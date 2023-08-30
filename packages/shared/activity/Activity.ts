@@ -1,44 +1,6 @@
 import {createClass} from "../createClass";
-import {Atom, computed, incPick, incUnique} from "rata";
 import {Entity} from "../entity/Entity";
-
-export const Role = createClass({
-    name: 'Role',
-    display: (obj) => obj.name,
-    public: {
-        name: {
-            type: 'string',
-            required: true,
-            constraints: {
-                format({ name } : {name:Atom<string>}) {
-                    return computed(() => validNameFormatExp.test(name))
-                },
-            }
-        },
-        isRef: {
-            type: 'boolean',
-            defaultValue: () => false
-        }
-    }
-})
-
-// TODO Role 和 Attributive 合在一起可以变成新的 Role，怎么表示？
-
-export const RoleAttributive = createClass({
-    name: 'RoleAttributive',
-    display: (obj) => `${obj.name}`,
-    public: {
-        content: {
-            type: 'object',
-        },
-        stringContent: {
-            type: 'string',
-        },
-        name: {
-            type: 'string'
-        }
-    }
-})
+import {UserAttributive, UserAttributives} from "../user/User";
 
 
 // TODO Entity 和 Attributive 合在一起可以变成新的 Role，怎么表示？
@@ -58,25 +20,6 @@ export const EntityAttributive = createClass({
     }
 })
 
-export const Attributive = createClass({
-    name: 'Attributive',
-    display: (obj) => `${obj.name}`,
-    public: {
-        name: {
-            type: 'string',
-        },
-        content: {
-            type: 'object',
-        },
-        stringContent: {
-            type: 'string',
-        },
-    }
-})
-
-const validNameFormatExp = /^[a-z(A-Z0-9_]+$/
-
-
 
 export const Action = createClass({
     name: 'Action',
@@ -89,6 +32,7 @@ export const Action = createClass({
 })
 
 
+export const GetAction = new Action({ name: 'get'})
 
 
 export const PayloadItem = createClass({
@@ -98,12 +42,11 @@ export const PayloadItem = createClass({
             type: 'string',
             required: true
         },
-        attributive: {
-            type: RoleAttributive
+        attributives: {
+            type: UserAttributives
         },
-        // TODO 可以是 role 也可以是 entity 怎么表达？？？
         base: {
-            type: Role,
+            type: [UserAttributive, Entity],
             required: true,
         },
         isRef: {
@@ -116,7 +59,7 @@ export const PayloadItem = createClass({
             defaultValue: () => false
         },
         itemRef: {
-            type: [Role, Entity]
+            type: [UserAttributive, Entity]
         }
     }
 })
@@ -132,16 +75,6 @@ export const Payload = createClass({
     }
 })
 
-export const constraints = {
-    actionNameUnique({actions}) {
-        const uniqueNames = incUnique(incPick(actions, '$name'))
-        return computed(() => uniqueNames.size === actions.length)
-    },
-    roleNameUnique({ roles }) {
-        const uniqueNames = incUnique(incPick(roles, '$name'))
-        return computed(() => uniqueNames.size === roles.length)
-    }
-}
 
 export const Interaction = createClass({
     name:'Interaction',
@@ -151,21 +84,24 @@ export const Interaction = createClass({
           type: 'string',
           required: true
         },
-        roleAttributive: {
-            type: RoleAttributive,
+        userAttributives: {
+            required: true,
+            type: UserAttributives,
         },
-        role : {
-            type: Role,
+        userRoleAttributive : {
+            type: UserAttributive,
             required: true
         },
-        roleRef: {
-            type: Role
+        userRef: {
+            type: UserAttributive
         },
         action:  {
             type: Action,
             required: true
         },
-        payload: Payload
+        payload: {
+            type: Payload
+        }
     }
 })
 
@@ -268,7 +204,11 @@ export const Activity = createClass({
     }
 })
 
-export function forEachInteraction(activity: ReturnType<typeof Activity.create>|ReturnType<typeof Activity.createReactive>, handle: (interaction: ReturnType<typeof Interaction.create>|ReturnType<typeof Interaction.createReactive>) => any) {
-    activity.interactions.forEach(interaction => handle(interaction))
-    activity.groups?.forEach((group) => forEachInteraction(group as InstanceType<typeof Activity>, handle) )
+type ActivityInstance = InstanceType<typeof Activity>
+type InteractionInstance = InstanceType<typeof Interaction>
+type InteractionGroupInstance = InstanceType<typeof InteractionGroup>
+
+export function forEachInteraction(activity: ActivityInstance|InteractionGroupInstance, handle: (interaction:InteractionInstance) => any) {
+    activity.interactions.forEach(interaction => handle(interaction));
+    (activity as ActivityInstance).groups?.forEach((group) => forEachInteraction(group as InteractionGroupInstance, handle) )
 }

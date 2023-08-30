@@ -43,13 +43,13 @@ export const Property = createClass({
         },
         args: {
             // TODO 怎么表达 args？？需要根据不同的 type 类型构建。例如 string 长度，number 范围。
-            computedType: (values) => PropertyTypeMap[values.type],
+            computedType: (values: {type: PropertyTypes}) => PropertyTypeMap[values.type],
         }
     }
 })
 
 export const constraints = {
-    entityNameUnique({entities}) {
+    entityNameUnique({entities} : {entities: (typeof Entity)[]}) {
         const uniqueNames = incUnique(incPick(entities, '$name'))
         return computed(() => uniqueNames.size === entities.length)
     }
@@ -95,9 +95,9 @@ export const Entity = createClass({
 
 
 export const PropertyTypeMap =  {
-    [PropertyTypes.String]:null,
-    [PropertyTypes.Number]: null,
-    [PropertyTypes.Boolean]: null,
+    [PropertyTypes.String]: 'string',
+    [PropertyTypes.Number]: 'number',
+    [PropertyTypes.Boolean]: 'boolean',
 }
 
 
@@ -118,7 +118,7 @@ export const Relation = createClass({
             constraints: {
                 nameNotSameWithProp({ entity1, targetName1 }) {
                     return computed(() => {
-                        return entity1?.properties?.every(p => {
+                        return entity1?.properties?.every((p: typeof Property) => {
                             return p.name !== targetName1
                         })
                     })
@@ -143,7 +143,7 @@ export const Relation = createClass({
             constraints: {
                 nameNotSameWithProp({ entity2, targetName2 }) {
                     return computed(() => {
-                        return entity2?.properties?.every(p => {
+                        return entity2?.properties?.every((p: typeof Property) => {
                             return p.name !== targetName2
                         })
                     })

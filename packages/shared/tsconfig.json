@@ -27,6 +27,7 @@
     "jsxFragmentFactory": "Fragment"
   },
   "include": [
-    "./"
+    "./",
+    "global.d.ts"
   ]
 }
