@@ -5,7 +5,8 @@ import {AttributiveInput} from "./AttributiveInput";
 import {Checkbox} from "../form/Checkbox";
 import {Input} from "../form/Input";
 import {createDraftControl} from "../createDraftControl";
-import {EntityAttributive, PayloadItem, Role, RoleAttributive} from "../../../../shared/activity/InteractionClass";
+import {EntityAttributive, PayloadItem} from "../../../../shared/activity/Activity";
+import { UserAttributive } from "../../../../shared/user/User";
 import {Button} from "../form/Button";
 import {Select} from "../form/Select";
 
@@ -22,14 +23,14 @@ export function PayloadInput({ value, errors, roles, entities, roleAttributives,
             const aliasDraftControl = createDraftControl(Input)
 
             const attributiveOptions = computed(() => {
-                return Role.is(item.base()) ? roleAttributives : entityAttributives
+                return UserAttributive.is(item.base()) ? roleAttributives : entityAttributives
             })
 
             // FIXME attributive 是动态的，需要更好地表达方式 例如 item.attributive.fromComputed(computed(xxx))
             computed(() => {
                 if (item.base()) {
                     item.attributive(
-                        Role.is(item.base()) ? RoleAttributive.createReactive({}) : EntityAttributive.createReactive({})
+                        UserAttributive.is(item.base()) ? UserAttributive.createReactive({}) : EntityAttributive.createReactive({})
                     )
                 }
             })

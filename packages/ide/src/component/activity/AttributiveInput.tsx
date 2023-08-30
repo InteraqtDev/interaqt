@@ -1,4 +1,5 @@
-import {AttrNode, AttrNodeTypes, OperatorNames, parse, VariableNode} from "./attrParser";
+import {BoolExpression, BoolExpressionNodeTypes, OperatorNames, VariableNode} from "../../../../types/boolExpression";
+import { parse } from '../../../../runtime/boolExpression'
 import {atom, computed, incFilter, reactive} from "rata";
 import {nextJob} from "../../util";
 import {createDraftControl} from "../createDraftControl";
@@ -7,30 +8,30 @@ import {Dropdown} from "../form/Dropdown";
 import {createEventTransfer, onDownKey, onEnterKey, onUpKey, InjectHandles, Props, configure} from "axii";
 
 
-function renderAttrNode(createElement, selectedAttributive, expression, availableAttrs?) {
+function renderAttrNode(createElement, Fragment,selectedAttributive, expression, availableAttrs?) {
     return <a href="#" style={{color: "blue", textDecoration:'underline'}} >{expression}</a>
 }
 
 
-function renderAttrExpression(createElement, selectedAttributive, expression?: AttrNode, mayNeedParams?: boolean, placeholder?: string) {
+function renderAttrExpression(createElement, Fragment, selectedAttributive, expression?: BoolExpression, mayNeedParams?: boolean, placeholder?: string) {
     if (!expression) return <div className="text-gray-400">{placeholder}</div>
 
-    if ( expression.type === AttrNodeTypes.variable) {
-        return renderAttrNode(createElement, selectedAttributive, (expression as VariableNode).name)
-    } else if (expression.type === AttrNodeTypes.group) {
+    if ( expression.type === BoolExpressionNodeTypes.variable) {
+        return renderAttrNode(createElement, Fragment,selectedAttributive, (expression as VariableNode).name)
+    } else if (expression.type === BoolExpressionNodeTypes.group) {
         const needParams = expression.op === OperatorNames['||'] && mayNeedParams
         return expression.op === OperatorNames['!'] ?
             (
                 <>
                     !
-                    {renderAttrExpression(createElement, selectedAttributive, expression.left, true)}
+                    {renderAttrExpression(createElement, Fragment,selectedAttributive, expression.left, true)}
                 </>
             ) : (
                  <>
                      {needParams ? '(' : null}
-                     {renderAttrExpression(createElement, selectedAttributive, expression.left, expression.op === '&&')}
+                     {renderAttrExpression(createElement, Fragment,selectedAttributive, expression.left, expression.op === '&&')}
                      {expression.op}
-                     {renderAttrExpression(createElement, selectedAttributive,  expression.right!, expression.op === '&&')}
+                     {renderAttrExpression(createElement, Fragment,selectedAttributive,  expression.right!, expression.op === '&&')}
                      {needParams ? ')' : null}
                  </>
             )
@@ -41,7 +42,7 @@ function renderAttrExpression(createElement, selectedAttributive, expression?: A
 }
 
 
-function AttrEditor({ value, onFocusout, errors, options}, { createElement} ) {
+function AttrEditor({ value, onFocusout, errors, options}, { createElement, Fragment} ) {
     const lastConsecutiveInputValue = atom('')
     // 基于 contenteditable lastConsecutiveInputValue 还要再构建一下，因为我们把 && || 空格 等也看做中断。
     const lastAttrNameLike = computed(() => lastConsecutiveInputValue().match(/[0-9a-zA-Z_]+$/)?.[0] || '')
@@ -49,8 +50,8 @@ function AttrEditor({ value, onFocusout, errors, options}, { createElement} ) {
     const renderDraftControl = createDraftControl(Contenteditable, {
         pushEvent: 'container:onFocusout',
         // FIXME 还是想改成数组
-        toControlValue: (rawValue) =>  <div className="px-4" $editingInput style={{minWidth:20, minHeight:20}} >{renderAttrExpression(createElement, () => {}, rawValue)}</div>,
-        toDraft: (controlValue) => (parse(controlValue.innerText)),
+        toControlValue: (rawValue) =>  <div className="px-4" $editingInput style={{minWidth:20, minHeight:20}} >{renderAttrExpression(createElement, Fragment, () => {}, rawValue)}</div>,
+        toDraft: (controlValue) => (parse(controlValue.innerText, options)),
     })
 
 
@@ -64,7 +65,7 @@ function AttrEditor({ value, onFocusout, errors, options}, { createElement} ) {
             // CAUTION 这里取 name 一定要得到真正的 string，因为这个节点是个当成 value 用的 dom 节点，不是组件的一部分，atom 不会被转化。
             const matched = matchedOptions[dropdownIndex()]
             // 会触发 selection change，然后 consecutiveInput 就重置了
-            replaceLastText(lastAttrNameLike().length, renderAttrNode(createElement, () => {}, matched.name()))
+            replaceLastText(lastAttrNameLike().length, renderAttrNode(createElement, Fragment,() => {}, matched.name()))
             // 应该要触发 selection change，重置 lastConsecutiveInputValue
             // setTimeout(() => {
             //     console.log(lastAttrNameLike())
@@ -129,7 +130,7 @@ function AttrEditor({ value, onFocusout, errors, options}, { createElement} ) {
 
 // FIXME options 应该从 context 读合理，还是从这里传进来合理？？这还是个层级比较低的组件，就取 Context 是不是滥用了？？？
 /* @jsx createElement */
-export function AttributiveInput({ value, options = [], selectedAttributive }: Props, { createElement, ref }: InjectHandles) {
+export function AttributiveInput({ value, options = [], selectedAttributive }: Props, { createElement, Fragment,ref }: InjectHandles) {
     const editing = atom(false)
     const errors = reactive([])
 
@@ -155,7 +156,9 @@ export function AttributiveInput({ value, options = [], selectedAttributive }: P
     return <div className="inline-block mr-4" onDblclick={onDblclick} >
         {() => {
             if (!value()?.content) return null
-            return editing() ? <AttrEditor ref='editor' value={value().content} onFocusout={onFocusout} errors={errors} options={options} /> : renderAttrExpression(createElement, selectedAttributive, value().content(), false, 'empty')
+            return editing() ?
+                <AttrEditor ref='editor' value={value().content} onFocusout={onFocusout} errors={errors} options={options} /> :
+                renderAttrExpression(createElement, Fragment,selectedAttributive, value().content(), false, 'empty')
         }}
     </div>
 }

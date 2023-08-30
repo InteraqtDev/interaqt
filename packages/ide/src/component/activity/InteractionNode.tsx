@@ -5,11 +5,10 @@ import {PayloadInput} from "./PayloadInput";
 import {Select} from "../form/Select";
 import {ActionInput} from "./ActionInput";
 import {createDraftControl} from "../createDraftControl";
-import {Role} from "../../../../shared/activity/InteractionClass";
-import {incConcat} from "rata";
 import {Input} from "../form/Input";
+import {UserAttributive} from "../../../../shared/user/User";
 
-export function InteractionNode({ interaction, roles, entities, roleAttributives, entityAttributives, selectedAttributive }){
+export function InteractionNode({ interaction, roleAttributiveOptions, entities, userAttributiveOptions, entityAttributives, selectedAttributive }){
 
     const renderActionDraftControl = createDraftControl(ActionInput, {
         pushEvent: 'input:onBlur'
@@ -17,19 +16,17 @@ export function InteractionNode({ interaction, roles, entities, roleAttributives
 
     const aliasDraftControl = createDraftControl(Input)
 
-window.interaction = interaction
-
     return (
         <div style={{border: '1px blue dashed', display: 'inline-block'}} classNames="overflow-visible">
             <div>
                 <AttributiveInput
-                    value={interaction.roleAttributive}
-                    options={roleAttributives}
+                    value={interaction.userAttributives}
+                    options={userAttributiveOptions}
                     selectedAttributive={selectedAttributive}
                 />
-                <Select value={interaction.role} options={roles} display={Role.display}></Select>
+                <Select value={interaction.userRoleAttributive} options={roleAttributiveOptions} display={UserAttributive.display}></Select>
                 {aliasDraftControl({
-                    value: interaction.roleRef()?.name,
+                    value: interaction.userRef()?.name,
                     placeholder: 'ref name'
                 })}
             </div>
@@ -39,8 +36,8 @@ window.interaction = interaction
             <div style={{ width: 200}}>
                 <PayloadInput
                     value={interaction.payload}
-                    roles={roles}
-                    roleAttributives={roleAttributives}
+                    roles={roleAttributiveOptions}
+                    roleAttributives={userAttributiveOptions}
                     entities={entities}
                     entityAttributives={entityAttributives}
                     selectedAttributive={selectedAttributive}

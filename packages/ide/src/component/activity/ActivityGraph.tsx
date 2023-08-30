@@ -6,16 +6,6 @@ import {Graph} from "../graph/graph";
 import {atom, computed, incMap, reactive} from "rata";
 import {GraphOptions} from "@antv/g6";
 import {InteractionEdge} from "./InteractionEdge";
-import {
-    Action,
-    Activity,
-    Interaction,
-    InteractionGroup,
-    Payload,
-    Role,
-    RoleAttributive,
-    Transfer
-} from "../../../../shared/activity/InteractionClass";
 import {ActivityNode} from "./AcitivityNode";
 import hotkeys from "hotkeys-js";
 import {service} from "../service";

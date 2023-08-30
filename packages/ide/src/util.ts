@@ -78,3 +78,8 @@ export function mapClassNameToObject(className: string) {
 }
 export const isObject = (val: unknown): val is Record<any, any> =>
     val !== null && typeof val === 'object'
+
+
+export function indexBy(arr: any[], key: string) {
+  return Object.fromEntries(arr.map(o => [o[key], o]))
+}
