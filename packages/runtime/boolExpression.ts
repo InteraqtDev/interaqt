@@ -71,7 +71,6 @@ function astNodeToAttrNode(astNode, optionsByName): BoolExpression {
             left: astNodeToAttrNode(astNode.argument, optionsByName)
         }
     } else {
-        debugger
         throw new Error('unknown ast node type')
     }
 }

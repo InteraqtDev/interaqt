@@ -6,12 +6,22 @@ import {createInstances, getInstance, KlassByName} from "../../shared/createClas
 import { Interaction } from "../../shared/activity/Activity";
 import {InteractionEventArgs} from "../../types/interaction";
 
+
+
 describe("interaction",  () => {
     let interactionCall: InteractionCall
     let system: MemorySystem
 
     beforeEach(async () => {
         const { data }  = (await import('./data/simpleInteraction'))
+        /**
+         * 当前的格式为:
+         * New && Other Admin as A
+         * sendRequest
+         * to: Other Admin isRef
+         * message: Message
+         */
+
         // TODO 需要能 destroy instance
         createInstances(data, false)
         system = new MemorySystem()
@@ -31,7 +41,6 @@ describe("interaction",  () => {
         }
         const response = interactionCall.call(event)
 
-        // TODO 这里有问题
         expect(response.error).toBe(null)
         expect(system.eventStack.length).toBe(1)
         expect(system.eventStack[0].args).toBe(event)
@@ -46,11 +55,13 @@ describe("interaction",  () => {
         }
         const response = interactionCall.call(event)
 
-        // TODO 这里有问题
         expect(response.error).not.toBe(null)
         expect(response.error instanceof LoginError).toBe(true)
         expect(response.error.type).toBe('role')
     })
+
+
+    // TODO payload check
 
 });
 

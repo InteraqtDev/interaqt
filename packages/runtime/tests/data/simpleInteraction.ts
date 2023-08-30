@@ -1,12 +1,12 @@
 export const data = [{
     "type": "Entity",
     "options": {"isReactive": true},
-    "uuid": "58e150f2-3aa4-41fa-8244-77a469912c43",
+    "uuid": "d70bc945-11cf-4a6e-8bc6-6e18b75e15f1",
     "public": {"name": "Message", "isRef": false}
 }, {
     "type": "UserAttributive",
     "options": {"isReactive": true},
-    "uuid": "4f4a3cb9-c1b8-4719-875f-0541cc801656",
+    "uuid": "f31a03cd-28b4-42f0-b00a-7bbe335fcc97",
     "public": {
         "stringContent": "function({ user }) { return user.roles.includes('user')}",
         "name": "user",
@@ -16,7 +16,7 @@ export const data = [{
 }, {
     "type": "UserAttributive",
     "options": {"isReactive": true},
-    "uuid": "90ea53a5-953a-4e35-b248-395cd5d80623",
+    "uuid": "f4b45b5b-d5f9-4626-98d0-8059474893b2",
     "public": {
         "stringContent": "function({ user }) { return user.roles.includes('A')}",
         "name": "A",
@@ -26,42 +26,42 @@ export const data = [{
 }, {
     "type": "UserAttributive",
     "options": {"isReactive": true},
-    "uuid": "22e84f84-4a9e-4fd0-b84c-4a165f10675a",
+    "uuid": "3814923d-88a1-440b-85d0-3ed31e00b231",
     "public": {"stringContent": "function New(){}", "name": "New", "isRef": null, "isRole": null}
 }, {
     "type": "UserAttributive",
     "options": {"isReactive": true},
-    "uuid": "37d9b93a-dd61-4a61-8377-6a9553ff3e74",
+    "uuid": "e9c1dd7d-7016-439d-8f32-075ad113c4dc",
     "public": {"stringContent": "function New2(){}", "name": "New2", "isRef": null, "isRole": null}
 }, {
     "type": "UserAttributive",
     "options": {"isReactive": true},
-    "uuid": "80a88d5a-e379-46b4-9ebe-834bad06dc94",
+    "uuid": "3c36716a-fa4c-417a-bf2d-dd0192aa1441",
     "public": {"stringContent": "function New3(){}", "name": "New3", "isRef": null, "isRole": null}
 }, {
     "type": "UserAttributive",
     "options": {"isReactive": true},
-    "uuid": "09fbf432-1ebf-4d88-96e9-781e5ae694d3",
+    "uuid": "5e93294b-e050-4f7b-b1b9-cd437c923851",
     "public": {"stringContent": "function Old(){}", "name": "Old", "isRef": null, "isRole": null}
 }, {
     "type": "UserAttributive",
     "options": {"isReactive": true},
-    "uuid": "f9f9ce97-efcb-4d1d-8406-5e1477929111",
+    "uuid": "b0de325e-da15-48c3-86e1-8c5dd6f6edbf",
     "public": {"stringContent": "function Old2(){}", "name": "Old2", "isRef": null, "isRole": null}
 }, {
     "type": "UserAttributive",
     "options": {"isReactive": true},
-    "uuid": "76c1bccd-ab33-4d41-af9b-e0729a180709",
+    "uuid": "6a21e1b1-993e-4e2c-8f13-06b2d6371ce9",
     "public": {"stringContent": "function Old3(){}", "name": "Old3", "isRef": null, "isRole": null}
 }, {
     "type": "UserAttributive",
     "options": {"isReactive": true},
-    "uuid": "64384155-a392-4687-88f2-b62764275da8",
+    "uuid": "fd629032-a16c-495a-a941-1d33058bd4d8",
     "public": {"stringContent": "function Other(){}", "name": "Other", "isRef": null, "isRole": null}
 }, {
     "type": "UserAttributive",
     "options": {"isReactive": true},
-    "uuid": "c190c52e-e11a-4cce-8999-143b134bb111",
+    "uuid": "80c4208f-9587-48cf-80dd-5eb291820957",
     "public": {
         "stringContent": "function({ user }) { return user.roles.includes('User')}",
         "name": "User",
@@ -71,7 +71,7 @@ export const data = [{
 }, {
     "type": "UserAttributive",
     "options": {"isReactive": true},
-    "uuid": "cdfce4c0-36c8-4448-8f9e-f654001094c7",
+    "uuid": "15179bac-1933-4c9f-b330-0372013f1e92",
     "public": {
         "stringContent": "function({ user }) { return user.roles.includes('Admin')}",
         "name": "Admin",
@@ -81,7 +81,7 @@ export const data = [{
 }, {
     "type": "UserAttributive",
     "options": {"isReactive": true},
-    "uuid": "8271c7af-e142-495e-94ee-46a2fcf1682e",
+    "uuid": "4bbc3bb0-03cf-45f6-933c-a512b1a210fb",
     "public": {
         "stringContent": "function({ user }) { return user.roles.includes('Anonymous')}",
         "name": "Anonymous",
@@ -89,37 +89,81 @@ export const data = [{
         "isRole": true
     }
 }, {
+    "type": "UserAttributive",
+    "options": {"isReactive": true},
+    "uuid": "13d902d1-bec6-4fdf-be1b-0b710038ab39",
+    "public": {"stringContent": null, "name": "B", "isRef": null, "isRole": null}
+}, {
     "type": "UserAttributives",
     "options": {"isReactive": true},
-    "uuid": "b7346637-4f7e-4d33-8f3b-de78f72c498a",
+    "uuid": "e9a58b35-1ec1-4068-ab06-59ef1e5e9cea",
     "public": {
         "content": {
             "type": "group",
             "op": "&&",
-            "left": {"type": "variable", "name": "New", "uuid": "22e84f84-4a9e-4fd0-b84c-4a165f10675a"},
-            "right": {"type": "variable", "name": "Old2", "uuid": "f9f9ce97-efcb-4d1d-8406-5e1477929111"}
+            "left": {"type": "variable", "name": "New", "uuid": "3814923d-88a1-440b-85d0-3ed31e00b231"},
+            "right": {"type": "variable", "name": "Other", "uuid": "fd629032-a16c-495a-a941-1d33058bd4d8"}
         }
     }
-}, {"type": "Action", "uuid": "fc1510d2-6961-484c-80ab-cc9ad6d9c022", "public": {"name": "get"}}, {
+}, {
+    "type": "UserAttributives",
+    "options": {"isReactive": true},
+    "uuid": "1a651472-f9e1-4eb4-9814-3e8af784e9a7",
+    "public": {"content": {"type": "variable", "name": "Other", "uuid": "fd629032-a16c-495a-a941-1d33058bd4d8"}}
+}, {
+    "type": "EntityAttributive",
+    "options": {"isReactive": true},
+    "uuid": "7c0a8396-3fcb-49ec-88b0-e675d642151c",
+    "public": {"name": null, "content": null, "stringContent": null}
+}, {
+    "type": "EntityAttributives",
+    "options": {"isReactive": true},
+    "uuid": "1e1956d9-477d-4e0e-8ca2-0072841f438f",
+    "public": {"content": null}
+}, {"type": "Action", "uuid": "4a8b9754-cba5-4e86-bfd8-46db570808e2", "public": {"name": "get"}}, {
     "type": "Action",
     "options": {"isReactive": true},
-    "uuid": "4ae53d70-287c-47a1-bf67-c0df0b38897b",
+    "uuid": "8a9a2ecb-fc02-4077-8bb5-64edef043698",
     "public": {"name": "sendRequest"}
+}, {
+    "type": "PayloadItem",
+    "options": {"isReactive": true},
+    "uuid": "21bf8cb6-3f0d-46d1-8cb1-b26a300f60be",
+    "public": {
+        "name": "to",
+        "attributives": "1a651472-f9e1-4eb4-9814-3e8af784e9a7",
+        "base": "15179bac-1933-4c9f-b330-0372013f1e92",
+        "isRef": true,
+        "isCollection": false,
+        "itemRef": "13d902d1-bec6-4fdf-be1b-0b710038ab39"
+    }
+}, {
+    "type": "PayloadItem",
+    "options": {"isReactive": true},
+    "uuid": "d02b81ac-8032-40a2-96dc-7456595f0bb9",
+    "public": {
+        "name": "message",
+        "attributives": "1e1956d9-477d-4e0e-8ca2-0072841f438f",
+        "base": "d70bc945-11cf-4a6e-8bc6-6e18b75e15f1",
+        "isRef": false,
+        "isCollection": false,
+        "itemRef": "7c0a8396-3fcb-49ec-88b0-e675d642151c"
+    }
 }, {
     "type": "Payload",
     "options": {"isReactive": true},
-    "uuid": "e087ad0d-02cc-4fe8-a078-4929995f9d6d",
+    "uuid": "1d9674f0-5f66-41af-ad9a-2622eb47d902",
     "public": {}
 }, {
     "type": "Interaction",
     "options": {"isReactive": true},
-    "uuid": "2b6308d7-d130-4ff9-8103-0d705198fa30",
+    "uuid": "98ced692-1c31-473a-a07f-41664b981e7c",
     "public": {
         "name": "sendRequest",
-        "userAttributives": "b7346637-4f7e-4d33-8f3b-de78f72c498a",
-        "userRoleAttributive": "cdfce4c0-36c8-4448-8f9e-f654001094c7",
-        "userRef": "90ea53a5-953a-4e35-b248-395cd5d80623",
-        "action": "4ae53d70-287c-47a1-bf67-c0df0b38897b",
-        "payload": "e087ad0d-02cc-4fe8-a078-4929995f9d6d"
+        "userAttributives": "e9a58b35-1ec1-4068-ab06-59ef1e5e9cea",
+        "userRoleAttributive": "15179bac-1933-4c9f-b330-0372013f1e92",
+        "userRef": "f4b45b5b-d5f9-4626-98d0-8059474893b2",
+        "action": "8a9a2ecb-fc02-4077-8bb5-64edef043698",
+        "payload": "1d9674f0-5f66-41af-ad9a-2622eb47d902"
     }
 }]
