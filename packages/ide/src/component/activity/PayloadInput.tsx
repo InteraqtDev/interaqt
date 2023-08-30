@@ -5,8 +5,8 @@ import {AttributiveInput} from "./AttributiveInput";
 import {Checkbox} from "../form/Checkbox";
 import {Input} from "../form/Input";
 import {createDraftControl} from "../createDraftControl";
-import {EntityAttributive, PayloadItem} from "../../../../shared/activity/Activity";
-import { UserAttributive } from "../../../../shared/user/User";
+import {EntityAttributive, EntityAttributives, PayloadItem} from "../../../../shared/activity/Activity";
+import { UserAttributive, UserAttributives } from "../../../../shared/user/User";
 import {Button} from "../form/Button";
 import {Select} from "../form/Select";
 
@@ -29,13 +29,18 @@ export function PayloadInput({ value, errors, roles, entities, roleAttributives,
             // FIXME attributive 是动态的，需要更好地表达方式 例如 item.attributive.fromComputed(computed(xxx))
             computed(() => {
                 if (item.base()) {
-                    item.attributive(
+                    item.attributives(
+                        UserAttributive.is(item.base()) ? UserAttributives.createReactive({}) : EntityAttributives.createReactive({})
+                    )
+
+                    item.itemRef(
                         UserAttributive.is(item.base()) ? UserAttributive.createReactive({}) : EntityAttributive.createReactive({})
                     )
                 }
             })
 
             // CAUTION 对于没有实时变化的，没有校验规则的数据编辑，没有必要用 draftControl
+            debugger
             return (
                 <div>
                     {renderNameDraftControl({
@@ -43,7 +48,7 @@ export function PayloadInput({ value, errors, roles, entities, roleAttributives,
                         placeholder: 'key'
                     })}
                     <span>:</span>
-                    <AttributiveInput value={item.attributive} options={attributiveOptions} selectedAttributive={selectedAttributive}/>
+                    <AttributiveInput value={item.attributives} options={attributiveOptions} selectedAttributive={selectedAttributive}/>
                     <Select placeholder={ 'choose'}
                         value={item.base}
                         options={incConcat(roles, entities)}
@@ -51,9 +56,9 @@ export function PayloadInput({ value, errors, roles, entities, roleAttributives,
                     />
                     <Checkbox value={item.isRef} label={'isRef'} />
                     <Checkbox value={item.isCollection} label={'isCollection'} />
-                    {aliasDraftControl({
+                    {() => item.itemRef() ? aliasDraftControl({
                         value: item.itemRef().name
-                    })}
+                    }) : null}
                 </div>
             )
         })}
