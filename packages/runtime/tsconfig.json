@@ -16,7 +16,7 @@
     "esModuleInterop": true,
     "removeComments": false,
     "lib": ["esnext", "dom"],
-    "types": ["jest/globals", "node"],
+    "types": ["node", "jest/globals"],
     "rootDir": ".",
     "paths": {
       "rata": ["../../../rata/src"],
@@ -27,6 +27,7 @@
     "jsxFragmentFactory": "Fragment"
   },
   "include": [
-    "./"
+    "./",
+    "../types"
   ]
 }
