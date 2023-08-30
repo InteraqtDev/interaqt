@@ -20,6 +20,16 @@ export const EntityAttributive = createClass({
     }
 })
 
+export const EntityAttributives = createClass({
+    name: 'EntityAttributives',
+    display: (obj) => `${obj.name}`,
+    public: {
+        content: {
+            type: 'object',
+        },
+    }
+})
+
 
 export const Action = createClass({
     name: 'Action',
@@ -42,9 +52,11 @@ export const PayloadItem = createClass({
             type: 'string',
             required: true
         },
+        // 用于修饰后面的 UserAttributive 或者 Entity，类型根据 base 变化而变化
         attributives: {
-            type: UserAttributives
+            type: [EntityAttributives, UserAttributives]
         },
+        // 当前 Item 的具体概念类型
         base: {
             type: [UserAttributive, Entity],
             required: true,
@@ -58,6 +70,7 @@ export const PayloadItem = createClass({
             type: 'boolean',
             defaultValue: () => false
         },
+        // 类型根据 base 变化而变化
         itemRef: {
             type: [UserAttributive, Entity]
         }

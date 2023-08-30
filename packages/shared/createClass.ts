@@ -148,7 +148,8 @@ export function createInstances(objects: KlassRawInstanceDataType[], reactiveFor
         const publicProps: {[k:string]:any} = {}
         const unsatisfiedProps: {[k:string]:any} = {}
         Object.entries(rawProps).forEach(([propName, propValue]) => {
-            if (typeof Klass.public[propName].type === 'function') {
+            // TODO 没有处理 ClassType 和 primitive 混合的情况
+            if (typeof Klass.public[propName].type === 'function' || (Array.isArray(Klass.public[propName].type) && typeof Klass.public[propName].type[0] === 'function')) {
                 // 对象应用，这时候 PropValue 是该对象的 uuid
                 const ref =uuidToInstance.get(propValue as string)
                 if (ref) {
@@ -156,10 +157,10 @@ export function createInstances(objects: KlassRawInstanceDataType[], reactiveFor
                 } else {
                     unsatisfiedProps[propName] = propValue
                 }
-            } else if (typeof Klass.public[propName].type === 'string'){
+            } else if (typeof Klass.public[propName].type === 'string' || (Array.isArray(Klass.public[propName].type) && typeof Klass.public[propName].type[0] === 'string')){
                 // 普通
                 publicProps[propName] = propValue
-            } else if (typeof Klass.public[propName].computedType){
+            } else if (Klass.public[propName].computedType){
                 // 计算属性？
                 debugger
                 if (propValue) {
