@@ -1,7 +1,7 @@
 import {describe, test, expect, beforeEach} from "@jest/globals";
 import {InteractionCall, LoginError} from "../InteractionCall";
 import { MemorySystem } from "../MemorySystem";
-import {createInstances, getInstance, KlassByName} from "../../shared/createClass";
+import {createInstances, getInstance, KlassByName, removeAllInstance} from "../../shared/createClass";
 
 import { Interaction } from "../../shared/activity/Activity";
 import {InteractionEventArgs} from "../../types/interaction";
@@ -13,6 +13,7 @@ describe("interaction",  () => {
     let system: MemorySystem
 
     beforeEach(async () => {
+        removeAllInstance()
         const { data }  = (await import('./data/simpleInteraction'))
         /**
          * 当前的格式为:
@@ -26,8 +27,6 @@ describe("interaction",  () => {
         createInstances(data, false)
         system = new MemorySystem()
         system.conceptClass = KlassByName
-        // TODO
-        // @ts-ignore
         interactionCall = new InteractionCall(getInstance(Interaction)[0], system)
     })
 

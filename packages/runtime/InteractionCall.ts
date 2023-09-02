@@ -1,4 +1,4 @@
-import {GetAction, Interaction as InteractionClass} from "../shared/activity/Activity";
+import {GetAction, InteractionInstanceType} from "../shared/activity/Activity";
 import { UserAttributive } from "../shared/user/User";
 // import { Entity} from "../shared/entity/Entity";
 import {System} from "./System";
@@ -8,14 +8,8 @@ import {BoolExpressionEvaluator} from "./boolExpression";
 import {BoolExpression, BoolExpressionNodeTypes, OperatorNames} from "../types/boolExpression";
 import {assert, indexBy} from "./util";
 import {getInstance} from "../shared/createClass";
+import {ActivityCall} from "./AcitivityCall";
 
-
-type Interaction = InstanceType<typeof InteractionClass>
-
-function evaluate(expression: string, ...args: any[]) {
-    const fn = new Function(expression)
-    return fn(...args)
-}
 
 
 type ConceptCheckStack = {
@@ -27,7 +21,7 @@ type ConceptCheckStack = {
 
 type HandleAttributive = (attributiveName: string) => boolean
 
-type ConceptCheckResponse = AtomError |true
+export type ConceptCheckResponse = AtomError |true
 
 type AtomError = {
     name: string,
@@ -43,15 +37,17 @@ export class LoginError{
     }
 }
 
+export type InteractionCallResponse= {
+    error?: any,
+    data?: any,
+    sideEffects?: {
+        [k: string]: any
+    }
+}
 
 export class InteractionCall {
-    constructor(public interaction: Interaction, public system: System) {
+    constructor(public interaction: InteractionInstanceType, public system: System, public activitySeqCall?: ActivityCall) {
 
-    }
-    // TODO e pression 要改
-    tryEvaluate(message: any, expression: string, ...args: any[]) {
-        const result = evaluate(expression, ...args)
-        if (!result) throw message
     }
     handleUserAttributive(attributiveName: string, interactionEvent: InteractionEventArgs) {
         const attributiveOptionsByName = indexBy(getInstance(UserAttributive), 'name')
@@ -76,21 +72,27 @@ export class InteractionCall {
         return true
     }
     checkUser(interactionEvent: InteractionEventArgs) {
-        // TODO
-        // @ts-ignore
-        const userAttributiveCombined: BoolExpression= {
-            type: BoolExpressionNodeTypes.group,
-            left: {
-                type: BoolExpressionNodeTypes.variable,
-                name:this.interaction.userRoleAttributive.name
-            },
-            op: OperatorNames['&&'],
-            right: this.interaction.userAttributives.content as BoolExpression
+        let res: ConceptCheckResponse|true
+        if (this.interaction.userRoleAttributive.isRef) {
+            // CAUTION 这里让 activity 自己在外部 check
+            res = true
+        } else {
+            // @ts-ignore
+            const userAttributiveCombined: BoolExpression= {
+                type: BoolExpressionNodeTypes.group,
+                left: {
+                    type: BoolExpressionNodeTypes.variable,
+                    name:this.interaction.userRoleAttributive.name
+                },
+                op: OperatorNames['&&'],
+                right: this.interaction.userAttributives.content as BoolExpression
+            }
+
+            res =  this.matchAttributives(interactionEvent.user, userAttributiveCombined, (attributiveName: string) => this.handleUserAttributive(attributiveName, interactionEvent), [])
         }
 
-        const res =  this.matchAttributives(interactionEvent.user, userAttributiveCombined, (attributiveName: string) => this.handleUserAttributive(attributiveName, interactionEvent), [])
         if (res === true) return res
-        throw new LoginError('role', res)
+        throw new LoginError('check user failed', res)
     }
 
     checkConcept(instance: ConceptInstance, attributives: Attributives, concept: Concept, stack: ConceptCheckStack[] = []): ConceptCheckResponse {
@@ -165,8 +167,8 @@ export class InteractionCall {
         // TODO
         // return this.system.storage.get(interactionEvent.payload, interactionEvent.query)
     }
-    call(interactionEventArgs: InteractionEventArgs) {
-        const response: any = {
+    call(interactionEventArgs: InteractionEventArgs): InteractionCallResponse {
+        const response: InteractionCallResponse = {
             error: null,
             data: null,
             sideEffects: {}

@@ -16,6 +16,9 @@ export class BoolExpressionEvaluator{
 
     }
     evaluate(expression = this.expression, stack: BoolExpression[] = [], inverse: boolean = false) :  BoolExpressionError| true{
+        // CAUTION 当没有 userAttributives 的时候我们可以回构造一个 && group，这时候 right 就是 null
+        if(!expression) return true
+
         const currentStack = stack.concat(expression)
         if (expression.type === 'variable') {
             const result = this.variableHandle(expression.name)

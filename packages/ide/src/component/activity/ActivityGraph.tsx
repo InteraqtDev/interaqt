@@ -3,29 +3,48 @@
 import {createElement} from "axii";
 import { InteractionNode } from "./InteractionNode";
 import {Graph} from "../graph/graph";
-import {atom, computed, incMap, reactive} from "rata";
+import {Atom, atom, computed, incMap, reactive} from "rata";
 import {GraphOptions} from "@antv/g6";
 import {InteractionEdge} from "./InteractionEdge";
 import {ActivityNode} from "./AcitivityNode";
 import hotkeys from "hotkeys-js";
 import {service} from "../service";
+import {EntityAttributive, Activity, forEachInteraction} from "../../../../shared/activity/Activity";
+import {Role, UserAttributive} from "../../../../shared/user/User";
+import {Entity} from "../../../../shared/entity/Entity";
 
 
 
+type ActivityGraphProps = {
+    value: ReturnType<typeof Activity.createReactive>,
+    roleAttributiveOptions: ReturnType<typeof UserAttributive.createReactive>[],
+    entities: ReturnType<typeof Entity.createReactive>[],
+    userAttributiveOptions: ReturnType<typeof UserAttributive.createReactive>[],
+    entityAttributives: ReturnType<typeof EntityAttributive.createReactive>[],
+    selectedAttributive: Atom<any>
+}
 // FIXME 目前没有递归处理 group
-export function ActivityGraph({ value, roles, entities, roleAttributives, entityAttributives, selectedAttributive  }) {
+export function ActivityGraph({ value, roleAttributiveOptions, entities, userAttributiveOptions, entityAttributives, selectedAttributive  }: ActivityGraphProps) {
     // TODO concat 如何仍然保持 incremental ?
     const nodes = computed(() => {
-        return value.interactions.map(interaction => ({ id: interaction.uuid, raw: interaction })).concat(
-            ...value.groups.map(group => group.interactions.map(interaction => ({ id: interaction.uuid, raw: interaction, comboId: group.uuid })))
-        )
+        const result = []
+        forEachInteraction(value, (interaction, group) => {
+            result.push({ id: interaction.uuid, raw: interaction, comboId: group?.uuid })
+        })
+
+        return result
     })
 
-    const nodeProps = {roles, entities, roleAttributives, entityAttributives, selectedAttributive }
+
+    const nodeProps = {
+        roleAttributiveOptions,
+        entities,
+        userAttributiveOptions,
+        entityAttributives,
+        selectedAttributive
+    }
 
     const combos = incMap(value.groups, group => ({ id: group.uuid, isGroup: true, raw: group}))
-
-    window.activity = value
 
     const edges = incMap(value.transfers, transfer => ({
         id: crypto.randomUUID(),

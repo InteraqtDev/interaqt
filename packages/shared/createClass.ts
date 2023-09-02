@@ -52,45 +52,51 @@ type KlassInstancePrimitives = {
     _options: KlassOptions,
 }
 
+type inferIfReactiveCollection<REACTIVE extends boolean, COLLECTION extends true|false|undefined, T> = REACTIVE extends true ?
+    (
+        COLLECTION extends true ?
+            UnwrapReactive<T[]>:
+            Atom<T>)
+    :(
+        COLLECTION extends true ?
+            T[]:
+            T
+    )
+
+
 export type KlassInstance<T extends NonNullable<ClassDef["public"]>> = {
     [Key in keyof T]:
         T[Key]['type'] extends KlassType<any> ?
-            (T[Key]["collection"] extends true ?
-                KlassInstance<T[Key]['type']['public']>[]:
-                KlassInstance<T[Key]['type']['public']>
-            ) :
+            inferIfReactiveCollection<false, T[Key]["collection"], KlassInstance<T[Key]['type']['public']>> :
         T[Key]['type'] extends KlassType<any>[] ?
-            (T[Key]["collection"] extends true ?
-                KlassInstance<any>[]:
-                KlassInstance<any>
-                ) :
+            inferIfReactiveCollection<false, T[Key]["collection"], KlassInstance<any>> :
         T[Key]['type'] extends PrimitivePropType ?
-            (T[Key]["collection"] extends true ?
-                PrimitivePropertyMap[T[Key]['type']][]:
-                PrimitivePropertyMap[T[Key]['type']]
-                ):
+            inferIfReactiveCollection<false, T[Key]["collection"], PrimitivePropertyMap[T[Key]['type']]>:
+        T[Key]['computedType'] extends Function ?
+            (ReturnType<T[Key]['computedType']> extends KlassType<any> ?
+                inferIfReactiveCollection<false, T[Key]["collection"], ReturnType<ReturnType<T[Key]['computedType']>["create"]>>:
+                inferIfReactiveCollection<false, T[Key]["collection"], any>
+            ):
         never
 } & KlassInstancePrimitives
+
 
 export type ReactiveKlassInstance<T extends NonNullable<ClassDef["public"]>> = {
     [Key in keyof T]:
         T[Key]['type'] extends KlassType<any> ?
-            (T[Key]["collection"] extends true ?
-                UnwrapReactive<KlassInstance<T[Key]['type']['public']>[]>:  // 对象数组
-                Atom<KlassInstance<T[Key]['type']['public']>> // 对象 单一值
-            ) :
+            inferIfReactiveCollection<true, T[Key]["collection"], KlassInstance<T[Key]['type']['public']>>:
         T[Key]['type'] extends KlassType<any>[] ?
-            (T[Key]["collection"] extends true ?
-                UnwrapReactive<KlassInstance<any>[]>:  // 对象数组
-                Atom<KlassInstance<any>> // 对象 单一值
-                ) :
+            inferIfReactiveCollection<true, T[Key]["collection"], KlassInstance<any>>:
         T[Key]['type'] extends PrimitivePropType ?
-            (T[Key]["collection"] extends true ?
-                UnwrapReactive<PrimitivePropertyMap[T[Key]['type']][]>: // primitive 的数组 reactive()
-                Atom<PrimitivePropertyMap[T[Key]['type']]>  // primitive 单一值
-            ):
+            inferIfReactiveCollection<true, T[Key]["collection"], PrimitivePropertyMap[T[Key]['type']]>:
+        T[Key]['computedType'] extends Function ?
+            (ReturnType<T[Key]['computedType']> extends KlassType<any> ?
+                inferIfReactiveCollection<true, T[Key]["collection"], ReturnType<ReturnType<T[Key]['computedType']>["createReactive"]>>:
+                inferIfReactiveCollection<true, T[Key]["collection"], any>
+                ):
         never
 } &  KlassInstancePrimitives
+
 
 
 export type KlassType<T extends ClassDef["public"]> = {
@@ -107,6 +113,7 @@ export type KlassType<T extends ClassDef["public"]> = {
     parse: () => KlassInstance<T>
     check: (data: object) => boolean
     is: (arg: any) => boolean
+    clone: <V>(obj: V, deep: boolean) => V
 }
 
 export type KlassOptions = {
@@ -135,41 +142,35 @@ export function createInstancesFromString(objStr: string) {
     return createInstances(objects)
 }
 
+// FIXME 改成最后统一处理 uuid 的情况
 export function createInstances(objects: KlassRawInstanceDataType[], reactiveForce?: boolean) {
     const uuidToInstance = new Map<string, KlassInstance<any>>()
-    const unsatisfiedInstances = new Map<KlassInstance<any>, object>()
+    const unsatisfiedInstances = new Map<KlassInstance<any>, {sure: object, maybe: object}>()
+
     objects.forEach(({ type, options = {}, uuid, public: rawProps } :KlassRawInstanceDataType) => {
         const Klass = KlassByName.get(type)!
         const optionsWithUUID: ReactiveKlassOptions|KlassOptions = {...options, uuid}
         if (reactiveForce !== undefined) {
+            // @ts-ignore
             optionsWithUUID.isReactive = reactiveForce
         }
         // 根据
         const publicProps: {[k:string]:any} = {}
         const unsatisfiedProps: {[k:string]:any} = {}
+        const maybeUnsatisfiedProps: {[k:string]:any} = {}
         Object.entries(rawProps).forEach(([propName, propValue]) => {
-            // TODO 没有处理 ClassType 和 primitive 混合的情况
+            // FIXME 没有处理 ClassType 和 primitive 混合的情况
             if (typeof Klass.public[propName].type === 'function' || (Array.isArray(Klass.public[propName].type) && typeof Klass.public[propName].type[0] === 'function')) {
-                // 对象应用，这时候 PropValue 是该对象的 uuid
-                const ref =uuidToInstance.get(propValue as string)
-                if (ref) {
-                    publicProps[propName] = ref
-                } else {
-                    unsatisfiedProps[propName] = propValue
-                }
+                unsatisfiedProps[propName] = propValue
             } else if (typeof Klass.public[propName].type === 'string' || (Array.isArray(Klass.public[propName].type) && typeof Klass.public[propName].type[0] === 'string')){
-                // 普通
                 publicProps[propName] = propValue
             } else if (Klass.public[propName].computedType){
-                // 计算属性？
-                debugger
                 if (propValue) {
-                    const type = Klass.public[propName].computedType(rawProps)
-                    // FIXME 这里有大问题，如果 computedType 依赖了  instance 怎么办？好像 computedType 要放到最后？
-                    //  computedType 里面也有引用怎么办？？？
-                    if (!type) throw new Error('computedValue not ready')
+                    // FIXME value 可能是一个具体的值，也可能是 ref, 这里只能尝试。
+                    //  我们这里没有考虑 是 unsatisfied ref 的情况
+                    publicProps[propName] = propValue
+                    maybeUnsatisfiedProps[propName] = propValue
                 }
-
             } else {
                 throw new Error('unknown prop type')
             }
@@ -179,24 +180,37 @@ export function createInstances(objects: KlassRawInstanceDataType[], reactiveFor
         uuidToInstance.set(uuid, instance)
 
         if (Object.keys(unsatisfiedProps).length) {
-            unsatisfiedInstances.set(instance, unsatisfiedProps )
+            unsatisfiedInstances.set(instance, { sure: unsatisfiedProps, maybe: maybeUnsatisfiedProps})
         }
     })
 
-    for(let [instance, unsatisfiedProps] of unsatisfiedInstances) {
+    for(let [instance, {sure: unsatisfiedProps, maybe: maybeUnsatisfiedProps}] of unsatisfiedInstances) {
         Object.entries(unsatisfiedProps).forEach(([propName, propValue]) => {
             // CAUTION 这里如果是 reactive 的默认一定有 reactive 的值。那么用 reactive 的方式
+            const refs = Array.isArray(propValue) ? propValue.map(uuid => uuidToInstance.get(uuid)) : uuidToInstance.get(propValue)
             if (instance._options.isReactive) {
                 if (Array.isArray(propValue)) {
-                    instance[propName].push(...propValue.map(uuid => uuidToInstance.get(uuid)))
+                    instance[propName].push(...(refs as KlassInstance<any>[]))
                 } else {
-                    instance[propName](uuidToInstance.get(propValue))
+                    instance[propName](refs)
                 }
             } else {
-                if (Array.isArray(propValue)) {
-                    instance[propName] = propValue.map(uuid => uuidToInstance.get(uuid))
+                instance[propName] = refs
+            }
+        })
+
+        Object.entries(maybeUnsatisfiedProps).forEach(([propName, propValue]) => {
+            // CAUTION 这里如果是 reactive 的默认一定有 reactive 的值。那么用 reactive 的方式
+            const refs = Array.isArray(propValue) ? propValue.map(uuid => uuidToInstance.get(uuid)) : uuidToInstance.get(propValue)
+            if (Array.isArray(refs) ? refs.every(x => x) : refs) {
+                if (instance._options.isReactive) {
+                    if (Array.isArray(propValue)) {
+                        instance[propName].push(...refs as KlassInstance<any>[])
+                    } else {
+                        instance[propName](refs)
+                    }
                 } else {
-                    instance[propName] = uuidToInstance.get(propValue)
+                    instance[propName] = refs
                 }
             }
         })
@@ -222,7 +236,7 @@ function returnEntityUUID(obj: any) {
     return (isObject(obj) && !isPlainObject(obj)) ? (obj as KlassInstance<any>).uuid : obj
 }
 
-export function createClass<T extends ClassDef>(def: T) : KlassType<T['public']> {
+export function createClass<T extends ClassDef>(def: T) : KlassType<T['public']>{
 // export function createClass(def){
 
     if (KlassByName.get(def.name)) throw new Error(`Class name must be global unique. ${def.name}`)
@@ -235,7 +249,7 @@ export function createClass<T extends ClassDef>(def: T) : KlassType<T['public']>
         return new Klass(rawStructureClone(fieldValues), { ...(options||{}), isReactive: true}) as unknown as ReactiveKlassInstance<typeof def.public>
     }
 
-    function stringify(obj: KlassInstance<T['public']>) {
+    function stringify(obj: KlassInstance<(typeof def)['public']>) {
         return JSON.stringify({
             type: def.name,
             options: obj._options,
@@ -248,7 +262,7 @@ export function createClass<T extends ClassDef>(def: T) : KlassType<T['public']>
     }
 
 
-    function clone(obj: KlassInstance<T['public']>, deepCloneKlass: boolean){
+    function clone(obj: KlassInstance<(typeof def)['public']>, deepCloneKlass: boolean){
         const arg = Object.fromEntries(Object.keys(def.public).map(k => [k, deepClone(obj[k], deepCloneKlass)]))
         return obj._options?.isReactive ? Klass.createReactive(arg): Klass.create(arg)
     }
@@ -356,9 +370,18 @@ export function deepClone<T>(obj: T, deepCloneKlass?: boolean): T{
     }
 
     // @ts-ignore
-    if (typeof obj?.constructor?.isKlass) return deepCloneKlass ? obj?.constructor?.clone(obj, deepCloneKlass) : obj
+    if (typeof obj?.constructor?.isKlass) return deepCloneKlass ? ((obj as KlassInstance<any>)?.constructor as KlassType<any>)?.clone(obj as KlassInstance<any>, deepCloneKlass) as T: obj
 
     // TODO 支持其他类型，例如 Date/RegExp/Error
     debugger
     throw new Error(`unknown type`)
+}
+
+export type KlassInstanceOf<T extends KlassType<any>, U extends boolean> = U extends true ? ReactiveKlassInstance<T["public"]> : KlassInstance<T["public"]>
+
+// TODO
+export function removeAllInstance() {
+    for( let [, Klass] of KlassByName ) {
+        Klass.instances.splice(0, Infinity)
+    }
 }

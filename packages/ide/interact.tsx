@@ -2,15 +2,19 @@
 import {createElement, createRoot} from "axii";
 import "./index.css"
 import {InteractionNode} from "./src/component/activity/InteractionNode";
-import {Action, Interaction, Payload,  EntityAttributive} from "../shared/activity/Activity";
+import {Action, Interaction, Payload} from "../shared/activity/Activity";
 import {UserAttributive, UserAttributives, createUserRoleAttributive} from '../shared/user/User'
-import {Entity} from "../shared/entity/Entity";
 import {atom, computed, reactive} from "rata";
 import {Code} from "./src/component/code/Code";
 import {Drawer} from "./src/component/util/Drawer";
 import {editor} from "monaco-editor";
 import IStandaloneEditorConstructionOptions = editor.IStandaloneEditorConstructionOptions;
-import {createInstances, stringifyAllInstances} from "../shared/createClass";
+import {KlassInstanceOf, stringifyAllInstances} from "../shared/createClass";
+import {
+    NewAttr, New2Attr, New3Attr, OldAttr, Old2Attr, Old3Attr, OtherAttr,
+    User,Admin,Anonymous,
+    Message
+} from './testdata/interaction'
 
 export const globalUserRole = createUserRoleAttributive({ name: 'user'}, {isReactive: true})
 
@@ -27,70 +31,12 @@ const sendInteraction = Interaction.createReactive({
     })
 })
 
-const NewAttr = UserAttributive.createReactive({
-    name: 'New',
-    stringContent: `function New(){}`
-})
-
-const New2Attr = UserAttributive.createReactive({
-    name: 'New2',
-    stringContent: `function New2(){}`
-})
-
-const New3Attr = UserAttributive.createReactive({
-    name: 'New3',
-    stringContent: `function New3(){}`
-})
-
-
-const OldAttr = UserAttributive.createReactive({
-    name: 'Old',
-    stringContent: `function Old(){}`
-})
-
-const Old2Attr = UserAttributive.createReactive({
-    name: 'Old2',
-    stringContent: `function Old2(){}`
-})
-
-const Old3Attr = UserAttributive.createReactive({
-    name: 'Old3',
-    stringContent: `function Old3(){}`
-})
-
-const OtherAttr = UserAttributive.createReactive({
-    name: 'Other',
-    stringContent: `function Other(){}`
-})
 
 const userAttributiveOptions = reactive([NewAttr, New2Attr, New3Attr, OldAttr, Old2Attr, Old3Attr, OtherAttr])
-
-const User = createUserRoleAttributive( {
-    name: 'User'
-}, { isReactive: true })
-
-const Admin = createUserRoleAttributive( {
-    name: 'Admin'
-}, { isReactive: true })
-
-const Anonymous = createUserRoleAttributive( {
-    name: 'Anonymous'
-}, { isReactive: true })
-
-const roleAttributiveOptions = reactive([User, Admin, Anonymous])
+const roleAttributiveOptions = reactive([User, Admin, Anonymous]) as KlassInstanceOf<typeof UserAttributive, true>[]
 // TODO entities and entity attributives
 
-const Message = Entity.createReactive({
-    name: 'Message',
-    properties: [{
-        name: 'content',
-        type: 'string',
-        collection: false,
-    }]
-})
-
 const entities = reactive([Message])
-
 const entityAttributives = reactive([])
 
 const root = createRoot(document.getElementById('root')!)

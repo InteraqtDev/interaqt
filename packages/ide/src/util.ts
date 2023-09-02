@@ -58,7 +58,7 @@ export function removeNodesBetween(start: ChildNode, endNode: ChildNode|Comment,
   if (includeEnd) endNode.remove()
 }
 
-export const isPlainObject = (val: unknown): val is object => val?.constructor === Object
+export const isPlainObject = (val: unknown): val is object => val?.constructor === Object || val?.constructor === Array
 
 const hasOwnProperty = Object.prototype.hasOwnProperty
 export const hasOwn = (

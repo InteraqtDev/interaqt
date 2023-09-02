@@ -13,3 +13,7 @@ export function filterMap(map: Map<any, any>, handle: (key: any, value: any) => 
 export function indexBy(arr: any[], key: string) {
     return Object.fromEntries(arr.map(o => [o[key], o]))
 }
+
+export function mapObject(a: object, fn: (k: string, v: any) => any) {
+    return Object.fromEntries(Object.entries(a).map(([k, v]) => [k, fn(k, v)]))
+}

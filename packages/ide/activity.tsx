@@ -3,132 +3,82 @@ import {createElement, createRoot} from "axii";
 import "./index.css"
 import {ActivityGraph} from "./src/component/activity/ActivityGraph";
 import {
-    Action, Activity, forEachInteraction,
+    Action, Activity,
     Interaction,
-    InteractionGroup,
+    ActivityGroup,
     Payload, PayloadItem,
-    Role,
-    RoleAttributive, Transfer
-} from "../shared/activity/InteractionClass";
+    Transfer, forEachInteraction
+} from "../shared/activity/Activity";
+
 import {atom, computed, reactive} from "rata";
 import {Entity} from "../shared/entity/Entity";
 import {Code} from "./src/component/code/Code";
 import {Drawer} from "./src/component/util/Drawer";
 import {editor} from "monaco-editor";
 import IStandaloneEditorConstructionOptions = editor.IStandaloneEditorConstructionOptions;
+import {
+    NewAttr, New2Attr, New3Attr, OldAttr, Old2Attr, Old3Attr, OtherAttr,
+    User,Admin,Anonymous,
+    Message
+} from './testdata/interaction'
+import {createUserRoleAttributive, UserAttributive, UserAttributives} from "../shared/user/User";
+import {KlassInstanceOf, stringifyAllInstances} from "../shared/createClass";
 
 
-const NewAttr = RoleAttributive.createReactive({
-    name: 'New',
-    stringContent: `function New(){}`
-})
-
-const New2Attr = RoleAttributive.createReactive({
-    name: 'New2',
-    stringContent: `function New2(){}`
-})
-
-const New3Attr = RoleAttributive.createReactive({
-    name: 'New3',
-    stringContent: `function New3(){}`
-})
-
-
-const OldAttr = RoleAttributive.createReactive({
-    name: 'Old',
-    stringContent: `function Old(){}`
-})
-
-const Old2Attr = RoleAttributive.createReactive({
-    name: 'Old2',
-    stringContent: `function Old2(){}`
-})
-
-const Old3Attr = RoleAttributive.createReactive({
-    name: 'Old3',
-    stringContent: `function Old3(){}`
-})
-
-const OtherAttr = RoleAttributive.createReactive({
-    name: 'Other',
-    stringContent: `function Other(){}`
-})
-
-
-const roleAttributives = reactive([NewAttr, New2Attr, New3Attr, OldAttr, Old2Attr, Old3Attr, OtherAttr])
-
-const User = Role.createReactive( {
-    name: 'User'
-})
-
-const Admin = Role.createReactive( {
-    name: 'Admin'
-})
-
-const Anonymous = Role.createReactive( {
-    name: 'Anonymous'
-})
-
-const roles = reactive([User, Admin, Anonymous])
+const userAttributiveOptions = reactive([NewAttr, New2Attr, New3Attr, OldAttr, Old2Attr, Old3Attr, OtherAttr])
+const roleAttributiveOptions = reactive([User, Admin, Anonymous])
 // TODO entities and entity attributives
 
-const Message = Entity.createReactive({
-    name: 'Message',
-    properties: [{
-        name: 'content',
-        type: 'string',
-        collection: false,
-    }]
-})
-
 const entities = reactive([Message])
-
 const entityAttributives = reactive([])
+export const globalUserRole = createUserRoleAttributive({ name: 'user'}, {isReactive: true})
+
+const userRefA = createUserRoleAttributive({name: 'A', isRef: true}, {isReactive:true})
+const userRefB = createUserRoleAttributive({name: 'B', isRef: true}, {isReactive:true})
 
 
-
-const globalUserRole = Role.createReactive({ name: 'User'})
 
 const sendInteraction = Interaction.createReactive({
     name: 'sendRequest',
-    roleAttributive: RoleAttributive.createReactive({
-        // TODO 写个 attributive
-    }),
-    role: globalUserRole,
-    roleRef: Role.createReactive({name: 'A', isRef: true}),
+    userAttributives: UserAttributives.createReactive({}),
+    userRoleAttributive: globalUserRole,
+    userRef: userRefA,
     action: Action.createReactive({ name: 'sendRequest'}),
     payload: Payload.createReactive({
-        items: [PayloadItem.createReactive({
-            name: 'to',
-            attributive: OtherAttr,
-            base: globalUserRole,
-            isRef: true,
-            itemRef: Role.createReactive({name: 'B', isRef: true})
-        }), PayloadItem.createReactive({
-            name: 'message',
-            base: Message,
-            itemRef: Entity.createReactive({name: '', isRef: true}),
-        })]
+        items: [
+            PayloadItem.createReactive({
+                name: 'to',
+                attributive: OtherAttr,
+                base: globalUserRole,
+                isRef: true,
+                itemRef: userRefB
+            }),
+            PayloadItem.createReactive({
+                name: 'message',
+                base: Message,
+                itemRef: Entity.createReactive({name: '', isRef: true}),
+            })
+        ]
     })
 })
 
+console.log(1111, sendInteraction.payload().items[0].uuid, sendInteraction.payload().items[0].name(), sendInteraction.payload().items[0].itemRef() === userRefB, userRefB.name(), userRefB.uuid)
 
 
 const approveInteraction = Interaction.createReactive({
     name: 'approve',
-    roleAttributive: RoleAttributive.createReactive({}),
-    role: sendInteraction.payload().items[0].itemRef(),
-    // TODO draft 改成 futureValue 的形式后就不需要了。
-    roleRef: Role.createReactive({name: '', isRef: true}),
+    userAttributives: UserAttributives.createReactive({}),
+    userRoleAttributive: userRefB,
+    userRef: createUserRoleAttributive({name: '', isRef: true}, {isReactive:true}),
     action: Action.createReactive({ name: 'approve'}),
     payload: Payload.createReactive({})
 })
 
 const rejectInteraction = Interaction.createReactive({
     name: 'reject',
-    roleAttributive: RoleAttributive.createReactive({}),
-    role: sendInteraction.payload().items[0].itemRef(),
-    roleRef: Role.createReactive({name: '', isRef: true}),
+    userAttributives: UserAttributives.createReactive({}),
+    userRoleAttributive: userRefB,
+    userRef: createUserRoleAttributive({name: '', isRef: true}, {isReactive:true}),
     action: Action.createReactive({ name: 'reject'}),
     payload: Payload.createReactive({
         items: [
@@ -143,24 +93,37 @@ const rejectInteraction = Interaction.createReactive({
 
 const cancelInteraction = Interaction.createReactive({
     name: 'cancel',
-    roleAttributive: RoleAttributive.createReactive({}),
-    role: sendInteraction.roleRef(),
-    roleRef: Role.createReactive({name: '', isRef: true}),
+    userAttributives: UserAttributives.createReactive({}),
+    userRoleAttributive: userRefA,
+    userRef: createUserRoleAttributive({name: '', isRef: true}, {isReactive:true}),
     action: Action.createReactive({ name: 'cancel'}),
     payload: Payload.createReactive({})
 })
 
-const responseGroup = InteractionGroup.createReactive({
-    type: 'or',
-    interactions: [
-        approveInteraction,
-        rejectInteraction,
-        cancelInteraction
-    ]
+const responseGroup = ActivityGroup.createReactive({
+    type: 'any',
+    activities: [
+        Activity.createReactive({
+            interactions: [
+                approveInteraction
+            ]
+        }),
+        Activity.createReactive({
+            interactions: [
+                rejectInteraction
+            ]
+        }),
+        Activity.createReactive({
+            interactions: [
+                cancelInteraction
+            ]
+        })
+    ],
 })
 
 
 const activity= Activity.createReactive({
+    name: "createFriendRelation",
     interactions: [
         sendInteraction
     ],
@@ -177,21 +140,21 @@ const activity= Activity.createReactive({
 })
 
 // TODO refRoles
-const rolesAndRefRoles = computed(() => {
+const userRolesAndUserRefs = computed(() => {
     const refRoles = []
     forEachInteraction(activity, (interaction: ReturnType<typeof Interaction.createReactive>) => {
-        if (interaction.roleRef()?.name() ) {
-            refRoles.push(interaction.roleRef())
+        if (interaction.userRef()?.name() ) {
+            refRoles.push(interaction.userRef())
         }
         // TODO 支持深层嵌套的 payload 格式
         interaction.payload().items.forEach(item => {
-            if (item.itemRef()?.name() && Role.is(item.base())) {
+            if (item.itemRef()?.name() && UserAttributive.is(item.base())) {
                 refRoles.push(item.itemRef())
             }
         })
     })
-    return roles.concat(refRoles)
-})
+    return roleAttributiveOptions.concat(refRoles)
+}) as KlassInstanceOf<typeof UserAttributive, true>[]
 
 
 const codeVisible = atom(false)
@@ -210,8 +173,8 @@ const root = createRoot(document.getElementById('root')!)
 root.render(<div>
     <ActivityGraph
         value={activity}
-        roles={rolesAndRefRoles}
-        roleAttributives={roleAttributives}
+        roleAttributiveOptions={userRolesAndUserRefs}
+        userAttributiveOptions={userAttributiveOptions}
         entities={entities}
         entityAttributives={entityAttributives}
         selectedAttributive={selected}
@@ -221,3 +184,5 @@ root.render(<div>
     </Drawer>
 </div>)
 
+window.activity = activity
+window.stringifyAllInstance = stringifyAllInstances
