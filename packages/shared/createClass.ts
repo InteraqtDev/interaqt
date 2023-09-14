@@ -22,7 +22,7 @@ type ClassCollectionPropType<T extends ClassDef['public']> = Omit<ClassPropType,
 
 type ClassDefPublicItem = ClassPropType | ClassCollectionPropType<any>
 
-type ClassDef = {
+export type ClassDef = {
     name: string,
     display? : (obj: KlassInstance<any>) => string,
     constraints?: {
@@ -379,9 +379,14 @@ export function deepClone<T>(obj: T, deepCloneKlass?: boolean): T{
 
 export type KlassInstanceOf<T extends KlassType<any>, U extends boolean> = U extends true ? ReactiveKlassInstance<T["public"]> : KlassInstance<T["public"]>
 
-// TODO
 export function removeAllInstance() {
     for( let [, Klass] of KlassByName ) {
         Klass.instances.splice(0, Infinity)
     }
 }
+
+// TODO 用来标记的
+export const CircularRef = createClass({
+    name: 'CircularRef',
+    public: {}
+})

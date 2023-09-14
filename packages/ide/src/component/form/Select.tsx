@@ -4,7 +4,7 @@ import {atom, incMap, reactive} from "rata";
 import {CheckIcon} from "../icons/Check";
 import {mapClassNameToObject} from "../../util";
 
-export function Select({ options, value, display, placeholder = atom(''), allowEmpty = atom(false), dropdownVisible = atom(false) }) {
+export function Select({ options, value, display, placeholder = atom('choose an item'), allowEmpty = atom(false), dropdownVisible = atom(false) }) {
     const dropdownClass = () => ({
         ...mapClassNameToObject("absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm"),
         'hidden' : !dropdownVisible()

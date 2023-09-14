@@ -1,7 +1,6 @@
 import {createClass} from "../shared/createClass";
+import { Entity, Relation } from "../shared/entity/Entity";
 import { interactionEvent } from '../types/interaction'
-
-
 
 
 
@@ -15,14 +14,20 @@ export type QueryArg = {
 
 export type EventStack = Map<string, interactionEvent>
 
+export type SystemCallback =  (...arg: any[]) => any
+
+
+export type Storage = {
+    get: (itemName: string, id: string, initialValue?: any) => any
+    set: (itemName: string, id: string, value: any) => any,
+    setup: (entities: (typeof Entity)[], relations: (typeof Relation)[]) => any
+}
+
 export interface System {
     saveEvent: (interactionEvent) => boolean
     conceptClass: Map<string, ReturnType<typeof createClass>>
 
-    storage: {
-        get: (itemName: string, id: string, initialValue?: any) => any
-        set: (itemName: string, id: string, value: any) => any
-    }
+    storage: Storage
     util: {
         uuid: () => string
     }

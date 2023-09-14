@@ -1,5 +1,6 @@
 import {Atom, incUnique, computed, incPick} from 'rata'
 import {createClass, getInstance} from "../createClass";
+import {MapActivityToEntity} from "./IncrementalComputation";
 
 
 export enum PropertyTypes {
@@ -66,6 +67,10 @@ export const Entity = createClass({
                     return computed(() => validNameFormatExp.test(name))
                 }
             }
+        },
+        computedData: {
+            type: [ MapActivityToEntity ],
+            collection: false,
         },
         properties: {
             type: Property,

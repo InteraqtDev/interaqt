@@ -2,16 +2,18 @@ import {createElement, InjectHandles} from "axii";
 import * as monaco from 'monaco-editor/esm/vs/editor/editor.api';
 import './useWorker';
 import {IMarkdownString} from "monaco-editor/esm/vs/editor/editor.api";
+import {atom, Atom} from "rata";
 
 type HoverProp = { match : (...arg: any[]) => any, contents: (...arg: any[]) => IMarkdownString[]}
 
 type CodeProp = {
-    options?: Parameters<typeof monaco.editor.create>[1],
+    options?: Omit<Parameters<typeof monaco.editor.create>[1], 'value'>,
+    value: Atom<string>,
     extraLib?: [string, string],
     hover?: HoverProp[]
 }
 
-export function Code({ options, extraLib, hover }: CodeProp, { useLayoutEffect} : InjectHandles) {
+export function Code({ value = atom(''), options, extraLib, hover }: CodeProp, { useLayoutEffect} : InjectHandles) {
 
     const container = <div style={{minHeight: 200}}></div>
 
@@ -40,7 +42,17 @@ export function Code({ options, extraLib, hover }: CodeProp, { useLayoutEffect} 
             });
         }
 
-        const editor = monaco.editor.create(container as HTMLElement, options);
+        const editor = monaco.editor.create(
+            container as HTMLElement,
+            {
+                ...options,
+                value: value()
+            }
+        );
+
+        editor.addCommand(monaco.KeyCode.KeyS | monaco.KeyMod.CtrlCmd, (e, a) => {
+            value(editor.getModel()?.getValue())
+        })
 
         return () => {
             editor.dispose()

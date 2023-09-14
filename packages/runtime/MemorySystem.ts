@@ -1,6 +1,7 @@
-import {System} from "./System";
+import {System, SystemCallback} from "./System";
 import { interactionEvent } from '../types/interaction'
 import {createClass} from "../shared/createClass";
+import {Entity, Relation} from "../shared/entity/Entity";
 
 let id = 0
 
@@ -17,6 +18,9 @@ class Storage {
         if (!conceptData) this.data.set(conceptName, (conceptData = new Map()))
         conceptData.set(id, value)
     }
+    setup(entities: (typeof Entity)[], relations: (typeof Relation)[]) {
+
+    }
 }
 
 export class MemorySystem implements System {
@@ -32,4 +36,5 @@ export class MemorySystem implements System {
         }
     }
     storage = new Storage()
+
 }

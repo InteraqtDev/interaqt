@@ -6,11 +6,14 @@ import {Column} from "./Column";
 import {IconAddProperty} from "../icons/Add";
 import {createFormForEntity, createFormForEntityProperty} from "../createFormForEntityProperty";
 import {createDialog, createDialogFooter} from "../createDialog";
-import {createClass} from "../../../../shared/createClass";
+import {createClass, KlassInstanceOf} from "../../../../shared/createClass";
+import {Detail} from "./Detail";
+import {Activity} from "../../../../shared/activity/Activity";
 
 type EREditorProps = {
-    entities: Entity[],
-    relations: Relation[]
+    entities: KlassInstanceOf<Entity, true>[],
+    relations: KlassInstanceOf<Relation, true>[],
+    activities: KlassInstanceOf<Activity, true>[]
 }
 
 export type RelationEntityMap = Map<Entity, Map<string, [string, Entity][]>>
@@ -18,12 +21,11 @@ export type RelationEntityMap = Map<Entity, Map<string, [string, Entity][]>>
 type ColumnData = {
     entity: Entity,
     opener?: { entity: Entity, relationName: string }
-    relationsByEntity: RelationEntityMap
     selected: Atom<Property>
 }
 
 
-export function EREditor({ entities, relations }: EREditorProps) {
+export function EREditor({ entities, relations, activities }: EREditorProps) {
     const columns: ColumnData[] = reactive([])
 
     // TODO 如何实现 patch ? 并且能把生成好的 reactive relations 给 column，不用 column 自己取。
@@ -50,8 +52,7 @@ export function EREditor({ entities, relations }: EREditorProps) {
     const onChooseEntity = (entity: Entity) => {
         columns.splice(0, Infinity, {
             entity,
-            selected: atom(null),
-            relationsByEntity
+            selected: atom(null)
         })
     }
 
@@ -64,8 +65,7 @@ export function EREditor({ entities, relations }: EREditorProps) {
                 entity: sourceTarget,
                 relationName
             },
-            selected: atom(null),
-            relationsByEntity
+            selected: atom(null)
         })
     }
 
@@ -86,6 +86,11 @@ export function EREditor({ entities, relations }: EREditorProps) {
         createDialogFooter([{ text: 'Submit', onClick: onAddEntity}, { text: 'Cancel', onClick: () => entityAddDialogVisible(false)}])
     )
 
+    const currentFocus = computed(() => {
+        if (!columns.length) return null
+        return columns.at(-1).selected() || columns.at(-1).entity
+
+    })
 
     return <div className="flex flex-grow h-full">
         {entityAddDialog}
@@ -109,9 +114,13 @@ export function EREditor({ entities, relations }: EREditorProps) {
         <div className="flex flex-grow overflow-x-scroll items-stretch">
             {incMap(columns, (data: Atom<ColumnData>, index) => {
                 return (
-                    <Column {...data} openRelatedEntity={(relationName) => openRelatedEntity(data.entity, relationName, index!)} addRelation={addRelation}/>
+                    <Column {...data} relationsByEntity={relationsByEntity} openRelatedEntity={(relationName) => openRelatedEntity(data.entity, relationName, index!)} addRelation={addRelation}/>
                 )
             })}
+        </div>
+
+        <div className="flex-grow-0 flex-shrink-0 w-96 border-l-2 border-slate-300">
+            <Detail target={currentFocus} activities={activities}/>
         </div>
     </div>
 }
