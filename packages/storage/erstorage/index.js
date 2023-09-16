@@ -10,7 +10,7 @@ import {
 } from './ERStorage.js'
 import {
   createAPIs as createObjectStorageApis
-} from './objectStorage.js'
+} from '../objectstorage/objectStorage.js'
 
 // const isERRegexp = /\.er\.json$/
 // const isFieldRegexp = /\.field\.js$/
