@@ -1,5 +1,5 @@
 import {EntityToTableMap} from "./EntityToTableMap";
-import {assert, setByPath} from "../util";
+import {assert, deepMerge, mapTree, setByPath} from "../util";
 import {BoolExpression, BoolExpressionNodeTypes} from "../../types/boolExpression";
 
 
@@ -8,14 +8,16 @@ type Database = {
 }
 
 // TODO 需要能指定  atom 的类型
-type MatchExpressionData = BoolExpression
+export type MatchExpressionData = BoolExpression
 
 
-class MatchExpression {
+export class MatchExpression {
     public entityQueryTree: EntityQueryTree = {}
-    constructor(public entityName: string, public map: EntityToTableMap, public data: MatchExpressionData) {
+    constructor(public entityName: string, public map: EntityToTableMap, public data?: MatchExpressionData, public contextRootEntity?: string) {
         this.entityQueryTree = {}
-        this.buildEntityQueryTree(this.data, this.entityQueryTree)
+        if (this.data) {
+            this.buildEntityQueryTree(this.data, this.entityQueryTree)
+        }
     }
     buildEntityQueryTree(data: MatchExpressionData, entityQueryTree: EntityQueryTree) {
         if (data.type === BoolExpressionNodeTypes.group) {
@@ -30,17 +32,98 @@ class MatchExpression {
             // variable
             const matchAttributePath = (data.key as string).split('.')
             const attributeInfo = this.map.getInfoByPath([this.entityName].concat(matchAttributePath))
-            if (attributeInfo.isEntity) {
-                setByPath(entityQueryTree, matchAttributePath, {})
-            } else {
-                // 最后一个是 attribute，所以不在 entityQueryTree 上。
-                setByPath(entityQueryTree, matchAttributePath.slice(0, matchAttributePath.length -1), {})
+
+            // value 的情况不用管
+            //  CAUTION 还有最后路径是 entity 但是  match 值是 EXIST 的不用管，因为会生成 exist 子句。只不过这里也不用特别处理，join 的表没用到会自动数据库忽略。
+            if(!(matchAttributePath.length === 1 && attributeInfo.isValue)) {
+                if (attributeInfo.isEntity) {
+                    setByPath(entityQueryTree, matchAttributePath, {})
+                } else {
+                    // 最后一个是 attribute，所以不在 entityQueryTree 上。
+                    setByPath(entityQueryTree, matchAttributePath.slice(0, matchAttributePath.length -1), {})
+                }
             }
         }
     }
+
+
+    getFinalFieldName(matchAttributePath: string[]) {
+        const namePath = [this.entityName].concat(matchAttributePath.slice(0, -1))
+        return this.map.getTableAliasAndFieldName(namePath, matchAttributePath.at(-1)!)
+    }
+    getReferenceFieldValue(valueStr:string) {
+
+        const matchAttributePath = valueStr.split('.')
+        const [tableAlias, rawFieldName] = this.map.getTableAliasAndFieldName([this.contextRootEntity||this.entityName].concat(matchAttributePath.slice(0, -1)), matchAttributePath.at(-1))
+        return `${tableAlias}.${rawFieldName}`
+    }
+
+    getFinalFieldValue(isReferenceValue: boolean, value: [string, any] ) {
+        let fieldValue
+        const simpleOp = ['=', '>', '<', '<=', '>=', 'like']
+
+        if (simpleOp.includes(value[0])) {
+            fieldValue = `${value[0]} ${isReferenceValue ? this.getReferenceFieldValue(value[1]) : value[1]}`
+        } else if(value[0].toLowerCase() === 'in') {
+            assert(!isReferenceValue, 'reference value cannot use IN to match')
+            fieldValue = `IN [${value[1].join(',')}]`
+        } else if(value[0].toLowerCase() === 'between') {
+            fieldValue = `BETWEEN ${isReferenceValue ? this.getReferenceFieldValue(value[1][0]) : value[1][0]} AND ${isReferenceValue ? this.getReferenceFieldValue(value[1][1]) : value[1][1]}]`
+        } else {
+            assert(false, `unknown value expression ${exp.value}`)
+        }
+
+        return fieldValue
+
+    }
+
+    buildFieldMatchExpression() : BoolExpression|null {
+        if (!this.data) return null
+        // 1. 所有 key 要 build 成 field
+        // 2. x:n 关系中的 EXIST 要增加查询范围限制，要把 value 中对上层引用也 build 成 field。
+        return mapTree(this.data, ['left', 'right'], (exp: BoolExpression) => {
+            if (exp.type === BoolExpressionNodeTypes.group) {
+                return {...exp}
+            } else {
+                const matchAttributePath = (exp.key as string).split('.')
+                const attributeInfo = this.map.getInfoByPath([this.entityName].concat(matchAttributePath))
+
+                // 如果结尾是 value
+                // 如果极为是 entity，那么后面匹配条件目前只能支持 EXIST。
+                //  CAUTION 针对关联实体的属性匹配，到这里已经被拍平了，所以结尾是  entity 的情况必定都是函数匹配。
+
+                if (attributeInfo.isValue) {
+                    return {
+                        ...exp,
+                        fieldName: this.getFinalFieldName(matchAttributePath),
+                        fieldValue: this.getFinalFieldValue(exp.isReferenceValue, exp.value)
+                    }
+                } else {
+                    // entity
+                    const namePath = [this.entityName].concat(matchAttributePath)
+                    const [,tableAlias] = this.map.getTableAndAlias(namePath)
+
+                    // CAUTION 函数匹配的情况不管了，因为可能未来涉及到使用 cursor 实现更强的功能，这就涉及到查询计划的修改了。统统扔到上层去做。
+                    //  注意，子查询中也可能对上层的引用，这个也放到上层好像能力有点重叠了。
+                    return {
+                        ...exp,
+                        namePath,
+                        isFunctionMatch: true,
+                        tableAlias
+                    }
+                }
+            }
+        })
+
+    }
+
     and(condition): MatchExpression {
-        // TODO
-        return new MatchExpression(this.entityName, this.map, {...this.data, ...condition})
+        return new MatchExpression(this.entityName, this.map, this.data ? {
+            type: BoolExpressionNodeTypes.group,
+            op: '&&',
+            left: condition,
+            right: this.data
+        } : condition)
     }
 }
 
@@ -81,17 +164,18 @@ export type EntityQueryDerivedData = {
     modifier? : Modifier
 }
 
-class EntityQuery {
-    static create(entityName: string, map: EntityToTableMap, data: EntityQueryData) {
+export class EntityQuery {
+    static create(entityName: string, map: EntityToTableMap, data: EntityQueryData, contextRootEntity?: string) {
         return new EntityQuery(
             entityName,
             map,
-            new MatchExpression(entityName, map, data.matchExpression),
-            new AttributeQuery(entityName, map, data.attributeQuery),
-            new Modifier(entityName, map, data.modifier)
+            new MatchExpression(entityName, map, data.matchExpression, contextRootEntity),
+            new AttributeQuery(entityName, map, data.attributeQuery || []),
+            new Modifier(entityName, map, data.modifier),
+            contextRootEntity
         )
     }
-    constructor(public entityName, public map: EntityToTableMap, public matchExpression?: MatchExpression, public attributeQuery?: AttributeQuery, public modifier?: Modifier) {}
+    constructor(public entityName, public map: EntityToTableMap, public matchExpression: MatchExpression, public attributeQuery: AttributeQuery, public modifier: Modifier, public contextRootEntity?:string) {}
     derive(derived: EntityQueryDerivedData) {
         return new EntityQuery(
             this.entityName,
@@ -116,7 +200,7 @@ export class AttributeQuery {
     public valueAttributes: string[] = []
     public entityQueryTree: EntityQueryTree = {}
     public fullEntityQueryTree: EntityQueryTree = {}
-    constructor(public entityName: string, public map: EntityToTableMap, public data: AttributeQueryData) {
+    constructor(public entityName: string, public map: EntityToTableMap, public data: AttributeQueryData = []) {
         data.forEach((item: AttributeQueryDataItem) => {
             const attributeName:string = typeof item=== 'string' ? item : item[0]
 
@@ -142,7 +226,7 @@ export class AttributeQuery {
         this.entityQueryTree = this.buildEntityQueryTree()
         this.fullEntityQueryTree = this.buildFullEntityQueryTree()
     }
-    getQueryFields (nameContext = [this.entityName]) {
+    getQueryFields (nameContext = [this.entityName]): [string, string][] {
         const queryFields = this.valueAttributes.map(attributeName => this.map.getTableAliasAndFieldName(nameContext, attributeName))
 
         this.xToOneEntities.forEach(({ name: entityAttributeName, entityQuery }) => {
@@ -177,30 +261,39 @@ class QueryContext {
 
 type JoinTables = {
     for: any
-    isRelationSource: boolean
-    lastEntityTable: [string, string]
-    relationTable: [string, string]
-    entityTable: [string, string]
+    joinSource: [string, string]
+    joinIdField: [string, string]
+    joinTarget: [string, string]
 }[]
 
 export class QueryAgent {
     constructor(public map: EntityToTableMap, public database: Database) {}
-    buildFindQuery(entityQuery: EntityQuery) {
+
+
+    // FIXME 需要增加 prefix，因为自己可能是个 子查询。这意味这下面的所有语句都要增加 prefix。
+    buildFindQuery(entityQuery: EntityQuery, prefix='') {
         // 2. 从所有条件里面构建出 join clause
-        // const joinTables = this.getJoinTables(matchExpression, modifier, attributeQuery)
-        // const joinTables = this.getJoinTables(entityQuery.attributeQuery.entityQueryTree)
-        // 3. 构建 match expression
+        const fieldQueryTree = entityQuery.attributeQuery!.entityQueryTree
+        const matchQueryTree = entityQuery.matchExpression.entityQueryTree
+        const finalQueryTree = deepMerge(fieldQueryTree, matchQueryTree)
 
-        // 4. 构建 modifier
-        return ''
+        const joinTables = this.getJoinTables(finalQueryTree, [entityQuery.entityName])
+        return `
+SELECT ${prefix ? '' : 'DISTINCT'}
+${this.buildSelectClause(entityQuery.attributeQuery.getQueryFields(), prefix)}
 
-//         return `
-// SELECT
-// // ${this.stringifyFieldQuery([entityName], attributeQuery)}
-// // ${this.stringifyJoinTables(joinTables)}
-// ${this.stringifyMatchExpression(matchExpression)}
-// ${this.stringifyModifier(modifier)}
-// `
+FROM
+${this.buildFromClause(entityQuery.entityName, prefix)}
+
+${this.buildJoinClause(joinTables, prefix)}
+
+WHERE
+${this.buildWhereClause( 
+    this.parseMatchExpressionValue(entityQuery.entityName, entityQuery.matchExpression.buildFieldMatchExpression(), entityQuery.contextRootEntity),
+    prefix
+)}        
+`
+        // FIXME modifier
     }
     async findEntities(entityQuery:EntityQuery) {
         // 1. 这里只通过合表或者 join  处理了 x:1 的关联查询。x:n 的查询是通过二次查询获取的。
@@ -214,7 +307,12 @@ export class QueryAgent {
                     // TODO 构造 context 查询关联实体的 ids，用来限制查找的范围。
                     const ids = await this.findRelatedEntityIds(entityQuery.entityName, entity.id, fieldName)
                     const relatedEntityQuery = entityQuery.derive({
-                        matchExpression: entityQuery.matchExpression.and('id', 'in', ids)
+                        matchExpression: entityQuery.matchExpression.and({
+                            type: BoolExpressionNodeTypes.variable,
+                            name: 'id',
+                            key: 'id',
+                            value: ['in', ids]
+                        })
                     })
 
                     entity[fieldName] = await this.findEntities(relatedEntityQuery)
@@ -250,14 +348,16 @@ export class QueryAgent {
             if ((currentTableAlias !== lastTableAndAlias![1])) {
                 // 剩下都是没有 三表合一 的情况
                 const [lastTable] = lastTableAndAlias
+                // FIXME 这里这个判断补眼睛，因为 attribute 不管是 source 还是 target name 确实可能相同
                 const isCurrentRelationSource = currentRelationData.sourceAttribute === entityAttributeName
 
                 // CAUTION 注意这里有些非常隐性的逻辑关联，关系表要合并的话永远只会往 n 或者 1:1 中往任意方向合并，所以下面通过实际的合并情况判断，实际也要和 n 关系吻合。
                 if (relationTable === lastTable) {
+                    // 关系表在上一张表中。
                     result.push({
                         for: context.concat(entityAttributeName),
                         joinSource: lastTableAndAlias,
-                        joinIdField: [entityAttributeName, 'id'],
+                        joinIdField: [isCurrentRelationSource ? currentRelationData.sourceField : currentRelationData.targetField, 'id'],
                         joinTarget: [currentTable, currentTableAlias]
                     })
 
@@ -267,7 +367,7 @@ export class QueryAgent {
                         for: context.concat(entityAttributeName),
                         joinSource: lastTableAndAlias,
                         // 这里要找当前实体中用什么 attributeName 指向上一个实体
-                        joinIdField: ['id', isCurrentRelationSource ? currentRelationData.targetAttribute : entityAttributeName],
+                        joinIdField: ['id', isCurrentRelationSource ? currentRelationData.targetField : currentRelationData.sourceField],
                         joinTarget: [currentTable, currentTableAlias]
                     })
                 } else {
@@ -275,29 +375,112 @@ export class QueryAgent {
                     result.push({
                         for: context.concat(entityAttributeName),
                         joinSource: lastTableAndAlias,
-                        joinIdField: ['id', isCurrentRelationSource ? '$source' : '$target'],
+                        joinIdField: ['id', isCurrentRelationSource ? currentRelationData.sourceField : currentRelationData.targetField],
                         joinTarget: [relationTable, relationTableAlias]
                     })
 
                     result.push({
                         for: context.concat(entityAttributeName),
                         joinSource: [relationTable, relationTableAlias],
-                        joinIdField: [isCurrentRelationSource ? '$target' : '$source', 'id'],
+                        joinIdField: [isCurrentRelationSource ? currentRelationData.targetField : currentRelationData.sourceField, 'id'],
                         joinTarget: [currentTable, currentTableAlias]
                     })
                 }
 
-                // console.log(lastTableAlias, currentTableAlias, relationTableAlias)
             }
             result.push(...this.getJoinTables(subQueryTree, context.concat(entityAttributeName), [currentTable!, currentTableAlias!]))
         })
 
         return result
     }
-    buildJoinExpression(joinTables: JoinTables) {
-        return joinTables.map(({currentRelationData, lastEntityTable, relationTable, entityTable}) => {
-            // TODO
+    withPrefix(prefix ='') {
+        return prefix? `${prefix}___` : ''
+    }
+    buildSelectClause(queryFields: [string, string][], prefix=''){
+        if (!queryFields.length) return '1'
 
+        return queryFields.map((queryField) => (
+            `${this.withPrefix(prefix)}${queryField[0]}.${queryField[1]} AS \`${this.withPrefix(prefix)}${queryField[0]}.${queryField[1]}\``
+        )).join(',\n')
+    }
+    buildFromClause(entityName: string, prefix='') {
+        return `${this.map.getEntityTable(entityName)} as ${this.withPrefix(prefix)}${entityName}`
+    }
+    buildJoinClause(joinTables: JoinTables, prefix='') {
+        return joinTables.map(({ joinSource, joinIdField, joinTarget}) => {
+            return `JOIN ${joinTarget[0]} as 
+${this.withPrefix(prefix)}${joinTarget[1]} ON 
+${this.withPrefix(prefix)}${joinSource[1]}.${joinIdField[0]} = ${this.withPrefix(prefix)}${joinTarget[1]}.${joinIdField[1]}
+`
+        }).join('\n')
+    }
+    buildWhereClause(fieldMatchExp: BoolExpression|null, prefix='') {
+        if (!fieldMatchExp) return '1=1'
+
+        if (fieldMatchExp.type === BoolExpressionNodeTypes.variable) {
+            return fieldMatchExp.isInnerQuery ? fieldMatchExp.fieldValue : `${this.withPrefix(prefix)}${fieldMatchExp.fieldName[0]}.${fieldMatchExp.fieldName[1]} ${fieldMatchExp.fieldValue}`
+        } else {
+            if (fieldMatchExp.op === '&&') {
+                return `(${this.buildWhereClause(fieldMatchExp.left, prefix)} AND ${this.buildWhereClause(fieldMatchExp.right, prefix)})`
+            } else  if (fieldMatchExp.op === '||') {
+                return `(${this.buildWhereClause(fieldMatchExp.left, prefix)} OR ${this.buildWhereClause(fieldMatchExp.right, prefix)})`
+            } else {
+                return `NOT (${this.buildWhereClause(fieldMatchExp.left, prefix)})`
+            }
+        }
+
+    }
+    parseMatchExpressionValue(entityName: string, fieldMatchExp: BoolExpression|null, contextRootEntity? :string) {
+        if (!fieldMatchExp) return null
+
+        return mapTree(fieldMatchExp, ['left', 'right'], (exp: BoolExpression, context:string[]) => {
+            if (exp.type === BoolExpressionNodeTypes.group) {
+                return {
+                    ...exp
+                }
+            } else {
+                assert(Array.isArray(exp.value), `match value is not a array ${context.join('.')}`)
+                if (exp.isFunctionMatch) {
+                    assert(exp.value[0].toLowerCase() === 'exist', `we only support Exist function match on entity for now. yours: ${exp.value[0]}`)
+
+                    const info = this.map.getInfoByPath(exp.namePath)
+                    const [, currentAlias] = this.map.getTableAndAlias(exp.namePath)
+                    const [, parentAlias] = this.map.getTableAndAlias(exp.namePath.slice(0, -1))
+                    const reverseAttributeName = this.map.getReverseAttribute(info.parentEntityName, info.attributeName)
+
+
+                    const existEntityQuery = EntityQuery.create(info.entityName, this.map, {
+                        entityName: info.entityName,
+                        matchExpression: {
+                            type: BoolExpressionNodeTypes.group,
+                            op: '&&',
+                            left: {
+                                type: BoolExpressionNodeTypes.variable,
+                                name: reverseAttributeName,
+                                key: `${reverseAttributeName}.id`,
+                                value: ['=', `${parentAlias}.id`]
+                            },
+                            right: exp.value[1]
+                        }
+                    } as EntityQueryData,
+                        // 如果上层还有，就继承上层的，如果没有， context 就只这一层。这个变量是用来给 matchExpression 里面的 value 来引用上层的值的。
+                        //  例如查询用户，要求他存在一个朋友的父母的年龄是小于这个用户。对朋友的父母的年龄匹配中，就需要引用最上层的 alias。
+                        contextRootEntity||entityName
+                    )
+
+                    return {
+                        ...exp,
+                        isInnerQuery: true,
+                        fieldValue: `
+EXISTS (
+${this.buildFindQuery(existEntityQuery, currentAlias)}
+)
+`
+                    }
+                } else {
+                    return exp
+                }
+            }
         })
     }
 

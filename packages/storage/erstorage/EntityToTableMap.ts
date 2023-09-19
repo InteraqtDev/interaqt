@@ -1,8 +1,8 @@
 import {assert} from "../util";
 
 export class AttributeInfo {
-    constructor(public data:EntityValueAttributeMapType|EntityEntityAttributeMapType) {
-
+    constructor(public data:EntityValueAttributeMapType|EntityEntityAttributeMapType, public attributeName, public parentEntityName) {
+        assert(!!data, 'data can not be null')
     }
     get isEntity() {
         return (this.data as EntityEntityAttributeMapType).isEntity
@@ -47,7 +47,7 @@ export class AttributeInfo {
 }
 
 
-type EntityValueAttributeMapType = {
+export type EntityValueAttributeMapType = {
     //entityType
     type: string,
     // 数据库的 fieldType
@@ -57,14 +57,17 @@ type EntityValueAttributeMapType = {
     field: string
 }
 
-type EntityEntityAttributeMapType = {
+
+
+export type EntityEntityAttributeMapType = {
     isEntity: true,
     relType: ['1'|'n', '1'|'n'],
     entityName: string,
     relationName: string,
+    isSource? : boolean
 }
 
-type EntityMapItemData = {
+export type EntityMapItemData = {
     // id 所在的 table。不一定有 fields 也在，fields 可能会因为各种优化拆出去。
     table: string,
     attributes: {
@@ -76,7 +79,7 @@ type EntityMapData = {
     [k:string]: EntityMapItemData
 }
 
-type RelationMapItemData = {
+export type RelationMapItemData = {
     attributes: {
         [k:string]: EntityValueAttributeMapType
     },
@@ -86,6 +89,9 @@ type RelationMapItemData = {
     targetEntity: string,
     targetAttribute: string,
     table: string,
+    sourceField: string,
+    targetField: string,
+    mergedTo? : 'source'|'target'
 }
 type RelationMapData = {
     [k:string]: RelationMapItemData
@@ -96,28 +102,44 @@ export type MapData = {
     relations: RelationMapData
 }
 
+
+const ID_ATTRIBUTE = {
+    type: 'id',
+    fieldType: 'id',
+    field: 'id'
+}
+
 export class EntityToTableMap {
-    constructor(public data: MapData) {
-    }
+    constructor(public data: MapData) {}
     isAttributeEntity(entityName: string, attribute: string) {
         return true
     }
+    getEntityTable(entityName: string) {
+        return this.data.entities[entityName].table
+    }
     getInfo(entityName: string, attribute: string) : AttributeInfo{
-        assert(!!this.data.entities[entityName]!.attributes[attribute], `cant find attribute ${attribute} in ${entityName}`)
-        return new AttributeInfo(this.data.entities[entityName]!.attributes[attribute]!)
+        if (!this.data.entities[entityName]!.attributes[attribute]) debugger
+        assert(!!this.data.entities[entityName]!.attributes[attribute],
+            `cant find attribute ${attribute} in ${entityName}. attributes: ${Object.keys(this.data.entities[entityName]!.attributes)}`
+        )
+        return new AttributeInfo(this.data.entities[entityName]!.attributes[attribute]!, attribute, entityName)
     }
     getInfoByPath(namePath: string[]): AttributeInfo {
         const [entityName, ...attributivePath] = namePath
-        let lastEntity = entityName
+        assert(attributivePath.length > 0, 'getInfoByPath should have a name path.')
+        let currentEntity = entityName
+        let parentEntity
         let currentAttribute
+        let lastAttribute
         let attributeData
         while(currentAttribute = attributivePath.shift()) {
-            const data = this.data.entities[lastEntity]
-            attributeData = data!.attributes[currentAttribute] as EntityEntityAttributeMapType
-            lastEntity = attributeData.isEntity ? attributeData.entityName : ''
+            const data = this.data.entities[currentEntity]
+            attributeData = currentAttribute === 'id' ? ID_ATTRIBUTE : data!.attributes[currentAttribute] as EntityEntityAttributeMapType
+            parentEntity = currentEntity
+            currentEntity = attributeData.isEntity ? attributeData.entityName : ''
+            lastAttribute = currentAttribute
         }
-
-        return new AttributeInfo(attributeData)
+        return new AttributeInfo(attributeData, lastAttribute, parentEntity)
     }
     getTableAndAlias(namePath: string[]): [string, string, EntityMapItemData, string, string, RelationMapItemData] {
         const [rootEntityName, ...relationPath] = namePath
@@ -150,7 +172,7 @@ export class EntityToTableMap {
             currentRelationData = this.data.relations[currentEntityAttribute.relationName]
             relationTable = currentRelationData.table
             // relationTable 的 alias 始终保持和 tableAlias 一致的规律
-            relationTableAlias = `REL-${lastTableAlias}`
+            relationTableAlias = `REL__${lastTableAlias}`
             isLastRelationSource = currentRelationData.targetEntity === currentEntityAttribute.entityName &&
                 currentRelationData.targetAttribute === currentAttributeName
         }
@@ -160,7 +182,18 @@ export class EntityToTableMap {
     }
     getTableAliasAndFieldName(namePath: string[], attributeName: string) {
         const [, lastTableAliasName,lastEntityData] = this.getTableAndAlias(namePath)
-        const fieldName = ((lastEntityData as EntityMapItemData).attributes[attributeName] as EntityValueAttributeMapType).field
+        const fieldName = attributeName === 'id' ? 'id' : ((lastEntityData as EntityMapItemData).attributes[attributeName] as EntityValueAttributeMapType).field
         return [lastTableAliasName, fieldName]
+    }
+    getReverseAttribute(entityName: string, attribute: string) : string {
+        const relationName = (this.data.entities[entityName].attributes[attribute] as EntityEntityAttributeMapType).relationName
+        const relationData = this.data.relations[relationName]
+        if (relationData.sourceEntity === entityName && relationData.sourceAttribute === attribute) {
+            return relationData.targetAttribute
+        } else if (relationData.targetEntity === entityName && relationData.targetAttribute === attribute) {
+            return relationData.sourceAttribute
+        } else {
+            assert(false, `wrong relation data ${entityName}.${attribute}`)
+        }
     }
 }

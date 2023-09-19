@@ -31,5 +31,33 @@ export function setByPath(root: ObjectContainer, inputPath: string[], value: any
         if (!pointer[nextAttr]) pointer[nextAttr] = {}
         pointer = pointer[nextAttr]
     }
-    return pointer[lastAttr]
+
+    pointer[lastAttr] = value
+    return true
+}
+
+export function mapTree(root: ObjectContainer, iteratorKeys: string[], fn: (object: any, context :string[]) => any, context: string[] = []) {
+    const result = fn(root, context)
+    iteratorKeys.forEach(key => {
+        if (result[key]) result[key] = mapTree(result[key] as ObjectContainer, iteratorKeys, fn, context.concat(key))
+    })
+
+    return result
+}
+
+
+export function deepMerge(a: ObjectContainer, b: ObjectContainer) {
+    const result = {}
+    const keys = new Set(Object.keys(a).concat(Object.keys(b)))
+    keys.forEach(k => {
+        if (a[k] && b[k]) {
+            assert(typeof a[k] === 'object' && typeof b[k]=== 'object', `${a[k]} or ${b[k]} is not object, cannot deep merge`)
+            result[k] = deepMerge(a[k], b[k])
+        } else if (a[k]) {
+            result[k] = a[k]
+        } else {
+            result[k] = b[k]
+        }
+    })
+    return result
 }
