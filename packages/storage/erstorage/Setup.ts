@@ -8,6 +8,7 @@ import {
     RelationMapItemData
 } from "./EntityToTableMap";
 import {assert} from "../util";
+import {Database} from "../../runtime/System";
 
 type ColumnData = {
     name:string,
@@ -30,7 +31,7 @@ export class DBSetup {
     public relationToJoinEntity = new Map<string,string>()
     public tables:TableData = {}
     public map: MapData = { relations: {}, entities: {}}
-    constructor(public entities: KlassInstanceOf<typeof Entity, false>[], public relations: KlassInstanceOf<typeof Relation, false>[]) {
+    constructor(public entities: KlassInstanceOf<typeof Entity, false>[], public relations: KlassInstanceOf<typeof Relation, false>[], public database?: Database) {
         this.buildMap()
         this.buildTables()
     }
@@ -144,17 +145,19 @@ export class DBSetup {
 
                     relationData.mergedTo = 'source'
                     relationData.sourceField = `${relationData.sourceEntity}_${relationData.sourceAttribute}`
-
+                    delete relationData.targetField
                 } else if (relType[0] === 'n') {
                     // n:1，只合并关系表
                     this.relationToJoinEntity.set(relationName, sourceEntity )
                     relationData.mergedTo = 'source'
                     relationData.sourceField = `${relationData.sourceEntity}_${relationData.sourceAttribute}`
+                    delete relationData.targetField
                 } else {
                     // 1:n 只合并关系表
                     this.relationToJoinEntity.set(relationName, targetEntity)
                     relationData.mergedTo = 'target'
-                    relationData.sourceField = `${relationData.targetEntity}_${relationData.targetAttribute}`
+                    relationData.targetField = `${relationData.targetEntity}_${relationData.targetAttribute}`
+                    delete relationData.sourceField
                 }
             }
         })
@@ -168,23 +171,26 @@ export class DBSetup {
         }
 
 
-        // 5. 重新修改 entity map 里面的 table 的名字。field 因为默认就加了前缀，所以不用管。
+        // 5. 重新修改 entity map 里面的 table 的名字。
+        //  CAUTION field 因为默认就加了前缀，所以不用管。
         this.entityToTableMap.forEach((tableName, entity) => {
             this.map.entities[entity].table = tableName
         })
+
         // 6. relation map 里面的 table 和 field 信息都要改
         this.relationToJoinEntity.forEach((entity, relationName) => {
             const relationData = this.map.relations[relationName]
             relationData.table = this.map.entities[entity].table
 
-
             // 这里的 field 要加前缀
             const relationAttributePrefix = this.getRelationFieldPrefix(relationData)
 
+            // relation 的 attributeData 是手动加的前缀，因为一开始不确定会往哪里合并，所以不能默认处理。
             Object.entries(relationData.attributes).forEach(([attribute, attributeData]) => {
                 attributeData.field = `${relationAttributePrefix}_${attribute}`
             })
         })
+
         // 7. 补充 relation 的辅助字段到 entity attribute 里面
         Object.entries(this.map.relations).forEach(([relation, relationData]) => {
             this.map.entities[relationData.sourceEntity].attributes[relationData.sourceAttribute] = {
@@ -192,17 +198,26 @@ export class DBSetup {
                 relType: relationData.relType,
                 entityName: relationData.targetEntity,
                 relationName: relation,
-                isSource: true
+                isSource: true,
+                table: this.map.entities[relationData.targetEntity].table,
+                // 这个 field 是指如果合表了，那么它在实体表里面的名字。
+                field: relationData.mergedTo ?
+                    (relationData.mergedTo === 'source' ? relationData.sourceField : relationData.targetField) :
+                    ''
             } as EntityEntityAttributeMapType
 
 
             this.map.entities[relationData.targetEntity].attributes[relationData.targetAttribute] = {
                 isEntity:true,
-                // CAUTION 这里翻转了！！！在 AttributeInfo 中方便判断。
+                // CAUTION 这里翻转了！在 AttributeInfo 中方便判断。不能用 Array.reverse()，因为不会返回新数组。
                 relType: [relationData.relType[1], relationData.relType[0]],
                 entityName: relationData.sourceEntity,
                 relationName: relation,
                 isSource:false,
+                table: this.map.entities[relationData.sourceEntity].table,
+                field: relationData.mergedTo ?
+                    (relationData.mergedTo === 'target' ? relationData.targetField : relationData.sourceField) :
+                    ''
             } as EntityEntityAttributeMapType
         })
 
@@ -273,7 +288,8 @@ export class DBSetup {
     }
     getDBFieldType(type: string) {
         if (type === 'pk') {
-            return 'INT PRIMARY KEY'
+            // TODO 不同的引擎不同，这里是 sqlite 的写法
+            return 'INTEGER PRIMARY KEY'
         } else if (type === 'id') {
             return 'INT'
         } else {
@@ -290,6 +306,11 @@ ${this.tables[tableName].columns.map(column => (`
 
 `
         ))
+    }
+    createTables() {
+        return Promise.all(this.createTableSQL().map(sql => {
+            return this.database!.scheme(sql)
+        }))
     }
 }
 

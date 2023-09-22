@@ -6,6 +6,7 @@ import {
     MatchExpressionData,
     MatchExpression, EntityQuery, EntityQueryData
 } from "../erstorage/ERStorage";
+import { SQLiteDB } from '../../runtime/BunSQLite'
 import {EntityToTableMap, MapData} from "../erstorage/EntityToTableMap";
 
 
@@ -29,24 +30,32 @@ const entityToTableMapData: MapData = {
                     relType: ['1', '1'],
                     entityName: 'Profile',
                     relationName: 'User_profile_user_Profile',
+                    table: 'User_Profile',
+                    field: 'User_profile',
                 },
                 leader: {
                     isEntity: true,
                     relType: ['n', '1'],
                     entityName: 'User',
                     relationName: 'User_leader_member_User',
+                    table: 'User_Profile',
+                    field: 'User_leader'
                 },
                 friends: {
                     isEntity: true,
                     relType: ['n', 'n'],
                     entityName: 'User',
                     relationName: 'User_friends_friends_User',
+                    table: 'User_Profile',
+                    field: ''
                 },
                 item: {
                     isEntity: true,
                     relType: ['1', '1'],
                     entityName: 'LargeItem',
                     relationName: 'User_item_owner_LargeItem',
+                    table: 'LargeItem',
+                    field: ''
                 }
             }
         },
@@ -123,7 +132,7 @@ const entityToTableMapData: MapData = {
     }
 }
 
-const database = {query: (sql: string) => Promise.resolve([])}
+const database = new SQLiteDB()
 const entityToTableMap = new EntityToTableMap(entityToTableMapData)
 
 describe('query agent test', () => {
@@ -201,27 +210,16 @@ describe('query agent test', () => {
 
     test('where clause test', () => {
 
-        const matchExpData: MatchExpressionData = {
-            type: 'group',
-            op: '&&',
-            left: {
-                type: 'variable',
-                name: 'name',
-                key: 'name',
-                value: ['=', 'A']
-            },
-            right: {
-                type: 'variable',
-                name: 'friends',
-                key: 'friends',
-                value: ['exist', {
-                    type: 'variable',
-                    name: 'age',
-                    key: 'age',
-                    value: ['<', '18']
-                }]
-            }
-        } as MatchExpressionData
+        const matchExpData: MatchExpressionData = MatchExpression.createFromAtom({
+            key: 'name',
+            value: ['=', 'A']
+        }).and({
+            key: 'friends',
+            value: ['exist', {
+                key: 'age',
+                value: ['<', '18']
+            }]
+        })
 
         const matchExp = new MatchExpression('User', entityToTableMap, matchExpData)
         const queryAgent = new QueryAgent(entityToTableMap, database)
@@ -229,7 +227,7 @@ describe('query agent test', () => {
         const fieldMatchExpWithValue = queryAgent.parseMatchExpressionValue('User', fieldMatchExp!)
 
 
-        expect(fieldMatchExpWithValue.left).toMatchObject({
+        expect(fieldMatchExpWithValue!.left.data).toMatchObject({
             fieldName: [
                 "User",
                 "user_name"
@@ -237,7 +235,7 @@ describe('query agent test', () => {
             fieldValue: "= A"
         })
 
-        expect(fieldMatchExpWithValue.right).toMatchObject({
+        expect(fieldMatchExpWithValue!.right.data).toMatchObject({
             isFunctionMatch: true,
             namePath: ['User', 'friends']
         })
@@ -245,26 +243,17 @@ describe('query agent test', () => {
 
         // 模拟 inner 的情况
         const innerEntityQuery = EntityQuery.create('User', entityToTableMap, {
-            matchExpression: {
-                type: 'group',
-                op: '&&',
+            matchExpression: MatchExpression.createFromAtom({
                 // 这里应该是外部添加的关于和 outer 相等的条件
-                left: {
-                    type: 'variable',
-                    name: '',
-                    key: 'friends.id',
-                    value: ['=', 'User.id']
-                },
-                right: {
-                    type: 'variable',
-                    name: '',
-                    key: 'age',
-                    value: ['<', '18']
-                }
-            }
+                key: 'friends.id',
+                value: ['=', 'User.id']
+            }).and({
+                key: 'age',
+                value: ['<', '18']
+            })
         } as EntityQueryData)
 
-        expect(fieldMatchExpWithValue.right.fieldValue).toBe(`
+        expect(fieldMatchExpWithValue!.right.data.fieldValue).toBe(`
 EXISTS (
 ${queryAgent.buildFindQuery(innerEntityQuery, 'User_friends')}
 )
@@ -295,39 +284,20 @@ ${queryAgent.buildFindQuery(innerEntityQuery, 'User_friends')}
                     ]
                 }],
             ],
-            matchExpression: {
-                type: 'group',
-                op: '&&',
-                // 这里应该是外部添加的关于和 outer 相等的条件
-                left: {
-                    type: 'variable',
-                    name: 'name',
+            matchExpression: MatchExpression.createFromAtom({
+                key: 'name',
+                value: ['=', 'A']
+            }).and({
+                key: 'friends',
+                value: ['exist',  MatchExpression.createFromAtom({
+                    key: 'age',
+                    value: ['<', '18']
+                }).and({
                     key: 'name',
-                    value: ['=', 'A']
-                },
-                right: {
-                    type: 'variable',
-                    name: 'friends',
-                    key: 'friends',
-                    value: ['exist', {
-                        type: 'group',
-                        op: '&&',
-                        left: {
-                            type: 'variable',
-                            name: 'age',
-                            key: 'age',
-                            value: ['<', '18']
-                        },
-                        right: {
-                            type: 'variable',
-                            name: 'name',
-                            key: 'name',
-                            isReferenceValue: true,
-                            value: ['=', 'name']
-                        }
-                    }]
-                }
-            }
+                    isReferenceValue: true,
+                    value: ['=', 'name']
+                })]
+            })
         } as EntityQueryData)
 
         const queryAgent = new QueryAgent(entityToTableMap, database)

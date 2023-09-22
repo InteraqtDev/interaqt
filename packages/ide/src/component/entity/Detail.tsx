@@ -1,7 +1,7 @@
 import {atom, Atom, computed} from "rata";
 import {Entity, Property} from "../../../../shared/entity/Entity";
 import {Select} from "../form/Select";
-import {MapActivityToEntity} from "../../../../shared/entity/IncrementalComputation";
+import {MapActivityToEntity} from "../../../../shared/IncrementalComputation";
 import {createDraftControl} from "../createDraftControl";
 import {KlassInstanceOf, KlassType, ReactiveKlassInstance} from "../../../../shared/createClass";
 import {Code} from "../code/Code";

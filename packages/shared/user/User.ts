@@ -14,15 +14,19 @@ export const UserAttributive = createClass({
         name: {
             type: 'string'
         },
+        // 是否是角色定语
+        isRole: {
+            type: 'boolean'
+        },
+        // 是否是引用了同 activity 下其他的 interaction 的 user。
+        //  这个值只有在 isRole 为 true 时才可能为 true
         isRef: {
             type: 'boolean'
         },
-        isRole: {
-            type: 'boolean'
-        }
     }
 })
 
+// TODO 它的 content 应该是定语的 boolExpression
 export const UserAttributives = createClass({
     name: 'UserAttributives',
     display: (obj) => `${obj.name}`,
@@ -32,29 +36,6 @@ export const UserAttributives = createClass({
         },
     }
 })
-
-const validNameFormatExp = /^[a-z(A-Z0-9_]+$/
-
-export const Role = createClass({
-    name: 'Role',
-    display: (obj) => obj.name,
-    public: {
-        name: {
-            type: 'string',
-            required: true,
-            constraints: {
-                format({ name } : {name:Atom<string>}) {
-                    return computed(() => validNameFormatExp.test(name))
-                },
-            }
-        },
-        isRef: {
-            type: 'boolean',
-            defaultValue: () => false
-        }
-    }
-})
-
 
 export function createUserRoleAttributive({name, isRef = false}: { name: string, isRef?: boolean}, options?: KlassOptions|ReactiveKlassOptions) {
     // TODO type?

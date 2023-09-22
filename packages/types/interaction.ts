@@ -24,7 +24,8 @@ export type InteractionEventArgs = {
     query?: EventQuery
 }
 
-export type interactionEvent = {
+export type InteractionEvent = {
     interactionId: string,
+    activityId?: string,
     args: InteractionEventArgs
 }

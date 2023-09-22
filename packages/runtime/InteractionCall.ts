@@ -2,7 +2,7 @@ import {GetAction, InteractionInstanceType} from "../shared/activity/Activity";
 import { UserAttributive } from "../shared/user/User";
 // import { Entity} from "../shared/entity/Entity";
 import {System} from "./System";
-import {interactionEvent, InteractionEventArgs} from "../types/interaction";
+import {InteractionEvent, InteractionEventArgs} from "../types/interaction";
 import {Attributives, Concept, ConceptAlias, ConceptInstance, DerivedConcept} from "../types/attributive";
 import {BoolExpressionEvaluator} from "./boolExpression";
 import {BoolExpression, BoolExpressionNodeTypes, OperatorNames} from "../types/boolExpression";
@@ -160,14 +160,14 @@ export class InteractionCall {
     isGetInteraction() {
         return this.interaction.action === GetAction
     }
-    saveEvent(interactionEvent: interactionEvent) {
+    saveEvent(interactionEvent: InteractionEvent) {
         this.system.saveEvent(interactionEvent)
     }
     retrieveData(interactionEvent: InteractionEventArgs) {
         // TODO
         // return this.system.storage.get(interactionEvent.payload, interactionEvent.query)
     }
-    call(interactionEventArgs: InteractionEventArgs): InteractionCallResponse {
+    call(interactionEventArgs: InteractionEventArgs, activityId?): InteractionCallResponse {
         const response: InteractionCallResponse = {
             error: null,
             data: null,
@@ -176,7 +176,8 @@ export class InteractionCall {
 
         const interactionEvent = {
             interactionId: this.interaction.uuid,
-            args: interactionEventArgs
+            args: interactionEventArgs,
+            activityId
         }
 
         try {

@@ -1,3 +1,4 @@
+// 完整交友的例子
 export const data = [{
     "type": "Entity",
     "options": {"isReactive": true},

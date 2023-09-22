@@ -2,7 +2,10 @@ export const data = [{
     "type": "MapActivityToEntity",
     "options": {"isReactive": true},
     "uuid": "a552045f-50bc-4b55-bc0d-71baca3a3bee",
-    "public": {"source": "764ebdcd-c0cc-4c3d-9ed8-6acc8e57b9ff", "handle": `function map(activity:x){
+    "public": {
+        "source": "764ebdcd-c0cc-4c3d-9ed8-6acc8e57b9ff",
+        "type": "MapActivityToEntity",
+        "handle": `function map(activity:x){
     return {
         from: x.interactions.sendFriendRequest.$user,
         to: x.interactions.sendFriendRequest.payload.to,

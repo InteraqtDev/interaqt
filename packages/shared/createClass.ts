@@ -1,5 +1,5 @@
 import {atom, Atom, isAtom, isReactive, rawStructureClone, reactive} from "rata";
-import {isPlainObject, hasOwn, isObject} from "../ide/src/util";
+import {isPlainObject, hasOwn, isObject} from "./util";
 import {toRaw, UnwrapReactive} from "rata";
 
 type PrimitivePropType = 'string'|'number'|'boolean'| 'object'
@@ -142,10 +142,9 @@ export function createInstancesFromString(objStr: string) {
     return createInstances(objects)
 }
 
-// FIXME 改成最后统一处理 uuid 的情况
 export function createInstances(objects: KlassRawInstanceDataType[], reactiveForce?: boolean) {
     const uuidToInstance = new Map<string, KlassInstance<any>>()
-    const unsatisfiedInstances = new Map<KlassInstance<any>, {sure: object, maybe: object}>()
+    const unsatisfiedInstances = new Map<KlassInstance<any>, object>()
 
     objects.forEach(({ type, options = {}, uuid, public: rawProps } :KlassRawInstanceDataType) => {
         const Klass = KlassByName.get(type)!
@@ -157,22 +156,15 @@ export function createInstances(objects: KlassRawInstanceDataType[], reactiveFor
         // 根据
         const publicProps: {[k:string]:any} = {}
         const unsatisfiedProps: {[k:string]:any} = {}
-        const maybeUnsatisfiedProps: {[k:string]:any} = {}
         Object.entries(rawProps).forEach(([propName, propValue]) => {
-            // FIXME 没有处理 ClassType 和 primitive 混合的情况
-            if (typeof Klass.public[propName].type === 'function' || (Array.isArray(Klass.public[propName].type) && typeof Klass.public[propName].type[0] === 'function')) {
+            const klassType = Klass.public[propName].type
+            publicProps[propName] = propValue
+
+            // 除了type 表明了不是 uuid 的情况，其他全部当成可能是 uuid 的情况
+            if (!(typeof klassType === 'string' ||
+                Array.isArray(klassType) && klassType.every(k => typeof k === 'string'))
+            ) {
                 unsatisfiedProps[propName] = propValue
-            } else if (typeof Klass.public[propName].type === 'string' || (Array.isArray(Klass.public[propName].type) && typeof Klass.public[propName].type[0] === 'string')){
-                publicProps[propName] = propValue
-            } else if (Klass.public[propName].computedType){
-                if (propValue) {
-                    // FIXME value 可能是一个具体的值，也可能是 ref, 这里只能尝试。
-                    //  我们这里没有考虑 是 unsatisfied ref 的情况
-                    publicProps[propName] = propValue
-                    maybeUnsatisfiedProps[propName] = propValue
-                }
-            } else {
-                throw new Error('unknown prop type')
             }
         })
 
@@ -180,38 +172,24 @@ export function createInstances(objects: KlassRawInstanceDataType[], reactiveFor
         uuidToInstance.set(uuid, instance)
 
         if (Object.keys(unsatisfiedProps).length) {
-            unsatisfiedInstances.set(instance, { sure: unsatisfiedProps, maybe: maybeUnsatisfiedProps})
+            unsatisfiedInstances.set(instance, unsatisfiedProps)
         }
     })
 
-    for(let [instance, {sure: unsatisfiedProps, maybe: maybeUnsatisfiedProps}] of unsatisfiedInstances) {
+    for(let [instance, unsatisfiedProps] of unsatisfiedInstances) {
         Object.entries(unsatisfiedProps).forEach(([propName, propValue]) => {
+            // TODO 这里要不要做更加严格的校验，防止真的出现了 value 的值刚好就和 uuid 匹配上了？
+            const refs = Array.isArray(propValue) ? propValue.map(maybeUUID => (uuidToInstance.get(maybeUUID)||maybeUUID)) : (uuidToInstance.get(propValue)||propValue)
+
             // CAUTION 这里如果是 reactive 的默认一定有 reactive 的值。那么用 reactive 的方式
-            const refs = Array.isArray(propValue) ? propValue.map(uuid => uuidToInstance.get(uuid)) : uuidToInstance.get(propValue)
             if (instance._options.isReactive) {
                 if (Array.isArray(propValue)) {
-                    instance[propName].push(...(refs as KlassInstance<any>[]))
+                    instance[propName].splice(0, Infinity, ...(refs as KlassInstance<any>[]))
                 } else {
                     instance[propName](refs)
                 }
             } else {
                 instance[propName] = refs
-            }
-        })
-
-        Object.entries(maybeUnsatisfiedProps).forEach(([propName, propValue]) => {
-            // CAUTION 这里如果是 reactive 的默认一定有 reactive 的值。那么用 reactive 的方式
-            const refs = Array.isArray(propValue) ? propValue.map(uuid => uuidToInstance.get(uuid)) : uuidToInstance.get(propValue)
-            if (Array.isArray(refs) ? refs.every(x => x) : refs) {
-                if (instance._options.isReactive) {
-                    if (Array.isArray(propValue)) {
-                        instance[propName].push(...refs as KlassInstance<any>[])
-                    } else {
-                        instance[propName](refs)
-                    }
-                } else {
-                    instance[propName] = refs
-                }
             }
         })
     }
@@ -384,9 +362,3 @@ export function removeAllInstance() {
         Klass.instances.splice(0, Infinity)
     }
 }
-
-// TODO 用来标记的
-export const CircularRef = createClass({
-    name: 'CircularRef',
-    public: {}
-})

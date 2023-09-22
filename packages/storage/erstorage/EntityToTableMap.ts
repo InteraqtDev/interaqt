@@ -41,8 +41,31 @@ export class AttributeInfo {
         return this.isManyToMany||this.isOneToMany
     }
     get entityName() {
-        if (!this.isEntity) throw new Error('not a entity')
+        assert(this.isEntity, `${this.attributeName} is not a entity`)
         return (this.data as EntityEntityAttributeMapType).entityName
+    }
+    get table() {
+        assert(this.isEntity, `${this.attributeName} is not a entity`)
+        return (this.data as EntityEntityAttributeMapType).table
+    }
+    get field() {
+        return (this.data as EntityValueAttributeMapType).field
+    }
+}
+
+
+export class RelationInfo {
+    constructor(public data: RelationMapItemData) {
+
+    }
+    get table() {
+        return this.data.table
+    }
+    get attributes() {
+        return this.data.attributes
+    }
+    get sourceEntity() {
+        return this.data.sourceEntity
     }
 }
 
@@ -64,7 +87,10 @@ export type EntityEntityAttributeMapType = {
     relType: ['1'|'n', '1'|'n'],
     entityName: string,
     relationName: string,
-    isSource? : boolean
+    isSource? : boolean,
+    table: string,
+    // 这个 field 是指如果合表了，那么它在实体表里面的名字。
+    field : string
 }
 
 export type EntityMapItemData = {
@@ -89,6 +115,7 @@ export type RelationMapItemData = {
     targetEntity: string,
     targetAttribute: string,
     table: string,
+    // CAUTION 特别注意，这里的 sourceField 和 targetField 和 sourceAttribute 一样，是指站在 source 的角度去看，存的是关联实体(target)的 id. 不要搞成了自己的 id 。
     sourceField: string,
     targetField: string,
     mergedTo? : 'source'|'target'
@@ -117,12 +144,24 @@ export class EntityToTableMap {
     getEntityTable(entityName: string) {
         return this.data.entities[entityName].table
     }
+    getRelationTable(entityName: string, attribute: string) {
+        return this.data.relations[(this.data.entities[entityName].attributes[attribute] as EntityEntityAttributeMapType).relationName].table
+    }
+    getReverseRelatedName(entityName: string, attribute: string) {
+        const relationData = this.data.relations[(this.data.entities[entityName].attributes[attribute] as EntityEntityAttributeMapType).relationName]
+        return relationData.sourceEntity === entityName ? relationData.targetAttribute : relationData.sourceAttribute
+    }
     getInfo(entityName: string, attribute: string) : AttributeInfo{
         if (!this.data.entities[entityName]!.attributes[attribute]) debugger
         assert(!!this.data.entities[entityName]!.attributes[attribute],
             `cant find attribute ${attribute} in ${entityName}. attributes: ${Object.keys(this.data.entities[entityName]!.attributes)}`
         )
         return new AttributeInfo(this.data.entities[entityName]!.attributes[attribute]!, attribute, entityName)
+    }
+    getRelationInfoData(entityName: string, attribute: string) {
+        const relationName = (this.data.entities[entityName].attributes[attribute] as EntityEntityAttributeMapType).relationName
+        assert(!!relationName, `cannot find relation ${entityName} ${attribute}`)
+        return this.data.relations[relationName]
     }
     getInfoByPath(namePath: string[]): AttributeInfo {
         const [entityName, ...attributivePath] = namePath
@@ -195,5 +234,21 @@ export class EntityToTableMap {
         } else {
             assert(false, `wrong relation data ${entityName}.${attribute}`)
         }
+    }
+    groupAttributes(entityName: string, attributeNames: string[]) : [AttributeInfo[], AttributeInfo[]]{
+        const valueAttributes = []
+        const entityAttributes = []
+        attributeNames.forEach(attributeName => {
+            if (this.data.entities[entityName].attributes[attributeName]) {
+                const info = this.getInfo(entityName, attributeName)
+                if (info.isValue) {
+                    valueAttributes.push(info)
+                } else {
+                    entityAttributes.push(info)
+                }
+            }
+        })
+
+        return [valueAttributes, entityAttributes]
     }
 }

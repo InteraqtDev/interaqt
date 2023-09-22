@@ -6,18 +6,19 @@ import {Checkbox} from "../form/Checkbox";
 import {Input} from "../form/Input";
 import {createDraftControl} from "../createDraftControl";
 import {EntityAttributive, EntityAttributives, Payload, PayloadItem} from "../../../../shared/activity/Activity";
-import { UserAttributive, UserAttributives, Role } from "../../../../shared/user/User";
+import { UserAttributive, UserAttributives } from "../../../../shared/user/User";
 import {Button} from "../form/Button";
 import {Select} from "../form/Select";
 import {Entity} from "../../../../shared/entity/Entity";
+import {KlassInstanceOf} from "../../../../shared/createClass";
 
 
 type PayloadInputProps = {
-    value: Atom<ReturnType<typeof Payload.createReactive>>,
-    roleAttributiveOptions: ReturnType<typeof Role.createReactive>[],
-    entities: ReturnType<typeof Entity.createReactive>[],
-    userAttributiveOptions: ReturnType<typeof UserAttributive.createReactive>[],
-    entityAttributives: ReturnType<typeof EntityAttributive.createReactive>[],
+    value: Atom<KlassInstanceOf<typeof Payload, true>>,
+    roleAttributiveOptions: KlassInstanceOf<typeof UserAttributive, true>[],
+    entities: KlassInstanceOf<typeof Entity, true>[],
+    userAttributiveOptions: KlassInstanceOf<typeof UserAttributive, true>[],
+    entityAttributives: KlassInstanceOf<typeof EntityAttributive, true>[],
     selectedAttributive: Atom<any>
 }
 

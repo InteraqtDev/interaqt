@@ -45,9 +45,13 @@ export function EREditor({ entities, relations, activities }: EREditorProps) {
     }) as RelationEntityMap
 
 
-    setTimeout(() => {
-        onChooseEntity(entities[1])
-    })
+    // TODO test
+    if (entities.length) {
+        setTimeout(() => {
+            onChooseEntity(entities[0])
+        })
+    }
+
 
     const onChooseEntity = (entity: Entity) => {
         columns.splice(0, Infinity, {
@@ -56,7 +60,7 @@ export function EREditor({ entities, relations, activities }: EREditorProps) {
         })
     }
 
-    const openRelatedEntity = (sourceTarget: Entity, relationName: string,  index: Atom<number>) => {
+    const openRelatedEntity = (sourceTarget: KlassInstanceOf<typeof Entity, true>, relationName: string,  index: Atom<number>) => {
         columns[index].selected(relationName)
         const [, targetEntity] = relationsByEntity.get(sourceTarget).get(relationName)
         columns.splice(index+1, Infinity, {
@@ -69,7 +73,7 @@ export function EREditor({ entities, relations, activities }: EREditorProps) {
         })
     }
 
-    const addRelation = (relation: Relation) => {
+    const addRelation = (relation: KlassInstanceOf<typeof Relation, true>) => {
         relations.push(relation)
     }
 
@@ -79,6 +83,7 @@ export function EREditor({ entities, relations, activities }: EREditorProps) {
         console.log(newEntity)
         entities.push(Entity.createReactive(newEntity))
         entityAddDialogVisible(false)
+
     }
 
     const [entityAddDialogVisible, entityAddDialog] = createDialog(
@@ -106,7 +111,7 @@ export function EREditor({ entities, relations, activities }: EREditorProps) {
             </div>
 
 
-            {incMap(entities, (entity: Entity) => (
+            {incMap(entities, (entity: Entity) => entity.isRef() ? null :(
                 <div className="py-4 text-center border-b-2 border-slate-200 cursor-pointer" onClick={() => onChooseEntity(entity)}>{entity.name}</div>
             ))}
         </div>

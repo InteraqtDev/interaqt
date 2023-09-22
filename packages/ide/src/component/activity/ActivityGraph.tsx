@@ -10,7 +10,7 @@ import {ActivityNode} from "./AcitivityNode";
 import hotkeys from "hotkeys-js";
 import {service} from "../service";
 import {EntityAttributive, Activity, forEachInteraction} from "../../../../shared/activity/Activity";
-import {Role, UserAttributive} from "../../../../shared/user/User";
+import {UserAttributive} from "../../../../shared/user/User";
 import {Entity} from "../../../../shared/entity/Entity";
 
 

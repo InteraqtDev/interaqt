@@ -44,6 +44,7 @@ export function createFormForEntityProperty<T>(EntityType: typeof T, propertyNam
 
 export function createFormForEntity<T>(EntityType: typeof T, formOptions? : FormOptions, renderOptions?: RenderFormOptions) {
     const propertyNames = formOptions?.fields || Object.keys(EntityType.public)
+    console.log(propertyNames)
 
     return createForm({
         title: renderOptions?.title,

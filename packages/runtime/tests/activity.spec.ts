@@ -1,4 +1,5 @@
-import {describe, test, expect, beforeEach} from "@jest/globals";
+import {describe, test, expect, beforeEach} from "bun:test";
+
 import { MemorySystem } from "../MemorySystem";
 import {createInstances, getInstance, KlassByName, KlassInstanceOf, removeAllInstance} from "../../shared/createClass";
 
@@ -6,7 +7,7 @@ import { Activity } from "../../shared/activity/Activity";
 import {ActivityCall, ActivityGroupNode} from "../AcitivityCall";
 
 describe("activity state", () => {
-    let activityCall: ActivityCall
+    let createFriendRelationActivityCall: ActivityCall
     let system: MemorySystem
 
     let sendRequestUUID:string
@@ -27,22 +28,21 @@ describe("activity state", () => {
          * message: Message
          */
 
-        // TODO 需要能 destroy instance
         createInstances(data, false)
         system = new MemorySystem()
         system.conceptClass = KlassByName
         const mainActivity = (getInstance(Activity) as KlassInstanceOf<typeof Activity, false>[]).find(a => a.name === 'createFriendRelation')!
-        activityCall = new ActivityCall(mainActivity, system)
+        createFriendRelationActivityCall = new ActivityCall(mainActivity, system)
 
-        sendRequestUUID = activityCall.graph.head.uuid
-        approveUUID = (activityCall.graph.tail as ActivityGroupNode).childSeqs![0].head.uuid
-        rejectUUID = (activityCall.graph.tail as ActivityGroupNode).childSeqs![1].head.uuid
-        cancelUUID = (activityCall.graph.tail as ActivityGroupNode).childSeqs![2].head.uuid
+        sendRequestUUID = createFriendRelationActivityCall.graph.head.uuid
+        approveUUID = (createFriendRelationActivityCall.graph.tail as ActivityGroupNode).childSeqs![0].head.uuid
+        rejectUUID = (createFriendRelationActivityCall.graph.tail as ActivityGroupNode).childSeqs![1].head.uuid
+        cancelUUID = (createFriendRelationActivityCall.graph.tail as ActivityGroupNode).childSeqs![2].head.uuid
     })
 
     test("call friend request activity with approve response", () => {
         // 1. 创建 activity
-        const { activityId, state } =  activityCall.create()
+        const { activityId, state } =  createFriendRelationActivityCall.create()
         expect(activityId).not.toBe(null)
         expect(state.current!.uuid).toBe(sendRequestUUID)
         expect(approveUUID).not.toBe(null)
@@ -50,57 +50,57 @@ describe("activity state", () => {
         expect(cancelUUID).not.toBe(null)
 
         // 2. 交互顺序错误 approve
-        const res1 = activityCall.callInteraction(activityId, approveUUID, {user: userA})
+        const res1 = createFriendRelationActivityCall.callInteraction(activityId, approveUUID, {user: userA})
 
         expect(res1.error).toBeDefined()
 
         // 3. a 发起 sendFriendRequest
-        const res2 = activityCall.callInteraction(activityId, sendRequestUUID, {user: userA, payload: {to: userB}})
+        const res2 = createFriendRelationActivityCall.callInteraction(activityId, sendRequestUUID, {user: userA, payload: {to: userB}})
         expect(res2.error).toBeUndefined()
 
         // 4. 交互顺序错误 a sendFriendRequest
-        const res3 = activityCall.callInteraction(activityId, sendRequestUUID, {user: userA})
+        const res3 = createFriendRelationActivityCall.callInteraction(activityId, sendRequestUUID, {user: userA})
         expect(res3.error).toBeDefined()
 
         // 5. 角色错误 a approve
-        const res4 = activityCall.callInteraction(activityId, approveUUID, {user: userA})
+        const res4 = createFriendRelationActivityCall.callInteraction(activityId, approveUUID, {user: userA})
         expect(res4.error).toBeDefined()
 
 
         // 6. 正确 b approve
-        const res5 = activityCall.callInteraction(activityId, approveUUID, {user: userB})
+        const res5 = createFriendRelationActivityCall.callInteraction(activityId, approveUUID, {user: userB})
         expect(res5.error).toBeUndefined()
 
         // 7. 错误 b reject
-        const res6 = activityCall.callInteraction(activityId, rejectUUID, {user: userB})
+        const res6 = createFriendRelationActivityCall.callInteraction(activityId, rejectUUID, {user: userB})
         expect(res6.error).toBeDefined()
 
         // 8. 错误 a cancel
-        const res7 = activityCall.callInteraction(activityId, cancelUUID, {user: userA})
+        const res7 = createFriendRelationActivityCall.callInteraction(activityId, cancelUUID, {user: userA})
         expect(res7.error).toBeDefined()
         // 8. 获取 activity 状态是否 complete
-        const currentState = activityCall.getState(activityId)
+        const currentState = createFriendRelationActivityCall.getState(activityId)
         expect(currentState.current).toBeUndefined()
     })
 
     test("call friend request activity with cancel response", () => {
         // 1. 创建 activity
-        const { activityId} =  activityCall.create()
+        const { activityId} =  createFriendRelationActivityCall.create()
 
         // 3. a 发起 sendFriendRequest
-        const res2 = activityCall.callInteraction(activityId, sendRequestUUID, {user: userA, payload: {to: userB}})
+        const res2 = createFriendRelationActivityCall.callInteraction(activityId, sendRequestUUID, {user: userA, payload: {to: userB}})
         expect(res2.error).toBeUndefined()
 
         // 6. 正确 a cancel
-        const res5 = activityCall.callInteraction(activityId, cancelUUID, {user: userA})
+        const res5 = createFriendRelationActivityCall.callInteraction(activityId, cancelUUID, {user: userA})
         expect(res5.error).toBeUndefined()
 
         // 7. 错误 b reject
-        const res6 = activityCall.callInteraction(activityId, rejectUUID, {user: userB})
+        const res6 = createFriendRelationActivityCall.callInteraction(activityId, rejectUUID, {user: userB})
         expect(res6.error).toBeDefined()
 
         // 8. 获取 activity 状态是否 complete
-        const currentState = activityCall.getState(activityId)
+        const currentState = createFriendRelationActivityCall.getState(activityId)
         expect(currentState.current).toBeUndefined()
     })
 

@@ -1,6 +1,5 @@
 import {Atom, incUnique, computed, incPick} from 'rata'
-import {createClass, getInstance} from "../createClass";
-import {MapActivityToEntity} from "./IncrementalComputation";
+import {createClass, getInstance, KlassType} from "../createClass";
 
 
 export enum PropertyTypes {
@@ -10,7 +9,7 @@ export enum PropertyTypes {
 }
 
 
-const validNameFormatExp = /^[a-z(A-Z0-9_]+$/
+const validNameFormatExp = /^[a-zA-Z0-9_]+$/
 
 
 export const Property = createClass({
@@ -20,11 +19,12 @@ export const Property = createClass({
         name: {
             type: 'string',
             required: true,
+            collection: false,
             constraints: {
-                format({ name } : {name:Atom<string>}) {
+                format({name}: { name: Atom<string> }) {
                     return computed(() => validNameFormatExp.test(name))
                 },
-                length({ name } : {name:Atom<string>}) {
+                length({name}: { name: Atom<string> }) {
                     return computed(() => name.length > 1 && name.length < 5)
                 }
             }
@@ -38,19 +38,19 @@ export const Property = createClass({
         },
         collection: {
             type: 'boolean',
-            defaultValue () {
+            defaultValue() {
                 return false
             }
         },
         args: {
             // TODO 怎么表达 args？？需要根据不同的 type 类型构建。例如 string 长度，number 范围。
-            computedType: (values: {type: PropertyTypes}) => PropertyTypeMap[values.type],
+            computedType: (values: { type: PropertyTypes }) => PropertyTypeMap[values.type],
         }
     }
 })
 
 export const constraints = {
-    entityNameUnique({entities} : {entities: (typeof Entity)[]}) {
+    entityNameUnique({entities}: { entities: (typeof Entity)[] }) {
         const uniqueNames = incUnique(incPick(entities, '$name'))
         return computed(() => uniqueNames.size === entities.length)
     }
@@ -63,13 +63,16 @@ export const Entity = createClass({
         name: {
             type: 'string',
             constraints: {
-                nameFormat({ name }: {name: Atom<string>} ) {
-                    return computed(() => validNameFormatExp.test(name))
+                nameFormat({name}: { name: Atom<string> }) {
+                    return computed(() => {
+                        return validNameFormatExp.test(name)
+                    })
                 }
             }
         },
         computedData: {
-            type: [ MapActivityToEntity ],
+            // CAUTION 这里的具体类型等着外面注册 IncrementalComputationHandle 的时候修补
+            type: [] as KlassType<any>[],
             collection: false,
         },
         properties: {
@@ -77,7 +80,7 @@ export const Entity = createClass({
             collection: true,
             constraints: {
                 // 默认第一参数是 property 本身，第二参数是 entity
-                eachNameUnique({ properties }) {
+                eachNameUnique({properties}) {
                     // CAUTION 这里取的是 leaf atom，不然到 incUnique 里面已经监听不到  name string 的变化了。
                     // FIXME 实例化之后 property 不是个 Class 吗？它的 name 就是个 atom，也没有 $name 这个属性，如何统一？？？
                     const uniqueNames = incUnique(incPick(properties, '$name'))
@@ -98,8 +101,7 @@ export const Entity = createClass({
 })
 
 
-
-export const PropertyTypeMap =  {
+export const PropertyTypeMap = {
     [PropertyTypes.String]: 'string',
     [PropertyTypes.Number]: 'number',
     [PropertyTypes.Boolean]: 'boolean',
@@ -117,18 +119,18 @@ export const Relation = createClass({
                 return getInstance(Entity)
             }
         },
-        targetName1 : {
+        targetName1: {
             type: 'string',
             required: true,
             constraints: {
-                nameNotSameWithProp({ entity1, targetName1 }) {
+                nameNotSameWithProp({entity1, targetName1}) {
                     return computed(() => {
                         return entity1?.properties?.every((p: typeof Property) => {
                             return p.name !== targetName1
                         })
                     })
                 },
-                nameUnique({ entity1, entity2, targetName1, targetName2 }) {
+                nameUnique({entity1, entity2, targetName1, targetName2}) {
                     return computed(() => {
                         return !(entity1 === entity2 && targetName1 === targetName2)
                     })
@@ -142,22 +144,51 @@ export const Relation = createClass({
                 return getInstance(Entity)
             }
         },
-        targetName2 : {
+        targetName2: {
             type: 'string',
             required: true,
             constraints: {
-                nameNotSameWithProp({ entity2, targetName2 }) {
+                nameNotSameWithProp({entity2, targetName2}) {
                     return computed(() => {
                         return entity2?.properties?.every((p: typeof Property) => {
                             return p.name !== targetName2
                         })
                     })
                 },
-                nameUnique({ targetName1, entity1, entity2, targetName2 }) {
+                nameUnique({targetName1, entity1, entity2, targetName2}) {
                     return computed(() => {
                         return !(entity1 === entity2 && targetName1 === targetName2)
                     })
                 }
+            }
+        },
+        relType: {
+            type: 'string',
+            collection: false,
+            options() {
+                return ['1:1', '1:n', 'n:1', 'n:n']
+            },
+            defaultValue() {
+                return ['1:1']
+            }
+        },
+        properties: {
+            type: Property,
+            collection: true,
+            constraints: {
+                // 这里是从上面复制下来的。
+                // 默认第一参数是 property 本身，第二参数是 relation
+                eachNameUnique({properties}) {
+                    // CAUTION 这里取的是 leaf atom，不然到 incUnique 里面已经监听不到  name string 的变化了。
+                    // FIXME 实例化之后 property 不是个 Class 吗？它的 name 就是个 atom，也没有 $name 这个属性，如何统一？？？
+                    const uniqueNames = incUnique(incPick(properties, '$name'))
+                    return computed(() => {
+                        return uniqueNames.size === properties.length
+                    })
+                }
+            },
+            defaultValue() {
+                return []
             }
         },
     }

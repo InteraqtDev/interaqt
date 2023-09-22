@@ -320,7 +320,7 @@ export class ActivityCall {
             }
         }
 
-        const res = interactionCall.call(interactionEventArgs)
+        const res = interactionCall.call(interactionEventArgs, activityId)
         if (res.error) {
             return res
         }

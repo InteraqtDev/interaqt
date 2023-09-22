@@ -1,8 +1,6 @@
 import { expect, test, describe } from "bun:test";
-import {AttributeQuery, AttributeQueryData, MatchExpression, MatchExpressionData} from "../erstorage/ERStorage";
+import { MatchExpression, MatchExpressionData} from "../erstorage/ERStorage";
 import {EntityToTableMap, MapData} from "../erstorage/EntityToTableMap";
-import {BoolExpressionNodeTypes} from "../../types/boolExpression";
-
 
 const entityToTableMapData: MapData = {
     entities: {
@@ -24,24 +22,32 @@ const entityToTableMapData: MapData = {
                     relType: ['1', '1'],
                     entityName: 'Profile',
                     relationName: 'User_profile_user_Profile',
+                    table: 'User_Profile',
+                    field: 'User_profile',
                 },
                 leader: {
                     isEntity: true,
                     relType: ['n', '1'],
                     entityName: 'User',
                     relationName: 'User_leader_member_User',
+                    table: 'User_Profile',
+                    field: 'User_leader'
                 },
                 friends: {
                     isEntity: true,
                     relType: ['n', 'n'],
                     entityName: 'User',
                     relationName: 'User_friends_friends_User',
+                    table: 'User_Profile',
+                    field: ''
                 },
                 item: {
                     isEntity: true,
                     relType: ['1', '1'],
                     entityName: 'LargeItem',
                     relationName: 'User_item_owner_LargeItem',
+                    table: 'LargeItem',
+                    field: ''
                 }
             }
         },
@@ -123,22 +129,13 @@ const entityToTableMap = new EntityToTableMap(entityToTableMapData)
 describe('match expression test', () => {
     test("basic match query", () => {
 
-        const queryData:MatchExpressionData = {
-            type: BoolExpressionNodeTypes.group,
-            op: '&&',
-            left: {
-                type: BoolExpressionNodeTypes.variable,
-                name: 'leader.name',
-                key: 'leader.name',
-                value: ['=', 'A']
-            },
-            right: {
-                type: BoolExpressionNodeTypes.variable,
-                name: 'leader.profile.title',
-                key: 'leader.profile.title',
-                value: ['=' , 'classified']
-            }
-        }
+        const queryData:MatchExpressionData = MatchExpression.createFromAtom({
+            key: 'leader.name',
+            value: ['=', 'A']
+        }).and({
+            key: 'leader.profile.title',
+            value: ['=' , 'classified']
+        })
 
         const matchExpression = new MatchExpression('User', entityToTableMap , queryData)
         expect(matchExpression.entityQueryTree).toMatchObject({

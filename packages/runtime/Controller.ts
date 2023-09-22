@@ -1,30 +1,59 @@
 import {System, SystemCallback} from "./System";
 import {Entity, Relation} from "../shared/entity/Entity";
 import {Activity, Interaction} from "../shared/activity/Activity";
-import {IncrementalComputationHandle} from "./IncrementalComputationHandle";
+import {EntityIncrementalComputationHandle, IncrementalComputationHandle} from "./IncrementalComputationHandle";
 import {ActivityCall} from "./AcitivityCall";
 import {InteractionCall} from "./InteractionCall";
 import {InteractionEventArgs} from "../types/interaction";
+import {KlassInstanceOf, KlassType} from "../shared/createClass";
 
 export class Controller {
     public incrementalComputationHandles = new Set<IncrementalComputationHandle>()
     public activityCalls = new Map<string, ActivityCall>()
+    public activityCallsByName = new Map<string, ActivityCall>()
+    public interactionCallsByName = new Map<string, InteractionCall>()
     public interactionCalls = new Map<string, InteractionCall>()
-    constructor(public system: System, public entities: (typeof Entity)[], public relations: (typeof Relation)[], public activities: (typeof Activity)[], public interactions: (typeof Interaction)[]) {
-        // 初始化 各种 computed。
-        system.storage.setup(entities, relations)
-
-        entities.forEach(entity => {
-            // TODO IncrementalComputed Handle 如何和他的数据定义关联起来
+    constructor(public system: System, public entities: KlassInstanceOf<typeof Entity, false>[], public relations: KlassInstanceOf<typeof Relation, false>[], public activities: KlassInstanceOf<typeof Activity, false>[], public interactions: KlassInstanceOf<typeof Interaction, false>[]) {
+        activities.forEach(activity => {
+            const activityCall = new ActivityCall(activity, system)
+            this.activityCalls.set(activity.uuid, activityCall)
+            if (activity.name) {
+                this.activityCallsByName.set(activity.name, activityCall)
+            }
         })
 
-        relations.forEach(entity => {
+        interactions.forEach(interaction => {
+            const interactionCall = new InteractionCall(interaction, system)
+            this.interactionCalls.set(interaction.uuid, interactionCall)
+            if (interaction.name) {
+                this.interactionCallsByName.set(interaction.name, interactionCall)
+            }
+        })
+
+
+        // 初始化 各种 computed。
+        entities.forEach(entity => {
+            if (entity.computedData) {
+                const Handle = EntityIncrementalComputationHandle.Handles.get(entity.computedData.constructor as KlassType<any>)
+                this.incrementalComputationHandles.add(
+                    new Handle(this, entity)
+                )
+            }
+        })
+
+
+        relations.forEach(relation => {
             // TODO IncrementalComputed Handle 如何和他的数据定义关联起来
             // this.incrementalComputationHandles.add(new IncrementalComputationHandle(this, entity))
         })
 
-        // TODO 如果是恢复模式，应该从 event stack 中开始恢复数据。
 
+
+    }
+    async setup() {
+        // CAUTION 注意这里的 entities/relations 可能被 IncrementalComputationHandle 修改过了
+        await this.system.storage.setup(this.entities, this.relations)
+        // TODO 如果是恢复模式，应该从 event stack 中开始恢复数据。
     }
     callbacks: Map<any, Set<SystemCallback>> = new Map()
     listen(event:any, callback: SystemCallback) {
@@ -38,30 +67,39 @@ export class Controller {
             callbacks.delete(callback)
         }
     }
-    dispatch(event: any, ...args: any[]) {
+
+    async dispatch(event: any, ...args: any[]) {
         const callbacks = this.callbacks.get(event)
+
         if (callbacks) {
-            callbacks.forEach(callback => callback(...args))
+            for(const callback of callbacks) {
+                await callback(...args)
+            }
         }
     }
-    callInteraction(interactionId:string, interactionEventArgs: InteractionEventArgs) {
+    // TODO interaction call 也要全部改成 async 的。里面的 getEvent/saveEvent/get/set 应该都是异步
+    async callInteraction(interactionId:string, interactionEventArgs: InteractionEventArgs) {
         const interactionCall = this.interactionCalls.get(interactionId)!
         const result = interactionCall.call(interactionEventArgs)
         if (!result.error) {
-            this.dispatch(interactionCall.interaction, interactionEventArgs)
+            await this.dispatch(interactionCall.interaction, interactionEventArgs)
         }
 
         return result
     }
-    callActivityInteraction(activityCallId:string, interactionCallId:string, activityId: string, interactionEventArgs: InteractionEventArgs) {
+    async callActivityInteraction(activityCallId:string, interactionCallId:string, activityId: string, interactionEventArgs: InteractionEventArgs) {
         const activityCall = this.activityCalls.get(activityCallId)!
         const result = activityCall.callInteraction(activityId, interactionCallId, interactionEventArgs)
 
         if (!result.error) {
-            this.dispatch(activityCall.uuidToInteractionCall.get(interactionCallId)!.interaction, interactionEventArgs)
+            await this.dispatch(activityCall.uuidToInteractionCall.get(interactionCallId)!.interaction, interactionEventArgs, activityId)
         }
 
         return result
+    }
+    createActivity(activityCallId:string) {
+        const activityCall = this.activityCalls.get(activityCallId)!
+        return activityCall.create()
     }
 }
 
