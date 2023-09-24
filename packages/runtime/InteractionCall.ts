@@ -3,9 +3,9 @@ import { UserAttributive } from "../shared/user/User";
 // import { Entity} from "../shared/entity/Entity";
 import {System} from "./System";
 import {InteractionEvent, InteractionEventArgs} from "../types/interaction";
-import {Attributives, Concept, ConceptAlias, ConceptInstance, DerivedConcept} from "../types/attributive";
-import {BoolExpressionEvaluator} from "./boolExpression";
-import {BoolExpression, BoolExpressionNodeTypes, OperatorNames} from "../types/boolExpression";
+import { Concept, ConceptAlias, ConceptInstance, DerivedConcept} from "../shared/attributive";
+import {BoolExpression, BoolExpressionData} from "../shared/boolExpression";
+import { Attributives, UserAttributiveAtom} from '../shared/attributive'
 import {assert, indexBy} from "./util";
 import {getInstance} from "../shared/createClass";
 import {ActivityCall} from "./AcitivityCall";
@@ -19,7 +19,7 @@ type ConceptCheckStack = {
     }
 }
 
-type HandleAttributive = (attributiveName: string) => boolean
+
 
 export type ConceptCheckResponse = AtomError |true
 
@@ -45,29 +45,36 @@ export type InteractionCallResponse= {
     }
 }
 
+
+
+
+type HandleAttributive = (attributive: UserAttributiveAtom) => boolean
+
 export class InteractionCall {
     constructor(public interaction: InteractionInstanceType, public system: System, public activitySeqCall?: ActivityCall) {
 
     }
-    handleUserAttributive(attributiveName: string, interactionEvent: InteractionEventArgs) {
+    checkUserAttributive(attributiveData: UserAttributiveAtom, interactionEvent: InteractionEventArgs) {
+        const attributiveName = attributiveData?.key
         const attributiveOptionsByName = indexBy(getInstance(UserAttributive), 'name')
         const attributive = attributiveOptionsByName[attributiveName]
         assert(attributive, `can not find attributive: ${attributiveName}`)
         if (attributive.stringContent) {
             // debugger
             const testFn = new Function('event', `return (${attributive.stringContent})(event)`)
+
             const result = testFn(interactionEvent)
+
             if ( result === undefined ) {
                 console.warn(`attributive ${attributiveName} returned undefined, maybe not implemented, we will return true for temp`)
                 return true
             }
-
             return result
         }
         console.warn(`${attributiveName} not implemented`)
         return true
     }
-    handleMixedAttributive(attributiveName: string, instance: ConceptInstance) {
+    checkMixedAttributive(attributiveData: UserAttributiveAtom, instance: ConceptInstance) {
         // const attributiveByName = indexBy((UserAttributive.instances as any[]).concat(Entity.instances), 'name')
         return true
     }
@@ -77,21 +84,22 @@ export class InteractionCall {
             // CAUTION 这里让 activity 自己在外部 check
             res = true
         } else {
-            // @ts-ignore
-            const userAttributiveCombined: BoolExpression= {
-                type: BoolExpressionNodeTypes.group,
-                left: {
-                    type: BoolExpressionNodeTypes.variable,
-                    name:this.interaction.userRoleAttributive.name
-                },
-                op: OperatorNames['&&'],
-                right: this.interaction.userAttributives.content as BoolExpression
+
+            let userAttributiveCombined = BoolExpression.createFromAtom<UserAttributiveAtom>({
+                key: this.interaction.userRoleAttributive.name as string
+            })
+
+            if (this.interaction.userAttributives.content) {
+                userAttributiveCombined = userAttributiveCombined.and(this.interaction.userAttributives.content as BoolExpressionData<UserAttributiveAtom>)
             }
 
-            res =  this.matchAttributives(interactionEvent.user, userAttributiveCombined, (attributiveName: string) => this.handleUserAttributive(attributiveName, interactionEvent), [])
+
+
+            res =  this.checkAttributives(interactionEvent.user, userAttributiveCombined, (attributive: UserAttributiveAtom) => this.checkUserAttributive(attributive, interactionEvent), [])
         }
 
         if (res === true) return res
+
         throw new LoginError('check user failed', res)
     }
 
@@ -101,7 +109,7 @@ export class InteractionCall {
         const conceptRes = this.isConcept(instance, concept, currentStack)
         if (conceptRes !== true) return conceptRes
 
-        const attrMatchRes = this.matchAttributives(instance, attributives, (attributiveName) => this.handleMixedAttributive(attributiveName, instance), currentStack)
+        const attrMatchRes = this.checkAttributives(instance, new BoolExpression<UserAttributiveAtom>(attributives), (attributiveData) => this.checkMixedAttributive(attributiveData, instance), currentStack)
         if (attrMatchRes !== true) return attrMatchRes
 
         return true
@@ -140,10 +148,9 @@ export class InteractionCall {
     isConceptAlias(concept: Concept) {
         return !!(concept as ConceptAlias).for
     }
-    matchAttributives(instance: ConceptInstance, attributives: Attributives, handleAttributive: HandleAttributive, stack: ConceptCheckStack[]) : ConceptCheckResponse{
-        const roleAttributiveExpression = new BoolExpressionEvaluator(attributives, handleAttributive)
-        const result =  roleAttributiveExpression.evaluate()
-        return result === true ? result : {name: '', type: 'matchAttributives', stack, error: result}
+    checkAttributives(instance: ConceptInstance, attributives: BoolExpression<UserAttributiveAtom>, handleAttributive: HandleAttributive, stack: ConceptCheckStack[]) : ConceptCheckResponse{
+        const result =  attributives.evaluate(handleAttributive)
+        return result === true ? true : {name: '', type: 'matchAttributives', stack, error: result}
     }
     checkPayload(interactionEvent: InteractionEventArgs) {
         // TODO

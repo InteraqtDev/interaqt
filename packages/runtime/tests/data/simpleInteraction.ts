@@ -99,17 +99,17 @@ export const data = [{
     "uuid": "e9a58b35-1ec1-4068-ab06-59ef1e5e9cea",
     "public": {
         "content": {
-            "type": "group",
-            "op": "&&",
-            "left": {"type": "variable", "name": "New", "uuid": "3814923d-88a1-440b-85d0-3ed31e00b231"},
-            "right": {"type": "variable", "name": "Other", "uuid": "fd629032-a16c-495a-a941-1d33058bd4d8"}
+            "type": "expression",
+            "operator": "and",
+            "left": {"type": "atom", "data": {"key": "New", "uuid": "3814923d-88a1-440b-85d0-3ed31e00b231"}},
+            "right": {"type": "atom", "data": {"key": "Other", "uuid": "fd629032-a16c-495a-a941-1d33058bd4d8"}}
         }
     }
 }, {
     "type": "UserAttributives",
     "options": {"isReactive": true},
     "uuid": "1a651472-f9e1-4eb4-9814-3e8af784e9a7",
-    "public": {"content": {"type": "variable", "name": "Other", "uuid": "fd629032-a16c-495a-a941-1d33058bd4d8"}}
+    "public": {"content": {"type": "atom", "data": {"key": "Other", "uuid": "fd629032-a16c-495a-a941-1d33058bd4d8"}}}
 }, {
     "type": "EntityAttributive",
     "options": {"isReactive": true},

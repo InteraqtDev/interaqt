@@ -2,55 +2,6 @@ import { parse as parseStr} from 'acorn'
 import {BoolExpression, BoolExpressionNodeTypes, OperatorNames, VariableNode} from "../types/boolExpression";
 import {assert, indexBy} from "./util";
 
-export type VariableHandle = (...arg: any[]) => boolean
-export type BoolExpressionError = {
-    name: string,
-    type: string,
-    stack: BoolExpression[],
-    error: any,
-    inverse: boolean
-}
-
-export class BoolExpressionEvaluator{
-    constructor(public expression: BoolExpression, public variableHandle: VariableHandle) {
-
-    }
-    evaluate(expression = this.expression, stack: BoolExpression[] = [], inverse: boolean = false) :  BoolExpressionError| true{
-        // CAUTION 当没有 userAttributives 的时候我们可以回构造一个 && group，这时候 right 就是 null
-        if(!expression) return true
-
-        const currentStack = stack.concat(expression)
-        if (expression.type === 'variable') {
-            const result = this.variableHandle(expression.name)
-            const error = { type: expression.type, name: (expression as VariableNode).name, inverse, stack, error: 'variable evaluate error' }
-            return (result && !inverse || !result && inverse) ? true : error
-
-        } else if (expression.type === 'group') {
-            if (expression.op === OperatorNames['||'] || (expression.op === OperatorNames['&&'] && inverse)) {
-                const leftRes = this.evaluate(expression.left, currentStack)
-                if (leftRes === true) return true
-                const rightRes = this.evaluate(expression.right, currentStack)
-                return rightRes === true ? true : { name: expression.op, type: expression.type, stack, error: [leftRes, rightRes], inverse }
-
-                // TODO
-                // @ts-ignore
-            } else if (expression.op === OperatorNames['&&'] || (expression.op === OperatorNames['||'] && inverse)) {
-                const leftRes = this.evaluate(expression.left, currentStack)
-                if (leftRes !== true) return leftRes
-
-                return this.evaluate(expression.right, currentStack)
-            } else if (expression.op === OperatorNames['!']) {
-                return this.evaluate(expression.left, currentStack, !inverse)
-            }
-        } else {
-            // 这里的数据由于是 浏览器端 acorn 解析出来的，所以确实可能出问题。
-            // @ts-ignore
-            assert(false, `invalid bool expression type: ${expression!.type}`)
-        }
-        return true
-    }
-}
-
  // @ts-ignore
 function astNodeToAttrNode(astNode, optionsByName): BoolExpression {
     if (astNode.type === "LogicalExpression") {

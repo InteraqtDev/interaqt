@@ -1,6 +1,6 @@
 export function assert(condition: boolean, message: string ) {
     if (!condition) {
-        if (__DEV__) debugger
+        // if (__DEV__) debugger
         throw new Error(message)
     }
 }
