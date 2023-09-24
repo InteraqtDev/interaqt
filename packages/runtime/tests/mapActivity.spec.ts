@@ -68,6 +68,18 @@ describe('map activity', () => {
         expect(rejectUUID).not.toBe(null)
         expect(cancelUUID).not.toBe(null)
 
+
+// 查询 request 数据
+        const requestMatch = MatchExpression.createFromAtom({
+            key: 'from.name',
+            value: ['=', userA.name]
+        }).and({
+            key:'to.name',
+            value: ['=', userB.name]
+        })
+
+        const requests1 = await controller.system.storage.queryHandle.find('Request', requestMatch, undefined, ['handled', 'activityId', ['from',{attributeQuery:["name"]}], ['to', {attributeQuery:["name"]}], ['message', {attributeQuery:["content"]}]])
+        expect(requests1.length).toBe(0)
         // 2. 交互顺序错误 approve
         // const res1 = createFriendRelationActivityCall.callInteraction(activityId, approveUUID, {user: userA})
         // expect(res1.error).toBeDefined()
@@ -82,6 +94,10 @@ describe('map activity', () => {
         const res2 = await controller.callActivityInteraction(makeFriendActivityUUID,  sendRequestUUID, activityId,{user: userA, payload})
         expect(res2.error).toBeUndefined()
 
+        const requests2 = await controller.system.storage.queryHandle.find('Request', requestMatch, undefined, ['handled', 'activityId', ['from',{attributeQuery:["name"]}], ['to', {attributeQuery:["name"]}], ['message', {attributeQuery:["content"]}]])
+        expect(requests2.length).toBe(1)
+        expect(!!requests2[0].handled).toBeFalse()
+        expect(requests2[0].activityId).toBe(activityId)
         // 4. 交互顺序错误 a sendFriendRequest
         // const res3 = createFriendRelationActivityCall.callInteraction(activityId, sendRequestUUID, {user: userA})
         // expect(res3.error).toBeDefined()
@@ -95,6 +111,11 @@ describe('map activity', () => {
         const res5 = await controller.callActivityInteraction(makeFriendActivityUUID, approveUUID, activityId, {user: userB})
         expect(res5.error).toBeUndefined()
 
+        const requests3 = await controller.system.storage.queryHandle.find('Request', requestMatch, undefined, ['handled', 'activityId', ['from',{attributeQuery:["name"]}], ['to', {attributeQuery:["name"]}], ['message', {attributeQuery:["content"]}]])
+        expect(requests3.length).toBe(1)
+        expect(!!requests3[0].handled).toBeTrue()
+        expect(requests3[0].activityId).toBe(activityId)
+
         // 7. 错误 b reject
         // const res6 = createFriendRelationActivityCall.callInteraction(activityId, rejectUUID, {user: userB})
         // expect(res6.error).toBeDefined()
@@ -106,19 +127,6 @@ describe('map activity', () => {
         const currentState = createFriendRelationActivityCall.getState(activityId)
         expect(currentState.current).toBeUndefined()
 
-
-        // 查询 request 数据
-        const match = MatchExpression.createFromAtom({
-            key: 'from.name',
-            value: ['=', userA.name]
-        }).and({
-            key:'to.name',
-            value: ['=', userB.name]
-        })
-        const requests = await controller.system.storage.queryHandle.find('Request', match, undefined, [['from', {attributeQuery:["name"]}], ['to', {attributeQuery:["name"]}], ['message', {attributeQuery:["content"]}]])
-
-        expect(requests.length).toBe(1)
-        console.log(requests)
     })
 
 })

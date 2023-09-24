@@ -58,7 +58,6 @@ class MapActivityToEntityHandle extends EntityIncrementalComputationHandle {
         // 监听的 interaction 变化
         const interactionsToListen = this.computedData.triggerInteraction || getInteractions(this.data.sourceActivity)
 
-
         interactionsToListen.forEach(interaction => {
             this.controller.listen(interaction, this.onCallInteraction)
         })
@@ -66,13 +65,9 @@ class MapActivityToEntityHandle extends EntityIncrementalComputationHandle {
     onCallInteraction = async (interactionEventArgs: InteractionEventArgs, activityId) => {
         const match = MatchExpression.createFromAtom({
             key: 'activityId',
-            value: ['=', `${activityId}`]
+            value: ['=', activityId]
         })
 
-        if (await this.controller.system.storage.findOne(this.data.name, match)){
-            // 已经有数据了。
-            return
-        }
 
         // 还没有数据，尝试执行 map 函数看能不能得到数据
         const allInteractionEvents = this.controller.system.getEvent({activityId}) as InteractionEvent[]
@@ -86,24 +81,31 @@ class MapActivityToEntityHandle extends EntityIncrementalComputationHandle {
 
         const newMappedItem = this.mapItem(sourceData)
 
-        const test = function map(stack){
-            const sendRequestEvent = stack.find(i => i.interaction.name === 'sendRequest')
-            if (!sendRequestEvent) return undefined
-
-            return {
-                from: sendRequestEvent.data.user,
-                to: sendRequestEvent.data.payload.to,
-                message: sendRequestEvent.data.payload.message
-            }
-        }
-
 
         // 只有 undefined 是被认为没准备好
         if (newMappedItem !== undefined) {
-            await this.controller.system.storage.create(this.data.name, {
-                ...newMappedItem,
-                activity: activityId
-            })
+            const oldData = await this.controller.system.storage.findOne(this.data.name, match)
+            console.log(111, oldData)
+            if (oldData){
+                // 已经有数据了。
+                // TODO 未来有没有可能有不需要更新的情况？
+                await this.controller.system.storage.update(
+                    this.data.name,
+                    MatchExpression.createFromAtom({ key: 'id', value: ['=', oldData.id]}),
+                    {
+                        ...newMappedItem,
+                        activityId
+                    },
+                )
+
+            } else {
+                await this.controller.system.storage.create(this.data.name, {
+                    ...newMappedItem,
+                    activityId
+                })
+            }
+
+
         }
     }
 }

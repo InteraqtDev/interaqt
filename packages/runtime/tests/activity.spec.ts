@@ -19,7 +19,7 @@ describe("activity state", () => {
     const userB = { id: "2", roles: ['user']}
     beforeEach(async () => {
         removeAllInstance()
-        const { data }  = (await import('./data/simpleActivity'))
+        const { data }  = (await import('./data/simpleActivityWithER'))
         /**
          * 当前的格式为:
          * New && Other Admin as A

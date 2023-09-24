@@ -7,19 +7,21 @@ export const data = [
     "uuid": "a552045f-50bc-4b55-bc0d-71baca3a3bee",
     "public": {
         "sourceActivity": "42913934-59dd-43a6-9420-68f07fc38cbd",
-        "triggerInteraction": ["72af2454-c3a9-45f2-b981-71f0be193514"],
+        "triggerInteraction": ["72af2454-c3a9-45f2-b981-71f0be193514", "deef98f0-7d00-41fd-a5e4-ffad5314f3ef", "9b7baac9-54f7-47a8-8a4d-48cfb781d500"],
         "handle": `function map(stack){
         const sendRequestEvent = stack.find(i => i.interaction.name === 'sendRequest')
         
-if (!sendRequestEvent) {
-    console.log('cannot find request', stack) 
+if (!sendRequestEvent) { 
     return undefined
 }
+
+const handled = !!stack.find(i => i.interaction.name === 'approve' || i.interaction.name === 'reject')
         
 return {
     from: sendRequestEvent.data.user,
     to: sendRequestEvent.data.payload.to,
-    message: sendRequestEvent.data.payload.message 
+    message: sendRequestEvent.data.payload.message,
+    handled,
 }
 }`}
     },{
@@ -43,10 +45,20 @@ return {
         "isRef": false
     }
 }, {
+        "type": "Property",
+        "options": {"isReactive": true},
+        "uuid": "4dac9222-f1a5-40c6-bfca-f66e94447d05",
+        "public": {"name": "handled", "type": "boolean", "collection": false, "args": null}
+},{
     "type": "Entity",
     "options": {"isReactive": true},
     "uuid": "42913934-59dd-43a6-9420-68f07fc38cbd",
-    "public": {"name": "Request", "computedData": "a552045f-50bc-4b55-bc0d-71baca3a3bee", "properties": [], "isRef": false}
+    "public": {
+        "name": "Request",
+        "computedData": "a552045f-50bc-4b55-bc0d-71baca3a3bee",
+        "properties": ["4dac9222-f1a5-40c6-bfca-f66e94447d05"],
+        "isRef": false
+    }
 }, {
     "type": "Relation",
     "options": {"isReactive": true},

@@ -11,6 +11,11 @@ export class SQLiteDB implements Database{
         const result = this.db.query(sql).all() as any[]
         return Promise.resolve(result)
     }
+    update = (sql:string) => {
+        console.log('update', sql)
+        const result = this.db.query(`${sql} RETURNING id`).all() as any[]
+        return Promise.resolve(result)
+    }
     insert= (sql:string) => {
         console.log('insert', `${sql} RETURNING id`)
         const { id } = this.db.query(`${sql} RETURNING id`).get()

@@ -35,11 +35,14 @@ class MemoryStorage implements Storage{
     findOne(...arg) {
         return this.queryHandle.findOne(...arg)
     }
-    find(entityName:string, ...arg) {
-        return this.queryHandle.find(entityName, ...arg)
+    find(...arg) {
+        return this.queryHandle.find(...arg)
     }
-    create(entityName:string, data: any) {
-        return this.queryHandle.create(entityName, data)
+    create(...arg) {
+        return this.queryHandle.create(...arg)
+    }
+    update(...arg) {
+        return this.queryHandle.update(...arg)
     }
 
 }

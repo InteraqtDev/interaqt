@@ -25,6 +25,7 @@ export type Storage = {
     // er存储
     setup: (entities: KlassInstanceOf<typeof Entity, false>[], relations: KlassInstanceOf<typeof Relation, false>[]) => any
     findOne: (entityName: string, ...arg: any[]) => Promise<any>,
+    update: (entityName: string, ...arg: any[]) => Promise<any>,
     find: (entityName: string, ...arg: any[]) => Promise<any[]>,
     create: (entityName: string, data:any) => Promise<any>
 }
@@ -49,4 +50,5 @@ export type Database = {
     scheme: (sql:string) => Promise<any>
     query: (sql: string) => Promise<any[]>,
     insert: (sql: string) => Promise<EntityIdRef>
+    update: (sql: string) => Promise<EntityIdRef[]>
 }
