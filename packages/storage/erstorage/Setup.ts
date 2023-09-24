@@ -137,15 +137,25 @@ export class DBSetup {
             const {relType, sourceEntity, targetEntity} = relationData
             if (relType.includes('1')) {
                 if (relType[0] === '1' && relType[1] === '1') {
-                    // 三表合一 。往 source 方向合表
+                    // 1:1 关系。并且 entity 不同样。真正的三表合一 。往 source 方向合表
                     if (sourceEntity !== targetEntity) {
                         this.joinTables(sourceEntity, targetEntity)
-                    }
-                    this.relationToJoinEntity.set(relationName, sourceEntity)
+                        this.relationToJoinEntity.set(relationName, sourceEntity)
 
-                    relationData.mergedTo = 'source'
-                    relationData.sourceField = `${relationData.sourceEntity}_${relationData.sourceAttribute}`
-                    delete relationData.targetField
+                        // 待会改成 allCombined
+                        relationData.mergedTo = 'combined'
+                        // 这种情况是共用 id 了，而且 mergeTo 其实不区分谁是 source 谁是 target 了。
+                        // relationData.sourceField = `${relationData.sourceEntity}_${relationData.sourceAttribute}`
+                        delete relationData.sourceField
+                        delete relationData.targetField
+                    } else {
+                        // 1:1 关系，entity 相同，无法合表。仍然是 relation 往 source 方向
+                        this.relationToJoinEntity.set(relationName, sourceEntity )
+                        relationData.mergedTo = 'source'
+                        relationData.sourceField = `${relationData.sourceEntity}_${relationData.sourceAttribute}`
+                        delete relationData.targetField
+                    }
+
                 } else if (relType[0] === 'n') {
                     // n:1，只合并关系表
                     this.relationToJoinEntity.set(relationName, sourceEntity )
@@ -200,10 +210,8 @@ export class DBSetup {
                 relationName: relation,
                 isSource: true,
                 table: this.map.entities[relationData.targetEntity].table,
-                // 这个 field 是指如果合表了，那么它在实体表里面的名字。
-                field: relationData.mergedTo ?
-                    (relationData.mergedTo === 'source' ? relationData.sourceField : relationData.targetField) :
-                    ''
+                // 这个 field 是指如果合表了，那么它在实体表里面用于记录 id 的名字。
+                field: (relationData.mergedTo === 'source' ? relationData.sourceField : undefined)
             } as EntityEntityAttributeMapType
 
 
@@ -215,9 +223,7 @@ export class DBSetup {
                 relationName: relation,
                 isSource:false,
                 table: this.map.entities[relationData.sourceEntity].table,
-                field: relationData.mergedTo ?
-                    (relationData.mergedTo === 'target' ? relationData.targetField : relationData.sourceField) :
-                    ''
+                field: relationData.mergedTo === 'target' ? relationData.targetField : undefined
             } as EntityEntityAttributeMapType
         })
 

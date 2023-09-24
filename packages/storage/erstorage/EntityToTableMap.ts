@@ -1,7 +1,7 @@
 import {assert} from "../util";
 
 export class AttributeInfo {
-    constructor(public data:EntityValueAttributeMapType|EntityEntityAttributeMapType, public attributeName, public parentEntityName) {
+    constructor(public data:EntityValueAttributeMapType|EntityEntityAttributeMapType, public attributeName, public parentEntityName, public map: EntityToTableMap) {
         assert(!!data, 'data can not be null')
     }
     get isEntity() {
@@ -50,6 +50,54 @@ export class AttributeInfo {
     }
     get field() {
         return (this.data as EntityValueAttributeMapType).field
+    }
+    isMergedTo(entityToMatch: string) {
+        assert(this.isEntity, `${this.attributeName} is not a entity`)
+        // CAUTION 如果是同一实体，表相同，但逻辑上不是合表，所以这里要排除掉。
+        return this.entityName !== entityToMatch && this.table === this.map.getEntityTable(entityToMatch)
+    }
+    isMergedToParentEntity() {
+        return this.isMergedTo(this.parentEntityName)
+    }
+    isRelationTableMergedToParentEntity(includeAllCombined: boolean) {
+        assert(this.isEntity, `${this.attributeName} is not a entity`)
+        const relationData = this.map.getRelationInfoData(this.parentEntityName, this.attributeName)
+        // CAUTION 不能简单地用 table 来判断，因为可能 source 和 target 是同一个，自然表也相同。
+        if (!relationData.mergedTo) return false
+        if (includeAllCombined) {
+            if (relationData.mergedTo === 'combined') return true
+        } else {
+            if (relationData.mergedTo === 'combined') return false
+        }
+
+        const mergedToEntity = relationData.mergedTo === 'source' ? relationData.sourceEntity : relationData.targetEntity
+        const mergedToAttribute = relationData.mergedTo === 'source' ? relationData.sourceAttribute : relationData.targetAttribute
+        return mergedToEntity=== this.parentEntityName && mergedToAttribute === this.attributeName
+    }
+    isRelationTableMergedToAttributeEntity(includeAllCombined: boolean) {
+        assert(this.isEntity, `${this.attributeName} is not a entity`)
+        const relationData = this.map.getRelationInfoData(this.parentEntityName, this.attributeName)
+        // CAUTION 不能简单地用 table 来判断，因为可能 source 和 target 是同一个，自然表也相同。
+        if (!relationData.mergedTo) return false
+        if (includeAllCombined) {
+            if (relationData.mergedTo === 'combined') return true
+        } else {
+            if (relationData.mergedTo === 'combined') return false
+        }
+        const mergedToEntity = relationData.mergedTo === 'source' ? relationData.sourceEntity : relationData.targetEntity
+        const mergedToAttribute = relationData.mergedTo === 'source' ? relationData.sourceAttribute : relationData.targetAttribute
+        // 走到这里是肯定有合表的情况。因为上面已经处理没合表的情况。所以这里用一下反向判断。
+        return !(mergedToEntity=== this.parentEntityName && mergedToAttribute === this.attributeName)
+    }
+    isParentEntitySource() {
+        assert(this.isEntity, `${this.attributeName} is not a entity`)
+        const relationData = this.map.getRelationInfoData(this.parentEntityName, this.attributeName)
+        if (relationData.mergedTo === 'combined') return false
+        // FIXME 没考虑同实体同名关系？
+        return this.parentEntityName === relationData.sourceEntity && this.attributeName === relationData.sourceAttribute
+    }
+    getReverseInfo() {
+        return this.map.getInfo(this.entityName, this.map.getReverseAttribute(this.parentEntityName, this.attributeName))
     }
 }
 
@@ -118,7 +166,7 @@ export type RelationMapItemData = {
     // CAUTION 特别注意，这里的 sourceField 和 targetField 和 sourceAttribute 一样，是指站在 source 的角度去看，存的是关联实体(target)的 id. 不要搞成了自己的 id 。
     sourceField: string,
     targetField: string,
-    mergedTo? : 'source'|'target'
+    mergedTo? : 'source'|'target'|'combined'
 }
 type RelationMapData = {
     [k:string]: RelationMapItemData
@@ -154,9 +202,9 @@ export class EntityToTableMap {
     getInfo(entityName: string, attribute: string) : AttributeInfo{
         if (!this.data.entities[entityName]!.attributes[attribute]) debugger
         assert(!!this.data.entities[entityName]!.attributes[attribute],
-            `cant find attribute ${attribute} in ${entityName}. attributes: ${Object.keys(this.data.entities[entityName]!.attributes)}`
+            `cannot find attribute ${attribute} in ${entityName}. attributes: ${Object.keys(this.data.entities[entityName]!.attributes)}`
         )
-        return new AttributeInfo(this.data.entities[entityName]!.attributes[attribute]!, attribute, entityName)
+        return new AttributeInfo(this.data.entities[entityName]!.attributes[attribute]!, attribute, entityName, this)
     }
     getRelationInfoData(entityName: string, attribute: string) {
         const relationName = (this.data.entities[entityName].attributes[attribute] as EntityEntityAttributeMapType).relationName
@@ -178,7 +226,7 @@ export class EntityToTableMap {
             currentEntity = attributeData.isEntity ? attributeData.entityName : ''
             lastAttribute = currentAttribute
         }
-        return new AttributeInfo(attributeData, lastAttribute, parentEntity)
+        return new AttributeInfo(attributeData, lastAttribute, parentEntity, this)
     }
     getTableAndAlias(namePath: string[]): [string, string, EntityMapItemData, string, string, RelationMapItemData] {
         const [rootEntityName, ...relationPath] = namePath

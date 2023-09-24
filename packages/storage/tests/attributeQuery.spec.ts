@@ -24,7 +24,7 @@ const entityToTableMapData: MapData = {
                     entityName: 'Profile',
                     relationName: 'User_profile_user_Profile',
                     table: 'User_Profile',
-                    field: 'User_profile',
+                    field: '',
                 },
                 leader: {
                     isEntity: true,
@@ -59,6 +59,14 @@ const entityToTableMapData: MapData = {
                     type: 'string',
                     fieldType: 'text',
                     field: 'profile_title'
+                },
+                owner: {
+                    isEntity: true,
+                    relType: ['1', '1'],
+                    entityName: 'User',
+                    relationName: 'User_profile_user_Profile',
+                    table: 'User_Profile',
+                    field: ''
                 }
             }
         },
@@ -70,6 +78,14 @@ const entityToTableMapData: MapData = {
                     type: 'number',
                     fieldType: 'bigInt',
                     field: 'serialNumber'
+                },
+                owner: {
+                    isEntity: true,
+                    relType: ['1', '1'],
+                    entityName: 'User',
+                    relationName: 'User_item_owner_LargeItem',
+                    table: 'LargeItem',
+                    field: 'LargeItem_owner'
                 }
             }
         }
@@ -176,6 +192,12 @@ describe('attribute query test', () => {
         expect(attributeQuery.xToManyEntities[0].name).toBe('friends')
         expect(attributeQuery.getQueryFields()).toMatchObject([
             // 自己的字段
+            //  永远自动加上 id
+            {
+                tableAliasAndField: ["User", "id"],
+                nameContext: ["User"],
+                attribute: "id"
+            },
             {
                 tableAliasAndField: ["User", "user_name"],
                 nameContext: ["User"],
@@ -188,11 +210,21 @@ describe('attribute query test', () => {
             },
             // 1:1 字段
             {
+                tableAliasAndField: ["User", "id"],
+                nameContext: ["User", "profile"],
+                attribute: "id"
+            },
+            {
                 tableAliasAndField: ["User", "profile_title"],
                 nameContext: ["User", "profile"],
                 attribute: "title"
             },
             // 1:1 字段
+            {
+                tableAliasAndField: ["User_item", "id"],
+                nameContext: ["User", "item"],
+                attribute: "id"
+            },
             {
                 tableAliasAndField: ["User_item", "serialNumber"],
                 nameContext: ["User", "item"],
@@ -200,9 +232,20 @@ describe('attribute query test', () => {
             },
             // 1:n 字段
             {
+                tableAliasAndField: ["User_leader", "id"],
+                nameContext: ["User", "leader"],
+                attribute: "id"
+            },
+            {
                 tableAliasAndField: ["User_leader", "user_name"],
                 nameContext: ["User", "leader"],
                 attribute: "name"
+            },
+            // 1:n:1 字段
+            {
+                tableAliasAndField: ["User_leader", "id"],
+                nameContext: ["User", "leader", "profile"],
+                attribute: "id"
             },
             {
                 tableAliasAndField: ["User_leader", "profile_title"],

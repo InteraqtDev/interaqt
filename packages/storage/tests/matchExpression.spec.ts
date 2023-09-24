@@ -23,7 +23,7 @@ const entityToTableMapData: MapData = {
                     entityName: 'Profile',
                     relationName: 'User_profile_user_Profile',
                     table: 'User_Profile',
-                    field: 'User_profile',
+                    field: '',
                 },
                 leader: {
                     isEntity: true,
@@ -58,6 +58,14 @@ const entityToTableMapData: MapData = {
                     type: 'string',
                     fieldType: 'text',
                     field: 'profile_title'
+                },
+                owner: {
+                    isEntity: true,
+                    relType: ['1', '1'],
+                    entityName: 'User',
+                    relationName: 'User_profile_user_Profile',
+                    table: 'User_Profile',
+                    field: ''
                 }
             }
         },
@@ -69,6 +77,14 @@ const entityToTableMapData: MapData = {
                     type: 'number',
                     fieldType: 'bigInt',
                     field: 'serialNumber'
+                },
+                owner: {
+                    isEntity: true,
+                    relType: ['1', '1'],
+                    entityName: 'User',
+                    relationName: 'User_item_owner_LargeItem',
+                    table: 'LargeItem',
+                    field: 'LargeItem_owner'
                 }
             }
         }

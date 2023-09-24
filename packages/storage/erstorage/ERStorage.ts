@@ -66,9 +66,11 @@ export class MatchExpression {
         return this.map.getTableAliasAndFieldName(namePath, matchAttributePath.at(-1)!)
     }
     getReferenceFieldValue(valueStr:string) {
-
         const matchAttributePath = valueStr.split('.')
-        const [tableAlias, rawFieldName] = this.map.getTableAliasAndFieldName([this.contextRootEntity||this.entityName].concat(matchAttributePath.slice(0, -1)), matchAttributePath.at(-1))
+        const [tableAlias, rawFieldName] = this.map.getTableAliasAndFieldName(
+            [this.contextRootEntity||this.entityName].concat(matchAttributePath.slice(0, -1)),
+            matchAttributePath.at(-1)
+        )
         return `${tableAlias}.${rawFieldName}`
     }
 
@@ -238,7 +240,6 @@ export class AttributeQuery {
         }))
 
 
-
         this.xToOneEntities.forEach(({ name: entityAttributeName, entityQuery }) => {
             queryFields.push(...entityQuery.attributeQuery!.getQueryFields(nameContext.concat(entityAttributeName)))
         })
@@ -281,7 +282,7 @@ export class QueryAgent {
 
 
     buildFindQuery(entityQuery: EntityQuery, prefix='') {
-        // 2. 从所有条件里面构建出 join clause
+        // 从所有条件里面构建出 join clause
         const fieldQueryTree = entityQuery.attributeQuery!.entityQueryTree
         const matchQueryTree = entityQuery.matchExpression.entityQueryTree
         const finalQueryTree = deepMerge(fieldQueryTree, matchQueryTree)
@@ -302,23 +303,30 @@ ${this.buildWhereClause(
     this.parseMatchExpressionValue(entityQuery.entityName, fieldMatchExp , entityQuery.contextRootEntity),
     prefix
 )}
-` : ''}
-        
+` : ''}   
 `
-        // FIXME modifier
+        // FIXME 添加 modifier
+    }
+    structureRawReturns(rawReturns: {[k:string]: any}[]) {
+        return rawReturns.map(rawReturn => {
+            const obj = {}
+            Object.entries(rawReturn).forEach(([key, value]) => {
+                // CAUTION 注意这里去掉了最开始的 entityName
+                setByPath(obj, key.split('.').slice(1, Infinity), value)
+            })
+            return obj
+        })
     }
     async findEntities(entityQuery:EntityQuery) : Promise<any[]>{
         // 1. 这里只通过合表或者 join  处理了 x:1 的关联查询。x:n 的查询是通过二次查询获取的。
-        const data = (await this.query(this.buildFindQuery(entityQuery))) as any[]
-        // 2. FIXME 关联数据的结构化。也可以把信息丢到客户端，然客户端去结构化？？？
-        //  FIXME 结构化的时候要处理 id 的问题
+        const data = this.structureRawReturns(await this.query(this.buildFindQuery(entityQuery))) as any[]
+        // 2. TODO 关联数据的结构化。也可以把信息丢到客户端，然客户端去结构化？？？
 
 
         // 3. x:n 关联实体的查询
         if (entityQuery.attributeQuery!.xToManyEntities) {
             for (let [fieldName, subEntityQuery] of entityQuery.attributeQuery.xToManyEntities) {
                 for (let entity of data) {
-                    // TODO 构造 context 查询关联实体的 ids，用来限制查找的范围。
                     const ids = await this.findRelatedEntityIds(subEntityQuery.entityName, entity.id, fieldName)
                     const relatedEntityQuery = subEntityQuery.derive({
                         matchExpression: subEntityQuery.matchExpression.and({
@@ -337,56 +345,48 @@ ${this.buildWhereClause(
     async findRelatedEntityIds(entityName: string, entityId: string, fieldName: string) {
         return []
     }
-    // stringifyFieldQuery(namePath: string[], attributeQuery: AttributeQuery ) {
-    //
-    //     const fields = attributeQuery.valueAttributes.map(attrName => `${this.getTableAlias(namePath)}.${attrName}`)
-    //
-    //     // TODO 这里没有处理获取关系表上字段的问题
-    //     attributeQuery.xToOneEntities.forEach(({ name, attributeQuery: relatedEntityAttributeQuery}) => {
-    //         // 这里会产生递归
-    //         fields.push(...this.stringifyFieldQuery(namePath.concat(name), relatedEntityAttributeQuery))
-    //     })
-    // }
-    getJoinTables(queryTree: EntityQueryTree, context: string[] = [], lastTableAndAlias?: [string, string]) :JoinTables {
+    // 根据 queryTree 来获得 join table 的信息。因为 queryTree 是树形，所以这里也是个递归结构。
+
+    getJoinTables(queryTree: EntityQueryTree, context: string[] = [], parentTableAndAlias?: [string, string]) :JoinTables {
         // 应该是深度 遍历？
         const result = []
-        if (!lastTableAndAlias) {
-            lastTableAndAlias = this.map.getTableAndAlias([context[0]]).slice(0, 2) as [string, string]
+        if (!parentTableAndAlias) {
+            //  context 里面至少会有 entityName 这一个值。
+            parentTableAndAlias = this.map.getTableAndAlias([context[0]]).slice(0, 2) as [string, string]
         }
         Object.entries(queryTree).forEach(([entityAttributeName, subQueryTree]) => {
+
+            const attributeInfo = this.map.getInfoByPath(context.concat(entityAttributeName))
+
             const [currentTable, currentTableAlias, /*lastEntityData*/,relationTable, relationTableAlias, currentRelationData] = this.map.getTableAndAlias(context.concat(entityAttributeName))
-            // 可能会出现和上一个路径一样的情况，因为合表了，实体表都合并了一定是三表合一。这种情况就不需要新的 join 了。
-            // 注意，这里只要用 alias 判断就行了，因为 alias 用路径生成的，一定是唯一的。
-            if ((currentTableAlias !== lastTableAndAlias![1])) {
-                // 剩下都是没有 三表合一 的情况
-                const [lastTable] = lastTableAndAlias
-                // FIXME 这里这个判断补眼睛，因为 attribute 不管是 source 还是 target name 确实可能相同
-                const isCurrentRelationSource = currentRelationData.sourceAttribute === entityAttributeName
+            // 这里只处理没有和上一个节点 三表合一 的情况。三表合一的情况不需要 join .
+            if (!attributeInfo.isMergedToParentEntity()) {
+                const isCurrentRelationSource = attributeInfo.isParentEntitySource()
 
                 // CAUTION 注意这里有些非常隐性的逻辑关联，关系表要合并的话永远只会往 n 或者 1:1 中往任意方向合并，所以下面通过实际的合并情况判断，实际也要和 n 关系吻合。
-                if (relationTable === lastTable) {
-                    // 关系表在上一张表中。
+                if (attributeInfo.isRelationTableMergedToParentEntity(false)) {
+                    // 关系表在上一级实体表中。
                     result.push({
                         for: context.concat(entityAttributeName),
-                        joinSource: lastTableAndAlias,
-                        joinIdField: [isCurrentRelationSource ? currentRelationData.sourceField : currentRelationData.targetField, 'id'],
+                        joinSource: parentTableAndAlias,
+                        joinIdField: [attributeInfo.field, 'id'],
                         joinTarget: [currentTable, currentTableAlias]
                     })
 
-                } else if (relationTable === currentTable) {
+                } else if (attributeInfo.isRelationTableMergedToAttributeEntity(false)) {
                     // 关系表合并到 current 表中
                     result.push({
                         for: context.concat(entityAttributeName),
-                        joinSource: lastTableAndAlias,
+                        joinSource: parentTableAndAlias,
                         // 这里要找当前实体中用什么 attributeName 指向上一个实体
-                        joinIdField: ['id', isCurrentRelationSource ? currentRelationData.targetField : currentRelationData.sourceField],
+                        joinIdField: ['id', attributeInfo.getReverseInfo().field],
                         joinTarget: [currentTable, currentTableAlias]
                     })
                 } else {
-                    // 三表独立
+                    // 关系表独立
                     result.push({
                         for: context.concat(entityAttributeName),
-                        joinSource: lastTableAndAlias,
+                        joinSource: parentTableAndAlias,
                         joinIdField: ['id', isCurrentRelationSource ? currentRelationData.sourceField : currentRelationData.targetField],
                         joinTarget: [relationTable, relationTableAlias]
                     })
@@ -416,11 +416,11 @@ ${this.buildWhereClause(
         )).join(',\n')
     }
     buildFromClause(entityName: string, prefix='') {
-        return `${this.map.getEntityTable(entityName)} as ${this.withPrefix(prefix)}${entityName}`
+        return `${this.map.getEntityTable(entityName)} AS ${this.withPrefix(prefix)}${entityName}`
     }
     buildJoinClause(joinTables: JoinTables, prefix='') {
         return joinTables.map(({ joinSource, joinIdField, joinTarget}) => {
-            return `JOIN ${joinTarget[0]} as 
+            return `JOIN ${joinTarget[0]} AS 
 ${this.withPrefix(prefix)}${joinTarget[1]} ON 
 ${this.withPrefix(prefix)}${joinSource[1]}.${joinIdField[0]} = ${this.withPrefix(prefix)}${joinTarget[1]}.${joinIdField[1]}
 `
@@ -456,11 +456,15 @@ ${this.withPrefix(prefix)}${joinSource[1]}.${joinIdField[0]} = ${this.withPrefix
                 const [, parentAlias] = this.map.getTableAndAlias(exp.data.namePath!.slice(0, -1))
                 const reverseAttributeName = this.map.getReverseAttribute(info.parentEntityName, info.attributeName)
 
+                // 注意这里去掉了 namePath 里面根部的 entityName，因为后面计算 referenceValue 的时候会加上。
+                const parentAttributeNamePath = exp.data.namePath!.slice(1, -1)
+
                 const existEntityQuery = EntityQuery.create(info.entityName, this.map, {
                         entityName: info.entityName,
                         matchExpression: BoolExpression.createFromAtom({
                             key: `${reverseAttributeName}.id`,
-                            value: ['=', `${parentAlias}.id`]
+                            value: ['=', parentAttributeNamePath.concat('id').join('.')],
+                            isReferenceValue: true
                         }).and(exp.data.value[1] instanceof BoolExpression ? exp.data.value[1] : MatchExpression.createFromAtom(exp.data.value[1]))
                     } as EntityQueryData,
                     // 如果上层还有，就继承上层的，如果没有， context 就只这一层。这个变量是用来给 matchExpression 里面的 value 来引用上层的值的。
@@ -483,72 +487,155 @@ ${this.buildFindQuery(existEntityQuery, currentAlias)}
         })
     }
 
-    async insertEntityData(entityName: string, sameTableFieldAndValues: [string, string][] ): Promise<EntityIdRef> {
+    async insertEntityData(entityName: string, sameTableFieldAndValues: [string, string][], reuseEntityId? : string ): Promise<EntityIdRef> {
 
         const values = sameTableFieldAndValues.map(x => JSON.stringify(x[1]))
         const columns = sameTableFieldAndValues.map(x => JSON.stringify(x[0]))
 
-        return this.database.insert(`
+        if (!reuseEntityId) {
+            return this.database.insert(`
 INSERT INTO ${this.map.getEntityTable(entityName)}
 (${columns.join(',')})
 VALUES
 (${values.join(',')}) 
 `) as EntityIdRef
+        } else {
+
+            return (await this.database.update(`
+UPDATE ${this.map.getEntityTable(entityName)}
+SET
+${columns.map((column, index) => (`
+${column} = ${values[index]}
+`)).join(',')
+}
+ 
+WHERE
+id = ${JSON.stringify(reuseEntityId)}
+`))[0] as EntityIdRef
+        }
+
+
     }
 
-    // 还少判断了关系表是往
+
     async createEntity(entityName: string, newEntityData: NewEntityData ) : Promise<EntityIdRef>{
         if (newEntityData.isRef()) return Promise.resolve(newEntityData.rawData as EntityIdRef)
 
         const entityTable = this.map.getEntityTable(entityName)
         // 1. 先把同一表中的数据全部拿出来
-        const sameTableFieldAndValuesWithRelation = [...newEntityData.sameTableFieldAndValues]
+        const sameTableFieldAndValuesWithRelation = [...newEntityData.sameRowFieldAndValues]
 
-        // 2. 优先递归处理 related entity。关键是
-        const relatedNewEntities = []
-        const sameTableRelatedEntityName = []
-        for(let newRelatedEntityData of newEntityData.relatedEntitiesData) {
-            // 这里只处理没有三表合并的场景。因为三表合并的数据在 sameTableFieldAndValues 已经有了
-            if (entityTable !== newRelatedEntityData.info!.table) {
-                const relatedEntityRef = await this.createEntity(newRelatedEntityData.info!.entityName, newRelatedEntityData)
+        // 2. 优先递归处理 related entity。如果是要创建的就创建。
+        const relatedNewEntities: NewEntityData[] = []
+        for(let newRelatedEntityData of newEntityData.differentTableEntitiesData) {
+            // 这里全都是其他表中的数据，如果不是 ref 就要创建。
+            const relatedEntityRef = newRelatedEntityData.isRef() ?
+                newRelatedEntityData.getRef() :
+                await this.createEntity(newRelatedEntityData.info!.entityName, newRelatedEntityData)
 
-                // 判断关系表。如果和实体表合表了，那么数据就直接扔到 sameTableFieldAndValuesWithRelation 等待一起创建。如果没有，后面还要单独处理关系表
-                const relationTable = this.map.getRelationTable(entityName, newRelatedEntityData.info!.attributeName)
-                if (relationTable === entityTable) {
-                    // 关系表和实体表合并了
-                    assert(!!newRelatedEntityData.info!.field, `cannot find field ${newRelatedEntityData.info?.attributeName}`)
-                    sameTableFieldAndValuesWithRelation.push([newRelatedEntityData.info!.field, relatedEntityRef.id])
-                } else {
-                    // 没合并，后面还要单独处理关系表
-                    relatedNewEntities.push({
-                        attributeInfo: newRelatedEntityData.info,
-                        entity:relatedEntityRef
-                    })
-                }
-            } else {
-                sameTableRelatedEntityName.push(newRelatedEntityData.info?.attributeName)
-            }
+            // 这里肯定要处理关系表，因为唯一不要处理关系表的情况是"数据是 ref，并且关系表合到了实体表里面"，在上面 sameRow 里面已经处理过了。
+            relatedNewEntities.push(newRelatedEntityData.derive(relatedEntityRef))
         }
 
-        const newEntity = await this.insertEntityData(entityName, sameTableFieldAndValuesWithRelation)
+
+        // CAUTION 如果有 reuseEntityId, 说明是 更新一个已有的 row。这是因为 newEntityData 中已经有合并的 1:1 关系的实体 id。
+        const newEntity = await this.insertEntityData(entityName, sameTableFieldAndValuesWithRelation, newEntityData.reuseEntityId)
 
         // 需要单独处理的关系
         for(let relatedNewEntity of relatedNewEntities) {
-            await this.addRelation(entityName, relatedNewEntity.attributeInfo?.attributeName, newEntity.id, relatedNewEntity.entity.id)
-            if (relatedNewEntity.attributeInfo.isXToOne) {
-                newEntity[relatedNewEntity.attributeInfo?.attributeName] = { id: relatedNewEntity.entity.id}
+            await this.addRelation(entityName, relatedNewEntity.info!.attributeName, newEntity.id, relatedNewEntity.getRef().id)
+            if (relatedNewEntity.info!.isXToOne) {
+                newEntity[relatedNewEntity.info!.attributeName] = { id: relatedNewEntity.getRef().id}
             } else {
-                newEntity[relatedNewEntity.attributeInfo?.attributeName] = [{id: relatedNewEntity.entity.id}]
+                newEntity[relatedNewEntity.info!.attributeName] = [{id: relatedNewEntity.getRef().id}]
             }
         }
 
-        // 1:1 的 relatedEntity 的id 就是自身
-        sameTableRelatedEntityName.forEach(name => {
+        // 1:1 的 relatedEntity 的id 就是自身。这里也返还一下。
+        newEntityData.sameRowEntityAttributes.forEach(name => {
             newEntity[name] = { id: newEntity.id }
         })
 
         return Promise.resolve(newEntity)
     }
+
+
+
+    // CAUTION 除了 1:1 并且合表的关系，不能递归更新 relatedEntity，如果是传入了，说明是建立新的关系。
+    updateEntityData(entityName: string, matchExpressionData: MatchExpressionData, columnAndValue)  {
+        // TODO 要更新拆表出去的 field
+        const matchExpression = new MatchExpression(entityName, this.map, matchExpressionData)
+        const matchQueryTree = matchExpression.entityQueryTree
+        const joinTables = this.getJoinTables(matchQueryTree, [entityName])
+
+        const fieldMatchExp = matchExpression.buildFieldMatchExpression()
+// CAUTION update 语句可以有 别名和 join，但似乎 SET 里面不能用主表的 别名!!!
+        return this.database.update(`
+UPDATE ${this.buildFromClause(entityName, '')}
+${this.buildJoinClause(joinTables, '')}
+SET
+${columnAndValue.map(({field, value}) => `
+${field} = ${value}
+`).join(',')}
+${fieldMatchExp ? `
+WHERE
+${this.buildWhereClause(
+            this.parseMatchExpressionValue(entityName, fieldMatchExp , ''),
+            ''
+        )}
+` : ''}   
+`)
+    }
+    // 只有 1:1 关系可以递归更新实体数据，其他都能改当前实体的数据或者和其他实体关系。
+    async updateEntity(entityName: string, matchExpressionData: MatchExpressionData, newEntityData: NewEntityData)  {
+        // 先更新自身的 value 和 三表合一 或者 关系表合并的情况
+        const columnAndValue = newEntityData.sameRowFieldAndValues.map(([field, value]) => (
+            {
+                field,
+                /// TODO value 要考虑引用自身或者 related entity 其他 field 的情况？例如 age+5
+                value: JSON.stringify(value)
+            }
+        ))
+
+        const updatedEntities = await this.updateEntityData(entityName, matchExpressionData, columnAndValue)
+        // 这里验证一下三表合一情况下的数据正确性
+        if(newEntityData.reuseEntityId) {
+            assert(updatedEntities.length === 1 && updatedEntities[0].id === newEntityData.reuseEntityId, `updated multiple records with only 1 1:1 related entity, ${updatedEntities[0].id} ${newEntityData.reuseEntityId}` )
+        }
+
+        // 除了一下和其他实体更新关系的情况。
+        for(let newRelatedEntityData of newEntityData.differentTableEntitiesData) {
+            // 这里只处理没有三表合并的场景。因为三表合并的数据在 sameTableFieldAndValues 已经有了
+            // 这里只需要处理 1）关系表独立 或者 2）关系表往另一个方向合了的情况。因为往本方向和的情况已经在前面 updateEntityData 里面处理了
+
+            // 我们永远只允许 1:1 关系创建/更新连带数据。这里验证一下。
+            assert(!!(newRelatedEntityData.isRef() || newRelatedEntityData.info?.isOneToOne) , `cannot update/create non-1:1 related ${newRelatedEntityData.info?.attributeName}`)
+
+
+            if (newRelatedEntityData.info?.isXToMany) {
+                // CAUTION  x:n 的情况让用户自己再次调用。因为这里的语义很难确定是要新增，还是 replace 掉原来所有的关系。
+                assert(false, 'cannot update x:n relation because of ambiguous goal.')
+            }
+
+            // 剩下都是 xToOne 的情况了
+            // CAUTION 我们不支持抢夺别人的 1:1 related entity 的情况
+            let finalRelatedEntityRef
+
+            if (newRelatedEntityData.isRef()) {
+                finalRelatedEntityRef = newRelatedEntityData.getRef()
+            } else {
+                finalRelatedEntityRef = await this.createEntity(newRelatedEntityData.info!.entityName!, newRelatedEntityData)
+            }
+
+            for(let updatedEntity of updatedEntities) {
+                await this.addRelation(entityName, newRelatedEntityData.info?.attributeName, updatedEntity.id, finalRelatedEntityRef.id)
+            }
+        }
+
+        return updatedEntities
+
+    }
+
     addRelation(entity: string, attribute:string, entityId, relatedEntityId, attributes: {} = {}) {
         const relationData = this.map.getRelationInfoData(entity, attribute)
         const isEntitySource = relationData.sourceEntity === entity
@@ -569,7 +656,6 @@ VALUES
                 ...attributePairs
             ]
 
-            console.log(111, keyValuePairs, relationData, isEntitySource, entity, attribute)
 
             return this.query(`
 UPDATE ${relationData.table}
@@ -606,25 +692,50 @@ type RawEntityData = {[k:string]: any}
 
 
 class NewEntityData {
-    sameTableFieldAndValues: [string, string][]
-    relatedEntitiesData: NewEntityData[]
+    public sameRowFieldAndValues: [string, string][]
+    public relatedEntitiesData: NewEntityData[]
+    public differentTableEntitiesData: NewEntityData[] = []
+    public valueAttributes: [string, any][]
+    public sameRowEntityAttributes: string[] = []
+    // 如果是 data 里面有 ref,并且和当前表是合一的，说明我们的需要的 row 已经有了，只要  update 相应 column 就行了
+    public reuseEntityId = null
     constructor(public map: EntityToTableMap, public entityName: string, public rawData: RawEntityData, public info?: AttributeInfo) {
-        const currentEntityTable = this.map.getEntityTable(entityName)
         const [valueAttributesInfo, entityAttributesInfo] = this.map.groupAttributes(entityName, Object.keys(rawData))
-
-        // TODO 要把那些独立出去的 field 排除出去。
-        this.sameTableFieldAndValues = valueAttributesInfo.map(info => [info.field, rawData[info.attributeName]])
-
         this.relatedEntitiesData = entityAttributesInfo.map(info => new NewEntityData(this.map, info.entityName, rawData[info.attributeName], info))
 
+        this.valueAttributes = valueAttributesInfo.map(info => {
+            return [info.attributeName!, rawData[info.attributeName]]
+        })
+        // TODO 要把那些独立出去的 field 排除出去。
+        this.sameRowFieldAndValues = valueAttributesInfo.map(info => [info.field, rawData[info.attributeName]])
         this.relatedEntitiesData.forEach(newRelatedEntityData => {
-            if (newRelatedEntityData.info!.table === currentEntityTable) {
-                this.sameTableFieldAndValues.push(...newRelatedEntityData.sameTableFieldAndValues)
+            // CAUTION 三表合一的情况（需要排除掉关系的 source、target 是同一实体的情况，这种情况下不算合表）
+            if (newRelatedEntityData.info!.isMergedToParentEntity()) {
+                if(newRelatedEntityData.isRef()) {
+                    assert(!this.reuseEntityId || this.reuseEntityId === newRelatedEntityData.getRef().id, `same entity with different id conflict ${this.reuseEntityId} ${newRelatedEntityData.getRef().id}`)
+                    this.reuseEntityId = newRelatedEntityData.getRef().id
+                } else {
+                    this.sameRowFieldAndValues.push(...newRelatedEntityData.sameRowFieldAndValues)
+                }
+                this.sameRowEntityAttributes.push(newRelatedEntityData.info?.attributeName)
+            } else {
+                // 只是关系表合并到了当前实体表，并且数据又是个 ref，那么只要把 ref id 记录到实体表中就行了
+                if(newRelatedEntityData.isRef() && newRelatedEntityData.info!.isRelationTableMergedToParentEntity(false)) {
+                    this.sameRowFieldAndValues.push([newRelatedEntityData.info!.field, newRelatedEntityData.getRef().id])
+                } else {
+                    this.differentTableEntitiesData.push(newRelatedEntityData)
+                }
             }
         })
     }
+    derive(newRawData: RawEntityData) {
+        return new NewEntityData(this.map, this.entityName, newRawData, this.info)
+    }
+    getRef() {
+        return {id: this.rawData.id}
+    }
     isRef() {
-        return this.info?.isEntity && this.rawData["id"] !== undefined
+        return !!(this.info?.isEntity && this.rawData["id"] !== undefined)
     }
 }
 
@@ -664,9 +775,10 @@ export class EntityQueryHandle {
         const newEntityData = new NewEntityData(this.map, entityName, rawData)
         return this.agent.createEntity(entityName, newEntityData)
     }
-
-    async update() {
-
+    // CAUTION 不能递归更新 relate entity 的 value，如果传入了 related entity 的值，说明是建立新的联系。
+    async update(entityName: string, matchExpressionData: MatchExpressionData, rawData: RawEntityData) {
+        const newEntityData = new NewEntityData(this.map, entityName, rawData)
+        return this.agent.updateEntity(entityName, matchExpressionData, newEntityData)
     }
 
     async addRelation(sourceEntity: EntityIdRef, relationName: string, targetEntity: EntityIdRef) {
