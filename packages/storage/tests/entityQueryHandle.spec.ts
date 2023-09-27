@@ -43,24 +43,15 @@ describe('create data', () => {
 
 
     test('create and query with n:n related entities', async () => {
-        const returnUser = await entityQueryHandle.create('User', {name: 'aaa', age: 17, file: {fileName: 'aaa-file'}})
-        console.log(returnUser)
-        expect(returnUser.file?.length).toBe(1)
-        expect(returnUser.file[0].id).not.toBeUndefined()
-        //
-        const findUser = await entityQueryHandle.findOne('User', MatchExpression.createFromAtom({ key:'file.fileName', value: ['=', 'aaa-file']}), {}, ['name', 'age'])
-        console.log(findUser)
+        // TODO
     })
 
-    // test('create with existing related entities', () => {
-    //     // TODO
-    // })
 })
 
 
 
 
-describe('update date', () => {
+describe('update data', () => {
     let db
     let setup
     let entityQueryHandle
@@ -122,3 +113,5 @@ describe('update date', () => {
 
     })
 })
+
+

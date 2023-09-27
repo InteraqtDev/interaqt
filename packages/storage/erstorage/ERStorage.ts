@@ -25,7 +25,7 @@ export class MatchExpression {
         return BoolExpression.createFromAtom<MatchAtom>(value)
     }
     public entityQueryTree: EntityQueryTree = {}
-    constructor(public entityName: string, public map: EntityToTableMap, public data?: MatchExpressionData, public contextRootEntity?: string) {
+    constructor(public entityName: string, public map: EntityToTableMap, public data?: MatchExpressionData, public contextRootEntity?: string, public fromRelation?: boolean) {
 
         this.entityQueryTree = {}
         if (this.data) {
@@ -145,7 +145,7 @@ type ModifierData = {
 
 
 class Modifier {
-    constructor(public entityName: string, public map: EntityToTableMap, public data: ModifierData) {
+    constructor(public entityName: string, public map: EntityToTableMap, public data: ModifierData, public fromRelation?: boolean) {
     }
 
     derive(overwrite: ModifierData) {
@@ -170,25 +170,26 @@ export type EntityQueryDerivedData = {
     modifier? : Modifier
 }
 
-export class EntityQuery {
+export class RecordQuery {
     static create(entityName: string, map: EntityToTableMap, data: EntityQueryData, contextRootEntity?: string) {
-        return new EntityQuery(
+        return new RecordQuery(
             entityName,
             map,
             new MatchExpression(entityName, map, data.matchExpression, contextRootEntity),
             new AttributeQuery(entityName, map, data.attributeQuery || []),
             new Modifier(entityName, map, data.modifier),
-            contextRootEntity
+            contextRootEntity,
         )
     }
     constructor(public entityName, public map: EntityToTableMap, public matchExpression: MatchExpression, public attributeQuery: AttributeQuery, public modifier: Modifier, public contextRootEntity?:string) {}
     derive(derived: EntityQueryDerivedData) {
-        return new EntityQuery(
+        return new RecordQuery(
             this.entityName,
             this.map,
             derived.matchExpression || this.matchExpression,
             derived.attributeQuery || this.attributeQuery,
-            derived.modifier || this.modifier
+            derived.modifier || this.modifier,
+            this.contextRootEntity
         )
     }
 
@@ -200,9 +201,9 @@ type EntityQueryTree = {
 }
 
 export class AttributeQuery {
-    public relatedEntities: {name: string, entityQuery: EntityQuery}[] = []
-    public xToManyEntities: {name: string, entityQuery: EntityQuery}[] = []
-    public xToOneEntities: {name: string, entityQuery: EntityQuery}[] = []
+    public relatedEntities: {name: string, entityQuery: RecordQuery}[] = []
+    public xToManyEntities: {name: string, entityQuery: RecordQuery}[] = []
+    public xToOneEntities: {name: string, entityQuery: RecordQuery}[] = []
     public valueAttributes: string[] = []
     public entityQueryTree: EntityQueryTree = {}
     public fullEntityQueryTree: EntityQueryTree = {}
@@ -212,22 +213,25 @@ export class AttributeQuery {
 
             const attributeInfo = this.map.getInfo(this.entityName, attributeName)
             if (attributeInfo.isEntity) {
-                this.relatedEntities.push({
+                const relatedEntity = {
                     name: attributeName,
-                    entityQuery: EntityQuery.create(attributeInfo.entityName, this.map, item[1] as EntityQueryData)
-                })
+                    entityQuery: RecordQuery.create(attributeInfo.entityName, this.map, item[1] as EntityQueryData)
+                }
+
+                this.relatedEntities.push(relatedEntity)
+
+                if (attributeInfo.isXToMany) {
+                    this.xToManyEntities.push(relatedEntity)
+                } else if (attributeInfo.isXToOne) {
+                    this.xToOneEntities.push(relatedEntity)
+                }
+
+
             } else {
                 this.valueAttributes.push(attributeName)
             }
         })
 
-        this.xToManyEntities = this.relatedEntities.filter(({name}) => {
-            return this.map.getInfo(this.entityName, name).isXToMany
-        })
-
-        this.xToOneEntities = this.relatedEntities.filter(({name}) => {
-            return this.map.getInfo(this.entityName, name).isXToOne
-        })
 
         this.entityQueryTree = this.buildEntityQueryTree()
         this.fullEntityQueryTree = this.buildFullEntityQueryTree()
@@ -281,7 +285,7 @@ export class QueryAgent {
     constructor(public map: EntityToTableMap, public database: Database) {}
 
 
-    buildFindQuery(entityQuery: EntityQuery, prefix='') {
+    buildFindQuery(entityQuery: RecordQuery, prefix='') {
         // 从所有条件里面构建出 join clause
         const fieldQueryTree = entityQuery.attributeQuery!.entityQueryTree
         const matchQueryTree = entityQuery.matchExpression.entityQueryTree
@@ -317,7 +321,8 @@ ${this.buildWhereClause(
             return obj
         })
     }
-    async findEntities(entityQuery:EntityQuery) : Promise<any[]>{
+    // 查 entity 和 查 relation 都是一样的。具体在 entityQuery 里面区别。
+    async findRecords(entityQuery:RecordQuery) : Promise<any[]>{
         // 1. 这里只通过合表或者 join  处理了 x:1 的关联查询。x:n 的查询是通过二次查询获取的。
         const data = this.structureRawReturns(await this.query(this.buildFindQuery(entityQuery))) as any[]
         // 2. TODO 关联数据的结构化。也可以把信息丢到客户端，然客户端去结构化？？？
@@ -325,9 +330,10 @@ ${this.buildWhereClause(
 
         // 3. x:n 关联实体的查询
         if (entityQuery.attributeQuery!.xToManyEntities) {
-            for (let [fieldName, subEntityQuery] of entityQuery.attributeQuery.xToManyEntities) {
+            for (let relatedEntity of entityQuery.attributeQuery.xToManyEntities) {
+                const {name: subAttributeName, entityQuery: subEntityQuery} = relatedEntity
                 for (let entity of data) {
-                    const ids = await this.findRelatedEntityIds(subEntityQuery.entityName, entity.id, fieldName)
+                    const ids = await this.findRelatedEntityIds(subEntityQuery.entityName, entity.id, subAttributeName)
                     const relatedEntityQuery = subEntityQuery.derive({
                         matchExpression: subEntityQuery.matchExpression.and({
                             key: 'id',
@@ -335,7 +341,7 @@ ${this.buildWhereClause(
                         })
                     })
 
-                    entity[fieldName] = await this.findEntities(relatedEntityQuery)
+                    entity[subAttributeName] = await this.findRecords(relatedEntityQuery)
                 }
             }
         }
@@ -361,7 +367,6 @@ ${this.buildWhereClause(
             const [currentTable, currentTableAlias, /*lastEntityData*/,relationTable, relationTableAlias, currentRelationData] = this.map.getTableAndAlias(context.concat(entityAttributeName))
             // 这里只处理没有和上一个节点 三表合一 的情况。三表合一的情况不需要 join .
             if (!attributeInfo.isMergedToParentEntity()) {
-                const isCurrentRelationSource = attributeInfo.isParentEntitySource()
 
                 // CAUTION 注意这里有些非常隐性的逻辑关联，关系表要合并的话永远只会往 n 或者 1:1 中往任意方向合并，所以下面通过实际的合并情况判断，实际也要和 n 关系吻合。
                 if (attributeInfo.isRelationTableMergedToParentEntity(false)) {
@@ -383,6 +388,7 @@ ${this.buildWhereClause(
                         joinTarget: [currentTable, currentTableAlias]
                     })
                 } else {
+                    const isCurrentRelationSource = attributeInfo.isParentEntitySource()
                     // 关系表独立
                     result.push({
                         for: context.concat(entityAttributeName),
@@ -459,7 +465,7 @@ ${this.withPrefix(prefix)}${joinSource[1]}.${joinIdField[0]} = ${this.withPrefix
                 // 注意这里去掉了 namePath 里面根部的 entityName，因为后面计算 referenceValue 的时候会加上。
                 const parentAttributeNamePath = exp.data.namePath!.slice(1, -1)
 
-                const existEntityQuery = EntityQuery.create(info.entityName, this.map, {
+                const existEntityQuery = RecordQuery.create(info.entityName, this.map, {
                         entityName: info.entityName,
                         matchExpression: BoolExpression.createFromAtom({
                             key: `${reverseAttributeName}.id`,
@@ -644,7 +650,7 @@ ${this.buildWhereClause(
         const targetId = isEntitySource? relatedEntityId: entityId
 
         if( relationData.mergedTo ) {
-
+            assert(relationData.mergedTo !== 'combined', `do not use add relation with 1:1 relation. ${entity} ${attribute}`)
             const isMergeToSource = relationData.mergedTo === 'source'
             const rowId = isMergeToSource ? sourceId: targetId
             const relatedId = isMergeToSource ? targetId : sourceId
@@ -684,7 +690,6 @@ VALUES
     async query(sql: string) {
         return this.database.query(sql)
     }
-
 }
 
 
@@ -758,17 +763,17 @@ export class EntityQueryHandle {
     }
 
     async find(entityName: string, matchExpressionData?: MatchExpressionData, modifierData?: ModifierData, attributeQueryData: AttributeQueryData = []) {
-        const entityQuery = EntityQuery.create(
+        const entityQuery = RecordQuery.create(
             entityName,
             this.map,
             {
                 matchExpression: matchExpressionData,
                 attributeQuery: attributeQueryData,
                 modifier: modifierData
-            }
+            },
         )
 
-        return this.agent.findEntities(entityQuery)
+        return this.agent.findRecords(entityQuery)
     }
 
     async create(entityName: string, rawData: RawEntityData ) : Promise<EntityIdRef>{
@@ -796,40 +801,21 @@ export class EntityQueryHandle {
     async count() {
 
     }
+    // TODO 增加 source/target  rename 的能力
+    async findRelation(inputRelationName: string|string[], matchExpressionData: MatchExpressionData,modifierData?: ModifierData, attributeQueryData: AttributeQueryData = []) {
+        const relationName = Array.isArray(inputRelationName) ?
+            this.map.getInfo(inputRelationName[0], inputRelationName[1]).relationName :
+            inputRelationName as string
 
-    async hasRelation() {
-
+        return this.find(relationName, matchExpressionData, modifierData, attributeQueryData)
     }
 
-
-}
-
-
-
-
-
-export class RelationQueryHandle {
-    findRelation() {
-
-    }
-
-    createRelation() {
-
-    }
-
-    updateRelation() {
-
-    }
-
-    updateOrCreateRelation() {
-
-    }
-
-    deleteRelation() {
-
-    }
-
-    countRelation() {
-
+    async findOneRelation(inputRelationName: string|string[], matchExpressionData: MatchExpressionData,modifierData: ModifierData = {}, attributeQueryData: AttributeQueryData = []) {
+        const limitedModifier = {
+            ...modifierData,
+            limit: 1
+        }
+        return this.findRelation(inputRelationName, matchExpressionData, limitedModifier, attributeQueryData)
     }
 }
+

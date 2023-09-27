@@ -14,7 +14,6 @@ export class AttributeInfo {
         if (!this.isEntity) throw new Error('not a entity')
         const data = (this.data as EntityEntityAttributeMapType)
         return data.relType[0] === 'n' && data.relType[1] === '1'
-
     }
     get isManyToMany() {
         if (!this.isEntity) throw new Error('not a entity')
@@ -50,6 +49,9 @@ export class AttributeInfo {
     }
     get field() {
         return (this.data as EntityValueAttributeMapType).field
+    }
+    get relationName() {
+        return (this.data as EntityEntityAttributeMapType).relationName
     }
     isMergedTo(entityToMatch: string) {
         assert(this.isEntity, `${this.attributeName} is not a entity`)
@@ -102,21 +104,6 @@ export class AttributeInfo {
 }
 
 
-export class RelationInfo {
-    constructor(public data: RelationMapItemData) {
-
-    }
-    get table() {
-        return this.data.table
-    }
-    get attributes() {
-        return this.data.attributes
-    }
-    get sourceEntity() {
-        return this.data.sourceEntity
-    }
-}
-
 
 export type EntityValueAttributeMapType = {
     //entityType
@@ -138,7 +125,9 @@ export type EntityEntityAttributeMapType = {
     isSource? : boolean,
     table: string,
     // 这个 field 是指如果合表了，那么它在实体表里面的名字。
+    //  这个是从 EntityMapItemData 的 sourceField 或者 targetField 复制过来的。
     field : string
+    fieldType: string,
 }
 
 export type EntityMapItemData = {
@@ -147,6 +136,8 @@ export type EntityMapItemData = {
     attributes: {
         [k:string]: EntityValueAttributeMapType|EntityEntityAttributeMapType
     }
+    // relation 模拟的 entity
+    isRelation? :boolean
 }
 
 type EntityMapData = {
@@ -155,7 +146,7 @@ type EntityMapData = {
 
 export type RelationMapItemData = {
     attributes: {
-        [k:string]: EntityValueAttributeMapType
+        [k:string]: EntityValueAttributeMapType|EntityEntityAttributeMapType
     },
     relType: [string, string]
     sourceEntity: string,
@@ -164,9 +155,11 @@ export type RelationMapItemData = {
     targetAttribute: string,
     table: string,
     // CAUTION 特别注意，这里的 sourceField 和 targetField 和 sourceAttribute 一样，是指站在 source 的角度去看，存的是关联实体(target)的 id. 不要搞成了自己的 id 。
+    //  当发生表合并时，他们表示的是在合并的表里面的 field。根据往合并情况不同，sourceField/targetField 都可能不存在。
     sourceField: string,
     targetField: string,
-    mergedTo? : 'source'|'target'|'combined'
+    mergedTo? : 'source'|'target'|'combined',
+    isSourceRelation?: boolean
 }
 type RelationMapData = {
     [k:string]: RelationMapItemData
