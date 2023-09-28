@@ -15,72 +15,65 @@ describe("db setup", () => {
     test('validate 1:1 relation map', () => {
         // Profile & User
         const setup = new DBSetup(entities, relations);
+        // console.log(JSON.stringify(setup.map, null, 4))
         // 应该是 三表 合一
-        expect(setup.map.entities.User).toBeDefined()
-        expect(setup.map.entities.Profile).toBeDefined()
-        expect(setup.map.entities.User.table).toBe(setup.map.entities.Profile.table)
-        expect(setup.map.entities.User.attributes.profile).toMatchObject({
-            isEntity: true,
+        expect(setup.map.records.User).toBeDefined()
+        expect(setup.map.records.Profile).toBeDefined()
+        expect(setup.map.records.User.table).toBe(setup.map.records.Profile.table)
+        expect(setup.map.records.User.attributes.profile).toMatchObject({
+            type: 'id',
+            isRecord: true,
             relType: ['1', '1'],
-            entityName: 'Profile',
-            relationName: 'Profile_owner_profile_User',
+            recordName: 'Profile',
+            linkName: 'Profile_owner_profile_User',
             isSource:false,
-            field: undefined,
-            table: setup.map.entities.Profile.table,
         })
+        expect(setup.map.records.User.attributes.profile.field).toBeUndefined()
 
-        expect(setup.map.entities.Profile.attributes.owner).toMatchObject({
-            isEntity: true,
+        expect(setup.map.records.Profile.attributes.owner).toMatchObject({
+            type: 'id',
+            isRecord: true,
             relType: ['1', '1'],
-            entityName: 'User',
-            relationName: 'Profile_owner_profile_User',
+            recordName: 'User',
+            linkName: 'Profile_owner_profile_User',
             isSource:true,
-            field: undefined,
-            table: setup.map.entities.Profile.table,
         })
+        expect(setup.map.records.Profile.attributes.owner.field).toBeUndefined()
 
-        expect(setup.map.relations.Profile_owner_profile_User).toMatchObject({
-            table: setup.map.entities.Profile.table,
-            attributes: {},
+        expect(setup.map.links.Profile_owner_profile_User).toMatchObject({
             relType: ['1', '1'],
-            sourceEntity: 'Profile',
+            sourceRecord: 'Profile',
             sourceAttribute: 'owner',
-            targetEntity: 'User',
+            targetRecord: 'User',
             targetAttribute: 'profile',
             mergedTo: 'combined',
         })
-        expect(setup.map.relations.Profile_owner_profile_User.sourceField).toBeUndefined()
-        expect(setup.map.relations.Profile_owner_profile_User.targetField).toBeUndefined()
 
         // 关系实体化后的字段
-        expect(setup.map.entities.Profile_owner_profile_User).toMatchObject({
+        expect(setup.map.records.Profile_owner_profile_User).toMatchObject({
             // 应该在关系表和实体表合并的时候修改过了。
-            table: setup.map.entities.Profile.table,
+            table: setup.map.records.Profile.table,
             isRelation:true,
             attributes: {},
         })
 
         // 虚拟关系表
-        expect(setup.map.relations.Profile_owner_profile_User_source).toMatchObject({
-            table: setup.map.entities.Profile.table,
+        expect(setup.map.links.Profile_owner_profile_User_source).toMatchObject({
             isSourceRelation: true,
-            attributes: {},
             relType: ['1', '1'],
-            sourceEntity: 'Profile_owner_profile_User',
+            sourceRecord: 'Profile_owner_profile_User',
             sourceAttribute: 'source',
-            targetEntity: 'Profile',
+            targetRecord: 'Profile',
             targetAttribute: undefined,
             mergedTo: 'combined',
         })
 
-        expect(setup.map.relations.Profile_owner_profile_User_target).toMatchObject({
-            table: setup.map.entities.Profile.table,
+        expect(setup.map.links.Profile_owner_profile_User_target).toMatchObject({
             isSourceRelation: true,
-            attributes: {},
             relType: ['1', '1'],
-            sourceEntity: 'Profile_owner_profile_User',
+            sourceRecord: 'Profile_owner_profile_User',
             sourceAttribute: 'target',
-            targetEntity: 'User',
+            targetRecord: 'User',
             targetAttribute: undefined,
             mergedTo: 'combined',
         })
@@ -89,62 +82,55 @@ describe("db setup", () => {
     test('validate n:1 relation map', () => {
         // File & User
         const setup = new DBSetup(entities, relations);
-        expect(setup.map.entities.User).toBeDefined()
-        expect(setup.map.entities.File).toBeDefined()
-        expect(setup.map.entities.User.table).not.toBe(setup.map.entities.File.table)
-        expect(setup.map.entities.User.attributes.file).toMatchObject({
-            isEntity: true,
+        expect(setup.map.records.User).toBeDefined()
+        expect(setup.map.records.File).toBeDefined()
+        expect(setup.map.records.User.table).not.toBe(setup.map.records.File.table)
+        expect(setup.map.records.User.attributes.file).toMatchObject({
+            isRecord: true,
             relType: ['1', 'n'],
-            entityName: 'File',
-            relationName: 'File_owner_file_User',
+            recordName: 'File',
+            linkName: 'File_owner_file_User',
             isSource:false,
-            field: undefined,
-            table: setup.map.entities.File.table,
         })
+        expect(setup.map.records.User.attributes.file.field).toBeUndefined()
 
-        expect(setup.map.entities.File.attributes.owner).toMatchObject({
-            isEntity: true,
+
+        expect(setup.map.records.File.attributes.owner).toMatchObject({
+            type:'id',
+            isRecord: true,
             relType: ['n', '1'],
-            entityName: 'User',
-            relationName: 'File_owner_file_User',
+            recordName: 'User',
+            linkName: 'File_owner_file_User',
             isSource:true,
             field: 'File_owner',
-            table: setup.map.entities.User.table,
         })
 
-        expect(setup.map.relations.File_owner_file_User).toMatchObject({
-            // 应该跟 File 合并了
-            table: setup.map.entities.File.table,
-            attributes: {},
+        expect(setup.map.links.File_owner_file_User).toMatchObject({
             relType: ['n', '1'],
-            sourceEntity: 'File',
+            sourceRecord: 'File',
             sourceAttribute: 'owner',
-            targetEntity: 'User',
+            targetRecord: 'User',
             targetAttribute: 'file',
             mergedTo: 'source',
         })
 
         // 虚拟关系表
-        expect(setup.map.relations.File_owner_file_User_source).toMatchObject({
-            table: setup.map.entities.File_owner_file_User.table,
-            attributes: {},
+        expect(setup.map.links.File_owner_file_User_source).toMatchObject({
             relType: ['1', '1'],
             isSourceRelation:true,
-            sourceEntity: 'File_owner_file_User',
+            sourceRecord: 'File_owner_file_User',
             sourceAttribute: 'source',
-            targetEntity: 'File',
+            targetRecord: 'File',
             targetAttribute: undefined,
             mergedTo: 'combined',
         })
 
-        expect(setup.map.relations.File_owner_file_User_target).toMatchObject({
-            table: setup.map.entities.File_owner_file_User.table,
-            attributes: {},
+        expect(setup.map.links.File_owner_file_User_target).toMatchObject({
             relType: ['n', '1'],
             isSourceRelation:true,
-            sourceEntity: 'File_owner_file_User',
+            sourceRecord: 'File_owner_file_User',
             sourceAttribute: 'target',
-            targetEntity: 'User',
+            targetRecord: 'User',
             targetAttribute: undefined,
             mergedTo: 'source',
         })
@@ -155,61 +141,53 @@ describe("db setup", () => {
     test('validate n:n relation map', () => {
         // User & User friends 关系
         const setup = new DBSetup(entities, relations);
-        expect(setup.map.entities.User).toBeDefined()
-        expect(setup.map.entities.User.attributes.friends).toMatchObject({
-            isEntity: true,
+        expect(setup.map.records.User).toBeDefined()
+        expect(setup.map.records.User.attributes.friends).toMatchObject({
+            isRecord: true,
             relType: ['n', 'n'],
-            entityName: 'User',
-            relationName: 'User_friends_friends_User',
+            recordName: 'User',
+            linkName: 'User_friends_friends_User',
             isSource:false,
-            field: undefined,
-            table: setup.map.entities.User.table,
         })
+        expect(setup.map.records.User.attributes.friends.field).toBeUndefined()
 
-        expect(setup.map.relations.User_friends_friends_User).toMatchObject({
+        expect(setup.map.links.User_friends_friends_User).toMatchObject({
             // 没合并
-            table: setup.map.entities.User_friends_friends_User.table,
-            attributes: {},
+            table: setup.map.records.User_friends_friends_User.table,
             relType: ['n', 'n'],
-            sourceEntity: 'User',
+            sourceRecord: 'User',
             sourceAttribute: 'friends',
-            targetEntity: 'User',
+            targetRecord: 'User',
             targetAttribute: 'friends',
-            // FIXME field 的名字到底是谁决定的。如果我们用 虚拟表，那么就应该是虚拟表决定的。
-            sourceField: '_source',
-            targetField: '_target'
         })
-        expect(setup.map.relations.User_friends_friends_User.mergedTo).toBeUndefined()
+        expect(setup.map.links.User_friends_friends_User.mergedTo).toBeUndefined()
 
         // 虚拟关系表
-        expect(setup.map.relations.User_friends_friends_User_source).toMatchObject({
-            table: setup.map.entities.User_friends_friends_User.table,
-            attributes: {},
+        expect(setup.map.links.User_friends_friends_User_source).toMatchObject({
+
             relType: ['n', '1'],
             isSourceRelation:true,
-            sourceEntity: 'User_friends_friends_User',
+            sourceRecord: 'User_friends_friends_User',
             sourceAttribute: 'source',
-            targetEntity: 'User',
+            targetRecord: 'User',
             targetAttribute: undefined,
             mergedTo: 'source',
         })
 
         //
-        expect(setup.map.relations.User_friends_friends_User_target).toMatchObject({
-            table: setup.map.entities.User_friends_friends_User.table,
-            attributes: {},
+        expect(setup.map.links.User_friends_friends_User_target).toMatchObject({
             relType: ['n', '1'],
             isSourceRelation:true,
-            sourceEntity: 'User_friends_friends_User',
+            sourceRecord: 'User_friends_friends_User',
             sourceAttribute: 'target',
-            targetEntity: 'User',
+            targetRecord: 'User',
             targetAttribute: undefined,
             mergedTo: 'source',
         })
 
     })
 
-    test.only('create table', async () => {
+    test('create table', async () => {
         const file = "test-create.sqlite"
         if (fs.existsSync(file)) {
             fs.unlinkSync(file)
@@ -217,16 +195,17 @@ describe("db setup", () => {
 
         const setup = new DBSetup(entities, relations, new SQLiteDB(file, {create:true, readwrite: true}))
         await setup.createTables()
+        // console.log(1111111111, setup.map)
+        // console.log(222222222, setup.tables)
         // TODO 查询表结构
     })
-})
 
 
-describe('query test', () => {
-    test('query test', async () => {
+    test('query test1111', async () => {
         const database = new SQLiteDB(':memory:')
         const setup = new DBSetup(entities, relations, database);
         await setup.createTables()
+
 
         const entityToTableMap = new EntityToTableMap(setup.map)
         const entityQuery = RecordQuery.create('User', entityToTableMap, {
@@ -268,4 +247,6 @@ describe('query test', () => {
         expect(result.length).toBe(0)
     })
 })
+
+
 

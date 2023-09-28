@@ -9,7 +9,7 @@ import {EntityToTableMap} from "../erstorage/EntityToTableMap";
 describe('create data', () => {
     let db
     let setup
-    let entityQueryHandle
+    let entityQueryHandle: EntityQueryHandle
 
     beforeEach(async () => {
         const { entities, relations } = createCommonData()

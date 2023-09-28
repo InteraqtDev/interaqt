@@ -18,7 +18,7 @@ describe('attribute query test', () => {
             }],
             // 不合表的 1:1 关系
             ['item', {
-                attributeQuery: ['serialNumber']
+                attributeQuery: ['itemName']
             }],
             // n:1 关系
             ['leader', {
@@ -62,12 +62,12 @@ describe('attribute query test', () => {
                 attribute: "id"
             },
             {
-                tableAliasAndField: ["User", "user_name"],
+                tableAliasAndField: ["User", "User_name"],
                 nameContext: ["User"],
                 attribute: "name"
             },
             {
-                tableAliasAndField: ["User", "user_age"],
+                tableAliasAndField: ["User", "User_age"],
                 nameContext: ["User"],
                 attribute: "age"
             },
@@ -78,20 +78,20 @@ describe('attribute query test', () => {
                 attribute: "id"
             },
             {
-                tableAliasAndField: ["User", "profile_title"],
+                tableAliasAndField: ["User", "Profile_title"],
                 nameContext: ["User", "profile"],
                 attribute: "title"
             },
             // 1:1 字段
             {
-                tableAliasAndField: ["User_item", "id"],
+                tableAliasAndField: ["User", "id"],
                 nameContext: ["User", "item"],
                 attribute: "id"
             },
             {
-                tableAliasAndField: ["User_item", "serialNumber"],
+                tableAliasAndField: ["User", "Item_itemName"],
                 nameContext: ["User", "item"],
-                attribute: "serialNumber"
+                attribute: "itemName"
             },
             // 1:n 字段
             {
@@ -100,7 +100,7 @@ describe('attribute query test', () => {
                 attribute: "id"
             },
             {
-                tableAliasAndField: ["User_leader", "user_name"],
+                tableAliasAndField: ["User_leader", "User_name"],
                 nameContext: ["User", "leader"],
                 attribute: "name"
             },
@@ -111,7 +111,7 @@ describe('attribute query test', () => {
                 attribute: "id"
             },
             {
-                tableAliasAndField: ["User_leader", "profile_title"],
+                tableAliasAndField: ["User_leader", "Profile_title"],
                 nameContext: ["User", "leader", "profile"],
                 attribute: "title"
             }

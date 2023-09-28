@@ -26,7 +26,7 @@ describe('query agent test', () => {
             }],
             // 不合表的 1:1 关系
             ['item', {
-                attributeQuery: ['serialNumber']
+                attributeQuery: ['itemName']
             }],
             // n:1 关系
             ['leader', {
@@ -55,33 +55,27 @@ describe('query agent test', () => {
 
         const joinExp = queryAgent.getJoinTables(attributeQuery.fullEntityQueryTree, ['User'])
         expect(joinExp).toMatchObject([
-            // 和 item join，item 中已经有关系表
-            {
-                for: ["User", "item"],
-                joinSource: ["User_Profile", "User"],
-                joinIdField: ["id", "LargeItem_owner"],
-                joinTarget: ["LargeItem", "User_item"]
-            },
+            // 和 item 合一了，不需要join
             // 和自身 join
             {
                 for: ["User", "leader"],
-                joinSource: ["User_Profile", "User"],
+                joinSource: ["Profile_User_Item", "User"],
                 joinIdField: ["User_leader", "id"],
-                joinTarget: ["User_Profile", "User_leader"]
+                joinTarget: ["Profile_User_Item", "User_leader"]
             },
             // 和关系表 join
             {
                 for: ["User", "friends"],
-                joinSource: ["User_Profile", "User"],
-                joinIdField: ["id", "$source"],
+                joinSource: ["Profile_User_Item", "User"],
+                joinIdField: ["id", "_source"],
                 joinTarget: ["User_friends_friends_User", "REL__User_friends"]
             },
             // 关系表和 friend join。
             {
                 for: ["User", "friends"],
                 joinSource: ["User_friends_friends_User", "REL__User_friends"],
-                joinIdField: ["$target", "id"],
-                joinTarget: ["User_Profile", "User_friends"]
+                joinIdField: ["_target", "id"],
+                joinTarget: ["Profile_User_Item", "User_friends"]
             }
         ])
     });
@@ -109,9 +103,11 @@ describe('query agent test', () => {
         expect(fieldMatchExpWithValue!.left.data).toMatchObject({
             fieldName: [
                 "User",
-                "user_name"
+                "User_name"
             ],
-            fieldValue: "= \"A\""
+            fieldValue: "= \"A\"",
+            key: "name",
+            value: ['=', 'A']
         })
 
         expect(fieldMatchExpWithValue!.right.data).toMatchObject({
@@ -152,7 +148,7 @@ ${queryAgent.buildFindQuery(innerEntityQuery, 'User_friends')}
                 }],
                 // 不合表的 1:1 关系
                 ['item', {
-                    attributeQuery: ['serialNumber']
+                    attributeQuery: ['itemName']
                 }],
                 // n:1 关系
                 ['leader', {

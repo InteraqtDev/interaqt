@@ -1,140 +1,520 @@
 import {MapData} from "../../erstorage/EntityToTableMap";
 
 export const entityToTableMapData: MapData = {
-    entities: {
-        User: {
-            table: 'User_Profile',
-            attributes: {
-                name: {
-                    type: 'string',
-                    fieldType: 'text',
-                    field: 'user_name'
-                },
-                age: {
-                    type: 'number',
-                    fieldType: 'int',
-                    field: 'user_age'
-                },
-                profile: {
-                    isEntity: true,
-                    relType: ['1', '1'],
-                    entityName: 'Profile',
-                    relationName: 'User_profile_user_Profile',
-                    table: 'User_Profile',
-                    field: '',
-                },
-                leader: {
-                    isEntity: true,
-                    relType: ['n', '1'],
-                    entityName: 'User',
-                    relationName: 'User_leader_member_User',
-                    table: 'User_Profile',
-                    field: 'User_leader'
-                },
-                friends: {
-                    isEntity: true,
-                    relType: ['n', 'n'],
-                    entityName: 'User',
-                    relationName: 'User_friends_friends_User',
-                    table: 'User_Profile',
-                    field: ''
-                },
-                item: {
-                    isEntity: true,
-                    relType: ['1', '1'],
-                    entityName: 'LargeItem',
-                    relationName: 'User_item_owner_LargeItem',
-                    table: 'LargeItem',
-                    field: ''
-                }
-            }
+    "links": {
+        "File_owner_file_User": {
+            "table": "File_owner_file_User",
+            "relType": [
+                "n",
+                "1"
+            ],
+            "sourceRecord": "File",
+            "sourceAttribute": "owner",
+            "targetRecord": "User",
+            "targetAttribute": "file",
+            "recordName": "File_owner_file_User",
+            "mergedTo": "source"
         },
-        Profile: {
-            table: 'User_Profile',
-            attributes: {
-                title: {
-                    type: 'string',
-                    fieldType: 'text',
-                    field: 'profile_title'
-                },
-                owner: {
-                    isEntity: true,
-                    relType: ['1', '1'],
-                    entityName: 'User',
-                    relationName: 'User_profile_user_Profile',
-                    table: 'User_Profile',
-                    field: ''
-                }
-            }
+        "File_owner_file_User_source": {
+            "table": "File_owner_file_User_source",
+            "sourceRecord": "File_owner_file_User",
+            "sourceAttribute": "source",
+            "targetRecord": "File",
+            "relType": [
+                "1",
+                "1"
+            ],
+            "isSourceRelation": true,
+            "mergedTo": "combined"
         },
-        // 也是 1:1 关系，但是不合表的情况
-        LargeItem: {
-            table: 'LargeItem',
-            attributes: {
-                serialNumber: {
-                    type: 'number',
-                    fieldType: 'bigInt',
-                    field: 'serialNumber'
-                },
-                owner: {
-                    isEntity: true,
-                    relType: ['1', '1'],
-                    entityName: 'User',
-                    relationName: 'User_item_owner_LargeItem',
-                    table: 'LargeItem',
-                    field: 'LargeItem_owner'
-                }
-            }
+        "File_owner_file_User_target": {
+            "table": "File_owner_file_User_target",
+            "sourceRecord": "File_owner_file_User",
+            "sourceAttribute": "target",
+            "targetRecord": "User",
+            "relType": [
+                "n",
+                "1"
+            ],
+            "isSourceRelation": true,
+            "mergedTo": "source"
+        },
+        "Profile_owner_profile_User": {
+            "table": "Profile_owner_profile_User",
+            "relType": [
+                "1",
+                "1"
+            ],
+            "sourceRecord": "Profile",
+            "sourceAttribute": "owner",
+            "targetRecord": "User",
+            "targetAttribute": "profile",
+            "recordName": "Profile_owner_profile_User",
+            "mergedTo": "combined"
+        },
+        "Profile_owner_profile_User_source": {
+            "table": "Profile_owner_profile_User_source",
+            "sourceRecord": "Profile_owner_profile_User",
+            "sourceAttribute": "source",
+            "targetRecord": "Profile",
+            "relType": [
+                "1",
+                "1"
+            ],
+            "isSourceRelation": true,
+            "mergedTo": "combined"
+        },
+        "Profile_owner_profile_User_target": {
+            "table": "Profile_owner_profile_User_target",
+            "sourceRecord": "Profile_owner_profile_User",
+            "sourceAttribute": "target",
+            "targetRecord": "User",
+            "relType": [
+                "1",
+                "1"
+            ],
+            "isSourceRelation": true,
+            "mergedTo": "combined"
+        },
+        "User_leader_member_User": {
+            "table": "User_leader_member_User",
+            "relType": [
+                "n",
+                "1"
+            ],
+            "sourceRecord": "User",
+            "sourceAttribute": "leader",
+            "targetRecord": "User",
+            "targetAttribute": "member",
+            "recordName": "User_leader_member_User",
+            "mergedTo": "source"
+        },
+        "User_leader_member_User_source": {
+            "table": "User_leader_member_User_source",
+            "sourceRecord": "User_leader_member_User",
+            "sourceAttribute": "source",
+            "targetRecord": "User",
+            "relType": [
+                "1",
+                "1"
+            ],
+            "isSourceRelation": true,
+            "mergedTo": "combined"
+        },
+        "User_leader_member_User_target": {
+            "table": "User_leader_member_User_target",
+            "sourceRecord": "User_leader_member_User",
+            "sourceAttribute": "target",
+            "targetRecord": "User",
+            "relType": [
+                "n",
+                "1"
+            ],
+            "isSourceRelation": true,
+            "mergedTo": "source"
+        },
+        "User_friends_friends_User": {
+            "table": "User_friends_friends_User",
+            "relType": [
+                "n",
+                "n"
+            ],
+            "sourceRecord": "User",
+            "sourceAttribute": "friends",
+            "targetRecord": "User",
+            "targetAttribute": "friends",
+            "recordName": "User_friends_friends_User"
+        },
+        "User_friends_friends_User_source": {
+            "table": "User_friends_friends_User_source",
+            "sourceRecord": "User_friends_friends_User",
+            "sourceAttribute": "source",
+            "targetRecord": "User",
+            "relType": [
+                "n",
+                "1"
+            ],
+            "isSourceRelation": true,
+            "mergedTo": "source"
+        },
+        "User_friends_friends_User_target": {
+            "table": "User_friends_friends_User_target",
+            "sourceRecord": "User_friends_friends_User",
+            "sourceAttribute": "target",
+            "targetRecord": "User",
+            "relType": [
+                "n",
+                "1"
+            ],
+            "isSourceRelation": true,
+            "mergedTo": "source"
+        },
+        "User_item_owner_Item": {
+            "table": "User_item_owner_Item",
+            "relType": [
+                "1",
+                "1"
+            ],
+            "sourceRecord": "User",
+            "sourceAttribute": "item",
+            "targetRecord": "Item",
+            "targetAttribute": "owner",
+            "recordName": "User_item_owner_Item",
+            "mergedTo": "combined"
+        },
+        "User_item_owner_Item_source": {
+            "table": "User_item_owner_Item_source",
+            "sourceRecord": "User_item_owner_Item",
+            "sourceAttribute": "source",
+            "targetRecord": "User",
+            "relType": [
+                "1",
+                "1"
+            ],
+            "isSourceRelation": true,
+            "mergedTo": "combined"
+        },
+        "User_item_owner_Item_target": {
+            "table": "User_item_owner_Item_target",
+            "sourceRecord": "User_item_owner_Item",
+            "sourceAttribute": "target",
+            "targetRecord": "Item",
+            "relType": [
+                "1",
+                "1"
+            ],
+            "isSourceRelation": true,
+            "mergedTo": "combined"
         }
     },
-    relations: {
-        User_profile_user_Profile: {
-            attributes: {},
-            sourceEntity: 'User',
-            sourceAttribute: 'profile',
-            targetEntity: 'Profile',
-            targetAttribute: 'owner',
-            relType: ['1', '1'],
-            table: 'User_Profile',  // 1:1 三表合一,
-            mergedTo: 'source',
-            sourceField: 'User_profile',
-            targetField: 'Profile_owner',
+    "records": {
+        "User": {
+            "table": "Profile_User_Item",
+            "attributes": {
+                "name": {
+                    "type": "string",
+                    "field": "User_name"
+                },
+                "age": {
+                    "type": "number",
+                    "field": "User_age"
+                },
+                "id": {
+                    "type": "pk",
+                    "field": "id"
+                },
+                "file": {
+                    "type": "id",
+                    "isRecord": true,
+                    "relType": [
+                        "1",
+                        "n"
+                    ],
+                    "recordName": "File",
+                    "linkName": "File_owner_file_User",
+                    "isSource": false
+                },
+                "profile": {
+                    "type": "id",
+                    "isRecord": true,
+                    "relType": [
+                        "1",
+                        "1"
+                    ],
+                    "recordName": "Profile",
+                    "linkName": "Profile_owner_profile_User",
+                    "isSource": false
+                },
+                "leader": {
+                    "type": "id",
+                    "isRecord": true,
+                    "relType": [
+                        "n",
+                        "1"
+                    ],
+                    "recordName": "User",
+                    "linkName": "User_leader_member_User",
+                    "isSource": true,
+                    "field": "User_leader"
+                },
+                "member": {
+                    "type": "id",
+                    "isRecord": true,
+                    "relType": [
+                        "1",
+                        "n"
+                    ],
+                    "recordName": "User",
+                    "linkName": "User_leader_member_User",
+                    "isSource": false
+                },
+                "friends": {
+                    "type": "id",
+                    "isRecord": true,
+                    "relType": [
+                        "n",
+                        "n"
+                    ],
+                    "recordName": "User",
+                    "linkName": "User_friends_friends_User",
+                    "isSource": false
+                },
+                "item": {
+                    "type": "id",
+                    "isRecord": true,
+                    "relType": [
+                        "1",
+                        "1"
+                    ],
+                    "recordName": "Item",
+                    "linkName": "User_item_owner_Item",
+                    "isSource": true
+                }
+            }
         },
-        User_leader_member_User: {
-            attributes: {},
-            sourceEntity: 'User',
-            sourceAttribute: 'leader',
-            targetEntity: 'User',
-            targetAttribute: 'member',
-            relType: ['n', '1'],
-            table: 'User_Profile',  // n:1 往 n 方向合表
-            mergedTo: 'source',
-            sourceField: 'User_leader',
-            targetField: '$target',
+        "Profile": {
+            "table": "Profile_User_Item",
+            "attributes": {
+                "title": {
+                    "type": "string",
+                    "field": "Profile_title"
+                },
+                "id": {
+                    "type": "pk",
+                    "field": "id"
+                },
+                "owner": {
+                    "type": "id",
+                    "isRecord": true,
+                    "relType": [
+                        "1",
+                        "1"
+                    ],
+                    "recordName": "User",
+                    "linkName": "Profile_owner_profile_User",
+                    "isSource": true
+                }
+            }
         },
-        User_friends_friends_User: {
-            attributes: {},
-            sourceEntity: 'User',
-            sourceAttribute: 'friends',
-            targetEntity: 'User',
-            targetAttribute: 'friends',
-            relType: ['n', 'n'],
-            table: 'User_friends_friends_User',  // n:n 关系，表是独立的
-            sourceField: '$source',
-            targetField: '$target',
+        "File": {
+            "table": "File",
+            "attributes": {
+                "fileName": {
+                    "type": "string",
+                    "field": "File_fileName"
+                },
+                "id": {
+                    "type": "pk",
+                    "field": "id"
+                },
+                "owner": {
+                    "type": "id",
+                    "isRecord": true,
+                    "relType": [
+                        "n",
+                        "1"
+                    ],
+                    "recordName": "User",
+                    "linkName": "File_owner_file_User",
+                    "isSource": true,
+                    "field": "File_owner"
+                }
+            }
         },
-        User_item_owner_LargeItem: {
-            attributes: {},
-            sourceEntity: 'User',
-            sourceAttribute: 'item',
-            targetEntity: 'LargeItem',
-            targetAttribute: 'owner',
-            relType: ['1', '1'],
-            table: 'LargeItem',  // 特殊的 1:1 关系，表往 target 合并了
-            mergedTo: 'target',
-            sourceField: '$source',
-            targetField: 'LargeItem_owner',
+        "Item": {
+            "table": "Profile_User_Item",
+            "attributes": {
+                "itemName": {
+                    "type": "string",
+                    "field": "Item_itemName"
+                },
+                "id": {
+                    "type": "pk",
+                    "field": "id"
+                },
+                "owner": {
+                    "type": "id",
+                    "isRecord": true,
+                    "relType": [
+                        "1",
+                        "1"
+                    ],
+                    "recordName": "User",
+                    "linkName": "User_item_owner_Item",
+                    "isSource": false
+                }
+            }
+        },
+        "File_owner_file_User": {
+            "table": "File",
+            "attributes": {
+                "id": {
+                    "type": "pk",
+                    "field": "id"
+                },
+                "source": {
+                    "type": "id",
+                    "isRecord": true,
+                    "relType": [
+                        "1",
+                        "1"
+                    ],
+                    "recordName": "File",
+                    "linkName": "File_owner_file_User_source",
+                    "isSource": true,
+                    "field": "id"
+                },
+                "target": {
+                    "type": "id",
+                    "isRecord": true,
+                    "relType": [
+                        "n",
+                        "1"
+                    ],
+                    "recordName": "User",
+                    "linkName": "File_owner_file_User_target",
+                    "isSource": true,
+                    "field": "File_owner"
+                }
+            },
+            "isRelation": true
+        },
+        "Profile_owner_profile_User": {
+            "table": "Profile_User_Item",
+            "attributes": {
+                "id": {
+                    "type": "pk",
+                    "field": "id"
+                },
+                "source": {
+                    "type": "id",
+                    "isRecord": true,
+                    "relType": [
+                        "1",
+                        "1"
+                    ],
+                    "recordName": "Profile",
+                    "linkName": "Profile_owner_profile_User_source",
+                    "isSource": true,
+                    "field": "id"
+                },
+                "target": {
+                    "type": "id",
+                    "isRecord": true,
+                    "relType": [
+                        "1",
+                        "1"
+                    ],
+                    "recordName": "User",
+                    "linkName": "Profile_owner_profile_User_target",
+                    "isSource": true,
+                    "field": "id"
+                }
+            },
+            "isRelation": true
+        },
+        "User_leader_member_User": {
+            "table": "Profile_User_Item",
+            "attributes": {
+                "id": {
+                    "type": "pk",
+                    "field": "id"
+                },
+                "source": {
+                    "type": "id",
+                    "isRecord": true,
+                    "relType": [
+                        "1",
+                        "1"
+                    ],
+                    "recordName": "User",
+                    "linkName": "User_leader_member_User_source",
+                    "isSource": true,
+                    "field": "id"
+                },
+                "target": {
+                    "type": "id",
+                    "isRecord": true,
+                    "relType": [
+                        "n",
+                        "1"
+                    ],
+                    "recordName": "User",
+                    "linkName": "User_leader_member_User_target",
+                    "isSource": true,
+                    "field": "User_leader"
+                }
+            },
+            "isRelation": true
+        },
+        "User_friends_friends_User": {
+            "table": "User_friends_friends_User",
+            "attributes": {
+                "id": {
+                    "type": "pk",
+                    "field": "id"
+                },
+                "source": {
+                    "type": "id",
+                    "isRecord": true,
+                    "relType": [
+                        "n",
+                        "1"
+                    ],
+                    "recordName": "User",
+                    "linkName": "User_friends_friends_User_source",
+                    "isSource": true,
+                    "field": "_source"
+                },
+                "target": {
+                    "type": "id",
+                    "isRecord": true,
+                    "relType": [
+                        "n",
+                        "1"
+                    ],
+                    "recordName": "User",
+                    "linkName": "User_friends_friends_User_target",
+                    "isSource": true,
+                    "field": "_target"
+                }
+            },
+            "isRelation": true
+        },
+        "User_item_owner_Item": {
+            "table": "Profile_User_Item",
+            "attributes": {
+                "id": {
+                    "type": "pk",
+                    "field": "id"
+                },
+                "source": {
+                    "type": "id",
+                    "isRecord": true,
+                    "relType": [
+                        "1",
+                        "1"
+                    ],
+                    "recordName": "User",
+                    "linkName": "User_item_owner_Item_source",
+                    "isSource": true,
+                    "field": "id"
+                },
+                "target": {
+                    "type": "id",
+                    "isRecord": true,
+                    "relType": [
+                        "1",
+                        "1"
+                    ],
+                    "recordName": "Item",
+                    "linkName": "User_item_owner_Item_target",
+                    "isSource": true,
+                    "field": "id"
+                }
+            },
+            "isRelation": true
         }
     }
-}
+} as MapData
 
