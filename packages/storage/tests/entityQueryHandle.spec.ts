@@ -7,12 +7,13 @@ import {EntityToTableMap} from "../erstorage/EntityToTableMap";
 
 
 describe('create data', () => {
-    let db
+    let db: SQLiteDB
     let setup
     let entityQueryHandle: EntityQueryHandle
 
     beforeEach(async () => {
         const { entities, relations } = createCommonData()
+        // @ts-ignore
         db = new SQLiteDB(':memory:', {create:true, readwrite: true})
         setup = new DBSetup(entities, relations, db)
         await setup.createTables()
@@ -52,12 +53,13 @@ describe('create data', () => {
 
 
 describe('update data', () => {
-    let db
+    let db: SQLiteDB
     let setup
-    let entityQueryHandle
+    let entityQueryHandle : EntityQueryHandle
 
     beforeEach(async () => {
         const { entities, relations } = createCommonData()
+        // @ts-ignore
         db = new SQLiteDB(':memory:', {create:true, readwrite: true})
         setup = new DBSetup(entities, relations, db)
         await setup.createTables()
@@ -72,6 +74,18 @@ describe('update data', () => {
     test('update self value', async () => {
         const returnUser = await entityQueryHandle.create('User', {name: 'aaa', age: 17})
         const updated = await entityQueryHandle.update('User', MatchExpression.createFromAtom({ key: 'name', value: ['=', 'aaa']}), {name: 'bbb', age: 18})
+        expect(updated.length).toBe(1)
+        expect(updated[0].id).toBe(returnUser.id)
+        const findUser = await entityQueryHandle.findOne('User', MatchExpression.createFromAtom({ key: 'name', value: ['=', 'bbb']}), {}, ['name', 'age'] )
+        expect(findUser.id).toBe(returnUser.id)
+        expect(findUser.name).toBe('bbb')
+        expect(findUser.age).toBe(18)
+    })
+
+    test('update self value with related entity as match', async () => {
+        const leader = await entityQueryHandle.create('User', {name: 'elader', age: 17})
+        const returnUser = await entityQueryHandle.create('User', {name: 'aaa', age: 17, leader})
+        const updated = await entityQueryHandle.update('User', MatchExpression.createFromAtom({ key: 'leader.id', value: ['=', leader.id]}), {name: 'bbb', age: 18})
         expect(updated.length).toBe(1)
         expect(updated[0].id).toBe(returnUser.id)
         const findUser = await entityQueryHandle.findOne('User', MatchExpression.createFromAtom({ key: 'name', value: ['=', 'bbb']}), {}, ['name', 'age'] )

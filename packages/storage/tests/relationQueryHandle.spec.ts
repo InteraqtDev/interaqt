@@ -5,16 +5,18 @@ import {DBSetup} from "../erstorage/Setup";
 import { SQLiteDB } from '../../runtime/BunSQLite'
 import {EntityToTableMap} from "../erstorage/EntityToTableMap";
 import {removeAllInstance} from '../../shared/createClass'
+import exp from "constants";
 
 
 describe('find relation', () => {
-    let db
+    let db: SQLiteDB
     let setup
-    let entityQueryHandle
+    let entityQueryHandle: EntityQueryHandle
 
     beforeEach(async () => {
         removeAllInstance()
         const { entities, relations } = createCommonData()
+        // @ts-ignore
         db = new SQLiteDB(':memory:', {create:true, readwrite: true})
         setup = new DBSetup(entities, relations, db)
         await setup.createTables()
@@ -48,8 +50,39 @@ describe('find relation', () => {
         expect(result2.length).toBe(1)
     })
 
-    test('create and query with n:n related entities', async () => {
 
+    test('create and query with 1:n related entities', async () => {
+        const user = await entityQueryHandle.create('User', {name: 'aaa', age: 17 })
+        const file1 = await entityQueryHandle.create('File', {fileName: 'file1', owner: user })
+        const file2 = await entityQueryHandle.create('File', {fileName: 'file2', owner: user })
+
+        const match1 = MatchExpression.createFromAtom({
+            key: 'target.name',
+            value: ['=', 'aaa']
+        })
+        const result1 = await entityQueryHandle.findRelation(['User', 'file'], match1, {}, [['source', { attributeQuery: ['fileName']}], ['target', {attributeQuery: ['name']}]])
+
+        expect( result1.length).toBe(2)
+        expect( result1[0].source.fileName).toBe('file1')
+        expect( result1[0].target.name).toBe('aaa')
+        expect( result1[1].source.fileName).toBe('file2')
+        expect( result1[1].target.name).toBe('aaa')
+
+        const match2 = MatchExpression.createFromAtom({
+            key: 'target.name',
+            value: ['=', 'aaa']
+        }).and({
+            key: 'source.fileName',
+            value: ['=', 'file1']
+        })
+
+        await entityQueryHandle.removeRelation(['User', 'file'], match2)
+        const result2 = await entityQueryHandle.findRelation(['User', 'file'], match1, {}, [['source', { attributeQuery: ['fileName']}], ['target', {attributeQuery: ['name']}]])
+        expect( result2.length).toBe(1)
+        expect( result2[0].source.fileName).toBe('file2')
+        expect( result2[0].target.name).toBe('aaa')
     })
+
+
 
 })

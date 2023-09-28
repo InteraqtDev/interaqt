@@ -1,7 +1,7 @@
 import {assert} from "../util";
 
 export class AttributeInfo {
-    constructor(public data:ValueAttribute|RecordAttribute, public attributeName, public parentEntityName, public map: EntityToTableMap) {
+    constructor(public data:ValueAttribute|RecordAttribute, public attributeName: string, public parentEntityName: string, public map: EntityToTableMap) {
         assert(!!data, 'data can not be null')
     }
     get isRecord() {
@@ -75,7 +75,7 @@ export class AttributeInfo {
 
 
 export class LinkInfo {
-    constructor(public name, public data: LinkMapItem, public map: EntityToTableMap) {
+    constructor(public name: string, public data: LinkMapItem, public map: EntityToTableMap) {
     }
     isMerged() {
         return !!this.data.mergedTo
@@ -92,6 +92,12 @@ export class LinkInfo {
     isRecordSource(recordName:string) {
         return this.data.sourceRecord === recordName
     }
+    get sourceRecord() {
+        return this.data.sourceRecord
+    }
+    get targetRecord() {
+        return this.data.targetRecord
+    }
     get record() : RecordMapItem {
         return this.map.getRecord(this.name)!
     }
@@ -99,10 +105,11 @@ export class LinkInfo {
         return this.record.table
     }
     get sourceField() {
-        return this.record.attributes.source.field
+        // CAUTION sourceField 指的的是 target 在source 表中的名字！
+        return this.record.attributes.target.field
     }
     get targetField() {
-        return this.record.attributes.target.field
+        return this.record.attributes.source.field
     }
 }
 
@@ -130,7 +137,6 @@ export type RecordAttribute = {
     //  这个是从 EntityMapItemData 的 sourceField 或者 targetField 复制过来的。
     table?: string,
     field? : string
-    fieldType: string,
 }
 
 export type RecordMapItem = {
@@ -151,7 +157,7 @@ export type LinkMapItem = {
     sourceRecord: string,
     sourceAttribute: string,
     targetRecord: string,
-    targetAttribute: string,
+    targetAttribute?: string,
     isSourceRelation?: boolean,
     // 这个 link 是否有个对应的 record. 当这个 link 是根据 Relation 创建的时候就有这个。
     //  它等同于 isSourceRelation 为 true 时 sourceRecord
@@ -199,6 +205,9 @@ export class EntityToTableMap {
         assert(!!linkName, `cannot find relation ${recordName} ${attribute}`)
         return new LinkInfo(linkName, this.data.links[linkName], this)
     }
+    getLinkInfoByName(linkName: string) {
+        return new LinkInfo(linkName, this.data.links[linkName], this)
+    }
     getRelationInfoData(entityName: string, attribute: string) {
         const relationName = (this.data.records[entityName].attributes[attribute] as RecordAttribute).linkName
         assert(!!relationName, `cannot find relation ${entityName} ${attribute}`)
@@ -219,7 +228,7 @@ export class EntityToTableMap {
             currentEntity = (attributeData as RecordAttribute).isRecord ? (attributeData as RecordAttribute).recordName : ''
             lastAttribute = currentAttribute
         }
-        return new AttributeInfo(attributeData, lastAttribute, parentEntity, this)
+        return new AttributeInfo(attributeData!, lastAttribute!, parentEntity!, this)
     }
     getTableAndAlias(namePath: string[]): [string, string, RecordMapItem, string, string, LinkMapItem] {
         const [rootEntityName, ...relationPath] = namePath
@@ -258,7 +267,7 @@ export class EntityToTableMap {
         }
 
 
-        return [lastTable, lastTableAlias, lastEntityData, relationTable, relationTableAlias, currentRelationData]
+        return [lastTable, lastTableAlias, lastEntityData, relationTable!, relationTableAlias!, currentRelationData!]
     }
     getTableAliasAndFieldName(namePath: string[], attributeName: string) {
         const [, lastTableAliasName,lastEntityData] = this.getTableAndAlias(namePath)
@@ -274,11 +283,12 @@ export class EntityToTableMap {
             return relationData.sourceAttribute
         } else {
             assert(false, `wrong relation data ${entityName}.${attribute}`)
+            return ''
         }
     }
     groupAttributes(entityName: string, attributeNames: string[]) : [AttributeInfo[], AttributeInfo[]]{
-        const valueAttributes = []
-        const entityAttributes = []
+        const valueAttributes: AttributeInfo[] = []
+        const entityAttributes: AttributeInfo[] = []
         attributeNames.forEach(attributeName => {
             if (this.data.records[entityName].attributes[attributeName]) {
                 const info = this.getInfo(entityName, attributeName)

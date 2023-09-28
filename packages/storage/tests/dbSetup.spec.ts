@@ -193,6 +193,7 @@ describe("db setup", () => {
             fs.unlinkSync(file)
         }
 
+        // @ts-ignore
         const setup = new DBSetup(entities, relations, new SQLiteDB(file, {create:true, readwrite: true}))
         await setup.createTables()
         // console.log(1111111111, setup.map)
