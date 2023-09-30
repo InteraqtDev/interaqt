@@ -8,7 +8,7 @@ import {
     LinkMapItem
 } from "./EntityToTableMap";
 import {assert} from "../util";
-import {Database} from "../../runtime/System";
+import {Database, ID_ATTR, ROW_ID_ATTR} from "../../runtime/System";
 
 type ColumnData = {
     name:string,
@@ -24,7 +24,7 @@ export type TableData = {
     }
 }
 
-export const ID_ATTR = 'id'
+
 
 export class DBSetup {
     public recordToTableMap = new Map<string,string>()
@@ -53,18 +53,18 @@ export class DBSetup {
         assert(!!originTable  && !!tableToJoin, `table not exists ${originTable} ${tableToJoin}`)
         if (originTable == tableToJoin) return
 
-        const sameTableRecords = this.tableToRecordsMap.get(originTable)
+        const sameTableRecords = this.tableToRecordsMap.get(originTable)!
         // 1. 清空原来的
         this.tableToRecordsMap.set(originTable, new Set())
         // 2. 指针也都修改该过来
         sameTableRecords.forEach(sameTableRecord => this.recordToTableMap.set(sameTableRecord, tableToJoin))
 
         // 3. 新 table 也要合并数据
-        const entitiesInTarget = this.tableToRecordsMap.get(tableToJoin)
+        const entitiesInTarget = this.tableToRecordsMap.get(tableToJoin)!
         this.tableToRecordsMap.set(tableToJoin, new Set([...entitiesInTarget, ...sameTableRecords]))
     }
-    renameTableWithJoinedEntities(originTableName) {
-        const records = Array.from(this.tableToRecordsMap.get(originTableName))
+    renameTableWithJoinedEntities(originTableName: string) {
+        const records = Array.from(this.tableToRecordsMap.get(originTableName)!)
         if (!records.length) return
 
         // CAUTION 有合并的情况的话，里面一定有 entity，只用 entity 的名字。除非TableName 始终只用其中 的 entity 名字
@@ -110,7 +110,7 @@ export class DBSetup {
 
         // 自动补充
         attributes[ID_ATTR] = {
-            type: 'pk'
+            type: 'id'
         }
 
         if (isRelation) {
@@ -212,16 +212,17 @@ export class DBSetup {
         this.mergeRecords()
     }
     mergeRecords() {
+
         // 基本合表策略。合表操作开始，n:n 不合表。 1:1 三表合一 ， 其他往 n 方向合表。
         // 要做两件事:
         // 1) 修改 links 里面的数据。以里面的 mergeTo 作为判断标准
         // 2) 根据 link 情况给 records 分配表，分配 field
-
         //  TODO 可能有实体声明自己不合并。
         Object.entries(this.map.links).forEach(([relationName, relationData]) => {
             const {relType, sourceRecord, targetRecord, isSourceRelation} = relationData
             // n:n 不合表，先排除
             if (relType.includes('1')) {
+                // FIXME  - 如果 A 和 B 有两个关系的都是 1:1，只能按照其中一个关系三表合一，不然逻辑上有问题。
                 if (relType[0] === '1' && relType[1] === '1') {
                     // 1:1 关系。并且 entity 不同样。真正的三表合一 。往 source 方向合表
                     if (sourceRecord !== targetRecord) {
@@ -265,13 +266,17 @@ export class DBSetup {
             Object.entries(record.attributes).forEach(([attributeName, attributeData]) => {
                 if ((attributeData as RecordAttribute).isRecord) return
 
-                // valueAttribute 或者 如果这个关系表被合到了这里，并且不是三表合一，我们才给他分配 field
-                // attribute 统统加上前缀，这样不管合表没合表，都不会冲突。
-                // 如果是 id ，不加前缀，所有合表的实体都共用 id
-                attributeData.field = attributeName=== ID_ATTR ? ID_ATTR :`${recordName}_${attributeName}`
+                if(record.isRelation && attributeName === ID_ATTR) {
+                    attributeData.field = ROW_ID_ATTR
+                } else {
+                    // valueAttribute 或者 如果这个关系表被合到了这里，并且不是三表合一，我们才给他分配 field
+                    // attribute 统统加上前缀，这样不管合表没合表，都不会冲突。包括 ID
+                    attributeData.field = `${recordName}_${attributeName}`
+                }
             })
         })
 
+        // FIXME ID 问题 source/target 到底归属于谁？？？还是 relation record 是一种特殊的，永远都有？？？
         // 3. 开始决定合表后的 source/target 字段分配。这里只要处理作为 relation 的 record 的 source/target 字段
         //  CAUTION  因为后面无论是处理 join 还是其他的，都是从 record 上去找字段。不是从 link 中
         Object.entries(this.map.records).forEach(([recordName, record]) => {
@@ -284,17 +289,19 @@ export class DBSetup {
                 // field 名字以 sourceRecord 里面的称呼为主
                 const sourceRecord = this.map.records[link.sourceRecord]
                 sourceRecord.attributes[link.sourceAttribute].field = `${link.sourceRecord}_${link.sourceAttribute}`
-                record.attributes.source.field = ID_ATTR
+                record.attributes.source.field = sourceRecord.attributes[ID_ATTR].field
                 record.attributes.target.field = sourceRecord.attributes[link.sourceAttribute].field
             } else if (link.mergedTo === 'target') {
                 const targetRecord = this.map.records[link.targetRecord]
-                targetRecord.attributes[link.targetAttribute].field = `${link.targetRecord}_${link.targetAttribute}`
-                record.attributes.source.field = targetRecord.attributes[link.targetAttribute].field
-                record.attributes.target.field = ID_ATTR
+                targetRecord.attributes[link.targetAttribute!].field = `${link.targetRecord}_${link.targetAttribute}`
+                record.attributes.source.field = targetRecord.attributes[link.targetAttribute!].field
+                record.attributes.target.field =  targetRecord.attributes[ID_ATTR].field
             } else {
                 // combined 情况
-                record.attributes.source.field = ID_ATTR
-                record.attributes.target.field = ID_ATTR
+                const sourceRecord = this.map.records[link.sourceRecord]
+                const targetRecord = this.map.records[link.targetRecord]
+                record.attributes.source.field = sourceRecord.attributes[ID_ATTR].field
+                record.attributes.target.field = targetRecord.attributes[ID_ATTR].field
             }
         })
 
@@ -303,7 +310,12 @@ export class DBSetup {
         // 先添加 valueAttributes 的字段。
         Object.entries(this.map.records).forEach(([recordName, record]) => {
             if (!this.tables[record.table]) {
-                this.tables[record.table] = { columns: {}}
+                this.tables[record.table] = { columns: {
+                    [ROW_ID_ATTR]: {
+                        name: ROW_ID_ATTR,
+                        type: 'pk'
+                    }
+                }}
             }
 
             // 有分配 field 的都说明在这张表内
@@ -322,6 +334,10 @@ export class DBSetup {
             return 'INTEGER PRIMARY KEY'
         } else if (type === 'id') {
             return 'INT'
+        } else if (type === 'string') {
+            return 'TEXT'
+        } else if (type === 'boolean') {
+            return 'INT(2)'
         } else {
             return type
         }

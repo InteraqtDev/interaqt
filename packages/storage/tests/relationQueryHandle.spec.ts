@@ -30,7 +30,7 @@ describe('find relation', () => {
 
     test('find 1:1 relation', async () => {
         await entityQueryHandle.create('User', {name: 'aaa', age: 17, profile: {title: 'aaa-profile'}})
-        const result = await entityQueryHandle.findRelation(['User', 'profile'], undefined, {}, [['source', { attributeQuery: ['title']}], ['target', {attributeQuery: ['name']}]])
+        const result = await entityQueryHandle.findRelationFromEntity(['User', 'profile'], undefined, {}, [['source', { attributeQuery: ['title']}], ['target', {attributeQuery: ['name']}]])
         expect(result.length).toBe(1)
         expect(result[0].source.title).toBe('aaa-profile')
         expect(result[0].target.name).toBe('aaa')
@@ -39,14 +39,14 @@ describe('find relation', () => {
             key: 'source.title',
             value: ['=', 'xxx']
         })
-        const result1 = await entityQueryHandle.findRelation(['User', 'profile'], match1, {}, [['source', { attributeQuery: ['title']}], ['target', {attributeQuery: ['name']}]])
+        const result1 = await entityQueryHandle.findRelationFromEntity(['User', 'profile'], match1, {}, [['source', { attributeQuery: ['title']}], ['target', {attributeQuery: ['name']}]])
         expect(result1.length).toBe(0)
 
         const match2 = MatchExpression.createFromAtom({
             key: 'source.title',
             value: ['=', 'aaa-profile']
         })
-        const result2 = await entityQueryHandle.findRelation(['User', 'profile'], match2, {}, [['source', { attributeQuery: ['title']}], ['target', {attributeQuery: ['name']}]])
+        const result2 = await entityQueryHandle.findRelationFromEntity(['User', 'profile'], match2, {}, [['source', { attributeQuery: ['title']}], ['target', {attributeQuery: ['name']}]])
         expect(result2.length).toBe(1)
     })
 
@@ -60,7 +60,7 @@ describe('find relation', () => {
             key: 'target.name',
             value: ['=', 'aaa']
         })
-        const result1 = await entityQueryHandle.findRelation(['User', 'file'], match1, {}, [['source', { attributeQuery: ['fileName']}], ['target', {attributeQuery: ['name']}]])
+        const result1 = await entityQueryHandle.findRelationFromEntity(['User', 'file'], match1, {}, [['source', { attributeQuery: ['fileName']}], ['target', {attributeQuery: ['name']}]])
 
         expect( result1.length).toBe(2)
         expect( result1[0].source.fileName).toBe('file1')
@@ -76,8 +76,8 @@ describe('find relation', () => {
             value: ['=', 'file1']
         })
 
-        await entityQueryHandle.removeRelation(['User', 'file'], match2)
-        const result2 = await entityQueryHandle.findRelation(['User', 'file'], match1, {}, [['source', { attributeQuery: ['fileName']}], ['target', {attributeQuery: ['name']}]])
+        await entityQueryHandle.removeRelationFromEntity(['User', 'file'], match2)
+        const result2 = await entityQueryHandle.findRelationFromEntity(['User', 'file'], match1, {}, [['source', { attributeQuery: ['fileName']}], ['target', {attributeQuery: ['name']}]])
         expect( result2.length).toBe(1)
         expect( result2[0].source.fileName).toBe('file2')
         expect( result2[0].target.name).toBe('aaa')

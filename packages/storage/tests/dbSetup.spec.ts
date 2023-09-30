@@ -5,6 +5,7 @@ import fs from 'fs'
 import {DBSetup} from "../erstorage/Setup";
 import {RecordQuery, EntityQueryData, QueryAgent, MatchExpression} from "../erstorage/ERStorage";
 import {EntityToTableMap} from "../erstorage/EntityToTableMap";
+// @ts-ignore
 import { SQLiteDB } from '../../runtime/BunSQLite'
 import {createCommonData} from "./data/common";
 
@@ -202,7 +203,7 @@ describe("db setup", () => {
     })
 
 
-    test('query test1111', async () => {
+    test('query test', async () => {
         const database = new SQLiteDB(':memory:')
         const setup = new DBSetup(entities, relations, database);
         await setup.createTables()

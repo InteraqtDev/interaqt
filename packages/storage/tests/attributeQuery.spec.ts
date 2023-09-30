@@ -57,7 +57,7 @@ describe('attribute query test', () => {
             // 自己的字段
             //  永远自动加上 id
             {
-                tableAliasAndField: ["User", "id"],
+                tableAliasAndField: ["User", "User_id"],
                 nameContext: ["User"],
                 attribute: "id"
             },
@@ -73,7 +73,7 @@ describe('attribute query test', () => {
             },
             // 1:1 字段
             {
-                tableAliasAndField: ["User", "id"],
+                tableAliasAndField: ["User", "Profile_id"],
                 nameContext: ["User", "profile"],
                 attribute: "id"
             },
@@ -84,7 +84,7 @@ describe('attribute query test', () => {
             },
             // 1:1 字段
             {
-                tableAliasAndField: ["User", "id"],
+                tableAliasAndField: ["User", "Item_id"],
                 nameContext: ["User", "item"],
                 attribute: "id"
             },
@@ -95,7 +95,7 @@ describe('attribute query test', () => {
             },
             // 1:n 字段
             {
-                tableAliasAndField: ["User_leader", "id"],
+                tableAliasAndField: ["User_leader", "User_id"],
                 nameContext: ["User", "leader"],
                 attribute: "id"
             },
@@ -106,7 +106,7 @@ describe('attribute query test', () => {
             },
             // 1:n:1 字段
             {
-                tableAliasAndField: ["User_leader", "id"],
+                tableAliasAndField: ["User_leader", "Profile_id"],
                 nameContext: ["User", "leader", "profile"],
                 attribute: "id"
             },

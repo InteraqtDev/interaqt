@@ -60,21 +60,21 @@ describe('query agent test', () => {
             {
                 for: ["User", "leader"],
                 joinSource: ["Profile_User_Item", "User"],
-                joinIdField: ["User_leader", "id"],
+                joinIdField: ["User_leader", "User_id"],
                 joinTarget: ["Profile_User_Item", "User_leader"]
             },
             // 和关系表 join
             {
                 for: ["User", "friends"],
                 joinSource: ["Profile_User_Item", "User"],
-                joinIdField: ["id", "_source"],
+                joinIdField: ["User_id", "_source"],
                 joinTarget: ["User_friends_friends_User", "REL__User_friends"]
             },
             // 关系表和 friend join。
             {
                 for: ["User", "friends"],
                 joinSource: ["User_friends_friends_User", "REL__User_friends"],
-                joinIdField: ["_target", "id"],
+                joinIdField: ["_target", "User_id"],
                 joinTarget: ["Profile_User_Item", "User_friends"]
             }
         ])

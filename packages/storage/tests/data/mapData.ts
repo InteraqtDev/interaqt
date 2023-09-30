@@ -200,8 +200,8 @@ export const entityToTableMapData: MapData = {
                     "field": "User_age"
                 },
                 "id": {
-                    "type": "pk",
-                    "field": "id"
+                    "type": "id",
+                    "field": "User_id"
                 },
                 "file": {
                     "type": "id",
@@ -280,8 +280,8 @@ export const entityToTableMapData: MapData = {
                     "field": "Profile_title"
                 },
                 "id": {
-                    "type": "pk",
-                    "field": "id"
+                    "type": "id",
+                    "field": "Profile_id"
                 },
                 "owner": {
                     "type": "id",
@@ -304,8 +304,8 @@ export const entityToTableMapData: MapData = {
                     "field": "File_fileName"
                 },
                 "id": {
-                    "type": "pk",
-                    "field": "id"
+                    "type": "id",
+                    "field": "File_id"
                 },
                 "owner": {
                     "type": "id",
@@ -329,8 +329,8 @@ export const entityToTableMapData: MapData = {
                     "field": "Item_itemName"
                 },
                 "id": {
-                    "type": "pk",
-                    "field": "id"
+                    "type": "id",
+                    "field": "Item_id"
                 },
                 "owner": {
                     "type": "id",
@@ -349,8 +349,8 @@ export const entityToTableMapData: MapData = {
             "table": "File",
             "attributes": {
                 "id": {
-                    "type": "pk",
-                    "field": "id"
+                    "type": "id",
+                    "field": "_rowId"
                 },
                 "source": {
                     "type": "id",
@@ -362,7 +362,7 @@ export const entityToTableMapData: MapData = {
                     "recordName": "File",
                     "linkName": "File_owner_file_User_source",
                     "isSource": true,
-                    "field": "id"
+                    "field": "File_id"
                 },
                 "target": {
                     "type": "id",
@@ -383,8 +383,8 @@ export const entityToTableMapData: MapData = {
             "table": "Profile_User_Item",
             "attributes": {
                 "id": {
-                    "type": "pk",
-                    "field": "id"
+                    "type": "id",
+                    "field": "_rowId"
                 },
                 "source": {
                     "type": "id",
@@ -396,7 +396,7 @@ export const entityToTableMapData: MapData = {
                     "recordName": "Profile",
                     "linkName": "Profile_owner_profile_User_source",
                     "isSource": true,
-                    "field": "id"
+                    "field": "Profile_id"
                 },
                 "target": {
                     "type": "id",
@@ -408,7 +408,7 @@ export const entityToTableMapData: MapData = {
                     "recordName": "User",
                     "linkName": "Profile_owner_profile_User_target",
                     "isSource": true,
-                    "field": "id"
+                    "field": "User_id"
                 }
             },
             "isRelation": true
@@ -417,8 +417,8 @@ export const entityToTableMapData: MapData = {
             "table": "Profile_User_Item",
             "attributes": {
                 "id": {
-                    "type": "pk",
-                    "field": "id"
+                    "type": "id",
+                    "field": "_rowId"
                 },
                 "source": {
                     "type": "id",
@@ -430,7 +430,7 @@ export const entityToTableMapData: MapData = {
                     "recordName": "User",
                     "linkName": "User_leader_member_User_source",
                     "isSource": true,
-                    "field": "id"
+                    "field": "User_id"
                 },
                 "target": {
                     "type": "id",
@@ -451,8 +451,8 @@ export const entityToTableMapData: MapData = {
             "table": "User_friends_friends_User",
             "attributes": {
                 "id": {
-                    "type": "pk",
-                    "field": "id"
+                    "type": "id",
+                    "field": "_rowId"
                 },
                 "source": {
                     "type": "id",
@@ -485,8 +485,8 @@ export const entityToTableMapData: MapData = {
             "table": "Profile_User_Item",
             "attributes": {
                 "id": {
-                    "type": "pk",
-                    "field": "id"
+                    "type": "id",
+                    "field": "_rowId"
                 },
                 "source": {
                     "type": "id",
@@ -498,7 +498,7 @@ export const entityToTableMapData: MapData = {
                     "recordName": "User",
                     "linkName": "User_item_owner_Item_source",
                     "isSource": true,
-                    "field": "id"
+                    "field": "User_id"
                 },
                 "target": {
                     "type": "id",
@@ -510,7 +510,7 @@ export const entityToTableMapData: MapData = {
                     "recordName": "Item",
                     "linkName": "User_item_owner_Item_target",
                     "isSource": true,
-                    "field": "id"
+                    "field": "Item_id"
                 }
             },
             "isRelation": true

@@ -98,6 +98,12 @@ export class LinkInfo {
     get targetRecord() {
         return this.data.targetRecord
     }
+    get sourceAttribute() {
+        return this.data.sourceAttribute
+    }
+    get targetAttribute() {
+        return this.data.targetAttribute
+    }
     get record() : RecordMapItem {
         return this.map.getRecord(this.name)!
     }
@@ -180,10 +186,6 @@ export type MapData = {
 }
 
 
-const ID_ATTRIBUTE: ValueAttribute = {
-    type: 'id',
-    field: 'id'
-}
 
 export class EntityToTableMap {
     constructor(public data: MapData) {}
@@ -278,7 +280,7 @@ export class EntityToTableMap {
         const relationName = (this.data.records[entityName].attributes[attribute] as RecordAttribute).linkName
         const relationData = this.data.links[relationName]
         if (relationData.sourceRecord === entityName && relationData.sourceAttribute === attribute) {
-            return relationData.targetAttribute
+            return relationData.targetAttribute!
         } else if (relationData.targetRecord === entityName && relationData.targetAttribute === attribute) {
             return relationData.sourceAttribute
         } else {
