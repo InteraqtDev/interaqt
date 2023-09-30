@@ -1,8 +1,55 @@
 import {assert} from "../util";
 
+export class RecordInfo {
+    data: RecordMapItem
+    constructor(public record: string, public map: EntityToTableMap) {
+        this.data = this.map.data.records[record]!
+    }
+    get combinedRecords() {
+        return Object.keys(this.data.attributes).map(attribute => {
+            return new AttributeInfo(this.record, attribute, this.map)
+        }).filter(info => info.isRecord && info.isMergedWithParent())
+    }
+
+    get table() {
+        return this.map.getRecordTable(this.record)
+    }
+    get idField() {
+        return this.data.attributes.id.field
+    }
+    get allFields(): string[] {
+        return Object.values(this.data.attributes).map(a => a.field!).filter(x => x)
+    }
+    get allLinks() {
+        return Object.keys(this.data.attributes).map(attribute => {
+            const attr = new AttributeInfo(this.record, attribute, this.map)
+            return attr.isRecord ? attr.getLinkInfo() : null
+        }).filter(x => x)
+    }
+    get differentTableRecords() {
+        return Object.keys(this.data.attributes).map(attribute => {
+            return new AttributeInfo(this.record, attribute, this.map)
+        }).filter(info =>
+            info.isRecord && !info.isMergedWithParent() && !info.field
+        )
+    }
+    getAttributeInfo(attribute:string) {
+        return new AttributeInfo(this.record, attribute, this.map)
+    }
+    get valueAttributes() {
+        return Object.entries(this.data.attributes).filter(([, attribute]) => {
+            return !(attribute as RecordAttribute).isRecord
+        }).map(([attributeName]) => {
+            return new AttributeInfo(this.record, attributeName, this.map)
+        })
+    }
+}
+
 export class AttributeInfo {
-    constructor(public data:ValueAttribute|RecordAttribute, public attributeName: string, public parentEntityName: string, public map: EntityToTableMap) {
-        assert(!!data, 'data can not be null')
+    public data:ValueAttribute|RecordAttribute
+    constructor(public parentEntityName: string, public attributeName: string, public map: EntityToTableMap) {
+        this.data =  this.map.data.records[parentEntityName].attributes[attributeName]
+        assert(!!this.data, `${parentEntityName} has no ${attributeName}`)
     }
     get isRecord() {
         return (this.data as RecordAttribute).isRecord
@@ -70,6 +117,10 @@ export class AttributeInfo {
         assert(this.isRecord, `only record attribute can get linkInfo`)
         return this.map.getLinkInfo(this.parentEntityName, this.attributeName)
     }
+    getRecordInfo() {
+        assert(this.isRecord, `only record attribute can get linkInfo`)
+        return this.map.getRecordInfo(this.entityName)
+    }
 }
 
 
@@ -94,6 +145,12 @@ export class LinkInfo {
     }
     get sourceRecord() {
         return this.data.sourceRecord
+    }
+    get sourceRecordInfo() {
+        return new RecordInfo(this.data.sourceRecord, this.map)
+    }
+    get targetRecordInfo() {
+        return new RecordInfo(this.data.targetRecord, this.map)
     }
     get targetRecord() {
         return this.data.targetRecord
@@ -195,12 +252,15 @@ export class EntityToTableMap {
     getRecord(recordName:string) {
         return this.data.records[recordName]
     }
+    getRecordInfo(recordName:string) {
+        return new RecordInfo(recordName, this)
+    }
     getInfo(entityName: string, attribute: string) : AttributeInfo{
         if (!this.data.records[entityName]!.attributes[attribute]) debugger
         assert(!!this.data.records[entityName]!.attributes[attribute],
             `cannot find attribute ${attribute} in ${entityName}. attributes: ${Object.keys(this.data.records[entityName]!.attributes)}`
         )
-        return new AttributeInfo(this.data.records[entityName]!.attributes[attribute]!, attribute, entityName, this)
+        return new AttributeInfo( entityName, attribute, this)
     }
     getLinkInfo(recordName: string, attribute: string) {
         const linkName = (this.data.records[recordName].attributes[attribute] as RecordAttribute).linkName
@@ -230,7 +290,7 @@ export class EntityToTableMap {
             currentEntity = (attributeData as RecordAttribute).isRecord ? (attributeData as RecordAttribute).recordName : ''
             lastAttribute = currentAttribute
         }
-        return new AttributeInfo(attributeData!, lastAttribute!, parentEntity!, this)
+        return new AttributeInfo( parentEntity!, lastAttribute!, this)
     }
     getTableAndAlias(namePath: string[]): [string, string, RecordMapItem, string, string, LinkMapItem] {
         const [rootEntityName, ...relationPath] = namePath

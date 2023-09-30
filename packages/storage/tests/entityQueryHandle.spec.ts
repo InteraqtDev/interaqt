@@ -35,7 +35,7 @@ describe('create data', () => {
 
     test('create and query with 1:1 related entities', async () => {
         const returnUser = await entityQueryHandle.create('User', {name: 'aaa', age: 17, profile: {title: 'aaa-profile'}})
-        console.log(returnUser)
+        console.log(111111, returnUser)
         expect(returnUser.profile?.id).not.toBeUndefined()
         //
         const findUser = await entityQueryHandle.findOne('User', MatchExpression.createFromAtom({ key:'profile.title', value: ['=', 'aaa-profile']}), {}, ['name', 'age'])
