@@ -1,9 +1,10 @@
-import {EntityQueryHandle, MatchExpression} from "../erstorage/ERStorage";
+import {EntityQueryHandle} from "../erstorage/ERStorage";
 import {expect, test, describe, afterEach, beforeAll, beforeEach} from "bun:test";
 import { createCommonData} from "./data/common";
 import {DBSetup} from "../erstorage/Setup";
 import { SQLiteDB } from '../../runtime/BunSQLite'
 import {EntityToTableMap} from "../erstorage/EntityToTableMap";
+import {MatchExpression} from "../erstorage/MatchExpression.ts";
 
 
 describe('create data', () => {

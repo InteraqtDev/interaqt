@@ -1,7 +1,7 @@
 import {expect, test, describe} from "bun:test";
-import {AttributeQuery, AttributeQueryData} from "../erstorage/ERStorage";
 import {EntityToTableMap, MapData} from "../erstorage/EntityToTableMap";
 import {entityToTableMapData} from './data/mapData'
+import {AttributeQuery, AttributeQueryData} from "../erstorage/AttributeQuery.ts";
 
 
 const entityToTableMap = new EntityToTableMap(entityToTableMapData)

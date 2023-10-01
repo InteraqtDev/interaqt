@@ -1,281 +1,17 @@
-import {AttributeInfo, EntityToTableMap} from "./EntityToTableMap";
-import {assert, deepMerge, mapTree, setByPath} from "../util";
+import {EntityToTableMap} from "./EntityToTableMap";
+import {assert, deepMerge, setByPath} from "../util";
 // @ts-ignore
 import {BoolExpression, ExpressionData} from '../../shared/BoolExpression'
 // @ts-ignore
-import { Database, EntityIdRef } from '../../runtime/System'
+import {Database, EntityIdRef} from '../../runtime/System'
+import {FieldMatchAtom, MatchAtom, MatchExpression, MatchExpressionData} from "./MatchExpression.ts";
+import {ModifierData} from "./Modifier.ts";
+import {AttributeQuery, AttributeQueryData, AttributeQueryDataItem} from "./AttributeQuery.ts";
+import {EntityQueryData, EntityQueryTree, RecordQuery} from "./RecordQuery.ts";
+import {NewEntityData, RawEntityData} from "./NewEntityData.ts";
 
 
-export type MatchAtom = {key: string, value: [string, any], isReferenceValue?: boolean}
-export type MatchExpressionData = BoolExpression<MatchAtom>
-
-export type FieldMatchAtom = MatchAtom & {
-    isInnerQuery?: boolean,
-    //  value 类型的
-    fieldName?: [string, string],
-    fieldValue?: string,
-    // entity 类型的
-    namePath?: string[],
-    isFunctionMatch?: boolean,
-    tableAlias?:string,
-
-}
-
-export class MatchExpression {
-    public static createFromAtom(value: MatchAtom) {
-        return BoolExpression.createFromAtom<MatchAtom>(value)
-    }
-    public entityQueryTree: EntityQueryTree = {}
-    constructor(public entityName: string, public map: EntityToTableMap, public data?: MatchExpressionData, public contextRootEntity?: string, public fromRelation?: boolean) {
-
-        this.entityQueryTree = {}
-        if (this.data) {
-            assert(this.data instanceof BoolExpression, `match data is not a BoolExpression instance, you passed: ${this.data}`)
-            this.buildEntityQueryTree(this.data, this.entityQueryTree)
-        }
-    }
-    buildEntityQueryTree(matchData: MatchExpressionData, entityQueryTree: EntityQueryTree) {
-        if (matchData.isExpression()) {
-            if (matchData.left) {
-                this.buildEntityQueryTree(matchData.left, entityQueryTree)
-            }
-
-            if (matchData.right) {
-                this.buildEntityQueryTree(matchData.right, entityQueryTree)
-            }
-        } else {
-            // variable
-            const matchAttributePath = (matchData.data.key as string).split('.')
-            const attributeInfo = this.map.getInfoByPath([this.entityName].concat(matchAttributePath))
-
-            // value 的情况不用管
-            //  CAUTION 还有最后路径是 entity 但是  match 值是 EXIST 的不用管，因为会生成 exist 子句。只不过这里也不用特别处理，join 的表没用到会自动数据库忽略。
-            if(!(matchAttributePath.length === 1 && attributeInfo.isValue)) {
-                if (attributeInfo.isRecord) {
-                    setByPath(entityQueryTree, matchAttributePath, {})
-                } else {
-                    // 最后一个是 attribute，所以不在 entityQueryTree 上。
-                    setByPath(entityQueryTree, matchAttributePath.slice(0, matchAttributePath.length -1), {})
-                }
-            }
-        }
-    }
-
-
-    getFinalFieldName(matchAttributePath: string[]) {
-        const namePath = [this.entityName].concat(matchAttributePath.slice(0, -1))
-        return this.map.getTableAliasAndFieldName(namePath, matchAttributePath.at(-1)!)
-    }
-    getReferenceFieldValue(valueStr:string) {
-        const matchAttributePath = valueStr.split('.')
-        const [tableAlias, rawFieldName] = this.map.getTableAliasAndFieldName(
-            [this.contextRootEntity||this.entityName].concat(matchAttributePath.slice(0, -1)),
-            matchAttributePath.at(-1)!
-        )
-        return `${tableAlias}.${rawFieldName}`
-    }
-
-    getFinalFieldValue(isReferenceValue: boolean, value: [string, any] ) {
-        let fieldValue
-        const simpleOp = ['=', '>', '<', '<=', '>=', 'like']
-
-        if (simpleOp.includes(value[0])) {
-            fieldValue = `${value[0]} ${isReferenceValue ? this.getReferenceFieldValue(value[1]) : JSON.stringify(value[1])}`
-        } else if(value[0].toLowerCase() === 'in') {
-            assert(!isReferenceValue, 'reference value cannot use IN to match')
-            fieldValue = `IN [${value[1].map((x:any) => JSON.stringify(x)).join(',')}]`
-        } else if(value[0].toLowerCase() === 'between') {
-            fieldValue = `BETWEEN ${isReferenceValue ? this.getReferenceFieldValue(value[1][0]) : JSON.stringify(value[1][0])} AND ${isReferenceValue ? this.getReferenceFieldValue(value[1][1]) : JSON.stringify(value[1][1])}]`
-        } else {
-            assert(false, `unknown value expression ${JSON.stringify(value)}`)
-        }
-
-        return fieldValue
-    }
-
-    buildFieldMatchExpression() : BoolExpression<FieldMatchAtom>|null {
-        if (!this.data) return null
-        // 1. 所有 key 要 build 成 field
-        // 2. x:n 关系中的 EXIST 要增加查询范围限制，要把 value 中对上层引用也 build 成 field。
-        return this.data.map((exp: MatchExpressionData) => {
-            const matchAttributePath = (exp.data.key as string).split('.')
-            const attributeInfo = this.map.getInfoByPath([this.entityName].concat(matchAttributePath))
-
-            // 如果结尾是 value
-            // 如果极为是 entity，那么后面匹配条件目前只能支持 EXIST。
-            //  CAUTION 针对关联实体的属性匹配，到这里已经被拍平了，所以结尾是  entity 的情况必定都是函数匹配。
-            if (attributeInfo.isValue) {
-                return {
-                    ...exp.data,
-                    fieldName: this.getFinalFieldName(matchAttributePath),
-                    fieldValue: this.getFinalFieldValue(exp.data.isReferenceValue!, exp.data.value)
-                }
-
-            } else {
-                // entity
-                const namePath = [this.entityName].concat(matchAttributePath)
-                const [,tableAlias] = this.map.getTableAndAlias(namePath)
-
-                // CAUTION 函数匹配的情况不管了，因为可能未来涉及到使用 cursor 实现更强的功能，这就涉及到查询计划的修改了。统统扔到上层去做。
-                //  注意，子查询中也可能对上层的引用，这个也放到上层好像能力有点重叠了。
-                return {
-                    ...exp.data,
-                    namePath,
-                    isFunctionMatch: true,
-                    tableAlias
-                }
-            }
-        })
-
-    }
-
-    and(condition: MatchAtom): MatchExpression {
-        return new MatchExpression(this.entityName, this.map, this.data ? this.data.and(condition) : BoolExpression.createFromAtom<MatchAtom>(condition))
-    }
-}
-
-
-type ModifierData = {
-    orderBy?: {
-        [k: string]: string
-    },
-    limit?: number,
-    offset?: number
-}
-
-
-
-class Modifier {
-    constructor(public entityName: string, public map: EntityToTableMap, public data: ModifierData, public fromRelation?: boolean) {
-    }
-
-    derive(overwrite: ModifierData) {
-        return new Modifier(this.entityName, this.map, {...this.data, ...overwrite})
-    }
-}
-
-
-export type EntityQueryData = {
-    matchExpression?: MatchExpressionData,
-    attributeQuery?: AttributeQueryData,
-    modifier?: ModifierData
-}
-
-export type AttributeQueryDataItem = string|[string, EntityQueryData]
-
-export type AttributeQueryData = AttributeQueryDataItem[]
-
-export type EntityQueryDerivedData = {
-    matchExpression? : MatchExpression,
-    attributeQuery? :AttributeQuery,
-    modifier? : Modifier
-}
-
-export class RecordQuery {
-    static create(entityName: string, map: EntityToTableMap, data: EntityQueryData, contextRootEntity?: string) {
-        return new RecordQuery(
-            entityName,
-            map,
-            new MatchExpression(entityName, map, data.matchExpression, contextRootEntity),
-            new AttributeQuery(entityName, map, data.attributeQuery || []),
-            new Modifier(entityName, map, data.modifier!),
-            contextRootEntity,
-        )
-    }
-    constructor(public entityName: string, public map: EntityToTableMap, public matchExpression: MatchExpression, public attributeQuery: AttributeQuery, public modifier: Modifier, public contextRootEntity?:string) {}
-    derive(derived: EntityQueryDerivedData) {
-        return new RecordQuery(
-            this.entityName,
-            this.map,
-            derived.matchExpression || this.matchExpression,
-            derived.attributeQuery || this.attributeQuery,
-            derived.modifier || this.modifier,
-            this.contextRootEntity
-        )
-    }
-
-}
-
-
-type EntityQueryTree = {
-    [k:string] : EntityQueryTree
-}
-
-export class AttributeQuery {
-    public relatedEntities: {name: string, entityQuery: RecordQuery}[] = []
-    public xToManyEntities: {name: string, entityQuery: RecordQuery}[] = []
-    public xToOneEntities: {name: string, entityQuery: RecordQuery}[] = []
-    public valueAttributes: string[] = []
-    public entityQueryTree: EntityQueryTree = {}
-    public fullEntityQueryTree: EntityQueryTree = {}
-    constructor(public entityName: string, public map: EntityToTableMap, public data: AttributeQueryData = []) {
-        data.forEach((item: AttributeQueryDataItem) => {
-            const attributeName:string = typeof item=== 'string' ? item : item[0]
-
-            const attributeInfo = this.map.getInfo(this.entityName, attributeName)
-            if (attributeInfo.isRecord) {
-                const relatedEntity = {
-                    name: attributeName,
-                    entityQuery: RecordQuery.create(attributeInfo.entityName, this.map, item[1] as EntityQueryData)
-                }
-
-                this.relatedEntities.push(relatedEntity)
-
-                if (attributeInfo.isXToMany) {
-                    this.xToManyEntities.push(relatedEntity)
-                } else if (attributeInfo.isXToOne) {
-                    this.xToOneEntities.push(relatedEntity)
-                }
-
-
-            } else {
-                this.valueAttributes.push(attributeName)
-            }
-        })
-
-
-        this.entityQueryTree = this.buildEntityQueryTree()
-        this.fullEntityQueryTree = this.buildFullEntityQueryTree()
-    }
-    getQueryFields (nameContext = [this.entityName]): {tableAliasAndField: [string, string], nameContext: string[], attribute: string}[] {
-        const queryFields = ['id'].concat(this.valueAttributes).map(attributeName => ({
-            tableAliasAndField: this.map.getTableAliasAndFieldName(nameContext, attributeName).slice(0, 2) as [string, string],
-            nameContext,
-            attribute: attributeName
-        }))
-
-
-        this.xToOneEntities.forEach(({ name: entityAttributeName, entityQuery }) => {
-            queryFields.push(...entityQuery.attributeQuery!.getQueryFields(nameContext.concat(entityAttributeName)))
-        })
-
-        return queryFields
-    }
-    buildEntityQueryTree() {
-        const result: EntityQueryTree = {}
-        // CAUTION 我们这里只管 xToOne 的情况，因为其他情况是用 id 去做二次查询得到的。
-        this.xToOneEntities.forEach(({ name, entityQuery}) => {
-            result[name] = entityQuery.attributeQuery!.entityQueryTree
-        })
-        return result
-    }
-    buildFullEntityQueryTree() {
-        const result:EntityQueryTree = {}
-        // CAUTION 我们这里只管 xToOne 的情况，因为其他情况是用 id 去做二次查询得到的。
-        this.relatedEntities.forEach(({ name, entityQuery}) => {
-            result[name] = entityQuery.attributeQuery!.entityQueryTree
-        })
-        return result
-    }
-
-}
-
-
-class QueryContext {
-
-}
-
-type JoinTables = {
+export type JoinTables = {
     for: any
     joinSource: [string, string]
     joinIdField: [string, string]
@@ -284,8 +20,6 @@ type JoinTables = {
 
 export class QueryAgent {
     constructor(public map: EntityToTableMap, public database: Database) {}
-
-
     buildFindQuery(entityQuery: RecordQuery, prefix='') {
         // 从所有条件里面构建出 join clause
         const fieldQueryTree = entityQuery.attributeQuery!.entityQueryTree
@@ -513,8 +247,8 @@ ${this.buildFindQuery(existEntityQuery, currentAlias)}
         })
     }
 
-    async insertRecordData(newEntityData: NewEntityData): Promise<EntityIdRef> {
 
+    async insertRecordData(newEntityData: NewEntityData): Promise<EntityIdRef> {
         let result: EntityIdRef
         const tableName = this.map.getRecordTable(newEntityData.recordName)
 
@@ -559,12 +293,9 @@ VALUES
 
         const [firstSameRowEntityIdRef, ...restSameRowEntityIdRefs] = newEntityData.sameRowEntityIdRefs
         // 先 unlink 已有的。
-        await this.unlinkFromRecord(
+        await this.unlinkFromRecordById(
             [firstSameRowEntityIdRef.info?.parentEntityName!, firstSameRowEntityIdRef.info?.attributeName!],
-            MatchExpression.createFromAtom({
-                key: 'id',
-                value: ['=', firstSameRowEntityIdRef.getRef().id]
-            })
+            firstSameRowEntityIdRef.getRef().id
         )
 
         // 把其他的数据 都 flashOut 出来
@@ -833,13 +564,34 @@ ${recordInfo.idField} IN (${updateRowIds})
 
         return this.addLink(linkInfo.name, sourceId, targetId, attributes)
     }
-    // FIXME 能不能复用 createRecord？？有没有什么区别
-    addLink(linkName: string, sourceId: string, targetId:string, attributes: RawEntityData) {
+
+
+    async addLink(linkName: string, sourceId: string, targetId:string, attributes: RawEntityData = {}, moveSource = false) {
         const linkInfo = this.map.getLinkInfoByName(linkName)
 
-        if( linkInfo.isMerged()) {
+        // FIXME 所有情况都没有考虑如果 attributes 里面有实体，当前这个关系可能还要递归处理关系的问题。还是得复用 createRecord
+
+        if (linkInfo.isCombined()) {
+            // 一比一关系也要处理
+            const match = MatchExpression.createFromAtom({
+                key: moveSource ? 'target.id': 'source.id',
+                value: ['=', moveSource ? targetId: sourceId]
+            })
+            await this.unlink(linkName, match, moveSource)
+            const moveRecordName = moveSource ? linkInfo.sourceRecord : linkInfo.targetRecord
+            const matchExpressionData = MatchExpression.createFromAtom({key: 'id', value: ['=', moveSource ? sourceId: targetId ]})
+            const moveRecordInfo = moveSource ? linkInfo.sourceRecordInfo : linkInfo.targetRecordInfo
+            const includeRelated = moveRecordInfo.combinedRecords.map(info => info.attributeName)
+            const moveRecord = (await this.flashOutRecords(moveRecordName, matchExpressionData, includeRelated))[0]
+
+            const stayId = moveSource ? targetId : sourceId
+            const stayAttribute = moveSource ? linkInfo.sourceAttribute : linkInfo.targetAttribute
+            moveRecord[stayAttribute] = {id: stayId}
+            const newData = new NewEntityData(this.map, moveRecordName, moveRecord)
+            await this.insertRecordData(newData)
+
+        } else if( linkInfo.isMerged()) {
             // 关系表不独立
-            // FIXME 一比一关系也要处理
             assert(!linkInfo.isCombined(), `do not use add relation with 1:1 relation. ${linkInfo.sourceRecord} ${linkInfo.sourceAttribute}`)
             const isMergeToSource = linkInfo.isMergedToSource()
             const idValue = isMergeToSource ? sourceId: targetId
@@ -863,13 +615,23 @@ WHERE
 ${idField} = ${idValue}
 `)
 
-        } else {
-            // 独立关系表
-            // FIXME 1:n 关系的抢夺
-            const attributeValues = Object.values(attributes)
-            const attributeKeys = Object.keys(attributes).map(k => linkInfo.record.attributes[k].field)
+        } else { // 独立关系表
+            // 1:n 关系的抢夺
+            if (linkInfo.isManyToOne || linkInfo.isOneToMany) {
+                // n 方向要 unlink ?
+                const unlinkAttr = linkInfo.isManyToOne ? 'source.id' : 'target.id'
+                const unlinkId = linkInfo.isManyToOne? sourceId: targetId
+                const match = MatchExpression.createFromAtom({
+                    key: unlinkAttr,
+                    value: ['=', unlinkId]
+                })
+                await this.unlink(linkName, match)
+            }
 
-            return this.query(`
+            const attributeValues = Object.values(attributes)
+            console.log(1111, attributes)
+            const attributeKeys = Object.keys(attributes).map(k => linkInfo.record.attributes[k].field)
+            return this.database.insert(`
 INSERT INTO ${linkInfo.table}
 (${[linkInfo.sourceField, linkInfo.targetField].concat(attributeKeys).join(',')})
 VALUES
@@ -877,6 +639,9 @@ VALUES
 `)
         }
     }
+
+
+
     async unlinkFromRecord(recordNameAndAttribute: [string, string], matchExpressionData: MatchExpressionData,) {
         const [record, attribute] = recordNameAndAttribute
         const linkInfo = this.map.getLinkInfo(recordNameAndAttribute[0], recordNameAndAttribute[1])
@@ -884,6 +649,14 @@ VALUES
         const moveSource = !linkInfo.isRecordSource(record)
         const newMatch = this.transformMatch(matchExpressionData, record, attribute,true)
         return this.unlink(linkInfo.name, newMatch, moveSource)
+    }
+
+    async unlinkFromRecordById(recordNameAndAttribute: [string, string], recordId: string) {
+        assert(!!recordId, `record id cannot be empty`)
+        return this.unlinkFromRecord(recordNameAndAttribute, MatchExpression.createFromAtom({
+            key: 'id',
+            value: ['=', recordId]
+        }))
     }
 
 
@@ -1088,98 +861,6 @@ WHERE ${idField} IN (${relationRecords.map(({id}) => JSON.stringify(id)).join(',
 }
 
 
-type RawEntityData = {[k:string]: any}
-
-
-class NewEntityData {
-    // 同表的新数据，或者关系表往这边和了的有 id 的 field,一起记录下来可以一次性插入的。
-    public sameRowEntityValuesAndRefFields: [string, string][]
-    public sameRowNewEntitiesData: NewEntityData[] = []
-    public relatedEntitiesData: NewEntityData[] = []
-    public differentTableEntitiesData: NewEntityData[] = []
-    public holdFieldNewRelatedEntities: NewEntityData[] = []
-    public holdMyFieldRelatedEntities: NewEntityData[] = []
-    public valueAttributes: [string, any][]
-    // 和当前合表并且是  id 的。说明我们的需要的 row 已经有了，只要update 相应 column 就行了
-    public sameRowEntityIdRefs: NewEntityData[] = []
-    constructor(public map: EntityToTableMap, public recordName: string, public rawData: RawEntityData, public info?: AttributeInfo) {
-        const [valueAttributesInfo, entityAttributesInfo] = this.map.groupAttributes(recordName, Object.keys(rawData))
-        this.relatedEntitiesData = entityAttributesInfo.map(info => new NewEntityData(this.map, info.entityName, rawData[info.attributeName], info))
-
-        this.valueAttributes = valueAttributesInfo.map(info => {
-            return [info.attributeName!, rawData[info.attributeName]]
-        })
-        // TODO 要把那些独立出去的 field 排除出去。
-        this.sameRowEntityValuesAndRefFields = valueAttributesInfo.map(info => [info.field, rawData[info.attributeName]])
-        this.relatedEntitiesData.forEach(newRelatedEntityData => {
-            // CAUTION 三表合一的情况（需要排除掉关系的 source、target 是同一实体的情况，这种情况下不算合表）
-            if (newRelatedEntityData.info!.isMergedWithParent()) {
-                // 三表合一的情况。记录合表的数据到底是有 id ，还是新的。如果是有 id ，说明是要  update 某一行。
-                if(newRelatedEntityData.isRef()) {
-                    this.sameRowEntityIdRefs.push(newRelatedEntityData)
-                } else {
-                    this.sameRowNewEntitiesData.push(newRelatedEntityData)
-                    // 全新的同表的数据
-                    this.sameRowEntityValuesAndRefFields.push(...newRelatedEntityData.sameRowEntityValuesAndRefFields)
-                }
-            } else {
-                // 有 field 说明是关系表合并到了当前实体表，一起处理
-                if(newRelatedEntityData.info!.field) {
-                    if (newRelatedEntityData.isRef() ) {
-                        this.sameRowEntityValuesAndRefFields.push([newRelatedEntityData.info!.field, newRelatedEntityData.getRef().id])
-                    } else {
-                        // 没有 id 的说明要单独新建
-                        this.holdFieldNewRelatedEntities.push(newRelatedEntityData)
-                    }
-                } else {
-
-                    // 把 hold 我的 field 的 record 识别出来。
-                    const linkInfo = newRelatedEntityData.info!.getLinkInfo()
-                    if (linkInfo.isRecordSource(this.recordName) ? linkInfo.isMergedToTarget() : linkInfo.isMergedToSource()) {
-                        this.holdMyFieldRelatedEntities.push(newRelatedEntityData)
-                    } else {
-                        // 完全没合表的
-                        this.differentTableEntitiesData.push(newRelatedEntityData)
-                    }
-
-
-                }
-            }
-        })
-
-    }
-    derive(newRawData: RawEntityData) {
-        return new NewEntityData(this.map, this.recordName, newRawData, this.info)
-    }
-    merge(partialNewRawData: RawEntityData) {
-        return new NewEntityData(this.map, this.recordName, {...this.rawData, ...partialNewRawData }, this.info)
-    }
-    exclude(attributeNames: string[]) {
-        const newRawData = {...this.rawData}
-        attributeNames.forEach(name => delete newRawData[name])
-        return new NewEntityData(this.map, this.recordName, newRawData, this.info)
-    }
-    getRef() {
-        return {id: this.rawData.id}
-    }
-    getData() {
-        return {...this.rawData}
-    }
-    isRef() {
-        return !!(this.info?.isRecord && this.rawData["id"] !== undefined)
-    }
-    getIdField() {
-        const recordInfo = this.map.getRecordInfo(this.recordName)
-        return recordInfo.idField!
-    }
-    getIdFieldAndValue(): [string, string] {
-        assert(this.isRef(), 'is not ref')
-        const recordInfo = this.map.getRecordInfo(this.recordName)
-        return [recordInfo.idField!, this.rawData.id!]
-    }
-}
-
-
 
 export class EntityQueryHandle {
     agent: QueryAgent
@@ -1221,8 +902,6 @@ export class EntityQueryHandle {
         return this.agent.updateRecord(entityName, matchExpressionData, newEntityData)
     }
 
-
-
     async createOrUpdate() {
 
     }
@@ -1234,18 +913,37 @@ export class EntityQueryHandle {
     async count() {
 
     }
-    async addRelation(relationName: string|string[], sourceEntityId: string,  targetEntityId:string, rawData: RawEntityData) {
-        const linkInfo = Array.isArray(relationName) ? this.map.getLinkInfo(relationName[0], relationName[1]) : this.map.getLinkInfoByName(relationName)
-        return this.agent.addLinkFromRecord(linkInfo.sourceRecord, linkInfo.sourceAttribute, sourceEntityId, targetEntityId, rawData)
+    async addRelation(relationName: string, sourceEntityId: string,  targetEntityId:string, rawData: RawEntityData) {
+        // return this.agent.addLink(relationName, sourceEntityId, targetEntityId, rawData)
+    }
+    async addRelationByName(relationName: string, sourceEntityId: string,  targetEntityId:string, rawData: RawEntityData) {
+        return this.agent.addLink(relationName, sourceEntityId, targetEntityId, rawData)
+    }
+    async addRelationById(entity:string, attribute:string, entityId: string, attributeEntityId:string, relationData?: RawEntityData) {
+        return this.agent.addLinkFromRecord(entity, attribute, entityId, attributeEntityId, relationData)
     }
     async updateRelation(relationName:string, matchExpressionData: MatchExpressionData, newData: RawEntityData) {
         // TODO
         return Promise.resolve()
     }
+    async updateRelationByName(relationName:string, matchExpressionData: MatchExpressionData, newData: RawEntityData) {
+        // TODO
+        return Promise.resolve()
+    }
     async findRelation(relationName: string, matchExpressionData?: MatchExpressionData, modifierData?: ModifierData, attributeQueryData: AttributeQueryData = []) {
+        // return this.find(relationName, matchExpressionData, modifierData, attributeQueryData)
+    }
+    async findRelationByName(relationName: string, matchExpressionData?: MatchExpressionData, modifierData?: ModifierData, attributeQueryData: AttributeQueryData = []) {
         return this.find(relationName, matchExpressionData, modifierData, attributeQueryData)
     }
     async findOneRelation(relationName: string, matchExpressionData: MatchExpressionData, modifierData: ModifierData = {}, attributeQueryData: AttributeQueryData = []) {
+        // const limitedModifier = {
+        //     ...modifierData,
+        //     limit: 1
+        // }
+        // return this.findRelation(relationName, matchExpressionData, limitedModifier, attributeQueryData)
+    }
+    async findOneRelationByName(relationName: string, matchExpressionData: MatchExpressionData, modifierData: ModifierData = {}, attributeQueryData: AttributeQueryData = []) {
         const limitedModifier = {
             ...modifierData,
             limit: 1
@@ -1253,34 +951,13 @@ export class EntityQueryHandle {
         return this.findRelation(relationName, matchExpressionData, limitedModifier, attributeQueryData)
     }
     async removeRelation(relationName: string, matchExpressionData: MatchExpressionData) {
+        // return this.agent.removeLink(relationName, matchExpressionData)
+    }
+    async removeRelationByName(relationName: string, matchExpressionData: MatchExpressionData) {
         return this.agent.removeLink(relationName, matchExpressionData)
     }
-    // TODO 增加 source/target  rename 的能力，不然 Match 的时候还得知道 source/target
-    async findRelationFromEntity(inputRelationName: string[], matchExpressionData?: MatchExpressionData, modifierData?: ModifierData, attributeQueryData: AttributeQueryData = []) {
-        // FIXME matchExpreesionData 要”转秩“
-        const relationName = Array.isArray(inputRelationName) ?
-            this.map.getInfo(inputRelationName[0], inputRelationName[1]).linkName :
-            inputRelationName as string
-        return this.find(relationName, matchExpressionData, modifierData, attributeQueryData)
+    getRelationName(entity:string, attribute) {
+        return this.map.getInfo(entity, attribute).linkName
     }
-    async findOneRelationFromEntity(inputRelationName: string[], matchExpressionData: MatchExpressionData, modifierData: ModifierData = {}, attributeQueryData: AttributeQueryData = []) {
-        const limitedModifier = {
-            ...modifierData,
-            limit: 1
-        }
-        return this.findRelationFromEntity(inputRelationName, matchExpressionData, limitedModifier, attributeQueryData)
-    }
-    async updateRelationFromEntity(relationName:string[], matchExpressionData: MatchExpressionData, newData: RawEntityData) {
-        // TODO
-        return Promise.resolve()
-    }
-    async removeRelationFromEntity(inputRelationName: string[], matchExpressionData: MatchExpressionData) {
-        // FIXME matchExpreesionData 要”转秩“
-        const relationName = Array.isArray(inputRelationName) ?
-            this.map.getInfo(inputRelationName[0], inputRelationName[1]).linkName :
-            inputRelationName as string
-        return this.agent.removeLink(relationName, matchExpressionData)
-    }
-
 }
 

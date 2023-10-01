@@ -1,14 +1,13 @@
 import {expect, test, describe} from "bun:test";
 import {
-    QueryAgent,
-    AttributeQuery,
-    AttributeQueryData,
-    MatchExpressionData,
-    MatchExpression, RecordQuery, EntityQueryData
+    QueryAgent
 } from "../erstorage/ERStorage";
 import { SQLiteDB } from '../../runtime/BunSQLite'
 import {EntityToTableMap, MapData} from "../erstorage/EntityToTableMap";
 import {entityToTableMapData} from "./data/mapData";
+import {MatchExpression, MatchExpressionData} from "../erstorage/MatchExpression.ts";
+import {AttributeQuery, AttributeQueryData} from "../erstorage/AttributeQuery.ts";
+import {EntityQueryData, RecordQuery} from "../erstorage/RecordQuery.ts";
 
 
 const database = new SQLiteDB()

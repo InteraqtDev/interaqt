@@ -1,7 +1,7 @@
 import { expect, test, describe } from "bun:test";
-import { MatchExpression, MatchExpressionData} from "../erstorage/ERStorage";
 import {EntityToTableMap, MapData} from "../erstorage/EntityToTableMap";
 import {entityToTableMapData} from "./data/mapData";
+import {MatchExpression, MatchExpressionData} from "../erstorage/MatchExpression.ts";
 
 
 const entityToTableMap = new EntityToTableMap(entityToTableMapData)

@@ -143,6 +143,27 @@ export class LinkInfo {
     isRecordSource(recordName:string) {
         return this.data.sourceRecord === recordName
     }
+    get isManyToOne() {
+        return this.data.relType[0] === 'n' && this.data.relType[1] === '1'
+    }
+    get isManyToMany() {
+        return this.data.relType[0] === 'n' && this.data.relType[1] === 'n'
+    }
+    get isOneToOne() {
+        return this.data.relType[0] === '1' && this.data.relType[1] === '1'
+    }
+    get isOneToMany() {
+        return this.data.relType[0] === '1' && this.data.relType[1] === 'n'
+    }
+    get isXToOne() {
+        return this.isManyToOne || this.isOneToOne
+    }
+    get isOneToX() {
+        return this.isOneToMany || this.isOneToOne
+    }
+    get isXToMany() {
+        return this.isManyToMany||this.isOneToMany
+    }
     get sourceRecord() {
         return this.data.sourceRecord
     }

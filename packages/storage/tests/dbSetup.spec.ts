@@ -3,11 +3,13 @@ import { Database } from "bun:sqlite";
 import fs from 'fs'
 
 import {DBSetup} from "../erstorage/Setup";
-import {RecordQuery, EntityQueryData, QueryAgent, MatchExpression} from "../erstorage/ERStorage";
+import {QueryAgent} from "../erstorage/ERStorage";
 import {EntityToTableMap} from "../erstorage/EntityToTableMap";
 // @ts-ignore
 import { SQLiteDB } from '../../runtime/BunSQLite'
 import {createCommonData} from "./data/common";
+import {MatchExpression} from "../erstorage/MatchExpression.ts";
+import {EntityQueryData, RecordQuery} from "../erstorage/RecordQuery.ts";
 
 const { entities, relations } = createCommonData()
 
