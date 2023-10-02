@@ -11,5 +11,8 @@
   },
   "tsd": {
     "directory": "tests"
+  },
+  "dependencies": {
+    "acorn": "^8.10.0"
   }
 }

@@ -1,7 +1,5 @@
-import {BoolExpression} from "./boolExpression";
+import {BoolExpressionData} from "./BoolExpression";
 
-
-export type Attributives = BoolExpression
 
 // Role/RoleAttributive/Entity 是 ConceptType
 export type ConceptType = {}
@@ -13,7 +11,7 @@ export interface Concept {
 
 export interface DerivedConcept extends Concept {
     base? : Concept,
-    attributive?: Attributives,
+    attributive?: UserAttributives,
 }
 
 export interface ConceptAlias extends Concept {
@@ -22,3 +20,17 @@ export interface ConceptAlias extends Concept {
 
 
 export type ConceptInstance = any
+
+export type UserAttributiveAtom = {
+    key: string,
+    [k:string]: any
+}
+
+export type UserAttributives = BoolExpressionData<UserAttributiveAtom>
+
+export type EntityAttributiveAtom = {
+    key: string,
+    [k:string]: any
+}
+
+export type EntityAttributives = BoolExpressionData<EntityAttributiveAtom>

@@ -1,8 +1,6 @@
 
 // TODO Role 和 Attributive 合在一起可以变成新的 Role，怎么表示？
-
 import {createClass, KlassOptions, ReactiveKlassOptions} from "../createClass";
-import {Atom, computed} from "rata";
 
 export const UserAttributive = createClass({
     name: 'UserAttributive',
@@ -26,11 +24,11 @@ export const UserAttributive = createClass({
     }
 })
 
-// TODO 它的 content 应该是定语的 boolExpression
 export const UserAttributives = createClass({
     name: 'UserAttributives',
     display: (obj) => `${obj.name}`,
     public: {
+        // CAUTION content 的类型是 BoolExpressionData<UserAttributiveAtom>
         content: {
             type: 'object',
         },
@@ -42,7 +40,7 @@ export function createUserRoleAttributive({name, isRef = false}: { name: string,
     // @ts-ignore
     return new UserAttributive({
         name,
-        stringContent: `function({ user }) { return user.roles.includes('${name}')}`,
+        stringContent: `function(user) { return user.roles.includes('${name}')}`,
         isRef,
         isRole: true
     }, options)

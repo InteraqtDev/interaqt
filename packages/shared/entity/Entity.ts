@@ -62,6 +62,7 @@ export const Entity = createClass({
     public: {
         name: {
             type: 'string',
+            collection: false,
             constraints: {
                 nameFormat({name}: { name: Atom<string> }) {
                     return computed(() => {
@@ -112,9 +113,16 @@ export const Relation = createClass({
     name: 'Relation',
     display: (instance) => ``,
     public: {
+        name: {
+            // TODO 是自动根据 entity/attribute 生成的，应该怎么表示？
+            type: 'string',
+            required: false,
+            collection: false
+        },
         entity1: {
             type: Entity,
             required: true,
+            collection: false,
             options() {
                 return getInstance(Entity)
             }
@@ -122,6 +130,7 @@ export const Relation = createClass({
         targetName1: {
             type: 'string',
             required: true,
+            collection: false,
             constraints: {
                 nameNotSameWithProp({entity1, targetName1}) {
                     return computed(() => {
@@ -140,6 +149,7 @@ export const Relation = createClass({
         entity2: {
             type: Entity,
             required: true,
+            collection: false,
             options() {
                 return getInstance(Entity)
             }
@@ -147,6 +157,7 @@ export const Relation = createClass({
         targetName2: {
             type: 'string',
             required: true,
+            collection: false,
             constraints: {
                 nameNotSameWithProp({entity2, targetName2}) {
                     return computed(() => {
@@ -171,6 +182,11 @@ export const Relation = createClass({
             defaultValue() {
                 return ['1:1']
             }
+        },
+        computedData: {
+            // CAUTION 这里的具体类型等着外面注册 IncrementalComputationHandle 的时候修补
+            type: [] as KlassType<any>[],
+            collection: false,
         },
         properties: {
             type: Property,

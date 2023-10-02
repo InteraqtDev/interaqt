@@ -1,5 +1,6 @@
+// @ts-ignore
 import {atom, Atom, isAtom, isReactive, rawStructureClone, reactive} from "rata";
-import {isPlainObject, hasOwn, isObject} from "./util";
+import {isPlainObject, hasOwn, isObject, assert} from "./util";
 import {toRaw, UnwrapReactive} from "rata";
 
 type PrimitivePropType = 'string'|'number'|'boolean'| 'object'
@@ -32,6 +33,8 @@ export type ClassDef = {
     public: {
         [key: string]: ClassDefPublicItem
     }
+    // 检测一个实例是不是 Class，用户可以自定义规则，如果没有自定义就会用 instanceof
+    is? : (obj: any) => boolean
     // TODO 完成 Private 等等其他
 }
 
@@ -145,8 +148,8 @@ export function createInstancesFromString(objStr: string) {
 export function createInstances(objects: KlassRawInstanceDataType[], reactiveForce?: boolean) {
     const uuidToInstance = new Map<string, KlassInstance<any>>()
     const unsatisfiedInstances = new Map<KlassInstance<any>, object>()
-
     objects.forEach(({ type, options = {}, uuid, public: rawProps } :KlassRawInstanceDataType) => {
+        assert(!uuidToInstance.get(uuid), `duplicate uuid ${uuid}, ${type}, ${JSON.stringify(rawProps)}`)
         const Klass = KlassByName.get(type)!
         const optionsWithUUID: ReactiveKlassOptions|KlassOptions = {...options, uuid}
         if (reactiveForce !== undefined) {
@@ -169,6 +172,7 @@ export function createInstances(objects: KlassRawInstanceDataType[], reactiveFor
         })
 
         const instance = new Klass(publicProps, optionsWithUUID)
+
         uuidToInstance.set(uuid, instance)
 
         if (Object.keys(unsatisfiedProps).length) {
@@ -260,7 +264,7 @@ export function createClass<T extends ClassDef>(def: T) : KlassType<T['public']>
         static create = create
         static createReactive = createReactive
         static stringify = stringify
-        static is = is
+        static is = def.is || is
         static clone = clone
         static check = check
         static isKlass = true
