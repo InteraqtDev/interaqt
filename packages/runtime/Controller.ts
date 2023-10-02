@@ -1,11 +1,16 @@
 import {System, SystemCallback} from "./System";
 import {Entity, Relation} from "../shared/entity/Entity";
 import {Activity, Interaction} from "../shared/activity/Activity";
-import {EntityIncrementalComputationHandle, IncrementalComputationHandle} from "./IncrementalComputationHandle";
+import {
+    EntityIncrementalComputationHandle,
+    IncrementalComputationHandle,
+    RelationIncrementalComputationHandle
+} from "./incrementalComputationHandles/IncrementalComputationHandle";
 import {ActivityCall} from "./AcitivityCall";
 import {InteractionCall} from "./InteractionCall";
 import {InteractionEventArgs} from "../types/interaction";
 import {KlassInstanceOf, KlassType} from "../shared/createClass";
+import {assert} from "./util";
 
 export class Controller {
     public incrementalComputationHandles = new Set<IncrementalComputationHandle>()
@@ -13,7 +18,13 @@ export class Controller {
     public activityCallsByName = new Map<string, ActivityCall>()
     public interactionCallsByName = new Map<string, InteractionCall>()
     public interactionCalls = new Map<string, InteractionCall>()
-    constructor(public system: System, public entities: KlassInstanceOf<typeof Entity, false>[], public relations: KlassInstanceOf<typeof Relation, false>[], public activities: KlassInstanceOf<typeof Activity, false>[], public interactions: KlassInstanceOf<typeof Interaction, false>[]) {
+    constructor(
+        public system: System,
+        public entities: KlassInstanceOf<typeof Entity, false>[],
+        public relations: KlassInstanceOf<typeof Relation, false>[],
+        public activities: KlassInstanceOf<typeof Activity, false>[],
+        public interactions: KlassInstanceOf<typeof Interaction, false>[])
+    {
         activities.forEach(activity => {
             const activityCall = new ActivityCall(activity, system)
             this.activityCalls.set(activity.uuid, activityCall)
@@ -43,11 +54,11 @@ export class Controller {
 
 
         relations.forEach(relation => {
-            // TODO IncrementalComputed Handle 如何和他的数据定义关联起来
-            // this.incrementalComputationHandles.add(new IncrementalComputationHandle(this, entity))
+            if(relation.computedData) {
+                const Handle = RelationIncrementalComputationHandle.Handles.get(relation.computedData.constructor as KlassType<any>)
+                this.incrementalComputationHandles.add(new Handle(this, relation))
+            }
         })
-
-
 
     }
     async setup() {
@@ -73,26 +84,30 @@ export class Controller {
 
         if (callbacks) {
             for(const callback of callbacks) {
-                await callback(...args)
+                await callback(...args, event)
             }
         }
     }
-    // TODO interaction call 也要全部改成 async 的。里面的 getEvent/saveEvent/get/set 应该都是异步
     async callInteraction(interactionId:string, interactionEventArgs: InteractionEventArgs) {
         const interactionCall = this.interactionCalls.get(interactionId)!
-        const result = interactionCall.call(interactionEventArgs)
+        assert(!!interactionCall,`cannot find interaction for ${interactionId}`)
+        const result = await interactionCall.call(interactionEventArgs)
         if (!result.error) {
             await this.dispatch(interactionCall.interaction, interactionEventArgs)
+        } else {
+            console.error(result.error)
         }
 
         return result
     }
     async callActivityInteraction(activityCallId:string, interactionCallId:string, activityId: string, interactionEventArgs: InteractionEventArgs) {
         const activityCall = this.activityCalls.get(activityCallId)!
-        const result = activityCall.callInteraction(activityId, interactionCallId, interactionEventArgs)
+        const result = await activityCall.callInteraction(activityId, interactionCallId, interactionEventArgs)
 
         if (!result.error) {
             await this.dispatch(activityCall.uuidToInteractionCall.get(interactionCallId)!.interaction, interactionEventArgs, activityId)
+        } else {
+            console.error(result.error)
         }
 
         return result

@@ -16,7 +16,7 @@
     "esModuleInterop": true,
     "removeComments": false,
     "lib": ["esnext", "dom"],
-    "types": ["node", "jest/globals"],
+    "types": ["node", "bun-types"],
     "rootDir": ".",
     "paths": {
       "rata": ["../../../rata/src"],

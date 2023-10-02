@@ -250,6 +250,8 @@ export class ActivityCall {
             const sourceNode = (this.rawToNode.get(transfer.source as InteractionInstanceType) || rawGatewayToNode.get(transfer.source as InteractionInstanceType))!
             const targetNode = (this.rawToNode.get(transfer.target as InteractionInstanceType) || rawGatewayToNode.get(transfer.target as GatewayInstanceType))!
 
+            assert(!!sourceNode, `cannot find source ${transfer.source.name}`)
+            assert(!!targetNode, `cannot find target ${transfer.target.name}`)
             // CAUTION gateway 的 next 是个数组。其他的都是只有一个指向
             if (Gateway.is(sourceNode)) {
                 (sourceNode as GatewayNode).next.push(targetNode)
@@ -303,7 +305,7 @@ export class ActivityCall {
         return node.parentSeq.tail === node
     }
 
-    callInteraction(activityId: string, uuid: string, interactionEventArgs: InteractionEventArgs) : InteractionCallResponse{
+    async callInteraction(activityId: string, uuid: string, interactionEventArgs: InteractionEventArgs) : InteractionCallResponse{
         const activityStateData = this.system.storage.get('ActivityState', activityId)
 
         const state = new ActivityState(activityStateData, this)
@@ -320,7 +322,7 @@ export class ActivityCall {
             }
         }
 
-        const res = interactionCall.call(interactionEventArgs, activityId)
+        const res = await interactionCall.call(interactionEventArgs, activityId)
         if (res.error) {
             return res
         }

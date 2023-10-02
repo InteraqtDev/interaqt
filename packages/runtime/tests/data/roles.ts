@@ -1,5 +1,5 @@
-import {createUserRoleAttributive, UserAttributive} from "../../shared/user/User";
-import {Entity} from "../../shared/entity/Entity";
+import {createUserRoleAttributive, UserAttributive} from "../../../shared/user/User";
+import {Entity} from "../../../shared/entity/Entity";
 
 export const NewAttr = UserAttributive.createReactive({
     name: 'New',
@@ -34,8 +34,12 @@ export const Old3Attr = UserAttributive.createReactive({
 
 export const OtherAttr = UserAttributive.createReactive({
     name: 'Other',
-    // stringContent: `function Other({ user }, {currentUser}){ user.id !== currentUser.id }`
-    stringContent: `function Other(){}`
+    stringContent: `
+function Other(targetUser, { user }){ 
+    return user.id !== targetUser.id 
+}
+`
+    // stringContent: `function Other(){}`
 })
 
 export const User = createUserRoleAttributive( {
@@ -50,11 +54,3 @@ export const Anonymous = createUserRoleAttributive( {
     name: 'Anonymous'
 }, { isReactive: true })
 
-export const Message = Entity.createReactive({
-    name: 'Message',
-    properties: [{
-        name: 'content',
-        type: 'string',
-        collection: false,
-    }]
-})

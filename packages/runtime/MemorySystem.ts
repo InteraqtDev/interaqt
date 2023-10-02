@@ -8,14 +8,14 @@ import { EntityQueryHandle } from '../storage/erstorage/ERStorage'
 import { EntityToTableMap } from '../storage/erstorage/EntityToTableMap'
 import {SQLiteDB} from "./BunSQLite";
 
-let id = 0
+
 
 
 
 class MemoryStorage implements Storage{
     data = new Map<string, Map<string, any>>()
     db = new SQLiteDB()
-    public queryHandle: EntityQueryHandle
+    public queryHandle?: EntityQueryHandle
     // kv 结构
     get(conceptName: string, id: string, initialValue?: any) {
         let res = this.data.get(conceptName)!.get(id)
@@ -32,32 +32,76 @@ class MemoryStorage implements Storage{
         await setup.createTables()
         this.queryHandle = new EntityQueryHandle( new EntityToTableMap(setup.map), this.db)
     }
-    findOne(...arg) {
-        return this.queryHandle.findOne(...arg)
+    findOne(...arg:Parameters<EntityQueryHandle["findOne"]>) {
+        return this.queryHandle!.findOne(...arg)
     }
-    find(...arg) {
-        return this.queryHandle.find(...arg)
+    find(...arg:Parameters<EntityQueryHandle["find"]>) {
+        return this.queryHandle!.find(...arg)
     }
-    create(...arg) {
-        return this.queryHandle.create(...arg)
+    create(...arg:Parameters<EntityQueryHandle["create"]>) {
+        return this.queryHandle!.create(...arg)
     }
-    update(...arg) {
-        return this.queryHandle.update(...arg)
+    update(...arg:Parameters<EntityQueryHandle["update"]>) {
+        return this.queryHandle!.update(...arg)
+    }
+    findRelation(...arg:Parameters<EntityQueryHandle["findRelation"]>) {
+        return this.queryHandle!.findRelation(...arg)
+    }
+    findRelationByName(...arg:Parameters<EntityQueryHandle["findRelationByName"]>) {
+        return this.queryHandle!.findRelationByName(...arg)
+    }
+    findOneRelation(...arg: Parameters<EntityQueryHandle["findOneRelation"]>) {
+        return this.queryHandle!.findOneRelation(...arg)
+    }
+    findOneRelationById(...arg: Parameters<EntityQueryHandle["findOneRelationById"]>) {
+        return this.queryHandle!.findOneRelationById(...arg)
+    }
+    findOneRelationByName(...arg: Parameters<EntityQueryHandle["findOneRelationByName"]>) {
+        return this.queryHandle!.findOneRelationByName(...arg)
+    }
+    updateRelation(...arg:Parameters<EntityQueryHandle["updateRelation"]> ) {
+        return this.queryHandle!.updateRelation(...arg)
+    }
+    updateRelationByName(...arg:Parameters<EntityQueryHandle["updateRelationByName"]> ) {
+        return this.queryHandle!.updateRelationByName(...arg)
+    }
+    removeRelation(...arg:Parameters<EntityQueryHandle["removeRelation"]>) {
+        return this.queryHandle!.removeRelation(...arg)
+    }
+    removeRelationByName(...arg:Parameters<EntityQueryHandle["removeRelationByName"]>) {
+        return this.queryHandle!.removeRelationByName(...arg)
+    }
+    addRelationById(...arg:Parameters<EntityQueryHandle["addRelationById"]>) {
+        return this.queryHandle!.addRelationById(...arg)
+    }
+    addRelationByNameById(...arg:Parameters<EntityQueryHandle["addRelationByNameById"]>) {
+        return this.queryHandle!.addRelationByNameById(...arg)
+    }
+    getRelationName(...arg:Parameters<EntityQueryHandle["getRelationName"]>) {
+        return this.queryHandle!.getRelationName(...arg)
     }
 
 }
+
+type EventQuery = {
+    interactionId?: string,
+    activityId?: string,
+}
+
+let id = 0
 
 export class MemorySystem implements System {
     eventStack: InteractionEvent[] = []
     conceptClass: Map<string, ReturnType<typeof createClass>> = new Map()
     saveEvent(event: InteractionEvent) {
         this.eventStack.push(event)
-        return true
+        return Promise.resolve(true)
     }
-    getEvent(query: { [k:string]: any} = {} ) {
-        return this.eventStack.filter(e => {
+    getEvent(query: EventQuery = {} ) {
+        return Promise.resolve(this.eventStack.filter(e => {
+            // @ts-ignore
             return Object.keys(query).every(k => e[k] === query[k])
-        })
+        }))
     }
     util = {
         uuid() {

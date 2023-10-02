@@ -8,7 +8,7 @@ export const data = [{
     "options": {"isReactive": true},
     "uuid": "f31a03cd-28b4-42f0-b00a-7bbe335fcc97",
     "public": {
-        "stringContent": "function({ user }) { return user.roles.includes('user')}",
+        "stringContent": "function(user) { return user.roles.includes('user')}",
         "name": "user",
         "isRef": false,
         "isRole": true
@@ -18,7 +18,7 @@ export const data = [{
     "options": {"isReactive": true},
     "uuid": "f4b45b5b-d5f9-4626-98d0-8059474893b2",
     "public": {
-        "stringContent": "function({ user }) { return user.roles.includes('A')}",
+        "stringContent": "function(user) { return user.roles.includes('A')}",
         "name": "A",
         "isRef": true,
         "isRole": true
@@ -63,7 +63,7 @@ export const data = [{
     "options": {"isReactive": true},
     "uuid": "80c4208f-9587-48cf-80dd-5eb291820957",
     "public": {
-        "stringContent": "function({ user }) { return user.roles.includes('User')}",
+        "stringContent": "function(user) { return user.roles.includes('User')}",
         "name": "User",
         "isRef": false,
         "isRole": true
@@ -73,7 +73,7 @@ export const data = [{
     "options": {"isReactive": true},
     "uuid": "15179bac-1933-4c9f-b330-0372013f1e92",
     "public": {
-        "stringContent": "function({ user }) { return user.roles.includes('Admin')}",
+        "stringContent": "function(user) { return user.roles.includes('Admin')}",
         "name": "Admin",
         "isRef": false,
         "isRole": true
@@ -83,7 +83,7 @@ export const data = [{
     "options": {"isReactive": true},
     "uuid": "4bbc3bb0-03cf-45f6-933c-a512b1a210fb",
     "public": {
-        "stringContent": "function({ user }) { return user.roles.includes('Anonymous')}",
+        "stringContent": "function(user) { return user.roles.includes('Anonymous')}",
         "name": "Anonymous",
         "isRef": false,
         "isRole": true

@@ -2,10 +2,22 @@ import {describe, test, expect, beforeEach} from "bun:test";
 import {Controller} from "../Controller";
 import {ActivityCall, ActivityGroupNode} from "../AcitivityCall";
 import {MemorySystem} from "../MemorySystem";
-import {createInstances, getInstance, KlassByName, KlassInstanceOf, removeAllInstance} from "../../shared/createClass";
+import {createInstances, getInstance, KlassByName, KlassInstanceOf, removeAllInstance, stringifyAllInstances} from "../../shared/createClass";
 import { Activity, Interaction } from "../../shared/activity/Activity";
 import { Entity, Relation } from "../../shared/entity/Entity";
-import {EntityQueryHandle, MatchExpression} from '../../storage/erstorage/ERStorage'
+import '../incrementalComputationHandles/MapActivityToEntity'
+import '../incrementalComputationHandles/RelationStateMachine'
+import {MatchExpression} from '../../storage/erstorage/MatchExpression'
+import exp from "constants";
+
+// 里面有所有必须的数据？
+
+
+type User = {
+    id: string,
+    roles: string[],
+    [k:string]: any
+}
 
 describe('map activity', () => {
 
@@ -17,13 +29,17 @@ describe('map activity', () => {
     let approveUUID:string
     let rejectUUID:string
     let cancelUUID:string
-    let controller
+    let deleteUUID: string
+    let controller: Controller
 
-    let userA
-    let userB
+    let userA: User
+    let userB: User
     beforeEach(async () => {
         removeAllInstance()
-        const { data }  = (await import('./data/simpleActivityWithER'))
+        const { data }  = (await import('./data/activity'))
+        createInstances(data, false)
+
+        // createInstances(data, false)
         /**
          * 当前的格式为:
          * New && Other Admin as A
@@ -32,28 +48,29 @@ describe('map activity', () => {
          * message: Message
          */
 
-        createInstances(data, false)
+
         system = new MemorySystem()
         system.conceptClass = KlassByName
         controller = new Controller(system, [...Entity.instances].filter(e => !e.isRef), [...Relation.instances], [...Activity.instances], [...Interaction.instances])
         await controller.setup()
 
-        createFriendRelationActivityCall = controller.activityCallsByName.get('createFriendRelation')
+        createFriendRelationActivityCall = controller.activityCallsByName.get('createFriendRelation')!
         makeFriendActivityUUID = createFriendRelationActivityCall.activity.uuid
 
         sendRequestUUID = createFriendRelationActivityCall.graph.head.uuid
         approveUUID = (createFriendRelationActivityCall.graph.tail as ActivityGroupNode).childSeqs![0].head.uuid
         rejectUUID = (createFriendRelationActivityCall.graph.tail as ActivityGroupNode).childSeqs![1].head.uuid
         cancelUUID = (createFriendRelationActivityCall.graph.tail as ActivityGroupNode).childSeqs![2].head.uuid
+        deleteUUID = Interaction.instances.find(i => i.name === 'deleteFriend').uuid
 
 
         userA = {name: 'A', age:10}
-        const userARef = await system.storage.queryHandle.create('User', userA)
+        const userARef = await system.storage.queryHandle!.create('User', userA)
         userA.id = userARef.id
         userA.roles = ['user']
 
         userB = {name: 'B', age:12}
-        const userBRef = await system.storage.queryHandle.create('User', userB)
+        const userBRef = await system.storage.queryHandle!.create('User', userB)
         userB.id = userBRef.id
         userB.roles = ['user']
 
@@ -78,7 +95,7 @@ describe('map activity', () => {
             value: ['=', userB.name]
         })
 
-        const requests1 = await controller.system.storage.queryHandle.find('Request', requestMatch, undefined, ['handled', 'activityId', ['from',{attributeQuery:["name"]}], ['to', {attributeQuery:["name"]}], ['message', {attributeQuery:["content"]}]])
+        const requests1 = await controller.system.storage.find('Request', requestMatch, undefined, ['handled', 'activityId', ['from',{attributeQuery:["name"]}], ['to', {attributeQuery:["name"]}], ['message', {attributeQuery:["content"]}]])
         expect(requests1.length).toBe(0)
         // 2. 交互顺序错误 approve
         // const res1 = createFriendRelationActivityCall.callInteraction(activityId, approveUUID, {user: userA})
@@ -94,7 +111,7 @@ describe('map activity', () => {
         const res2 = await controller.callActivityInteraction(makeFriendActivityUUID,  sendRequestUUID, activityId,{user: userA, payload})
         expect(res2.error).toBeUndefined()
 
-        const requests2 = await controller.system.storage.queryHandle.find('Request', requestMatch, undefined, ['handled', 'activityId', ['from',{attributeQuery:["name"]}], ['to', {attributeQuery:["name"]}], ['message', {attributeQuery:["content"]}]])
+        const requests2 = await controller.system.storage.find('Request', requestMatch, undefined, ['handled', 'activityId', ['from',{attributeQuery:["name"]}], ['to', {attributeQuery:["name"]}], ['message', {attributeQuery:["content"]}]])
         expect(requests2.length).toBe(1)
         expect(!!requests2[0].handled).toBeFalse()
         expect(requests2[0].activityId).toBe(activityId)
@@ -111,7 +128,7 @@ describe('map activity', () => {
         const res5 = await controller.callActivityInteraction(makeFriendActivityUUID, approveUUID, activityId, {user: userB})
         expect(res5.error).toBeUndefined()
 
-        const requests3 = await controller.system.storage.queryHandle.find('Request', requestMatch, undefined, ['handled', 'activityId', ['from',{attributeQuery:["name"]}], ['to', {attributeQuery:["name"]}], ['message', {attributeQuery:["content"]}]])
+        const requests3 = await controller.system.storage.find('Request', requestMatch, undefined, ['handled', 'activityId', ['from',{attributeQuery:["name"]}], ['to', {attributeQuery:["name"]}], ['message', {attributeQuery:["content"]}]])
         expect(requests3.length).toBe(1)
         expect(!!requests3[0].handled).toBeTrue()
         expect(requests3[0].activityId).toBe(activityId)
@@ -127,6 +144,26 @@ describe('map activity', () => {
         const currentState = createFriendRelationActivityCall.getState(activityId)
         expect(currentState.current).toBeUndefined()
 
+        const relationName = controller.system.storage.getRelationName('User', 'friends')
+        const friendRelations = await controller.system.storage.findRelationByName(relationName, undefined, undefined, [['source', {attributeQuery: ['name', 'age']}], ['target', {attributeQuery: ['name', 'age']}]])
+        expect(friendRelations.length).toBe(1)
+        expect(friendRelations[0].source.name).toBe('B')
+        expect(friendRelations[0].source.id).toBe(userB.id)
+        expect(friendRelations[0].target.name).toBe('A')
+        expect(friendRelations[0].target.id).toBe(userA.id)
+
+
+        // 删除关系，继续驱动状态机
+        const res6 = await controller.callInteraction(deleteUUID, {
+            user: userB,
+            payload: {
+                target: userA
+            }
+        })
+        expect(res6.error).toBeUndefined()
+
+        const friendRelations2 = await controller.system.storage.findRelationByName(relationName, undefined, undefined, [['source', {attributeQuery: ['name', 'age']}], ['target', {attributeQuery: ['name', 'age']}]])
+        expect(friendRelations2.length).toBe(0)
     })
 
 })

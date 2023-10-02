@@ -6,8 +6,6 @@ import {createInstances, getInstance, KlassByName, KlassInstanceOf, removeAllIns
 import { Interaction } from "../../shared/activity/Activity";
 import {InteractionEventArgs} from "../../types/interaction";
 
-
-
 describe("interaction",  () => {
     let interactionCall: InteractionCall
     let system: MemorySystem
@@ -38,9 +36,9 @@ describe("interaction",  () => {
                 roles: ['Admin']
             }
         }
-        const response = interactionCall.call(event)
+        const response = await interactionCall.call(event)
 
-        expect(response.error).toBe(null)
+        expect(response.error).toBeUndefined()
         expect(system.eventStack.length).toBe(1)
         expect(system.eventStack[0].args).toBe(event)
     })
@@ -52,9 +50,9 @@ describe("interaction",  () => {
                 roles: ['User']
             }
         }
-        const response = interactionCall.call(event)
+        const response = await interactionCall.call(event)
 
-        expect(response.error).not.toBe(null)
+        expect(response.error).toBeDefined()
         expect(response.error instanceof LoginError).toBe(true)
         expect(response.error.type).toBe('check user failed')
     })
