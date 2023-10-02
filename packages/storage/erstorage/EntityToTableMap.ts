@@ -277,9 +277,8 @@ export class EntityToTableMap {
         return new RecordInfo(recordName, this)
     }
     getInfo(entityName: string, attribute: string) : AttributeInfo{
-        if (!this.data.records[entityName]!.attributes[attribute]) debugger
-        assert(!!this.data.records[entityName]!.attributes[attribute],
-            `cannot find attribute ${attribute} in ${entityName}. attributes: ${Object.keys(this.data.records[entityName]!.attributes)}`
+        assert(!!this.data.records[entityName]?.attributes[attribute],
+            `cannot find attribute ${attribute} in ${entityName}. attributes: ${this.data.records[entityName] && Object.keys(this.data.records[entityName]?.attributes)}`
         )
         return new AttributeInfo( entityName, attribute, this)
     }
@@ -289,6 +288,7 @@ export class EntityToTableMap {
         return new LinkInfo(linkName, this.data.links[linkName], this)
     }
     getLinkInfoByName(linkName: string) {
+        assert(!!this.data.links[linkName], `cannot find link ${linkName}`)
         return new LinkInfo(linkName, this.data.links[linkName], this)
     }
     getRelationInfoData(entityName: string, attribute: string) {

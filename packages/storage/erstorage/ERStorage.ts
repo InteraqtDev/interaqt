@@ -210,7 +210,7 @@ ${this.buildWhereClause(
         return fieldMatchExp.map((exp: BoolExpression<FieldMatchAtom>, context:string[]) => {
             assert(Array.isArray(exp.data.value), `match value is not a array ${context.join('.')}`)
             if (exp.data.isFunctionMatch) {
-                assert(exp.data.value[0].toLowerCase() === 'exist', `we only support Exist function match on entity for now. yours: ${exp.data.value[0]}`)
+                assert(exp.data.value[0].toLowerCase() === 'exist', `we only support Exist function match on entity for now. yours: ${exp.data.key} ${exp.data.value[0]} ${exp.data.value[1]}`)
 
                 const info = this.map.getInfoByPath(exp.data.namePath!)
                 const [, currentAlias] = this.map.getTableAndAlias(exp.data.namePath!)
@@ -568,7 +568,6 @@ ${recordInfo.idField} IN (${updateRowIds})
 
     async addLink(linkName: string, sourceId: string, targetId:string, attributes: RawEntityData = {}, moveSource = false) {
         const linkInfo = this.map.getLinkInfoByName(linkName)
-
         // FIXME 所有情况都没有考虑如果 attributes 里面有实体，当前这个关系可能还要递归处理关系的问题。还是得复用 createRecord
 
         if (linkInfo.isCombined()) {
@@ -629,7 +628,6 @@ ${idField} = ${idValue}
             }
 
             const attributeValues = Object.values(attributes)
-            console.log(1111, attributes)
             const attributeKeys = Object.keys(attributes).map(k => linkInfo.record.attributes[k].field)
             return this.database.insert(`
 INSERT INTO ${linkInfo.table}
@@ -913,10 +911,11 @@ export class EntityQueryHandle {
     async count() {
 
     }
-    async addRelation(relationName: string, sourceEntityId: string,  targetEntityId:string, rawData: RawEntityData) {
+    async addRelation(relationName: string, matchExpressionData: MatchExpressionData, rawData: RawEntityData) {
         // return this.agent.addLink(relationName, sourceEntityId, targetEntityId, rawData)
     }
-    async addRelationByName(relationName: string, sourceEntityId: string,  targetEntityId:string, rawData: RawEntityData) {
+    async addRelationByNameById(relationName: string, sourceEntityId: string,  targetEntityId:string, rawData: RawEntityData = {}) {
+        assert(!!relationName && !!sourceEntityId && targetEntityId!!, `${relationName} ${sourceEntityId} ${targetEntityId} cannot be empty`)
         return this.agent.addLink(relationName, sourceEntityId, targetEntityId, rawData)
     }
     async addRelationById(entity:string, attribute:string, entityId: string, attributeEntityId:string, relationData?: RawEntityData) {
@@ -930,25 +929,40 @@ export class EntityQueryHandle {
         // TODO
         return Promise.resolve()
     }
-    async findRelation(relationName: string, matchExpressionData?: MatchExpressionData, modifierData?: ModifierData, attributeQueryData: AttributeQueryData = []) {
+    async findRelation(record: string, attribute:string, matchExpressionData?: MatchExpressionData, modifierData?: ModifierData, attributeQueryData: AttributeQueryData = []) {
+        // FIXME 全部要转换
         // return this.find(relationName, matchExpressionData, modifierData, attributeQueryData)
     }
     async findRelationByName(relationName: string, matchExpressionData?: MatchExpressionData, modifierData?: ModifierData, attributeQueryData: AttributeQueryData = []) {
         return this.find(relationName, matchExpressionData, modifierData, attributeQueryData)
     }
-    async findOneRelation(relationName: string, matchExpressionData: MatchExpressionData, modifierData: ModifierData = {}, attributeQueryData: AttributeQueryData = []) {
-        // const limitedModifier = {
-        //     ...modifierData,
-        //     limit: 1
-        // }
-        // return this.findRelation(relationName, matchExpressionData, limitedModifier, attributeQueryData)
+
+    // async findOneRelation(relationName: string, matchExpressionData: MatchExpressionData, modifierData: ModifierData = {}, attributeQueryData: AttributeQueryData = []) {
+    // FIXME 重构成 MatchExpression modifier 等都能自己 tranform 的形式
+    async findOneRelation(entity: string, attribute: string,  matchExpressionData: MatchExpressionData) {
+        const limitedModifier = {
+            limit: 1
+        }
+        const newMatch = this.agent.transformMatch(matchExpressionData, entity, attribute, true)
+        const relationName = this.getRelationName(entity, attribute)
+        return this.findOneRelationByName(relationName, newMatch, limitedModifier)
+    }
+    async findOneRelationById(entity: string, attribute: string,  entityId:string, attributeId:string) {
+        const newMatch = MatchExpression.createFromAtom({
+            key: 'id',
+            value: ['=', entityId]
+        }).and({
+            key: `${attribute}.id`,
+            value: ['=', attributeId]
+        })
+        return this.findOneRelation(entity, attribute, newMatch)
     }
     async findOneRelationByName(relationName: string, matchExpressionData: MatchExpressionData, modifierData: ModifierData = {}, attributeQueryData: AttributeQueryData = []) {
         const limitedModifier = {
             ...modifierData,
             limit: 1
         }
-        return this.findRelation(relationName, matchExpressionData, limitedModifier, attributeQueryData)
+        return (await this.findRelationByName(relationName, matchExpressionData, limitedModifier, attributeQueryData))[0]
     }
     async removeRelation(relationName: string, matchExpressionData: MatchExpressionData) {
         // return this.agent.removeLink(relationName, matchExpressionData)
@@ -956,7 +970,7 @@ export class EntityQueryHandle {
     async removeRelationByName(relationName: string, matchExpressionData: MatchExpressionData) {
         return this.agent.removeLink(relationName, matchExpressionData)
     }
-    getRelationName(entity:string, attribute) {
+    getRelationName(entity:string, attribute): string {
         return this.map.getInfo(entity, attribute).linkName
     }
 }

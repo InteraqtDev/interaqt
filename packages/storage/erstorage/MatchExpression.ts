@@ -26,7 +26,6 @@ export class MatchExpression {
     public entityQueryTree: EntityQueryTree = {}
 
     constructor(public entityName: string, public map: EntityToTableMap, public data?: MatchExpressionData, public contextRootEntity?: string, public fromRelation?: boolean) {
-
         this.entityQueryTree = {}
         if (this.data) {
             assert(this.data instanceof BoolExpression, `match data is not a BoolExpression instance, you passed: ${this.data}`)
