@@ -128,21 +128,7 @@ export class AttributeInfo {
 export class LinkInfo {
     constructor(public name: string, public data: LinkMapItem, public map: EntityToTableMap) {
     }
-    isMerged() {
-        return !!this.data.mergedTo
-    }
-    isMergedToSource() {
-        return this.data.mergedTo === 'source'
-    }
-    isMergedToTarget() {
-        return this.data.mergedTo === 'target'
-    }
-    isCombined() {
-        return this.data.mergedTo === 'combined'
-    }
-    isRecordSource(recordName:string) {
-        return this.data.sourceRecord === recordName
-    }
+
     get isManyToOne() {
         return this.data.relType[0] === 'n' && this.data.relType[1] === '1'
     }
@@ -194,6 +180,24 @@ export class LinkInfo {
     }
     get targetField() {
         return this.record.attributes.source.field
+    }
+    isMerged() {
+        return !!this.data.mergedTo
+    }
+    isMergedToSource() {
+        return this.data.mergedTo === 'source'
+    }
+    isMergedToTarget() {
+        return this.data.mergedTo === 'target'
+    }
+    isCombined() {
+        return this.data.mergedTo === 'combined'
+    }
+    isRecordSource(recordName:string) {
+        return this.data.sourceRecord === recordName
+    }
+    getAttributeName(recordName: string) {
+        return this.isRecordSource(recordName) ? ['source', 'target'] : ['target', 'source']
     }
 }
 

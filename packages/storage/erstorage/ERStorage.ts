@@ -3,7 +3,7 @@ import {assert, deepMerge, setByPath} from "../util";
 // @ts-ignore
 import {BoolExpression, ExpressionData} from '../../shared/BoolExpression'
 // @ts-ignore
-import {Database, EntityIdRef} from '../../runtime/System'
+import {Database, EntityIdRef, ROW_ID_ATTR} from '../../runtime/System'
 import {FieldMatchAtom, MatchAtom, MatchExpression, MatchExpressionData} from "./MatchExpression.ts";
 import {ModifierData} from "./Modifier.ts";
 import {AttributeQuery, AttributeQueryData, AttributeQueryDataItem} from "./AttributeQuery.ts";
@@ -293,10 +293,17 @@ VALUES
 
         const [firstSameRowEntityIdRef, ...restSameRowEntityIdRefs] = newEntityData.sameRowEntityIdRefs
         // 先 unlink 已有的。
-        await this.unlinkFromRecordById(
-            [firstSameRowEntityIdRef.info?.parentEntityName!, firstSameRowEntityIdRef.info?.attributeName!],
-            firstSameRowEntityIdRef.getRef().id
-        )
+        const linkInfo = firstSameRowEntityIdRef.info!.getLinkInfo()
+        const [firstSameRowEntityAttrName] = linkInfo.getAttributeName(firstSameRowEntityIdRef.info!.parentEntityName!)
+
+        await this.unlink(linkInfo.name, MatchExpression.createFromAtom({
+            key: `${firstSameRowEntityAttrName}.id`,
+            value: ['=', firstSameRowEntityIdRef.getRef().id]
+        }))
+        // await this.unlinkFromRecordById(
+        //     [firstSameRowEntityIdRef.info?.parentEntityName!, firstSameRowEntityIdRef.info?.attributeName!],
+        //     firstSameRowEntityIdRef.getRef().id
+        // )
 
         // 把其他的数据 都 flashOut 出来
         const restSameRowEntitiesData:{[k:string]: RawEntityData} = {}
@@ -639,25 +646,6 @@ VALUES
     }
 
 
-
-    async unlinkFromRecord(recordNameAndAttribute: [string, string], matchExpressionData: MatchExpressionData,) {
-        const [record, attribute] = recordNameAndAttribute
-        const linkInfo = this.map.getLinkInfo(recordNameAndAttribute[0], recordNameAndAttribute[1])
-        // 如果是 三表合一，永远都是  move 掉 attribute 方向的数据。
-        const moveSource = !linkInfo.isRecordSource(record)
-        const newMatch = this.transformMatch(matchExpressionData, record, attribute,true)
-        return this.unlink(linkInfo.name, newMatch, moveSource)
-    }
-
-    async unlinkFromRecordById(recordNameAndAttribute: [string, string], recordId: string) {
-        assert(!!recordId, `record id cannot be empty`)
-        return this.unlinkFromRecord(recordNameAndAttribute, MatchExpression.createFromAtom({
-            key: 'id',
-            value: ['=', recordId]
-        }))
-    }
-
-
     async unlink(linkName: string, matchExpressionData: MatchExpressionData, moveSource = false) {
         const linkInfo = this.map.getLinkInfoByName(linkName)
         const toMoveRecordInfo = moveSource ? linkInfo.sourceRecordInfo : linkInfo.targetRecordInfo
@@ -694,19 +682,31 @@ VALUES
             return
         }
 
-        if (linkInfo.isMerged()) {
+        if (!linkInfo.isMerged()) {
             // 完全独立，直接删除符合条件的 就行了
             return this.deleteRecord(linkName, matchExpressionData)
         }
 
+
         // 剩下的都是 merge 到某一边的
-        if (linkInfo) {
-            const newMatch = this.transformMatch(matchExpressionData, linkName, linkInfo.isMergedToSource()? 'source': 'target')
-            const recordName = linkInfo.isMergedToSource() ? linkInfo.sourceRecord : linkInfo.targetRecord
-            const attributeName = linkInfo.isMergedToSource() ? linkInfo.sourceAttribute : linkInfo.targetAttribute!
-            const newData = new NewEntityData(this.map,recordName, {[attributeName]: null} )
-            return await this.updateRecord(recordName, newMatch, newData)
-        }
+        const records = await this.findRecords(RecordQuery.create(linkName, this.map, {
+            matchExpression: matchExpressionData,
+            attributeQuery: [
+                ['source', {attributeQuery: ['id']}],
+                ['target', {attributeQuery: ['id']}]
+            ]
+        }))
+
+        const recordName = linkInfo.isMergedToSource() ? linkInfo.sourceRecord : linkInfo.targetRecord
+        const toUnlinkIds = records.map(record => linkInfo.isMergedToSource() ? record.source.id : record.target.id)
+        const newMatch = MatchExpression.createFromAtom({
+            key: 'id',
+            value: ['in', toUnlinkIds]
+        })
+
+        const attributeName = linkInfo.isMergedToSource() ? linkInfo.sourceAttribute : linkInfo.targetAttribute!
+        const newData = new NewEntityData(this.map, recordName, {[attributeName]: null} )
+        return await this.updateRecord(recordName, newMatch, newData)
     }
     // 默认会把连带的都移走
     async moveRecords(recordName:string, matchExpressionData: MatchExpressionData, excludeLinks: string[] = []) {
@@ -762,64 +762,6 @@ VALUES
 
         return valueAttributes.concat(...relatedRecordsAttributeQuery)
     }
-    transformMatch(matchExpressionData: MatchExpressionData, recordName: string, attribute: string, toLinkAngle = false) {
-        if (!toLinkAngle) {
-            const reverseAttribute = this.map.getReverseAttribute(recordName, attribute)
-            // 本质上等于给所有条件的 key 换名字
-            return matchExpressionData.map((atom, context) => {
-                const {key, value, isReferenceValue} = atom.data
-                if (context[0] === attribute) {
-                    // 说明是 attribute 下面的，去掉前缀就行了
-                    const newKey = key.split('.').slice(1, Infinity).join('.')
-                    assert(!!newKey, `${key} has no prefix, something wrong`)
-                    // FIXME value 里面有引用，那么也要换。但它可能是表达式，我们这里只是简单处理，可能会对表达式破坏
-                    const newValue = isReferenceValue ? value[1].split('.').slice(1, Infinity).join('.') : value[1]
-                    return {
-                        key: newKey,
-                        value: [value[0], newValue]
-                    }
-                } else {
-                    // 说明是 record 的字段
-                    // FIXME value 里面有引用，那么也要换。但它可能是表达式，我们这里只是简单处理，可能会对表达式破坏
-                    const newValue = isReferenceValue ? `${reverseAttribute}.${value[1]}` : value[1]
-                    return {
-                        key: `${reverseAttribute}.${key}`,
-                        value: [value[0], newValue]
-                    }
-                }
-            })
-        }
-
-
-        // transform 成 link angle 的
-        const linkInfo = this.map.getLinkInfo(recordName, attribute)
-        const recordPrefix = linkInfo.isRecordSource(recordName) ? 'source' : 'target'
-        const attributePrefix = linkInfo.isRecordSource(recordName) ? 'target': 'source'
-        // 两边都要加前缀
-        return matchExpressionData.map((atom, context) => {
-            const {key, value, isReferenceValue} = atom.data
-            if (context[0] === attribute) {
-                // 说明是 attribute 下面的，替换前缀
-                const newKey = [attributePrefix].concat(key.split('.').slice(1, Infinity)).join('.')
-                assert(!!newKey, `${key} has no prefix, something wrong`)
-                // FIXME value 里面有引用，那么也要换。但它可能是表达式，我们这里只是简单处理，可能会对表达式破坏
-                const newValue = isReferenceValue ? [attributePrefix].concat(value[1].split('.').slice(1, Infinity)).join('.') : value[1]
-                return {
-                    key: newKey,
-                    value: [value[0], newValue]
-                }
-            } else {
-                // 说明是 record 的字段，添加前缀
-                // FIXME value 里面有引用，那么也要换。但它可能是表达式，我们这里只是简单处理，可能会对表达式破坏
-                const newValue = isReferenceValue ? `${recordPrefix}.${value[1]}` : value[1]
-                return {
-                    key: `${recordPrefix}.${key}`,
-                    value: [value[0], newValue]
-                }
-            }
-        })
-    }
-
 
     // FIXME 能不能复用 delete record
     async removeLink(relationName: string, matchExpressionData: MatchExpressionData,) {
@@ -911,9 +853,7 @@ export class EntityQueryHandle {
     async count() {
 
     }
-    async addRelation(relationName: string, matchExpressionData: MatchExpressionData, rawData: RawEntityData) {
-        // return this.agent.addLink(relationName, sourceEntityId, targetEntityId, rawData)
-    }
+
     async addRelationByNameById(relationName: string, sourceEntityId: string,  targetEntityId:string, rawData: RawEntityData = {}) {
         assert(!!relationName && !!sourceEntityId && targetEntityId!!, `${relationName} ${sourceEntityId} ${targetEntityId} cannot be empty`)
         return this.agent.addLink(relationName, sourceEntityId, targetEntityId, rawData)
@@ -921,51 +861,23 @@ export class EntityQueryHandle {
     async addRelationById(entity:string, attribute:string, entityId: string, attributeEntityId:string, relationData?: RawEntityData) {
         return this.agent.addLinkFromRecord(entity, attribute, entityId, attributeEntityId, relationData)
     }
-    async updateRelation(relationName:string, matchExpressionData: MatchExpressionData, newData: RawEntityData) {
-        // TODO
-        return Promise.resolve()
-    }
     async updateRelationByName(relationName:string, matchExpressionData: MatchExpressionData, newData: RawEntityData) {
-        // TODO
-        return Promise.resolve()
-    }
-    async findRelation(record: string, attribute:string, matchExpressionData?: MatchExpressionData, modifierData?: ModifierData, attributeQueryData: AttributeQueryData = []) {
-        // FIXME 全部要转换
-        // return this.find(relationName, matchExpressionData, modifierData, attributeQueryData)
+        return this.agent.updateRecord(relationName, matchExpressionData, newData)
     }
     async findRelationByName(relationName: string, matchExpressionData?: MatchExpressionData, modifierData?: ModifierData, attributeQueryData: AttributeQueryData = []) {
         return this.find(relationName, matchExpressionData, modifierData, attributeQueryData)
     }
 
-    // async findOneRelation(relationName: string, matchExpressionData: MatchExpressionData, modifierData: ModifierData = {}, attributeQueryData: AttributeQueryData = []) {
-    // FIXME 重构成 MatchExpression modifier 等都能自己 tranform 的形式
-    async findOneRelation(entity: string, attribute: string,  matchExpressionData: MatchExpressionData) {
-        const limitedModifier = {
-            limit: 1
-        }
-        const newMatch = this.agent.transformMatch(matchExpressionData, entity, attribute, true)
-        const relationName = this.getRelationName(entity, attribute)
-        return this.findOneRelationByName(relationName, newMatch, limitedModifier)
-    }
-    async findOneRelationById(entity: string, attribute: string,  entityId:string, attributeId:string) {
-        const newMatch = MatchExpression.createFromAtom({
-            key: 'id',
-            value: ['=', entityId]
-        }).and({
-            key: `${attribute}.id`,
-            value: ['=', attributeId]
-        })
-        return this.findOneRelation(entity, attribute, newMatch)
-    }
     async findOneRelationByName(relationName: string, matchExpressionData: MatchExpressionData, modifierData: ModifierData = {}, attributeQueryData: AttributeQueryData = []) {
         const limitedModifier = {
             ...modifierData,
             limit: 1
         }
+
         return (await this.findRelationByName(relationName, matchExpressionData, limitedModifier, attributeQueryData))[0]
     }
-    async removeRelation(relationName: string, matchExpressionData: MatchExpressionData) {
-        // return this.agent.removeLink(relationName, matchExpressionData)
+    createMatchFromAtom(...arg: Parameters<MatchExpression["createFromAtom"]>) {
+        return MatchExpression.createFromAtom(...arg)
     }
     async removeRelationByName(relationName: string, matchExpressionData: MatchExpressionData) {
         return this.agent.removeLink(relationName, matchExpressionData)
