@@ -44,35 +44,18 @@ class MemoryStorage implements Storage{
     update(...arg:Parameters<EntityQueryHandle["update"]>) {
         return this.queryHandle!.update(...arg)
     }
-    findRelation(...arg:Parameters<EntityQueryHandle["findRelation"]>) {
-        return this.queryHandle!.findRelation(...arg)
-    }
+
     findRelationByName(...arg:Parameters<EntityQueryHandle["findRelationByName"]>) {
         return this.queryHandle!.findRelationByName(...arg)
-    }
-    findOneRelation(...arg: Parameters<EntityQueryHandle["findOneRelation"]>) {
-        return this.queryHandle!.findOneRelation(...arg)
-    }
-    findOneRelationById(...arg: Parameters<EntityQueryHandle["findOneRelationById"]>) {
-        return this.queryHandle!.findOneRelationById(...arg)
     }
     findOneRelationByName(...arg: Parameters<EntityQueryHandle["findOneRelationByName"]>) {
         return this.queryHandle!.findOneRelationByName(...arg)
     }
-    updateRelation(...arg:Parameters<EntityQueryHandle["updateRelation"]> ) {
-        return this.queryHandle!.updateRelation(...arg)
-    }
     updateRelationByName(...arg:Parameters<EntityQueryHandle["updateRelationByName"]> ) {
         return this.queryHandle!.updateRelationByName(...arg)
     }
-    removeRelation(...arg:Parameters<EntityQueryHandle["removeRelation"]>) {
-        return this.queryHandle!.removeRelation(...arg)
-    }
     removeRelationByName(...arg:Parameters<EntityQueryHandle["removeRelationByName"]>) {
         return this.queryHandle!.removeRelationByName(...arg)
-    }
-    addRelationById(...arg:Parameters<EntityQueryHandle["addRelationById"]>) {
-        return this.queryHandle!.addRelationById(...arg)
     }
     addRelationByNameById(...arg:Parameters<EntityQueryHandle["addRelationByNameById"]>) {
         return this.queryHandle!.addRelationByNameById(...arg)
@@ -80,7 +63,6 @@ class MemoryStorage implements Storage{
     getRelationName(...arg:Parameters<EntityQueryHandle["getRelationName"]>) {
         return this.queryHandle!.getRelationName(...arg)
     }
-
 }
 
 type EventQuery = {

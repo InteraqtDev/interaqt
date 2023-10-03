@@ -133,8 +133,18 @@ export const MyFriend = UserAttributive.createReactive({
     name: 'MyFriend',
     stringContent: `
 async function MyFriend(target, { user }){
-console.log(999, 'checking friend', target.id, user.id, !!(await this.system.storage.findOneRelationById('User', 'friends', user.id, target.id)))
-    return !!(await this.system.storage.findOneRelationById('User', 'friends', user.id, target.id))  
+    const linkInfo = this.system.storage.queryHandle.map.getLinkInfo('User', 'friends')
+    const [entityAttrName, attrAttrName] = linkInfo.getAttributeName('User')  
+    
+    const match = this.system.storage.queryHandle.createMatchFromAtom({
+        key: \`\${entityAttrName}.id\`, 
+        value: ['=', user.id]
+    }).and({
+        key: \`\${attrAttrName}.id\`, 
+        value: ['=', target.id]
+    })
+
+    return !!(await this.system.storage.findOneRelationByName(linkInfo.name, match))  
 }`
 })
 

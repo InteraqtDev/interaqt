@@ -23,16 +23,11 @@ export type Storage = {
     update: (entityName: string, ...arg: any[]) => Promise<any>,
     find: (entityName: string, ...arg: any[]) => Promise<any[]>,
     create: (entityName: string, data:any) => Promise<any>
-    findOneRelation: (relationName: string, ...arg: any[]) => Promise<any>
     findOneRelationByName: (relationName: string, ...arg: any[]) => Promise<any>
-    findRelation: (relationName: string, ...arg: any[]) => Promise<any>
     findRelationByName: (relationName: string, ...arg: any[]) => Promise<any>
-    updateRelation: (relationName: string, ...arg: any[]) => Promise<any>
     updateRelationByName: (relationName: string, ...arg: any[]) => Promise<any>
-    removeRelation: (relationName: string, ...arg: any[]) => Promise<any>
     removeRelationByName: (relationName: string, ...arg: any[]) => Promise<any>
     // addRelation: (relationName: string, ...arg: any[]) => Promise<any>
-    addRelationById: (relationName: string, ...arg: any[]) => Promise<any>
     addRelationByNameById: (relationName: string, ...arg: any[]) => Promise<any>
     getRelationName: (...arg: any[]) => string
 }

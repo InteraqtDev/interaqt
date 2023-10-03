@@ -113,7 +113,7 @@ export class RelationStateMachineHandle extends RelationIncrementalComputationHa
                         } else {
                             // TODO 除了 fixedProperties 还有 propertyHandle 来计算 动态的 property
                             const nextAttributes = Object.fromEntries(nextState.fixedProperties.map(p => ([p.name, p.value])))
-                            await this.controller.system.storage.updateRelation(relationName, MatchExpression.createFromAtom(matchExp), nextAttributes)
+                            await this.controller.system.storage.updateRelationByName(relationName, MatchExpression.createFromAtom(matchExp), nextAttributes)
                         }
                     }
 
