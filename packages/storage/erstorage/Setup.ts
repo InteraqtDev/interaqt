@@ -94,11 +94,11 @@ export class DBSetup {
             assert(false, `unknown type: ${property.type}`)
         }
     }
-    getRelationFieldPrefix(relationData: LinkMapItem) {
-        return relationData.mergedTo === 'source' ?
-            `${relationData.sourceRecord}_${relationData.sourceAttribute}` :
-            `${relationData.targetRecord}_${relationData.targetAttribute}`
-    }
+    // getRelationFieldPrefix(relationData: LinkMapItem) {
+    //     return relationData.mergedTo === 'source' ?
+    //         `${relationData.sourceRecord}_${relationData.sourceAttribute}` :
+    //         `${relationData.targetRecord}_${relationData.targetAttribute}`
+    // }
 
     createRecord(entity: KlassInstanceOf<typeof Entity, false>|KlassInstanceOf<typeof Relation, false>, isRelation? :boolean) {
         const attributes = Object.fromEntries(entity.properties.map(property => [

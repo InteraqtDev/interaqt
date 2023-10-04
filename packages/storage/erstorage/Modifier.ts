@@ -12,7 +12,7 @@ export class Modifier {
     constructor(public entityName: string, public map: EntityToTableMap, public data: ModifierData, public fromRelation?: boolean) {
     }
 
-    derive(overwrite: ModifierData) {
-        return new Modifier(this.entityName, this.map, {...this.data, ...overwrite})
-    }
+    // derive(overwrite: ModifierData) {
+    //     return new Modifier(this.entityName, this.map, {...this.data, ...overwrite})
+    // }
 }

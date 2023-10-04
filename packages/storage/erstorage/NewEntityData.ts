@@ -70,22 +70,19 @@ export class NewEntityData {
         return new NewEntityData(this.map, this.recordName, {...this.rawData, ...partialNewRawData}, this.info)
     }
 
-    exclude(attributeNames: string[]) {
-        const newRawData = {...this.rawData}
-        attributeNames.forEach(name => delete newRawData[name])
-        return new NewEntityData(this.map, this.recordName, newRawData, this.info)
-    }
+    // exclude(attributeNames: string[]) {
+    //     const newRawData = {...this.rawData}
+    //     attributeNames.forEach(name => delete newRawData[name])
+    //     return new NewEntityData(this.map, this.recordName, newRawData, this.info)
+    // }
 
     getRef() {
         return {id: this.rawData.id}
     }
 
-    getData() {
-        return {...this.rawData}
-    }
 
     isRef() {
-        return !!(this.info?.isRecord && this.rawData?.id !== undefined)
+        return this.rawData?.id !== undefined
     }
 
     isNull() {

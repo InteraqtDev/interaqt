@@ -8,11 +8,11 @@ export type EntityQueryData = {
     attributeQuery?: AttributeQueryData,
     modifier?: ModifierData
 }
-export type EntityQueryDerivedData = {
-    matchExpression?: MatchExpression,
-    attributeQuery?: AttributeQuery,
-    modifier?: Modifier
-}
+// export type EntityQueryDerivedData = {
+//     matchExpression?: MatchExpression,
+//     attributeQuery?: AttributeQuery,
+//     modifier?: Modifier
+// }
 
 export class RecordQuery {
     static create(entityName: string, map: EntityToTableMap, data: EntityQueryData, contextRootEntity?: string) {
@@ -26,16 +26,16 @@ export class RecordQuery {
         )
     }
     constructor(public entityName: string, public map: EntityToTableMap, public matchExpression: MatchExpression, public attributeQuery: AttributeQuery, public modifier: Modifier, public contextRootEntity?: string) {}
-    derive(derived: EntityQueryDerivedData) {
-        return new RecordQuery(
-            this.entityName,
-            this.map,
-            derived.matchExpression || this.matchExpression,
-            derived.attributeQuery || this.attributeQuery,
-            derived.modifier || this.modifier,
-            this.contextRootEntity
-        )
-    }
+    // derive(derived: EntityQueryDerivedData) {
+    //     return new RecordQuery(
+    //         this.entityName,
+    //         this.map,
+    //         derived.matchExpression || this.matchExpression,
+    //         derived.attributeQuery || this.attributeQuery,
+    //         derived.modifier || this.modifier,
+    //         this.contextRootEntity
+    //     )
+    // }
 
 }
 

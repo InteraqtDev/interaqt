@@ -103,6 +103,9 @@ export class AttributeInfo {
     isMergedWithParent() {
         return this.getLinkInfo().isCombined()
     }
+    isRecordSource() {
+        return this.getLinkInfo().isRelationSource(this.parentEntityName, this.attributeName)
+    }
     getReverseInfo() {
         const reverseAttribute = this.map.getReverseAttribute(this.parentEntityName, this.attributeName)
         if (!reverseAttribute) return undefined
