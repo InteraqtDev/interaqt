@@ -62,30 +62,29 @@ ${this.buildWhereClause(
         const data = this.structureRawReturns(await this.query(this.buildFindQuery(entityQuery))) as any[]
         // 2. TODO 关联数据的结构化。也可以把信息丢到客户端，然客户端去结构化？？？
 
-
         // 3. x:n 关联实体的查询
         if (entityQuery.attributeQuery!.xToManyEntities) {
             for (let relatedEntity of entityQuery.attributeQuery.xToManyEntities) {
-                const {name: subAttributeName, entityQuery: subEntityQuery} = relatedEntity
+                const {name: attributeName, entityQuery: subEntityQuery} = relatedEntity
                 for (let entity of data) {
-                    const ids = await this.findRelatedEntityIds(subEntityQuery.entityName, entity.id, subAttributeName)
-                    const relatedEntityQuery = subEntityQuery.derive({
-                        matchExpression: subEntityQuery.matchExpression.and({
-                            key: 'id',
-                            value: ['in', ids]
-                        })
-                    })
-
-                    entity[subAttributeName] = await this.findRecords(relatedEntityQuery)
+                    entity[attributeName] = await this.findRelatedRecords(entityQuery.entityName, attributeName, entity.id, subEntityQuery)
                 }
             }
         }
 
         return data
     }
-    async findRelatedEntityIds(entityName: string, entityId: string, fieldName: string) {
-        // TODO
-        return []
+    async findRelatedRecords(recordName: string, attributeName: string, recordId: string, subEntityQuery: RecordQuery) {
+        const reverseInfo = this.map.getInfo(recordName, attributeName).getReverseInfo()
+
+        const newMatch = subEntityQuery.matchExpression.and({
+            key: `${reverseInfo?.attributeName!}.id`,
+            value: ['=', recordId]
+        })
+
+        const newSubQuery = new RecordQuery(subEntityQuery.entityName, subEntityQuery.map, newMatch, subEntityQuery.attributeQuery, subEntityQuery.modifier, subEntityQuery.contextRootEntity)
+
+        return this.findRecords(newSubQuery)
     }
     // 根据 queryTree 来获得 join table 的信息。因为 queryTree 是树形，所以这里也是个递归结构。
 
@@ -638,7 +637,7 @@ ${idField} = ${idValue}
             const attributeKeys = Object.keys(attributes).map(k => linkInfo.record.attributes[k].field)
             return this.database.insert(`
 INSERT INTO ${linkInfo.table}
-(${[linkInfo.sourceField, linkInfo.targetField].concat(attributeKeys).join(',')})
+(${[linkInfo.sourceAttrField, linkInfo.targetAttrField].concat(attributeKeys).join(',')})
 VALUES
 (${[sourceId, targetId].concat(attributeValues).map(v => JSON.stringify(v)).join(',')})
 `)

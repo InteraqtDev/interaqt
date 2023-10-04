@@ -25,10 +25,7 @@ export class RecordQuery {
             contextRootEntity,
         )
     }
-
-    constructor(public entityName: string, public map: EntityToTableMap, public matchExpression: MatchExpression, public attributeQuery: AttributeQuery, public modifier: Modifier, public contextRootEntity?: string) {
-    }
-
+    constructor(public entityName: string, public map: EntityToTableMap, public matchExpression: MatchExpression, public attributeQuery: AttributeQuery, public modifier: Modifier, public contextRootEntity?: string) {}
     derive(derived: EntityQueryDerivedData) {
         return new RecordQuery(
             this.entityName,

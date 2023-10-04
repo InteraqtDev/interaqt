@@ -105,30 +105,32 @@ SELECT * from Profile_User_Item
         const relationName = entityQueryHandle.getRelationName('User', 'friends')
 
         const match1 = MatchExpression.createFromAtom({
-            key: 'source.name',
+            key: 'target.name',
             value: ['=', 'aaa']
         })
         const result1 = await entityQueryHandle.findRelationByName(relationName, match1, undefined, [['source', { attributeQuery: ['name', 'age']}], ['target', {attributeQuery: ['name', 'age']}]])
         //
         expect( result1.length).toBe(2)
-        expect( result1[0].source.name).toBe('aaa')
-        expect( result1[0].target.name).toBe('bbb')
-        expect( result1[1].source.name).toBe('aaa')
-        expect( result1[1].target.name).toBe('ccc')
+        expect( result1[0].target.name).toBe('aaa')
+        expect( result1[0].source.name).toBe('bbb')
+        expect( result1[1].target.name).toBe('aaa')
+        expect( result1[1].source.name).toBe('ccc')
         //
         const match2 = MatchExpression.createFromAtom({
-            key: 'source.name',
+            key: 'target.name',
             value: ['=', 'aaa']
         }).and({
-            key: 'target.name',
+            key: 'source.name',
             value: ['=', 'bbb']
         })
-        //
+        // 把 bbb 的关系删除
         await entityQueryHandle.removeRelationByName(relationName, match2)
+        // 重新用 match1 查找，应该就只剩 ccc 了
         const result2 = await entityQueryHandle.findRelationByName(relationName, match1, undefined, [['source', { attributeQuery: ['name', 'age']}], ['target', {attributeQuery: ['name', 'age']}]])
         expect( result2.length).toBe(1)
-        expect( result2[0].source.name).toBe('aaa')
-        expect( result2[0].target.name).toBe('ccc')
+        console.log(result2)
+        expect( result2[0].source.name).toBe('ccc')
+        expect( result2[0].target.name).toBe('aaa')
     })
 
 

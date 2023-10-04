@@ -65,6 +65,19 @@ export const createCommonData = () => {
         relType: '1:1'
     })
 
+    const teamEntity = Entity.create({ name: 'Team'})
+    const teamProperty = Property.create({ name: 'teamName', type: PropertyTypes.String })
+    teamEntity.properties.push(teamProperty)
+
+    Relation.create({
+        entity1: userEntity,
+        targetName1: 'teams',
+        entity2: teamEntity,
+        targetName2: 'members',
+        relType: 'n:n'
+    })
+
+
     const entities = [...Entity.instances]
     const relations = [...Relation.instances]
 

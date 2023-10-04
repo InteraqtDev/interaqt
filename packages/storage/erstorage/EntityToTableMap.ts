@@ -174,12 +174,19 @@ export class LinkInfo {
     get table (){
         return this.record.table
     }
+    // CAUTION sourceField 指的的是 target 在source 表中的名字！
     get sourceField() {
-        // CAUTION sourceField 指的的是 target 在source 表中的名字！
         return this.record.attributes.target.field
     }
+    // CAUTION sourceField 指的的是 target 在source 表中的名字！
     get targetField() {
         return this.record.attributes.source.field
+    }
+    get sourceAttrField() {
+        return this.record.attributes.source.field
+    }
+    get targetAttrField() {
+        return this.record.attributes.target.field
     }
     isMerged() {
         return !!this.data.mergedTo
