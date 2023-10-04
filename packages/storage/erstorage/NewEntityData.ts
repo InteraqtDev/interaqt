@@ -43,8 +43,8 @@ export class NewEntityData {
             } else {
                 // 有 field 说明是关系表合并到了当前实体表，一起处理
                 if (newRelatedEntityData.info!.field) {
-                    if (newRelatedEntityData.isRef()) {
-                        this.sameRowEntityValuesAndRefFields.push([newRelatedEntityData.info!.field, newRelatedEntityData.getRef().id])
+                    if (newRelatedEntityData.isRef() || newRelatedEntityData.isNull()) {
+                        this.sameRowEntityValuesAndRefFields.push([newRelatedEntityData.info!.field, newRelatedEntityData.isRef() ? newRelatedEntityData.getRef().id : null])
                     } else {
                         // 没有 id 的说明要单独新建
                         this.holdFieldNewRelatedEntities.push(newRelatedEntityData)
@@ -53,23 +53,18 @@ export class NewEntityData {
 
                     // 把 hold 我的 field 的 record 识别出来。
                     const linkInfo = newRelatedEntityData.info!.getLinkInfo()
-                    if (linkInfo.isRecordSource(this.recordName) ? linkInfo.isMergedToTarget() : linkInfo.isMergedToSource()) {
+                    if (linkInfo.isRelationSource(this.recordName, newRelatedEntityData.info!.attributeName) ? linkInfo.isMergedToTarget() : linkInfo.isMergedToSource()) {
                         this.holdMyFieldRelatedEntities.push(newRelatedEntityData)
                     } else {
                         // 完全没合表的
                         this.differentTableEntitiesData.push(newRelatedEntityData)
                     }
-
-
                 }
             }
         })
 
     }
 
-    derive(newRawData: RawEntityData) {
-        return new NewEntityData(this.map, this.recordName, newRawData, this.info)
-    }
 
     merge(partialNewRawData: RawEntityData) {
         return new NewEntityData(this.map, this.recordName, {...this.rawData, ...partialNewRawData}, this.info)
@@ -91,6 +86,10 @@ export class NewEntityData {
 
     isRef() {
         return !!(this.info?.isRecord && this.rawData?.id !== undefined)
+    }
+
+    isNull() {
+        return this.rawData === null
     }
 
     getIdField() {

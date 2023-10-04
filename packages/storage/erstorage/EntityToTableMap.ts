@@ -100,13 +100,8 @@ export class AttributeInfo {
     get linkName() {
         return (this.data as RecordAttribute).linkName
     }
-    isMergedTo(entityToMatch: string) {
-        assert(this.isRecord, `${this.attributeName} is not a entity`)
-        // CAUTION 如果是同一实体，表相同，但逻辑上不是合表，所以这里要排除掉。
-        return this.entityName !== entityToMatch && this.table === this.map.getRecordTable(entityToMatch)
-    }
     isMergedWithParent() {
-        return this.isMergedTo(this.parentEntityName)
+        return this.getLinkInfo().isCombined()
     }
     getReverseInfo() {
         const reverseAttribute = this.map.getReverseAttribute(this.parentEntityName, this.attributeName)
@@ -200,11 +195,11 @@ export class LinkInfo {
     isCombined() {
         return this.data.mergedTo === 'combined'
     }
-    isRecordSource(recordName:string) {
-        return this.data.sourceRecord === recordName
+    isRelationSource(recordName: string, attribute: string) {
+        return this.data.sourceRecord === recordName && this.data.sourceAttribute === attribute
     }
-    getAttributeName(recordName: string) {
-        return this.isRecordSource(recordName) ? ['source', 'target'] : ['target', 'source']
+    getAttributeName(recordName: string, attribute: string) {
+        return this.isRelationSource(recordName, attribute) ? ['source', 'target'] : ['target', 'source']
     }
 }
 
@@ -333,17 +328,19 @@ export class EntityToTableMap {
         let relationTable:string
         let relationTableAlias:string
         let isLastRelationSource = true
-        let currentRelationData: LinkMapItem
+        let currentLink: LinkMapItem
 
         for(let i = 0; i<relationPath.length; i++) {
             const currentAttributeName = relationPath[i]
             const currentEntityAttribute = lastEntityData.attributes[currentAttributeName] as RecordAttribute
             assert(currentEntityAttribute.isRecord, `${relationPath.slice(0, i+1).join('.')} is not a entity attribute`)
 
+            currentLink = this.data.links[currentEntityAttribute.linkName]
             const currentEntityData = this.data.records[currentEntityAttribute.recordName] as RecordMapItem
 
-            // CAUTION 如果表不相同（说明没有合表），就有新的 join，就能取新名字。或者 实体相同，说明关系指向了同一种实体，这是无法合表的，也按照 join 处理。
-            if (currentEntityData === lastEntityData || currentEntityData.table !== lastTable) {
+
+            // CAUTION 只要不是合表的，就要生成新的 alias.
+            if (currentLink.mergedTo !== 'combined') {
                 // CAUTION alias name 要用 namePath，把 rootEntityName 也加上
                 lastTableAlias = namePath.slice(0, i+2).join('_')
             }
@@ -352,16 +349,16 @@ export class EntityToTableMap {
 
             // TODO 找到 relationTable ，生成 relationTableName
             // relation table 有三种情况： 独立的/往n 方向合表了，与 1:1 合成一张表了。
-            currentRelationData = this.data.links[currentEntityAttribute.linkName]
-            relationTable = currentRelationData.table
+
+            relationTable = currentLink.table
             // relationTable 的 alias 始终保持和 tableAlias 一致的规律
             relationTableAlias = `REL__${lastTableAlias}`
-            isLastRelationSource = currentRelationData.targetRecord === currentEntityAttribute.recordName &&
-                currentRelationData.targetAttribute === currentAttributeName
+            isLastRelationSource = currentLink.targetRecord === currentEntityAttribute.recordName &&
+                currentLink.targetAttribute === currentAttributeName
         }
 
 
-        return [lastTable, lastTableAlias, lastEntityData, relationTable!, relationTableAlias!, currentRelationData!]
+        return [lastTable, lastTableAlias, lastEntityData, relationTable!, relationTableAlias!, currentLink!]
     }
     getTableAliasAndFieldName(namePath: string[], attributeName: string) {
         const [, lastTableAliasName,lastEntityData] = this.getTableAndAlias(namePath)

@@ -23,7 +23,6 @@ describe('match expression test', () => {
                 profile: {}
             }
         })
-
     });
 })
 

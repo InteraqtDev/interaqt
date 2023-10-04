@@ -8,7 +8,6 @@ const entityToTableMap = new EntityToTableMap(entityToTableMapData)
 
 describe('attribute query test', () => {
     test("basic attribute query", () => {
-
         const queryData: AttributeQueryData = [
             'name',
             'age',
@@ -117,5 +116,26 @@ describe('attribute query test', () => {
             }
         ])
     });
+
+    test("relation attributeQuery", () => {
+        const attributeQuery = new AttributeQuery('User_leader_member_User', entityToTableMap,
+            ['source', 'target'])
+
+        expect(attributeQuery.getQueryFields()).toMatchObject([
+            {
+                tableAliasAndField: [ "User_leader_member_User", "_rowId" ],
+                nameContext: [ "User_leader_member_User" ],
+                attribute: "id"
+            }, {
+                tableAliasAndField: [ "User_leader_member_User", "User_id" ],
+                nameContext: [ "User_leader_member_User", "source" ],
+                attribute: "id"
+            }, {
+                tableAliasAndField: [ "User_leader_member_User_target", "User_id" ],
+                nameContext: [ "User_leader_member_User", "target" ],
+                attribute: "id"
+            }
+        ])
+    })
 })
 
