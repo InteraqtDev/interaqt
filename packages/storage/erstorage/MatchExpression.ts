@@ -83,7 +83,7 @@ export class MatchExpression {
             fieldValue = `${value[0]} ${isReferenceValue ? this.getReferenceFieldValue(value[1]) : JSON.stringify(value[1])}`
         } else if (value[0].toLowerCase() === 'in') {
             assert(!isReferenceValue, 'reference value cannot use IN to match')
-            fieldValue = `IN [${value[1].map((x: any) => JSON.stringify(x)).join(',')}]`
+            fieldValue = `IN (${value[1].map((x: any) => JSON.stringify(x)).join(',')})`
         } else if (value[0].toLowerCase() === 'between') {
             fieldValue = `BETWEEN ${isReferenceValue ? this.getReferenceFieldValue(value[1][0]) : JSON.stringify(value[1][0])} AND ${isReferenceValue ? this.getReferenceFieldValue(value[1][1]) : JSON.stringify(value[1][1])}]`
         } else {

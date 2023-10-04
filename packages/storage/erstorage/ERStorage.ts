@@ -241,7 +241,9 @@ ${this.buildFindQuery(existEntityQuery, currentAlias)}
 `
                 }
             } else {
-                return {...exp.data}
+                return {
+                    ...exp.data,
+                }
             }
         })
     }
@@ -324,7 +326,7 @@ VALUES
 
         assert(!!idValue &&!!idValue, `${idField} ${idValue} can be null`)
 
-        const updated = (await this.database.update(`
+        const updated = columns.length && (await this.database.update(`
 UPDATE ${tableName}
 SET
 ${columns.map((column, index) => (`
@@ -427,7 +429,7 @@ ${idField} = ${idValue}
 
 
     // CAUTION 除了 1:1 并且合表的关系，不能递归更新 relatedEntity，如果是传入了，说明是建立新的关系。
-    async updateRecordData(entityName: string, matchExpressionData: MatchExpressionData, columnAndValue: {field:string, value:string}[])  {
+    async updateRecordData(entityName: string, matchExpressionData: MatchExpressionData, columnAndValue: {field:string, value:string}[]): Promise<EntityIdRef[]>  {
         // TODO 要更新拆表出去的 field
         const matchedEntities = await this.findRecords(RecordQuery.create(entityName, this.map, {
             matchExpression: matchExpressionData,
@@ -436,14 +438,14 @@ ${idField} = ${idValue}
         const idField= this.map.getInfo(entityName, 'id').field
 
 // CAUTION update 语句可以有 别名和 join，但似乎 SET 里面不能用主表的 别名!!!
-        return this.database.update(`
+        return columnAndValue.length ? await this.database.update(`
 UPDATE ${this.map.getRecordTable(entityName)}
 SET
 ${columnAndValue.map(({field, value}) => `
 ${field} = ${value}
 `).join(',')}
 WHERE ${idField} IN (${matchedEntities.map(i => JSON.stringify(i.id)).join(',')})
-`, idField)
+`, idField) : []
     }
     // 只有 1:1 关系可以递归更新实体数据，其他都能改当前实体的数据或者和其他实体关系。
     async updateRecord(entityName: string, matchExpressionData: MatchExpressionData, newEntityData: NewEntityData)  {
@@ -462,22 +464,34 @@ WHERE ${idField} IN (${matchedEntities.map(i => JSON.stringify(i.id)).join(',')}
         //     assert(updatedEntities.length === 1 && updatedEntities[0].id === newEntityData.reuseEntityId, `updated multiple records with only 1 1:1 related entity, ${updatedEntities[0].id} ${newEntityData.reuseEntityId}` )
         // }
 
-        // 除了一下和其他实体更新关系的情况。
+
+        // CAUTION 这里的语义认为是 replace。如果用户想表达新增，自己拆成两步进行。
+        // CAUTION 由于 xToMany 的数组情况会平铺，所以这里可能出现两次，所以这里记录一下排重
+        const removedLinkName = new Set()
+        for(let newRelatedEntityData of newEntityData.differentTableEntitiesData) {
+            const linkInfo = newRelatedEntityData.info!.getLinkInfo()
+            if (removedLinkName.has(linkInfo.name)) {
+                continue
+            }
+
+            removedLinkName.add(linkInfo.name)
+            const updatedEntityLinkAttr = linkInfo.isRecordSource(entityName) ? 'source' : 'target'
+            for(let updatedEntity of updatedEntities) {
+                // FIXME 需要正对 xToOne 并且 关系表往自身合的情况加速一下，因为下面的 addLinkFromRecord 本来就会覆盖。
+                await this.unlink(linkInfo.name, MatchExpression.createFromAtom({
+                    key: `${updatedEntityLinkAttr}.id`,
+                    value: ['=', updatedEntity.id]
+                }))
+            }
+        }
+
+
+
+        // 处理和其他实体更新关系的情况。
         for(let newRelatedEntityData of newEntityData.differentTableEntitiesData) {
             // 这里只处理没有三表合并的场景。因为三表合并的数据在 sameTableFieldAndValues 已经有了
             // 这里只需要处理 1）关系表独立 或者 2）关系表往另一个方向合了的情况。因为往本方向和的情况已经在前面 updateEntityData 里面处理了
 
-            // 我们永远只允许 1:1 关系创建/更新连带数据。这里验证一下。
-            assert(!!(newRelatedEntityData.isRef() || newRelatedEntityData.info?.isOneToOne) , `cannot update/create non-1:1 related ${newRelatedEntityData.info?.attributeName}`)
-
-
-            if (newRelatedEntityData.info?.isXToMany) {
-                // CAUTION  x:n 的情况让用户自己再次调用。因为这里的语义很难确定是要新增，还是 replace 掉原来所有的关系。
-                assert(false, 'cannot update x:n relation because of ambiguous goal.')
-            }
-
-            // 剩下都是 xToOne 的情况了
-            // CAUTION 我们不支持抢夺别人的 1:1 related entity 的情况
             let finalRelatedEntityRef
 
             if (newRelatedEntityData.isRef()) {
@@ -499,12 +513,13 @@ WHERE ${idField} IN (${matchedEntities.map(i => JSON.stringify(i.id)).join(',')}
         const combinedRecordIdFields = recordInfo.combinedRecords.map(info => {
             return [info.attributeName!, { attributeQuery: ['id']}] as [string, EntityQueryData]
         })
-        const records = await this.findRecords(
-            RecordQuery.create(recordName, this.map, {
-                matchExpression: matchExp,
-                attributeQuery: ['id', ...combinedRecordIdFields]
-            })
-        )
+
+        const deleteQuery =RecordQuery.create(recordName, this.map, {
+            matchExpression: matchExp,
+            attributeQuery: ['id', ...combinedRecordIdFields]
+        })
+
+        const records = await this.findRecords(deleteQuery)
 
 
         const deleteRowIds =[]
@@ -526,7 +541,7 @@ WHERE ${idField} IN (${matchedEntities.map(i => JSON.stringify(i.id)).join(',')}
             await this.database.query(`
 DELETE FROM ${this.map.getRecordTable(recordName)}
 WHERE
-${recordInfo.idField} IN (${deleteRowIds})
+${recordInfo.idField} IN (${deleteRowIds.map(i => JSON.stringify(i)).join(',')})
 `)
         }
 
@@ -544,7 +559,7 @@ ${field} = NULL
 `)}
 
 WHERE
-${recordInfo.idField} IN (${updateRowIds})
+${recordInfo.idField} IN (${updateRowIds.map(i => JSON.stringify(i)).join(',')})
 `)
         }
 
@@ -763,7 +778,7 @@ VALUES
     }
 
     // FIXME 能不能复用 delete record
-    async removeLink(relationName: string, matchExpressionData: MatchExpressionData,) {
+    async removeLink(relationName: string, matchExpressionData: MatchExpressionData,):Promise<EntityIdRef[]> {
         const relationRecords = await this.findRecords(RecordQuery.create(relationName, this.map, {
             matchExpression: matchExpressionData,
             attributeQuery: [['source', {attributeQuery: ['id']}], ['target', {attributeQuery: ['id']}]]
@@ -775,21 +790,21 @@ VALUES
         assert(!linkInfo.isCombined(), `remove 1:1 with combined entity is not implemented yet ${relationName}`)
         if (!linkInfo.isMerged()) {
             // 独立的表
-            return this.query(`
+            return relationRecords.length ? await this.query(`
 DELETE FROM ${this.map.getRecordTable(relationName)}
 WHERE ${idField} IN (${relationRecords.map(({id}) => JSON.stringify(id)).join(',')})
-`)
+`) : []
         } else {
             // 合并的表
             const table =  this.map.getRecordTable(linkInfo.isMergedToSource() ? linkInfo.sourceRecord : linkInfo.targetRecord)
             // 记录的 field
             const field = linkInfo.isMergedToSource() ? linkInfo.sourceField : linkInfo.targetField
-            return this.query(`
+            return relationRecords.length ? await  this.query(`
 UPDATE ${table}
 SET
 ${field} = NULL
 WHERE ${idField} IN (${relationRecords.map(({id}) => JSON.stringify(id)).join(',')})
-`)
+`) : []
         }
 
     }
@@ -845,8 +860,8 @@ export class EntityQueryHandle {
 
     }
 
-    async delete() {
-
+    async delete(entityName: string, matchExpressionData: MatchExpressionData, ) {
+        return this.agent.deleteRecord(entityName, matchExpressionData)
     }
 
     async count() {

@@ -58,37 +58,157 @@ describe('many to many', () => {
             ['name', 'age', ['teams', { attributeQuery: ['teamName']}]]
         )
 
-
-        // console.log(await entityQueryHandle.database.query(`select * from User_teams_members_Team`))
-        // console.log(await entityQueryHandle.find('User_teams_members_Team', undefined, undefined, ['source', 'target']))
-
-
-        // console.log(findUser)
         expect(findUser).toMatchObject(rawData)
 
     })
 
     test('create many to many data:create with existing related', async () => {
-        const userA = await entityQueryHandle.create('User', {name: 'aaa', age: 17})
-        const teamA = await entityQueryHandle.create('Team', {teamName: 'teamA'})
-        const teamB = await entityQueryHandle.create('Team', {teamName: 'teamA'})
+        const teamA = await entityQueryHandle.create('Team', {teamName: 't1'})
+        const teamB = await entityQueryHandle.create('Team', {teamName: 't2'})
+
+        const userA = await entityQueryHandle.create('User', {name: 'aaa', age: 17, teams: [teamA, teamB]})
+        const findUser = await entityQueryHandle.findOne(
+            'User',
+            MatchExpression.createFromAtom({ key: 'id', value: ['=', userA.id]}), {},
+            ['name', 'age', ['teams', { attributeQuery: ['teamName']}]]
+        )
+
+        expect(findUser).toMatchObject({
+            name: 'aaa',
+            age: 17,
+            teams: [{
+                teamName: 't1'
+            }, {
+                teamName: 't2'
+            }]
+        })
     })
 
 
     test('delete many to many data:delete self', async () => {
+        const rawData = {
+            name: 'aaa',
+            age: 17,
+            teams: [{
+                teamName: 't1'
+            }, {
+                teamName: 't2'
+            }]
+        }
+
+        const userA = await entityQueryHandle.create('User', rawData)
+        await entityQueryHandle.delete('User', MatchExpression.createFromAtom({
+            key: 'id',
+            value: ['=', userA.id]
+        }))
+
+
+        const findUser = await entityQueryHandle.find(
+            'User',
+            MatchExpression.createFromAtom({ key: 'id', value: ['=', userA.id]}), {},
+            ['name', 'age']
+        )
+        expect(findUser.length).toBe(0)
+
+        const findRelation = await entityQueryHandle.find('User_friends_friends_User')
+        expect(findRelation.length).toBe(0)
     })
 
 
     test('update many to many data:update self', async () => {
+        const rawData = {
+            name: 'aaa',
+            age: 17,
+            teams: [{
+                teamName: 't1'
+            }, {
+                teamName: 't2'
+            }]
+        }
 
+        const userA = await entityQueryHandle.create('User', rawData)
+        await entityQueryHandle.update('User', MatchExpression.createFromAtom({
+            key: 'id',
+            value: ['=', userA.id]
+        }), { name: 'bbb'})
+
+        const findUser = await entityQueryHandle.find(
+            'User',
+            MatchExpression.createFromAtom({ key: 'id', value: ['=', userA.id]}), {},
+            ['name', 'age']
+        )
+        expect(findUser.length).toBe(1)
+        expect(findUser[0].name).toBe('bbb')
     })
 
-    test('update many to many data:update with new related', async () => {
 
+    test('update many to many data:update with new related', async () => {
+        const rawData = {
+            name: 'aaa',
+            age: 17,
+        }
+
+        const userA = await entityQueryHandle.create('User', rawData)
+
+        await entityQueryHandle.update('User', MatchExpression.createFromAtom({
+            key: 'id',
+            value: ['=', userA.id]
+        }),
+        {
+            name: 'bbb',
+            teams: [{
+                teamName: 't1'
+            }, {
+                teamName: 't2'
+            }]
+        })
+
+        const findUser = await entityQueryHandle.findOne(
+            'User',
+            MatchExpression.createFromAtom({ key: 'id', value: ['=', userA.id]}), {},
+            ['name', 'age', ['teams', { attributeQuery: ['teamName']}]]
+        )
+
+        expect(findUser).toMatchObject({
+            name: 'bbb',
+            age: 17,
+            teams: [{
+                teamName: 't1'
+            }, {
+                teamName: 't2'
+            }]
+        })
     })
 
     test('update many to many data:update with existing related', async () => {
+        const teamA = await entityQueryHandle.create('Team', {teamName: 't1'})
+        const teamB = await entityQueryHandle.create('Team', {teamName: 't2'})
 
+        const userA = await entityQueryHandle.create('User', {name: 'aaa', age: 17, teams: [teamA, teamB]})
+        await entityQueryHandle.update('User', MatchExpression.createFromAtom({
+                key: 'id',
+                value: ['=', userA.id]
+            }),
+            {
+                name: 'bbb',
+                teams: [teamA,teamB]
+            })
+
+        const findUser = await entityQueryHandle.findOne(
+            'User',
+            MatchExpression.createFromAtom({ key: 'id', value: ['=', userA.id]}), {},
+            ['name', 'age', ['teams', { attributeQuery: ['teamName']}]]
+        )
+
+        expect(findUser).toMatchObject({
+            name: 'bbb',
+            age: 17,
+            teams: [{
+                teamName: 't1'
+            }, {
+                teamName: 't2'
+            }]
+        })
     })
 })
 

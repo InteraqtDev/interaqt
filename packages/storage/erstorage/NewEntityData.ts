@@ -17,18 +17,18 @@ export class NewEntityData {
     public sameRowEntityIdRefs: NewEntityData[] = []
 
     constructor(public map: EntityToTableMap, public recordName: string, public rawData: RawEntityData, public info?: AttributeInfo) {
-        const [valueAttributesInfo, entityAttributesInfo] = this.map.groupAttributes(recordName, Object.keys(rawData))
+        const [valueOrRefAttributesInfo, entityAttributesInfo] = this.map.groupAttributes(recordName, rawData ? Object.keys(rawData) : [])
         this.relatedEntitiesData = flatten(entityAttributesInfo.map(info =>
             Array.isArray(rawData[info.attributeName]) ?
                 rawData[info.attributeName].map(i => new NewEntityData(this.map, info.entityName, i, info)):
                 new NewEntityData(this.map, info.entityName, rawData[info.attributeName], info)
         ))
 
-        this.valueAttributes = valueAttributesInfo.map(info => {
+        this.valueAttributes = valueOrRefAttributesInfo.map(info => {
             return [info.attributeName!, rawData[info.attributeName]]
         })
         // TODO 要把那些独立出去的 field 排除出去。
-        this.sameRowEntityValuesAndRefFields = valueAttributesInfo.map(info => [info.field, rawData[info.attributeName]])
+        this.sameRowEntityValuesAndRefFields = valueOrRefAttributesInfo.map(info => [info.field, rawData[info.attributeName]])
         this.relatedEntitiesData.forEach(newRelatedEntityData => {
             // CAUTION 三表合一的情况（需要排除掉关系的 source、target 是同一实体的情况，这种情况下不算合表）
             if (newRelatedEntityData.info!.isMergedWithParent()) {
@@ -90,7 +90,7 @@ export class NewEntityData {
     }
 
     isRef() {
-        return !!(this.info?.isRecord && this.rawData["id"] !== undefined)
+        return !!(this.info?.isRecord && this.rawData?.id !== undefined)
     }
 
     getIdField() {

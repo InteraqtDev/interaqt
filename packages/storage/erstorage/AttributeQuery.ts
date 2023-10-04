@@ -44,7 +44,8 @@ export class AttributeQuery {
     }
 
     getQueryFields(nameContext = [this.entityName]): { tableAliasAndField: [string, string], nameContext: string[], attribute: string }[] {
-        const queryFields = ['id'].concat(this.valueAttributes).map(attributeName => ({
+        const queryAttributes = this.valueAttributes.includes('id') ? this.valueAttributes : ['id'].concat(this.valueAttributes)
+        const queryFields = queryAttributes.map(attributeName => ({
             tableAliasAndField: this.map.getTableAliasAndFieldName(nameContext, attributeName).slice(0, 2) as [string, string],
             nameContext,
             attribute: attributeName
