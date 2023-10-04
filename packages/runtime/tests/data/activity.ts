@@ -134,7 +134,7 @@ export const MyFriend = UserAttributive.createReactive({
     stringContent: `
 async function MyFriend(target, { user }){
     const linkInfo = this.system.storage.queryHandle.map.getLinkInfo('User', 'friends')
-    const [entityAttrName, attrAttrName] = linkInfo.getAttributeName('User')  
+    const [entityAttrName, attrAttrName] = linkInfo.getAttributeName('User', 'friends')  
     
     const match = this.system.storage.queryHandle.createMatchFromAtom({
         key: \`\${entityAttrName}.id\`, 

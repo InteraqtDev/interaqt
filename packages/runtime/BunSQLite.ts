@@ -8,17 +8,20 @@ export class SQLiteDB implements Database{
         this.db = new SQLite(file, options)
     }
     query= (sql:string) => {
-        console.log('query', sql)
+        console.log('query==============')
+        console.log(sql)
         const result = this.db.query(sql).all() as any[]
         return Promise.resolve(result)
     }
     update = (sql:string, idField?:string) => {
-        console.log('update', sql)
+        console.log('update=============')
+        console.log(sql)
         const result = this.db.query(`${sql} RETURNING ${ROW_ID_ATTR} ${idField ? `, ${idField} AS id`: ''}`).all() as any[]
         return Promise.resolve(result)
     }
     insert= (sql:string) => {
-        console.log('insert', `${sql} RETURNING ${ROW_ID_ATTR}`)
+        console.log('insert==============')
+        // console.log(`${sql} RETURNING ${ROW_ID_ATTR}`)
         const { id } = this.db.query(`${sql} RETURNING ${ROW_ID_ATTR}`).get() as EntityIdRef
         return Promise.resolve( {id} as EntityIdRef)
     }

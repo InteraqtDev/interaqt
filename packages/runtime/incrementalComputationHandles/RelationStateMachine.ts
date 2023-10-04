@@ -76,7 +76,6 @@ export class RelationStateMachineHandle extends RelationIncrementalComputationHa
             // TODO 继续过滤掉 符合当前 relation 状态的 pair 。
             for(let sourceAndTargetPair of sourceAndTargetPairs) {
 
-
                 const [sourceRef, targetRef] = sourceAndTargetPair
                 const currentState = transfer.fromState
                 const nextState = transfer.toState
@@ -101,6 +100,8 @@ export class RelationStateMachineHandle extends RelationIncrementalComputationHa
                     })
 
                     const matchedRelation = await this.controller.system.storage.findOneRelationByName(relationName, relationMatch)
+                    console.log(await this.controller.system.storage.queryHandle.database.query(`select * from User_friends_friends_User`))
+                    console.log(222222222222222, sourceAndTargetPair, relationName, relationMatch.raw)
                     if (matchedRelation) {
                         const matchExp = {
                             key: 'id',
@@ -109,6 +110,7 @@ export class RelationStateMachineHandle extends RelationIncrementalComputationHa
 
                         if(!nextState.hasRelation) {
                             // 转移成删除
+
                             await this.controller.system.storage.removeRelationByName(relationName, MatchExpression.createFromAtom(matchExp))
                         } else {
                             // TODO 除了 fixedProperties 还有 propertyHandle 来计算 动态的 property
@@ -124,6 +126,7 @@ export class RelationStateMachineHandle extends RelationIncrementalComputationHa
                         // 没有数据才说明匹配
                         // 转移 变成有
                         const nextAttributes = Object.fromEntries(nextState.fixedProperties.map(p => ([p.name, p.value])))
+                        console.log(111111111111, sourceRef, targetRef, )
                         await this.controller.system.storage.addRelationByNameById(relationName, sourceRef.id, targetRef.id, nextAttributes)
                     } else {
                     }

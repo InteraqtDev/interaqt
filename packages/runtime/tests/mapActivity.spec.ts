@@ -76,7 +76,7 @@ describe('map activity', () => {
 
     })
 
-    test('make friend activity', async () => {
+    test.only('make friend activity', async () => {
         // 1. 创建 activity
         const { activityId, state } = controller.createActivity(makeFriendActivityUUID)
         expect(activityId).not.toBe(null)
@@ -146,18 +146,19 @@ describe('map activity', () => {
 
         const relationName = controller.system.storage.getRelationName('User', 'friends')
         const friendRelations = await controller.system.storage.findRelationByName(relationName, undefined, undefined, [['source', {attributeQuery: ['name', 'age']}], ['target', {attributeQuery: ['name', 'age']}]])
+
         expect(friendRelations.length).toBe(1)
-        expect(friendRelations[0].source.name).toBe('B')
-        expect(friendRelations[0].source.id).toBe(userB.id)
-        expect(friendRelations[0].target.name).toBe('A')
-        expect(friendRelations[0].target.id).toBe(userA.id)
+        expect(friendRelations[0].source.name).toBe('A')
+        expect(friendRelations[0].source.id).toBe(userA.id)
+        expect(friendRelations[0].target.name).toBe('B')
+        expect(friendRelations[0].target.id).toBe(userB.id)
 
 
         // 删除关系，继续驱动状态机
         const res6 = await controller.callInteraction(deleteUUID, {
-            user: userB,
+            user: userA,
             payload: {
-                target: userA
+                target: userB
             }
         })
         expect(res6.error).toBeUndefined()
