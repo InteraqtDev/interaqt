@@ -134,7 +134,59 @@ describe('one to one', () => {
 
 
     test('update data:update self with new related on combined table', async () => {
+        const userA = await entityQueryHandle.create(
+            'User', {
+                name:'a1',
+                age:12,
+                profile: {
+                    title: 'f1'
+                }
+            })
 
+
+        await entityQueryHandle.update('User',
+            MatchExpression.createFromAtom({ key: 'id', value: ['=', userA.id]}),
+            { profile: { title: 'f2'} }
+        )
+
+        const findUser = await entityQueryHandle.findOne('User',
+            MatchExpression.createFromAtom({ key: 'id', value: ['=', userA.id]}),
+            {},
+            ['name', 'age', ['profile', {attributeQuery: ['title']}]]
+        )
+
+        expect(findUser.name).toBe('a1')
+        expect(findUser.profile.title).toBe('f2')
+
+        const findProfiles = await entityQueryHandle.find('Profile',
+            MatchExpression.createFromAtom({ key: 'title', value: ['=', 'f2']}),
+            {},
+            ['title', ['owner', {attributeQuery: ['name']}]]
+        )
+        expect(findProfiles.length).toBe(1)
+        expect(findProfiles[0]).toMatchObject({
+            title: 'f2',
+            owner: {
+                name: 'a1'
+            }
+        })
+
+
+
+        const findProfiles2 = await entityQueryHandle.find('Profile',
+            MatchExpression.createFromAtom({ key: 'title', value: ['=', 'f1']}),
+            {},
+            ['title', ['owner', {attributeQuery: ['name']}]]
+        )
+
+        expect(findProfiles2.length).toBe(1)
+        expect(findProfiles2[0]).toMatchObject({
+            title: 'f1',
+            owner: {
+                id: null,
+                name: null,
+            }
+        })
     })
 
 
@@ -147,8 +199,7 @@ describe('one to one', () => {
                     title: 'f1'
                 }
             })
-
-
+        console.log(await entityQueryHandle.database.query('select * from Profile_User_Item'))
         const profileA = await entityQueryHandle.create('Profile', {title:'f2'})
 
         await entityQueryHandle.update('User',
@@ -161,6 +212,7 @@ describe('one to one', () => {
             {},
             ['name', 'age', ['profile', {attributeQuery: ['title']}]]
         )
+
 
         expect(findUser.name).toBe('a1')
         expect(findUser.profile.id).toBe(profileA.id)

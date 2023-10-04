@@ -430,11 +430,8 @@ ${idField} = ${idValue}
 
 
     // CAUTION 除了 1:1 并且合表的关系，不能递归更新 relatedEntity，如果是传入了，说明是建立新的关系。
-    async updateRecordData(entityName: string, matchExpressionData: MatchExpressionData, columnAndValue: {field:string, value:string}[]): Promise<EntityIdRef[]>  {
+    async updateRecordDataByIds(entityName: string, idRefs: {id:string}[], columnAndValue: {field:string, value:string}[]): Promise<EntityIdRef[]>  {
         // TODO 要更新拆表出去的 field
-        const matchedEntities = await this.findRecords(RecordQuery.create(entityName, this.map, {
-            matchExpression: matchExpressionData,
-        }))
 
         const idField= this.map.getInfo(entityName, 'id').field
 
@@ -446,11 +443,11 @@ SET
 ${columnAndValue.map(({field, value}) => `
 ${field} = ${value}
 `).join(',')}
-WHERE ${idField} IN (${matchedEntities.map(i => JSON.stringify(i.id)).join(',')})
+WHERE ${idField} IN (${idRefs.map(i => JSON.stringify(i.id)).join(',')})
 `, idField)
         }
         // 注意这里，使用要返回匹配的类，虽然可能没有更新数据。这样才能保证外部的逻辑比较一致。
-        return matchedEntities
+        return idRefs
     }
     // 只有 1:1 关系可以递归更新实体数据，其他都能改当前实体的数据或者和其他实体关系。
     async updateRecord(entityName: string, matchExpressionData: MatchExpressionData, newEntityData: NewEntityData)  {
@@ -468,8 +465,31 @@ WHERE ${idField} IN (${matchedEntities.map(i => JSON.stringify(i.id)).join(',')}
         Object.assign(newRefIds, holdFieldRelatedEntityIdRefs)
 
 
+
+        const matchedEntities = await this.findRecords(RecordQuery.create(entityName, this.map, {
+            matchExpression: matchExpressionData,
+        }))
+
+        // 跟自己合表的必须先删除，不然下面 updateRecordData 的时候可能冲掉了。
+        const sameRoleEntityRefOrNewData = newEntityData.sameRowEntityIdRefs.concat(newEntityData.sameRowNewEntitiesData)
+        for(let newRelatedEntityData of sameRoleEntityRefOrNewData) {
+            const linkInfo = newRelatedEntityData.info!.getLinkInfo()
+            const updatedEntityLinkAttr = linkInfo.isRelationSource(entityName, newRelatedEntityData.info!.attributeName) ? 'source' : 'target'
+            for(let updatedEntity of matchedEntities) {
+                await this.unlink(
+                    linkInfo.name,
+                    MatchExpression.createFromAtom({
+                        key: `${updatedEntityLinkAttr}.id`,
+                        value: ['=', updatedEntity.id],
+                    }),
+                    !linkInfo.isRelationSource(entityName, newRelatedEntityData.info!.attributeName)
+                )
+            }
+        }
+
         // 2. 先更新自身的 value 和 三表合一 或者 关系表合并的情况
-        const columnAndValue = newEntityData.merge(holdFieldRelatedEntityIdRefs).sameRowEntityValuesAndRefFields.map(([field, value]) => (
+        const allSameRowData = newEntityData.merge(holdFieldRelatedEntityIdRefs).sameRowEntityValuesAndRefFields
+        const columnAndValue = allSameRowData.map(([field, value]) => (
             {
                 field,
                 /// TODO value 要考虑引用自身或者 related entity 其他 field 的情况？例如 age+5
@@ -477,10 +497,7 @@ WHERE ${idField} IN (${matchedEntities.map(i => JSON.stringify(i.id)).join(',')}
             }
         ))
 
-
-
-
-        const updatedEntities = await this.updateRecordData(entityName, matchExpressionData, columnAndValue)
+        await this.updateRecordDataByIds(entityName, matchedEntities.map(e => ({id:e.id})), columnAndValue)
         // FIXME 这里验证一下三表合一情况下的数据正确性
         // if(newEntityData.sameRowEntityIds.length) {
         //     assert(updatedEntities.length === 1 && updatedEntities[0].id === newEntityData.reuseEntityId, `updated multiple records with only 1 1:1 related entity, ${updatedEntities[0].id} ${newEntityData.reuseEntityId}` )
@@ -490,10 +507,7 @@ WHERE ${idField} IN (${matchedEntities.map(i => JSON.stringify(i.id)).join(',')}
         // 3.1. 删除旧关系
         // CAUTION 这里的语义认为是 replace。对于 xToMany 的情况下，如果用户想表达新增，自己拆成两步进行。
         // CAUTION 由于 xToMany 的数组情况会平铺，所以这里可能出现两次，所以这里记录一下排重
-        const otherTableEntitiesData = newEntityData.differentTableEntitiesData.concat(
-            newEntityData.holdMyFieldRelatedEntities,
-            newEntityData.sameRowEntityIdRefs
-        )
+        const otherTableEntitiesData = newEntityData.differentTableEntitiesData.concat(newEntityData.holdMyFieldRelatedEntities)
 
         const removedLinkName = new Set()
         for(let newRelatedEntityData of otherTableEntitiesData) {
@@ -504,7 +518,7 @@ WHERE ${idField} IN (${matchedEntities.map(i => JSON.stringify(i.id)).join(',')}
 
             removedLinkName.add(linkInfo.name)
             const updatedEntityLinkAttr = linkInfo.isRelationSource(entityName, newRelatedEntityData.info!.attributeName) ? 'source' : 'target'
-            for(let updatedEntity of updatedEntities) {
+            for(let updatedEntity of matchedEntities) {
                 await this.unlink(
                     linkInfo.name,
                     MatchExpression.createFromAtom({
@@ -518,7 +532,7 @@ WHERE ${idField} IN (${matchedEntities.map(i => JSON.stringify(i.id)).join(',')}
 
         // 3.1. 建立新关系
         // 处理和其他实体更新关系的情况。
-        for(let newRelatedEntityData of otherTableEntitiesData) {
+        for(let newRelatedEntityData of otherTableEntitiesData.concat(newEntityData.sameRowEntityIdRefs)) {
             // 这里只处理没有三表合并的场景。因为三表合并的数据在 sameTableFieldAndValues 已经有了
             // 这里只需要处理 1）关系表独立 或者 2）关系表往另一个方向合了的情况。因为往本方向和的情况已经在前面 updateEntityData 里面处理了
             let finalRelatedEntityRef
@@ -529,12 +543,12 @@ WHERE ${idField} IN (${matchedEntities.map(i => JSON.stringify(i.id)).join(',')}
                 finalRelatedEntityRef = await this.createRecord(newRelatedEntityData)
             }
 
-            for(let updatedEntity of updatedEntities) {
+            for(let updatedEntity of matchedEntities) {
                 await this.addLinkFromRecord(entityName, newRelatedEntityData.info?.attributeName!, updatedEntity.id, finalRelatedEntityRef.id)
             }
         }
 
-        return updatedEntities.map(updatedEntity => Object.assign(updatedEntity, newRefIds))
+        return matchedEntities.map(updatedEntity => Object.assign(updatedEntity, newRefIds))
 
     }
     async deleteRecord(recordName:string, matchExp: MatchExpressionData, includeRelatedRecords: string[]= []) {
@@ -720,6 +734,7 @@ VALUES
 
 
             // 除了当前 link 以外，所有和 toMove 相关的
+            console.log(7777777777, toMoveIds, records, linkName, matchExpressionData.data)
             if (toMoveIds.length) {
                 await this.moveRecords(
                     toMoveRecordInfo.record,
@@ -773,14 +788,13 @@ VALUES
         const records = await this.flashOutRecords(recordName, matchExpressionData, includeRelated)
 
         const newIds = []
+        console.log(99999999, recordName, matchExpressionData.data, records)
         for( let record of records) {
             newIds.push(await this.insertRecordData(new NewEntityData(this.map, recordName, record)))
         }
         return newIds
     }
     async flashOutRecords(recordName:string, matchExpressionData: MatchExpressionData, includeRelated: string[] = []) {
-
-
         const records = await this.findRecords(RecordQuery.create(recordName, this.map, {
             matchExpression: matchExpressionData,
             // 所有关联数据。fields

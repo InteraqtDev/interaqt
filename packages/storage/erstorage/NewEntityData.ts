@@ -36,8 +36,9 @@ export class NewEntityData {
                 if (newRelatedEntityData.isRef()) {
                     this.sameRowEntityIdRefs.push(newRelatedEntityData)
                 } else {
-                    this.sameRowNewEntitiesData.push(newRelatedEntityData)
                     // 全新的同表的数据
+                    this.sameRowNewEntitiesData.push(newRelatedEntityData)
+
                     this.sameRowEntityValuesAndRefFields.push(...newRelatedEntityData.sameRowEntityValuesAndRefFields)
                 }
             } else {
