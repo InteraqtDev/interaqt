@@ -10,7 +10,6 @@ export class RecordInfo {
             return new AttributeInfo(this.record, attribute, this.map)
         }).filter(info => info.isRecord && info.isMergedWithParent())
     }
-
     get table() {
         return this.map.getRecordTable(this.record)
     }
@@ -33,8 +32,9 @@ export class RecordInfo {
             info.isRecord && !info.isMergedWithParent() && !info.field
         )
     }
-    getAttributeInfo(attribute:string) {
-        return new AttributeInfo(this.record, attribute, this.map)
+    get differentTableReliance() : AttributeInfo[]{
+        // FIXME
+        return []
     }
     get valueAttributes() {
         return Object.entries(this.data.attributes).filter(([, attribute]) => {
@@ -42,6 +42,9 @@ export class RecordInfo {
         }).map(([attributeName]) => {
             return new AttributeInfo(this.record, attributeName, this.map)
         })
+    }
+    getAttributeInfo(attribute:string) {
+        return new AttributeInfo(this.record, attribute, this.map)
     }
 }
 
@@ -86,7 +89,7 @@ export class AttributeInfo {
     get isXToMany() {
         return this.isManyToMany||this.isOneToMany
     }
-    get entityName() {
+    get recordName() {
         assert(this.isRecord, `${this.attributeName} is not a entity`)
         return (this.data as RecordAttribute).recordName
     }
@@ -94,8 +97,26 @@ export class AttributeInfo {
         assert(this.isRecord, `${this.attributeName} is not a entity`)
         return this.map.getRecord((this.data as RecordAttribute).recordName).table
     }
+    // FIXME 改好
     get field() {
-        return (this.data as ValueAttribute).field
+        if (this.isValue) {
+            return (this.data as ValueAttribute).field
+        } else {
+            if (this.isManyToOne && this.isLinkMergedWithParent()) {
+                if (this.data.field) return this.data.field
+                const linkInfoRecord = this.getLinkInfo().record
+                return this.isRecordSource() ? linkInfoRecord.attributes.target.field : linkInfoRecord.attributes.source.field
+            }
+        }
+    }
+    get linkField() {
+        if (this.isRecord && this.isManyToOne && this.isLinkMergedWithParent() ) {
+            // 如果parent 是 linkRecord， source/target 这样的 field 就是 attribute 上面在管。
+            if (this.data.field) return this.data.field
+
+            const linkInfoRecord = this.getLinkInfo().record
+            return this.isRecordSource() ? linkInfoRecord?.attributes.target.field : linkInfoRecord?.attributes.source.field
+        }
     }
     get linkName() {
         return (this.data as RecordAttribute).linkName
@@ -103,13 +124,21 @@ export class AttributeInfo {
     isMergedWithParent() {
         return this.getLinkInfo().isCombined()
     }
+    isLinkMergedWithParent() {
+        const linkInfo = this.getLinkInfo()
+        return linkInfo.isRelationSource(this.parentEntityName, this.attributeName) ? linkInfo.isMergedToSource() : linkInfo.isMergedToTarget()
+    }
+    isLinkMergedWithAttribute() {
+        const linkInfo = this.getLinkInfo()
+        return linkInfo.isRelationSource(this.parentEntityName, this.attributeName) ? linkInfo.isMergedToTarget(): linkInfo.isMergedToSource()
+    }
     isRecordSource() {
         return this.getLinkInfo().isRelationSource(this.parentEntityName, this.attributeName)
     }
     getReverseInfo() {
         const reverseAttribute = this.map.getReverseAttribute(this.parentEntityName, this.attributeName)
         if (!reverseAttribute) return undefined
-        return this.map.getInfo(this.entityName, reverseAttribute)
+        return this.map.getInfo(this.recordName, reverseAttribute)
     }
     getLinkInfo() {
         assert(this.isRecord, `only record attribute can get linkInfo`)
@@ -117,7 +146,7 @@ export class AttributeInfo {
     }
     getRecordInfo() {
         assert(this.isRecord, `only record attribute can get linkInfo`)
-        return this.map.getRecordInfo(this.entityName)
+        return this.map.getRecordInfo(this.recordName)
     }
 }
 
@@ -202,6 +231,7 @@ export class LinkInfo {
         return this.data.sourceRecord === recordName && this.data.sourceAttribute === attribute
     }
     getAttributeName(recordName: string, attribute: string) {
+        assert(!!recordName && !! attribute, `${recordName}, ${attribute} cannot be empty`)
         return this.isRelationSource(recordName, attribute) ? ['source', 'target'] : ['target', 'source']
     }
 }
@@ -380,20 +410,26 @@ export class EntityToTableMap {
             return ''
         }
     }
-    groupAttributes(entityName: string, attributeNames: string[]) : [AttributeInfo[], AttributeInfo[]]{
+    groupAttributes(entityName: string, attributeNames: string[]) : [AttributeInfo[], AttributeInfo[], AttributeInfo[]]{
         const valueAttributes: AttributeInfo[] = []
+        const entityIdAttributes: AttributeInfo[] = []
         const entityAttributes: AttributeInfo[] = []
         attributeNames.forEach(attributeName => {
+
             if (this.data.records[entityName].attributes[attributeName]) {
                 const info = this.getInfo(entityName, attributeName)
-                if (info.isValue) {
+                if (info.isValue  ) {
                     valueAttributes.push(info)
                 } else {
-                    entityAttributes.push(info)
+                    if (this.data.records[entityName].attributes[attributeName].field) {
+                        entityIdAttributes.push(info)
+                    } else {
+                        entityAttributes.push(info)
+                    }
                 }
             }
         })
 
-        return [valueAttributes, entityAttributes]
+        return [valueAttributes, entityAttributes, entityIdAttributes]
     }
 }

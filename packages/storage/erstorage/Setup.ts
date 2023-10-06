@@ -265,14 +265,7 @@ export class DBSetup {
             record.table = this.recordToTableMap.get(recordName)!
             Object.entries(record.attributes).forEach(([attributeName, attributeData]) => {
                 if ((attributeData as RecordAttribute).isRecord) return
-
-                if(record.isRelation && attributeName === ID_ATTR) {
-                    attributeData.field = ROW_ID_ATTR
-                } else {
-                    // valueAttribute 或者 如果这个关系表被合到了这里，并且不是三表合一，我们才给他分配 field
-                    // attribute 统统加上前缀，这样不管合表没合表，都不会冲突。包括 ID
-                    attributeData.field = `${recordName}_${attributeName}`
-                }
+                attributeData.field = `${recordName}_${attributeName}`
             })
         })
 
@@ -287,21 +280,15 @@ export class DBSetup {
                 record.attributes.target.field = `_target`
             } else if (link.mergedTo === 'source') {
                 // field 名字以 sourceRecord 里面的称呼为主
-                const sourceRecord = this.map.records[link.sourceRecord]
-                sourceRecord.attributes[link.sourceAttribute].field = `${link.sourceRecord}_${link.sourceAttribute}`
-                record.attributes.source.field = sourceRecord.attributes[ID_ATTR].field
-                record.attributes.target.field = sourceRecord.attributes[link.sourceAttribute].field
+                record.attributes.target.field = `${link.sourceRecord}_${link.sourceAttribute}`
             } else if (link.mergedTo === 'target') {
-                const targetRecord = this.map.records[link.targetRecord]
-                targetRecord.attributes[link.targetAttribute!].field = `${link.targetRecord}_${link.targetAttribute}`
-                record.attributes.source.field = targetRecord.attributes[link.targetAttribute!].field
-                record.attributes.target.field =  targetRecord.attributes[ID_ATTR].field
+                record.attributes.source.field = `${link.targetRecord}_${link.targetAttribute}`
             } else {
                 // combined 情况
-                const sourceRecord = this.map.records[link.sourceRecord]
-                const targetRecord = this.map.records[link.targetRecord]
-                record.attributes.source.field = sourceRecord.attributes[ID_ATTR].field
-                record.attributes.target.field = targetRecord.attributes[ID_ATTR].field
+                // const sourceRecord = this.map.records[link.sourceRecord]
+                // const targetRecord = this.map.records[link.targetRecord]
+                // record.attributes.source.field = sourceRecord.attributes[ID_ATTR].field
+                // record.attributes.target.field = targetRecord.attributes[ID_ATTR].field
             }
         })
 

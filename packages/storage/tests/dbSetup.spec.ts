@@ -57,8 +57,34 @@ describe("db setup", () => {
             // 应该在关系表和实体表合并的时候修改过了。
             table: setup.map.records.Profile.table,
             isRelation:true,
-            attributes: {},
+            attributes: {
+                id: {
+                    field: "Profile_owner_profile_User_id",
+                    type: "id"
+                },
+                source: {
+                    isRecord: true,
+                    relType: ['1', '1'],
+                    recordName: 'Profile',
+                    linkName: 'Profile_owner_profile_User_source',
+                    isSource:true,
+                    type: 'id',
+                },
+                target: {
+                    isRecord: true,
+                    relType: ['1', '1'],
+                    recordName: 'User',
+                    isSource:true,
+                    linkName: 'Profile_owner_profile_User_target',
+                    type: 'id',
+                }
+            },
         })
+        // 三表合一没有 field
+        expect(setup.map.records.Profile_owner_profile_User.attributes.source.field).toBeUndefined()
+        expect(setup.map.records.Profile_owner_profile_User.attributes.target.field).toBeUndefined()
+
+
 
         // 虚拟关系表
         expect(setup.map.links.Profile_owner_profile_User_source).toMatchObject({
@@ -105,8 +131,10 @@ describe("db setup", () => {
             recordName: 'User',
             linkName: 'File_owner_file_User',
             isSource:true,
-            field: 'File_owner',
         })
+
+        expect(setup.map.records.File_owner_file_User.attributes.source.field).toBeUndefined()
+        expect(setup.map.records.File_owner_file_User.attributes.target.field).toBe('File_owner')
 
         expect(setup.map.links.File_owner_file_User).toMatchObject({
             relType: ['n', '1'],
@@ -163,6 +191,8 @@ describe("db setup", () => {
             targetRecord: 'User',
             targetAttribute: 'friends',
         })
+        expect(setup.map.records.User_friends_friends_User.attributes.source.field).toBe('_source')
+        expect(setup.map.records.User_friends_friends_User.attributes.target.field).toBe('_target')
         expect(setup.map.links.User_friends_friends_User.mergedTo).toBeUndefined()
 
         // 虚拟关系表

@@ -21,7 +21,7 @@ export class AttributeQuery {
             if (attributeInfo.isRecord) {
                 const relatedEntity = {
                     name: attributeName,
-                    entityQuery: RecordQuery.create(attributeInfo.entityName, this.map, item[1] as EntityQueryData)
+                    entityQuery: RecordQuery.create(attributeInfo.recordName, this.map, item[1] as EntityQueryData)
                 }
 
                 this.relatedEntities.push(relatedEntity)
