@@ -1,6 +1,7 @@
-import {AttributeInfo, EntityToTableMap} from "./EntityToTableMap";
+import {EntityToTableMap} from "./EntityToTableMap";
 import {assert} from "../util.ts";
 import {flatten} from "./util.ts";
+import {AttributeInfo} from "./AttributeInfo.ts";
 
 export type RawEntityData = { [k: string]: any }
 
@@ -24,6 +25,8 @@ export class NewRecordData {
     // 当时 linkRecord 的时候，source/target 就可能出现在下面
     public entityIdAttributes: AttributeInfo[] = []
 
+
+    //===========
     // 同表的新数据，或者关系表往这边和了的有 id 的 field,一起记录下来可以一次性插入的。
     public sameRowEntityValuesAndRefFields: [string, string][]
     public sameRowNewEntitiesData: NewRecordData[] = []

@@ -77,7 +77,7 @@ export class MatchExpression {
 
     getFinalFieldValue(isReferenceValue: boolean, value: [string, any]) {
         let fieldValue
-        const simpleOp = ['=', '>', '<', '<=', '>=', 'like']
+        const simpleOp = ['=', '>', '<', '<=', '>=', 'like', 'not']
 
         if (simpleOp.includes(value[0])) {
             fieldValue = `${value[0]} ${isReferenceValue ? this.getReferenceFieldValue(value[1]) : JSON.stringify(value[1])}`
@@ -130,6 +130,6 @@ export class MatchExpression {
     }
 
     and(condition: MatchAtom): MatchExpression {
-        return new MatchExpression(this.entityName, this.map, this.data ? this.data.and(condition) : BoolExpression.createFromAtom<MatchAtom>(condition))
+        return new MatchExpression(this.entityName, this.map, this.data ? this.data.and(condition) : BoolExpression.createFromAtom<MatchAtom>(condition), this.contextRootEntity)
     }
 }

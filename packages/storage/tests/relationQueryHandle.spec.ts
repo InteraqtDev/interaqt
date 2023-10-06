@@ -32,9 +32,6 @@ describe('find relation', () => {
     test('find 1:1 relation', async () => {
         await entityQueryHandle.create('User', {name: 'aaa', age: 17, profile: {title: 'aaa-profile'}})
 
-        console.log(await db.query(`
-SELECT * from Profile_User_Item
-`))
         const relationName = entityQueryHandle.getRelationName('User', 'profile')
         const result = await entityQueryHandle.findRelationByName(relationName, undefined, {}, [['source', { attributeQuery: ['title']}], ['target', {attributeQuery: ['name']}]])
         expect(result.length).toBe(1)

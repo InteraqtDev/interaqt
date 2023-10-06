@@ -155,6 +155,7 @@ describe('one to one', () => {
             ['name', 'age', ['profile', {attributeQuery: ['title']}]]
         )
 
+
         expect(findUser.name).toBe('a1')
         expect(findUser.profile.title).toBe('f2')
 
@@ -199,7 +200,6 @@ describe('one to one', () => {
                     title: 'f1'
                 }
             })
-        console.log(await entityQueryHandle.database.query('select * from Profile_User_Item'))
         const profileA = await entityQueryHandle.create('Profile', {title:'f2'})
 
         await entityQueryHandle.update('User',
@@ -212,7 +212,6 @@ describe('one to one', () => {
             {},
             ['name', 'age', ['profile', {attributeQuery: ['title']}]]
         )
-
 
         expect(findUser.name).toBe('a1')
         expect(findUser.profile.id).toBe(profileA.id)

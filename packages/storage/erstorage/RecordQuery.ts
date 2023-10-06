@@ -16,10 +16,16 @@ export type EntityQueryData = {
 
 export class RecordQuery {
     static create(entityName: string, map: EntityToTableMap, data: EntityQueryData, contextRootEntity?: string) {
+        // CAUTION 因为合表后可能用关联数据匹配到行。
+        const matchExpression = (new MatchExpression(entityName, map, data.matchExpression, contextRootEntity)).and({
+            key: 'id',
+            value: ['not', null]
+        })
         return new RecordQuery(
             entityName,
             map,
-            new MatchExpression(entityName, map, data.matchExpression, contextRootEntity),
+            matchExpression,
+            // new MatchExpression(entityName, map, data.matchExpression, contextRootEntity),
             new AttributeQuery(entityName, map, data.attributeQuery || []),
             new Modifier(entityName, map, data.modifier!),
             contextRootEntity,

@@ -1,241 +1,7 @@
 import {assert} from "../util";
-
-export class RecordInfo {
-    data: RecordMapItem
-    constructor(public record: string, public map: EntityToTableMap) {
-        this.data = this.map.data.records[record]!
-    }
-    get combinedRecords() {
-        return Object.keys(this.data.attributes).map(attribute => {
-            return new AttributeInfo(this.record, attribute, this.map)
-        }).filter(info => info.isRecord && info.isMergedWithParent())
-    }
-    get table() {
-        return this.map.getRecordTable(this.record)
-    }
-    get idField() {
-        return this.data.attributes.id.field
-    }
-    get allFields(): string[] {
-        return Object.values(this.data.attributes).map(a => a.field!).filter(x => x)
-    }
-    get allLinks() {
-        return Object.keys(this.data.attributes).map(attribute => {
-            const attr = new AttributeInfo(this.record, attribute, this.map)
-            return attr.isRecord ? attr.getLinkInfo() : null
-        }).filter(x => x)
-    }
-    get differentTableRecords() {
-        return Object.keys(this.data.attributes).map(attribute => {
-            return new AttributeInfo(this.record, attribute, this.map)
-        }).filter(info =>
-            info.isRecord && !info.isMergedWithParent() && !info.field
-        )
-    }
-    get differentTableReliance() : AttributeInfo[]{
-        // FIXME
-        return []
-    }
-    get valueAttributes() {
-        return Object.entries(this.data.attributes).filter(([, attribute]) => {
-            return !(attribute as RecordAttribute).isRecord
-        }).map(([attributeName]) => {
-            return new AttributeInfo(this.record, attributeName, this.map)
-        })
-    }
-    getAttributeInfo(attribute:string) {
-        return new AttributeInfo(this.record, attribute, this.map)
-    }
-}
-
-export class AttributeInfo {
-    public data:ValueAttribute|RecordAttribute
-    constructor(public parentEntityName: string, public attributeName: string, public map: EntityToTableMap) {
-        this.data =  this.map.data.records[parentEntityName].attributes[attributeName]
-        assert(!!this.data, `${parentEntityName} has no ${attributeName}`)
-    }
-    get isRecord() {
-        return (this.data as RecordAttribute).isRecord
-    }
-    get isValue() {
-        return !(this.data as RecordAttribute).isRecord
-    }
-    get isManyToOne() {
-        if (!this.isRecord) throw new Error('not a entity')
-        const data = (this.data as RecordAttribute)
-        return data.relType[0] === 'n' && data.relType[1] === '1'
-    }
-    get isManyToMany() {
-        if (!this.isRecord) throw new Error('not a entity')
-        const data = (this.data as RecordAttribute)
-        return data.relType[0] === 'n' && data.relType[1] === 'n'
-    }
-    get isOneToOne() {
-        if (!this.isRecord) throw new Error('not a entity')
-        const data = (this.data as RecordAttribute)
-        return data.relType[0] === '1' && data.relType[1] === '1'
-    }
-    get isOneToMany() {
-        if (!this.isRecord) throw new Error('not a entity')
-        const data = (this.data as RecordAttribute)
-        return data.relType[0] === '1' && data.relType[1] === 'n'
-    }
-    get isXToOne() {
-        return this.isManyToOne || this.isOneToOne
-    }
-    get isOneToX() {
-        return this.isOneToMany || this.isOneToOne
-    }
-    get isXToMany() {
-        return this.isManyToMany||this.isOneToMany
-    }
-    get recordName() {
-        assert(this.isRecord, `${this.attributeName} is not a entity`)
-        return (this.data as RecordAttribute).recordName
-    }
-    get table() {
-        assert(this.isRecord, `${this.attributeName} is not a entity`)
-        return this.map.getRecord((this.data as RecordAttribute).recordName).table
-    }
-    // FIXME 改好
-    get field() {
-        if (this.isValue) {
-            return (this.data as ValueAttribute).field
-        } else {
-            if (this.isManyToOne && this.isLinkMergedWithParent()) {
-                if (this.data.field) return this.data.field
-                const linkInfoRecord = this.getLinkInfo().record
-                return this.isRecordSource() ? linkInfoRecord.attributes.target.field : linkInfoRecord.attributes.source.field
-            }
-        }
-    }
-    get linkField() {
-        if (this.isRecord && this.isManyToOne && this.isLinkMergedWithParent() ) {
-            // 如果parent 是 linkRecord， source/target 这样的 field 就是 attribute 上面在管。
-            if (this.data.field) return this.data.field
-
-            const linkInfoRecord = this.getLinkInfo().record
-            return this.isRecordSource() ? linkInfoRecord?.attributes.target.field : linkInfoRecord?.attributes.source.field
-        }
-    }
-    get linkName() {
-        return (this.data as RecordAttribute).linkName
-    }
-    isMergedWithParent() {
-        return this.getLinkInfo().isCombined()
-    }
-    isLinkMergedWithParent() {
-        const linkInfo = this.getLinkInfo()
-        return linkInfo.isRelationSource(this.parentEntityName, this.attributeName) ? linkInfo.isMergedToSource() : linkInfo.isMergedToTarget()
-    }
-    isLinkMergedWithAttribute() {
-        const linkInfo = this.getLinkInfo()
-        return linkInfo.isRelationSource(this.parentEntityName, this.attributeName) ? linkInfo.isMergedToTarget(): linkInfo.isMergedToSource()
-    }
-    isRecordSource() {
-        return this.getLinkInfo().isRelationSource(this.parentEntityName, this.attributeName)
-    }
-    getReverseInfo() {
-        const reverseAttribute = this.map.getReverseAttribute(this.parentEntityName, this.attributeName)
-        if (!reverseAttribute) return undefined
-        return this.map.getInfo(this.recordName, reverseAttribute)
-    }
-    getLinkInfo() {
-        assert(this.isRecord, `only record attribute can get linkInfo`)
-        return this.map.getLinkInfo(this.parentEntityName, this.attributeName)
-    }
-    getRecordInfo() {
-        assert(this.isRecord, `only record attribute can get linkInfo`)
-        return this.map.getRecordInfo(this.recordName)
-    }
-}
-
-
-
-export class LinkInfo {
-    constructor(public name: string, public data: LinkMapItem, public map: EntityToTableMap) {
-    }
-
-    get isManyToOne() {
-        return this.data.relType[0] === 'n' && this.data.relType[1] === '1'
-    }
-    get isManyToMany() {
-        return this.data.relType[0] === 'n' && this.data.relType[1] === 'n'
-    }
-    get isOneToOne() {
-        return this.data.relType[0] === '1' && this.data.relType[1] === '1'
-    }
-    get isOneToMany() {
-        return this.data.relType[0] === '1' && this.data.relType[1] === 'n'
-    }
-    get isXToOne() {
-        return this.isManyToOne || this.isOneToOne
-    }
-    get isOneToX() {
-        return this.isOneToMany || this.isOneToOne
-    }
-    get isXToMany() {
-        return this.isManyToMany||this.isOneToMany
-    }
-    get sourceRecord() {
-        return this.data.sourceRecord
-    }
-    get sourceRecordInfo() {
-        return new RecordInfo(this.data.sourceRecord, this.map)
-    }
-    get targetRecordInfo() {
-        return new RecordInfo(this.data.targetRecord, this.map)
-    }
-    get targetRecord() {
-        return this.data.targetRecord
-    }
-    get sourceAttribute() {
-        return this.data.sourceAttribute
-    }
-    get targetAttribute() {
-        return this.data.targetAttribute
-    }
-    get record() : RecordMapItem {
-        return this.map.getRecord(this.name)!
-    }
-    get table (){
-        return this.record.table
-    }
-    // CAUTION sourceField 指的的是 target 在source 表中的名字！
-    get sourceField() {
-        return this.record.attributes.target.field
-    }
-    // CAUTION sourceField 指的的是 target 在source 表中的名字！
-    get targetField() {
-        return this.record.attributes.source.field
-    }
-    get sourceAttrField() {
-        return this.record.attributes.source.field
-    }
-    get targetAttrField() {
-        return this.record.attributes.target.field
-    }
-    isMerged() {
-        return !!this.data.mergedTo
-    }
-    isMergedToSource() {
-        return this.data.mergedTo === 'source'
-    }
-    isMergedToTarget() {
-        return this.data.mergedTo === 'target'
-    }
-    isCombined() {
-        return this.data.mergedTo === 'combined'
-    }
-    isRelationSource(recordName: string, attribute: string) {
-        return this.data.sourceRecord === recordName && this.data.sourceAttribute === attribute
-    }
-    getAttributeName(recordName: string, attribute: string) {
-        assert(!!recordName && !! attribute, `${recordName}, ${attribute} cannot be empty`)
-        return this.isRelationSource(recordName, attribute) ? ['source', 'target'] : ['target', 'source']
-    }
-}
-
+import {AttributeInfo} from "./AttributeInfo.ts";
+import {RecordInfo} from "./RecordInfo.ts";
+import {LinkInfo} from "./LinkInfo.ts";
 
 
 export type ValueAttribute = {
@@ -260,6 +26,8 @@ export type RecordAttribute = {
     //  这个是从 EntityMapItemData 的 sourceField 或者 targetField 复制过来的。
     table?: string,
     field? : string
+    // 当attribute是 target，并且关系上有 targetIsReliance 时为 true
+    isReliance? : boolean
 }
 
 export type RecordMapItem = {
@@ -281,6 +49,7 @@ export type LinkMapItem = {
     sourceAttribute: string,
     targetRecord: string,
     targetAttribute?: string,
+    // 用来判断这个 relation 是不是 virtual 的，是的话为 true.
     isSourceRelation?: boolean,
     // 这个 link 是否有个对应的 record. 当这个 link 是根据 Relation 创建的时候就有这个。
     //  它等同于 isSourceRelation 为 true 时 sourceRecord
@@ -291,6 +60,8 @@ export type LinkMapItem = {
     //  当发生表合并时，他们表示的是在合并的表里面的 field。根据往合并情况不同，sourceField/targetField 都可能不存在。
     sourceField?: string,
     targetField?: string,
+    // 连接两个生命周期依赖的实体的，只能 target 依赖 source。
+    isTargetReliance?: boolean
 }
 
 type LinkMap = {

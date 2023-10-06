@@ -132,8 +132,7 @@ export class DBSetup {
             targetRecord: relation.entity2.name,
             targetAttribute: relation.targetName2,
             recordName: relationName,
-            // sourceField: '_source',
-            // targetField: '_target'
+            isTargetReliance: relation.isTargetReliance
         } as LinkMapItem
     }
     createLinkOfRelationAndEntity(relationEntityName: string, relationName: string, relation: KlassInstanceOf<typeof Relation, false>, isSource: boolean) {
@@ -205,6 +204,7 @@ export class DBSetup {
                     recordName: relationData.sourceRecord,
                     linkName: relation,
                     isSource:false,
+                    isReliance: relationData.isTargetReliance
                 } as RecordAttribute
             }
         })

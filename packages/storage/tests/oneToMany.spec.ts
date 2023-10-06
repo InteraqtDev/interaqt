@@ -112,7 +112,6 @@ describe('one to many', () => {
 
 
     test('delete one to many data:delete self as source', async () => {
-
         const rawData = {
             name: 'a1',
             age:11,
@@ -132,13 +131,14 @@ describe('one to many', () => {
 
         expect(findUsers.length).toBe(0)
 
-        const findRelations = await entityQueryHandle.find('User',
+        const findUsers2 = await entityQueryHandle.find('User',
             undefined,
             {},
             ['name', 'age']
         )
-        expect(findRelations.length).toBe(1)
-        expect(findRelations[0].name).toBe('l1')
+        console.log(findUsers2)
+        expect(findUsers2.length).toBe(1)
+        expect(findUsers2[0].name).toBe('l1')
     })
 
     test('delete one to many data:delete self as target', async () => {
@@ -180,10 +180,12 @@ describe('one to many', () => {
     test('update one to many data:update self with new related as source', async () => {
         const userA = await entityQueryHandle.create('User', {name:'a1', age:12})
 
+
         await entityQueryHandle.update('User', MatchExpression.createFromAtom({
             key: 'id',
             value: ['=', userA.id]
         }), { member: [{name: 'm1', age:11} ] })
+
 
         const findUser = await entityQueryHandle.findOne('User',
             MatchExpression.createFromAtom({ key: 'id', value: ['=', userA.id]}),
@@ -199,6 +201,7 @@ describe('one to many', () => {
                 age: 11
             }]
         })
+
 
         await entityQueryHandle.update('User', MatchExpression.createFromAtom({
             key: 'id',
