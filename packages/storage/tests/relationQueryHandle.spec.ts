@@ -29,7 +29,7 @@ describe('find relation', () => {
         await db.close()
     })
 
-    test('find 1:1 relation', async () => {
+    test('create and query and delete 1:1 relation', async () => {
         await entityQueryHandle.create('User', {name: 'aaa', age: 17, profile: {title: 'aaa-profile'}})
 
         const relationName = entityQueryHandle.getRelationName('User', 'profile')
@@ -53,10 +53,43 @@ describe('find relation', () => {
 
         const result2 = await entityQueryHandle.findRelationByName(relationName, match2, {}, [['source', { attributeQuery: ['title']}], ['target', {attributeQuery: ['name']}]])
         expect(result2.length).toBe(1)
+
+
+        const match3 = MatchExpression.createFromAtom({
+            key: 'target.name',
+            value: ['=', 'aaa']
+        }).and({
+            key: 'source.title',
+            value: ['=', 'aaa-profile']
+        })
+
+        await entityQueryHandle.removeRelationByName(relationName, match3)
+        const result3 = await entityQueryHandle.findRelationByName(relationName, match3, {}, [['source', { attributeQuery: ['title']}], ['target', {attributeQuery: ['name']}]])
+        expect(result3.length).toBe(0)
+
+        // 只是关系断开，数据仍然要存在
+        const findUser = await entityQueryHandle.find('User', MatchExpression.createFromAtom({
+            key: 'name',
+            value: ['=', 'aaa'],
+        }), undefined, ['name'])
+        expect(findUser.length).toBe(1)
+        expect(findUser[0]).toMatchObject({
+            name: 'aaa'
+        })
+
+        const findProfile = await entityQueryHandle.find('Profile', MatchExpression.createFromAtom({
+            key: 'title',
+            value: ['=', 'aaa-profile'],
+        }), undefined, ['title'])
+        expect(findProfile.length).toBe(1)
+        expect(findProfile[0]).toMatchObject({
+            title: 'aaa-profile'
+        })
+
     })
 
 
-    test('create and query with 1:n related entities', async () => {
+    test('create and query and delete with 1:n related entities', async () => {
         const user = await entityQueryHandle.create('User', {name: 'aaa', age: 17 })
         const file1 = await entityQueryHandle.create('File', {fileName: 'file1', owner: user })
         const file2 = await entityQueryHandle.create('File', {fileName: 'file2', owner: user })
@@ -93,7 +126,7 @@ describe('find relation', () => {
     })
 
 
-    test('create and query with n:n related entities', async () => {
+    test('create and query and delete with n:n related entities', async () => {
         const user = await entityQueryHandle.create('User', {name: 'aaa', age: 17 })
         const user2 = await entityQueryHandle.create('User', {name: 'bbb', age: 18, friends: [user] })
         const user3 = await entityQueryHandle.create('User', {name: 'ccc', age: 19 })
@@ -125,7 +158,7 @@ describe('find relation', () => {
         // 重新用 match1 查找，应该就只剩 ccc 了
         const result2 = await entityQueryHandle.findRelationByName(relationName, match1, undefined, [['source', { attributeQuery: ['name', 'age']}], ['target', {attributeQuery: ['name', 'age']}]])
         expect( result2.length).toBe(1)
-        console.log(result2)
+        // console.log(result2)
         expect( result2[0].source.name).toBe('ccc')
         expect( result2[0].target.name).toBe('aaa')
     })

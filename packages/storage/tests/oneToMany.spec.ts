@@ -136,7 +136,7 @@ describe('one to many', () => {
             {},
             ['name', 'age']
         )
-        console.log(findUsers2)
+        // console.log(findUsers2)
         expect(findUsers2.length).toBe(1)
         expect(findUsers2[0].name).toBe('l1')
     })

@@ -25,21 +25,13 @@ export class NewRecordData {
     // 当时 linkRecord 的时候，source/target 就可能出现在下面
     public entityIdAttributes: AttributeInfo[] = []
 
-
-    //===========
-    // 同表的新数据，或者关系表往这边和了的有 id 的 field,一起记录下来可以一次性插入的。
-    public sameRowEntityValuesAndRefFields: [string, string][]
-    public sameRowNewEntitiesData: NewRecordData[] = []
     public relatedEntitiesData: NewRecordData[] = []
-    public differentTableEntitiesData: NewRecordData[] = []
-    public holdFieldNewRelatedEntities: NewRecordData[] = []
-    public holdMyFieldRelatedEntities: NewRecordData[] = []
     public valueAttributes: AttributeInfo[]
 
     // 和当前合表并且是  id 的。说明我们的需要的 row 已经有了，只要update 相应 column 就行了
     public sameRowEntityIdRefs: NewRecordData[] = []
 
-    constructor(public map: EntityToTableMap, public recordName: string, public rawData: RawEntityData, public info?: AttributeInfo, public linkRawData?: RawEntityData) {
+    constructor(public map: EntityToTableMap, public recordName: string, public rawData: RawEntityData, public info?: AttributeInfo, ) {
         const [valueAttributesInfo, entityAttributesInfo, entityIdAttributes] = this.map.groupAttributes(recordName, rawData ? Object.keys(rawData) : [])
         this.relatedEntitiesData = flatten(entityAttributesInfo.map(info =>
             Array.isArray(rawData[info.attributeName]) ?
@@ -51,43 +43,18 @@ export class NewRecordData {
         this.entityIdAttributes = entityIdAttributes
 
         // TODO 要把那些独立出去的 field 排除出去。
-        this.sameRowEntityValuesAndRefFields = valueAttributesInfo.map(info => [info.field, rawData[info.attributeName]])
         this.relatedEntitiesData.forEach(newRelatedEntityData => {
             // CAUTION 三表合一的情况（需要排除掉关系的 source、target 是同一实体的情况，这种情况下不算合表）
             if (newRelatedEntityData.info!.isMergedWithParent()) {
                 // 三表合一的情况。记录合表的数据到底是有 id ，还是新的。如果是有 id ，说明是要  update 某一行。
                 if (newRelatedEntityData.isRef()) {
-                    this.sameRowEntityIdRefs.push(newRelatedEntityData)
                     this.combinedRecordIdRefs.push(newRelatedEntityData)
                 } else {
                     // 全新的同表的数据
-                    this.sameRowNewEntitiesData.push(newRelatedEntityData)
-
-                    this.sameRowEntityValuesAndRefFields.push(...newRelatedEntityData.sameRowEntityValuesAndRefFields)
                     this.combinedNewRecords.push(newRelatedEntityData)
                 }
 
-
             } else {
-                // 有 field 说明是关系表合并到了当前实体表，一起处理
-                if (newRelatedEntityData.info!.isLinkMergedWithParent()) {
-                    if (newRelatedEntityData.isRef() || newRelatedEntityData.isNull()) {
-                        this.sameRowEntityValuesAndRefFields.push([newRelatedEntityData.info!.linkField, newRelatedEntityData.isRef() ? newRelatedEntityData.getRef().id : null])
-                    } else {
-                        // 没有 id 的说明要单独新建
-                        this.holdFieldNewRelatedEntities.push(newRelatedEntityData)
-                    }
-                } else {
-
-                    // 把 hold 我的 field 的 record 识别出来。
-                    const linkInfo = newRelatedEntityData.info!.getLinkInfo()
-                    if (linkInfo.isRelationSource(this.recordName, newRelatedEntityData.info!.attributeName) ? linkInfo.isMergedToTarget() : linkInfo.isMergedToSource()) {
-                        this.holdMyFieldRelatedEntities.push(newRelatedEntityData)
-                    } else {
-                        // 完全没合表的
-                        this.differentTableEntitiesData.push(newRelatedEntityData)
-                    }
-                }
 
                 // FIXME relatedEntitiesData 是不是要限制下，只允许那些自己能管的。
                 //  因为 source/target 这样的合并之后就不规自己管了。这里也不应该处理。
@@ -148,17 +115,6 @@ export class NewRecordData {
     isNull() {
         return this.rawData === null
     }
-
-    getIdField() {
-        const recordInfo = this.map.getRecordInfo(this.recordName)
-        return recordInfo.idField!
-    }
-
-    getIdFieldAndValue(): [string, string] {
-        assert(this.isRef(), 'is not ref')
-        const recordInfo = this.map.getRecordInfo(this.recordName)
-        return [recordInfo.idField!, this.rawData.id!]
-    }
     getData() {
         return {...this.rawData}
     }
@@ -178,7 +134,7 @@ export class NewRecordData {
             })
         })
 
-        // 往自己合表的关系上的 id
+        // 往自己合表的关系上的 id 以及关系数据
         this.mergedLinkTargetRecordIdRefs.forEach(recordData => {
             result.push({
                 field: recordData.info?.linkField,
@@ -189,6 +145,11 @@ export class NewRecordData {
                 result.push(...recordData.linkRecordData.getSameRowFieldAndValue())
             }
         })
+
+        // 有 info 说明自己是派生出来的，上层可能在创建的时候通过 & 字段来指定了要创建的关系的 attribute。
+        if (this.info && this.linkRecordData && this.info.isLinkMergedWithAttribute()) {
+            result.push(...this.linkRecordData.getSameRowFieldAndValue())
+        }
 
         // 三表合一的数据
         this.combinedNewRecords.concat(this.combinedRecordIdRefs).forEach(combinedNewRecord => {

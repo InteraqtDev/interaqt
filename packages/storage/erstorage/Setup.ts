@@ -37,7 +37,7 @@ export class DBSetup {
         this.buildTables()
     }
     getRelationName(relation: KlassInstanceOf<typeof Relation, false>) {
-        return `${relation.entity1.name}_${relation.targetName1}_${relation.targetName2}_${relation.entity2.name}`
+        return `${Relation.is(relation.entity1) ? this.getRelationName(relation.entity1) : relation.entity1.name}_${relation.targetName1}_${relation.targetName2}_${relation.entity2.name}`
     }
 
     createRecordToTable(item:string, table:string) {
@@ -50,7 +50,7 @@ export class DBSetup {
         assert(joinTargetRecord !== record, `join entity should not equal, ${record}`)
         const originTable = this.recordToTableMap.get(record)!
         const tableToJoin = this.recordToTableMap.get(joinTargetRecord)!
-        assert(!!originTable  && !!tableToJoin, `table not exists ${originTable} ${tableToJoin}`)
+        assert(!!originTable  && !!tableToJoin, `table not exists for ${record} ${originTable} to join ${joinTargetRecord} ${tableToJoin}`)
         if (originTable == tableToJoin) return
 
         const sameTableRecords = this.tableToRecordsMap.get(originTable)!
@@ -127,22 +127,26 @@ export class DBSetup {
         return {
             table: relationName,
             relType: relation.relType.split(':'),
-            sourceRecord: relation.entity1.name,
+            sourceRecord: this.getRecordName(relation.entity1),
             sourceAttribute: relation.targetName1,
-            targetRecord: relation.entity2.name,
+            targetRecord: this.getRecordName(relation.entity2),
             targetAttribute: relation.targetName2,
             recordName: relationName,
             isTargetReliance: relation.isTargetReliance
         } as LinkMapItem
     }
+    getRecordName(rawRecord:KlassInstanceOf<typeof Entity, false>|KlassInstanceOf<typeof Relation, false>) {
+        return Relation.is(rawRecord) ? this.getRelationName(rawRecord): rawRecord.name
+    }
+    //虚拟 link
     createLinkOfRelationAndEntity(relationEntityName: string, relationName: string, relation: KlassInstanceOf<typeof Relation, false>, isSource: boolean) {
         const relationRelType = relation.relType.split(':')
         return {
-            table: relationName,
+            table: undefined, // 虚拟 link 没有表
             sourceRecord: relationEntityName,
             sourceAttribute: isSource ? 'source' : 'target',
-
-            targetRecord: isSource ? relation.entity1.name: relation.entity2.name,
+            targetRecord: isSource ? this.getRecordName(relation.entity1): this.getRecordName(relation.entity2),
+            // targetRecord: isSource ? relation.entity1.name: relation.entity2.name,
             targetAttribute: undefined, // 不能从 entity 来获取关系表
             // source 1:x1 -关联表- x2:1 target
             // 如果是 1: n 关系，x1 是 n，x2 是 1
@@ -270,15 +274,19 @@ export class DBSetup {
             })
         })
 
-        // FIXME ID 问题 source/target 到底归属于谁？？？还是 relation record 是一种特殊的，永远都有？？？
+        // 2.1 给所有 links 分配 table
+        Object.entries(this.map.links).forEach(([linkName, link]) => {
+            link.table = this.recordToTableMap.get(linkName)!
+        })
+
         // 3. 开始决定合表后的 source/target 字段分配。这里只要处理作为 relation 的 record 的 source/target 字段
         //  CAUTION  因为后面无论是处理 join 还是其他的，都是从 record 上去找字段。不是从 link 中
         Object.entries(this.map.records).forEach(([recordName, record]) => {
             if( !record.isRelation) return
             const link = this.map.links[recordName]
             if (!link.mergedTo ) {
-                record.attributes.source.field = `_source`
-                record.attributes.target.field = `_target`
+                record.attributes.source.field = `${recordName}_source`
+                record.attributes.target.field = `${recordName}_target`
             } else if (link.mergedTo === 'source') {
                 // field 名字以 sourceRecord 里面的称呼为主
                 record.attributes.target.field = `${link.sourceRecord}_${link.sourceAttribute}`

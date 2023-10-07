@@ -267,10 +267,10 @@ ${this.buildFindQuery(existEntityQuery, currentAlias)}
             }
         }
 
-        // 处理三表合一的 link record
+        // 处理三表合一的 link record 的 dependency
         for( let combinedRecord of newRecordData.combinedNewRecords.concat(newRecordData.combinedRecordIdRefs)) {
             if (combinedRecord.linkRecordData) {
-                const newLinkRecordDataWithDep = await this.createRecordDependency(newLinkRecordData)
+                const newLinkRecordDataWithDep = await this.createRecordDependency(combinedRecord.linkRecordData)
                 newRecordDataWithDeps[combinedRecord.info!.attributeName] = {
                     // 注意这里原本的数据不能丢，因为下面的 merge 不是深度 merge。
                     ...combinedRecord.getData(),
@@ -339,7 +339,6 @@ ${this.buildFindQuery(existEntityQuery, currentAlias)}
 
     async insertSameRowData(newEntityData: NewRecordData): Promise<EntityIdRef>{
         const newEntityDataWithIdsWithFlashOutRecords = await this.prepareSameRowData(newEntityData)
-
         // 3. 插入新行。
         const sameRowNewFieldAndValue = newEntityDataWithIdsWithFlashOutRecords.getSameRowFieldAndValue()
         const result = await this.database.insert(`
@@ -420,7 +419,6 @@ VALUES
                 })
                 await this.unlink(record.info!.linkName, match)
             }
-
             const linkRawData: RawEntityData = record.linkRecordData?.getData() || {}
             Object.assign(linkRawData, {
                 source: record.info!.isRecordSource() ? currentIdRef : record.getRef(),
@@ -467,8 +465,7 @@ WHERE ${idField} IN (${idRefs.map(i => JSON.stringify(i.id)).join(',')})
 
 
         // 跟自己合表的必须先删除，不然下面 updateRecordData 的时候可能冲掉了。
-        const sameRoleEntityRefOrNewData = newEntityData.sameRowEntityIdRefs.concat(newEntityData.sameRowNewEntitiesData)
-
+        const sameRoleEntityRefOrNewData = newEntityData.combinedRecordIdRefs.concat(newEntityData.combinedNewRecords)
 
         for(let newRelatedEntityData of sameRoleEntityRefOrNewData) {
             const linkInfo = newRelatedEntityData.info!.getLinkInfo()
@@ -506,7 +503,11 @@ WHERE ${idField} IN (${idRefs.map(i => JSON.stringify(i.id)).join(',')})
         // 3.1. 删除旧关系
         // CAUTION 这里的语义认为是 replace。对于 xToMany 的情况下，如果用户想表达新增，自己拆成两步进行。
         // CAUTION 由于 xToMany 的数组情况会平铺，所以这里可能出现两次，所以这里记录一下排重
-        const otherTableEntitiesData = newEntityData.differentTableEntitiesData.concat(newEntityData.holdMyFieldRelatedEntities)
+        const otherTableEntitiesData = newEntityData.differentTableMergedLinkRecordIdRefs.concat(
+            newEntityData.differentTableMergedLinkNewRecords,
+            newEntityData.isolatedRecordIdRefs,
+            newEntityData.isolatedNewRecords,
+        )
 
         const removedLinkName = new Set()
         for(let newRelatedEntityData of otherTableEntitiesData) {
@@ -799,36 +800,6 @@ WHERE ${recordInfo.idField} IN (${records.map(({id}) => JSON.stringify(id)).join
 
         return valueAttributes.concat(relatedRecordsAttributeQuery)
     }
-
-    async removeLink(relationName: string, matchExpressionData: MatchExpressionData,):Promise<EntityIdRef[]> {
-        const relationRecords = await this.findRecords(RecordQuery.create(relationName, this.map, {
-            matchExpression: matchExpressionData,
-            attributeQuery: [['source', {attributeQuery: ['id']}], ['target', {attributeQuery: ['id']}]]
-        } ))
-
-        const linkInfo = this.map.getLinkInfoByName(relationName)
-        const idField = this.map.getInfo(relationName, 'id').field
-
-        assert(!linkInfo.isCombined(), `remove 1:1 with combined entity is not implemented yet ${relationName}`)
-        if (!linkInfo.isMerged()) {
-            // 独立的表
-            return relationRecords.length ? await this.database.query(`
-DELETE FROM ${this.map.getRecordTable(relationName)}
-WHERE ${idField} IN (${relationRecords.map(({id}) => JSON.stringify(id)).join(',')})
-`) : []
-        } else {
-            // 合并的表
-            const table =  this.map.getRecordTable(linkInfo.isMergedToSource() ? linkInfo.sourceRecord : linkInfo.targetRecord)
-            // 记录的 field
-            const field = linkInfo.isMergedToSource() ? linkInfo.sourceField : linkInfo.targetField
-            return relationRecords.length ? await  this.database.query(`
-UPDATE ${table}
-SET
-${field} = NULL
-WHERE ${idField} IN (${relationRecords.map(({id}) => JSON.stringify(id)).join(',')})
-`) : []
-        }
-    }
 }
 
 
@@ -904,7 +875,7 @@ export class EntityQueryHandle {
         return MatchExpression.createFromAtom(...arg)
     }
     async removeRelationByName(relationName: string, matchExpressionData: MatchExpressionData) {
-        return this.agent.removeLink(relationName, matchExpressionData)
+        return this.agent.unlink(relationName, matchExpressionData)
     }
     getRelationName(entity:string, attribute): string {
         return this.map.getInfo(entity, attribute).linkName

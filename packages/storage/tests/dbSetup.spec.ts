@@ -35,7 +35,7 @@ describe("db setup", () => {
 
         // 三表合一的 reliance 有 reliance 标记
         expect(setup.map.links.User_item_owner_Item).toMatchObject({
-            table: 'User_item_owner_Item',
+            table: 'Profile_User_Item',
             mergedTo: 'combined',
             relType: ['1','1'],
             sourceRecord: 'User',
@@ -218,8 +218,8 @@ describe("db setup", () => {
             targetRecord: 'User',
             targetAttribute: 'friends',
         })
-        expect(setup.map.records.User_friends_friends_User.attributes.source.field).toBe('_source')
-        expect(setup.map.records.User_friends_friends_User.attributes.target.field).toBe('_target')
+        expect(setup.map.records.User_friends_friends_User.attributes.source.field).toBe('User_friends_friends_User_source')
+        expect(setup.map.records.User_friends_friends_User.attributes.target.field).toBe('User_friends_friends_User_target')
         expect(setup.map.links.User_friends_friends_User.mergedTo).toBeUndefined()
 
         // 虚拟关系表

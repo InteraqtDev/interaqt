@@ -75,7 +75,6 @@ export class RecordInfo {
 
     get differentTableReliance(): AttributeInfo[] {
         return this.reliance.filter(info => {
-            console.log(11111, info.attributeName, info.table, this.table)
             return info.table !== this.table
         })
     }

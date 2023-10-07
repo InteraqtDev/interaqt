@@ -3,20 +3,24 @@ import { removeAllInstance } from "../../../shared/createClass";
 
 export const createCommonData = () => {
 
-    const userEntity = Entity.create({ name: 'User' })
-    const nameProperty = Property.create({ name: 'name', type: PropertyTypes.String })
-    const ageProperty = Property.create({ name: 'age', type: PropertyTypes.Number })
-    userEntity.properties.push(nameProperty)
-    userEntity.properties.push(ageProperty)
+    const userEntity = Entity.create({
+        name: 'User',
+        properties: [
+            Property.create({ name: 'name', type: PropertyTypes.String }),
+            Property.create({ name: 'age', type: PropertyTypes.Number })
+        ]
+    })
 
 
-    const profileEntity = Entity.create({ name: 'Profile'})
-    const profileNameProperty = Property.create({ name: 'title', type: PropertyTypes.String })
-    profileEntity.properties.push(profileNameProperty)
+    const profileEntity = Entity.create({
+        name: 'Profile',
+        properties: [Property.create({ name: 'title', type: PropertyTypes.String })]
+    })
 
-    const fileEntity = Entity.create({ name: 'File'})
-    const filenameProperty = Property.create({ name: 'fileName', type: PropertyTypes.String })
-    fileEntity.properties.push(filenameProperty)
+    const fileEntity = Entity.create({
+        name: 'File',
+        properties: [Property.create({ name: 'fileName', type: PropertyTypes.String })]
+    })
 
 
     Relation.create({
@@ -24,7 +28,10 @@ export const createCommonData = () => {
         targetName1: 'owner',
         entity2: userEntity,
         targetName2: 'file',
-        relType: 'n:1'
+        relType: 'n:1',
+        properties: [
+            Property.create({ name: 'viewed', type: PropertyTypes.Number })
+        ]
     })
 
     Relation.create({
@@ -32,7 +39,10 @@ export const createCommonData = () => {
         targetName1: 'owner',
         entity2: userEntity,
         targetName2: 'profile',
-        relType: '1:1'
+        relType: '1:1',
+        properties: [
+            Property.create({ name: 'viewed', type: PropertyTypes.Number })
+        ]
     })
 
 
@@ -44,18 +54,23 @@ export const createCommonData = () => {
         relType: 'n:1'
     })
 
+
+
+
     Relation.create({
         entity1: userEntity,
         targetName1: 'friends',
         entity2: userEntity,
         targetName2: 'friends',
-        relType: 'n:n'
+        relType: 'n:n',
+
     })
 
 
-    const itemEntity = Entity.create({ name: 'Item'})
-    const itemProperty = Property.create({ name: 'itemName', type: PropertyTypes.String })
-    itemEntity.properties.push(itemProperty)
+    const itemEntity = Entity.create({
+        name: 'Item',
+        properties: [Property.create({ name: 'itemName', type: PropertyTypes.String })]
+    })
 
     Relation.create({
         entity1: userEntity,
@@ -66,22 +81,69 @@ export const createCommonData = () => {
         isTargetReliance: true
     })
 
-    const teamEntity = Entity.create({ name: 'Team'})
-    const teamProperty = Property.create({ name: 'teamName', type: PropertyTypes.String })
-    teamEntity.properties.push(teamProperty)
+    const teamEntity = Entity.create({
+        name: 'Team',
+        properties: [Property.create({ name: 'teamName', type: PropertyTypes.String })]
+    })
 
-    Relation.create({
+
+    const locEntity = Entity.create({
+        name: 'Location',
+        properties: [
+            Property.create({ name: 'name', type: PropertyTypes.String })
+        ]
+    })
+
+    const matchEntity = Entity.create({
+        name: 'Match',
+        properties: [
+            Property.create({ name: 'name', type: PropertyTypes.String })
+        ]
+    })
+
+    const teamRelation = Relation.create({
         entity1: userEntity,
         targetName1: 'teams',
         entity2: teamEntity,
         targetName2: 'members',
-        relType: 'n:n'
+        relType: 'n:n',
+        properties: [
+            Property.create({ name: 'role', type: PropertyTypes.String}),
+        ]
+    })
+
+    Relation.create({
+        entity1: teamRelation,
+        targetName1: 'base',
+        entity2: locEntity,
+        targetName2: 'belong',
+        relType: '1:1',
+    })
+
+    Relation.create({
+        entity1: teamRelation,
+        targetName1: 'matches',
+        entity2: matchEntity,
+        targetName2: 'host',
+        relType: '1:n',
+    })
+
+    Relation.create({
+        entity1: teamRelation,
+        targetName1: 'participates',
+        entity2: matchEntity,
+        targetName2: 'participants',
+        relType: 'n:n',
     })
 
 
-    const powerEntity = Entity.create({ name: 'Power'})
-    const powerProperty = Property.create({ name: 'powerName', type: PropertyTypes.String })
-    powerEntity.properties.push(powerProperty)
+    const powerEntity = Entity.create({
+        name: 'Power',
+        properties: [
+            Property.create({ name: 'powerName', type: PropertyTypes.String })
+        ]
+    })
+
     Relation.create({
         entity1: userEntity,
         targetName1: 'powers',

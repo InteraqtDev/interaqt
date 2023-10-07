@@ -30,7 +30,10 @@ describe('create data', () => {
         const returnUser = await entityQueryHandle.create('User', {name: 'aaa', age: 17})
         expect(returnUser).toMatchObject({id: 1})
         const findUser = await entityQueryHandle.findOne('User', MatchExpression.createFromAtom({key:'name', value: ['=', 'aaa']}), {}, ['name', 'age'])
-        console.log(findUser)
+        expect(findUser).toMatchObject({
+            name: 'aaa',
+            age: 17
+        })
     })
 
 
@@ -39,7 +42,10 @@ describe('create data', () => {
         expect(returnUser.profile?.id).not.toBeUndefined()
         //
         const findUser = await entityQueryHandle.findOne('User', MatchExpression.createFromAtom({ key:'profile.title', value: ['=', 'aaa-profile']}), {}, ['name', 'age'])
-        console.log(findUser)
+        expect(findUser).toMatchObject({
+            name: 'aaa',
+            age: 17
+        })
     })
 
 
@@ -75,7 +81,6 @@ describe('update data', () => {
         const returnUser = await entityQueryHandle.create('User', {name: 'aaa', age: 17})
         const updated = await entityQueryHandle.update('User', MatchExpression.createFromAtom({ key: 'name', value: ['=', 'aaa']}), {name: 'bbb', age: 18})
         expect(updated.length).toBe(1)
-        console.log(updated)
         expect(updated[0].id).toBe(returnUser.id)
         const findUser = await entityQueryHandle.findOne('User', MatchExpression.createFromAtom({ key: 'name', value: ['=', 'bbb']}), {}, ['name', 'age'] )
         expect(findUser.id).toBe(returnUser.id)
@@ -113,7 +118,6 @@ describe('update data', () => {
         expect(updated[0].id).toBe(userA.id)
 
         const findUser = await entityQueryHandle.findOne('User', MatchExpression.createFromAtom({ key: 'id', value: ['=', userA.id]}), {}, ['name', 'age', ['leader', { attributeQuery: ['name', 'age']}]] )
-        console.log(findUser)
         expect(findUser).toMatchObject({
             name:'a1',
             leader: {
