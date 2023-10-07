@@ -191,6 +191,8 @@ export class DBSetup {
                 recordName: relationData.targetRecord,
                 linkName: relation,
                 isSource: true,
+                // CAUTION 这里是表示这个 target 是 reliance
+                isReliance: relationData.isTargetReliance
             } as RecordAttribute
 
             // CAUTION 关联查询时，不可能出现从实体来获取一个关系的情况，语义不正确。
@@ -204,7 +206,6 @@ export class DBSetup {
                     recordName: relationData.sourceRecord,
                     linkName: relation,
                     isSource:false,
-                    isReliance: relationData.isTargetReliance
                 } as RecordAttribute
             }
         })

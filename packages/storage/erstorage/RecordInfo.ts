@@ -30,13 +30,13 @@ export class RecordInfo {
         const linkFields = this.strictRecordAttributes.filter(info => {
             return info.isLinkMergedWithParent()
         }).map(info => {
-            console.log(info.attributeName)
             return info.getLinkInfo().recordInfo.sameRowFields
         })
 
-        const relianceFields = this.reliance.filter(info => {
-            return info.getRecordInfo().table === this.table
-        }).map(info => info.getRecordInfo().sameRowFields)
+        const relianceFields = this.sameTableReliance.map(info => {
+            return info.getRecordInfo().sameRowFields
+        })
+
 
         return valueFields.concat(...linkFields, ...relianceFields)
     }
@@ -68,7 +68,7 @@ export class RecordInfo {
 
     get reliance(): AttributeInfo[] {
         return Object.keys(this.data.attributes).filter(attribute => {
-            if (!(this.data.attributes[attribute] as RecordAttribute).isReliance) return false
+            return (this.data.attributes[attribute] as RecordAttribute).isReliance
         }).map(attribute => {
             return new AttributeInfo(this.name, attribute, this.map)
         })
@@ -83,6 +83,12 @@ export class RecordInfo {
     get differentTableReliance(): AttributeInfo[] {
         return this.reliance.filter(info => {
             return info.table !== this.table
+        })
+    }
+
+    get sameTableReliance(): AttributeInfo[] {
+        return this.reliance.filter(info => {
+            return info.table === this.table
         })
     }
 

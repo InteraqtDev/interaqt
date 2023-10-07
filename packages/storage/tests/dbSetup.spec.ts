@@ -33,6 +33,28 @@ describe("db setup", () => {
         })
         expect(setup.map.records.User.attributes.profile.field).toBeUndefined()
 
+        // 三表合一的 reliance 有 reliance 标记
+        expect(setup.map.links.User_item_owner_Item).toMatchObject({
+            table: 'User_item_owner_Item',
+            mergedTo: 'combined',
+            relType: ['1','1'],
+            sourceRecord: 'User',
+            sourceAttribute: 'item',
+            targetRecord: 'Item',
+            targetAttribute: 'owner',
+            recordName: 'User_item_owner_Item',
+            isTargetReliance: true
+        })
+        expect(setup.map.records.User.attributes.item).toMatchObject({
+            type: 'id',
+            isRecord: true,
+            relType: ['1', '1'],
+            recordName: 'Item',
+            linkName: 'User_item_owner_Item',
+            isSource:true,
+            isReliance: true
+        })
+
         expect(setup.map.records.Profile.attributes.owner).toMatchObject({
             type: 'id',
             isRecord: true,
@@ -51,6 +73,9 @@ describe("db setup", () => {
             targetAttribute: 'profile',
             mergedTo: 'combined',
         })
+
+
+
 
         // 关系实体化后的字段
         expect(setup.map.records.Profile_owner_profile_User).toMatchObject({
@@ -84,8 +109,6 @@ describe("db setup", () => {
         expect(setup.map.records.Profile_owner_profile_User.attributes.source.field).toBeUndefined()
         expect(setup.map.records.Profile_owner_profile_User.attributes.target.field).toBeUndefined()
 
-
-
         // 虚拟关系表
         expect(setup.map.links.Profile_owner_profile_User_source).toMatchObject({
             isSourceRelation: true,
@@ -106,6 +129,9 @@ describe("db setup", () => {
             targetAttribute: undefined,
             mergedTo: 'combined',
         })
+
+
+
     })
 
     test('validate n:1 relation map', () => {

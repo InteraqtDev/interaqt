@@ -62,7 +62,8 @@ export const createCommonData = () => {
         targetName1: 'item',
         entity2: itemEntity,
         targetName2: 'owner',
-        relType: '1:1'
+        relType: '1:1',
+        isTargetReliance: true
     })
 
     const teamEntity = Entity.create({ name: 'Team'})
@@ -76,6 +77,9 @@ export const createCommonData = () => {
         targetName2: 'members',
         relType: 'n:n'
     })
+
+
+    // TODO 再增加一个 1:n 的 reliance
 
 
     const entities = [...Entity.instances]

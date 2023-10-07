@@ -108,12 +108,15 @@ describe('one to one', () => {
     })
 
 
-    test('delete data:delete self with same row data', async () => {
+    test.only('delete data:delete self with same row data', async () => {
         const userA = await entityQueryHandle.create('User', {
             name:'a1',
             age:12,
             profile: {
                 title: 'f1'
+            },
+            item: {
+                itemName: 'item1'
             }
         })
 
@@ -121,15 +124,27 @@ describe('one to one', () => {
             MatchExpression.createFromAtom({ key: 'id', value: ['=', userA.id]}),
         )
 
+
         const findProfile = await entityQueryHandle.findOne('Profile',
             MatchExpression.createFromAtom({ key: 'title', value: ['=', 'f1']}),
             {},
-            ['title']
+            ['title', ['owner', {attributeQuery: ['id']}]]
         )
 
         expect(findProfile).toMatchObject({
-            title: 'f1'
+            title: 'f1',
+            owner: {
+                id: null
+            }
         })
+
+        const findItems = await entityQueryHandle.find('Item',
+            undefined, {},
+            ['itemName']
+        )
+
+        // reliance 会被连带删除
+        expect(findItems.length).toBe(0)
     })
 
 
