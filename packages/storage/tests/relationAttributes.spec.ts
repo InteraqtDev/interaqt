@@ -25,7 +25,7 @@ describe('relation attributes', () => {
         await db.close()
     })
 
-    test('create relation attribute on many to many', async () => {
+    test('create relation and update attribute on many to many', async () => {
         const userA = await entityQueryHandle.create('User', {
             name: 'aaa',
             age: 17,
@@ -38,15 +38,35 @@ describe('relation attributes', () => {
         })
 
 
+        const relationName = entityQueryHandle.getRelationName('User', 'teams')
+        const match = MatchExpression.createFromAtom({ key: 'source.id', value: ['=', userA.id]})
         const findTeamRelation = await entityQueryHandle.findOne(
-            entityQueryHandle.getRelationName('User', 'teams'),
-            MatchExpression.createFromAtom({ key: 'source.id', value: ['=', userA.id]}),
+            relationName,
+            match,
             {},
             ['role', ['source', {attributeQuery: ['name', 'age']}], ['target', {attributeQuery: ['teamName']}]]
         )
 
         expect(findTeamRelation).toMatchObject({
             role: 'leader',
+            source:{
+                name: 'aaa',
+                age:17
+            },
+            target: {
+                teamName: 'teamA'
+            }
+        })
+
+        await entityQueryHandle.updateRelationByName(relationName, match, { role: 'member'})
+        const findTeamRelation2 = await entityQueryHandle.findOne(
+            relationName,
+            match,
+            {},
+            ['role', ['source', {attributeQuery: ['name', 'age']}], ['target', {attributeQuery: ['teamName']}]]
+        )
+        expect(findTeamRelation2).toMatchObject({
+            role: 'member',
             source:{
                 name: 'aaa',
                 age:17

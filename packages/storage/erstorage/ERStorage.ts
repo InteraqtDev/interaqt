@@ -677,6 +677,8 @@ WHERE ${recordInfo.idField} IN (${records.map(({id}) => JSON.stringify(id)).join
 
     async unlink(linkName: string, matchExpressionData: MatchExpressionData, moveSource = false) {
         const linkInfo = this.map.getLinkInfoByName(linkName)
+        assert(!linkInfo.isTargetReliance, `cannot unlink reliance data, you can only delete record, ${linkName}`)
+
         const toMoveRecordInfo = moveSource ? linkInfo.sourceRecordInfo : linkInfo.targetRecordInfo
         const toMove = moveSource  ? 'source': 'target'
         if (linkInfo.isCombined()) {
@@ -840,9 +842,9 @@ export class EntityQueryHandle {
         return this.agent.createRecord(newEntityData)
     }
     // CAUTION 不能递归更新 relate entity 的 value，如果传入了 related entity 的值，说明是建立新的联系。
-    async update(entityName: string, matchExpressionData: MatchExpressionData, rawData: RawEntityData) {
-        const newEntityData = new NewRecordData(this.map, entityName, rawData)
-        return this.agent.updateRecord(entityName, matchExpressionData, newEntityData)
+    async update(entity: string, matchExpressionData: MatchExpressionData, rawData: RawEntityData) {
+        const newEntityData = new NewRecordData(this.map, entity, rawData)
+        return this.agent.updateRecord(entity, matchExpressionData, newEntityData)
     }
 
     async delete(entityName: string, matchExpressionData: MatchExpressionData, ) {
@@ -856,8 +858,9 @@ export class EntityQueryHandle {
     async addRelationById(entity:string, attribute:string, entityId: string, attributeEntityId:string, relationData?: RawEntityData) {
         return this.agent.addLinkFromRecord(entity, attribute, entityId, attributeEntityId, relationData)
     }
-    async updateRelationByName(relationName:string, matchExpressionData: MatchExpressionData, newData: RawEntityData) {
-        return this.agent.updateRecord(relationName, matchExpressionData, newData)
+    async updateRelationByName(relationName:string, matchExpressionData: MatchExpressionData, rawData: RawEntityData) {
+        assert(!rawData.source && !rawData.target, 'Relation can only update attributes. Use addRelation/removeRelation to update source/target.')
+        return this.agent.updateRecord(relationName, matchExpressionData, new NewRecordData(this.map, relationName, rawData))
     }
     async findRelationByName(relationName: string, matchExpressionData?: MatchExpressionData, modifierData?: ModifierData, attributeQueryData: AttributeQueryData = []) {
         return this.find(relationName, matchExpressionData, modifierData, attributeQueryData)

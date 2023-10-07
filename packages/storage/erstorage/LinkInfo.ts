@@ -69,22 +69,8 @@ export class LinkInfo {
         return this.record.table
     }
 
-    // CAUTION sourceField 指的的是 target 在source 表中的名字！
-    get sourceField() {
-        return this.record.attributes.target.field
-    }
-
-    // CAUTION sourceField 指的的是 target 在source 表中的名字！
-    get targetField() {
-        return this.record.attributes.source.field
-    }
-
-    get sourceAttrField() {
-        return this.record.attributes.source.field
-    }
-
-    get targetAttrField() {
-        return this.record.attributes.target.field
+    get isTargetReliance() {
+        return this.data.isTargetReliance
     }
 
     isMerged() {
@@ -106,6 +92,8 @@ export class LinkInfo {
     isRelationSource(recordName: string, attribute: string) {
         return this.data.sourceRecord === recordName && this.data.sourceAttribute === attribute
     }
+
+
 
     getAttributeName(recordName: string, attribute: string) {
         assert(!!recordName && !!attribute, `${recordName}, ${attribute} cannot be empty`)

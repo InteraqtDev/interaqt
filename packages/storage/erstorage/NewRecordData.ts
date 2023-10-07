@@ -26,7 +26,7 @@ export class NewRecordData {
     public entityIdAttributes: AttributeInfo[] = []
 
     public relatedEntitiesData: NewRecordData[] = []
-    public valueAttributes: AttributeInfo[]
+    public valueAttributes: AttributeInfo[] = []
 
     // 和当前合表并且是  id 的。说明我们的需要的 row 已经有了，只要update 相应 column 就行了
     public sameRowEntityIdRefs: NewRecordData[] = []
