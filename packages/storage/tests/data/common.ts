@@ -79,8 +79,17 @@ export const createCommonData = () => {
     })
 
 
-    // TODO 再增加一个 1:n 的 reliance
-
+    const powerEntity = Entity.create({ name: 'Power'})
+    const powerProperty = Property.create({ name: 'powerName', type: PropertyTypes.String })
+    powerEntity.properties.push(powerProperty)
+    Relation.create({
+        entity1: userEntity,
+        targetName1: 'powers',
+        entity2: powerEntity,
+        targetName2: 'owner',
+        relType: '1:n',
+        isTargetReliance: true
+    })
 
     const entities = [...Entity.instances]
     const relations = [...Relation.instances]

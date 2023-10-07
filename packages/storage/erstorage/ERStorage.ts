@@ -7,7 +7,7 @@ import {Database, EntityIdRef, ROW_ID_ATTR} from '../../runtime/System'
 import {FieldMatchAtom, MatchAtom, MatchExpression, MatchExpressionData} from "./MatchExpression.ts";
 import {ModifierData} from "./Modifier.ts";
 import {AttributeQuery, AttributeQueryData, AttributeQueryDataItem} from "./AttributeQuery.ts";
-import {EntityQueryData, EntityQueryTree, RecordQuery} from "./RecordQuery.ts";
+import {RecordQueryData, RecordQueryTree, RecordQuery} from "./RecordQuery.ts";
 import {NewRecordData, RawEntityData} from "./NewRecordData.ts";
 import {someAsync} from "./util.ts";
 
@@ -23,11 +23,11 @@ export class QueryAgent {
     constructor(public map: EntityToTableMap, public database: Database) {}
     buildFindQuery(entityQuery: RecordQuery, prefix='') {
         // 从所有条件里面构建出 join clause
-        const fieldQueryTree = entityQuery.attributeQuery!.entityQueryTree
+        const fieldQueryTree = entityQuery.attributeQuery!.xToOneQueryTree
         const matchQueryTree = entityQuery.matchExpression.entityQueryTree
         const finalQueryTree = deepMerge(fieldQueryTree, matchQueryTree)
 
-        const joinTables = this.getJoinTables(finalQueryTree, [entityQuery.entityName])
+        const joinTables = this.getJoinTables(finalQueryTree, [entityQuery.recordName])
 
         const fieldMatchExp = entityQuery.matchExpression.buildFieldMatchExpression()
 
@@ -35,12 +35,12 @@ export class QueryAgent {
 SELECT ${prefix ? '' : 'DISTINCT'}
 ${this.buildSelectClause(entityQuery.attributeQuery.getQueryFields(), prefix)}
 FROM
-${this.buildFromClause(entityQuery.entityName, prefix)}
+${this.buildFromClause(entityQuery.recordName, prefix)}
 ${this.buildJoinClause(joinTables, prefix)}
 ${fieldMatchExp ? `
 WHERE
 ${this.buildWhereClause( 
-    this.parseMatchExpressionValue(entityQuery.entityName, fieldMatchExp , entityQuery.contextRootEntity),
+    this.parseMatchExpressionValue(entityQuery.recordName, fieldMatchExp , entityQuery.contextRootEntity),
     prefix
 )}
 ` : ''}   
@@ -64,11 +64,11 @@ ${this.buildWhereClause(
         // 2. TODO 关联数据的结构化。也可以把信息丢到客户端，然客户端去结构化？？？
 
         // 3. x:n 关联实体的查询
-        if (entityQuery.attributeQuery!.xToManyEntities) {
-            for (let relatedEntity of entityQuery.attributeQuery.xToManyEntities) {
+        if (entityQuery.attributeQuery!.xToManyRecords) {
+            for (let relatedEntity of entityQuery.attributeQuery.xToManyRecords) {
                 const {name: attributeName, entityQuery: subEntityQuery} = relatedEntity
                 for (let entity of data) {
-                    entity[attributeName] = await this.findRelatedRecords(entityQuery.entityName, attributeName, entity.id, subEntityQuery)
+                    entity[attributeName] = await this.findRelatedRecords(entityQuery.recordName, attributeName, entity.id, subEntityQuery)
                 }
             }
         }
@@ -84,13 +84,12 @@ ${this.buildWhereClause(
         })
 
         // FIXME 改成 create
-        const newSubQuery = new RecordQuery(subEntityQuery.entityName, subEntityQuery.map, newMatch, subEntityQuery.attributeQuery, subEntityQuery.modifier, subEntityQuery.contextRootEntity)
+        const newSubQuery = new RecordQuery(subEntityQuery.recordName, subEntityQuery.map, newMatch, subEntityQuery.attributeQuery, subEntityQuery.modifier, subEntityQuery.contextRootEntity)
 
         return this.findRecords(newSubQuery)
     }
     // 根据 queryTree 来获得 join table 的信息。因为 queryTree 是树形，所以这里也是个递归结构。
-
-    getJoinTables(queryTree: EntityQueryTree, context: string[] = [], parentInfos?: [string, string, string]) :JoinTables {
+    getJoinTables(queryTree: RecordQueryTree, context: string[] = [], parentInfos?: [string, string, string]) :JoinTables {
         // 应该是深度 遍历？
         const result: JoinTables = []
         if (!parentInfos) {
@@ -112,54 +111,47 @@ ${this.buildWhereClause(
             const [currentTable, currentTableAlias, /*lastEntityData*/,relationTable, relationTableAlias] = this.map.getTableAndAlias(context.concat(entityAttributeName))
             const [, idField] = this.map.getTableAliasAndFieldName(context.concat(entityAttributeName), 'id')
             // 这里的目的是把 attribute 对应的 record table 找到，并且正确 join 进来。
-            // 任何关系都会有一个 中间 record 吗？不会。
+            // join 本质上是把当前的路径和上一级路径连起来。
             // 这里只处理没有和上一个节点 三表合一 的情况。三表合一的情况不需要 join。复用 alias 就行
             if (!attributeInfo.isMergedWithParent()) {
                 // 这里要判断的是 关联 id 是记录在了哪里？
                 // 如果 attributeInfo 自己就有 field，说明就是自己记录的
-                if (attributeInfo.field) {
-                    assert(attributeInfo.isManyToOne, `only many to one can attribute may have field`)
+                if (attributeInfo.isLinkMergedWithParent()) {
                     result.push({
                         for: context.concat(entityAttributeName),
                         joinSource: parentTableAndAlias!,
                         joinIdField: [attributeInfo.field, idField],
                         joinTarget: [currentTable, currentTableAlias]
                     })
-                } else {
-                    //
+                } else if (attributeInfo.isLinkMergedWithAttribute()){
                     const reverseAttributeInfo = attributeInfo.getReverseInfo()
                     // 说明记录在对方的 field 里面
-                    if (reverseAttributeInfo && reverseAttributeInfo.field) {
-                        result.push({
-                            for: context.concat(entityAttributeName),
-                            joinSource: parentTableAndAlias!,
-                            // 这里要找当前实体中用什么 attributeName 指向上一个实体
-                            joinIdField: [parentIdField, reverseAttributeInfo.field],
-                            joinTarget: [currentTable, currentTableAlias]
-                        })
-                    } else {
-                        // 说明记录在了 relation record 的 source/target 中
-                        const linkInfo = attributeInfo.getLinkInfo()
-                        const isCurrentRelationSource = linkInfo.isRelationSource(attributeInfo.parentEntityName, attributeInfo.attributeName)
+                    result.push({
+                        for: context.concat(entityAttributeName),
+                        joinSource: parentTableAndAlias!,
+                        // 这里要找当前实体中用什么 attributeName 指向上一个实体
+                        joinIdField: [parentIdField, reverseAttributeInfo.field],
+                        joinTarget: [currentTable, currentTableAlias]
+                    })
+                } else {
+                    // 说明记录在了 relation record 的 source/target 中
+                    const linkInfo = attributeInfo.getLinkInfo()
+                    const isCurrentRelationSource = linkInfo.isRelationSource(attributeInfo.parentEntityName, attributeInfo.attributeName)
+                    // 关系表独立
+                    result.push({
+                        for: context.concat(entityAttributeName),
+                        joinSource: parentTableAndAlias!,
+                        // CAUTION sourceField 是用在合并了情况里面的，指的是 target 在 source 里面的名字！所以这里不能用
+                        joinIdField: [parentIdField, isCurrentRelationSource ? linkInfo.record.attributes.source.field! : linkInfo.record.attributes.target.field!],
+                        joinTarget: [relationTable, relationTableAlias]
+                    })
 
-                        // 关系表独立
-                        result.push({
-                            for: context.concat(entityAttributeName),
-                            joinSource: parentTableAndAlias!,
-                            // CAUTION sourceField 是用在合并了情况里面的，指的是 target 在 source 里面的名字！所以这里不能用
-                            joinIdField: [parentIdField, isCurrentRelationSource ? linkInfo.record.attributes.source.field! : linkInfo.record.attributes.target.field!],
-                            joinTarget: [relationTable, relationTableAlias]
-                        })
-
-                        result.push({
-                            for: context.concat(entityAttributeName),
-                            joinSource: [relationTable, relationTableAlias],
-                            joinIdField: [isCurrentRelationSource ? linkInfo.record.attributes.target.field! : linkInfo.record.attributes.source.field!, idField],
-                            joinTarget: [currentTable, currentTableAlias]
-                        })
-
-                    }
-
+                    result.push({
+                        for: context.concat(entityAttributeName),
+                        joinSource: [relationTable, relationTableAlias],
+                        joinIdField: [isCurrentRelationSource ? linkInfo.record.attributes.target.field! : linkInfo.record.attributes.source.field!, idField],
+                        joinTarget: [currentTable, currentTableAlias]
+                    })
                 }
             }
             result.push(...this.getJoinTables(subQueryTree, context.concat(entityAttributeName), [currentTable!, currentTableAlias!, idField!]))
@@ -568,9 +560,12 @@ WHERE ${idField} IN (${idRefs.map(i => JSON.stringify(i.id)).join(',')})
         const records = await this.findRecords(deleteQuery)
 
         if (records.length) {
-            await this.deleteRecordSameRowData(recordName, records)
-            await this.deleteNotReliantSeparateLinkRecords(recordName, records)
+            // 删除依赖我的
             await this.deleteDifferentTableReliance(recordName, records)
+            // 删除自身
+            await this.deleteRecordSameRowData(recordName, records)
+            // 删除其他的关系
+            await this.deleteNotReliantSeparateLinkRecords(recordName, records)
         }
 
         return records
@@ -619,8 +614,6 @@ WHERE ${recordInfo.idField} IN (${records.map(({id}) => JSON.stringify(id)).join
     }
 
 
-
-
     async deleteNotReliantSeparateLinkRecords(recordName: string, record: EntityIdRef[]) {
         const recordInfo = this.map.getRecordInfo(recordName)
         for(let info of recordInfo.differentTableRecordAttributes) {
@@ -643,7 +636,6 @@ WHERE ${recordInfo.idField} IN (${records.map(({id}) => JSON.stringify(id)).join
                 key: `${info.getReverseInfo()?.attributeName!}.id`,
                 value: ['in', records.map(r => r.id)]
             })
-
             await this.deleteRecord(info.recordName, matchInIds)
         }
     }

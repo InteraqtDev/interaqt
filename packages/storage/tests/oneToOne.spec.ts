@@ -108,7 +108,7 @@ describe('one to one', () => {
     })
 
 
-    test.only('delete data:delete self with same row data', async () => {
+    test('delete data:delete self with same row data', async () => {
         const userA = await entityQueryHandle.create('User', {
             name:'a1',
             age:12,

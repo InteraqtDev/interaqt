@@ -165,6 +165,7 @@ export class EntityToTableMap {
         return [lastTable, lastTableAlias, lastEntityData, relationTable!, relationTableAlias!, currentLink!]
     }
     getTableAliasAndFieldName(namePath: string[], attributeName: string) {
+        // 获取 id 时，可以直接从关系表上获得，不需要额外的 table
         const [, lastTableAliasName,lastEntityData] = this.getTableAndAlias(namePath)
         const fieldName = ((lastEntityData as RecordMapItem).attributes[attributeName] as ValueAttribute).field
         return [lastTableAliasName, fieldName]

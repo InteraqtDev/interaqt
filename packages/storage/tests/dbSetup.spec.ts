@@ -9,7 +9,7 @@ import {EntityToTableMap} from "../erstorage/EntityToTableMap";
 import { SQLiteDB } from '../../runtime/BunSQLite'
 import {createCommonData} from "./data/common";
 import {MatchExpression} from "../erstorage/MatchExpression.ts";
-import {EntityQueryData, RecordQuery} from "../erstorage/RecordQuery.ts";
+import {RecordQueryData, RecordQuery} from "../erstorage/RecordQuery.ts";
 
 const { entities, relations } = createCommonData()
 
@@ -45,6 +45,7 @@ describe("db setup", () => {
             recordName: 'User_item_owner_Item',
             isTargetReliance: true
         })
+
         expect(setup.map.records.User.attributes.item).toMatchObject({
             type: 'id',
             isRecord: true,

@@ -43,15 +43,15 @@ describe('attribute query test', () => {
         const attributeQuery = new AttributeQuery('User', entityToTableMap, queryData)
 
         // CAUTION 应该没有 friends 节点，因为 AttributeQuery 只管 x:1 关系，这是能直接获取的
-        expect(attributeQuery.entityQueryTree).toMatchObject({
+        expect(attributeQuery.xToOneQueryTree).toMatchObject({
             profile: {},
             item: {},
             leader: {
                 profile: {}
             },
         })
-        expect(attributeQuery.xToManyEntities.length).toBe(1)
-        expect(attributeQuery.xToManyEntities[0].name).toBe('friends')
+        expect(attributeQuery.xToManyRecords.length).toBe(1)
+        expect(attributeQuery.xToManyRecords[0].name).toBe('friends')
         expect(attributeQuery.getQueryFields()).toMatchObject([
             // 自己的字段
             //  永远自动加上 id

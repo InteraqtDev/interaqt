@@ -2,7 +2,7 @@ import {BoolExpression} from "../../shared/BoolExpression";
 import {EntityToTableMap} from "./EntityToTableMap";
 import {assert, setByPath} from "../util";
 
-import {EntityQueryTree} from "./RecordQuery.ts";
+import {RecordQueryTree} from "./RecordQuery.ts";
 
 export type MatchAtom = { key: string, value: [string, any], isReferenceValue?: boolean }
 export type MatchExpressionData = BoolExpression<MatchAtom>
@@ -23,7 +23,7 @@ export class MatchExpression {
         return BoolExpression.createFromAtom<MatchAtom>(value)
     }
 
-    public entityQueryTree: EntityQueryTree = {}
+    public entityQueryTree: RecordQueryTree = {}
 
     constructor(public entityName: string, public map: EntityToTableMap, public data?: MatchExpressionData, public contextRootEntity?: string, public fromRelation?: boolean) {
         this.entityQueryTree = {}
@@ -33,7 +33,7 @@ export class MatchExpression {
         }
     }
 
-    buildEntityQueryTree(matchData: MatchExpressionData, entityQueryTree: EntityQueryTree) {
+    buildEntityQueryTree(matchData: MatchExpressionData, entityQueryTree: RecordQueryTree) {
         if (matchData.isExpression()) {
             if (matchData.left) {
                 this.buildEntityQueryTree(matchData.left, entityQueryTree)

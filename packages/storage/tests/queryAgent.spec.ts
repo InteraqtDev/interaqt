@@ -7,7 +7,7 @@ import {EntityToTableMap, MapData} from "../erstorage/EntityToTableMap";
 import {entityToTableMapData} from "./data/mapData";
 import {MatchExpression, MatchExpressionData} from "../erstorage/MatchExpression.ts";
 import {AttributeQuery, AttributeQueryData} from "../erstorage/AttributeQuery.ts";
-import {EntityQueryData, RecordQuery} from "../erstorage/RecordQuery.ts";
+import {RecordQueryData, RecordQuery} from "../erstorage/RecordQuery.ts";
 
 
 const database = new SQLiteDB()
@@ -52,7 +52,7 @@ describe('query agent test', () => {
         const attributeQuery = new AttributeQuery('User', entityToTableMap, queryData)
         const queryAgent = new QueryAgent(entityToTableMap, database)
 
-        const joinExp = queryAgent.getJoinTables(attributeQuery.fullEntityQueryTree, ['User'])
+        const joinExp = queryAgent.getJoinTables(attributeQuery.fullQueryTree, ['User'])
         expect(joinExp).toMatchObject([
             // 和 item 合一了，不需要join
             // 和自身 join
@@ -126,7 +126,7 @@ describe('query agent test', () => {
                 key: 'age',
                 value: ['<', '18']
             })
-        } as EntityQueryData)
+        } as RecordQueryData)
 
         expect(fieldMatchExpWithValue!.right.data.fieldValue).toBe(`
 EXISTS (
@@ -173,7 +173,7 @@ ${queryAgent.buildFindQuery(innerEntityQuery, 'User_friends')}
                     value: ['=', 'name']
                 })]
             })
-        } as EntityQueryData)
+        } as RecordQueryData)
 
         const queryAgent = new QueryAgent(entityToTableMap, database)
         expect(() => queryAgent.buildFindQuery(entityQuery)).not.toThrow()

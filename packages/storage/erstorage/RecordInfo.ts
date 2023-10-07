@@ -58,13 +58,6 @@ export class RecordInfo {
         return this.strictRecordAttributes.filter(info => info.table !== this.table)
     }
 
-    get differentTableRecords() {
-        return Object.keys(this.data.attributes).map(attribute => {
-            return new AttributeInfo(this.name, attribute, this.map)
-        }).filter(info =>
-            info.isRecord && !info.isMergedWithParent() && !info.field
-        )
-    }
 
     get reliance(): AttributeInfo[] {
         return Object.keys(this.data.attributes).filter(attribute => {
@@ -82,6 +75,7 @@ export class RecordInfo {
 
     get differentTableReliance(): AttributeInfo[] {
         return this.reliance.filter(info => {
+            console.log(11111, info.attributeName, info.table, this.table)
             return info.table !== this.table
         })
     }

@@ -148,7 +148,12 @@ describe('one to many', () => {
             member: [
                 {name:'m1', age:12},
                 {name:'m2', age:13},
-            ]}
+            ],
+            powers: [
+                {powerName: 'speed'},
+                {powerName: 'fly'},
+            ]
+        }
         const userA = await entityQueryHandle.create('User', rawData)
         // 删除用户
         // console.log(await entityQueryHandle.database.query(`select * from User_leader_member_User`))
@@ -173,6 +178,10 @@ describe('one to many', () => {
         expect(findRelations.length).toBe(2)
         expect(findRelations[0].leader.id).toBe(null)
         expect(findRelations[1].leader.id).toBe(null)
+
+        //1:n reliance 要被连带删除
+        const findPowers = await entityQueryHandle.find('Power', undefined, undefined, ['powerName'])
+        expect(findPowers.length).toBe(0)
     })
 
 
