@@ -1,6 +1,6 @@
 import {BoolExpression} from "../../shared/BoolExpression";
 import {EntityToTableMap} from "./EntityToTableMap";
-import {assert, setByPath} from "../util";
+import {assert, getByPath, setByPath} from "../util";
 
 import {RecordQueryTree} from "./RecordQuery.ts";
 
@@ -26,7 +26,7 @@ export class MatchExpression {
     public entityQueryTree: RecordQueryTree = {}
 
     constructor(public entityName: string, public map: EntityToTableMap, public data?: MatchExpressionData, public contextRootEntity?: string, public fromRelation?: boolean) {
-        this.entityQueryTree = {}
+        this.entityQueryTree = new RecordQueryTree(this.entityName, this.map)
         if (this.data) {
             assert(this.data instanceof BoolExpression, `match data is not a BoolExpression instance, you passed: ${this.data}`)
             this.buildEntityQueryTree(this.data, this.entityQueryTree)
@@ -51,10 +51,10 @@ export class MatchExpression {
             //  CAUTION 还有最后路径是 entity 但是  match 值是 EXIST 的不用管，因为会生成 exist 子句。只不过这里也不用特别处理，join 的表没用到会自动数据库忽略。
             if (!(matchAttributePath.length === 1 && attributeInfo.isValue)) {
                 if (attributeInfo.isRecord) {
-                    setByPath(entityQueryTree, matchAttributePath, {})
+                    entityQueryTree.addRecord(matchAttributePath)
                 } else {
                     // 最后一个是 attribute，所以不在 entityQueryTree 上。
-                    setByPath(entityQueryTree, matchAttributePath.slice(0, matchAttributePath.length - 1), {})
+                    entityQueryTree.addField(matchAttributePath)
                 }
             }
         }
@@ -63,7 +63,7 @@ export class MatchExpression {
 
     getFinalFieldName(matchAttributePath: string[]) {
         const namePath = [this.entityName].concat(matchAttributePath.slice(0, -1))
-        return this.map.getTableAliasAndFieldName(namePath, matchAttributePath.at(-1)!)
+        return this.map.getTableAliasAndFieldName(namePath, matchAttributePath.at(-1)!).slice(0, 2)
     }
 
     getReferenceFieldValue(valueStr: string) {
@@ -114,7 +114,7 @@ export class MatchExpression {
             } else {
                 // entity
                 const namePath = [this.entityName].concat(matchAttributePath)
-                const [, tableAlias] = this.map.getTableAndAlias(namePath)
+                const {alias: tableAlias} = this.map.getTableAndAliasStack(namePath).at(-1)
 
                 // CAUTION 函数匹配的情况不管了，因为可能未来涉及到使用 cursor 实现更强的功能，这就涉及到查询计划的修改了。统统扔到上层去做。
                 //  注意，子查询中也可能对上层的引用，这个也放到上层好像能力有点重叠了。

@@ -36,6 +36,18 @@ export function setByPath(root: ObjectContainer, inputPath: string[], value: any
     return true
 }
 
+export function getByPath(root: ObjectContainer, inputPath: string[]) {
+    const path = [...inputPath]
+    let pointer = root
+    let nextAttr
+    while(nextAttr = path.shift()) {
+        if (!pointer[nextAttr]) return undefined
+        pointer = pointer[nextAttr]
+    }
+
+    return pointer
+}
+
 export function mapTree(root: ObjectContainer, iteratorKeys: string[], fn: (object: any, context :string[]) => any, context: string[] = []) {
     const result = fn(root, context)
     iteratorKeys.forEach(key => {

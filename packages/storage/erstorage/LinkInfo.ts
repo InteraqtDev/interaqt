@@ -88,6 +88,9 @@ export class LinkInfo {
     isCombined() {
         return this.data.mergedTo === 'combined'
     }
+    isIsolated() {
+        return !this.data.mergedTo
+    }
 
     isRelationSource(recordName: string, attribute: string) {
         return this.data.sourceRecord === recordName && this.data.sourceAttribute === attribute

@@ -2,6 +2,7 @@ import {expect, test, describe} from "bun:test";
 import {EntityToTableMap, MapData} from "../erstorage/EntityToTableMap";
 import {entityToTableMapData} from './data/mapData'
 import {AttributeQuery, AttributeQueryData} from "../erstorage/AttributeQuery.ts";
+import {RecordQueryTree} from "../erstorage/RecordQuery.ts";
 
 
 const entityToTableMap = new EntityToTableMap(entityToTableMapData)
@@ -43,13 +44,12 @@ describe('attribute query test', () => {
         const attributeQuery = new AttributeQuery('User', entityToTableMap, queryData)
 
         // CAUTION 应该没有 friends 节点，因为 AttributeQuery 只管 x:1 关系，这是能直接获取的
-        expect(attributeQuery.xToOneQueryTree).toMatchObject({
-            profile: {},
-            item: {},
-            leader: {
-                profile: {}
-            },
-        })
+
+        expect(attributeQuery.xToOneQueryTree.records.profile).toBeInstanceOf(RecordQueryTree)
+        expect(attributeQuery.xToOneQueryTree.records.item).toBeInstanceOf(RecordQueryTree)
+        expect(attributeQuery.xToOneQueryTree.records.leader).toBeInstanceOf(RecordQueryTree)
+        expect(attributeQuery.xToOneQueryTree.records.leader.records.profile).toBeInstanceOf(RecordQueryTree)
+
         expect(attributeQuery.xToManyRecords.length).toBe(1)
         expect(attributeQuery.xToManyRecords[0].name).toBe('friends')
         expect(attributeQuery.getQueryFields()).toMatchObject([
@@ -94,7 +94,8 @@ describe('attribute query test', () => {
             },
             // 1:n 字段
             {
-                tableAliasAndField: ["User_leader", "User_id"],
+                // CAUTION 请求的 id 的时候会更具情况来直接用关系表！
+                tableAliasAndField: ["User", "User_leader"],
                 nameContext: ["User", "leader"],
                 attribute: "id"
             },
@@ -131,7 +132,8 @@ describe('attribute query test', () => {
                 nameContext: [ "User_leader_member_User", "source" ],
                 attribute: "id"
             }, {
-                tableAliasAndField: [ "User_leader_member_User_target", "User_id" ],
+                // 请求 id 会缩减 join
+                tableAliasAndField: [ "User_leader_member_User", "User_leader" ],
                 nameContext: [ "User_leader_member_User", "target" ],
                 attribute: "id"
             }

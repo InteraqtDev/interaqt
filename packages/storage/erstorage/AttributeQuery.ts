@@ -10,10 +10,10 @@ export class AttributeQuery {
     public xToManyRecords: { name: string, entityQuery: RecordQuery }[] = []
     public xToOneRecords: { name: string, entityQuery: RecordQuery }[] = []
     public valueAttributes: string[] = []
-    public xToOneQueryTree: RecordQueryTree = {}
-    public fullQueryTree: RecordQueryTree = {}
+    public xToOneQueryTree: RecordQueryTree
+    public fullQueryTree: RecordQueryTree
 
-    constructor(public recordName: string, public map: EntityToTableMap, public data: AttributeQueryData = []) {
+    constructor(public recordName: string, public map: EntityToTableMap, public data: AttributeQueryData = [], public parentRecord?: string, public attributeName?: string) {
         data.forEach((item: AttributeQueryDataItem) => {
             const attributeName: string = typeof item === 'string' ? item : item[0]
 
@@ -21,7 +21,7 @@ export class AttributeQuery {
             if (attributeInfo.isRecord) {
                 const relatedEntity = {
                     name: attributeName,
-                    entityQuery: RecordQuery.create(attributeInfo.recordName, this.map, item[1] as RecordQueryData)
+                    entityQuery: RecordQuery.create(attributeInfo.recordName, this.map, item[1] as RecordQueryData, undefined, this.recordName, attributeName)
                 }
 
                 this.relatedRecords.push(relatedEntity)
@@ -38,9 +38,9 @@ export class AttributeQuery {
             }
         })
 
-
         this.xToOneQueryTree = this.buildXToOneQueryTree()
         this.fullQueryTree = this.buildFullQueryTree()
+
     }
 
     getQueryFields(nameContext = [this.recordName]): { tableAliasAndField: [string, string], nameContext: string[], attribute: string }[] {
@@ -62,19 +62,23 @@ export class AttributeQuery {
     }
 
     buildXToOneQueryTree() {
-        const result: RecordQueryTree = {}
+        const result = new RecordQueryTree(this.recordName, this.map, this.parentRecord, this.attributeName)
+        this.data.forEach(i => {
+            if (!Array.isArray(i)) {
+                result.addField([i])
+            }
+        })
         // CAUTION 我们这里只管 xToOne 的情况，因为 xToMany 都是外部用 id 去做二次查询得到的。不是用 join 语句一次性得到的。
         this.xToOneRecords.forEach(({name, entityQuery}) => {
-
-            result[name] = entityQuery.attributeQuery!.xToOneQueryTree
+            result.addRecord([name], entityQuery.attributeQuery!.xToOneQueryTree)
         })
         return result
     }
 
     buildFullQueryTree() {
-        const result: RecordQueryTree = {}
+        const result = new RecordQueryTree(this.recordName, this.map, this.parentRecord, this.attributeName)
         this.relatedRecords.forEach(({name, entityQuery}) => {
-            result[name] = entityQuery.attributeQuery!.xToOneQueryTree
+            result.addRecord([name], entityQuery.attributeQuery!.fullQueryTree)
         })
         return result
     }

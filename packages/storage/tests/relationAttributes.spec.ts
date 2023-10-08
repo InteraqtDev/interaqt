@@ -194,7 +194,7 @@ describe('relation attributes', () => {
             },
             target: {
                 teamName: 'teamA'
-            }
+            },
         })
     })
 

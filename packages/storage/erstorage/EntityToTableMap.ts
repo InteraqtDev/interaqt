@@ -123,7 +123,7 @@ export class EntityToTableMap {
         }
         return new AttributeInfo( parentEntity!, lastAttribute!, this)
     }
-    getTableAndAlias(namePath: string[]): [string, string, RecordMapItem, string, string, LinkMapItem] {
+    getTableAndAliasStack(namePath: string[]): {table:string, alias: string, record: RecordMapItem, linkTable?:string, linkAlias?:string, link?: LinkMapItem, path: string[]}[] {
         const [rootEntityName, ...relationPath] = namePath
         let lastEntityData: RecordMapItem = this.data.records[rootEntityName]
         let lastTable:string = lastEntityData.table
@@ -133,6 +133,21 @@ export class EntityToTableMap {
         let relationTableAlias:string
         let isLastRelationSource = true
         let currentLink: LinkMapItem
+
+        const result = [{
+            // 最后一张表名
+            table: lastTable,
+            // 最后一张表 alias，
+            alias: lastTableAlias,
+            // 最后表代表的 entity 数据，
+            record: lastEntityData,
+            // 上一张表和最后一张表的关联表（如果是 relation 和  entity 的连接，这个link 就是虚拟的，table 是空，因为肯定是个合并的），
+            linkTable: relationTable,
+            // 上一张表和最后一张表的关联表的 alias.
+            linkAlias: relationTableAlias,
+            link: currentLink,
+            path: [rootEntityName]
+        }]
 
         for(let i = 0; i<relationPath.length; i++) {
             const currentAttributeName = relationPath[i]
@@ -159,16 +174,40 @@ export class EntityToTableMap {
             relationTableAlias = `REL__${lastTableAlias}`
             isLastRelationSource = currentLink.targetRecord === currentEntityAttribute.recordName &&
                 currentLink.targetAttribute === currentAttributeName
+
+            result.push({
+                table: lastTable,
+                alias: lastTableAlias,
+                record: lastEntityData,
+                linkTable: relationTable,
+                linkAlias: relationTableAlias,
+                link: currentLink,
+                path: [rootEntityName, ...relationPath.slice(0, i+1)]
+            })
         }
 
-
-        return [lastTable, lastTableAlias, lastEntityData, relationTable!, relationTableAlias!, currentLink!]
+        return result
     }
-    getTableAliasAndFieldName(namePath: string[], attributeName: string) {
+    getTableAliasAndFieldName(namePath: string[], attributeName: string, dontShrink = false): [string, string,string] {
+        const stack = this.getTableAndAliasStack(namePath)
+        const {table, alias, record, path, linkAlias, linkTable} = stack.at(-1)
+        const attrInfo = stack.length > 1 ? this.getInfoByPath(path) : null
         // 获取 id 时，可以直接从关系表上获得，不需要额外的 table
-        const [, lastTableAliasName,lastEntityData] = this.getTableAndAlias(namePath)
-        const fieldName = ((lastEntityData as RecordMapItem).attributes[attributeName] as ValueAttribute).field
-        return [lastTableAliasName, fieldName]
+        if (!dontShrink && attributeName === 'id' && namePath.length > 1 && (attrInfo?.isLinkMergedWithParent() || attrInfo?.isLinkIsolated())) {
+            if (attrInfo?.isLinkMergedWithParent()) {
+                // 和父亲合并了，应该用父亲的 alias 和 表上用于记录关系 id 的 field
+                const {alias: parentAlias, table: parentTable} = stack.at(-2)
+                return [parentAlias, attrInfo!.linkField, parentTable]
+            } else {
+                // isolated。应该用关系表上的记录 id 的 source/target 字段
+                const linkInfoRecord = attrInfo!.getLinkInfo().record
+                return [linkAlias, attrInfo!.isRecordSource() ? linkInfoRecord?.attributes.target.field : linkInfoRecord?.attributes.source.field, linkTable]
+            }
+        } else {
+
+            const fieldName = record.attributes[attributeName].field
+            return [alias, fieldName, table]
+        }
     }
     getReverseAttribute(entityName: string, attribute: string) : string {
         const relationName = (this.data.records[entityName].attributes[attribute] as RecordAttribute).linkName

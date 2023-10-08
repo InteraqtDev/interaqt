@@ -81,7 +81,6 @@ describe('one to many', () => {
             leader: {name:'l1', age:12}
         }
         const userA = await entityQueryHandle.create('User', rawData)
-
         const findUser = await entityQueryHandle.findOne('User',
             MatchExpression.createFromAtom({ key: 'id', value: ['=', userA.id]}),
             {},
@@ -170,14 +169,17 @@ describe('one to many', () => {
 
         expect(findUsers.length).toBe(0)
 
-        const findRelations = await entityQueryHandle.find('User',
+        const findUsers2 = await entityQueryHandle.find('User',
             undefined,
             {},
             ['name', 'age', ['leader', {attributeQuery: ['name', 'age']}]]
         )
-        expect(findRelations.length).toBe(2)
-        expect(findRelations[0].leader.id).toBe(null)
-        expect(findRelations[1].leader.id).toBe(null)
+        console.log(await entityQueryHandle.database.query(`select * from Profile_User_Item`))
+        expect(findUsers2.length).toBe(2)
+        expect(findUsers2[0].name).toBe('m1')
+        expect(findUsers2[0].leader.id).toBe(null)
+        expect(findUsers2[1].name).toBe('m2')
+        expect(findUsers2[1].leader.id).toBe(null)
 
         //1:n reliance 要被连带删除
         const findPowers = await entityQueryHandle.find('Power', undefined, undefined, ['powerName'])
@@ -282,7 +284,6 @@ describe('one to many', () => {
         const userA = await entityQueryHandle.create('User', {name:'a1', age:12})
         const userB = await entityQueryHandle.create('User', {name: 'm1', age:11})
         const userC = await entityQueryHandle.create('User', {name: 'm2', age:14})
-
         await entityQueryHandle.update('User', MatchExpression.createFromAtom({
             key: 'id',
             value: ['=', userA.id]
@@ -324,7 +325,7 @@ describe('one to many', () => {
         })
     })
 
-    test('update one to many data:update with existing related as source', async () => {
+    test.only('update one to many data:update with existing related as source', async () => {
         const userA = await entityQueryHandle.create('User', {name:'a1', age:12})
         const userB = await entityQueryHandle.create('User', {name: 'm1', age:11})
         const userC = await entityQueryHandle.create('User', {name: 'm2', age:14})

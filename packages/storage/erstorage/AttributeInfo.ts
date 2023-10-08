@@ -81,7 +81,7 @@ export class AttributeInfo {
     }
 
     get linkField() {
-        if (this.isRecord && this.isManyToOne && this.isLinkMergedWithParent()) {
+        if (this.isRecord && this.isLinkMergedWithParent()) {
             // 如果parent 是 linkRecord， source/target 这样的 field 就是 attribute 上面在管。
             if (this.data.field) return this.data.field
 
@@ -106,6 +106,11 @@ export class AttributeInfo {
     isLinkMergedWithAttribute() {
         const linkInfo = this.getLinkInfo()
         return linkInfo.isRelationSource(this.parentEntityName, this.attributeName) ? linkInfo.isMergedToTarget() : linkInfo.isMergedToSource()
+    }
+
+    isLinkIsolated() {
+        const linkInfo = this.getLinkInfo()
+        return linkInfo.isIsolated()
     }
 
     isRecordSource() {
