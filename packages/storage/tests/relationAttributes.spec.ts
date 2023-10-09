@@ -4,12 +4,12 @@ import { createCommonData} from "./data/common";
 import {DBSetup} from "../erstorage/Setup";
 import { SQLiteDB } from '../../runtime/BunSQLite'
 import {EntityToTableMap} from "../erstorage/EntityToTableMap";
-import {MatchExpression} from "../erstorage/MatchExpression.ts";
+import {MatchExp} from "../erstorage/MatchExp.ts";
 
 describe('relation attributes', () => {
     let db: SQLiteDB
     let setup
-    let entityQueryHandle: EntityQueryHandle
+    let handle: EntityQueryHandle
 
     beforeEach(async () => {
         const { entities, relations } = createCommonData()
@@ -17,7 +17,7 @@ describe('relation attributes', () => {
         db = new SQLiteDB(':memory:', {create:true, readwrite: true})
         setup = new DBSetup(entities, relations, db)
         await setup.createTables()
-        entityQueryHandle = new EntityQueryHandle(new EntityToTableMap(setup.map), db)
+        handle = new EntityQueryHandle(new EntityToTableMap(setup.map), db)
     })
 
     afterEach(async () => {
@@ -26,7 +26,7 @@ describe('relation attributes', () => {
     })
 
     test('create relation and update attribute on many to many', async () => {
-        const userA = await entityQueryHandle.create('User', {
+        const userA = await handle.create('User', {
             name: 'aaa',
             age: 17,
             teams: [{
@@ -38,9 +38,9 @@ describe('relation attributes', () => {
         })
 
 
-        const relationName = entityQueryHandle.getRelationName('User', 'teams')
-        const match = MatchExpression.createFromAtom({ key: 'source.id', value: ['=', userA.id]})
-        const findTeamRelation = await entityQueryHandle.findOne(
+        const relationName = handle.getRelationName('User', 'teams')
+        const match = MatchExp.atom({ key: 'source.id', value: ['=', userA.id]})
+        const findTeamRelation = await handle.findOne(
             relationName,
             match,
             {},
@@ -58,8 +58,8 @@ describe('relation attributes', () => {
             }
         })
 
-        await entityQueryHandle.updateRelationByName(relationName, match, { role: 'member'})
-        const findTeamRelation2 = await entityQueryHandle.findOne(
+        await handle.updateRelationByName(relationName, match, { role: 'member'})
+        const findTeamRelation2 = await handle.findOne(
             relationName,
             match,
             {},
@@ -78,7 +78,7 @@ describe('relation attributes', () => {
     })
 
     test('create relation attribute on one to many', async () => {
-        const userA = await entityQueryHandle.create('User', {
+        const rawData = {
             name: 'aaa',
             file: [{
                 fileName: 'f1',
@@ -86,10 +86,11 @@ describe('relation attributes', () => {
                     viewed: 100
                 }
             }]
-        })
-        const findTeamRelation = await entityQueryHandle.findOne(
-            entityQueryHandle.getRelationName('User', 'file'),
-            MatchExpression.createFromAtom({ key: 'target.id', value: ['=', userA.id]}),
+        }
+        const userA = await handle.create('User', rawData)
+        const findTeamRelation = await handle.findOne(
+            handle.getRelationName('User', 'file'),
+            MatchExp.atom({ key: 'target.id', value: ['=', userA.id]}),
             {},
             ['viewed', ['source', {attributeQuery: ['fileName']}], ['target', {attributeQuery: ['name']}]]
         )
@@ -103,11 +104,33 @@ describe('relation attributes', () => {
                 name: 'aaa'
             }
         })
+
+        const foundUser = await handle.findOne(
+            'User',
+            MatchExp.atom({key: 'id', value: ['=', userA.id]}),
+            undefined,
+            [
+                'name',
+                [
+                    'file',
+                    {
+                        attributeQuery: [
+                            'fileName',
+                            ['&', {attributeQuery: ['viewed']}]
+                        ]
+                    }
+                ]
+            ]
+        )
+
+        // console.log(JSON.stringify(foundUser, null, 4))
+        expect(foundUser).toMatchObject(rawData)
     })
 
 
+    // TODO x:1 关系上的 x:n 关联实体
     test('create relation attribute on one to one', async () => {
-        const userA = await entityQueryHandle.create('User', {
+        const userA = await handle.create('User', {
             name: 'aaa',
             profile: {
                 title: 'p1',
@@ -117,9 +140,9 @@ describe('relation attributes', () => {
             }
         })
 
-        const findTeamRelation = await entityQueryHandle.findOne(
-            entityQueryHandle.getRelationName('User', 'profile'),
-            MatchExpression.createFromAtom({ key: 'target.id', value: ['=', userA.id]}),
+        const findTeamRelation = await handle.findOne(
+            handle.getRelationName('User', 'profile'),
+            MatchExp.atom({ key: 'target.id', value: ['=', userA.id]}),
             {},
             ['viewed', ['source', {attributeQuery: ['title']}], ['target', {attributeQuery: ['name']}]]
         )
@@ -133,16 +156,49 @@ describe('relation attributes', () => {
                 name: 'aaa'
             }
         })
+
+        // query from entity
+        const foundUser = await handle.findOne(
+            'User',
+            MatchExp.atom({
+                key: 'id',
+                value: ['=', userA.id]
+            }),
+            undefined,
+            [
+                'name',
+                ['profile',
+                    {
+                        attributeQuery: [
+                            'title',
+                            ['&', {attributeQuery: ['viewed']}]
+                        ]
+                    }
+                ]
+            ]
+        )
+
+        expect(foundUser).toMatchObject({
+            id: userA.id,
+            name: "aaa",
+            profile: {
+                title: "p1",
+                "&": {
+                    viewed: 200
+                }
+            }
+        })
     })
 
 
     test('create record relation attribute on many to many', async () => {
-        const userA = await entityQueryHandle.create('User', {
+        const rawData = {
             name: 'aaa',
             age: 17,
             teams: [{
                 teamName: 'teamA',
                 '&': {
+                    role: 'leader',
                     base: {
                         name: 'zhuzhou'
                     },
@@ -158,12 +214,13 @@ describe('relation attributes', () => {
                     }]
                 }
             }]
-        })
+        }
+        const userA = await handle.create('User', rawData)
 
 
-        const findTeamRelation = await entityQueryHandle.findOne(
-            entityQueryHandle.getRelationName('User', 'teams'),
-            MatchExpression.createFromAtom({ key: 'source.id', value: ['=', userA.id]}),
+        const findTeamRelation = await handle.findOne(
+            handle.getRelationName('User', 'teams'),
+            MatchExp.atom({ key: 'source.id', value: ['=', userA.id]}),
             {},
             [
                 ['base', {attributeQuery: ['name']}],
@@ -196,6 +253,37 @@ describe('relation attributes', () => {
                 teamName: 'teamA'
             },
         })
+
+        // query relation data with entity
+        const foundUser = await handle.findOne(
+            'User',
+            MatchExp.atom({
+                key: 'id',
+                value: ['=', userA.id]
+            }),
+            undefined,
+            [
+                'name',
+                'age',
+                [
+                    'teams',
+                    {
+                        attributeQuery: [
+                            'teamName',
+                            ['&', {attributeQuery: [
+                                'role',
+                                ['base', { attributeQuery: ['name']}],
+                                ['matches', { attributeQuery: ['name']}],
+                                ['participates', { attributeQuery: ['name']}],
+                            ]}]
+                        ]
+                    }
+                ]
+            ]
+        )
+
+        expect(foundUser).toMatchObject(rawData)
+        // console.log(JSON.stringify(foundUser, null, 4))
     })
 
     // TODO 更多关系上的测试

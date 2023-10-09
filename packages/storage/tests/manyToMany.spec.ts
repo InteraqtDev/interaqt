@@ -4,7 +4,7 @@ import { createCommonData} from "./data/common";
 import {DBSetup} from "../erstorage/Setup";
 import { SQLiteDB } from '../../runtime/BunSQLite'
 import {EntityToTableMap} from "../erstorage/EntityToTableMap";
-import {MatchExpression} from "../erstorage/MatchExpression.ts";
+import {MatchExp} from "../erstorage/MatchExp.ts";
 
 describe('many to many', () => {
     let db: SQLiteDB
@@ -29,11 +29,11 @@ describe('many to many', () => {
         const userA = await entityQueryHandle.create('User', {name: 'aaa', age: 17})
         const teamA = await entityQueryHandle.create('Team', {teamName: 'teamA'})
 
-        const findUser = await entityQueryHandle.findOne('User', MatchExpression.createFromAtom({ key: 'id', value: ['=', userA.id]}), {}, ['name', 'age'] )
+        const findUser = await entityQueryHandle.findOne('User', MatchExp.atom({ key: 'id', value: ['=', userA.id]}), {}, ['name', 'age'] )
         expect(findUser).toMatchObject({
             name:'aaa',
         })
-        const findTeam = await entityQueryHandle.findOne('Team', MatchExpression.createFromAtom({ key: 'teamName', value: ['=', 'teamA']}), {}, ['teamName'] )
+        const findTeam = await entityQueryHandle.findOne('Team', MatchExp.atom({ key: 'teamName', value: ['=', 'teamA']}), {}, ['teamName'] )
         expect(findTeam).toMatchObject({
             teamName:'teamA',
         })
@@ -54,7 +54,7 @@ describe('many to many', () => {
 
         const findUser = await entityQueryHandle.findOne(
             'User',
-            MatchExpression.createFromAtom({ key: 'id', value: ['=', userA.id]}), {},
+            MatchExp.atom({ key: 'id', value: ['=', userA.id]}), {},
             ['name', 'age', ['teams', { attributeQuery: ['teamName']}]]
         )
 
@@ -69,7 +69,7 @@ describe('many to many', () => {
         const userA = await entityQueryHandle.create('User', {name: 'aaa', age: 17, teams: [teamA, teamB]})
         const findUser = await entityQueryHandle.findOne(
             'User',
-            MatchExpression.createFromAtom({ key: 'id', value: ['=', userA.id]}), {},
+            MatchExp.atom({ key: 'id', value: ['=', userA.id]}), {},
             ['name', 'age', ['teams', { attributeQuery: ['teamName']}]]
         )
 
@@ -97,7 +97,7 @@ describe('many to many', () => {
         }
 
         const userA = await entityQueryHandle.create('User', rawData)
-        await entityQueryHandle.delete('User', MatchExpression.createFromAtom({
+        await entityQueryHandle.delete('User', MatchExp.atom({
             key: 'id',
             value: ['=', userA.id]
         }))
@@ -105,7 +105,7 @@ describe('many to many', () => {
 
         const findUser = await entityQueryHandle.find(
             'User',
-            MatchExpression.createFromAtom({ key: 'id', value: ['=', userA.id]}), {},
+            MatchExp.atom({ key: 'id', value: ['=', userA.id]}), {},
             ['name', 'age']
         )
         expect(findUser.length).toBe(0)
@@ -127,14 +127,14 @@ describe('many to many', () => {
         }
 
         const userA = await entityQueryHandle.create('User', rawData)
-        await entityQueryHandle.update('User', MatchExpression.createFromAtom({
+        await entityQueryHandle.update('User', MatchExp.atom({
             key: 'id',
             value: ['=', userA.id]
         }), { name: 'bbb'})
 
         const findUser = await entityQueryHandle.find(
             'User',
-            MatchExpression.createFromAtom({ key: 'id', value: ['=', userA.id]}), {},
+            MatchExp.atom({ key: 'id', value: ['=', userA.id]}), {},
             ['name', 'age']
         )
         expect(findUser.length).toBe(1)
@@ -150,7 +150,7 @@ describe('many to many', () => {
 
         const userA = await entityQueryHandle.create('User', rawData)
 
-        await entityQueryHandle.update('User', MatchExpression.createFromAtom({
+        await entityQueryHandle.update('User', MatchExp.atom({
             key: 'id',
             value: ['=', userA.id]
         }),
@@ -165,7 +165,7 @@ describe('many to many', () => {
 
         const findUser = await entityQueryHandle.findOne(
             'User',
-            MatchExpression.createFromAtom({ key: 'id', value: ['=', userA.id]}), {},
+            MatchExp.atom({ key: 'id', value: ['=', userA.id]}), {},
             ['name', 'age', ['teams', { attributeQuery: ['teamName']}]]
         )
 
@@ -185,7 +185,7 @@ describe('many to many', () => {
         const teamB = await entityQueryHandle.create('Team', {teamName: 't2'})
 
         const userA = await entityQueryHandle.create('User', {name: 'aaa', age: 17, teams: [teamA, teamB]})
-        await entityQueryHandle.update('User', MatchExpression.createFromAtom({
+        await entityQueryHandle.update('User', MatchExp.atom({
                 key: 'id',
                 value: ['=', userA.id]
             }),
@@ -196,7 +196,7 @@ describe('many to many', () => {
 
         const findUser = await entityQueryHandle.findOne(
             'User',
-            MatchExpression.createFromAtom({ key: 'id', value: ['=', userA.id]}), {},
+            MatchExp.atom({ key: 'id', value: ['=', userA.id]}), {},
             ['name', 'age', ['teams', { attributeQuery: ['teamName']}]]
         )
 

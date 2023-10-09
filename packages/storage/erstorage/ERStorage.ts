@@ -1,13 +1,13 @@
 import {EntityToTableMap} from "./EntityToTableMap";
 import {assert, deepMerge, setByPath} from "../util";
 // @ts-ignore
-import {BoolExpression, ExpressionData} from '../../shared/BoolExpression'
+import {BoolExp, ExpressionData} from '../../shared/BoolExp.ts'
 // @ts-ignore
 import {Database, EntityIdRef, ROW_ID_ATTR} from '../../runtime/System'
-import {FieldMatchAtom, MatchAtom, MatchExpression, MatchExpressionData} from "./MatchExpression.ts";
+import {FieldMatchAtom, MatchAtom, MatchExp, MatchExpressionData} from "./MatchExp.ts";
 import {ModifierData} from "./Modifier.ts";
 import {AttributeQuery, AttributeQueryData, AttributeQueryDataItem} from "./AttributeQuery.ts";
-import {RecordQueryData, RecordQueryTree, RecordQuery} from "./RecordQuery.ts";
+import {RecordQueryData, RecordQueryTree, RecordQuery, LINK_SYMBOL} from "./RecordQuery.ts";
 import {NewRecordData, RawEntityData} from "./NewRecordData.ts";
 import {someAsync} from "./util.ts";
 
@@ -21,26 +21,26 @@ export type JoinTables = {
 
 export class QueryAgent {
     constructor(public map: EntityToTableMap, public database: Database) {}
-    buildFindQuery(entityQuery: RecordQuery, prefix='') {
+    buildFindQuery(recordQuery: RecordQuery, prefix='') {
         // 从所有条件里面构建出 join clause
-        const fieldQueryTree = entityQuery.attributeQuery!.xToOneQueryTree
-        const matchQueryTree = entityQuery.matchExpression.entityQueryTree
+        const fieldQueryTree = recordQuery.attributeQuery!.xToOneQueryTree
+        const matchQueryTree = recordQuery.matchExpression.entityQueryTree
         const finalQueryTree = fieldQueryTree.merge(matchQueryTree)
 
-        const joinTables = this.getJoinTables(finalQueryTree, [entityQuery.recordName])
+        const joinTables = this.getJoinTables(finalQueryTree, [recordQuery.recordName])
 
-        const fieldMatchExp = entityQuery.matchExpression.buildFieldMatchExpression()
+        const fieldMatchExp = recordQuery.matchExpression.buildFieldMatchExpression()
 
         return `
 SELECT ${prefix ? '' : 'DISTINCT'}
-${this.buildSelectClause(entityQuery.attributeQuery.getQueryFields(), prefix)}
+${this.buildSelectClause(recordQuery.attributeQuery.getValueAndXToOneRecordFields(), prefix)}
 FROM
-${this.buildFromClause(entityQuery.recordName, prefix)}
+${this.buildFromClause(recordQuery.recordName, prefix)}
 ${this.buildJoinClause(joinTables, prefix)}
 ${fieldMatchExp ? `
 WHERE
 ${this.buildWhereClause( 
-    this.parseMatchExpressionValue(entityQuery.recordName, fieldMatchExp , entityQuery.contextRootEntity),
+    this.parseMatchExpressionValue(recordQuery.recordName, fieldMatchExp , recordQuery.contextRootEntity),
     prefix
 )}
 ` : ''}   
@@ -58,35 +58,103 @@ ${this.buildWhereClause(
         })
     }
     // 查 entity 和 查 relation 都是一样的。具体在 entityQuery 里面区别。
-    async findRecords(entityQuery:RecordQuery, queryName='') : Promise<any[]>{
-        // 1. 这里只通过合表或者 join  处理了 x:1 的关联查询。x:n 的查询是通过二次查询获取的。
-        const data = this.structureRawReturns(await this.database.query(this.buildFindQuery(entityQuery), queryName)) as any[]
-        // 2. TODO 关联数据的结构化。也可以把信息丢到客户端，然客户端去结构化？？？
+    // TODO 为了性能，也可以把信息丢到客户端，然客户端去结构化？？？
 
-        // 3. x:n 关联实体的查询
-        if (entityQuery.attributeQuery!.xToManyRecords) {
-            for (let relatedEntity of entityQuery.attributeQuery.xToManyRecords) {
-                const {name: attributeName, entityQuery: subEntityQuery} = relatedEntity
-                for (let entity of data) {
-                    entity[attributeName] = await this.findRelatedRecords(entityQuery.recordName, attributeName, entity.id, subEntityQuery)
+    // CAUTION findRelatedRecords 中的递归调用会使得 includeRelationData 变为 true
+    async findRecords(entityQuery: RecordQuery, queryName = ''): Promise<any[]>{
+        // findRecords 的一个 join 语句里面只能一次性搞定 x:1 的关联实体，以及关系上的 x:1 关联实体。
+        // 1. 这里只通过合表或者 join  处理了 x:1 的关联查询。x:n 的查询是通过二次查询获取的。
+        const records = this.structureRawReturns(await this.database.query(this.buildFindQuery(entityQuery, ''), queryName)) as any[]
+
+        // 2. x:1 上的 关系的x:many关联实体 查询
+        // FIXME 没有限制 link.id
+        for (let subEntityQuery of entityQuery.attributeQuery.xToOneRecords) {
+            // x:1 上的关系
+            const subLinkRecordQuery = subEntityQuery.attributeQuery.parentLinkRecordQuery
+            if (subLinkRecordQuery) {
+                // 关系上的 xToMany 查询
+                for(let subEntityQueryOfSubLink of subLinkRecordQuery.attributeQuery.xToManyRecords) {
+                    for (let entity of records) {
+                        setByPath(
+                            entity,
+                            [subEntityQuery.attributeName!, LINK_SYMBOL, subEntityQueryOfSubLink.attributeName],
+                            await this.findRecords(subEntityQueryOfSubLink, `finding relation data: ${entityQuery.recordName}.${subEntityQuery.attributeName}.&.${subEntityQueryOfSubLink.attributeName}`)
+                        )
+                    }
                 }
             }
         }
 
-        return data
-    }
-    async findRelatedRecords(recordName: string, attributeName: string, recordId: string, subEntityQuery: RecordQuery) {
-        const reverseInfo = this.map.getInfo(recordName, attributeName).getReverseInfo()
 
-        const newMatch = subEntityQuery.matchExpression.and({
-            key: `${reverseInfo?.attributeName!}.id`,
+        // 3. x:n 关联实体的查询
+        for (let subEntityQuery of entityQuery.attributeQuery.xToManyRecords) {
+            // XToMany 的 relationData 是在上面 buildFindQuery 一起查完了的
+            if (!subEntityQuery.onlyRelationData) {
+                for (let entity of records) {
+                    entity[subEntityQuery.attributeName!] = await this.findXToManyRelatedRecords(entityQuery.recordName, subEntityQuery.attributeName!, entity.id, subEntityQuery)
+                }
+            }
+        }
+        return records
+    }
+    // CAUTION 任何两个具体的实体之间只能有一条关系，但是可以在关系上有多条数据。1:n 的数据
+
+    async findXToManyRelatedRecords(recordName: string, attributeName: string, recordId: string, relatedRecordQuery: RecordQuery) {
+        const reverseAttributeName = this.map.getInfo(recordName, attributeName).getReverseInfo()?.attributeName!
+
+        // FIXME 对 n:N 关联实体的查询中，也可能会引用主实体的值，这个时候值已经是确定的了，应该作为 context 传进来，替换掉原本的 matchExpression
+        const newMatch = relatedRecordQuery.matchExpression.and({
+            key: `${reverseAttributeName}.id`,
+            // FIXME 这里是不是要把 n;n 的情况改成 EXIST ? 现在能 work 是因为有 DISDINCT，但效率很低？
             value: ['=', recordId]
         })
 
-        // FIXME 改成 create
-        const newSubQuery = new RecordQuery(subEntityQuery.recordName, subEntityQuery.map, newMatch, subEntityQuery.attributeQuery, subEntityQuery.modifier, subEntityQuery.contextRootEntity)
+        // FIXME 改成 create 或者 derive ?
+        const newSubQuery = new RecordQuery(
+            relatedRecordQuery.recordName,
+            relatedRecordQuery.map,
+            newMatch,
+            relatedRecordQuery.attributeQuery.parentLinkRecordQuery ?
+                relatedRecordQuery.attributeQuery.withParentLinkData():
+                relatedRecordQuery.attributeQuery,
+            relatedRecordQuery.modifier,
+            relatedRecordQuery.contextRootEntity
+        )
 
-        return this.findRecords(newSubQuery)
+        // CAUTION 注意这里的第二个参数。因为任何两个具体的实体之间只能有一条关系。所以即使是 n:n 和关系表关联上时，也只有一条关系数据，所以这里可以带上 relation data。
+        // 1. 查询 x:n 的实体，以及和父亲的关联关系上的 x:1 的数据
+        const data = (await this.findRecords(newSubQuery, `finding related record: ${relatedRecordQuery.parentRecord}.${relatedRecordQuery.attributeName}`))
+        // 1.1 这里再反向处理一下关系数据。因为查出来的时候是用反向的关系名字差的
+        const records =  relatedRecordQuery.attributeQuery.parentLinkRecordQuery ? data.map(item => {
+            const itemWithParentLinkData = {
+                ...item,
+                [LINK_SYMBOL]: item[reverseAttributeName][LINK_SYMBOL]
+            }
+            delete itemWithParentLinkData[reverseAttributeName]
+            return itemWithParentLinkData
+        }) : data
+
+
+        // 1.2 和父亲的关联关系上的 x:n 的数据
+        const parentLinkRecordQuery = relatedRecordQuery.attributeQuery.parentLinkRecordQuery
+        if (parentLinkRecordQuery) {
+            // 关系上的 xToMany 查询
+            for(let subEntityQueryOfLink of parentLinkRecordQuery.attributeQuery.xToManyRecords) {
+                for (let record of records) {
+                    // 应该已经有了和父亲 link 的 id。
+                    // CAUTION 注意这里用了上面处理过路径
+                    const linkId = record[LINK_SYMBOL].id
+                    // 查找这个 link 的 x:n 关联实体
+                    setByPath(
+                        record,
+                        [LINK_SYMBOL, subEntityQueryOfLink.attributeName],
+                        await this.findXToManyRelatedRecords(subEntityQueryOfLink.parentRecord, subEntityQueryOfLink.attributeName!, linkId, subEntityQueryOfLink)
+                    )
+                }
+            }
+        }
+
+        return records
     }
     // 根据 queryTree 来获得 join table 的信息。因为 queryTree 是树形，所以这里也是个递归结构。
     getJoinTables(queryTree: RecordQueryTree, context: string[] = [], parentInfos?: [string, string, string]) :JoinTables {
@@ -108,7 +176,7 @@ ${this.buildWhereClause(
             assert(attributeInfo.isRecord, `${context.concat(entityAttributeName).join('.')} is not a record`)
 
             const currentNamePath = context.concat(entityAttributeName)
-            const {table:currentTable, alias:currentTableAlias, linkTable:relationTable, linkAlias: relationTableAlias} = this.map.getTableAndAliasStack(currentNamePath).at(-1)
+            const {table:currentTable, alias:currentTableAlias, linkTable:relationTable, linkAlias: relationTableAlias} = this.map.getTableAndAliasStack(currentNamePath).at(-1)!
             // CAUTION 特别注意最后一个参数，这是真的要连接实体表的时候就能拿用 shrink 的 id 了。
             const [, idField] = this.map.getTableAliasAndFieldName(currentNamePath, 'id', true)
             // 这里的目的是把 attribute 对应的 record table 找到，并且正确 join 进来。
@@ -122,17 +190,17 @@ ${this.buildWhereClause(
                     result.push({
                         for: currentNamePath,
                         joinSource: parentTableAndAlias!,
-                        joinIdField: [attributeInfo.field, idField],
+                        joinIdField: [attributeInfo.field!, idField],
                         joinTarget: [currentTable, currentTableAlias]
                     })
                 } else if (attributeInfo.isLinkMergedWithAttribute()){
-                    const reverseAttributeInfo = attributeInfo.getReverseInfo()
+                    const reverseAttributeInfo = attributeInfo.getReverseInfo()!
                     // 说明记录在对方的 field 里面
                     result.push({
                         for: currentNamePath,
                         joinSource: parentTableAndAlias!,
                         // 这里要找当前实体中用什么 attributeName 指向上一个实体
-                        joinIdField: [parentIdField, reverseAttributeInfo.field],
+                        joinIdField: [parentIdField, reverseAttributeInfo.field!],
                         joinTarget: [currentTable, currentTableAlias]
                     })
                 } else {
@@ -145,14 +213,14 @@ ${this.buildWhereClause(
                         joinSource: parentTableAndAlias!,
                         // CAUTION sourceField 是用在合并了情况里面的，指的是 target 在 source 里面的名字！所以这里不能用
                         joinIdField: [parentIdField, isCurrentRelationSource ? linkInfo.record.attributes.source.field! : linkInfo.record.attributes.target.field!],
-                        joinTarget: [relationTable, relationTableAlias]
+                        joinTarget: [relationTable!, relationTableAlias!]
                     })
 
                     // CAUTION 只有当还要继续获取除 id 的部分时，才要 join 实体表。
                     if(!subQueryTree.onlyIdField()) {
                         result.push({
                             for: currentNamePath,
-                            joinSource: [relationTable, relationTableAlias],
+                            joinSource: [relationTable!, relationTableAlias!],
                             joinIdField: [isCurrentRelationSource ? linkInfo.record.attributes.target.field! : linkInfo.record.attributes.source.field!, idField],
                             joinTarget: [currentTable, currentTableAlias]
                         })
@@ -168,7 +236,7 @@ ${this.buildWhereClause(
     withPrefix(prefix ='') {
         return prefix? `${prefix}___` : ''
     }
-    buildSelectClause(queryFields: ReturnType<AttributeQuery["getQueryFields"]>, prefix=''){
+    buildSelectClause(queryFields: ReturnType<AttributeQuery["getValueAndXToOneRecordFields"]>, prefix=''){
         if (!queryFields.length) return '1'
         // CAUTION 所有 entity 都要 select id
         return queryFields.map(({tableAliasAndField, attribute, nameContext}) => (
@@ -186,7 +254,7 @@ ${this.buildWhereClause(
 `
         }).join('\n')
     }
-    buildWhereClause(fieldMatchExp: BoolExpression<FieldMatchAtom>|null, prefix=''): string {
+    buildWhereClause(fieldMatchExp: BoolExp<FieldMatchAtom>|null, prefix=''): string {
         if (!fieldMatchExp) return '1=1'
 
         if (fieldMatchExp.isAtom()) {
@@ -203,27 +271,27 @@ ${this.buildWhereClause(
     }
 
     // 把 match 中的 exist 创建成子 sql
-    parseMatchExpressionValue(entityName: string, fieldMatchExp: BoolExpression<FieldMatchAtom>|null, contextRootEntity? :string): BoolExpression<FieldMatchAtom>|null {
+    parseMatchExpressionValue(entityName: string, fieldMatchExp: BoolExp<FieldMatchAtom>|null, contextRootEntity? :string): BoolExp<FieldMatchAtom>|null {
         if (!fieldMatchExp) return null
 
-        return fieldMatchExp.map((exp: BoolExpression<FieldMatchAtom>, context:string[]) => {
+        return fieldMatchExp.map((exp: BoolExp<FieldMatchAtom>, context:string[]) => {
             assert(Array.isArray(exp.data.value), `match value is not a array ${context.join('.')}`)
             if (exp.data.isFunctionMatch) {
                 assert(exp.data.value[0].toLowerCase() === 'exist', `we only support Exist function match on entity for now. yours: ${exp.data.key} ${exp.data.value[0]} ${exp.data.value[1]}`)
 
                 const info = this.map.getInfoByPath(exp.data.namePath!)
-                const {alias: currentAlias} = this.map.getTableAndAliasStack(exp.data.namePath!).at(-1)
+                const {alias: currentAlias} = this.map.getTableAndAliasStack(exp.data.namePath!).at(-1)!
                 const reverseAttributeName = this.map.getReverseAttribute(info.parentEntityName, info.attributeName)
 
                 // 注意这里去掉了 namePath 里面根部的 entityName，因为后面计算 referenceValue 的时候会加上。
                 const parentAttributeNamePath = exp.data.namePath!.slice(1, -1)
 
                 const existEntityQuery = RecordQuery.create(info.recordName, this.map, {
-                        matchExpression: BoolExpression.createFromAtom({
+                        matchExpression: BoolExp.atom({
                             key: `${reverseAttributeName}.id`,
                             value: ['=', parentAttributeNamePath.concat('id').join('.')],
                             isReferenceValue: true
-                        } as MatchAtom).and(exp.data.value[1] instanceof BoolExpression ? exp.data.value[1] : MatchExpression.createFromAtom(exp.data.value[1]))
+                        } as MatchAtom).and(exp.data.value[1] instanceof BoolExp ? exp.data.value[1] : MatchExp.atom(exp.data.value[1]))
                     },
                     // 如果上层还有，就继承上层的，如果没有， context 就只这一层。这个变量是用来给 matchExpression 里面的 value 来引用上层的值的。
                     //  例如查询用户，要求他存在一个朋友的父母的年龄是小于这个用户。对朋友的父母的年龄匹配中，就需要引用最上层的 alias。
@@ -276,10 +344,10 @@ ${this.buildFindQuery(existEntityQuery, currentAlias)}
         for( let combinedRecord of newRecordData.combinedNewRecords.concat(newRecordData.combinedRecordIdRefs)) {
             if (combinedRecord.linkRecordData) {
                 const newLinkRecordDataWithDep = await this.createRecordDependency(combinedRecord.linkRecordData)
-                newRecordDataWithDeps[combinedRecord.info!.attributeName] = {
+                newRecordDataWithDeps[combinedRecord.info!.attributeName!] = {
                     // 注意这里原本的数据不能丢，因为下面的 merge 不是深度 merge。
-                    ...combinedRecord.getData(),
-                    '&': newLinkRecordDataWithDep.getData()
+                    ...combinedRecord.getData() as EntityIdRef,
+                    [LINK_SYMBOL]: newLinkRecordDataWithDep.getData()
                 }
             }
         }
@@ -290,7 +358,7 @@ ${this.buildFindQuery(existEntityQuery, currentAlias)}
 
     async createRecord(newEntityData: NewRecordData) : Promise<EntityIdRef>{
         const newEntityDataWithDep = await this.createRecordDependency(newEntityData)
-        const newRecordIdRef = await this.insertSameRowData(newEntityDataWithDep, newEntityData.isRef())
+        const newRecordIdRef = await this.insertSameRowData(newEntityDataWithDep)
 
         const relianceResult = await this.handleReliance(newEntityDataWithDep.merge(newRecordIdRef))
 
@@ -332,7 +400,7 @@ ${this.buildFindQuery(existEntityQuery, currentAlias)}
                 return name !== combinedRecordIdRef.info?.getReverseInfo()?.attributeName
             })
 
-            const newMatch =  MatchExpression.createFromAtom({
+            const newMatch =  MatchExp.atom({
                 key: 'id',
                 value: ['=', combinedRecordIdRef.getRef().id]
             })
@@ -361,17 +429,17 @@ VALUES
 
     async handleReliance(newEntityData: NewRecordData): Promise<object> {
         const currentIdRef = newEntityData.getRef()
-        const newIdRefs: {[k:string]: EntityIdRef} = {}
+        const newIdRefs: {[k:string]: EntityIdRef|EntityIdRef[]} = {}
         // 1. 处理关系往 attribute 方向合并的新数据
         for( let record of newEntityData.differentTableMergedLinkNewRecords) {
-            const reverseAttribute = record.info?.getReverseInfo()?.attributeName
+            const reverseAttribute = record.info?.getReverseInfo()?.attributeName!
             const newRecordDataWithMyId = record.merge({
                 [reverseAttribute] : currentIdRef
             })
             const newRecordIdRef = await this.createRecord(newRecordDataWithMyId)
             if (record.info!.isXToMany) {
                 if (!newIdRefs[record.info!.attributeName]) {
-                    newIdRefs[record.info!.attributeName] = []
+                    newIdRefs[record.info!.attributeName!] = []
                 }
                 newIdRefs[record.info!.attributeName].push(newRecordIdRef)
             } else {
@@ -381,14 +449,14 @@ VALUES
 
         // 2. 处理关系往 attribute 方向合并的老数据
         for( let record of newEntityData.differentTableMergedLinkRecordIdRefs) {
-            const reverseInfo = record.info!.getReverseInfo()
-            const idMatch = MatchExpression.createFromAtom({
+            const reverseInfo = record.info!.getReverseInfo()!
+            const idMatch = MatchExp.atom({
                 key: 'id',
                 value: ['=', record.getRef().id]
             })
             const newData = {
                 [reverseInfo!.attributeName]: currentIdRef,
-                '&': record.getData()['&']
+                [LINK_SYMBOL]: record.getData()[LINK_SYMBOL]
             }
             await this.updateRecord(reverseInfo.parentEntityName, idMatch, new NewRecordData(this.map, reverseInfo.parentEntityName, newData))
         }
@@ -398,7 +466,7 @@ VALUES
             const newRecordIdRef = await this.createRecord(record)
             if (record.info!.isXToMany) {
                 if (!newIdRefs[record.info!.attributeName]) {
-                    newIdRefs[record.info!.attributeName] = []
+                    newIdRefs[record.info!.attributeName!] = []
                 }
                 newIdRefs[record.info!.attributeName].push(newRecordIdRef)
             } else {
@@ -418,7 +486,7 @@ VALUES
         for (let record of newEntityData.isolatedRecordIdRefs) {
             // 针对 x:1 关系要先删除原来的关系
             if(record.info!.isXToOne) {
-                const match = MatchExpression.createFromAtom({
+                const match = MatchExp.atom({
                     key: record.info?.isRecordSource() ? 'target.id' : 'source.id',
                     value: ['=', record.getRef().id]
                 })
@@ -478,7 +546,7 @@ WHERE ${idField} IN (${idRefs.map(i => JSON.stringify(i.id)).join(',')})
             for(let updatedEntity of matchedEntities) {
                 await this.unlink(
                     linkInfo.name,
-                    MatchExpression.createFromAtom({
+                    MatchExp.atom({
                         key: `${updatedEntityLinkAttr}.id`,
                         value: ['=', updatedEntity.id],
                     }),
@@ -528,7 +596,7 @@ WHERE ${idField} IN (${idRefs.map(i => JSON.stringify(i.id)).join(',')})
 
                 await this.unlink(
                     linkInfo.name,
-                    MatchExpression.createFromAtom({
+                    MatchExp.atom({
                         key: `${updatedEntityLinkAttr}.id`,
                         value: ['=', updatedEntity.id],
                     }),
@@ -589,7 +657,7 @@ WHERE ${idField} IN (${idRefs.map(i => JSON.stringify(i.id)).join(',')})
                     recordName,
                     this.map,
                     {
-                        matchExpression:MatchExpression.createFromAtom({
+                        matchExpression:MatchExp.atom({
                             key: `id`,
                             value: ['=', record.id]
                         }),
@@ -628,7 +696,7 @@ WHERE ${recordInfo.idField} IN (${records.map(({id}) => JSON.stringify(id)).join
             if (!info.isReliance) {
 
                 const key = info.isRecordSource() ? 'source.id' : 'target.id'
-                const newMatch = MatchExpression.createFromAtom({
+                const newMatch = MatchExp.atom({
                     key,
                     value: ['in', record.map(r => r.id)]
                 })
@@ -641,7 +709,7 @@ WHERE ${recordInfo.idField} IN (${records.map(({id}) => JSON.stringify(id)).join
     async deleteDifferentTableReliance(recordName: string, records: EntityIdRef[]) {
         const recordInfo = this.map.getRecordInfo(recordName)
         for (let info of recordInfo.differentTableReliance) {
-            const matchInIds = MatchExpression.createFromAtom({
+            const matchInIds = MatchExp.atom({
                 key: `${info.getReverseInfo()?.attributeName!}.id`,
                 value: ['in', records.map(r => r.id)]
             })
@@ -661,12 +729,21 @@ WHERE ${recordInfo.idField} IN (${records.map(({id}) => JSON.stringify(id)).join
     }
 
     async addLink(linkName: string, sourceId: string, targetId:string, attributes: RawEntityData = {}, moveSource = false) {
+        const existRecord = (await this.findRecords(RecordQuery.create(linkName, this.map, {
+            matchExpression: MatchExp.atom({key: 'source.id', value: ['=', sourceId]}).and({key: 'target.id', value: ['=', targetId]}),
+            modifier: {
+                limit: 1
+            }
+        })))[0]
+
+        assert(!existRecord, `cannot create ${linkName} for ${sourceId} ${targetId}, link already exist`)
+
         const linkInfo = this.map.getLinkInfoByName(linkName)
         if (!linkInfo.isCombined() && !linkInfo.isMerged() && (linkInfo.isManyToOne || linkInfo.isOneToMany)) {
             // n 方向要 unlink ?
             const unlinkAttr = linkInfo.isManyToOne ? 'source.id' : 'target.id'
             const unlinkId = linkInfo.isManyToOne? sourceId: targetId
-            const match = MatchExpression.createFromAtom({
+            const match = MatchExp.atom({
                 key: unlinkAttr,
                 value: ['=', unlinkId]
             })
@@ -711,7 +788,7 @@ WHERE ${recordInfo.idField} IN (${records.map(({id}) => JSON.stringify(id)).join
             if (toMoveIds.length) {
                 await this.moveRecords(
                     toMoveRecordInfo.name,
-                    MatchExpression.createFromAtom({
+                    MatchExp.atom({
                         key: 'id',
                         value: ['in', toMoveIds]
                     }),
@@ -740,7 +817,7 @@ WHERE ${recordInfo.idField} IN (${records.map(({id}) => JSON.stringify(id)).join
         if (records.length) {
             const recordName = linkInfo.isMergedToSource() ? linkInfo.sourceRecord : linkInfo.targetRecord
             const toUnlinkIds = records.map(record => linkInfo.isMergedToSource() ? record.source.id : record.target.id)
-            const newMatch = MatchExpression.createFromAtom({
+            const newMatch = MatchExp.atom({
                 key: 'id',
                 value: ['in', toUnlinkIds]
             })
@@ -779,10 +856,10 @@ WHERE ${recordInfo.idField} IN (${records.map(({id}) => JSON.stringify(id)).join
         // 删除老的
         if (records.length) {
             const ids = records.map(r => r.id)
-            await this.deleteRecord(recordName, MatchExpression.createFromAtom({
+            await this.deleteRecord(recordName, MatchExp.atom({
                 key: 'id',
                 value: ['in', ids]
-            }), includeRelated)
+            }))
         }
 
 
@@ -821,7 +898,7 @@ export class EntityQueryHandle {
         this.agent = new QueryAgent(map, database)
     }
 
-    async findOne(entityName: string, matchExpression: MatchExpressionData, modifier: ModifierData = {}, attributeQuery?: AttributeQueryData) {
+    async findOne(entityName: string, matchExpression?: MatchExpressionData, modifier: ModifierData = {}, attributeQuery?: AttributeQueryData) {
         const limitedModifier = {
             ...modifier,
             limit: 1
@@ -882,13 +959,13 @@ export class EntityQueryHandle {
         return (await this.findRelationByName(relationName, matchExpressionData, limitedModifier, attributeQueryData))[0]
     }
 
-    createMatchFromAtom(...arg: Parameters<MatchExpression["createFromAtom"]>) {
-        return MatchExpression.createFromAtom(...arg)
+    createMatchFromAtom(...arg: Parameters<(typeof MatchExp)["atom"]>) {
+        return MatchExp.atom(...arg)
     }
     async removeRelationByName(relationName: string, matchExpressionData: MatchExpressionData) {
         return this.agent.unlink(relationName, matchExpressionData)
     }
-    getRelationName(entity:string, attribute): string {
+    getRelationName(entity:string, attribute:string): string {
         return this.map.getInfo(entity, attribute).linkName
     }
 }

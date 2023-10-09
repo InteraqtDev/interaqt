@@ -23,9 +23,9 @@ export class RecordInfo {
         return this.data.attributes.id.field
     }
 
-    get sameRowFields() {
+    get sameRowFields(): string[] {
         // 自身的value 字段
-        const valueFields = this.valueAttributes.map(info => info.field)
+        const valueFields = this.valueAttributes.map(info => info.field!)
 
         // 和自己合并的关系字段
         const linkFields = this.strictRecordAttributes.filter(info => {
@@ -36,7 +36,7 @@ export class RecordInfo {
 
         // 当自身是一个关系 record 时，它的 source/target 虽然是 record attribute，但字段是由我来管辖的。
         const managedRecordAttributeFields = this.managedRecordAttributes.map(info => {
-            return info.linkField
+            return info.linkField!
         })
 
         const relianceFields = this.sameTableReliance.map(info => {

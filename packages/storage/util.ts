@@ -1,4 +1,4 @@
-export function assert(condition: boolean, message: string ) {
+export function assert(condition: any, message: string ) {
     if (!condition) {
         // if (__DEV__) debugger
         throw new Error(message)
@@ -26,7 +26,7 @@ export function setByPath(root: ObjectContainer, inputPath: string[], value: any
     const path = [...inputPath]
     let pointer = root
     let nextAttr
-    const lastAttr = path.pop()
+    const lastAttr = path.pop()!
     while(nextAttr = path.shift()) {
         if (!pointer[nextAttr]) pointer[nextAttr] = {}
         pointer = pointer[nextAttr]
@@ -59,7 +59,7 @@ export function mapTree(root: ObjectContainer, iteratorKeys: string[], fn: (obje
 
 
 export function deepMerge(a: ObjectContainer, b: ObjectContainer) {
-    const result = {}
+    const result: any = {}
     const keys = new Set(Object.keys(a).concat(Object.keys(b)))
     keys.forEach(k => {
         if (a[k] && b[k]) {

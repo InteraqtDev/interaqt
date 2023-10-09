@@ -51,8 +51,8 @@ describe('attribute query test', () => {
         expect(attributeQuery.xToOneQueryTree.records.leader.records.profile).toBeInstanceOf(RecordQueryTree)
 
         expect(attributeQuery.xToManyRecords.length).toBe(1)
-        expect(attributeQuery.xToManyRecords[0].name).toBe('friends')
-        expect(attributeQuery.getQueryFields()).toMatchObject([
+        expect(attributeQuery.xToManyRecords[0].attributeName).toBe('friends')
+        expect(attributeQuery.getValueAndXToOneRecordFields()).toMatchObject([
             // 自己的字段
             //  永远自动加上 id
             {
@@ -122,7 +122,7 @@ describe('attribute query test', () => {
         const attributeQuery = new AttributeQuery('User_leader_member_User', entityToTableMap,
             ['source', 'target'])
 
-        expect(attributeQuery.getQueryFields()).toMatchObject([
+        expect(attributeQuery.getValueAndXToOneRecordFields()).toMatchObject([
             {
                 tableAliasAndField: [ "User_leader_member_User", "_rowId" ],
                 nameContext: [ "User_leader_member_User" ],

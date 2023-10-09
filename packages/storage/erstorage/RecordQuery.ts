@@ -1,4 +1,4 @@
-import {MatchExpression, MatchExpressionData} from "./MatchExpression";
+import {MatchExp, MatchExpressionData} from "./MatchExp.ts";
 import {AttributeQuery, AttributeQueryData} from "./AttributeQuery";
 import {Modifier, ModifierData} from "./Modifier";
 import {EntityToTableMap} from "./EntityToTableMap";
@@ -12,9 +12,9 @@ export type RecordQueryData = {
 
 
 export class RecordQuery {
-    static create(recordName: string, map: EntityToTableMap, data: RecordQueryData, contextRootEntity?: string, parentRecord?:string, attributeName?:string) {
+    static create(recordName: string, map: EntityToTableMap, data: RecordQueryData, contextRootEntity?: string, parentRecord?:string, attributeName?:string, onlyRelationData?: boolean) {
         // CAUTION 因为合表后可能用关联数据匹配到行。
-        const matchExpression = (new MatchExpression(recordName, map, data.matchExpression, contextRootEntity)).and({
+        const matchExpression = (new MatchExp(recordName, map, data.matchExpression, contextRootEntity)).and({
             key: 'id',
             value: ['not', null]
         })
@@ -26,9 +26,29 @@ export class RecordQuery {
             new AttributeQuery(recordName, map, data.attributeQuery || [], parentRecord, attributeName),
             new Modifier(recordName, map, data.modifier!),
             contextRootEntity,
+            parentRecord,
+            attributeName,
+            onlyRelationData
         )
     }
-    constructor(public recordName: string, public map: EntityToTableMap, public matchExpression: MatchExpression, public attributeQuery: AttributeQuery, public modifier: Modifier, public contextRootEntity?: string) {}
+    constructor(
+        public recordName: string,
+        public map: EntityToTableMap,
+        public matchExpression: MatchExp,
+        public attributeQuery: AttributeQuery,
+        public modifier: Modifier,
+        public contextRootEntity?: string,
+        public parentRecord?:string,
+        public attributeName?:string,
+        public onlyRelationData?:boolean
+    ) {}
+    getData(): RecordQueryData {
+        return {
+            matchExpression: this.matchExpression.data,
+            attributeQuery: this.attributeQuery.data,
+            modifier: this.modifier.data
+        }
+    }
 }
 
 
@@ -42,7 +62,7 @@ export class RecordQueryTree {
             this.records = data.records || {}
         }
         if (parentRecord) {
-            this.info = new AttributeInfo(this.parentRecord, this.attributeName, this.map)
+            this.info = new AttributeInfo(this.parentRecord!, this.attributeName!, this.map)
         }
     }
     addField(namePath:string[]) {
@@ -72,7 +92,7 @@ export class RecordQueryTree {
     }
     merge(otherTree:RecordQueryTree) {
         const fields = Array.from(new Set([...this.fields, ...otherTree.fields]))
-        const records = {}
+        const records: {[k:string]: RecordQueryTree} = {}
         const keys = Array.from(new Set([...Object.keys(this.records), ...Object.keys(otherTree.records)]))
         keys.forEach(key => {
             if (this.records[key] && otherTree.records[key]) {
@@ -87,6 +107,8 @@ export class RecordQueryTree {
         return new RecordQueryTree(this.recordName, this.map, this.parentRecord, this.attributeName, { fields, records})
     }
 }
+
+export const LINK_SYMBOL = '&'
 
 // export type RecordQueryTree = {
 //     _fields?: string[],

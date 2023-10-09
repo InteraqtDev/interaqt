@@ -4,7 +4,7 @@ import { createCommonData} from "./data/common";
 import {DBSetup} from "../erstorage/Setup";
 import { SQLiteDB } from '../../runtime/BunSQLite'
 import {EntityToTableMap} from "../erstorage/EntityToTableMap";
-import {MatchExpression} from "../erstorage/MatchExpression.ts";
+import {MatchExp} from "../erstorage/MatchExp.ts";
 
 describe('one to one', () => {
     let db: SQLiteDB
@@ -28,7 +28,7 @@ describe('one to one', () => {
     test('create one to one data:create self on combined table', async () => {
         const userA = await entityQueryHandle.create('User', {name:'a1', age:12})
         const findUser = await entityQueryHandle.findOne('User',
-            MatchExpression.createFromAtom({ key: 'id', value: ['=', userA.id]}),
+            MatchExp.atom({ key: 'id', value: ['=', userA.id]}),
             {},
             ['name', 'age']
         )
@@ -49,7 +49,7 @@ describe('one to one', () => {
             }
         })
         const findUser = await entityQueryHandle.findOne('User',
-            MatchExpression.createFromAtom({ key: 'id', value: ['=', userA.id]}),
+            MatchExp.atom({ key: 'id', value: ['=', userA.id]}),
             {},
             ['name', 'age', ['profile', {attributeQuery: ['title']}]]
         )
@@ -69,7 +69,7 @@ describe('one to one', () => {
         const userA = await entityQueryHandle.create('User', {name:'a1', age:12, profile: profileA})
 
         const findUser = await entityQueryHandle.findOne('User',
-            MatchExpression.createFromAtom({ key: 'id', value: ['=', userA.id]}),
+            MatchExp.atom({ key: 'id', value: ['=', userA.id]}),
             {},
             ['name', 'age', ['profile', {attributeQuery: ['title']}]]
         )
@@ -85,11 +85,11 @@ describe('one to one', () => {
         const profileA = await entityQueryHandle.create('Profile', {title:'f1'})
 
         await entityQueryHandle.delete('User',
-            MatchExpression.createFromAtom({ key: 'id', value: ['=', userA.id]}),
+            MatchExp.atom({ key: 'id', value: ['=', userA.id]}),
         )
 
         const findUsers = await entityQueryHandle.find('User',
-            MatchExpression.createFromAtom({ key: 'id', value: ['=', userA.id]}),
+            MatchExp.atom({ key: 'id', value: ['=', userA.id]}),
             {},
             ['name']
         )
@@ -97,7 +97,7 @@ describe('one to one', () => {
         expect(findUsers.length).toBe(0)
 
         const findProfile = await entityQueryHandle.findOne('Profile',
-            MatchExpression.createFromAtom({ key: 'id', value: ['=', profileA.id]}),
+            MatchExp.atom({ key: 'id', value: ['=', profileA.id]}),
             {},
             ['title']
         )
@@ -121,12 +121,12 @@ describe('one to one', () => {
         })
 
         await entityQueryHandle.delete('User',
-            MatchExpression.createFromAtom({ key: 'id', value: ['=', userA.id]}),
+            MatchExp.atom({ key: 'id', value: ['=', userA.id]}),
         )
 
 
         const findProfile = await entityQueryHandle.findOne('Profile',
-            MatchExpression.createFromAtom({ key: 'title', value: ['=', 'f1']}),
+            MatchExp.atom({ key: 'title', value: ['=', 'f1']}),
             {},
             ['title', ['owner', {attributeQuery: ['id']}]]
         )
@@ -160,12 +160,12 @@ describe('one to one', () => {
 
 
         await entityQueryHandle.update('User',
-            MatchExpression.createFromAtom({ key: 'id', value: ['=', userA.id]}),
+            MatchExp.atom({ key: 'id', value: ['=', userA.id]}),
             { profile: { title: 'f2'} }
         )
 
         const findUser = await entityQueryHandle.findOne('User',
-            MatchExpression.createFromAtom({ key: 'id', value: ['=', userA.id]}),
+            MatchExp.atom({ key: 'id', value: ['=', userA.id]}),
             {},
             ['name', 'age', ['profile', {attributeQuery: ['title']}]]
         )
@@ -175,7 +175,7 @@ describe('one to one', () => {
         expect(findUser.profile.title).toBe('f2')
 
         const findProfiles = await entityQueryHandle.find('Profile',
-            MatchExpression.createFromAtom({ key: 'title', value: ['=', 'f2']}),
+            MatchExp.atom({ key: 'title', value: ['=', 'f2']}),
             {},
             ['title', ['owner', {attributeQuery: ['name']}]]
         )
@@ -190,7 +190,7 @@ describe('one to one', () => {
 
 
         const findProfiles2 = await entityQueryHandle.find('Profile',
-            MatchExpression.createFromAtom({ key: 'title', value: ['=', 'f1']}),
+            MatchExp.atom({ key: 'title', value: ['=', 'f1']}),
             {},
             ['title', ['owner', {attributeQuery: ['name']}]]
         )
@@ -218,12 +218,12 @@ describe('one to one', () => {
         const profileA = await entityQueryHandle.create('Profile', {title:'f2'})
 
         await entityQueryHandle.update('User',
-            MatchExpression.createFromAtom({ key: 'id', value: ['=', userA.id]}),
+            MatchExp.atom({ key: 'id', value: ['=', userA.id]}),
             { profile: profileA }
         )
 
         const findUser = await entityQueryHandle.findOne('User',
-            MatchExpression.createFromAtom({ key: 'id', value: ['=', userA.id]}),
+            MatchExp.atom({ key: 'id', value: ['=', userA.id]}),
             {},
             ['name', 'age', ['profile', {attributeQuery: ['title']}]]
         )
@@ -233,7 +233,7 @@ describe('one to one', () => {
         expect(findUser.profile.title).toBe('f2')
 
         const findProfiles = await entityQueryHandle.find('Profile',
-            MatchExpression.createFromAtom({ key: 'title', value: ['=', 'f2']}),
+            MatchExp.atom({ key: 'title', value: ['=', 'f2']}),
             {},
             ['title', ['owner', {attributeQuery: ['name']}]]
         )
@@ -247,7 +247,7 @@ describe('one to one', () => {
 
 
         const findProfiles2 = await entityQueryHandle.find('Profile',
-            MatchExpression.createFromAtom({ key: 'title', value: ['=', 'f1']}),
+            MatchExp.atom({ key: 'title', value: ['=', 'f1']}),
             {},
             ['title', ['owner', {attributeQuery: ['name']}]]
         )

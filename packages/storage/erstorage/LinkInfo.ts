@@ -66,7 +66,7 @@ export class LinkInfo {
     }
 
     get table() {
-        return this.record.table
+        return this.record?.table
     }
 
     get isTargetReliance() {

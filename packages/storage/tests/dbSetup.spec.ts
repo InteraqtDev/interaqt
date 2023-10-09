@@ -8,7 +8,7 @@ import {EntityToTableMap} from "../erstorage/EntityToTableMap";
 // @ts-ignore
 import { SQLiteDB } from '../../runtime/BunSQLite'
 import {createCommonData} from "./data/common";
-import {MatchExpression} from "../erstorage/MatchExpression.ts";
+import {MatchExp} from "../erstorage/MatchExp.ts";
 import {RecordQueryData, RecordQuery} from "../erstorage/RecordQuery.ts";
 
 const { entities, relations } = createCommonData()
@@ -289,7 +289,7 @@ describe("db setup", () => {
                     ]
                 }],
             ],
-            matchExpression: MatchExpression.createFromAtom({
+            matchExpression: MatchExp.atom({
                 key: 'name',
                 value: ['=', 'a']
             }).and({

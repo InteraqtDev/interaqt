@@ -6,7 +6,7 @@ export class AttributeInfo {
 
     constructor(public parentEntityName: string, public attributeName: string, public map: EntityToTableMap) {
         this.data = this.map.data.records[parentEntityName].attributes[attributeName]
-        assert(!!this.data, `${parentEntityName} has no ${attributeName}`)
+        assert(!!this.data, `${parentEntityName} has no attribute: ${attributeName}`)
     }
 
     get isRecord() {
@@ -131,5 +131,9 @@ export class AttributeInfo {
     getRecordInfo() {
         assert(this.isRecord, `only record attribute can get linkInfo`)
         return this.map.getRecordInfo(this.recordName)
+    }
+
+    getAttribute(name:string) {
+        return this.map.getInfo(this.recordName, name)
     }
 }

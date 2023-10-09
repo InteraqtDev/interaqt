@@ -5,7 +5,7 @@ import {DBSetup} from "../erstorage/Setup";
 import { SQLiteDB } from '../../runtime/BunSQLite'
 import {EntityToTableMap} from "../erstorage/EntityToTableMap";
 import {removeAllInstance} from '../../shared/createClass'
-import {MatchExpression} from "../erstorage/MatchExpression.ts";
+import {MatchExp} from "../erstorage/MatchExp.ts";
 
 
 describe('find relation', () => {
@@ -37,14 +37,14 @@ describe('find relation', () => {
         expect(result[0].source.title).toBe('aaa-profile')
         expect(result[0].target.name).toBe('aaa')
 
-        const match1 = MatchExpression.createFromAtom({
+        const match1 = MatchExp.atom({
             key: 'source.title',
             value: ['=', 'xxx']
         })
         const result1 = await entityQueryHandle.findRelationByName(relationName, match1, {}, [['source', { attributeQuery: ['title']}], ['target', {attributeQuery: ['name']}]])
         expect(result1.length).toBe(0)
 
-        const match2 = MatchExpression.createFromAtom({
+        const match2 = MatchExp.atom({
             key: 'source.title',
             value: ['=', 'aaa-profile']
         })
@@ -54,7 +54,7 @@ describe('find relation', () => {
         expect(result2.length).toBe(1)
 
 
-        const match3 = MatchExpression.createFromAtom({
+        const match3 = MatchExp.atom({
             key: 'target.name',
             value: ['=', 'aaa']
         }).and({
@@ -67,7 +67,7 @@ describe('find relation', () => {
         expect(result3.length).toBe(0)
 
         // 只是关系断开，数据仍然要存在
-        const findUser = await entityQueryHandle.find('User', MatchExpression.createFromAtom({
+        const findUser = await entityQueryHandle.find('User', MatchExp.atom({
             key: 'name',
             value: ['=', 'aaa'],
         }), undefined, ['name'])
@@ -76,7 +76,7 @@ describe('find relation', () => {
             name: 'aaa'
         })
 
-        const findProfile = await entityQueryHandle.find('Profile', MatchExpression.createFromAtom({
+        const findProfile = await entityQueryHandle.find('Profile', MatchExp.atom({
             key: 'title',
             value: ['=', 'aaa-profile'],
         }), undefined, ['title'])
@@ -96,7 +96,7 @@ describe('find relation', () => {
         const relationName = entityQueryHandle.getRelationName('User', 'file')
 
 
-        const match1 = MatchExpression.createFromAtom({
+        const match1 = MatchExp.atom({
             key: 'target.name',
             value: ['=', 'aaa']
         })
@@ -108,7 +108,7 @@ describe('find relation', () => {
         expect( result1[1].source.fileName).toBe('file2')
         expect( result1[1].target.name).toBe('aaa')
 
-        const match2 = MatchExpression.createFromAtom({
+        const match2 = MatchExp.atom({
             key: 'target.name',
             value: ['=', 'aaa']
         }).and({
@@ -133,7 +133,7 @@ describe('find relation', () => {
 
         const relationName = entityQueryHandle.getRelationName('User', 'friends')
 
-        const match1 = MatchExpression.createFromAtom({
+        const match1 = MatchExp.atom({
             key: 'target.name',
             value: ['=', 'aaa']
         })
@@ -145,7 +145,7 @@ describe('find relation', () => {
         expect( result1[1].target.name).toBe('aaa')
         expect( result1[1].source.name).toBe('ccc')
         //
-        const match2 = MatchExpression.createFromAtom({
+        const match2 = MatchExp.atom({
             key: 'target.name',
             value: ['=', 'aaa']
         }).and({

@@ -1,37 +1,42 @@
 import {EntityToTableMap} from "./EntityToTableMap";
+import {assert} from "../util.ts";
 
-import {RecordQueryData, RecordQueryTree, RecordQuery} from "./RecordQuery.ts";
+import {RecordQueryData, RecordQueryTree, RecordQuery, LINK_SYMBOL} from "./RecordQuery.ts";
 
-export type AttributeQueryDataItem = string | [string, RecordQueryData]
+export type AttributeQueryDataRecordItem = [string, RecordQueryData, boolean?]
+export type AttributeQueryDataItem = string | AttributeQueryDataRecordItem
 export type AttributeQueryData = AttributeQueryDataItem[]
 
 export class AttributeQuery {
-    public relatedRecords: { name: string, entityQuery: RecordQuery }[] = []
-    public xToManyRecords: { name: string, entityQuery: RecordQuery }[] = []
-    public xToOneRecords: { name: string, entityQuery: RecordQuery }[] = []
+    public relatedRecords: RecordQuery[] = []
+    public xToManyRecords: RecordQuery[] = []
+    public xToOneRecords: RecordQuery[] = []
     public valueAttributes: string[] = []
     public xToOneQueryTree: RecordQueryTree
     public fullQueryTree: RecordQueryTree
+    public parentLinkRecordQuery?: RecordQuery
+    constructor(public recordName: string, public map: EntityToTableMap, public data: AttributeQueryData = [], public parentRecord?: string, public attributeName?: string, public shouldQueryParentLinkData?: boolean) {
+        data.forEach((rawItem: AttributeQueryDataItem) => {
+            const item = (typeof rawItem === 'string' ? [rawItem, {}, false] : rawItem)  as AttributeQueryDataRecordItem
+            const [attributeName, subQueryData, onlyRelationData] = item
 
-    constructor(public recordName: string, public map: EntityToTableMap, public data: AttributeQueryData = [], public parentRecord?: string, public attributeName?: string) {
-        data.forEach((item: AttributeQueryDataItem) => {
-            const attributeName: string = typeof item === 'string' ? item : item[0]
+            if (attributeName === LINK_SYMBOL) {
+                assert(!!(this.parentRecord && this.attributeName), `${this.parentRecord} ${this.attributeName} cannot be empty when query link data`)
+                const info = this.map.getInfo(this.parentRecord!, this.attributeName!)
+                this.parentLinkRecordQuery = RecordQuery.create(info.linkName, this.map, subQueryData as RecordQueryData, undefined)
+                return
+            }
 
             const attributeInfo = this.map.getInfo(this.recordName, attributeName)
             if (attributeInfo.isRecord) {
-                const relatedEntity = {
-                    name: attributeName,
-                    entityQuery: RecordQuery.create(attributeInfo.recordName, this.map, item[1] as RecordQueryData, undefined, this.recordName, attributeName)
-                }
+                const relatedEntity = RecordQuery.create(attributeInfo.recordName, this.map, subQueryData as RecordQueryData, undefined, this.recordName, attributeName, onlyRelationData)
 
                 this.relatedRecords.push(relatedEntity)
-
                 if (attributeInfo.isXToMany) {
                     this.xToManyRecords.push(relatedEntity)
                 } else if (attributeInfo.isXToOne) {
                     this.xToOneRecords.push(relatedEntity)
                 }
-
 
             } else {
                 this.valueAttributes.push(attributeName)
@@ -43,10 +48,9 @@ export class AttributeQuery {
 
     }
 
-    getQueryFields(nameContext = [this.recordName]): { tableAliasAndField: [string, string], nameContext: string[], attribute: string }[] {
+    getValueAndXToOneRecordFields(nameContext = [this.recordName]): { tableAliasAndField: [string, string], nameContext: string[], attribute: string }[] {
         const queryAttributes = this.valueAttributes.includes('id') ? this.valueAttributes : ['id'].concat(this.valueAttributes)
         const queryFields = queryAttributes.map(attributeName => {
-
             return {
                 tableAliasAndField: this.map.getTableAliasAndFieldName(nameContext, attributeName).slice(0, 2) as [string, string],
                 nameContext,
@@ -54,10 +58,27 @@ export class AttributeQuery {
             }
         })
 
-        this.xToOneRecords.forEach(({name: entityAttributeName, entityQuery}) => {
-            queryFields.push(...entityQuery.attributeQuery!.getQueryFields(nameContext.concat(entityAttributeName)))
+        this.xToOneRecords.forEach((recordQuery) => {
+            const namePath = nameContext.concat(recordQuery.attributeName!)
+            queryFields.push(
+                ...recordQuery.attributeQuery!.getValueAndXToOneRecordFields(namePath)
+            )
+
+            if (recordQuery.attributeQuery.parentLinkRecordQuery!) {
+                queryFields.push(
+                    ...recordQuery.attributeQuery.parentLinkRecordQuery!.attributeQuery!.getValueAndXToOneRecordFields(namePath.concat(LINK_SYMBOL))
+                )
+            }
         })
 
+        if (this.shouldQueryParentLinkData && this.parentLinkRecordQuery) {
+            const reverseAttribute = this.map.getInfo(this.parentRecord!, this.attributeName!).getReverseInfo()?.attributeName!
+            const namePath = nameContext.concat(reverseAttribute!)
+            queryFields.push(
+                ...this.parentLinkRecordQuery!.attributeQuery!.getValueAndXToOneRecordFields(namePath.concat(LINK_SYMBOL))
+            )
+        }
+        // xToMany 的 onlyRelationData 一起查，这是父亲在处理 findRelatedRecords 的时候传过来的。
         return queryFields
     }
 
@@ -69,18 +90,23 @@ export class AttributeQuery {
             }
         })
         // CAUTION 我们这里只管 xToOne 的情况，因为 xToMany 都是外部用 id 去做二次查询得到的。不是用 join 语句一次性得到的。
-        this.xToOneRecords.forEach(({name, entityQuery}) => {
-            result.addRecord([name], entityQuery.attributeQuery!.xToOneQueryTree)
+        this.xToOneRecords.forEach((entityQuery) => {
+            result.addRecord([entityQuery.attributeName!], entityQuery.attributeQuery!.xToOneQueryTree)
         })
         return result
     }
 
     buildFullQueryTree() {
         const result = new RecordQueryTree(this.recordName, this.map, this.parentRecord, this.attributeName)
-        this.relatedRecords.forEach(({name, entityQuery}) => {
-            result.addRecord([name], entityQuery.attributeQuery!.fullQueryTree)
+        this.relatedRecords.forEach((entityQuery) => {
+            result.addRecord([entityQuery.attributeName!], entityQuery.attributeQuery!.fullQueryTree)
         })
         return result
+    }
+
+    withParentLinkData() {
+        if (!this.parentLinkRecordQuery) return this
+        return new AttributeQuery(this.recordName, this.map, this.data, this.parentRecord, this.attributeName, true)
     }
 
 }

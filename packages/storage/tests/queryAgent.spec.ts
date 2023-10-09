@@ -5,7 +5,7 @@ import {
 import { SQLiteDB } from '../../runtime/BunSQLite'
 import {EntityToTableMap, MapData} from "../erstorage/EntityToTableMap";
 import {entityToTableMapData} from "./data/mapData";
-import {MatchExpression, MatchExpressionData} from "../erstorage/MatchExpression.ts";
+import {MatchExp, MatchExpressionData} from "../erstorage/MatchExp.ts";
 import {AttributeQuery, AttributeQueryData} from "../erstorage/AttributeQuery.ts";
 import {RecordQueryData, RecordQuery} from "../erstorage/RecordQuery.ts";
 
@@ -82,7 +82,7 @@ describe('query agent test', () => {
 
     test('where clause test', () => {
 
-        const matchExpData: MatchExpressionData = MatchExpression.createFromAtom({
+        const matchExpData: MatchExpressionData = MatchExp.atom({
             key: 'name',
             value: ['=', 'A']
         }).and({
@@ -93,7 +93,7 @@ describe('query agent test', () => {
             }]
         })
 
-        const matchExp = new MatchExpression('User', entityToTableMap, matchExpData)
+        const matchExp = new MatchExp('User', entityToTableMap, matchExpData)
         const queryAgent = new QueryAgent(entityToTableMap, database)
         const fieldMatchExp = matchExp.buildFieldMatchExpression()
         const fieldMatchExpWithValue = queryAgent.parseMatchExpressionValue('User', fieldMatchExp!)
@@ -117,7 +117,7 @@ describe('query agent test', () => {
 
         // 模拟 inner 的情况
         const innerEntityQuery = RecordQuery.create('User', entityToTableMap, {
-            matchExpression: MatchExpression.createFromAtom({
+            matchExpression: MatchExp.atom({
                 // 这里应该是外部添加的关于和 outer 相等的条件
                 key: 'friends.id',
                 value: ['=', 'id'],
@@ -159,12 +159,12 @@ ${queryAgent.buildFindQuery(innerEntityQuery, 'User_friends')}
                     ]
                 }],
             ],
-            matchExpression: MatchExpression.createFromAtom({
+            matchExpression: MatchExp.atom({
                 key: 'name',
                 value: ['=', 'A']
             }).and({
                 key: 'friends',
-                value: ['exist',  MatchExpression.createFromAtom({
+                value: ['exist',  MatchExp.atom({
                     key: 'age',
                     value: ['<', '18']
                 }).and({
