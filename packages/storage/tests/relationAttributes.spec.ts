@@ -275,7 +275,7 @@ describe('relation attributes', () => {
             },
         })
 
-        // query relation data with entity
+        // query relation data from entity
         const foundUser = await handle.findOne(
             'User',
             MatchExp.atom({
@@ -304,7 +304,8 @@ describe('relation attributes', () => {
         )
 
         expect(foundUser).toMatchObject(rawData)
-        // console.log(JSON.stringify(foundUser, null, 4))
+
+        // query
     })
 
     // TODO 更多关系上的测试
