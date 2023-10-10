@@ -98,6 +98,21 @@ describe('query agent test', () => {
         const fieldMatchExp = matchExp.buildFieldMatchExpression()
         const fieldMatchExpWithValue = queryAgent.parseMatchExpressionValue('User', fieldMatchExp!)
 
+        const joinExp = queryAgent.getJoinTables(matchExp.xToOneQueryTree, ['User'])
+        expect(joinExp).toMatchObject([
+            {
+                for: [ "User", "friends" ],
+                joinSource: [ "Profile_User_Item", "User" ],
+                joinIdField: [ "User_id", "_source" ],
+                joinTarget: [ "User_friends_friends_User", "REL__User_friends" ]
+            }, {
+                for: [ "User", "friends" ],
+                joinSource: [ "User_friends_friends_User", "REL__User_friends" ],
+                joinIdField: [ "_target", "User_id" ],
+                joinTarget: [ "Profile_User_Item", "User_friends" ]
+            }
+        ])
+
 
         expect(fieldMatchExpWithValue!.left.data).toMatchObject({
             fieldName: [

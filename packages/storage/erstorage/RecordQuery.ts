@@ -56,7 +56,16 @@ export class RecordQueryTree {
     public fields: string[] =[]
     public records: {[k:string]: RecordQueryTree} = {}
     public info? :AttributeInfo
-    constructor(public recordName: string, public map: EntityToTableMap, public parentRecord?:string, public attributeName?: string, data?: {fields: string[], records: {[k:string]: RecordQueryTree}}) {
+    // 父节点和自己这个几点 link 上的 query
+    public parentLinkQueryTree? : RecordQueryTree
+    constructor(
+        public recordName: string,
+        public map: EntityToTableMap,
+        public parentRecord?:string,
+        public attributeName?: string,
+        public data?: {fields: string[], records: {[k:string]: RecordQueryTree}},
+        public parent?: RecordQueryTree
+    ) {
         if (data){
             this.fields = data.fields || []
             this.records = data.records || {}
@@ -65,13 +74,20 @@ export class RecordQueryTree {
             this.info = new AttributeInfo(this.parentRecord!, this.attributeName!, this.map)
         }
     }
+
     addField(namePath:string[]) {
         const [name, ...rest] = namePath
         if (namePath.length === 1) {
             this.fields.push(name)
+        } else if(name === LINK_SYMBOL){
+            if (!this.parentLinkQueryTree) {
+                this.parentLinkQueryTree = new RecordQueryTree(this.info!.linkName, this.map)
+            }
+
+            this.parentLinkQueryTree.addField(rest)
         } else {
             const info = this.map.getInfo(this.recordName, name)
-            if (!this.records[name]) this.records[name] = new RecordQueryTree(info.recordName, this.map, this.recordName, name)
+            if (!this.records[name]) this.records[name] = new RecordQueryTree(info.recordName, this.map, this.recordName, name, undefined, this)
             this.records[name].addField(rest)
         }
     }
@@ -79,7 +95,12 @@ export class RecordQueryTree {
         const [name, ...rest] = namePath
         if (namePath.length === 1) {
             const info = this.map.getInfo(this.recordName, name)
-            this.records[name] = subTree || new RecordQueryTree(info.recordName, this.map, this.recordName, name)
+            this.records[name] = subTree || new RecordQueryTree(info.recordName, this.map, this.recordName, name, undefined, this)
+        } else if(name === LINK_SYMBOL) {
+            if (!this.parentLinkQueryTree) {
+                this.parentLinkQueryTree = new RecordQueryTree(this.info!.linkName, this.map)
+            }
+            this.parentLinkQueryTree.addRecord(rest, subTree)
         } else {
             this.records[name].addRecord(rest, subTree)
         }
@@ -106,6 +127,7 @@ export class RecordQueryTree {
 
         return new RecordQueryTree(this.recordName, this.map, this.parentRecord, this.attributeName, { fields, records})
     }
+
 }
 
 export const LINK_SYMBOL = '&'

@@ -23,24 +23,24 @@ export class MatchExp {
         return BoolExp.atom<MatchAtom>(value)
     }
 
-    public entityQueryTree: RecordQueryTree
+    public xToOneQueryTree: RecordQueryTree
 
     constructor(public entityName: string, public map: EntityToTableMap, public data?: MatchExpressionData, public contextRootEntity?: string, public fromRelation?: boolean) {
-        this.entityQueryTree = new RecordQueryTree(this.entityName, this.map)
+        this.xToOneQueryTree = new RecordQueryTree(this.entityName, this.map)
         if (this.data) {
             assert(this.data instanceof BoolExp, `match data is not a BoolExpression instance, you passed: ${this.data}`)
-            this.buildEntityQueryTree(this.data, this.entityQueryTree)
+            this.buildXToOneQueryTree(this.data, this.xToOneQueryTree)
         }
     }
 
-    buildEntityQueryTree(matchData: MatchExpressionData, entityQueryTree: RecordQueryTree) {
+    buildXToOneQueryTree(matchData: MatchExpressionData, recordQueryTree: RecordQueryTree) {
         if (matchData.isExpression()) {
             if (matchData.left) {
-                this.buildEntityQueryTree(matchData.left, entityQueryTree)
+                this.buildXToOneQueryTree(matchData.left, recordQueryTree)
             }
 
             if (matchData.right) {
-                this.buildEntityQueryTree(matchData.right, entityQueryTree)
+                this.buildXToOneQueryTree(matchData.right, recordQueryTree)
             }
         } else {
             // variable
@@ -51,10 +51,10 @@ export class MatchExp {
             //  CAUTION 还有最后路径是 entity 但是  match 值是 EXIST 的不用管，因为会生成 exist 子句。只不过这里也不用特别处理，join 的表没用到会自动数据库忽略。
             if (!(matchAttributePath.length === 1 && attributeInfo.isValue)) {
                 if (attributeInfo.isRecord) {
-                    entityQueryTree.addRecord(matchAttributePath)
+                    recordQueryTree.addRecord(matchAttributePath)
                 } else {
-                    // 最后一个是 attribute，所以不在 entityQueryTree 上。
-                    entityQueryTree.addField(matchAttributePath)
+                    // 最后一个是 attribute，所以不在 recordQueryTree 上。
+                    recordQueryTree.addField(matchAttributePath)
                 }
             }
         }

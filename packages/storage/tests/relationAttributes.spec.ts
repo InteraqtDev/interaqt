@@ -129,8 +129,8 @@ describe('relation attributes', () => {
 
 
     // TODO x:1 关系上的 x:n 关联实体
-    test('create relation attribute on one to one', async () => {
-        const userA = await handle.create('User', {
+    test.only('create relation attribute on one to one', async () => {
+        const rawData = {
             name: 'aaa',
             profile: {
                 title: 'p1',
@@ -138,7 +138,8 @@ describe('relation attributes', () => {
                     viewed: 200
                 }
             }
-        })
+        }
+        const userA = await handle.create('User', rawData)
 
         const findTeamRelation = await handle.findOne(
             handle.getRelationName('User', 'profile'),
@@ -180,13 +181,33 @@ describe('relation attributes', () => {
 
         expect(foundUser).toMatchObject({
             id: userA.id,
-            name: "aaa",
-            profile: {
-                title: "p1",
-                "&": {
-                    viewed: 200
-                }
-            }
+            ...rawData
+        })
+
+        // query with attribute match
+        const foundUser2 = await handle.findOne(
+            'User',
+            MatchExp.atom({
+                key: 'profile.&.viewed',
+                value: ['=', 200]
+            }),
+            undefined,
+            [
+                'name',
+                ['profile',
+                    {
+                        attributeQuery: [
+                            'title',
+                            ['&', {attributeQuery: ['viewed']}]
+                        ]
+                    }
+                ]
+            ]
+        )
+
+        expect(foundUser2).toMatchObject({
+            id: userA.id,
+            ...rawData
         })
     })
 

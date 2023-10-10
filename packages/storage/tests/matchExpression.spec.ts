@@ -19,8 +19,8 @@ describe('match expression test', () => {
         })
 
         const matchExpression = new MatchExp('User', entityToTableMap , queryData)
-        expect(matchExpression.entityQueryTree.records.leader).toBeInstanceOf(RecordQueryTree)
-        expect(matchExpression.entityQueryTree.records.leader.records.profile).toBeInstanceOf(RecordQueryTree)
+        expect(matchExpression.xToOneQueryTree.records.leader).toBeInstanceOf(RecordQueryTree)
+        expect(matchExpression.xToOneQueryTree.records.leader.records.profile).toBeInstanceOf(RecordQueryTree)
     });
 })
 

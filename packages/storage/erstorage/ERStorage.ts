@@ -24,7 +24,7 @@ export class QueryAgent {
     buildFindQuery(recordQuery: RecordQuery, prefix='') {
         // 从所有条件里面构建出 join clause
         const fieldQueryTree = recordQuery.attributeQuery!.xToOneQueryTree
-        const matchQueryTree = recordQuery.matchExpression.entityQueryTree
+        const matchQueryTree = recordQuery.matchExpression.xToOneQueryTree
         const finalQueryTree = fieldQueryTree.merge(matchQueryTree)
 
         const joinTables = this.getJoinTables(finalQueryTree, [recordQuery.recordName])
@@ -77,7 +77,7 @@ ${this.buildWhereClause(
                     for (let entity of records) {
                         setByPath(
                             entity,
-                            [subEntityQuery.attributeName!, LINK_SYMBOL, subEntityQueryOfSubLink.attributeName],
+                            [subEntityQuery.attributeName!, LINK_SYMBOL, subEntityQueryOfSubLink.attributeName!],
                             await this.findRecords(subEntityQueryOfSubLink, `finding relation data: ${entityQuery.recordName}.${subEntityQuery.attributeName}.&.${subEntityQueryOfSubLink.attributeName}`)
                         )
                     }
@@ -105,7 +105,7 @@ ${this.buildWhereClause(
         // FIXME 对 n:N 关联实体的查询中，也可能会引用主实体的值，这个时候值已经是确定的了，应该作为 context 传进来，替换掉原本的 matchExpression
         const newMatch = relatedRecordQuery.matchExpression.and({
             key: `${reverseAttributeName}.id`,
-            // FIXME 这里是不是要把 n;n 的情况改成 EXIST ? 现在能 work 是因为有 DISDINCT，但效率很低？
+            // 这里不能用 EXIST，因为 EXIST 会把 join 变成子查询，而我们还需要关系上的数据，不能用子查询
             value: ['=', recordId]
         })
 
@@ -147,8 +147,8 @@ ${this.buildWhereClause(
                     // 查找这个 link 的 x:n 关联实体
                     setByPath(
                         record,
-                        [LINK_SYMBOL, subEntityQueryOfLink.attributeName],
-                        await this.findXToManyRelatedRecords(subEntityQueryOfLink.parentRecord, subEntityQueryOfLink.attributeName!, linkId, subEntityQueryOfLink)
+                        [LINK_SYMBOL, subEntityQueryOfLink.attributeName!],
+                        await this.findXToManyRelatedRecords(subEntityQueryOfLink.parentRecord!, subEntityQueryOfLink.attributeName!, linkId, subEntityQueryOfLink)
                     )
                 }
             }
@@ -229,6 +229,22 @@ ${this.buildWhereClause(
                 }
             }
             result.push(...this.getJoinTables(subQueryTree, currentNamePath, [idField!, currentTable!, currentTableAlias! ]))
+
+            // 处理 link 上的 query。如果只要 id, 那么在上面实体链接的时候就已经有了
+            if(subQueryTree.parentLinkQueryTree && !subQueryTree.parentLinkQueryTree.onlyIdField()) {
+                // 连接 link 和它的子节点
+                const linkNamePath = currentNamePath.concat(LINK_SYMBOL)
+                const [, linkIdField] = this.map.getTableAliasAndFieldName(linkNamePath, 'id', true)
+                const linkParentInfo: [string, string, string] = [
+                    linkIdField!,// link 的 idField
+                    relationTable!, // link 的 tableName
+                    relationTableAlias!, // link 的 tableAlias
+                ]
+                subQueryTree.parentLinkQueryTree.forEachRecords(linkSubQueryTree => {
+                    result.push(...this.getJoinTables(linkSubQueryTree, linkNamePath, linkParentInfo))
+                })
+            }
+
         })
 
         return result

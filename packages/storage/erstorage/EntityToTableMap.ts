@@ -123,18 +123,18 @@ export class EntityToTableMap {
         let currentEntity = entityName
         let parentEntity: string|undefined
         let lastAttribute: string|undefined
-        let attributeData: ValueAttribute|RecordAttribute
+        let attributeData: ValueAttribute|RecordAttribute|undefined
 
         let currentAttribute:string
         const stack = []
-        while(currentAttribute = attributivePath.shift()) {
+        while(currentAttribute = attributivePath.shift()!) {
             stack.push(currentAttribute)
             // 增加了 & 的影响
             if (currentAttribute === LINK_SYMBOL) {
                 assert(!!parentEntity && !!lastAttribute, `reading link in wrong path ${stack.join('.')}`)
                 parentEntity = (this.data.records[parentEntity!].attributes[lastAttribute!] as RecordAttribute).linkName
                 lastAttribute = undefined
-                currentEntity = (attributeData as RecordAttribute).linkName
+                currentEntity = (attributeData! as RecordAttribute).linkName
                 attributeData = undefined
             } else {
                 const data = this.data.records[currentEntity]
