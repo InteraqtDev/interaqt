@@ -71,7 +71,7 @@ export class RecordQueryTree {
             this.records = data.records || {}
         }
         if (parentRecord) {
-            this.info = new AttributeInfo(this.parentRecord!, this.attributeName!, this.map)
+            this.info = this.map.getInfo(this.parentRecord!, this.attributeName!)
         }
     }
 

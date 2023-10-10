@@ -303,7 +303,7 @@ describe("db setup", () => {
 
         const queryAgent = new QueryAgent(entityToTableMap, database)
         // console.log(queryAgent.buildFindQuery(entityQuery))
-        const result = await database.query(queryAgent.buildFindQuery(entityQuery))
+        const result = await database.query(queryAgent.buildXToOneFindQuery(entityQuery))
         // console.log(result)
         expect(result.length).toBe(0)
     })

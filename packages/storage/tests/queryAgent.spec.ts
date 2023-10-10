@@ -66,14 +66,14 @@ describe('query agent test', () => {
             {
                 for: ["User", "friends"],
                 joinSource: ["Profile_User_Item", "User"],
-                joinIdField: ["User_id", "_source"],
-                joinTarget: ["User_friends_friends_User", "REL__User_friends"]
+                joinIdField: ["User_id", "_target"],
+                joinTarget: ["User_friends_friends_User", "REL_User_friends"]
             },
             // 关系表和 friend join。
             {
                 for: ["User", "friends"],
-                joinSource: ["User_friends_friends_User", "REL__User_friends"],
-                joinIdField: ["_target", "User_id"],
+                joinSource: ["User_friends_friends_User", "REL_User_friends"],
+                joinIdField: ["_source", "User_id"],
                 joinTarget: ["Profile_User_Item", "User_friends"]
             }
         ])
@@ -101,15 +101,26 @@ describe('query agent test', () => {
         const joinExp = queryAgent.getJoinTables(matchExp.xToOneQueryTree, ['User'])
         expect(joinExp).toMatchObject([
             {
-                for: [ "User", "friends" ],
+                for: [ "User", "friends:source" ],
                 joinSource: [ "Profile_User_Item", "User" ],
                 joinIdField: [ "User_id", "_source" ],
-                joinTarget: [ "User_friends_friends_User", "REL__User_friends" ]
+                joinTarget: [ "User_friends_friends_User", "REL_User_friends_SOURCE" ]
             }, {
-                for: [ "User", "friends" ],
-                joinSource: [ "User_friends_friends_User", "REL__User_friends" ],
+                for: [ "User", "friends:source" ],
+                joinSource: [ "User_friends_friends_User", "REL_User_friends_SOURCE" ],
                 joinIdField: [ "_target", "User_id" ],
-                joinTarget: [ "Profile_User_Item", "User_friends" ]
+                joinTarget: [ "Profile_User_Item", "User_friends_SOURCE" ]
+            },
+            {
+                for: [ "User", "friends:target" ],
+                joinSource: [ "Profile_User_Item", "User" ],
+                joinIdField: [ "User_id", "_target" ],
+                joinTarget: [ "User_friends_friends_User", "REL_User_friends_TARGET" ]
+            }, {
+                for: [ "User", "friends:target" ],
+                joinSource: [ "User_friends_friends_User", "REL_User_friends_TARGET" ],
+                joinIdField: [ "_source", "User_id" ],
+                joinTarget: [ "Profile_User_Item", "User_friends_TARGET" ]
             }
         ])
 
@@ -124,9 +135,17 @@ describe('query agent test', () => {
             value: ['=', 'A']
         })
 
-        expect(fieldMatchExpWithValue!.right.data).toMatchObject({
+
+        // 因为 friend 是 对称关系，所以要分裂成了两个
+        expect(fieldMatchExpWithValue!.right.isOr()).toBe(true)
+
+        expect(fieldMatchExpWithValue!.right.left.data).toMatchObject({
             isFunctionMatch: true,
-            namePath: ['User', 'friends']
+            namePath: ['User', 'friends:source']
+        })
+        expect(fieldMatchExpWithValue!.right.right.data).toMatchObject({
+            isFunctionMatch: true,
+            namePath: ['User', 'friends:target']
         })
 
 
@@ -143,9 +162,16 @@ describe('query agent test', () => {
             })
         } as RecordQueryData)
 
-        expect(fieldMatchExpWithValue!.right.data.fieldValue).toBe(`
+        console.log(fieldMatchExpWithValue!.right.left.data.fieldValue)
+        expect(fieldMatchExpWithValue!.right.left.data.fieldValue).toBe(`
 EXISTS (
-${queryAgent.buildFindQuery(innerEntityQuery, 'User_friends')}
+${queryAgent.buildXToOneFindQuery(innerEntityQuery, 'User_friends_SOURCE')}
+)
+`)
+
+        expect(fieldMatchExpWithValue!.right.right.data.fieldValue).toBe(`
+EXISTS (
+${queryAgent.buildXToOneFindQuery(innerEntityQuery, 'User_friends_TARGET')}
 )
 `)
     })
@@ -191,7 +217,7 @@ ${queryAgent.buildFindQuery(innerEntityQuery, 'User_friends')}
         } as RecordQueryData)
 
         const queryAgent = new QueryAgent(entityToTableMap, database)
-        expect(() => queryAgent.buildFindQuery(entityQuery)).not.toThrow()
+        expect(() => queryAgent.buildXToOneFindQuery(entityQuery)).not.toThrow()
 
     })
 

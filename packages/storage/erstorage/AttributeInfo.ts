@@ -4,8 +4,8 @@ import {EntityToTableMap, RecordAttribute, ValueAttribute} from "./EntityToTable
 export class AttributeInfo {
     public data: ValueAttribute | RecordAttribute
 
-    constructor(public parentEntityName: string, public attributeName: string, public map: EntityToTableMap) {
-        this.data = this.map.data.records[parentEntityName].attributes[attributeName]
+    constructor(public parentEntityName: string, public attributeName: string, public map: EntityToTableMap, public symmetricDirection?: 'source'|'target') {
+        this.data = this.map.getAttributeData(parentEntityName, attributeName)
         assert(!!this.data, `${parentEntityName} has no attribute: ${attributeName}`)
     }
 
@@ -115,6 +115,11 @@ export class AttributeInfo {
 
     isRecordSource() {
         return this.getLinkInfo().isRelationSource(this.parentEntityName, this.attributeName)
+    }
+
+    isLinkManyToManySymmetric() {
+        const linkInfo = this.getLinkInfo()
+        return linkInfo.isManyToMany && linkInfo.isSymmetric()
     }
 
     getReverseInfo() {

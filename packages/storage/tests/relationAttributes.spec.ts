@@ -129,7 +129,7 @@ describe('relation attributes', () => {
 
 
     // TODO x:1 关系上的 x:n 关联实体
-    test.only('create relation attribute on one to one', async () => {
+    test('create relation attribute on one to one', async () => {
         const rawData = {
             name: 'aaa',
             profile: {

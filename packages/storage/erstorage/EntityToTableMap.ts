@@ -93,16 +93,25 @@ export class EntityToTableMap {
     getRecord(recordName:string) {
         return this.data.records[recordName]
     }
+    getAttributeName(rawAttributeName:string) {
+        return rawAttributeName.includes(':') ? rawAttributeName.split(':')[0] : rawAttributeName
+    }
+    getAttributeData(recordName:string, attributeName: string) {
+        return this.data.records[recordName].attributes[this.getAttributeName(attributeName)]
+    }
     getRecordInfo(recordName:string) {
         return new RecordInfo(recordName, this)
     }
     getInfo(entityName: string, attribute: string) : AttributeInfo{
-        assert(!!this.data.records[entityName]?.attributes[attribute],
-            `cannot find attribute ${attribute} in ${entityName}. attributes: ${this.data.records[entityName] && Object.keys(this.data.records[entityName]?.attributes)}`
+        const result = this.getInfoByPath([entityName, attribute])
+
+        assert(!!result,
+            `cannot find attribute "${attribute}" in "${entityName}". attributes: ${this.data.records[entityName] && Object.keys(this.data.records[entityName]?.attributes)}`
         )
-        return new AttributeInfo( entityName, attribute, this)
+        return result!
     }
-    getLinkInfo(recordName: string, attribute: string) {
+    getLinkInfo(recordName: string, rawAttribute: string) {
+        const attribute = this.getAttributeName(rawAttribute)
         const linkName = (this.data.records[recordName].attributes[attribute] as RecordAttribute).linkName
         assert(!!linkName, `cannot find relation ${recordName} ${attribute}`)
         return new LinkInfo(linkName, this.data.links[linkName], this)
@@ -111,13 +120,8 @@ export class EntityToTableMap {
         assert(!!this.data.links[linkName], `cannot find link ${linkName}`)
         return new LinkInfo(linkName, this.data.links[linkName], this)
     }
-    getRelationInfoData(entityName: string, attribute: string) {
-        const relationName = (this.data.records[entityName].attributes[attribute] as RecordAttribute).linkName
-        assert(!!relationName, `cannot find relation ${entityName} ${attribute}`)
-        return this.data.links[relationName]
-    }
 
-    getInfoByPath(namePath: string[]): AttributeInfo {
+    getInfoByPath(namePath: string[]): AttributeInfo|undefined {
         const [entityName, ...attributivePath] = namePath
         assert(attributivePath.length > 0, 'getInfoByPath should have a name path.')
         let currentEntity = entityName
@@ -125,10 +129,16 @@ export class EntityToTableMap {
         let lastAttribute: string|undefined
         let attributeData: ValueAttribute|RecordAttribute|undefined
 
-        let currentAttribute:string
+        let rawCurrentAttribute:string
+        let lastSymmetricDirection
         const stack = []
-        while(currentAttribute = attributivePath.shift()!) {
-            stack.push(currentAttribute)
+        while(rawCurrentAttribute = attributivePath.shift()!) {
+            stack.push(rawCurrentAttribute)
+            // 路径中可能有 symmetric 的方向
+            const currentNamePair = rawCurrentAttribute.includes(':') ? rawCurrentAttribute.split(':') : [rawCurrentAttribute, undefined]
+            const [currentAttribute, symmetricDirection] = currentNamePair
+            lastSymmetricDirection = symmetricDirection
+
             // 增加了 & 的影响
             if (currentAttribute === LINK_SYMBOL) {
                 assert(!!parentEntity && !!lastAttribute, `reading link in wrong path ${stack.join('.')}`)
@@ -138,13 +148,15 @@ export class EntityToTableMap {
                 attributeData = undefined
             } else {
                 const data = this.data.records[currentEntity]
-                attributeData = data!.attributes[currentAttribute] as RecordAttribute
+                attributeData = data!.attributes[currentAttribute!] as RecordAttribute
                 parentEntity = currentEntity
                 currentEntity = (attributeData as RecordAttribute).isRecord ? (attributeData as RecordAttribute).recordName : ''
                 lastAttribute = currentAttribute
             }
         }
-        return new AttributeInfo( parentEntity!, lastAttribute!, this)
+
+        if (!parentEntity || !lastAttribute) return undefined
+        return new AttributeInfo( parentEntity!, lastAttribute!, this, lastSymmetricDirection!)
     }
     getTableAndAliasStack(namePath: string[]): TableAndAliasStack {
         const [rootEntityName, ...relationPath] = namePath
@@ -174,7 +186,10 @@ export class EntityToTableMap {
         }]
 
         for(let i = 0; i<relationPath.length; i++) {
-            const currentAttributeName = relationPath[i]
+            // 对称关系要说明方向，不然  join 表的时候两个方向都用的同一个 alias，逻辑错误。它的格式是 'xxx:source' 或者 ‘xxx:target’
+            const currentNamePair = relationPath[i].includes(':') ? relationPath[i].split(':') : [relationPath[i], undefined]
+            const [currentAttributeName, symmetricDirection] = currentNamePair
+
             const path = [rootEntityName, ...relationPath.slice(0, i+1)]
             // 如果是读 link 上的数据
             if (currentAttributeName === LINK_SYMBOL) {
@@ -189,13 +204,22 @@ export class EntityToTableMap {
                 relationTableAlias = ''
                 info = undefined
             } else {
-                info = this.getInfoByPath(path)
-                const currentEntityAttribute = lastEntityData.attributes[currentAttributeName] as RecordAttribute
+                info = this.getInfoByPath(path)!
+                const currentEntityAttribute = lastEntityData.attributes[currentAttributeName!] as RecordAttribute
                 assert(info.isRecord, `${relationPath.slice(0, i+1).join('.')} is not a entity attribute`)
 
                 const currentEntityData = this.data.records[currentEntityAttribute.recordName] as RecordMapItem
 
-                const currentTableAlias = namePath.slice(0, i+2).join('_')
+                const currentTableAlias = namePath.slice(0, i+2).map(name => {
+                    // 处理 symmetric 中的:
+                    if(name.includes(':')) {
+                        const pair = name.split(':')
+                        return `${pair[0]}_${pair[1].toUpperCase()}`
+                    } else {
+                        return name
+                    }
+                }).join('_')
+
                 // CAUTION 一定要先处理 linkAlias，因为依赖于上一次 tableAlias。
                 if (info.isMergedWithParent() || info.isLinkMergedWithParent()) {
                     // 和上一个表同名。当前表也就是上一个
@@ -203,7 +227,8 @@ export class EntityToTableMap {
                     // link 没有合并的情况也要生成新的 alias。否则就和 lastTableAlias 同名
                 } else if (info.isLinkIsolated()){
                     // link 表独立，给个新名字
-                    relationTableAlias = `REL__${currentTableAlias}`
+                    // CAUTION symmetric 路径要手动指定关系
+                    relationTableAlias = `REL_${currentTableAlias}`
                 } else {
                     // link 表合并了，名字和当前一样。
                     relationTableAlias = currentTableAlias
@@ -260,13 +285,46 @@ export class EntityToTableMap {
             } else {
                 // isolated。应该用关系表上的记录 id 的 source/target 字段
                 const linkInfoRecord = attrInfo!.getLinkInfo().record
-                return [linkAlias!, attrInfo!.isRecordSource() ? linkInfoRecord?.attributes.target!.field! : linkInfoRecord?.attributes.source!.field!, linkTable!]
+                const fieldName = attrInfo?.isLinkManyToManySymmetric() ?
+                    (attrInfo?.symmetricDirection === 'source' ? linkInfoRecord?.attributes.target!.field! : linkInfoRecord?.attributes.source!.field!) :
+                    (attrInfo!.isRecordSource() ? linkInfoRecord?.attributes.target!.field! : linkInfoRecord?.attributes.source!.field!)
+
+                return [linkAlias!, fieldName, linkTable!]
             }
         } else {
-            const fieldName = record.attributes[attributeName].field
+            const fieldName = record.attributes[this.getAttributeName(attributeName)].field
             return [alias, fieldName!, table]
         }
     }
+    findManyToManySymmetricPath( namePath: string[]): string[]|undefined {
+        const result = [namePath[0]]
+        let found = false
+        // 注意是从 1 开始的。
+        for(let i = 1; i< namePath.length; i++) {
+            result.push(namePath[i])
+            const info = this.getInfoByPath(namePath.slice(0, i+1))
+            if (info?.isRecord && info.isLinkManyToManySymmetric()) {
+                found = true
+                break
+            }
+        }
+
+        // 用 found 来判断，这样即使是最后一个也算找到了。
+        return found ? result: undefined
+    }
+    spawnManyToManySymmetricPath( namePath: string[] ): [string[], string[]] | undefined {
+        const foundPath = this.findManyToManySymmetricPath(namePath)
+        if (!foundPath) return undefined
+        const head = foundPath.slice(0, -1)
+        const splitPoint = foundPath.at(-1)
+        const rest = namePath.slice(foundPath.length, Infinity)
+
+        return [
+            [...head, `${splitPoint}:source`, ...rest],
+            [...head, `${splitPoint}:target`, ...rest],
+        ]
+    }
+
     getReverseAttribute(entityName: string, attribute: string) : string {
         const relationName = (this.data.records[entityName].attributes[attribute] as RecordAttribute).linkName
         const relationData = this.data.links[relationName]

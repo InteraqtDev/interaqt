@@ -92,6 +92,9 @@ export class LinkInfo {
         return !this.data.mergedTo
     }
 
+    isSymmetric() {
+        return this.data.sourceRecord === this.data.targetRecord && this.data.sourceAttribute === this.data.targetAttribute
+    }
     isRelationSource(recordName: string, attribute: string) {
         return this.data.sourceRecord === recordName && this.data.sourceAttribute === attribute
     }

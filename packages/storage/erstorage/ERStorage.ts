@@ -21,7 +21,7 @@ export type JoinTables = {
 
 export class QueryAgent {
     constructor(public map: EntityToTableMap, public database: Database) {}
-    buildFindQuery(recordQuery: RecordQuery, prefix='') {
+    buildXToOneFindQuery(recordQuery: RecordQuery, prefix='') {
         // 从所有条件里面构建出 join clause
         const fieldQueryTree = recordQuery.attributeQuery!.xToOneQueryTree
         const matchQueryTree = recordQuery.matchExpression.xToOneQueryTree
@@ -64,7 +64,7 @@ ${this.buildWhereClause(
     async findRecords(entityQuery: RecordQuery, queryName = ''): Promise<any[]>{
         // findRecords 的一个 join 语句里面只能一次性搞定 x:1 的关联实体，以及关系上的 x:1 关联实体。
         // 1. 这里只通过合表或者 join  处理了 x:1 的关联查询。x:n 的查询是通过二次查询获取的。
-        const records = this.structureRawReturns(await this.database.query(this.buildFindQuery(entityQuery, ''), queryName)) as any[]
+        const records = this.structureRawReturns(await this.database.query(this.buildXToOneFindQuery(entityQuery, ''), queryName)) as any[]
 
         // 2. x:1 上的 关系的x:many关联实体 查询
         // FIXME 没有限制 link.id
@@ -206,7 +206,10 @@ ${this.buildWhereClause(
                 } else {
                     // 说明记录在了 relation record 的 source/target 中
                     const linkInfo = attributeInfo.getLinkInfo()
-                    const isCurrentRelationSource = linkInfo.isRelationSource(attributeInfo.parentEntityName, attributeInfo.attributeName)
+                    const isCurrentRelationSource =
+                        attributeInfo.isLinkManyToManySymmetric() ?
+                            (attributeInfo.symmetricDirection === 'source') :
+                            linkInfo.isRelationSource(attributeInfo.parentEntityName, attributeInfo.attributeName)
                     // 关系表独立
                     result.push({
                         for: currentNamePath,
@@ -292,41 +295,38 @@ ${this.buildWhereClause(
 
         return fieldMatchExp.map((exp: BoolExp<FieldMatchAtom>, context:string[]) => {
             assert(Array.isArray(exp.data.value), `match value is not a array ${context.join('.')}`)
-            if (exp.data.isFunctionMatch) {
-                assert(exp.data.value[0].toLowerCase() === 'exist', `we only support Exist function match on entity for now. yours: ${exp.data.key} ${exp.data.value[0]} ${exp.data.value[1]}`)
 
-                const info = this.map.getInfoByPath(exp.data.namePath!)
-                const {alias: currentAlias} = this.map.getTableAndAliasStack(exp.data.namePath!).at(-1)!
-                const reverseAttributeName = this.map.getReverseAttribute(info.parentEntityName, info.attributeName)
+            if (!exp.data.isFunctionMatch) return { ...exp.data}
 
-                // 注意这里去掉了 namePath 里面根部的 entityName，因为后面计算 referenceValue 的时候会加上。
-                const parentAttributeNamePath = exp.data.namePath!.slice(1, -1)
+            assert(exp.data.value[0].toLowerCase() === 'exist', `we only support Exist function match on entity for now. yours: ${exp.data.key} ${exp.data.value[0]} ${exp.data.value[1]}`)
 
-                const existEntityQuery = RecordQuery.create(info.recordName, this.map, {
-                        matchExpression: BoolExp.atom({
-                            key: `${reverseAttributeName}.id`,
-                            value: ['=', parentAttributeNamePath.concat('id').join('.')],
-                            isReferenceValue: true
-                        } as MatchAtom).and(exp.data.value[1] instanceof BoolExp ? exp.data.value[1] : MatchExp.atom(exp.data.value[1]))
-                    },
-                    // 如果上层还有，就继承上层的，如果没有， context 就只这一层。这个变量是用来给 matchExpression 里面的 value 来引用上层的值的。
-                    //  例如查询用户，要求他存在一个朋友的父母的年龄是小于这个用户。对朋友的父母的年龄匹配中，就需要引用最上层的 alias。
-                    contextRootEntity||entityName
-                )
+            const info = this.map.getInfoByPath(exp.data.namePath!)!
+            const {alias: currentAlias} = this.map.getTableAndAliasStack(exp.data.namePath!).at(-1)!
+            const reverseAttributeName = this.map.getReverseAttribute(info.parentEntityName, info.attributeName)
 
-                return {
-                    ...exp.data,
-                    isInnerQuery: true,
-                    fieldValue: `
+            // 注意这里去掉了 namePath 里面根部的 entityName，因为后面计算 referenceValue 的时候会加上。
+            const parentAttributeNamePath = exp.data.namePath!.slice(1, -1)
+
+            const existEntityQuery = RecordQuery.create(info.recordName, this.map, {
+                    matchExpression: BoolExp.atom({
+                        key: `${reverseAttributeName}.id`,
+                        value: ['=', parentAttributeNamePath.concat('id').join('.')],
+                        isReferenceValue: true
+                    } as MatchAtom).and(exp.data.value[1] instanceof BoolExp ? exp.data.value[1] : MatchExp.atom(exp.data.value[1]))
+                },
+                // 如果上层还有，就继承上层的，如果没有， context 就只这一层。这个变量是用来给 matchExpression 里面的 value 来引用上层的值的。
+                //  例如查询用户，要求他存在一个朋友的父母的年龄是小于这个用户。对朋友的父母的年龄匹配中，就需要引用最上层的 alias。
+                contextRootEntity||entityName
+            )
+
+            return {
+                ...exp.data,
+                isInnerQuery: true,
+                fieldValue: `
 EXISTS (
-${this.buildFindQuery(existEntityQuery, currentAlias)}
+${this.buildXToOneFindQuery(existEntityQuery, currentAlias)}
 )
 `
-                }
-            } else {
-                return {
-                    ...exp.data,
-                }
             }
         })
     }

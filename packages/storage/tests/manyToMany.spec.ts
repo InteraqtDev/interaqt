@@ -9,7 +9,7 @@ import {MatchExp} from "../erstorage/MatchExp.ts";
 describe('many to many', () => {
     let db: SQLiteDB
     let setup
-    let entityQueryHandle: EntityQueryHandle
+    let handle: EntityQueryHandle
 
     beforeEach(async () => {
         const { entities, relations } = createCommonData()
@@ -17,7 +17,7 @@ describe('many to many', () => {
         db = new SQLiteDB(':memory:', {create:true, readwrite: true})
         setup = new DBSetup(entities, relations, db)
         await setup.createTables()
-        entityQueryHandle = new EntityQueryHandle(new EntityToTableMap(setup.map), db)
+        handle = new EntityQueryHandle(new EntityToTableMap(setup.map), db)
     })
 
     afterEach(async () => {
@@ -26,14 +26,14 @@ describe('many to many', () => {
     })
 
     test('create many to many data:create self', async () => {
-        const userA = await entityQueryHandle.create('User', {name: 'aaa', age: 17})
-        const teamA = await entityQueryHandle.create('Team', {teamName: 'teamA'})
+        const userA = await handle.create('User', {name: 'aaa', age: 17})
+        const teamA = await handle.create('Team', {teamName: 'teamA'})
 
-        const findUser = await entityQueryHandle.findOne('User', MatchExp.atom({ key: 'id', value: ['=', userA.id]}), {}, ['name', 'age'] )
+        const findUser = await handle.findOne('User', MatchExp.atom({ key: 'id', value: ['=', userA.id]}), {}, ['name', 'age'] )
         expect(findUser).toMatchObject({
             name:'aaa',
         })
-        const findTeam = await entityQueryHandle.findOne('Team', MatchExp.atom({ key: 'teamName', value: ['=', 'teamA']}), {}, ['teamName'] )
+        const findTeam = await handle.findOne('Team', MatchExp.atom({ key: 'teamName', value: ['=', 'teamA']}), {}, ['teamName'] )
         expect(findTeam).toMatchObject({
             teamName:'teamA',
         })
@@ -50,9 +50,9 @@ describe('many to many', () => {
                 teamName: 't2'
             }]
         }
-        const userA = await entityQueryHandle.create('User', rawData)
+        const userA = await handle.create('User', rawData)
 
-        const findUser = await entityQueryHandle.findOne(
+        const findUser = await handle.findOne(
             'User',
             MatchExp.atom({ key: 'id', value: ['=', userA.id]}), {},
             ['name', 'age', ['teams', { attributeQuery: ['teamName']}]]
@@ -63,11 +63,11 @@ describe('many to many', () => {
     })
 
     test('create many to many data:create with existing related', async () => {
-        const teamA = await entityQueryHandle.create('Team', {teamName: 't1'})
-        const teamB = await entityQueryHandle.create('Team', {teamName: 't2'})
+        const teamA = await handle.create('Team', {teamName: 't1'})
+        const teamB = await handle.create('Team', {teamName: 't2'})
 
-        const userA = await entityQueryHandle.create('User', {name: 'aaa', age: 17, teams: [teamA, teamB]})
-        const findUser = await entityQueryHandle.findOne(
+        const userA = await handle.create('User', {name: 'aaa', age: 17, teams: [teamA, teamB]})
+        const findUser = await handle.findOne(
             'User',
             MatchExp.atom({ key: 'id', value: ['=', userA.id]}), {},
             ['name', 'age', ['teams', { attributeQuery: ['teamName']}]]
@@ -96,21 +96,21 @@ describe('many to many', () => {
             }]
         }
 
-        const userA = await entityQueryHandle.create('User', rawData)
-        await entityQueryHandle.delete('User', MatchExp.atom({
+        const userA = await handle.create('User', rawData)
+        await handle.delete('User', MatchExp.atom({
             key: 'id',
             value: ['=', userA.id]
         }))
 
 
-        const findUser = await entityQueryHandle.find(
+        const findUser = await handle.find(
             'User',
             MatchExp.atom({ key: 'id', value: ['=', userA.id]}), {},
             ['name', 'age']
         )
         expect(findUser.length).toBe(0)
 
-        const findRelation = await entityQueryHandle.find('User_friends_friends_User')
+        const findRelation = await handle.find('User_teams_members_Team')
         expect(findRelation.length).toBe(0)
     })
 
@@ -126,13 +126,13 @@ describe('many to many', () => {
             }]
         }
 
-        const userA = await entityQueryHandle.create('User', rawData)
-        await entityQueryHandle.update('User', MatchExp.atom({
+        const userA = await handle.create('User', rawData)
+        await handle.update('User', MatchExp.atom({
             key: 'id',
             value: ['=', userA.id]
         }), { name: 'bbb'})
 
-        const findUser = await entityQueryHandle.find(
+        const findUser = await handle.find(
             'User',
             MatchExp.atom({ key: 'id', value: ['=', userA.id]}), {},
             ['name', 'age']
@@ -148,9 +148,9 @@ describe('many to many', () => {
             age: 17,
         }
 
-        const userA = await entityQueryHandle.create('User', rawData)
+        const userA = await handle.create('User', rawData)
 
-        await entityQueryHandle.update('User', MatchExp.atom({
+        await handle.update('User', MatchExp.atom({
             key: 'id',
             value: ['=', userA.id]
         }),
@@ -163,7 +163,7 @@ describe('many to many', () => {
             }]
         })
 
-        const findUser = await entityQueryHandle.findOne(
+        const findUser = await handle.findOne(
             'User',
             MatchExp.atom({ key: 'id', value: ['=', userA.id]}), {},
             ['name', 'age', ['teams', { attributeQuery: ['teamName']}]]
@@ -181,10 +181,10 @@ describe('many to many', () => {
     })
 
     test('update many to many data:update with existing related', async () => {
-        const teamA = await entityQueryHandle.create('Team', {teamName: 't1'})
-        const teamB = await entityQueryHandle.create('Team', {teamName: 't2'})
-        const userA = await entityQueryHandle.create('User', {name: 'aaa', age: 17, teams: [teamA, teamB]})
-        await entityQueryHandle.update('User', MatchExp.atom({
+        const teamA = await handle.create('Team', {teamName: 't1'})
+        const teamB = await handle.create('Team', {teamName: 't2'})
+        const userA = await handle.create('User', {name: 'aaa', age: 17, teams: [teamA, teamB]})
+        await handle.update('User', MatchExp.atom({
                 key: 'id',
                 value: ['=', userA.id]
             }),
@@ -193,7 +193,7 @@ describe('many to many', () => {
                 teams: [teamA,teamB]
             })
 
-        const findUser = await entityQueryHandle.findOne(
+        const findUser = await handle.findOne(
             'User',
             MatchExp.atom({ key: 'id', value: ['=', userA.id]}), {},
             ['name', 'age', ['teams', { attributeQuery: ['teamName']}]]
@@ -210,11 +210,11 @@ describe('many to many', () => {
         })
     })
 
-    test.only('query many to many data: with match expression', async () => {
-        const teamA = await entityQueryHandle.create('Team', {teamName: 't1'})
-        const teamB = await entityQueryHandle.create('Team', {teamName: 't2'})
-        const userA = await entityQueryHandle.create('User', {name: 'aaa', age: 17, teams: [teamA, teamB]})
-        const foundUser = await entityQueryHandle.findOne(
+    test('query many to many data: with match expression', async () => {
+        const teamA = await handle.create('Team', {teamName: 't1'})
+        const teamB = await handle.create('Team', {teamName: 't2'})
+        const userA = await handle.create('User', {name: 'aaa', age: 17, teams: [teamA, teamB]})
+        const foundUser = await handle.findOne(
             'User',
             MatchExp.atom({ key: 'id', value: ['=', userA.id]}), {},
             [
@@ -231,7 +231,7 @@ describe('many to many', () => {
                 ]
             ]
         )
-        
+
         expect(foundUser).toMatchObject({
             id: userA.id,
             name: 'aaa',
@@ -241,6 +241,47 @@ describe('many to many', () => {
                 teamName:'t2'
             }]
         })
+    })
+
+    test('n:n symmetric relation create and query', async () => {
+        const user = await handle.create('User', {name: 'aaa', age: 17 })
+        const user2 = await handle.create('User', {name: 'bbb', age: 18})
+        const user3 = await handle.create('User', {name: 'ccc', age: 19 })
+        // user is source
+        await handle.addRelationById('User', 'friends', user.id, user2.id)
+        // user3 is source
+        await handle.addRelationById('User', 'friends', user3.id, user.id)
+
+        const foundUser = await handle.findOne(
+            'User',
+            MatchExp.atom({ key: 'id', value: ['=', user.id]}), {},
+            [
+                'name',
+                'age', [
+                'friends',
+                {
+                    attributeQuery: ['name', 'age'],
+                }
+            ]
+            ]
+        )
+
+        console.log(foundUser)
+        expect(foundUser).toMatchObject({
+            id: user.id,
+            name: 'aaa',
+            age: 17,
+            friends: [{
+                id: user2.id,
+                name: 'bbb',
+                age: 18
+            }, {
+                id: user3.id,
+                name: 'ccc',
+                age: 19
+            }]
+        })
+
     })
 })
 
