@@ -55,9 +55,10 @@ export type EntityIdRef = {
 export const ID_ATTR = 'id'
 export const ROW_ID_ATTR = '_rowId'
 export type Database = {
-    scheme: (sql:string) => Promise<any>
-    query: (sql: string) => Promise<any[]>
-    insert: (sql: string) => Promise<EntityIdRef>
-    update: (sql: string, idField?: string) => Promise<EntityIdRef[]>
+    scheme: (sql:string, name?:string) => Promise<any>
+    query: (sql: string, name?:string) => Promise<any[]>
+    delete: (sql: string, name?:string) => Promise<any[]>
+    insert: (sql: string, name?:string) => Promise<EntityIdRef>
+    update: (sql: string, idField?: string, name?:string) => Promise<EntityIdRef[]>
     getAutoId: (recordName: string) => Promise<string>
 }

@@ -7,25 +7,32 @@ export class SQLiteDB implements Database{
     constructor(public file:string = ':memory:', public options?: ConstructorParameters<typeof SQLite>[1]) {
         this.db = new SQLite(file, options)
     }
-    query= (sql:string) => {
-        console.log('query==============')
+    query= (sql:string, name='') => {
+        console.log(`query==============${name}`)
         console.log(sql)
         const result = this.db.query(sql).all() as any[]
         return Promise.resolve(result)
     }
-    update = (sql:string, idField?:string) => {
-        console.log('update=============')
-        console.log(sql)
+    update = (sql:string, idField?:string, name='') => {
+        console.log(`update=============${name}`)
+        // console.log(sql)
         const result = this.db.query(`${sql} RETURNING ${ROW_ID_ATTR} ${idField ? `, ${idField} AS id`: ''}`).all() as any[]
         return Promise.resolve(result)
     }
-    insert= (sql:string) => {
-        console.log('insert==============')
+    insert= (sql:string, name='') => {
+        console.log(`insert==============${name}`)
         // console.log(`${sql} RETURNING ${ROW_ID_ATTR}`)
-        const { id } = this.db.query(`${sql} RETURNING ${ROW_ID_ATTR}`).get() as EntityIdRef
-        return Promise.resolve( {id} as EntityIdRef)
+        const result = this.db.query(`${sql} RETURNING ${ROW_ID_ATTR}`).get() as EntityIdRef
+        return Promise.resolve( result as EntityIdRef)
+    }
+    delete= (sql:string, name='') => {
+        console.log(`delete==============${name}`)
+        // console.log(sql)
+        const result = this.db.query(sql).all() as any[]
+        return Promise.resolve(result)
     }
     scheme = (sql: string) => {
+        console.log(`scheme=============`)
         // console.log(sql)
         return Promise.resolve(this.db.query(sql).run())
     }

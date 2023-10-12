@@ -5,7 +5,7 @@ import {EntityIncrementalComputationHandle} from "./IncrementalComputationHandle
 import { getInteractions, Interaction} from "../../shared/activity/Activity";
 import {Entity, Property} from "../../shared/entity/Entity";
 import { MapActivityToEntity } from '../../shared/IncrementalComputation'
-import {MatchExpression} from '../../storage/erstorage/MatchExpression'
+import {MatchExp} from '../../storage/erstorage/MatchExp'
 
 export type MapSourceDataType = {
     interaction: KlassInstanceOf<typeof Interaction, false>,
@@ -49,7 +49,7 @@ export class MapActivityToEntityHandle extends EntityIncrementalComputationHandl
         })
     }
     onCallInteraction = async (interactionEventArgs: InteractionEventArgs, activityId:string) => {
-        const match = MatchExpression.createFromAtom({
+        const match = MatchExp.atom({
             key: 'activityId',
             value: ['=', activityId]
         })
@@ -76,7 +76,7 @@ export class MapActivityToEntityHandle extends EntityIncrementalComputationHandl
                 // TODO 未来有没有可能有不需要更新的情况？
                 await this.controller.system.storage.update(
                     this.data.name,
-                    MatchExpression.createFromAtom({ key: 'id', value: ['=', oldData.id]}),
+                    MatchExp.atom({ key: 'id', value: ['=', oldData.id]}),
                     {
                         ...newMappedItem,
                         activityId

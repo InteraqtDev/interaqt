@@ -1,5 +1,5 @@
 import {describe, test, expect} from "bun:test";
-import {parse, EvaluateError} from "../../shared/boolExpression";
+import {parse, EvaluateError} from "../../shared/BoolExp";
 
 const handle = (data: AtomType) => /^true/i.test(data.key)
 

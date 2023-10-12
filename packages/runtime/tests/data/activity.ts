@@ -128,19 +128,17 @@ export const activity = Activity.createReactive({
     ]
 })
 
-// FIXME 还要增加一个 removeFriend 的 interaction
 export const MyFriend = UserAttributive.createReactive({
     name: 'MyFriend',
     stringContent: `
 async function MyFriend(target, { user }){
     const linkInfo = this.system.storage.queryHandle.map.getLinkInfo('User', 'friends')
-    const [entityAttrName, attrAttrName] = linkInfo.getAttributeName('User', 'friends')  
-    
+      
     const match = this.system.storage.queryHandle.createMatchFromAtom({
-        key: \`\${entityAttrName}.id\`, 
+        key: 'source.id', 
         value: ['=', user.id]
     }).and({
-        key: \`\${attrAttrName}.id\`, 
+        key: 'target.id', 
         value: ['=', target.id]
     })
 

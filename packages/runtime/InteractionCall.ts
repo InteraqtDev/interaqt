@@ -4,7 +4,7 @@ import { UserAttributive } from "../shared/user/User";
 import {System} from "./System";
 import {InteractionEvent, InteractionEventArgs} from "../types/interaction";
 import {Concept, ConceptAlias, ConceptInstance, DerivedConcept, EntityAttributiveAtom} from "../shared/attributive";
-import {BoolExpression, BoolExpressionData} from "../shared/boolExpression";
+import {BoolExp, BoolExpressionData} from "../shared/BoolExp";
 import { UserAttributives, UserAttributiveAtom} from '../shared/attributive'
 import {assert, everyAsync, everyWithErrorAsync, indexBy} from "./util";
 import {getInstance} from "../shared/createClass";
@@ -98,7 +98,7 @@ export class InteractionCall {
             res = true
         } else {
 
-            let userAttributiveCombined = BoolExpression.createFromAtom<UserAttributiveAtom>({
+            let userAttributiveCombined = BoolExp.atom<UserAttributiveAtom>({
                 key: this.interaction.userRoleAttributive.name as string
             })
 
@@ -124,7 +124,7 @@ export class InteractionCall {
 
         if (attributives) {
             const handleAttributives = (attributiveData) => this.checkMixedAttributive(attributiveData, instance)
-            const attrMatchRes = await this.checkAttributives(new BoolExpression<UserAttributiveAtom>(attributives), handleAttributives , currentStack)
+            const attrMatchRes = await this.checkAttributives(new BoolExp<UserAttributiveAtom>(attributives), handleAttributives , currentStack)
             if (attrMatchRes !== true) return attrMatchRes
         }
 
@@ -182,7 +182,7 @@ export class InteractionCall {
     isConceptAlias(concept: Concept) {
         return !!(concept as ConceptAlias).for
     }
-    async checkAttributives(attributives: BoolExpression<UserAttributiveAtom>, handleAttributive: HandleAttributive, stack: ConceptCheckStack[]) : ConceptCheckResponse{
+    async checkAttributives(attributives: BoolExp<UserAttributiveAtom>, handleAttributive: HandleAttributive, stack: ConceptCheckStack[]) : ConceptCheckResponse{
         const result =  await attributives.evaluateAsync(handleAttributive)
         return result === true ? true : {name: '', type: 'matchAttributives', stack, error: result}
     }
@@ -231,8 +231,8 @@ export class InteractionCall {
             if (payloadDef.attributives) {
 
                 const attributives = isPayloadUser ?
-                    new BoolExpression<UserAttributiveAtom>(payloadDef.attributives.content as BoolExpressionData<UserAttributiveAtom>):
-                    new BoolExpression<EntityAttributiveAtom>(payloadDef.attributives.content as BoolExpressionData<EntityAttributiveAtom>)
+                    new BoolExp<UserAttributiveAtom>(payloadDef.attributives.content as BoolExpressionData<UserAttributiveAtom>):
+                    new BoolExp<EntityAttributiveAtom>(payloadDef.attributives.content as BoolExpressionData<EntityAttributiveAtom>)
 
                 if (payloadDef.isCollection) {
                     const result = await everyWithErrorAsync(payloadItem, (item => {

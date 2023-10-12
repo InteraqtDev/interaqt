@@ -7,12 +7,9 @@ import { Activity, Interaction } from "../../shared/activity/Activity";
 import { Entity, Relation } from "../../shared/entity/Entity";
 import '../incrementalComputationHandles/MapActivityToEntity'
 import '../incrementalComputationHandles/RelationStateMachine'
-import {MatchExpression} from '../../storage/erstorage/MatchExpression'
-import exp from "constants";
+import {MatchExp} from '../../storage/erstorage/MatchExp'
 
 // 里面有所有必须的数据？
-
-
 type User = {
     id: string,
     roles: string[],
@@ -76,7 +73,7 @@ describe('map activity', () => {
 
     })
 
-    test.only('make friend activity', async () => {
+    test('make friend activity', async () => {
         // 1. 创建 activity
         const { activityId, state } = controller.createActivity(makeFriendActivityUUID)
         expect(activityId).not.toBe(null)
@@ -86,8 +83,8 @@ describe('map activity', () => {
         expect(cancelUUID).not.toBe(null)
 
 
-// 查询 request 数据
-        const requestMatch = MatchExpression.createFromAtom({
+        // 查询 request 数据
+        const requestMatch = MatchExp.atom({
             key: 'from.name',
             value: ['=', userA.name]
         }).and({
