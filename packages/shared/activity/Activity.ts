@@ -92,43 +92,6 @@ export const PayloadItem = createClass({
     }
 })
 
-// const i = {
-//     name: 'PayloadItem',
-//     public: {
-//         name: {
-//             type: 'string',
-//             required: true
-//         },
-//         // 用于修饰后面的 UserAttributive 或者 Entity，类型根据 base 变化而变化
-//         attributives: {
-//             type: [EntityAttributives, UserAttributives]
-//         },
-//         // 当前 Item 的具体概念类型
-//         base: {
-//             type: [UserAttributive, Entity],
-//             required: true,
-//             collection: false
-//         },
-//         isRef: {
-//             type: 'boolean',
-//             defaultValue: () => false
-//         },
-//         required: {
-//             type: 'boolean',
-//             defaultValue: () => false
-//         },
-//         isCollection: {
-//             type: 'boolean',
-//             defaultValue: () => false
-//         },
-//         // 类型根据 base 变化而变化
-//         itemRef: {
-//             type: [UserAttributive, Entity]
-//         }
-//     }
-// }
-//
-// type II = (typeof i)["public"]["base"]["collection"] extends true ? true: string
 
 
 export const Payload = createClass({

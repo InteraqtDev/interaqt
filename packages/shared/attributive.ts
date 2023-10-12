@@ -1,4 +1,4 @@
-import {BoolExpressionData} from "./BoolExpression";
+import {BoolExpressionData} from "./BoolExp";
 
 
 // Role/RoleAttributive/Entity 是 ConceptType

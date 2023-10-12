@@ -66,25 +66,27 @@ type inferIfReactiveCollection<REACTIVE extends boolean, COLLECTION extends true
             T
     )
 
-
-export type KlassInstance<T extends NonNullable<ClassDef["public"]>> = {
-    [Key in keyof T]:
-        T[Key]['type'] extends KlassType<any> ?
-            inferIfReactiveCollection<false, T[Key]["collection"], KlassInstance<T[Key]['type']['public']>> :
+// FIXME required
+export type KlassInstanceRaw<T extends NonNullable<ClassDef["public"]>> = {
+    [Key in keyof T]?:
+    T[Key]['type'] extends KlassType<any> ?
+        inferIfReactiveCollection<false, T[Key]["collection"], KlassInstance<T[Key]['type']['public']>>:
         T[Key]['type'] extends KlassType<any>[] ?
-            inferIfReactiveCollection<false, T[Key]["collection"], KlassInstance<any>> :
-        T[Key]['type'] extends PrimitivePropType ?
-            inferIfReactiveCollection<false, T[Key]["collection"], PrimitivePropertyMap[T[Key]['type']]>:
-        T[Key]['computedType'] extends Function ?
-            (ReturnType<T[Key]['computedType']> extends KlassType<any> ?
-                inferIfReactiveCollection<false, T[Key]["collection"], ReturnType<ReturnType<T[Key]['computedType']>["create"]>>:
-                inferIfReactiveCollection<false, T[Key]["collection"], any>
-            ):
-        never
-} & KlassInstancePrimitives
+            inferIfReactiveCollection<false, T[Key]["collection"], KlassInstance<any>>:
+            T[Key]['type'] extends PrimitivePropType ?
+                inferIfReactiveCollection<false, T[Key]["collection"], PrimitivePropertyMap[T[Key]['type']]> :
+                T[Key]['computedType'] extends Function ?
+                    (ReturnType<T[Key]['computedType']> extends KlassType<any> ?
+                        inferIfReactiveCollection<false, T[Key]["collection"], ReturnType<ReturnType<T[Key]['computedType']>["create"]>>:
+                        inferIfReactiveCollection<false, T[Key]["collection"], any>
+                        ):
+                    never
+}
 
+export type KlassInstance<T extends NonNullable<ClassDef["public"]>> = KlassInstanceRaw<T> & KlassInstancePrimitives
 
-export type ReactiveKlassInstance<T extends NonNullable<ClassDef["public"]>> = {
+// FIXME required
+export type ReactiveKlassInstanceRaw<T extends NonNullable<ClassDef["public"]>> = {
     [Key in keyof T]:
         T[Key]['type'] extends KlassType<any> ?
             inferIfReactiveCollection<true, T[Key]["collection"], KlassInstance<T[Key]['type']['public']>>:
@@ -98,14 +100,15 @@ export type ReactiveKlassInstance<T extends NonNullable<ClassDef["public"]>> = {
                 inferIfReactiveCollection<true, T[Key]["collection"], any>
                 ):
         never
-} &  KlassInstancePrimitives
+}
+
+export type ReactiveKlassInstance<T extends NonNullable<ClassDef["public"]>> = ReactiveKlassInstanceRaw<T> &  KlassInstancePrimitives
 
 
-
-export type KlassType<T extends ClassDef["public"]> = {
+export type KlassType<T extends NonNullable<ClassDef["public"]>> = {
     new<U extends KlassOptions|ReactiveKlassOptions>(arg: object, options?: U) : U extends ReactiveKlassOptions ? ReactiveKlassInstance<T> : KlassInstance<T>,
-    create: (arg: object, options?: KlassOptions) => KlassInstance<T>,
-    createReactive: (arg: object, options?: KlassOptions) => ReactiveKlassInstance<T>,
+    create: (arg: KlassInstanceRaw<T>, options?: KlassOptions) => KlassInstance<T>,
+    createReactive: (arg: KlassInstanceRaw<T>, options?: KlassOptions) => ReactiveKlassInstance<T>,
     displayName: string,
     isKlass: true,
     public: T,
@@ -223,11 +226,11 @@ export function createClass<T extends ClassDef>(def: T) : KlassType<T['public']>
 
     if (KlassByName.get(def.name)) throw new Error(`Class name must be global unique. ${def.name}`)
 
-    function create(fieldValues: object, options?: KlassOptions): KlassInstance<typeof def.public> {
+    function create(fieldValues: KlassInstance<T["public"]>, options?: KlassOptions): KlassInstance<typeof def.public> {
         return new Klass(rawStructureClone(fieldValues), options) as unknown as KlassInstance<typeof def.public>
     }
 
-    function createReactive(fieldValues: object, options?: KlassOptions) : ReactiveKlassInstance<typeof def.public>{
+    function createReactive(fieldValues: KlassInstance<T["public"]>, options?: KlassOptions) : ReactiveKlassInstance<typeof def.public>{
         return new Klass(rawStructureClone(fieldValues), { ...(options||{}), isReactive: true}) as unknown as ReactiveKlassInstance<typeof def.public>
     }
 
@@ -244,8 +247,8 @@ export function createClass<T extends ClassDef>(def: T) : KlassType<T['public']>
     }
 
 
-    function clone(obj: KlassInstance<(typeof def)['public']>, deepCloneKlass: boolean){
-        const arg = Object.fromEntries(Object.keys(def.public).map(k => [k, deepClone(obj[k], deepCloneKlass)]))
+    function clone(obj: KlassInstance<T['public']>, deepCloneKlass: boolean){
+        const arg = Object.fromEntries(Object.keys(def.public).map(k => [k, deepClone(obj[k], deepCloneKlass)])) as KlassInstance<T['public']>
         return obj._options?.isReactive ? Klass.createReactive(arg): Klass.create(arg)
     }
 

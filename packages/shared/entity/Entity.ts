@@ -120,7 +120,7 @@ export const Relation = createClass({
             collection: false
         },
         entity1: {
-            type: Entity,
+            type: [Entity],
             required: true,
             collection: false,
             options() {
@@ -173,6 +173,14 @@ export const Relation = createClass({
                 }
             }
         },
+        isTargetReliance: {
+            type: 'boolean',
+            required: false,
+            collection:false,
+            defaultValue() {
+                return false
+            }
+        },
         relType: {
             type: 'string',
             collection: false,
@@ -209,3 +217,6 @@ export const Relation = createClass({
         },
     }
 })
+// CAUTION Relation 可以作为 source
+// FIXME type relation 和 entity 的 public type 最好都单独定义
+Relation.public.entity1.type.push(Relation)

@@ -70,7 +70,7 @@ export class BoolExp<T> {
             type: 'expression',
             operator: 'or',
             left: this.raw,
-            right: atomValueOrExp instanceof BoolExp<T> ? atomValueOrExp.raw : { type: 'atom', data: atomValueOrExp}
+            right: (atomValueOrExp instanceof BoolExp) ? atomValueOrExp.raw : { type: 'atom', data: atomValueOrExp}
         })
     }
     // 取反
@@ -81,7 +81,7 @@ export class BoolExp<T> {
             left: this.raw,
         })
     }
-    map(fn: MapFn<T> , context: string[] =[]): BoolExp<T> {
+    map<U>(fn: MapFn<T, U> , context: string[] =[]): BoolExp<U> {
         if (this.isExpression()) {
             const newLeft = this.left.map(fn, ['left'])
             if (this.isNot()) {
@@ -91,7 +91,9 @@ export class BoolExp<T> {
                 return this.isAnd() ? newLeft.and(newRight) : newLeft.or(newRight)
             }
         } else {
-            return BoolExp.atom<T>(fn(this, context))
+            const newAtomData = fn(this, context)
+            // 可以返回一个新的 expression
+            return newAtomData instanceof BoolExp ? newAtomData : BoolExp.atom<U>(newAtomData)
         }
     }
     evaluate(atomHandle: AtomHandle<T>, stack :any[] = [], inverse: boolean = false): true|EvaluateError {
@@ -123,8 +125,9 @@ export class BoolExp<T> {
         }
 
         assert(false, `invalid bool expression type: ${JSON.stringify(this.raw)}`)
+        return true
     }
-    async evaluateAsync(atomHandle: AtomHandle<T>, stack :any[] = [], inverse: boolean = false): true|EvaluateError {
+    async evaluateAsync(atomHandle: AtomHandle<T>, stack :any[] = [], inverse: boolean = false): Promise<true|EvaluateError> {
 
         const currentStack = stack.concat(this.raw)
 
@@ -153,11 +156,12 @@ export class BoolExp<T> {
         }
 
         assert(false, `invalid bool expression type: ${JSON.stringify(this.raw)}`)
+        return true
     }
 }
 
 
-type MapFn<T> = (object: BoolExp<T>, context :string[]) => T
+type MapFn<T, U> = (object: BoolExp<T>, context :string[]) => U | BoolExp<U>
 
 
 const OperatorNames = {
@@ -175,10 +179,10 @@ function astNodeToBoolExpressionNode<T>(astNode, optionsByName, parseAtomNameToO
     if (astNode.type === "LogicalExpression") {
         return {
             type: 'expression',
-            operator: OperatorNames[astNode.operator],
+            operator: OperatorNames[astNode.operator as keyof typeof OperatorNames],
             left: astNodeToBoolExpressionNode(astNode.left, optionsByName, parseAtomNameToObject),
             right: astNodeToBoolExpressionNode(astNode.right, optionsByName, parseAtomNameToObject)
-        }
+        } as BoolExpressionData<T>
     }
 
     if (astNode.type === "Identifier") {
