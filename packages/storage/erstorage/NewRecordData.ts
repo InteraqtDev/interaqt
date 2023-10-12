@@ -11,7 +11,7 @@ export class NewRecordData {
     // 关系往自身合并的异表老 record
     public mergedLinkTargetRecordIdRefs: NewRecordData[] = []
     // 自己跟父亲之间的 relation 的数据
-    public linkRecordData: NewRecordData
+    public linkRecordData?: NewRecordData
     // 三表合一的 record
     public combinedNewRecords : NewRecordData[] = []
     // 三表合一的老 record
@@ -35,7 +35,7 @@ export class NewRecordData {
         const [valueAttributesInfo, entityAttributesInfo, entityIdAttributes] = this.map.groupAttributes(recordName, rawData ? Object.keys(rawData) : [])
         this.relatedEntitiesData = flatten(entityAttributesInfo.map(info =>
             Array.isArray(rawData[info.attributeName]) ?
-                rawData[info.attributeName].map(i => new NewRecordData(this.map, info.recordName, i, info)):
+                rawData[info.attributeName].map((i: RawEntityData) => new NewRecordData(this.map, info.recordName, i, info)):
                 new NewRecordData(this.map, info.recordName, rawData[info.attributeName], info)
         ))
 
@@ -87,7 +87,7 @@ export class NewRecordData {
         })
 
         if (this.rawData?.['&']) {
-            this.linkRecordData = new NewRecordData(this.map, info?.linkName, this.rawData['&'])
+            this.linkRecordData = new NewRecordData(this.map, info?.linkName!, this.rawData['&'])
         }
 
     }
@@ -122,14 +122,14 @@ export class NewRecordData {
     getSameRowFieldAndValue() : {field:string, value:any}[]{
         // 自身的 attribute
         const result: {field:string, value:any}[] = this.valueAttributes.map((info) => ({
-            field: info.field,
-            value: this.rawData[info.attributeName]
+            field: info.field!,
+            value: this.rawData[info.attributeName]!
         }))
 
         // source/target 里面记录的 id
         this.entityIdAttributes.forEach(info => {
             result.push({
-                field:info.field,
+                field:info.linkField!,
                 value: this.rawData[info.attributeName].id
             })
         })
@@ -137,7 +137,7 @@ export class NewRecordData {
         // 往自己合表的关系上的 id 以及关系数据
         this.mergedLinkTargetRecordIdRefs.forEach(recordData => {
             result.push({
-                field: recordData.info?.linkField,
+                field: recordData.info?.linkField!,
                 value: recordData.getRef().id
             })
 

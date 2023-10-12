@@ -15,7 +15,7 @@ describe('one to one', () => {
         const { entities, relations } = createCommonData()
         // @ts-ignore
         db = new SQLiteDB(':memory:', {create:true, readwrite: true})
-        setup = new DBSetup(entities, relations, db)
+        setup = new DBSetup(entities, relations, db, ['Profile.owner'])
         await setup.createTables()
         entityQueryHandle = new EntityQueryHandle(new EntityToTableMap(setup.map), db)
     })

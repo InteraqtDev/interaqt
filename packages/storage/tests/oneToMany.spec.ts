@@ -8,7 +8,7 @@ import {MatchExp} from "../erstorage/MatchExp.ts";
 
 describe('one to many', () => {
     let db: SQLiteDB
-    let setup
+    let setup: DBSetup
     let entityQueryHandle: EntityQueryHandle
 
     beforeEach(async () => {
@@ -153,9 +153,10 @@ describe('one to many', () => {
                 {powerName: 'fly'},
             ]
         }
+
+
         const userA = await entityQueryHandle.create('User', rawData)
         // 删除用户
-        // console.log(await entityQueryHandle.database.query(`select * from User_leader_member_User`))
         await entityQueryHandle.delete('User', MatchExp.atom({
             key: 'id',
             value: ['=', userA.id]
@@ -174,7 +175,6 @@ describe('one to many', () => {
             {},
             ['name', 'age', ['leader', {attributeQuery: ['name', 'age']}]]
         )
-        console.log(await entityQueryHandle.database.query(`select * from Profile_User_Item`))
         expect(findUsers2.length).toBe(2)
         expect(findUsers2[0].name).toBe('m1')
         expect(findUsers2[0].leader.id).toBe(null)

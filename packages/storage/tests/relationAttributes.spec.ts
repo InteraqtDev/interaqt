@@ -8,7 +8,7 @@ import {MatchExp} from "../erstorage/MatchExp.ts";
 
 describe('relation attributes', () => {
     let db: SQLiteDB
-    let setup
+    let setup: DBSetup
     let handle: EntityQueryHandle
 
     beforeEach(async () => {

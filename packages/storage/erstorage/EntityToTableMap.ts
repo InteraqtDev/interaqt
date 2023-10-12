@@ -187,11 +187,12 @@ export class EntityToTableMap {
         for(let i = 0; i<relationPath.length; i++) {
             // 对称关系要说明方向，不然  join 表的时候两个方向都用的同一个 alias，逻辑错误。它的格式是 'xxx:source' 或者 ‘xxx:target’
             const currentNamePair = relationPath[i].includes(':') ? relationPath[i].split(':') : [relationPath[i], undefined]
-            const [currentAttributeName, symmetricDirection] = currentNamePair
+            const [currentAttributeName, symmetricDirection] = this.getAttributeAndSymmetricDirection(relationPath[i])
 
             const path = [rootEntityName, ...relationPath.slice(0, i+1)]
             // 如果是读 link 上的数据
             if (currentAttributeName === LINK_SYMBOL) {
+
                 // 先把上一个 Pop 出来。
                 const {linkTable, linkAlias, path} = result.pop()!
                 assert(!isLinkRecord, `last attribute in path is a link, cannot read link of a link ${path.join('.')}`)
@@ -209,15 +210,8 @@ export class EntityToTableMap {
 
                 const currentEntityData = this.data.records[currentEntityAttribute.recordName] as RecordMapItem
 
-                const currentTableAlias = namePath.slice(0, i+2).map(name => {
-                    // 处理 symmetric 中的:
-                    if(name.includes(':')) {
-                        const pair = name.split(':')
-                        return `${pair[0]}_${pair[1].toUpperCase()}`
-                    } else {
-                        return name
-                    }
-                }).join('_')
+                // 处理 symmetric 中的:
+                const currentTableAlias = `${lastTableAlias}_${currentAttributeName}${symmetricDirection ? `_${symmetricDirection.toUpperCase()}` : ''}`
 
                 // CAUTION 一定要先处理 linkAlias，因为依赖于上一次 tableAlias。
                 if (info.isMergedWithParent() || info.isLinkMergedWithParent()) {

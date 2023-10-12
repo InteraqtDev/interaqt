@@ -24,19 +24,19 @@ export type TableData = {
     }
 }
 
-export type MergeLinks = string[][]
+export type MergeLinks = string[]
 
 export class DBSetup {
     public recordToTableMap = new Map<string,string>()
     public tableToRecordsMap = new Map<string, Set<string>>()
-    public relationToJoinEntity = new Map<string,string>()
+    public mergeLog: any[] = []
     public tables:TableData = {}
     public map: MapData = { links: {}, records: {}}
     constructor(
         public entities: KlassInstanceOf<typeof Entity, false>[],
         public relations: KlassInstanceOf<typeof Relation, false>[],
         public database?: Database,
-        public mergeLinks?: MergeLinks
+        public mergeLinks: MergeLinks = []
     ) {
         this.buildMap()
         this.buildTables()
@@ -51,22 +51,52 @@ export class DBSetup {
         this.tableToRecordsMap.set(table, new Set([item]))
     }
     // CAUTION 把一个 item 拉过来，等于把它所有同表的 item 拉过来
-    joinTables(joinTargetRecord:string, record:string) {
+    joinTables(joinTargetRecord:string, record:string, link: string): string[]| undefined {
+
         assert(joinTargetRecord !== record, `join entity should not equal, ${record}`)
-        const originTable = this.recordToTableMap.get(record)!
-        const tableToJoin = this.recordToTableMap.get(joinTargetRecord)!
-        assert(!!originTable  && !!tableToJoin, `table not exists for ${record} ${originTable} to join ${joinTargetRecord} ${tableToJoin}`)
-        if (originTable == tableToJoin) return
+        const moveTable = this.recordToTableMap.get(record)!
+        const joinTargetTable = this.recordToTableMap.get(joinTargetRecord)!
+        const joinTargetSameTableRecords = this.tableToRecordsMap.get(joinTargetTable)!
+        assert(!!moveTable  && !!joinTargetTable, `table not exists for ${record} ${moveTable} to join ${joinTargetRecord} ${joinTargetTable}`)
+        if (moveTable == joinTargetTable) return
 
-        const sameTableRecords = this.tableToRecordsMap.get(originTable)!
-        // 1. 清空原来的
-        this.tableToRecordsMap.set(originTable, new Set())
-        // 2. 指针也都修改该过来
-        sameTableRecords.forEach(sameTableRecord => this.recordToTableMap.set(sameTableRecord, tableToJoin))
+        const sameTableRecordsToMove = this.tableToRecordsMap.get(moveTable)!
 
-        // 3. 新 table 也要合并数据
-        const entitiesInTarget = this.tableToRecordsMap.get(tableToJoin)!
-        this.tableToRecordsMap.set(tableToJoin, new Set([...entitiesInTarget, ...sameTableRecords]))
+        // 0 检测是否有环。CAUTION 就是检测 joinTargetTable 里面是否已经有了重复的。
+
+        const conflicts: string[] = []
+        sameTableRecordsToMove.forEach(sameTableRecordToMove => {
+            // TODO 还要提供 merge 的关系信息？
+            if (joinTargetSameTableRecords.has(sameTableRecordToMove)) conflicts.push(sameTableRecordToMove)
+        })
+
+        if (conflicts.length) {
+            this.mergeLog.push({ joinTargetRecord, record, link, conflicts })
+            return conflicts
+        }
+
+
+        // 1. 清空原来 table 里的 records
+        this.tableToRecordsMap.set(moveTable, new Set())
+        // 2. 移除的 record 对 table 的指针也都修改过来
+        sameTableRecordsToMove.forEach(sameTableRecord => this.recordToTableMap.set(sameTableRecord, joinTargetTable))
+
+        // 3. 新 table 合并数据
+
+        this.tableToRecordsMap.set(joinTargetTable, new Set([...joinTargetSameTableRecords, ...sameTableRecordsToMove]))
+
+        // 4. 记录 log
+        this.mergeLog.push({ joinTargetRecord, record, link })
+    }
+    combineRecordTable(mergeTarget: string, toMerge: string, link: string,) {
+        let linkConflict
+        // target/toMerge 一定是不同实体才能merge 所以这里可以用这个判断方向
+        const virtualLinkName = (this.map.records[link].attributes.source as RecordAttribute).linkName
+        linkConflict = this.joinTables(mergeTarget, link, virtualLinkName)
+
+        if (linkConflict) return linkConflict
+
+        return this.joinTables(mergeTarget, toMerge, link)
     }
     renameTableWithJoinedEntities(originTableName: string) {
         const records = Array.from(this.tableToRecordsMap.get(originTableName)!)
@@ -74,10 +104,7 @@ export class DBSetup {
 
         // CAUTION 有合并的情况的话，里面一定有 entity，只用 entity 的名字。除非TableName 始终只用其中 的 entity 名字
         const entities = records.filter(recordName => !this.map.records[recordName].isRelation )
-
-        assert(!!entities.length || records.length === 1, `find merged records, but no entity inside, ${entities.length}, ${records.length}`)
         const newTableName = entities.length ? entities.join('_') : originTableName
-
 
         this.tableToRecordsMap.delete(originTableName)
         this.tableToRecordsMap.set(newTableName, new Set(records))
@@ -229,46 +256,151 @@ export class DBSetup {
         // 基本合表策略:
         // 1. 从用户指定的 mergeLinks 里面开始合并三表合一
         // 2. reliance 三表合一。这里有一个不能有链的检测。
-        // 3. n:1 关系合并关系表。
+        // 3. 剩余的 x:1 关系只合并关系表。
 
-
-        // 合并往 要做两件事:
+        // 合并后要做的事:
         // 1) 修改 links 里面的数据。以里面的 mergeTo 作为判断标准
-        // 2) 根据 link 情况给 records 分配表，分配 field
-        //  TODO 可能有实体声明自己不合并。
-        Object.entries(this.map.links).forEach(([relationName, relationData]) => {
-            const {relType, sourceRecord, targetRecord, isSourceRelation} = relationData
-            // n:n 不合表，先排除
-            if (relType.includes('1')) {
-                // FIXME  - 如果 A 和 B 有两个关系的都是 1:1，只能按照其中一个关系三表合一，不然逻辑上有问题。
-                if (relType[0] === '1' && relType[1] === '1') {
-                    // 1:1 关系。并且 entity 不同样。真正的三表合一 。往 source 方向合表
-                    if (sourceRecord !== targetRecord) {
-                        this.joinTables(sourceRecord, targetRecord)
-                        this.relationToJoinEntity.set(relationName, sourceRecord)
-                        relationData.mergedTo = 'combined'
-                        // 这种情况是共用 id 了，而且 mergeTo 其实不区分谁是 source 谁是 target 了。
-                    } else {
-                        assert(!isSourceRelation, 'virtual relation cannot reach here')
-                        // 1:1 关系，entity 相同，无法合表。仍然是 relation 往 source 方向
-                        this.relationToJoinEntity.set(relationName, sourceRecord )
-                        relationData.mergedTo = 'source'
-                    }
 
-                } else if (relType[0] === 'n') {
-                    // n:1，合并关系表到 source
-                    this.relationToJoinEntity.set(relationName, sourceRecord )
-                    relationData.mergedTo = 'source'
-                } else {
-                    // 1:n 合并关系表到 target
-                    assert(!isSourceRelation, `virtual relation can not merge to target, relType: [${relType[0]} : ${relType[1]}]`)
-                    this.relationToJoinEntity.set(relationName, targetRecord)
-                    relationData.mergedTo = 'target'
+        //  TODO 可能有 reliance 实体声明自己不合并。
+        // 0. 做好数据准备，先把 reliance 关系和 非 reliance 的 xToOne 找出来等待处理。CAUTION oneToOneReliance 肯定不是 symmetric ？
+        const oneToOneRelianceLinks = Object.fromEntries(Object.entries(this.map.links).filter(([, linkData]) => {
+            return !linkData.isSourceRelation && linkData.relType[0] === '1' && linkData.relType[1] === '1' && linkData.isTargetReliance
+        }))
+
+        const xToOneNotRelianceLinks = Object.fromEntries(Object.entries(this.map.links).filter(([, linkData]) => {
+            // CAUTION 一定要过滤掉虚拟 link
+            return !linkData.isSourceRelation && !linkData.isTargetReliance &&
+                (
+                    (linkData.relType[0] === '1' && linkData.relType[1] === '1') ||
+                    (linkData.relType[0] === 'n' && linkData.relType[1] === '1') ||
+                    (linkData.relType[0] === '1' && linkData.relType[1] === 'n')
+                )
+        }))
+
+        const mergedLinks: LinkMapItem[] = []
+
+        // 1. 遍历用户指定的 merge 路径。
+        this.mergeLinks.forEach(path => {
+            const [rootRecord, ...attributePath] = path.split('.')
+            let currentRecord = rootRecord
+            for(let i = 0; i < attributePath.length; i++ ) {
+                const currentAttribute = attributePath[i]
+                const attributeData = (this.map.records[currentRecord].attributes[currentAttribute]! as RecordAttribute)
+                const linkName = attributeData.linkName
+                const linkData = this.map.links[linkName]
+                const {relType, sourceRecord, targetRecord, isSourceRelation} = linkData
+                assert(
+                    relType[0] === '1' && relType[1] === '1' && sourceRecord !== targetRecord,
+                    `only 1:1 can merge: ${rootRecord}.${attributePath.slice(0, i+1).join('.')}`
+                )
+                const recordToMove = sourceRecord === currentRecord ? targetRecord : sourceRecord
+                const conflicts = this.combineRecordTable(currentRecord, recordToMove, linkName)
+                if (conflicts) {
+                    throw new Error(`conflict found when join ${linkName}, ${conflicts.join(',')} already merged with ${currentRecord}`)
                 }
-            } else {
-                assert(!isSourceRelation, 'virtual relation can not be n:n')
+
+                // 成功要修改 map 的数据
+                linkData.mergedTo = 'combined'
+                mergedLinks.push(linkData)
+                // 路径下一个
+                currentRecord = attributeData.recordName
+                // 处理完了 在上面的 links 里面删除这个 link
+                delete oneToOneRelianceLinks[linkName]
+                delete xToOneNotRelianceLinks[linkName]
             }
         })
+
+
+        // 2. reliance 三表合一。这里有一个不能有链的检测。
+        Object.values(oneToOneRelianceLinks).forEach(linkData => {
+            const { sourceRecord, targetRecord, recordName: linkRecord} = linkData
+            // 只是尝试。有冲突就不会处理
+            const conflicts = this.combineRecordTable(sourceRecord, targetRecord, linkRecord!)
+            if (!conflicts) {
+                linkData.mergedTo = 'combined'
+                mergedLinks.push(linkData)
+            } else {
+                // 改为 尝试 merge link
+                const linkToRecordLinkName = (this.map.records[linkRecord!].attributes.source! as RecordAttribute).linkName
+                const linkConflicts = this.joinTables(sourceRecord, linkRecord!, linkToRecordLinkName!)
+                if (!linkConflicts) {
+                    this.mergeLog.push(conflicts)
+                    linkData.mergedTo = 'source'
+                    mergedLinks.push(linkData)
+                }
+            }
+        })
+
+        // CAUTION 这些关系里面没有虚拟关系。上面过滤掉了。
+        // FIXME 还要加上 reliance 不是 1:1 的？
+        // 3. 剩余的 x:1 关系只合并关系表。
+        Object.values(xToOneNotRelianceLinks).forEach(linkData => {
+            const { relType, sourceRecord, targetRecord, recordName: linkRecord} = linkData
+            const mergeWithSource = relType[1] !== 'n'
+            const mergeTarget = mergeWithSource ? sourceRecord : targetRecord
+            const linkToRecordLinkName = (this.map.records[linkRecord!].attributes[mergeWithSource ? 'source': 'target']! as RecordAttribute).linkName
+            // 只是尝试。有冲突就不会处理
+            const linkConflicts = this.joinTables(mergeTarget, linkRecord!, linkToRecordLinkName!)
+            if (!linkConflicts) {
+                linkData.mergedTo = mergeWithSource ? 'source' : 'target'
+                mergedLinks.push(linkData)
+            }
+        })
+
+
+        // 4. 先给所有的 virtualLink 赋予默认 的 mergeTo，下一步再按照实际情况修改该
+        Object.values(this.map.links).forEach(linkData => {
+            if (linkData.isSourceRelation) {
+                linkData.mergedTo = 'source'
+            }
+        })
+
+        // 4.1 给 virtualLink 也更新 map
+        mergedLinks.forEach(mergedLinkData => {
+            if (mergedLinkData.mergedTo === 'combined' || mergedLinkData.mergedTo === 'source') {
+                const sourceLinkName = (this.map.records[mergedLinkData.recordName!].attributes.source as RecordAttribute).linkName
+                this.map.links[sourceLinkName].mergedTo = 'combined'
+            }
+
+            if (mergedLinkData.mergedTo === 'combined' || mergedLinkData.mergedTo === 'target') {
+                const sourceLinkName = (this.map.records[mergedLinkData.recordName!].attributes.target as RecordAttribute).linkName
+                this.map.links[sourceLinkName].mergedTo = 'combined'
+            }
+        })
+
+        // Object.entries(this.map.links).forEach(([relationName, relationData]) => {
+        //     const {relType, sourceRecord, targetRecord, isSourceRelation} = relationData
+        //     // n:n 不合表，先排除
+        //     if (relType.includes('1')) {
+        //         // FIXME  - 如果 A 和 B 有两个关系的都是 1:1，只能按照其中一个关系三表合一，不然逻辑上有问题。
+        //         if (relType[0] === '1' && relType[1] === '1') {
+        //             // 1:1 关系。并且 entity 不同样。真正的三表合一 。往 source 方向合表
+        //             if (sourceRecord !== targetRecord) {
+        //                 this.joinTables(sourceRecord, targetRecord)
+        //                 this.relationToJoinEntity.set(relationName, sourceRecord)
+        //                 relationData.mergedTo = 'combined'
+        //                 // 这种情况是共用 id 了，而且 mergeTo 其实不区分谁是 source 谁是 target 了。
+        //             } else {
+        //                 assert(!isSourceRelation, 'virtual relation cannot reach here')
+        //                 // 1:1 关系，entity 相同，无法合表。仍然是 relation 往 source 方向
+        //                 this.relationToJoinEntity.set(relationName, sourceRecord )
+        //                 relationData.mergedTo = 'source'
+        //             }
+        //
+        //         } else if (relType[0] === 'n') {
+        //             // n:1，合并关系表到 source
+        //             this.relationToJoinEntity.set(relationName, sourceRecord )
+        //             relationData.mergedTo = 'source'
+        //         } else {
+        //             // 1:n 合并关系表到 target
+        //             assert(!isSourceRelation, `virtual relation can not merge to target, relType: [${relType[0]} : ${relType[1]}]`)
+        //             this.relationToJoinEntity.set(relationName, targetRecord)
+        //             relationData.mergedTo = 'target'
+        //         }
+        //     } else {
+        //         assert(!isSourceRelation, 'virtual relation can not be n:n')
+        //     }
+        // })
 
         // TODO  独立字段的处理
     }

@@ -17,7 +17,10 @@ const { entities, relations } = createCommonData()
 describe("db setup", () => {
     test('validate 1:1 relation map', () => {
         // Profile & User
-        const setup = new DBSetup(entities, relations);
+        const clues = [
+            'Profile.owner',
+        ]
+        const setup = new DBSetup(entities, relations, undefined, clues);
         // console.log(JSON.stringify(setup.map, null, 4))
         // 应该是 三表 合一
         expect(setup.map.records.User).toBeDefined()
@@ -136,8 +139,11 @@ describe("db setup", () => {
     })
 
     test('validate n:1 relation map', () => {
+        const clues = [
+            'Profile.owner',
+        ]
         // File & User
-        const setup = new DBSetup(entities, relations);
+        const setup = new DBSetup(entities, relations, undefined, clues);
         expect(setup.map.records.User).toBeDefined()
         expect(setup.map.records.File).toBeDefined()
         expect(setup.map.records.User.table).not.toBe(setup.map.records.File.table)

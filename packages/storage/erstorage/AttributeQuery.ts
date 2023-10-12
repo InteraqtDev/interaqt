@@ -2,6 +2,7 @@ import {EntityToTableMap} from "./EntityToTableMap";
 import {assert} from "../util.ts";
 
 import {RecordQueryData, RecordQueryTree, RecordQuery, LINK_SYMBOL} from "./RecordQuery.ts";
+import {MatchExp} from "./MatchExp.ts";
 
 export type AttributeQueryDataRecordItem = [string, RecordQueryData, boolean?]
 export type AttributeQueryDataItem = string | AttributeQueryDataRecordItem
@@ -12,9 +13,10 @@ export class AttributeQuery {
     public xToManyRecords: RecordQuery[] = []
     public xToOneRecords: RecordQuery[] = []
     public valueAttributes: string[] = []
-    public xToOneQueryTree: RecordQueryTree
+
     public fullQueryTree: RecordQueryTree
     public parentLinkRecordQuery?: RecordQuery
+    public id = Math.random()
     constructor(public recordName: string, public map: EntityToTableMap, public data: AttributeQueryData = [], public parentRecord?: string, public attributeName?: string, public shouldQueryParentLinkData?: boolean) {
         data.forEach((rawItem: AttributeQueryDataItem) => {
             const item = (typeof rawItem === 'string' ? [rawItem, {}, false] : rawItem)  as AttributeQueryDataRecordItem
@@ -29,6 +31,7 @@ export class AttributeQuery {
 
             const attributeInfo = this.map.getInfo(this.recordName, attributeName)
             if (attributeInfo.isRecord) {
+
                 const relatedEntity = RecordQuery.create(attributeInfo.recordName, this.map, subQueryData as RecordQueryData, undefined, this.recordName, attributeName, onlyRelationData)
 
                 this.relatedRecords.push(relatedEntity)
@@ -43,7 +46,7 @@ export class AttributeQuery {
             }
         })
 
-        this.xToOneQueryTree = this.buildXToOneQueryTree()
+        // this.xToOneQueryTree = this.buildXToOneQueryTree()
         this.fullQueryTree = this.buildFullQueryTree()
 
     }
@@ -90,7 +93,9 @@ export class AttributeQuery {
         // xToMany 的 onlyRelationData 一起查，这是父亲在处理 findRelatedRecords 的时候传过来的。
         return queryFields
     }
-
+    public get xToOneQueryTree(): RecordQueryTree {
+        return this.buildXToOneQueryTree()
+    }
     buildXToOneQueryTree() {
         const result = new RecordQueryTree(this.recordName, this.map, this.parentRecord, this.attributeName)
         this.data.forEach(i => {
@@ -99,9 +104,15 @@ export class AttributeQuery {
             }
         })
         // CAUTION 我们这里只管 xToOne 的情况，因为 xToMany 都是外部用 id 去做二次查询得到的。不是用 join 语句一次性得到的。
-        this.xToOneRecords.forEach((entityQuery) => {
-            result.addRecord([entityQuery.attributeName!], entityQuery.attributeQuery!.xToOneQueryTree)
+        this.xToOneRecords.forEach((recordQuery) => {
+            result.addRecord([recordQuery.attributeName!], recordQuery.attributeQuery!.xToOneQueryTree)
         })
+
+        if (this.shouldQueryParentLinkData && this.parentLinkRecordQuery) {
+            const reverseInfo = this.map.getInfo(this.parentRecord!, this.attributeName!).getReverseInfo()
+            result.addRecord([reverseInfo?.attributeName!, LINK_SYMBOL], this.parentLinkRecordQuery.attributeQuery!.xToOneQueryTree)
+        }
+
         return result
     }
 

@@ -24,9 +24,9 @@ export class QueryAgent {
     buildXToOneFindQuery(recordQuery: RecordQuery, prefix='') {
         // 从所有条件里面构建出 join clause
         const fieldQueryTree = recordQuery.attributeQuery!.xToOneQueryTree
+
         const matchQueryTree = recordQuery.matchExpression.xToOneQueryTree
         const finalQueryTree = fieldQueryTree.merge(matchQueryTree)
-
         const joinTables = this.getJoinTables(finalQueryTree, [recordQuery.recordName])
 
         const fieldMatchExp = recordQuery.matchExpression.buildFieldMatchExpression()
@@ -122,6 +122,7 @@ ${this.buildWhereClause(
             relatedRecordQuery.contextRootEntity
         )
 
+
         // CAUTION 注意这里的第二个参数。因为任何两个具体的实体之间只能有一条关系。所以即使是 n:n 和关系表关联上时，也只有一条关系数据，所以这里可以带上 relation data。
         // 1. 查询 x:n 的实体，以及和父亲的关联关系上的 x:1 的数据
         const data = (await this.findRecords(newSubQuery, `finding related record: ${relatedRecordQuery.parentRecord}.${relatedRecordQuery.attributeName}`))
@@ -185,7 +186,11 @@ ${this.buildWhereClause(
 
         const [parentIdField, ...parentTableAndAlias] = parentInfos
 
+
+
+
         queryTree.forEachRecords((subQueryTree) => {
+
             const entityAttributeName = subQueryTree.attributeName!
 
             const attributeInfo = subQueryTree.info!
@@ -206,17 +211,18 @@ ${this.buildWhereClause(
                     result.push({
                         for: currentNamePath,
                         joinSource: parentTableAndAlias!,
-                        joinIdField: [attributeInfo.field!, idField],
+                        joinIdField: [attributeInfo.linkField!, idField],
                         joinTarget: [currentTable, currentTableAlias]
                     })
                 } else if (attributeInfo.isLinkMergedWithAttribute()){
                     const reverseAttributeInfo = attributeInfo.getReverseInfo()!
                     // 说明记录在对方的 field 里面
+                    assert(!!reverseAttributeInfo.linkField!, `${reverseAttributeInfo.parentEntityName}.${reverseAttributeInfo.attributeName} has no field`)
                     result.push({
                         for: currentNamePath,
                         joinSource: parentTableAndAlias!,
                         // 这里要找当前实体中用什么 attributeName 指向上一个实体
-                        joinIdField: [parentIdField, reverseAttributeInfo.field!],
+                        joinIdField: [parentIdField, reverseAttributeInfo.linkField!],
                         joinTarget: [currentTable, currentTableAlias]
                     })
                 } else {
@@ -244,10 +250,15 @@ ${this.buildWhereClause(
                             joinTarget: [currentTable, currentTableAlias]
                         })
                     }
-
                 }
             }
+
+
             result.push(...this.getJoinTables(subQueryTree, currentNamePath, [idField!, currentTable!, currentTableAlias! ]))
+
+            if (subQueryTree.parentLinkQueryTree) {
+
+            }
 
             // 处理 link 上的 query。如果只要 id, 那么在上面实体链接的时候就已经有了
             if(subQueryTree.parentLinkQueryTree && !subQueryTree.parentLinkQueryTree.onlyIdField()) {
@@ -259,12 +270,16 @@ ${this.buildWhereClause(
                     relationTable!, // link 的 tableName
                     relationTableAlias!, // link 的 tableAlias
                 ]
-                subQueryTree.parentLinkQueryTree.forEachRecords(linkSubQueryTree => {
-                    result.push(...this.getJoinTables(linkSubQueryTree, linkNamePath, linkParentInfo))
-                })
-            }
 
+                result.push(...this.getJoinTables(subQueryTree.parentLinkQueryTree, linkNamePath, linkParentInfo))
+
+                // subQueryTree.parentLinkQueryTree.forEachRecords(linkSubQueryTree => {
+                //     console.log(7777777, linkSubQueryTree.recordName, linkSubQueryTree.getData(),  linkNamePath, linkParentInfo)
+                // })
+            }
         })
+
+
 
         return result
     }
@@ -514,7 +529,7 @@ VALUES
             await this.createRecord(newLinkData)
         }
 
-        // 4. 处理完全独立数据和的关系。
+        // 4. 处理完全独立的老数据和的关系。
         for (let record of newEntityData.isolatedRecordIdRefs) {
             // 针对 x:1 关系要先删除原来的关系
             if(record.info!.isXToOne) {
@@ -530,7 +545,6 @@ VALUES
                 target: record.info!.isRecordSource() ? record.getRef() : currentIdRef
             })
             const newLinkData = new NewRecordData(this.map, record.info!.linkName, linkRawData)
-
             await this.createRecord(newLinkData)
         }
 

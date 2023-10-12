@@ -3,6 +3,7 @@ import {AttributeQuery, AttributeQueryData} from "./AttributeQuery";
 import {Modifier, ModifierData} from "./Modifier";
 import {EntityToTableMap} from "./EntityToTableMap";
 import {AttributeInfo} from "./AttributeInfo.ts";
+import {assert} from "../util.ts";
 
 export type RecordQueryData = {
     matchExpression?: MatchExpressionData,
@@ -54,22 +55,22 @@ export class RecordQuery {
 
 export class RecordQueryTree {
     public fields: string[] =[]
-    public records: {[k:string]: RecordQueryTree} = {}
+    public records: {[k:string]: RecordQueryTree}
     public info? :AttributeInfo
     // 父节点和自己这个几点 link 上的 query
-    public parentLinkQueryTree? : RecordQueryTree
+
     constructor(
         public recordName: string,
         public map: EntityToTableMap,
         public parentRecord?:string,
         public attributeName?: string,
         public data?: {fields: string[], records: {[k:string]: RecordQueryTree}},
-        public parent?: RecordQueryTree
+        public parent?: RecordQueryTree,
+        public parentLinkQueryTree? : RecordQueryTree
     ) {
-        if (data){
-            this.fields = data.fields || []
-            this.records = data.records || {}
-        }
+        assert(!!recordName, 'recordName cannot be empty')
+        this.fields = data?.fields || []
+        this.records = data?.records || {}
         if (parentRecord) {
             this.info = this.map.getInfo(this.parentRecord!, this.attributeName!)
         }
@@ -94,14 +95,25 @@ export class RecordQueryTree {
     addRecord(namePath: string[], subTree?: RecordQueryTree) {
         const [name, ...rest] = namePath
         if (namePath.length === 1) {
-            const info = this.map.getInfo(this.recordName, name)
-            this.records[name] = subTree || new RecordQueryTree(info.recordName, this.map, this.recordName, name, undefined, this)
+            if (name === LINK_SYMBOL) {
+                if (!this.parentLinkQueryTree) {
+                    this.parentLinkQueryTree = new RecordQueryTree(this.info!.linkName, this.map)
+                }
+
+                if (subTree) this.parentLinkQueryTree = this.parentLinkQueryTree.merge(subTree)
+            } else {
+                const info = this.map.getInfo(this.recordName, name)
+                const newTree = subTree || new RecordQueryTree(info.recordName, this.map, this.recordName, name, undefined, this)
+                this.records[name] = this.records[name] ? this.records[name].merge(newTree) : newTree
+            }
         } else if(name === LINK_SYMBOL) {
             if (!this.parentLinkQueryTree) {
                 this.parentLinkQueryTree = new RecordQueryTree(this.info!.linkName, this.map)
             }
             this.parentLinkQueryTree.addRecord(rest, subTree)
         } else {
+            const info = this.map.getInfo(this.recordName, name)
+            this.records[name] = new RecordQueryTree(info.recordName, this.map, this.recordName, name, undefined, this)
             this.records[name].addRecord(rest, subTree)
         }
     }
@@ -111,10 +123,11 @@ export class RecordQueryTree {
     onlyIdField() {
         return this.fields.length === 1 && this.fields[0] === 'id'
     }
-    merge(otherTree:RecordQueryTree) {
+    merge(otherTree:RecordQueryTree) : RecordQueryTree{
         const fields = Array.from(new Set([...this.fields, ...otherTree.fields]))
         const records: {[k:string]: RecordQueryTree} = {}
         const keys = Array.from(new Set([...Object.keys(this.records), ...Object.keys(otherTree.records)]))
+
         keys.forEach(key => {
             if (this.records[key] && otherTree.records[key]) {
                 records[key] = this.records[key].merge(otherTree.records[key])
@@ -125,7 +138,29 @@ export class RecordQueryTree {
             }
         })
 
-        return new RecordQueryTree(this.recordName, this.map, this.parentRecord, this.attributeName, { fields, records})
+        let parentLinkQueryTree
+        if (this.parentLinkQueryTree && otherTree.parentLinkQueryTree) {
+            parentLinkQueryTree = this.parentLinkQueryTree.merge(otherTree.parentLinkQueryTree)
+        } else {
+            parentLinkQueryTree = this.parentLinkQueryTree || otherTree.parentLinkQueryTree
+        }
+
+        return new RecordQueryTree(this.recordName, this.map, this.parentRecord, this.attributeName, { fields, records }, this.parent, parentLinkQueryTree)
+    }
+    getData() {
+        const result: {[k:string]: any} = {
+            __fields: this.fields
+        }
+
+
+        this.forEachRecords(record => {
+            result[record.attributeName!] = record.getData()
+        })
+
+        if (this.parentLinkQueryTree) {
+            result[LINK_SYMBOL] = this.parentLinkQueryTree.getData()
+        }
+        return result
     }
 
 }
