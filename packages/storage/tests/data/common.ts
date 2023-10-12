@@ -57,14 +57,17 @@ export const createCommonData = () => {
 
 
 
-    Relation.create({
+    const friendRelation = Relation.create({
         entity1: userEntity,
         targetName1: 'friends',
         entity2: userEntity,
         targetName2: 'friends',
         relType: 'n:n',
-
+        properties: [
+            Property.create({ name: 'level', type: PropertyTypes.Number })
+        ]
     })
+
 
 
     const itemEntity = Entity.create({

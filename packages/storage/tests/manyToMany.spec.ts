@@ -248,9 +248,9 @@ describe('many to many', () => {
         const user2 = await handle.create('User', {name: 'bbb', age: 18})
         const user3 = await handle.create('User', {name: 'ccc', age: 19 })
         // user is source
-        await handle.addRelationById('User', 'friends', user.id, user2.id)
+        await handle.addRelationById('User', 'friends', user.id, user2.id, { level: 1 })
         // user3 is source
-        await handle.addRelationById('User', 'friends', user3.id, user.id)
+        await handle.addRelationById('User', 'friends', user3.id, user.id, { level: 2 })
 
         const foundUser = await handle.findOne(
             'User',
@@ -260,13 +260,17 @@ describe('many to many', () => {
                 'age', [
                 'friends',
                 {
-                    attributeQuery: ['name', 'age'],
+                    attributeQuery: [
+                        'name',
+                        'age',
+                        ['&', { attributeQuery: ['level']}]
+                    ],
                 }
             ]
             ]
         )
 
-        console.log(foundUser)
+        console.log(JSON.stringify(foundUser, null, 4))
         expect(foundUser).toMatchObject({
             id: user.id,
             name: 'aaa',
@@ -274,11 +278,17 @@ describe('many to many', () => {
             friends: [{
                 id: user2.id,
                 name: 'bbb',
-                age: 18
+                age: 18,
+                '&': {
+                    level: 1
+                }
             }, {
                 id: user3.id,
                 name: 'ccc',
-                age: 19
+                age: 19,
+                '&': {
+                    level: 2
+                }
             }]
         })
 

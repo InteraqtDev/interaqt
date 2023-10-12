@@ -100,7 +100,8 @@ ${this.buildWhereClause(
     // CAUTION 任何两个具体的实体之间只能有一条关系，但是可以在关系上有多条数据。1:n 的数据
 
     async findXToManyRelatedRecords(recordName: string, attributeName: string, recordId: string, relatedRecordQuery: RecordQuery) {
-        const reverseAttributeName = this.map.getInfo(recordName, attributeName).getReverseInfo()?.attributeName!
+        const info = this.map.getInfo(recordName, attributeName)
+        const reverseAttributeName = info.getReverseInfo()?.attributeName!
 
         // FIXME 对 n:N 关联实体的查询中，也可能会引用主实体的值，这个时候值已经是确定的了，应该作为 context 传进来，替换掉原本的 matchExpression
         const newMatch = relatedRecordQuery.matchExpression.and({
@@ -124,13 +125,28 @@ ${this.buildWhereClause(
         // CAUTION 注意这里的第二个参数。因为任何两个具体的实体之间只能有一条关系。所以即使是 n:n 和关系表关联上时，也只有一条关系数据，所以这里可以带上 relation data。
         // 1. 查询 x:n 的实体，以及和父亲的关联关系上的 x:1 的数据
         const data = (await this.findRecords(newSubQuery, `finding related record: ${relatedRecordQuery.parentRecord}.${relatedRecordQuery.attributeName}`))
-        // 1.1 这里再反向处理一下关系数据。因为查出来的时候是用反向的关系名字差的
+        // 1.1 这里再反向处理一下关系数据。因为在上一步 withParentLinkData 查出来的时候是用的是反向的关系名字
         const records =  relatedRecordQuery.attributeQuery.parentLinkRecordQuery ? data.map(item => {
-            const itemWithParentLinkData = {
-                ...item,
-                [LINK_SYMBOL]: item[reverseAttributeName][LINK_SYMBOL]
+            let itemWithParentLinkData
+            if (!info.isLinkManyToManySymmetric()) {
+                itemWithParentLinkData = {
+                    ...item,
+                    [LINK_SYMBOL]: item[reverseAttributeName][LINK_SYMBOL]
+                }
+                delete itemWithParentLinkData[reverseAttributeName]
+            } else {
+                // TODO 是不是有更优雅的判断？？？
+                // CAUTION 对称 n:n 关系，和父亲也只有一个方向是有的。
+                itemWithParentLinkData = {
+                    ...item,
+                    [LINK_SYMBOL]: item[`${reverseAttributeName}:source`]?.[LINK_SYMBOL]?.id ?
+                        item[`${reverseAttributeName}:source`]?.[LINK_SYMBOL] :
+                        item[`${reverseAttributeName}:target`]?.[LINK_SYMBOL]
+                }
+                delete itemWithParentLinkData[`${reverseAttributeName}:source`]
+                delete itemWithParentLinkData[`${reverseAttributeName}:target`]
             }
-            delete itemWithParentLinkData[reverseAttributeName]
+
             return itemWithParentLinkData
         }) : data
 

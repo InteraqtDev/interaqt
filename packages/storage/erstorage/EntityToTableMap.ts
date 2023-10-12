@@ -49,14 +49,14 @@ export type LinkMapItem = {
     sourceRecord: string,
     sourceAttribute: string,
     targetRecord: string,
-    targetAttribute?: string,
+    targetAttribute: string|undefined,
     // 用来判断这个 relation 是不是 virtual 的，是的话为 true.
     isSourceRelation?: boolean,
     // 这个 link 是否有个对应的 record. 当这个 link 是根据 Relation 创建的时候就有这个。
     //  它等同于 isSourceRelation 为 true 时 sourceRecord
     recordName?: string,
     mergedTo? : 'source'|'target'|'combined',
-    table: string,
+    table?: string,
     // CAUTION 特别注意，这里的 sourceField 和 targetField 和 sourceAttribute 一样，是指站在 source 的角度去看，存的是关联实体(target)的 id. 不要搞成了自己的 id 。
     //  当发生表合并时，他们表示的是在合并的表里面的 field。根据往合并情况不同，sourceField/targetField 都可能不存在。
     sourceField?: string,
@@ -93,11 +93,11 @@ export class EntityToTableMap {
     getRecord(recordName:string) {
         return this.data.records[recordName]
     }
-    getAttributeName(rawAttributeName:string) {
-        return rawAttributeName.includes(':') ? rawAttributeName.split(':')[0] : rawAttributeName
+    getAttributeAndSymmetricDirection(rawAttributeName:string): [string, 'source'|'target'|undefined] {
+        return rawAttributeName.includes(':') ? rawAttributeName.split(':') as [string, 'source'|'target'] : [rawAttributeName, undefined]
     }
     getAttributeData(recordName:string, attributeName: string) {
-        return this.data.records[recordName].attributes[this.getAttributeName(attributeName)]
+        return this.data.records[recordName].attributes[this.getAttributeAndSymmetricDirection(attributeName)[0]]
     }
     getRecordInfo(recordName:string) {
         return new RecordInfo(recordName, this)
@@ -111,7 +111,7 @@ export class EntityToTableMap {
         return result!
     }
     getLinkInfo(recordName: string, rawAttribute: string) {
-        const attribute = this.getAttributeName(rawAttribute)
+        const attribute = this.getAttributeAndSymmetricDirection(rawAttribute)[0]
         const linkName = (this.data.records[recordName].attributes[attribute] as RecordAttribute).linkName
         assert(!!linkName, `cannot find relation ${recordName} ${attribute}`)
         return new LinkInfo(linkName, this.data.links[linkName], this)
@@ -135,8 +135,7 @@ export class EntityToTableMap {
         while(rawCurrentAttribute = attributivePath.shift()!) {
             stack.push(rawCurrentAttribute)
             // 路径中可能有 symmetric 的方向
-            const currentNamePair = rawCurrentAttribute.includes(':') ? rawCurrentAttribute.split(':') : [rawCurrentAttribute, undefined]
-            const [currentAttribute, symmetricDirection] = currentNamePair
+            const [currentAttribute, symmetricDirection] = this.getAttributeAndSymmetricDirection(rawCurrentAttribute)
             lastSymmetricDirection = symmetricDirection
 
             // 增加了 & 的影响
@@ -292,7 +291,7 @@ export class EntityToTableMap {
                 return [linkAlias!, fieldName, linkTable!]
             }
         } else {
-            const fieldName = record.attributes[this.getAttributeName(attributeName)].field
+            const fieldName = record.attributes[this.getAttributeAndSymmetricDirection(attributeName)[0]].field
             return [alias, fieldName!, table]
         }
     }

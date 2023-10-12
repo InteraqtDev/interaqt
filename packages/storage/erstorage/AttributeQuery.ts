@@ -73,10 +73,19 @@ export class AttributeQuery {
 
         if (this.shouldQueryParentLinkData && this.parentLinkRecordQuery) {
             const reverseAttribute = this.map.getInfo(this.parentRecord!, this.attributeName!).getReverseInfo()?.attributeName!
-            const namePath = nameContext.concat(reverseAttribute!)
-            queryFields.push(
-                ...this.parentLinkRecordQuery!.attributeQuery!.getValueAndXToOneRecordFields(namePath.concat(LINK_SYMBOL))
-            )
+            const namePath = nameContext.concat(reverseAttribute!, LINK_SYMBOL)
+            const symmetricLinkPaths = this.map.spawnManyToManySymmetricPath(namePath)
+            if (!symmetricLinkPaths) {
+                queryFields.push(
+                    ...this.parentLinkRecordQuery!.attributeQuery!.getValueAndXToOneRecordFields(namePath)
+                )
+            } else {
+                queryFields.push(
+                    ...this.parentLinkRecordQuery!.attributeQuery!.getValueAndXToOneRecordFields(symmetricLinkPaths[0]),
+                    ...this.parentLinkRecordQuery!.attributeQuery!.getValueAndXToOneRecordFields(symmetricLinkPaths[1])
+                )
+            }
+
         }
         // xToMany 的 onlyRelationData 一起查，这是父亲在处理 findRelatedRecords 的时候传过来的。
         return queryFields

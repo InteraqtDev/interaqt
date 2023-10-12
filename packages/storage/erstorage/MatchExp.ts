@@ -116,17 +116,13 @@ export class MatchExp {
             const attributeInfo = this.map.getInfoByPath([this.entityName].concat(matchAttributePath))!
 
             const namePath = [this.entityName].concat(matchAttributePath)
-            const symmetricPath = this.map.findManyToManySymmetricPath(namePath)
+            const symmetricPaths = this.map.spawnManyToManySymmetricPath(namePath)
 
             let sourcePath, targetPath
-            if (symmetricPath) {
-                const symmetricIndex = symmetricPath.length - 2
-                // CAUTION 对称关系，要改造一下 matchAttributePath
-                sourcePath = [...matchAttributePath]
-                sourcePath[symmetricIndex] = `${sourcePath.at(symmetricIndex)}:source`
-
-                targetPath = [...matchAttributePath]
-                targetPath[symmetricIndex] = `${targetPath.at(symmetricIndex)}:target`
+            if (symmetricPaths) {
+                // 要去除 头部 的 entity
+                sourcePath = symmetricPaths[0].slice(1, Infinity)
+                targetPath = symmetricPaths[1].slice(1, Infinity)
             }
 
 
@@ -139,8 +135,7 @@ export class MatchExp {
 
                 const fieldValue = this.getFinalFieldValue(exp.data.isReferenceValue!, exp.data.value)
 
-
-                if (!symmetricPath) {
+                if (!symmetricPaths) {
                     return {
                         ...exp.data,
                         fieldName: this.getFinalFieldName(matchAttributePath),
@@ -161,11 +156,10 @@ export class MatchExp {
 
             } else {
                 // CAUTION record 的情况只有可能 n:n 关系
-                // entity
 
                 // CAUTION 函数匹配的情况不管了，因为可能未来涉及到使用 cursor 实现更强的功能，这就涉及到查询计划的修改了。统统扔到上层去做。
                 //  注意，子查询中也可能对上层的引用，这个也放到上层好像能力有点重叠了。
-                if (!symmetricPath) {
+                if (!symmetricPaths) {
                     return {
                         ...exp.data,
                         namePath,

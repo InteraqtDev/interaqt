@@ -24,7 +24,7 @@ export type TableData = {
     }
 }
 
-
+export type MergeLinks = string[][]
 
 export class DBSetup {
     public recordToTableMap = new Map<string,string>()
@@ -32,12 +32,17 @@ export class DBSetup {
     public relationToJoinEntity = new Map<string,string>()
     public tables:TableData = {}
     public map: MapData = { links: {}, records: {}}
-    constructor(public entities: KlassInstanceOf<typeof Entity, false>[], public relations: KlassInstanceOf<typeof Relation, false>[], public database?: Database) {
+    constructor(
+        public entities: KlassInstanceOf<typeof Entity, false>[],
+        public relations: KlassInstanceOf<typeof Relation, false>[],
+        public database?: Database,
+        public mergeLinks?: MergeLinks
+    ) {
         this.buildMap()
         this.buildTables()
     }
-    getRelationName(relation: KlassInstanceOf<typeof Relation, false>) {
-        return `${Relation.is(relation.entity1) ? this.getRelationName(relation.entity1) : relation.entity1.name}_${relation.targetName1}_${relation.targetName2}_${relation.entity2.name}`
+    getRelationName(relation: KlassInstanceOf<typeof Relation, false>) : string{
+        return `${Relation.is(relation.entity1) ? this.getRelationName(relation.entity1 as KlassInstanceOf<typeof Relation, false>) : relation.entity1!.name}_${relation.targetName1}_${relation.targetName2}_${relation.entity2!.name}`
     }
 
     createRecordToTable(item:string, table:string) {
@@ -101,7 +106,7 @@ export class DBSetup {
     // }
 
     createRecord(entity: KlassInstanceOf<typeof Entity, false>|KlassInstanceOf<typeof Relation, false>, isRelation? :boolean) {
-        const attributes = Object.fromEntries(entity.properties.map(property => [
+        const attributes = Object.fromEntries(entity.properties!.map(property => [
             property.name,
             {
                 type: property.type,
@@ -126,26 +131,28 @@ export class DBSetup {
     createLink(relationName: string, relation: KlassInstanceOf<typeof Relation, false>) {
         return {
             table: relationName,
-            relType: relation.relType.split(':'),
-            sourceRecord: this.getRecordName(relation.entity1),
+            relType: relation.relType!.split(':'),
+            sourceRecord: this.getRecordName(relation.entity1 as KlassInstanceOf<typeof Entity, false>),
             sourceAttribute: relation.targetName1,
-            targetRecord: this.getRecordName(relation.entity2),
+            targetRecord: this.getRecordName(relation.entity2!),
             targetAttribute: relation.targetName2,
             recordName: relationName,
             isTargetReliance: relation.isTargetReliance
         } as LinkMapItem
     }
-    getRecordName(rawRecord:KlassInstanceOf<typeof Entity, false>|KlassInstanceOf<typeof Relation, false>) {
-        return Relation.is(rawRecord) ? this.getRelationName(rawRecord): rawRecord.name
+    getRecordName(rawRecord:KlassInstanceOf<typeof Entity, false>|KlassInstanceOf<typeof Relation, false>): string {
+        return Relation.is(rawRecord) ?
+            this.getRelationName(rawRecord as KlassInstanceOf<typeof Relation, false>):
+            rawRecord.name!
     }
     //虚拟 link
     createLinkOfRelationAndEntity(relationEntityName: string, relationName: string, relation: KlassInstanceOf<typeof Relation, false>, isSource: boolean) {
-        const relationRelType = relation.relType.split(':')
+        const relationRelType = relation.relType!.split(':')
         return {
             table: undefined, // 虚拟 link 没有表
             sourceRecord: relationEntityName,
             sourceAttribute: isSource ? 'source' : 'target',
-            targetRecord: isSource ? this.getRecordName(relation.entity1): this.getRecordName(relation.entity2),
+            targetRecord: isSource ? this.getRecordName(relation.entity1 as KlassInstanceOf<typeof Entity, false>): this.getRecordName(relation.entity2!),
             // targetRecord: isSource ? relation.entity1.name: relation.entity2.name,
             targetAttribute: undefined, // 不能从 entity 来获取关系表
             // source 1:x1 -关联表- x2:1 target
@@ -166,9 +173,9 @@ export class DBSetup {
     buildMap() {
         // 1. 按照范式生成基础 entity record
         this.entities.forEach(entity => {
-            this.map.records[entity.name] = this.createRecord(entity)
+            this.map.records[entity.name!] = this.createRecord(entity)
             // 记录一下 entity 和 表的关系。后面用于合并的时候做计算。
-            this.createRecordToTable(entity.name, entity.name)
+            this.createRecordToTable(entity.name!, entity.name!)
         })
 
         // 2. 生成 relation record 以及所有的 link
@@ -215,11 +222,17 @@ export class DBSetup {
         })
 
         this.mergeRecords()
+        this.assignTables()
+
     }
     mergeRecords() {
+        // 基本合表策略:
+        // 1. 从用户指定的 mergeLinks 里面开始合并三表合一
+        // 2. reliance 三表合一。这里有一个不能有链的检测。
+        // 3. n:1 关系合并关系表。
 
-        // 基本合表策略。合表操作开始，n:n 不合表。 1:1 三表合一 ， 其他往 n 方向合表。
-        // 要做两件事:
+
+        // 合并往 要做两件事:
         // 1) 修改 links 里面的数据。以里面的 mergeTo 作为判断标准
         // 2) 根据 link 情况给 records 分配表，分配 field
         //  TODO 可能有实体声明自己不合并。
@@ -258,7 +271,8 @@ export class DBSetup {
         })
 
         // TODO  独立字段的处理
-
+    }
+    assignTables() {
         // 1. 给所有的 record 分配表（表名重命名过了）
         const originTableNames = Array.from(this.tableToRecordsMap.keys())
         for(let originTableName of originTableNames) {
@@ -300,7 +314,6 @@ export class DBSetup {
                 // record.attributes.target.field = targetRecord.attributes[ID_ATTR].field
             }
         })
-
     }
     buildTables() {
         // 先添加 valueAttributes 的字段。
