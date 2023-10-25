@@ -1,10 +1,10 @@
-import {EntityQueryHandle} from "../erstorage/ERStorage";
 import {expect, test, describe, afterEach, beforeAll, beforeEach} from "bun:test";
 import { createCommonData} from "./data/common";
 import {DBSetup} from "../erstorage/Setup";
 import { SQLiteDB } from '../../runtime/BunSQLite'
 import {EntityToTableMap} from "../erstorage/EntityToTableMap";
 import {MatchExp} from "../erstorage/MatchExp.ts";
+import {EntityQueryHandle} from "../erstorage/EntityQueryHandle.ts";
 
 describe('one to many', () => {
     let db: SQLiteDB

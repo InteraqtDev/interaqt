@@ -3,7 +3,7 @@ import { Database } from "bun:sqlite";
 import fs from 'fs'
 
 import {DBSetup} from "../erstorage/Setup";
-import {QueryAgent} from "../erstorage/ERStorage";
+import {RecordQueryAgent} from "../erstorage/RecordQueryAgent.ts";
 import {EntityToTableMap} from "../erstorage/EntityToTableMap";
 // @ts-ignore
 import { SQLiteDB } from '../../runtime/BunSQLite'
@@ -307,7 +307,7 @@ describe("db setup", () => {
             })
         })
 
-        const queryAgent = new QueryAgent(entityToTableMap, database)
+        const queryAgent = new RecordQueryAgent(entityToTableMap, database)
         // console.log(queryAgent.buildFindQuery(entityQuery))
         const result = await database.query(queryAgent.buildXToOneFindQuery(entityQuery))
         // console.log(result)

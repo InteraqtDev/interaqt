@@ -1,7 +1,7 @@
 import {expect, test, describe} from "bun:test";
 import {
-    QueryAgent
-} from "../erstorage/ERStorage";
+    RecordQueryAgent
+} from "../erstorage/RecordQueryAgent.ts";
 import { SQLiteDB } from '../../runtime/BunSQLite'
 import {EntityToTableMap, MapData} from "../erstorage/EntityToTableMap";
 import {entityToTableMapData} from "./data/mapData";
@@ -50,7 +50,7 @@ describe('query agent test', () => {
 
 
         const attributeQuery = new AttributeQuery('User', entityToTableMap, queryData)
-        const queryAgent = new QueryAgent(entityToTableMap, database)
+        const queryAgent = new RecordQueryAgent(entityToTableMap, database)
 
         const joinExp = queryAgent.getJoinTables(attributeQuery.fullQueryTree, ['User'])
         expect(joinExp).toMatchObject([
@@ -94,7 +94,7 @@ describe('query agent test', () => {
         })
 
         const matchExp = new MatchExp('User', entityToTableMap, matchExpData)
-        const queryAgent = new QueryAgent(entityToTableMap, database)
+        const queryAgent = new RecordQueryAgent(entityToTableMap, database)
         const fieldMatchExp = matchExp.buildFieldMatchExpression()
         const fieldMatchExpWithValue = queryAgent.parseMatchExpressionValue('User', fieldMatchExp!)
 
@@ -216,7 +216,7 @@ ${queryAgent.buildXToOneFindQuery(innerEntityQuery, 'User_friends_TARGET')}
             })
         } as RecordQueryData)
 
-        const queryAgent = new QueryAgent(entityToTableMap, database)
+        const queryAgent = new RecordQueryAgent(entityToTableMap, database)
         expect(() => queryAgent.buildXToOneFindQuery(entityQuery)).not.toThrow()
 
     })

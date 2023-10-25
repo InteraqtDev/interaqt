@@ -1,13 +1,12 @@
 import {EntityToTableMap} from "./EntityToTableMap";
-import {assert, deepMerge, setByPath} from "../util";
+import {assert, setByPath} from "../util";
 // @ts-ignore
 import {BoolExp, ExpressionData} from '../../shared/BoolExp.ts'
 // @ts-ignore
-import {Database, EntityIdRef, ROW_ID_ATTR} from '../../runtime/System'
+import {Database, EntityIdRef} from '../../runtime/System'
 import {FieldMatchAtom, MatchAtom, MatchExp, MatchExpressionData} from "./MatchExp.ts";
-import {ModifierData} from "./Modifier.ts";
-import {AttributeQuery, AttributeQueryData, AttributeQueryDataItem} from "./AttributeQuery.ts";
-import {RecordQueryData, RecordQueryTree, RecordQuery, LINK_SYMBOL} from "./RecordQuery.ts";
+import {AttributeQuery, AttributeQueryDataItem} from "./AttributeQuery.ts";
+import {LINK_SYMBOL, RecordQuery, RecordQueryTree} from "./RecordQuery.ts";
 import {NewRecordData, RawEntityData} from "./NewRecordData.ts";
 import {someAsync} from "./util.ts";
 
@@ -19,7 +18,7 @@ export type JoinTables = {
     joinTarget: [string, string]
 }[]
 
-export class QueryAgent {
+export class RecordQueryAgent {
     constructor(public map: EntityToTableMap, public database: Database) {}
     buildXToOneFindQuery(recordQuery: RecordQuery, prefix='') {
         // 从所有条件里面构建出 join clause
@@ -407,13 +406,13 @@ ${this.buildXToOneFindQuery(existEntityQuery, currentAlias)}
         const newEntityDataWithDep = await this.createRecordDependency(newEntityData)
         const newRecordIdRef = await this.insertSameRowData(newEntityDataWithDep)
 
-        const relianceResult = await this.handleReliance(newEntityDataWithDep.merge(newRecordIdRef))
+        const relianceResult = await this.handleCreationReliance(newEntityDataWithDep.merge(newRecordIdRef))
 
         // 更新 relianceResult 的信息到
         return Object.assign(newRecordIdRef, relianceResult)
     }
 
-    async prepareSameRowData(newEntityData: NewRecordData, ignoreSelfId = false): Promise<NewRecordData> {
+    async preprocessSameRowData(newEntityData: NewRecordData, ignoreSelfId = false): Promise<NewRecordData> {
         const newRawDataWithNewIds = newEntityData.getData()
         // 1. 先为三表合一的新数据分配 id
         for(let record of newEntityData.combinedNewRecords) {
@@ -458,7 +457,7 @@ ${this.buildXToOneFindQuery(existEntityQuery, currentAlias)}
     }
 
     async insertSameRowData(newEntityData: NewRecordData): Promise<EntityIdRef>{
-        const newEntityDataWithIdsWithFlashOutRecords = await this.prepareSameRowData(newEntityData)
+        const newEntityDataWithIdsWithFlashOutRecords = await this.preprocessSameRowData(newEntityData)
         // 3. 插入新行。
         const sameRowNewFieldAndValue = newEntityDataWithIdsWithFlashOutRecords.getSameRowFieldAndValue()
         const result = await this.database.insert(`
@@ -474,7 +473,7 @@ VALUES
     }
 
 
-    async handleReliance(newEntityData: NewRecordData): Promise<object> {
+    async handleCreationReliance(newEntityData: NewRecordData): Promise<object> {
         const currentIdRef = newEntityData.getRef()
         const newIdRefs: {[k:string]: EntityIdRef|EntityIdRef[]} = {}
         // 1. 处理关系往 attribute 方向合并的新数据
@@ -553,7 +552,7 @@ VALUES
 
 
     // CAUTION 除了 1:1 并且合表的关系，不能递归更新 relatedEntity，如果是传入了，说明是建立新的关系。
-    async updateRecordDataByIds(entityName: string, idRefs: {id:string}[], columnAndValue: {field:string, value:string}[]): Promise<EntityIdRef[]>  {
+    async updateRecordDataByIds(entityName: string, idRefs: EntityIdRef[], columnAndValue: {field:string, value:string}[]): Promise<EntityIdRef[]>  {
         // TODO 要更新拆表出去的 field
 
         const idField= this.map.getInfo(entityName, 'id').field
@@ -572,18 +571,8 @@ WHERE ${idField} IN (${idRefs.map(i => JSON.stringify(i.id)).join(',')})
         // 注意这里，使用要返回匹配的类，虽然可能没有更新数据。这样才能保证外部的逻辑比较一致。
         return idRefs
     }
-    // 只有 1:1 关系可以递归更新实体数据，其他都能改当前实体的数据或者和其他实体关系。
-    async updateRecord(entityName: string, matchExpressionData: MatchExpressionData, newEntityData: NewRecordData)  {
-
-        // 1. 更新我依赖的
-        const newEntityDataWithDep = await this.createRecordDependency(newEntityData)
-
-        const matchedEntities = await this.findRecords(RecordQuery.create(entityName, this.map, {
-            matchExpression: matchExpressionData,
-        }), `find record for updating ${entityName}`)
-
-
-        // 跟自己合表的必须先删除，不然下面 updateRecordData 的时候可能冲掉了。
+    async updateSameRowData(entityName: string, matchedEntities: EntityIdRef[], newEntityData: NewRecordData, newEntityDataWithIdsWithFlashOutRecords: NewRecordData) {
+        // 跟自己合表实体的必须先断开关联，也就是移走。不然下面 updateRecordData 的时候就会把数据删除。
         const sameRoleEntityRefOrNewData = newEntityData.combinedRecordIdRefs.concat(newEntityData.combinedNewRecords)
 
         for(let newRelatedEntityData of sameRoleEntityRefOrNewData) {
@@ -603,9 +592,8 @@ WHERE ${idField} IN (${idRefs.map(i => JSON.stringify(i.id)).join(',')})
         }
 
         // 2. 先更新自身的 value 和 三表合一 或者 关系表合并的情况
-        const newEntityDataWithIdsWithFlashOutRecords = await this.prepareSameRowData(newEntityDataWithDep, true)
         const allSameRowData = newEntityDataWithIdsWithFlashOutRecords.getSameRowFieldAndValue()
-        const columnAndValue = allSameRowData.map(({field, value}) => (
+        const columnAndValue = allSameRowData.map(({field, value}: {field:string, value:string}) => (
             {
                 field,
                 /// TODO value 要考虑引用自身或者 related entity 其他 field 的情况？例如 age+5
@@ -613,47 +601,43 @@ WHERE ${idField} IN (${idRefs.map(i => JSON.stringify(i.id)).join(',')})
             }
         ))
 
-        await this.updateRecordDataByIds(entityName, matchedEntities.map(e => ({id:e.id})), columnAndValue)
-        // FIXME 这里验证一下三表合一情况下的数据正确性
-        // if(newEntityData.sameRowEntityIds.length) {
-        //     assert(updatedEntities.length === 1 && updatedEntities[0].id === newEntityData.reuseEntityId, `updated multiple records with only 1 1:1 related entity, ${updatedEntities[0].id} ${newEntityData.reuseEntityId}` )
-        // }
-
-        // 3. 更新依赖我的和关系表独立的
-        // 3.1. 删除旧关系
-        // CAUTION 这里的语义认为是 replace。对于 xToMany 的情况下，如果用户想表达新增，自己拆成两步进行。
-        // CAUTION 由于 xToMany 的数组情况会平铺，所以这里可能出现两次，所以这里记录一下排重
+        return this.updateRecordDataByIds(entityName, matchedEntities, columnAndValue)
+    }
+    async handleUpdateReliance(entityName:string, matchedEntities: EntityIdRef[], newEntityData: NewRecordData) {
+        // 这里面都是依赖我的，或者关系数据完全独立的。
+        // CAUTION update 里面的表达关联实体的语义统统认为是 replace。如果用户想要表达 xToMany 的情况下新增关系，应该自己拆成两步进行。既先更新数据，再用 addLink 去增加关系。
+        // 1. 断开自己和原来关联实体的关系。这里只要处理依赖我的，或者关系独立的，因为我依赖的在应该在 updateSameRowData 里面处理了。
         const otherTableEntitiesData = newEntityData.differentTableMergedLinkRecordIdRefs.concat(
             newEntityData.differentTableMergedLinkNewRecords,
             newEntityData.isolatedRecordIdRefs,
             newEntityData.isolatedNewRecords,
         )
 
+        // CAUTION 由于 xToMany 的数组情况会平铺处理，所以这里可能出现两次，所以这里记录一下排重
         const removedLinkName = new Set()
-        for(let newRelatedEntityData of otherTableEntitiesData) {
-            const linkInfo = newRelatedEntityData.info!.getLinkInfo()
+        for(let relatedEntityData of otherTableEntitiesData) {
+            const linkInfo = relatedEntityData.info!.getLinkInfo()
             if (removedLinkName.has(linkInfo.name)) {
                 continue
             }
 
             removedLinkName.add(linkInfo.name)
-            const updatedEntityLinkAttr = linkInfo.isRelationSource(entityName, newRelatedEntityData.info!.attributeName) ? 'source' : 'target'
+            const updatedEntityLinkAttr = linkInfo.isRelationSource(entityName, relatedEntityData.info!.attributeName) ? 'source' : 'target'
             for(let updatedEntity of matchedEntities) {
-
                 await this.unlink(
                     linkInfo.name,
                     MatchExp.atom({
                         key: `${updatedEntityLinkAttr}.id`,
                         value: ['=', updatedEntity.id],
                     }),
-                    !linkInfo.isRelationSource(entityName, newRelatedEntityData.info!.attributeName)
+                    !linkInfo.isRelationSource(entityName, relatedEntityData.info!.attributeName)
                 )
             }
         }
 
-        // 3.1. 建立新关系
+        // 2. 建立新关系
         // 处理和其他实体更新关系的情况。
-        for(let newRelatedEntityData of otherTableEntitiesData.concat(newEntityData.sameRowEntityIdRefs)) {
+        for(let newRelatedEntityData of otherTableEntitiesData) {
             // 这里只处理没有三表合并的场景。因为三表合并的数据在 sameTableFieldAndValues 已经有了
             // 这里只需要处理 1）关系表独立 或者 2）关系表往另一个方向合了的情况。因为往本方向和的情况已经在前面 updateEntityData 里面处理了
             let finalRelatedEntityRef
@@ -668,9 +652,26 @@ WHERE ${idField} IN (${idRefs.map(i => JSON.stringify(i.id)).join(',')})
                 await this.addLinkFromRecord(entityName, newRelatedEntityData.info?.attributeName!, updatedEntity.id, finalRelatedEntityRef.id)
             }
         }
+    }
+    // 只有 1:1 关系可以递归更新实体数据，其他都能改当前实体的数据或者和其他实体关系。
+    async updateRecord(entityName: string, matchExpressionData: MatchExpressionData, newEntityData: NewRecordData)  {
+
+        // 1. 创建我依赖的
+        const newEntityDataWithDep = await this.createRecordDependency(newEntityData)
+        // CAUTION 更新前先找到所有受影响的数据。为什么不直接更新？？？这样不是损失性能吗？？？
+        const matchedEntities = await this.findRecords(RecordQuery.create(entityName, this.map, {
+            matchExpression: matchExpressionData,
+        }), `find record for updating ${entityName}`)
+
+        // 2. 把同表的实体移出去，为新同表建立 id
+        const newEntityDataWithIdsWithFlashOutRecords = await this.preprocessSameRowData(newEntityDataWithDep, true)
+        // 更新所有同表数据。
+        await this.updateSameRowData(entityName, matchedEntities, newEntityData,  newEntityDataWithIdsWithFlashOutRecords)
+
+        // 3. 更新依赖我的和关系表独立的
+        await this.handleUpdateReliance(entityName, matchedEntities, newEntityData)
 
         return matchedEntities.map(updatedEntity => Object.assign(updatedEntity, newEntityDataWithIdsWithFlashOutRecords.getData()))
-
     }
 
     async deleteRecord(recordName:string, matchExp: MatchExpressionData) {
@@ -936,83 +937,4 @@ WHERE ${recordInfo.idField} IN (${records.map(({id}) => JSON.stringify(id)).join
 }
 
 
-
-export class EntityQueryHandle {
-    agent: QueryAgent
-
-    constructor(public map: EntityToTableMap, public database: Database) {
-        this.agent = new QueryAgent(map, database)
-    }
-
-    async findOne(entityName: string, matchExpression?: MatchExpressionData, modifier: ModifierData = {}, attributeQuery?: AttributeQueryData) {
-        const limitedModifier = {
-            ...modifier,
-            limit: 1
-        }
-
-        return (await this.find(entityName, matchExpression, limitedModifier, attributeQuery))[0]
-    }
-
-    async find(entityName: string, matchExpressionData?: MatchExpressionData, modifierData?: ModifierData, attributeQueryData: AttributeQueryData = []) {
-        assert(this.map.getRecord(entityName), `cannot find entity ${entityName}`)
-        const entityQuery = RecordQuery.create(
-            entityName,
-            this.map,
-            {
-                matchExpression: matchExpressionData,
-                attributeQuery: attributeQueryData,
-                modifier: modifierData
-            },
-        )
-
-        return this.agent.findRecords(entityQuery)
-    }
-
-    async create(entityName: string, rawData: RawEntityData ) : Promise<EntityIdRef>{
-        const newEntityData = new NewRecordData(this.map, entityName, rawData)
-        return this.agent.createRecord(newEntityData)
-    }
-    // CAUTION 不能递归更新 relate entity 的 value，如果传入了 related entity 的值，说明是建立新的联系。
-    async update(entity: string, matchExpressionData: MatchExpressionData, rawData: RawEntityData) {
-        const newEntityData = new NewRecordData(this.map, entity, rawData)
-        return this.agent.updateRecord(entity, matchExpressionData, newEntityData)
-    }
-
-    async delete(entityName: string, matchExpressionData: MatchExpressionData, ) {
-        return this.agent.deleteRecord(entityName, matchExpressionData)
-    }
-
-    async addRelationByNameById(relationName: string, sourceEntityId: string,  targetEntityId:string, rawData: RawEntityData = {}) {
-        assert(!!relationName && !!sourceEntityId && targetEntityId!!, `${relationName} ${sourceEntityId} ${targetEntityId} cannot be empty`)
-        return this.agent.addLink(relationName, sourceEntityId, targetEntityId, rawData)
-    }
-    async addRelationById(entity:string, attribute:string, entityId: string, attributeEntityId:string, relationData?: RawEntityData) {
-        return this.agent.addLinkFromRecord(entity, attribute, entityId, attributeEntityId, relationData)
-    }
-    async updateRelationByName(relationName:string, matchExpressionData: MatchExpressionData, rawData: RawEntityData) {
-        assert(!rawData.source && !rawData.target, 'Relation can only update attributes. Use addRelation/removeRelation to update source/target.')
-        return this.agent.updateRecord(relationName, matchExpressionData, new NewRecordData(this.map, relationName, rawData))
-    }
-    async findRelationByName(relationName: string, matchExpressionData?: MatchExpressionData, modifierData?: ModifierData, attributeQueryData: AttributeQueryData = []) {
-        return this.find(relationName, matchExpressionData, modifierData, attributeQueryData)
-    }
-    async findOneRelationByName(relationName: string, matchExpressionData: MatchExpressionData, modifierData: ModifierData = {}, attributeQueryData: AttributeQueryData = []) {
-        const limitedModifier = {
-            ...modifierData,
-            limit: 1
-        }
-
-        return (await this.findRelationByName(relationName, matchExpressionData, limitedModifier, attributeQueryData))[0]
-    }
-
-    createMatchFromAtom(...arg: Parameters<(typeof MatchExp)["atom"]>) {
-        return MatchExp.atom(...arg)
-    }
-    async removeRelationByName(relationName: string, matchExpressionData: MatchExpressionData) {
-        return this.agent.unlink(relationName, matchExpressionData)
-    }
-    getRelationName(entity:string, attribute:string): string {
-        return this.map.getInfo(entity, attribute).linkName
-    }
-}
 
