@@ -5,6 +5,8 @@ import { SQLiteDB } from '../../runtime/BunSQLite'
 import {EntityToTableMap} from "../erstorage/EntityToTableMap";
 import {MatchExp} from "../erstorage/MatchExp.ts";
 import {EntityQueryHandle} from "../erstorage/EntityQueryHandle.ts";
+import {MutationEvent} from "../erstorage/RecordQueryAgent.ts";
+import {LINK_SYMBOL} from "../erstorage/RecordQuery.ts";
 
 describe('many to many', () => {
     let db: SQLiteDB
@@ -26,7 +28,8 @@ describe('many to many', () => {
     })
 
     test('create many to many data:create self', async () => {
-        const userA = await handle.create('User', {name: 'aaa', age: 17})
+        const events: MutationEvent[] = []
+        const userA = await handle.create('User', {name: 'aaa', age: 17}, events)
         const teamA = await handle.create('Team', {teamName: 'teamA'})
 
         const findUser = await handle.findOne('User', MatchExp.atom({ key: 'id', value: ['=', userA.id]}), {}, ['name', 'age'] )
@@ -37,10 +40,19 @@ describe('many to many', () => {
         expect(findTeam).toMatchObject({
             teamName:'teamA',
         })
+
+        expect(events.length).toBe(1)
+        expect(events[0]).toMatchObject({
+            type: 'create',
+            recordName: 'User',
+            record: findUser,
+        })
     })
 
 
     test('create many to many data:create with new related', async () => {
+        const events: MutationEvent[] = []
+
         const rawData = {
             name: 'aaa',
             age: 17,
@@ -50,7 +62,7 @@ describe('many to many', () => {
                 teamName: 't2'
             }]
         }
-        const userA = await handle.create('User', rawData)
+        const userA = await handle.create('User', rawData, events)
 
         const findUser = await handle.findOne(
             'User',
@@ -60,13 +72,71 @@ describe('many to many', () => {
 
         expect(findUser).toMatchObject(rawData)
 
+        expect(events.length).toBe(5)
+        expect(events).toMatchObject([
+            {
+                type: "create",
+                recordName: "User",
+                record: {
+                    name: "aaa",
+                    age: 17,
+                    teams: [
+                        {
+                            teamName: "t1"
+                        }, {
+                            teamName: "t2"
+                        }
+                    ],
+                    id: userA.id
+                }
+            }, {
+                type: "create",
+                recordName: "Team",
+                record: {
+                    id: userA.teams[0].id,
+                }
+            }, {
+                type: "create",
+                recordName: "User_teams_members_Team",
+                record: {
+                    source: {
+                        id: userA.id
+                    },
+                    target: {
+                        id: userA.teams[0].id,
+                    },
+                    id: userA.teams[0][LINK_SYMBOL].id
+                }
+            }, {
+                type: "create",
+                recordName: "Team",
+                record: {
+                    teamName: "t2",
+                    id: 2
+                }
+            }, {
+                type: "create",
+                recordName: "User_teams_members_Team",
+                record: {
+                    source: {
+                        id: userA.id
+                    },
+                    target: {
+                        id: userA.teams[1].id,
+                    },
+                    id: userA.teams[1][LINK_SYMBOL].id
+                }
+            }
+        ])
     })
+
 
     test('create many to many data:create with existing related', async () => {
         const teamA = await handle.create('Team', {teamName: 't1'})
         const teamB = await handle.create('Team', {teamName: 't2'})
 
-        const userA = await handle.create('User', {name: 'aaa', age: 17, teams: [teamA, teamB]})
+        const events:MutationEvent[] = []
+        const userA = await handle.create('User', {name: 'aaa', age: 17, teams: [teamA, teamB]}, events)
         const findUser = await handle.findOne(
             'User',
             MatchExp.atom({ key: 'id', value: ['=', userA.id]}), {},
@@ -82,6 +152,53 @@ describe('many to many', () => {
                 teamName: 't2'
             }]
         })
+
+        expect(events.length).toBe(3)
+        expect(events).toMatchObject([
+            {
+                type: "create",
+                recordName: "User",
+                record: {
+                    name: "aaa",
+                    age: 17,
+                    teams: [
+                        {
+                            teamName: "t1",
+                            id: teamA.id
+                        }, {
+                            teamName: "t2",
+                            id: teamB.id
+                        }
+                    ],
+                    id: userA.id
+                }
+            }, {
+                type: "create",
+                recordName: "User_teams_members_Team",
+                record: {
+                    source: {
+                        id: userA.id
+                    },
+                    target: {
+                        id: teamA.id
+                    },
+                    id: userA.teams[0][LINK_SYMBOL].id
+                }
+            }, {
+                type: "create",
+                recordName: "User_teams_members_Team",
+                record: {
+                    source: {
+                        id: userA.id
+                    },
+                    target: {
+                        id: teamB.id
+                    },
+                    id: userA.teams[1][LINK_SYMBOL].id
+                }
+            }
+        ])
+
     })
 
 
@@ -97,10 +214,12 @@ describe('many to many', () => {
         }
 
         const userA = await handle.create('User', rawData)
+
+        const events:MutationEvent[] = []
         await handle.delete('User', MatchExp.atom({
             key: 'id',
             value: ['=', userA.id]
-        }))
+        }), events)
 
 
         const findUser = await handle.find(
@@ -112,6 +231,32 @@ describe('many to many', () => {
 
         const findRelation = await handle.find('User_teams_members_Team')
         expect(findRelation.length).toBe(0)
+
+        expect(events).toMatchObject([
+            {
+                type: "delete",
+                recordName: "User_teams_members_Team",
+                record: {
+                    role: null,
+                    id: userA.teams[0][LINK_SYMBOL].id
+                }
+            }, {
+                type: "delete",
+                recordName: "User_teams_members_Team",
+                record: {
+                    role: null,
+                    id: userA.teams[1][LINK_SYMBOL].id
+                }
+            }, {
+                type: "delete",
+                recordName: "User",
+                record: {
+                    name: "aaa",
+                    age: 17,
+                    id: userA.id,
+                }
+            }
+        ])
     })
 
 
@@ -150,7 +295,8 @@ describe('many to many', () => {
 
         const userA = await handle.create('User', rawData)
 
-        await handle.update('User', MatchExp.atom({
+        const events:MutationEvent[] = []
+        const updatedUsers = await handle.update('User', MatchExp.atom({
             key: 'id',
             value: ['=', userA.id]
         }),
@@ -161,7 +307,7 @@ describe('many to many', () => {
             }, {
                 teamName: 't2'
             }]
-        })
+        }, events)
 
         const findUser = await handle.findOne(
             'User',
@@ -178,20 +324,87 @@ describe('many to many', () => {
                 teamName: 't2'
             }]
         })
+
+        expect(events).toMatchObject([
+            {
+                "type": "update",
+                "recordName": "User",
+                "record": {
+                    "name": "bbb",
+                    "teams": [
+                        {
+                            "teamName": "t1"
+                        },
+                        {
+                            "teamName": "t2"
+                        }
+                    ]
+                },
+                "oldRecord": {
+                    "name": "aaa",
+                    "age": 17,
+                    "id": updatedUsers[0].id
+                }
+            },
+            {
+                "type": "create",
+                "recordName": "Team",
+                "record": {
+                    "teamName": "t1",
+                    "id": updatedUsers[0].teams[0].id
+                }
+            },
+            {
+                "type": "create",
+                "recordName": "User_teams_members_Team",
+                "record": {
+                    "source": {
+                        "id": updatedUsers[0].id
+                    },
+                    "target": {
+                        "id": updatedUsers[0].teams[0].id
+                    },
+                    "id": updatedUsers[0].teams[0][LINK_SYMBOL].id
+                }
+            },
+            {
+                "type": "create",
+                "recordName": "Team",
+                "record": {
+                    "teamName": "t2",
+                    "id": updatedUsers[0].teams[1].id
+                }
+            },
+            {
+                "type": "create",
+                "recordName": "User_teams_members_Team",
+                "record": {
+                    "source": {
+                        "id": updatedUsers[0].id
+                    },
+                    "target": {
+                        "id": updatedUsers[0].teams[1].id
+                    },
+                    "id": updatedUsers[0].teams[1][LINK_SYMBOL].id
+                }
+            }
+        ])
     })
+
 
     test('update many to many data:update with existing related', async () => {
         const teamA = await handle.create('Team', {teamName: 't1'})
         const teamB = await handle.create('Team', {teamName: 't2'})
         const userA = await handle.create('User', {name: 'aaa', age: 17, teams: [teamA, teamB]})
-        await handle.update('User', MatchExp.atom({
+        const  events:MutationEvent[] = []
+        const updatedUsers = await handle.update('User', MatchExp.atom({
                 key: 'id',
                 value: ['=', userA.id]
             }),
             {
                 name: 'bbb',
                 teams: [teamA,teamB]
-            })
+            }, events)
 
         const findUser = await handle.findOne(
             'User',
@@ -208,7 +421,66 @@ describe('many to many', () => {
                 teamName: 't2'
             }]
         })
+
+        expect(events).toMatchObject([
+            {
+                type: "update",
+                recordName: "User",
+                record: {
+                    name: "bbb",
+                    teams: [
+                        teamA,
+                        teamB
+                    ]
+                },
+                oldRecord: {
+                    name: "aaa",
+                    age: 17,
+                    id: updatedUsers[0].id
+                }
+            }, {
+                type: "delete",
+                recordName: "User_teams_members_Team",
+                record: {
+                    role: null,
+                    id: userA.teams[0][LINK_SYMBOL].id
+                }
+            }, {
+                type: "delete",
+                recordName: "User_teams_members_Team",
+                record: {
+                    role: null,
+                    id: userA.teams[1][LINK_SYMBOL].id
+                }
+            }, {
+                type: "create",
+                recordName: "User_teams_members_Team",
+                record: {
+                    source: {
+                        id: userA.id
+                    },
+                    target: {
+                        id: updatedUsers[0].teams[0].id
+                    },
+                    id: updatedUsers[0].teams[0][LINK_SYMBOL].id
+                }
+            }, {
+                type: "create",
+                recordName: "User_teams_members_Team",
+                record: {
+                    source: {
+                        id:userA.id
+                    },
+                    target: {
+                        id: updatedUsers[0].teams[1].id
+                    },
+                    id: updatedUsers[0].teams[1][LINK_SYMBOL].id
+                }
+            }
+        ])
+
     })
+
 
     test('query many to many data: with match expression', async () => {
         const teamA = await handle.create('Team', {teamName: 't1'})
@@ -243,14 +515,16 @@ describe('many to many', () => {
         })
     })
 
-    test('n:n symmetric relation create and query', async () => {
+    test.only('n:n symmetric relation create and query', async () => {
         const user = await handle.create('User', {name: 'aaa', age: 17 })
         const user2 = await handle.create('User', {name: 'bbb', age: 18})
         const user3 = await handle.create('User', {name: 'ccc', age: 19 })
+
+        const events:MutationEvent[] = []
         // user is source
-        await handle.addRelationById('User', 'friends', user.id, user2.id, { level: 1 })
+        const relation1 = await handle.addRelationById('User', 'friends', user.id, user2.id, { level: 1 }, events)
         // user3 is source
-        await handle.addRelationById('User', 'friends', user3.id, user.id, { level: 2 })
+        const relation2 = await handle.addRelationById('User', 'friends', user3.id, user.id, { level: 2 }, events)
 
         const foundUser = await handle.findOne(
             'User',
@@ -270,7 +544,6 @@ describe('many to many', () => {
             ]
         )
 
-        console.log(JSON.stringify(foundUser, null, 4))
         expect(foundUser).toMatchObject({
             id: user.id,
             name: 'aaa',
@@ -291,6 +564,38 @@ describe('many to many', () => {
                 }
             }]
         })
+
+        console.log(events)
+
+        expect(events).toMatchObject([
+            {
+                type: "create",
+                recordName: "User_friends_friends_User",
+                record: {
+                    source: {
+                        id: user.id
+                    },
+                    target: {
+                        id: user2.id
+                    },
+                    level: 1,
+                    id: relation1.id
+                }
+            }, {
+                type: "create",
+                recordName: "User_friends_friends_User",
+                record: {
+                    source: {
+                        id: user3.id
+                    },
+                    target: {
+                        id: user.id
+                    },
+                    level: 2,
+                    id: relation2.id
+                }
+            }
+        ])
 
     })
 })

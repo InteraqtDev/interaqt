@@ -2,6 +2,7 @@ import {EntityToTableMap} from "./EntityToTableMap";
 import {assert} from "../util.ts";
 import {flatten} from "./util.ts";
 import {AttributeInfo} from "./AttributeInfo.ts";
+import {Record} from "./RecordQueryAgent.ts";
 
 export type RawEntityData = { [k: string]: any }
 
@@ -115,8 +116,8 @@ export class NewRecordData {
     isNull() {
         return this.rawData === null
     }
-    getData() {
-        return {...this.rawData}
+    getData() : Record{
+        return {...this.rawData} as Record
     }
 
     getSameRowFieldAndValue() : {field:string, value:any}[]{

@@ -17,6 +17,27 @@ export class AttributeQuery {
     public fullQueryTree: RecordQueryTree
     public parentLinkRecordQuery?: RecordQuery
     public id = Math.random()
+    public static getAttributeQueryDataForRecord(recordName:string, map: EntityToTableMap, includeSameTableReliance = false): AttributeQueryData{
+        const result: AttributeQueryData = map.getRecordInfo(recordName).valueAttributes.map(info => info.attributeName)
+        if(includeSameTableReliance) {
+            const recordInfo = map.getRecordInfo(recordName)
+            recordInfo.sameTableReliance.forEach(info =>{
+                const relianceAttributeQueryData = AttributeQuery.getAttributeQueryDataForRecord(info.recordName, map, true)
+                const relianceRelationAttributeQueryData = AttributeQuery.getAttributeQueryDataForRecord(info.linkName, map, true)
+                result.push(
+                    [
+                        info.attributeName,
+                        {
+                            attributeQuery: [...relianceAttributeQueryData, [LINK_SYMBOL, { attributeQuery: relianceRelationAttributeQueryData }]]
+                        }
+                    ]
+                )
+            })
+        }
+
+
+        return result
+    }
     constructor(public recordName: string, public map: EntityToTableMap, public data: AttributeQueryData = [], public parentRecord?: string, public attributeName?: string, public shouldQueryParentLinkData?: boolean) {
         data.forEach((rawItem: AttributeQueryDataItem) => {
             const item = (typeof rawItem === 'string' ? [rawItem, {}, false] : rawItem)  as AttributeQueryDataRecordItem

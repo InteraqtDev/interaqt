@@ -5,7 +5,7 @@ import {AttributeQueryData} from "./AttributeQuery.ts";
 import {assert} from "../util.ts";
 import {RecordQuery} from "./RecordQuery.ts";
 import {NewRecordData, RawEntityData} from "./NewRecordData.ts";
-import {RecordQueryAgent} from "./RecordQueryAgent.ts";
+import {MutationEvent, RecordQueryAgent} from "./RecordQueryAgent.ts";
 import {Database, EntityIdRef} from '../../runtime/System'
 export class EntityQueryHandle {
     agent: RecordQueryAgent
@@ -38,33 +38,37 @@ export class EntityQueryHandle {
         return this.agent.findRecords(entityQuery)
     }
 
-    async create(entityName: string, rawData: RawEntityData): Promise<EntityIdRef> {
+    async create(entityName: string, rawData: RawEntityData, events?: MutationEvent[]): Promise<EntityIdRef> {
         const newEntityData = new NewRecordData(this.map, entityName, rawData)
-        return this.agent.createRecord(newEntityData)
+        return this.agent.createRecord(newEntityData, events)
     }
 
     // CAUTION 不能递归更新 relate entity 的 value，如果传入了 related entity 的值，说明是建立新的联系。
-    async update(entity: string, matchExpressionData: MatchExpressionData, rawData: RawEntityData) {
+    async update(entity: string, matchExpressionData: MatchExpressionData, rawData: RawEntityData, events?: MutationEvent[]) {
         const newEntityData = new NewRecordData(this.map, entity, rawData)
-        return this.agent.updateRecord(entity, matchExpressionData, newEntityData)
+        return this.agent.updateRecord(entity, matchExpressionData, newEntityData, events)
     }
 
-    async delete(entityName: string, matchExpressionData: MatchExpressionData,) {
-        return this.agent.deleteRecord(entityName, matchExpressionData)
+    async delete(entityName: string, matchExpressionData: MatchExpressionData,events?: MutationEvent[]) {
+        return this.agent.deleteRecord(entityName, matchExpressionData, events)
     }
 
-    async addRelationByNameById(relationName: string, sourceEntityId: string, targetEntityId: string, rawData: RawEntityData = {}) {
+    async addRelationByNameById(relationName: string, sourceEntityId: string, targetEntityId: string, rawData: RawEntityData = {}, events?: MutationEvent[]) {
         assert(!!relationName && !!sourceEntityId && targetEntityId!!, `${relationName} ${sourceEntityId} ${targetEntityId} cannot be empty`)
-        return this.agent.addLink(relationName, sourceEntityId, targetEntityId, rawData)
+        return this.agent.addLink(relationName, sourceEntityId, targetEntityId, rawData, false, events)
     }
 
-    async addRelationById(entity: string, attribute: string, entityId: string, attributeEntityId: string, relationData?: RawEntityData) {
-        return this.agent.addLinkFromRecord(entity, attribute, entityId, attributeEntityId, relationData)
+    async addRelationById(entity: string, attribute: string, entityId: string, attributeEntityId: string, relationData?: RawEntityData, events?: MutationEvent[]) {
+        return this.agent.addLinkFromRecord(entity, attribute, entityId, attributeEntityId, relationData, events)
     }
 
-    async updateRelationByName(relationName: string, matchExpressionData: MatchExpressionData, rawData: RawEntityData) {
+    async updateRelationByName(relationName: string, matchExpressionData: MatchExpressionData, rawData: RawEntityData, events?: MutationEvent[]) {
         assert(!rawData.source && !rawData.target, 'Relation can only update attributes. Use addRelation/removeRelation to update source/target.')
-        return this.agent.updateRecord(relationName, matchExpressionData, new NewRecordData(this.map, relationName, rawData))
+        return this.agent.updateRecord(relationName, matchExpressionData, new NewRecordData(this.map, relationName, rawData), events)
+    }
+
+    async removeRelationByName(relationName: string, matchExpressionData: MatchExpressionData, events?: MutationEvent[]) {
+        return this.agent.unlink(relationName, matchExpressionData, false, `remove relation ${relationName}`, events)
     }
 
     async findRelationByName(relationName: string, matchExpressionData?: MatchExpressionData, modifierData?: ModifierData, attributeQueryData: AttributeQueryData = []) {
@@ -82,10 +86,6 @@ export class EntityQueryHandle {
 
     createMatchFromAtom(...arg: Parameters<(typeof MatchExp)["atom"]>) {
         return MatchExp.atom(...arg)
-    }
-
-    async removeRelationByName(relationName: string, matchExpressionData: MatchExpressionData) {
-        return this.agent.unlink(relationName, matchExpressionData)
     }
 
     getRelationName(entity: string, attribute: string): string {

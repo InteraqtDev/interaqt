@@ -11,12 +11,25 @@ import {NewRecordData, RawEntityData} from "./NewRecordData.ts";
 import {someAsync} from "./util.ts";
 
 
+export type MutationEvent = {
+    type: "create"|'update'|'delete',
+    recordName: string,
+    id?: string,
+    keys?: string[],
+    record?: Record
+    oldRecord?: Record
+}
+
 export type JoinTables = {
     for: any
     joinSource: [string, string]
     joinIdField: [string, string]
     joinTarget: [string, string]
 }[]
+
+export type Record = EntityIdRef & {
+    [k:string]: any
+}
 
 export class RecordQueryAgent {
     constructor(public map: EntityToTableMap, public database: Database) {}
@@ -60,7 +73,7 @@ ${this.buildWhereClause(
     // TODO 为了性能，也可以把信息丢到客户端，然客户端去结构化？？？
 
     // CAUTION findRelatedRecords 中的递归调用会使得 includeRelationData 变为 true
-    async findRecords(entityQuery: RecordQuery, queryName = ''): Promise<any[]>{
+    async findRecords(entityQuery: RecordQuery, queryName = ''): Promise<Record[]>{
         // findRecords 的一个 join 语句里面只能一次性搞定 x:1 的关联实体，以及关系上的 x:1 关联实体。
         // 1. 这里只通过合表或者 join  处理了 x:1 的关联查询。x:n 的查询是通过二次查询获取的。
         const records = this.structureRawReturns(await this.database.query(this.buildXToOneFindQuery(entityQuery, ''), queryName)) as any[]
@@ -127,7 +140,7 @@ ${this.buildWhereClause(
         const data = (await this.findRecords(newSubQuery, `finding related record: ${relatedRecordQuery.parentRecord}.${relatedRecordQuery.attributeName}`))
         // 1.1 这里再反向处理一下关系数据。因为在上一步 withParentLinkData 查出来的时候是用的是反向的关系名字
         const records =  relatedRecordQuery.attributeQuery.parentLinkRecordQuery ? data.map(item => {
-            let itemWithParentLinkData
+            let itemWithParentLinkData: Record
             if (!info.isLinkManyToManySymmetric()) {
                 itemWithParentLinkData = {
                     ...item,
@@ -362,13 +375,13 @@ ${this.buildXToOneFindQuery(existEntityQuery, currentAlias)}
     }
 
 
-    async createRecordDependency(newRecordData: NewRecordData) : Promise<NewRecordData>{
+    async createRecordDependency(newRecordData: NewRecordData, events?: MutationEvent[]) : Promise<NewRecordData>{
         const newRecordDataWithDeps: {[k:string]: EntityIdRef} = {}
         // 处理往自身合并的需要新建的关系和 record
         for( let mergedLinkTargetRecord of newRecordData.mergedLinkTargetNewRecords.concat(newRecordData.mergedLinkTargetRecordIdRefs)) {
             let newDepIdRef
             if (!mergedLinkTargetRecord.isRef()) {
-                newDepIdRef = await this.createRecord(mergedLinkTargetRecord)
+                newDepIdRef = await this.createRecord(mergedLinkTargetRecord, events)
             } else {
                 newDepIdRef = mergedLinkTargetRecord.getRef()
             }
@@ -386,10 +399,10 @@ ${this.buildXToOneFindQuery(existEntityQuery, currentAlias)}
             }
         }
 
-        // 处理三表合一的 link record 的 dependency
+        // 处理和我三表合一的 link record 的 dependency
         for( let combinedRecord of newRecordData.combinedNewRecords.concat(newRecordData.combinedRecordIdRefs)) {
             if (combinedRecord.linkRecordData) {
-                const newLinkRecordDataWithDep = await this.createRecordDependency(combinedRecord.linkRecordData)
+                const newLinkRecordDataWithDep = await this.createRecordDependency(combinedRecord.linkRecordData, events)
                 newRecordDataWithDeps[combinedRecord.info!.attributeName!] = {
                     // 注意这里原本的数据不能丢，因为下面的 merge 不是深度 merge。
                     ...combinedRecord.getData() as EntityIdRef,
@@ -402,17 +415,17 @@ ${this.buildXToOneFindQuery(existEntityQuery, currentAlias)}
         return newRecordData.merge(newRecordDataWithDeps)
     }
 
-    async createRecord(newEntityData: NewRecordData) : Promise<EntityIdRef>{
-        const newEntityDataWithDep = await this.createRecordDependency(newEntityData)
-        const newRecordIdRef = await this.insertSameRowData(newEntityDataWithDep)
+    async createRecord(newEntityData: NewRecordData, events?: MutationEvent[]) : Promise<EntityIdRef>{
+        const newEntityDataWithDep = await this.createRecordDependency(newEntityData, events)
+        const newRecordIdRef = await this.insertSameRowData(newEntityDataWithDep, events)
 
-        const relianceResult = await this.handleCreationReliance(newEntityDataWithDep.merge(newRecordIdRef))
+        const relianceResult = await this.handleCreationReliance(newEntityDataWithDep.merge(newRecordIdRef), events)
 
         // 更新 relianceResult 的信息到
         return Object.assign(newRecordIdRef, relianceResult)
     }
-
-    async preprocessSameRowData(newEntityData: NewRecordData, ignoreSelfId = false): Promise<NewRecordData> {
+    // CAUTION 因为这里分配了 id，并且所有的判断逻辑都在，所以事件也放在这里处理，而不是真实插入或者更新数据的时候。
+    async preprocessSameRowData(newEntityData: NewRecordData, isUpdate = false,  events?:  MutationEvent[], oldRecord?: Record): Promise<NewRecordData> {
         const newRawDataWithNewIds = newEntityData.getData()
         // 1. 先为三表合一的新数据分配 id
         for(let record of newEntityData.combinedNewRecords) {
@@ -420,18 +433,40 @@ ${this.buildXToOneFindQuery(existEntityQuery, currentAlias)}
                 ...newRawDataWithNewIds[record.info!.attributeName],
                 id: await this.database.getAutoId(record.info!.recordName!),
             }
+            events?.push({
+                type:'create',
+                recordName:record.recordName,
+                record: newRawDataWithNewIds[record.info!.attributeName]
+            })
         }
 
-        // 2. 为我要新建 三表合一、或者我 mergedLink 的 的关系分配 id.
+        // 2. 为我要新建 三表合一、或者我 mergedLink 的 的 关系 record 分配 id.
         for(let record of newEntityData.mergedLinkTargetNewRecords.concat(newEntityData.mergedLinkTargetRecordIdRefs, newEntityData.combinedNewRecords)) {
             newRawDataWithNewIds[record.info!.attributeName]['&'] = {
                 ...(newRawDataWithNewIds[record.info!.attributeName]['&']||{}),
                 id: await this.database.getAutoId(record.info!.linkName!),
             }
+            events?.push({
+                type:'create',
+                recordName:record.info!.linkName,
+                record: newRawDataWithNewIds[record.info!.attributeName]['&']
+            })
         }
 
-        if (!ignoreSelfId) {
+        if (!isUpdate) {
             newRawDataWithNewIds.id = await this.database.getAutoId(newEntityData.recordName)
+            events?.push({
+                type:'create',
+                recordName:newEntityData.recordName,
+                record: newRawDataWithNewIds
+            })
+        } else {
+            events?.push({
+                type:'update',
+                recordName: newEntityData.recordName,
+                record: newEntityData.getData()!,
+                oldRecord: oldRecord
+            })
         }
 
         const newEntityDataWithIds = newEntityData.merge(newRawDataWithNewIds)
@@ -441,23 +476,47 @@ ${this.buildXToOneFindQuery(existEntityQuery, currentAlias)}
         // CAUTION 这里是从 newEntityData 里读，不是从 newEntityDataWithIds，那里面是刚分配id 的，还没数据。
         for(let combinedRecordIdRef of newEntityData.combinedRecordIdRefs) {
             const combinedRecordInfo = combinedRecordIdRef.info?.getRecordInfo()!
+            const reverseAttributeName = combinedRecordIdRef.info?.getReverseInfo()?.attributeName!
             const allRelatedRecords = combinedRecordInfo?.combinedRecords.map(info => info.attributeName!).filter(name => {
                 // CAUTION 去掉反向的数据。不然死循环了。
-                return name !== combinedRecordIdRef.info?.getReverseInfo()?.attributeName
+                return name !== reverseAttributeName
             })
 
             const newMatch =  MatchExp.atom({
                 key: 'id',
                 value: ['=', combinedRecordIdRef.getRef().id]
             })
-            flashOutRecordRasData[combinedRecordIdRef.info?.attributeName!] = await this.flashOutRecords(combinedRecordInfo?.name!, newMatch, allRelatedRecords)
+            // 这里都是 1:1 关系的。所以 flashOut 对于已经有数据等同于抢夺过来。
+            const flashOutCombined = (await this.flashOutRecords(combinedRecordInfo?.name!, newMatch, allRelatedRecords, reverseAttributeName))[0]
+            // 如果是抢夺，要记录一下事件。
+            if(flashOutCombined[reverseAttributeName]) {
+                // 可能查出来个空对象
+                if(flashOutCombined[reverseAttributeName]?.[LINK_SYMBOL]?.id){
+                    events?.push({
+                        type: 'delete',
+                        recordName: this.map.getInfo(combinedRecordInfo?.name!, reverseAttributeName).linkName,
+                        record: flashOutCombined[reverseAttributeName]?.[LINK_SYMBOL],
+                    })
+                }
+
+                delete flashOutCombined[reverseAttributeName]
+            }
+            flashOutRecordRasData[combinedRecordIdRef.info?.attributeName!] = flashOutCombined
+
+            // 相当于新建了关系
+            events?.push({
+                type:'create',
+                recordName:combinedRecordIdRef.info!.linkName,
+                record: combinedRecordIdRef.getData()[LINK_SYMBOL]
+            })
         }
 
         return newEntityDataWithIds.merge(flashOutRecordRasData)
     }
 
-    async insertSameRowData(newEntityData: NewRecordData): Promise<EntityIdRef>{
-        const newEntityDataWithIdsWithFlashOutRecords = await this.preprocessSameRowData(newEntityData)
+    async insertSameRowData(newEntityData: NewRecordData, events?: MutationEvent[]): Promise<EntityIdRef>{
+        // 由于我们可以抢夺别人的关联实体，所以会产生一个 unlink 事件，所以 events 要穿进去。
+        const newEntityDataWithIdsWithFlashOutRecords = await this.preprocessSameRowData(newEntityData, false, events)
         // 3. 插入新行。
         const sameRowNewFieldAndValue = newEntityDataWithIdsWithFlashOutRecords.getSameRowFieldAndValue()
         const result = await this.database.insert(`
@@ -467,13 +526,11 @@ VALUES
 (${sameRowNewFieldAndValue.map(f => JSON.stringify(f.value)).join(',')}) 
 `) as EntityIdRef
 
-
-
         return Object.assign(result,newEntityDataWithIdsWithFlashOutRecords.getData())
     }
 
 
-    async handleCreationReliance(newEntityData: NewRecordData): Promise<object> {
+    async handleCreationReliance(newEntityData: NewRecordData, events?: MutationEvent[]): Promise<object> {
         const currentIdRef = newEntityData.getRef()
         const newIdRefs: {[k:string]: EntityIdRef|EntityIdRef[]} = {}
         // 1. 处理关系往 attribute 方向合并的新数据
@@ -482,7 +539,7 @@ VALUES
             const newRecordDataWithMyId = record.merge({
                 [reverseAttribute] : currentIdRef
             })
-            const newRecordIdRef = await this.createRecord(newRecordDataWithMyId)
+            const newRecordIdRef = await this.createRecord(newRecordDataWithMyId, events)
             if (record.info!.isXToMany) {
                 if (!newIdRefs[record.info!.attributeName]) {
                     newIdRefs[record.info!.attributeName!] = []
@@ -504,20 +561,13 @@ VALUES
                 [reverseInfo!.attributeName]: currentIdRef,
                 [LINK_SYMBOL]: record.getData()[LINK_SYMBOL]
             }
-            await this.updateRecord(reverseInfo.parentEntityName, idMatch, new NewRecordData(this.map, reverseInfo.parentEntityName, newData))
+            await this.updateRecord(reverseInfo.parentEntityName, idMatch, new NewRecordData(this.map, reverseInfo.parentEntityName, newData), events)
         }
 
         // 3. 处理完全独立的新数据和关系
         for( let record of newEntityData.isolatedNewRecords) {
-            const newRecordIdRef = await this.createRecord(record)
-            if (record.info!.isXToMany) {
-                if (!newIdRefs[record.info!.attributeName]) {
-                    newIdRefs[record.info!.attributeName!] = []
-                }
-                newIdRefs[record.info!.attributeName].push(newRecordIdRef)
-            } else {
-                newIdRefs[record.info!.attributeName] = newRecordIdRef
-            }
+            const newRecordIdRef = await this.createRecord(record, events)
+
 
             const linkRawData: RawEntityData = record.linkRecordData?.getData() || {}
             Object.assign(linkRawData, {
@@ -525,18 +575,34 @@ VALUES
                 target: record.info!.isRecordSource() ? newRecordIdRef : currentIdRef
             })
             const newLinkData = new NewRecordData(this.map, record.info!.linkName, linkRawData)
-            await this.createRecord(newLinkData)
+            const newLinkRecord = await this.createRecord(newLinkData, events)
+
+            if (record.info!.isXToMany) {
+                if (!newIdRefs[record.info!.attributeName]) {
+                    newIdRefs[record.info!.attributeName!] = []
+                }
+                newIdRefs[record.info!.attributeName].push({
+                    ...newRecordIdRef,
+                    [LINK_SYMBOL]: newLinkRecord
+                })
+            } else {
+                newIdRefs[record.info!.attributeName] = {
+                    ...newRecordIdRef,
+                    [LINK_SYMBOL]: newLinkRecord
+                }
+            }
         }
 
         // 4. 处理完全独立的老数据和的关系。
-        for (let record of newEntityData.isolatedRecordIdRefs) {
+        for (let key in newEntityData.isolatedRecordIdRefs) {
+            const record = newEntityData.isolatedRecordIdRefs[key]
             // 针对 x:1 关系要先删除原来的关系
             if(record.info!.isXToOne) {
                 const match = MatchExp.atom({
                     key: record.info?.isRecordSource() ? 'target.id' : 'source.id',
                     value: ['=', record.getRef().id]
                 })
-                await this.unlink(record.info!.linkName, match)
+                await this.unlink(record.info!.linkName, match, false,'unlink xToOne old link',  events)
             }
             const linkRawData: RawEntityData = record.linkRecordData?.getData() || {}
             Object.assign(linkRawData, {
@@ -544,7 +610,22 @@ VALUES
                 target: record.info!.isRecordSource() ? record.getRef() : currentIdRef
             })
             const newLinkData = new NewRecordData(this.map, record.info!.linkName, linkRawData)
-            await this.createRecord(newLinkData)
+            const newLinkRecord = await this.createRecord(newLinkData, events)
+
+            if (record.info!.isXToMany) {
+                if (!newIdRefs[record.info!.attributeName]) {
+                    newIdRefs[record.info!.attributeName!] = []
+                }
+                (newIdRefs[record.info!.attributeName] as Record[])![key] = {
+                    ...record.getData(),
+                    [LINK_SYMBOL]: newLinkRecord
+                }
+            } else {
+                newIdRefs[record.info!.attributeName] = {
+                    ...record.getData(),
+                    [LINK_SYMBOL]: newLinkRecord
+                }
+            }
         }
 
         return newIdRefs
@@ -552,7 +633,7 @@ VALUES
 
 
     // CAUTION 除了 1:1 并且合表的关系，不能递归更新 relatedEntity，如果是传入了，说明是建立新的关系。
-    async updateRecordDataByIds(entityName: string, idRefs: EntityIdRef[], columnAndValue: {field:string, value:string}[]): Promise<EntityIdRef[]>  {
+    async updateRecordDataById(entityName: string, idRef: EntityIdRef, columnAndValue: {field:string, value:string}[]): Promise<EntityIdRef>  {
         // TODO 要更新拆表出去的 field
 
         const idField= this.map.getInfo(entityName, 'id').field
@@ -565,33 +646,34 @@ SET
 ${columnAndValue.map(({field, value}) => `
 ${field} = ${value}
 `).join(',')}
-WHERE ${idField} IN (${idRefs.map(i => JSON.stringify(i.id)).join(',')})
+WHERE ${idField} = (${JSON.stringify(idRef.id)})
 `, idField)
         }
         // 注意这里，使用要返回匹配的类，虽然可能没有更新数据。这样才能保证外部的逻辑比较一致。
-        return idRefs
+        return idRef
     }
-    async updateSameRowData(entityName: string, matchedEntities: EntityIdRef[], newEntityData: NewRecordData, newEntityDataWithIdsWithFlashOutRecords: NewRecordData) {
+    async updateSameRowData(entityName: string, matchedEntity: Record,  newEntityDataWithDep:NewRecordData, events?: MutationEvent[]) {
         // 跟自己合表实体的必须先断开关联，也就是移走。不然下面 updateRecordData 的时候就会把数据删除。
-        const sameRoleEntityRefOrNewData = newEntityData.combinedRecordIdRefs.concat(newEntityData.combinedNewRecords)
-
-        for(let newRelatedEntityData of sameRoleEntityRefOrNewData) {
+        // const sameRoleEntityRefOrNewData = newEntityData.combinedRecordIdRefs.concat(newEntityData.combinedNewRecords)
+        const sameRowEntityRefOrNewData = newEntityDataWithDep.combinedRecordIdRefs.concat(newEntityDataWithDep.combinedNewRecords)
+        // 1. 删除旧的关系
+        for(let newRelatedEntityData of sameRowEntityRefOrNewData) {
             const linkInfo = newRelatedEntityData.info!.getLinkInfo()
             const updatedEntityLinkAttr = linkInfo.isRelationSource(entityName, newRelatedEntityData.info!.attributeName) ? 'source' : 'target'
-            for(let updatedEntity of matchedEntities) {
-                await this.unlink(
-                    linkInfo.name,
-                    MatchExp.atom({
-                        key: `${updatedEntityLinkAttr}.id`,
-                        value: ['=', updatedEntity.id],
-                    }),
-                    !linkInfo.isRelationSource(entityName, newRelatedEntityData.info!.attributeName),
-                    `unlink ${newRelatedEntityData.info?.parentEntityName} ${newRelatedEntityData.info?.attributeName} for update ${entityName}`
-                )
-            }
+            await this.unlink(
+                linkInfo.name,
+                MatchExp.atom({
+                    key: `${updatedEntityLinkAttr}.id`,
+                    value: ['=', matchedEntity.id],
+                }),
+                !linkInfo.isRelationSource(entityName, newRelatedEntityData.info!.attributeName),
+                `unlink ${newRelatedEntityData.info?.parentEntityName} ${newRelatedEntityData.info?.attributeName} for update ${entityName}`,
+                events
+            )
         }
 
-        // 2. 先更新自身的 value 和 三表合一 或者 关系表合并的情况
+        // 2. 分配 id,处理需要 flash out 的数据等，事件也是这里面记录的。这里面会有抢夺关系，所以也可能会有删除事件。
+        const newEntityDataWithIdsWithFlashOutRecords = await this.preprocessSameRowData(newEntityDataWithDep, true, events, matchedEntity)
         const allSameRowData = newEntityDataWithIdsWithFlashOutRecords.getSameRowFieldAndValue()
         const columnAndValue = allSameRowData.map(({field, value}: {field:string, value:string}) => (
             {
@@ -601,9 +683,11 @@ WHERE ${idField} IN (${idRefs.map(i => JSON.stringify(i.id)).join(',')})
             }
         ))
 
-        return this.updateRecordDataByIds(entityName, matchedEntities, columnAndValue)
+        // 3. 真实处理数据，这里面没有记录事件，事件是上面处理的。、
+        await this.updateRecordDataById(entityName, matchedEntity, columnAndValue)
+        return newEntityDataWithIdsWithFlashOutRecords
     }
-    async handleUpdateReliance(entityName:string, matchedEntities: EntityIdRef[], newEntityData: NewRecordData) {
+    async handleUpdateReliance(entityName:string, matchedEntity: EntityIdRef, newEntityData: NewRecordData, events?: MutationEvent[]) {
         // 这里面都是依赖我的，或者关系数据完全独立的。
         // CAUTION update 里面的表达关联实体的语义统统认为是 replace。如果用户想要表达 xToMany 的情况下新增关系，应该自己拆成两步进行。既先更新数据，再用 addLink 去增加关系。
         // 1. 断开自己和原来关联实体的关系。这里只要处理依赖我的，或者关系独立的，因为我依赖的在应该在 updateSameRowData 里面处理了。
@@ -623,18 +707,19 @@ WHERE ${idField} IN (${idRefs.map(i => JSON.stringify(i.id)).join(',')})
 
             removedLinkName.add(linkInfo.name)
             const updatedEntityLinkAttr = linkInfo.isRelationSource(entityName, relatedEntityData.info!.attributeName) ? 'source' : 'target'
-            for(let updatedEntity of matchedEntities) {
-                await this.unlink(
-                    linkInfo.name,
-                    MatchExp.atom({
-                        key: `${updatedEntityLinkAttr}.id`,
-                        value: ['=', updatedEntity.id],
-                    }),
-                    !linkInfo.isRelationSource(entityName, relatedEntityData.info!.attributeName)
-                )
-            }
+            await this.unlink(
+                linkInfo.name,
+                MatchExp.atom({
+                    key: `${updatedEntityLinkAttr}.id`,
+                    value: ['=', matchedEntity.id],
+                }),
+                !linkInfo.isRelationSource(entityName, relatedEntityData.info!.attributeName),
+                'unlink old reliance for update',
+                events,
+            )
         }
 
+        const result: Record = {id: matchedEntity.id}
         // 2. 建立新关系
         // 处理和其他实体更新关系的情况。
         for(let newRelatedEntityData of otherTableEntitiesData) {
@@ -645,99 +730,159 @@ WHERE ${idField} IN (${idRefs.map(i => JSON.stringify(i.id)).join(',')})
             if (newRelatedEntityData.isRef()) {
                 finalRelatedEntityRef = newRelatedEntityData.getRef()
             } else {
-                finalRelatedEntityRef = await this.createRecord(newRelatedEntityData)
+                finalRelatedEntityRef = await this.createRecord(newRelatedEntityData, events)
             }
 
-            for(let updatedEntity of matchedEntities) {
-                await this.addLinkFromRecord(entityName, newRelatedEntityData.info?.attributeName!, updatedEntity.id, finalRelatedEntityRef.id)
+            const linkRecord = await this.addLinkFromRecord(entityName, newRelatedEntityData.info?.attributeName!, matchedEntity.id, finalRelatedEntityRef.id, undefined, events)
+            if(newRelatedEntityData.info!.isXToMany) {
+                if (!result[newRelatedEntityData.info!.attributeName!]){
+                    result[newRelatedEntityData.info!.attributeName!] = []
+                }
+                result[newRelatedEntityData.info!.attributeName!].push({
+                    ...finalRelatedEntityRef,
+                    [LINK_SYMBOL]: linkRecord,
+                })
+            } else {
+                result[newRelatedEntityData.info!.attributeName!] = {
+                    ...finalRelatedEntityRef,
+                    [LINK_SYMBOL]: linkRecord,
+                }
             }
+
         }
+
+        return result
     }
     // 只有 1:1 关系可以递归更新实体数据，其他都能改当前实体的数据或者和其他实体关系。
-    async updateRecord(entityName: string, matchExpressionData: MatchExpressionData, newEntityData: NewRecordData)  {
-
-        // 1. 创建我依赖的
-        const newEntityDataWithDep = await this.createRecordDependency(newEntityData)
-        // CAUTION 更新前先找到所有受影响的数据。为什么不直接更新？？？这样不是损失性能吗？？？
+    // TODO 如果 newEntityData 中只更新自己的字段，那么可以直接 批量更新 加速一下。
+    // TODO 支持在 update 字段的同时，使用 null 来删除关系
+    async updateRecord(entityName: string, matchExpressionData: MatchExpressionData, newEntityData: NewRecordData, events?: MutationEvent[])  {
+        // TODO 数据要做验证，比如 oneToX 的 ref 不能批量更新。
+        // CAUTION  因为需要事件，所以找到的数据里面就要带上 newRecordData 里面的所有字段作为 oldValues。
         const matchedEntities = await this.findRecords(RecordQuery.create(entityName, this.map, {
             matchExpression: matchExpressionData,
+            // FIXME 这里其实只要查 newEntityData 里面有的字段就可以了。
+            attributeQuery: AttributeQuery.getAttributeQueryDataForRecord(entityName, this.map)
         }), `find record for updating ${entityName}`)
 
-        // 2. 把同表的实体移出去，为新同表建立 id
-        const newEntityDataWithIdsWithFlashOutRecords = await this.preprocessSameRowData(newEntityDataWithDep, true)
-        // 更新所有同表数据。
-        await this.updateSameRowData(entityName, matchedEntities, newEntityData,  newEntityDataWithIdsWithFlashOutRecords)
+        const result: Record[] = []
+        for(let matchedEntity of matchedEntities) {
+            // 1. 创建我依赖的
+            const newEntityDataWithDep = await this.createRecordDependency(newEntityData, events)
+            // CAUTION 更新前先找到所有受影响的数据。为什么不直接更新？？？这样不是损失性能吗？？？
+            // 2. 把同表的实体移出去，为新同表建立 id；可能有要删除的 reliance
+            const newEntityDataWithIdsWithFlashOutRecords = await this.updateSameRowData(entityName, matchedEntity, newEntityDataWithDep, events)
+            // 3. 更新依赖我的和关系表独立的
+            const relianceUpdatedResult = await this.handleUpdateReliance(entityName, matchedEntity, newEntityData, events)
 
-        // 3. 更新依赖我的和关系表独立的
-        await this.handleUpdateReliance(entityName, matchedEntities, newEntityData)
+            result.push({...newEntityData.getData(), ...newEntityDataWithIdsWithFlashOutRecords.getData(), ...relianceUpdatedResult})
+        }
 
-        return matchedEntities.map(updatedEntity => Object.assign(updatedEntity, newEntityDataWithIdsWithFlashOutRecords.getData()))
+        return result
     }
 
-    async deleteRecord(recordName:string, matchExp: MatchExpressionData) {
+    async deleteRecord(recordName:string, matchExp: MatchExpressionData, events?: MutationEvent[], inSameRowDataOp = false) {
         const deleteQuery = RecordQuery.create(recordName, this.map, {
             matchExpression: matchExp,
-            attributeQuery: ['id']
+            attributeQuery: AttributeQuery.getAttributeQueryDataForRecord(
+                recordName,
+                this.map,
+                true
+            )
         })
         const records = await this.findRecords(deleteQuery)
 
         if (records.length) {
             // 删除独立表或者关系在另一边的关系数据
-            await this.deleteNotReliantSeparateLinkRecords(recordName, records)
+            await this.deleteNotReliantSeparateLinkRecords(recordName, records, events)
             // 删除依赖我的实体
-            await this.deleteDifferentTableReliance(recordName, records)
-            // 删除自身
-            await this.deleteRecordSameRowData(recordName, records)
-
+            await this.deleteDifferentTableReliance(recordName, records, events)
+            // 删除自身以及有生命周期依赖的合表 record
+            await this.deleteRecordSameRowData(recordName, records, events, inSameRowDataOp)
         }
 
         return records
     }
 
-    async deleteRecordSameRowData(recordName: string, records: EntityIdRef[]) {
+    // 这里会把通表的 reliance，以及 reliance 的 reliance 都删除掉。
+    // this method will delete all the reliance of the record, and the reliance of the reliance.
+    async deleteRecordSameRowData(recordName: string, records: EntityIdRef[], events?: MutationEvent[], inSameRowDataOp = false) {
         const recordInfo = this.map.getRecordInfo(recordName)
 
         for(let record of records) {
-            // FIXME 其实可以利用数据库 select * 来加速，怎么看这个问题？？
-            const hasSameRowData = recordInfo.notReliantCombined.length && await someAsync(recordInfo.notReliantCombined, async (info) => {
-                const existQuery = RecordQuery.create(
-                    recordName,
-                    this.map,
-                    {
-                        matchExpression:MatchExp.atom({
-                            key: `id`,
-                            value: ['=', record.id]
-                        }),
-                        attributeQuery:[[info.attributeName, {attributeQuery: ['id']}]],
-                        modifier: {limit: 1}
-                    }
-                )
-                const result = await this.findRecords(existQuery)
-                return !!result[0]?.[info.attributeName]?.id
-            })
+            if (!inSameRowDataOp) {
+                // FIXME 其实可以利用数据库 select * 来加速，怎么看这个问题？？
+                const hasSameRowData = recordInfo.notReliantCombined.length && await someAsync(recordInfo.notReliantCombined, async (info) => {
+                    const existQuery = RecordQuery.create(
+                        recordName,
+                        this.map,
+                        {
+                            matchExpression:MatchExp.atom({
+                                key: `id`,
+                                value: ['=', record.id]
+                            }),
+                            attributeQuery:[[info.attributeName, {attributeQuery: ['id']}]],
+                            modifier: {limit: 1}
+                        }
+                    )
+                    const result = await this.findRecords(existQuery)
+                    return !!result[0]?.[info.attributeName]?.id
+                })
 
-            if (hasSameRowData) {
-                // 存在同行 record，只能用 update
-                const fields = recordInfo.sameRowFields
-                return this.database.delete(`
+                if (hasSameRowData) {
+                    // 存在同行 record，只能用 update
+                    const fields = recordInfo.sameRowFields
+                    return this.database.delete(`
 UPDATE ${recordInfo.table}
 SET ${fields.map(field => `${field} = NULL`).join(',')}
 WHERE ${recordInfo.idField} IN (${records.map(({id}) => JSON.stringify(id)).join(',')})
 `, `use update to delete ${recordName} because of sameRowData`)
 
-            } else {
-                // 不存在同行数据 record ，可以 delete row
+                } else {
+                    // 不存在同行数据 record ，可以 delete row
 
-                await this.database.delete(`
+                    await this.database.delete(`
 DELETE FROM ${recordInfo.table}
 WHERE ${recordInfo.idField} IN (${records.map(({id}) => JSON.stringify(id)).join(',')})
 `, `delete record ${recordInfo.name} as row`)
+                }
             }
+
+            events?.push({
+                type:'delete',
+                recordName: recordName,
+                record,
+            })
+
+            // 递归处理同表的 reliance tree
+            recordInfo.sameTableReliance.forEach(relianceInfo => {
+                // 只要真正存在这个数据才要删除
+                if(record[relianceInfo.attributeName]!.id){
+                    // 和 reliance 的 link record 的事件
+                    events?.push({
+                        type:'delete',
+                        recordName: relianceInfo.linkName,
+                        record: record[relianceInfo.attributeName][LINK_SYMBOL],
+                    })
+
+                    this.handleDeletedRecordReliance(relianceInfo.recordName, record[relianceInfo.attributeName]!, events)
+                }
+            })
         }
     }
 
+    async handleDeletedRecordReliance(recordName: string, record: EntityIdRef, events?: MutationEvent[]) {
 
-    async deleteNotReliantSeparateLinkRecords(recordName: string, record: EntityIdRef[]) {
+        // 删除独立表或者关系在另一边的关系数据
+        await this.deleteNotReliantSeparateLinkRecords(recordName, [record], events)
+        // 删除依赖我的实体
+        await this.deleteDifferentTableReliance(recordName, [record], events)
+        // 删除自身以及有生命周期依赖的合表 record
+        await this.deleteRecordSameRowData(recordName, [record], events, true)
+        return record
+    }
+
+    async deleteNotReliantSeparateLinkRecords(recordName: string, record: EntityIdRef[], events?: MutationEvent[]) {
         const recordInfo = this.map.getRecordInfo(recordName)
         for(let info of recordInfo.differentTableRecordAttributes) {
             if (!info.isReliance) {
@@ -747,35 +892,34 @@ WHERE ${recordInfo.idField} IN (${records.map(({id}) => JSON.stringify(id)).join
                     key,
                     value: ['in', record.map(r => r.id)]
                 })
-                await this.deleteRecord(info.linkName, newMatch)
+                await this.deleteRecord(info.linkName, newMatch, events)
             }
         }
     }
 
-    // TODO 也许有 多个 reliance 也合表了，并且刚好可以一起删除的情况。
-    async deleteDifferentTableReliance(recordName: string, records: EntityIdRef[]) {
+    async deleteDifferentTableReliance(recordName: string, records: EntityIdRef[], events?: MutationEvent[]) {
         const recordInfo = this.map.getRecordInfo(recordName)
         for (let info of recordInfo.differentTableReliance) {
             const matchInIds = MatchExp.atom({
                 key: `${info.getReverseInfo()?.attributeName!}.id`,
                 value: ['in', records.map(r => r.id)]
             })
-            await this.deleteRecord(info.recordName, matchInIds)
+            await this.deleteRecord(info.recordName, matchInIds, events)
         }
     }
 
 
-    addLinkFromRecord(entity: string, attribute:string, entityId:string, relatedEntityId: string, attributes: RawEntityData = {}) {
+    addLinkFromRecord(entity: string, attribute:string, entityId:string, relatedEntityId: string, attributes: RawEntityData = {}, events?: MutationEvent[]) {
         const linkInfo = this.map.getLinkInfo(entity, attribute)
         const isEntitySource = linkInfo.isRelationSource(entity, attribute)
 
         const sourceId = isEntitySource? entityId : relatedEntityId
         const targetId = isEntitySource? relatedEntityId: entityId
 
-        return this.addLink(linkInfo.name, sourceId, targetId, attributes, !linkInfo.isRelationSource(entity, attribute))
+        return this.addLink(linkInfo.name, sourceId, targetId, attributes, !linkInfo.isRelationSource(entity, attribute), events )
     }
 
-    async addLink(linkName: string, sourceId: string, targetId:string, attributes: RawEntityData = {}, moveSource = false) {
+    async addLink(linkName: string, sourceId: string, targetId:string, attributes: RawEntityData = {}, moveSource = false, events?: MutationEvent[]) {
         const existRecord = (await this.findRecords(RecordQuery.create(linkName, this.map, {
             matchExpression: MatchExp.atom({key: 'source.id', value: ['=', sourceId]}).and({key: 'target.id', value: ['=', targetId]}),
             modifier: {
@@ -794,7 +938,7 @@ WHERE ${recordInfo.idField} IN (${records.map(({id}) => JSON.stringify(id)).join
                 key: unlinkAttr,
                 value: ['=', unlinkId]
             })
-            await this.unlink(linkName, match)
+            await this.unlink(linkName, match, false, 'unlink combined record for add new link', events)
         }
 
         const newLinkData = new NewRecordData(this.map, linkInfo.name, {
@@ -803,11 +947,11 @@ WHERE ${recordInfo.idField} IN (${records.map(({id}) => JSON.stringify(id)).join
             ...attributes
         })
 
-        return this.createRecord(newLinkData)
+        return this.createRecord(newLinkData, events)
     }
 
 
-    async unlink(linkName: string, matchExpressionData: MatchExpressionData, moveSource = false, reason = '') {
+    async unlink(linkName: string, matchExpressionData: MatchExpressionData, moveSource = false, reason = '', events?:MutationEvent[]) {
         const linkInfo = this.map.getLinkInfoByName(linkName)
         assert(!linkInfo.isTargetReliance, `cannot unlink reliance data, you can only delete record, ${linkName}`)
 
@@ -846,34 +990,7 @@ WHERE ${recordInfo.idField} IN (${records.map(({id}) => JSON.stringify(id)).join
             return
         }
 
-        if (!linkInfo.isMerged()) {
-            // 完全独立，直接删除符合条件的 就行了
-            return this.deleteRecord(linkName, matchExpressionData)
-        }
-
-
-        // 剩下的都是 merge 到某一边的
-        const records = await this.findRecords(RecordQuery.create(linkName, this.map, {
-            matchExpression: matchExpressionData,
-            attributeQuery: [
-                ['source', {attributeQuery: ['id']}],
-                ['target', {attributeQuery: ['id']}]
-            ]
-        }), `finding ${linkName} for unlink ${JSON.stringify(matchExpressionData.raw)}`)
-
-        if (records.length) {
-            const recordName = linkInfo.isMergedToSource() ? linkInfo.sourceRecord : linkInfo.targetRecord
-            const toUnlinkIds = records.map(record => linkInfo.isMergedToSource() ? record.source.id : record.target.id)
-            const newMatch = MatchExp.atom({
-                key: 'id',
-                value: ['in', toUnlinkIds]
-            })
-
-            const attributeName = linkInfo.isMergedToSource() ? linkInfo.sourceAttribute : linkInfo.targetAttribute!
-            const newData = new NewRecordData(this.map, recordName, {[attributeName]: null} )
-
-            return await this.updateRecord(recordName, newMatch, newData)
-        }
+        return this.deleteRecord(linkName, matchExpressionData, events)
 
     }
     // 默认会把连带的都移走
@@ -892,15 +1009,22 @@ WHERE ${recordInfo.idField} IN (${records.map(({id}) => JSON.stringify(id)).join
         }
         return newIds
     }
-    async flashOutRecords(recordName:string, matchExpressionData: MatchExpressionData, includeRelated: string[] = []) {
+    async flashOutRecords(recordName:string, matchExpressionData: MatchExpressionData, includeRelated: string[],fromAttribute?: string): Promise<Record[]> {
+        const attributeQuery = this.constructAttributeQueryTree(recordName, includeRelated)
         const records = await this.findRecords(RecordQuery.create(recordName, this.map, {
             matchExpression: matchExpressionData,
             // 所有关联数据。fields
-            attributeQuery: this.constructAttributeQueryTree(recordName, includeRelated)
-        }), `finding ${recordName} fro flashout`)
+            // attributeQuery
+            // FIXME 这里要获取所有关系上的同行数据。
+            attributeQuery: fromAttribute?
+                attributeQuery.concat([[fromAttribute!, {attributeQuery:[['&', {attributeQuery:['id']}]]}]]):
+                attributeQuery
+
+    }), `finding ${recordName} for flash out`)
 
 
         // 删除老的
+        // FIXME 要包括所有 includeRelated 以及关系数据，但不包括 fromAttribute，那个是只要查询！！！
         if (records.length) {
             const ids = records.map(r => r.id)
             await this.deleteRecord(recordName, MatchExp.atom({
@@ -908,7 +1032,6 @@ WHERE ${recordInfo.idField} IN (${records.map(({id}) => JSON.stringify(id)).join
                 value: ['in', ids]
             }))
         }
-
 
         return records
     }

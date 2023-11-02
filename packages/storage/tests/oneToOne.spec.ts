@@ -108,7 +108,7 @@ describe('one to one', () => {
     })
 
 
-    test('delete data:delete self with same row data', async () => {
+    test('delete data:delete self with same row reliance', async () => {
         const userA = await entityQueryHandle.create('User', {
             name:'a1',
             age:12,
@@ -188,7 +188,7 @@ describe('one to one', () => {
         })
 
 
-
+        // f1 必须还存在，我们只是断开了联系。
         const findProfiles2 = await entityQueryHandle.find('Profile',
             MatchExp.atom({ key: 'title', value: ['=', 'f1']}),
             {},
