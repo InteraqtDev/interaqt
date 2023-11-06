@@ -515,7 +515,7 @@ describe('many to many', () => {
         })
     })
 
-    test.only('n:n symmetric relation create and query', async () => {
+    test('n:n symmetric relation create and query', async () => {
         const user = await handle.create('User', {name: 'aaa', age: 17 })
         const user2 = await handle.create('User', {name: 'bbb', age: 18})
         const user3 = await handle.create('User', {name: 'ccc', age: 19 })
@@ -564,8 +564,6 @@ describe('many to many', () => {
                 }
             }]
         })
-
-        console.log(events)
 
         expect(events).toMatchObject([
             {

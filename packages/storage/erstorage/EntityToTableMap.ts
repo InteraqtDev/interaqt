@@ -335,12 +335,13 @@ export class EntityToTableMap {
         const entityIdAttributes: AttributeInfo[] = []
         const entityAttributes: AttributeInfo[] = []
         attributeNames.forEach(attributeName => {
-
             if (this.data.records[entityName].attributes[attributeName]) {
                 const info = this.getInfo(entityName, attributeName)
                 if (info.isValue  ) {
                     valueAttributes.push(info)
                 } else {
+                    // link record 的 source/target 字段有 field
+                    // if (info.isLinkSourceRelation()) {
                     if (this.data.records[entityName].attributes[attributeName].field) {
                         entityIdAttributes.push(info)
                     } else {

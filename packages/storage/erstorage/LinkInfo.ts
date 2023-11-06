@@ -77,6 +77,10 @@ export class LinkInfo {
         return !!this.data.mergedTo
     }
 
+    isSourceRelation() {
+        return !! this.data.isSourceRelation
+    }
+
     isMergedToSource() {
         return this.data.mergedTo === 'source'
     }

@@ -17,18 +17,33 @@ export class AttributeQuery {
     public fullQueryTree: RecordQueryTree
     public parentLinkRecordQuery?: RecordQuery
     public id = Math.random()
-    public static getAttributeQueryDataForRecord(recordName:string, map: EntityToTableMap, includeSameTableReliance = false): AttributeQueryData{
+    public static getAttributeQueryDataForRecord(recordName:string, map: EntityToTableMap, includeSameTableReliance = false, includeMergedRecordAttribute = false): AttributeQueryData{
         const result: AttributeQueryData = map.getRecordInfo(recordName).valueAttributes.map(info => info.attributeName)
+        const recordInfo = map.getRecordInfo(recordName)
+
         if(includeSameTableReliance) {
-            const recordInfo = map.getRecordInfo(recordName)
             recordInfo.sameTableReliance.forEach(info =>{
-                const relianceAttributeQueryData = AttributeQuery.getAttributeQueryDataForRecord(info.recordName, map, true)
-                const relianceRelationAttributeQueryData = AttributeQuery.getAttributeQueryDataForRecord(info.linkName, map, true)
+                const relianceAttributeQueryData = AttributeQuery.getAttributeQueryDataForRecord(info.recordName, map, true, includeMergedRecordAttribute)
+                const relianceRelationAttributeQueryData = AttributeQuery.getAttributeQueryDataForRecord(info.linkName, map, true, includeMergedRecordAttribute)
                 result.push(
                     [
                         info.attributeName,
                         {
                             attributeQuery: [...relianceAttributeQueryData, [LINK_SYMBOL, { attributeQuery: relianceRelationAttributeQueryData }]]
+                        }
+                    ]
+                )
+            })
+        }
+
+        if(includeMergedRecordAttribute) {
+            recordInfo.mergedRecordAttributes.forEach(info =>{
+                const relianceRelationAttributeQueryData = AttributeQuery.getAttributeQueryDataForRecord(info.linkName, map, includeSameTableReliance, true)
+                result.push(
+                    [
+                        info.attributeName,
+                        {
+                            attributeQuery: ['id', [LINK_SYMBOL, { attributeQuery: relianceRelationAttributeQueryData }]]
                         }
                     ]
                 )

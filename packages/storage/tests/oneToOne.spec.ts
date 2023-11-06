@@ -5,6 +5,9 @@ import { SQLiteDB } from '../../runtime/BunSQLite'
 import {EntityToTableMap} from "../erstorage/EntityToTableMap";
 import {MatchExp} from "../erstorage/MatchExp.ts";
 import {EntityQueryHandle} from "../erstorage/EntityQueryHandle.ts";
+import {MutationEvent} from "../erstorage/RecordQueryAgent.ts";
+import {LINK_SYMBOL} from "../erstorage/RecordQuery.ts";
+
 
 describe('one to one', () => {
     let db: SQLiteDB
@@ -26,7 +29,8 @@ describe('one to one', () => {
     })
 
     test('create one to one data:create self on combined table', async () => {
-        const userA = await entityQueryHandle.create('User', {name:'a1', age:12})
+        const events: MutationEvent[] = []
+        const userA = await entityQueryHandle.create('User', {name:'a1', age:12}, events)
         const findUser = await entityQueryHandle.findOne('User',
             MatchExp.atom({ key: 'id', value: ['=', userA.id]}),
             {},
@@ -37,17 +41,30 @@ describe('one to one', () => {
             name: 'a1',
             age: 12,
         })
+
+        expect(events).toMatchObject([
+            {
+                type: "create",
+                recordName: "User",
+                record: {
+                    name: "a1",
+                    age: 12,
+                    id: userA.id
+                }
+            }
+        ])
     })
 
 
     test('create one to one data:create with new related on combined table', async () => {
+        const events: MutationEvent[] = []
         const userA = await entityQueryHandle.create('User', {
             name:'a1',
             age:12,
             profile: {
                 title: 'f1'
             }
-        })
+        }, events)
         const findUser = await entityQueryHandle.findOne('User',
             MatchExp.atom({ key: 'id', value: ['=', userA.id]}),
             {},
@@ -61,12 +78,38 @@ describe('one to one', () => {
                 title: 'f1'
             }
         })
+        console.log(events)
+        expect(events).toMatchObject([
+            {
+                type: "create",
+                recordName: "Profile",
+                record: {
+                    title: "f1",
+                    id: userA.profile.id,
+                }
+            }, {
+                type: "create",
+                recordName: "Profile_owner_profile_User",
+                record: {
+                    id: userA.profile[LINK_SYMBOL].id
+                }
+            }, {
+                type: "create",
+                recordName: "User",
+                record: {
+                    name: "a1",
+                    age: 12,
+                    id: userA.id,
+                }
+            }
+        ])
     })
 
 
     test('create one to one data:create with existing related on combined table', async () => {
         const profileA = await entityQueryHandle.create('Profile', {title:'f1'})
-        const userA = await entityQueryHandle.create('User', {name:'a1', age:12, profile: profileA})
+        const events: MutationEvent[] = []
+        const userA = await entityQueryHandle.create('User', {name:'a1', age:12, profile: profileA}, events)
 
         const findUser = await entityQueryHandle.findOne('User',
             MatchExp.atom({ key: 'id', value: ['=', userA.id]}),
@@ -77,16 +120,33 @@ describe('one to one', () => {
         expect(findUser.name).toBe('a1')
         expect(findUser.profile.id).toBe(profileA.id)
         expect(findUser.profile.title).toBe('f1')
+        expect(events).toMatchObject([
+            {
+                type: "create",
+                recordName: "User",
+                record: {
+                    name: "a1",
+                    age: 12,
+                    id: 1
+                }
+            }, {
+                type: "create",
+                recordName: "Profile_owner_profile_User",
+                record: {
+                    id: userA.profile[LINK_SYMBOL]?.id
+                }
+            }
+        ])
     })
-
 
     test('delete data:delete self with non same row data', async () => {
         const userA = await entityQueryHandle.create('User', {name:'a1', age:12})
         const profileA = await entityQueryHandle.create('Profile', {title:'f1'})
 
+        const events: MutationEvent[] = []
         await entityQueryHandle.delete('User',
             MatchExp.atom({ key: 'id', value: ['=', userA.id]}),
-        )
+            events)
 
         const findUsers = await entityQueryHandle.find('User',
             MatchExp.atom({ key: 'id', value: ['=', userA.id]}),
@@ -105,6 +165,18 @@ describe('one to one', () => {
         expect(findProfile).toMatchObject({
             title: 'f1'
         })
+
+        expect(events).toMatchObject([
+            {
+                type: "delete",
+                recordName: "User",
+                record: {
+                    name: "a1",
+                    age: 12,
+                    id: userA.id,
+                }
+            }
+        ])
     })
 
 
@@ -120,8 +192,10 @@ describe('one to one', () => {
             }
         })
 
+        const events: MutationEvent[] = []
         await entityQueryHandle.delete('User',
             MatchExp.atom({ key: 'id', value: ['=', userA.id]}),
+            events
         )
 
 
@@ -145,6 +219,31 @@ describe('one to one', () => {
 
         // reliance 会被连带删除
         expect(findItems.length).toBe(0)
+
+        expect(events).toMatchObject([
+            {
+                type: "delete",
+                recordName: "User",
+                record: {
+                    name: "a1",
+                    age: 12,
+                    id: userA.id,
+                }
+            }, {
+                type: "delete",
+                recordName: "User_item_owner_Item",
+                record: {
+                    id: userA.item[LINK_SYMBOL].id
+                }
+            }, {
+                type: "delete",
+                recordName: "Item",
+                record: {
+                    itemName: "item1",
+                    id: userA.item.id,
+                }
+            }
+        ])
     })
 
 
@@ -158,10 +257,11 @@ describe('one to one', () => {
                 }
             })
 
-
-        await entityQueryHandle.update('User',
+        const events: MutationEvent[] = []
+        const [updatedUser] = await entityQueryHandle.update('User',
             MatchExp.atom({ key: 'id', value: ['=', userA.id]}),
-            { profile: { title: 'f2'} }
+            { profile: { title: 'f2'} },
+            events
         )
 
         const findUser = await entityQueryHandle.findOne('User',
@@ -203,6 +303,29 @@ describe('one to one', () => {
                 name: null,
             }
         })
+
+        expect(events).toMatchObject([
+            {
+                type: "delete",
+                recordName: "Profile_owner_profile_User",
+                record: {
+                    id: userA.profile[LINK_SYMBOL].id
+                }
+            }, {
+                type: "create",
+                recordName: "Profile",
+                record: {
+                    title: "f2",
+                    id: 3,
+                }
+            }, {
+                type: "create",
+                recordName: "Profile_owner_profile_User",
+                record: {
+                    id: 2
+                }
+            }
+        ])
     })
 
 
@@ -217,9 +340,11 @@ describe('one to one', () => {
             })
         const profileA = await entityQueryHandle.create('Profile', {title:'f2'})
 
-        await entityQueryHandle.update('User',
+        const events: MutationEvent[] = []
+        const [updatedUser] = await entityQueryHandle.update('User',
             MatchExp.atom({ key: 'id', value: ['=', userA.id]}),
-            { profile: profileA }
+            { profile: profileA },
+            events
         )
 
         const findUser = await entityQueryHandle.findOne('User',
@@ -261,6 +386,21 @@ describe('one to one', () => {
             }
         })
 
+        expect(events).toMatchObject([
+            {
+                type: "delete",
+                recordName: "Profile_owner_profile_User",
+                record: {
+                    id: userA.profile[LINK_SYMBOL].id
+                }
+            }, {
+                type: "create",
+                recordName: "Profile_owner_profile_User",
+                record: {
+                    id: updatedUser.profile[LINK_SYMBOL].id
+                }
+            }
+        ])
 
     })
 })

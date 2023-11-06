@@ -122,6 +122,11 @@ export class AttributeInfo {
         return linkInfo.isManyToMany && linkInfo.isSymmetric()
     }
 
+    isLinkSourceRelation() {
+        const linkInfo = this.getLinkInfo()
+        return linkInfo.isSourceRelation()
+    }
+
     getReverseInfo() {
         const reverseAttribute = this.map.getReverseAttribute(this.parentEntityName, this.attributeName)
         if (!reverseAttribute) return undefined

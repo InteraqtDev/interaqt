@@ -188,6 +188,7 @@ export class DBSetup {
             // 如果是 n: n 关系，x1 是 n，x2 是 n
             // 如果是 1 : 1 关系，x1 是 1，x2 是 1
             relType: [relationRelType[isSource? 1:0], '1'],
+            // 用来标记这是个虚拟 link 的
             isSourceRelation: true,
             // sourceField: 'source',
             // targetField: undefined, // 虚拟表只往 relation 方向合并。
@@ -249,7 +250,7 @@ export class DBSetup {
         })
 
         this.mergeRecords()
-        this.assignTables()
+        this.assignTableAndField()
 
     }
     mergeRecords() {
@@ -404,7 +405,7 @@ export class DBSetup {
 
         // TODO  独立字段的处理
     }
-    assignTables() {
+    assignTableAndField() {
         // 1. 给所有的 record 分配表（表名重命名过了）
         const originTableNames = Array.from(this.tableToRecordsMap.keys())
         for(let originTableName of originTableNames) {

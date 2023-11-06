@@ -3,6 +3,7 @@ import {assert} from "../util.ts";
 import {flatten} from "./util.ts";
 import {AttributeInfo} from "./AttributeInfo.ts";
 import {Record} from "./RecordQueryAgent.ts";
+import {LINK_SYMBOL} from "./RecordQuery.ts";
 
 export type RawEntityData = { [k: string]: any }
 
@@ -25,7 +26,7 @@ export class NewRecordData {
     public isolatedRecordIdRefs: NewRecordData[] = []
     // 当时 linkRecord 的时候，source/target 就可能出现在下面
     public entityIdAttributes: AttributeInfo[] = []
-
+    // 不包括虚拟 link
     public relatedEntitiesData: NewRecordData[] = []
     public valueAttributes: AttributeInfo[] = []
 
@@ -87,8 +88,8 @@ export class NewRecordData {
             }
         })
 
-        if (this.rawData?.['&']) {
-            this.linkRecordData = new NewRecordData(this.map, info?.linkName!, this.rawData['&'])
+        if (this.rawData?.[LINK_SYMBOL]) {
+            this.linkRecordData = new NewRecordData(this.map, info?.linkName!, this.rawData[LINK_SYMBOL])
         }
 
     }

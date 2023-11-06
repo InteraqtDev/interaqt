@@ -46,7 +46,11 @@ export class RecordInfo {
 
         return valueFields.concat(...linkFields, ...managedRecordAttributeFields, ...relianceFields)
     }
-
+    get mergedRecordAttributes() {
+        return this.strictRecordAttributes.filter(info => {
+            return info.isLinkMergedWithParent()
+        })
+    }
     get allFields(): string[] {
         return Object.values(this.data.attributes).map(a => a.field!).filter(x => x)
     }
