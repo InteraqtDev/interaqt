@@ -1,4 +1,4 @@
-import {ClassDef, createClass, KlassInstanceOf, KlassType} from "../createClass";
+import { createClass, KlassInstanceOf, KlassType} from "../createClass";
 import {Entity} from "../entity/Entity";
 import {UserAttributive, UserAttributives} from "../user/User";
 
@@ -318,26 +318,7 @@ export const ActivityGroup: KlassType<ActivityGroupDef["public"]> = createClass(
 
 // const a:[typeof Interaction, KlassType<ActivityGroupDef["public"]>, typeof Gateway ] = [Interaction, ActivityGroup, Gateway]
 
-const a:TransferDef = {
-    name: 'Transfer',
-    public: {
-        name: {
-            type: 'string',
-            required: true,
-            collection: false
-        },
-        source: {
-            type: [Interaction, ActivityGroup, Gateway],
-            required: true,
-            collection: false
-        },
-        target: {
-            type: [Interaction, ActivityGroup, Gateway],
-            required: true,
-            collection: false
-        }
-    }
-}
+
 
 export const Transfer: KlassType<TransferDef["public"]> = createClass({
     name: 'Transfer',
@@ -372,8 +353,8 @@ export type GatewayInstanceType = KlassInstanceOf<typeof Gateway, false>
 export type TransferInstanceType = KlassInstanceOf<typeof Transfer, false>
 
 export function forEachInteraction(activity: ActivityInstanceType, handle:(i:InteractionInstanceType, g?: ActivityGroupInstanceType) => any, parenGroup?: ActivityGroupInstanceType) {
-    activity.interactions.forEach(i => handle(i, parenGroup))
-    activity.groups?.forEach(group => group.activities.forEach(sub => forEachInteraction(sub, handle, group)))
+    activity.interactions!.forEach(i => handle(i, parenGroup))
+    activity.groups?.forEach(group => group.activities!.forEach(sub => forEachInteraction(sub, handle, group)))
 }
 
 export function getInteractions(activity: ActivityInstanceType) {

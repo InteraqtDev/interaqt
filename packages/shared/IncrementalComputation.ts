@@ -1,6 +1,6 @@
 import { createClass} from "./createClass";
 import {Activity, Interaction} from "./activity/Activity";
-import {Entity, Relation} from "./entity/Entity";
+import {Entity, Property, Relation} from "./entity/Entity";
 
 export const MapActivityToEntity = createClass({
     name: 'MapActivityToEntity',
@@ -122,4 +122,41 @@ export const RelationStateMachine = createClass({
 })
 
 Relation.public.computedData.type.push(RelationStateMachine)
-// TODO 其他几种类型
+
+// TODO Property 支持的 count/filter/max/min/topN
+export const IncrementalRelationCount = createClass({
+    name: 'PropertyIncrementalCount',
+    public: {
+        relation: {
+            type: Relation,
+            collection: false,
+            required: true
+        },
+        // 因为 relation 可能 source/target 实体相同，所以还有增加方向信息
+        relationDirection: {
+            type: 'string',
+            collection: false,
+            required: true,
+            defaultValue: () => 'source'
+        },
+        isBidirectional: {
+            type: 'boolean',
+            collection: false,
+            required: true,
+            defaultValue: () => false
+        },
+
+        // 创建初始值的时候用于计算哪些 relation 是要  count 的
+        // 这里 match 的是 relatedEntity
+        matchExpression: {
+            type: 'string',
+            collection: false,
+            required: true
+        }
+    }
+})
+
+Property.public.computedData.type.push(IncrementalRelationCount)
+
+// TODO 其他的
+
