@@ -1,21 +1,22 @@
-import {System, Storage, Database, EntityIdRef} from "./System";
+import {System, Storage, Database, EntityIdRef, RecordMutationEvent, RecordChangeListener} from "./System";
 import { InteractionEvent } from '../types/interaction'
 import {createClass, KlassInstanceOf} from "../shared/createClass";
 import {Entity, Relation} from "../shared/entity/Entity";
 import { DBSetup } from '../storage/erstorage/Setup'
-import { Database as SQLite } from "bun:sqlite";
-import { EntityQueryHandle } from '../storage/erstorage/ERStorage'
+import {EntityQueryHandle} from '../storage/erstorage/EntityQueryHandle'
+import {MatchExpressionData} from '../storage/erstorage/MatchExp'
+import {RawEntityData} from '../storage/erstorage/NewRecordData'
 import { EntityToTableMap } from '../storage/erstorage/EntityToTableMap'
 import {SQLiteDB} from "./BunSQLite";
-
-
-
+import { MutationEvent } from "../storage/erstorage/RecordQueryAgent";
+import {nextJob} from "../shared/util";
 
 
 class MemoryStorage implements Storage{
     data = new Map<string, Map<string, any>>()
     db = new SQLiteDB()
     public queryHandle?: EntityQueryHandle
+    public callbacks: Set<RecordChangeListener> = new Set()
     // kv 结构
     get(conceptName: string, id: string, initialValue?: any) {
         let res = this.data.get(conceptName)!.get(id)
@@ -38,30 +39,53 @@ class MemoryStorage implements Storage{
     find(...arg:Parameters<EntityQueryHandle["find"]>) {
         return this.queryHandle!.find(...arg)
     }
-    create(...arg:Parameters<EntityQueryHandle["create"]>) {
-        return this.queryHandle!.create(...arg)
+    create(entityName: string, rawData: RawEntityData,) {
+        return this.callWithEvents(this.queryHandle!.create.bind(this.queryHandle), [entityName, rawData])
     }
-    update(...arg:Parameters<EntityQueryHandle["update"]>) {
-        return this.queryHandle!.update(...arg)
+    update(entity: string, matchExpressionData: MatchExpressionData, rawData: RawEntityData,) {
+        return this.callWithEvents(this.queryHandle!.update.bind(this.queryHandle), [entity, matchExpressionData, rawData])
     }
-
+    delete(entityName: string, matchExpressionData: MatchExpressionData,) {
+        return this.callWithEvents(this.queryHandle!.delete.bind(this.queryHandle), [entityName, matchExpressionData])
+    }
+    async callWithEvents<T extends any[]>(method: (...arg: [...T, MutationEvent[]]) => any, args: T) {
+        const events: MutationEvent[] = []
+        const result = await method(...args, events)
+        // FIXME 还没有实现异步机制
+        // nextJob(() => {
+        //     this.dispatch(events)
+        // })
+        const recordMutationEvents = events.map(e => {
+            // 区分 entity/relation
+        })
+        await this.dispatch(events)
+        return result
+    }
     findRelationByName(...arg:Parameters<EntityQueryHandle["findRelationByName"]>) {
         return this.queryHandle!.findRelationByName(...arg)
     }
     findOneRelationByName(...arg: Parameters<EntityQueryHandle["findOneRelationByName"]>) {
         return this.queryHandle!.findOneRelationByName(...arg)
     }
-    updateRelationByName(...arg:Parameters<EntityQueryHandle["updateRelationByName"]> ) {
-        return this.queryHandle!.updateRelationByName(...arg)
+    updateRelationByName(relationName: string, matchExpressionData: MatchExpressionData, rawData: RawEntityData,  ) {
+        return this.callWithEvents(this.queryHandle!.updateRelationByName.bind(this.queryHandle), [relationName, matchExpressionData, rawData])
     }
-    removeRelationByName(...arg:Parameters<EntityQueryHandle["removeRelationByName"]>) {
-        return this.queryHandle!.removeRelationByName(...arg)
+    removeRelationByName(relationName: string, matchExpressionData: MatchExpressionData,) {
+        return this.callWithEvents(this.queryHandle!.removeRelationByName.bind(this.queryHandle), [relationName, matchExpressionData])
     }
-    addRelationByNameById(...arg:Parameters<EntityQueryHandle["addRelationByNameById"]>) {
-        return this.queryHandle!.addRelationByNameById(...arg)
+    addRelationByNameById(relationName: string, sourceEntityId: string, targetEntityId: string, rawData: RawEntityData = {},) {
+        return this.callWithEvents(this.queryHandle!.addRelationByNameById.bind(this.queryHandle), [relationName, sourceEntityId, targetEntityId, rawData])
     }
     getRelationName(...arg:Parameters<EntityQueryHandle["getRelationName"]>) {
         return this.queryHandle!.getRelationName(...arg)
+    }
+    listen(callback: RecordChangeListener) {
+        this.callbacks.add(callback)
+    }
+    async dispatch(events: RecordMutationEvent[]) {
+        for(let callback of this.callbacks) {
+            await callback(events)
+        }
     }
 }
 

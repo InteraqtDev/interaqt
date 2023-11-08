@@ -29,14 +29,14 @@ export class RelationStateMachineHandle extends RelationIncrementalComputationHa
         // FIXME 理论上在一个状态机中，任何状态都应该是能用属性完全独立区别开的。最好在这里验证一下。
     }
     parseTransferHandle() {
-        this.computedData.transfers.forEach(transfer => {
+        this.computedData.transfers!.forEach(transfer => {
             const parsedHandle = new Function('arg', 'activityId', `return (${transfer.handle}).call(this, arg, activityId)`) as TransferHandleFn
             this.transferHandleFn.set(transfer, parsedHandle)
         })
     }
     listenInteractions() {
         // 遍历 transfer 来监听 interaction
-        this.computedData.transfers.forEach(transfer => {
+        this.computedData.transfers!.forEach(transfer => {
             this.controller.listen(transfer.triggerInteraction, (...arg) => {
                 return this.onCallInteraction(transfer, ...arg)
             })
@@ -68,7 +68,7 @@ export class RelationStateMachineHandle extends RelationIncrementalComputationHa
     }
     onCallInteraction = async (transfer: KlassInstanceOf<typeof RelationStateTransfer, false>, interactionEventArgs: InteractionEventArgs, activityId?: string) => {
         // CAUTION 不能房子啊 constructor 里面因为它实在 controller 里面调用的，controller 还没准备好。
-        const relationName = this.controller.system.storage.getRelationName(this.data.entity1.name, this.data.targetName1)
+        const relationName = this.controller.system.storage.getRelationName(this.data.entity1!.name, this.data.targetName1)
         const handleFn = this.transferHandleFn.get(transfer)!
         if (transfer.handleType === 'computeSource') {
             // 1. 执行 handle 来计算  source 和 target
@@ -77,8 +77,8 @@ export class RelationStateMachineHandle extends RelationIncrementalComputationHa
             for(let sourceAndTargetPair of sourceAndTargetPairs) {
 
                 const [sourceRef, targetRef] = sourceAndTargetPair
-                const currentState = transfer.fromState
-                const nextState = transfer.toState
+                const currentState = transfer.fromState!
+                const nextState = transfer.toState!
 
                 const baseRelationMatch =  MatchExp.atom({
                     key: 'source.id',
@@ -112,7 +112,7 @@ export class RelationStateMachineHandle extends RelationIncrementalComputationHa
                             await this.controller.system.storage.removeRelationByName(relationName, MatchExp.atom(matchExp))
                         } else {
                             // TODO 除了 fixedProperties 还有 propertyHandle 来计算 动态的 property
-                            const nextAttributes = Object.fromEntries(nextState.fixedProperties.map(p => ([p.name, p.value])))
+                            const nextAttributes = Object.fromEntries(nextState.fixedProperties!.map(p => ([p.name, p.value])))
                             await this.controller.system.storage.updateRelationByName(relationName, MatchExp.atom(matchExp), nextAttributes)
                         }
                     }
@@ -123,7 +123,7 @@ export class RelationStateMachineHandle extends RelationIncrementalComputationHa
                     if (!matchedRelation) {
                         // 没有数据才说明匹配
                         // 转移 变成有
-                        const nextAttributes = Object.fromEntries(nextState.fixedProperties.map(p => ([p.name, p.value])))
+                        const nextAttributes = Object.fromEntries(nextState.fixedProperties!.map(p => ([p.name, p.value])))
                         await this.controller.system.storage.addRelationByNameById(relationName, sourceRef.id, targetRef.id, nextAttributes)
                     } else {
                     }

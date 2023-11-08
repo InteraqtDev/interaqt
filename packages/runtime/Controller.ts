@@ -3,7 +3,7 @@ import {Entity, Relation} from "../shared/entity/Entity";
 import {Activity, Interaction} from "../shared/activity/Activity";
 import {
     EntityIncrementalComputationHandle,
-    IncrementalComputationHandle,
+    IncrementalComputationHandle, PropertyIncrementalComputationHandle,
     RelationIncrementalComputationHandle
 } from "./incrementalComputationHandles/IncrementalComputationHandle";
 import {ActivityCall} from "./AcitivityCall";
@@ -43,32 +43,60 @@ export class Controller {
 
 
         // 初始化 各种 computed。
+        // entity 的
         entities.forEach(entity => {
             if (entity.computedData) {
-                const Handle = EntityIncrementalComputationHandle.Handles.get(entity.computedData.constructor as KlassType<any>)
+                const Handle = EntityIncrementalComputationHandle.Handles.get(entity.computedData.constructor as KlassType<any>)!
                 this.incrementalComputationHandles.add(
                     new Handle(this, entity)
                 )
             }
+
+            // property 的
+            entity.properties?.forEach(property => {
+                if (property.computedData) {
+                    const Handle = PropertyIncrementalComputationHandle.Handles.get(property.computedData.constructor as KlassType<any>)!
+                    this.incrementalComputationHandles.add(
+                        new Handle(this, entity, property)
+                    )
+
+                }
+            })
         })
 
-
+        // relation 的
         relations.forEach(relation => {
             if(relation.computedData) {
-                const Handle = RelationIncrementalComputationHandle.Handles.get(relation.computedData.constructor as KlassType<any>)
+                const Handle = RelationIncrementalComputationHandle.Handles.get(relation.computedData.constructor as KlassType<any>)!
                 this.incrementalComputationHandles.add(new Handle(this, relation))
             }
+
+            relation.properties?.forEach(property => {
+                if (property.computedData) {
+                    const Handle = PropertyIncrementalComputationHandle.Handles.get(property.computedData.constructor as KlassType<any>)!
+                    this.incrementalComputationHandles.add(
+                        new Handle(this, relation, property)
+                    )
+                }
+            })
         })
+        // TODO 全局的
 
     }
     async setup() {
+        // 1. setup 数据库
         // CAUTION 注意这里的 entities/relations 可能被 IncrementalComputationHandle 修改过了
         await this.system.storage.setup(this.entities, this.relations)
+
+        // 2. 增量计算的字段设置初始值
         // TODO 如果是恢复模式，应该从 event stack 中开始恢复数据。
+        for(const handle of this.incrementalComputationHandles) {
+            await handle.recoverComputedData()
+        }
     }
     callbacks: Map<any, Set<SystemCallback>> = new Map()
     listen(event:any, callback: SystemCallback) {
-        let callbacks = this.callbacks.get(event)
+        let callbacks = this.callbacks.get(event)!
         if (!callbacks) {
             this.callbacks.set(event, (callbacks = new Set()))
         }

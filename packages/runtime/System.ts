@@ -12,6 +12,8 @@ export interface Payload {
 export type SystemCallback =  (...arg: any[]) => any
 
 
+export type RecordChangeListener = (mutationEvents:RecordMutationEvent[]) => any
+
 export type Storage = {
     // kv 存储
     get: (itemName: string, id: string, initialValue?: any) => any
@@ -30,6 +32,19 @@ export type Storage = {
     // addRelation: (relationName: string, ...arg: any[]) => Promise<any>
     addRelationByNameById: (relationName: string, ...arg: any[]) => Promise<any>
     getRelationName: (...arg: any[]) => string
+    listen: (callback: RecordChangeListener) => any
+}
+
+export type RecordMutationEvent = {
+    recordName:  string,
+    type: 'create' | 'update' | 'delete',
+    keys?: string[],
+    record?: {
+        [key: string]: any
+    },
+    oldRecord?: {
+        [key: string]: any
+    }
 }
 
 export interface System {
@@ -40,8 +55,7 @@ export interface System {
 
     storage: Storage
     util: {
-        uuid: () => string,
-        autoIncrementId: () => number
+        uuid: () => string
     }
 }
 

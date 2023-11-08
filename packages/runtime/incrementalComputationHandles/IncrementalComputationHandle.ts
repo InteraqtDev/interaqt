@@ -1,9 +1,12 @@
 import {KlassInstanceOf, KlassType} from "../../shared/createClass";
-import {Entity, Relation} from "../../shared/entity/Entity";
+import {Entity, Property, Relation} from "../../shared/entity/Entity";
 import {Controller} from "../Controller";
 
 export class IncrementalComputationHandle {
     constructor(public controller: Controller) {
+    }
+    // 初始值
+    async recoverComputedData() {
 
     }
 }
@@ -14,9 +17,8 @@ export class EntityIncrementalComputationHandle extends IncrementalComputationHa
     constructor(public controller: Controller, public data: KlassInstanceOf<typeof Entity, false>) {
         super(controller);
     }
+
 }
-
-
 
 
 export class RelationIncrementalComputationHandle extends IncrementalComputationHandle {
@@ -25,4 +27,17 @@ export class RelationIncrementalComputationHandle extends IncrementalComputation
         super(controller);
     }
 }
+
+export class PropertyIncrementalComputationHandle extends IncrementalComputationHandle{
+    public static Handles = new Map<KlassType<any>, typeof PropertyIncrementalComputationHandle>()
+    constructor(public controller: Controller, public entity: KlassInstanceOf<typeof Entity, false>, public property: KlassInstanceOf<typeof Property, false>) {
+        super(controller);
+    }
+}
+
+export class GlobalIncrementalComputationHandle extends IncrementalComputationHandle{
+    public static Handles = new Map<KlassType<any>, typeof GlobalIncrementalComputationHandle>()
+}
+
+
 

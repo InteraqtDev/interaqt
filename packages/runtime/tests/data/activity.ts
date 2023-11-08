@@ -10,7 +10,7 @@ import {
 } from "../../../shared/activity/Activity";
 import {OtherAttr} from "./roles";
 import {Entity, Property, PropertyTypes, Relation} from "../../../shared/entity/Entity";
-import {RelationStateMachine, RelationStateNode, RelationStateTransfer, MapActivityToEntity} from "../../../shared/IncrementalComputation";
+import {RelationStateMachine, RelationStateNode, RelationStateTransfer, MapActivityToEntity, IncrementalRelationCount} from "../../../shared/IncrementalComputation";
 import {removeAllInstance, stringifyAllInstances} from "../../../shared/createClass";
 
 const UserEntity = Entity.createReactive({ name: 'User' })
@@ -20,11 +20,11 @@ UserEntity.properties.push(nameProperty)
 UserEntity.properties.push(ageProperty)
 export const Message = Entity.createReactive({
     name: 'Message',
-    properties: [{
+    properties: [Property.create({
         name: 'content',
         type: 'string',
         collection: false,
-    }]
+    })]
 })
 
 export const globalUserRole = createUserRoleAttributive({name: 'user'}, {isReactive: true})
@@ -228,7 +228,7 @@ const friendRelationSM = RelationStateMachine.createReactive({
 
 
 
-Relation.createReactive({
+const friendRelation = Relation.createReactive({
     entity1: UserEntity,
     targetName1: 'friends',
     entity2: UserEntity,
@@ -280,7 +280,7 @@ Relation.createReactive({
     relType: 'n:1'
 })
 
-Relation.createReactive({
+const receivedRequestRelation = Relation.createReactive({
     entity1: requestEntity,
     targetName1: 'to',
     entity2: UserEntity,
@@ -296,6 +296,40 @@ Relation.createReactive({
     targetName2: 'request',
     relType: '1:1'
 })
+
+// 计算 unhandled request 的总数
+const userTotalUnhandledRequest = IncrementalRelationCount.createReactive({
+    relation: receivedRequestRelation,
+    relationDirection: 'target',
+    matchExpression: `
+(request) => {
+    return !request.handled
+}`
+    ,
+})
+
+UserEntity.properties.push(Property.createReactive({
+    name: 'totalUnhandledRequest',
+    type: 'number',
+    collection: false,
+    computedData: userTotalUnhandledRequest
+}))
+
+
+// 计算 total friend count
+const userTotalFriendCount = IncrementalRelationCount.createReactive({
+    relation: friendRelation,
+    relationDirection: 'source',
+    isBidirectional: true,
+    matchExpression: `() => true`
+})
+//
+UserEntity.properties.push(Property.createReactive({
+    name: 'totalFriendCount',
+    type: 'number',
+    collection: false,
+    computedData: userTotalFriendCount
+}))
 
 export const data = JSON.parse(stringifyAllInstances())
 removeAllInstance()

@@ -20,12 +20,12 @@ export class MapActivityToEntityHandle extends EntityIncrementalComputationHandl
         this.computedData = data.computedData as KlassInstanceOf<typeof MapActivityToEntity, false>
         this.addActivityIdFieldToEntity()
 
-        this.mapItem = this.parseFunction(this.computedData.handle)
+        this.mapItem = this.parseFunction(this.computedData.handle!)
         this.listenInteractionInActivity()
     }
 
     addActivityIdFieldToEntity() {
-        this.data.properties.push(Property.create({
+        this.data.properties!.push(Property.create({
             name: 'activityId',
             type: 'string',
             collection: false
@@ -42,7 +42,7 @@ export class MapActivityToEntityHandle extends EntityIncrementalComputationHandl
 
     listenInteractionInActivity(){
         // 监听的 interaction 变化
-        const interactionsToListen = this.computedData.triggerInteraction || getInteractions(this.computedData.sourceActivity)
+        const interactionsToListen = this.computedData.triggerInteraction || getInteractions(this.computedData.sourceActivity!)
 
         interactionsToListen.forEach(interaction => {
             this.controller.listen(interaction, this.onCallInteraction)
@@ -70,12 +70,12 @@ export class MapActivityToEntityHandle extends EntityIncrementalComputationHandl
 
         // 只有 undefined 是被认为没准备好
         if (newMappedItem !== undefined) {
-            const oldData = await this.controller.system.storage.findOne(this.data.name, match)
+            const oldData = await this.controller.system.storage.findOne(this.data.name!, match)
             if (oldData){
                 // 已经有数据了。
                 // TODO 未来有没有可能有不需要更新的情况？
                 await this.controller.system.storage.update(
-                    this.data.name,
+                    this.data.name!,
                     MatchExp.atom({ key: 'id', value: ['=', oldData.id]}),
                     {
                         ...newMappedItem,
@@ -84,7 +84,7 @@ export class MapActivityToEntityHandle extends EntityIncrementalComputationHandl
                 )
 
             } else {
-                await this.controller.system.storage.create(this.data.name, {
+                await this.controller.system.storage.create(this.data.name!, {
                     ...newMappedItem,
                     activityId
                 })

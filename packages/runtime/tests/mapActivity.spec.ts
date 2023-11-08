@@ -5,8 +5,7 @@ import {MemorySystem} from "../MemorySystem";
 import {createInstances, getInstance, KlassByName, KlassInstanceOf, removeAllInstance, stringifyAllInstances} from "../../shared/createClass";
 import { Activity, Interaction } from "../../shared/activity/Activity";
 import { Entity, Relation } from "../../shared/entity/Entity";
-import '../incrementalComputationHandles/MapActivityToEntity'
-import '../incrementalComputationHandles/RelationStateMachine'
+import '../incrementalComputationHandles/index'
 import {MatchExp} from '../../storage/erstorage/MatchExp'
 
 // 里面有所有必须的数据？
@@ -29,8 +28,8 @@ describe('map activity', () => {
     let deleteUUID: string
     let controller: Controller
 
-    let userA: User
-    let userB: User
+    let userAId: string
+    let userBId: string
     beforeEach(async () => {
         removeAllInstance()
         const { data }  = (await import('./data/activity'))
@@ -58,22 +57,40 @@ describe('map activity', () => {
         approveUUID = (createFriendRelationActivityCall.graph.tail as ActivityGroupNode).childSeqs![0].head.uuid
         rejectUUID = (createFriendRelationActivityCall.graph.tail as ActivityGroupNode).childSeqs![1].head.uuid
         cancelUUID = (createFriendRelationActivityCall.graph.tail as ActivityGroupNode).childSeqs![2].head.uuid
-        deleteUUID = Interaction.instances.find(i => i.name === 'deleteFriend').uuid
+        deleteUUID = Interaction.instances!.find(i => i.name === 'deleteFriend')!.uuid
 
 
-        userA = {name: 'A', age:10}
-        const userARef = await system.storage.queryHandle!.create('User', userA)
-        userA.id = userARef.id
-        userA.roles = ['user']
+        const userARef = await system.storage.create('User', {name: 'A', age:10})
+        userAId = userARef.id
 
-        userB = {name: 'B', age:12}
-        const userBRef = await system.storage.queryHandle!.create('User', userB)
-        userB.id = userBRef.id
-        userB.roles = ['user']
+        const userBRef = await system.storage.create('User', {name: 'B', age:12})
+        userBId = userBRef.id
 
     })
 
     test('make friend activity', async () => {
+        // 0. 验证初始数据
+        const userA: User = {
+            ...await system.storage.findOne('User', MatchExp.atom({
+                key:'id',
+                value: ['=', userAId]
+            }), undefined, ['*']),
+            roles:['user']
+        }
+
+        const userB: User = {
+            ...await system.storage.findOne('User', MatchExp.atom({
+                key:'id',
+                value: ['=', userBId]
+            }), undefined, ['*']),
+            roles:['user']
+        }
+
+        expect(userA.totalUnhandledRequest).toBe(0)
+        expect(userB.totalUnhandledRequest).toBe(0)
+        expect(userA.totalFriendCount).toBe(0)
+        expect(userB.totalFriendCount).toBe(0)
+
         // 1. 创建 activity
         const { activityId, state } = controller.createActivity(makeFriendActivityUUID)
         expect(activityId).not.toBe(null)
@@ -112,6 +129,13 @@ describe('map activity', () => {
         expect(requests2.length).toBe(1)
         expect(!!requests2[0].handled).toBeFalse()
         expect(requests2[0].activityId).toBe(activityId)
+
+        const userB1 = (await system.storage.findOne('User', MatchExp.atom({
+                key:'id',
+                value: ['=', userBId]
+            }), undefined, ['*']))
+        expect(userB1.totalUnhandledRequest).toBe(1)
+
         // 4. 交互顺序错误 a sendFriendRequest
         // const res3 = createFriendRelationActivityCall.callInteraction(activityId, sendRequestUUID, {user: userA})
         // expect(res3.error).toBeDefined()
@@ -130,6 +154,18 @@ describe('map activity', () => {
         expect(!!requests3[0].handled).toBeTrue()
         expect(requests3[0].activityId).toBe(activityId)
 
+        const userB2 = (await system.storage.findOne('User', MatchExp.atom({
+            key:'id',
+            value: ['=', userBId]
+        }), undefined, ['*']))
+        expect(userB2.totalUnhandledRequest).toBe(0)
+        expect(userB2.totalFriendCount).toBe(1)
+
+        const userA2 = (await system.storage.findOne('User', MatchExp.atom({
+            key:'id',
+            value: ['=', userAId]
+        }), undefined, ['*']))
+        expect(userA2.totalFriendCount).toBe(1)
         // 7. 错误 b reject
         // const res6 = createFriendRelationActivityCall.callInteraction(activityId, rejectUUID, {user: userB})
         // expect(res6.error).toBeDefined()
@@ -150,7 +186,6 @@ describe('map activity', () => {
         expect(friendRelations[0].target.name).toBe('B')
         expect(friendRelations[0].target.id).toBe(userB.id)
 
-
         // 删除关系，继续驱动状态机
         const res6 = await controller.callInteraction(deleteUUID, {
             user: userA,
@@ -162,6 +197,19 @@ describe('map activity', () => {
 
         const friendRelations2 = await controller.system.storage.findRelationByName(relationName, undefined, undefined, [['source', {attributeQuery: ['name', 'age']}], ['target', {attributeQuery: ['name', 'age']}]])
         expect(friendRelations2.length).toBe(0)
+
+
+        const userB3 = (await system.storage.findOne('User', MatchExp.atom({
+            key:'id',
+            value: ['=', userBId]
+        }), undefined, ['*']))
+        expect(userB3.totalFriendCount).toBe(0)
+
+        const userA3 = (await system.storage.findOne('User', MatchExp.atom({
+            key:'id',
+            value: ['=', userAId]
+        }), undefined, ['*']))
+        expect(userA3.totalFriendCount).toBe(0)
     })
 
 })

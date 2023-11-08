@@ -15,19 +15,19 @@ export class SQLiteDB implements Database{
     }
     update = (sql:string, idField?:string, name='') => {
         console.log(`update=============${name}`)
-        // console.log(sql)
+        console.log(sql)
         const result = this.db.query(`${sql} RETURNING ${ROW_ID_ATTR} ${idField ? `, ${idField} AS id`: ''}`).all() as any[]
         return Promise.resolve(result)
     }
     insert= (sql:string, name='') => {
         console.log(`insert==============${name}`)
-        // console.log(`${sql} RETURNING ${ROW_ID_ATTR}`)
+        console.log(`${sql} RETURNING ${ROW_ID_ATTR}`)
         const result = this.db.query(`${sql} RETURNING ${ROW_ID_ATTR}`).get() as EntityIdRef
         return Promise.resolve( result as EntityIdRef)
     }
     delete= (sql:string, name='') => {
         console.log(`delete==============${name}`)
-        // console.log(sql)
+        console.log(sql)
         const result = this.db.query(sql).all() as any[]
         return Promise.resolve(result)
     }
