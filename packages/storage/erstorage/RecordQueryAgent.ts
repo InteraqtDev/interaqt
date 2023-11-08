@@ -427,6 +427,11 @@ ${this.buildXToOneFindQuery(existEntityQuery, currentAlias)}
     // CAUTION 因为这里分配了 id，并且所有的判断逻辑都在，所以事件也放在这里处理，而不是真实插入或者更新数据的时候。
     async preprocessSameRowData(newEntityData: NewRecordData, isUpdate = false,  events?:  MutationEvent[], oldRecord?: Record): Promise<NewRecordData> {
         const newRawDataWithNewIds = newEntityData.getData()
+        if (!isUpdate) {
+            // 为自己分配 id，一定要在最前面，因为后面记录link 事件的地方一定要有 target/source 的 id
+            newRawDataWithNewIds.id = await this.database.getAutoId(newEntityData.recordName)
+        }
+
         // 1. 先为三表合一的新数据分配 id
         for(let record of newEntityData.combinedNewRecords) {
             newRawDataWithNewIds[record.info!.attributeName] = {
@@ -442,19 +447,29 @@ ${this.buildXToOneFindQuery(existEntityQuery, currentAlias)}
 
         // 2. 为我要新建 三表合一、或者我 mergedLink 的 的 关系 record 分配 id.
         for(let record of newEntityData.mergedLinkTargetNewRecords.concat(newEntityData.mergedLinkTargetRecordIdRefs, newEntityData.combinedNewRecords)){
-            newRawDataWithNewIds[record.info!.attributeName][LINK_SYMBOL] = {
-                ...(newRawDataWithNewIds[record.info!.attributeName][LINK_SYMBOL]||{}),
-                id: await this.database.getAutoId(record.info!.linkName!),
+            if (newRawDataWithNewIds[record.info!.attributeName].id !== oldRecord?.[record.info!.attributeName]?.id) {
+                newRawDataWithNewIds[record.info!.attributeName][LINK_SYMBOL] = {
+                    ...(newRawDataWithNewIds[record.info!.attributeName][LINK_SYMBOL]||{}),
+                    id: await this.database.getAutoId(record.info!.linkName!),
+                }
+
+                const linkRecord = {...newRawDataWithNewIds[record.info!.attributeName][LINK_SYMBOL] }
+                linkRecord[record.info!.isRecordSource() ? 'target' : 'source'] = record.getData()
+                linkRecord[record.info!.isRecordSource() ? 'source' : 'target'] = {...newRawDataWithNewIds}
+                delete linkRecord.target[LINK_SYMBOL]
+                delete linkRecord.source[LINK_SYMBOL]
+
+
+                events?.push({
+                    type:'create',
+                    recordName:record.info!.linkName,
+                    record:linkRecord
+                })
             }
-            events?.push({
-                type:'create',
-                recordName:record.info!.linkName,
-                record: newRawDataWithNewIds[record.info!.attributeName][LINK_SYMBOL]
-            })
         }
 
+        // FIXME 应该先 有 create 再有  Link 事件
         if (!isUpdate) {
-            newRawDataWithNewIds.id = await this.database.getAutoId(newEntityData.recordName)
             events?.push({
                 type:'create',
                 recordName:newEntityData.recordName,
@@ -690,16 +705,18 @@ WHERE ${idField} = (${JSON.stringify(idRef.id)})
         for(let newRelatedEntityData of sameRowEntityRefOrNewData) {
             const linkInfo = newRelatedEntityData.info!.getLinkInfo()
             const updatedEntityLinkAttr = linkInfo.isRelationSource(entityName, newRelatedEntityData.info!.attributeName) ? 'source' : 'target'
-            await this.unlink(
-                linkInfo.name,
-                MatchExp.atom({
-                    key: `${updatedEntityLinkAttr}.id`,
-                    value: ['=', matchedEntity.id],
-                }),
-                !linkInfo.isRelationSource(entityName, newRelatedEntityData.info!.attributeName),
-                `unlink ${newRelatedEntityData.info?.parentEntityName} ${newRelatedEntityData.info?.attributeName} for update ${entityName}`,
-                events
-            )
+            if (!newRelatedEntityData.isRef() || matchedEntity[newRelatedEntityData.info?.attributeName!]?.id !== newRelatedEntityData.getData().id) {
+                await this.unlink(
+                    linkInfo.name,
+                    MatchExp.atom({
+                        key: `${updatedEntityLinkAttr}.id`,
+                        value: ['=', matchedEntity.id],
+                    }),
+                    !linkInfo.isRelationSource(entityName, newRelatedEntityData.info!.attributeName),
+                    `unlink ${newRelatedEntityData.info?.parentEntityName} ${newRelatedEntityData.info?.attributeName} for update ${entityName}`,
+                    events
+                )
+            }
         }
 
         // 2. 分配 id,处理需要 flash out 的数据等，事件也是这里面记录的。这里面会有抢夺关系，所以也可能会有删除事件。
@@ -794,7 +811,7 @@ WHERE ${idField} = (${JSON.stringify(idRef.id)})
         const matchedEntities = await this.findRecords(RecordQuery.create(entityName, this.map, {
             matchExpression: matchExpressionData,
             // FIXME 这里其实只要查 newEntityData 里面有的字段就可以了。
-            attributeQuery: AttributeQuery.getAttributeQueryDataForRecord(entityName, this.map)
+            attributeQuery: AttributeQuery.getAttributeQueryDataForRecord(entityName, this.map, true, true)
         }), `find record for updating ${entityName}`)
 
         const result: Record[] = []
@@ -819,6 +836,7 @@ WHERE ${idField} = (${JSON.stringify(idRef.id)})
             attributeQuery: AttributeQuery.getAttributeQueryDataForRecord(
                 recordName,
                 this.map,
+                true,
                 true,
                 true
             )
@@ -880,7 +898,6 @@ WHERE ${recordInfo.idField} IN (${records.map(({id}) => JSON.stringify(id)).join
 `, `delete record ${recordInfo.name} as row`)
                 }
             }
-            console.log(11111, 'delete !!!!', recordName, events)
             events?.push({
                 type:'delete',
                 recordName: recordName,

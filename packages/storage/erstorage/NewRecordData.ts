@@ -128,6 +128,7 @@ export class NewRecordData {
             value: this.rawData[info.attributeName]!
         }))
 
+
         // source/target 里面记录的 id
         this.entityIdAttributes.forEach(info => {
             result.push({

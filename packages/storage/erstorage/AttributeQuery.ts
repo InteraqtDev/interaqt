@@ -1,7 +1,7 @@
 import {EntityToTableMap} from "./EntityToTableMap";
 import {assert} from "../util.ts";
 
-import {RecordQueryData, RecordQueryTree, RecordQuery, LINK_SYMBOL} from "./RecordQuery.ts";
+import {RecordQueryData, RecordQueryTree, RecordQuery, LINK_SYMBOL, ALL_ATTR_SYMBOL} from "./RecordQuery.ts";
 import {MatchExp} from "./MatchExp.ts";
 
 export type AttributeQueryDataRecordItem = [string, RecordQueryData, boolean?]
@@ -17,7 +17,7 @@ export class AttributeQuery {
     public fullQueryTree: RecordQueryTree
     public parentLinkRecordQuery?: RecordQuery
     public id = Math.random()
-    public static getAttributeQueryDataForRecord(recordName:string, map: EntityToTableMap, includeSameTableReliance = false, includeMergedRecordAttribute = false): AttributeQueryData{
+    public static getAttributeQueryDataForRecord(recordName:string, map: EntityToTableMap, includeSameTableReliance = false, includeMergedRecordAttribute = false, includeManagedRecordAttributes = false): AttributeQueryData{
         const result: AttributeQueryData = map.getRecordInfo(recordName).valueAttributes.map(info => info.attributeName)
         const recordInfo = map.getRecordInfo(recordName)
 
@@ -49,11 +49,26 @@ export class AttributeQuery {
                 )
             })
         }
+        // link record 的 source/target 字段
+        if (includeManagedRecordAttributes) {
+            recordInfo.managedRecordAttributes.forEach(info => {
+                result.push(
+                    [
+                        info.attributeName,
+                        {
+                            attributeQuery: ['id']
+                        }
+                    ]
+                )
+            })
+        }
 
 
         return result
     }
     constructor(public recordName: string, public map: EntityToTableMap, public data: AttributeQueryData = [], public parentRecord?: string, public attributeName?: string, public shouldQueryParentLinkData?: boolean) {
+        let valueAttributesSet = new Set<string>()
+
         data.forEach((rawItem: AttributeQueryDataItem) => {
             const item = (typeof rawItem === 'string' ? [rawItem, {}, false] : rawItem)  as AttributeQueryDataRecordItem
             const [attributeName, subQueryData, onlyRelationData] = item
@@ -62,6 +77,11 @@ export class AttributeQuery {
                 assert(!!(this.parentRecord && this.attributeName), `${this.parentRecord} ${this.attributeName} cannot be empty when query link data`)
                 const info = this.map.getInfo(this.parentRecord!, this.attributeName!)
                 this.parentLinkRecordQuery = RecordQuery.create(info.linkName, this.map, subQueryData as RecordQueryData, undefined)
+                return
+            }
+
+            if (attributeName === ALL_ATTR_SYMBOL) {
+                valueAttributesSet = new Set(this.map.getRecordInfo(this.recordName).valueAttributes.map(info => info.attributeName))
                 return
             }
 
@@ -78,10 +98,11 @@ export class AttributeQuery {
                 }
 
             } else {
-                this.valueAttributes.push(attributeName)
+                valueAttributesSet.add(attributeName)
             }
         })
 
+        this.valueAttributes = Array.from(valueAttributesSet)
         // this.xToOneQueryTree = this.buildXToOneQueryTree()
         this.fullQueryTree = this.buildFullQueryTree()
 

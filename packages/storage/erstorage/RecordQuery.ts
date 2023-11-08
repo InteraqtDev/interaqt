@@ -166,6 +166,7 @@ export class RecordQueryTree {
 }
 
 export const LINK_SYMBOL = '&'
+export const ALL_ATTR_SYMBOL = '*'
 
 // export type RecordQueryTree = {
 //     _fields?: string[],

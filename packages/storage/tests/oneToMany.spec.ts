@@ -652,7 +652,7 @@ describe('one to many', () => {
         ])
     })
 
-    test('update one to many data:update with existing related as source', async () => {
+    test('update one to many data:update with existing related as target', async () => {
         const userA = await entityQueryHandle.create('User', {name:'a1', age:12})
         const userB = await entityQueryHandle.create('User', {name: 'm1', age:11})
         const userC = await entityQueryHandle.create('User', {name: 'm2', age:14})
@@ -718,6 +718,31 @@ describe('one to many', () => {
                 }
             }
         ])
+
+        // 测试 update 传入一样的数据，应该不产生事件
+        const events3: MutationEvent[] = []
+        const [updatedUserA3] = await entityQueryHandle.update('User', MatchExp.atom({
+            key: 'id',
+            value: ['=', userA.id]
+        }), { leader: userC }, events3)
+
+        const findUser3 = await entityQueryHandle.findOne('User',
+            MatchExp.atom({ key: 'id', value: ['=', userA.id]}),
+            {},
+            ['name', 'age', ['leader', { attributeQuery: ['name', 'age']}]]
+        )
+
+        expect(findUser3).toMatchObject({
+            name: 'a1',
+            age: 12,
+            leader: {
+                name: 'm2',
+                age: 14
+            }
+        })
+
+        // 应该没有事件
+        expect(events3).toMatchObject([])
     })
 })
 

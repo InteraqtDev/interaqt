@@ -18,8 +18,10 @@ export type FieldMatchAtom = MatchAtom & {
 }
 
 export class MatchExp {
-    public static atom(value: MatchAtom) {
-        return BoolExp.atom<MatchAtom>(value)
+    public static atom(condition: MatchAtom) {
+        console.assert(condition.key !== undefined, 'key cannot be undefined')
+        console.assert(Array.isArray(condition.value) && condition.value.length === 2, 'value must be array')
+        return BoolExp.atom<MatchAtom>(condition)
     }
 
     public xToOneQueryTree: RecordQueryTree
@@ -187,6 +189,8 @@ export class MatchExp {
     }
 
     and(condition: MatchAtom): MatchExp {
+        console.assert(condition.key !== undefined, 'key cannot be undefined')
+        console.assert(Array.isArray(condition.value) && condition.value.length === 2, 'value must be array')
         return new MatchExp(this.entityName, this.map, this.data ? this.data.and(condition) : BoolExp.atom<MatchAtom>(condition), this.contextRootEntity)
     }
 }
