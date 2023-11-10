@@ -25,6 +25,7 @@ export type Storage = {
     update: (entityName: string, ...arg: any[]) => Promise<any>,
     find: (entityName: string, ...arg: any[]) => Promise<any[]>,
     create: (entityName: string, data:any) => Promise<any>
+    delete: (entityName: string, data:any) => Promise<any>
     findOneRelationByName: (relationName: string, ...arg: any[]) => Promise<any>
     findRelationByName: (relationName: string, ...arg: any[]) => Promise<any>
     updateRelationByName: (relationName: string, ...arg: any[]) => Promise<any>

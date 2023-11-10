@@ -5,7 +5,7 @@ import {MemorySystem} from "../MemorySystem";
 import {createInstances, getInstance, KlassByName, KlassInstanceOf, removeAllInstance, stringifyAllInstances} from "../../shared/createClass";
 import { Activity, Interaction } from "../../shared/activity/Activity";
 import { Entity, Relation } from "../../shared/entity/Entity";
-import '../incrementalComputationHandles/index'
+import '../computedDataHandles/index'
 import {MatchExp} from '../../storage/erstorage/MatchExp'
 
 // 里面有所有必须的数据？
@@ -144,7 +144,6 @@ describe('map activity', () => {
         // const res4 = createFriendRelationActivityCall.callInteraction(activityId, approveUUID, {user: userA})
         // expect(res4.error).toBeDefined()
 
-
         // 6. 正确 b approve
         const res5 = await controller.callActivityInteraction(makeFriendActivityUUID, approveUUID, activityId, {user: userB})
         expect(res5.error).toBeUndefined()
@@ -185,6 +184,7 @@ describe('map activity', () => {
         expect(friendRelations[0].source.id).toBe(userA.id)
         expect(friendRelations[0].target.name).toBe('B')
         expect(friendRelations[0].target.id).toBe(userB.id)
+        console.log(11111111111111111111111111)
 
         // 删除关系，继续驱动状态机
         const res6 = await controller.callInteraction(deleteUUID, {
@@ -197,7 +197,6 @@ describe('map activity', () => {
 
         const friendRelations2 = await controller.system.storage.findRelationByName(relationName, undefined, undefined, [['source', {attributeQuery: ['name', 'age']}], ['target', {attributeQuery: ['name', 'age']}]])
         expect(friendRelations2.length).toBe(0)
-
 
         const userB3 = (await system.storage.findOne('User', MatchExp.atom({
             key:'id',

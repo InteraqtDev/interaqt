@@ -57,7 +57,6 @@ export class IncrementalRelationCountHandle extends PropertyIncrementalComputati
     async updateCountForRelationChange(mutationEvent: RecordMutationEvent,mutationEvents: RecordMutationEvent[]) {
         const toCountRelationName = this.controller.system.storage.getRelationName(this.entity.name, this.toCountAttributeName)
         // 1. 用 computeSource 判断是否引发增量计算，并计算影响的记录。它一定要返回真实受影响的。如果没返回说明没有受影响。
-        console.log(44444, mutationEvent)
         const affectedIds = this.computedData.isBidirectional ?
             [ { affectedId: mutationEvent.record!.target.id, relatedEntityRelationAttribute: 'source' }, { affectedId: mutationEvent.record!.source.id, relatedEntityRelationAttribute: 'target' }]:
             [ { affectedId: mutationEvent.record![this.entityRelationAttribute].id, relatedEntityRelationAttribute: this.relatedEntityRelationAttribute }]
@@ -72,7 +71,6 @@ export class IncrementalRelationCountHandle extends PropertyIncrementalComputati
             let isOriginMatch = false
             // 如果是关系的新增和删除
             if (mutationEvent.type === 'create' || mutationEvent.type === 'update') {
-
                 const relationRecord = await this.controller.system.storage.findOneRelationByName(toCountRelationName!, MatchExp.atom({
                     key: 'id',
                     value: ['=', mutationEvent.record!.id]
@@ -158,4 +156,3 @@ export class IncrementalRelationCountHandle extends PropertyIncrementalComputati
         }
     }
 }
-PropertyIncrementalComputationHandle.Handles.set(IncrementalRelationCount, IncrementalRelationCountHandle)

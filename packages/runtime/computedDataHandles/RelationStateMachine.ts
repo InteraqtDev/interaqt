@@ -1,37 +1,52 @@
 import {KlassInstanceOf, KlassType} from "../../shared/createClass";
 import {Entity, Relation} from "../../shared/entity/Entity";
-import {RelationIncrementalComputationHandle} from "./IncrementalComputationHandle";
-import {MapActivityToEntity, RelationStateMachine, RelationStateTransfer} from '../../shared/IncrementalComputation'
+import {
+    ComputedData,
+    MapActivityToEntity,
+    RelationStateMachine,
+    RelationStateTransfer
+} from '../../shared/IncrementalComputation'
 import {Controller} from "../Controller";
 import {InteractionEventArgs} from "../../types/interaction";
 import {assert} from "../util";
-import { EntityIdRef} from '../System'
-import { MatchExp } from '../../storage/erstorage/MatchExp'
+import {EntityIdRef, RecordMutationEvent} from '../System'
+import {MatchAtom, MatchExp} from '../../storage/erstorage/MatchExp'
+import {ComputedDataHandle, DataContext} from "./ComputedDataHandle";
 
 
 type SourceTargetPair = [EntityIdRef, EntityIdRef][]
 type ComputeSourceResult = SourceTargetPair | {source: EntityIdRef[] | EntityIdRef, target: EntityIdRef[]|EntityIdRef} | undefined
 type TransferHandleFn = (this: Controller,interactionEventArgs: InteractionEventArgs, activityId?:string ) =>  Promise<ComputeSourceResult>
 
-export class RelationStateMachineHandle extends RelationIncrementalComputationHandle {
+export class RelationStateMachineHandle extends ComputedDataHandle {
     computedData: KlassInstanceOf<typeof RelationStateMachine, false>
-    transferHandleFn: Map<KlassInstanceOf<typeof RelationStateTransfer, false>, TransferHandleFn> = new Map()
-
-    constructor(public controller: Controller, public data: KlassInstanceOf<typeof Relation, false>) {
-        super(controller, data);
-        this.computedData = data.computedData as KlassInstanceOf<typeof RelationStateMachine, false>
-
-        this.parseTransferHandle()
-        this.listenInteractions()
+    transferHandleFn?: Map<KlassInstanceOf<typeof RelationStateTransfer, false>, TransferHandleFn>
+    data?: KlassInstanceOf<typeof Relation, false>
+    constructor(controller: Controller , computedData: KlassInstanceOf<typeof ComputedData, false> , dataContext:  DataContext) {
+        super(controller, computedData, dataContext)
+        this.computedData = computedData as KlassInstanceOf<typeof RelationStateMachine, false>
+        this.data = this.dataContext.id as KlassInstanceOf<typeof Relation, false>
+        this.transferHandleFn = new Map()
         this.validateState()
+        // FIXME 移出去
+        this.listenInteractions()
     }
+    setupSchema() {
+        // 这里不能写在 constructor 里面是因为 super 里面的钩子会先调用，下面钩子函数里面的用的 data 就等于没有
+    }
+
     validateState() {
         // FIXME 理论上在一个状态机中，任何状态都应该是能用属性完全独立区别开的。最好在这里验证一下。
     }
-    parseTransferHandle() {
+    // FIXME 之后 从 listen interaction 也改成 监听 record 事件
+    computeEffect(mutationEvent: RecordMutationEvent, mutationEvents: RecordMutationEvent[]): any {
+
+    }
+
+    parseComputedData() {
         this.computedData.transfers!.forEach(transfer => {
             const parsedHandle = new Function('arg', 'activityId', `return (${transfer.handle}).call(this, arg, activityId)`) as TransferHandleFn
-            this.transferHandleFn.set(transfer, parsedHandle)
+            this.transferHandleFn!.set(transfer, parsedHandle)
         })
     }
     listenInteractions() {
@@ -68,8 +83,8 @@ export class RelationStateMachineHandle extends RelationIncrementalComputationHa
     }
     onCallInteraction = async (transfer: KlassInstanceOf<typeof RelationStateTransfer, false>, interactionEventArgs: InteractionEventArgs, activityId?: string) => {
         // CAUTION 不能房子啊 constructor 里面因为它实在 controller 里面调用的，controller 还没准备好。
-        const relationName = this.controller.system.storage.getRelationName(this.data.entity1!.name, this.data.targetName1)
-        const handleFn = this.transferHandleFn.get(transfer)!
+        const relationName = this.controller.system.storage.getRelationName(this.data!.entity1!.name, this.data!.targetName1)
+        const handleFn = this.transferHandleFn!.get(transfer)!
         if (transfer.handleType === 'computeSource') {
             // 1. 执行 handle 来计算  source 和 target
             const sourceAndTargetPairs = this.getSourceTargetPairs(await handleFn.call(this.controller, interactionEventArgs, activityId))
@@ -137,4 +152,4 @@ export class RelationStateMachineHandle extends RelationIncrementalComputationHa
         }
     }
 }
-RelationIncrementalComputationHandle.Handles.set(RelationStateMachine, RelationStateMachineHandle)
+ComputedDataHandle.Handles.set(RelationStateMachine, RelationStateMachineHandle)

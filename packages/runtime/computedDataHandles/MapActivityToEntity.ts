@@ -1,38 +1,51 @@
 import {KlassInstanceOf} from "../../shared/createClass";
 import {InteractionEvent, InteractionEventArgs} from "../../types/interaction";
 import {Controller} from "../Controller";
-import {EntityIncrementalComputationHandle} from "./IncrementalComputationHandle";
 import { getInteractions, Interaction} from "../../shared/activity/Activity";
 import {Entity, Property} from "../../shared/entity/Entity";
-import { MapActivityToEntity } from '../../shared/IncrementalComputation'
+import {ComputedData, MapActivityToEntity} from '../../shared/IncrementalComputation'
 import {MatchExp} from '../../storage/erstorage/MatchExp'
+import {ComputedDataHandle, DataContext} from "./ComputedDataHandle";
+import {RecordMutationEvent} from "../System";
 
 export type MapSourceDataType = {
     interaction: KlassInstanceOf<typeof Interaction, false>,
     data: InteractionEventArgs
 }
 
-export class MapActivityToEntityHandle extends EntityIncrementalComputationHandle {
-    mapItem: (data: MapSourceDataType[]) => any
+export class MapActivityToEntityHandle extends ComputedDataHandle {
+    data?: KlassInstanceOf<typeof Entity, false>
+    mapItem: (data: MapSourceDataType[]) => any = () => undefined
     computedData: KlassInstanceOf<typeof MapActivityToEntity, false>
-    constructor(public controller: Controller, public data: KlassInstanceOf<typeof Entity, false>) {
-        super(controller, data);
-        this.computedData = data.computedData as KlassInstanceOf<typeof MapActivityToEntity, false>
-        this.addActivityIdFieldToEntity()
+    constructor(controller: Controller , computedData: KlassInstanceOf<typeof ComputedData, false> , dataContext:  DataContext) {
 
-        this.mapItem = this.parseFunction(this.computedData.handle!)
+        super(controller, computedData, dataContext);
+        this.computedData = computedData as KlassInstanceOf<typeof MapActivityToEntity, false>
+        this.data = this.dataContext.id as KlassInstanceOf<typeof Entity, false>
+        // FIXME 移出去
         this.listenInteractionInActivity()
     }
+    // FIXME 之后 从 listen interaction 也改成 监听 record 事件
+    computeEffect(mutationEvent: RecordMutationEvent, mutationEvents: RecordMutationEvent[]): any {
 
+    }
+    parseComputedData() {
+        this.mapItem = this.parseMapItemFunction(this.computedData.handle!)
+    }
+    setupSchema() {
+        // 这里不能写在 constructor 里面是因为 super 里面的钩子会先调用，下面钩子函数里面的用的 data 就等于没有
+        this.addActivityIdFieldToEntity()
+        this.listenInteractionInActivity()
+    }
     addActivityIdFieldToEntity() {
-        this.data.properties!.push(Property.create({
+        this.data!.properties!.push(Property.create({
             name: 'activityId',
             type: 'string',
             collection: false
         }))
     }
 
-    parseFunction(stringContent: string) {
+    parseMapItemFunction(stringContent: string) {
         const body = new Function('sourceData', `return (${stringContent})(sourceData)`)
 
         return (sourceData: MapSourceDataType[]) => {
@@ -70,12 +83,12 @@ export class MapActivityToEntityHandle extends EntityIncrementalComputationHandl
 
         // 只有 undefined 是被认为没准备好
         if (newMappedItem !== undefined) {
-            const oldData = await this.controller.system.storage.findOne(this.data.name!, match)
+            const oldData = await this.controller.system.storage.findOne(this.data!.name!, match)
             if (oldData){
                 // 已经有数据了。
                 // TODO 未来有没有可能有不需要更新的情况？
                 await this.controller.system.storage.update(
-                    this.data.name!,
+                    this.data!.name!,
                     MatchExp.atom({ key: 'id', value: ['=', oldData.id]}),
                     {
                         ...newMappedItem,
@@ -84,7 +97,7 @@ export class MapActivityToEntityHandle extends EntityIncrementalComputationHandl
                 )
 
             } else {
-                await this.controller.system.storage.create(this.data.name!, {
+                await this.controller.system.storage.create(this.data!.name!, {
                     ...newMappedItem,
                     activityId
                 })
@@ -94,4 +107,5 @@ export class MapActivityToEntityHandle extends EntityIncrementalComputationHandl
         }
     }
 }
-EntityIncrementalComputationHandle.Handles.set(MapActivityToEntity, MapActivityToEntityHandle)
+
+ComputedDataHandle.Handles.set(MapActivityToEntity, MapActivityToEntityHandle)

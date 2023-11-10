@@ -1,19 +1,16 @@
 import {System, SystemCallback} from "./System";
-import {Entity, Relation} from "../shared/entity/Entity";
+import {Entity, Relation, Property} from "../shared/entity/Entity";
 import {Activity, Interaction} from "../shared/activity/Activity";
-import {
-    EntityIncrementalComputationHandle,
-    IncrementalComputationHandle, PropertyIncrementalComputationHandle,
-    RelationIncrementalComputationHandle
-} from "./incrementalComputationHandles/IncrementalComputationHandle";
+import './computedDataHandles/index'
 import {ActivityCall} from "./AcitivityCall";
 import {InteractionCall} from "./InteractionCall";
 import {InteractionEventArgs} from "../types/interaction";
 import {KlassInstanceOf, KlassType} from "../shared/createClass";
 import {assert} from "./util";
+import {ComputedDataHandle, DataContext} from "./computedDataHandles/ComputedDataHandle";
 
 export class Controller {
-    public incrementalComputationHandles = new Set<IncrementalComputationHandle>()
+    public computedDataHandles = new Set<ComputedDataHandle>()
     public activityCalls = new Map<string, ActivityCall>()
     public activityCallsByName = new Map<string, ActivityCall>()
     public interactionCallsByName = new Map<string, InteractionCall>()
@@ -23,7 +20,8 @@ export class Controller {
         public entities: KlassInstanceOf<typeof Entity, false>[],
         public relations: KlassInstanceOf<typeof Relation, false>[],
         public activities: KlassInstanceOf<typeof Activity, false>[],
-        public interactions: KlassInstanceOf<typeof Interaction, false>[])
+        public interactions: KlassInstanceOf<typeof Interaction, false>[],
+        public states: KlassInstanceOf<typeof Property, false>[] = [])
     {
         activities.forEach(activity => {
             const activityCall = new ActivityCall(activity, system)
@@ -46,18 +44,25 @@ export class Controller {
         // entity 的
         entities.forEach(entity => {
             if (entity.computedData) {
-                const Handle = EntityIncrementalComputationHandle.Handles.get(entity.computedData.constructor as KlassType<any>)!
-                this.incrementalComputationHandles.add(
-                    new Handle(this, entity)
+                const dataContext: DataContext = {
+                    id: entity
+                }
+                const Handle = ComputedDataHandle.Handles.get(entity.computedData.constructor as KlassType<any>)!
+                this.computedDataHandles.add(
+                    new Handle(this, entity.computedData, dataContext)
                 )
             }
 
             // property 的
             entity.properties?.forEach(property => {
                 if (property.computedData) {
-                    const Handle = PropertyIncrementalComputationHandle.Handles.get(property.computedData.constructor as KlassType<any>)!
-                    this.incrementalComputationHandles.add(
-                        new Handle(this, entity, property)
+                    const dataContext: DataContext = {
+                        host: entity,
+                        id: property
+                    }
+                    const Handle = ComputedDataHandle.Handles.get(property.computedData.constructor as KlassType<any>)!
+                    this.computedDataHandles.add(
+                        new Handle(this, property.computedData, dataContext)
                     )
 
                 }
@@ -67,32 +72,59 @@ export class Controller {
         // relation 的
         relations.forEach(relation => {
             if(relation.computedData) {
-                const Handle = RelationIncrementalComputationHandle.Handles.get(relation.computedData.constructor as KlassType<any>)!
-                this.incrementalComputationHandles.add(new Handle(this, relation))
+                const dataContext: DataContext = {
+                    id: relation
+                }
+                const Handle = ComputedDataHandle.Handles.get(relation.computedData.constructor as KlassType<any>)!
+                this.computedDataHandles.add(new Handle(this, relation.computedData, dataContext))
             }
 
             relation.properties?.forEach(property => {
                 if (property.computedData) {
-                    const Handle = PropertyIncrementalComputationHandle.Handles.get(property.computedData.constructor as KlassType<any>)!
-                    this.incrementalComputationHandles.add(
-                        new Handle(this, relation, property)
+                    const dataContext: DataContext = {
+                        host: relation,
+                        id: property
+                    }
+                    const Handle = ComputedDataHandle.Handles.get(property.computedData.constructor as KlassType<any>)!
+                    this.computedDataHandles.add(
+                        new Handle(this, property.computedData, dataContext)
                     )
                 }
             })
         })
-        // TODO 全局的
 
+        // 全局的
+        states.forEach(state => {
+            if (state.computedData) {
+                const dataContext: DataContext = {
+                    id: state
+                }
+                const Handle = ComputedDataHandle.Handles.get(state.computedData.constructor as KlassType<any>)!
+                this.computedDataHandles.add(
+                    new Handle(this, state.computedData, dataContext)
+                )
+            }
+        })
     }
     async setup() {
         // 1. setup 数据库
+        for(const handle of this.computedDataHandles) {
+            handle.setupSchema()
+        }
         // CAUTION 注意这里的 entities/relations 可能被 IncrementalComputationHandle 修改过了
         await this.system.storage.setup(this.entities, this.relations)
 
         // 2. 增量计算的字段设置初始值
-        // TODO 如果是恢复模式，应该从 event stack 中开始恢复数据。
-        for(const handle of this.incrementalComputationHandles) {
-            await handle.recoverComputedData()
+        for(const handle of this.computedDataHandles) {
+            handle.parseComputedData()
+            handle.addEventListener()
+            await handle.setupInitialValue()
         }
+
+        for(const handle of this.computedDataHandles) {
+            await handle.setupStates()
+        }
+        // TODO 如果是恢复模式，还要从 event stack 中开始恢复数据。
     }
     callbacks: Map<any, Set<SystemCallback>> = new Map()
     listen(event:any, callback: SystemCallback) {
