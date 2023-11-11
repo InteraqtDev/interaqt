@@ -10,7 +10,9 @@ import {
 } from "../../../shared/activity/Activity";
 import {OtherAttr} from "./roles";
 import {Entity, Property, PropertyTypes, Relation} from "../../../shared/entity/Entity";
-import {RelationStateMachine, RelationStateNode, RelationStateTransfer, MapActivityToEntity, IncrementalRelationCount} from "../../../shared/IncrementalComputation";
+import {State} from "../../../shared/state/State";
+
+import {RelationStateMachine, RelationStateNode, RelationStateTransfer, MapActivityToEntity, RelationCount, Count} from "../../../shared/IncrementalComputation";
 import {removeAllInstance, stringifyAllInstances} from "../../../shared/createClass";
 
 const UserEntity = Entity.createReactive({ name: 'User' })
@@ -239,8 +241,6 @@ const friendRelation = Relation.createReactive({
 
 
 
-
-
 export const mapFriendActivityToRequest = MapActivityToEntity.createReactive({
     sourceActivity: activity,
     triggerInteraction: [sendInteraction, approveInteraction, rejectInteraction],
@@ -298,7 +298,7 @@ Relation.createReactive({
 })
 
 // 计算 unhandled request 的总数
-const userTotalUnhandledRequest = IncrementalRelationCount.createReactive({
+const userTotalUnhandledRequest = RelationCount.createReactive({
     relation: receivedRequestRelation,
     relationDirection: 'target',
     matchExpression: `
@@ -317,19 +317,29 @@ UserEntity.properties.push(Property.createReactive({
 
 
 // 计算 total friend count
-const userTotalFriendCount = IncrementalRelationCount.createReactive({
+const userTotalFriendCount = RelationCount.createReactive({
     relation: friendRelation,
     relationDirection: 'source',
-    isBidirectional: true,
     matchExpression: `() => true`
 })
-//
+
 UserEntity.properties.push(Property.createReactive({
     name: 'totalFriendCount',
     type: 'number',
     collection: false,
     computedData: userTotalFriendCount
 }))
+
+
+State.createReactive({
+    name: 'totalFriendRelation',
+    type: 'number',
+    collection: false,
+    computedData: Count.createReactive({
+        record: friendRelation,
+        matchExpression: `() => true`
+    })
+})
 
 export const data = JSON.parse(stringifyAllInstances())
 removeAllInstance()

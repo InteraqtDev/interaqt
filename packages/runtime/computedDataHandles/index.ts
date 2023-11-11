@@ -1,3 +1,6 @@
 import './MapActivityToEntity'
 import './RelationStateMachine'
 import './RelationBasedWeightedSummation'
+import './RelationCount'
+import './WeightedSummation'
+import  './RecordCount'

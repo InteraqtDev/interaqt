@@ -5,6 +5,7 @@ import {MemorySystem} from "../MemorySystem";
 import {createInstances, getInstance, KlassByName, KlassInstanceOf, removeAllInstance, stringifyAllInstances} from "../../shared/createClass";
 import { Activity, Interaction } from "../../shared/activity/Activity";
 import { Entity, Relation } from "../../shared/entity/Entity";
+import { State } from "../../shared/state/State";
 import '../computedDataHandles/index'
 import {MatchExp} from '../../storage/erstorage/MatchExp'
 
@@ -47,7 +48,14 @@ describe('map activity', () => {
 
         system = new MemorySystem()
         system.conceptClass = KlassByName
-        controller = new Controller(system, [...Entity.instances].filter(e => !e.isRef), [...Relation.instances], [...Activity.instances], [...Interaction.instances])
+        controller = new Controller(
+            system,
+            [...Entity.instances].filter(e => !e.isRef),
+            [...Relation.instances],
+            [...Activity.instances],
+            [...Interaction.instances],
+            [...State.instances]
+        )
         await controller.setup()
 
         createFriendRelationActivityCall = controller.activityCallsByName.get('createFriendRelation')!
@@ -65,7 +73,6 @@ describe('map activity', () => {
 
         const userBRef = await system.storage.create('User', {name: 'B', age:12})
         userBId = userBRef.id
-
     })
 
     test('make friend activity', async () => {
@@ -86,10 +93,13 @@ describe('map activity', () => {
             roles:['user']
         }
 
+        const totalFriendRelation = await system.storage.get('state','totalFriendRelation')
+
         expect(userA.totalUnhandledRequest).toBe(0)
         expect(userB.totalUnhandledRequest).toBe(0)
         expect(userA.totalFriendCount).toBe(0)
         expect(userB.totalFriendCount).toBe(0)
+        expect(totalFriendRelation).toBe(0)
 
         // 1. 创建 activity
         const { activityId, state } = controller.createActivity(makeFriendActivityUUID)
@@ -184,7 +194,10 @@ describe('map activity', () => {
         expect(friendRelations[0].source.id).toBe(userA.id)
         expect(friendRelations[0].target.name).toBe('B')
         expect(friendRelations[0].target.id).toBe(userB.id)
-        console.log(11111111111111111111111111)
+
+        const totalFriendRelation1 = await system.storage.get('state','totalFriendRelation')
+        expect(totalFriendRelation1).toBe(1)
+
 
         // 删除关系，继续驱动状态机
         const res6 = await controller.callInteraction(deleteUUID, {
@@ -209,6 +222,11 @@ describe('map activity', () => {
             value: ['=', userAId]
         }), undefined, ['*']))
         expect(userA3.totalFriendCount).toBe(0)
+
+
+        const totalFriendRelation2 = await system.storage.get('state','totalFriendRelation')
+        expect(totalFriendRelation2).toBe(0)
+
     })
 
 })

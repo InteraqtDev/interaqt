@@ -76,6 +76,8 @@ export class Controller {
                     id: relation
                 }
                 const Handle = ComputedDataHandle.Handles.get(relation.computedData.constructor as KlassType<any>)!
+                assert(!!Handle, `cannot find handle for ${relation.computedData.constructor.name}`)
+
                 this.computedDataHandles.add(new Handle(this, relation.computedData, dataContext))
             }
 
@@ -86,6 +88,8 @@ export class Controller {
                         id: property
                     }
                     const Handle = ComputedDataHandle.Handles.get(property.computedData.constructor as KlassType<any>)!
+                    assert(!!Handle, `cannot find handle for ${property.computedData.constructor.name}`)
+
                     this.computedDataHandles.add(
                         new Handle(this, property.computedData, dataContext)
                     )
@@ -97,9 +101,10 @@ export class Controller {
         states.forEach(state => {
             if (state.computedData) {
                 const dataContext: DataContext = {
-                    id: state
+                    id: state.name!
                 }
                 const Handle = ComputedDataHandle.Handles.get(state.computedData.constructor as KlassType<any>)!
+                assert(!!Handle, `cannot find handle for ${state.computedData.constructor.name}`)
                 this.computedDataHandles.add(
                     new Handle(this, state.computedData, dataContext)
                 )

@@ -17,6 +17,7 @@ class MemoryStorage implements Storage{
     db = new SQLiteDB()
     public queryHandle?: EntityQueryHandle
     public callbacks: Set<RecordChangeListener> = new Set()
+    public dbSetup?: DBSetup
     // kv 结构
     get(conceptName: string, id: string, initialValue?: any) {
         let res = this.data.get(conceptName)!.get(id)
@@ -29,9 +30,9 @@ class MemoryStorage implements Storage{
         conceptData.set(id, value)
     }
     async setup(entities: KlassInstanceOf<typeof Entity, false>[], relations: KlassInstanceOf<typeof Relation, false>[]) {
-        const setup = new DBSetup(entities, relations, this.db)
-        await setup.createTables()
-        this.queryHandle = new EntityQueryHandle( new EntityToTableMap(setup.map), this.db)
+        this.dbSetup = new DBSetup(entities, relations, this.db)
+        await this.dbSetup.createTables()
+        this.queryHandle = new EntityQueryHandle( new EntityToTableMap(this.dbSetup.map), this.db)
     }
     findOne(...arg:Parameters<EntityQueryHandle["findOne"]>) {
         return this.queryHandle!.findOne(...arg)
@@ -78,6 +79,10 @@ class MemoryStorage implements Storage{
     }
     getRelationName(...arg:Parameters<EntityQueryHandle["getRelationName"]>) {
         return this.queryHandle!.getRelationName(...arg)
+    }
+    // FIXME 应该移出去，由 Relation 自己写成 computedData。这样动态获取没有必要
+    getRelationNameByDef(relation:Parameters<DBSetup["getRelationName"]>[0]) {
+        return this.dbSetup?.getRelationName(relation)!
     }
     listen(callback: RecordChangeListener) {
         this.callbacks.add(callback)

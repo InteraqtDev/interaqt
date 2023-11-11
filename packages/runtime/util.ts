@@ -1,4 +1,4 @@
-export function assert(condition: boolean, message: string ) {
+export function assert(condition: any, message: string ) {
     if (!condition) {
         // if (__DEV__) debugger
         throw new Error(message)

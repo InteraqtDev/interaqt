@@ -20,6 +20,7 @@ export class ComputedDataHandle {
     userFullCompute: (...args: any[]) => any = () => true
     public recordName?: string
     public propertyName?: string
+    public stateName?: string
     constructor(public controller: Controller , public computedData: KlassInstanceOf<typeof ComputedData, false> , public dataContext:  DataContext) {
         this.computedDataType = (!dataContext.host && typeof dataContext.id === 'string' )?
             'global' :
@@ -34,6 +35,8 @@ export class ComputedDataHandle {
         if (this.computedDataType === 'property') {
             this.recordName = (this.dataContext.host as KlassInstanceOf<typeof Entity, false>).name
             this.propertyName = (this.dataContext.id as KlassInstanceOf<typeof Property, false>).name
+        } else if (this.computedDataType === 'global') {
+            this.stateName = this.dataContext.id as string
         }
     }
     setupSchema() {

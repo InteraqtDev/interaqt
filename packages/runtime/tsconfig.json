@@ -20,7 +20,9 @@
     "rootDir": ".",
     "paths": {
       "rata": ["../../../rata/src"],
-      "axii": ["../../../axii/src"]
+      "axii": ["../../../axii/src"],
+      "@shared": ["../shared"],
+      "@storage": ["../storage"],
     },
     "jsx": "react",
     "jsxFactory": "createElement",
@@ -28,6 +30,7 @@
   },
   "include": [
     "./",
-    "../types"
+    "../shared/**/*",
+    "../storage",
   ]
 }
