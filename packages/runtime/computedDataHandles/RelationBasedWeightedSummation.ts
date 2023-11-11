@@ -40,8 +40,8 @@ type WeightedSummationRelation = {
 // CAUTION 只支持 computedDataType 为 property
 //  我们加权的权重必须是固定的，不能有条件判断，不然就必须每次重算。
 export class RelationBasedWeightedSummationHandle extends IncrementalComputedDataHandle {
-    entityName: string = ''
-    relationInfos: WeightedSummationRelation[] = []
+    entityName!: string
+    relationInfos!: WeightedSummationRelation[]
     computedData: KlassInstanceOf<typeof RelationBasedWeightedSummation, false> = this.computedData as KlassInstanceOf<typeof RelationBasedWeightedSummation, false>
     relations: KlassInstanceOf<typeof RelationBasedWeightedSummation, false>["relations"]
     mapRelationToWeight: (record: KlassInstanceOf<typeof Entity, false>, relation: KlassInstanceOf<typeof Relation, false>) => number = () => 0
@@ -58,6 +58,7 @@ export class RelationBasedWeightedSummationHandle extends IncrementalComputedDat
     async setupStates(): Promise<void> {
         this.relationInfos = this.relations!.map(({relation, relationDirection}) => {
             const toCountAttributeName = relation![relationDirection==='source' ? 'targetName1': 'targetName2']!
+            console.log(this.entityName, toCountAttributeName, relation)
             return {
                 relationName: this.controller.system.storage.getRelationName(this.entityName, toCountAttributeName),
                 toCountAttributeName,
@@ -123,7 +124,7 @@ export class RelationBasedWeightedSummationHandle extends IncrementalComputedDat
     async getLastValue(effect: RelationChangeEffect|RelatedRecordChangeEffect, mutationEvent: RecordMutationEvent, mutationEvents: RecordMutationEvent[]) {
         if (effect.type === 'relation') {
             const match = MatchExp.atom({key: 'id', value: ['=', effect.affectedId]})
-            const originEntity = await this.controller.system.storage.findOne(this.entityName!, match, undefined, [this.propertyName])
+            const originEntity = await this.controller.system.storage.findOne(this.entityName!, match, undefined, [this.propertyName!])
             return originEntity[this.propertyName!]
         } else {
             // 因为 effect 里面查过一次了，所以这里节约性能直接获取就行了。

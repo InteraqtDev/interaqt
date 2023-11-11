@@ -96,9 +96,12 @@ describe('map activity', () => {
         const totalFriendRelation = await system.storage.get('state','totalFriendRelation')
 
         expect(userA.totalUnhandledRequest).toBe(0)
-        expect(userB.totalUnhandledRequest).toBe(0)
         expect(userA.totalFriendCount).toBe(0)
+        expect(userA.everySendRequestHandled).toBeTruthy()
+        expect(userA.anySendRequestHandled).toBeFalsy()
         expect(userB.totalFriendCount).toBe(0)
+        expect(userB.totalUnhandledRequest).toBe(0)
+
         expect(totalFriendRelation).toBe(0)
 
         // 1. 创建 activity
@@ -146,6 +149,14 @@ describe('map activity', () => {
             }), undefined, ['*']))
         expect(userB1.totalUnhandledRequest).toBe(1)
 
+        const userA1 = (await system.storage.findOne('User', MatchExp.atom({
+            key:'id',
+            value: ['=', userAId]
+        }), undefined, ['*']))
+        expect(userA1.everySendRequestHandled).toBeFalsy()
+        expect(userA1.anySendRequestHandled).toBeFalsy()
+
+
         // 4. 交互顺序错误 a sendFriendRequest
         // const res3 = createFriendRelationActivityCall.callInteraction(activityId, sendRequestUUID, {user: userA})
         // expect(res3.error).toBeDefined()
@@ -175,6 +186,8 @@ describe('map activity', () => {
             value: ['=', userAId]
         }), undefined, ['*']))
         expect(userA2.totalFriendCount).toBe(1)
+        expect(userA2.everySendRequestHandled).toBeTruthy()
+        expect(userA2.anySendRequestHandled).toBeTruthy()
         // 7. 错误 b reject
         // const res6 = createFriendRelationActivityCall.callInteraction(activityId, rejectUUID, {user: userB})
         // expect(res6.error).toBeDefined()

@@ -14,35 +14,37 @@ export type MapSourceDataType = {
 }
 
 export class MapActivityToEntityHandle extends ComputedDataHandle {
-    data?: KlassInstanceOf<typeof Entity, false>
+    data!: KlassInstanceOf<typeof Entity, false>
     mapItem: (data: MapSourceDataType[]) => any = () => undefined
     computedData: KlassInstanceOf<typeof MapActivityToEntity, false>
     constructor(controller: Controller , computedData: KlassInstanceOf<typeof ComputedData, false> , dataContext:  DataContext) {
-
         super(controller, computedData, dataContext);
         this.computedData = computedData as KlassInstanceOf<typeof MapActivityToEntity, false>
-        this.data = this.dataContext.id as KlassInstanceOf<typeof Entity, false>
-        // FIXME 移出去
-        this.listenInteractionInActivity()
     }
     // FIXME 之后 从 listen interaction 也改成 监听 record 事件
     computeEffect(mutationEvent: RecordMutationEvent, mutationEvents: RecordMutationEvent[]): any {
 
     }
     parseComputedData() {
+        this.data = this.dataContext.id as KlassInstanceOf<typeof Entity, false>
         this.mapItem = this.parseMapItemFunction(this.computedData.handle!)
     }
     setupSchema() {
-        // 这里不能写在 constructor 里面是因为 super 里面的钩子会先调用，下面钩子函数里面的用的 data 就等于没有
-        this.addActivityIdFieldToEntity()
-        this.listenInteractionInActivity()
-    }
-    addActivityIdFieldToEntity() {
-        this.data!.properties!.push(Property.create({
+        (this.dataContext.id as KlassInstanceOf<typeof Entity, false>)!.properties!.push(Property.create({
             name: 'activityId',
             type: 'string',
             collection: false
         }))
+    }
+    addEventListener() {
+        super.addEventListener()
+        // FIXME 改成监听 record 事件
+        // 监听的 interaction 变化
+        const interactionsToListen = this.computedData.triggerInteraction || getInteractions(this.computedData.sourceActivity!)
+
+        interactionsToListen.forEach(interaction => {
+            this.controller.listen(interaction, this.onCallInteraction)
+        })
     }
 
     parseMapItemFunction(stringContent: string) {
@@ -51,15 +53,6 @@ export class MapActivityToEntityHandle extends ComputedDataHandle {
         return (sourceData: MapSourceDataType[]) => {
             return body(sourceData)
         }
-    }
-
-    listenInteractionInActivity(){
-        // 监听的 interaction 变化
-        const interactionsToListen = this.computedData.triggerInteraction || getInteractions(this.computedData.sourceActivity!)
-
-        interactionsToListen.forEach(interaction => {
-            this.controller.listen(interaction, this.onCallInteraction)
-        })
     }
     onCallInteraction = async (interactionEventArgs: InteractionEventArgs, activityId:string) => {
         const match = MatchExp.atom({

@@ -17,7 +17,7 @@ export class ComputedDataHandle {
     public static  Handles: Map<KlassType<any>,  typeof ComputedDataHandle> = new Map()
     computedDataType: 'global' | 'entity' | 'relation' | 'property'
     userComputeEffect: (mutationEvent: any, mutationEvents: any) => any = () => true
-    userFullCompute: (...args: any[]) => any = () => true
+    userFullCompute: (...args: any[]) => Promise<any> = () => Promise.resolve(true)
     public recordName?: string
     public propertyName?: string
     public stateName?: string
@@ -38,6 +38,8 @@ export class ComputedDataHandle {
         } else if (this.computedDataType === 'global') {
             this.stateName = this.dataContext.id as string
         }
+
+        this.setupSchema()
     }
     setupSchema() {
         // 用来增加/修改 schema 的
@@ -98,7 +100,6 @@ export class ComputedDataHandle {
     insertDefaultPropertyValue(newRecord: any) {
         const defaultValue = this.getDefaultValue(newRecord.id)
         const match = MatchExp.atom({key: 'id', value: ['=', newRecord.id]})
-        console.log(222222, newRecord.id, this.recordName, {[this.propertyName!]: defaultValue})
         return this.controller.system.storage.update(this.recordName!, match, {[this.propertyName!]: defaultValue})
     }
     computeEffect(mutationEvent: RecordMutationEvent, mutationEvents: RecordMutationEvent[]) {
@@ -110,12 +111,12 @@ export class ComputedDataHandle {
     }
     async recompute(effect: any, mutationEvent: RecordMutationEvent, mutationEvents: RecordMutationEvent[]) {
         if (this.computedDataType === 'global' || this.computedDataType === 'entity' || this.computedDataType === 'relation') {
-            const newValue = this.userFullCompute()
+            const newValue = await this.userFullCompute()
             await this.updateState(true, newValue)
         } else if (this.computedDataType === 'property'){
             const affectedRecordIds = Array.isArray(effect) ? effect : [effect]
             for(let id of affectedRecordIds){
-                const newValue = this.userFullCompute(id)
+                const newValue = await this.userFullCompute(id)
                 await this.updateState(id, newValue)
             }
         }

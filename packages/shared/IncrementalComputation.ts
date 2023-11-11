@@ -143,7 +143,7 @@ export const ComputedData = createClass({
 })
 
 
-const WeightedSummationRelation = createClass({
+const RelationBasedItem = createClass({
     name: 'WeightedSummationRelation',
     public: {
         relation: {
@@ -166,7 +166,7 @@ export const RelationBasedWeightedSummation = createClass({
     name: 'RelationWeightedSummation',
     public: {
         relations: {
-            type: WeightedSummationRelation,
+            type: RelationBasedItem,
             collection: true,
             required: true
         },
@@ -241,6 +241,58 @@ export const Count = createClass({
 })
 
 State.public.computedData.type.push(WeightedSummation, Count)
+
+
+// every
+export const RelationBasedEvery = createClass({
+    name: 'RelationBasedEvery',
+    public: {
+        relation: {
+            type: Relation,
+            collection: false,
+            required: true
+        },
+        // 因为 relation 可能 source/target 实体相同，所以还有增加方向信息
+        relationDirection: {
+            type: 'string',
+            collection: false,
+            required: true,
+            defaultValue: () => 'source'
+        },
+        // 创建初始值的时候用于计算哪些 relation 是要  count 的
+        // 这里 match 的是 relatedEntity
+        matchExpression: {
+            type: 'string',
+            collection: false,
+            required: true
+        }
+    }
+})
+export const RelationBasedAny = createClass({
+    name: 'RelationBasedAny',
+    public: {
+        relation: {
+            type: Relation,
+            collection: false,
+            required: true
+        },
+        // 因为 relation 可能 source/target 实体相同，所以还有增加方向信息
+        relationDirection: {
+            type: 'string',
+            collection: false,
+            required: true,
+            defaultValue: () => 'source'
+        },
+        // 创建初始值的时候用于计算哪些 relation 是要  count 的
+        // 这里 match 的是 relatedEntity
+        matchExpression: {
+            type: 'string',
+            collection: false,
+            required: true
+        }
+    }
+})
+Property.public.computedData.type.push(RelationBasedEvery, RelationBasedAny)
 
 // TODO Property 支持的 max/min/topN/filter/
 

@@ -12,7 +12,15 @@ import {OtherAttr} from "./roles";
 import {Entity, Property, PropertyTypes, Relation} from "../../../shared/entity/Entity";
 import {State} from "../../../shared/state/State";
 
-import {RelationStateMachine, RelationStateNode, RelationStateTransfer, MapActivityToEntity, RelationCount, Count} from "../../../shared/IncrementalComputation";
+import {
+    RelationStateMachine,
+    RelationStateNode,
+    RelationStateTransfer,
+    MapActivityToEntity,
+    RelationCount,
+    Count,
+    RelationBasedEvery, RelationBasedAny
+} from "../../../shared/IncrementalComputation";
 import {removeAllInstance, stringifyAllInstances} from "../../../shared/createClass";
 
 const UserEntity = Entity.createReactive({ name: 'User' })
@@ -272,7 +280,7 @@ const requestEntity= Entity.createReactive({
     })]
 })
 
-Relation.createReactive({
+const sendRequestRelation = Relation.createReactive({
     entity1: requestEntity,
     targetName1: 'from',
     entity2: UserEntity,
@@ -315,6 +323,27 @@ UserEntity.properties.push(Property.createReactive({
     computedData: userTotalUnhandledRequest
 }))
 
+UserEntity.properties.push(Property.createReactive({
+    name: 'everySendRequestHandled',
+    type: 'boolean',
+    collection: false,
+    computedData: RelationBasedEvery.createReactive({
+        relation: sendRequestRelation,
+        relationDirection: 'target',
+        matchExpression: `(request) => request.handled`
+    })
+}))
+
+UserEntity.properties.push(Property.createReactive({
+    name: 'anySendRequestHandled',
+    type: 'boolean',
+    collection: false,
+    computedData: RelationBasedAny.createReactive({
+        relation: sendRequestRelation,
+        relationDirection: 'target',
+        matchExpression: `(request) => request.handled`
+    })
+}))
 
 // 计算 total friend count
 const userTotalFriendCount = RelationCount.createReactive({

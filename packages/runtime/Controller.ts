@@ -5,7 +5,7 @@ import './computedDataHandles/index'
 import {ActivityCall} from "./AcitivityCall";
 import {InteractionCall} from "./InteractionCall";
 import {InteractionEventArgs} from "../types/interaction";
-import {KlassInstanceOf, KlassType} from "../shared/createClass";
+import {KlassInstanceOf, KlassType, KlassInstance} from "../shared/createClass";
 import {assert} from "./util";
 import {ComputedDataHandle, DataContext} from "./computedDataHandles/ComputedDataHandle";
 
@@ -44,27 +44,13 @@ export class Controller {
         // entity 的
         entities.forEach(entity => {
             if (entity.computedData) {
-                const dataContext: DataContext = {
-                    id: entity
-                }
-                const Handle = ComputedDataHandle.Handles.get(entity.computedData.constructor as KlassType<any>)!
-                this.computedDataHandles.add(
-                    new Handle(this, entity.computedData, dataContext)
-                )
+                this.addComputedDataHandle(entity.computedData, undefined, entity)
             }
 
             // property 的
             entity.properties?.forEach(property => {
                 if (property.computedData) {
-                    const dataContext: DataContext = {
-                        host: entity,
-                        id: property
-                    }
-                    const Handle = ComputedDataHandle.Handles.get(property.computedData.constructor as KlassType<any>)!
-                    this.computedDataHandles.add(
-                        new Handle(this, property.computedData, dataContext)
-                    )
-
+                    this.addComputedDataHandle(property.computedData, entity, property)
                 }
             })
         })
@@ -72,27 +58,12 @@ export class Controller {
         // relation 的
         relations.forEach(relation => {
             if(relation.computedData) {
-                const dataContext: DataContext = {
-                    id: relation
-                }
-                const Handle = ComputedDataHandle.Handles.get(relation.computedData.constructor as KlassType<any>)!
-                assert(!!Handle, `cannot find handle for ${relation.computedData.constructor.name}`)
-
-                this.computedDataHandles.add(new Handle(this, relation.computedData, dataContext))
+                this.addComputedDataHandle(relation.computedData, undefined, relation)
             }
 
             relation.properties?.forEach(property => {
                 if (property.computedData) {
-                    const dataContext: DataContext = {
-                        host: relation,
-                        id: property
-                    }
-                    const Handle = ComputedDataHandle.Handles.get(property.computedData.constructor as KlassType<any>)!
-                    assert(!!Handle, `cannot find handle for ${property.computedData.constructor.name}`)
-
-                    this.computedDataHandles.add(
-                        new Handle(this, property.computedData, dataContext)
-                    )
+                    this.addComputedDataHandle(property.computedData, relation, property)
                 }
             })
         })
@@ -100,30 +71,34 @@ export class Controller {
         // 全局的
         states.forEach(state => {
             if (state.computedData) {
-                const dataContext: DataContext = {
-                    id: state.name!
-                }
-                const Handle = ComputedDataHandle.Handles.get(state.computedData.constructor as KlassType<any>)!
-                assert(!!Handle, `cannot find handle for ${state.computedData.constructor.name}`)
-                this.computedDataHandles.add(
-                    new Handle(this, state.computedData, dataContext)
-                )
+                this.addComputedDataHandle(state.computedData, undefined, state.name as string)
             }
         })
+    }
+    addComputedDataHandle(computedData: KlassInstance<any>, host:DataContext["host"], id: DataContext["id"]) {
+        const dataContext: DataContext = {
+            host,
+            id
+        }
+        const Handle = ComputedDataHandle.Handles.get(computedData.constructor as KlassType<any>)!
+        assert(!!Handle, `cannot find handle for ${computedData.constructor.name}`)
+
+        this.computedDataHandles.add(
+            new Handle(this, computedData, dataContext)
+        )
     }
     async setup() {
         // 1. setup 数据库
         for(const handle of this.computedDataHandles) {
-            handle.setupSchema()
+            handle.parseComputedData()
         }
         // CAUTION 注意这里的 entities/relations 可能被 IncrementalComputationHandle 修改过了
         await this.system.storage.setup(this.entities, this.relations)
 
         // 2. 增量计算的字段设置初始值
         for(const handle of this.computedDataHandles) {
-            handle.parseComputedData()
-            handle.addEventListener()
             await handle.setupInitialValue()
+            handle.addEventListener()
         }
 
         for(const handle of this.computedDataHandles) {

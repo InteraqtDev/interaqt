@@ -31,9 +31,6 @@ export class RelationStateMachineHandle extends ComputedDataHandle {
         // FIXME 移出去
         this.listenInteractions()
     }
-    setupSchema() {
-        // 这里不能写在 constructor 里面是因为 super 里面的钩子会先调用，下面钩子函数里面的用的 data 就等于没有
-    }
 
     validateState() {
         // FIXME 理论上在一个状态机中，任何状态都应该是能用属性完全独立区别开的。最好在这里验证一下。
