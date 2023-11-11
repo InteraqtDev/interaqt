@@ -91,4 +91,7 @@ export class EntityQueryHandle {
     getRelationName(entity: string, attribute: string): string {
         return this.map.getInfo(entity, attribute).linkName
     }
+    getRelationNameByDef(relation: string, attribute: string): string {
+        return this.map.get(entity, attribute).linkName
+    }
 }
