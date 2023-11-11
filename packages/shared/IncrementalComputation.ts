@@ -1,6 +1,7 @@
 import { createClass} from "./createClass";
 import {Activity, Interaction} from "./activity/Activity";
 import {Entity, Property, Relation} from "./entity/Entity";
+import {State} from "./state/State";
 
 export const MapActivityToEntity = createClass({
     name: 'MapActivityToEntity',
@@ -123,8 +124,63 @@ export const RelationStateMachine = createClass({
 
 Relation.public.computedData.type.push(RelationStateMachine)
 
-// TODO Property 支持的 count/filter/max/min/topN
-export const IncrementalRelationCount = createClass({
+
+// ComputedData 的基础结构
+export const ComputedData = createClass({
+    name: 'ComputedData',
+    public: {
+        computeEffect: {
+            type: 'string',
+            collection: false,
+            required: true
+        },
+        computation: {
+            type: 'string',
+            collection: false,
+            required: true
+        }
+    }
+})
+
+
+const WeightedSummationRelation = createClass({
+    name: 'WeightedSummationRelation',
+    public: {
+        relation: {
+            type: Relation,
+            collection: false,
+            required: true
+        },
+        // 因为 relation 可能 source/target 实体相同，所以还有增加方向信息
+        relationDirection: {
+            type: 'string',
+            collection: false,
+            required: true,
+            defaultValue: () => 'source'
+        },
+    }
+})
+
+
+export const RelationBasedWeightedSummation = createClass({
+    name: 'RelationWeightedSummation',
+    public: {
+        relations: {
+            type: WeightedSummationRelation,
+            collection: true,
+            required: true
+        },
+        // 创建初始值的时候用于计算哪些 relation 是要  count 的
+        // 这里 match 的是 relatedEntity
+        matchRelationToWeight: {
+            type: 'string',
+            collection: false,
+            required: true
+        }
+    }
+})
+
+export const RelationCount = createClass({
     name: 'PropertyIncrementalCount',
     public: {
         relation: {
@@ -139,13 +195,6 @@ export const IncrementalRelationCount = createClass({
             required: true,
             defaultValue: () => 'source'
         },
-        isBidirectional: {
-            type: 'boolean',
-            collection: false,
-            required: true,
-            defaultValue: () => false
-        },
-
         // 创建初始值的时候用于计算哪些 relation 是要  count 的
         // 这里 match 的是 relatedEntity
         matchExpression: {
@@ -156,7 +205,43 @@ export const IncrementalRelationCount = createClass({
     }
 })
 
-Property.public.computedData.type.push(IncrementalRelationCount)
+Property.public.computedData.type.push(RelationCount, RelationBasedWeightedSummation)
 
-// TODO 其他的
+// 整个系统的加权和count
+export const WeightedSummation = createClass({
+    name: 'WeightedSummation',
+    public: {
+        records: {
+            type: [Entity, Relation],
+            collection: true,
+            required: true
+        },
+        matchRecordToWeight: {
+            type: 'string',
+            collection: false,
+            required: true
+        }
+    }
+})
+
+export const Count = createClass({
+    name: 'Count',
+    public: {
+        record: {
+            type: [Entity, Relation],
+            collection: false,
+            required: true
+        },
+        matchExpression: {
+            type: 'string',
+            collection: false,
+            required: true
+        }
+    }
+})
+
+State.public.computedData.type.push(WeightedSummation, Count)
+
+// TODO Property 支持的 max/min/topN/filter/
+
 
