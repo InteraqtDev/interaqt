@@ -228,4 +228,5 @@ export const Relation = createClass({
 })
 // CAUTION Relation 可以作为 source
 // FIXME type relation 和 entity 的 public type 最好都单独定义
+// @ts-ignore
 Relation.public.entity1.type.push(Relation)
