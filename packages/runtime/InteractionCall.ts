@@ -1,15 +1,21 @@
 import {EntityAttributive, GetAction, InteractionInstanceType} from "@shared/activity/Activity";
-import { UserAttributive } from "@shared/user/User";
-// import { Entity} from "@shared/entity/Entity";
+import {UserAttributive} from "@shared/user/User";
 import {System} from "./System";
 import {InteractionEvent, InteractionEventArgs} from "../types/interaction";
-import {Concept, ConceptAlias, ConceptInstance, DerivedConcept, EntityAttributiveAtom} from "@shared/attributive";
+import {
+    Concept,
+    ConceptAlias,
+    ConceptInstance,
+    DerivedConcept,
+    EntityAttributiveAtom,
+    UserAttributiveAtom,
+    UserAttributives
+} from "@shared/attributive";
 import {BoolExp, BoolExpressionData} from "@shared/BoolExp";
-import { UserAttributives, UserAttributiveAtom} from '@shared/attributive'
-import {assert, everyAsync, everyWithErrorAsync, indexBy} from "./util";
-import {getInstance} from "@shared/createClass";
+import {assert, everyWithErrorAsync} from "./util";
+import {getInstance, KlassType} from "@shared/createClass";
 import {ActivityCall} from "./AcitivityCall";
-
+import {someAsync} from "@storage/erstorage/util";
 
 
 type ConceptCheckStack = {
@@ -46,7 +52,7 @@ export type InteractionCallResponse= {
 }
 
 
-type HandleAttributive = (attributive: UserAttributiveAtom) => boolean
+type HandleAttributive = (attributive: UserAttributiveAtom) => Promise<boolean>
 
 type Attributive = {
     stringContent: string,
@@ -85,7 +91,7 @@ export class InteractionCall {
         // const attributiveByName = indexBy((UserAttributive.instances as any[]).concat(Entity.instances), 'name')
         return Promise.resolve(true)
     }
-    createHandleAttributive(AttributiveClass, interactionEvent, target) {
+    createHandleAttributive(AttributiveClass: KlassType<any>, interactionEvent: InteractionEventArgs, target) {
         return (attributiveData: UserAttributiveAtom) => {
             const attributive = getInstance(AttributiveClass).find(i => i.name === attributiveData?.key)
             return this.checkAttributive(attributive, interactionEvent, target)
@@ -93,17 +99,17 @@ export class InteractionCall {
     }
     async checkUser(interactionEvent: InteractionEventArgs) {
         let res: ConceptCheckResponse|true
-        if (this.interaction.userRoleAttributive.isRef) {
+        if (this.interaction.userRoleAttributive!.isRef) {
             // CAUTION 这里让 activity 自己在外部 check
             res = true
         } else {
 
             let userAttributiveCombined = BoolExp.atom<UserAttributiveAtom>({
-                key: this.interaction.userRoleAttributive.name as string
+                key: this.interaction.userRoleAttributive!.name as string
             })
 
-            if (this.interaction.userAttributives.content) {
-                userAttributiveCombined = userAttributiveCombined.and(this.interaction.userAttributives.content as BoolExpressionData<UserAttributiveAtom>)
+            if (this.interaction.userAttributives!.content) {
+                userAttributiveCombined = userAttributiveCombined.and(this.interaction.userAttributives!.content as BoolExpressionData<UserAttributiveAtom>)
             }
 
             // FIXME 目前是用名字做索引，因为这个表达是嵌套对象，之后要支持深度的序列化和反序列化才能得到不需要名字索引的数据。
@@ -116,21 +122,21 @@ export class InteractionCall {
         throw new LoginError('check user failed', res)
     }
     // 用来check attributive 形容的后面的  target 到底是不是那个概念的实例。
-    async checkConcept(instance: ConceptInstance, concept: Concept, attributives?: UserAttributives, stack: ConceptCheckStack[] = []): ConceptCheckResponse {
+    async checkConcept(instance: ConceptInstance, concept: Concept, attributives?: UserAttributives, stack: ConceptCheckStack[] = []): Promise<ConceptCheckResponse> {
         const currentStack = stack.concat({type: 'concept', values: {attributives, concept}})
 
         const conceptRes = await this.isConcept(instance, concept, currentStack)
         if (conceptRes !== true) return conceptRes
 
         if (attributives) {
-            const handleAttributives = (attributiveData) => this.checkMixedAttributive(attributiveData, instance)
+            const handleAttributives = (attributiveData: UserAttributiveAtom) => this.checkMixedAttributive(attributiveData, instance)
             const attrMatchRes = await this.checkAttributives(new BoolExp<UserAttributiveAtom>(attributives), handleAttributives , currentStack)
             if (attrMatchRes !== true) return attrMatchRes
         }
 
         return true
     }
-    async isConcept(instance: ConceptInstance, concept: Concept, stack: ConceptCheckStack[] = []): ConceptCheckResponse {
+    async isConcept(instance: ConceptInstance, concept: Concept, stack: ConceptCheckStack[] = []): Promise<ConceptCheckResponse> {
         const currentStack = stack.concat({type: 'isConcept', values: {concept}})
 
         if (this.isDerivedConcept(concept)) {
@@ -139,8 +145,9 @@ export class InteractionCall {
 
         if (this.isConceptAlias(concept)) {
             const errors: AtomError[] = []
-            const somePassed = (concept as ConceptAlias).for.some((concept: Concept) => {
-                const checkRes = this.isConcept(instance, concept)
+
+            const somePassed = someAsync((concept as ConceptAlias).for, async (concept: Concept) => {
+                const checkRes = await this.isConcept(instance, concept)
                 if (checkRes === true) {
                     return true
                 } else {
@@ -182,7 +189,7 @@ export class InteractionCall {
     isConceptAlias(concept: Concept) {
         return !!(concept as ConceptAlias).for
     }
-    async checkAttributives(attributives: BoolExp<UserAttributiveAtom>, handleAttributive: HandleAttributive, stack: ConceptCheckStack[]) : ConceptCheckResponse{
+    async checkAttributives(attributives: BoolExp<UserAttributiveAtom>, handleAttributive: HandleAttributive, stack: ConceptCheckStack[] = []) : Promise<ConceptCheckResponse>{
         const result =  await attributives.evaluateAsync(handleAttributive)
         return result === true ? true : {name: '', type: 'matchAttributives', stack, error: result}
     }
@@ -190,7 +197,7 @@ export class InteractionCall {
         const payloadDefs = this.interaction.payload?.items || []
         for(let payloadDef of payloadDefs) {
 
-            const payloadItem = interactionEvent.payload[payloadDef.name]
+            const payloadItem = interactionEvent.payload![payloadDef.name!]
             if (payloadDef.required && !payloadItem) {
                 throw new LoginError(`payload ${payloadDef.name} missing`, interactionEvent.payload)
             }
@@ -282,7 +289,7 @@ export class InteractionCall {
         // TODO
         // return this.system.storage.get(interactionEvent.payload, interactionEvent.query)
     }
-    async call(interactionEventArgs: InteractionEventArgs, activityId?): InteractionCallResponse {
+    async call(interactionEventArgs: InteractionEventArgs, activityId?: string): Promise<InteractionCallResponse> {
         const response: InteractionCallResponse = {
             sideEffects: {}
         }
