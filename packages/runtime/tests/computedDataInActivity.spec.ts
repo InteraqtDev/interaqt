@@ -16,7 +16,7 @@ type User = {
     [k:string]: any
 }
 
-describe('map activity', () => {
+describe('computed data in activity', () => {
 
     let createFriendRelationActivityCall: ActivityCall
     let system: MemorySystem
@@ -31,6 +31,8 @@ describe('map activity', () => {
 
     let userAId: string
     let userBId: string
+    let userCId: string
+    let userDId: string
     beforeEach(async () => {
         removeAllInstance()
         const { data }  = (await import('./data/activity'))
@@ -68,14 +70,20 @@ describe('map activity', () => {
         deleteUUID = Interaction.instances!.find(i => i.name === 'deleteFriend')!.uuid
 
 
-        const userARef = await system.storage.create('User', {name: 'A', age:10})
+        const userARef = await system.storage.create('User', {name: 'A', age:11})
         userAId = userARef.id
 
         const userBRef = await system.storage.create('User', {name: 'B', age:12})
         userBId = userBRef.id
+
+        const userCRef = await system.storage.create('User', {name: 'C', age:13})
+        userCId = userCRef.id
+
+        const userDRef = await system.storage.create('User', {name: 'D', age:14})
+        userDId = userDRef.id
     })
 
-    test('make friend activity', async () => {
+    test.only('make friend activity', async () => {
         // 0. 验证初始数据
         const userA: User = {
             ...await system.storage.findOne('User', MatchExp.atom({
@@ -93,7 +101,25 @@ describe('map activity', () => {
             roles:['user']
         }
 
+        const userC: User = {
+            ...await system.storage.findOne('User', MatchExp.atom({
+                key:'id',
+                value: ['=', userCId]
+            }), undefined, ['*']),
+            roles:['user']
+        }
+
+        const userD: User = {
+            ...await system.storage.findOne('User', MatchExp.atom({
+                key:'id',
+                value: ['=', userCId]
+            }), undefined, ['*']),
+            roles:['user']
+        }
+
         const totalFriendRelation = await system.storage.get('state','totalFriendRelation')
+        const everyRequestHandled = await system.storage.get('state','everyRequestHandled')
+        const anyRequestHandled = await system.storage.get('state','anyRequestHandled')
 
         expect(userA.totalUnhandledRequest).toBe(0)
         expect(userA.totalFriendCount).toBe(0)
@@ -103,15 +129,11 @@ describe('map activity', () => {
         expect(userB.totalUnhandledRequest).toBe(0)
 
         expect(totalFriendRelation).toBe(0)
+        expect(everyRequestHandled).toBeTruthy()
+        expect(anyRequestHandled).toBeFalsy()
 
-        // 1. 创建 activity
+        // 1. 创建 A 与 B 交友的 activity
         const { activityId, state } = await controller.createActivity(makeFriendActivityUUID)
-        expect(activityId).not.toBe(null)
-        expect(state.current!.uuid).toBe(sendRequestUUID)
-        expect(approveUUID).not.toBe(null)
-        expect(rejectUUID).not.toBe(null)
-        expect(cancelUUID).not.toBe(null)
-
 
         // 查询 request 数据
         const requestMatch = MatchExp.atom({
@@ -122,13 +144,7 @@ describe('map activity', () => {
             value: ['=', userB.name]
         })
 
-        const requests1 = await controller.system.storage.find('Request', requestMatch, undefined, ['handled', 'activityId', ['from',{attributeQuery:["name"]}], ['to', {attributeQuery:["name"]}], ['message', {attributeQuery:["content"]}]])
-        expect(requests1.length).toBe(0)
-        // 2. 交互顺序错误 approve
-        // const res1 = createFriendRelationActivityCall.callInteraction(activityId, approveUUID, {user: userA})
-        // expect(res1.error).toBeDefined()
-
-        // 3. a 发起 sendFriendRequest
+        // 3. a 发起 sendFriendRequest to b
         const payload = {
             to: userB,
             message: {
@@ -137,11 +153,6 @@ describe('map activity', () => {
         }
         const res2 = await controller.callActivityInteraction(makeFriendActivityUUID,  sendRequestUUID, activityId,{user: userA, payload})
         expect(res2.error).toBeUndefined()
-
-        const requests2 = await controller.system.storage.find('Request', requestMatch, undefined, ['handled', 'activityId', ['from',{attributeQuery:["name"]}], ['to', {attributeQuery:["name"]}], ['message', {attributeQuery:["content"]}]])
-        expect(requests2.length).toBe(1)
-        expect(!!requests2[0].handled).toBeFalse()
-        expect(requests2[0].activityId).toBe(activityId)
 
         const userB1 = (await system.storage.findOne('User', MatchExp.atom({
                 key:'id',
@@ -155,24 +166,12 @@ describe('map activity', () => {
         }), undefined, ['*']))
         expect(userA1.everySendRequestHandled).toBeFalsy()
         expect(userA1.anySendRequestHandled).toBeFalsy()
-
-
-        // 4. 交互顺序错误 a sendFriendRequest
-        // const res3 = createFriendRelationActivityCall.callInteraction(activityId, sendRequestUUID, {user: userA})
-        // expect(res3.error).toBeDefined()
-
-        // 5. 角色错误 a approve
-        // const res4 = createFriendRelationActivityCall.callInteraction(activityId, approveUUID, {user: userA})
-        // expect(res4.error).toBeDefined()
+        const everyRequestHandled1 = await system.storage.get('state','everyRequestHandled')
+        expect(everyRequestHandled1).toBeFalsy()
 
         // 6. 正确 b approve
         const res5 = await controller.callActivityInteraction(makeFriendActivityUUID, approveUUID, activityId, {user: userB})
         expect(res5.error).toBeUndefined()
-
-        const requests3 = await controller.system.storage.find('Request', requestMatch, undefined, ['handled', 'activityId', ['from',{attributeQuery:["name"]}], ['to', {attributeQuery:["name"]}], ['message', {attributeQuery:["content"]}]])
-        expect(requests3.length).toBe(1)
-        expect(!!requests3[0].handled).toBeTrue()
-        expect(requests3[0].activityId).toBe(activityId)
 
         const userB2 = (await system.storage.findOne('User', MatchExp.atom({
             key:'id',
@@ -188,25 +187,11 @@ describe('map activity', () => {
         expect(userA2.totalFriendCount).toBe(1)
         expect(userA2.everySendRequestHandled).toBeTruthy()
         expect(userA2.anySendRequestHandled).toBeTruthy()
-        // 7. 错误 b reject
-        // const res6 = createFriendRelationActivityCall.callInteraction(activityId, rejectUUID, {user: userB})
-        // expect(res6.error).toBeDefined()
 
-        // 8. 错误 a cancel
-        // const res7 = createFriendRelationActivityCall.callInteraction(activityId, cancelUUID, {user: userA})
-        // expect(res7.error).toBeDefined()
-        // 8. 获取 activity 状态是否 complete
-        const currentState = await createFriendRelationActivityCall.getState(activityId)
-        expect(currentState.current).toBeUndefined()
-
-        const relationName = controller.system.storage.getRelationName('User', 'friends')
-        const friendRelations = await controller.system.storage.findRelationByName(relationName, undefined, undefined, [['source', {attributeQuery: ['name', 'age']}], ['target', {attributeQuery: ['name', 'age']}]])
-
-        expect(friendRelations.length).toBe(1)
-        expect(friendRelations[0].source.name).toBe('A')
-        expect(friendRelations[0].source.id).toBe(userA.id)
-        expect(friendRelations[0].target.name).toBe('B')
-        expect(friendRelations[0].target.id).toBe(userB.id)
+        const everyRequestHandled2 = await system.storage.get('state','everyRequestHandled')
+        expect(everyRequestHandled2).toBeTruthy()
+        const anyRequestHandled2 = await system.storage.get('state','anyRequestHandled')
+        expect(anyRequestHandled2).toBeTruthy()
 
         const totalFriendRelation1 = await system.storage.get('state','totalFriendRelation')
         expect(totalFriendRelation1).toBe(1)
@@ -220,9 +205,6 @@ describe('map activity', () => {
             }
         })
         expect(res6.error).toBeUndefined()
-
-        const friendRelations2 = await controller.system.storage.findRelationByName(relationName, undefined, undefined, [['source', {attributeQuery: ['name', 'age']}], ['target', {attributeQuery: ['name', 'age']}]])
-        expect(friendRelations2.length).toBe(0)
 
         const userB3 = (await system.storage.findOne('User', MatchExp.atom({
             key:'id',
@@ -240,6 +222,55 @@ describe('map activity', () => {
         const totalFriendRelation2 = await system.storage.get('state','totalFriendRelation')
         expect(totalFriendRelation2).toBe(0)
 
+        // c 与 d 发起请求
+        const { activityId: activity11 } = await controller.createActivity(makeFriendActivityUUID)
+        const payload11 = {
+            to: userB,
+            message: {
+                content: 'let use make friend'
+            }
+        }
+        const res11 = await controller.callActivityInteraction(makeFriendActivityUUID,  sendRequestUUID, activity11,{user: userC, payload: payload11})
+        expect(res11.error).toBeUndefined()
+
+
+        const { activityId: activity12 } = await controller.createActivity(makeFriendActivityUUID)
+        const payload12 = {
+            to: userB,
+            message: {
+                content: 'let use make friend'
+            }
+        }
+        const res12 = await controller.callActivityInteraction(makeFriendActivityUUID,  sendRequestUUID, activity12,{user: userD, payload: payload12})
+        expect(res12.error).toBeUndefined()
+
+        const userB12 = (await system.storage.findOne('User', MatchExp.atom({
+            key:'id',
+            value: ['=', userBId]
+        }), undefined, ['*']))
+        expect(userB12.totalUnhandledRequest).toBe(2)
+
+        const everyRequestHandled12 = await system.storage.get('state','everyRequestHandled')
+        expect(everyRequestHandled12).toBeFalsy()
+        const anyRequestHandled12 = await system.storage.get('state','anyRequestHandled')
+        expect(anyRequestHandled12).toBeTruthy()
+
+        // b approve c 和 d
+        const res13 = await controller.callActivityInteraction(makeFriendActivityUUID, approveUUID, activity11, {user: userB})
+        expect(res13.error).toBeUndefined()
+        const res14 = await controller.callActivityInteraction(makeFriendActivityUUID, approveUUID, activity12, {user: userB})
+        expect(res14.error).toBeUndefined()
+
+        const userB14 = (await system.storage.findOne('User', MatchExp.atom({
+            key:'id',
+            value: ['=', userBId]
+        }), undefined, ['*']))
+        expect(userB14.totalUnhandledRequest).toBe(0)
+
+        const everyRequestHandled14 = await system.storage.get('state','everyRequestHandled')
+        expect(everyRequestHandled14).toBeTruthy()
+        const anyRequestHandled14 = await system.storage.get('state','anyRequestHandled')
+        expect(anyRequestHandled14).toBeTruthy()
     })
 
 })

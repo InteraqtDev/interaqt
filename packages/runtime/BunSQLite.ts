@@ -9,7 +9,7 @@ export class SQLiteDB implements Database{
     }
     query= (sql:string, name='') => {
         console.log(`query==============${name}`)
-        console.log(sql)
+        // console.log(sql)
         const result = this.db.query(sql).all() as any[]
         return Promise.resolve(result)
     }

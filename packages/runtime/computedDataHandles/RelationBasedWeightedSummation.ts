@@ -58,7 +58,6 @@ export class RelationBasedWeightedSummationHandle extends IncrementalComputedDat
     async setupStates(): Promise<void> {
         this.relationInfos = this.relations!.map(({relation, relationDirection}) => {
             const toCountAttributeName = relation![relationDirection==='source' ? 'targetName1': 'targetName2']!
-            console.log(this.entityName, toCountAttributeName, relation)
             return {
                 relationName: this.controller.system.storage.getRelationName(this.entityName, toCountAttributeName),
                 toCountAttributeName,

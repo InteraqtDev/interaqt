@@ -49,8 +49,8 @@ export class WeightedSummationHandle extends IncrementalComputedDataHandle {
 
         if (mutationEvent.type === 'create' || mutationEvent.type === 'update') {
             const match = MatchExp.atom({key: 'id', value: ['=', affectedId]})
-            currentRecord = isRelation ? await this.controller.system.storage.findOneRelationByName(recordName!, match)
-                : await this.controller.system.storage.findOne(recordName!, match)
+            currentRecord = isRelation ? await this.controller.system.storage.findOneRelationByName(recordName!, match, undefined, ['*'])
+                : await this.controller.system.storage.findOne(recordName!, match, undefined, ['*'])
         }
 
         if (mutationEvent.type === 'update') {

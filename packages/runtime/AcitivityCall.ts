@@ -131,7 +131,7 @@ class InteractionState {
         const isGroup = ActivityGroup.is((node as ActivityGroupNode).content)
 
         if (isGroup) {
-            const GroupStateNode = InteractionState.GroupStateNodeType.get(node!.content.type)!
+            const GroupStateNode = InteractionState.GroupStateNodeType.get(node!.content.type!)!
             const groupState = new GroupStateNode(node!, graph, parent)
 
             groupState.isGroup = true
@@ -215,20 +215,20 @@ export class ActivityCall {
         const rawGatewayToNode = new Map<GatewayInstanceType, GatewayNode>()
         const seq = {}
 
-        for(let interaction of activity.interactions) {
+        for(let interaction of activity.interactions!) {
             const node: InteractionNode = { content: interaction, next: null, uuid: interaction.uuid, parentGroup, parentSeq: seq as Seq, }
             this.uuidToNode.set(interaction.uuid, node)
             this.rawToNode.set(interaction, node)
             this.uuidToInteractionCall.set(interaction.uuid, new InteractionCall(interaction, this.system, this))
         }
 
-        for(let gateway of activity.gateways) {
+        for(let gateway of activity.gateways!) {
             const node: GatewayNode = { content: gateway, next: [], prev: [], uuid: gateway.uuid }
             this.uuidToNode.set(gateway.uuid, node)
             this.rawToNode.set(gateway, node)
         }
 
-        for(let group of activity.groups) {
+        for(let group of activity.groups!) {
             const node: ActivityGroupNode = {
                 uuid: group.uuid,
                 content: group,
@@ -243,8 +243,8 @@ export class ActivityCall {
         }
 
         // 开始计算图中的 start 和 end
-        const candidateStart = new Set<InteractionInstanceType|ActivityGroupInstanceType>([...Object.values(activity.interactions), ...Object.values(activity.groups)])
-        const candidateEnd = new Set<InteractionInstanceType|ActivityGroupInstanceType>([...Object.values(activity.interactions), ...Object.values(activity.groups)])
+        const candidateStart = new Set<InteractionInstanceType|ActivityGroupInstanceType>([...Object.values(activity.interactions!), ...Object.values(activity.groups)])
+        const candidateEnd = new Set<InteractionInstanceType|ActivityGroupInstanceType>([...Object.values(activity.interactions!), ...Object.values(activity.groups)])
 
         activity.transfers?.forEach((transfer:TransferInstanceType) => {
             const sourceNode = (this.rawToNode.get(transfer.source as InteractionInstanceType) || rawGatewayToNode.get(transfer.source as InteractionInstanceType))!
@@ -280,11 +280,11 @@ export class ActivityCall {
 
         return seq as Seq
     }
-    create() {
+    async create() {
         const activityId = this.system.util.uuid()
         const initialStateData = ActivityState.createInitialState(this.graph.head)
-        this.system.storage.set('ActivityState', activityId, initialStateData)
-        this.system.storage.set('ActivityRefs', activityId, new Map())
+        await this.system.storage.set('ActivityState', activityId, initialStateData)
+        await this.system.storage.set('ActivityRefs', activityId, {})
         return {
             activityId,
             state: initialStateData
@@ -306,7 +306,7 @@ export class ActivityCall {
     }
 
     async callInteraction(activityId: string, uuid: string, interactionEventArgs: InteractionEventArgs) : Promise<InteractionCallResponse>{
-        const activityStateData = this.system.storage.get('ActivityState', activityId)
+        const activityStateData = await this.system.storage.get('ActivityState', activityId)
 
         const state = new ActivityState(activityStateData, this)
         if(!state.isInteractionAvailable(uuid)) {
@@ -316,7 +316,8 @@ export class ActivityCall {
         }
 
         const interactionCall = this.uuidToInteractionCall.get(uuid)!
-        if (!this.checkUserRef(activityId, interactionCall.interaction, interactionEventArgs)) {
+        const userMatch= await this.checkUserRef(activityId, interactionCall.interaction, interactionEventArgs)
+        if (!userMatch) {
             return {
                 error: `current user cannot call this interaction: activityId:${activityId}, interactionId: ${uuid}`
             }
@@ -328,38 +329,39 @@ export class ActivityCall {
         }
 
         // 如果有 ref，要保存下来，方便后面 interactionCall 的时候通过 checkUserRef 去取
-        this.saveUserRefs(activityId, interactionCall, interactionEventArgs)
+        await this.saveUserRefs(activityId, interactionCall, interactionEventArgs)
 
         const result = state.completeInteraction(uuid)
         assert(result, 'change activity state failed')
         // 完成了。存新的 state。
         const nextState = state.toJSON()
-        this.system.storage.set('ActivityState', activityId, nextState)
+        await this.system.storage.set('ActivityState', activityId, nextState)
 
         return {
             data: nextState
         }
     }
     // TODO 我们没有处理 interaction 循环的情况
-    saveUserRefs(activityId: string, interactionCall: InteractionCall, interactionEventArgs: InteractionEventArgs) {
-        const refs = this.system.storage.get('ActivityRefs', activityId, new Map())!
+    async saveUserRefs(activityId: string, interactionCall: InteractionCall, interactionEventArgs: InteractionEventArgs) {
+        const refs = await this.system.storage.get('ActivityRefs', activityId, {})!
         if (interactionCall.interaction.userRef?.name) {
-            refs.set(interactionCall.interaction.userRef?.name, interactionEventArgs.user.id)
+            refs[interactionCall.interaction.userRef?.name] = interactionEventArgs.user.id
         }
 
-        interactionCall.interaction.payload.items.forEach((payloadItem) => {
+        interactionCall.interaction.payload.items!.forEach((payloadItem) => {
             if (UserAttributive.is(payloadItem.itemRef) && payloadItem.itemRef?.name) {
-                refs.set(payloadItem.itemRef?.name, interactionEventArgs.payload![payloadItem.name]!.id!)
+                refs[payloadItem.itemRef?.name] =  interactionEventArgs.payload![payloadItem.name]!.id!
             }
         })
 
+        await this.system.storage.set('ActivityRefs', activityId, refs)
     }
-    checkUserRef(activityId: string, interaction: InteractionInstanceType, interactionEventArgs: InteractionEventArgs): boolean {
+    async checkUserRef(activityId: string, interaction: InteractionInstanceType, interactionEventArgs: InteractionEventArgs): Promise<boolean> {
         // TODO 处理 userAttributives
-        if (!interaction.userRoleAttributive.isRef) return true
+        if (!interaction.userRoleAttributive!.isRef) return true
 
-        const refs = this.system.storage.get('ActivityRefs', activityId)!
-        return refs.get(interaction.userRoleAttributive.name) === interactionEventArgs.user.id
+        const refs = await this.system.storage.get('ActivityRefs', activityId)
+        return refs[interaction.userRoleAttributive!.name!] === interactionEventArgs.user.id
     }
 }
 

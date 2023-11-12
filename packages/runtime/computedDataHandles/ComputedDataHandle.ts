@@ -124,7 +124,7 @@ export class ComputedDataHandle {
     async updateState(affectedId: true|string, newValue: any){
         // 如果是全局状态，那么更新全局状态的值，如果是 property数据，那么 更新 property 的值
         if (this.computedDataType === 'global') {
-            this.controller.system.storage.set('state', this.dataContext.id as string, newValue)
+            await this.controller.system.storage.set('state', this.dataContext.id as string, newValue)
         } else if (this.computedDataType === 'property'){
             const match = MatchExp.atom({key: 'id', value: ['=', affectedId]})
             await this.controller.system.storage.update(this.recordName!, match, {[this.propertyName!]: newValue})

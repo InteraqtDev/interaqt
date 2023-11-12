@@ -98,11 +98,11 @@ export class Controller {
         // 2. 增量计算的字段设置初始值
         for(const handle of this.computedDataHandles) {
             await handle.setupInitialValue()
-            handle.addEventListener()
         }
 
         for(const handle of this.computedDataHandles) {
             await handle.setupStates()
+            handle.addEventListener()
         }
         // TODO 如果是恢复模式，还要从 event stack 中开始恢复数据。
     }

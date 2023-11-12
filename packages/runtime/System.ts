@@ -14,10 +14,12 @@ export type SystemCallback =  (...arg: any[]) => any
 
 export type RecordChangeListener = (mutationEvents:RecordMutationEvent[]) => any
 
+export const SYSTEM_RECORD = '_System_'
+
 export type Storage = {
     // kv 存储
-    get: (itemName: string, id: string, initialValue?: any) => any
-    set: (itemName: string, id: string, value: any) => any,
+    get: (itemName: string, id: string, initialValue?: any) => Promise<any>
+    set: (itemName: string, id: string, value: any) => Promise<any>,
 
     // er存储
     setup: (entities: KlassInstanceOf<typeof Entity, false>[], relations: KlassInstanceOf<typeof Relation, false>[]) => any

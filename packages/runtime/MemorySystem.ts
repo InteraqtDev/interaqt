@@ -1,10 +1,10 @@
-import {System, Storage, Database, EntityIdRef, RecordMutationEvent, RecordChangeListener} from "./System";
+import {System, Storage, Database, EntityIdRef, SYSTEM_RECORD, RecordMutationEvent, RecordChangeListener} from "./System";
 import { InteractionEvent } from '../types/interaction'
 import {createClass, KlassInstanceOf} from "../shared/createClass";
-import {Entity, Relation} from "../shared/entity/Entity";
+import {Entity, Relation, Property} from "../shared/entity/Entity";
 import { DBSetup } from '../storage/erstorage/Setup'
 import {EntityQueryHandle} from '../storage/erstorage/EntityQueryHandle'
-import {MatchExpressionData} from '../storage/erstorage/MatchExp'
+import {MatchExp, MatchExpressionData} from '../storage/erstorage/MatchExp'
 import {RawEntityData} from '../storage/erstorage/NewRecordData'
 import { EntityToTableMap } from '../storage/erstorage/EntityToTableMap'
 import {SQLiteDB} from "./BunSQLite";
@@ -18,19 +18,59 @@ class MemoryStorage implements Storage{
     public queryHandle?: EntityQueryHandle
     public callbacks: Set<RecordChangeListener> = new Set()
     public dbSetup?: DBSetup
-    // kv 结构
-    get(conceptName: string, id: string, initialValue?: any) {
-        let res = this.data.get(conceptName)!.get(id)
-        if (initialValue && !res) this.data.get(conceptName)!.set(id, (res = initialValue))
-        return res
+    // CAUTION kv 结构数据的实现也用 er。这是系统约定，因为也需要  Record 事件！！！
+    // async get(concept: string, key: string, initialValue?: any) {
+    //     let res = this.data.get(concept)!.get(key)
+    //     if (initialValue && !res) this.data.get(concept)!.set(key, (res = initialValue))
+    //     return res
+    // }
+    // async set(concept: string, key: string, value:any) {
+    //     let conceptData = this.data.get(concept)
+    //     if (!conceptData) this.data.set(concept, (conceptData = new Map()))
+    //     return await Promise.resolve().then(() => {
+    //         conceptData!.set(key, value)
+    //     })
+    // }
+    async get(concept: string, key: string, initialValue?: any) {
+        const match = MatchExp.atom({key: 'key', value: ['=', key]}).and({  key: 'concept', value: ['=', concept] })
+        const value = (await this.queryHandle!.findOne(SYSTEM_RECORD, match, undefined, ['value']))?.value
+        if (value === undefined) return initialValue
+
+        return JSON.parse(decodeURI(value))
     }
-    set(conceptName: string, id: string, value:any) {
-        let conceptData = this.data.get(conceptName)
-        if (!conceptData) this.data.set(conceptName, (conceptData = new Map()))
-        conceptData.set(id, value)
+    async set(concept: string, key: string, value:any) {
+        const match = MatchExp.atom({key: 'key', value: ['=', key]}).and({  key: 'concept', value: ['=', concept] })
+        const origin = await this.queryHandle!.findOne(SYSTEM_RECORD, match, undefined, ['value'])
+        if (origin) {
+            // CAUtION 之类一定是用 this 上的方法才有事件
+            return this.update(SYSTEM_RECORD, match,{ concept, key: key.toString(), value: encodeURI(JSON.stringify(value))})
+        } else {
+            return this.create(SYSTEM_RECORD, { concept, key: key.toString(), value: encodeURI(JSON.stringify(value))})
+        }
     }
     async setup(entities: KlassInstanceOf<typeof Entity, false>[], relations: KlassInstanceOf<typeof Relation, false>[]) {
-        this.dbSetup = new DBSetup(entities, relations, this.db)
+        const systemEntity = Entity.create({
+            name: SYSTEM_RECORD,
+            properties: [
+                Property.create({
+                    name: 'concept',
+                    type: 'string',
+                    collection: false,
+                }),
+                Property.create({
+                    name: 'key',
+                    type: 'string',
+                    collection: false,
+                }),
+                Property.create({
+                    name: 'value',
+                    type: 'string',
+                    collection: false,
+                })
+            ]
+        })
+
+        this.dbSetup = new DBSetup([...entities, systemEntity], relations, this.db)
         await this.dbSetup.createTables()
         this.queryHandle = new EntityQueryHandle( new EntityToTableMap(this.dbSetup.map), this.db)
     }
@@ -40,7 +80,7 @@ class MemoryStorage implements Storage{
     find(...arg:Parameters<EntityQueryHandle["find"]>) {
         return this.queryHandle!.find(...arg)
     }
-    create(entityName: string, rawData: RawEntityData,) {
+    create(entityName: string, rawData: RawEntityData) {
         return this.callWithEvents(this.queryHandle!.create.bind(this.queryHandle), [entityName, rawData])
     }
     update(entity: string, matchExpressionData: MatchExpressionData, rawData: RawEntityData,) {
@@ -56,9 +96,6 @@ class MemoryStorage implements Storage{
         // nextJob(() => {
         //     this.dispatch(events)
         // })
-        const recordMutationEvents = events.map(e => {
-            // 区分 entity/relation
-        })
         await this.dispatch(events)
         return result
     }
@@ -120,5 +157,4 @@ export class MemorySystem implements System {
         }
     }
     storage = new MemoryStorage()
-
 }

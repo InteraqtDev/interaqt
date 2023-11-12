@@ -59,10 +59,9 @@ export class IncrementalComputedDataHandle extends ComputedDataHandle {
         throw new Error('not implemented')
     }
     async patchState(statePatch: StatePatch) {
-        console.log(11111, statePatch)
         if (this.computedDataType === 'global') {
             // 更新全局 state
-            this.controller.system.storage.set('state', this.dataContext.id as string, statePatch.value)
+            await this.controller.system.storage.set('state', this.dataContext.id as string, statePatch.value)
         } else {
             // 其他都是对 record 的操作
             const newData = {
@@ -71,7 +70,6 @@ export class IncrementalComputedDataHandle extends ComputedDataHandle {
             if (statePatch.type === 'create') {
                 await this.controller.system.storage.create(this.recordName!, newData)
             } else if (statePatch.type === 'update') {
-                console.log('update', this.recordName!, statePatch.affectedId, newData)
                 const match = MatchExp.atom({key: 'id', value: ['=', statePatch.affectedId]})
                 await this.controller.system.storage.update(this.recordName!, match, newData)
             } else if (statePatch.type === 'delete') {

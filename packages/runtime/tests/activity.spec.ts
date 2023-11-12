@@ -31,6 +31,7 @@ describe("activity state", () => {
 
         createInstances(data, false)
         system = new MemorySystem()
+        await system.storage.setup([], [])
         system.conceptClass = KlassByName
         const mainActivity = (getInstance(Activity) as KlassInstanceOf<typeof Activity, false>[]).find(a => a.name === 'createFriendRelation')!
         createFriendRelationActivityCall = new ActivityCall(mainActivity, system)
@@ -43,7 +44,7 @@ describe("activity state", () => {
 
     test("call friend request activity with approve response", async () => {
         // 1. 创建 activity
-        const { activityId, state } =  createFriendRelationActivityCall.create()
+        const { activityId, state } = await  createFriendRelationActivityCall.create()
         expect(activityId).not.toBe(null)
         expect(state.current!.uuid).toBe(sendRequestUUID)
         expect(approveUUID).not.toBe(null)
@@ -83,13 +84,13 @@ describe("activity state", () => {
         const res7 = await createFriendRelationActivityCall.callInteraction(activityId, cancelUUID, {user: userA})
         expect(res7.error).toBeDefined()
         // 8. 获取 activity 状态是否 complete
-        const currentState = createFriendRelationActivityCall.getState(activityId)
+        const currentState = await createFriendRelationActivityCall.getState(activityId)
         expect(currentState.current).toBeUndefined()
     })
 
     test("call friend request activity with cancel response", async () => {
         // 1. 创建 activity
-        const { activityId} =  createFriendRelationActivityCall.create()
+        const { activityId} = await createFriendRelationActivityCall.create()
 
         // 3. a 发起 sendFriendRequest
         const res2 = await createFriendRelationActivityCall.callInteraction(activityId, sendRequestUUID, {user: userA, payload: {to: userB}})
@@ -104,7 +105,7 @@ describe("activity state", () => {
         expect(res6.error).toBeDefined()
 
         // 8. 获取 activity 状态是否 complete
-        const currentState = createFriendRelationActivityCall.getState(activityId)
+        const currentState = await createFriendRelationActivityCall.getState(activityId)
         expect(currentState.current).toBeUndefined()
     })
 

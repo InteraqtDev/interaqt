@@ -294,6 +294,40 @@ export const RelationBasedAny = createClass({
 })
 Property.public.computedData.type.push(RelationBasedEvery, RelationBasedAny)
 
-// TODO Property 支持的 max/min/topN/filter/
+export const Every = createClass({
+    name: 'Every',
+    public: {
+        record: {
+            type: [Entity, Relation],
+            collection: false,
+            required: true
+        },
+        matchExpression: {
+            type: 'string',
+            collection: false,
+            required: true
+        }
+    }
+})
+
+export const Any = createClass({
+    name: 'Any',
+    public: {
+        record: {
+            type: [Entity, Relation],
+            collection: false,
+            required: true
+        },
+        matchExpression: {
+            type: 'string',
+            collection: false,
+            required: true
+        }
+    }
+})
+
+
+// TODO Property 支持的 只增不减的 max/min/topN/
+//  TODO 支持 filter？就是 关系上 comptedData
 
 

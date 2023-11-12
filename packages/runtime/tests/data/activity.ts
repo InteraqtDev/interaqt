@@ -19,7 +19,7 @@ import {
     MapActivityToEntity,
     RelationCount,
     Count,
-    RelationBasedEvery, RelationBasedAny
+    RelationBasedEvery, RelationBasedAny, Every, Any
 } from "../../../shared/IncrementalComputation";
 import {removeAllInstance, stringifyAllInstances} from "../../../shared/createClass";
 
@@ -367,6 +367,30 @@ State.createReactive({
     computedData: Count.createReactive({
         record: friendRelation,
         matchExpression: `() => true`
+    })
+})
+
+State.createReactive({
+    name: 'everyRequestHandled',
+    type: 'boolean',
+    collection: false,
+    computedData: Every.createReactive({
+        record: requestEntity,
+        matchExpression: `(request) => {
+        return request.handled
+        }`
+    })
+})
+
+State.createReactive({
+    name: 'anyRequestHandled',
+    type: 'boolean',
+    collection: false,
+    computedData: Any.createReactive({
+        record: requestEntity,
+        matchExpression: `(request) => {
+        return request.handled
+        }`
     })
 })
 
