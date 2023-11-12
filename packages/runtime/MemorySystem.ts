@@ -1,16 +1,16 @@
 import {System, Storage, Database, EntityIdRef, SYSTEM_RECORD, RecordMutationEvent, RecordChangeListener} from "./System";
 import { InteractionEvent } from '../types/interaction'
-import {createClass, KlassInstanceOf} from "../shared/createClass";
-import {Entity, Relation, Property} from "../shared/entity/Entity";
-import { DBSetup } from '../storage/erstorage/Setup'
-import {EntityQueryHandle} from '../storage/erstorage/EntityQueryHandle'
-import {MatchExp, MatchExpressionData} from '../storage/erstorage/MatchExp'
-import {RawEntityData} from '../storage/erstorage/NewRecordData'
-import { EntityToTableMap } from '../storage/erstorage/EntityToTableMap'
+import {createClass, KlassInstanceOf} from "@shared/createClass";
+import {Entity, Relation, Property} from "@shared/entity/Entity";
+import { DBSetup } from '@storage/erstorage/Setup'
+import {EntityQueryHandle} from '@storage/erstorage/EntityQueryHandle'
+import {MatchExp, MatchExpressionData} from '@storage/erstorage/MatchExp'
+import {RawEntityData} from '@storage/erstorage/NewRecordData'
+import { EntityToTableMap } from '@storage/erstorage/EntityToTableMap'
 // import {SQLiteDB} from "./BunSQLite";
 import {SQLiteDB} from "./SQLite";
-import { MutationEvent } from "../storage/erstorage/RecordQueryAgent";
-import {nextJob} from "../shared/util";
+import { MutationEvent } from "@storage/erstorage/RecordQueryAgent";
+import {nextJob} from "@shared/util";
 
 
 class MemoryStorage implements Storage{

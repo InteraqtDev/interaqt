@@ -1,9 +1,9 @@
 import {Controller} from "../Controller";
-import {KlassInstanceOf, KlassType} from "../../shared/createClass";
-import {Entity, Property, Relation} from "../../shared/entity/Entity";
+import {KlassInstanceOf, KlassType} from "@shared/createClass";
+import {Entity, Property, Relation} from "@shared/entity/Entity";
 import {RecordMutationEvent} from "../System";
-import {ComputedData} from "../../shared/IncrementalComputation";
-import {MatchExp} from '../../storage/erstorage/MatchExp'
+import {ComputedData} from "@shared/IncrementalComputation";
+import {MatchExp} from '@storage/erstorage/MatchExp'
 
 
 

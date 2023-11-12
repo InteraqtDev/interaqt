@@ -1,16 +1,16 @@
-import {KlassInstanceOf, KlassType} from "../../shared/createClass";
-import {Entity, Relation} from "../../shared/entity/Entity";
+import {KlassInstanceOf, KlassType} from "@shared/createClass";
+import {Entity, Relation} from "@shared/entity/Entity";
 import {
     ComputedData,
     MapActivityToEntity,
     RelationStateMachine,
     RelationStateTransfer
-} from '../../shared/IncrementalComputation'
+} from '@shared/IncrementalComputation'
 import {Controller} from "../Controller";
 import {InteractionEventArgs} from "../../types/interaction";
 import {assert} from "../util";
 import {EntityIdRef, RecordMutationEvent} from '../System'
-import {MatchAtom, MatchExp} from '../../storage/erstorage/MatchExp'
+import {MatchAtom, MatchExp} from '@storage/erstorage/MatchExp'
 import {ComputedDataHandle, DataContext} from "./ComputedDataHandle";
 
 
@@ -50,6 +50,7 @@ export class RelationStateMachineHandle extends ComputedDataHandle {
         // 遍历 transfer 来监听 interaction
         this.computedData.transfers!.forEach(transfer => {
             this.controller.listen(transfer.triggerInteraction, (...arg) => {
+                // @ts-ignore
                 return this.onCallInteraction(transfer, ...arg)
             })
         })

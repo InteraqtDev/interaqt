@@ -1,5 +1,5 @@
-import {createUserRoleAttributive, UserAttributive} from "../../../shared/user/User";
-import {Entity} from "../../../shared/entity/Entity";
+import {createUserRoleAttributive, UserAttributive} from "@shared/user/User";
+import {Entity} from "@shared/entity/Entity";
 
 export const NewAttr = UserAttributive.createReactive({
     name: 'New',

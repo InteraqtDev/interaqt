@@ -1,13 +1,13 @@
-import {EntityAttributive, GetAction, InteractionInstanceType} from "../shared/activity/Activity";
-import { UserAttributive } from "../shared/user/User";
-// import { Entity} from "../shared/entity/Entity";
+import {EntityAttributive, GetAction, InteractionInstanceType} from "@shared/activity/Activity";
+import { UserAttributive } from "@shared/user/User";
+// import { Entity} from "@shared/entity/Entity";
 import {System} from "./System";
 import {InteractionEvent, InteractionEventArgs} from "../types/interaction";
-import {Concept, ConceptAlias, ConceptInstance, DerivedConcept, EntityAttributiveAtom} from "../shared/attributive";
-import {BoolExp, BoolExpressionData} from "../shared/BoolExp";
-import { UserAttributives, UserAttributiveAtom} from '../shared/attributive'
+import {Concept, ConceptAlias, ConceptInstance, DerivedConcept, EntityAttributiveAtom} from "@shared/attributive";
+import {BoolExp, BoolExpressionData} from "@shared/BoolExp";
+import { UserAttributives, UserAttributiveAtom} from '@shared/attributive'
 import {assert, everyAsync, everyWithErrorAsync, indexBy} from "./util";
-import {getInstance} from "../shared/createClass";
+import {getInstance} from "@shared/createClass";
 import {ActivityCall} from "./AcitivityCall";
 
 

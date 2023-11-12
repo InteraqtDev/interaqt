@@ -1,7 +1,7 @@
-import {KlassInstanceOf} from "../../shared/createClass";
+import {KlassInstanceOf} from "@shared/createClass";
 import {
     Count,
-} from '../../shared/IncrementalComputation'
+} from '@shared/IncrementalComputation'
 import {ComputedDataHandle} from "./ComputedDataHandle";
 import {WeightedSummationHandle} from "./WeightedSummation";
 

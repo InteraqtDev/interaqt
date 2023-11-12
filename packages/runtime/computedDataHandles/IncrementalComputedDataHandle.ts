@@ -1,5 +1,5 @@
 import {RecordMutationEvent} from "../System";
-import {MatchExp} from '../../storage/erstorage/MatchExp'
+import {MatchExp} from '@storage/erstorage/MatchExp'
 import {ComputedDataHandle} from "./ComputedDataHandle";
 
 export type StatePatch = {

@@ -1,11 +1,11 @@
 import {System, SystemCallback} from "./System";
-import {Entity, Relation, Property} from "../shared/entity/Entity";
-import {Activity, Interaction} from "../shared/activity/Activity";
+import {Entity, Relation, Property} from "@shared/entity/Entity";
+import {Activity, Interaction} from "@shared/activity/Activity";
 import './computedDataHandles/index'
 import {ActivityCall} from "./AcitivityCall";
 import {InteractionCall} from "./InteractionCall";
 import {InteractionEventArgs} from "../types/interaction";
-import {KlassInstanceOf, KlassType, KlassInstance} from "../shared/createClass";
+import {KlassInstanceOf, KlassType, KlassInstance} from "@shared/createClass";
 import {assert} from "./util";
 import {ComputedDataHandle, DataContext} from "./computedDataHandles/ComputedDataHandle";
 

@@ -1,7 +1,7 @@
-import {KlassInstanceOf} from "../../shared/createClass";
+import {KlassInstanceOf} from "@shared/createClass";
 import {
     RelationCount, RelationBasedWeightedSummation,
-} from '../../shared/IncrementalComputation'
+} from '@shared/IncrementalComputation'
 import {RelationBasedWeightedSummationHandle} from "./RelationBasedWeightedSummation";
 import {ComputedDataHandle} from "./ComputedDataHandle";
 

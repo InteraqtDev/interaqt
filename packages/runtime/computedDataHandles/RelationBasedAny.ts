@@ -1,9 +1,9 @@
 import {ComputedDataHandle} from "./ComputedDataHandle";
-import {KlassInstanceOf, KlassType} from "../../shared/createClass";
-import {MatchExp} from '../../storage/erstorage/MatchExp'
-import {Entity, Property, Relation} from "../../shared/entity/Entity";
+import {KlassInstanceOf, KlassType} from "@shared/createClass";
+import {MatchExp} from '@storage/erstorage/MatchExp'
+import {Entity, Property, Relation} from "@shared/entity/Entity";
 
-import {RelationBasedAny, RelationCount} from "../../shared/IncrementalComputation";
+import {RelationBasedAny, RelationCount} from "@shared/IncrementalComputation";
 import {RecordMutationEvent} from "../System";
 
 export class RelationBasedAnyHandle extends ComputedDataHandle {

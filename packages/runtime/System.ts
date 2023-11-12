@@ -1,5 +1,5 @@
-import {createClass, KlassInstanceOf} from "../shared/createClass";
-import { Entity, Relation } from "../shared/entity/Entity";
+import {createClass, KlassInstanceOf} from "@shared/createClass";
+import { Entity, Relation } from "@shared/entity/Entity";
 // @ts-ignore
 import { InteractionEvent } from '../types/interaction'
 

@@ -1,8 +1,8 @@
 import {ComputedDataHandle} from "./ComputedDataHandle";
-import {KlassInstanceOf, KlassType} from "../../shared/createClass";
-import {State} from "../../shared/state/State";
+import {KlassInstanceOf, KlassType} from "@shared/createClass";
+import {State} from "@shared/state/State";
 
-import {Every, Count} from "../../shared/IncrementalComputation";
+import {Every, Count} from "@shared/IncrementalComputation";
 import {RecordMutationEvent, SYSTEM_RECORD} from "../System";
 
 export class EveryHandle extends ComputedDataHandle {
@@ -52,22 +52,12 @@ export class EveryHandle extends ComputedDataHandle {
 
     computeEffect(mutationEvent: RecordMutationEvent, mutationEvents: RecordMutationEvent[]): any {
         // 如果是自己的 record 的上面两个字段更新，那么才要重算
-
-        if (
-            mutationEvent.recordName === SYSTEM_RECORD
-            && mutationEvent.type === 'update'
-            && mutationEvent.record!.concept === 'state'
-        ) {
-            console.log(11111111, mutationEvent)
-        }
-
         if (
             mutationEvent.recordName === SYSTEM_RECORD
             && mutationEvent.type === 'update'
             && mutationEvent.record!.concept === 'state'
             && mutationEvent.record!.key === this.totalCountField || mutationEvent.record!.key ===this.matchCountField
         ) {
-            console.log(11111111, mutationEvent)
             return true
         }
     }
@@ -75,7 +65,6 @@ export class EveryHandle extends ComputedDataHandle {
     async isMatchCountEqualTotalCount(effect: string) {
         const matchCountFieldCount = await this.controller.system.storage.get('state',this.matchCountField)
         const totalCountFieldCount = await this.controller.system.storage.get('state',this.totalCountField)
-        console.log("222222222", matchCountFieldCount, totalCountFieldCount)
         return matchCountFieldCount === totalCountFieldCount
     }
 }

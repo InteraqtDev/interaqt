@@ -1,8 +1,8 @@
 import {ComputedDataHandle} from "./ComputedDataHandle";
-import {KlassInstanceOf, KlassType} from "../../shared/createClass";
-import {Any, Count} from "../../shared/IncrementalComputation";
+import {KlassInstanceOf, KlassType} from "@shared/createClass";
+import {Any, Count} from "@shared/IncrementalComputation";
 import {RecordMutationEvent, SYSTEM_RECORD} from "../System";
-import {State} from "../../shared/state/State";
+import {State} from "@shared/state/State";
 
 export class RelationBasedAnyHandle extends ComputedDataHandle {
     matchCountField: string = `${this.stateName}_match_count`

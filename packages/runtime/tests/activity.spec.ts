@@ -1,9 +1,9 @@
 import {describe, test, expect, beforeEach} from "vitest";
 
 import { MemorySystem } from "../MemorySystem";
-import {createInstances, getInstance, KlassByName, KlassInstanceOf, removeAllInstance} from "../../shared/createClass";
+import {createInstances, getInstance, KlassByName, KlassInstanceOf, removeAllInstance} from "@shared/createClass";
 
-import { Activity } from "../../shared/activity/Activity";
+import { Activity } from "@shared/activity/Activity";
 import {ActivityCall, ActivityGroupNode} from "../AcitivityCall";
 
 describe("activity state", () => {

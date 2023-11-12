@@ -1,9 +1,9 @@
 import {describe, test, expect, beforeEach} from "vitest";
 import {InteractionCall, LoginError} from "../InteractionCall";
 import { MemorySystem } from "../MemorySystem";
-import {createInstances, getInstance, KlassByName, KlassInstanceOf, removeAllInstance} from "../../shared/createClass";
+import {createInstances, getInstance, KlassByName, KlassInstanceOf, removeAllInstance} from "@shared/createClass";
 
-import { Interaction } from "../../shared/activity/Activity";
+import { Interaction } from "@shared/activity/Activity";
 import {InteractionEventArgs} from "../../types/interaction";
 
 describe("interaction",  () => {
