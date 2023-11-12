@@ -237,14 +237,14 @@ export class ActivityCall {
                 parentGroup
             }
             // 每个 group 下都是多个 sub activityGraph
-            node.childSeqs = group.activities.map(sub => this.buildGraph(sub, node))
+            node.childSeqs = group.activities?.map(sub => this.buildGraph(sub, node))
             this.uuidToNode.set(group.uuid, node)
             this.rawToNode.set(group, node)
         }
 
         // 开始计算图中的 start 和 end
-        const candidateStart = new Set<InteractionInstanceType|ActivityGroupInstanceType>([...Object.values(activity.interactions!), ...Object.values(activity.groups)])
-        const candidateEnd = new Set<InteractionInstanceType|ActivityGroupInstanceType>([...Object.values(activity.interactions!), ...Object.values(activity.groups)])
+        const candidateStart = new Set<InteractionInstanceType|ActivityGroupInstanceType>([...Object.values(activity.interactions!), ...Object.values(activity.groups!)])
+        const candidateEnd = new Set<InteractionInstanceType|ActivityGroupInstanceType>([...Object.values(activity.interactions!), ...Object.values(activity.groups!)])
 
         activity.transfers?.forEach((transfer:TransferInstanceType) => {
             const sourceNode = (this.rawToNode.get(transfer.source as InteractionInstanceType) || rawGatewayToNode.get(transfer.source as InteractionInstanceType))!
@@ -348,9 +348,9 @@ export class ActivityCall {
             refs[interactionCall.interaction.userRef?.name] = interactionEventArgs.user.id
         }
 
-        interactionCall.interaction.payload.items!.forEach((payloadItem) => {
+        interactionCall.interaction.payload?.items!.forEach((payloadItem) => {
             if (UserAttributive.is(payloadItem.itemRef) && payloadItem.itemRef?.name) {
-                refs[payloadItem.itemRef?.name] =  interactionEventArgs.payload![payloadItem.name]!.id!
+                refs[payloadItem.itemRef?.name] =  interactionEventArgs.payload![payloadItem.name!]!.id!
             }
         })
 

@@ -1,7 +1,7 @@
 import {describe, test, expect, beforeEach} from "bun:test";
 import {Controller} from "../Controller";
 import {ActivityCall, ActivityGroupNode} from "../AcitivityCall";
-import {MemorySystem} from "../MemorySystem";
+import {BunSystem} from "../BunSystem";
 import {createInstances, getInstance, KlassByName, KlassInstanceOf, removeAllInstance, stringifyAllInstances} from "../../shared/createClass";
 import { Activity, Interaction } from "../../shared/activity/Activity";
 import { Entity, Relation } from "../../shared/entity/Entity";
@@ -19,7 +19,7 @@ type User = {
 describe('computed data in activity', () => {
 
     let createFriendRelationActivityCall: ActivityCall
-    let system: MemorySystem
+    let system: BunSystem
 
     let makeFriendActivityUUID: string
     let sendRequestUUID:string
@@ -48,7 +48,7 @@ describe('computed data in activity', () => {
          */
 
 
-        system = new MemorySystem()
+        system = new BunSystem()
         system.conceptClass = KlassByName
         controller = new Controller(
             system,
@@ -83,7 +83,7 @@ describe('computed data in activity', () => {
         userDId = userDRef.id
     })
 
-    test.only('make friend activity', async () => {
+    test('make friend activity', async () => {
         // 0. 验证初始数据
         const userA: User = {
             ...await system.storage.findOne('User', MatchExp.atom({

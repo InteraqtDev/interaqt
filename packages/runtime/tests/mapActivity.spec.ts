@@ -1,7 +1,7 @@
 import {describe, test, expect, beforeEach} from "bun:test";
 import {Controller} from "../Controller";
 import {ActivityCall, ActivityGroupNode} from "../AcitivityCall";
-import {MemorySystem} from "../MemorySystem";
+import {BunSystem} from "../BunSystem";
 import {createInstances, getInstance, KlassByName, KlassInstanceOf, removeAllInstance, stringifyAllInstances} from "../../shared/createClass";
 import { Activity, Interaction } from "../../shared/activity/Activity";
 import { Entity, Relation } from "../../shared/entity/Entity";
@@ -19,7 +19,7 @@ type User = {
 describe('map activity', () => {
 
     let createFriendRelationActivityCall: ActivityCall
-    let system: MemorySystem
+    let system: BunSystem
 
     let makeFriendActivityUUID: string
     let sendRequestUUID:string
@@ -46,7 +46,7 @@ describe('map activity', () => {
          */
 
 
-        system = new MemorySystem()
+        system = new BunSystem()
         system.conceptClass = KlassByName
         controller = new Controller(
             system,

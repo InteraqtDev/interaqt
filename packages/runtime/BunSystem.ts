@@ -12,7 +12,7 @@ import { MutationEvent } from "../storage/erstorage/RecordQueryAgent";
 import {nextJob} from "../shared/util";
 
 
-class MemoryStorage implements Storage{
+class BunStorage implements Storage{
     data = new Map<string, Map<string, any>>()
     db = new SQLiteDB()
     public queryHandle?: EntityQueryHandle
@@ -138,7 +138,7 @@ type EventQuery = {
 
 let id = 0
 
-export class MemorySystem implements System {
+export class BunSystem implements System {
     eventStack: InteractionEvent[] = []
     conceptClass: Map<string, ReturnType<typeof createClass>> = new Map()
     saveEvent(event: InteractionEvent) {
@@ -156,5 +156,5 @@ export class MemorySystem implements System {
             return (++id).toString()
         }
     }
-    storage = new MemoryStorage()
+    storage = new BunStorage()
 }
