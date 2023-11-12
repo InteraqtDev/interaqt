@@ -2,22 +2,22 @@
   "name": "@interaqt/runtime",
   "module": "index.ts",
   "devDependencies": {
+    "bun-types": "latest",
     "typescript": "^5.1.6",
-    "bun-types": "latest"
+    "vitest": "^0.34.6"
   },
-  "peerDependencies": {
-    "typescript": "^5.0.0"
+  "scripts": {
+    "test": "vitest"
   },
-  "description": "To install dependencies:",
   "version": "1.0.0",
   "main": "index.js",
   "author": "sskyy<skyking_H@hotmail.com>",
   "license": "MIT",
   "dependencies": {
-    "@jest/globals": "^29.6.4",
-    "@types/mocha": "^10.0.1",
     "@types/node": "^20.5.7",
-    "acorn": "^8.10.0"
+    "acorn": "^8.10.0",
+    "promised-sqlite3": "^2.1.0",
+    "sqlite3": "^5.1.6"
   },
   "type": "module"
 }

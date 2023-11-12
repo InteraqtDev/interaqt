@@ -7,12 +7,13 @@ import {EntityQueryHandle} from '../storage/erstorage/EntityQueryHandle'
 import {MatchExp, MatchExpressionData} from '../storage/erstorage/MatchExp'
 import {RawEntityData} from '../storage/erstorage/NewRecordData'
 import { EntityToTableMap } from '../storage/erstorage/EntityToTableMap'
-import {SQLiteDB} from "./BunSQLite";
+// import {SQLiteDB} from "./BunSQLite";
+import {SQLiteDB} from "./SQLite";
 import { MutationEvent } from "../storage/erstorage/RecordQueryAgent";
 import {nextJob} from "../shared/util";
 
 
-class BunStorage implements Storage{
+class MemoryStorage implements Storage{
     data = new Map<string, Map<string, any>>()
     db = new SQLiteDB()
     public queryHandle?: EntityQueryHandle
@@ -69,7 +70,7 @@ class BunStorage implements Storage{
                 })
             ]
         })
-
+        await this.db.open()
         this.dbSetup = new DBSetup([...entities, systemEntity], relations, this.db)
         await this.dbSetup.createTables()
         this.queryHandle = new EntityQueryHandle( new EntityToTableMap(this.dbSetup.map), this.db)
@@ -138,7 +139,7 @@ type EventQuery = {
 
 let id = 0
 
-export class BunSystem implements System {
+export class MemorySystem implements System {
     eventStack: InteractionEvent[] = []
     conceptClass: Map<string, ReturnType<typeof createClass>> = new Map()
     saveEvent(event: InteractionEvent) {
@@ -156,5 +157,5 @@ export class BunSystem implements System {
             return (++id).toString()
         }
     }
-    storage = new BunStorage()
+    storage = new MemoryStorage()
 }

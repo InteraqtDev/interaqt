@@ -30,7 +30,7 @@
   },
   "include": [
     "./",
-    "../shared/**/*",
+    "../shared",
     "../storage",
   ]
 }

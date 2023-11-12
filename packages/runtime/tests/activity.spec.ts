@@ -1,6 +1,6 @@
-import {describe, test, expect, beforeEach} from "bun:test";
+import {describe, test, expect, beforeEach} from "vitest";
 
-import { BunSystem } from "../BunSystem";
+import { MemorySystem } from "../MemorySystem";
 import {createInstances, getInstance, KlassByName, KlassInstanceOf, removeAllInstance} from "../../shared/createClass";
 
 import { Activity } from "../../shared/activity/Activity";
@@ -8,7 +8,7 @@ import {ActivityCall, ActivityGroupNode} from "../AcitivityCall";
 
 describe("activity state", () => {
     let createFriendRelationActivityCall: ActivityCall
-    let system: BunSystem
+    let system: MemorySystem
 
     let sendRequestUUID:string
     let approveUUID:string
@@ -30,7 +30,7 @@ describe("activity state", () => {
          */
 
         createInstances(data, false)
-        system = new BunSystem()
+        system = new MemorySystem()
         await system.storage.setup([], [])
         system.conceptClass = KlassByName
         const mainActivity = (getInstance(Activity) as KlassInstanceOf<typeof Activity, false>[]).find(a => a.name === 'createFriendRelation')!

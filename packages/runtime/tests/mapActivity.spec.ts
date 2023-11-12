@@ -1,7 +1,7 @@
-import {describe, test, expect, beforeEach} from "bun:test";
+import {describe, test, expect, beforeEach} from "vitest";
 import {Controller} from "../Controller";
 import {ActivityCall, ActivityGroupNode} from "../AcitivityCall";
-import {BunSystem} from "../BunSystem";
+import {MemorySystem} from "../MemorySystem";
 import {createInstances, getInstance, KlassByName, KlassInstanceOf, removeAllInstance, stringifyAllInstances} from "../../shared/createClass";
 import { Activity, Interaction } from "../../shared/activity/Activity";
 import { Entity, Relation } from "../../shared/entity/Entity";
@@ -19,7 +19,7 @@ type User = {
 describe('map activity', () => {
 
     let createFriendRelationActivityCall: ActivityCall
-    let system: BunSystem
+    let system: MemorySystem
 
     let makeFriendActivityUUID: string
     let sendRequestUUID:string
@@ -46,7 +46,7 @@ describe('map activity', () => {
          */
 
 
-        system = new BunSystem()
+        system = new MemorySystem()
         system.conceptClass = KlassByName
         controller = new Controller(
             system,
@@ -140,7 +140,7 @@ describe('map activity', () => {
 
         const requests2 = await controller.system.storage.find('Request', requestMatch, undefined, ['handled', 'activityId', ['from',{attributeQuery:["name"]}], ['to', {attributeQuery:["name"]}], ['message', {attributeQuery:["content"]}]])
         expect(requests2.length).toBe(1)
-        expect(!!requests2[0].handled).toBeFalse()
+        expect(!!requests2[0].handled).toBeFalsy()
         expect(requests2[0].activityId).toBe(activityId)
 
         const userB1 = (await system.storage.findOne('User', MatchExp.atom({
@@ -171,7 +171,7 @@ describe('map activity', () => {
 
         const requests3 = await controller.system.storage.find('Request', requestMatch, undefined, ['handled', 'activityId', ['from',{attributeQuery:["name"]}], ['to', {attributeQuery:["name"]}], ['message', {attributeQuery:["content"]}]])
         expect(requests3.length).toBe(1)
-        expect(!!requests3[0].handled).toBeTrue()
+        expect(!!requests3[0].handled).toBeTruthy()
         expect(requests3[0].activityId).toBe(activityId)
 
         const userB2 = (await system.storage.findOne('User', MatchExp.atom({
