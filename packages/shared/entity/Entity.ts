@@ -1,5 +1,6 @@
-import {Atom, incUnique, computed, incPick} from 'rata'
-import {createClass, getInstance, KlassType} from "../createClass";
+import {Atom, computed, incPick, incUnique} from 'rata'
+import {createClass, getInstance, Klass} from "../createClass";
+import {ComputedData} from "../IncrementalComputation";
 
 
 export enum PropertyTypes {
@@ -14,7 +15,7 @@ const validNameFormatExp = /^[a-zA-Z0-9_]+$/
 
 export const Property = createClass({
     name: 'Property',
-    display: (obj) => obj.name,
+    display: (obj: any) => obj.name,
     public: {
         name: {
             type: 'string',
@@ -52,7 +53,7 @@ export const Property = createClass({
         computedData: {
             collection: false,
             // CAUTION 这里的具体类型等着外面注册 IncrementalComputationHandle 的时候修补
-            type: [] as KlassType<any>[],
+            type: [] as Klass<any>[],
             required: false,
         }
     }
@@ -67,11 +68,12 @@ export const constraints = {
 
 export const Entity = createClass({
     name: 'Entity',
-    display: (instance) => instance.name,
+    display: (instance: any) => instance.name,
     public: {
         name: {
             type: 'string',
             collection: false,
+            required:true,
             constraints: {
                 nameFormat({name}: { name: Atom<string> }) {
                     return computed(() => {
@@ -82,12 +84,14 @@ export const Entity = createClass({
         },
         computedData: {
             // CAUTION 这里的具体类型等着外面注册 IncrementalComputationHandle 的时候修补
-            type: [] as KlassType<any>[],
+            type: [] as (typeof ComputedData)[],
             collection: false,
+            required: false,
         },
         properties: {
             type: Property,
             collection: true,
+            required:true,
             constraints: {
                 // 默认第一参数是 property 本身，第二参数是 entity
                 eachNameUnique({properties}) {
@@ -104,12 +108,13 @@ export const Entity = createClass({
             }
         },
         isRef: {
+            required: true,
+            collection: false,
             type: 'boolean', // 可以在 payload 中作为 ref 被后续的 interaction 引用。
             defaultValue: () => false
         }
     }
 })
-
 
 export const PropertyTypeMap = {
     [PropertyTypes.String]: 'string',
@@ -184,7 +189,7 @@ export const Relation = createClass({
         },
         isTargetReliance: {
             type: 'boolean',
-            required: false,
+            required: true,
             collection:false,
             defaultValue() {
                 return false
@@ -193,6 +198,7 @@ export const Relation = createClass({
         relType: {
             type: 'string',
             collection: false,
+            required: true,
             options() {
                 return ['1:1', '1:n', 'n:1', 'n:n']
             },
@@ -202,12 +208,14 @@ export const Relation = createClass({
         },
         computedData: {
             // CAUTION 这里的具体类型等着外面注册 IncrementalComputationHandle 的时候修补
-            type: [] as KlassType<any>[],
+            type: [] as Klass<any>[],
             collection: false,
+            required: false,
         },
         properties: {
             type: Property,
             collection: true,
+            required: true,
             constraints: {
                 // 这里是从上面复制下来的。
                 // 默认第一参数是 property 本身，第二参数是 relation
@@ -230,3 +238,15 @@ export const Relation = createClass({
 // FIXME type relation 和 entity 的 public type 最好都单独定义
 // @ts-ignore
 Relation.public.entity1.type.push(Relation)
+
+const User = Entity.create({
+    name: 'test',
+})
+
+console.log(User.name)
+
+log(User.properties)
+
+function log(name: any[]) {
+
+}

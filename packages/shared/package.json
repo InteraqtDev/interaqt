@@ -3,17 +3,20 @@
   "module": "index.ts",
   "type": "module",
   "devDependencies": {
-    "bun-types": "latest",
-    "tsd": "^0.29.0"
+    "tsd": "^0.29.0",
+    "vitest": "^1.0.0-beta.4"
   },
   "peerDependencies": {
     "typescript": "^5.2.2"
+  },
+  "scripts": {
+    "test": "vitest --typecheck"
   },
   "tsd": {
     "directory": "tests"
   },
   "dependencies": {
-    "rata": "^1.0.0",
-    "acorn": "^8.10.0"
+    "acorn": "^8.10.0",
+    "rata": "^1.0.0"
   }
 }

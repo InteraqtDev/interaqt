@@ -1,14 +1,29 @@
-import { createClass, KlassInstanceOf, KlassType} from "../createClass";
+import {createClass, Klass, KlassInstance, KlassInstancePrimitiveProps} from "../createClass";
 import {Entity} from "../entity/Entity";
 import {UserAttributive, UserAttributives} from "../user/User";
 
 
-export const EntityAttributive = createClass({
+type EntityAttributivePublicType = {
+    name: {
+        type: 'string',
+        required:true
+    },
+    content: {
+        type: 'object',
+    },
+    stringContent: {
+        type: 'string',
+        required:true
+    },
+}
+
+export const EntityAttributive: Klass<EntityAttributivePublicType> = createClass({
     name: 'EntityAttributive',
-    display: (obj) => `${obj.name}`,
-    public: {
+    display: (obj: KlassInstance<Klass<EntityAttributivePublicType>, false>) => `${obj.name}`,
+    public:{
         name: {
             type: 'string',
+            required:true
         },
         // parse 之后的
         content: {
@@ -17,17 +32,25 @@ export const EntityAttributive = createClass({
         // 原始函数描述
         stringContent: {
             type: 'string',
+            required:true
         },
     }
 })
 
+type EntityAttributivesPublicType = {
+    content: {
+        type: 'object',
+        required:true
+    },
+}
 // EntityAttributive 的 bool 组合
-export const EntityAttributives = createClass({
+export const EntityAttributives: Klass<EntityAttributivesPublicType> = createClass({
     name: 'EntityAttributives',
-    display: (obj) => `${obj.name}`,
+    display: (obj:KlassInstance<Klass<EntityAttributivesPublicType>, false>) => `${obj.content}`,
     public: {
         content: {
             type: 'object',
+            required:true
         },
     }
 })
@@ -101,14 +124,49 @@ export const Payload = createClass({
             type: PayloadItem,
             collection: true,
             required: true,
+            defaultValue: () => []
         }
     }
 })
 
 
-export const Interaction = createClass({
+type InteractionPublicType = {
+    name: {
+        type: 'string',
+        collection: false,
+        required: true
+    },
+    // 用户自定义的任何定语
+    userAttributives: {
+        required: true,
+        collection: false,
+        type: typeof UserAttributives,
+    },
+    // 角色定语。例如 NORMAL_USER, ADMIN 等
+    userRoleAttributive : {
+        type: typeof UserAttributive,
+        collection: false,
+        required: true
+    },
+    // 当前的用户的 alias 名字。这个地方应该改成 Alias 才更加好
+    userRef: {
+        type: typeof UserAttributive,
+        collection: false,
+    },
+    action:  {
+        type: typeof Action,
+        collection: false,
+        required: true
+    },
+    payload: {
+        type: typeof Payload,
+        collection: false,
+    }
+}
+
+export const Interaction: Klass<InteractionPublicType> = createClass({
     name:'Interaction',
-    display: (obj) => `${obj.action.name}`,
+    display: (interaction: KlassInstance<Klass<InteractionPublicType>, false>) => `${interaction.action.name}`,
     public: {
         name: {
             type: 'string',
@@ -144,8 +202,14 @@ export const Interaction = createClass({
     }
 })
 
+type GatewayPublicType = {
+    name: {
+        type: 'string',
+        required: true
+    }
+}
 // 分支条件判断
-export const Gateway = createClass({
+export const Gateway: Klass<GatewayPublicType> = createClass({
     name: 'Gateway',
     public: {
         name: {
@@ -179,128 +243,153 @@ export const SideEffect = createClass({
 })
 
 // activity activityGroup transfer 互相引用了，所以 type 要单独写了。
-type ActivityDef = {
+type ActivityPublicType = {
+    name: {
+        type: 'string',
+        collection :false,
+        required: true
+    },
+    interactions: {
+        type: Klass<InteractionPublicType>,
+        collection :true,
+        defaultValue: (...args: any[]) => KlassInstance<Klass<InteractionPublicType>, any>[]
+    },
+
+    transfers: {
+        type: Klass<TransferPublicType>
+        collection: true
+        defaultValue: (...args: any[]) => KlassInstance<Klass<TransferPublicType>, any>[]
+    },
+    groups: {
+        type: Klass<ActivityGroupPublicType>,
+        collection: true
+        defaultValue: (...args: any[]) => KlassInstance<Klass<ActivityGroupPublicType>, any>[]
+    },
+    gateways: {
+        type: Klass<GatewayPublicType>
+        collection: true
+        defaultValue: (...args: any[]) => KlassInstance<Klass<GatewayPublicType>, any>[]
+    },
+    events: {
+        type: typeof Event,
+        collection: true
+        defaultValue: (...args: any[]) => KlassInstance<typeof Event, any>[]
+    },
+    // 副作用
+    sideEffects: {
+        type: typeof SideEffect,
+        collection: true
+        defaultValue: (...args: any[]) => KlassInstance<typeof SideEffect, any>[]
+    },
+} 
+
+
+// interface Activities {
+//     type: Klass<ActivityPublicType>,
+//     required: false,
+//     collection: true,
+// }
+
+type UnwrappedActivityInstanceType = {
     name: string,
-    public: {
-        name: {
-            type: 'string',
-            collection :false
-        },
-        interactions: {
-            type: typeof Interaction,
-            collection :true
-        },
-        gateways: {
-            type: typeof Gateway,
-            collection: true
-        },
-        transfers: {
-            type: KlassType<TransferDef["public"]>
-            collection: true
-        },
-        groups: {
-            type: KlassType<ActivityGroupDef["public"]>,
-            collection: true
-        },
-        events: {
-            type: typeof Event,
-            collection: true
-        },
-        // 副作用
-        sideEffects: {
-            type: typeof SideEffect,
-            collection: true
-        },
+    interactions: KlassInstance<Klass<InteractionPublicType>, any>[]
+    transfers: KlassInstance<Klass<TransferPublicType>, any>[]
+    groups: KlassInstance<Klass<ActivityGroupPublicType>, any>[]
+    gateways: KlassInstance<Klass<GatewayPublicType>, any>[]
+    events: KlassInstance<typeof Event, any>[]
+    sideEffects: KlassInstance<typeof SideEffect, any>[]
+} & KlassInstancePrimitiveProps
+
+type ActivityGroupPublicType = {
+    // 指定是并行的，还是串行的 等等
+    type: {
+        type: 'string',
+        required: true,
+        collection: false
+    },
+    activities: {
+        // type: Klass<ActivityPublicType>,
+        instanceType: UnwrappedActivityInstanceType,
+        required: false,
+        collection: true,
+        defaultValue: (...args: any[]) => UnwrappedActivityInstanceType[]
+    },
+}
+
+
+type TransferPublicType = {
+    name: {
+        type: 'string',
+        required: true,
+        collection: false
+    },
+    source: {
+        type: (Klass<InteractionPublicType>| Klass<ActivityGroupPublicType>| Klass<GatewayPublicType>)[]
+        required: true
+        collection: false
+    },
+    target: {
+        type: (Klass<InteractionPublicType>| Klass<ActivityGroupPublicType>| Klass<GatewayPublicType>)[]
+        required: true
+        collection: false
     }
 }
 
-type ActivityGroupDef = {
-    name: string,
-    public: {
-        type: {
-            type: 'string',
-            required: true,
-            collection: false
-        },
-        activities: {
-            type: KlassType<ActivityDef["public"]>,
-            required: false,
-            collection: true,
-        },
-        // TODO 可以有配置逻辑的。用于让用户自己扩展 Group 类型。
-    }
-}
 
+const TRANSFER_PLACEHOLDER = {} as unknown as Klass<TransferPublicType>
+const ACTIVITY_GROUP_PLACEHOLDER = {} as unknown as Klass<ActivityGroupPublicType>
 
-type TransferDef = {
-    name: string,
-    public: {
-        name: {
-            type: 'string',
-            required: boolean,
-            collection: boolean
-        },
-        source: {
-            type: [typeof Interaction, KlassType<ActivityGroupDef["public"]>,typeof Gateway]
-            // type: KlassTypeAny[]
-            required: boolean
-            collection: boolean
-        },
-        target: {
-            type: [typeof Interaction, KlassType<ActivityGroupDef["public"]>, typeof Gateway]
-            required: boolean
-            collection: boolean
-        }
-    }
-}
-
-const TRANSFER_PLACEHOLDER = {} as unknown as KlassType<TransferDef["public"]>
-const ACTIVITY_GROUP_PLACEHOLDER = {} as unknown as KlassType<ActivityGroupDef["public"]>
-
-export const Activity: KlassType<ActivityDef["public"]> = createClass({
+export const Activity: Klass<ActivityPublicType> = createClass({
     name: 'Activity',
-    public: {
+    public: ({
         name: {
             type: 'string',
-            collection: false
+            collection: false,
+            required: true
         },
         // 节点
         interactions: {
             type: Interaction,
-            collection: true
+            collection: true,
+            defaultValue: (...args: any[]) => []
         },
         // 节点
         gateways: {
             type: Gateway,
-            collection: true
+            collection: true,
+            defaultValue: (...args: any[]) => []
         },
         // 边
         transfers: {
             type: TRANSFER_PLACEHOLDER, // 待会要被替换掉的，因为 activity/transfer 循环引用了。所以只能待会再替换成真的
-            collection: true
+            collection: true,
+            defaultValue: (...args: any[]) => []
         },
         // 节点分组
         groups: {
             // 待会要被替换掉的，因为 activity/activityGroup 循环引用了。所以只能待会再替换成真的
             type: ACTIVITY_GROUP_PLACEHOLDER,
-            collection: true
+            collection: true,
+            defaultValue: (...args: any[]) => []
         },
-        // 抛出的事件
+        // 抛出的事件groups
         events: {
             type: Event,
-            collection: true
+            collection: true,
+            defaultValue: (...args: any[]) => []
         },
         // 副作用
         sideEffects: {
             type: SideEffect,
-            collection: true
+            collection: true,
+            defaultValue: (...args: any[]) => []
         },
-    }
+    } as ActivityPublicType)
 })
 
 
 // ActivityGroup 本质上是一个控制单元，不是 Activity。用来决定里面的 interaction 在什么情况下达到了完成状态。
-export const ActivityGroup: KlassType<ActivityGroupDef["public"]> = createClass({
+export const ActivityGroup: Klass<ActivityGroupPublicType> = createClass({
     name: 'ActivityGroup',
     public: {
         type: {
@@ -309,18 +398,18 @@ export const ActivityGroup: KlassType<ActivityGroupDef["public"]> = createClass(
             collection: false
         },
         activities: {
-            type: Activity,
+            // type: Activity,
+            instanceType: {} as unknown as UnwrappedActivityInstanceType,
+            collection: true,
             required: false,
-            collection: true
+            defaultValue: (...args: any[]) => []
         }
     }
-} as ActivityGroupDef)
-
-// const a:[typeof Interaction, KlassType<ActivityGroupDef["public"]>, typeof Gateway ] = [Interaction, ActivityGroup, Gateway]
+})
 
 
 
-export const Transfer: KlassType<TransferDef["public"]> = createClass({
+export const Transfer: Klass<TransferPublicType> = createClass({
     name: 'Transfer',
     public: {
         name: {
@@ -339,22 +428,27 @@ export const Transfer: KlassType<TransferDef["public"]> = createClass({
             collection: false
         }
     }
-} as TransferDef)
+})
 
 // 修正前面 Activity 里面为了解决循环引用问题的占位符
 Activity.public.transfers.type = Transfer
 Activity.public.groups.type = ActivityGroup
 
 
-export type ActivityInstanceType = KlassInstanceOf<typeof Activity, false>
-export type ActivityGroupInstanceType = KlassInstanceOf<typeof ActivityGroup, false>
-export type InteractionInstanceType = KlassInstanceOf<typeof Interaction, false>
-export type GatewayInstanceType = KlassInstanceOf<typeof Gateway, false>
-export type TransferInstanceType = KlassInstanceOf<typeof Transfer, false>
+export type ActivityInstanceType = KlassInstance<typeof Activity, false>
+export type ActivityGroupInstanceType = KlassInstance<Klass<ActivityGroupPublicType>, false>
+export type InteractionInstanceType = KlassInstance<typeof Interaction, false>
+export type GatewayInstanceType = KlassInstance<typeof Gateway, false>
+export type TransferInstanceType = KlassInstance<typeof Transfer, false>
+
 
 export function forEachInteraction(activity: ActivityInstanceType, handle:(i:InteractionInstanceType, g?: ActivityGroupInstanceType) => any, parenGroup?: ActivityGroupInstanceType) {
-    activity.interactions!.forEach(i => handle(i, parenGroup))
-    activity.groups?.forEach(group => group.activities!.forEach(sub => forEachInteraction(sub, handle, group)))
+    console.log(activity.name)
+    activity.interactions.forEach(i => handle(i, parenGroup))
+    activity.groups.forEach(group => {
+        group.type = 'parallel'
+        group.activities!.forEach(sub => forEachInteraction(sub, handle, group))
+    })
 }
 
 export function getInteractions(activity: ActivityInstanceType) {

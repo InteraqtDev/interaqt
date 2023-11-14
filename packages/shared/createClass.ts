@@ -1,37 +1,45 @@
 // @ts-ignore
-import {atom, Atom, isAtom, isReactive, rawStructureClone, reactive} from "rata";
+import {atom, Atom, computed, isAtom, isReactive, rawStructureClone, reactive} from "rata";
 import {isPlainObject, hasOwn, isObject, assert} from "./util";
 import {toRaw, UnwrapReactive} from "rata";
 
 type PrimitivePropType = 'string'|'number'|'boolean'| 'object'
+type DefaultValueType = (...args: any[]) => any
 
 type ClassPropType = {
-    type?: KlassType<any>|KlassType<any>[]|PrimitivePropType,
-    collection?: false,
+    type?: Klass<any>|Klass<any>[]|PrimitivePropType,
+    // 用来接触循环引用的
+    instanceType?: Object,
+    reactiveInstanceType?: KlassInstance<any, true>,
     computedType?: (...arg: any[]) => string|Function,
-    defaultValue?: () => any,
-    required?: boolean,
     options? : any[] | ((thisProp: any, thisEntity: object) => any[])
     constraints?: {
         [ruleName: string] : ((thisProp: any, thisEntity: object) => Atom<boolean>|boolean|any[]) | Function | string
     }
 }
 
-type ClassCollectionPropType<T extends ClassDef['public']> = Omit<ClassPropType, 'collection'> & {
-    collection: true,
-}
+type OptionalRequiredType<T> = T&{required?:false} | T& { required: true}
+type OptionalDefaultValueType<T> = T&{defaultValue?: undefined} | T& { defaultValue: DefaultValueType}
+type OptionalCollectionType<T> = T&{collection?: false} | T& { collection: true}
+// arg 是有 required 并且一定没有 defaultValue 才有
+// prop 是有 required 或者有 defaultValue 就必有
+type RequireWithoutDefault<T extends ClassMetaPublicItem, IS_ARG extends true|false> =
+    IS_ARG extends true ?
+        (T["defaultValue"] extends DefaultValueType? false:  T["required"] extends true  ? true : false) :
+        (T["defaultValue"] extends DefaultValueType? true:  T["required"] extends true  ? true : false)
 
-type ClassDefPublicItem = ClassPropType | ClassCollectionPropType<any>
 
-export type ClassDef = {
+type ClassMetaPublicItem = OptionalRequiredType<OptionalDefaultValueType<OptionalCollectionType<ClassPropType>>>
+
+export type KlassMeta = {
     name: string,
-    display? : (obj: KlassInstance<any>) => string,
+    display? : (obj:any) => string,
     constraints?: {
         [ruleName: string] : (thisInstance: object, allInstance: object[]) => Atom<boolean>|boolean
     }
 
     public: {
-        [key: string]: ClassDefPublicItem
+        [key: string]: ClassMetaPublicItem
     }
     // 检测一个实例是不是 Class，用户可以自定义规则，如果没有自定义就会用 instanceof
     is? : (obj: any) => boolean
@@ -39,7 +47,7 @@ export type ClassDef = {
 }
 
 
-export function getInstance<T extends KlassType<any>>(Type: T){
+export function getInstance<T extends Klass<any>>(Type: T){
     return Type.instances
 }
 
@@ -50,12 +58,16 @@ interface PrimitivePropertyMap {
     object: object
 }
 
-type KlassInstancePrimitives = {
+export type KlassInstancePrimitiveProps = {
     uuid: string,
     _options: KlassOptions,
+    _type: string
 }
 
-type inferIfReactiveCollection<REACTIVE extends boolean, COLLECTION extends true|false|undefined, T> = REACTIVE extends true ?
+
+type KlassProp<REACTIVE extends boolean, COLLECTION extends true|false|undefined, T> = IfReactiveCollectionProp<REACTIVE, COLLECTION, T>
+
+type IfReactiveCollectionProp<REACTIVE extends boolean, COLLECTION extends true|false|undefined, T> = REACTIVE extends true ?
     (
         COLLECTION extends true ?
             UnwrapReactive<T[]>:
@@ -64,59 +76,75 @@ type inferIfReactiveCollection<REACTIVE extends boolean, COLLECTION extends true
         COLLECTION extends true ?
             T[]:
             T
-    )
+        )
 
-// FIXME required
-export type KlassInstanceRaw<T extends NonNullable<ClassDef["public"]>> = {
-    [Key in keyof T]?:
-    T[Key]['type'] extends KlassType<any> ?
-        inferIfReactiveCollection<false, T[Key]["collection"], KlassInstance<T[Key]['type']['public']>>:
-        T[Key]['type'] extends KlassType<any>[] ?
-            inferIfReactiveCollection<false, T[Key]["collection"], KlassInstance<any>>:
-            T[Key]['type'] extends PrimitivePropType ?
-                inferIfReactiveCollection<false, T[Key]["collection"], PrimitivePropertyMap[T[Key]['type']]> :
-                T[Key]['computedType'] extends Function ?
-                    (ReturnType<T[Key]['computedType']> extends KlassType<any> ?
-                        inferIfReactiveCollection<false, T[Key]["collection"], ReturnType<ReturnType<T[Key]['computedType']>["create"]>>:
-                        inferIfReactiveCollection<false, T[Key]["collection"], any>
-                        ):
-                    never
-}
 
-export type KlassInstance<T extends NonNullable<ClassDef["public"]>> = KlassInstanceRaw<T> & KlassInstancePrimitives
+type OmitNever<T> = Omit<T, { [K in keyof T]: T[K] extends never ? K : never }[keyof T]>
 
-// FIXME required
-export type ReactiveKlassInstanceRaw<T extends NonNullable<ClassDef["public"]>> = {
+export type RequiredProps<T extends NonNullable<KlassMeta["public"]>, REACTIVE extends true|false, IS_ARG extends true|false> = OmitNever<{
     [Key in keyof T]:
-        T[Key]['type'] extends KlassType<any> ?
-            inferIfReactiveCollection<true, T[Key]["collection"], KlassInstance<T[Key]['type']['public']>>:
-        T[Key]['type'] extends KlassType<any>[] ?
-            inferIfReactiveCollection<true, T[Key]["collection"], KlassInstance<any>>:
-        T[Key]['type'] extends PrimitivePropType ?
-            inferIfReactiveCollection<true, T[Key]["collection"], PrimitivePropertyMap[T[Key]['type']]>:
-        T[Key]['computedType'] extends Function ?
-            (ReturnType<T[Key]['computedType']> extends KlassType<any> ?
-                inferIfReactiveCollection<true, T[Key]["collection"], ReturnType<ReturnType<T[Key]['computedType']>["createReactive"]>>:
-                inferIfReactiveCollection<true, T[Key]["collection"], any>
-                ):
-        never
-}
+        RequireWithoutDefault<T[Key], IS_ARG> extends true ?
+            (
+                // 这个类型是用来解决循环引用的
+                T[Key]["instanceType"] extends Object?
+                    KlassProp<REACTIVE, T[Key]["collection"],  T[Key]["instanceType"]>:
+                    (
+                        T[Key]['type'] extends Klass<any> ?
+                            KlassProp<REACTIVE, T[Key]["collection"],  InertKlassInstance<T[Key]['type']['public']>> :
+                            T[Key]['type'] extends Klass<any>[] ?
+                                KlassProp<REACTIVE, T[Key]["collection"],InertKlassInstance<any>>:
+                                T[Key]['type'] extends PrimitivePropType ?
+                                    KlassProp<REACTIVE, T[Key]["collection"],  PrimitivePropertyMap[T[Key]['type']]> :
+                                    never
+                    )
+            ):
+            never
+}>
 
-export type ReactiveKlassInstance<T extends NonNullable<ClassDef["public"]>> = ReactiveKlassInstanceRaw<T> &  KlassInstancePrimitives
+
+export type OptionalProps<T extends NonNullable<KlassMeta["public"]>, REACTIVE extends true|false, IS_ARG  extends true|false> = Partial<OmitNever<{
+    [Key in keyof T]:
+        RequireWithoutDefault<T[Key], IS_ARG> extends true ?
+            never:
+            (
+                // 这个类型是用来解决循环引用的
+                T[Key]["instanceType"] extends Object ?
+                    KlassProp<REACTIVE, T[Key]["collection"],  T[Key]["instanceType"]>:
+                    (
+                        T[Key]['type'] extends Klass<any> ?
+                            KlassProp<REACTIVE, T[Key]["collection"],  InertKlassInstance<T[Key]['type']['public']>> :
+                            T[Key]['type'] extends Klass<any>[] ?
+                                KlassProp<REACTIVE, T[Key]["collection"],InertKlassInstance<any>>:
+                                T[Key]['type'] extends PrimitivePropType ?
+                                    KlassProp<REACTIVE, T[Key]["collection"],  PrimitivePropertyMap[T[Key]['type']]> :
+                                    never
+                    )
+            )
+}>>
 
 
-export type KlassType<T extends NonNullable<ClassDef["public"]>> = {
-    new<U extends KlassOptions|ReactiveKlassOptions>(arg: object, options?: U) : U extends ReactiveKlassOptions ? ReactiveKlassInstance<T> : KlassInstance<T>,
-    create: (arg: KlassInstanceRaw<T>, options?: KlassOptions) => KlassInstance<T>,
-    createReactive: (arg: KlassInstanceRaw<T>, options?: KlassOptions) => ReactiveKlassInstance<T>,
+// 参数和返回值是两码事
+//  参数是有 required 但是没有 defaultValue 的就必填
+//  返回值是有 required 或者有 defaultValue 的就必有
+export type KlassInstanceArgs<T extends NonNullable<KlassMeta["public"]>> = OptionalProps<T, false, true> & RequiredProps<T,false, true>
+export type InertKlassInstanceProps<T extends NonNullable<KlassMeta["public"]>> = OptionalProps<T, false, false> & RequiredProps<T, false, false>
+export type InertKlassInstance<T extends NonNullable<KlassMeta["public"]>> = InertKlassInstanceProps<T> & KlassInstancePrimitiveProps
+
+export type ReactiveKlassInstanceProps<T extends NonNullable<KlassMeta["public"]>> = OptionalProps<T, true, false> & RequiredProps<T, true, false>
+export type ReactiveKlassInstance<T extends NonNullable<KlassMeta["public"]>> = ReactiveKlassInstanceProps<T> &  KlassInstancePrimitiveProps
+
+export type Klass<T extends NonNullable<KlassMeta["public"]>> = {
+    new<U extends KlassOptions|ReactiveKlassOptions>(arg: object, options?: U) : U extends ReactiveKlassOptions ? ReactiveKlassInstance<T> : InertKlassInstance<T>,
+    create: (arg: KlassInstanceArgs<T>, options?: KlassOptions) => InertKlassInstance<T>,
+    createReactive: (arg: KlassInstanceArgs<T>, options?: KlassOptions) => ReactiveKlassInstance<T>,
     displayName: string,
     isKlass: true,
     public: T,
-    constraints: ClassDef['constraints'],
-    instances: (ReactiveKlassInstance<T>|KlassInstance<T>)[],
-    display? : ClassDef['display']
-    stringify: (instance: KlassInstance<T>) => string
-    parse: () => KlassInstance<T>
+    constraints: KlassMeta['constraints'],
+    instances: (ReactiveKlassInstance<T>|InertKlassInstance<T>)[],
+    display? : KlassMeta['display']
+    stringify: (instance: InertKlassInstance<T>|ReactiveKlassInstance<T>) => string
+    parse: () => InertKlassInstance<T>
     check: (data: object) => boolean
     is: (arg: any) => boolean
     clone: <V>(obj: V, deep: boolean) => V
@@ -135,12 +163,10 @@ type KlassRawInstanceDataType = {
     type: string,
     uuid: string,
     options?: KlassOptions|ReactiveKlassOptions,
-    public: {
-        [k: string]: any
-    }
+    public: KlassInstanceArgs<any>
 }
 
-export const KlassByName = new Map<string, KlassType<any>>()
+export const KlassByName = new Map<string, Klass<any>>()
 
 // 遍历两次，建立所有关系。第一次把非对象值建立起来。第二次把那些引用的 uuid 的值替换出来。
 export function createInstancesFromString(objStr: string) {
@@ -149,8 +175,8 @@ export function createInstancesFromString(objStr: string) {
 }
 
 export function createInstances(objects: KlassRawInstanceDataType[], reactiveForce?: boolean) {
-    const uuidToInstance = new Map<string, KlassInstance<any>>()
-    const unsatisfiedInstances = new Map<KlassInstance<any>, object>()
+    const uuidToInstance = new Map<string, InertKlassInstance<any>|ReactiveKlassInstance<any>>()
+    const unsatisfiedInstances = new Map<InertKlassInstance<any>|ReactiveKlassInstance<any>, object>()
     objects.forEach(({ type, options = {}, uuid, public: rawProps } :KlassRawInstanceDataType) => {
         assert(!uuidToInstance.get(uuid), `duplicate uuid ${uuid}, ${type}, ${JSON.stringify(rawProps)}`)
         const Klass = KlassByName.get(type)!
@@ -160,8 +186,8 @@ export function createInstances(objects: KlassRawInstanceDataType[], reactiveFor
             optionsWithUUID.isReactive = reactiveForce
         }
         // 根据
-        const publicProps: {[k:string]:any} = {}
-        const unsatisfiedProps: {[k:string]:any} = {}
+        const publicProps:{[k:string]: any} = {}
+        const unsatisfiedProps: {[k:string]: any} = {}
         Object.entries(rawProps).forEach(([propName, propValue]) => {
             const klassType = Klass.public[propName].type
             publicProps[propName] = propValue
@@ -175,7 +201,7 @@ export function createInstances(objects: KlassRawInstanceDataType[], reactiveFor
         })
 
         const instance = new Klass(publicProps, optionsWithUUID)
-
+        // FIXME 根据 option + reactiveForce 共同判断
         uuidToInstance.set(uuid, instance)
 
         if (Object.keys(unsatisfiedProps).length) {
@@ -184,18 +210,23 @@ export function createInstances(objects: KlassRawInstanceDataType[], reactiveFor
     })
 
     for(let [instance, unsatisfiedProps] of unsatisfiedInstances) {
-        Object.entries(unsatisfiedProps).forEach(([propName, propValue]) => {
+        Object.entries(unsatisfiedProps).forEach(([rawPropName, propValue]) => {
+            const propName = rawPropName as keyof typeof instance
             // TODO 这里要不要做更加严格的校验，防止真的出现了 value 的值刚好就和 uuid 匹配上了？
             const refs = Array.isArray(propValue) ? propValue.map(maybeUUID => (uuidToInstance.get(maybeUUID)||maybeUUID)) : (uuidToInstance.get(propValue)||propValue)
 
             // CAUTION 这里如果是 reactive 的默认一定有 reactive 的值。那么用 reactive 的方式
             if (instance._options.isReactive) {
                 if (Array.isArray(propValue)) {
-                    instance[propName].splice(0, Infinity, ...(refs as KlassInstance<any>[]))
+                    // @ts-ignore
+                    (instance[propName] as InertKlassInstance<any>[]).splice(0, Infinity, ...(refs as InertKlassInstance<any>[]))
                 } else {
-                    instance[propName](refs)
+                    // @ts-ignore
+                    (instance[propName] as Atom)(refs)
                 }
             } else {
+                // FIXME type
+                // @ts-ignore
                 instance[propName] = refs
             }
         })
@@ -212,80 +243,81 @@ export function stringifyAllInstances() {
     return `[${result.join(',')}]`
 }
 
-export function stringifyInstance(obj: KlassInstance<any>) {
-    const Klass = KlassByName.get(obj._type) as KlassType<any>
+export function stringifyInstance(obj: InertKlassInstance<any>) {
+    const Klass = KlassByName.get(obj._type) as Klass<any>
     return Klass.stringify(obj)
 }
 
 function returnEntityUUID(obj: any) {
-    return (isObject(obj) && !isPlainObject(obj)) ? (obj as KlassInstance<any>).uuid : obj
+    return (isObject(obj) && !isPlainObject(obj)) ? (obj as InertKlassInstance<any>).uuid : obj
 }
 
-export function createClass<T extends ClassDef>(def: T) : KlassType<T['public']>{
+export function createClass<T extends KlassMeta>(metadata: T) : Klass<T['public']>{
 // export function createClass(def){
 
-    if (KlassByName.get(def.name)) throw new Error(`Class name must be global unique. ${def.name}`)
+    if (KlassByName.get(metadata.name)) throw new Error(`Class name must be global unique. ${metadata.name}`)
 
-    function create(fieldValues: KlassInstance<T["public"]>, options?: KlassOptions): KlassInstance<typeof def.public> {
-        return new Klass(rawStructureClone(fieldValues), options) as unknown as KlassInstance<typeof def.public>
+    function create(fieldValues: InertKlassInstance<T["public"]>, options?: KlassOptions): InertKlassInstance<typeof metadata.public> {
+        return new KlassClass(rawStructureClone(fieldValues), options) as unknown as InertKlassInstance<typeof metadata.public>
     }
 
-    function createReactive(fieldValues: KlassInstance<T["public"]>, options?: KlassOptions) : ReactiveKlassInstance<typeof def.public>{
-        return new Klass(rawStructureClone(fieldValues), { ...(options||{}), isReactive: true}) as unknown as ReactiveKlassInstance<typeof def.public>
+    function createReactive(fieldValues: InertKlassInstance<T["public"]>, options?: KlassOptions) : ReactiveKlassInstance<typeof metadata.public>{
+        return new KlassClass(rawStructureClone(fieldValues), { ...(options||{}), isReactive: true}) as unknown as ReactiveKlassInstance<typeof metadata.public>
     }
 
-    function stringify(obj: KlassInstance<(typeof def)['public']>) {
+    function stringify(obj: InertKlassInstance<(typeof metadata)['public']>) {
         return JSON.stringify({
-            type: def.name,
+            type: metadata.name,
             options: obj._options,
             uuid: obj.uuid,
-            public: Object.fromEntries(Object.entries(def.public).map(([key, propDef]) => {
+            public: Object.fromEntries(Object.entries(metadata.public).map(([key, propDef]) => {
                 // CAUTION 任何叶子结点都会被替换成 uuid
-                return [key, rawStructureClone(obj[key], returnEntityUUID)]
+                return [key, rawStructureClone(obj[key as keyof typeof obj], returnEntityUUID)]
             })),
         } as KlassRawInstanceDataType)
     }
 
 
-    function clone(obj: KlassInstance<T['public']>, deepCloneKlass: boolean){
-        const arg = Object.fromEntries(Object.keys(def.public).map(k => [k, deepClone(obj[k], deepCloneKlass)])) as KlassInstance<T['public']>
-        return obj._options?.isReactive ? Klass.createReactive(arg): Klass.create(arg)
+    function clone(obj: InertKlassInstance<T['public']>, deepCloneKlass: boolean){
+        const arg = Object.fromEntries(Object.keys(metadata.public).map(k => [k, deepClone(obj[k as keyof typeof obj], deepCloneKlass)])) as InertKlassInstance<T['public']>
+        return obj._options?.isReactive ? KlassClass.createReactive(arg): KlassClass.create(arg)
     }
 
     function is(obj: any) {
-        return obj instanceof Klass
+        return obj instanceof KlassClass
     }
 
-    function check(data: KlassInstance<any>) {
+    function check(data: InertKlassInstance<any>) {
         // TODO 要check 到底有没有
         if (data.uuid) return true
         // TODO check data is valid or not
         return true
     }
 
-    class Klass {
+
+    class KlassClass {
         static create = create
         static createReactive = createReactive
         static stringify = stringify
-        static is = def.is || is
+        static is = metadata.is || is
         static clone = clone
         static check = check
         static isKlass = true
         public _options?: KlassOptions|ReactiveKlassOptions
-        public _type = def.name
-        public static displayName = def.name
-        public static public = def.public
-        public static constraints = def.constraints
-        public static display = def.display
-        public static instances:(KlassInstance<typeof def.public>|ReactiveKlassInstance<typeof def.public>)[] = reactive([])
+        public _type = metadata.name
+        public static displayName = metadata.name
+        public static public = metadata.public
+        public static constraints = metadata.constraints
+        public static display = metadata.display
+        public static instances:(InertKlassInstance<typeof metadata.public>|ReactiveKlassInstance<typeof metadata.public>)[] = reactive([])
         public uuid: string
         constructor(arg: KlassRawInstanceDataType["public"], options? :KlassOptions|ReactiveKlassOptions) {
-            const self = this as unknown as KlassInstance<typeof def.public>
+            const self = this as unknown as InertKlassInstance<typeof metadata.public>
 
             const isReactive = options?.isReactive
-            if (def.public) {
-                Object.entries(def.public).forEach(([ propName, propDef]: [string, ClassDefPublicItem]) => {
-                    const initialValue = hasOwn(arg, propName) ? arg[propName] : propDef.defaultValue?.()
+            if (metadata.public) {
+                Object.entries(metadata.public).forEach(([ propName, propDef]: [string, ClassMetaPublicItem]) => {
+                    const initialValue = hasOwn(arg, propName) ? arg[propName as unknown as keyof typeof arg] : propDef.defaultValue?.()
                     // CAUTION 所有值都有
 
                     if (initialValue!==undefined) {
@@ -314,23 +346,23 @@ export function createClass<T extends ClassDef>(def: T) : KlassType<T['public']>
             this._options = options
 
             this.uuid = this._options?.uuid || crypto.randomUUID()
-            Klass.instances.push(self)
+            KlassClass.instances.push(self)
         }
     }
 
 
-    KlassByName.set(def.name, Klass as unknown as KlassType<typeof def.public>)
-    return Klass as unknown as KlassType<typeof def.public>
+    KlassByName.set(metadata.name, KlassClass as unknown as Klass<typeof metadata.public>)
+    return KlassClass as unknown as Klass<typeof metadata.public>
 }
 
-export function getUUID(obj: KlassInstance<any>): string {
+export function getUUID(obj: InertKlassInstance<any>): string {
     return (isAtom(obj) ? obj().uuid : obj.uuid) || ''
 }
 
 
-export function getDisplayValue( obj: KlassInstance<any>) {
-    const rawObj: KlassInstance<any> = isAtom(obj) ? obj() : obj
-    return (rawObj.constructor as KlassType<any>).display?.(rawObj)
+export function getDisplayValue( obj: InertKlassInstance<any>) {
+    const rawObj: InertKlassInstance<any> = isAtom(obj) ? obj() : obj
+    return (rawObj.constructor as Klass<any>).display?.(rawObj)
 }
 
 // FIXME 这里没法指定要不要 clone Klass 里面的 引用，现在默认就是不 copy
@@ -355,14 +387,14 @@ export function deepClone<T>(obj: T, deepCloneKlass?: boolean): T{
     }
 
     // @ts-ignore
-    if (typeof obj?.constructor?.isKlass) return deepCloneKlass ? ((obj as KlassInstance<any>)?.constructor as KlassType<any>)?.clone(obj as KlassInstance<any>, deepCloneKlass) as T: obj
+    if (typeof obj?.constructor?.isKlass) return deepCloneKlass ? ((obj as InertKlassInstance<any>)?.constructor as Klass<any>)?.clone(obj as InertKlassInstance<any>, deepCloneKlass) as T: obj
 
     // TODO 支持其他类型，例如 Date/RegExp/Error
     debugger
     throw new Error(`unknown type`)
 }
 
-export type KlassInstanceOf<T extends KlassType<any>, U extends boolean> = U extends true ? ReactiveKlassInstance<T["public"]> : KlassInstance<T["public"]>
+export type KlassInstance<T extends Klass<any>, U extends boolean> = U extends true ? ReactiveKlassInstance<T["public"]> : InertKlassInstance<T["public"]>
 
 export function removeAllInstance() {
     for( let [, Klass] of KlassByName ) {
