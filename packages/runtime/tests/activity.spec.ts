@@ -1,7 +1,7 @@
 import {describe, test, expect, beforeEach} from "vitest";
 
 import { MemorySystem } from "../MemorySystem";
-import {createInstances, getInstance, KlassByName, KlassInstanceOf, removeAllInstance} from "@shared/createClass";
+import {createInstances, getInstance, KlassByName, KlassInstance, removeAllInstance} from "@shared/createClass";
 
 import { Activity } from "@shared/activity/Activity";
 import {ActivityCall, ActivityGroupNode} from "../AcitivityCall";
@@ -33,7 +33,7 @@ describe("activity state", () => {
         system = new MemorySystem()
         await system.storage.setup([], [])
         system.conceptClass = KlassByName
-        const mainActivity = (getInstance(Activity) as KlassInstanceOf<typeof Activity, false>[]).find(a => a.name === 'createFriendRelation')!
+        const mainActivity = (getInstance(Activity) as KlassInstance<typeof Activity, false>[]).find(a => a.name === 'createFriendRelation')!
         createFriendRelationActivityCall = new ActivityCall(mainActivity, system)
 
         sendRequestUUID = createFriendRelationActivityCall.graph.head.uuid

@@ -1,5 +1,5 @@
 import {ComputedDataHandle} from "./ComputedDataHandle";
-import {KlassInstanceOf, KlassType} from "@shared/createClass";
+import {KlassInstance, Klass} from "@shared/createClass";
 import {State} from "@shared/state/State";
 
 import {Every, Count} from "@shared/IncrementalComputation";
@@ -9,7 +9,7 @@ export class EveryHandle extends ComputedDataHandle {
     matchCountField: string = `${this.propertyName}_match_count`
     totalCountField: string= `${this.propertyName}_total_count`
     setupSchema() {
-        const computedData = this.computedData as KlassInstanceOf<typeof Every, false>
+        const computedData = this.computedData as KlassInstance<typeof Every, false>
         const matchCountField = `${this.stateName}_match_count`
         const totalCountField = `${this.stateName}_total_count`
         // 新赠两个 count

@@ -1,4 +1,4 @@
-import {KlassInstanceOf} from "@shared/createClass";
+import {KlassInstance} from "@shared/createClass";
 import {
     Count,
 } from '@shared/IncrementalComputation'
@@ -10,7 +10,7 @@ import {WeightedSummationHandle} from "./WeightedSummation";
 export class RecordCountHandle extends WeightedSummationHandle {
     // 只是用来转换类型
     parseComputedData(){
-        const computedData = this.computedData as  KlassInstanceOf<typeof Count, false>
+        const computedData = this.computedData as  KlassInstance<typeof Count, false>
         this.mapRelationToWeight = this.parseMatchRelationFunction(computedData.matchExpression!).bind(this.controller)
         this.records = [computedData.record!]
     }

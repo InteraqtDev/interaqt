@@ -1,6 +1,6 @@
 import {RecordMutationEvent} from "../System";
 import {IncrementalComputedDataHandle, StatePatch} from "./IncrementalComputedDataHandle";
-import {KlassInstanceOf} from "@shared/createClass";
+import {KlassInstance} from "@shared/createClass";
 import {Entity, Relation} from "@shared/entity/Entity";
 import {RelationCount, RelationBasedWeightedSummation} from "@shared/IncrementalComputation";
 import {MatchExp} from '@storage/erstorage/MatchExp'
@@ -42,12 +42,12 @@ type WeightedSummationRelation = {
 export class RelationBasedWeightedSummationHandle extends IncrementalComputedDataHandle {
     entityName!: string
     relationInfos!: WeightedSummationRelation[]
-    computedData: KlassInstanceOf<typeof RelationBasedWeightedSummation, false> = this.computedData as KlassInstanceOf<typeof RelationBasedWeightedSummation, false>
-    relations: KlassInstanceOf<typeof RelationBasedWeightedSummation, false>["relations"]
-    mapRelationToWeight: (record: KlassInstanceOf<typeof Entity, false>, relation: KlassInstanceOf<typeof Relation, false>) => number = () => 0
+    computedData: KlassInstance<typeof RelationBasedWeightedSummation, false> = this.computedData as KlassInstance<typeof RelationBasedWeightedSummation, false>
+    relations: KlassInstance<typeof RelationBasedWeightedSummation, false>["relations"]
+    mapRelationToWeight: (record: KlassInstance<typeof Entity, false>, relation: KlassInstance<typeof Relation, false>) => number = () => 0
     // 单独抽出来让下面能覆写
     parseComputedData(){
-        const computedData = this.computedData as  KlassInstanceOf<typeof RelationBasedWeightedSummation, false>
+        const computedData = this.computedData as  KlassInstance<typeof RelationBasedWeightedSummation, false>
         this.mapRelationToWeight = this.parseMapRelationFunction(computedData.matchRelationToWeight!).bind(this.controller)
         this.entityName = this.dataContext.host!.name!
         this.relations = computedData.relations
@@ -154,9 +154,9 @@ export class RelationBasedWeightedSummationHandle extends IncrementalComputedDat
 
             // 针对 update 判断之前是否满足条件
             if (mutationEvent.type === 'update') {
-                oldRelationRecord =  mutationEvent.oldRecord as KlassInstanceOf<typeof Relation, false>
+                oldRelationRecord =  mutationEvent.oldRecord as KlassInstance<typeof Relation, false>
             } else if (mutationEvent.type === 'delete'){
-                oldRelationRecord = mutationEvent.record as KlassInstanceOf<typeof Relation, false>
+                oldRelationRecord = mutationEvent.record as KlassInstance<typeof Relation, false>
             }
         } else if(mutationEvent.recordName === toCountEntityName && mutationEvent.type === 'update'){
             currentRelationRecord = (effect as RelatedRecordChangeEffect).relationRecord
@@ -195,7 +195,7 @@ export class RelationBasedWeightedSummationHandle extends IncrementalComputedDat
                 }
             } else {
                 if ( mutationEvent.type === 'update' ) {
-                    oldRecord = mutationEvent.oldRecord as KlassInstanceOf<typeof Entity, false>
+                    oldRecord = mutationEvent.oldRecord as KlassInstance<typeof Entity, false>
                 }
             }
         }
@@ -206,7 +206,7 @@ export class RelationBasedWeightedSummationHandle extends IncrementalComputedDat
         }
 
         if (oldRelationRecord) {
-            originWeight = this.mapRelationToWeight(oldRecord!, oldRelationRecord as KlassInstanceOf<typeof Relation, false>)
+            originWeight = this.mapRelationToWeight(oldRecord!, oldRelationRecord as KlassInstance<typeof Relation, false>)
         }
 
         if(currentWeight !== originWeight) {

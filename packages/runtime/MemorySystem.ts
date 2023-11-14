@@ -1,6 +1,6 @@
 import {RecordChangeListener, RecordMutationEvent, Storage, System, SYSTEM_RECORD} from "./System";
 import {InteractionEvent} from '../types/interaction'
-import {createClass, KlassInstanceOf} from "@shared/createClass";
+import {createClass, KlassInstance} from "@shared/createClass";
 import {Entity, Property, Relation} from "@shared/entity/Entity";
 import {DBSetup} from '@storage/erstorage/Setup'
 import {EntityQueryHandle} from '@storage/erstorage/EntityQueryHandle'
@@ -47,7 +47,7 @@ class MemoryStorage implements Storage{
             return this.create(SYSTEM_RECORD, { concept, key: key.toString(), value: encodeURI(JSON.stringify(value))})
         }
     }
-    async setup(entities: KlassInstanceOf<typeof Entity, false>[], relations: KlassInstanceOf<typeof Relation, false>[]) {
+    async setup(entities: KlassInstance<typeof Entity, false>[], relations: KlassInstance<typeof Relation, false>[]) {
         const systemEntity = Entity.create({
             name: SYSTEM_RECORD,
             properties: [

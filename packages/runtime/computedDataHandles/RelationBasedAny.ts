@@ -1,5 +1,5 @@
 import {ComputedDataHandle} from "./ComputedDataHandle";
-import {KlassInstanceOf, KlassType} from "@shared/createClass";
+import {KlassInstance, Klass} from "@shared/createClass";
 import {MatchExp} from '@storage/erstorage/MatchExp'
 import {Entity, Property, Relation} from "@shared/entity/Entity";
 
@@ -9,7 +9,7 @@ import {RecordMutationEvent} from "../System";
 export class RelationBasedAnyHandle extends ComputedDataHandle {
     matchCountField: string = `${this.propertyName}_match_count`
     setupSchema() {
-        const computedData = this.computedData as KlassInstanceOf<typeof RelationBasedAny, false>
+        const computedData = this.computedData as KlassInstance<typeof RelationBasedAny, false>
         const matchCountField = `${this.propertyName}_match_count`
         // 新赠两个 count
         const matchCountProperty = Property.create({

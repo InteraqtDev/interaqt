@@ -1,5 +1,5 @@
 import {ComputedDataHandle} from "./ComputedDataHandle";
-import {KlassInstanceOf, KlassType} from "@shared/createClass";
+import {KlassInstance, Klass} from "@shared/createClass";
 import {Any, Count} from "@shared/IncrementalComputation";
 import {RecordMutationEvent, SYSTEM_RECORD} from "../System";
 import {State} from "@shared/state/State";
@@ -7,7 +7,7 @@ import {State} from "@shared/state/State";
 export class RelationBasedAnyHandle extends ComputedDataHandle {
     matchCountField: string = `${this.stateName}_match_count`
     setupSchema() {
-        const computedData = this.computedData as KlassInstanceOf<typeof Any, false>
+        const computedData = this.computedData as KlassInstance<typeof Any, false>
         const matchCountField = `${this.stateName}_match_count`
         const matchCountState = State.create({
             name: matchCountField,

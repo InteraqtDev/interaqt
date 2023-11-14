@@ -1,23 +1,23 @@
 import {RecordMutationEvent} from "../System";
 import {IncrementalComputedDataHandle, StatePatch} from "./IncrementalComputedDataHandle";
-import {KlassInstanceOf, KlassInstance} from "@shared/createClass";
+import {KlassInstance} from "@shared/createClass";
 import {Entity, Relation} from "@shared/entity/Entity";
-import {RelationCount, RelationBasedWeightedSummation, WeightedSummation} from "@shared/IncrementalComputation";
+import {WeightedSummation} from "@shared/IncrementalComputation";
 import {MatchExp} from '@storage/erstorage/MatchExp'
 import {ComputedDataHandle} from "./ComputedDataHandle";
 
 type RecordChangeEffect = {
     affectedId: string,
     recordName: string
-    info: KlassInstance<any>
+    info: KlassInstance<any, false>
 }
 
 export class WeightedSummationHandle extends IncrementalComputedDataHandle {
-    records: KlassInstanceOf<typeof WeightedSummation, false>['records'] = []
-    mapRelationToWeight: (record: KlassInstanceOf<typeof Entity, false> | KlassInstanceOf<typeof Relation, false>, info: KlassInstance<any>) => number = () => 0
+    records: KlassInstance<typeof WeightedSummation, false>['records'] = []
+    mapRelationToWeight: (record: KlassInstance<typeof Entity, false> | KlassInstance<typeof Relation, false>, info: KlassInstance<any, false>) => number = () => 0
     // 单独抽出来让下面能覆写
     parseComputedData(){
-        const computedData = this.computedData as KlassInstanceOf<typeof WeightedSummation, false>
+        const computedData = this.computedData as KlassInstance<typeof WeightedSummation, false>
         this.mapRelationToWeight = this.parseMapRelationFunction(computedData.matchRecordToWeight!).bind(this.controller)
         this.records = computedData.records
     }
@@ -27,7 +27,7 @@ export class WeightedSummationHandle extends IncrementalComputedDataHandle {
     parseMapRelationFunction(stringContent:string) {
         return new Function('record', `return (${stringContent})(record)`)
     }
-    async computeEffect(mutationEvent: RecordMutationEvent, mutationEvents: RecordMutationEvent[]): Promise<KlassInstance<any>|undefined> {
+    async computeEffect(mutationEvent: RecordMutationEvent, mutationEvents: RecordMutationEvent[]): Promise<KlassInstance<any, false>|undefined> {
         return this.records!.find((record) => {
             return (record instanceof Entity ? record.name :this.controller.system.storage.getRelationNameByDef(record)) === mutationEvent.recordName
         })
@@ -35,7 +35,7 @@ export class WeightedSummationHandle extends IncrementalComputedDataHandle {
     async getLastValue(effect: RecordChangeEffect, mutationEvent: RecordMutationEvent, mutationEvents: RecordMutationEvent[]) {
         return this.controller.system.storage.get('state', this.stateName!)
     }
-    async computePatch(effect: KlassInstance<any>, lastSummation: number, mutationEvent: RecordMutationEvent, mutationEvents: RecordMutationEvent[]): Promise<StatePatch|StatePatch[]|undefined> {
+    async computePatch(effect: KlassInstance<any, false>, lastSummation: number, mutationEvent: RecordMutationEvent, mutationEvents: RecordMutationEvent[]): Promise<StatePatch|StatePatch[]|undefined> {
         let currentWeight = 0
         let originWeight = 0
 
@@ -66,7 +66,7 @@ export class WeightedSummationHandle extends IncrementalComputedDataHandle {
         }
 
         if (oldRecord) {
-            originWeight = this.mapRelationToWeight(oldRecord as KlassInstanceOf<typeof Entity, false>, effect)
+            originWeight = this.mapRelationToWeight(oldRecord as KlassInstance<typeof Entity, false>, effect)
         }
 
         if(currentWeight !== originWeight) {

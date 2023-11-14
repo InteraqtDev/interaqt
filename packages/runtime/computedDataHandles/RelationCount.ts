@@ -1,4 +1,4 @@
-import {KlassInstanceOf} from "@shared/createClass";
+import {KlassInstance} from "@shared/createClass";
 import {
     RelationCount, RelationBasedWeightedSummation,
 } from '@shared/IncrementalComputation'
@@ -9,12 +9,12 @@ import {ComputedDataHandle} from "./ComputedDataHandle";
 // 监听某个实体的某个关联实体以及关系上的变化，并自动 count 符合条件的关系
 export class RelationCountHandle extends RelationBasedWeightedSummationHandle {
     // 只是用来转换类型
-    computedData: KlassInstanceOf<typeof RelationCount, false> = this.computedData as KlassInstanceOf<typeof RelationCount, false>
+    computedData: KlassInstance<typeof RelationCount, false> = this.computedData as KlassInstance<typeof RelationCount, false>
     parseComputedData(){
-        const computedData = this.computedData as  KlassInstanceOf<typeof RelationCount, false>
+        const computedData = this.computedData as  KlassInstance<typeof RelationCount, false>
         this.mapRelationToWeight = this.parseMatchRelationFunction(computedData.matchExpression!).bind(this.controller)
         this.entityName = this.dataContext.host!.name!
-        this.relations = [{relation: computedData.relation, relationDirection: computedData.relationDirection}] as KlassInstanceOf<typeof RelationBasedWeightedSummation, false>["relations"]
+        this.relations = [{relation: computedData.relation, relationDirection: computedData.relationDirection}] as KlassInstance<typeof RelationBasedWeightedSummation, false>["relations"]
     }
     parseMatchRelationFunction(stringContent:string) {
         return new Function('record', `return (${stringContent})(record) ? 1 : 0`)

@@ -2,7 +2,7 @@ import {describe, test, expect, beforeEach} from "vitest";
 import {Controller} from "../Controller";
 import {ActivityCall, ActivityGroupNode} from "../AcitivityCall";
 import {MemorySystem} from "../MemorySystem";
-import {createInstances, getInstance, KlassByName, KlassInstanceOf, removeAllInstance, stringifyAllInstances} from "@shared/createClass";
+import {createInstances, getInstance, KlassByName, KlassInstance, removeAllInstance, stringifyAllInstances} from "@shared/createClass";
 import { Activity, Interaction } from "@shared/activity/Activity";
 import { Entity, Relation } from "@shared/entity/Entity";
 import { State } from "@shared/state/State";

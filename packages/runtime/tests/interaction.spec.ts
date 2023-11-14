@@ -1,7 +1,7 @@
 import {describe, test, expect, beforeEach} from "vitest";
 import {InteractionCall, LoginError} from "../InteractionCall";
 import { MemorySystem } from "../MemorySystem";
-import {createInstances, getInstance, KlassByName, KlassInstanceOf, removeAllInstance} from "@shared/createClass";
+import {createInstances, getInstance, KlassByName, KlassInstance, removeAllInstance} from "@shared/createClass";
 
 import { Interaction } from "@shared/activity/Activity";
 import {InteractionEventArgs} from "../../types/interaction";
@@ -25,7 +25,7 @@ describe("interaction",  () => {
         createInstances(data, false)
         system = new MemorySystem()
         system.conceptClass = KlassByName
-        interactionCall = new InteractionCall(getInstance(Interaction)[0] as KlassInstanceOf<typeof Interaction, false>, system)
+        interactionCall = new InteractionCall(getInstance(Interaction)[0] as KlassInstance<typeof Interaction, false>, system)
     })
 
 

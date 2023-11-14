@@ -1,4 +1,4 @@
-import {KlassInstanceOf, KlassType} from "@shared/createClass";
+import {KlassInstance, Klass} from "@shared/createClass";
 import {Entity, Relation} from "@shared/entity/Entity";
 import {
     ComputedData,
@@ -19,13 +19,13 @@ type ComputeSourceResult = SourceTargetPair | {source: EntityIdRef[] | EntityIdR
 type TransferHandleFn = (this: Controller,interactionEventArgs: InteractionEventArgs, activityId?:string ) =>  Promise<ComputeSourceResult>
 
 export class RelationStateMachineHandle extends ComputedDataHandle {
-    computedData: KlassInstanceOf<typeof RelationStateMachine, false>
-    transferHandleFn?: Map<KlassInstanceOf<typeof RelationStateTransfer, false>, TransferHandleFn>
-    data?: KlassInstanceOf<typeof Relation, false>
-    constructor(controller: Controller , computedData: KlassInstanceOf<typeof ComputedData, false> , dataContext:  DataContext) {
+    computedData: KlassInstance<typeof RelationStateMachine, false>
+    transferHandleFn?: Map<KlassInstance<typeof RelationStateTransfer, false>, TransferHandleFn>
+    data?: KlassInstance<typeof Relation, false>
+    constructor(controller: Controller , computedData: KlassInstance<typeof ComputedData, false> , dataContext:  DataContext) {
         super(controller, computedData, dataContext)
-        this.computedData = computedData as KlassInstanceOf<typeof RelationStateMachine, false>
-        this.data = this.dataContext.id as KlassInstanceOf<typeof Relation, false>
+        this.computedData = computedData as KlassInstance<typeof RelationStateMachine, false>
+        this.data = this.dataContext.id as KlassInstance<typeof Relation, false>
         this.transferHandleFn = new Map()
         this.validateState()
         // FIXME 移出去
@@ -79,7 +79,7 @@ export class RelationStateMachineHandle extends ComputedDataHandle {
         return []
 
     }
-    onCallInteraction = async (transfer: KlassInstanceOf<typeof RelationStateTransfer, false>, interactionEventArgs: InteractionEventArgs, activityId?: string) => {
+    onCallInteraction = async (transfer: KlassInstance<typeof RelationStateTransfer, false>, interactionEventArgs: InteractionEventArgs, activityId?: string) => {
         // CAUTION 不能房子啊 constructor 里面因为它实在 controller 里面调用的，controller 还没准备好。
         const relationName = this.controller.system.storage.getRelationName(this.data!.entity1!.name, this.data!.targetName1)
         const handleFn = this.transferHandleFn!.get(transfer)!

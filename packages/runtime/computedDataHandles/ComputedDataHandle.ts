@@ -1,5 +1,5 @@
 import {Controller} from "../Controller";
-import {KlassInstanceOf, KlassType} from "@shared/createClass";
+import {KlassInstance, Klass} from "@shared/createClass";
 import {Entity, Property, Relation} from "@shared/entity/Entity";
 import {RecordMutationEvent} from "../System";
 import {ComputedData} from "@shared/IncrementalComputation";
@@ -8,20 +8,20 @@ import {MatchExp} from '@storage/erstorage/MatchExp'
 
 
 export type DataContext = {
-    host?: KlassInstanceOf<typeof Entity, false>| KlassInstanceOf<typeof Relation, false>
-    id: KlassInstanceOf<typeof Entity, false>| KlassInstanceOf<typeof Relation, false>| KlassInstanceOf<typeof Property, false>|string
+    host?: KlassInstance<typeof Entity, false>| KlassInstance<typeof Relation, false>
+    id: KlassInstance<typeof Entity, false>| KlassInstance<typeof Relation, false>| KlassInstance<typeof Property, false>|string
 }
 
 
 export class ComputedDataHandle {
-    public static  Handles: Map<KlassType<any>,  typeof ComputedDataHandle> = new Map()
+    public static  Handles: Map<Klass<any>,  typeof ComputedDataHandle> = new Map()
     computedDataType: 'global' | 'entity' | 'relation' | 'property'
     userComputeEffect: (mutationEvent: any, mutationEvents: any) => any = () => true
     userFullCompute: (...args: any[]) => Promise<any> = () => Promise.resolve(true)
     public recordName?: string
     public propertyName?: string
     public stateName?: string
-    constructor(public controller: Controller , public computedData: KlassInstanceOf<typeof ComputedData, false> , public dataContext:  DataContext) {
+    constructor(public controller: Controller , public computedData: KlassInstance<typeof ComputedData, false> , public dataContext:  DataContext) {
         this.computedDataType = (!dataContext.host && typeof dataContext.id === 'string' )?
             'global' :
             dataContext.id instanceof Entity ?
@@ -33,8 +33,8 @@ export class ComputedDataHandle {
 
 
         if (this.computedDataType === 'property') {
-            this.recordName = (this.dataContext.host as KlassInstanceOf<typeof Entity, false>).name
-            this.propertyName = (this.dataContext.id as KlassInstanceOf<typeof Property, false>).name
+            this.recordName = (this.dataContext.host as KlassInstance<typeof Entity, false>).name
+            this.propertyName = (this.dataContext.id as KlassInstance<typeof Property, false>).name
         } else if (this.computedDataType === 'global') {
             this.stateName = this.dataContext.id as string
         }

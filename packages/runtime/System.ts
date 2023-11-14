@@ -1,4 +1,4 @@
-import {createClass, KlassInstanceOf} from "@shared/createClass";
+import {createClass, KlassInstance} from "@shared/createClass";
 import { Entity, Relation } from "@shared/entity/Entity";
 // @ts-ignore
 import { InteractionEvent } from '../types/interaction'
@@ -22,7 +22,7 @@ export type Storage = {
     set: (itemName: string, id: string, value: any) => Promise<any>,
 
     // er存储
-    setup: (entities: KlassInstanceOf<typeof Entity, false>[], relations: KlassInstanceOf<typeof Relation, false>[]) => any
+    setup: (entities: KlassInstance<typeof Entity, false>[], relations: KlassInstance<typeof Relation, false>[]) => any
     findOne: (entityName: string, ...arg: any[]) => Promise<any>,
     update: (entityName: string, ...arg: any[]) => Promise<any>,
     find: (entityName: string, ...arg: any[]) => Promise<any[]>,

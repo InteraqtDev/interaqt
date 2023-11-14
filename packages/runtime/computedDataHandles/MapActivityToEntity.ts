@@ -1,4 +1,4 @@
-import {KlassInstanceOf} from "@shared/createClass";
+import {KlassInstance} from "@shared/createClass";
 import {InteractionEvent, InteractionEventArgs} from "../../types/interaction";
 import {Controller} from "../Controller";
 import { getInteractions, Interaction} from "@shared/activity/Activity";
@@ -9,28 +9,28 @@ import {ComputedDataHandle, DataContext} from "./ComputedDataHandle";
 import {RecordMutationEvent} from "../System";
 
 export type MapSourceDataType = {
-    interaction: KlassInstanceOf<typeof Interaction, false>,
+    interaction: KlassInstance<typeof Interaction, false>,
     data: InteractionEventArgs
 }
 
 export class MapActivityToEntityHandle extends ComputedDataHandle {
-    data!: KlassInstanceOf<typeof Entity, false>
+    data!: KlassInstance<typeof Entity, false>
     mapItem: (data: MapSourceDataType[]) => any = () => undefined
-    computedData: KlassInstanceOf<typeof MapActivityToEntity, false>
-    constructor(controller: Controller , computedData: KlassInstanceOf<typeof ComputedData, false> , dataContext:  DataContext) {
+    computedData: KlassInstance<typeof MapActivityToEntity, false>
+    constructor(controller: Controller , computedData: KlassInstance<typeof ComputedData, false> , dataContext:  DataContext) {
         super(controller, computedData, dataContext);
-        this.computedData = computedData as KlassInstanceOf<typeof MapActivityToEntity, false>
+        this.computedData = computedData as KlassInstance<typeof MapActivityToEntity, false>
     }
     // FIXME 之后 从 listen interaction 也改成 监听 record 事件
     computeEffect(mutationEvent: RecordMutationEvent, mutationEvents: RecordMutationEvent[]): any {
 
     }
     parseComputedData() {
-        this.data = this.dataContext.id as KlassInstanceOf<typeof Entity, false>
+        this.data = this.dataContext.id as KlassInstance<typeof Entity, false>
         this.mapItem = this.parseMapItemFunction(this.computedData.handle!)
     }
     setupSchema() {
-        (this.dataContext.id as KlassInstanceOf<typeof Entity, false>)!.properties!.push(Property.create({
+        (this.dataContext.id as KlassInstance<typeof Entity, false>)!.properties!.push(Property.create({
             name: 'activityId',
             type: 'string',
             collection: false

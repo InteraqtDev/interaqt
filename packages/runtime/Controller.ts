@@ -1,13 +1,14 @@
 import {System, SystemCallback} from "./System";
-import {Entity, Relation, Property} from "@shared/entity/Entity";
+import {Entity, Property, Relation} from "@shared/entity/Entity";
 import {Activity, Interaction} from "@shared/activity/Activity";
 import './computedDataHandles/index'
 import {ActivityCall} from "./AcitivityCall";
 import {InteractionCall} from "./InteractionCall";
 import {InteractionEventArgs} from "../types/interaction";
-import {KlassInstanceOf, KlassType, KlassInstance} from "@shared/createClass";
+import {Klass, KlassInstance} from "@shared/createClass";
 import {assert} from "./util";
 import {ComputedDataHandle, DataContext} from "./computedDataHandles/ComputedDataHandle";
+import {ComputedData} from "@shared/IncrementalComputation";
 
 export class Controller {
     public computedDataHandles = new Set<ComputedDataHandle>()
@@ -17,11 +18,11 @@ export class Controller {
     public interactionCalls = new Map<string, InteractionCall>()
     constructor(
         public system: System,
-        public entities: KlassInstanceOf<typeof Entity, false>[],
-        public relations: KlassInstanceOf<typeof Relation, false>[],
-        public activities: KlassInstanceOf<typeof Activity, false>[],
-        public interactions: KlassInstanceOf<typeof Interaction, false>[],
-        public states: KlassInstanceOf<typeof Property, false>[] = [])
+        public entities: KlassInstance<typeof Entity, false>[],
+        public relations: KlassInstance<typeof Relation, false>[],
+        public activities: KlassInstance<typeof Activity, false>[],
+        public interactions: KlassInstance<typeof Interaction, false>[],
+        public states: KlassInstance<typeof Property, false>[] = [])
     {
         activities.forEach(activity => {
             const activityCall = new ActivityCall(activity, system)
@@ -44,13 +45,13 @@ export class Controller {
         // entity 的
         entities.forEach(entity => {
             if (entity.computedData) {
-                this.addComputedDataHandle(entity.computedData, undefined, entity)
+                this.addComputedDataHandle(entity.computedData as KlassInstance<typeof ComputedData, false>, undefined, entity)
             }
 
             // property 的
             entity.properties?.forEach(property => {
                 if (property.computedData) {
-                    this.addComputedDataHandle(property.computedData, entity, property)
+                    this.addComputedDataHandle(property.computedData as KlassInstance<typeof ComputedData, false>, entity, property)
                 }
             })
         })
@@ -58,12 +59,12 @@ export class Controller {
         // relation 的
         relations.forEach(relation => {
             if(relation.computedData) {
-                this.addComputedDataHandle(relation.computedData, undefined, relation)
+                this.addComputedDataHandle(relation.computedData as KlassInstance<typeof ComputedData, false>, undefined, relation)
             }
 
             relation.properties?.forEach(property => {
                 if (property.computedData) {
-                    this.addComputedDataHandle(property.computedData, relation, property)
+                    this.addComputedDataHandle(property.computedData as KlassInstance<typeof ComputedData, false>, relation, property)
                 }
             })
         })
@@ -71,16 +72,16 @@ export class Controller {
         // 全局的
         states.forEach(state => {
             if (state.computedData) {
-                this.addComputedDataHandle(state.computedData, undefined, state.name as string)
+                this.addComputedDataHandle(state.computedData as KlassInstance<typeof ComputedData, false>, undefined, state.name as string)
             }
         })
     }
-    addComputedDataHandle(computedData: KlassInstance<any>, host:DataContext["host"], id: DataContext["id"]) {
+    addComputedDataHandle(computedData: KlassInstance<typeof ComputedData, false>, host:DataContext["host"], id: DataContext["id"]) {
         const dataContext: DataContext = {
             host,
             id
         }
-        const Handle = ComputedDataHandle.Handles.get(computedData.constructor as KlassType<any>)!
+        const Handle = ComputedDataHandle.Handles.get(computedData.constructor as Klass<any>)!
         assert(!!Handle, `cannot find handle for ${computedData.constructor.name}`)
 
         this.computedDataHandles.add(

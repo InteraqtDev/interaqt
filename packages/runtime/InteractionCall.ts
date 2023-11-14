@@ -1,4 +1,4 @@
-import {EntityAttributive, GetAction, InteractionInstanceType} from "@shared/activity/Activity";
+import {EntityAttributive, EntityAttributives, GetAction, InteractionInstanceType} from "@shared/activity/Activity";
 import {UserAttributive} from "@shared/user/User";
 import {System} from "./System";
 import {InteractionEvent, InteractionEventArgs} from "../types/interaction";
@@ -13,9 +13,10 @@ import {
 } from "@shared/attributive";
 import {BoolExp, BoolExpressionData} from "@shared/BoolExp";
 import {assert, everyWithErrorAsync} from "./util";
-import {getInstance, KlassType} from "@shared/createClass";
+import {getInstance, Klass, KlassInstance} from "@shared/createClass";
 import {ActivityCall} from "./AcitivityCall";
 import {someAsync} from "@storage/erstorage/util";
+import {Entity} from "@shared/entity/Entity";
 
 
 type ConceptCheckStack = {
@@ -63,7 +64,7 @@ export class InteractionCall {
     constructor(public interaction: InteractionInstanceType, public system: System, public activitySeqCall?: ActivityCall) {
 
     }
-    async checkAttributive(inputAttributive: any, interactionEvent: InteractionEventArgs, attributiveTarget) {
+    async checkAttributive(inputAttributive: any, interactionEvent: InteractionEventArgs|undefined, attributiveTarget: any) {
         const  attributive = inputAttributive as unknown as Attributive
         assert(attributive, `can not find attributive: ${attributive.name}`)
         if (attributive.stringContent) {
@@ -91,9 +92,10 @@ export class InteractionCall {
         // const attributiveByName = indexBy((UserAttributive.instances as any[]).concat(Entity.instances), 'name')
         return Promise.resolve(true)
     }
-    createHandleAttributive(AttributiveClass: KlassType<any>, interactionEvent: InteractionEventArgs, target) {
+    createHandleAttributive(AttributiveClass: typeof UserAttributive| typeof EntityAttributive, interactionEvent: InteractionEventArgs, target: any) {
         return (attributiveData: UserAttributiveAtom) => {
-            const attributive = getInstance(AttributiveClass).find(i => i.name === attributiveData?.key)
+            const instances = getInstance(AttributiveClass) as (KlassInstance<typeof UserAttributive, false> | KlassInstance<typeof EntityAttributive, false>)[]
+            const attributive = instances.find(i => i.name === attributiveData?.key)
             return this.checkAttributive(attributive, interactionEvent, target)
         }
     }
@@ -165,11 +167,11 @@ export class InteractionCall {
             // CAUTION 这里的 concept 是 Role/Entity 的实例. 例如 UserRole/AdminRole，实体例如 Post/Profile
             if (UserAttributive.is(concept)) {
                 // Role
-                return (await this.checkAttributive(concept, {}, instance)) ? true : {name: concept.name, type: 'conceptCheck', stack: currentStack, error: 'role check error'}
+                return (await this.checkAttributive(concept, undefined, instance)) ? true : {name: concept.name, type: 'conceptCheck', stack: currentStack, error: 'role check error'}
             }
 
             // Entity 或者其他具备 check 能力的
-            const constructorCheck = concept.constructor?.checkRawData
+            const constructorCheck = (concept.constructor as Klass<any>)?.check
             if (constructorCheck) {
                 return constructorCheck(instance) ? true : {name: concept.name, type: 'conceptCheck', stack: currentStack, error: 'constructor check error'}
             }
@@ -210,7 +212,7 @@ export class InteractionCall {
             }
 
             if (payloadDef.isCollection) {
-                if (payloadDef.isRef && !payloadItem.every(item => !!item.id)) {
+                if (payloadDef.isRef && !(payloadItem as {id: string}[]).every(item => !!item.id)) {
                     throw new LoginError(`${payloadDef.name} data not every is ref`, payloadItem)
                 }
             } else {
@@ -221,12 +223,12 @@ export class InteractionCall {
 
 
             if (payloadDef.isCollection) {
-                const result = await everyWithErrorAsync(payloadItem,(item => this.checkConcept(item, payloadDef.base)))
+                const result = await everyWithErrorAsync(payloadItem,(item => this.checkConcept(item, payloadDef.base as KlassInstance<typeof Entity, false>)))
                 if (result! == true) {
                     throw new LoginError(`${payloadDef.name} check concept failed`, result)
                 }
             } else {
-                const result = await this.checkConcept(payloadItem, payloadDef.base)
+                const result = await this.checkConcept(payloadItem, payloadDef.base as KlassInstance<typeof Entity, false>)
                 if (result !== true) {
                     throw new LoginError(`${payloadDef.name} check concept failed`, result)
                 }
@@ -236,10 +238,10 @@ export class InteractionCall {
 
 
             if (payloadDef.attributives) {
-
+                const rawAttributives = (payloadDef.attributives as KlassInstance<typeof EntityAttributives, false>).content
                 const attributives = isPayloadUser ?
-                    new BoolExp<UserAttributiveAtom>(payloadDef.attributives.content as BoolExpressionData<UserAttributiveAtom>):
-                    new BoolExp<EntityAttributiveAtom>(payloadDef.attributives.content as BoolExpressionData<EntityAttributiveAtom>)
+                    new BoolExp<UserAttributiveAtom>(rawAttributives  as BoolExpressionData<UserAttributiveAtom>):
+                    new BoolExp<EntityAttributiveAtom>(rawAttributives as BoolExpressionData<EntityAttributiveAtom>)
 
                 if (payloadDef.isCollection) {
                     const result = await everyWithErrorAsync(payloadItem, (item => {
