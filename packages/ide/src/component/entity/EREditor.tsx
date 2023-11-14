@@ -6,14 +6,14 @@ import {Column} from "./Column";
 import {IconAddProperty} from "../icons/Add";
 import {createFormForEntity, createFormForEntityProperty} from "../createFormForEntityProperty";
 import {createDialog, createDialogFooter} from "../createDialog";
-import {createClass, KlassInstanceOf} from "../../../../shared/createClass";
+import {createClass, KlassInstance} from "../../../../shared/createClass";
 import {Detail} from "./Detail";
 import {Activity} from "../../../../shared/activity/Activity";
 
 type EREditorProps = {
-    entities: KlassInstanceOf<Entity, true>[],
-    relations: KlassInstanceOf<Relation, true>[],
-    activities: KlassInstanceOf<Activity, true>[]
+    entities: KlassInstance<Entity, true>[],
+    relations: KlassInstance<Relation, true>[],
+    activities: KlassInstance<Activity, true>[]
 }
 
 export type RelationEntityMap = Map<Entity, Map<string, [string, Entity][]>>
@@ -60,7 +60,7 @@ export function EREditor({ entities, relations, activities }: EREditorProps) {
         })
     }
 
-    const openRelatedEntity = (sourceTarget: KlassInstanceOf<typeof Entity, true>, relationName: string,  index: Atom<number>) => {
+    const openRelatedEntity = (sourceTarget: KlassInstance<typeof Entity, true>, relationName: string, index: Atom<number>) => {
         columns[index].selected(relationName)
         const [, targetEntity] = relationsByEntity.get(sourceTarget).get(relationName)
         columns.splice(index+1, Infinity, {
@@ -73,7 +73,7 @@ export function EREditor({ entities, relations, activities }: EREditorProps) {
         })
     }
 
-    const addRelation = (relation: KlassInstanceOf<typeof Relation, true>) => {
+    const addRelation = (relation: KlassInstance<typeof Relation, true>) => {
         relations.push(relation)
     }
 

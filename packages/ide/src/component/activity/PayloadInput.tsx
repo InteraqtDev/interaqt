@@ -10,15 +10,15 @@ import { UserAttributive, UserAttributives } from "../../../../shared/user/User"
 import {Button} from "../form/Button";
 import {Select} from "../form/Select";
 import {Entity} from "../../../../shared/entity/Entity";
-import {KlassInstanceOf} from "../../../../shared/createClass";
+import {KlassInstance} from "../../../../shared/createClass";
 
 
 type PayloadInputProps = {
-    value: Atom<KlassInstanceOf<typeof Payload, true>>,
-    roleAttributiveOptions: KlassInstanceOf<typeof UserAttributive, true>[],
-    entities: KlassInstanceOf<typeof Entity, true>[],
-    userAttributiveOptions: KlassInstanceOf<typeof UserAttributive, true>[],
-    entityAttributives: KlassInstanceOf<typeof EntityAttributive, true>[],
+    value: Atom<KlassInstance<typeof Payload, true>>,
+    roleAttributiveOptions: KlassInstance<typeof UserAttributive, true>[],
+    entities: KlassInstance<typeof Entity, true>[],
+    userAttributiveOptions: KlassInstance<typeof UserAttributive, true>[],
+    entityAttributives: KlassInstance<typeof EntityAttributive, true>[],
     selectedAttributive: Atom<any>
 }
 

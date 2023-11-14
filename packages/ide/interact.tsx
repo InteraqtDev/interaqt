@@ -9,7 +9,7 @@ import {Code} from "./src/component/code/Code";
 import {Drawer} from "./src/component/util/Drawer";
 import {editor} from "monaco-editor";
 import IStandaloneEditorConstructionOptions = editor.IStandaloneEditorConstructionOptions;
-import {KlassInstanceOf, stringifyAllInstances} from "../shared/createClass";
+import {KlassInstance, stringifyAllInstances} from "../shared/createClass";
 import {
     NewAttr, New2Attr, New3Attr, OldAttr, Old2Attr, Old3Attr, OtherAttr,
     User,Admin,Anonymous,
@@ -33,7 +33,7 @@ const sendInteraction = Interaction.createReactive({
 
 
 const userAttributiveOptions = reactive([NewAttr, New2Attr, New3Attr, OldAttr, Old2Attr, Old3Attr, OtherAttr])
-const roleAttributiveOptions = reactive([User, Admin, Anonymous]) as KlassInstanceOf<typeof UserAttributive, true>[]
+const roleAttributiveOptions = reactive([User, Admin, Anonymous]) as KlassInstance<typeof UserAttributive, true>[]
 // TODO entities and entity attributives
 
 const entities = reactive([Message])

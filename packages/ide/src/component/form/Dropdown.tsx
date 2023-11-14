@@ -1,6 +1,6 @@
 import {onUpKey, onDownKey} from "axii";
 import {Atom, computed, incMap} from "rata";
-import {KlassType} from "../../../../shared/createClass";
+import {Klass} from "../../../../shared/createClass";
 
 export function Dropdown({ index, options}, { createElement, ref }) {
     const setNextIndex = () => {
@@ -27,7 +27,7 @@ export function Dropdown({ index, options}, { createElement, ref }) {
                 }
             }
 
-            const displayValue = (option.constructor as KlassType<object>).display?.(option) ?? option.toString()
+            const displayValue = (option.constructor as Klass<object>).display?.(option) ?? option.toString()
 
             return (
                 <div className={className}>

@@ -22,7 +22,7 @@ import {
     Message
 } from './testdata/interaction'
 import {createUserRoleAttributive, UserAttributive, UserAttributives} from "../shared/user/User";
-import {KlassInstanceOf, stringifyAllInstances} from "../shared/createClass";
+import {KlassInstance, stringifyAllInstances} from "../shared/createClass";
 
 
 const userAttributiveOptions = reactive([NewAttr, New2Attr, New3Attr, OldAttr, Old2Attr, Old3Attr, OtherAttr])
@@ -154,7 +154,7 @@ const userRolesAndUserRefs = computed(() => {
         })
     })
     return roleAttributiveOptions.concat(refRoles)
-}) as KlassInstanceOf<typeof UserAttributive, true>[]
+}) as KlassInstance<typeof UserAttributive, true>[]
 
 
 const codeVisible = atom(false)

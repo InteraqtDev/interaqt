@@ -3,7 +3,7 @@ import {Entity, Property} from "../../../../shared/entity/Entity";
 import {Select} from "../form/Select";
 import {MapActivityToEntity} from "../../../../shared/IncrementalComputation";
 import {createDraftControl} from "../createDraftControl";
-import {KlassInstanceOf, KlassType, ReactiveKlassInstance} from "../../../../shared/createClass";
+import {KlassInstance, Klass, ReactiveKlassInstance} from "../../../../shared/createClass";
 import {Code} from "../code/Code";
 import {Activity} from "../../../../shared/activity/Activity";
 
@@ -19,7 +19,7 @@ export function Detail({ target, activities }: DetailProps, {createElement}) {
 // 2. 选择 关联 activity
 // 3. 写代码
 type EntityDetailProp = {
-    entity: KlassInstanceOf<typeof Entity, true>
+    entity: KlassInstance<typeof Entity, true>
     activities: (typeof Activity)[]
 }
 
@@ -35,7 +35,7 @@ export function EntityDetail({ entity, activities }: EntityDetailProp, {createEl
     //
     computed(() => {
         if (selectedComputedType() && !selectedComputedType().is(entity.computedData())) {
-            entity.computedData((selectedComputedType() as KlassType<any>)!.createReactive({}))
+            entity.computedData((selectedComputedType() as Klass<any>)!.createReactive({}))
         }
     })
 
