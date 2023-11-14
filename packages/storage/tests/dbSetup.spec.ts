@@ -1,4 +1,4 @@
-import {expect, test, describe} from "bun:test";
+import {expect, test, describe} from "vitest";
 import { Database } from "bun:sqlite";
 import fs from 'fs'
 
@@ -6,7 +6,7 @@ import {DBSetup} from "../erstorage/Setup";
 import {RecordQueryAgent} from "../erstorage/RecordQueryAgent.ts";
 import {EntityToTableMap} from "../erstorage/EntityToTableMap";
 // @ts-ignore
-import { SQLiteDB } from '../../runtime/BunSQLite'
+import { SQLiteDB } from '../../runtime/SQLite'
 import {createCommonData} from "./data/common";
 import {MatchExp} from "../erstorage/MatchExp.ts";
 import {RecordQueryData, RecordQuery} from "../erstorage/RecordQuery.ts";
@@ -260,7 +260,9 @@ describe("db setup", () => {
         }
 
         // @ts-ignore
-        const setup = new DBSetup(entities, relations, new SQLiteDB(file, {create:true, readwrite: true}))
+        const db = new SQLiteDB(file)
+        await db.open()
+        const setup = new DBSetup(entities, relations, db )
         await setup.createTables()
         // console.log(1111111111, setup.map)
         // console.log(222222222, setup.tables)
@@ -270,6 +272,7 @@ describe("db setup", () => {
 
     test('query test', async () => {
         const database = new SQLiteDB(':memory:')
+        await database.open()
         const setup = new DBSetup(entities, relations, database);
         await setup.createTables()
 

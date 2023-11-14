@@ -1,8 +1,8 @@
-import {expect, test, describe} from "bun:test";
+import {expect, test, describe} from "vitest";
 import {
     RecordQueryAgent
 } from "../erstorage/RecordQueryAgent.ts";
-import { SQLiteDB } from '../../runtime/BunSQLite'
+import { SQLiteDB } from '../../runtime/SQLite'
 import {EntityToTableMap, MapData} from "../erstorage/EntityToTableMap";
 import {entityToTableMapData} from "./data/mapData";
 import {MatchExp, MatchExpressionData} from "../erstorage/MatchExp.ts";

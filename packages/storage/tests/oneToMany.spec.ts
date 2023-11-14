@@ -1,7 +1,7 @@
-import {expect, test, describe, afterEach, beforeAll, beforeEach} from "bun:test";
+import {expect, test, describe, afterEach, beforeAll, beforeEach} from "vitest";
 import { createCommonData} from "./data/common";
 import {DBSetup} from "../erstorage/Setup";
-import { SQLiteDB } from '../../runtime/BunSQLite'
+import { SQLiteDB } from '../../runtime/SQLite'
 import {EntityToTableMap} from "../erstorage/EntityToTableMap";
 import {MatchExp} from "../erstorage/MatchExp.ts";
 import {EntityQueryHandle} from "../erstorage/EntityQueryHandle.ts";
@@ -17,7 +17,8 @@ describe('one to many', () => {
     beforeEach(async () => {
         const { entities, relations } = createCommonData()
         // @ts-ignore
-        db = new SQLiteDB(':memory:', {create:true, readwrite: true})
+        db = new SQLiteDB()
+        await db.open()
         setup = new DBSetup(entities, relations, db)
         await setup.createTables()
         entityQueryHandle = new EntityQueryHandle(new EntityToTableMap(setup.map), db)
