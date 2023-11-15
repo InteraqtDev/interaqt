@@ -87,11 +87,7 @@ export class EntityQueryHandle {
     createMatchFromAtom(...arg: Parameters<(typeof MatchExp)["atom"]>) {
         return MatchExp.atom(...arg)
     }
-
     getRelationName(entity: string, attribute: string): string {
         return this.map.getInfo(entity, attribute).linkName
-    }
-    getRelationNameByDef(relation: string, attribute: string): string {
-        return this.map.get(entity, attribute).linkName
     }
 }
