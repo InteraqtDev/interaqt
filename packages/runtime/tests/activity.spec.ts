@@ -31,7 +31,7 @@ describe("activity state", () => {
 
         createInstances(data, false)
         system = new MemorySystem()
-        await system.storage.setup([], [])
+        await system.setup([], [])
         system.conceptClass = KlassByName
         const mainActivity = (getInstance(Activity) as KlassInstance<typeof Activity, false>[]).find(a => a.name === 'createFriendRelation')!
         createFriendRelationActivityCall = new ActivityCall(mainActivity, system)

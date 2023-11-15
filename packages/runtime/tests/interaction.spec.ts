@@ -24,6 +24,7 @@ describe("interaction",  () => {
         // TODO 需要能 destroy instance
         createInstances(data, false)
         system = new MemorySystem()
+        await system.setup([], [])
         system.conceptClass = KlassByName
         interactionCall = new InteractionCall(getInstance(Interaction)[0] as KlassInstance<typeof Interaction, false>, system)
     })
@@ -39,8 +40,9 @@ describe("interaction",  () => {
         const response = await interactionCall.call(event)
 
         expect(response.error).toBeUndefined()
-        expect(system.eventStack.length).toBe(1)
-        expect(system.eventStack[0].args).toBe(event)
+        const events = (await system.getEvent())
+        expect(events.length).toBe(1)
+        expect(events[0].args).toMatchObject(event)
     })
 
     test("simple interaction with wrong role should not pass", async () => {

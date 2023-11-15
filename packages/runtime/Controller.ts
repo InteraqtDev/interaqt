@@ -94,7 +94,7 @@ export class Controller {
             handle.parseComputedData()
         }
         // CAUTION 注意这里的 entities/relations 可能被 IncrementalComputationHandle 修改过了
-        await this.system.storage.setup(this.entities, this.relations)
+        await this.system.setup(this.entities, this.relations)
 
         // 2. 增量计算的字段设置初始值
         for(const handle of this.computedDataHandles) {

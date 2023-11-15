@@ -16,7 +16,7 @@
     "esModuleInterop": true,
     "removeComments": false,
     "lib": ["esnext", "dom"],
-    "types": ["node", "bun-types"],
+    "types": ["node"],
     "paths": {
       "@shared/*": ["../shared/*"],
       "@storage/*": ["../storage/*"],
@@ -29,5 +29,6 @@
     "./",
     "../shared",
     "../storage",
+    "./tests"
   ]
 }

@@ -1,7 +1,8 @@
-import {RecordChangeListener, RecordMutationEvent, Storage, System, SYSTEM_RECORD} from "./System";
+import {EVENT_RECORD, RecordChangeListener, RecordMutationEvent, Storage, System, SYSTEM_RECORD} from "./System";
 import {InteractionEvent} from '../types/interaction'
 import {createClass, KlassInstance} from "@shared/createClass";
 import {Entity, Property, Relation} from "@shared/entity/Entity";
+import {State} from "@shared/state/State";
 import {DBSetup} from '@storage/erstorage/Setup'
 import {EntityQueryHandle} from '@storage/erstorage/EntityQueryHandle'
 import {MatchExp, MatchExpressionData} from '@storage/erstorage/MatchExp'
@@ -12,24 +13,11 @@ import {MutationEvent} from "@storage/erstorage/RecordQueryAgent";
 
 
 class MemoryStorage implements Storage{
-    data = new Map<string, Map<string, any>>()
     db = new SQLiteDB()
     public queryHandle?: EntityQueryHandle
     public callbacks: Set<RecordChangeListener> = new Set()
     public dbSetup?: DBSetup
-    // CAUTION kv 结构数据的实现也用 er。这是系统约定，因为也需要  Record 事件！！！
-    // async get(concept: string, key: string, initialValue?: any) {
-    //     let res = this.data.get(concept)!.get(key)
-    //     if (initialValue && !res) this.data.get(concept)!.set(key, (res = initialValue))
-    //     return res
-    // }
-    // async set(concept: string, key: string, value:any) {
-    //     let conceptData = this.data.get(concept)
-    //     if (!conceptData) this.data.set(concept, (conceptData = new Map()))
-    //     return await Promise.resolve().then(() => {
-    //         conceptData!.set(key, value)
-    //     })
-    // }
+    // CAUTION kv 结构数据的实现也用 er。这是系统约定，因为也需要  Record 事件！
     async get(concept: string, key: string, initialValue?: any) {
         const match = MatchExp.atom({key: 'key', value: ['=', key]}).and({  key: 'concept', value: ['=', concept] })
         const value = (await this.queryHandle!.findOne(SYSTEM_RECORD, match, undefined, ['value']))?.value
@@ -48,28 +36,9 @@ class MemoryStorage implements Storage{
         }
     }
     async setup(entities: KlassInstance<typeof Entity, false>[], relations: KlassInstance<typeof Relation, false>[]) {
-        const systemEntity = Entity.create({
-            name: SYSTEM_RECORD,
-            properties: [
-                Property.create({
-                    name: 'concept',
-                    type: 'string',
-                    collection: false,
-                }),
-                Property.create({
-                    name: 'key',
-                    type: 'string',
-                    collection: false,
-                }),
-                Property.create({
-                    name: 'value',
-                    type: 'string',
-                    collection: false,
-                })
-            ]
-        })
+
         await this.db.open()
-        this.dbSetup = new DBSetup([...entities, systemEntity], relations, this.db)
+        this.dbSetup = new DBSetup(entities, relations, this.db)
         await this.dbSetup.createTables()
         this.queryHandle = new EntityQueryHandle( new EntityToTableMap(this.dbSetup.map), this.db)
     }
@@ -138,22 +107,78 @@ type EventQuery = {
 let id = 0
 
 export class MemorySystem implements System {
-    eventStack: InteractionEvent[] = []
     conceptClass: Map<string, ReturnType<typeof createClass>> = new Map()
-    saveEvent(event: InteractionEvent) {
-        this.eventStack.push(event)
-        return Promise.resolve(true)
+    async saveEvent(event: InteractionEvent) {
+        await this.storage.create(EVENT_RECORD, {...event, args: encodeURI(JSON.stringify(event.args||{}))})
+        return true
     }
-    getEvent(query: EventQuery = {} ) {
-        return Promise.resolve(this.eventStack.filter(e => {
-            // @ts-ignore
-            return Object.keys(query).every(k => e[k] === query[k])
-        }))
+    async getEvent(query?: MatchExpressionData ) {
+        return (await this.storage.find(EVENT_RECORD, query, undefined, ['*'])).map(event => ({
+            ...event,
+            args: JSON.parse(decodeURI(event.args))
+        })) as unknown as InteractionEvent[]
+        // return Promise.resolve(this.eventStack.filter(e => {
+        //     // @ts-ignore
+        //     return Object.keys(query).every(k => e[k] === query[k])
+        // }))
     }
     util = {
         uuid() {
+            // FIXME 应该使用 storage 分配的 id
             return (++id).toString()
         }
+    }
+    setup(entities: KlassInstance<typeof Entity, false>[], relations: KlassInstance<typeof Relation, false>[]){
+        // state 等系统配置数据的实体化
+        const systemEntity = Entity.create({
+            name: SYSTEM_RECORD,
+            properties: [
+                Property.create({
+                    name: 'concept',
+                    type: 'string',
+                    collection: false,
+                }),
+                Property.create({
+                    name: 'key',
+                    type: 'string',
+                    collection: false,
+                }),
+                Property.create({
+                    name: 'value',
+                    type: 'string',
+                    collection: false,
+                })
+            ]
+        })
+
+        // event 的实体化
+        const eventEntity = Entity.create({
+            name: EVENT_RECORD,
+            properties: [
+                Property.create({
+                    name: 'interactionId',
+                    type: 'string',
+                    collection: false,
+                }),
+                Property.create({
+                    name: 'interactionName',
+                    type: 'string',
+                    collection: false,
+                }),
+                Property.create({
+                    name: 'activityId',
+                    type: 'string',
+                    collection: false,
+                }),
+                Property.create({
+                    name: 'args',
+                    type: 'string',
+                    collection: false,
+                })
+            ]
+        })
+
+        return this.storage.setup([...entities, systemEntity, eventEntity], relations)
     }
     storage = new MemoryStorage()
 }

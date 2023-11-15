@@ -105,16 +105,19 @@ const responseGroup = ActivityGroup.createReactive({
     type: 'any',
     activities: [
         Activity.createReactive({
+            name: "approveFriendRelation",
             interactions: [
                 approveInteraction
             ]
         }),
         Activity.createReactive({
+            name: "rejectFriendRelation",
             interactions: [
                 rejectInteraction
             ]
         }),
         Activity.createReactive({
+            name: "cancelFriendRelation",
             interactions: [
                 cancelInteraction
             ]
@@ -199,10 +202,16 @@ const addFriendTransfer = RelationStateTransfer.createReactive({
     handleType: 'computeSource',
     handle: `
 async function(eventArgs, activityId) {
-    const sendEvent = (await this.system.getEvent({
-        interactionName: 'sendRequest',
-        activityId
-    }))[0]
+
+    const match = this.system.storage.queryHandle.createMatchFromAtom({
+        key: 'interactionName', 
+        value: ['=', 'sendRequest']
+    }).and({
+        key: 'activityId', 
+        value: ['=', activityId]
+    })
+
+    const sendEvent = (await this.system.getEvent(match))[0]
     return {
         source: sendEvent.args.user,
         target: eventArgs.user

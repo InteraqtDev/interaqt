@@ -15,6 +15,7 @@ export type SystemCallback =  (...arg: any[]) => any
 export type RecordChangeListener = (mutationEvents:RecordMutationEvent[]) => any
 
 export const SYSTEM_RECORD = '_System_'
+export const EVENT_RECORD = '_Event_'
 
 export type Storage = {
     // kv 存储
@@ -56,11 +57,11 @@ export interface System {
     // FIXME 所有地方改成 async 的
     saveEvent: (interactionEvent: InteractionEvent) => Promise<boolean>
     conceptClass: Map<string, ReturnType<typeof createClass>>
-
     storage: Storage
     util: {
         uuid: () => string
     }
+    setup: (entities: KlassInstance<typeof Entity, false>[], relations: KlassInstance<typeof Relation, false>[]) => Promise<any>
 }
 
 export type EntityIdRef = {

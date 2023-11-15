@@ -14,7 +14,6 @@
   "author": "sskyy<skyking_H@hotmail.com>",
   "license": "MIT",
   "dependencies": {
-    "@types/node": "^20.5.7",
     "acorn": "^8.10.0",
     "promised-sqlite3": "^2.1.0",
     "sqlite3": "^5.1.6"

@@ -16,18 +16,20 @@ export type MapSourceDataType = {
 export class MapActivityToEntityHandle extends ComputedDataHandle {
     data!: KlassInstance<typeof Entity, false>
     mapItem: (data: MapSourceDataType[]) => any = () => undefined
-    computedData: KlassInstance<typeof MapActivityToEntity, false>
+    interactionsToListen: KlassInstance<typeof Interaction, false>[] = []
     constructor(controller: Controller , computedData: KlassInstance<typeof ComputedData, false> , dataContext:  DataContext) {
         super(controller, computedData, dataContext);
-        this.computedData = computedData as KlassInstance<typeof MapActivityToEntity, false>
     }
     // FIXME 之后 从 listen interaction 也改成 监听 record 事件
     computeEffect(mutationEvent: RecordMutationEvent, mutationEvents: RecordMutationEvent[]): any {
 
     }
     parseComputedData() {
+        const computedData = this.computedData as unknown as  KlassInstance<typeof MapActivityToEntity, false>
+        this.interactionsToListen = computedData.triggerInteraction || getInteractions(computedData.sourceActivity!)
+
         this.data = this.dataContext.id as KlassInstance<typeof Entity, false>
-        this.mapItem = this.parseMapItemFunction(this.computedData.handle!)
+        this.mapItem = this.parseMapItemFunction(computedData.handle!)
     }
     setupSchema() {
         (this.dataContext.id as KlassInstance<typeof Entity, false>)!.properties!.push(Property.create({
@@ -39,10 +41,7 @@ export class MapActivityToEntityHandle extends ComputedDataHandle {
     addEventListener() {
         super.addEventListener()
         // FIXME 改成监听 record 事件
-        // 监听的 interaction 变化
-        const interactionsToListen = this.computedData.triggerInteraction || getInteractions(this.computedData.sourceActivity!)
-
-        interactionsToListen.forEach(interaction => {
+        this.interactionsToListen.forEach(interaction => {
             this.controller.listen(interaction, this.onCallInteraction)
         })
     }
@@ -62,7 +61,11 @@ export class MapActivityToEntityHandle extends ComputedDataHandle {
 
 
         // 还没有数据，尝试执行 map 函数看能不能得到数据
-        const allInteractionEvents = await this.controller.system.getEvent({activityId}) as InteractionEvent[]
+        const eventMatch = MatchExp.atom({
+            key: 'activityId',
+            value: ['=', activityId]
+        })
+        const allInteractionEvents = await this.controller.system.getEvent(eventMatch)
         const sourceData: MapSourceDataType[] = allInteractionEvents.map(event => {
             return {
                 interaction: this.controller.interactionCalls.get(event.interactionId)!.interaction,
