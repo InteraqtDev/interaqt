@@ -188,12 +188,12 @@ const activityEntity = Entity.create({
             collection: false,
         }),
         Property.create({
-            name: 'ActivityState',
+            name: 'state',
             type: 'string',
             collection: false,
         }),
         Property.create({
-            name: 'ActivityRefs',
+            name: 'refs',
             type: 'string',
             collection: false,
         })
@@ -214,29 +214,29 @@ export class MonoSystem implements System {
     async createActivity(activity: any) {
         return this.storage.create(ACTIVITY_RECORD, {
             ...activity,
-            ActivityState: JSONStringify(activity.ActivityState),
-            ActivityRefs: JSONStringify(activity.ActivityRefs),
+            state: JSONStringify(activity.state),
+            refs: JSONStringify(activity.refs),
         })
     }
     async updateActivity(match: MatchExpressionData, activity: any) {
         const data = {
             ...activity
         }
-        delete data.ActivityRefs
-        delete data.ActivityState
-        if (activity.ActivityState) {
-            data.ActivityState = JSONStringify(activity.ActivityState)
+        delete data.state
+        delete data.refs
+        if (activity.state) {
+            data.state = JSONStringify(activity.state)
         }
-        if (activity.ActivityRefs) {
-            data.ActivityRefs = JSONStringify(activity.ActivityRefs)
+        if (activity.refs) {
+            data.refs = JSONStringify(activity.refs)
         }
         return this.storage.update(ACTIVITY_RECORD, match, data)
     }
     async getActivity(query?: MatchExpressionData) {
         return (await this.storage.find(ACTIVITY_RECORD, query, undefined, ['*'])).map(activity => ({
             ...activity,
-            ActivityState: JSONParse(activity.ActivityState),
-            ActivityRefs: JSONParse(activity.ActivityRefs),
+            state: JSONParse(activity.state),
+            refs: JSONParse(activity.refs),
         }))
     }
     setup(entities: KlassInstance<typeof Entity, false>[], relations: KlassInstance<typeof Relation, false>[]){

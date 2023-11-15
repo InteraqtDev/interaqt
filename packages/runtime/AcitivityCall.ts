@@ -290,8 +290,8 @@ export class ActivityCall {
         const activity = await this.system.createActivity({
             name: this.activity.name,
             uuid: this.activity.uuid,
-            ActivityState: initialStateData,
-            ActivityRefs: {},
+            state: initialStateData,
+            refs: {},
         })
         return {
             activityId: activity.id,
@@ -303,7 +303,7 @@ export class ActivityCall {
     }
     async getState(activityId: string) {
         // return this.system.storage.get('ActivityState', activityId)
-        return (await this.getActivity(activityId))?.['ActivityState']
+        return (await this.getActivity(activityId))?.state
     }
     async getActivity(activityId: string) {
         const match = MatchExp.atom({
@@ -320,12 +320,11 @@ export class ActivityCall {
         return await this.system.updateActivity(match, value)
     }
     async setState(activityId: string, state: any) {
-        // return this.system.storage.get('ActivityState', activityId)
         const match = MatchExp.atom({
             key: 'id',
             value: ['=', activityId],
         })
-        return await this.system.updateActivity(match, {ActivityState: state})
+        return await this.system.updateActivity(match, {state: state})
     }
     isStartNode(uuid: string) {
         const node = this.uuidToNode.get(uuid) as InteractionLikeNode
@@ -367,7 +366,7 @@ export class ActivityCall {
         // 完成了。存新的 state。
         const nextState = state.toJSON()
         // await this.system.storage.set('ActivityState', activityId, nextState)
-        await this.setActivity( activityId, {'ActivityState':nextState})
+        await this.setActivity( activityId, {'state':nextState})
 
 
         return {
@@ -377,7 +376,7 @@ export class ActivityCall {
     // TODO 我们没有处理 interaction 循环的情况
     async saveUserRefs(activityId: string, interactionCall: InteractionCall, interactionEventArgs: InteractionEventArgs) {
         // const refs = await this.system.storage.get('ActivityRefs', activityId, {})!
-        const refs = (await this.getActivity(activityId))?.ActivityRefs! || {}
+        const refs = (await this.getActivity(activityId))?.refs! || {}
         if (interactionCall.interaction.userRef?.name) {
             refs[interactionCall.interaction.userRef?.name] = interactionEventArgs.user.id
         }
@@ -389,14 +388,14 @@ export class ActivityCall {
         })
 
         // await this.system.storage.set('ActivityRefs', activityId, refs)
-        await this.setActivity( activityId, {'ActivityRefs':refs})
+        await this.setActivity( activityId, {refs})
     }
     async checkUserRef(activityId: string, interaction: InteractionInstanceType, interactionEventArgs: InteractionEventArgs): Promise<boolean> {
         // TODO 处理 userAttributives
         if (!interaction.userRoleAttributive!.isRef) return true
 
         // const refs = await this.system.storage.get('ActivityRefs', activityId)
-        const refs = (await this.getActivity(activityId))?.ActivityRefs
+        const refs = (await this.getActivity(activityId))?.refs
         return refs[interaction.userRoleAttributive!.name!] === interactionEventArgs.user.id
     }
 }
