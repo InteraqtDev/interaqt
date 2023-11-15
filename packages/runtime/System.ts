@@ -2,6 +2,8 @@ import {createClass, KlassInstance} from "@shared/createClass";
 import { Entity, Relation } from "@shared/entity/Entity";
 // @ts-ignore
 import { InteractionEvent } from '../types/interaction'
+import {Activity} from "@shared/activity/Activity";
+import {MatchExpressionData} from "@storage/erstorage/MatchExp";
 
 
 
@@ -16,6 +18,7 @@ export type RecordChangeListener = (mutationEvents:RecordMutationEvent[]) => any
 
 export const SYSTEM_RECORD = '_System_'
 export const EVENT_RECORD = '_Event_'
+export const ACTIVITY_RECORD = '_Activity_'
 
 export type Storage = {
     // kv 存储
@@ -54,13 +57,12 @@ export type RecordMutationEvent = {
 
 export interface System {
     getEvent: (query: any) => Promise<InteractionEvent[]>
-    // FIXME 所有地方改成 async 的
-    saveEvent: (interactionEvent: InteractionEvent) => Promise<boolean>
+    saveEvent: (interactionEvent: InteractionEvent) => Promise<any>
+    createActivity: (activity: any) => Promise<any>
+    updateActivity: (match: MatchExpressionData, activity: any) => Promise<any>
+    getActivity:(query?: MatchExpressionData) => Promise<any[]>
     conceptClass: Map<string, ReturnType<typeof createClass>>
     storage: Storage
-    util: {
-        uuid: () => string
-    }
     setup: (entities: KlassInstance<typeof Entity, false>[], relations: KlassInstance<typeof Relation, false>[]) => Promise<any>
 }
 
@@ -69,7 +71,6 @@ export type EntityIdRef = {
     [ROW_ID_ATTR]? : string,
     [k:string]: any
 }
-
 
 export const ID_ATTR = 'id'
 export const ROW_ID_ATTR = '_rowId'

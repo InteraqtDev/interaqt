@@ -1,6 +1,6 @@
 import {describe, test, expect, beforeEach} from "vitest";
 
-import { MemorySystem } from "../MemorySystem";
+import { MonoSystem } from "../MonoSystem";
 import {createInstances, getInstance, KlassByName, KlassInstance, removeAllInstance} from "@shared/createClass";
 
 import { Activity } from "@shared/activity/Activity";
@@ -8,7 +8,7 @@ import {ActivityCall, ActivityGroupNode} from "../AcitivityCall";
 
 describe("activity state", () => {
     let createFriendRelationActivityCall: ActivityCall
-    let system: MemorySystem
+    let system: MonoSystem
 
     let sendRequestUUID:string
     let approveUUID:string
@@ -30,7 +30,7 @@ describe("activity state", () => {
          */
 
         createInstances(data, false)
-        system = new MemorySystem()
+        system = new MonoSystem()
         await system.setup([], [])
         system.conceptClass = KlassByName
         const mainActivity = (getInstance(Activity) as KlassInstance<typeof Activity, false>[]).find(a => a.name === 'createFriendRelation')!

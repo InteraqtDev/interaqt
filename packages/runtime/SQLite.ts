@@ -9,6 +9,8 @@ export class SQLiteDB implements Database{
     }
     async open() {
         this.db = await SQLite.open(this.file, this.options)
+        // 这里处理？
+        await this.createIDTable()
     }
     async query (sql:string, name= '')  {
         console.log(`query==============${name}`)
@@ -38,11 +40,17 @@ export class SQLiteDB implements Database{
     close() {
         return this.db.close()
     }
-    getAutoId(recordName: string) {
-        if(!this.ids.get(recordName)) this.ids.set(recordName, 0)
-        const lastId = this.ids.get(recordName)!
-        const newId = lastId+1
-        this.ids.set(recordName, newId)
-        return Promise.resolve(newId as unknown as string)
+    createIDTable() {
+        return this.db.run(`CREATE Table IF NOT EXISTS _IDS_ (last INTEGER, name TEXT)`)
+    }
+    async getAutoId(recordName: string) {
+        const lastId =  (await this.db.all( `SELECT last FROM _IDS_ WHERE name = '${recordName}'`))[0]?.last as unknown as number
+        const newId = (lastId || 0) +1
+        if (lastId === undefined) {
+            await this.db.run(`INSERT INTO _IDS_ (name, last) VALUES ('${recordName}', ${newId})`)
+        } else {
+            await this.db.run(`UPDATE _IDS_ SET last = ${newId} WHERE name = '${recordName}'`)
+        }
+        return newId as unknown as string
     }
 }

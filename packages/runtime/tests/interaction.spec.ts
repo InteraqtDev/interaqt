@@ -1,6 +1,6 @@
 import {describe, test, expect, beforeEach} from "vitest";
 import {InteractionCall, LoginError} from "../InteractionCall";
-import { MemorySystem } from "../MemorySystem";
+import { MonoSystem } from "../MonoSystem";
 import {createInstances, getInstance, KlassByName, KlassInstance, removeAllInstance} from "@shared/createClass";
 
 import { Interaction } from "@shared/activity/Activity";
@@ -8,7 +8,7 @@ import {InteractionEventArgs} from "../../types/interaction";
 
 describe("interaction",  () => {
     let interactionCall: InteractionCall
-    let system: MemorySystem
+    let system: MonoSystem
 
     beforeEach(async () => {
         removeAllInstance()
@@ -23,7 +23,7 @@ describe("interaction",  () => {
 
         // TODO 需要能 destroy instance
         createInstances(data, false)
-        system = new MemorySystem()
+        system = new MonoSystem()
         await system.setup([], [])
         system.conceptClass = KlassByName
         interactionCall = new InteractionCall(getInstance(Interaction)[0] as KlassInstance<typeof Interaction, false>, system)

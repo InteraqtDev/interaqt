@@ -14,6 +14,7 @@ import {System} from "./System";
 import { InteractionCall, InteractionCallResponse} from "./InteractionCall";
 import {InteractionEventArgs} from "../types/interaction";
 import {UserAttributive} from "@shared/user/User";
+import {MatchExp} from "@storage/erstorage/MatchExp";
 
 
 
@@ -281,20 +282,50 @@ export class ActivityCall {
         return seq as Seq
     }
     async create() {
-        const activityId = this.system.util.uuid()
+        // const activityId = this.system.util.uuid()
         const initialStateData = ActivityState.createInitialState(this.graph.head)
-        await this.system.storage.set('ActivityState', activityId, initialStateData)
-        await this.system.storage.set('ActivityRefs', activityId, {})
+        // await this.system.storage.set('ActivityState', activityId, initialStateData)
+        // await this.system.storage.set('ActivityRefs', activityId, {})
+
+        const activity = await this.system.createActivity({
+            name: this.activity.name,
+            uuid: this.activity.uuid,
+            ActivityState: initialStateData,
+            ActivityRefs: {},
+        })
         return {
-            activityId,
+            activityId: activity.id,
             state: initialStateData
         }
     }
     getNodeByUUID(uuid: string) {
         return this.uuidToNode.get(uuid)
     }
-    getState(activityId: string) {
-        return this.system.storage.get('ActivityState', activityId)
+    async getState(activityId: string) {
+        // return this.system.storage.get('ActivityState', activityId)
+        return (await this.getActivity(activityId))?.['ActivityState']
+    }
+    async getActivity(activityId: string) {
+        const match = MatchExp.atom({
+            key: 'id',
+            value: ['=', activityId],
+        })
+        return (await this.system.getActivity(match))[0]
+    }
+    async setActivity(activityId: string, value: any) {
+        const match = MatchExp.atom({
+            key: 'id',
+            value: ['=', activityId],
+        })
+        return await this.system.updateActivity(match, value)
+    }
+    async setState(activityId: string, state: any) {
+        // return this.system.storage.get('ActivityState', activityId)
+        const match = MatchExp.atom({
+            key: 'id',
+            value: ['=', activityId],
+        })
+        return await this.system.updateActivity(match, {ActivityState: state})
     }
     isStartNode(uuid: string) {
         const node = this.uuidToNode.get(uuid) as InteractionLikeNode
@@ -306,7 +337,7 @@ export class ActivityCall {
     }
 
     async callInteraction(activityId: string, uuid: string, interactionEventArgs: InteractionEventArgs) : Promise<InteractionCallResponse>{
-        const activityStateData = await this.system.storage.get('ActivityState', activityId)
+        const activityStateData = await this.getState(activityId)
 
         const state = new ActivityState(activityStateData, this)
         if(!state.isInteractionAvailable(uuid)) {
@@ -335,7 +366,9 @@ export class ActivityCall {
         assert(result, 'change activity state failed')
         // 完成了。存新的 state。
         const nextState = state.toJSON()
-        await this.system.storage.set('ActivityState', activityId, nextState)
+        // await this.system.storage.set('ActivityState', activityId, nextState)
+        await this.setActivity( activityId, {'ActivityState':nextState})
+
 
         return {
             data: nextState
@@ -343,7 +376,8 @@ export class ActivityCall {
     }
     // TODO 我们没有处理 interaction 循环的情况
     async saveUserRefs(activityId: string, interactionCall: InteractionCall, interactionEventArgs: InteractionEventArgs) {
-        const refs = await this.system.storage.get('ActivityRefs', activityId, {})!
+        // const refs = await this.system.storage.get('ActivityRefs', activityId, {})!
+        const refs = (await this.getActivity(activityId))?.ActivityRefs! || {}
         if (interactionCall.interaction.userRef?.name) {
             refs[interactionCall.interaction.userRef?.name] = interactionEventArgs.user.id
         }
@@ -354,13 +388,15 @@ export class ActivityCall {
             }
         })
 
-        await this.system.storage.set('ActivityRefs', activityId, refs)
+        // await this.system.storage.set('ActivityRefs', activityId, refs)
+        await this.setActivity( activityId, {'ActivityRefs':refs})
     }
     async checkUserRef(activityId: string, interaction: InteractionInstanceType, interactionEventArgs: InteractionEventArgs): Promise<boolean> {
         // TODO 处理 userAttributives
         if (!interaction.userRoleAttributive!.isRef) return true
 
-        const refs = await this.system.storage.get('ActivityRefs', activityId)
+        // const refs = await this.system.storage.get('ActivityRefs', activityId)
+        const refs = (await this.getActivity(activityId))?.ActivityRefs
         return refs[interaction.userRoleAttributive!.name!] === interactionEventArgs.user.id
     }
 }

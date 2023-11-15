@@ -1,4 +1,12 @@
-import {EVENT_RECORD, RecordChangeListener, RecordMutationEvent, Storage, System, SYSTEM_RECORD} from "./System";
+import {
+    ACTIVITY_RECORD,
+    EVENT_RECORD,
+    RecordChangeListener,
+    RecordMutationEvent,
+    Storage,
+    System,
+    SYSTEM_RECORD
+} from "./System";
 import {InteractionEvent} from '../types/interaction'
 import {createClass, KlassInstance} from "@shared/createClass";
 import {Entity, Property, Relation} from "@shared/entity/Entity";
@@ -10,9 +18,18 @@ import {RawEntityData} from '@storage/erstorage/NewRecordData'
 import {EntityToTableMap} from '@storage/erstorage/EntityToTableMap'
 import {SQLiteDB} from "./SQLite";
 import {MutationEvent} from "@storage/erstorage/RecordQueryAgent";
+import {Activity} from "@shared/activity/Activity";
 
 
-class MemoryStorage implements Storage{
+function JSONStringify(value:any) {
+    return encodeURI(JSON.stringify(value))
+}
+
+function JSONParse(value: string) {
+    return value === undefined ? undefined : JSON.parse(decodeURI(value))
+}
+
+class MonoStorage implements Storage{
     db = new SQLiteDB()
     public queryHandle?: EntityQueryHandle
     public callbacks: Set<RecordChangeListener> = new Set()
@@ -23,14 +40,14 @@ class MemoryStorage implements Storage{
         const value = (await this.queryHandle!.findOne(SYSTEM_RECORD, match, undefined, ['value']))?.value
         if (value === undefined) return initialValue
 
-        return JSON.parse(decodeURI(value))
+        return JSONParse(value)
     }
     async set(concept: string, key: string, value:any) {
         const match = MatchExp.atom({key: 'key', value: ['=', key]}).and({  key: 'concept', value: ['=', concept] })
         const origin = await this.queryHandle!.findOne(SYSTEM_RECORD, match, undefined, ['value'])
         if (origin) {
             // CAUtION 之类一定是用 this 上的方法才有事件
-            return this.update(SYSTEM_RECORD, match,{ concept, key: key.toString(), value: encodeURI(JSON.stringify(value))})
+            return this.update(SYSTEM_RECORD, match,{ concept, key: key.toString(), value: JSONStringify(value)})
         } else {
             return this.create(SYSTEM_RECORD, { concept, key: key.toString(), value: encodeURI(JSON.stringify(value))})
         }
@@ -106,79 +123,126 @@ type EventQuery = {
 
 let id = 0
 
-export class MemorySystem implements System {
+
+// state 等系统配置数据的实体化
+const systemEntity = Entity.create({
+    name: SYSTEM_RECORD,
+    properties: [
+        Property.create({
+            name: 'concept',
+            type: 'string',
+            collection: false,
+        }),
+        Property.create({
+            name: 'key',
+            type: 'string',
+            collection: false,
+        }),
+        Property.create({
+            name: 'value',
+            type: 'string',
+            collection: false,
+        })
+    ]
+})
+
+// event 的实体化
+const eventEntity = Entity.create({
+    name: EVENT_RECORD,
+    properties: [
+        Property.create({
+            name: 'interactionId',
+            type: 'string',
+            collection: false,
+        }),
+        Property.create({
+            name: 'interactionName',
+            type: 'string',
+            collection: false,
+        }),
+        Property.create({
+            name: 'activityId',
+            type: 'string',
+            collection: false,
+        }),
+        Property.create({
+            name: 'args',
+            type: 'string',
+            collection: false,
+        })
+    ]
+})
+
+// activity 数据
+const activityEntity = Entity.create({
+    name: ACTIVITY_RECORD,
+    properties: [
+        Property.create({
+            name: 'name',
+            type: 'string',
+            collection: false,
+        }),
+        Property.create({
+            name: 'uuid',
+            type: 'string',
+            collection: false,
+        }),
+        Property.create({
+            name: 'ActivityState',
+            type: 'string',
+            collection: false,
+        }),
+        Property.create({
+            name: 'ActivityRefs',
+            type: 'string',
+            collection: false,
+        })
+    ]
+})
+
+export class MonoSystem implements System {
     conceptClass: Map<string, ReturnType<typeof createClass>> = new Map()
     async saveEvent(event: InteractionEvent) {
-        await this.storage.create(EVENT_RECORD, {...event, args: encodeURI(JSON.stringify(event.args||{}))})
-        return true
+        return this.storage.create(EVENT_RECORD, {...event, args: JSONStringify(event.args||{})})
     }
     async getEvent(query?: MatchExpressionData ) {
         return (await this.storage.find(EVENT_RECORD, query, undefined, ['*'])).map(event => ({
             ...event,
-            args: JSON.parse(decodeURI(event.args))
+            args: JSONParse(event.args)
         })) as unknown as InteractionEvent[]
-        // return Promise.resolve(this.eventStack.filter(e => {
-        //     // @ts-ignore
-        //     return Object.keys(query).every(k => e[k] === query[k])
-        // }))
     }
-    util = {
-        uuid() {
-            // FIXME 应该使用 storage 分配的 id
-            return (++id).toString()
+    async createActivity(activity: any) {
+        return this.storage.create(ACTIVITY_RECORD, {
+            ...activity,
+            ActivityState: JSONStringify(activity.ActivityState),
+            ActivityRefs: JSONStringify(activity.ActivityRefs),
+        })
+    }
+    async updateActivity(match: MatchExpressionData, activity: any) {
+        const data = {
+            ...activity
         }
+        delete data.ActivityRefs
+        delete data.ActivityState
+        if (activity.ActivityState) {
+            data.ActivityState = JSONStringify(activity.ActivityState)
+        }
+        if (activity.ActivityRefs) {
+            data.ActivityRefs = JSONStringify(activity.ActivityRefs)
+        }
+        return this.storage.update(ACTIVITY_RECORD, match, data)
+    }
+    async getActivity(query?: MatchExpressionData) {
+        return (await this.storage.find(ACTIVITY_RECORD, query, undefined, ['*'])).map(activity => ({
+            ...activity,
+            ActivityState: JSONParse(activity.ActivityState),
+            ActivityRefs: JSONParse(activity.ActivityRefs),
+        }))
     }
     setup(entities: KlassInstance<typeof Entity, false>[], relations: KlassInstance<typeof Relation, false>[]){
-        // state 等系统配置数据的实体化
-        const systemEntity = Entity.create({
-            name: SYSTEM_RECORD,
-            properties: [
-                Property.create({
-                    name: 'concept',
-                    type: 'string',
-                    collection: false,
-                }),
-                Property.create({
-                    name: 'key',
-                    type: 'string',
-                    collection: false,
-                }),
-                Property.create({
-                    name: 'value',
-                    type: 'string',
-                    collection: false,
-                })
-            ]
-        })
 
-        // event 的实体化
-        const eventEntity = Entity.create({
-            name: EVENT_RECORD,
-            properties: [
-                Property.create({
-                    name: 'interactionId',
-                    type: 'string',
-                    collection: false,
-                }),
-                Property.create({
-                    name: 'interactionName',
-                    type: 'string',
-                    collection: false,
-                }),
-                Property.create({
-                    name: 'activityId',
-                    type: 'string',
-                    collection: false,
-                }),
-                Property.create({
-                    name: 'args',
-                    type: 'string',
-                    collection: false,
-                })
-            ]
-        })
 
-        return this.storage.setup([...entities, systemEntity, eventEntity], relations)
+        return this.storage.setup([...entities, systemEntity, eventEntity, activityEntity], relations)
     }
-    storage = new MemoryStorage()
+    storage = new MonoStorage()
 }

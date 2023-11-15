@@ -1,7 +1,7 @@
 import {describe, test, expect, beforeEach} from "vitest";
 import {Controller} from "../Controller";
 import {ActivityCall, ActivityGroupNode} from "../AcitivityCall";
-import {MemorySystem} from "../MemorySystem";
+import {MonoSystem} from "../MonoSystem";
 import {createInstances, getInstance, KlassByName, KlassInstance, removeAllInstance, stringifyAllInstances} from "@shared/createClass";
 import { Activity, Interaction } from "@shared/activity/Activity";
 import { Entity, Relation } from "@shared/entity/Entity";
@@ -19,7 +19,7 @@ type User = {
 describe('computed data in activity', () => {
 
     let createFriendRelationActivityCall: ActivityCall
-    let system: MemorySystem
+    let system: MonoSystem
 
     let makeFriendActivityUUID: string
     let sendRequestUUID:string
@@ -48,7 +48,7 @@ describe('computed data in activity', () => {
          */
 
 
-        system = new MemorySystem()
+        system = new MonoSystem()
         system.conceptClass = KlassByName
         controller = new Controller(
             system,
