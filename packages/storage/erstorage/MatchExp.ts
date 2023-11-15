@@ -1,6 +1,6 @@
 import {BoolExp} from "../../shared/BoolExp";
 import {EntityToTableMap} from "./EntityToTableMap";
-import {assert, getByPath, setByPath} from "../util";
+import {assert} from "../util";
 
 import {RecordQueryTree} from "./RecordQuery.ts";
 

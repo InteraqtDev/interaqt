@@ -1,6 +1,7 @@
-import {Entity, Property, PropertyTypes, Relation} from "../../../shared/entity/Entity";
-import { removeAllInstance } from "../../../shared/createClass";
+import {Entity, Property, PropertyTypes, Relation} from "@shared/entity/Entity";
+import { removeAllInstance } from "@shared/createClass";
 
+// @ts-ignore
 export const createCommonData = () => {
 
     const userEntity = Entity.create({

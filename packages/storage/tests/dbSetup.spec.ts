@@ -1,5 +1,4 @@
 import {expect, test, describe} from "vitest";
-import { Database } from "bun:sqlite";
 import fs from 'fs'
 
 import {DBSetup} from "../erstorage/Setup";

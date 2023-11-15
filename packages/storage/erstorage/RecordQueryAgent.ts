@@ -1,7 +1,7 @@
 import {EntityToTableMap} from "./EntityToTableMap";
 import {assert, setByPath} from "../util";
 // @ts-ignore
-import {BoolExp, ExpressionData} from '../../shared/BoolExp.ts'
+import {BoolExp} from '../../shared/BoolExp.ts'
 // @ts-ignore
 import {Database, EntityIdRef} from '../../runtime/System'
 import {FieldMatchAtom, MatchAtom, MatchExp, MatchExpressionData} from "./MatchExp.ts";
@@ -548,10 +548,13 @@ ${this.buildXToOneFindQuery(existEntityQuery, currentAlias)}
 INSERT INTO ${this.map.getRecordTable(newEntityData.recordName)}
 (${sameRowNewFieldAndValue.map(f => f.field).join(',')})
 VALUES
-(${sameRowNewFieldAndValue.map(f => JSON.stringify(f.value)).join(',')}) 
+(${sameRowNewFieldAndValue.map(f => this.prepareFieldValue(f.value)).join(',')}) 
 `) as EntityIdRef
 
         return Object.assign(result,newEntityDataWithIdsWithFlashOutRecords.getData())
+    }
+    prepareFieldValue(value:any) {
+        return value === undefined ? 'null' : JSON.stringify(value)
     }
 
 

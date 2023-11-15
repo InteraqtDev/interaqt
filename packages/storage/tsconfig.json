@@ -15,11 +15,14 @@
     "allowSyntheticDefaultImports": true,
     "forceConsistentCasingInFileNames": true,
     "allowJs": true,
-    "types": [
-    ],
+    "paths": {
+      "@shared/*": ["../shared/*"],
+    },
     "include": [
-      "../shared/**/*",
-      "../runtime"
+      "../shared",
+      "../runtime",
+      "./erstorage",
+      "./test"
     ]
   }
 }

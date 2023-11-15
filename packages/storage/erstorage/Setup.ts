@@ -1,12 +1,6 @@
-import { Entity, Relation, Property } from "../../shared/entity/Entity";
-import { KlassInstanceOf } from "../../shared/createClass";
-import {
-    RecordAttribute,
-    RecordMapItem,
-    ValueAttribute,
-    MapData,
-    LinkMapItem
-} from "./EntityToTableMap";
+import {Entity, Property, Relation} from "../../shared/entity/Entity.ts";
+import {KlassInstance} from "../../shared/createClass.ts";
+import {LinkMapItem, MapData, RecordAttribute, RecordMapItem, ValueAttribute} from "./EntityToTableMap";
 import {assert} from "../util";
 import {Database, ID_ATTR, ROW_ID_ATTR} from "../../runtime/System";
 
@@ -33,16 +27,16 @@ export class DBSetup {
     public tables:TableData = {}
     public map: MapData = { links: {}, records: {}}
     constructor(
-        public entities: KlassInstanceOf<typeof Entity, false>[],
-        public relations: KlassInstanceOf<typeof Relation, false>[],
+        public entities: KlassInstance<typeof Entity, false>[],
+        public relations: KlassInstance<typeof Relation, false>[],
         public database?: Database,
         public mergeLinks: MergeLinks = []
     ) {
         this.buildMap()
         this.buildTables()
     }
-    getRelationName(relation: KlassInstanceOf<typeof Relation, false>) : string{
-        return `${Relation.is(relation.entity1) ? this.getRelationName(relation.entity1 as KlassInstanceOf<typeof Relation, false>) : relation.entity1!.name}_${relation.targetName1}_${relation.targetName2}_${relation.entity2!.name}`
+    getRelationName(relation: KlassInstance<typeof Relation, false>) : string{
+        return `${Relation.is(relation.entity1) ? this.getRelationName(relation.entity1 as KlassInstance<typeof Relation, false>) : relation.entity1!.name}_${relation.targetName1}_${relation.targetName2}_${relation.entity2!.name}`
     }
 
     createRecordToTable(item:string, table:string) {
@@ -115,7 +109,7 @@ export class DBSetup {
     }
 
     // TODO 应该和数据库有关，应该能配置更多地参数
-    getFieldType(property: KlassInstanceOf<typeof Property, false>) {
+    getFieldType(property: KlassInstance<typeof Property, false>) {
         if (property.type === 'string') {
             return 'TEXT'
         } else if (property.type === 'number') {
@@ -132,7 +126,7 @@ export class DBSetup {
     //         `${relationData.targetRecord}_${relationData.targetAttribute}`
     // }
 
-    createRecord(entity: KlassInstanceOf<typeof Entity, false>|KlassInstanceOf<typeof Relation, false>, isRelation? :boolean) {
+    createRecord(entity: KlassInstance<typeof Entity, false>|KlassInstance<typeof Relation, false>, isRelation? :boolean) {
         const attributes = Object.fromEntries(entity.properties!.map(property => [
             property.name,
             {
@@ -155,11 +149,11 @@ export class DBSetup {
             isRelation,
         } as RecordMapItem
     }
-    createLink(relationName: string, relation: KlassInstanceOf<typeof Relation, false>) {
+    createLink(relationName: string, relation: KlassInstance<typeof Relation, false>) {
         return {
             table: relationName,
             relType: relation.relType!.split(':'),
-            sourceRecord: this.getRecordName(relation.entity1 as KlassInstanceOf<typeof Entity, false>),
+            sourceRecord: this.getRecordName(relation.entity1 as KlassInstance<typeof Entity, false>),
             sourceAttribute: relation.targetName1,
             targetRecord: this.getRecordName(relation.entity2!),
             targetAttribute: relation.targetName2,
@@ -167,19 +161,19 @@ export class DBSetup {
             isTargetReliance: relation.isTargetReliance
         } as LinkMapItem
     }
-    getRecordName(rawRecord:KlassInstanceOf<typeof Entity, false>|KlassInstanceOf<typeof Relation, false>): string {
+    getRecordName(rawRecord:KlassInstance<typeof Entity, false>|KlassInstance<typeof Relation, false>): string {
         return Relation.is(rawRecord) ?
-            this.getRelationName(rawRecord as KlassInstanceOf<typeof Relation, false>):
+            this.getRelationName(rawRecord as KlassInstance<typeof Relation, false>):
             rawRecord.name!
     }
     //虚拟 link
-    createLinkOfRelationAndEntity(relationEntityName: string, relationName: string, relation: KlassInstanceOf<typeof Relation, false>, isSource: boolean) {
+    createLinkOfRelationAndEntity(relationEntityName: string, relationName: string, relation: KlassInstance<typeof Relation, false>, isSource: boolean) {
         const relationRelType = relation.relType!.split(':')
         return {
             table: undefined, // 虚拟 link 没有表
             sourceRecord: relationEntityName,
             sourceAttribute: isSource ? 'source' : 'target',
-            targetRecord: isSource ? this.getRecordName(relation.entity1 as KlassInstanceOf<typeof Entity, false>): this.getRecordName(relation.entity2!),
+            targetRecord: isSource ? this.getRecordName(relation.entity1 as KlassInstance<typeof Entity, false>): this.getRecordName(relation.entity2!),
             // targetRecord: isSource ? relation.entity1.name: relation.entity2.name,
             targetAttribute: undefined, // 不能从 entity 来获取关系表
             // source 1:x1 -关联表- x2:1 target
