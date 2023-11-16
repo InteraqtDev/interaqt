@@ -19,17 +19,14 @@ type ComputeSourceResult = SourceTargetPair | {source: EntityIdRef[] | EntityIdR
 type TransferHandleFn = (this: Controller,interactionEventArgs: InteractionEventArgs, activityId?:string ) =>  Promise<ComputeSourceResult>
 
 export class RelationStateMachineHandle extends ComputedDataHandle {
-    computedData: KlassInstance<typeof RelationStateMachine, false>
+    transfers!: KlassInstance<typeof RelationStateTransfer, false>[]
     transferHandleFn?: Map<KlassInstance<typeof RelationStateTransfer, false>, TransferHandleFn>
     data?: KlassInstance<typeof Relation, false>
     constructor(controller: Controller , computedData: KlassInstance<typeof ComputedData, false> , dataContext:  DataContext) {
         super(controller, computedData, dataContext)
-        this.computedData = computedData as KlassInstance<typeof RelationStateMachine, false>
         this.data = this.dataContext.id as KlassInstance<typeof Relation, false>
         this.transferHandleFn = new Map()
         this.validateState()
-        // FIXME 移出去
-        this.listenInteractions()
     }
 
     validateState() {
@@ -39,16 +36,21 @@ export class RelationStateMachineHandle extends ComputedDataHandle {
     computeEffect(mutationEvent: RecordMutationEvent, mutationEvents: RecordMutationEvent[]): any {
 
     }
-
     parseComputedData() {
-        this.computedData.transfers!.forEach(transfer => {
+        const computedData = this.computedData as unknown as KlassInstance<typeof RelationStateMachine, false>
+        this.transfers = computedData.transfers
+        computedData.transfers!.forEach(transfer => {
             const parsedHandle = new Function('arg', 'activityId', `return (${transfer.handle}).call(this, arg, activityId)`) as TransferHandleFn
             this.transferHandleFn!.set(transfer, parsedHandle)
         })
     }
+    addEventListener() {
+        super.addEventListener();
+        this.listenInteractions()
+    }
     listenInteractions() {
         // 遍历 transfer 来监听 interaction
-        this.computedData.transfers!.forEach(transfer => {
+        this.transfers.forEach(transfer => {
             this.controller.listen(transfer.triggerInteraction, (...arg) => {
                 // @ts-ignore
                 return this.onCallInteraction(transfer, ...arg)

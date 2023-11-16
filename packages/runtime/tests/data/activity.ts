@@ -26,8 +26,8 @@ import {removeAllInstance, stringifyAllInstances} from "@shared/createClass";
 const UserEntity = Entity.createReactive({ name: 'User' })
 const nameProperty = Property.createReactive({ name: 'name', type: PropertyTypes.String })
 const ageProperty = Property.createReactive({ name: 'age', type: PropertyTypes.Number })
-UserEntity.properties.push(nameProperty)
-UserEntity.properties.push(ageProperty)
+UserEntity.properties.push(nameProperty, ageProperty)
+
 export const Message = Entity.createReactive({
     name: 'Message',
     properties: [Property.create({
@@ -269,7 +269,12 @@ if (!sendRequestEvent) {
 }
 
 const handled = !!stack.find(i => i.interaction.name === 'approve' || i.interaction.name === 'reject')
-        
+        console.log(11111111111, {
+    from: sendRequestEvent.data.user,
+    to: sendRequestEvent.data.payload.to,
+    message: sendRequestEvent.data.payload.message,
+    handled,
+})
 return {
     from: sendRequestEvent.data.user,
     to: sendRequestEvent.data.payload.to,

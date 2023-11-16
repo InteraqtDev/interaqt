@@ -98,8 +98,6 @@ export class MapActivityToEntityHandle extends ComputedDataHandle {
                     activityId
                 })
             }
-
-
         }
     }
 }

@@ -134,7 +134,7 @@ export class Controller {
         assert(!!interactionCall,`cannot find interaction for ${interactionId}`)
         const result = await interactionCall.call(interactionEventArgs)
         if (!result.error) {
-            await this.dispatch(interactionCall.interaction, interactionEventArgs)
+            await this.dispatch(interactionCall.interaction, result.event!.args)
         } else {
             console.error(result.error)
         }

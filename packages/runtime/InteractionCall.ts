@@ -47,6 +47,7 @@ export class LoginError{
 export type InteractionCallResponse= {
     error?: any,
     data?: any,
+    event?: InteractionEvent
     sideEffects?: {
         [k: string]: any
     }
@@ -285,7 +286,27 @@ export class InteractionCall {
         return this.interaction.action === GetAction
     }
     async saveEvent(interactionEvent: InteractionEvent) {
+        // 为 payload 里面的新数据保存起来
         return await this.system.saveEvent(interactionEvent)
+    }
+    async savePayload(payload: InteractionEventArgs["payload"]){
+        const payloadDefs = this.interaction.payload?.items || []
+        const savedPayload: InteractionEventArgs["payload"] = {}
+        for(let payloadDef of payloadDefs) {
+            const isPayloadUser = UserAttributive.is(payloadDef.base)
+            if (!payloadDef.isRef && !isPayloadUser) {
+                const payloadItem = payload![payloadDef.name!]
+                if (payloadItem) {
+                    const recordName = (payloadDef.base as KlassInstance<typeof Entity, false>).name
+                    if (payloadDef.isCollection) {
+                        savedPayload[payloadDef.name!] = await Promise.all((payloadItem as any[]).map(item => this.system.storage.create(recordName, item)))
+                    } else {
+                        savedPayload[payloadDef.name!] = await this.system.storage.create(recordName, payloadItem)
+                    }
+                }
+            }
+        }
+        return savedPayload
     }
     async retrieveData(interactionEvent: InteractionEventArgs) {
         // TODO
@@ -293,14 +314,7 @@ export class InteractionCall {
     }
     async call(interactionEventArgs: InteractionEventArgs, activityId?: string): Promise<InteractionCallResponse> {
         const response: InteractionCallResponse = {
-            sideEffects: {}
-        }
-
-        const interactionEvent = {
-            interactionName: this.interaction.name,
-            interactionId: this.interaction.uuid,
-            args: interactionEventArgs,
-            activityId
+            sideEffects: {},
         }
 
         try {
@@ -312,8 +326,22 @@ export class InteractionCall {
         }
 
         if (!response.error) {
-            // 执行
-            await this.saveEvent(interactionEvent)
+            const savedPayload = await this.savePayload(interactionEventArgs.payload)
+            const event = {
+                interactionName: this.interaction.name,
+                interactionId: this.interaction.uuid,
+                args: {
+                    ...interactionEventArgs,
+                    payload: {
+                        ...interactionEventArgs.payload,
+                        ...savedPayload
+                    },
+                    // savedPayload: savedPayload
+                },
+                activityId
+            }
+            await this.saveEvent(event)
+            response.event = event
             // effect
             await this.runEffect()
             if (this.isGetInteraction()) {

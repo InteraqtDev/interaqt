@@ -30,8 +30,6 @@ export class ComputedDataHandle {
                     'relation' :
                     'property'
 
-
-
         if (this.computedDataType === 'property') {
             this.recordName = (this.dataContext.host as KlassInstance<typeof Entity, false>).name
             this.propertyName = (this.dataContext.id as KlassInstance<typeof Property, false>).name
