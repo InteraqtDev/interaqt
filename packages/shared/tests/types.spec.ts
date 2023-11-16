@@ -1,60 +1,27 @@
 import {assertType, describe, test} from "vitest";
-import {Activity, ActivityInstanceType} from "../activity/Activity";
-
-
-type ClassPropType = {
-    // defaultValue?: () => any,
-    // required?: false,
-}
-
-type DefaultValueType = () => any
-
-// type GenRequiredType<T> = Omit<T, 'required'> & { required: true}
-type OptionalRequiredType<T> = T&{required?:false} | T& { required: true}
-type OptionalDefaultValueType<T> = T&{defaultValue?: undefined} | T& { defaultValue: DefaultValueType}
-// type ClassMetaPublicItem = ClassPropType | ClassCollectionPropType| ClassRequiredPropType | ClassRequiredCollectionPropType
-// type ClassMetaPublicItem = ClassPropType | GenRequiredType<ClassPropType>
-type ClassMetaPublicItem = OptionalDefaultValueType<OptionalRequiredType<ClassPropType>>
-
-
-// type RequireWithoutDefault<T extends ClassMetaPublicItem> =  T["required"] extends true ? T["defaultValue"] extends never ? true : false : false
-type RequireWithoutDefault<T extends ClassMetaPublicItem> =  T["required"] extends true ? true: false
-
-const a: ClassMetaPublicItem  = {
-    required: true,
-}
-
-type Ta1 = typeof a
-type ShouldBeUndefined = Ta1["defaultValue"]
-
-type ShouldTree = RequireWithoutDefault<typeof a>
+import {Entity, Relation} from "../entity/Entity";
+import {KlassInstance, RequireWithoutDefault, Klass, UnwrapCollectionType} from "../createClass";
 
 
 
-type A = {
-    b: B
-}
+type RelationKlassType = typeof Relation
+type RelationInstanceType = KlassInstance<typeof Relation, false>
+type RelationPublicType = RelationKlassType["public"]
 
-type B = {
-   c: C
-}
-type C= {
-    a: A
-}
+describe("createClass types", () => {
+  test('relation types', () => {
 
+      // assertType<RequireWithoutDefault<(typeof Relation.public)["entity1"],false>>(true)
+      assertType<RequireWithoutDefault<RelationPublicType["entity1"],false>>(true)
 
-const acitivity :ActivityInstanceType= Activity.create({
-    name: 'Activit1111y',
-})
-
-
-
-describe("test", () => {
-  test('types', () => {
-      assertType<ShouldTree>(true)
-      assertType<undefined>(a.defaultValue as ShouldBeUndefined)
-    assertType<any>(acitivity.interactions)
-
+      const relation = Relation.create({
+          entity1: Entity.create({ name: 'test'}),
+          entity2: Entity.create({ name: 'test2'}),
+          targetName1: 'to2',
+          targetName2: 'to1',
+      })
+      assertType<KlassInstance<typeof Entity, false>>(relation.entity1)
+      assertType<string>(relation.entity1.name)
   })
 })
 

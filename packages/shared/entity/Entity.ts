@@ -134,7 +134,9 @@ export const Relation = createClass({
             collection: false
         },
         entity1: {
-            type: [Entity],
+            // source 可以是 Entity 或者 relation
+            // CAUTION 理论上应该改成 Entity 和 Relation 的交集，这里先强行这样实现了
+            type: [Entity] as unknown as typeof Entity,
             required: true,
             collection: false,
             options() {
@@ -238,15 +240,3 @@ export const Relation = createClass({
 // FIXME type relation 和 entity 的 public type 最好都单独定义
 // @ts-ignore
 Relation.public.entity1.type.push(Relation)
-
-const User = Entity.create({
-    name: 'test',
-})
-
-console.log(User.name)
-
-log(User.properties)
-
-function log(name: any[]) {
-
-}

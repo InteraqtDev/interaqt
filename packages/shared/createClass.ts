@@ -23,7 +23,7 @@ type OptionalDefaultValueType<T> = T&{defaultValue?: undefined} | T& { defaultVa
 type OptionalCollectionType<T> = T&{collection?: false} | T& { collection: true}
 // arg 是有 required 并且一定没有 defaultValue 才有
 // prop 是有 required 或者有 defaultValue 就必有
-type RequireWithoutDefault<T extends ClassMetaPublicItem, IS_ARG extends true|false> =
+export type RequireWithoutDefault<T extends ClassMetaPublicItem, IS_ARG extends true|false> =
     IS_ARG extends true ?
         (T["defaultValue"] extends DefaultValueType? false:  T["required"] extends true  ? true : false) :
         (T["defaultValue"] extends DefaultValueType? true:  T["required"] extends true  ? true : false)
@@ -65,7 +65,7 @@ export type KlassInstancePrimitiveProps = {
 }
 
 
-type KlassProp<REACTIVE extends boolean, COLLECTION extends true|false|undefined, T> = IfReactiveCollectionProp<REACTIVE, COLLECTION, T>
+export type KlassProp<REACTIVE extends boolean, COLLECTION extends true|false|undefined, T> = IfReactiveCollectionProp<REACTIVE, COLLECTION, T>
 
 type IfReactiveCollectionProp<REACTIVE extends boolean, COLLECTION extends true|false|undefined, T> = REACTIVE extends true ?
     (
@@ -81,6 +81,10 @@ type IfReactiveCollectionProp<REACTIVE extends boolean, COLLECTION extends true|
 
 type OmitNever<T> = Omit<T, { [K in keyof T]: T[K] extends never ? K : never }[keyof T]>
 
+export type UnwrapCollectionType<T extends Klass<any>[]> = {
+    [Key in keyof T]: T[Key]["public"]
+}[keyof T][number]
+
 export type RequiredProps<T extends NonNullable<KlassMeta["public"]>, REACTIVE extends true|false, IS_ARG extends true|false> = OmitNever<{
     [Key in keyof T]:
         RequireWithoutDefault<T[Key], IS_ARG> extends true ?
@@ -92,7 +96,8 @@ export type RequiredProps<T extends NonNullable<KlassMeta["public"]>, REACTIVE e
                         T[Key]['type'] extends Klass<any> ?
                             KlassProp<REACTIVE, T[Key]["collection"],  InertKlassInstance<T[Key]['type']['public']>> :
                             T[Key]['type'] extends Klass<any>[] ?
-                                KlassProp<REACTIVE, T[Key]["collection"],InertKlassInstance<any>>:
+                                // KlassProp<REACTIVE, T[Key]["collection"],InertKlassInstance<any>>:
+                                KlassProp<REACTIVE, T[Key]["collection"], InertKlassInstance<UnwrapCollectionType<T[Key]['type']>>>:
                                 T[Key]['type'] extends PrimitivePropType ?
                                     KlassProp<REACTIVE, T[Key]["collection"],  PrimitivePropertyMap[T[Key]['type']]> :
                                     never

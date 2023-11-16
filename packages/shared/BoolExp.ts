@@ -1,4 +1,4 @@
-import { parse as parseStr} from 'acorn'
+import {Expression, ExpressionStatement, parse as parseStr} from 'acorn'
 import {assert, indexBy} from "./util";
 
 type AtomData<T> = {
@@ -175,7 +175,7 @@ function defaultParse(key:string) {
     return {key}
 }
 
-function astNodeToBoolExpressionNode<T>(astNode, optionsByName, parseAtomNameToObject: ParseAtomNameToObjectType): ExpressionData<T> {
+function astNodeToBoolExpressionNode<T>(astNode: Expression, optionsByName: {[k:string]: any}, parseAtomNameToObject: ParseAtomNameToObjectType): ExpressionData<T> {
     if (astNode.type === "LogicalExpression") {
         return {
             type: 'expression',
@@ -207,6 +207,6 @@ export function parse<T>(exp: string, options: any[] = [], parseAtomNameToObject
     const optionsByName = indexBy(options, 'name')
     const ast = parseStr(exp, {ecmaVersion: 2020})
     return new BoolExp<T>(
-        astNodeToBoolExpressionNode<T>(ast.body[0].expression, optionsByName, parseAtomNameToObject)
+        astNodeToBoolExpressionNode<T>((ast.body[0] as ExpressionStatement).expression, optionsByName, parseAtomNameToObject)
     )
 }
