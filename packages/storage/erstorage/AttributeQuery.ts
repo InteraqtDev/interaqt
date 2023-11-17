@@ -17,22 +17,63 @@ export class AttributeQuery {
     public fullQueryTree: RecordQueryTree
     public parentLinkRecordQuery?: RecordQuery
     public id = Math.random()
-    public static getAttributeQueryDataForRecord(recordName:string, map: EntityToTableMap, includeSameTableReliance = false, includeMergedRecordAttribute = false, includeManagedRecordAttributes = false): AttributeQueryData{
+    public static getAttributeQueryDataForRecord(
+        recordName:string, map: EntityToTableMap,
+        includeSameTableReliance = false,
+        includeMergedRecordAttribute = false,
+        includeManagedRecordAttributes = false, // link record 的 source/target 字段
+        includeNotRelianceCombined: boolean = false
+    ): AttributeQueryData{
         const result: AttributeQueryData = map.getRecordInfo(recordName).valueAttributes.map(info => info.attributeName)
         const recordInfo = map.getRecordInfo(recordName)
 
+        // FIXME 再想想以下几个参数的递归查询，特别是关系上的数据。
         if(includeSameTableReliance) {
             recordInfo.sameTableReliance.forEach(info =>{
                 const relianceAttributeQueryData = AttributeQuery.getAttributeQueryDataForRecord(info.recordName, map, true, includeMergedRecordAttribute)
-                const relianceRelationAttributeQueryData = AttributeQuery.getAttributeQueryDataForRecord(info.linkName, map, true, includeMergedRecordAttribute)
-                result.push(
-                    [
-                        info.attributeName,
-                        {
-                            attributeQuery: [...relianceAttributeQueryData, [LINK_SYMBOL, { attributeQuery: relianceRelationAttributeQueryData }]]
-                        }
-                    ]
-                )
+                const attributeQueryItem:AttributeQueryDataItem  = [
+                    info.attributeName,
+                    {
+                        attributeQuery: [...relianceAttributeQueryData]
+                    }
+                ]
+
+                if (!recordInfo.isRelation) {
+                    const relianceRelationAttributeQueryData = AttributeQuery.getAttributeQueryDataForRecord(info.linkName, map, true, includeMergedRecordAttribute)
+                    attributeQueryItem[1].attributeQuery!.push([LINK_SYMBOL, { attributeQuery: relianceRelationAttributeQueryData }])
+                }
+
+                result.push(attributeQueryItem)
+            })
+        }
+
+        if (includeNotRelianceCombined){
+            recordInfo.notRelianceCombined.forEach(info =>{
+                // const relianceAttributeQueryData = AttributeQuery.getAttributeQueryDataForRecord(info.recordName, map, true, includeMergedRecordAttribute, true)
+                // const relianceRelationAttributeQueryData = AttributeQuery.getAttributeQueryDataForRecord(info.linkName, map, true, includeMergedRecordAttribute, true)
+                // result.push(
+                //     [
+                //         info.attributeName,
+                //         {
+                //             attributeQuery: [...relianceAttributeQueryData, [LINK_SYMBOL, { attributeQuery: relianceRelationAttributeQueryData }]]
+                //         }
+                //     ]
+                // )
+
+                const relianceAttributeQueryData = AttributeQuery.getAttributeQueryDataForRecord(info.recordName, map, true, includeMergedRecordAttribute)
+                const attributeQueryItem:AttributeQueryDataItem  = [
+                    info.attributeName,
+                    {
+                        attributeQuery: [...relianceAttributeQueryData]
+                    }
+                ]
+
+                if (!recordInfo.isRelation) {
+                    const relianceRelationAttributeQueryData = AttributeQuery.getAttributeQueryDataForRecord(info.linkName, map, true, includeMergedRecordAttribute)
+                    attributeQueryItem[1].attributeQuery!.push([LINK_SYMBOL, { attributeQuery: relianceRelationAttributeQueryData }])
+                }
+
+                result.push(attributeQueryItem)
             })
         }
 

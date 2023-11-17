@@ -9,6 +9,10 @@ export class RecordInfo {
         this.data = this.map.data.records[name]!
     }
 
+    get isRelation() {
+        return this.data.isRelation
+    }
+
     get combinedRecords() {
         return this.strictRecordAttributes.filter(info => {
             return info.isMergedWithParent()
@@ -91,7 +95,7 @@ export class RecordInfo {
         })
     }
 
-    get notReliantCombined() :AttributeInfo[] {
+    get notRelianceCombined() :AttributeInfo[] {
         return this.combinedRecords.filter(info => {
             return !info.isReliance
         })

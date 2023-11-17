@@ -123,6 +123,7 @@ export class EntityToTableMap {
 
     getInfoByPath(namePath: string[]): AttributeInfo|undefined {
         const [entityName, ...attributivePath] = namePath
+        assert(this.data.records[entityName], `entity ${entityName} not found`)
         assert(attributivePath.length > 0, 'getInfoByPath should have a name path.')
         let currentEntity = entityName
         let parentEntity: string|undefined
@@ -319,6 +320,7 @@ export class EntityToTableMap {
     }
 
     getReverseAttribute(entityName: string, attribute: string) : string {
+        assert(this.data.records[entityName], `entity ${entityName} not found`)
         const relationName = (this.data.records[entityName].attributes[attribute] as RecordAttribute).linkName
         const relationData = this.data.links[relationName]
         if (relationData.sourceRecord === entityName && relationData.sourceAttribute === attribute) {
@@ -331,6 +333,7 @@ export class EntityToTableMap {
         }
     }
     groupAttributes(entityName: string, attributeNames: string[]) : [AttributeInfo[], AttributeInfo[], AttributeInfo[]]{
+        assert(this.data.records[entityName], `entity ${entityName} not found`)
         const valueAttributes: AttributeInfo[] = []
         const entityIdAttributes: AttributeInfo[] = []
         const entityAttributes: AttributeInfo[] = []

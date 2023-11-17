@@ -342,6 +342,7 @@ describe('one to one', () => {
         const profileA = await entityQueryHandle.create('Profile', {title:'f2'})
 
         const events: MutationEvent[] = []
+        // 更新 profile 为 f2
         const [updatedUser] = await entityQueryHandle.update('User',
             MatchExp.atom({ key: 'id', value: ['=', userA.id]}),
             { profile: profileA },
@@ -363,6 +364,7 @@ describe('one to one', () => {
             {},
             ['title', ['owner', {attributeQuery: ['name']}]]
         )
+        // f2 应该仍然只有一个，是被移动了的
         expect(findProfiles.length).toBe(1)
         expect(findProfiles[0]).toMatchObject({
             title: 'f2',

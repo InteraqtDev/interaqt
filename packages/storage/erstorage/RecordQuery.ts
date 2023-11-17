@@ -13,9 +13,10 @@ export type RecordQueryData = {
 
 
 export class RecordQuery {
-    static create(recordName: string, map: EntityToTableMap, data: RecordQueryData, contextRootEntity?: string, parentRecord?:string, attributeName?:string, onlyRelationData?: boolean) {
+    static create(recordName: string, map: EntityToTableMap, data: RecordQueryData, contextRootEntity?: string, parentRecord?:string, attributeName?:string, onlyRelationData?: boolean, allowNull = false) {
         // CAUTION 因为合表后可能用关联数据匹配到行。
-        const matchExpression = (new MatchExp(recordName, map, data.matchExpression, contextRootEntity)).and({
+        const inputMatch = new MatchExp(recordName, map, data.matchExpression, contextRootEntity)
+        const matchExpression = allowNull ? inputMatch: inputMatch.and({
             key: 'id',
             value: ['not', null]
         })

@@ -5,7 +5,7 @@ import {BoolExp} from '../../shared/BoolExp.ts'
 // @ts-ignore
 import {Database, EntityIdRef} from '../../runtime/System'
 import {FieldMatchAtom, MatchAtom, MatchExp, MatchExpressionData} from "./MatchExp.ts";
-import {AttributeQuery, AttributeQueryDataItem} from "./AttributeQuery.ts";
+import {AttributeQuery, AttributeQueryData, AttributeQueryDataItem} from "./AttributeQuery.ts";
 import {LINK_SYMBOL, RecordQuery, RecordQueryTree} from "./RecordQuery.ts";
 import {NewRecordData, RawEntityData} from "./NewRecordData.ts";
 import {someAsync} from "./util.ts";
@@ -490,53 +490,105 @@ ${this.buildXToOneFindQuery(existEntityQuery, currentAlias)}
         const newEntityDataWithIds = newEntityData.merge(newRawDataWithNewIds)
 
         // 2. 处理需要 flashOut 的数据
-        const flashOutRecordRasData:{[k:string]: RawEntityData} = {}
+        const flashOutRecordRasData:{[k:string]: RawEntityData} = await this.flashOutCombinedRecordsAndMergedLinks(newEntityData, events)
+
+        return newEntityDataWithIds.merge(flashOutRecordRasData)
+    }
+    async flashOutCombinedRecordsAndMergedLinks(newEntityData: NewRecordData, events?: MutationEvent[]): Promise<{[k:string]: RawEntityData}>{
+        const result:{[k:string]: RawEntityData} = {}
         // CAUTION 这里是从 newEntityData 里读，不是从 newEntityDataWithIds，那里面是刚分配id 的，还没数据。
+        let match: MatchExpressionData|undefined
+        // 这里的目的是抢夺 combined record 上的所有数据，那么一定穷尽 combined record 的同表数据才行。
+        const attributeQuery: AttributeQueryData = AttributeQuery.getAttributeQueryDataForRecord(newEntityData.recordName, this.map, true, true, false, true)
         for(let combinedRecordIdRef of newEntityData.combinedRecordIdRefs) {
-            const combinedRecordInfo = combinedRecordIdRef.info?.getRecordInfo()!
-            const reverseAttributeName = combinedRecordIdRef.info?.getReverseInfo()?.attributeName!
-            const allRelatedRecords = combinedRecordInfo?.combinedRecords.map(info => info.attributeName!).filter(name => {
-                // CAUTION 去掉反向的数据。不然死循环了。
-                return name !== reverseAttributeName
-            })
-
-            const newMatch =  MatchExp.atom({
-                key: 'id',
+            const attributeIdMatchAtom: MatchAtom = {
+                key: `${combinedRecordIdRef.info!.attributeName!}.id`,
                 value: ['=', combinedRecordIdRef.getRef().id]
-            })
-            // 这里都是 1:1 关系的。所以 flashOut 对于已经有数据等同于抢夺过来。
-            const flashOutCombined = (await this.flashOutRecords(combinedRecordInfo?.name!, newMatch, allRelatedRecords, reverseAttributeName))[0]
-            // 如果是抢夺，要记录一下事件。
-            if(flashOutCombined[reverseAttributeName]) {
-                // 可能查出来个空对象
-                if(flashOutCombined[reverseAttributeName]?.[LINK_SYMBOL]?.id){
-                    events?.push({
-                        type: 'delete',
-                        recordName: this.map.getInfo(combinedRecordInfo?.name!, reverseAttributeName).linkName,
-                        record: flashOutCombined[reverseAttributeName]?.[LINK_SYMBOL],
-                    })
-                }
-                // 要先删除掉 reverse link 上的信息
-                delete flashOutCombined[reverseAttributeName]
             }
-
-            flashOutRecordRasData[combinedRecordIdRef.info?.attributeName!] = flashOutCombined
-
-            // 相当于新建了关系。如果不是虚拟link 就要记录。
-            // TODO 要给出一个明确的 虚拟 link  record 的差异
-            if (!combinedRecordIdRef.info!.isLinkSourceRelation()){
-                flashOutRecordRasData[combinedRecordIdRef.info?.attributeName!][LINK_SYMBOL] = {
-                    id: await this.database.getAutoId(combinedRecordIdRef.info!.linkName!),
-                }
-                events?.push({
-                    type:'create',
-                    recordName:combinedRecordIdRef.info!.linkName,
-                    record: flashOutRecordRasData[combinedRecordIdRef.info?.attributeName!][LINK_SYMBOL]
-                })
+            if(!match) {
+                match = MatchExp.atom(attributeIdMatchAtom)
+            } else {
+                match = match.or(attributeIdMatchAtom)
             }
         }
 
-        return newEntityDataWithIds.merge(flashOutRecordRasData)
+        const recordQuery = RecordQuery.create(newEntityData.recordName, this.map, {
+            matchExpression: match,
+            attributeQuery: attributeQuery,
+        }, undefined, undefined, undefined, false, true)
+
+        const recordsWithCombined = await this.findRecords(recordQuery, `finding combined records for flashOut ${newEntityData.recordName}'s combined`)
+
+        // 开始 merge 数据，并记录 unLink 事件
+        for(let recordWithCombined of recordsWithCombined) {
+            for(let combinedRecordIdRef of newEntityData.combinedRecordIdRefs) {
+                if (recordWithCombined[combinedRecordIdRef.info?.attributeName!]) {
+
+
+                    // merge 数据
+                    assert(!result[combinedRecordIdRef.info?.attributeName!], `should not have same combined record, conflict attribute: ${combinedRecordIdRef.info?.attributeName!}`)
+                    result[combinedRecordIdRef.info?.attributeName!] = {
+                        ...recordWithCombined[combinedRecordIdRef.info?.attributeName!]
+                    }
+
+                    // 删掉 combined 原来的所有同行数据
+                    await this.deleteRecordSameRowData(combinedRecordIdRef.recordName, [{id: recordWithCombined[combinedRecordIdRef.info?.attributeName!].id}])
+
+                    // 如果是抢夺，要记录一下事件。
+                    if(recordWithCombined.id) {
+                        events?.push({
+                            type: 'delete',
+                            recordName: combinedRecordIdRef.info!.linkName!,
+                            record: recordWithCombined[combinedRecordIdRef.info?.attributeName!][LINK_SYMBOL],
+                        })
+                    }
+
+                    // 相当于新建了关系。如果不是虚拟link 就要记录。
+                        // TODO 要给出一个明确的 虚拟 link  record 的差异
+                    if (!combinedRecordIdRef.info!.isLinkSourceRelation()){
+                        result[combinedRecordIdRef.info?.attributeName!][LINK_SYMBOL] = {
+                            id: await this.database.getAutoId(combinedRecordIdRef.info!.linkName!),
+                        }
+                        events?.push({
+                            type:'create',
+                            recordName:combinedRecordIdRef.info!.linkName,
+                            record: result[combinedRecordIdRef.info?.attributeName!][LINK_SYMBOL]
+                        })
+                    }
+                }
+            }
+        }
+
+        return result
+    }
+    async relocateCombinedRecordDataForLink(linkName: string, matchExpressionData: MatchExpressionData, moveSource = false,  events?:MutationEvent[]) {
+        const attributeQuery: AttributeQueryData = AttributeQuery.getAttributeQueryDataForRecord(linkName, this.map, true, true, false, true)
+        const moveAttribute = moveSource ? 'source' : 'target'
+
+        const records = await this.findRecords(RecordQuery.create(linkName, this.map, {
+            matchExpression: matchExpressionData,
+            attributeQuery: attributeQuery
+        }), `finding combined records for relocate ${linkName}.${moveAttribute}`)
+
+        const toMoveRecordInfo = this.map.getLinkInfoByName(linkName)[moveSource ? 'sourceRecordInfo' : 'targetRecordInfo']
+
+        // 1. 把这些数据删除，在下面重新插入到新行
+        await this.deleteRecordSameRowData(toMoveRecordInfo.name, records.map(r => r[moveAttribute]))
+
+        // 2. 重新插入到新行
+        for(let record of records) {
+            const toMoveRecordData = new NewRecordData(this.map, toMoveRecordInfo.name, record[moveAttribute])
+            await this.insertSameRowData(toMoveRecordData)
+
+            // 3. 增加 delete 关系的事件
+            events?.push({
+                type: 'delete',
+                recordName: linkName,
+                record: record
+            })
+        }
+
+
     }
 
     async insertSameRowData(newEntityData: NewRecordData, events?: MutationEvent[]): Promise<EntityIdRef>{
@@ -844,7 +896,7 @@ WHERE ${idField} = (${JSON.stringify(idRef.id)})
                 true
             )
         })
-        const records = await this.findRecords(deleteQuery)
+        const records = await this.findRecords(deleteQuery, `find record for deleting ${recordName}`)
 
         if (records.length) {
             // 删除独立表或者关系在另一边的关系数据
@@ -866,7 +918,7 @@ WHERE ${idField} = (${JSON.stringify(idRef.id)})
         for(let record of records) {
             if (!inSameRowDataOp) {
                 // FIXME 其实可以利用数据库 select * 来加速，怎么看这个问题？？
-                const hasSameRowData = recordInfo.notReliantCombined.length && await someAsync(recordInfo.notReliantCombined, async (info) => {
+                const hasSameRowData = recordInfo.notRelianceCombined.length && await someAsync(recordInfo.notRelianceCombined, async (info) => {
                     const existQuery = RecordQuery.create(
                         recordName,
                         this.map,
@@ -921,7 +973,7 @@ WHERE ${recordInfo.idField} IN (${records.map(({id}) => JSON.stringify(id)).join
             // 递归处理同表的 reliance tree
             recordInfo.sameTableReliance.forEach(relianceInfo => {
                 // 只要真正存在这个数据才要删除
-                if(record[relianceInfo.attributeName]!.id){
+                if(record[relianceInfo.attributeName]?.id){
                     // 和 reliance 的 link record 的事件
                     events?.push({
                         type:'delete',
@@ -1018,101 +1070,14 @@ WHERE ${recordInfo.idField} IN (${records.map(({id}) => JSON.stringify(id)).join
         const linkInfo = this.map.getLinkInfoByName(linkName)
         assert(!linkInfo.isTargetReliance, `cannot unlink reliance data, you can only delete record, ${linkName}`)
 
-        const toMoveRecordInfo = moveSource ? linkInfo.sourceRecordInfo : linkInfo.targetRecordInfo
-        const toMove = moveSource  ? 'source': 'target'
         if (linkInfo.isCombined()) {
-            // 根据 Keep 决定是  source 还是 target 换位置
-            const records = await this.findRecords(RecordQuery.create(linkName, this.map, {
-                matchExpression: matchExpressionData,
-                attributeQuery: [
-                    ['source', {attributeQuery: ['id']}],
-                    ['target', {attributeQuery: ['id']}]
-                ]
-            }), reason)
-
-            const toMoveIds = []
-            for(let record of records) {
-                if( record[toMove].id ) {
-                    toMoveIds.push(record[toMove].id)
-                }
-            }
-
-            // 除了当前 link 的 record 以外，所有和 toMoveRecordInfo.name 合表的数据都要移走
-            if (toMoveIds.length) {
-                await this.relocateCombinedRecords(
-                    toMoveRecordInfo.name,
-                    MatchExp.atom({
-                        key: 'id',
-                        value: ['in', toMoveIds]
-                    }),
-                    linkName,
-                    events
-                )
-            }
-
-            return
+            return this.relocateCombinedRecordDataForLink(linkName, matchExpressionData, moveSource, events)
         }
 
         return this.deleteRecord(linkName, matchExpressionData, events)
 
     }
-    // 默认会把连带的都移走
-    async relocateCombinedRecords(recordName:string, matchExpressionData: MatchExpressionData, linkToBreak: string, events?: MutationEvent[]) {
-        const recordInfo = this.map.getRecordInfo(recordName)
-        const includeRelated = recordInfo.combinedRecords.filter(info => {
-            return linkToBreak !== info.linkName
-        }).map(info => info.attributeName)
 
-        const linkToBreakInfo = recordInfo.combinedRecords.find(info => {
-            return linkToBreak === info.linkName
-        })
-
-        // 所有 1:1 连带数据都要取出。始终只带出同表数据！还会带出断掉的关系数据！
-        // const records = await this.flashOutRecords(recordName, matchExpressionData, includeRelated, undefined)
-        const records = await this.flashOutRecords(recordName, matchExpressionData, includeRelated, linkToBreakInfo!.attributeName)
-        const movedRecords: Record[] = []
-        for( let record of records) {
-            // 借用 createRecord 的行为重新插入数据
-            const recordWithoutLink = {...record}
-            delete recordWithoutLink[linkToBreakInfo!.attributeName]
-            movedRecords.push(await this.createRecord(new NewRecordData(this.map, recordName, recordWithoutLink)))
-
-            events?.push({
-                type: 'delete',
-                recordName: linkToBreakInfo!.linkName,
-                record: record[linkToBreakInfo!.attributeName][LINK_SYMBOL]
-            })
-        }
-        return movedRecords
-    }
-
-    async flashOutRecords(recordName:string, matchExpressionData: MatchExpressionData, includeRelated: string[], fromAttribute?: string): Promise<Record[]> {
-        const attributeQuery = this.constructAttributeQueryTree(recordName, includeRelated)
-        const records = await this.findRecords(RecordQuery.create(recordName, this.map, {
-            matchExpression: matchExpressionData,
-            // 所有关联数据。fields
-            // attributeQuery
-            // FIXME 这里要获取所有关系上的同行数据。
-            attributeQuery: fromAttribute?
-                attributeQuery.concat([[fromAttribute!, {attributeQuery:[[LINK_SYMBOL, {attributeQuery:['id']}]]}]]):
-                attributeQuery
-
-    }), `finding ${recordName} for flash out`)
-
-        // 删除老的
-        // FIXME 要包括所有 includeRelated 以及关系数据，但不包括 fromAttribute，那个是只要查询！！！
-        //  而且也不应该 delete reliance，这里本质上只是要把数据 取出来一下而已！
-        //  应该直接用 database.delete
-        if (records.length) {
-            const ids = records.map(r => r.id)
-            await this.deleteRecord(recordName, MatchExp.atom({
-                key: 'id',
-                value: ['in', ids]
-            }))
-        }
-
-        return records
-    }
     // FIXME 还有关联的 relation 的 attribute
     constructAttributeQueryTree(recordName:string, includeAttributes: string[] = []) {
         const recordInfo = this.map.getRecordInfo(recordName)
