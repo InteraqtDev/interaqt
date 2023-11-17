@@ -26,6 +26,7 @@ export type InteractionEventArgs = {
 
 export type InteractionEvent = {
     interactionId: string,
+    interactionName: string,
     activityId?: string,
     args: InteractionEventArgs
 }
