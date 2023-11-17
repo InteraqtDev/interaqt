@@ -24,8 +24,27 @@ export const MapActivityToEntity = createClass({
     }
 })
 
+export const MapInteractionToRecord = createClass({
+    name: 'MapInteractionToRecord',
+    public: {
+        sourceInteraction: {
+            type: Interaction,
+            collection: false,
+            required: true
+        },
+        handle: {
+            type: 'string',
+            collection: false,
+            required: true
+        }
+    }
+})
+
 // CAUTION 修补 Entity computedData 里面的类型
-Entity.public.computedData.type.push(MapActivityToEntity)
+Entity.public.computedData.type.push(
+    MapActivityToEntity as unknown as typeof ComputedData,
+    MapInteractionToRecord as unknown as typeof ComputedData
+)
 
 
 const FixedProperty = createClass({

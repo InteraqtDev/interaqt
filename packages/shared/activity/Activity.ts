@@ -110,7 +110,8 @@ export const PayloadItem = createClass({
         // payload 也可以指向前其他交互中定义的实体之类的，这用在了 activity 中。
         itemRef: {
             collection: false,
-            type: [UserAttributive, Entity]
+            required: false,
+            type: [UserAttributive, Entity] as (typeof UserAttributive | typeof Entity)[],
         }
     }
 })
@@ -130,7 +131,7 @@ export const Payload = createClass({
 })
 
 
-type InteractionPublicType = {
+export type InteractionPublicType = {
     name: {
         type: 'string',
         collection: false,
@@ -202,7 +203,7 @@ export const Interaction: Klass<InteractionPublicType> = createClass({
     }
 })
 
-type GatewayPublicType = {
+export type GatewayPublicType = {
     name: {
         type: 'string',
         required: true
@@ -300,7 +301,7 @@ type UnwrappedActivityInstanceType = {
     sideEffects: KlassInstance<typeof SideEffect, any>[]
 } & KlassInstancePrimitiveProps
 
-type ActivityGroupPublicType = {
+export type ActivityGroupPublicType = {
     // 指定是并行的，还是串行的 等等
     type: {
         type: 'string',
@@ -317,7 +318,7 @@ type ActivityGroupPublicType = {
 }
 
 
-type TransferPublicType = {
+export type TransferPublicType = {
     name: {
         type: 'string',
         required: true,
@@ -325,6 +326,7 @@ type TransferPublicType = {
     },
     source: {
         type: (Klass<InteractionPublicType>| Klass<ActivityGroupPublicType>| Klass<GatewayPublicType>)[]
+        // type: [Klass<InteractionPublicType>, Klass<ActivityGroupPublicType>, Klass<GatewayPublicType>]
         required: true
         collection: false
     },

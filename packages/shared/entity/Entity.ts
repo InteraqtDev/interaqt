@@ -53,7 +53,7 @@ export const Property = createClass({
         computedData: {
             collection: false,
             // CAUTION 这里的具体类型等着外面注册 IncrementalComputationHandle 的时候修补
-            type: [] as Klass<any>[],
+            type: [] as unknown as  typeof ComputedData,
             required: false,
         }
     }
@@ -84,7 +84,7 @@ export const Entity = createClass({
         },
         computedData: {
             // CAUTION 这里的具体类型等着外面注册 IncrementalComputationHandle 的时候修补
-            type: [] as (typeof ComputedData)[],
+            type: [] as unknown as  typeof ComputedData,
             collection: false,
             required: false,
         },
@@ -148,15 +148,17 @@ export const Relation = createClass({
             required: true,
             collection: false,
             constraints: {
-                nameNotSameWithProp({entity1, targetName1}) {
+                nameNotSameWithProp(relation) {
                     return computed(() => {
+                        const {entity1, targetName1} = relation
                         return entity1?.properties?.every((p: typeof Property) => {
                             return p.name !== targetName1
                         })
                     })
                 },
-                nameUnique({entity1, entity2, targetName1, targetName2}) {
+                nameUnique(relation) {
                     return computed(() => {
+                        const {entity1, entity2, targetName1, targetName2} = relation
                         return !(entity1 === entity2 && targetName1 === targetName2)
                     })
                 }
@@ -175,15 +177,17 @@ export const Relation = createClass({
             required: true,
             collection: false,
             constraints: {
-                nameNotSameWithProp({entity2, targetName2}) {
+                nameNotSameWithProp(relation) {
                     return computed(() => {
+                        const {entity2, targetName2} = relation
                         return entity2?.properties?.every((p: typeof Property) => {
                             return p.name !== targetName2
                         })
                     })
                 },
-                nameUnique({targetName1, entity1, entity2, targetName2}) {
+                nameUnique(relation) {
                     return computed(() => {
+                        const {entity1, entity2, targetName1, targetName2} = relation
                         return !(entity1 === entity2 && targetName1 === targetName2)
                     })
                 }
@@ -210,7 +214,7 @@ export const Relation = createClass({
         },
         computedData: {
             // CAUTION 这里的具体类型等着外面注册 IncrementalComputationHandle 的时候修补
-            type: [] as Klass<any>[],
+            type: [] as unknown as typeof ComputedData,
             collection: false,
             required: false,
         },
@@ -221,12 +225,15 @@ export const Relation = createClass({
             constraints: {
                 // 这里是从上面复制下来的。
                 // 默认第一参数是 property 本身，第二参数是 relation
-                eachNameUnique({properties}) {
+                eachNameUnique(relation) {
                     // CAUTION 这里取的是 leaf atom，不然到 incUnique 里面已经监听不到  name string 的变化了。
                     // FIXME 实例化之后 property 不是个 Class 吗？它的 name 就是个 atom，也没有 $name 这个属性，如何统一？？？
-                    const uniqueNames = incUnique(incPick(properties, '$name'))
                     return computed(() => {
-                        return uniqueNames.size === properties.length
+                        const {properties} = relation
+                        const uniqueNames = incUnique(incPick(properties, '$name'))
+                        return computed(() => {
+                            return uniqueNames.size === properties.length
+                        })
                     })
                 }
             },
