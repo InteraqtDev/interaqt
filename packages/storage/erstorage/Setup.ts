@@ -35,10 +35,6 @@ export class DBSetup {
         this.buildMap()
         this.buildTables()
     }
-    getRelationName(relation: KlassInstance<typeof Relation, false>) : string{
-        return `${Relation.is(relation.entity1) ? this.getRelationName(relation.entity1 as KlassInstance<typeof Relation, false>) : relation.entity1!.name}_${relation.targetName1}_${relation.targetName2}_${relation.entity2!.name}`
-    }
-
     createRecordToTable(item:string, table:string) {
         this.recordToTableMap.set(item, table)
         assert(!this.tableToRecordsMap.get(table), `create table for ${item} ${table} failed, ${table} already exist.`)
@@ -76,7 +72,6 @@ export class DBSetup {
         sameTableRecordsToMove.forEach(sameTableRecord => this.recordToTableMap.set(sameTableRecord, joinTargetTable))
 
         // 3. 新 table 合并数据
-
         this.tableToRecordsMap.set(joinTargetTable, new Set([...joinTargetSameTableRecords, ...sameTableRecordsToMove]))
 
         // 4. 记录 log
@@ -162,9 +157,7 @@ export class DBSetup {
         } as LinkMapItem
     }
     getRecordName(rawRecord:KlassInstance<typeof Entity, false>|KlassInstance<typeof Relation, false>): string {
-        return Relation.is(rawRecord) ?
-            this.getRelationName(rawRecord as KlassInstance<typeof Relation, false>):
-            rawRecord.name!
+        return rawRecord.name!
     }
     //虚拟 link
     createLinkOfRelationAndEntity(relationEntityName: string, relationName: string, relation: KlassInstance<typeof Relation, false>, isSource: boolean) {
@@ -202,7 +195,7 @@ export class DBSetup {
 
         // 2. 生成 relation record 以及所有的 link
         this.relations.forEach(relation => {
-            const relationName = this.getRelationName(relation)
+            const relationName = relation.name!
             this.map.records[relationName] = this.createRecord(relation, true)
             this.createRecordToTable(relationName, relationName)
             // 记录 relation 里面的  Entity 和 Entity 的关系
