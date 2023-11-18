@@ -1,5 +1,5 @@
 import {Atom, computed, incPick, incUnique} from 'rata'
-import {createClass, getInstance, Klass} from "../createClass";
+import {createClass, getInstance} from "../createClass";
 import {ComputedData} from "../IncrementalComputation";
 
 
