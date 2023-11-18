@@ -131,7 +131,11 @@ export const Relation = createClass({
             // TODO 是自动根据 entity/attribute 生成的，应该怎么表示？
             type: 'string',
             required: false,
-            collection: false
+            collection: false,
+            // fixme type
+            computed: (relation: any) => {
+                return `${relation.entity1!.name}_${relation.targetName1}_${relation.targetName2}_${relation.entity2!.name}`
+            }
         },
         entity1: {
             // source 可以是 Entity 或者 relation

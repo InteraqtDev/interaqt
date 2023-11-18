@@ -5,12 +5,16 @@ import {toRaw, UnwrapReactive} from "rata";
 
 type PrimitivePropType = 'string'|'number'|'boolean'| 'object'
 type DefaultValueType = (...args: any[]) => any
+// FIXME return type 应该是个 Prop ?
+type ComputedValueType = (obj: KlassInstance<any, any>) => any
 
 type ClassPropType = {
     type?: Klass<any>|Klass<any>[]|PrimitivePropType,
     // 用来接触循环引用的
     instanceType?: Object,
+    // FIXME 有用吗？
     reactiveInstanceType?: KlassInstance<any, true>,
+    // FIXME 去掉
     computedType?: (...arg: any[]) => string|Function,
     options? : any[] | ((thisProp: any, thisEntity: object) => any[])
     constraints?: {
@@ -20,16 +24,19 @@ type ClassPropType = {
 
 type OptionalRequiredType<T> = T&{required?:false} | T& { required: true}
 type OptionalDefaultValueType<T> = T&{defaultValue?: undefined} | T& { defaultValue: DefaultValueType}
+type OptionalComputedValueType<T> = T&{computed?: undefined} | T& { computed: ComputedValueType}
 type OptionalCollectionType<T> = T&{collection?: false} | T& { collection: true}
-// arg 是有 required 并且一定没有 defaultValue 才有
-// prop 是有 required 或者有 defaultValue 就必有
-export type RequireWithoutDefault<T extends ClassMetaPublicItem, IS_ARG extends true|false> =
+// arg 是有 required 并且一定没有 defaultValue并且一定没有 computed 才有
+// prop 是有 required 或者有 defaultValue 或者有 computed 就必有
+// FIXME 还要判断有没有 defaultValue 和 computed value
+
+export type RequireWithoutDefaultAndComputed<T extends ClassMetaPublicItem, IS_ARG extends true|false> =
     IS_ARG extends true ?
-        (T["defaultValue"] extends DefaultValueType? false:  T["required"] extends true  ? true : false) :
-        (T["defaultValue"] extends DefaultValueType? true:  T["required"] extends true  ? true : false)
+        (T["defaultValue"] extends DefaultValueType? false: T["computed"] extends ComputedValueType? false:  T["required"] extends true  ? true : false) :
+        (T["defaultValue"] extends DefaultValueType? true:  T["computed"] extends ComputedValueType? true: T["required"] extends true  ? true : false)
 
 
-type ClassMetaPublicItem = OptionalRequiredType<OptionalDefaultValueType<OptionalCollectionType<ClassPropType>>>
+type ClassMetaPublicItem = OptionalComputedValueType<OptionalRequiredType<OptionalDefaultValueType<OptionalCollectionType<ClassPropType>>>>
 
 export type KlassMeta = {
     name: string,
@@ -92,7 +99,7 @@ type ExtractKlassTypes<REACTIVE extends boolean, COLLECTION extends true|false|u
 
 export type RequiredProps<T extends NonNullable<KlassMeta["public"]>, REACTIVE extends true|false, IS_ARG extends true|false> = OmitNever<{
     [Key in keyof T]:
-        RequireWithoutDefault<T[Key], IS_ARG> extends true ?
+        RequireWithoutDefaultAndComputed<T[Key], IS_ARG> extends true ?
             (
                 // 这个类型是用来解决循环引用的
                 T[Key]["instanceType"] extends Object?
@@ -113,7 +120,7 @@ export type RequiredProps<T extends NonNullable<KlassMeta["public"]>, REACTIVE e
 
 export type OptionalProps<T extends NonNullable<KlassMeta["public"]>, REACTIVE extends true|false, IS_ARG  extends true|false> = Partial<OmitNever<{
     [Key in keyof T]:
-        RequireWithoutDefault<T[Key], IS_ARG> extends true ?
+        RequireWithoutDefaultAndComputed<T[Key], IS_ARG> extends true ?
             never:
             (
                 // 这个类型是用来解决循环引用的
@@ -350,6 +357,21 @@ export function createClass<T extends KlassMeta>(metadata: T) : Klass<T['public'
                     // TODO 要不要再这里就验证？？？
                 })
             }
+
+            // computed value
+            Object.entries(metadata.public).forEach(([ propName, propDef]: [string, ClassMetaPublicItem]) => {
+                if (propDef.computed) {
+                    if(isReactive) {
+                        // @ts-ignore
+                        self[propName] = computed(() => propDef.computed(self))
+                    } else {
+                        Object.defineProperty(self, propName, {
+                            get: () => propDef.computed!(self),
+                            enumerable: true,
+                        })
+                    }
+                }
+            })
 
 
             this._options = options
