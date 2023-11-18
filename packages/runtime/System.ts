@@ -39,7 +39,6 @@ export type Storage = {
     // addRelation: (relationName: string, ...arg: any[]) => Promise<any>
     addRelationByNameById: (relationName: string, ...arg: any[]) => Promise<any>
     getRelationName: (...arg: any[]) => string
-    getRelationNameByDef: (...arg: any[]) => string
     listen: (callback: RecordChangeListener) => any
 }
 

@@ -102,10 +102,6 @@ class MonoStorage implements Storage{
     getRelationName(...arg:Parameters<EntityQueryHandle["getRelationName"]>) {
         return this.queryHandle!.getRelationName(...arg)
     }
-    // FIXME 应该移出去，由 Relation 自己写成 computedData。这样动态获取没有必要
-    getRelationNameByDef(relation:Parameters<DBSetup["getRelationName"]>[0]) {
-        return this.dbSetup?.getRelationName(relation)!
-    }
     listen(callback: RecordChangeListener) {
         this.callbacks.add(callback)
     }

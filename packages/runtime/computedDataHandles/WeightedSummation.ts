@@ -29,8 +29,7 @@ export class WeightedSummationHandle extends IncrementalComputedDataHandle {
     }
     async computeEffect(mutationEvent: RecordMutationEvent, mutationEvents: RecordMutationEvent[]): Promise<KlassInstance<any, false>|undefined> {
         return this.records!.find((record) => {
-            // FIXME relation name 应该直接从 relation 上面可以获取
-            return (record instanceof Entity ? record.name :this.controller.system.storage.getRelationNameByDef(record)) === mutationEvent.recordName
+            return (record.name) === mutationEvent.recordName
         })
     }
     async getLastValue(effect: RecordChangeEffect, mutationEvent: RecordMutationEvent, mutationEvents: RecordMutationEvent[]) {

@@ -54,9 +54,7 @@ export class MapInteractionToRecordHandle extends ComputedDataHandle {
             if (this.data instanceof Entity) {
                 await this.controller.system.storage.create( this.data.name!, newMappedItem)
             } else {
-                // FIXME relation 名字问题
-                const recordName = this.controller.system.storage.getRelationNameByDef(this.data)
-                await this.controller.system.storage.addRelationByNameById( recordName, newMappedItem.source.id, newMappedItem.target.id, newMappedItem)
+                await this.controller.system.storage.addRelationByNameById( this.data.name!, newMappedItem.source.id, newMappedItem.target.id, newMappedItem)
             }
         }
     }
