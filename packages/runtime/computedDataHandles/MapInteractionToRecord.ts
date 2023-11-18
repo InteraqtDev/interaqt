@@ -52,9 +52,9 @@ export class MapInteractionToRecordHandle extends ComputedDataHandle {
             // CAUTION 注意，这里的增量计算语义是 map one interaction to one relation。所以不会有更新的情况，因为 Interaction 不会更新。
             //  如果有更复杂的 computed Relation 需求，应该用别的
             if (this.data instanceof Entity) {
-                await this.controller.system.storage.create( this.data.name!, newMappedItem)
+                await this.controller.system.storage.create( this.data.name, newMappedItem)
             } else {
-                await this.controller.system.storage.addRelationByNameById( this.data.name!, newMappedItem.source.id, newMappedItem.target.id, newMappedItem)
+                await this.controller.system.storage.addRelationByNameById( this.data.name, newMappedItem.source.id, newMappedItem.target.id, newMappedItem)
             }
         }
     }

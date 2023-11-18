@@ -195,7 +195,7 @@ export class DBSetup {
 
         // 2. 生成 relation record 以及所有的 link
         this.relations.forEach(relation => {
-            const relationName = relation.name!
+            const relationName = relation.name
             this.map.records[relationName] = this.createRecord(relation, true)
             this.createRecordToTable(relationName, relationName)
             // 记录 relation 里面的  Entity 和 Entity 的关系
