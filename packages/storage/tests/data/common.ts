@@ -1,8 +1,8 @@
-import {Entity, Property, PropertyTypes, Relation} from "@shared/entity/Entity";
-import { removeAllInstance } from "@shared/createClass";
+import {Entity, Property, PropertyTypes, Relation} from "../../../shared/entity/Entity";
+import {KlassInstance, removeAllInstance} from "../../../shared/createClass";
 
 // @ts-ignore
-export const createCommonData = () => {
+export function createCommonData(): { entities: KlassInstance<typeof Entity, false>[], relations: KlassInstance<typeof Relation, false>[] } {
 
     const userEntity = Entity.create({
         name: 'User',
@@ -157,8 +157,8 @@ export const createCommonData = () => {
         isTargetReliance: true
     })
 
-    const entities = [...Entity.instances]
-    const relations = [...Relation.instances]
+    const entities = [...Entity.instances] as KlassInstance<typeof Entity, false>[]
+    const relations = [...Relation.instances] as KlassInstance<typeof Relation, false>[]
 
     removeAllInstance()
 

@@ -1,7 +1,7 @@
+// @ts-ignore
 import {BoolExp} from "../../shared/BoolExp";
 import {EntityToTableMap} from "./EntityToTableMap";
 import {assert} from "../util";
-
 import {RecordQueryTree} from "./RecordQuery.ts";
 
 export type MatchAtom = { key: string, value: [string, any], isReferenceValue?: boolean }
@@ -19,9 +19,22 @@ export type FieldMatchAtom = MatchAtom & {
 
 export class MatchExp {
     public static atom(condition: MatchAtom) {
-        console.assert(condition.key !== undefined, 'key cannot be undefined')
-        console.assert(Array.isArray(condition.value) && condition.value.length === 2, 'value must be array')
+        assert(condition.key !== undefined, 'key cannot be undefined')
+        assert(Array.isArray(condition.value) && condition.value.length === 2, 'value must be array')
+        assert(condition.value[1] !== undefined, `${condition.key} value cannot be undefined`)
         return BoolExp.atom<MatchAtom>(condition)
+    }
+    // TODO 支持更复杂的格式
+    public static fromObject(condition: Object) {
+        let root: BoolExp<MatchAtom> | undefined
+        Object.entries(condition).forEach(([key, value]) => {
+              if (!root) {
+                  root = MatchExp.atom({key, value: ['=', value]})
+              }  else {
+                  root = root.and({key, value: ['=', value]})
+              }
+        })
+        return root!
     }
 
     public xToOneQueryTree: RecordQueryTree
@@ -189,8 +202,9 @@ export class MatchExp {
     }
 
     and(condition: MatchAtom): MatchExp {
-        console.assert(condition.key !== undefined, 'key cannot be undefined')
-        console.assert(Array.isArray(condition.value) && condition.value.length === 2, 'value must be array')
+        assert(condition.key !== undefined, 'key cannot be undefined')
+        assert(Array.isArray(condition.value) && condition.value.length === 2, 'value must be array')
+        assert(condition.value[1] !== undefined, `${condition.key} value cannot be undefined`)
         return new MatchExp(this.entityName, this.map, this.data ? this.data.and(condition) : BoolExp.atom<MatchAtom>(condition), this.contextRootEntity)
     }
 }

@@ -149,6 +149,7 @@ export class EntityToTableMap {
             } else {
                 const data = this.data.records[currentEntity]
                 attributeData = data!.attributes[currentAttribute!] as RecordAttribute
+                assert(!!attributeData, `attribute ${currentAttribute} not found in ${currentEntity}. namePath: ${namePath.join('.')}`)
                 parentEntity = currentEntity
                 currentEntity = (attributeData as RecordAttribute).isRecord ? (attributeData as RecordAttribute).recordName : ''
                 lastAttribute = currentAttribute

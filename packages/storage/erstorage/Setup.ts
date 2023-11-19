@@ -188,6 +188,7 @@ export class DBSetup {
     buildMap() {
         // 1. 按照范式生成基础 entity record
         this.entities.forEach(entity => {
+            assert(!this.map.records[entity.name!], `entity name ${entity.name} is duplicated`)
             this.map.records[entity.name!] = this.createRecord(entity)
             // 记录一下 entity 和 表的关系。后面用于合并的时候做计算。
             this.createRecordToTable(entity.name!, entity.name!)
@@ -196,6 +197,7 @@ export class DBSetup {
         // 2. 生成 relation record 以及所有的 link
         this.relations.forEach(relation => {
             const relationName = relation.name
+            assert(!this.map.records[relationName], `relation name ${relationName} is duplicated`)
             this.map.records[relationName] = this.createRecord(relation, true)
             this.createRecordToTable(relationName, relationName)
             // 记录 relation 里面的  Entity 和 Entity 的关系

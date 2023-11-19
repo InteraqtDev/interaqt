@@ -490,11 +490,15 @@ ${this.buildXToOneFindQuery(existEntityQuery, currentAlias)}
         const newEntityDataWithIds = newEntityData.merge(newRawDataWithNewIds)
 
         // 2. 处理需要 flashOut 的数据
-        const flashOutRecordRasData:{[k:string]: RawEntityData} = await this.flashOutCombinedRecordsAndMergedLinks(newEntityData, events)
+        const flashOutRecordRasData:{[k:string]: RawEntityData} = await this.flashOutCombinedRecordsAndMergedLinks(
+            newEntityData,
+            events,
+            `finding combined records for ${newEntityData.recordName} to flash out, for ${isUpdate? 'updating' : 'creation'} with data ${JSON.stringify(newEntityDataWithIds.getData())}`
+        )
 
         return newEntityDataWithIds.merge(flashOutRecordRasData)
     }
-    async flashOutCombinedRecordsAndMergedLinks(newEntityData: NewRecordData, events?: MutationEvent[]): Promise<{[k:string]: RawEntityData}>{
+    async flashOutCombinedRecordsAndMergedLinks(newEntityData: NewRecordData, events?: MutationEvent[], reason=''): Promise<{[k:string]: RawEntityData}>{
         const result:{[k:string]: RawEntityData} = {}
         // CAUTION 这里是从 newEntityData 里读，不是从 newEntityDataWithIds，那里面是刚分配id 的，还没数据。
         let match: MatchExpressionData|undefined
@@ -517,47 +521,51 @@ ${this.buildXToOneFindQuery(existEntityQuery, currentAlias)}
             attributeQuery: attributeQuery,
         }, undefined, undefined, undefined, false, true)
 
-        const recordsWithCombined = await this.findRecords(recordQuery, `finding combined records for flashOut ${newEntityData.recordName}'s combined`)
+        const recordsWithCombined = await this.findRecords(recordQuery, reason)
 
-        // 开始 merge 数据，并记录 unLink 事件
-        for(let recordWithCombined of recordsWithCombined) {
-            for(let combinedRecordIdRef of newEntityData.combinedRecordIdRefs) {
-                if (recordWithCombined[combinedRecordIdRef.info?.attributeName!]) {
-
-
-                    // merge 数据
-                    assert(!result[combinedRecordIdRef.info?.attributeName!], `should not have same combined record, conflict attribute: ${combinedRecordIdRef.info?.attributeName!}`)
-                    result[combinedRecordIdRef.info?.attributeName!] = {
-                        ...recordWithCombined[combinedRecordIdRef.info?.attributeName!]
-                    }
-
-                    // 删掉 combined 原来的所有同行数据
-                    await this.deleteRecordSameRowData(combinedRecordIdRef.recordName, [{id: recordWithCombined[combinedRecordIdRef.info?.attributeName!].id}])
-
-                    // 如果是抢夺，要记录一下事件。
-                    if(recordWithCombined.id) {
-                        events?.push({
-                            type: 'delete',
-                            recordName: combinedRecordIdRef.info!.linkName!,
-                            record: recordWithCombined[combinedRecordIdRef.info?.attributeName!][LINK_SYMBOL],
-                        })
-                    }
-
-                    // 相当于新建了关系。如果不是虚拟link 就要记录。
-                        // TODO 要给出一个明确的 虚拟 link  record 的差异
-                    if (!combinedRecordIdRef.info!.isLinkSourceRelation()){
-                        result[combinedRecordIdRef.info?.attributeName!][LINK_SYMBOL] = {
-                            id: await this.database.getAutoId(combinedRecordIdRef.info!.linkName!),
+        // if (recordsWithCombined.length === 1 && !recordsWithCombined[0].id) {
+        //     // 说明 combined 数据已经有了，而且还是同一行，并且和当前的 new record 不冲突，
+        //     // TODO
+        //     debugger
+        // } else {
+            // 开始 merge 数据，并记录 unLink 事件
+            for(let recordWithCombined of recordsWithCombined) {
+                for(let combinedRecordIdRef of newEntityData.combinedRecordIdRefs) {
+                    if (recordWithCombined[combinedRecordIdRef.info?.attributeName!]) {
+                        // merge 数据
+                        assert(!result[combinedRecordIdRef.info?.attributeName!], `should not have same combined record, conflict attribute: ${combinedRecordIdRef.info?.attributeName!}`)
+                        result[combinedRecordIdRef.info?.attributeName!] = {
+                            ...recordWithCombined[combinedRecordIdRef.info?.attributeName!]
                         }
-                        events?.push({
-                            type:'create',
-                            recordName:combinedRecordIdRef.info!.linkName,
-                            record: result[combinedRecordIdRef.info?.attributeName!][LINK_SYMBOL]
-                        })
+
+                        // 删掉 combined 原来的所有同行数据
+                        await this.deleteRecordSameRowData(combinedRecordIdRef.recordName, [{id: recordWithCombined[combinedRecordIdRef.info?.attributeName!].id}])
+
+                        // 如果是抢夺，要记录一下事件。
+                        if(recordWithCombined.id) {
+                            events?.push({
+                                type: 'delete',
+                                recordName: combinedRecordIdRef.info!.linkName!,
+                                record: recordWithCombined[combinedRecordIdRef.info?.attributeName!][LINK_SYMBOL],
+                            })
+                        }
+
+                        // 相当于新建了关系。如果不是虚拟link 就要记录。
+                        // TODO 要给出一个明确的 虚拟 link  record 的差异
+                        if (!combinedRecordIdRef.info!.isLinkSourceRelation()){
+                            result[combinedRecordIdRef.info?.attributeName!][LINK_SYMBOL] = {
+                                id: await this.database.getAutoId(combinedRecordIdRef.info!.linkName!),
+                            }
+                            events?.push({
+                                type:'create',
+                                recordName:combinedRecordIdRef.info!.linkName,
+                                record: result[combinedRecordIdRef.info?.attributeName!][LINK_SYMBOL]
+                            })
+                        }
                     }
                 }
             }
-        }
+        // }
 
         return result
     }
@@ -865,8 +873,7 @@ WHERE ${idField} = (${JSON.stringify(idRef.id)})
         // CAUTION  因为需要事件，所以找到的数据里面就要带上 newRecordData 里面的所有字段作为 oldValues。
         const matchedEntities = await this.findRecords(RecordQuery.create(entityName, this.map, {
             matchExpression: matchExpressionData,
-            // FIXME 这里其实只要查 newEntityData 里面有的字段就可以了。
-            attributeQuery: AttributeQuery.getAttributeQueryDataForRecord(entityName, this.map, true, true)
+            attributeQuery: AttributeQuery.getAttributeQueryDataForRecord(entityName, this.map, true, true, true, true)
         }), `find record for updating ${entityName}`)
 
         const result: Record[] = []
@@ -931,7 +938,7 @@ WHERE ${idField} = (${JSON.stringify(idRef.id)})
                             modifier: {limit: 1}
                         }
                     )
-                    const result = await this.findRecords(existQuery)
+                    const result = await this.findRecords(existQuery, `check if has same row data for delete ${recordName}`)
                     return !!result[0]?.[info.attributeName]?.id
                 })
 
@@ -1040,7 +1047,7 @@ WHERE ${recordInfo.idField} IN (${records.map(({id}) => JSON.stringify(id)).join
             modifier: {
                 limit: 1
             }
-        })))[0]
+        }), `check if link exist for add link ${linkName}`))[0]
 
         assert(!existRecord, `cannot create ${linkName} for ${sourceId} ${targetId}, link already exist`)
 
