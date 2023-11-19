@@ -17,7 +17,7 @@ export class RelationCountHandle extends RelationBasedWeightedSummationHandle {
         this.relations = [{relation: computedData.relation, relationDirection: computedData.relationDirection}] as KlassInstance<typeof RelationBasedWeightedSummation, false>["relations"]
     }
     parseMatchRelationFunction(stringContent:string) {
-        return new Function('record', `return (${stringContent})(record) ? 1 : 0`)
+        return new Function('record', 'relation',`return (${stringContent})(record, relation) ? 1 : 0`)
     }
 }
 

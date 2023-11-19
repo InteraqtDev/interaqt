@@ -12,6 +12,8 @@ export class RecordCountHandle extends WeightedSummationHandle {
     parseComputedData(){
         const computedData = this.computedData as  KlassInstance<typeof Count, false>
         this.mapRelationToWeight = this.parseMatchRelationFunction(computedData.matchExpression!).bind(this.controller)
+        // FIXME type
+        // @ts-ignore
         this.records = [computedData.record!]
     }
     parseMatchRelationFunction(stringContent:string) {

@@ -16,10 +16,11 @@ type User = {
     [k:string]: any
 }
 
-describe('map activity', () => {
+describe.only('map interaction', () => {
 
     let system: MonoSystem
     let sendRequestUUID: string
+    let approveRequestUUID: string
     let controller: Controller
 
     let userAId: string
@@ -51,6 +52,7 @@ describe('map activity', () => {
         )
         await controller.setup()
         sendRequestUUID = Interaction.instances!.find(i => i.name === 'sendRequest')!.uuid
+        approveRequestUUID = Interaction.instances!.find(i => i.name === 'approve')!.uuid
 
         const userARef = await system.storage.create('User', {name: 'A', age: 10})
         userAId = userARef.id
@@ -91,7 +93,25 @@ describe('map activity', () => {
         expect(requests1.length).toBe(1)
         expect(requests1[0].to.id).toBe(userBId)
         expect(requests1[0].from.id).toBe(userAId)
-        console.log(requests1)
 
+        // 4. b 接受
+        const payload2 = {
+            request: requests1[0]
+        }
+        const res2 = await controller.callInteraction(approveRequestUUID,  {user: userB, payload: payload2})
+        const requests2 = await controller.system.storage.find(
+            'Request',
+            undefined,
+            undefined,
+            ['*',
+                ['from', {attributeQuery: ["*"]}],
+                ['to', {
+                    attributeQuery: ["*", ["&", {attributeQuery:["*"]}]]
+                }]
+            ]
+        )
+        expect(requests2.length).toBe(1)
+        expect(requests2[0].approved).toBeTruthy()
+        expect(requests2[0].rejected).toBeFalsy()
     })
 })

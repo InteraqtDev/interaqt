@@ -21,7 +21,7 @@ export class ComputedDataHandle {
     public recordName?: string
     public propertyName?: string
     public stateName?: string
-    constructor(public controller: Controller , public computedData: KlassInstance<typeof ComputedData, false> , public dataContext:  DataContext) {
+    constructor(public controller: Controller , public computedData: KlassInstance<any, false> , public dataContext:  DataContext) {
         this.computedDataType = (!dataContext.host && typeof dataContext.id === 'string' )?
             'global' :
             dataContext.id instanceof Entity ?
@@ -84,8 +84,9 @@ export class ComputedDataHandle {
     }
     // parse 用户的 function 等。
     parseComputedData(){
-        this.userComputeEffect = this.parseComputeEffectFunction(this.computedData.computeEffect!)
-        this.userFullCompute = this.parseFullComputeFunction(this.computedData.computation!)
+        const computedData = this.computedData as KlassInstance<typeof ComputedData, false>
+        this.userComputeEffect = this.parseComputeEffectFunction(computedData.computeEffect!)
+        this.userFullCompute = this.parseFullComputeFunction(computedData.computation!)
     }
     // 生成初始值额
     getDefaultValue(newRecordId?: any): any{

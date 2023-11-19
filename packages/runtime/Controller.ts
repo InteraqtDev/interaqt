@@ -76,7 +76,7 @@ export class Controller {
             }
         })
     }
-    addComputedDataHandle(computedData: KlassInstance<typeof ComputedData, false>, host:DataContext["host"], id: DataContext["id"]) {
+    addComputedDataHandle(computedData: KlassInstance<any, false>, host:DataContext["host"], id: DataContext["id"]) {
         const dataContext: DataContext = {
             host,
             id

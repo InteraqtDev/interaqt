@@ -32,7 +32,7 @@ export class SQLiteDB implements Database{
     }
     async query<T extends any>(sql:string, name= '')  {
         console.log(`query==============${name}`)
-        // console.log(sql)
+        console.log(sql)
         return (await this.db.all<T>(sql))
     }
     async update(sql:string, idField?:string, name='') {

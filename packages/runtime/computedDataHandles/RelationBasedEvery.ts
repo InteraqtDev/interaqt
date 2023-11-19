@@ -10,7 +10,7 @@ export class RelationBasedEveryHandle extends ComputedDataHandle {
     matchCountField: string = `${this.propertyName}_match_count`
     totalCountField: string= `${this.propertyName}_total_count`
     setupSchema() {
-        const computedData = this.computedData as KlassInstance<typeof RelationBasedEvery, false>
+        const computedData = this.computedData as unknown as KlassInstance<typeof RelationBasedEvery, false>
         const matchCountField = `${this.propertyName}_match_count`
         const totalCountField = `${this.propertyName}_total_count`
         // 新赠两个 count

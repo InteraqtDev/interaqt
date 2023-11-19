@@ -69,21 +69,24 @@ export class RelationBasedWeightedSummationHandle extends IncrementalComputedDat
     }
 
     parseMapRelationFunction(stringContent:string) {
-        return new Function('record', `return (${stringContent})(record)`)
+        return new Function('record','relation', `return (${stringContent})(record,relation)`)
     }
+    // 这里不管是 relation 的变化，还是 relatedRecord 的变化，都会应该触发相应的 relation 重新计算权重差量
     async computeEffect(mutationEvent: RecordMutationEvent, mutationEvents: RecordMutationEvent[]): Promise<RelationChangeEffect[]|RelatedRecordChangeEffect[]|undefined> {
         const matchedRelation = this.relationInfos.find(({relationName}) => relationName === mutationEvent.recordName)
         if (matchedRelation) {
+            const infoRecord = mutationEvent.type === 'update' ? mutationEvent.oldRecord! : mutationEvent.record!
+            if(!infoRecord[matchedRelation.entityRelationAttribute].id) debugger
             const relationEffects: RelationChangeEffect[] = matchedRelation.isBidirectional ?
                 [
                     {
-                        affectedId: mutationEvent.record!.target.id,
+                        affectedId: infoRecord.target.id,
                         relatedEntityRelationAttribute: 'source',
                         info: matchedRelation,
                         type: 'relation'
                     },
                     {
-                        affectedId: mutationEvent.record!.source.id,
+                        affectedId: infoRecord.source.id,
                         relatedEntityRelationAttribute: 'target',
                         info: matchedRelation,
                         type: 'relation'
@@ -91,7 +94,7 @@ export class RelationBasedWeightedSummationHandle extends IncrementalComputedDat
                 ]:
                 [
                     {
-                        affectedId: mutationEvent.record![matchedRelation.entityRelationAttribute].id,
+                        affectedId: infoRecord[matchedRelation.entityRelationAttribute].id,
                         relatedEntityRelationAttribute: matchedRelation.relatedEntityRelationAttribute,
                         info: matchedRelation,
                         type: 'relation'
@@ -100,6 +103,7 @@ export class RelationBasedWeightedSummationHandle extends IncrementalComputedDat
             return relationEffects
         }
 
+        // 对 relatedRecord 只判断 update 事件就够了
         if (mutationEvent.type === 'update') {
             const matchedRecordRelationInfo = this.relationInfos.find(({toCountEntityName}) => toCountEntityName === mutationEvent.recordName)
             if (matchedRecordRelationInfo) {
@@ -144,11 +148,14 @@ export class RelationBasedWeightedSummationHandle extends IncrementalComputedDat
         // 计算上面的四个值，构建成 isCurrentMatch/isOriginMatch 的计算参数
         // 先找 currentRelationRecord/oldRelationRecord
         if (mutationEvent.recordName === relationName ) {
+
             if (mutationEvent.type === 'create' || mutationEvent.type === 'update' ) {
+                const infoRecord = mutationEvent.type === 'update' ? mutationEvent.oldRecord! : mutationEvent.record!
+
                 currentRelationRecord = await this.controller.system.storage.findOneRelationByName(relationName!, MatchExp.atom({
                     key: 'id',
-                    value: ['=', mutationEvent.record!.id]
-                }), undefined, [[relatedEntityRelationAttribute, { attributeQuery: ['*']}]])
+                    value: ['=', infoRecord.id]
+                }), undefined, ['*', [relatedEntityRelationAttribute, { attributeQuery: ['*']}]])
             }
 
             // 针对 update 判断之前是否满足条件
@@ -210,6 +217,11 @@ export class RelationBasedWeightedSummationHandle extends IncrementalComputedDat
 
         if(currentWeight !== originWeight) {
             // FIXME 改成引用的形式, 例如 “+1” 这样就不用获取上一次的值了 ？storage 要支持，现在好像不支持？？？
+            console.log(111111111111111, this.recordName, this.propertyName, {
+                type: 'update',
+                affectedId: effect.affectedId,
+                value: lastSummation + (currentWeight - originWeight)
+            })
             return {
                 type: 'update',
                 affectedId: effect.affectedId,

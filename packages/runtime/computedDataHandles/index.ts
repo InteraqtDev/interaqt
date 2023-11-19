@@ -1,5 +1,6 @@
 import './MapActivityToEntity'
 import './MapInteractionToRecord'
+import './MapInteractionToProperty'
 import './RelationStateMachine'
 import './RelationBasedWeightedSummation'
 import './RelationCount'
