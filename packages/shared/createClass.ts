@@ -54,8 +54,8 @@ export type KlassMeta = {
 }
 
 
-export function getInstance<T extends Klass<any>>(Type: T){
-    return Type.instances
+export function getInstance<T extends Klass<any>>(Type: T): KlassInstance<T, any >[]{
+    return Type.instances as  KlassInstance<T, any >[]
 }
 
 interface PrimitivePropertyMap {
@@ -157,7 +157,7 @@ export type Klass<T extends NonNullable<KlassMeta["public"]>> = {
     isKlass: true,
     public: T,
     constraints: KlassMeta['constraints'],
-    instances: (ReactiveKlassInstance<T>|InertKlassInstance<T>)[],
+    instances: KlassInstance<Klass<T>, any>[],
     display? : KlassMeta['display']
     stringify: (instance: InertKlassInstance<T>|ReactiveKlassInstance<T>) => string
     parse: () => InertKlassInstance<T>

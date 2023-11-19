@@ -1,6 +1,5 @@
 import {Atom, computed, incPick, incUnique} from 'rata'
-import {createClass, getInstance} from "../createClass";
-import {ComputedData} from "../IncrementalComputation";
+import {createClass, getInstance, Klass, KlassInstance} from "../createClass";
 
 
 export enum PropertyTypes {
@@ -53,7 +52,7 @@ export const Property = createClass({
         computedData: {
             collection: false,
             // CAUTION 这里的具体类型等着外面注册 IncrementalComputationHandle 的时候修补
-            type: [] as unknown as  typeof ComputedData,
+            type: [] as Klass<any>[],
             required: false,
         }
     }
@@ -84,7 +83,7 @@ export const Entity = createClass({
         },
         computedData: {
             // CAUTION 这里的具体类型等着外面注册 IncrementalComputationHandle 的时候修补
-            type: [] as unknown as  typeof ComputedData,
+            type: [] as Klass<any>[],
             collection: false,
             required: false,
         },
@@ -122,6 +121,75 @@ export const PropertyTypeMap = {
     [PropertyTypes.Boolean]: 'boolean',
 }
 
+
+type RelationPublic = {
+    name: {
+        // TODO 是自动根据 entity/attribute 生成的，应该怎么表示？
+        type: 'string',
+        required: false,
+        collection: false,
+        // fixme type
+        computed: (relation: any) => any
+    },
+    entity1: {
+        // source 可以是 Entity 或者 relation
+        // CAUTION 理论上应该改成 Entity 和 Relation 的交集，这里先强行这样实现了
+        type: typeof Entity | Klass<RelationPublic>,
+        required: true,
+        collection: false,
+        options: () => (KlassInstance<typeof Entity, any>|KlassInstance<Klass<RelationPublic>, any>)[]
+    },
+    targetName1: {
+        type: 'string',
+        required: true,
+        collection: false,
+        constraints: {
+            [ruleName: string]: ((thisProp: any, thisEntity: object) => Atom<boolean> | boolean | any[]) | Function | string
+        }
+    }
+    entity2: {
+        type: typeof Entity,
+        required: true,
+        collection: false,
+        options: () => (KlassInstance<typeof Entity, any>|KlassInstance<Klass<RelationPublic>, any>)[]
+    },
+    targetName2: {
+        type: 'string',
+        required: true,
+        collection: false,
+        constraints: {
+            [ruleName: string]: ((thisProp: any, thisEntity: object) => Atom<boolean> | boolean | any[]) | Function | string
+        },
+    }
+    isTargetReliance: {
+        type: 'boolean',
+        required: true,
+        collection:false,
+        defaultValue:() => boolean
+    },
+    relType: {
+        type: 'string',
+        collection: false,
+        required: true,
+        options: () => string[]
+        defaultValue: () => [string]
+    }
+    computedData: {
+        // CAUTION 这里的具体类型等着外面注册 IncrementalComputationHandle 的时候修补
+        type: Klass<any>[],
+        collection: false,
+        required: false,
+    },
+    properties: {
+        type: typeof Property,
+        collection: true,
+        required: true,
+        constraints: {
+            [ruleName: string]: ((thisProp: any, thisEntity: object) => Atom<boolean> | boolean | any[]) | Function | string
+        },
+        defaultValue: () => any[]
+    }
+}
 
 export const Relation = createClass({
     name: 'Relation',
@@ -218,7 +286,7 @@ export const Relation = createClass({
         },
         computedData: {
             // CAUTION 这里的具体类型等着外面注册 IncrementalComputationHandle 的时候修补
-            type: [] as unknown as typeof ComputedData,
+            type: [] as Klass<any>[],
             collection: false,
             required: false,
         },
@@ -245,7 +313,7 @@ export const Relation = createClass({
                 return []
             }
         },
-    }
+    } as RelationPublic
 })
 // CAUTION Relation 可以作为 source
 // FIXME type relation 和 entity 的 public type 最好都单独定义

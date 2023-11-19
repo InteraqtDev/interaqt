@@ -1,4 +1,4 @@
-import { createClass} from "./createClass";
+import {createClass, Klass} from "./createClass";
 import {Activity, Interaction} from "./activity/Activity";
 import {Entity, Property, Relation} from "./entity/Entity";
 import {State} from "./state/State";
@@ -40,6 +40,43 @@ export const MapInteractionToRecord = createClass({
     }
 })
 
+export const MapInteractionToPropertyItem = createClass({
+    name: 'MapInteractionToPropertyItem',
+    public: {
+        interaction: {
+            type: Interaction,
+            collection: false,
+            required: true
+        },
+        value: {
+            type: 'string',
+            collection: false,
+            required: true
+        },
+        computeSource: {
+            type: 'string',
+            collection: false,
+            required: true
+        }
+    }
+})
+
+export const MapInteractionToProperty = createClass({
+    name: 'MapInteractionToProperty',
+    public: {
+        items: {
+            type: MapInteractionToPropertyItem,
+            collection: true,
+            required: true
+        },
+        defaultValue: {
+            type: 'string',
+            collection: false,
+            required: false
+        }
+    }
+})
+
 // CAUTION 修补 Entity computedData 里面的类型
 Entity.public.computedData.type.push(
     MapActivityToEntity as unknown as typeof ComputedData,
@@ -56,7 +93,7 @@ const FixedProperty = createClass({
             required:true
         },
         value: {
-            type: [], // 可以是任何
+            type: [] as Klass<any>[], // 可以是任何
             collection: false,
             required: true,
         }
