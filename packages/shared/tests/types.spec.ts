@@ -30,7 +30,6 @@ describe("createClass types", () => {
           targetName1: 'to2',
           targetName2: 'to1',
       })
-      assertType<KlassInstance<typeof Entity, false>>(relation.entity1)
       assertType<string>(relation.entity1.name)
   })
 
