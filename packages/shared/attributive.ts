@@ -11,7 +11,7 @@ export interface Concept {
 
 export interface DerivedConcept extends Concept {
     base? : Concept,
-    attributive?: UserAttributives,
+    attributive?: any,
 }
 
 export interface ConceptAlias extends Concept {

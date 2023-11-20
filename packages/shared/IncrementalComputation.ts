@@ -112,7 +112,7 @@ export const RelationStateNode = createClass({
         fixedProperties: {
             type: FixedProperty,
             collection: true,
-            required: false
+            required: false,
         },
         propertyHandle: {
             type: 'string',

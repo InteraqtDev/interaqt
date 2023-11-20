@@ -1,6 +1,5 @@
-
 // TODO Role 和 Attributive 合在一起可以变成新的 Role，怎么表示？
-import {createClass, KlassOptions, ReactiveKlassOptions} from "../createClass";
+import {createClass, KlassInstance, KlassOptions, ReactiveKlassOptions} from "../createClass";
 
 export const UserAttributive = createClass({
     name: 'UserAttributive',
@@ -24,13 +23,101 @@ export const UserAttributive = createClass({
     }
 })
 
+
+export const BoolAtomData = createClass({
+    name: 'BoolAtomData',
+    public: {
+        type: {
+            type: 'string',
+            required: true,
+            collection: false,
+            defaultValue: () => 'atom'
+        },
+        data: {
+            type: UserAttributive,
+            required: true,
+            collection: false,
+        }
+    }
+})
+
+
+type UnwrappedBoolExpressionInstanceType = {
+    type: 'expression',
+    operator: 'and' | 'or' | 'not',
+    left: UnwrappedBoolExpressionInstanceType| KlassInstance<typeof BoolAtomData, any>,
+    right?: UnwrappedBoolExpressionInstanceType| KlassInstance<typeof BoolAtomData, any>,
+}
+
+type BoolExpressionDataPublic = {
+    type: {
+        type: 'string',
+        required: true,
+        collection: false,
+        defaultValue: () => 'expression'
+    },
+    operator: {
+        type: 'string',
+        required: true,
+        collection: false,
+        options: ['and', 'or', 'not'],
+        defaultValue: () => 'and'
+    },
+    left: {
+        // type: (typeof BoolAtomData | Klass<BoolExpressionDataPublic>)[],
+        instanceType: (typeof BoolAtomData | UnwrappedBoolExpressionInstanceType),
+        required: true,
+        collection: false,
+    },
+    right: {
+        instanceType: (typeof BoolAtomData | UnwrappedBoolExpressionInstanceType),
+        required: false,
+        collection: false,
+    }
+}
+
+
+export const BoolExpressionData = createClass({
+    name: 'BoolExpressionData',
+    public: {
+        type: {
+            type: 'string',
+            required: true,
+            collection: false,
+            defaultValue: () => 'expression'
+        },
+        operator: {
+            type: 'string',
+            required: true,
+            collection: false,
+            options: ['and', 'or', 'not'],
+            defaultValue: () => 'and'
+        },
+        left: {
+            instanceType: {} as unknown as  (typeof BoolAtomData | UnwrappedBoolExpressionInstanceType),
+            required: true,
+            collection: false,
+        },
+        right: {
+            instanceType: {} as unknown as  (typeof BoolAtomData | UnwrappedBoolExpressionInstanceType),
+            required: false,
+            collection: false,
+        }
+    } as BoolExpressionDataPublic
+})
+
+
+
+
 export const UserAttributives = createClass({
     name: 'UserAttributives',
     display: (obj) => `${obj.name}`,
     public: {
         // CAUTION content 的类型是 BoolExpressionData<UserAttributiveAtom>
         content: {
-            type: 'object',
+            type: [BoolExpressionData, BoolAtomData],
+            collection: false,
+            required: false
         },
     }
 })
