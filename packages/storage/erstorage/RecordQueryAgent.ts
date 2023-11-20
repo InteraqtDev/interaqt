@@ -79,18 +79,29 @@ ${this.buildWhereClause(
         const records = this.structureRawReturns(await this.database.query(this.buildXToOneFindQuery(entityQuery, ''), queryName)) as any[]
 
         // 2. x:1 上的 关系的x:many关联实体 查询
-        // FIXME 没有限制 link.id
         for (let subEntityQuery of entityQuery.attributeQuery.xToOneRecords) {
             // x:1 上的关系
             const subLinkRecordQuery = subEntityQuery.attributeQuery.parentLinkRecordQuery
             if (subLinkRecordQuery) {
                 // 关系上的 xToMany 查询
                 for(let subEntityQueryOfSubLink of subLinkRecordQuery.attributeQuery.xToManyRecords) {
+
+                    const linkRecordAttributeInfo = this.map.getInfo(subEntityQueryOfSubLink.parentRecord!, subEntityQueryOfSubLink.attributeName!)
+                    const linkRecordReverseAttributeName = linkRecordAttributeInfo.getReverseInfo()?.attributeName
+
                     for (let entity of records) {
+                        // 限制 link.id
+                        const linkRecordId = entity[subEntityQuery.attributeName!][LINK_SYMBOL].id
+                        const queryOfThisRecord = subEntityQueryOfSubLink.derive({
+                            matchExpression: subEntityQueryOfSubLink.matchExpression!.and({
+                                key: `${linkRecordReverseAttributeName}.id`,
+                                value: ['=',linkRecordId ]
+                            })
+                        })
                         setByPath(
                             entity,
                             [subEntityQuery.attributeName!, LINK_SYMBOL, subEntityQueryOfSubLink.attributeName!],
-                            await this.findRecords(subEntityQueryOfSubLink, `finding relation data: ${entityQuery.recordName}.${subEntityQuery.attributeName}.&.${subEntityQueryOfSubLink.attributeName}`)
+                            await this.findRecords(queryOfThisRecord, `finding relation data: ${entityQuery.recordName}.${subEntityQuery.attributeName}.&.${subEntityQueryOfSubLink.attributeName}`)
                         )
                     }
                 }
@@ -115,24 +126,21 @@ ${this.buildWhereClause(
         const info = this.map.getInfo(recordName, attributeName)
         const reverseAttributeName = info.getReverseInfo()?.attributeName!
 
-        // FIXME 对 n:N 关联实体的查询中，也可能会引用主实体的值，这个时候值已经是确定的了，应该作为 context 传进来，替换掉原本的 matchExpression
+        // FIXME 对 n:N 关联实体的查询中，也可能会引用主实体的值，例如：age < '$host.age'。这个时候值已经是确定的了，应该作为 context 传进来，替换掉原本的 matchExpression
         const newMatch = relatedRecordQuery.matchExpression.and({
             key: `${reverseAttributeName}.id`,
             // 这里不能用 EXIST，因为 EXIST 会把 join 变成子查询，而我们还需要关系上的数据，不能用子查询
             value: ['=', recordId]
         })
 
-        // FIXME 改成 create 或者 derive ?
-        const newSubQuery = new RecordQuery(
-            relatedRecordQuery.recordName,
-            relatedRecordQuery.map,
-            newMatch,
-            relatedRecordQuery.attributeQuery.parentLinkRecordQuery ?
-                relatedRecordQuery.attributeQuery.withParentLinkData():
-                relatedRecordQuery.attributeQuery,
-            relatedRecordQuery.modifier,
-            relatedRecordQuery.contextRootEntity
-        )
+
+        const newAttributeQuery = relatedRecordQuery.attributeQuery.parentLinkRecordQuery ?
+            relatedRecordQuery.attributeQuery.withParentLinkData():
+            relatedRecordQuery.attributeQuery
+        const newSubQuery = relatedRecordQuery.derive({
+              matchExpression: newMatch,
+              attributeQuery: newAttributeQuery,
+        })
 
 
         // CAUTION 注意这里的第二个参数。因为任何两个具体的实体之间只能有一条关系。所以即使是 n:n 和关系表关联上时，也只有一条关系数据，所以这里可以带上 relation data。
@@ -490,6 +498,7 @@ ${this.buildXToOneFindQuery(existEntityQuery, currentAlias)}
         const newEntityDataWithIds = newEntityData.merge(newRawDataWithNewIds)
 
         // 2. 处理需要 flashOut 的数据
+        // TODO create 的情况下，有没可能不需要 flashout 已有的数据，直接更新到已有的 combined record 的行就行了。
         const flashOutRecordRasData:{[k:string]: RawEntityData} = await this.flashOutCombinedRecordsAndMergedLinks(
             newEntityData,
             events,
@@ -523,49 +532,46 @@ ${this.buildXToOneFindQuery(existEntityQuery, currentAlias)}
 
         const recordsWithCombined = await this.findRecords(recordQuery, reason)
 
-        // if (recordsWithCombined.length === 1 && !recordsWithCombined[0].id) {
-        //     // 说明 combined 数据已经有了，而且还是同一行，并且和当前的 new record 不冲突，
-        //     // TODO
-        //     debugger
-        // } else {
-            // 开始 merge 数据，并记录 unLink 事件
-            for(let recordWithCombined of recordsWithCombined) {
-                for(let combinedRecordIdRef of newEntityData.combinedRecordIdRefs) {
-                    if (recordWithCombined[combinedRecordIdRef.info?.attributeName!]) {
-                        // merge 数据
-                        assert(!result[combinedRecordIdRef.info?.attributeName!], `should not have same combined record, conflict attribute: ${combinedRecordIdRef.info?.attributeName!}`)
-                        result[combinedRecordIdRef.info?.attributeName!] = {
-                            ...recordWithCombined[combinedRecordIdRef.info?.attributeName!]
-                        }
 
-                        // 删掉 combined 原来的所有同行数据
-                        await this.deleteRecordSameRowData(combinedRecordIdRef.recordName, [{id: recordWithCombined[combinedRecordIdRef.info?.attributeName!].id}])
+        // const hasNoConflict = recordsWithCombined.length === 1 && !recordsWithCombined[0].id
+        // 开始 merge 数据，并记录 unLink 事件
+        for(let recordWithCombined of recordsWithCombined) {
+            for(let combinedRecordIdRef of newEntityData.combinedRecordIdRefs) {
+                if (recordWithCombined[combinedRecordIdRef.info?.attributeName!]) {
 
-                        // 如果是抢夺，要记录一下事件。
-                        if(recordWithCombined.id) {
-                            events?.push({
-                                type: 'delete',
-                                recordName: combinedRecordIdRef.info!.linkName!,
-                                record: recordWithCombined[combinedRecordIdRef.info?.attributeName!][LINK_SYMBOL],
-                            })
-                        }
+                    // TODO 如果没有冲突的话，可以不用删除原来的数据。外面直接更新这一行就行了
+                    //1. 删掉 combined 原来的所有同行数据
+                    await this.deleteRecordSameRowData(combinedRecordIdRef.recordName, [{id: recordWithCombined[combinedRecordIdRef.info?.attributeName!].id}])
 
-                        // 相当于新建了关系。如果不是虚拟link 就要记录。
-                        // TODO 要给出一个明确的 虚拟 link  record 的差异
-                        if (!combinedRecordIdRef.info!.isLinkSourceRelation()){
-                            result[combinedRecordIdRef.info?.attributeName!][LINK_SYMBOL] = {
-                                id: await this.database.getAutoId(combinedRecordIdRef.info!.linkName!),
-                            }
-                            events?.push({
-                                type:'create',
-                                recordName:combinedRecordIdRef.info!.linkName,
-                                record: result[combinedRecordIdRef.info?.attributeName!][LINK_SYMBOL]
-                            })
+                    //2. 如果是抢夺，要记录一下事件。
+                    if(recordWithCombined.id) {
+                        events?.push({
+                            type: 'delete',
+                            recordName: combinedRecordIdRef.info!.linkName!,
+                            record: recordWithCombined[combinedRecordIdRef.info?.attributeName!][LINK_SYMBOL],
+                        })
+                    }
+
+                    //3. merge 数据并建立定的关系。
+                    assert(!result[combinedRecordIdRef.info?.attributeName!], `should not have same combined record, conflict attribute: ${combinedRecordIdRef.info?.attributeName!}`)
+                    result[combinedRecordIdRef.info?.attributeName!] = {
+                        ...recordWithCombined[combinedRecordIdRef.info?.attributeName!]
+                    }
+                    // 相当于新建了关系。如果不是虚拟link 就要记录。
+                    // TODO 要给出一个明确的 虚拟 link  record 的差异
+                    if (!combinedRecordIdRef.info!.isLinkSourceRelation()){
+                        result[combinedRecordIdRef.info?.attributeName!][LINK_SYMBOL] = {
+                            id: await this.database.getAutoId(combinedRecordIdRef.info!.linkName!),
                         }
+                        events?.push({
+                            type:'create',
+                            recordName:combinedRecordIdRef.info!.linkName,
+                            record: result[combinedRecordIdRef.info?.attributeName!][LINK_SYMBOL]
+                        })
                     }
                 }
             }
-        // }
+        }
 
         return result
     }
@@ -600,7 +606,7 @@ ${this.buildXToOneFindQuery(existEntityQuery, currentAlias)}
     }
 
     async insertSameRowData(newEntityData: NewRecordData, events?: MutationEvent[]): Promise<EntityIdRef>{
-        // 由于我们可以抢夺别人的关联实体，所以会产生一个 unlink 事件，所以 events 要穿进去。
+        // 由于我们可以抢夺别人的关联实体，所以会产生一个 unlink 事件，所以 events 要传进去。
         const newEntityDataWithIdsWithFlashOutRecords = await this.preprocessSameRowData(newEntityData, false, events)
         // 3. 插入新行。
         const sameRowNewFieldAndValue = newEntityDataWithIdsWithFlashOutRecords.getSameRowFieldAndValue()
@@ -924,22 +930,21 @@ WHERE ${idField} = (${JSON.stringify(idRef.id)})
 
         for(let record of records) {
             if (!inSameRowDataOp) {
-                // FIXME 其实可以利用数据库 select * 来加速，怎么看这个问题？？
-                const hasSameRowData = recordInfo.notRelianceCombined.length && await someAsync(recordInfo.notRelianceCombined, async (info) => {
-                    const existQuery = RecordQuery.create(
-                        recordName,
-                        this.map,
-                        {
-                            matchExpression:MatchExp.atom({
-                                key: `id`,
-                                value: ['=', record.id]
-                            }),
-                            attributeQuery:[[info.attributeName, {attributeQuery: ['id']}]],
-                            modifier: {limit: 1}
-                        }
-                    )
-                    const result = await this.findRecords(existQuery, `check if has same row data for delete ${recordName}`)
-                    return !!result[0]?.[info.attributeName]?.id
+                const recordWithSameRowDataQuery = RecordQuery.create(
+                    recordName,
+                    this.map,
+                    {
+                        matchExpression:MatchExp.atom({
+                            key: `id`,
+                            value: ['=', record.id]
+                        }),
+                        attributeQuery: AttributeQuery.getAttributeQueryDataForRecord(recordName,  this.map, true, true, true, true),
+                        modifier: {limit: 1}
+                    }
+                )
+                const recordWithSameRowData = await this.findRecords(recordWithSameRowDataQuery, `find record with same row data for delete ${recordName}`)
+                const hasSameRowData = recordInfo.notRelianceCombined.some(info => {
+                    return !!recordWithSameRowData[0]?.[info.attributeName]?.id
                 })
 
                 if (hasSameRowData) {
@@ -1083,29 +1088,6 @@ WHERE ${recordInfo.idField} IN (${records.map(({id}) => JSON.stringify(id)).join
 
         return this.deleteRecord(linkName, matchExpressionData, events)
 
-    }
-
-    // FIXME 还有关联的 relation 的 attribute
-    constructAttributeQueryTree(recordName:string, includeAttributes: string[] = []) {
-        const recordInfo = this.map.getRecordInfo(recordName)
-        const valueAttributes: AttributeQueryDataItem[] = recordInfo.valueAttributes.map(info => info.attributeName)
-        const relatedCombinedInfos = includeAttributes.map(r => {
-            return recordInfo.getAttributeInfo(r)
-        })
-        const relatedRecordsAttributeQuery: AttributeQueryDataItem[] = relatedCombinedInfos.map(info => {
-            const linkName = info.getLinkInfo().name
-            const subRecordInfo = info.getRecordInfo()
-            // CAUTION 一定要排除当前的，不然死循环了
-            const subRelatedAttributes = subRecordInfo.combinedRecords.filter(subInfo => {
-                return subInfo.linkName !== linkName
-            }).map(subInfo => subInfo.attributeName)
-
-            return [info.attributeName, {
-                attributeQuery: this.constructAttributeQueryTree(info.getRecordInfo().name, subRelatedAttributes)
-            }] as AttributeQueryDataItem
-        })
-
-        return valueAttributes.concat(relatedRecordsAttributeQuery)
     }
 }
 

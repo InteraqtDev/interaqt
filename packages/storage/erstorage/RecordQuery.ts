@@ -13,7 +13,16 @@ export type RecordQueryData = {
 
 
 export class RecordQuery {
-    static create(recordName: string, map: EntityToTableMap, data: RecordQueryData, contextRootEntity?: string, parentRecord?:string, attributeName?:string, onlyRelationData?: boolean, allowNull = false) {
+    static create(
+        recordName: string,
+        map: EntityToTableMap,
+        data: RecordQueryData,
+        contextRootEntity?: string,
+        parentRecord?:string,
+        attributeName?:string,
+        onlyRelationData?: boolean,
+        allowNull = false
+    ) {
         // CAUTION 因为合表后可能用关联数据匹配到行。
         const inputMatch = new MatchExp(recordName, map, data.matchExpression, contextRootEntity)
         const matchExpression = allowNull ? inputMatch: inputMatch.and({
@@ -30,9 +39,11 @@ export class RecordQuery {
             contextRootEntity,
             parentRecord,
             attributeName,
-            onlyRelationData
+            onlyRelationData,
+            allowNull
         )
     }
+
     constructor(
         public recordName: string,
         public map: EntityToTableMap,
@@ -42,7 +53,8 @@ export class RecordQuery {
         public contextRootEntity?: string,
         public parentRecord?:string,
         public attributeName?:string,
-        public onlyRelationData?:boolean
+        public onlyRelationData?:boolean,
+        public allowNull = false
     ) {}
     getData(): RecordQueryData {
         return {
@@ -50,6 +62,22 @@ export class RecordQuery {
             attributeQuery: this.attributeQuery.data,
             modifier: this.modifier.data
         }
+    }
+    // CAUTION 特别注意这里的参数，不能让用取用原本的 matchExpression, attributeQuery, modifier 里面的 data 传进来。
+    //   因为  data 不能代表一切配置，例如 attributeQuery 里面 还有个 shouldQueryParentLinkData 就是保存在 this 上的。
+    derive({ matchExpression, attributeQuery, modifier } : { matchExpression?: MatchExp, attributeQuery?: AttributeQuery, modifier?: Modifier }) {
+        return new RecordQuery(
+            this.recordName,
+            this.map,
+matchExpression||this.matchExpression,
+attributeQuery||this.attributeQuery,
+     modifier||this.modifier,
+            this.contextRootEntity,
+            this.parentRecord,
+            this.attributeName,
+            this.onlyRelationData,
+            this.allowNull
+        )
     }
 }
 

@@ -528,6 +528,8 @@ describe('many to many', () => {
         // user3 is source
         const relation2 = await handle.addRelationById('User', 'friends', user3.id, user.id, { level: 2 }, events)
 
+        const a = await handle.findRelationByName("User_friends_friends_User", undefined, undefined, ['*'])
+
         const foundUser = await handle.findOne(
             'User',
             MatchExp.atom({ key: 'id', value: ['=', user.id]}), {},
