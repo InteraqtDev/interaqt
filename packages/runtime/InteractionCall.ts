@@ -2,18 +2,10 @@ import {EntityAttributive, EntityAttributives, GetAction, InteractionInstanceTyp
 import {UserAttributive} from "@shared/user/User";
 import {System} from "./System";
 import {InteractionEvent, InteractionEventArgs} from "../types/interaction";
-import {
-    Concept,
-    ConceptAlias,
-    ConceptInstance,
-    DerivedConcept,
-    EntityAttributiveAtom,
-    UserAttributiveAtom,
-    UserAttributives
-} from "@shared/attributive";
+import {Concept, ConceptAlias, ConceptInstance, DerivedConcept,} from "@shared/attributive";
 import {BoolExp, BoolExpressionData} from "@shared/BoolExp";
 import {assert, everyWithErrorAsync} from "./util";
-import {getInstance, Klass, KlassInstance} from "@shared/createClass";
+import {Klass, KlassInstance} from "@shared/createClass";
 import {ActivityCall} from "./AcitivityCall";
 import {someAsync} from "@storage/erstorage/util";
 import {Entity} from "@shared/entity/Entity";
@@ -39,7 +31,7 @@ type AtomError = {
 }
 
 
-export class LoginError{
+export class AttributeError {
     constructor(public type: string, public error: any) {
     }
 }
@@ -54,7 +46,11 @@ export type InteractionCallResponse= {
 }
 
 
-type HandleAttributive = (attributive: UserAttributiveAtom) => Promise<boolean>
+type UserAttributiveAtom = KlassInstance<typeof UserAttributive, false>
+/// FIXME EntityAttributiveAtom 没有 isRole 字段
+type EntityAttributiveAtom =  UserAttributiveAtom
+
+type HandleAttributive = (attributive: KlassInstance<typeof UserAttributive, false>) => Promise<boolean>
 
 type Attributive = {
     stringContent: string,
@@ -89,14 +85,12 @@ export class InteractionCall {
         console.warn(`${attributive.name} not implemented`)
         return true
     }
-    async checkMixedAttributive(attributiveData: UserAttributiveAtom, instance: ConceptInstance) {
+    async checkMixedAttributive(attributiveData: KlassInstance<typeof UserAttributive, false>, instance: ConceptInstance) {
         // const attributiveByName = indexBy((UserAttributive.instances as any[]).concat(Entity.instances), 'name')
         return Promise.resolve(true)
     }
     createHandleAttributive(AttributiveClass: typeof UserAttributive| typeof EntityAttributive, interactionEvent: InteractionEventArgs, target: any) {
-        return (attributiveData: UserAttributiveAtom) => {
-            const instances = getInstance(AttributiveClass) as (KlassInstance<typeof UserAttributive, false> | KlassInstance<typeof EntityAttributive, false>)[]
-            const attributive = instances.find(i => i.name === attributiveData?.key)
+        return (attributive: KlassInstance<typeof UserAttributive, false>) => {
             return this.checkAttributive(attributive, interactionEvent, target)
         }
     }
@@ -107,33 +101,34 @@ export class InteractionCall {
             res = true
         } else {
 
-            let userAttributiveCombined = BoolExp.atom<UserAttributiveAtom>({
-                key: this.interaction.userRoleAttributive!.name as string
-            })
+            let userAttributiveCombined = BoolExp.atom<KlassInstance<typeof UserAttributive, false>>(
+                this.interaction.userRoleAttributive!
+            )
 
             if (this.interaction.userAttributives!.content) {
-                userAttributiveCombined = userAttributiveCombined.and(this.interaction.userAttributives!.content as BoolExpressionData<UserAttributiveAtom>)
+                userAttributiveCombined = userAttributiveCombined.and(this.interaction.userAttributives!.content)
             }
 
-            // FIXME 目前是用名字做索引，因为这个表达是嵌套对象，之后要支持深度的序列化和反序列化才能得到不需要名字索引的数据。
-            const handleAttributive = this.createHandleAttributive(UserAttributive, interactionEvent, interactionEvent.user)
-            res =  await this.checkAttributives(userAttributiveCombined, handleAttributive, [])
+            const checkHandle = (attributive: KlassInstance<typeof UserAttributive, false>) => {
+                return this.checkAttributive(attributive, interactionEvent, interactionEvent.user)
+            }
+            res =  await this.checkAttributives(userAttributiveCombined, checkHandle, [])
         }
 
         if (res === true) return res
 
-        throw new LoginError('check user failed', res)
+        throw new AttributeError('check user failed', res)
     }
     // 用来check attributive 形容的后面的  target 到底是不是那个概念的实例。
-    async checkConcept(instance: ConceptInstance, concept: Concept, attributives?: UserAttributives, stack: ConceptCheckStack[] = []): Promise<ConceptCheckResponse> {
+    async checkConcept(instance: ConceptInstance, concept: Concept, attributives?: BoolExpressionData<KlassInstance<typeof UserAttributive, false>>, stack: ConceptCheckStack[] = []): Promise<ConceptCheckResponse> {
         const currentStack = stack.concat({type: 'concept', values: {attributives, concept}})
 
         const conceptRes = await this.isConcept(instance, concept, currentStack)
         if (conceptRes !== true) return conceptRes
 
         if (attributives) {
-            const handleAttributives = (attributiveData: UserAttributiveAtom) => this.checkMixedAttributive(attributiveData, instance)
-            const attrMatchRes = await this.checkAttributives(new BoolExp<UserAttributiveAtom>(attributives), handleAttributives , currentStack)
+            const handleAttributives = (attributive: KlassInstance<typeof UserAttributive, false>) => this.checkMixedAttributive(attributive, instance)
+            const attrMatchRes = await this.checkAttributives(new BoolExp<KlassInstance<typeof UserAttributive, false>>(attributives), handleAttributives , currentStack)
             if (attrMatchRes !== true) return attrMatchRes
         }
 
@@ -192,7 +187,7 @@ export class InteractionCall {
     isConceptAlias(concept: Concept) {
         return !!(concept as ConceptAlias).for
     }
-    async checkAttributives(attributives: BoolExp<UserAttributiveAtom>, handleAttributive: HandleAttributive, stack: ConceptCheckStack[] = []) : Promise<ConceptCheckResponse>{
+    async checkAttributives(attributives: BoolExp<KlassInstance<typeof UserAttributive, false>>, handleAttributive: HandleAttributive, stack: ConceptCheckStack[] = []) : Promise<ConceptCheckResponse>{
         const result =  await attributives.evaluateAsync(handleAttributive)
         return result === true ? true : {name: '', type: 'matchAttributives', stack, error: result}
     }
@@ -202,23 +197,23 @@ export class InteractionCall {
 
             const payloadItem = interactionEvent.payload![payloadDef.name!]
             if (payloadDef.required && !payloadItem) {
-                throw new LoginError(`payload ${payloadDef.name} missing`, interactionEvent.payload)
+                throw new AttributeError(`payload ${payloadDef.name} missing`, interactionEvent.payload)
             }
 
             if (!payloadItem) return
 
 
             if (payloadDef.isCollection && !Array.isArray(payloadItem)) {
-                throw new LoginError(`${payloadDef.name} data is not array`, payloadItem)
+                throw new AttributeError(`${payloadDef.name} data is not array`, payloadItem)
             }
 
             if (payloadDef.isCollection) {
                 if (payloadDef.isRef && !(payloadItem as {id: string}[]).every(item => !!item.id)) {
-                    throw new LoginError(`${payloadDef.name} data not every is ref`, payloadItem)
+                    throw new AttributeError(`${payloadDef.name} data not every is ref`, payloadItem)
                 }
             } else {
                 if (payloadDef.isRef && !payloadItem.id) {
-                    throw new LoginError(`${payloadDef.name} data is not a ref`, payloadItem)
+                    throw new AttributeError(`${payloadDef.name} data is not a ref`, payloadItem)
                 }
             }
 
@@ -226,12 +221,12 @@ export class InteractionCall {
             if (payloadDef.isCollection) {
                 const result = await everyWithErrorAsync(payloadItem,(item => this.checkConcept(item, payloadDef.base as KlassInstance<typeof Entity, false>)))
                 if (result! == true) {
-                    throw new LoginError(`${payloadDef.name} check concept failed`, result)
+                    throw new AttributeError(`${payloadDef.name} check concept failed`, result)
                 }
             } else {
                 const result = await this.checkConcept(payloadItem, payloadDef.base as KlassInstance<typeof Entity, false>)
                 if (result !== true) {
-                    throw new LoginError(`${payloadDef.name} check concept failed`, result)
+                    throw new AttributeError(`${payloadDef.name} check concept failed`, result)
                 }
             }
 
@@ -256,7 +251,7 @@ export class InteractionCall {
                     }))
 
                     if (result !== true) {
-                        throw new LoginError(`${payloadDef.name} not every item match attribute`, payloadItem)
+                        throw new AttributeError(`${payloadDef.name} not every item match attribute`, payloadItem)
                     }
                 } else {
                     const handleAttribute = this.createHandleAttributive(
@@ -266,7 +261,7 @@ export class InteractionCall {
                     )
                     const result = await this.checkAttributives(attributives, handleAttribute)
                     if (result !== true ) {
-                        throw new LoginError(`${payloadDef.name} not match attributive`, payloadItem)
+                        throw new AttributeError(`${payloadDef.name} not match attributive`, { payload: payloadItem, result})
                     }
                 }
             }

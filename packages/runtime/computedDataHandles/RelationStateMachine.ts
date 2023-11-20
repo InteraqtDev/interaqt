@@ -127,7 +127,7 @@ export class RelationStateMachineHandle extends ComputedDataHandle {
                             await this.controller.system.storage.removeRelationByName(relationName, MatchExp.atom(matchExp))
                         } else {
                             // TODO 除了 fixedProperties 还有 propertyHandle 来计算 动态的 property
-                            const nextAttributes = Object.fromEntries(nextState.fixedProperties!.map(p => ([p.name, p.value])))
+                            const nextAttributes = Object.fromEntries(nextState.fixedProperties?.map(p => ([p.name, p.value])) || [])
                             await this.controller.system.storage.updateRelationByName(relationName, MatchExp.atom(matchExp), nextAttributes)
                         }
                     }
@@ -138,7 +138,7 @@ export class RelationStateMachineHandle extends ComputedDataHandle {
                     if (!matchedRelation) {
                         // 没有数据才说明匹配
                         // 转移 变成有
-                        const nextAttributes = Object.fromEntries(nextState.fixedProperties!.map(p => ([p.name, p.value])))
+                        const nextAttributes = Object.fromEntries(nextState.fixedProperties?.map(p => ([p.name, p.value])) || [])
                         await this.controller.system.storage.addRelationByNameById(relationName, sourceRef.id, targetRef.id, nextAttributes)
                     } else {
                     }

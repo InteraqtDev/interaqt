@@ -32,22 +32,22 @@ export class SQLiteDB implements Database{
     }
     async query<T extends any>(sql:string, name= '')  {
         console.log(`query==============${name}`)
-        console.log(sql)
+        // console.log(sql)
         return (await this.db.all<T>(sql))
     }
     async update(sql:string, idField?:string, name='') {
         console.log(`update=============${name}`)
-        console.log(sql)
+        // console.log(sql)
         return (await this.db.run(`${sql} RETURNING ${ROW_ID_ATTR} ${idField ? `, ${idField} AS id`: ''}`))  as unknown as any[]
     }
     async insert (sql:string, name='')  {
         console.log(`insert==============${name}`)
-        console.log(`${sql} RETURNING ${ROW_ID_ATTR}`)
+        // console.log(`${sql} RETURNING ${ROW_ID_ATTR}`)
         return (await this.db.run(`${sql} RETURNING ${ROW_ID_ATTR}`)) as unknown as EntityIdRef
     }
     async delete (sql:string, name='') {
         console.log(`delete==============${name}`)
-        console.log(sql)
+        // console.log(sql)
         return (await this.db.run(sql) ) as unknown as  any[]
     }
     scheme(sql: string) {

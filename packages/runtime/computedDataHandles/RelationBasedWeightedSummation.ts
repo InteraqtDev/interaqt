@@ -217,11 +217,6 @@ export class RelationBasedWeightedSummationHandle extends IncrementalComputedDat
 
         if(currentWeight !== originWeight) {
             // FIXME 改成引用的形式, 例如 “+1” 这样就不用获取上一次的值了 ？storage 要支持，现在好像不支持？？？
-            console.log(111111111111111, this.recordName, this.propertyName, {
-                type: 'update',
-                affectedId: effect.affectedId,
-                value: lastSummation + (currentWeight - originWeight)
-            })
             return {
                 type: 'update',
                 affectedId: effect.affectedId,

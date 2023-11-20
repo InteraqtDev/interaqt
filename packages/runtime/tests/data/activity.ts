@@ -269,12 +269,7 @@ if (!sendRequestEvent) {
 }
 
 const handled = !!stack.find(i => i.interaction.name === 'approve' || i.interaction.name === 'reject')
-        console.log(11111111111, {
-    from: sendRequestEvent.data.user,
-    to: sendRequestEvent.data.payload.to,
-    message: sendRequestEvent.data.payload.message,
-    handled,
-})
+        
 return {
     from: sendRequestEvent.data.user,
     to: sendRequestEvent.data.payload.to,

@@ -8,6 +8,7 @@ import { Entity, Relation } from "@shared/entity/Entity";
 import { State } from "@shared/state/State";
 import '../computedDataHandles/index'
 import {MatchExp} from '@storage/erstorage/MatchExp'
+import {AttributeError} from "../InteractionCall";
 
 // 里面有所有必须的数据？
 type User = {
@@ -25,6 +26,7 @@ describe.only('map interaction', () => {
 
     let userAId: string
     let userBId: string
+    let userCId: string
     beforeEach(async () => {
         removeAllInstance()
         const {data} = (await import('./data/leaveRequest'))
@@ -59,9 +61,12 @@ describe.only('map interaction', () => {
 
         const userBRef = await system.storage.create('User', {name: 'B', age: 12})
         userBId = userBRef.id
+
+        const userCRef = await system.storage.create('User', {name: 'C', age: 14})
+        userCId = userCRef.id
     })
 
-    test('map interaction to relation', async () => {
+    test.only('map interaction to relation', async () => {
         // 0. 验证初始数据
         const userA: User = {
             ...await system.storage.findOne('User', MatchExp.atom({
@@ -75,6 +80,14 @@ describe.only('map interaction', () => {
             ...await system.storage.findOne('User', MatchExp.atom({
                 key: 'id',
                 value: ['=', userBId]
+            }), undefined, ['*']),
+            roles: ['user']
+        }
+
+        const userC: User = {
+            ...await system.storage.findOne('User', MatchExp.atom({
+                key: 'id',
+                value: ['=', userCId]
             }), undefined, ['*']),
             roles: ['user']
         }
@@ -93,6 +106,17 @@ describe.only('map interaction', () => {
         expect(requests1.length).toBe(1)
         expect(requests1[0].to.id).toBe(userBId)
         expect(requests1[0].from.id).toBe(userAId)
+
+        // 4. 错误 C 接受
+        const _payload2 = {
+            request: requests1[0]
+        }
+
+
+        // should throw
+        const _res2 = await controller.callInteraction(approveRequestUUID,  {user: userC, payload: _payload2})
+        expect(_res2.error).toBeInstanceOf(AttributeError)
+        // FIXME 获取 userAttribute error 信息
 
         // 4. b 接受
         const payload2 = {

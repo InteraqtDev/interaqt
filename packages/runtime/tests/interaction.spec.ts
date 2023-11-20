@@ -1,5 +1,5 @@
 import {describe, test, expect, beforeEach} from "vitest";
-import {InteractionCall, LoginError} from "../InteractionCall";
+import {InteractionCall, AttributeError} from "../InteractionCall";
 import { MonoSystem } from "../MonoSystem";
 import {createInstances, getInstance, KlassByName, KlassInstance, removeAllInstance} from "@shared/createClass";
 
@@ -55,7 +55,7 @@ describe("interaction",  () => {
         const response = await interactionCall.call(event)
 
         expect(response.error).toBeDefined()
-        expect(response.error instanceof LoginError).toBe(true)
+        expect(response.error instanceof AttributeError).toBe(true)
         expect(response.error.type).toBe('check user failed')
     })
 
