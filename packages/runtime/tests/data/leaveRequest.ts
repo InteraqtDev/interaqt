@@ -4,6 +4,7 @@ import {OtherAttr} from "./roles";
 import {Entity, Property, PropertyTypes, Relation} from "@shared/entity/Entity";
 
 import {
+    ComputedData,
     MapInteractionToProperty,
     MapInteractionToPropertyItem,
     MapInteractionToRecord,
@@ -327,7 +328,37 @@ RequestEntity.properties.push(Property.create({
         }
 `
     })
-})
+}), Property.create({
+        name: 'result',
+        type: 'string',
+        collection: false,
+        computedData: ComputedData.create({
+            computeEffect: `
+        (mutationEvent) => {
+            if(
+                mutationEvent.type === 'update' 
+                && 
+                mutationEvent.recordName === 'Request' &&
+                (mutationEvent.record.approved !== undefined || mutationEvent.record.rejected !== undefined)
+            ){
+                return mutationEvent.oldRecord.id
+            }
+        
+        }
+        `,
+            computation:`
+        async (requestId) => {
+            const match = this.system.storage.queryHandle.createMatchFromAtom({
+                key: 'id', 
+                value: ['=', requestId]
+            })
+            
+            const request = await this.system.storage.findOne('Request', match, undefined, ['approved', 'rejected'])
+            return request.approved ? 'approved' : (request.rejected ? 'rejected' : 'pending')
+        }
+`
+        })
+    })
 )
 
 export const data = JSON.parse(stringifyAllInstances())

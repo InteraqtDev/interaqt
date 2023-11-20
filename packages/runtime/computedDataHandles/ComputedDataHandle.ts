@@ -12,12 +12,15 @@ export type DataContext = {
     id: KlassInstance<typeof Entity, false>| KlassInstance<typeof Relation, false>| KlassInstance<typeof Property, false>|string
 }
 
+export type ComputedEffect = any
+
+export type ComputeEffectResult= ComputedEffect|ComputedEffect[]|undefined
 
 export class ComputedDataHandle {
     public static  Handles: Map<Klass<any>,  typeof ComputedDataHandle> = new Map()
     computedDataType: 'global' | 'entity' | 'relation' | 'property'
-    userComputeEffect: (mutationEvent: any, mutationEvents: any) => any = () => true
-    userFullCompute: (...args: any[]) => Promise<any> = () => Promise.resolve(true)
+    userComputeEffect!: (mutationEvent: any, mutationEvents: any) => Promise<ComputeEffectResult>|ComputeEffectResult
+    userFullCompute!: (...args: any[]) => Promise<any>
     public recordName?: string
     public propertyName?: string
     public stateName?: string
@@ -69,24 +72,16 @@ export class ComputedDataHandle {
         })
     }
     parseComputeEffectFunction(stringContent: string) {
-        const body = new Function('sourceData', `return (${stringContent})(sourceData)`)
-
-        return (sourceData: DataContext[]) => {
-            return body(sourceData)
-        }
+        return new Function('sourceData', `return (${stringContent})(sourceData)`)
     }
     parseFullComputeFunction(stringContent: string) {
-        const body = new Function('sourceData', `return (${stringContent})(sourceData)`)
-
-        return (sourceData: DataContext[]) => {
-            return body(sourceData)
-        }
+        return new Function('sourceData', `return (${stringContent})(sourceData)`)
     }
     // parse 用户的 function 等。
     parseComputedData(){
         const computedData = this.computedData as KlassInstance<typeof ComputedData, false>
-        this.userComputeEffect = this.parseComputeEffectFunction(computedData.computeEffect!)
-        this.userFullCompute = this.parseFullComputeFunction(computedData.computation!)
+        this.userComputeEffect = this.parseComputeEffectFunction(computedData.computeEffect!).bind(this.controller)
+        this.userFullCompute = this.parseFullComputeFunction(computedData.computation!).bind(this.controller)
     }
     // 生成初始值额
     getDefaultValue(newRecordId?: any): any{
@@ -96,8 +91,8 @@ export class ComputedDataHandle {
             return this.userFullCompute(newRecordId)
         }
     }
-    insertDefaultPropertyValue(newRecord: any) {
-        const defaultValue = this.getDefaultValue(newRecord.id)
+    async insertDefaultPropertyValue(newRecord: any) {
+        const defaultValue = await this.getDefaultValue(newRecord.id)
         const match = MatchExp.atom({key: 'id', value: ['=', newRecord.id]})
         return this.controller.system.storage.update(this.recordName!, match, {[this.propertyName!]: defaultValue})
     }
@@ -108,15 +103,24 @@ export class ComputedDataHandle {
         // 返回受影响的信息，如果当前是实体的某个属性，那么就是 ids. 如果是全局的，那么就是 true
         return this.userComputeEffect(mutationEvent, mutationEvents)
     }
-    async recompute(effect: any, mutationEvent: RecordMutationEvent, mutationEvents: RecordMutationEvent[]) {
+    async recompute(effectResult: ComputeEffectResult, mutationEvent: RecordMutationEvent, mutationEvents: RecordMutationEvent[]) {
         if (this.computedDataType === 'global' || this.computedDataType === 'entity' || this.computedDataType === 'relation') {
             const newValue = await this.userFullCompute()
             await this.updateState(true, newValue)
         } else if (this.computedDataType === 'property'){
-            const affectedRecordIds = Array.isArray(effect) ? effect : [effect]
-            for(let id of affectedRecordIds){
-                const newValue = await this.userFullCompute(id)
-                await this.updateState(id, newValue)
+            const effects: ComputedEffect[] = Array.isArray(effectResult!) ? effectResult! : [effectResult!]
+            for(let effect of effects){
+                const newValue = await this.userFullCompute(effect)
+
+                if (mutationEvent.recordName === this.recordName && mutationEvent.type === 'update') {
+                    const oldValue = mutationEvent.oldRecord![this.propertyName!]
+                    // CAUTION 特别注意这里是不是严格相等，因为数据库的值可能是 1 而不是 true
+                    if (oldValue != newValue) {
+                        await this.updateState(effect, newValue)
+                    }
+                } else {
+                    await this.updateState(effect, newValue)
+                }
             }
         }
     }
@@ -136,3 +140,5 @@ export class ComputedDataHandle {
         }
     }
 }
+
+ComputedDataHandle.Handles.set(ComputedData, ComputedDataHandle)

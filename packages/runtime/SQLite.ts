@@ -37,7 +37,7 @@ export class SQLiteDB implements Database{
     }
     async update(sql:string, idField?:string, name='') {
         console.log(`update=============${name}`)
-        // console.log(sql)
+        console.log(sql)
         return (await this.db.run(`${sql} RETURNING ${ROW_ID_ATTR} ${idField ? `, ${idField} AS id`: ''}`))  as unknown as any[]
     }
     async insert (sql:string, name='')  {

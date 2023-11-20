@@ -66,7 +66,7 @@ describe.only('map interaction', () => {
         userCId = userCRef.id
     })
 
-    test.only('map interaction to relation', async () => {
+    test('map interaction to relation', async () => {
         // 0. 验证初始数据
         const userA: User = {
             ...await system.storage.findOne('User', MatchExp.atom({
@@ -106,6 +106,8 @@ describe.only('map interaction', () => {
         expect(requests1.length).toBe(1)
         expect(requests1[0].to.id).toBe(userBId)
         expect(requests1[0].from.id).toBe(userAId)
+        expect(requests1[0].result).toBe('pending')
+
 
         // 4. 错误 C 接受
         const _payload2 = {
@@ -137,5 +139,6 @@ describe.only('map interaction', () => {
         expect(requests2.length).toBe(1)
         expect(requests2[0].approved).toBeTruthy()
         expect(requests2[0].rejected).toBeFalsy()
+        expect(requests2[0].result).toBe('approved')
     })
 })

@@ -1,4 +1,4 @@
-import {createUserRoleAttributive, UserAttributive, UserAttributives} from "@shared/user/User";
+import {BoolAtomData, createUserRoleAttributive, UserAttributive, UserAttributives} from "@shared/user/User";
 import {
     Action,
     Activity,
@@ -51,12 +51,7 @@ export const sendInteraction = Interaction.createReactive({
             PayloadItem.createReactive({
                 name: 'to',
                 attributives: UserAttributives.createReactive({
-                    content: {
-                        type:'atom',
-                        data: {
-                            key: OtherAttr.name
-                        }
-                    }
+                    content: BoolAtomData.create({data: OtherAttr})
                 }),
                 base: globalUserRole,
                 itemRef: userRefB
@@ -170,12 +165,7 @@ export const deleteInteraction = Interaction.createReactive({
             PayloadItem.createReactive({
                 name: 'target',
                 attributives: UserAttributives.createReactive({
-                    content: {
-                        type: 'atom',
-                        data: {
-                            key:MyFriend.name
-                        }
-                    }
+                    content: BoolAtomData.create({data: MyFriend})
                 }),
                 base: globalUserRole,
                 isRef: true,
