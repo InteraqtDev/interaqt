@@ -191,6 +191,28 @@ export function createInstancesFromString(objStr: string) {
     return createInstances(objects)
 }
 
+function parseInstanceProp(propValue: string, propType: string, propName: string) {
+    const propValueType = (propValue as string).slice(0, 6)
+    const propValueStr = (propValue as string).slice(6, Infinity)
+    if( propValueType === 'func::') {
+        assert(propType === 'function', `prop ${propName} should be ${propType}, but got ${propValue}`)
+        return {
+            type: 'function',
+            value: (new Function(`return (${propValueStr})`))()
+        }
+    } else if(propValueType === 'uuid::'){
+        // uuid 的情况
+        return {
+            type: 'uuid',
+            value: propValueStr
+        }
+    } else {
+
+        throw new Error(`unknown data type ${propValueType}`)
+    }
+}
+
+
 export function createInstances(objects: KlassRawInstanceDataType[], reactiveForce?: boolean) {
     const uuidToInstance = new Map<string, InertKlassInstance<any>|ReactiveKlassInstance<any>>()
     const unsatisfiedInstances = new Map<InertKlassInstance<any>|ReactiveKlassInstance<any>, object>()
@@ -209,42 +231,38 @@ export function createInstances(objects: KlassRawInstanceDataType[], reactiveFor
 
             const propType = Klass.public[propName].type
 
-            // if (propType !== 'string' && typeof propValue === 'string' ) {
-            //     // const propValueType = (propValue as string).slice(0, 6)
-            //     // const propValueStr = (propValue as string).slice(6, Infinity)
-            //     // if( propValueType === 'func::') {
-            //     //     publicProps[propName] = (new Function(`return (${propValueStr})`))()
-            //     // } else if(propValueType === 'uuid::'){
-            //     //     // uuid 的情况
-            //     //     publicProps[propName] = propValueStr
-            //     //     unsatisfiedProps[propName] = (propValue as string).slice(6, Infinity)
-            //     // } else {
-            //     //     throw new Error(`unknown data type ${propValueType}`)
-            //     // }
-            //
-            // } else {
-            //     publicProps[propName] = propValue
-            // }
+            const hasStringValue =  (typeof propValue === 'string'|| Array.isArray(propValue) && (propValue as any[]).some(i => typeof i === 'string'))
+            // 不应该是 string 类型，但是却是 string 类型的情况，说名是被序列化了。
+            if (propType !== 'string' && hasStringValue) {
+                if(Array.isArray(propValue)) {
+                    publicProps[propName] = [] as any[]
 
-            // FIXME 条件判断不对
-            // // 除了type 表明了不是 uuid 的情况，其他全部当成可能是 uuid 的情况
-            publicProps[propName] = propValue
-            if (propType === 'function') {
-                publicProps[propName] = (new Function(`return (${propValue})`))()
-            } else {
-                if (!(typeof propType === 'string' ||
-                    Array.isArray(propType) && propType.every(k => typeof k === 'string'))
-                ) {
-                    unsatisfiedProps[propName] = propValue
+                    (propValue as any[]).forEach((propValueItem, index) => {
+                        if (typeof propValueItem === 'string') {
+                            const { type, value } = parseInstanceProp(propValueItem, propType, propName)
+                            publicProps[propName][index] = value
+                            if (type === 'uuid') {
+                                unsatisfiedProps[`${propName}.${index}`] = value
+                            }
+                        } else {
+                            publicProps[propName][index] = propValueItem
+                        }
+                    })
+                } else {
+                    const { type, value } = parseInstanceProp(propValue, propType, propName)
+                    publicProps[propName] = value
+                    if (type === 'uuid') {
+                        unsatisfiedProps[propName] = value
+                    }
                 }
+            } else {
+                publicProps[propName] = propValue
             }
+
+            if (propName === 'transfers' && typeof propValue == 'string' && /^uuid/.test(propValue)  ) debugger
         })
 
-
-        //
-
         const instance = new Klass(publicProps, optionsWithUUID)
-        // FIXME 根据 option + reactiveForce 共同判断
         uuidToInstance.set(uuid, instance)
 
         if (Object.keys(unsatisfiedProps).length) {
@@ -253,24 +271,25 @@ export function createInstances(objects: KlassRawInstanceDataType[], reactiveFor
     })
 
     for(let [instance, unsatisfiedProps] of unsatisfiedInstances) {
-        Object.entries(unsatisfiedProps).forEach(([rawPropName, propValue]) => {
-            const propName = rawPropName as keyof typeof instance
-            // TODO 这里要不要做更加严格的校验，防止真的出现了 value 的值刚好就和 uuid 匹配上了？
-            const refs = Array.isArray(propValue) ? propValue.map(maybeUUID => (uuidToInstance.get(maybeUUID)||maybeUUID)) : (uuidToInstance.get(propValue)||propValue)
+        Object.entries(unsatisfiedProps).forEach(([rawPropName, uuid]) => {
+            const Klass = instance.constructor as Klass<any>
+            const [propNameStr, indexStr] = rawPropName.split('.')
+            const propName = propNameStr as keyof typeof instance
+            const isCollection = Klass.public[propName].collection
 
             // CAUTION 这里如果是 reactive 的默认一定有 reactive 的值。那么用 reactive 的方式
-            if (instance._options.isReactive) {
-                if (Array.isArray(propValue)) {
-                    // @ts-ignore
-                    (instance[propName] as InertKlassInstance<any>[]).splice(0, Infinity, ...(refs as InertKlassInstance<any>[]))
+            const  ref = uuidToInstance.get(uuid)!
+            assert(!!ref, `can not find instance ${uuid} for ${instance.constructor.name}.${propName as string}`)
+
+            if (isCollection) {
+                (instance[propName]! as any[])[parseInt(indexStr, 10)] = ref
+            } else {
+                if (instance._options.isReactive) {
+                    (instance[propName] as Atom)(ref)
                 } else {
                     // @ts-ignore
-                    (instance[propName] as Atom)(refs)
+                    instance[propName] = ref
                 }
-            } else {
-                // FIXME type
-                // @ts-ignore
-                instance[propName] = refs
             }
         })
     }
@@ -295,11 +314,11 @@ export function stringifyInstance(obj: InertKlassInstance<any>) {
 //  之前测试数据也都要改成这种格式
 export function stringifyAttribute(obj: any) {
     if (typeof obj === 'function') {
-        // return `func::${obj.toString()}`
-        return `${obj.toString()}`
+        return `func::${obj.toString()}`
+        // return `${obj.toString()}`
     } else if((isObject(obj) && !isPlainObject(obj))) {
-        // return `uuid::${(obj as InertKlassInstance<any>).uuid}`
-        return `${(obj as InertKlassInstance<any>).uuid}`
+        return `uuid::${(obj as InertKlassInstance<any>).uuid}`
+        // return `${(obj as InertKlassInstance<any>).uuid}`
     } else {
         return obj
     }
