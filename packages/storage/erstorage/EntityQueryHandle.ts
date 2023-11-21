@@ -46,6 +46,7 @@ export class EntityQueryHandle {
     // CAUTION 不能递归更新 relate entity 的 value，如果传入了 related entity 的值，说明是建立新的联系。
     async update(entity: string, matchExpressionData: MatchExpressionData, rawData: RawEntityData, events?: MutationEvent[]) {
         const newEntityData = new NewRecordData(this.map, entity, rawData)
+        if (entity === 'Request' && rawData.approved)  debugger
         return this.agent.updateRecord(entity, matchExpressionData, newEntityData, events)
     }
 

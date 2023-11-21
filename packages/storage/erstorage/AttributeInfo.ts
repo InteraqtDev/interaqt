@@ -17,6 +17,15 @@ export class AttributeInfo {
         return !(this.data as RecordAttribute).isRecord
     }
 
+    get isComputed() {
+        return this.isValue && (this.data as ValueAttribute).computed
+    }
+
+    get computed() {
+        if (!this.isComputed) throw new Error('not a computed attribute')
+        return (this.data as ValueAttribute).computed
+    }
+
     get isManyToOne() {
         if (!this.isRecord) throw new Error('not a entity')
         const data = (this.data as RecordAttribute)

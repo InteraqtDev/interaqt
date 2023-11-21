@@ -121,13 +121,32 @@ export class NewRecordData {
         return {...this.rawData} as Record
     }
 
-    getSameRowFieldAndValue() : {field:string, value:any}[]{
-        // 自身的 attribute
-        const result: {field:string, value:any}[] = this.valueAttributes.map((info) => ({
-            field: info.field!,
-            value: this.rawData[info.attributeName]!
-        }))
+    getSameRowFieldAndValue(oldRecord: Omit<Record, 'id'> = {}) : {field:string, value:any}[]{
 
+        const newRecord = {...oldRecord, ...this.rawData}
+
+        const result: {field:string, value:any}[] = this.valueAttributes.map((info) => {
+            const value = info.isComputed ? info.computed!({...this.rawData, ...oldRecord}) : this.rawData[info.attributeName]
+            return {
+                field: info.field!,
+                value
+            }
+        })
+
+        // CAUTION 因为我们没有标记 computed 依赖于哪些字段，所以任何字段的变化这里都要把 computed attribute 重新计算一遍。
+        // CAUTION 只有更新自己的字段和递归更新三表合一的字段是需要岛上 oldRecord 的。因为我们只允许递归更新三表合一的 record。
+        const recordInfo = this.map.getRecordInfo(this.recordName)
+        recordInfo.valueAttributes.forEach(info => {
+            if (info.isComputed) {
+                const newValue = info.computed!(newRecord)
+                if (newValue !== oldRecord[info.attributeName]) {
+                    result.push({
+                        field: info.field!,
+                        value: newValue
+                    })
+                }
+            }
+        })
 
         // source/target 里面记录的 id
         this.entityIdAttributes.forEach(info => {
@@ -156,12 +175,12 @@ export class NewRecordData {
 
         // 三表合一的数据
         this.combinedNewRecords.concat(this.combinedRecordIdRefs).forEach(combinedNewRecord => {
-            result.push(...combinedNewRecord.getSameRowFieldAndValue())
+            result.push(...combinedNewRecord.getSameRowFieldAndValue(oldRecord[combinedNewRecord.info?.attributeName!]))
             if (combinedNewRecord.linkRecordData) {
-                result.push(...combinedNewRecord.linkRecordData.getSameRowFieldAndValue())
+                // CAUTION 外部 updateRecord 声明了只有三表合一的数据允许递归更新。所以也要带上 oldRecord，因为 related record 能也有 computed attribute。
+                result.push(...combinedNewRecord.linkRecordData.getSameRowFieldAndValue(oldRecord[combinedNewRecord.info?.attributeName!]?.[LINK_SYMBOL]))
             }
         })
-
 
         return result
     }

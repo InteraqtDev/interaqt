@@ -790,7 +790,7 @@ WHERE ${idField} = (${JSON.stringify(idRef.id)})
 
         // 2. 分配 id,处理需要 flash out 的数据等，事件也是这里面记录的。这里面会有抢夺关系，所以也可能会有删除事件。
         const newEntityDataWithIdsWithFlashOutRecords = await this.preprocessSameRowData(newEntityDataWithDep, true, events, matchedEntity)
-        const allSameRowData = newEntityDataWithIdsWithFlashOutRecords.getSameRowFieldAndValue()
+        const allSameRowData = newEntityDataWithIdsWithFlashOutRecords.getSameRowFieldAndValue(matchedEntity)
         const columnAndValue = allSameRowData.map(({field, value}: {field:string, value:string}) => (
             {
                 field,
@@ -871,7 +871,7 @@ WHERE ${idField} = (${JSON.stringify(idRef.id)})
 
         return result
     }
-    // 只有 1:1 关系可以递归更新实体数据，其他都能改当前实体的数据或者和其他实体关系。
+    // CAUTION 只有 1:1 关系可以递归更新实体数据，其他都看做是创建新的关联实体。
     // TODO 如果 newEntityData 中只更新自己的字段，那么可以直接 批量更新 加速一下。
     // TODO 支持在 update 字段的同时，使用 null 来删除关系
     async updateRecord(entityName: string, matchExpressionData: MatchExpressionData, newEntityData: NewRecordData, events?: MutationEvent[])  {

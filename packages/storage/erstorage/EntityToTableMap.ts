@@ -10,7 +10,8 @@ export type ValueAttribute = {
     type: string,
     // 没有的话就继承上面的
     table?: string,
-    field: string
+    field: string,
+    computed?: (record: any) => any
 }
 
 

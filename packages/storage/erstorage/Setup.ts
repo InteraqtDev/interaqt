@@ -103,29 +103,13 @@ export class DBSetup {
         })
     }
 
-    // TODO 应该和数据库有关，应该能配置更多地参数
-    getFieldType(property: KlassInstance<typeof Property, false>) {
-        if (property.type === 'string') {
-            return 'TEXT'
-        } else if (property.type === 'number') {
-            return 'INT'
-        } else if (property.type === 'boolean') {
-            return 'SMALLINT'
-        } else {
-            assert(false, `unknown type: ${property.type}`)
-        }
-    }
-    // getRelationFieldPrefix(relationData: LinkMapItem) {
-    //     return relationData.mergedTo === 'source' ?
-    //         `${relationData.sourceRecord}_${relationData.sourceAttribute}` :
-    //         `${relationData.targetRecord}_${relationData.targetAttribute}`
-    // }
 
     createRecord(entity: KlassInstance<typeof Entity, false>|KlassInstance<typeof Relation, false>, isRelation? :boolean) {
-        const attributes = Object.fromEntries(entity.properties!.map(property => [
+        const attributes: {[k:string]: Omit<ValueAttribute, 'field'>} = Object.fromEntries(entity.properties!.map(property => [
             property.name,
             {
                 type: property.type,
+                computed: property.computed,
             }
         ]))
 
