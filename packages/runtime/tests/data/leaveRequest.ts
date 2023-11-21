@@ -302,63 +302,78 @@ const reviewerRelation = Relation.create({
     })]
 })
 
-RequestEntity.properties.push(Property.create({
-    name: 'approved',
-    type: 'boolean',
-    collection: false,
-    computedData: RelationBasedEvery.create({
-        relation: reviewerRelation,
-        relationDirection: 'source',
-        matchExpression:`
-        (_, relation) => {
-            return relation.result === 'approved'
-        }
-`
-    })
-}), Property.create({
-    name: 'rejected',
-    type: 'boolean',
-    collection: false,
-    computedData: RelationBasedAny.create({
-        relation: reviewerRelation,
-        relationDirection: 'source',
-        matchExpression:`
-        (_, relation) => {
-            return relation.result === 'rejected'
-        }
-`
-    })
-}), Property.create({
+RequestEntity.properties.push(
+    Property.create({
+        name: 'approved',
+        type: 'boolean',
+        collection: false,
+        computedData: RelationBasedEvery.create({
+            relation: reviewerRelation,
+            relationDirection: 'source',
+            notEmpty: true,
+            matchExpression:`
+            (_, relation) => {
+                return relation.result === 'approved'
+            }
+    `
+        })
+    }),
+    Property.create({
+        name: 'rejected',
+        type: 'boolean',
+        collection: false,
+        computedData: RelationBasedAny.create({
+            relation: reviewerRelation,
+            relationDirection: 'source',
+            matchExpression:`
+            (_, relation) => {
+                return relation.result === 'rejected'
+            }
+    `
+        })
+    }),
+    // Property.create({
+    //         name: 'result',
+    //         type: 'string',
+    //         collection: false,
+    //         computedData: ComputedData.create({
+    //             computeEffect: `
+    //         (mutationEvent) => {
+    //             if(
+    //                 mutationEvent.type === 'update'
+    //                 &&
+    //                 mutationEvent.recordName === 'Request' &&
+    //                 (mutationEvent.record.approved !== undefined || mutationEvent.record.rejected !== undefined)
+    //             ){
+    //                 return mutationEvent.oldRecord.id
+    //             }
+    //
+    //         }
+    //         `,
+    //             computation:`
+    //         async (requestId) => {
+    //             const match = this.system.storage.queryHandle.createMatchFromAtom({
+    //                 key: 'id',
+    //                 value: ['=', requestId]
+    //             })
+    //
+    //             const request = await this.system.storage.findOne('Request', match, undefined, ['approved', 'rejected'])
+    //             return request.approved ? 'approved' : (request.rejected ? 'rejected' : 'pending')
+    //         }
+    // `
+    //     })
+    // }),
+    // 上面和下面两种写法都可以，机制不同。下面的实在 insert/update 的时候就直接计算了
+    Property.create({
         name: 'result',
         type: 'string',
         collection: false,
-        computedData: ComputedData.create({
-            computeEffect: `
-        (mutationEvent) => {
-            if(
-                mutationEvent.type === 'update' 
-                && 
-                mutationEvent.recordName === 'Request' &&
-                (mutationEvent.record.approved !== undefined || mutationEvent.record.rejected !== undefined)
-            ){
-                return mutationEvent.oldRecord.id
-            }
-        
-        }
-        `,
-            computation:`
-        async (requestId) => {
-            const match = this.system.storage.queryHandle.createMatchFromAtom({
-                key: 'id', 
-                value: ['=', requestId]
-            })
-            
-            const request = await this.system.storage.findOne('Request', match, undefined, ['approved', 'rejected'])
+        computed: (request: any) => {
+            debugger
             return request.approved ? 'approved' : (request.rejected ? 'rejected' : 'pending')
         }
-`
-        })
-    })
+    }),
+
 )
 
 export const data = JSON.parse(stringifyAllInstances())

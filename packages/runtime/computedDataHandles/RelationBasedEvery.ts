@@ -9,6 +9,7 @@ import {RecordMutationEvent} from "../System";
 export class RelationBasedEveryHandle extends ComputedDataHandle {
     matchCountField: string = `${this.propertyName}_match_count`
     totalCountField: string= `${this.propertyName}_total_count`
+    notEmpty? :boolean
     setupSchema() {
         const computedData = this.computedData as unknown as KlassInstance<typeof RelationBasedEvery, false>
         const matchCountField = `${this.propertyName}_match_count`
@@ -47,10 +48,9 @@ export class RelationBasedEveryHandle extends ComputedDataHandle {
         this.totalCountField = `${this.propertyName}_total_count`
         this.userComputeEffect = this.computeEffect
         this.userFullCompute = this.isMatchCountEqualTotalCount
-    }
 
-    getDefaultValue() {
-        return true
+        const computedData = this.computedData as unknown as KlassInstance<typeof RelationBasedEvery, false>
+        this.notEmpty = computedData.notEmpty
     }
 
     computeEffect(mutationEvent: RecordMutationEvent, mutationEvents: RecordMutationEvent[]): any {
@@ -67,7 +67,9 @@ export class RelationBasedEveryHandle extends ComputedDataHandle {
     async isMatchCountEqualTotalCount(recordId: string) {
         const match = MatchExp.atom({key: 'id', value: ['=', recordId]})
         const record = await this.controller.system.storage.findOne(this.recordName!, match, undefined, ['*'])!
-        return record[this.matchCountField] === record[this.totalCountField]
+        const countMatch = record[this.matchCountField] === record[this.totalCountField]
+        const result =  this.notEmpty ? (countMatch && record[this.totalCountField] > 0) : countMatch
+        return result
     }
 }
 

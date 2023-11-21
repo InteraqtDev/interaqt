@@ -17,7 +17,7 @@ type User = {
     [k:string]: any
 }
 
-describe.only('map interaction', () => {
+describe('map interaction', () => {
 
     let system: MonoSystem
     let sendRequestUUID: string
@@ -106,6 +106,8 @@ describe.only('map interaction', () => {
         expect(requests1.length).toBe(1)
         expect(requests1[0].to.id).toBe(userBId)
         expect(requests1[0].from.id).toBe(userAId)
+        expect(requests1[0].approved).toBeFalsy()
+        expect(requests1[0].rejected).toBeFalsy()
         expect(requests1[0].result).toBe('pending')
 
 
