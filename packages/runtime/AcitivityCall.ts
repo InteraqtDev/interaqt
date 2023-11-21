@@ -251,6 +251,7 @@ export class ActivityCall {
             const sourceNode = (this.rawToNode.get(transfer.source as InteractionInstanceType) || rawGatewayToNode.get(transfer.source as InteractionInstanceType))!
             const targetNode = (this.rawToNode.get(transfer.target as InteractionInstanceType) || rawGatewayToNode.get(transfer.target as GatewayInstanceType))!
 
+            if (!sourceNode) debugger
             assert(!!sourceNode, `cannot find source ${(transfer.source as InteractionInstanceType).name!}`)
             assert(!!targetNode, `cannot find target ${(transfer.source as InteractionInstanceType).name!}`)
             // CAUTION gateway 的 next 是个数组。其他的都是只有一个指向
