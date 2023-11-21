@@ -3,7 +3,7 @@ import {atom, Atom, computed, isAtom, isReactive, rawStructureClone, reactive} f
 import {isPlainObject, hasOwn, isObject, assert} from "./util";
 import {toRaw, UnwrapReactive} from "rata";
 
-type PrimitivePropType = 'string'|'number'|'boolean'| 'object'
+type PrimitivePropType = 'string'|'number'|'boolean'| 'object'|'function'
 type DefaultValueType = (...args: any[]) => any
 // FIXME return type 应该是个 Prop ?
 type ComputedValueType = (obj: KlassInstance<any, any>) => any
@@ -63,6 +63,7 @@ interface PrimitivePropertyMap {
     number: number
     boolean: boolean
     object: object
+    function: (...arg: any[]) => any
 }
 
 export type KlassInstancePrimitiveProps = {
@@ -205,16 +206,42 @@ export function createInstances(objects: KlassRawInstanceDataType[], reactiveFor
         const publicProps:{[k:string]: any} = {}
         const unsatisfiedProps: {[k:string]: any} = {}
         Object.entries(rawProps).forEach(([propName, propValue]) => {
-            const klassType = Klass.public[propName].type
-            publicProps[propName] = propValue
 
-            // 除了type 表明了不是 uuid 的情况，其他全部当成可能是 uuid 的情况
-            if (!(typeof klassType === 'string' ||
-                Array.isArray(klassType) && klassType.every(k => typeof k === 'string'))
-            ) {
-                unsatisfiedProps[propName] = propValue
+            const propType = Klass.public[propName].type
+
+            // if (propType !== 'string' && typeof propValue === 'string' ) {
+            //     // const propValueType = (propValue as string).slice(0, 6)
+            //     // const propValueStr = (propValue as string).slice(6, Infinity)
+            //     // if( propValueType === 'func::') {
+            //     //     publicProps[propName] = (new Function(`return (${propValueStr})`))()
+            //     // } else if(propValueType === 'uuid::'){
+            //     //     // uuid 的情况
+            //     //     publicProps[propName] = propValueStr
+            //     //     unsatisfiedProps[propName] = (propValue as string).slice(6, Infinity)
+            //     // } else {
+            //     //     throw new Error(`unknown data type ${propValueType}`)
+            //     // }
+            //
+            // } else {
+            //     publicProps[propName] = propValue
+            // }
+
+            // FIXME 条件判断不对
+            // // 除了type 表明了不是 uuid 的情况，其他全部当成可能是 uuid 的情况
+            publicProps[propName] = propValue
+            if (propType === 'function') {
+                publicProps[propName] = (new Function(`return (${propValue})`))()
+            } else {
+                if (!(typeof propType === 'string' ||
+                    Array.isArray(propType) && propType.every(k => typeof k === 'string'))
+                ) {
+                    unsatisfiedProps[propName] = propValue
+                }
             }
         })
+
+
+        //
 
         const instance = new Klass(publicProps, optionsWithUUID)
         // FIXME 根据 option + reactiveForce 共同判断
@@ -264,10 +291,19 @@ export function stringifyInstance(obj: InertKlassInstance<any>) {
     return Klass.stringify(obj)
 }
 
-function returnEntityUUID(obj: any) {
-    return (isObject(obj) && !isPlainObject(obj)) ? (obj as InertKlassInstance<any>).uuid : obj
+// FIXME 增加类型提示
+//  之前测试数据也都要改成这种格式
+export function stringifyAttribute(obj: any) {
+    if (typeof obj === 'function') {
+        // return `func::${obj.toString()}`
+        return `${obj.toString()}`
+    } else if((isObject(obj) && !isPlainObject(obj))) {
+        // return `uuid::${(obj as InertKlassInstance<any>).uuid}`
+        return `${(obj as InertKlassInstance<any>).uuid}`
+    } else {
+        return obj
+    }
 }
-
 export function createClass<T extends KlassMeta>(metadata: T) : Klass<T['public']>{
 // export function createClass(def){
 
@@ -287,8 +323,9 @@ export function createClass<T extends KlassMeta>(metadata: T) : Klass<T['public'
             options: obj._options,
             uuid: obj.uuid,
             public: Object.fromEntries(Object.entries(metadata.public).map(([key, propDef]) => {
-                // CAUTION 任何叶子结点都会被替换成 uuid
-                return [key, rawStructureClone(obj[key as keyof typeof obj], returnEntityUUID)]
+
+                // CAUTION 任何 Klass 叶子结点都会被替换成 uuid
+                return [key, rawStructureClone(obj[key as keyof typeof obj], stringifyAttribute)]
             })),
         } as KlassRawInstanceDataType)
     }

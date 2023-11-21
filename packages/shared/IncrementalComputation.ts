@@ -321,6 +321,11 @@ export const RelationBasedEvery = createClass({
             type: 'string',
             collection: false,
             required: true
+        },
+        notEmpty: {
+            type: 'boolean',
+            collection: false,
+            required: false
         }
     }
 })
@@ -362,6 +367,11 @@ export const Every = createClass({
             type: 'string',
             collection: false,
             required: true
+        },
+        notEmpty: {
+            type: 'boolean',
+            collection: false,
+            required: false
         }
     }
 })

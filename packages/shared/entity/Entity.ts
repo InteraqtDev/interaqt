@@ -54,6 +54,11 @@ export const Property = createClass({
             // CAUTION 这里的具体类型等着外面注册 IncrementalComputationHandle 的时候修补
             type: [] as Klass<any>[],
             required: false,
+        },
+        computed: {
+            required: false,
+            type: "function",
+            collection: false,
         }
     }
 })
