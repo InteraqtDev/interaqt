@@ -8,7 +8,10 @@ import {assert} from "../util.ts";
 export type RecordQueryData = {
     matchExpression?: MatchExpressionData,
     attributeQuery?: AttributeQueryData,
-    modifier?: ModifierData
+    modifier?: ModifierData,
+    label?: string,
+    goto?: string
+    exit? : (data: any[]) => Promise<boolean>
 }
 
 
@@ -33,14 +36,15 @@ export class RecordQuery {
             recordName,
             map,
             matchExpression,
-            // new MatchExpression(recordName, map, data.matchExpression, contextRootEntity),
             new AttributeQuery(recordName, map, data.attributeQuery || [], parentRecord, attributeName),
             new Modifier(recordName, map, data.modifier!),
             contextRootEntity,
             parentRecord,
             attributeName,
             onlyRelationData,
-            allowNull
+            allowNull,
+            data.label,
+            data.goto
         )
     }
 
@@ -54,7 +58,9 @@ export class RecordQuery {
         public parentRecord?:string,
         public attributeName?:string,
         public onlyRelationData?:boolean,
-        public allowNull = false
+        public allowNull = false,
+        public label?: string,
+        public goto?: string,
     ) {}
     getData(): RecordQueryData {
         return {
@@ -65,7 +71,7 @@ export class RecordQuery {
     }
     // CAUTION 特别注意这里的参数，不能让用取用原本的 matchExpression, attributeQuery, modifier 里面的 data 传进来。
     //   因为  data 不能代表一切配置，例如 attributeQuery 里面 还有个 shouldQueryParentLinkData 就是保存在 this 上的。
-    derive({ matchExpression, attributeQuery, modifier } : { matchExpression?: MatchExp, attributeQuery?: AttributeQuery, modifier?: Modifier }) {
+    derive({ matchExpression, attributeQuery, modifier } : { matchExpression?: MatchExp, attributeQuery?: AttributeQuery, modifier?: Modifier}) {
         return new RecordQuery(
             this.recordName,
             this.map,
@@ -76,7 +82,9 @@ attributeQuery||this.attributeQuery,
             this.parentRecord,
             this.attributeName,
             this.onlyRelationData,
-            this.allowNull
+            this.allowNull,
+            this.label,
+            this.goto
         )
     }
 }

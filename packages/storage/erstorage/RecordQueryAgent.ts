@@ -31,8 +31,43 @@ export type Record = EntityIdRef & {
     [k:string]: any
 }
 
+class FindContext {
+    public recordQueryByName = new Map<string, RecordQuery>()
+    public parentResultByName = new Map<string, any[]>()
+    constructor(public recordQuery: RecordQuery) {
+        this.set(':root', recordQuery)
+        this.recursiveSaveLabelledRecordQuery(recordQuery)
+    }
+    recursiveSaveLabelledRecordQuery(recordQuery: RecordQuery) {
+        recordQuery.attributeQuery?.relatedRecords.forEach((relatedRecordQuery) => {
+            if (relatedRecordQuery.label) {
+                this.set(relatedRecordQuery.label, relatedRecordQuery)
+                this.recursiveSaveLabelledRecordQuery(relatedRecordQuery)
+            }
+        })
+    }
+    set(key: string, value: any) {
+        this.recordQueryByName.set(key, value)
+    }
+    get(key: string) {
+        return this.recordQueryByName.get(key)
+    }
+    pushStack(key: string, value: any) {
+        const arr = this.parentResultByName.get(key)
+        if (arr) {
+            arr.push(value)
+        } else {
+            this.parentResultByName.set(key, [value])
+        }
+    }
+    getStack(key: string) {
+        return this.parentResultByName.get(key)
+    }
+}
+
 export class RecordQueryAgent {
     constructor(public map: EntityToTableMap, public database: Database) {}
+    // 有 prefix 说明是比人的子查询
     buildXToOneFindQuery(recordQuery: RecordQuery, prefix='') {
         // 从所有条件里面构建出 join clause
         const fieldQueryTree = recordQuery.attributeQuery!.xToOneQueryTree
@@ -73,12 +108,60 @@ ${this.buildWhereClause(
     // TODO 为了性能，也可以把信息丢到客户端，然客户端去结构化？？？
 
     // CAUTION findRelatedRecords 中的递归调用会使得 includeRelationData 变为 true
-    async findRecords(entityQuery: RecordQuery, queryName = ''): Promise<Record[]>{
+    async findRecords(entityQuery: RecordQuery, queryName = '', findContext?:FindContext): Promise<Record[]>{
+        // 一定在一开始的时候就创建 findContext ，并且是通过直接遍历 entityQuery 拿到原始的 label 的 recordQuery，因为后面
+        //  拿不到原始的了，都会带上 parent 的 id，会产生叠加 parent id match 的问题
+        if (!findContext) {
+            findContext = new FindContext(entityQuery)
+        }
+
+        if(entityQuery.goto) {
+            // FIXME 执行退出判断。需要 stack
+
+            const gotoQuery = findContext.get(entityQuery.goto)!
+            assert(gotoQuery, `goto ${entityQuery.goto} not found`)
+            // 需要把 gotoQuery 和当前 query 中的 matchExpression 合并，因为当前 query 的 matchExpression 有递归的条件，例如 parent.id === xxx。
+            const matchExpWithParent = entityQuery.matchExpression.and(gotoQuery.matchExpression!)
+            //   统一在这里面处理 gotoQuery 和当前的合并，这样其他的抵用就只需要管好递归中和 parent 的 id 的关系就行了。
+            const newQuery = gotoQuery.derive({
+                matchExpression: matchExpWithParent
+            })
+            return this.findRecords(newQuery!, queryName, findContext)
+        }
+
         // findRecords 的一个 join 语句里面只能一次性搞定 x:1 的关联实体，以及关系上的 x:1 关联实体。
         // 1. 这里只通过合表或者 join  处理了 x:1 的关联查询。x:n 的查询是通过二次查询获取的。
         const records = this.structureRawReturns(await this.database.query(this.buildXToOneFindQuery(entityQuery, ''), queryName)) as any[]
 
-        // 2. x:1 上的 关系的x:many关联实体 查询
+
+        // 如果有 label 需要把结果 push 到 stack 里面，作为后面 exit 的参数
+        // FIXME 这里应该为每个 record 单独生成一个 stack，而不是整个查出来的 record 共用一个 stack。
+        // FIXME 从 stack 里面读有没有重复的节点，如果有重复的节点，说明有环。自动退出递归。
+        if (entityQuery.label) {
+            findContext.pushStack(entityQuery.label, records)
+        }
+
+        // x:1 关系上的递归 字段查询。因为是递归所以可能不会 join，不会在 buildXToOneFindQuery 里。所以单独查询。
+        for (let subEntityQuery of entityQuery.attributeQuery.xToOneRecords) {
+            // FIXME 这里的判断逻辑和 goto 耦合太重了？其他地方都是用 关系的类型 去判断的。
+            if(subEntityQuery.goto) {
+                const info = this.map.getInfo(subEntityQuery.parentRecord!, subEntityQuery.attributeName!)
+                const reverseAttributeName = info.getReverseInfo()?.attributeName
+                for (let entity of records) {
+                    const matchWithParentId = subEntityQuery.matchExpression.and({
+                        key: `${reverseAttributeName}.id`,
+                        value: ['=', entity.id]
+                    })
+                    const subGotoQueryWithParentMatch = subEntityQuery.derive({
+                        matchExpression: matchWithParentId
+                    })
+                    entity[subEntityQuery.attributeName!] = await this.findRecords(subGotoQueryWithParentMatch, queryName, findContext)
+                }
+            }
+        }
+
+
+        // 2. x:1 上的 关系的 x:many关联实体 查询
         for (let subEntityQuery of entityQuery.attributeQuery.xToOneRecords) {
             // x:1 上的关系
             const subLinkRecordQuery = subEntityQuery.attributeQuery.parentLinkRecordQuery
@@ -101,20 +184,19 @@ ${this.buildWhereClause(
                         setByPath(
                             entity,
                             [subEntityQuery.attributeName!, LINK_SYMBOL, subEntityQueryOfSubLink.attributeName!],
-                            await this.findRecords(queryOfThisRecord, `finding relation data: ${entityQuery.recordName}.${subEntityQuery.attributeName}.&.${subEntityQueryOfSubLink.attributeName}`)
+                            await this.findRecords(queryOfThisRecord, `finding relation data: ${entityQuery.recordName}.${subEntityQuery.attributeName}.&.${subEntityQueryOfSubLink.attributeName}`, findContext)
                         )
                     }
                 }
             }
         }
 
-
         // 3. x:n 关联实体的查询
         for (let subEntityQuery of entityQuery.attributeQuery.xToManyRecords) {
             // XToMany 的 relationData 是在上面 buildFindQuery 一起查完了的
             if (!subEntityQuery.onlyRelationData) {
                 for (let entity of records) {
-                    entity[subEntityQuery.attributeName!] = await this.findXToManyRelatedRecords(entityQuery.recordName, subEntityQuery.attributeName!, entity.id, subEntityQuery)
+                    entity[subEntityQuery.attributeName!] = await this.findXToManyRelatedRecords(entityQuery.recordName, subEntityQuery.attributeName!, entity.id, subEntityQuery, findContext)
                 }
             }
         }
@@ -122,7 +204,7 @@ ${this.buildWhereClause(
     }
     // CAUTION 任何两个具体的实体之间只能有一条关系，但是可以在关系上有多条数据。1:n 的数据
 
-    async findXToManyRelatedRecords(recordName: string, attributeName: string, recordId: string, relatedRecordQuery: RecordQuery) {
+    async findXToManyRelatedRecords(recordName: string, attributeName: string, recordId: string, relatedRecordQuery: RecordQuery, findContext: FindContext) {
         const info = this.map.getInfo(recordName, attributeName)
         const reverseAttributeName = info.getReverseInfo()?.attributeName!
 
@@ -145,7 +227,7 @@ ${this.buildWhereClause(
 
         // CAUTION 注意这里的第二个参数。因为任何两个具体的实体之间只能有一条关系。所以即使是 n:n 和关系表关联上时，也只有一条关系数据，所以这里可以带上 relation data。
         // 1. 查询 x:n 的实体，以及和父亲的关联关系上的 x:1 的数据
-        const data = (await this.findRecords(newSubQuery, `finding related record: ${relatedRecordQuery.parentRecord}.${relatedRecordQuery.attributeName}`))
+        const data = (await this.findRecords(newSubQuery, `finding related record: ${relatedRecordQuery.parentRecord}.${relatedRecordQuery.attributeName}`, findContext))
         // 1.1 这里再反向处理一下关系数据。因为在上一步 withParentLinkData 查出来的时候是用的是反向的关系名字
         const records =  relatedRecordQuery.attributeQuery.parentLinkRecordQuery ? data.map(item => {
             let itemWithParentLinkData: Record
@@ -185,7 +267,7 @@ ${this.buildWhereClause(
                     setByPath(
                         record,
                         [LINK_SYMBOL, subEntityQueryOfLink.attributeName!],
-                        await this.findXToManyRelatedRecords(subEntityQueryOfLink.parentRecord!, subEntityQueryOfLink.attributeName!, linkId, subEntityQueryOfLink)
+                        await this.findXToManyRelatedRecords(subEntityQueryOfLink.parentRecord!, subEntityQueryOfLink.attributeName!, linkId, subEntityQueryOfLink, findContext)
                     )
                 }
             }
@@ -530,7 +612,7 @@ ${this.buildXToOneFindQuery(existEntityQuery, currentAlias)}
             attributeQuery: attributeQuery,
         }, undefined, undefined, undefined, false, true)
 
-        const recordsWithCombined = await this.findRecords(recordQuery, reason)
+        const recordsWithCombined = await this.findRecords(recordQuery, reason, undefined)
 
 
         // const hasNoConflict = recordsWithCombined.length === 1 && !recordsWithCombined[0].id
@@ -582,7 +664,7 @@ ${this.buildXToOneFindQuery(existEntityQuery, currentAlias)}
         const records = await this.findRecords(RecordQuery.create(linkName, this.map, {
             matchExpression: matchExpressionData,
             attributeQuery: attributeQuery
-        }), `finding combined records for relocate ${linkName}.${moveAttribute}`)
+        }), `finding combined records for relocate ${linkName}.${moveAttribute}`, undefined)
 
         const toMoveRecordInfo = this.map.getLinkInfoByName(linkName)[moveSource ? 'sourceRecordInfo' : 'targetRecordInfo']
 
@@ -880,7 +962,7 @@ WHERE ${idField} = (${JSON.stringify(idRef.id)})
         const matchedEntities = await this.findRecords(RecordQuery.create(entityName, this.map, {
             matchExpression: matchExpressionData,
             attributeQuery: AttributeQuery.getAttributeQueryDataForRecord(entityName, this.map, true, true, true, true)
-        }), `find record for updating ${entityName}`)
+        }), `find record for updating ${entityName}`, undefined)
 
         const result: Record[] = []
         for(let matchedEntity of matchedEntities) {
@@ -909,7 +991,7 @@ WHERE ${idField} = (${JSON.stringify(idRef.id)})
                 true
             )
         })
-        const records = await this.findRecords(deleteQuery, `find record for deleting ${recordName}`)
+        const records = await this.findRecords(deleteQuery, `find record for deleting ${recordName}`, undefined)
 
         if (records.length) {
             // 删除独立表或者关系在另一边的关系数据
@@ -942,7 +1024,7 @@ WHERE ${idField} = (${JSON.stringify(idRef.id)})
                         modifier: {limit: 1}
                     }
                 )
-                const recordWithSameRowData = await this.findRecords(recordWithSameRowDataQuery, `find record with same row data for delete ${recordName}`)
+                const recordWithSameRowData = await this.findRecords(recordWithSameRowDataQuery, `find record with same row data for delete ${recordName}`, undefined)
                 const hasSameRowData = recordInfo.notRelianceCombined.some(info => {
                     return !!recordWithSameRowData[0]?.[info.attributeName]?.id
                 })
@@ -1048,11 +1130,14 @@ WHERE ${recordInfo.idField} IN (${records.map(({id}) => JSON.stringify(id)).join
 
     async addLink(linkName: string, sourceId: string, targetId:string, attributes: RawEntityData = {}, moveSource = false, events?: MutationEvent[]) {
         const existRecord = (await this.findRecords(RecordQuery.create(linkName, this.map, {
-            matchExpression: MatchExp.atom({key: 'source.id', value: ['=', sourceId]}).and({key: 'target.id', value: ['=', targetId]}),
+            matchExpression: MatchExp.atom({key: 'source.id', value: ['=', sourceId]}).and({
+                key: 'target.id',
+                value: ['=', targetId]
+            }),
             modifier: {
                 limit: 1
             }
-        }), `check if link exist for add link ${linkName}`))[0]
+        }), `check if link exist for add link ${linkName}`, undefined))[0]
 
         assert(!existRecord, `cannot create ${linkName} for ${sourceId} ${targetId}, link already exist`)
 
@@ -1087,6 +1172,40 @@ WHERE ${recordInfo.idField} IN (${records.map(({id}) => JSON.stringify(id)).join
         }
 
         return this.deleteRecord(linkName, matchExpressionData, events)
+
+    }
+
+    // 要限制一下level。
+    //  TODO  是否还需要支持特定的中断条件？？？例如碰到 名字为 xxx 就不要递归了？？？这样的话下面的 findPath 也可以基于这个实现、
+    async findRecordsWithRecursive() {
+
+    }
+    // 判断 isAncestorOf 等可以用 path 来做。这个 api 单独写出来而不是使用 findRecordsWithRecursive 是因为要单独中断
+    async findPath() {
+
+    }
+
+    async isAncestorOf(recordName: string, attribute: string, entityId: string, ancestorId: string) {
+        const recordQuery = RecordQuery.create(recordName, this.map, {
+            attributeQuery: ['id','name', ['parent', {attributeQuery: ['id']}]],
+            matchExpression: MatchExp.atom({key: 'id', value: ['=', ancestorId]}),
+        })
+
+        const [, parentIdField] = this.map.getTableAliasAndFieldName([recordName, attribute], 'id', false)
+
+        return this.database.query(`
+WITH RECURSIVE cte(\`Department.id\`, \`Department.name\`, \`Department.parent.id\`) AS
+(
+${this.buildXToOneFindQuery(recordQuery)}
+UNION ALL
+
+SELECT
+${this.buildSelectClause(recordQuery.attributeQuery.getValueAndXToOneRecordFields())}
+FROM
+${this.buildFromClause(recordQuery.recordName)}
+INNER JOIN cte c ON c.\`Department.id\` = ${recordQuery.recordName}.${parentIdField}
+)
+SELECT * FROM cte`)
 
     }
 }

@@ -3,6 +3,7 @@
   "module": "index.ts",
   "type": "module",
   "devDependencies": {
+    "@vitest/coverage-v8": "^0.34.6",
     "vite-tsconfig-paths": "^4.2.1",
     "vitest": "^0.34.6"
   },
@@ -10,6 +11,7 @@
     "typescript": "^5.2.2"
   },
   "scripts": {
-    "test": "vitest"
+    "test": "vitest",
+    "coverage": "vitest --coverage"
   }
 }

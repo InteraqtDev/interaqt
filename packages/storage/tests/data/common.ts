@@ -157,6 +157,38 @@ export function createCommonData(): { entities: KlassInstance<typeof Entity, fal
         isTargetReliance: true
     })
 
+
+    //  FIXME Group 这个名字不行？？？
+    // department
+    const departmentEntity = Entity.create({
+        name: 'Department',
+        properties: [
+            Property.create({ name: 'name', type: PropertyTypes.String })
+        ]
+    })
+
+    // group and group relation
+    Relation.create({
+        entity1: departmentEntity,
+        targetName1: 'parent',
+        entity2: departmentEntity,
+        targetName2: 'children',
+        relType: 'n:1',
+    })
+
+    // // group and user relation
+    // Relation.create({
+    //     entity1: groupEntity,
+    //     targetName1: 'members',
+    //     entity2: userEntity,
+    //     targetName2: 'groups',
+    //     relType: 'n:n',
+    //     properties: [
+    //         Property.create({ name: 'role', type: PropertyTypes.String })
+    //     ]
+    // })
+
+
     const entities = [...Entity.instances] as KlassInstance<typeof Entity, false>[]
     const relations = [...Relation.instances] as KlassInstance<typeof Relation, false>[]
 

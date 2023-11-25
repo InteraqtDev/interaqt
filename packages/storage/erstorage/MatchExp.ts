@@ -201,10 +201,15 @@ export class MatchExp {
 
     }
 
-    and(condition: MatchAtom): MatchExp {
-        assert(condition.key !== undefined, 'key cannot be undefined')
-        assert(Array.isArray(condition.value) && condition.value.length === 2, 'value must be array')
-        assert(condition.value[1] !== undefined, `${condition.key} value cannot be undefined`)
-        return new MatchExp(this.entityName, this.map, this.data ? this.data.and(condition) : BoolExp.atom<MatchAtom>(condition), this.contextRootEntity)
+    and(condition: MatchAtom|MatchExp): MatchExp {
+        if (condition instanceof MatchExp) {
+            return new MatchExp(this.entityName, this.map, this.data ? this.data.and(condition.data) : condition.data, this.contextRootEntity)
+        } else {
+            assert(condition.key !== undefined, 'key cannot be undefined')
+            assert(Array.isArray(condition.value) && condition.value.length === 2, 'value must be array')
+            assert(condition.value[1] !== undefined, `${condition.key} value cannot be undefined`)
+            return new MatchExp(this.entityName, this.map, this.data ? this.data.and(condition) : BoolExp.atom<MatchAtom>(condition), this.contextRootEntity)
+        }
+
     }
 }

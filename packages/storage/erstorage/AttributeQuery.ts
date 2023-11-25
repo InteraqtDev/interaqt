@@ -195,6 +195,7 @@ export class AttributeQuery {
         return this.buildXToOneQueryTree()
     }
     buildXToOneQueryTree() {
+        // FIXME 过滤掉 x:1 中递归地情况。
         const result = new RecordQueryTree(this.recordName, this.map, this.parentRecord, this.attributeName)
         this.data.forEach(i => {
             if (!Array.isArray(i)) {
@@ -203,12 +204,18 @@ export class AttributeQuery {
         })
         // CAUTION 我们这里只管 xToOne 的情况，因为 xToMany 都是外部用 id 去做二次查询得到的。不是用 join 语句一次性得到的。
         this.xToOneRecords.forEach((recordQuery) => {
-            result.addRecord([recordQuery.attributeName!], recordQuery.attributeQuery!.xToOneQueryTree)
+            // CAUTION 注意要排除掉 goto 递归的情况。递归肯定无法一次  join 查出，不管是什么关系。
+            if(!recordQuery.goto) {
+                result.addRecord([recordQuery.attributeName!], recordQuery.attributeQuery!.xToOneQueryTree)
+            }
         })
 
         if (this.shouldQueryParentLinkData && this.parentLinkRecordQuery) {
-            const reverseInfo = this.map.getInfo(this.parentRecord!, this.attributeName!).getReverseInfo()
-            result.addRecord([reverseInfo?.attributeName!, LINK_SYMBOL], this.parentLinkRecordQuery.attributeQuery!.xToOneQueryTree)
+            // link 也可能使用递归，所以也要排除掉。
+            if(!this.parentLinkRecordQuery.goto) {
+                const reverseInfo = this.map.getInfo(this.parentRecord!, this.attributeName!).getReverseInfo()
+                result.addRecord([reverseInfo?.attributeName!, LINK_SYMBOL], this.parentLinkRecordQuery.attributeQuery!.xToOneQueryTree)
+            }
         }
 
         return result
