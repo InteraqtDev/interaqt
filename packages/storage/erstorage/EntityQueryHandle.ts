@@ -85,8 +85,8 @@ export class EntityQueryHandle {
         return (await this.findRelationByName(relationName, matchExpressionData, limitedModifier, attributeQueryData))[0]
     }
 
-    async isAncestorOf(entity: string, attribute: string, entityId: string, ancestorId: string) {
-        return this.agent.isAncestorOf(entity, attribute, entityId, ancestorId)
+    async findPath(entity: string, attribute: string, entityId: string, ancestorId: string) {
+        return this.agent.findPath(entity, attribute, entityId, ancestorId)
     }
 
     createMatchFromAtom(...arg: Parameters<(typeof MatchExp)["atom"]>) {

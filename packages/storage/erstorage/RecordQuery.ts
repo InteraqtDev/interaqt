@@ -4,6 +4,7 @@ import {Modifier, ModifierData} from "./Modifier";
 import {EntityToTableMap} from "./EntityToTableMap";
 import {AttributeInfo} from "./AttributeInfo.ts";
 import {assert} from "../util.ts";
+import {RecursiveContext} from "./RecordQueryAgent.ts";
 
 export type RecordQueryData = {
     matchExpression?: MatchExpressionData,
@@ -11,7 +12,7 @@ export type RecordQueryData = {
     modifier?: ModifierData,
     label?: string,
     goto?: string
-    exit? : (data: any[]) => Promise<boolean>
+    exit? : (data:RecursiveContext) => Promise<any>
 }
 
 
@@ -44,7 +45,8 @@ export class RecordQuery {
             onlyRelationData,
             allowNull,
             data.label,
-            data.goto
+            data.goto,
+            data.exit
         )
     }
 
@@ -61,6 +63,7 @@ export class RecordQuery {
         public allowNull = false,
         public label?: string,
         public goto?: string,
+        public exit? : (context: RecursiveContext) => Promise<boolean>
     ) {}
     getData(): RecordQueryData {
         return {
@@ -84,7 +87,8 @@ attributeQuery||this.attributeQuery,
             this.onlyRelationData,
             this.allowNull,
             this.label,
-            this.goto
+            this.goto,
+            this.exit
         )
     }
 }

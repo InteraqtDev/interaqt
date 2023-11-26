@@ -5,7 +5,7 @@ import {SQLiteDB} from '../../runtime/SQLite'
 import {EntityToTableMap} from "../erstorage/EntityToTableMap";
 import {MatchExp} from "../erstorage/MatchExp.ts";
 import {EntityQueryHandle} from "../erstorage/EntityQueryHandle.ts";
-import {MutationEvent} from "../erstorage/RecordQueryAgent.ts";
+import {MutationEvent, RecursiveContext} from "../erstorage/RecordQueryAgent.ts";
 import {LINK_SYMBOL} from "../erstorage/RecordQuery.ts";
 
 describe('group tree', () => {
@@ -62,12 +62,14 @@ describe('group tree', () => {
             parent: group4
         })
 
+        const exit = async (context: RecursiveContext) => {}
+
         const foundGroup = (await entityQueryHandle.find('Department',
             MatchExp.atom({key: 'name', value: ['=', 'group1']}),
             undefined,
             ['*', ['children', {
                 label: 'childDept',
-                attributeQuery: ['*', ['children', { goto: 'childDept'}]]
+                attributeQuery: ['*', ['children', { goto: 'childDept', exit}]]
             }]],
         ))[0]
 
@@ -80,6 +82,12 @@ describe('group tree', () => {
         expect(foundGroup.children[0].children[0].children[0].children[0].id).toBe(group5.id)
         expect(foundGroup.children[0].children[0].children[0].children[1].id).toBe(group51.id)
 
+
+        const foundPath = await entityQueryHandle.findPath('Department','children', group1.id, group5.id)
+
+        expect(foundPath!.length).toBe(5)
+        expect(foundPath![0]!.id).toBe(group1.id)
+        expect(foundPath![4].id).toBe(group5.id)
     })
 
 })
