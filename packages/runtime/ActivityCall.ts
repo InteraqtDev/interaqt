@@ -8,13 +8,13 @@ import {
     ActivityGroupInstanceType,
     ActivityGroup,
     Gateway,
-} from "@shared/activity/Activity";
+} from "@interaqt/shared";
 import {assert} from "./util";
 import {System} from "./System";
 import { InteractionCall, InteractionCallResponse} from "./InteractionCall";
-import {InteractionEventArgs} from "../types/interaction";
-import {UserAttributive} from "@shared/user/User";
-import {MatchExp} from "@storage/erstorage/MatchExp";
+import {InteractionEventArgs} from "./types/interaction";
+import {UserAttributive} from "@interaqt/shared";
+import {MatchExp} from "@interaqt/storage";
 
 
 

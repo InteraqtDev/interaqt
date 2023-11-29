@@ -1,9 +1,9 @@
 import {ComputedDataHandle} from "./ComputedDataHandle";
-import {KlassInstance, Klass} from "@shared/createClass";
-import {MatchExp} from '@storage/erstorage/MatchExp'
-import {Entity, Property, Relation} from "@shared/entity/Entity";
+import {KlassInstance, Klass} from "@interaqt/shared";
+import {MatchExp} from '@interaqt/storage'
+import {Entity, Property, Relation} from "@interaqt/shared";
 
-import {RelationBasedEvery, RelationCount} from "@shared/IncrementalComputation";
+import {RelationBasedEvery, RelationCount} from "@interaqt/shared";
 import {RecordMutationEvent} from "../System";
 
 export class RelationBasedEveryHandle extends ComputedDataHandle {

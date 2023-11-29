@@ -1,16 +1,16 @@
-import {KlassInstance, Klass} from "@shared/createClass";
-import {Entity, Relation} from "@shared/entity/Entity";
+import {KlassInstance, Klass} from "@interaqt/shared";
+import {Entity, Relation} from "@interaqt/shared";
 import {
     ComputedData,
     MapActivityToEntity,
     RelationStateMachine,
     RelationStateTransfer
-} from '@shared/IncrementalComputation'
+} from '@interaqt/shared'
 import {Controller} from "../Controller";
-import {InteractionEventArgs} from "../../types/interaction";
+import {InteractionEventArgs} from "../types/interaction";
 import {assert} from "../util";
 import {EntityIdRef, RecordMutationEvent} from '../System'
-import {MatchAtom, MatchExp} from '@storage/erstorage/MatchExp'
+import {MatchAtom, MatchExp} from '@interaqt/storage'
 import {ComputedDataHandle, DataContext} from "./ComputedDataHandle";
 
 

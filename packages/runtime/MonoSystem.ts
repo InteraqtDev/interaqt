@@ -7,18 +7,18 @@ import {
     System,
     SYSTEM_RECORD
 } from "./System";
-import {InteractionEvent} from '../types/interaction'
-import {createClass, KlassInstance} from "@shared/createClass";
-import {Entity, Property, Relation} from "@shared/entity/Entity";
-import {State} from "@shared/state/State";
-import {DBSetup} from '@storage/erstorage/Setup'
-import {EntityQueryHandle} from '@storage/erstorage/EntityQueryHandle'
-import {MatchExp, MatchExpressionData} from '@storage/erstorage/MatchExp'
-import {RawEntityData} from '@storage/erstorage/NewRecordData'
-import {EntityToTableMap} from '@storage/erstorage/EntityToTableMap'
+import {InteractionEvent} from './types/interaction'
+import {createClass, Entity, KlassInstance, Property, Relation} from "@interaqt/shared";
+import {
+    DBSetup,
+    EntityQueryHandle,
+    EntityToTableMap,
+    MatchExp,
+    MatchExpressionData,
+    MutationEvent,
+    RawEntityData
+} from '@interaqt/storage'
 import {SQLiteDB} from "./SQLite";
-import {MutationEvent} from "@storage/erstorage/RecordQueryAgent";
-import {Activity} from "@shared/activity/Activity";
 
 
 function JSONStringify(value:any) {

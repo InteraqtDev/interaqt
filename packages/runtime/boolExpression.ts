@@ -1,5 +1,5 @@
 import { parse as parseStr} from 'acorn'
-import {BoolExpression, BoolExpressionNodeTypes, OperatorNames, VariableNode} from "../types/boolExpression";
+import {BoolExpression, BoolExpressionNodeTypes, OperatorNames, VariableNode} from "./types/boolExpression";
 import {assert, indexBy} from "./util";
 
  // @ts-ignore

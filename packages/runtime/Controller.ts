@@ -1,14 +1,14 @@
 import {System, SystemCallback} from "./System";
-import {Entity, Property, Relation} from "@shared/entity/Entity";
-import {Activity, Interaction} from "@shared/activity/Activity";
+import {Entity, Property, Relation} from "@interaqt/shared";
+import {Activity, Interaction} from "@interaqt/shared";
 import './computedDataHandles/index'
-import {ActivityCall} from "./AcitivityCall";
+import {ActivityCall} from "./ActivityCall";
 import {InteractionCall} from "./InteractionCall";
-import {InteractionEventArgs} from "../types/interaction";
-import {Klass, KlassInstance} from "@shared/createClass";
+import {InteractionEventArgs} from "./types/interaction";
+import {Klass, KlassInstance} from "@interaqt/shared";
 import {assert} from "./util";
 import {ComputedDataHandle, DataContext} from "./computedDataHandles/ComputedDataHandle";
-import {ComputedData} from "@shared/IncrementalComputation";
+import {ComputedData} from "@interaqt/shared";
 
 export class Controller {
     public computedDataHandles = new Set<ComputedDataHandle>()

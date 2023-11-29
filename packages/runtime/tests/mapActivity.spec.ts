@@ -1,13 +1,13 @@
-import {describe, test, expect, beforeEach} from "vitest";
+import {beforeEach, describe, expect, test} from "vitest";
 import {Controller} from "../Controller";
-import {ActivityCall, ActivityGroupNode} from "../AcitivityCall";
+import {ActivityCall, ActivityGroupNode} from "../ActivityCall";
 import {MonoSystem} from "../MonoSystem";
-import {createInstances, getInstance, KlassByName, KlassInstance, removeAllInstance, stringifyAllInstances} from "@shared/createClass";
-import { Activity, Interaction } from "@shared/activity/Activity";
-import { Entity, Relation } from "@shared/entity/Entity";
-import { State } from "@shared/state/State";
+import {createInstances, KlassByName, removeAllInstance} from "@interaqt/shared";
+import {Activity, Interaction} from "@interaqt/shared";
+import {Entity, Relation} from "@interaqt/shared";
+import {State} from "@interaqt/shared";
 import '../computedDataHandles/index'
-import {MatchExp} from '@storage/erstorage/MatchExp'
+import {MatchExp} from '@interaqt/storage'
 
 // 里面有所有必须的数据？
 type User = {

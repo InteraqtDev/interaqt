@@ -1,9 +1,9 @@
-import {KlassInstance} from "@shared/createClass";
-import {InteractionEventArgs} from "../../types/interaction";
-import {Interaction} from "@shared/activity/Activity";
-import {Entity} from "@shared/entity/Entity";
-import {MapInteractionToProperty} from '@shared/IncrementalComputation'
-import {MatchExp} from '@storage/erstorage/MatchExp'
+import {KlassInstance} from "@interaqt/shared";
+import {InteractionEventArgs} from "../types/interaction";
+import {Interaction} from "@interaqt/shared";
+import {Entity} from "@interaqt/shared";
+import {MapInteractionToProperty} from '@interaqt/shared'
+import {MatchExp} from '@interaqt/storage'
 import {ComputedDataHandle} from "./ComputedDataHandle";
 import {RecordMutationEvent} from "../System";
 

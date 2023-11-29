@@ -6,6 +6,8 @@
     "target": "esnext",
     "newLine": "LF",
     "useDefineForClassFields": false,
+    "declaration": true,
+    "declarationMap": true,
     "module": "esnext",
     "moduleResolution": "node",
     "allowJs": false,
@@ -16,11 +18,19 @@
     "esModuleInterop": true,
     "removeComments": false,
     "lib": ["esnext", "dom"],
-    "types": ["node"]
+    "types": ["node"],
   },
   "include": [
-    "./",
-    "./types",
-    "./tests"
+    "./computedDataHandles/**/*",
+    "./ActivityCall.ts",
+    "./boolExpression.ts",
+    "./index.ts",
+    "./Controller.ts",
+    "./InteractionCall.ts",
+    "./MonoSystem.ts",
+    "./System.ts",
+    "./SQLite.ts",
+    "./util.ts",
+
   ]
 }

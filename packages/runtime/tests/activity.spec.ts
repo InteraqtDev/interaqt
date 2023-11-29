@@ -1,10 +1,10 @@
 import {describe, test, expect, beforeEach} from "vitest";
 
 import { MonoSystem } from "../MonoSystem";
-import {createInstances, getInstance, KlassByName, KlassInstance, removeAllInstance} from "@shared/createClass";
+import {createInstances, getInstance, KlassByName, KlassInstance, removeAllInstance} from "@interaqt/shared";
 
-import { Activity } from "@shared/activity/Activity";
-import {ActivityCall, ActivityGroupNode} from "../AcitivityCall";
+import { Activity } from "@interaqt/shared";
+import {ActivityCall, ActivityGroupNode} from "../ActivityCall";
 
 describe("activity state", () => {
     let createFriendRelationActivityCall: ActivityCall

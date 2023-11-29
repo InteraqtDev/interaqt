@@ -1,14 +1,14 @@
-import {EntityAttributive, EntityAttributives, GetAction, InteractionInstanceType} from "@shared/activity/Activity";
-import {UserAttributive} from "@shared/user/User";
+import {EntityAttributive, EntityAttributives, GetAction, InteractionInstanceType} from "@interaqt/shared";
+import {UserAttributive} from "@interaqt/shared";
 import {System} from "./System";
-import {InteractionEvent, InteractionEventArgs} from "../types/interaction";
-import {Concept, ConceptAlias, ConceptInstance, DerivedConcept,} from "@shared/attributive";
-import {BoolExp, BoolExpressionData} from "@shared/BoolExp";
+import {InteractionEvent, InteractionEventArgs} from "./types/interaction";
+import {Concept, ConceptAlias, ConceptInstance, DerivedConcept,} from "@interaqt/shared";
+import {BoolExp, BoolExpressionRawData} from "@interaqt/shared";
 import {assert, everyWithErrorAsync} from "./util";
-import {Klass, KlassInstance} from "@shared/createClass";
-import {ActivityCall} from "./AcitivityCall";
-import {someAsync} from "@storage/erstorage/util";
-import {Entity} from "@shared/entity/Entity";
+import {Klass, KlassInstance} from "@interaqt/shared";
+import {ActivityCall} from "./ActivityCall";
+import {someAsync} from "@interaqt/storage";
+import {Entity} from "@interaqt/shared";
 
 
 type ConceptCheckStack = {
@@ -120,7 +120,7 @@ export class InteractionCall {
         throw new AttributeError('check user failed', res)
     }
     // 用来check attributive 形容的后面的  target 到底是不是那个概念的实例。
-    async checkConcept(instance: ConceptInstance, concept: Concept, attributives?: BoolExpressionData<KlassInstance<typeof UserAttributive, false>>, stack: ConceptCheckStack[] = []): Promise<ConceptCheckResponse> {
+    async checkConcept(instance: ConceptInstance, concept: Concept, attributives?: BoolExpressionRawData<KlassInstance<typeof UserAttributive, false>>, stack: ConceptCheckStack[] = []): Promise<ConceptCheckResponse> {
         const currentStack = stack.concat({type: 'concept', values: {attributives, concept}})
 
         const conceptRes = await this.isConcept(instance, concept, currentStack)
@@ -144,7 +144,7 @@ export class InteractionCall {
         if (this.isConceptAlias(concept)) {
             const errors: AtomError[] = []
 
-            const somePassed = someAsync((concept as ConceptAlias).for, async (concept: Concept) => {
+            const somePassed = await someAsync((concept as ConceptAlias).for, async (concept: Concept) => {
                 const checkRes = await this.isConcept(instance, concept)
                 if (checkRes === true) {
                     return true
@@ -236,8 +236,8 @@ export class InteractionCall {
             if (payloadDef.attributives) {
                 const rawAttributives = (payloadDef.attributives as KlassInstance<typeof EntityAttributives, false>).content
                 const attributives = isPayloadUser ?
-                    new BoolExp<UserAttributiveAtom>(rawAttributives  as BoolExpressionData<UserAttributiveAtom>):
-                    new BoolExp<EntityAttributiveAtom>(rawAttributives as BoolExpressionData<EntityAttributiveAtom>)
+                    new BoolExp<UserAttributiveAtom>(rawAttributives  as BoolExpressionRawData<UserAttributiveAtom>):
+                    new BoolExp<EntityAttributiveAtom>(rawAttributives as BoolExpressionRawData<EntityAttributiveAtom>)
 
                 if (payloadDef.isCollection) {
                     const result = await everyWithErrorAsync(payloadItem, (item => {

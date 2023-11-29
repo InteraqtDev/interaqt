@@ -1,9 +1,9 @@
-import {createClass, KlassInstance} from "@shared/createClass";
-import { Entity, Relation } from "@shared/entity/Entity";
+import {createClass, KlassInstance} from "@interaqt/shared";
+import { Entity, Relation } from "@interaqt/shared";
 // @ts-ignore
-import { InteractionEvent } from '../types/interaction'
-import {Activity} from "@shared/activity/Activity";
-import {MatchExpressionData} from "@storage/erstorage/MatchExp";
+import { InteractionEvent } from './types/interaction'
+import {Activity} from "@interaqt/shared";
+import {MatchExpressionData} from "@interaqt/storage";
 
 
 

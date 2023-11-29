@@ -1,5 +1,5 @@
 import {describe, expect, test} from "vitest";
-import {EvaluateError, parse} from "@shared/BoolExp";
+import {EvaluateError, parse} from "@interaqt/shared";
 
 const handle = (data: AtomType) => /^true/i.test(data.key)
 

@@ -1,4 +1,4 @@
-import {BoolAtomData, createUserRoleAttributive, UserAttributive, UserAttributives} from "@shared/user/User";
+import {BoolAtomData, createUserRoleAttributive, UserAttributive, UserAttributives} from "@interaqt/shared";
 import {
     Action,
     Activity,
@@ -7,10 +7,10 @@ import {
     Payload,
     PayloadItem,
     Transfer
-} from "@shared/activity/Activity";
+} from "@interaqt/shared";
 import {OtherAttr} from "./roles";
-import {Entity, Property, PropertyTypes, Relation} from "@shared/entity/Entity";
-import {State} from "@shared/state/State";
+import {Entity, Property, PropertyTypes, Relation} from "@interaqt/shared";
+import {State} from "@interaqt/shared";
 
 import {
     RelationStateMachine,
@@ -20,8 +20,8 @@ import {
     RelationCount,
     Count,
     RelationBasedEvery, RelationBasedAny, Every, Any
-} from "@shared/IncrementalComputation";
-import {removeAllInstance, stringifyAllInstances} from "@shared/createClass";
+} from "@interaqt/shared";
+import {removeAllInstance, stringifyAllInstances} from "@interaqt/shared";
 
 const UserEntity = Entity.createReactive({ name: 'User' })
 const nameProperty = Property.createReactive({ name: 'name', type: PropertyTypes.String })

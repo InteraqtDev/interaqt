@@ -1,13 +1,16 @@
 {
   "name": "@interaqt/runtime",
-  "module": "index.ts",
   "devDependencies": {
+    "rimraf": "^5.0.5",
     "typescript": "^5.2.2",
     "vite-tsconfig-paths": "^4.2.1",
     "vitest": "^0.34.6"
   },
   "scripts": {
-    "test": "vitest"
+    "test": "vitest",
+    "build": "rimraf dist && tsc -p ./tsconfig.prod.json",
+    "type": "api-extractor run --verbose",
+    "build-all": "npm run build && npm run type"
   },
   "version": "1.0.0",
   "main": "index.js",
@@ -17,6 +20,12 @@
     "acorn": "^8.10.0",
     "promised-sqlite3": "^2.1.0",
     "sqlite3": "^5.1.6"
+  },
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js"
+    }
   },
   "type": "module"
 }

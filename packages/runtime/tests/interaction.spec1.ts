@@ -1,9 +1,9 @@
 // import {describe, test, expect, beforeEach} from "vitest";
 // import {InteractionCall, AttributeError} from "../InteractionCall";
 // import { MonoSystem } from "../MonoSystem";
-// import {createInstances, getInstance, KlassByName, KlassInstance, removeAllInstance} from "@shared/createClass";
+// import {createInstances, getInstance, KlassByName, KlassInstance, removeAllInstance} from "@interaqt/shared";
 //
-// import { Interaction } from "@shared/activity/Activity";
+// import { Interaction } from "@interaqt/shared";
 // import {InteractionEventArgs} from "../../types/interaction";
 //
 // describe("interaction",  () => {

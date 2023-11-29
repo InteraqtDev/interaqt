@@ -1,9 +1,9 @@
 import {RecordMutationEvent} from "../System";
 import {IncrementalComputedDataHandle, StatePatch} from "./IncrementalComputedDataHandle";
-import {KlassInstance} from "@shared/createClass";
-import {Entity, Relation} from "@shared/entity/Entity";
-import {RelationBasedWeightedSummation} from "@shared/IncrementalComputation";
-import {MatchExp} from '@storage/erstorage/MatchExp'
+import {KlassInstance} from "@interaqt/shared";
+import {Entity, Relation} from "@interaqt/shared";
+import {RelationBasedWeightedSummation} from "@interaqt/shared";
+import {MatchExp} from '@interaqt/storage'
 import {ComputedDataHandle} from "./ComputedDataHandle";
 
 type RelationChangeEffect = {

@@ -1,7 +1,7 @@
-import {KlassInstance} from "@shared/createClass";
+import {KlassInstance} from "@interaqt/shared";
 import {
     Count,
-} from '@shared/IncrementalComputation'
+} from '@interaqt/shared'
 import {ComputedDataHandle} from "./ComputedDataHandle";
 import {WeightedSummationHandle} from "./WeightedSummation";
 

@@ -1,8 +1,8 @@
 import {ComputedDataHandle} from "./ComputedDataHandle";
-import {KlassInstance, Klass} from "@shared/createClass";
-import {State} from "@shared/state/State";
+import {KlassInstance, Klass} from "@interaqt/shared";
+import {State} from "@interaqt/shared";
 
-import {Every, Count} from "@shared/IncrementalComputation";
+import {Every, Count} from "@interaqt/shared";
 import {RecordMutationEvent, SYSTEM_RECORD} from "../System";
 
 export class EveryHandle extends ComputedDataHandle {
