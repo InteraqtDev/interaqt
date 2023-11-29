@@ -103,7 +103,7 @@
      * SUPPORTED TOKENS: <projectFolder>, <packageName>, <unscopedPackageName>
      * DEFAULT VALUE: "<projectFolder>/tsconfig.json"
      */
-    // "tsconfigFilePath": "<projectFolder>/tsconfig.json",
+     "tsconfigFilePath": "<projectFolder>/tsconfig.prod.json",
     /**
      * Provides a compiler configuration that will be used instead of reading the tsconfig.json file from disk.
      * The object must conform to the TypeScript tsconfig schema:
@@ -241,7 +241,7 @@
     /**
      * (REQUIRED) Whether to generate the .d.ts rollup file.
      */
-    "enabled": true
+    "enabled": true,
 
     /**
      * Specifies the output path for a .d.ts rollup file to be generated without any trimming.
@@ -255,7 +255,7 @@
      * SUPPORTED TOKENS: <projectFolder>, <packageName>, <unscopedPackageName>
      * DEFAULT VALUE: "<projectFolder>/dist/<unscopedPackageName>.d.ts"
      */
-    // "untrimmedFilePath": "<projectFolder>/dist/<unscopedPackageName>.d.ts",
+     "untrimmedFilePath": "<projectFolder>/dist/index.d.ts",
 
     /**
      * Specifies the output path for a .d.ts rollup file to be generated with trimming for an "alpha" release.

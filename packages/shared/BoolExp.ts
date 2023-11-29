@@ -1,5 +1,5 @@
 import {Expression, ExpressionStatement, parse as parseStr} from 'acorn'
-import {assert, indexBy} from "./util";
+import {assert, indexBy} from "./utils";
 
 type AtomData<T> = {
     type: 'atom',

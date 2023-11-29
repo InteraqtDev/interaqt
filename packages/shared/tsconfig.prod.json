@@ -31,6 +31,6 @@
     "./createClass.ts",
     "./IncrementalComputation.ts",
     "./index.ts",
-    "./util.ts",
+    "./utils.ts"
   ]
 }
