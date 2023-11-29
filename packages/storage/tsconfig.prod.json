@@ -1,0 +1,36 @@
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "outDir": "dist",
+    "sourceMap": true,
+    "target": "es2019",
+    "newLine": "LF",
+    "useDefineForClassFields": false,
+    "module": "esnext",
+    "declaration": true,
+    "declarationMap": true,
+    "moduleResolution": "node",
+    "allowJs": false,
+    "strict": true,
+    "noUnusedLocals": true,
+    "experimentalDecorators": true,
+    "resolveJsonModule": true,
+    "esModuleInterop": true,
+    "removeComments": false,
+    "lib": ["esnext", "dom"],
+    "types": [],
+    "rootDir": "."
+  },
+  "include": [
+    "./activity/**/*.ts",
+    "./entity/**/*.ts",
+    "./state/**/*.ts",
+    "./user/**/*.ts",
+    "./attributive.ts",
+    "./BoolExp.ts",
+    "./createClass.ts",
+    "./IncrementalComputation.ts",
+    "./index.ts",
+    "./util.ts",
+  ]
+}

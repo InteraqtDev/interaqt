@@ -1,6 +1,6 @@
-import {RecordInfo} from "./RecordInfo.ts";
-import {assert} from "../util.ts";
-import {EntityToTableMap, LinkMapItem, RecordMapItem} from "./EntityToTableMap.ts";
+import {RecordInfo} from "./RecordInfo";
+import {assert} from "../util";
+import {EntityToTableMap, LinkMapItem, RecordMapItem} from "./EntityToTableMap";
 
 export class LinkInfo {
     constructor(public name: string, public data: LinkMapItem, public map: EntityToTableMap) {

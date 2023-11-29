@@ -1,8 +1,7 @@
 import {EntityToTableMap} from "./EntityToTableMap";
-import {assert} from "../util.ts";
+import {assert} from "../util";
 
-import {RecordQueryData, RecordQueryTree, RecordQuery, LINK_SYMBOL, ALL_ATTR_SYMBOL} from "./RecordQuery.ts";
-import {MatchExp} from "./MatchExp.ts";
+import {ALL_ATTR_SYMBOL, LINK_SYMBOL, RecordQuery, RecordQueryData, RecordQueryTree} from "./RecordQuery";
 
 export type AttributeQueryDataRecordItem = [string, RecordQueryData, boolean?]
 export type AttributeQueryDataItem = string | AttributeQueryDataRecordItem

@@ -1,13 +1,13 @@
 import {expect, test, describe} from "vitest";
 import {
     RecordQueryAgent
-} from "../erstorage/RecordQueryAgent.ts";
+} from "../erstorage/RecordQueryAgent";
 import { SQLiteDB } from '../../runtime/SQLite'
 import {EntityToTableMap, MapData} from "../erstorage/EntityToTableMap";
 import {entityToTableMapData} from "./data/mapData";
-import {MatchExp, MatchExpressionData} from "../erstorage/MatchExp.ts";
-import {AttributeQuery, AttributeQueryData} from "../erstorage/AttributeQuery.ts";
-import {RecordQueryData, RecordQuery} from "../erstorage/RecordQuery.ts";
+import {MatchExp, MatchExpressionData} from "../erstorage/MatchExp";
+import {AttributeQuery, AttributeQueryData} from "../erstorage/AttributeQuery";
+import {RecordQueryData, RecordQuery} from "../erstorage/RecordQuery";
 
 
 const database = new SQLiteDB()

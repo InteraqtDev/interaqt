@@ -1,8 +1,7 @@
-// @ts-ignore
-import {BoolExp} from "../../shared/BoolExp";
+import {BoolExp} from "@interaqt/shared";
 import {EntityToTableMap} from "./EntityToTableMap";
 import {assert} from "../util";
-import {RecordQueryTree} from "./RecordQuery.ts";
+import {RecordQueryTree} from "./RecordQuery";
 
 export type MatchAtom = { key: string, value: [string, any], isReferenceValue?: boolean }
 export type MatchExpressionData = BoolExp<MatchAtom>

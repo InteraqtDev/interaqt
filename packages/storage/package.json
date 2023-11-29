@@ -2,16 +2,28 @@
   "name": "storage",
   "module": "index.ts",
   "type": "module",
+    "version": "1.0.0",
   "devDependencies": {
     "@vitest/coverage-v8": "^0.34.6",
+    "rimraf": "^5.0.5",
     "vite-tsconfig-paths": "^4.2.1",
     "vitest": "^0.34.6"
   },
   "peerDependencies": {
     "typescript": "^5.2.2"
   },
+  "dependencies": {
+    "@interaqt/shared": "^1.0.0"
+  },
   "scripts": {
     "test": "vitest",
+    "build": "rimraf dist && tsc -p ./tsconfig.prod.json",
+    "build-type": "api-extractor run",
     "coverage": "vitest --coverage"
+  },
+  "exports": {
+    ".": {
+      "import": "./dist/index.js"
+    }
   }
 }

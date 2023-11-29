@@ -1,10 +1,10 @@
-import {MatchExp, MatchExpressionData} from "./MatchExp.ts";
+import {MatchExp, MatchExpressionData} from "./MatchExp";
 import {AttributeQuery, AttributeQueryData} from "./AttributeQuery";
 import {Modifier, ModifierData} from "./Modifier";
 import {EntityToTableMap} from "./EntityToTableMap";
-import {AttributeInfo} from "./AttributeInfo.ts";
-import {assert} from "../util.ts";
-import {RecursiveContext} from "./RecordQueryAgent.ts";
+import {AttributeInfo} from "./AttributeInfo";
+import {assert} from "../util";
+import {RecursiveContext} from "./RecordQueryAgent";
 
 export type RecordQueryData = {
     matchExpression?: MatchExpressionData,

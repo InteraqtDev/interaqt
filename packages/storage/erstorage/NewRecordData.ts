@@ -1,9 +1,8 @@
 import {EntityToTableMap} from "./EntityToTableMap";
-import {assert} from "../util.ts";
-import {flatten} from "./util.ts";
-import {AttributeInfo} from "./AttributeInfo.ts";
-import {Record} from "./RecordQueryAgent.ts";
-import {LINK_SYMBOL} from "./RecordQuery.ts";
+import {flatten} from "./util";
+import {AttributeInfo} from "./AttributeInfo";
+import {Record} from "./RecordQueryAgent";
+import {LINK_SYMBOL} from "./RecordQuery";
 
 export type RawEntityData = { [k: string]: any }
 

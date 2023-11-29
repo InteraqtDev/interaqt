@@ -1,6 +1,5 @@
-import {AttributeInfo} from "./AttributeInfo.ts";
-import {EntityToTableMap, RecordAttribute, RecordMapItem} from "./EntityToTableMap.ts";
-import {flatten} from "./util.ts";
+import {AttributeInfo} from "./AttributeInfo";
+import {EntityToTableMap, RecordAttribute, RecordMapItem} from "./EntityToTableMap";
 
 export class RecordInfo {
     data: RecordMapItem

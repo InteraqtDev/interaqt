@@ -1,5 +1,5 @@
-import {assert} from "../util.ts";
-import {EntityToTableMap, RecordAttribute, ValueAttribute} from "./EntityToTableMap.ts";
+import {assert} from "../util";
+import {EntityToTableMap, RecordAttribute, ValueAttribute} from "./EntityToTableMap";
 
 export class AttributeInfo {
     public data: ValueAttribute | RecordAttribute

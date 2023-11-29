@@ -1,5 +1,5 @@
-import {Entity, Property, PropertyTypes, Relation} from "../../../shared/entity/Entity";
-import {KlassInstance, removeAllInstance} from "../../../shared/createClass";
+import {Entity, Property, PropertyTypes, Relation} from "@interaqt/shared";
+import {KlassInstance, removeAllInstance} from "@interaqt/shared";
 
 // @ts-ignore
 export function createCommonData(): { entities: KlassInstance<typeof Entity, false>[], relations: KlassInstance<typeof Relation, false>[] } {

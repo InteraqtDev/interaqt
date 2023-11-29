@@ -1,8 +1,8 @@
-import {Entity, Property, Relation} from "../../shared/entity/Entity.ts";
-import {KlassInstance} from "../../shared/createClass.ts";
+import {Entity, Relation} from "@interaqt/shared/";
+import {KlassInstance} from "@interaqt/shared";
 import {LinkMapItem, MapData, RecordAttribute, RecordMapItem, ValueAttribute} from "./EntityToTableMap";
 import {assert} from "../util";
-import {Database, ID_ATTR, ROW_ID_ATTR} from "../../runtime/System";
+import {Database, ID_ATTR, ROW_ID_ATTR} from "./EntityQueryHandle";
 
 type ColumnData = {
     name:string,
@@ -262,7 +262,7 @@ export class DBSetup {
                 const attributeData = (this.map.records[currentRecord].attributes[currentAttribute]! as RecordAttribute)
                 const linkName = attributeData.linkName
                 const linkData = this.map.links[linkName]
-                const {relType, sourceRecord, targetRecord, isSourceRelation} = linkData
+                const {relType, sourceRecord, targetRecord} = linkData
                 assert(
                     relType[0] === '1' && relType[1] === '1' && sourceRecord !== targetRecord,
                     `only 1:1 can merge: ${rootRecord}.${attributePath.slice(0, i+1).join('.')}`

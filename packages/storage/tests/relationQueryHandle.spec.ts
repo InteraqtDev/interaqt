@@ -3,9 +3,9 @@ import { createCommonData} from "./data/common";
 import {DBSetup} from "../erstorage/Setup";
 import { SQLiteDB } from '../../runtime/SQLite'
 import {EntityToTableMap} from "../erstorage/EntityToTableMap";
-import {removeAllInstance} from '../../shared/createClass'
-import {MatchExp} from "../erstorage/MatchExp.ts";
-import {EntityQueryHandle} from "../erstorage/EntityQueryHandle.ts";
+import {removeAllInstance} from '@interaqt/shared'
+import {MatchExp} from "../erstorage/MatchExp";
+import {EntityQueryHandle} from "../erstorage/EntityQueryHandle";
 
 
 describe('find relation', () => {

@@ -1,8 +1,8 @@
 import {assert} from "../util";
-import {AttributeInfo} from "./AttributeInfo.ts";
-import {RecordInfo} from "./RecordInfo.ts";
-import {LinkInfo} from "./LinkInfo.ts";
-import {LINK_SYMBOL} from "./RecordQuery.ts";
+import {AttributeInfo} from "./AttributeInfo";
+import {RecordInfo} from "./RecordInfo";
+import {LinkInfo} from "./LinkInfo";
+import {LINK_SYMBOL} from "./RecordQuery";
 
 
 export type ValueAttribute = {
@@ -189,7 +189,6 @@ export class EntityToTableMap {
 
         for(let i = 0; i<relationPath.length; i++) {
             // 对称关系要说明方向，不然  join 表的时候两个方向都用的同一个 alias，逻辑错误。它的格式是 'xxx:source' 或者 ‘xxx:target’
-            const currentNamePair = relationPath[i].includes(':') ? relationPath[i].split(':') : [relationPath[i], undefined]
             const [currentAttributeName, symmetricDirection] = this.getAttributeAndSymmetricDirection(relationPath[i])
 
             const path = [rootEntityName, ...relationPath.slice(0, i+1)]

@@ -1,12 +1,29 @@
-import {EntityToTableMap} from "./EntityToTableMap.ts";
-import {MatchExp, MatchExpressionData} from "./MatchExp.ts";
-import {ModifierData} from "./Modifier.ts";
-import {AttributeQueryData} from "./AttributeQuery.ts";
-import {assert} from "../util.ts";
-import {RecordQuery} from "./RecordQuery.ts";
-import {NewRecordData, RawEntityData} from "./NewRecordData.ts";
-import {MutationEvent, RecordQueryAgent} from "./RecordQueryAgent.ts";
-import {Database, EntityIdRef} from '../../runtime/System'
+import {EntityToTableMap} from "./EntityToTableMap";
+import {MatchExp, MatchExpressionData} from "./MatchExp";
+import {ModifierData} from "./Modifier";
+import {AttributeQueryData} from "./AttributeQuery";
+import {assert} from "../util";
+import {RecordQuery} from "./RecordQuery";
+import {NewRecordData, RawEntityData} from "./NewRecordData";
+import {MutationEvent, RecordQueryAgent} from "./RecordQueryAgent";
+
+export const ROW_ID_ATTR = '_rowId'
+export const ID_ATTR = 'id'
+
+export type EntityIdRef = {
+    id: string,
+    [ROW_ID_ATTR]? : string,
+    [k:string]: any
+}
+export type Database = {
+    scheme: (sql:string, name?:string) => Promise<any>
+    query: <T extends any>(sql: string, name?:string) => Promise<T[]>
+    delete: <T extends any>(sql: string, name?:string) => Promise<T[]>
+    insert: (sql: string, name?:string) => Promise<EntityIdRef>
+    update: (sql: string, idField?: string, name?:string) => Promise<EntityIdRef[]>
+    getAutoId: (recordName: string) => Promise<string>
+}
+
 export class EntityQueryHandle {
     agent: RecordQueryAgent
 

@@ -1,19 +1,11 @@
 import {EntityToTableMap} from "./EntityToTableMap";
 import {assert, setByPath} from "../util";
-// @ts-ignore
-import {BoolExp} from '../../shared/BoolExp.ts'
-// @ts-ignore
-import {Database, EntityIdRef} from '../../runtime/System'
-import {FieldMatchAtom, MatchAtom, MatchExp, MatchExpressionData} from "./MatchExp.ts";
-import {
-    AttributeQuery,
-    AttributeQueryData,
-    AttributeQueryDataItem,
-    AttributeQueryDataRecordItem
-} from "./AttributeQuery.ts";
-import {LINK_SYMBOL, RecordQuery, RecordQueryTree} from "./RecordQuery.ts";
-import {NewRecordData, RawEntityData} from "./NewRecordData.ts";
-import {someAsync} from "./util.ts";
+import {BoolExp} from '@interaqt/shared'
+import {Database, EntityIdRef} from './EntityQueryHandle'
+import {FieldMatchAtom, MatchAtom, MatchExp, MatchExpressionData} from "./MatchExp";
+import {AttributeQuery, AttributeQueryData, AttributeQueryDataRecordItem} from "./AttributeQuery";
+import {LINK_SYMBOL, RecordQuery, RecordQueryTree} from "./RecordQuery";
+import {NewRecordData, RawEntityData} from "./NewRecordData";
 
 
 export type MutationEvent = {
@@ -1247,7 +1239,7 @@ WHERE ${recordInfo.idField} IN (${records.map(({id}) => JSON.stringify(id)).join
             base.push([attr, { attributeQuery: ['*'] }])
             base = (base.at(-1)! as AttributeQueryDataRecordItem)[1].attributeQuery!
         }
-        let foundPath: string[]|undefined
+        let foundPath: Record[]|undefined
         const exit = async (context: RecursiveContext) => {
             if (foundPath) return true
 

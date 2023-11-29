@@ -1,8 +1,8 @@
 import { expect, test, describe } from "vitest";
 import {EntityToTableMap, MapData} from "../erstorage/EntityToTableMap";
 import {entityToTableMapData} from "./data/mapData";
-import {MatchExp, MatchExpressionData} from "../erstorage/MatchExp.ts";
-import {RecordQueryTree} from "../erstorage/RecordQuery.ts";
+import {MatchExp, MatchExpressionData} from "../erstorage/MatchExp";
+import {RecordQueryTree} from "../erstorage/RecordQuery";
 
 
 const entityToTableMap = new EntityToTableMap(entityToTableMapData)

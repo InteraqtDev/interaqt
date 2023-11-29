@@ -3,10 +3,10 @@ import { createCommonData} from "./data/common";
 import {DBSetup} from "../erstorage/Setup";
 import { SQLiteDB } from '../../runtime/SQLite'
 import {EntityToTableMap} from "../erstorage/EntityToTableMap";
-import {MatchExp} from "../erstorage/MatchExp.ts";
-import {EntityQueryHandle} from "../erstorage/EntityQueryHandle.ts";
-import {MutationEvent} from "../erstorage/RecordQueryAgent.ts";
-import {LINK_SYMBOL} from "../erstorage/RecordQuery.ts";
+import {MatchExp} from "../erstorage/MatchExp";
+import {EntityQueryHandle} from "../erstorage/EntityQueryHandle";
+import {MutationEvent} from "../erstorage/RecordQueryAgent";
+import {LINK_SYMBOL} from "../erstorage/RecordQuery";
 
 
 describe('one to one', () => {

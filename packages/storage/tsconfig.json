@@ -5,7 +5,7 @@
     "target": "esnext",
     "moduleResolution": "bundler",
     "moduleDetection": "force",
-    "allowImportingTsExtensions": true,
+    "allowImportingTsExtensions": false,
     "noEmit": true,
     "composite": true,
     "strict": true,
@@ -15,12 +15,7 @@
     "allowSyntheticDefaultImports": true,
     "forceConsistentCasingInFileNames": true,
     "allowJs": true,
-    "paths": {
-      "@shared/*": ["../shared/*"],
-    },
     "include": [
-      "../shared",
-      "../runtime",
       "./erstorage",
       "./test"
     ]
