@@ -1,4 +1,4 @@
-import {assert} from "../util";
+import {assert} from "../utils";
 import {EntityToTableMap, RecordAttribute, ValueAttribute} from "./EntityToTableMap";
 
 export class AttributeInfo {

@@ -1,5 +1,5 @@
 {
-  "name": "storage",
+  "name": "@interaqt/storage",
   "module": "index.ts",
   "type": "module",
     "version": "1.0.0",
@@ -18,9 +18,11 @@
   "scripts": {
     "test": "vitest",
     "build": "rimraf dist && tsc -p ./tsconfig.prod.json",
-    "build-type": "api-extractor run",
+    "type": "api-extractor run",
+    "build-all": "npm run build && npm run type",
     "coverage": "vitest --coverage"
   },
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "import": "./dist/index.js"

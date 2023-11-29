@@ -2,7 +2,7 @@ import {EntityToTableMap} from "./EntityToTableMap";
 import {MatchExp, MatchExpressionData} from "./MatchExp";
 import {ModifierData} from "./Modifier";
 import {AttributeQueryData} from "./AttributeQuery";
-import {assert} from "../util";
+import {assert} from "../utils";
 import {RecordQuery} from "./RecordQuery";
 import {NewRecordData, RawEntityData} from "./NewRecordData";
 import {MutationEvent, RecordQueryAgent} from "./RecordQueryAgent";

@@ -3,7 +3,7 @@ import {AttributeQuery, AttributeQueryData} from "./AttributeQuery";
 import {Modifier, ModifierData} from "./Modifier";
 import {EntityToTableMap} from "./EntityToTableMap";
 import {AttributeInfo} from "./AttributeInfo";
-import {assert} from "../util";
+import {assert} from "../utils";
 import {RecursiveContext} from "./RecordQueryAgent";
 
 export type RecordQueryData = {

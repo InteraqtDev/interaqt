@@ -1,5 +1,5 @@
 import {EntityToTableMap} from "./EntityToTableMap";
-import {assert} from "../util";
+import {assert} from "../utils";
 
 import {ALL_ATTR_SYMBOL, LINK_SYMBOL, RecordQuery, RecordQueryData, RecordQueryTree} from "./RecordQuery";
 

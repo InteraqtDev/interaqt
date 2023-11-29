@@ -1,7 +1,7 @@
-import {Entity, Relation} from "@interaqt/shared/";
+import {Entity, Relation} from "@interaqt/shared";
 import {KlassInstance} from "@interaqt/shared";
 import {LinkMapItem, MapData, RecordAttribute, RecordMapItem, ValueAttribute} from "./EntityToTableMap";
-import {assert} from "../util";
+import {assert} from "../utils";
 import {Database, ID_ATTR, ROW_ID_ATTR} from "./EntityQueryHandle";
 
 type ColumnData = {

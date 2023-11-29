@@ -1,5 +1,5 @@
 import {EntityToTableMap} from "./EntityToTableMap";
-import {assert, setByPath} from "../util";
+import {assert, setByPath} from "../utils";
 import {BoolExp} from '@interaqt/shared'
 import {Database, EntityIdRef} from './EntityQueryHandle'
 import {FieldMatchAtom, MatchAtom, MatchExp, MatchExpressionData} from "./MatchExp";

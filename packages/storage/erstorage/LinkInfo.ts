@@ -1,5 +1,5 @@
 import {RecordInfo} from "./RecordInfo";
-import {assert} from "../util";
+import {assert} from "../utils";
 import {EntityToTableMap, LinkMapItem, RecordMapItem} from "./EntityToTableMap";
 
 export class LinkInfo {

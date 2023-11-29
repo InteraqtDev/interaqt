@@ -1,6 +1,6 @@
 import {BoolExp} from "@interaqt/shared";
 import {EntityToTableMap} from "./EntityToTableMap";
-import {assert} from "../util";
+import {assert} from "../utils";
 import {RecordQueryTree} from "./RecordQuery";
 
 export type MatchAtom = { key: string, value: [string, any], isReferenceValue?: boolean }

@@ -22,15 +22,8 @@
     "rootDir": "."
   },
   "include": [
-    "./activity/**/*.ts",
-    "./entity/**/*.ts",
-    "./state/**/*.ts",
-    "./user/**/*.ts",
-    "./attributive.ts",
-    "./BoolExp.ts",
-    "./createClass.ts",
-    "./IncrementalComputation.ts",
+    "./erstorage",
     "./index.ts",
-    "./util.ts",
+    "./utils.ts"
   ]
 }

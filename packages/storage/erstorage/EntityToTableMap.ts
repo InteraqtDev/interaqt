@@ -1,4 +1,4 @@
-import {assert} from "../util";
+import {assert} from "../utils";
 import {AttributeInfo} from "./AttributeInfo";
 import {RecordInfo} from "./RecordInfo";
 import {LinkInfo} from "./LinkInfo";
