@@ -42,7 +42,7 @@ export const BoolAtomData = createClass({
 })
 
 
-type UnwrappedBoolExpressionInstanceType = {
+export type UnwrappedBoolExpressionInstanceType = {
     type: 'expression',
     operator: 'and' | 'or' | 'not',
     left: UnwrappedBoolExpressionInstanceType| KlassInstance<typeof BoolAtomData, any>,

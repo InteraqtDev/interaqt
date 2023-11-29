@@ -127,7 +127,7 @@ export const PropertyTypeMap = {
 }
 
 
-type RelationPublic = {
+export type RelationPublic = {
     name: {
         // TODO 是自动根据 entity/attribute 生成的，应该怎么表示？
         type: 'string',
@@ -225,15 +225,15 @@ export const Relation = createClass({
             required: true,
             collection: false,
             constraints: {
-                nameNotSameWithProp(relation) {
+                nameNotSameWithProp(relation:KlassInstance<Klass<RelationPublic>, false>) {
                     return computed(() => {
                         const {entity1, targetName1} = relation
-                        return entity1?.properties?.every((p: typeof Property) => {
+                        return entity1?.properties?.every((p) => {
                             return p.name !== targetName1
                         })
                     })
                 },
-                nameUnique(relation) {
+                nameUnique(relation:KlassInstance<Klass<RelationPublic>, false>) {
                     return computed(() => {
                         const {entity1, entity2, targetName1, targetName2} = relation
                         return !(entity1 === entity2 && targetName1 === targetName2)
@@ -254,15 +254,15 @@ export const Relation = createClass({
             required: true,
             collection: false,
             constraints: {
-                nameNotSameWithProp(relation) {
+                nameNotSameWithProp(relation:KlassInstance<Klass<RelationPublic>, false>) {
                     return computed(() => {
                         const {entity2, targetName2} = relation
-                        return entity2?.properties?.every((p: typeof Property) => {
+                        return entity2?.properties?.every((p) => {
                             return p.name !== targetName2
                         })
                     })
                 },
-                nameUnique(relation) {
+                nameUnique(relation:KlassInstance<Klass<RelationPublic>, false>) {
                     return computed(() => {
                         const {entity1, entity2, targetName1, targetName2} = relation
                         return !(entity1 === entity2 && targetName1 === targetName2)
@@ -302,7 +302,7 @@ export const Relation = createClass({
             constraints: {
                 // 这里是从上面复制下来的。
                 // 默认第一参数是 property 本身，第二参数是 relation
-                eachNameUnique(relation) {
+                eachNameUnique(relation:KlassInstance<Klass<RelationPublic>, false>) {
                     // CAUTION 这里取的是 leaf atom，不然到 incUnique 里面已经监听不到  name string 的变化了。
                     // FIXME 实例化之后 property 不是个 Class 吗？它的 name 就是个 atom，也没有 $name 这个属性，如何统一？？？
                     return computed(() => {

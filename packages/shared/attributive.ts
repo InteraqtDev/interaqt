@@ -1,4 +1,4 @@
-import {BoolExpressionData} from "./BoolExp";
+import {BoolExpressionRawData} from "./BoolExp";
 
 
 // Role/RoleAttributive/Entity 是 ConceptType
@@ -26,11 +26,11 @@ export type UserAttributiveAtom = {
     [k:string]: any
 }
 
-export type UserAttributives = BoolExpressionData<UserAttributiveAtom>
+export type UserAttributivesType = BoolExpressionRawData<UserAttributiveAtom>
 
 export type EntityAttributiveAtom = {
     key: string,
     [k:string]: any
 }
 
-export type EntityAttributives = BoolExpressionData<EntityAttributiveAtom>
+export type EntityAttributivesType = BoolExpressionRawData<EntityAttributiveAtom>

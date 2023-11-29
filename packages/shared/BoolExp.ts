@@ -6,7 +6,7 @@ type AtomData<T> = {
     data: T
 }
 
-export type BoolExpressionData<T> = {
+export type BoolExpressionRawData<T> = {
     type: 'expression',
     operator: 'and'|'not'|'or',
     left: ExpressionData<T>
@@ -20,7 +20,7 @@ export type EvaluateError = {
     inverse: boolean
 }
 
-export type ExpressionData<T> = BoolExpressionData<T> | AtomData<T>
+export type ExpressionData<T> = BoolExpressionRawData<T> | AtomData<T>
 
 export type AtomHandle<T> = (arg:T) => boolean|Promise<boolean>
 
@@ -33,10 +33,10 @@ export class BoolExp<T> {
         return this.raw.type === 'atom'
     }
     get left() {
-        return new BoolExp<T>((this.raw as BoolExpressionData<T>).left)
+        return new BoolExp<T>((this.raw as BoolExpressionRawData<T>).left)
     }
     get right() {
-        return new BoolExp<T>((this.raw as BoolExpressionData<T>).right!)
+        return new BoolExp<T>((this.raw as BoolExpressionRawData<T>).right!)
     }
     get data() {
         return (this.raw as AtomData<T>).data
@@ -57,13 +57,13 @@ export class BoolExp<T> {
         })
     }
     isAnd() {
-        return (this.raw as BoolExpressionData<T>).operator === 'and'
+        return (this.raw as BoolExpressionRawData<T>).operator === 'and'
     }
     isOr() {
-        return (this.raw as BoolExpressionData<T>).operator === 'or'
+        return (this.raw as BoolExpressionRawData<T>).operator === 'or'
     }
     isNot() {
-        return (this.raw as BoolExpressionData<T>).operator === 'not'
+        return (this.raw as BoolExpressionRawData<T>).operator === 'not'
     }
     or(atomValueOrExp: any) {
         return new BoolExp<T>({
@@ -182,7 +182,7 @@ function astNodeToBoolExpressionNode<T>(astNode: Expression, optionsByName: {[k:
             operator: OperatorNames[astNode.operator as keyof typeof OperatorNames],
             left: astNodeToBoolExpressionNode(astNode.left, optionsByName, parseAtomNameToObject),
             right: astNodeToBoolExpressionNode(astNode.right, optionsByName, parseAtomNameToObject)
-        } as BoolExpressionData<T>
+        } as BoolExpressionRawData<T>
     }
 
     if (astNode.type === "Identifier") {

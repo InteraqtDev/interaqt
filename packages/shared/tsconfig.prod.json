@@ -3,10 +3,12 @@
     "baseUrl": ".",
     "outDir": "dist",
     "sourceMap": true,
-    "target": "esnext",
+    "target": "es2019",
     "newLine": "LF",
     "useDefineForClassFields": false,
     "module": "esnext",
+    "declaration": true,
+    "declarationMap": true,
     "moduleResolution": "node",
     "allowJs": false,
     "strict": true,
@@ -16,11 +18,19 @@
     "esModuleInterop": true,
     "removeComments": false,
     "lib": ["esnext", "dom"],
-    "types": [ "node", "acorn"],
+    "types": [],
     "rootDir": "."
   },
   "include": [
-    "./",
-    "global.d.ts"
+    "./activity/**/*.ts",
+    "./entity/**/*.ts",
+    "./state/**/*.ts",
+    "./user/**/*.ts",
+    "./attributive.ts",
+    "./BoolExp.ts",
+    "./createClass.ts",
+    "./IncrementalComputation.ts",
+    "./index.ts",
+    "./util.ts",
   ]
 }
