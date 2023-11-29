@@ -299,31 +299,57 @@ describe('one to one', () => {
         expect(findProfiles2.length).toBe(1)
         expect(findProfiles2[0]).toMatchObject({
             title: 'f1',
+            id: userA.profile.id,
             owner: {
                 id: null,
                 name: null,
             }
         })
 
+        const profiles = await entityQueryHandle.find('Profile',
+            undefined,
+            {},
+            ['title', ['owner', {attributeQuery: ['name']}]]
+        )
+        expect(profiles.length).toBe(2)
+
         expect(events).toMatchObject([
             {
-                type: "delete",
-                recordName: "Profile_owner_profile_User",
-                record: {
-                    id: userA.profile[LINK_SYMBOL].id
+                "type": "delete",
+                "recordName": "Profile_owner_profile_User",
+                "record": {
+                    "viewed": null,
+                    "id": 1,
                 }
-            }, {
-                type: "create",
-                recordName: "Profile",
-                record: {
-                    title: "f2",
-                    id: 3,
+            },
+            {
+                "type": "create",
+                "recordName": "Profile",
+                "record": {
+                    "title": "f2",
+                    "id": 2,
+                    "&": {
+                        "id": 2
+                    }
                 }
-            }, {
-                type: "create",
-                recordName: "Profile_owner_profile_User",
-                record: {
-                    id: 2
+            },
+            {
+                "type": "create",
+                "recordName": "Profile_owner_profile_User",
+                "record": {
+                    "id": 2,
+                    "source": {
+                        "title": "f2"
+                    },
+                    "target": {
+                        "profile": {
+                            "title": "f2",
+                            "id": 2,
+                            "&": {
+                                "id": 2
+                            }
+                        }
+                    }
                 }
             }
         ])

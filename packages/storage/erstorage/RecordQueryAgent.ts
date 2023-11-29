@@ -557,7 +557,10 @@ ${this.buildXToOneFindQuery(existEntityQuery, currentAlias)}
     // CAUTION 因为这里分配了 id，并且所有的判断逻辑都在，所以事件也放在这里处理，而不是真实插入或者更新数据的时候。
     async preprocessSameRowData(newEntityData: NewRecordData, isUpdate = false,  events?:  MutationEvent[], oldRecord?: Record): Promise<NewRecordData> {
         const newRawDataWithNewIds = newEntityData.getData()
-        if (!isUpdate) {
+        // CAUTION 特别注意，我们是支持数据使用 外部  id，例如使用外部用户系统的时候，它的  id 就是外部分配的。
+        //  还有一种情况是 relocate record 的时候也用了这个函数，这个时候也是不要重新分配 id 的！
+        //  也正是因为如此，所以我们通过一个参数 isUpdate 显式声明到底是不是 update，不能用有没有 id 来判断！
+        if (!isUpdate && !newRawDataWithNewIds.id) {
             // 为自己分配 id，一定要在最前面，因为后面记录link 事件的地方一定要有 target/source 的 id
             newRawDataWithNewIds.id = await this.database.getAutoId(newEntityData.recordName)
         }
