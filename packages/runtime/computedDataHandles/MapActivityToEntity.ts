@@ -7,7 +7,7 @@ import {ComputedData, MapActivityToEntity} from '@interaqt/shared'
 import {MatchExp} from '@interaqt/storage'
 import {ComputedDataHandle, DataContext} from "./ComputedDataHandle.js";
 import {RecordMutationEvent} from "../System.js";
-import {activityEntity} from "../MonoSystem";
+import {activityEntity} from "../MonoSystem.js";
 
 export type MapSourceDataType = {
     interaction: KlassInstance<typeof Interaction, false>,
