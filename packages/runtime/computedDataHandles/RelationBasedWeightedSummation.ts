@@ -1,10 +1,10 @@
-import {RecordMutationEvent} from "../System";
-import {IncrementalComputedDataHandle, StatePatch} from "./IncrementalComputedDataHandle";
+import {RecordMutationEvent} from "../System.js";
+import {IncrementalComputedDataHandle, StatePatch} from "./IncrementalComputedDataHandle.js";
 import {KlassInstance} from "@interaqt/shared";
 import {Entity, Relation} from "@interaqt/shared";
 import {RelationBasedWeightedSummation} from "@interaqt/shared";
 import {MatchExp} from '@interaqt/storage'
-import {ComputedDataHandle} from "./ComputedDataHandle";
+import {ComputedDataHandle} from "./ComputedDataHandle.js";
 
 type RelationChangeEffect = {
     affectedId:string,
@@ -76,7 +76,6 @@ export class RelationBasedWeightedSummationHandle extends IncrementalComputedDat
         const matchedRelation = this.relationInfos.find(({relationName}) => relationName === mutationEvent.recordName)
         if (matchedRelation) {
             const infoRecord = mutationEvent.type === 'update' ? mutationEvent.oldRecord! : mutationEvent.record!
-            if(!infoRecord[matchedRelation.entityRelationAttribute].id) debugger
             const relationEffects: RelationChangeEffect[] = matchedRelation.isBidirectional ?
                 [
                     {
@@ -144,7 +143,7 @@ export class RelationBasedWeightedSummationHandle extends IncrementalComputedDat
 
         const { entityRelationAttribute, relatedEntityRelationAttribute, relationName, toCountAttributeName, toCountEntityName, isBidirectional } = effect.info
 
-
+        const a = await this.controller.system.storage.find('Request', undefined, undefined, ['*'])
         // 计算上面的四个值，构建成 isCurrentMatch/isOriginMatch 的计算参数
         // 先找 currentRelationRecord/oldRelationRecord
         if (mutationEvent.recordName === relationName ) {

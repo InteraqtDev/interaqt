@@ -1,10 +1,10 @@
-import {ComputedDataHandle} from "./ComputedDataHandle";
+import {ComputedDataHandle} from "./ComputedDataHandle.js";
 import {KlassInstance, Klass} from "@interaqt/shared";
 import {MatchExp} from '@interaqt/storage'
 import {Entity, Property, Relation} from "@interaqt/shared";
 
 import {RelationBasedEvery, RelationCount} from "@interaqt/shared";
-import {RecordMutationEvent} from "../System";
+import {RecordMutationEvent} from "../System.js";
 
 export class RelationBasedEveryHandle extends ComputedDataHandle {
     matchCountField: string = `${this.propertyName}_match_count`
@@ -35,7 +35,9 @@ export class RelationBasedEveryHandle extends ComputedDataHandle {
             computedData: RelationCount.create({
                 relation: computedData.relation,
                 relationDirection: computedData.relationDirection,
-                matchExpression: `()=>true`
+                matchExpression: `function ${totalCountField}(){
+                    return true
+                }`
             })
         })
         this.dataContext.host?.properties!.push(totalCountProperty)
@@ -69,6 +71,7 @@ export class RelationBasedEveryHandle extends ComputedDataHandle {
         const record = await this.controller.system.storage.findOne(this.recordName!, match, undefined, ['*'])!
         const countMatch = record[this.matchCountField] === record[this.totalCountField]
         const result =  this.notEmpty ? (countMatch && record[this.totalCountField] > 0) : countMatch
+
         return result
     }
 }

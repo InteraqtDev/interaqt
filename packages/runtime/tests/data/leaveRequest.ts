@@ -369,11 +369,9 @@ RequestEntity.properties.push(
         type: 'string',
         collection: false,
         computed: (request: any) => {
-            debugger
             return request.approved ? 'approved' : (request.rejected ? 'rejected' : 'pending')
         }
     }),
-
 )
 
 export const data = JSON.parse(stringifyAllInstances())

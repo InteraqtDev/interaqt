@@ -9,9 +9,9 @@ import {
     ActivityGroup,
     Gateway,
 } from "@interaqt/shared";
-import {assert} from "./util";
-import {System} from "./System";
-import { InteractionCall, InteractionCallResponse} from "./InteractionCall";
+import {assert} from "./util.js";
+import {System} from "./System.js";
+import { InteractionCall, InteractionCallResponse} from "./InteractionCall.js";
 import {InteractionEventArgs} from "./types/interaction";
 import {UserAttributive} from "@interaqt/shared";
 import {MatchExp} from "@interaqt/storage";
@@ -208,6 +208,7 @@ export class ActivityCall {
     graph:Seq
     uuidToNode = new Map<string, InteractionLikeNode|GatewayNode>()
     uuidToInteractionCall = new Map<string, InteractionCall>()
+    interactionCallByName = new Map<string, InteractionCall>()
     rawToNode = new Map<InteractionInstanceType|ActivityGroupInstanceType|GatewayInstanceType, InteractionLikeNode|GatewayNode>()
     constructor(public activity: ActivityInstanceType, public system: System) {
         this.graph = this.buildGraph(activity)
@@ -220,7 +221,11 @@ export class ActivityCall {
             const node: InteractionNode = { content: interaction, next: null, uuid: interaction.uuid, parentGroup, parentSeq: seq as Seq, }
             this.uuidToNode.set(interaction.uuid, node)
             this.rawToNode.set(interaction, node)
-            this.uuidToInteractionCall.set(interaction.uuid, new InteractionCall(interaction, this.system, this))
+            const interactionCall = new InteractionCall(interaction, this.system, this)
+            this.uuidToInteractionCall.set(interaction.uuid, interactionCall)
+            if (interaction.name!) {
+                this.interactionCallByName.set(interaction.name, interactionCall)
+            }
         }
 
         for(let gateway of activity.gateways!) {
@@ -251,7 +256,6 @@ export class ActivityCall {
             const sourceNode = (this.rawToNode.get(transfer.source as InteractionInstanceType) || rawGatewayToNode.get(transfer.source as InteractionInstanceType))!
             const targetNode = (this.rawToNode.get(transfer.target as InteractionInstanceType) || rawGatewayToNode.get(transfer.target as GatewayInstanceType))!
 
-            if (!sourceNode) debugger
             assert(!!sourceNode, `cannot find source ${(transfer.source as InteractionInstanceType).name!}`)
             assert(!!targetNode, `cannot find target ${(transfer.source as InteractionInstanceType).name!}`)
             // CAUTION gateway 的 next 是个数组。其他的都是只有一个指向

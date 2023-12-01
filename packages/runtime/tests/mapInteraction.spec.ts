@@ -1,13 +1,13 @@
 import {beforeEach, describe, expect, test} from "vitest";
-import {Controller} from "../Controller";
-import {MonoSystem} from "../MonoSystem";
+import {Controller} from "../Controller.js";
+import {MonoSystem} from "../MonoSystem.js";
 import {createInstances, KlassByName, removeAllInstance} from "@interaqt/shared";
 import {Activity, Interaction} from "@interaqt/shared";
 import {Entity, Relation} from "@interaqt/shared";
 import {State} from "@interaqt/shared";
-import '../computedDataHandles/index'
+import '../computedDataHandles/index.js'
 import {MatchExp} from '@interaqt/storage'
-import {AttributeError} from "../InteractionCall";
+import {AttributeError} from "../InteractionCall.js";
 
 // 里面有所有必须的数据？
 type User = {
@@ -105,6 +105,8 @@ describe('map interaction', () => {
         expect(requests1.length).toBe(1)
         expect(requests1[0].to.id).toBe(userBId)
         expect(requests1[0].from.id).toBe(userAId)
+        expect(requests1[0].approved_match_count).toBe(0)
+        expect(requests1[0].approved_total_count).toBe(1)
         expect(requests1[0].approved).toBeFalsy()
         expect(requests1[0].rejected).toBeFalsy()
         expect(requests1[0].result).toBe('pending')

@@ -9,6 +9,7 @@ import { ActivityGroupInstanceType } from '@interaqt/shared';
 import { ActivityGroupPublicType } from '@interaqt/shared';
 import { ActivityInstanceType } from '@interaqt/shared';
 import { AsyncDatabase } from 'promised-sqlite3';
+import { Atom } from 'rata';
 import { BoolExp } from '@interaqt/shared';
 import { BoolExpressionRawData } from '@interaqt/shared';
 import { Concept } from '@interaqt/shared';
@@ -29,6 +30,7 @@ import { KlassInstance } from '@interaqt/shared';
 import { MatchExpressionData } from '@interaqt/storage';
 import { MutationEvent as MutationEvent_2 } from '@interaqt/storage';
 import { Property } from '@interaqt/shared';
+import { PropertyTypes } from '@interaqt/shared';
 import { RawEntityData } from '@interaqt/storage';
 import { ReactiveKlassInstance } from '@interaqt/shared';
 import { Record as Record_2 } from '@interaqt/storage';
@@ -36,6 +38,81 @@ import { Relation } from '@interaqt/shared';
 import { RunResult } from 'sqlite3';
 import { TransferPublicType } from '@interaqt/shared';
 import { UserAttributive } from '@interaqt/shared';
+
+// @public (undocumented)
+export const activityEntity: InertKlassInstance<    {
+name: {
+type: "string";
+collection: false;
+required: true;
+constraints: {
+nameFormat({ name }: {
+name: Atom<string>;
+}): Atom<boolean>;
+};
+};
+computedData: {
+type: Klass<any>[];
+collection: false;
+required: false;
+};
+properties: {
+type: Klass<    {
+name: {
+type: "string";
+required: true;
+collection: false;
+constraints: {
+format({ name }: {
+name: Atom<string>;
+}): Atom<boolean>;
+length({ name }: {
+name: Atom<string>;
+}): Atom<boolean>;
+};
+};
+type: {
+type: "string";
+required: true;
+collection: false;
+options: PropertyTypes[];
+};
+collection: {
+type: "boolean";
+required: true;
+collection: false;
+defaultValue(): boolean;
+};
+args: {
+computedType: (values: {
+type: PropertyTypes;
+}) => string;
+};
+computedData: {
+collection: false;
+type: Klass<any>[];
+required: false;
+};
+computed: {
+required: false;
+type: "function";
+collection: false;
+};
+}>;
+collection: true;
+required: true;
+constraints: {
+eachNameUnique({ properties }: any): Atom<boolean>;
+};
+defaultValue(): never[];
+};
+isRef: {
+required: true;
+collection: false;
+type: "boolean";
+defaultValue: () => boolean;
+};
+}>;
 
 // @public (undocumented)
 export class Controller {
@@ -97,6 +174,81 @@ export class Controller {
     // (undocumented)
     system: System;
 }
+
+// @public (undocumented)
+export const eventEntity: InertKlassInstance<    {
+name: {
+type: "string";
+collection: false;
+required: true;
+constraints: {
+nameFormat({ name }: {
+name: Atom<string>;
+}): Atom<boolean>;
+};
+};
+computedData: {
+type: Klass<any>[];
+collection: false;
+required: false;
+};
+properties: {
+type: Klass<    {
+name: {
+type: "string";
+required: true;
+collection: false;
+constraints: {
+format({ name }: {
+name: Atom<string>;
+}): Atom<boolean>;
+length({ name }: {
+name: Atom<string>;
+}): Atom<boolean>;
+};
+};
+type: {
+type: "string";
+required: true;
+collection: false;
+options: PropertyTypes[];
+};
+collection: {
+type: "boolean";
+required: true;
+collection: false;
+defaultValue(): boolean;
+};
+args: {
+computedType: (values: {
+type: PropertyTypes;
+}) => string;
+};
+computedData: {
+collection: false;
+type: Klass<any>[];
+required: false;
+};
+computed: {
+required: false;
+type: "function";
+collection: false;
+};
+}>;
+collection: true;
+required: true;
+constraints: {
+eachNameUnique({ properties }: any): Atom<boolean>;
+};
+defaultValue(): never[];
+};
+isRef: {
+required: true;
+collection: false;
+type: "boolean";
+defaultValue: () => boolean;
+};
+}>;
 
 // @public (undocumented)
 export class MonoSystem implements System {
@@ -162,9 +314,92 @@ export class SQLiteDB implements Database {
     update(sql: string, idField?: string, name?: string): Promise<any[]>;
 }
 
+// Warning: (ae-forgotten-export) The symbol "ServerOptions" needs to be exported by the entry point index.d.ts
+//
+// @public (undocumented)
+export function startServer(controller: Controller, options: ServerOptions): Promise<void>;
+
+// @public (undocumented)
+export const systemEntity: InertKlassInstance<    {
+name: {
+type: "string";
+collection: false;
+required: true;
+constraints: {
+nameFormat({ name }: {
+name: Atom<string>;
+}): Atom<boolean>;
+};
+};
+computedData: {
+type: Klass<any>[];
+collection: false;
+required: false;
+};
+properties: {
+type: Klass<    {
+name: {
+type: "string";
+required: true;
+collection: false;
+constraints: {
+format({ name }: {
+name: Atom<string>;
+}): Atom<boolean>;
+length({ name }: {
+name: Atom<string>;
+}): Atom<boolean>;
+};
+};
+type: {
+type: "string";
+required: true;
+collection: false;
+options: PropertyTypes[];
+};
+collection: {
+type: "boolean";
+required: true;
+collection: false;
+defaultValue(): boolean;
+};
+args: {
+computedType: (values: {
+type: PropertyTypes;
+}) => string;
+};
+computedData: {
+collection: false;
+type: Klass<any>[];
+required: false;
+};
+computed: {
+required: false;
+type: "function";
+collection: false;
+};
+}>;
+collection: true;
+required: true;
+constraints: {
+eachNameUnique({ properties }: any): Atom<boolean>;
+};
+defaultValue(): never[];
+};
+isRef: {
+required: true;
+collection: false;
+type: "boolean";
+defaultValue: () => boolean;
+};
+}>;
+
+// @public (undocumented)
+export const USER_ENTITY = "User";
+
 // Warnings were encountered during analysis:
 //
-// Controller.ts:158:8 - (ae-forgotten-export) The symbol "ActivitySeqStateData" needs to be exported by the entry point index.d.ts
+// Controller.ts:161:8 - (ae-forgotten-export) The symbol "ActivitySeqStateData" needs to be exported by the entry point index.d.ts
 
 // (No @packageDocumentation comment for this package)
 

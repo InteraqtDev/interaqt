@@ -1,9 +1,9 @@
-import {ComputedDataHandle} from "./ComputedDataHandle";
+import {ComputedDataHandle} from "./ComputedDataHandle.js";
 import {KlassInstance, Klass} from "@interaqt/shared";
 import {State} from "@interaqt/shared";
 
 import {Every, Count} from "@interaqt/shared";
-import {RecordMutationEvent, SYSTEM_RECORD} from "../System";
+import {RecordMutationEvent, SYSTEM_RECORD} from "../System.js";
 
 export class EveryHandle extends ComputedDataHandle {
     matchCountField: string = `${this.propertyName}_match_count`

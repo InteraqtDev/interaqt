@@ -1,10 +1,10 @@
-import {RecordMutationEvent} from "../System";
-import {IncrementalComputedDataHandle, StatePatch} from "./IncrementalComputedDataHandle";
+import {RecordMutationEvent} from "../System.js";
+import {IncrementalComputedDataHandle, StatePatch} from "./IncrementalComputedDataHandle.js";
 import {KlassInstance} from "@interaqt/shared";
 import {Entity, Relation} from "@interaqt/shared";
 import {WeightedSummation} from "@interaqt/shared";
 import {MatchExp} from '@interaqt/storage'
-import {ComputedDataHandle} from "./ComputedDataHandle";
+import {ComputedDataHandle} from "./ComputedDataHandle.js";
 
 type RecordChangeEffect = {
     affectedId: string,

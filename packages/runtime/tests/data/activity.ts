@@ -1,4 +1,10 @@
-import {BoolAtomData, createUserRoleAttributive, UserAttributive, UserAttributives} from "@interaqt/shared";
+import {
+    BoolAtomData,
+    createUserRoleAttributive,
+    MapInteractionToProperty, MapInteractionToPropertyItem,
+    UserAttributive,
+    UserAttributives
+} from "@interaqt/shared";
 import {
     Action,
     Activity,
@@ -292,9 +298,124 @@ const receivedRequestRelation = Relation.createReactive({
     targetName1: 'to',
     entity2: UserEntity,
     targetName2: 'receivedRequest',
-    relType: 'n:1'
+    relType: 'n:1',
+    properties: [Property.create({
+        name: 'result',
+        type: 'string',
+        collection: false,
+        computedData: MapInteractionToProperty.create({
+            items: [
+                MapInteractionToPropertyItem.create({
+                    interaction: approveInteraction,
+                    value: 'approved',
+                    computeSource: `async (event, activityId) => {
+                        
+                        const match = this.system.storage.queryHandle.createMatchFromAtom({
+                            key: 'activity.id',
+                            value: ['=', activityId]
+                        })
+                        
+                        const request = await this.system.storage.findOne('Request', match)
+                        return {
+                            "source.id": request.id,
+                            "target.id": event.user.id
+                        }
+                    }`
+                }),
+                MapInteractionToPropertyItem.create({
+                    interaction: rejectInteraction,
+                    value: 'rejected',
+                    computeSource: `async (event, activityId) => {
+                        
+                        const match = this.system.storage.queryHandle.createMatchFromAtom({
+                            key: 'activity.id',
+                            value: ['=', activityId]
+                        })
+                        
+                        const request = await this.system.storage.findOne('Request', match)
+                            
+                        return {
+                            "source.id": request.id,
+                            "target.id": event.user.id
+                        }
+                    }`
+                })
+            ],
+        })
+    })]
 })
 
+requestEntity.properties.push(
+    Property.create({
+        name: 'approved',
+        type: 'boolean',
+        collection: false,
+        computedData: RelationBasedEvery.create({
+            relation: receivedRequestRelation,
+            relationDirection: 'source',
+            notEmpty: true,
+            matchExpression:`
+            (_, relation) => {
+                return relation.result === 'approved'
+            }
+    `
+        })
+    }),
+    Property.create({
+        name: 'rejected',
+        type: 'boolean',
+        collection: false,
+        computedData: RelationBasedAny.create({
+            relation: receivedRequestRelation,
+            relationDirection: 'source',
+            matchExpression:`
+            (_, relation) => {
+                return relation.result === 'rejected'
+            }
+    `
+        })
+    }),
+    // Property.create({
+    //         name: 'result',
+    //         type: 'string',
+    //         collection: false,
+    //         computedData: ComputedData.create({
+    //             computeEffect: `
+    //         (mutationEvent) => {
+    //             if(
+    //                 mutationEvent.type === 'update'
+    //                 &&
+    //                 mutationEvent.recordName === 'Request' &&
+    //                 (mutationEvent.record.approved !== undefined || mutationEvent.record.rejected !== undefined)
+    //             ){
+    //                 return mutationEvent.oldRecord.id
+    //             }
+    //
+    //         }
+    //         `,
+    //             computation:`
+    //         async (requestId) => {
+    //             const match = this.system.storage.queryHandle.createMatchFromAtom({
+    //                 key: 'id',
+    //                 value: ['=', requestId]
+    //             })
+    //
+    //             const request = await this.system.storage.findOne('Request', match, undefined, ['approved', 'rejected'])
+    //             return request.approved ? 'approved' : (request.rejected ? 'rejected' : 'pending')
+    //         }
+    // `
+    //     })
+    // }),
+    // 上面和下面两种写法都可以，机制不同。下面的实在 insert/update 的时候就直接计算了
+    Property.create({
+        name: 'result',
+        type: 'string',
+        collection: false,
+        computed: (request: any) => {
+            return request.approved ? 'approved' : (request.rejected ? 'rejected' : 'pending')
+        }
+    }),
+)
 
 Relation.createReactive({
     entity1: requestEntity,

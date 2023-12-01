@@ -1,12 +1,12 @@
 import {EntityAttributive, EntityAttributives, GetAction, InteractionInstanceType} from "@interaqt/shared";
 import {UserAttributive} from "@interaqt/shared";
-import {System} from "./System";
+import {System} from "./System.js";
 import {InteractionEvent, InteractionEventArgs} from "./types/interaction";
 import {Concept, ConceptAlias, ConceptInstance, DerivedConcept,} from "@interaqt/shared";
 import {BoolExp, BoolExpressionRawData} from "@interaqt/shared";
-import {assert, everyWithErrorAsync} from "./util";
+import {assert, everyWithErrorAsync} from "./util.js";
 import {Klass, KlassInstance} from "@interaqt/shared";
-import {ActivityCall} from "./ActivityCall";
+import {ActivityCall} from "./ActivityCall.js";
 import {someAsync} from "@interaqt/storage";
 import {Entity} from "@interaqt/shared";
 

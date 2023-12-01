@@ -1,6 +1,6 @@
 import { parse as parseStr} from 'acorn'
-import {BoolExpression, BoolExpressionNodeTypes, OperatorNames, VariableNode} from "./types/boolExpression";
-import {assert, indexBy} from "./util";
+import {BoolExpression, BoolExpressionNodeTypes, OperatorNames, VariableNode} from "./types/boolExpression.js";
+import {assert, indexBy} from "./util.js";
 
  // @ts-ignore
 function astNodeToAttrNode(astNode, optionsByName): BoolExpression {

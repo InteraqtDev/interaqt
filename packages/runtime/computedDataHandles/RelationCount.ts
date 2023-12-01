@@ -2,8 +2,8 @@ import {KlassInstance} from "@interaqt/shared";
 import {
     RelationCount, RelationBasedWeightedSummation,
 } from '@interaqt/shared'
-import {RelationBasedWeightedSummationHandle} from "./RelationBasedWeightedSummation";
-import {ComputedDataHandle} from "./ComputedDataHandle";
+import {RelationBasedWeightedSummationHandle} from "./RelationBasedWeightedSummation.js";
+import {ComputedDataHandle} from "./ComputedDataHandle.js";
 
 
 // 监听某个实体的某个关联实体以及关系上的变化，并自动 count 符合条件的关系

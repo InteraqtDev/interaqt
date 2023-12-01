@@ -31,6 +31,6 @@
     "./System.ts",
     "./SQLite.ts",
     "./util.ts",
-
+    "./server.ts",
   ]
 }

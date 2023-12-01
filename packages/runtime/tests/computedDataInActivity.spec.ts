@@ -1,7 +1,7 @@
 import {beforeEach, describe, expect, test} from "vitest";
-import {Controller} from "../Controller";
-import {ActivityCall, ActivityGroupNode} from "../ActivityCall";
-import {MonoSystem} from "../MonoSystem";
+import {Controller} from "../Controller.js";
+import {ActivityCall, ActivityGroupNode} from "../ActivityCall.js";
+import {MonoSystem} from "../MonoSystem.js";
 import {
     Activity,
     createInstances,
@@ -12,7 +12,7 @@ import {
     removeAllInstance,
     State
 } from "@interaqt/shared";
-import '../computedDataHandles/index'
+import '../computedDataHandles/index.js'
 import {MatchExp} from '@interaqt/storage'
 
 // 里面有所有必须的数据？

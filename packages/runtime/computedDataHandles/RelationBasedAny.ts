@@ -1,10 +1,10 @@
-import {ComputedDataHandle} from "./ComputedDataHandle";
+import {ComputedDataHandle} from "./ComputedDataHandle.js";
 import {KlassInstance, Klass} from "@interaqt/shared";
 import {MatchExp} from '@interaqt/storage'
 import {Entity, Property, Relation} from "@interaqt/shared";
 
 import {RelationBasedAny, RelationCount} from "@interaqt/shared";
-import {RecordMutationEvent} from "../System";
+import {RecordMutationEvent} from "../System.js";
 
 export class RelationBasedAnyHandle extends ComputedDataHandle {
     matchCountField: string = `${this.propertyName}_match_count`

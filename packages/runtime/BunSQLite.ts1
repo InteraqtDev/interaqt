@@ -1,5 +1,5 @@
 import { Database as SQLite } from "bun:sqlite";
-import {Database, EntityIdRef, ID_ATTR, ROW_ID_ATTR} from "./System";
+import {Database, EntityIdRef, ID_ATTR, ROW_ID_ATTR} from "./System.js";
 
 export class SQLiteDB implements Database{
     db: SQLite

@@ -1,14 +1,17 @@
-import {System, SystemCallback} from "./System";
+import {System, SystemCallback} from "./System.js";
 import {Entity, Property, Relation} from "@interaqt/shared";
 import {Activity, Interaction} from "@interaqt/shared";
-import './computedDataHandles/index'
-import {ActivityCall} from "./ActivityCall";
-import {InteractionCall} from "./InteractionCall";
+import './computedDataHandles/index.js'
+import {ActivityCall} from "./ActivityCall.js";
+import {InteractionCall} from "./InteractionCall.js";
 import {InteractionEventArgs} from "./types/interaction";
 import {Klass, KlassInstance} from "@interaqt/shared";
-import {assert} from "./util";
-import {ComputedDataHandle, DataContext} from "./computedDataHandles/ComputedDataHandle";
+import {assert} from "./util.js";
+import {ComputedDataHandle, DataContext} from "./computedDataHandles/ComputedDataHandle.js";
 import {ComputedData} from "@interaqt/shared";
+
+
+export const USER_ENTITY = 'User'
 
 export class Controller {
     public computedDataHandles = new Set<ComputedDataHandle>()

@@ -2,8 +2,8 @@ import {KlassInstance} from "@interaqt/shared";
 import {
     Count,
 } from '@interaqt/shared'
-import {ComputedDataHandle} from "./ComputedDataHandle";
-import {WeightedSummationHandle} from "./WeightedSummation";
+import {ComputedDataHandle} from "./ComputedDataHandle.js";
+import {WeightedSummationHandle} from "./WeightedSummation.js";
 
 
 // 监听某个实体的某个关联实体以及关系上的变化，并自动 count 符合条件的关系

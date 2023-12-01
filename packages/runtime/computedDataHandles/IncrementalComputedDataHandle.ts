@@ -1,6 +1,6 @@
-import {RecordMutationEvent} from "../System";
+import {RecordMutationEvent} from "../System.js";
 import {MatchExp} from '@interaqt/storage'
-import {ComputedDataHandle} from "./ComputedDataHandle";
+import {ComputedDataHandle} from "./ComputedDataHandle.js";
 
 export type StatePatch = {
     type: 'create' | 'update' | 'delete',
@@ -71,6 +71,7 @@ export class IncrementalComputedDataHandle extends ComputedDataHandle {
                 await this.controller.system.storage.create(this.recordName!, newData)
             } else if (statePatch.type === 'update') {
                 const match = MatchExp.atom({key: 'id', value: ['=', statePatch.affectedId]})
+                // if (newData.approved_total_count!==undefined) debugger
                 await this.controller.system.storage.update(this.recordName!, match, newData)
             } else if (statePatch.type === 'delete') {
                 const match = MatchExp.atom({key: 'id', value: ['=', statePatch.affectedId]})

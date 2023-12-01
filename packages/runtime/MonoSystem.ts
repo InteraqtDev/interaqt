@@ -1,3 +1,5 @@
+/// <reference types="rata" />
+
 import {
     ACTIVITY_RECORD,
     EVENT_RECORD,
@@ -6,7 +8,7 @@ import {
     Storage,
     System,
     SYSTEM_RECORD
-} from "./System";
+} from "./System.js";
 import {InteractionEvent} from './types/interaction'
 import {createClass, Entity, KlassInstance, Property, Relation} from "@interaqt/shared";
 import {
@@ -18,7 +20,7 @@ import {
     MutationEvent,
     RawEntityData
 } from '@interaqt/storage'
-import {SQLiteDB} from "./SQLite";
+import {SQLiteDB} from "./SQLite.js";
 
 
 function JSONStringify(value:any) {
@@ -121,7 +123,8 @@ let id = 0
 
 
 // state 等系统配置数据的实体化
-const systemEntity = Entity.create({
+// FIXME 应该独立到外部
+export const systemEntity = Entity.create({
     name: SYSTEM_RECORD,
     properties: [
         Property.create({
@@ -143,7 +146,7 @@ const systemEntity = Entity.create({
 })
 
 // event 的实体化
-const eventEntity = Entity.create({
+export const eventEntity = Entity.create({
     name: EVENT_RECORD,
     properties: [
         Property.create({
@@ -170,7 +173,7 @@ const eventEntity = Entity.create({
 })
 
 // activity 数据
-const activityEntity = Entity.create({
+export const activityEntity = Entity.create({
     name: ACTIVITY_RECORD,
     properties: [
         Property.create({

@@ -4,13 +4,13 @@ import {Interaction} from "@interaqt/shared";
 import {Entity} from "@interaqt/shared";
 import {MapInteractionToProperty} from '@interaqt/shared'
 import {MatchExp} from '@interaqt/storage'
-import {ComputedDataHandle} from "./ComputedDataHandle";
-import {RecordMutationEvent} from "../System";
+import {ComputedDataHandle} from "./ComputedDataHandle.js";
+import {RecordMutationEvent} from "../System.js";
 
 export class MapInteractionToPropertyHandle extends ComputedDataHandle {
     data!: KlassInstance<typeof Entity, false>
     mapItems!: Map<KlassInstance<typeof Interaction, false>, {
-        computeSource: (data: InteractionEventArgs) => any
+        computeSource: (data: InteractionEventArgs, activityId?: string) => any
         value: any
     }>
     // FIXME 之后 从 listen interaction 也改成 监听 record 事件??
@@ -28,26 +28,24 @@ export class MapInteractionToPropertyHandle extends ComputedDataHandle {
     }
     addEventListener() {
         this.mapItems.forEach((_, interaction)=> {
-            this.controller.listen(interaction, (event) => this.onCallInteraction(interaction, event))
+            this.controller.listen(interaction, (event, activityId) => this.onCallInteraction(interaction, event, activityId))
         })
     }
     parseMapItemFunction(stringContent: string) {
-        const body = new Function('sourceData', `return (${stringContent})(sourceData)`)
+        const body = new Function('sourceData', 'activityId',  `return (${stringContent})(sourceData, activityId)`)
 
-        return (sourceData: InteractionEventArgs) => {
-            return body(sourceData)
+        return (sourceData: InteractionEventArgs, activityId?: string) => {
+            return body.call(this.controller, sourceData, activityId)
         }
     }
-    onCallInteraction = async (interaction: KlassInstance<typeof Interaction, false>, interactionEventArgs: InteractionEventArgs) => {
+    onCallInteraction = async (interaction: KlassInstance<typeof Interaction, false>, interactionEventArgs: InteractionEventArgs, activityId?: string) => {
         const {value, computeSource} = this.mapItems.get(interaction)!
-        const source = computeSource(interactionEventArgs)
+        const source = await computeSource(interactionEventArgs, activityId)
         if (source) {
             const sources = Array.isArray(source) ? source : [source]
             for (const source of sources) {
                 const match = MatchExp.fromObject(source)
                 const result = await this.controller.system.storage.update(this.recordName!, match, {[this.propertyName!]: value})
-
-                console.log(result)
             }
         }
     }

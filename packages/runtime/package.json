@@ -13,18 +13,28 @@
     "build-all": "npm run build && npm run type"
   },
   "version": "1.0.0",
-  "main": "index.js",
+  "main": "dist/index.js",
+  "files": [
+    "dist"
+  ],
   "author": "sskyy<skyking_H@hotmail.com>",
   "license": "MIT",
   "dependencies": {
+    "@fastify/middie": "^8.3.0",
+    "@types/connect": "^3.4.38",
+    "@types/cors": "^2.8.17",
     "acorn": "^8.10.0",
+    "cors": "^2.8.5",
+    "fastify": "^4.24.3",
     "promised-sqlite3": "^2.1.0",
     "sqlite3": "^5.1.6"
   },
   "types": "./dist/index.d.ts",
+  "typings": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "import": "./dist/index.js"
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
     }
   },
   "type": "module"

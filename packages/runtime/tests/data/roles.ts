@@ -1,5 +1,4 @@
 import {createUserRoleAttributive, UserAttributive} from "@interaqt/shared";
-import {Entity} from "@interaqt/shared";
 
 export const NewAttr = UserAttributive.createReactive({
     name: 'New',

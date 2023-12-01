@@ -1,7 +1,7 @@
-import {Controller} from "../Controller";
+import {Controller} from "../Controller.js";
 import {KlassInstance, Klass} from "@interaqt/shared";
 import {Entity, Property, Relation} from "@interaqt/shared";
-import {RecordMutationEvent} from "../System";
+import {RecordMutationEvent} from "../System.js";
 import {ComputedData} from "@interaqt/shared";
 import {MatchExp} from '@interaqt/storage'
 

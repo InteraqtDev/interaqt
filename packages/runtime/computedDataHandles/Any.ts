@@ -1,7 +1,7 @@
-import {ComputedDataHandle} from "./ComputedDataHandle";
+import {ComputedDataHandle} from "./ComputedDataHandle.js";
 import {KlassInstance, Klass} from "@interaqt/shared";
 import {Any, Count} from "@interaqt/shared";
-import {RecordMutationEvent, SYSTEM_RECORD} from "../System";
+import {RecordMutationEvent, SYSTEM_RECORD} from "../System.js";
 import {State} from "@interaqt/shared";
 
 export class RelationBasedAnyHandle extends ComputedDataHandle {

@@ -1,6 +1,6 @@
 // import { Database as SQLite } from "sqlite3";
 import {AsyncDatabase as SQLite} from "promised-sqlite3";
-import {Database, EntityIdRef, ROW_ID_ATTR} from "./System";
+import {Database, EntityIdRef, ROW_ID_ATTR} from "./System.js";
 
 class IDSystem {
     constructor(public db: Database) {}

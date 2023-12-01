@@ -6,12 +6,12 @@ import {
     RelationStateMachine,
     RelationStateTransfer
 } from '@interaqt/shared'
-import {Controller} from "../Controller";
+import {Controller} from "../Controller.js";
 import {InteractionEventArgs} from "../types/interaction";
-import {assert} from "../util";
+import {assert} from "../util.js";
 import {EntityIdRef, RecordMutationEvent} from '../System'
 import {MatchAtom, MatchExp} from '@interaqt/storage'
-import {ComputedDataHandle, DataContext} from "./ComputedDataHandle";
+import {ComputedDataHandle, DataContext} from "./ComputedDataHandle.js";
 
 
 type SourceTargetPair = [EntityIdRef, EntityIdRef][]
