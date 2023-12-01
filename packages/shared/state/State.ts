@@ -1,6 +1,6 @@
 import {computed, Atom} from 'rata'
-import {createClass, Klass} from "../createClass";
-import { PropertyTypeMap, PropertyTypes} from "../entity/Entity";
+import {createClass, Klass} from "../createClass.js";
+import { PropertyTypeMap, PropertyTypes} from "../entity/Entity.js";
 const validNameFormatExp = /^[a-zA-Z0-9_]+$/
 
 export const State = createClass({

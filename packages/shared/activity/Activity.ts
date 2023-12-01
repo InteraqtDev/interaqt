@@ -1,6 +1,6 @@
-import {createClass, Klass, KlassInstance, KlassInstancePrimitiveProps} from "../createClass";
-import {Entity} from "../entity/Entity";
-import {UserAttributive, UserAttributives} from "../user/User";
+import {createClass, Klass, KlassInstance, KlassInstancePrimitiveProps} from "../createClass.js";
+import {Entity} from "../entity/Entity.js";
+import {UserAttributive, UserAttributives} from "../user/User.js";
 
 
 type EntityAttributivePublicType = {

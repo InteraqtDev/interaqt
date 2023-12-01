@@ -1,5 +1,5 @@
 // TODO Role 和 Attributive 合在一起可以变成新的 Role，怎么表示？
-import {createClass, KlassInstance, KlassOptions, ReactiveKlassOptions} from "../createClass";
+import {createClass, KlassInstance, KlassOptions, ReactiveKlassOptions} from "../createClass.js";
 
 export const UserAttributive = createClass({
     name: 'UserAttributive',

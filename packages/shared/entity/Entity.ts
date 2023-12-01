@@ -1,5 +1,5 @@
 import {Atom, computed, incPick, incUnique} from 'rata'
-import {createClass, getInstance, Klass, KlassInstance} from "../createClass";
+import {createClass, getInstance, Klass, KlassInstance} from "../createClass.js";
 
 
 export enum PropertyTypes {

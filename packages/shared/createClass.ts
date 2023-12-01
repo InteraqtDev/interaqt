@@ -1,6 +1,5 @@
-// @ts-ignore
 import {atom, Atom, computed, isAtom, isReactive, rawStructureClone, reactive} from "rata";
-import {isPlainObject, hasOwn, isObject, assert} from "./utils";
+import {isPlainObject, hasOwn, isObject, assert} from "./utils.js";
 import {toRaw, UnwrapReactive} from "rata";
 
 type PrimitivePropType = 'string'|'number'|'boolean'| 'object'|'function'

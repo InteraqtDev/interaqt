@@ -1,7 +1,7 @@
-import {createClass, Klass} from "./createClass";
-import {Activity, Interaction} from "./activity/Activity";
-import {Entity, Property, Relation} from "./entity/Entity";
-import {State} from "./state/State";
+import {createClass, Klass} from "./createClass.js";
+import {Activity, Interaction} from "./activity/Activity.js";
+import {Entity, Property, Relation} from "./entity/Entity.js";
+import {State} from "./state/State.js";
 
 export const MapActivityToEntity = createClass({
     name: 'MapActivityToEntity',

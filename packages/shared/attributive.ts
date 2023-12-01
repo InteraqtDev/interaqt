@@ -1,4 +1,4 @@
-import {BoolExpressionRawData} from "./BoolExp";
+import {BoolExpressionRawData} from "./BoolExp.js";
 
 
 // Role/RoleAttributive/Entity 是 ConceptType

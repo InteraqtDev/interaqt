@@ -1,6 +1,6 @@
 import {assertType, describe, test} from "vitest";
-import {Entity, Relation} from "../entity/Entity";
-import {InertKlassInstance, Klass, KlassInstance, KlassProp} from "../createClass";
+import {Entity, Relation} from "../entity/Entity.js";
+import {InertKlassInstance, Klass, KlassInstance, KlassProp} from "../createClass.js";
 import {
     ActivityGroup,
     ActivityGroupPublicType,
@@ -11,7 +11,7 @@ import {
     InteractionPublicType,
     TransferInstanceType,
     TransferPublicType
-} from "../activity/Activity";
+} from "../activity/Activity.js";
 
 
 assertType<(Klass<InteractionPublicType>| Klass<ActivityGroupPublicType>| Klass<GatewayPublicType>)[]>(

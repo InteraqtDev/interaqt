@@ -504,7 +504,7 @@
             },
             {
               "kind": "Content",
-              "text": "<boolean>;\n                        };\n                    };\n                    type: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        options: import(\"./entity/Entity\")."
+              "text": "<boolean>;\n                        };\n                    };\n                    type: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        options: import(\"./entity/Entity.js\")."
             },
             {
               "kind": "Reference",
@@ -513,7 +513,7 @@
             },
             {
               "kind": "Content",
-              "text": "[];\n                    };\n                    collection: {\n                        type: \"boolean\";\n                        required: true;\n                        collection: false;\n                        defaultValue(): boolean;\n                    };\n                    args: {\n                        computedType: (values: {\n                            type: import(\"./entity/Entity\")."
+              "text": "[];\n                    };\n                    collection: {\n                        type: \"boolean\";\n                        required: true;\n                        collection: false;\n                        defaultValue(): boolean;\n                    };\n                    args: {\n                        computedType: (values: {\n                            type: import(\"./entity/Entity.js\")."
             },
             {
               "kind": "Reference",
@@ -549,7 +549,7 @@
             },
             {
               "kind": "Content",
-              "text": "<import(\"./entity/Entity\")."
+              "text": "<import(\"./entity/Entity.js\")."
             },
             {
               "kind": "Reference",
@@ -629,7 +629,7 @@
             },
             {
               "kind": "Content",
-              "text": "import(\"../createClass\")."
+              "text": "import(\"../createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -638,7 +638,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n    type: {\n        type: \"string\";\n        required: true;\n        collection: false;\n        defaultValue: () => string;\n    };\n    data: {\n        type: import(\"../createClass\")."
+              "text": "<{\n    type: {\n        type: \"string\";\n        required: true;\n        collection: false;\n        defaultValue: () => string;\n    };\n    data: {\n        type: import(\"../createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -1513,7 +1513,7 @@
             },
             {
               "kind": "Content",
-              "text": "import(\"../createClass\")."
+              "text": "import(\"../createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -1927,7 +1927,7 @@
             },
             {
               "kind": "Content",
-              "text": "<boolean>;\n                        };\n                    };\n                    type: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        options: import(\"./entity/Entity\")."
+              "text": "<boolean>;\n                        };\n                    };\n                    type: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        options: import(\"./entity/Entity.js\")."
             },
             {
               "kind": "Reference",
@@ -1936,7 +1936,7 @@
             },
             {
               "kind": "Content",
-              "text": "[];\n                    };\n                    collection: {\n                        type: \"boolean\";\n                        required: true;\n                        collection: false;\n                        defaultValue(): boolean;\n                    };\n                    args: {\n                        computedType: (values: {\n                            type: import(\"./entity/Entity\")."
+              "text": "[];\n                    };\n                    collection: {\n                        type: \"boolean\";\n                        required: true;\n                        collection: false;\n                        defaultValue(): boolean;\n                    };\n                    args: {\n                        computedType: (values: {\n                            type: import(\"./entity/Entity.js\")."
             },
             {
               "kind": "Reference",
@@ -1972,7 +1972,7 @@
             },
             {
               "kind": "Content",
-              "text": "<import(\"./entity/Entity\")."
+              "text": "<import(\"./entity/Entity.js\")."
             },
             {
               "kind": "Reference",
@@ -2259,7 +2259,7 @@
             },
             {
               "kind": "Content",
-              "text": "import(\"../createClass\")."
+              "text": "import(\"../createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -2268,7 +2268,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n    stringContent: {\n        type: \"string\";\n    };\n    name: {\n        type: \"string\";\n    };\n    isRole: {\n        type: \"boolean\";\n    };\n    isRef: {\n        type: \"boolean\";\n    };\n}> | import(\"../createClass\")."
+              "text": "<{\n    stringContent: {\n        type: \"string\";\n    };\n    name: {\n        type: \"string\";\n    };\n    isRole: {\n        type: \"boolean\";\n    };\n    isRef: {\n        type: \"boolean\";\n    };\n}> | import(\"../createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -2899,7 +2899,7 @@
             },
             {
               "kind": "Content",
-              "text": "<boolean>;\n                        };\n                    };\n                    type: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        options: import(\"./entity/Entity\")."
+              "text": "<boolean>;\n                        };\n                    };\n                    type: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        options: import(\"./entity/Entity.js\")."
             },
             {
               "kind": "Reference",
@@ -2908,7 +2908,7 @@
             },
             {
               "kind": "Content",
-              "text": "[];\n                    };\n                    collection: {\n                        type: \"boolean\";\n                        required: true;\n                        collection: false;\n                        defaultValue(): boolean;\n                    };\n                    args: {\n                        computedType: (values: {\n                            type: import(\"./entity/Entity\")."
+              "text": "[];\n                    };\n                    collection: {\n                        type: \"boolean\";\n                        required: true;\n                        collection: false;\n                        defaultValue(): boolean;\n                    };\n                    args: {\n                        computedType: (values: {\n                            type: import(\"./entity/Entity.js\")."
             },
             {
               "kind": "Reference",
@@ -2944,7 +2944,7 @@
             },
             {
               "kind": "Content",
-              "text": "<import(\"./entity/Entity\")."
+              "text": "<import(\"./entity/Entity.js\")."
             },
             {
               "kind": "Reference",
@@ -3280,7 +3280,7 @@
             },
             {
               "kind": "Content",
-              "text": "import(\"../createClass\")."
+              "text": "import(\"../createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -3289,7 +3289,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n    name: {\n        type: \"string\";\n        required: true;\n    };\n}> | import(\"../createClass\")."
+              "text": "<{\n    name: {\n        type: \"string\";\n        required: true;\n    };\n}> | import(\"../createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -3456,7 +3456,7 @@
             },
             {
               "kind": "Content",
-              "text": "import(\"../createClass\")."
+              "text": "import(\"../createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -4489,7 +4489,7 @@
             },
             {
               "kind": "Content",
-              "text": "<import(\"./activity/Activity\")."
+              "text": "<import(\"./activity/Activity.js\")."
             },
             {
               "kind": "Reference",
@@ -4498,7 +4498,7 @@
             },
             {
               "kind": "Content",
-              "text": ">;\n                collection: true;\n                defaultValue: (...args: any[]) => (import(\"./createClass\")."
+              "text": ">;\n                collection: true;\n                defaultValue: (...args: any[]) => (import(\"./createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -4507,7 +4507,7 @@
             },
             {
               "kind": "Content",
-              "text": "<import(\"./activity/Activity\")."
+              "text": "<import(\"./activity/Activity.js\")."
             },
             {
               "kind": "Reference",
@@ -4516,7 +4516,7 @@
             },
             {
               "kind": "Content",
-              "text": "> | import(\"./createClass\")."
+              "text": "> | import(\"./createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -4525,7 +4525,7 @@
             },
             {
               "kind": "Content",
-              "text": "<import(\"./activity/Activity\")."
+              "text": "<import(\"./activity/Activity.js\")."
             },
             {
               "kind": "Reference",
@@ -4543,7 +4543,7 @@
             },
             {
               "kind": "Content",
-              "text": "<import(\"./activity/Activity\")."
+              "text": "<import(\"./activity/Activity.js\")."
             },
             {
               "kind": "Reference",
@@ -4552,7 +4552,7 @@
             },
             {
               "kind": "Content",
-              "text": ">;\n                collection: true;\n                defaultValue: (...args: any[]) => (import(\"./createClass\")."
+              "text": ">;\n                collection: true;\n                defaultValue: (...args: any[]) => (import(\"./createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -4561,7 +4561,7 @@
             },
             {
               "kind": "Content",
-              "text": "<import(\"./activity/Activity\")."
+              "text": "<import(\"./activity/Activity.js\")."
             },
             {
               "kind": "Reference",
@@ -4570,7 +4570,7 @@
             },
             {
               "kind": "Content",
-              "text": "> | import(\"./createClass\")."
+              "text": "> | import(\"./createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -4579,7 +4579,7 @@
             },
             {
               "kind": "Content",
-              "text": "<import(\"./activity/Activity\")."
+              "text": "<import(\"./activity/Activity.js\")."
             },
             {
               "kind": "Reference",
@@ -4597,7 +4597,7 @@
             },
             {
               "kind": "Content",
-              "text": "<import(\"./activity/Activity\")."
+              "text": "<import(\"./activity/Activity.js\")."
             },
             {
               "kind": "Reference",
@@ -4606,7 +4606,7 @@
             },
             {
               "kind": "Content",
-              "text": ">;\n                collection: true;\n                defaultValue: (...args: any[]) => (import(\"./createClass\")."
+              "text": ">;\n                collection: true;\n                defaultValue: (...args: any[]) => (import(\"./createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -4615,7 +4615,7 @@
             },
             {
               "kind": "Content",
-              "text": "<import(\"./activity/Activity\")."
+              "text": "<import(\"./activity/Activity.js\")."
             },
             {
               "kind": "Reference",
@@ -4624,7 +4624,7 @@
             },
             {
               "kind": "Content",
-              "text": "> | import(\"./createClass\")."
+              "text": "> | import(\"./createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -4633,7 +4633,7 @@
             },
             {
               "kind": "Content",
-              "text": "<import(\"./activity/Activity\")."
+              "text": "<import(\"./activity/Activity.js\")."
             },
             {
               "kind": "Reference",
@@ -4651,7 +4651,7 @@
             },
             {
               "kind": "Content",
-              "text": "<import(\"./activity/Activity\")."
+              "text": "<import(\"./activity/Activity.js\")."
             },
             {
               "kind": "Reference",
@@ -4660,7 +4660,7 @@
             },
             {
               "kind": "Content",
-              "text": ">;\n                collection: true;\n                defaultValue: (...args: any[]) => (import(\"./createClass\")."
+              "text": ">;\n                collection: true;\n                defaultValue: (...args: any[]) => (import(\"./createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -4669,7 +4669,7 @@
             },
             {
               "kind": "Content",
-              "text": "<import(\"./activity/Activity\")."
+              "text": "<import(\"./activity/Activity.js\")."
             },
             {
               "kind": "Reference",
@@ -4678,7 +4678,7 @@
             },
             {
               "kind": "Content",
-              "text": "> | import(\"./createClass\")."
+              "text": "> | import(\"./createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -4687,7 +4687,7 @@
             },
             {
               "kind": "Content",
-              "text": "<import(\"./activity/Activity\")."
+              "text": "<import(\"./activity/Activity.js\")."
             },
             {
               "kind": "Reference",
@@ -4705,7 +4705,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                    name: {\n                        type: \"string\";\n                        required: true;\n                    };\n                }>;\n                collection: true;\n                defaultValue: (...args: any[]) => (import(\"./createClass\")."
+              "text": "<{\n                    name: {\n                        type: \"string\";\n                        required: true;\n                    };\n                }>;\n                collection: true;\n                defaultValue: (...args: any[]) => (import(\"./createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -4714,7 +4714,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                    name: {\n                        type: \"string\";\n                        required: true;\n                    };\n                }> | import(\"./createClass\")."
+              "text": "<{\n                    name: {\n                        type: \"string\";\n                        required: true;\n                    };\n                }> | import(\"./createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -4732,7 +4732,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                    name: {\n                        type: \"string\";\n                        required: true;\n                    };\n                }>;\n                collection: true;\n                defaultValue: (...args: any[]) => (import(\"./createClass\")."
+              "text": "<{\n                    name: {\n                        type: \"string\";\n                        required: true;\n                    };\n                }>;\n                collection: true;\n                defaultValue: (...args: any[]) => (import(\"./createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -4741,7 +4741,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                    name: {\n                        type: \"string\";\n                        required: true;\n                    };\n                }> | import(\"./createClass\")."
+              "text": "<{\n                    name: {\n                        type: \"string\";\n                        required: true;\n                    };\n                }> | import(\"./createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -4759,7 +4759,7 @@
             },
             {
               "kind": "Content",
-              "text": "<import(\"./activity/Activity\")."
+              "text": "<import(\"./activity/Activity.js\")."
             },
             {
               "kind": "Reference",
@@ -4814,7 +4814,7 @@
             },
             {
               "kind": "Content",
-              "text": "<import(\"./activity/Activity\")."
+              "text": "<import(\"./activity/Activity.js\")."
             },
             {
               "kind": "Reference",
@@ -4860,7 +4860,7 @@
             },
             {
               "kind": "Content",
-              "text": "<import(\"./activity/Activity\")."
+              "text": "<import(\"./activity/Activity.js\")."
             },
             {
               "kind": "Reference",
@@ -4906,7 +4906,7 @@
             },
             {
               "kind": "Content",
-              "text": "<import(\"./activity/Activity\")."
+              "text": "<import(\"./activity/Activity.js\")."
             },
             {
               "kind": "Reference",
@@ -5314,7 +5314,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                                            stringContent: {\n                                                type: \"string\";\n                                            };\n                                            name: {\n                                                type: \"string\";\n                                            };\n                                            isRole: {\n                                                type: \"boolean\";\n                                            };\n                                            isRef: {\n                                                type: \"boolean\";\n                                            };\n                                        }>;\n                                        required: true;\n                                        collection: false;\n                                    };\n                                }> | import(\"../user/User\")."
+              "text": "<{\n                                            stringContent: {\n                                                type: \"string\";\n                                            };\n                                            name: {\n                                                type: \"string\";\n                                            };\n                                            isRole: {\n                                                type: \"boolean\";\n                                            };\n                                            isRef: {\n                                                type: \"boolean\";\n                                            };\n                                        }>;\n                                        required: true;\n                                        collection: false;\n                                    };\n                                }> | import(\"../user/User.js\")."
             },
             {
               "kind": "Reference",
@@ -5341,7 +5341,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                                            stringContent: {\n                                                type: \"string\";\n                                            };\n                                            name: {\n                                                type: \"string\";\n                                            };\n                                            isRole: {\n                                                type: \"boolean\";\n                                            };\n                                            isRef: {\n                                                type: \"boolean\";\n                                            };\n                                        }>;\n                                        required: true;\n                                        collection: false;\n                                    };\n                                }> | import(\"../user/User\")."
+              "text": "<{\n                                            stringContent: {\n                                                type: \"string\";\n                                            };\n                                            name: {\n                                                type: \"string\";\n                                            };\n                                            isRole: {\n                                                type: \"boolean\";\n                                            };\n                                            isRef: {\n                                                type: \"boolean\";\n                                            };\n                                        }>;\n                                        required: true;\n                                        collection: false;\n                                    };\n                                }> | import(\"../user/User.js\")."
             },
             {
               "kind": "Reference",
@@ -5449,7 +5449,7 @@
             },
             {
               "kind": "Content",
-              "text": "<boolean>;\n                                };\n                            };\n                            type: {\n                                type: \"string\";\n                                required: true;\n                                collection: false;\n                                options: import(\"../entity/Entity\")."
+              "text": "<boolean>;\n                                };\n                            };\n                            type: {\n                                type: \"string\";\n                                required: true;\n                                collection: false;\n                                options: import(\"../entity/Entity.js\")."
             },
             {
               "kind": "Reference",
@@ -5458,7 +5458,7 @@
             },
             {
               "kind": "Content",
-              "text": "[];\n                            };\n                            collection: {\n                                type: \"boolean\";\n                                required: true;\n                                collection: false;\n                                defaultValue(): boolean;\n                            };\n                            args: {\n                                computedType: (values: {\n                                    type: import(\"../entity/Entity\")."
+              "text": "[];\n                            };\n                            collection: {\n                                type: \"boolean\";\n                                required: true;\n                                collection: false;\n                                defaultValue(): boolean;\n                            };\n                            args: {\n                                computedType: (values: {\n                                    type: import(\"../entity/Entity.js\")."
             },
             {
               "kind": "Reference",
@@ -5575,7 +5575,7 @@
             },
             {
               "kind": "Content",
-              "text": "<boolean>;\n                                };\n                            };\n                            type: {\n                                type: \"string\";\n                                required: true;\n                                collection: false;\n                                options: import(\"../entity/Entity\")."
+              "text": "<boolean>;\n                                };\n                            };\n                            type: {\n                                type: \"string\";\n                                required: true;\n                                collection: false;\n                                options: import(\"../entity/Entity.js\")."
             },
             {
               "kind": "Reference",
@@ -5584,7 +5584,7 @@
             },
             {
               "kind": "Content",
-              "text": "[];\n                            };\n                            collection: {\n                                type: \"boolean\";\n                                required: true;\n                                collection: false;\n                                defaultValue(): boolean;\n                            };\n                            args: {\n                                computedType: (values: {\n                                    type: import(\"../entity/Entity\")."
+              "text": "[];\n                            };\n                            collection: {\n                                type: \"boolean\";\n                                required: true;\n                                collection: false;\n                                defaultValue(): boolean;\n                            };\n                            args: {\n                                computedType: (values: {\n                                    type: import(\"../entity/Entity.js\")."
             },
             {
               "kind": "Reference",
@@ -5702,7 +5702,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                                    stringContent: {\n                                        type: \"string\";\n                                    };\n                                    name: {\n                                        type: \"string\";\n                                    };\n                                    isRole: {\n                                        type: \"boolean\";\n                                    };\n                                    isRef: {\n                                        type: \"boolean\";\n                                    };\n                                }>;\n                                required: true;\n                                collection: false;\n                            };\n                        }> | import(\"../user/User\")."
+              "text": "<{\n                                    stringContent: {\n                                        type: \"string\";\n                                    };\n                                    name: {\n                                        type: \"string\";\n                                    };\n                                    isRole: {\n                                        type: \"boolean\";\n                                    };\n                                    isRef: {\n                                        type: \"boolean\";\n                                    };\n                                }>;\n                                required: true;\n                                collection: false;\n                            };\n                        }> | import(\"../user/User.js\")."
             },
             {
               "kind": "Reference",
@@ -5729,7 +5729,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                                    stringContent: {\n                                        type: \"string\";\n                                    };\n                                    name: {\n                                        type: \"string\";\n                                    };\n                                    isRole: {\n                                        type: \"boolean\";\n                                    };\n                                    isRef: {\n                                        type: \"boolean\";\n                                    };\n                                }>;\n                                required: true;\n                                collection: false;\n                            };\n                        }> | import(\"../user/User\")."
+              "text": "<{\n                                    stringContent: {\n                                        type: \"string\";\n                                    };\n                                    name: {\n                                        type: \"string\";\n                                    };\n                                    isRole: {\n                                        type: \"boolean\";\n                                    };\n                                    isRef: {\n                                        type: \"boolean\";\n                                    };\n                                }>;\n                                required: true;\n                                collection: false;\n                            };\n                        }> | import(\"../user/User.js\")."
             },
             {
               "kind": "Reference",
@@ -5837,7 +5837,7 @@
             },
             {
               "kind": "Content",
-              "text": "<boolean>;\n                        };\n                    };\n                    type: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        options: import(\"../entity/Entity\")."
+              "text": "<boolean>;\n                        };\n                    };\n                    type: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        options: import(\"../entity/Entity.js\")."
             },
             {
               "kind": "Reference",
@@ -5846,7 +5846,7 @@
             },
             {
               "kind": "Content",
-              "text": "[];\n                    };\n                    collection: {\n                        type: \"boolean\";\n                        required: true;\n                        collection: false;\n                        defaultValue(): boolean;\n                    };\n                    args: {\n                        computedType: (values: {\n                            type: import(\"../entity/Entity\")."
+              "text": "[];\n                    };\n                    collection: {\n                        type: \"boolean\";\n                        required: true;\n                        collection: false;\n                        defaultValue(): boolean;\n                    };\n                    args: {\n                        computedType: (values: {\n                            type: import(\"../entity/Entity.js\")."
             },
             {
               "kind": "Reference",
@@ -5963,7 +5963,7 @@
             },
             {
               "kind": "Content",
-              "text": "<boolean>;\n                        };\n                    };\n                    type: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        options: import(\"../entity/Entity\")."
+              "text": "<boolean>;\n                        };\n                    };\n                    type: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        options: import(\"../entity/Entity.js\")."
             },
             {
               "kind": "Reference",
@@ -5972,7 +5972,7 @@
             },
             {
               "kind": "Content",
-              "text": "[];\n                    };\n                    collection: {\n                        type: \"boolean\";\n                        required: true;\n                        collection: false;\n                        defaultValue(): boolean;\n                    };\n                    args: {\n                        computedType: (values: {\n                            type: import(\"../entity/Entity\")."
+              "text": "[];\n                    };\n                    collection: {\n                        type: \"boolean\";\n                        required: true;\n                        collection: false;\n                        defaultValue(): boolean;\n                    };\n                    args: {\n                        computedType: (values: {\n                            type: import(\"../entity/Entity.js\")."
             },
             {
               "kind": "Reference",
@@ -6462,7 +6462,7 @@
             },
             {
               "kind": "Content",
-              "text": "<import(\"./entity/Entity\")."
+              "text": "<import(\"./entity/Entity.js\")."
             },
             {
               "kind": "Reference",
@@ -6508,7 +6508,7 @@
             },
             {
               "kind": "Content",
-              "text": "<import(\"./entity/Entity\")."
+              "text": "<import(\"./entity/Entity.js\")."
             },
             {
               "kind": "Reference",
@@ -6563,7 +6563,7 @@
             },
             {
               "kind": "Content",
-              "text": "<import(\"./entity/Entity\")."
+              "text": "<import(\"./entity/Entity.js\")."
             },
             {
               "kind": "Reference",
@@ -6609,7 +6609,7 @@
             },
             {
               "kind": "Content",
-              "text": "<import(\"./entity/Entity\")."
+              "text": "<import(\"./entity/Entity.js\")."
             },
             {
               "kind": "Reference",
@@ -6924,7 +6924,7 @@
             },
             {
               "kind": "Content",
-              "text": "<import(\"./activity/Activity\")."
+              "text": "<import(\"./activity/Activity.js\")."
             },
             {
               "kind": "Reference",
@@ -6933,7 +6933,7 @@
             },
             {
               "kind": "Content",
-              "text": ">;\n                        collection: true;\n                        defaultValue: (...args: any[]) => (import(\"./createClass\")."
+              "text": ">;\n                        collection: true;\n                        defaultValue: (...args: any[]) => (import(\"./createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -6942,7 +6942,7 @@
             },
             {
               "kind": "Content",
-              "text": "<import(\"./activity/Activity\")."
+              "text": "<import(\"./activity/Activity.js\")."
             },
             {
               "kind": "Reference",
@@ -6951,7 +6951,7 @@
             },
             {
               "kind": "Content",
-              "text": "> | import(\"./createClass\")."
+              "text": "> | import(\"./createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -6960,7 +6960,7 @@
             },
             {
               "kind": "Content",
-              "text": "<import(\"./activity/Activity\")."
+              "text": "<import(\"./activity/Activity.js\")."
             },
             {
               "kind": "Reference",
@@ -6978,7 +6978,7 @@
             },
             {
               "kind": "Content",
-              "text": "<import(\"./activity/Activity\")."
+              "text": "<import(\"./activity/Activity.js\")."
             },
             {
               "kind": "Reference",
@@ -6987,7 +6987,7 @@
             },
             {
               "kind": "Content",
-              "text": ">;\n                        collection: true;\n                        defaultValue: (...args: any[]) => (import(\"./createClass\")."
+              "text": ">;\n                        collection: true;\n                        defaultValue: (...args: any[]) => (import(\"./createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -6996,7 +6996,7 @@
             },
             {
               "kind": "Content",
-              "text": "<import(\"./activity/Activity\")."
+              "text": "<import(\"./activity/Activity.js\")."
             },
             {
               "kind": "Reference",
@@ -7005,7 +7005,7 @@
             },
             {
               "kind": "Content",
-              "text": "> | import(\"./createClass\")."
+              "text": "> | import(\"./createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -7014,7 +7014,7 @@
             },
             {
               "kind": "Content",
-              "text": "<import(\"./activity/Activity\")."
+              "text": "<import(\"./activity/Activity.js\")."
             },
             {
               "kind": "Reference",
@@ -7032,7 +7032,7 @@
             },
             {
               "kind": "Content",
-              "text": "<import(\"./activity/Activity\")."
+              "text": "<import(\"./activity/Activity.js\")."
             },
             {
               "kind": "Reference",
@@ -7041,7 +7041,7 @@
             },
             {
               "kind": "Content",
-              "text": ">;\n                        collection: true;\n                        defaultValue: (...args: any[]) => (import(\"./createClass\")."
+              "text": ">;\n                        collection: true;\n                        defaultValue: (...args: any[]) => (import(\"./createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -7050,7 +7050,7 @@
             },
             {
               "kind": "Content",
-              "text": "<import(\"./activity/Activity\")."
+              "text": "<import(\"./activity/Activity.js\")."
             },
             {
               "kind": "Reference",
@@ -7059,7 +7059,7 @@
             },
             {
               "kind": "Content",
-              "text": "> | import(\"./createClass\")."
+              "text": "> | import(\"./createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -7068,7 +7068,7 @@
             },
             {
               "kind": "Content",
-              "text": "<import(\"./activity/Activity\")."
+              "text": "<import(\"./activity/Activity.js\")."
             },
             {
               "kind": "Reference",
@@ -7086,7 +7086,7 @@
             },
             {
               "kind": "Content",
-              "text": "<import(\"./activity/Activity\")."
+              "text": "<import(\"./activity/Activity.js\")."
             },
             {
               "kind": "Reference",
@@ -7095,7 +7095,7 @@
             },
             {
               "kind": "Content",
-              "text": ">;\n                        collection: true;\n                        defaultValue: (...args: any[]) => (import(\"./createClass\")."
+              "text": ">;\n                        collection: true;\n                        defaultValue: (...args: any[]) => (import(\"./createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -7104,7 +7104,7 @@
             },
             {
               "kind": "Content",
-              "text": "<import(\"./activity/Activity\")."
+              "text": "<import(\"./activity/Activity.js\")."
             },
             {
               "kind": "Reference",
@@ -7113,7 +7113,7 @@
             },
             {
               "kind": "Content",
-              "text": "> | import(\"./createClass\")."
+              "text": "> | import(\"./createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -7122,7 +7122,7 @@
             },
             {
               "kind": "Content",
-              "text": "<import(\"./activity/Activity\")."
+              "text": "<import(\"./activity/Activity.js\")."
             },
             {
               "kind": "Reference",
@@ -7140,7 +7140,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                            name: {\n                                type: \"string\";\n                                required: true;\n                            };\n                        }>;\n                        collection: true;\n                        defaultValue: (...args: any[]) => (import(\"./createClass\")."
+              "text": "<{\n                            name: {\n                                type: \"string\";\n                                required: true;\n                            };\n                        }>;\n                        collection: true;\n                        defaultValue: (...args: any[]) => (import(\"./createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -7149,7 +7149,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                            name: {\n                                type: \"string\";\n                                required: true;\n                            };\n                        }> | import(\"./createClass\")."
+              "text": "<{\n                            name: {\n                                type: \"string\";\n                                required: true;\n                            };\n                        }> | import(\"./createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -7167,7 +7167,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                            name: {\n                                type: \"string\";\n                                required: true;\n                            };\n                        }>;\n                        collection: true;\n                        defaultValue: (...args: any[]) => (import(\"./createClass\")."
+              "text": "<{\n                            name: {\n                                type: \"string\";\n                                required: true;\n                            };\n                        }>;\n                        collection: true;\n                        defaultValue: (...args: any[]) => (import(\"./createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -7176,7 +7176,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                            name: {\n                                type: \"string\";\n                                required: true;\n                            };\n                        }> | import(\"./createClass\")."
+              "text": "<{\n                            name: {\n                                type: \"string\";\n                                required: true;\n                            };\n                        }> | import(\"./createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -7194,7 +7194,7 @@
             },
             {
               "kind": "Content",
-              "text": "<import(\"./activity/Activity\")."
+              "text": "<import(\"./activity/Activity.js\")."
             },
             {
               "kind": "Reference",
@@ -7376,7 +7376,7 @@
             },
             {
               "kind": "Content",
-              "text": "<import(\"./activity/Activity\")."
+              "text": "<import(\"./activity/Activity.js\")."
             },
             {
               "kind": "Reference",
@@ -7385,7 +7385,7 @@
             },
             {
               "kind": "Content",
-              "text": ">;\n                collection: true;\n                defaultValue: (...args: any[]) => (import(\"./createClass\")."
+              "text": ">;\n                collection: true;\n                defaultValue: (...args: any[]) => (import(\"./createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -7394,7 +7394,7 @@
             },
             {
               "kind": "Content",
-              "text": "<import(\"./activity/Activity\")."
+              "text": "<import(\"./activity/Activity.js\")."
             },
             {
               "kind": "Reference",
@@ -7403,7 +7403,7 @@
             },
             {
               "kind": "Content",
-              "text": "> | import(\"./createClass\")."
+              "text": "> | import(\"./createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -7412,7 +7412,7 @@
             },
             {
               "kind": "Content",
-              "text": "<import(\"./activity/Activity\")."
+              "text": "<import(\"./activity/Activity.js\")."
             },
             {
               "kind": "Reference",
@@ -7430,7 +7430,7 @@
             },
             {
               "kind": "Content",
-              "text": "<import(\"./activity/Activity\")."
+              "text": "<import(\"./activity/Activity.js\")."
             },
             {
               "kind": "Reference",
@@ -7439,7 +7439,7 @@
             },
             {
               "kind": "Content",
-              "text": ">;\n                collection: true;\n                defaultValue: (...args: any[]) => (import(\"./createClass\")."
+              "text": ">;\n                collection: true;\n                defaultValue: (...args: any[]) => (import(\"./createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -7448,7 +7448,7 @@
             },
             {
               "kind": "Content",
-              "text": "<import(\"./activity/Activity\")."
+              "text": "<import(\"./activity/Activity.js\")."
             },
             {
               "kind": "Reference",
@@ -7457,7 +7457,7 @@
             },
             {
               "kind": "Content",
-              "text": "> | import(\"./createClass\")."
+              "text": "> | import(\"./createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -7466,7 +7466,7 @@
             },
             {
               "kind": "Content",
-              "text": "<import(\"./activity/Activity\")."
+              "text": "<import(\"./activity/Activity.js\")."
             },
             {
               "kind": "Reference",
@@ -7484,7 +7484,7 @@
             },
             {
               "kind": "Content",
-              "text": "<import(\"./activity/Activity\")."
+              "text": "<import(\"./activity/Activity.js\")."
             },
             {
               "kind": "Reference",
@@ -7493,7 +7493,7 @@
             },
             {
               "kind": "Content",
-              "text": ">;\n                collection: true;\n                defaultValue: (...args: any[]) => (import(\"./createClass\")."
+              "text": ">;\n                collection: true;\n                defaultValue: (...args: any[]) => (import(\"./createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -7502,7 +7502,7 @@
             },
             {
               "kind": "Content",
-              "text": "<import(\"./activity/Activity\")."
+              "text": "<import(\"./activity/Activity.js\")."
             },
             {
               "kind": "Reference",
@@ -7511,7 +7511,7 @@
             },
             {
               "kind": "Content",
-              "text": "> | import(\"./createClass\")."
+              "text": "> | import(\"./createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -7520,7 +7520,7 @@
             },
             {
               "kind": "Content",
-              "text": "<import(\"./activity/Activity\")."
+              "text": "<import(\"./activity/Activity.js\")."
             },
             {
               "kind": "Reference",
@@ -7538,7 +7538,7 @@
             },
             {
               "kind": "Content",
-              "text": "<import(\"./activity/Activity\")."
+              "text": "<import(\"./activity/Activity.js\")."
             },
             {
               "kind": "Reference",
@@ -7547,7 +7547,7 @@
             },
             {
               "kind": "Content",
-              "text": ">;\n                collection: true;\n                defaultValue: (...args: any[]) => (import(\"./createClass\")."
+              "text": ">;\n                collection: true;\n                defaultValue: (...args: any[]) => (import(\"./createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -7556,7 +7556,7 @@
             },
             {
               "kind": "Content",
-              "text": "<import(\"./activity/Activity\")."
+              "text": "<import(\"./activity/Activity.js\")."
             },
             {
               "kind": "Reference",
@@ -7565,7 +7565,7 @@
             },
             {
               "kind": "Content",
-              "text": "> | import(\"./createClass\")."
+              "text": "> | import(\"./createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -7574,7 +7574,7 @@
             },
             {
               "kind": "Content",
-              "text": "<import(\"./activity/Activity\")."
+              "text": "<import(\"./activity/Activity.js\")."
             },
             {
               "kind": "Reference",
@@ -7592,7 +7592,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                    name: {\n                        type: \"string\";\n                        required: true;\n                    };\n                }>;\n                collection: true;\n                defaultValue: (...args: any[]) => (import(\"./createClass\")."
+              "text": "<{\n                    name: {\n                        type: \"string\";\n                        required: true;\n                    };\n                }>;\n                collection: true;\n                defaultValue: (...args: any[]) => (import(\"./createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -7601,7 +7601,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                    name: {\n                        type: \"string\";\n                        required: true;\n                    };\n                }> | import(\"./createClass\")."
+              "text": "<{\n                    name: {\n                        type: \"string\";\n                        required: true;\n                    };\n                }> | import(\"./createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -7619,7 +7619,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                    name: {\n                        type: \"string\";\n                        required: true;\n                    };\n                }>;\n                collection: true;\n                defaultValue: (...args: any[]) => (import(\"./createClass\")."
+              "text": "<{\n                    name: {\n                        type: \"string\";\n                        required: true;\n                    };\n                }>;\n                collection: true;\n                defaultValue: (...args: any[]) => (import(\"./createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -7628,7 +7628,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                    name: {\n                        type: \"string\";\n                        required: true;\n                    };\n                }> | import(\"./createClass\")."
+              "text": "<{\n                    name: {\n                        type: \"string\";\n                        required: true;\n                    };\n                }> | import(\"./createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -7646,7 +7646,7 @@
             },
             {
               "kind": "Content",
-              "text": "<import(\"./activity/Activity\")."
+              "text": "<import(\"./activity/Activity.js\")."
             },
             {
               "kind": "Reference",
@@ -8651,7 +8651,7 @@
             },
             {
               "kind": "Content",
-              "text": "import(\"../createClass\")."
+              "text": "import(\"../createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -8709,7 +8709,7 @@
             },
             {
               "kind": "Content",
-              "text": "import(\"../createClass\")."
+              "text": "import(\"../createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -8718,7 +8718,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n    content: {\n        type: (import(\"../createClass\")."
+              "text": "<{\n    content: {\n        type: (import(\"../createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -8727,7 +8727,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n            type: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                defaultValue: () => string;\n            };\n            data: {\n                type: import(\"../createClass\")."
+              "text": "<{\n            type: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                defaultValue: () => string;\n            };\n            data: {\n                type: import(\"../createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -8736,7 +8736,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                    stringContent: {\n                        type: \"string\";\n                    };\n                    name: {\n                        type: \"string\";\n                    };\n                    isRole: {\n                        type: \"boolean\";\n                    };\n                    isRef: {\n                        type: \"boolean\";\n                    };\n                }>;\n                required: true;\n                collection: false;\n            };\n        }> | import(\"../createClass\")."
+              "text": "<{\n                    stringContent: {\n                        type: \"string\";\n                    };\n                    name: {\n                        type: \"string\";\n                    };\n                    isRole: {\n                        type: \"boolean\";\n                    };\n                    isRef: {\n                        type: \"boolean\";\n                    };\n                }>;\n                required: true;\n                collection: false;\n            };\n        }> | import(\"../createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -8903,7 +8903,7 @@
             },
             {
               "kind": "Content",
-              "text": "<boolean>;\n                        };\n                    };\n                    type: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        options: import(\"./entity/Entity\")."
+              "text": "<boolean>;\n                        };\n                    };\n                    type: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        options: import(\"./entity/Entity.js\")."
             },
             {
               "kind": "Reference",
@@ -8912,7 +8912,7 @@
             },
             {
               "kind": "Content",
-              "text": "[];\n                    };\n                    collection: {\n                        type: \"boolean\";\n                        required: true;\n                        collection: false;\n                        defaultValue(): boolean;\n                    };\n                    args: {\n                        computedType: (values: {\n                            type: import(\"./entity/Entity\")."
+              "text": "[];\n                    };\n                    collection: {\n                        type: \"boolean\";\n                        required: true;\n                        collection: false;\n                        defaultValue(): boolean;\n                    };\n                    args: {\n                        computedType: (values: {\n                            type: import(\"./entity/Entity.js\")."
             },
             {
               "kind": "Reference",
@@ -8948,7 +8948,7 @@
             },
             {
               "kind": "Content",
-              "text": "<import(\"./entity/Entity\")."
+              "text": "<import(\"./entity/Entity.js\")."
             },
             {
               "kind": "Reference",
