@@ -1,11 +1,11 @@
-import {EntityToTableMap} from "./EntityToTableMap";
-import {assert, setByPath} from "../utils";
+import {EntityToTableMap} from "./EntityToTableMap.js";
+import {assert, setByPath} from "../utils.js";
 import {BoolExp} from '@interaqt/shared'
-import {Database, EntityIdRef} from './EntityQueryHandle'
-import {FieldMatchAtom, MatchAtom, MatchExp, MatchExpressionData} from "./MatchExp";
-import {AttributeQuery, AttributeQueryData, AttributeQueryDataRecordItem} from "./AttributeQuery";
-import {LINK_SYMBOL, RecordQuery, RecordQueryTree} from "./RecordQuery";
-import {NewRecordData, RawEntityData} from "./NewRecordData";
+import {Database, EntityIdRef} from './EntityQueryHandle.js'
+import {FieldMatchAtom, MatchAtom, MatchExp, MatchExpressionData} from "./MatchExp.js";
+import {AttributeQuery, AttributeQueryData, AttributeQueryDataRecordItem} from "./AttributeQuery.js";
+import {LINK_SYMBOL, RecordQuery, RecordQueryTree} from "./RecordQuery.js";
+import {NewRecordData, RawEntityData} from "./NewRecordData.js";
 
 
 export type MutationEvent = {
@@ -565,6 +565,25 @@ ${this.buildXToOneFindQuery(existEntityQuery, currentAlias)}
             newRawDataWithNewIds.id = await this.database.getAutoId(newEntityData.recordName)
         }
 
+        // FIXME 应该先 有 create 再有  Link 事件
+        if (!isUpdate) {
+            events?.push({
+                type:'create',
+                recordName:newEntityData.recordName,
+                record: newRawDataWithNewIds
+            })
+        } else {
+            // 可能只是更新关系，所以这里一定要有自身的 value 才算是 update 自己
+            if (newEntityData.valueAttributes.length) {
+                events?.push({
+                    type:'update',
+                    recordName: newEntityData.recordName,
+                    record: newEntityData.getData()!,
+                    oldRecord: oldRecord
+                })
+            }
+        }
+
         // 1. 先为三表合一的新数据分配 id
         for(let record of newEntityData.combinedNewRecords) {
             newRawDataWithNewIds[record.info!.attributeName] = {
@@ -601,24 +620,7 @@ ${this.buildXToOneFindQuery(existEntityQuery, currentAlias)}
             }
         }
 
-        // FIXME 应该先 有 create 再有  Link 事件
-        if (!isUpdate) {
-            events?.push({
-                type:'create',
-                recordName:newEntityData.recordName,
-                record: newRawDataWithNewIds
-            })
-        } else {
-            // 可能只是更新关系，所以这里一定要有自身的 value 才算是 update 自己
-            if (newEntityData.valueAttributes.length) {
-                events?.push({
-                    type:'update',
-                    recordName: newEntityData.recordName,
-                    record: newEntityData.getData()!,
-                    oldRecord: oldRecord
-                })
-            }
-        }
+
 
         const newEntityDataWithIds = newEntityData.merge(newRawDataWithNewIds)
 

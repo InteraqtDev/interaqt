@@ -1,12 +1,12 @@
 import {expect, test, describe, afterEach, beforeAll, beforeEach} from "vitest";
 import { createCommonData} from "./data/common";
-import {DBSetup} from "../erstorage/Setup";
+import {DBSetup} from "../erstorage/Setup.js";
 import { SQLiteDB } from '../../runtime/SQLite'
-import {EntityToTableMap} from "../erstorage/EntityToTableMap";
-import {MatchExp} from "../erstorage/MatchExp";
-import {EntityQueryHandle} from "../erstorage/EntityQueryHandle";
-import {MutationEvent} from "../erstorage/RecordQueryAgent";
-import {LINK_SYMBOL} from "../erstorage/RecordQuery";
+import {EntityToTableMap} from "../erstorage/EntityToTableMap.js";
+import {MatchExp} from "../erstorage/MatchExp.js";
+import {EntityQueryHandle} from "../erstorage/EntityQueryHandle.js";
+import {MutationEvent} from "../erstorage/RecordQueryAgent.js";
+import {LINK_SYMBOL} from "../erstorage/RecordQuery.js";
 
 describe('many to many', () => {
     let db: SQLiteDB

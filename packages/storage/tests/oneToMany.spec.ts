@@ -1,12 +1,12 @@
 import {afterEach, beforeEach, describe, expect, test} from "vitest";
 import {createCommonData} from "./data/common";
-import {DBSetup} from "../erstorage/Setup";
+import {DBSetup} from "../erstorage/Setup.js";
 import {SQLiteDB} from '../../runtime/SQLite'
-import {EntityToTableMap} from "../erstorage/EntityToTableMap";
-import {MatchExp} from "../erstorage/MatchExp";
-import {EntityQueryHandle} from "../erstorage/EntityQueryHandle";
-import {MutationEvent} from "../erstorage/RecordQueryAgent";
-import {LINK_SYMBOL} from "../erstorage/RecordQuery";
+import {EntityToTableMap} from "../erstorage/EntityToTableMap.js";
+import {MatchExp} from "../erstorage/MatchExp.js";
+import {EntityQueryHandle} from "../erstorage/EntityQueryHandle.js";
+import {MutationEvent} from "../erstorage/RecordQueryAgent.js";
+import {LINK_SYMBOL} from "../erstorage/RecordQuery.js";
 
 describe('one to many', () => {
     let db: SQLiteDB
@@ -62,12 +62,6 @@ describe('one to many', () => {
                 }
             }, {
                 type: "create",
-                recordName: "User_leader_member_User",
-                record: {
-                    id: userA.member[0][LINK_SYMBOL].id
-                }
-            }, {
-                type: "create",
                 recordName: "User",
                 record: {
                     name: "m1",
@@ -81,7 +75,7 @@ describe('one to many', () => {
                 type: "create",
                 recordName: "User_leader_member_User",
                 record: {
-                    id: userA.member[1][LINK_SYMBOL].id,
+                    id: userA.member[0][LINK_SYMBOL].id
                 }
             }, {
                 type: "create",
@@ -93,6 +87,12 @@ describe('one to many', () => {
                         id:userA.id,
                     },
                     id: userA.member[1].id
+                }
+            }, {
+                type: "create",
+                recordName: "User_leader_member_User",
+                record: {
+                    id: userA.member[1][LINK_SYMBOL].id,
                 }
             }
         ])
@@ -184,12 +184,6 @@ describe('one to many', () => {
                 }
             }, {
                 type: "create",
-                recordName: "User_leader_member_User",
-                record: {
-                    id: userA.leader[LINK_SYMBOL].id
-                }
-            }, {
-                type: "create",
                 recordName: "User",
                 record: {
                     name: "a1",
@@ -198,6 +192,12 @@ describe('one to many', () => {
                         id: userA.leader.id
                     },
                     id: 2
+                }
+            }, {
+                type: "create",
+                recordName: "User_leader_member_User",
+                record: {
+                    id: userA.leader[LINK_SYMBOL].id
                 }
             }
         ])
@@ -226,12 +226,6 @@ describe('one to many', () => {
         expect(events).toMatchObject([
             {
                 type: "create",
-                recordName: "User_leader_member_User",
-                record: {
-                    id: userA.leader[LINK_SYMBOL].id
-                }
-            }, {
-                type: "create",
                 recordName: "User",
                 record: {
                     name: "a1",
@@ -240,6 +234,12 @@ describe('one to many', () => {
                         id:userA.leader.id
                     },
                     id: userA.id
+                }
+            }, {
+                type: "create",
+                recordName: "User_leader_member_User",
+                record: {
+                    id: userA.leader[LINK_SYMBOL].id
                 }
             }
         ])

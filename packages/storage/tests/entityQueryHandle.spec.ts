@@ -1,10 +1,10 @@
 import {expect, test, describe, afterEach, beforeAll, beforeEach} from "vitest";
 import { createCommonData} from "./data/common";
-import {DBSetup} from "../erstorage/Setup";
+import {DBSetup} from "../erstorage/Setup.js";
 import { SQLiteDB } from '../../runtime/SQLite'
-import {EntityToTableMap} from "../erstorage/EntityToTableMap";
-import {MatchExp} from "../erstorage/MatchExp";
-import {EntityQueryHandle} from "../erstorage/EntityQueryHandle";
+import {EntityToTableMap} from "../erstorage/EntityToTableMap.js";
+import {MatchExp} from "../erstorage/MatchExp.js";
+import {EntityQueryHandle} from "../erstorage/EntityQueryHandle.js";
 
 
 describe('create data', () => {

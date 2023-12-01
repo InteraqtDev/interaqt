@@ -1,6 +1,6 @@
-import {RecordInfo} from "./RecordInfo";
-import {assert} from "../utils";
-import {EntityToTableMap, LinkMapItem, RecordMapItem} from "./EntityToTableMap";
+import {RecordInfo} from "./RecordInfo.js";
+import {assert} from "../utils.js";
+import {EntityToTableMap, LinkMapItem, RecordMapItem} from "./EntityToTableMap.js";
 
 export class LinkInfo {
     constructor(public name: string, public data: LinkMapItem, public map: EntityToTableMap) {

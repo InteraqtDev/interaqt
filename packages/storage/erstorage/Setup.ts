@@ -1,8 +1,8 @@
 import {Entity, Relation} from "@interaqt/shared";
 import {KlassInstance} from "@interaqt/shared";
-import {LinkMapItem, MapData, RecordAttribute, RecordMapItem, ValueAttribute} from "./EntityToTableMap";
-import {assert} from "../utils";
-import {Database, ID_ATTR, ROW_ID_ATTR} from "./EntityQueryHandle";
+import {LinkMapItem, MapData, RecordAttribute, RecordMapItem, ValueAttribute} from "./EntityToTableMap.js";
+import {assert} from "../utils.js";
+import {Database, ID_ATTR, ROW_ID_ATTR} from "./EntityQueryHandle.js";
 
 type ColumnData = {
     name:string,

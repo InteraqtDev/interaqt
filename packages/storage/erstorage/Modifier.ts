@@ -1,4 +1,4 @@
-import {EntityToTableMap} from "./EntityToTableMap";
+import {EntityToTableMap} from "./EntityToTableMap.js";
 
 export type ModifierData = {
     orderBy?: {

@@ -1,8 +1,8 @@
-import {assert} from "../utils";
-import {AttributeInfo} from "./AttributeInfo";
-import {RecordInfo} from "./RecordInfo";
-import {LinkInfo} from "./LinkInfo";
-import {LINK_SYMBOL} from "./RecordQuery";
+import {assert} from "../utils.js";
+import {AttributeInfo} from "./AttributeInfo.js";
+import {RecordInfo} from "./RecordInfo.js";
+import {LinkInfo} from "./LinkInfo.js";
+import {LINK_SYMBOL} from "./RecordQuery.js";
 
 
 export type ValueAttribute = {

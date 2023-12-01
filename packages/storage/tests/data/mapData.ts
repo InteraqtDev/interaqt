@@ -1,4 +1,4 @@
-import {MapData} from "../../erstorage/EntityToTableMap";
+import {MapData} from "../../erstorage/EntityToTableMap.js";
 
 export const entityToTableMapData: MapData = {
     "links": {

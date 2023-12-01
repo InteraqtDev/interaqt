@@ -1,10 +1,10 @@
-import {MatchExp, MatchExpressionData} from "./MatchExp";
-import {AttributeQuery, AttributeQueryData} from "./AttributeQuery";
-import {Modifier, ModifierData} from "./Modifier";
-import {EntityToTableMap} from "./EntityToTableMap";
-import {AttributeInfo} from "./AttributeInfo";
-import {assert} from "../utils";
-import {RecursiveContext} from "./RecordQueryAgent";
+import {MatchExp, MatchExpressionData} from "./MatchExp.js";
+import {AttributeQuery, AttributeQueryData} from "./AttributeQuery.js";
+import {Modifier, ModifierData} from "./Modifier.js";
+import {EntityToTableMap} from "./EntityToTableMap.js";
+import {AttributeInfo} from "./AttributeInfo.js";
+import {assert} from "../utils.js";
+import {RecursiveContext} from "./RecordQueryAgent.js";
 
 export type RecordQueryData = {
     matchExpression?: MatchExpressionData,

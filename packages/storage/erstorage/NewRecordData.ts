@@ -1,8 +1,8 @@
-import {EntityToTableMap} from "./EntityToTableMap";
-import {flatten} from "./util";
-import {AttributeInfo} from "./AttributeInfo";
-import {Record} from "./RecordQueryAgent";
-import {LINK_SYMBOL} from "./RecordQuery";
+import {EntityToTableMap} from "./EntityToTableMap.js";
+import {flatten} from "./util.js";
+import {AttributeInfo} from "./AttributeInfo.js";
+import {Record} from "./RecordQueryAgent.js";
+import {LINK_SYMBOL} from "./RecordQuery.js";
 
 export type RawEntityData = { [k: string]: any }
 

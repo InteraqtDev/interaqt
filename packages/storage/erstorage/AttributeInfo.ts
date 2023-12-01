@@ -1,5 +1,5 @@
-import {assert} from "../utils";
-import {EntityToTableMap, RecordAttribute, ValueAttribute} from "./EntityToTableMap";
+import {assert} from "../utils.js";
+import {EntityToTableMap, RecordAttribute, ValueAttribute} from "./EntityToTableMap.js";
 
 export class AttributeInfo {
     public data: ValueAttribute | RecordAttribute

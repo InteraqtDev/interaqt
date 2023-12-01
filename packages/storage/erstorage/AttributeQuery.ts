@@ -1,7 +1,7 @@
-import {EntityToTableMap} from "./EntityToTableMap";
-import {assert} from "../utils";
+import {EntityToTableMap} from "./EntityToTableMap.js";
+import {assert} from "../utils.js";
 
-import {ALL_ATTR_SYMBOL, LINK_SYMBOL, RecordQuery, RecordQueryData, RecordQueryTree} from "./RecordQuery";
+import {ALL_ATTR_SYMBOL, LINK_SYMBOL, RecordQuery, RecordQueryData, RecordQueryTree} from "./RecordQuery.js";
 
 export type AttributeQueryDataRecordItem = [string, RecordQueryData, boolean?]
 export type AttributeQueryDataItem = string | AttributeQueryDataRecordItem

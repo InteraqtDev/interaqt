@@ -1,11 +1,11 @@
-import {EntityToTableMap} from "./EntityToTableMap";
-import {MatchExp, MatchExpressionData} from "./MatchExp";
-import {ModifierData} from "./Modifier";
-import {AttributeQueryData} from "./AttributeQuery";
-import {assert} from "../utils";
-import {RecordQuery} from "./RecordQuery";
-import {NewRecordData, RawEntityData} from "./NewRecordData";
-import {MutationEvent, RecordQueryAgent} from "./RecordQueryAgent";
+import {EntityToTableMap} from "./EntityToTableMap.js";
+import {MatchExp, MatchExpressionData} from "./MatchExp.js";
+import {ModifierData} from "./Modifier.js";
+import {AttributeQueryData} from "./AttributeQuery.js";
+import {assert} from "../utils.js";
+import {RecordQuery} from "./RecordQuery.js";
+import {NewRecordData, RawEntityData} from "./NewRecordData.js";
+import {MutationEvent, RecordQueryAgent} from "./RecordQueryAgent.js";
 
 export const ROW_ID_ATTR = '_rowId'
 export const ID_ATTR = 'id'
@@ -63,7 +63,7 @@ export class EntityQueryHandle {
     // CAUTION 不能递归更新 relate entity 的 value，如果传入了 related entity 的值，说明是建立新的联系。
     async update(entity: string, matchExpressionData: MatchExpressionData, rawData: RawEntityData, events?: MutationEvent[]) {
         const newEntityData = new NewRecordData(this.map, entity, rawData)
-        if (entity === 'Request' && rawData.approved)  debugger
+        if (entity === 'Request')  debugger
         return this.agent.updateRecord(entity, matchExpressionData, newEntityData, events)
     }
 

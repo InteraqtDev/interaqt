@@ -1,12 +1,12 @@
 import {expect, test, describe, afterEach, beforeAll, beforeEach} from "vitest";
 import { createCommonData} from "./data/common";
-import {DBSetup} from "../erstorage/Setup";
+import {DBSetup} from "../erstorage/Setup.js";
 import { SQLiteDB } from '../../runtime/SQLite'
-import {EntityToTableMap} from "../erstorage/EntityToTableMap";
-import {MatchExp} from "../erstorage/MatchExp";
-import {EntityQueryHandle} from "../erstorage/EntityQueryHandle";
-import {MutationEvent} from "../erstorage/RecordQueryAgent";
-import {LINK_SYMBOL} from "../erstorage/RecordQuery";
+import {EntityToTableMap} from "../erstorage/EntityToTableMap.js";
+import {MatchExp} from "../erstorage/MatchExp.js";
+import {EntityQueryHandle} from "../erstorage/EntityQueryHandle.js";
+import {MutationEvent} from "../erstorage/RecordQueryAgent.js";
+import {LINK_SYMBOL} from "../erstorage/RecordQuery.js";
 
 
 describe('one to one', () => {
@@ -80,7 +80,15 @@ describe('one to one', () => {
             }
         })
         console.log(events)
-        expect(events).toMatchObject([
+        expect(events).toMatchObject([{
+            type: "create",
+            recordName: "User",
+            record: {
+                name: "a1",
+                age: 12,
+                id: userA.id,
+            }
+        },
             {
                 type: "create",
                 recordName: "Profile",
@@ -94,15 +102,7 @@ describe('one to one', () => {
                 record: {
                     id: userA.profile[LINK_SYMBOL].id
                 }
-            }, {
-                type: "create",
-                recordName: "User",
-                record: {
-                    name: "a1",
-                    age: 12,
-                    id: userA.id,
-                }
-            }
+            },
         ])
     })
 

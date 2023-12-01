@@ -486,7 +486,7 @@
                 },
                 {
                   "kind": "Content",
-                  "text": "import(\"./LinkInfo\")."
+                  "text": "import(\"./LinkInfo.js\")."
                 },
                 {
                   "kind": "Reference",
@@ -522,7 +522,7 @@
                 },
                 {
                   "kind": "Content",
-                  "text": "import(\"./RecordInfo\")."
+                  "text": "import(\"./RecordInfo.js\")."
                 },
                 {
                   "kind": "Reference",
@@ -4340,7 +4340,7 @@
                 },
                 {
                   "kind": "Content",
-                  "text": "<import(\"./MatchExp\")."
+                  "text": "<import(\"./MatchExp.js\")."
                 },
                 {
                   "kind": "Reference",
@@ -4455,7 +4455,7 @@
                 },
                 {
                   "kind": "Content",
-                  "text": "<import(\"./RecordQueryAgent\")."
+                  "text": "<import(\"./RecordQueryAgent.js\")."
                 },
                 {
                   "kind": "Reference",
@@ -4560,7 +4560,7 @@
                 },
                 {
                   "kind": "Content",
-                  "text": "<import(\"./RecordQueryAgent\")."
+                  "text": "<import(\"./RecordQueryAgent.js\")."
                 },
                 {
                   "kind": "Reference",
@@ -4673,7 +4673,7 @@
                 },
                 {
                   "kind": "Content",
-                  "text": "<import(\"./RecordQueryAgent\")."
+                  "text": "<import(\"./RecordQueryAgent.js\")."
                 },
                 {
                   "kind": "Reference",
@@ -4786,7 +4786,7 @@
                 },
                 {
                   "kind": "Content",
-                  "text": "<import(\"./RecordQueryAgent\")."
+                  "text": "<import(\"./RecordQueryAgent.js\")."
                 },
                 {
                   "kind": "Reference",
@@ -4896,7 +4896,7 @@
                 },
                 {
                   "kind": "Content",
-                  "text": "<import(\"./RecordQueryAgent\")."
+                  "text": "<import(\"./RecordQueryAgent.js\")."
                 },
                 {
                   "kind": "Reference",
@@ -5009,7 +5009,7 @@
                 },
                 {
                   "kind": "Content",
-                  "text": "<import(\"./RecordQueryAgent\")."
+                  "text": "<import(\"./RecordQueryAgent.js\")."
                 },
                 {
                   "kind": "Reference",
@@ -5212,7 +5212,7 @@
                 },
                 {
                   "kind": "Content",
-                  "text": "<void | import(\"./RecordQueryAgent\")."
+                  "text": "<void | import(\"./RecordQueryAgent.js\")."
                 },
                 {
                   "kind": "Reference",
@@ -5321,7 +5321,7 @@
                 },
                 {
                   "kind": "Content",
-                  "text": "<import(\"./RecordQueryAgent\")."
+                  "text": "<import(\"./RecordQueryAgent.js\")."
                 },
                 {
                   "kind": "Reference",
@@ -5438,7 +5438,7 @@
                 },
                 {
                   "kind": "Content",
-                  "text": "<import(\"./RecordQueryAgent\")."
+                  "text": "<import(\"./RecordQueryAgent.js\")."
                 },
                 {
                   "kind": "Reference",

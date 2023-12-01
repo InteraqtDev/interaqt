@@ -1,5 +1,5 @@
-import {AttributeInfo} from "./AttributeInfo";
-import {EntityToTableMap, RecordAttribute, RecordMapItem} from "./EntityToTableMap";
+import {AttributeInfo} from "./AttributeInfo.js";
+import {EntityToTableMap, RecordAttribute, RecordMapItem} from "./EntityToTableMap.js";
 
 export class RecordInfo {
     data: RecordMapItem

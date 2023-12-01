@@ -1,14 +1,14 @@
 import {expect, test, describe} from "vitest";
 import fs from 'fs'
 
-import {DBSetup} from "../erstorage/Setup";
-import {RecordQueryAgent} from "../erstorage/RecordQueryAgent";
-import {EntityToTableMap} from "../erstorage/EntityToTableMap";
+import {DBSetup} from "../erstorage/Setup.js";
+import {RecordQueryAgent} from "../erstorage/RecordQueryAgent.js";
+import {EntityToTableMap} from "../erstorage/EntityToTableMap.js";
 // @ts-ignore
 import { SQLiteDB } from '../../runtime/SQLite'
 import {createCommonData} from "./data/common";
-import {MatchExp} from "../erstorage/MatchExp";
-import {RecordQueryData, RecordQuery} from "../erstorage/RecordQuery";
+import {MatchExp} from "../erstorage/MatchExp.js";
+import {RecordQueryData, RecordQuery} from "../erstorage/RecordQuery.js";
 
 const { entities, relations } = createCommonData()
 
