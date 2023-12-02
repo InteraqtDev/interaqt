@@ -1065,6 +1065,77 @@
             },
             {
               "kind": "Method",
+              "canonicalReference": "@interaqt/shared!BoolExp.fromValue:member(1)",
+              "docComment": "",
+              "excerptTokens": [
+                {
+                  "kind": "Content",
+                  "text": "static fromValue<T>(value: "
+                },
+                {
+                  "kind": "Reference",
+                  "text": "ExpressionData",
+                  "canonicalReference": "@interaqt/shared!ExpressionData:type"
+                },
+                {
+                  "kind": "Content",
+                  "text": "<T>"
+                },
+                {
+                  "kind": "Content",
+                  "text": "): "
+                },
+                {
+                  "kind": "Reference",
+                  "text": "BoolExp",
+                  "canonicalReference": "@interaqt/shared!BoolExp:class"
+                },
+                {
+                  "kind": "Content",
+                  "text": "<T>"
+                },
+                {
+                  "kind": "Content",
+                  "text": ";"
+                }
+              ],
+              "typeParameters": [
+                {
+                  "typeParameterName": "T",
+                  "constraintTokenRange": {
+                    "startIndex": 0,
+                    "endIndex": 0
+                  },
+                  "defaultTypeTokenRange": {
+                    "startIndex": 0,
+                    "endIndex": 0
+                  }
+                }
+              ],
+              "isStatic": true,
+              "returnTypeTokenRange": {
+                "startIndex": 4,
+                "endIndex": 6
+              },
+              "releaseTag": "Public",
+              "isProtected": false,
+              "overloadIndex": 1,
+              "parameters": [
+                {
+                  "parameterName": "value",
+                  "parameterTypeTokenRange": {
+                    "startIndex": 1,
+                    "endIndex": 3
+                  },
+                  "isOptional": false
+                }
+              ],
+              "isOptional": false,
+              "isAbstract": false,
+              "name": "fromValue"
+            },
+            {
+              "kind": "Method",
               "canonicalReference": "@interaqt/shared!BoolExp#isAnd:member(1)",
               "docComment": "",
               "excerptTokens": [
@@ -1498,6 +1569,42 @@
               "isStatic": false,
               "isProtected": false,
               "isAbstract": false
+            },
+            {
+              "kind": "Method",
+              "canonicalReference": "@interaqt/shared!BoolExp#toValue:member(1)",
+              "docComment": "",
+              "excerptTokens": [
+                {
+                  "kind": "Content",
+                  "text": "toValue(): "
+                },
+                {
+                  "kind": "Reference",
+                  "text": "AtomData",
+                  "canonicalReference": "@interaqt/shared!~AtomData:type"
+                },
+                {
+                  "kind": "Content",
+                  "text": "<T>"
+                },
+                {
+                  "kind": "Content",
+                  "text": ";"
+                }
+              ],
+              "isStatic": false,
+              "returnTypeTokenRange": {
+                "startIndex": 1,
+                "endIndex": 3
+              },
+              "releaseTag": "Public",
+              "isProtected": false,
+              "overloadIndex": 1,
+              "parameters": [],
+              "isOptional": false,
+              "isAbstract": false,
+              "name": "toValue"
             }
           ],
           "implementsTokenRanges": []

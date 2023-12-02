@@ -175,6 +175,8 @@ export class BoolExp<T> {
     // (undocumented)
     evaluateAsync(atomHandle: AtomHandle<T>, stack?: any[], inverse?: boolean): Promise<true | EvaluateError>;
     // (undocumented)
+    static fromValue<T>(value: ExpressionData<T>): BoolExp<T>;
+    // (undocumented)
     isAnd(): boolean;
     // (undocumented)
     isAtom(): boolean;
@@ -198,6 +200,10 @@ export class BoolExp<T> {
     raw: ExpressionData<T>;
     // (undocumented)
     get right(): BoolExp<T>;
+    // Warning: (ae-forgotten-export) The symbol "AtomData" needs to be exported by the entry point index.d.ts
+    //
+    // (undocumented)
+    toValue(): AtomData<T>;
 }
 
 // Warning: (ae-forgotten-export) The symbol "BoolExpressionDataPublic" needs to be exported by the entry point index.d.ts
@@ -594,8 +600,6 @@ export const Every: Klass<{
     };
 }>;
 
-// Warning: (ae-forgotten-export) The symbol "AtomData" needs to be exported by the entry point index.d.ts
-//
 // @public (undocumented)
 export type ExpressionData<T> = BoolExpressionRawData<T> | AtomData<T>;
 

@@ -41,6 +41,13 @@ export class BoolExp<T> {
     get data() {
         return (this.raw as AtomData<T>).data
     }
+    // 支持序列化和反序列化
+    toValue() {
+        return this.raw as AtomData<T>
+    }
+    static fromValue<T>(value:  ExpressionData<T>) {
+        return new BoolExp<T>(value)
+    }
     isExpression() {
         return this.raw.type === 'expression'
     }

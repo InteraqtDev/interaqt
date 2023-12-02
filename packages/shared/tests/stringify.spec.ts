@@ -1,5 +1,5 @@
-import {assertType, describe, expect, test} from "vitest";
-import {stringifyAllInstances, createInstances, createClass, removeAllInstance} from "../createClass";
+import {describe, expect, test} from "vitest";
+import {createClass, createInstances, removeAllInstance, stringifyAllInstances} from "../createClass";
 
 
 const Ref = createClass({
@@ -32,7 +32,7 @@ const FuncAndRef = createClass({
 describe('createClass', () => {
     test('stringifyAllInstances', () => {
         const ref = Ref.create({name: 'ref1'})
-        const funcAndRef = FuncAndRef.create({
+        FuncAndRef.create({
             funcProp: function test(){
                 return 1
             },
@@ -41,7 +41,7 @@ describe('createClass', () => {
 
         const data = JSON.parse(stringifyAllInstances())
         removeAllInstance()
-        const instances = createInstances(data)
+        createInstances(data)
         expect(FuncAndRef.instances.length).toBe(1)
         expect(typeof FuncAndRef.instances[0].funcProp).toBe('function')
         expect(FuncAndRef.instances[0].refProp.name).toBe('ref1')
