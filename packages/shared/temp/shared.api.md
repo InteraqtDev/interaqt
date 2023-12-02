@@ -124,7 +124,7 @@ export const Any: Klass<{
         required: true;
     };
     matchExpression: {
-        type: "string";
+        type: "function";
         collection: false;
         required: true;
     };
@@ -332,7 +332,7 @@ export const Count: Klass<{
         required: true;
     };
     matchExpression: {
-        type: "string";
+        type: "function";
         collection: false;
         required: true;
     };
@@ -351,7 +351,7 @@ export function createInstancesFromString(objStr: string): Map<string, InertKlas
 
 // @public (undocumented)
 export function createUserRoleAttributive({ name, isRef }: {
-    name: string;
+    name?: string;
     isRef?: boolean;
 }, options?: KlassOptions | ReactiveKlassOptions): InertKlassInstance<    {
 stringContent: {
@@ -583,7 +583,7 @@ export const Every: Klass<{
         required: true;
     };
     matchExpression: {
-        type: "string";
+        type: "function";
         collection: false;
         required: true;
     };
@@ -825,7 +825,7 @@ export const MapActivityToEntity: Klass<{
         required: false;
     };
     handle: {
-        type: "string";
+        type: "function";
         collection: false;
         required: true;
     };
@@ -846,7 +846,7 @@ export const MapInteractionToProperty: Klass<{
                 required: true;
             };
             computeSource: {
-                type: "string";
+                type: "function";
                 collection: false;
                 required: true;
             };
@@ -874,7 +874,7 @@ export const MapInteractionToPropertyItem: Klass<{
         required: true;
     };
     computeSource: {
-        type: "string";
+        type: "function";
         collection: false;
         required: true;
     };
@@ -888,7 +888,7 @@ export const MapInteractionToRecord: Klass<{
         required: true;
     };
     handle: {
-        type: "string";
+        type: "function";
         collection: false;
         required: true;
     };
@@ -1629,7 +1629,7 @@ export const RelationBasedAny: Klass<{
         defaultValue: () => string;
     };
     matchExpression: {
-        type: "string";
+        type: "function";
         collection: false;
         required: true;
     };
@@ -1649,7 +1649,7 @@ export const RelationBasedEvery: Klass<{
         defaultValue: () => string;
     };
     matchExpression: {
-        type: "string";
+        type: "function";
         collection: false;
         required: true;
     };
@@ -1680,7 +1680,7 @@ export const RelationBasedWeightedSummation: Klass<{
         required: true;
     };
     matchRelationToWeight: {
-        type: "string";
+        type: "function";
         collection: false;
         required: true;
     };
@@ -1700,7 +1700,7 @@ export const RelationCount: Klass<{
         defaultValue: () => string;
     };
     matchExpression: {
-        type: "string";
+        type: "function";
         collection: false;
         required: true;
     };
@@ -1797,7 +1797,7 @@ export const RelationStateMachine: Klass<{
                 required: false;
             };
             propertyHandle: {
-                type: "string";
+                type: "function";
                 required: false;
                 collection: false;
             };
@@ -1907,7 +1907,7 @@ export const RelationStateMachine: Klass<{
                         required: false;
                     };
                     propertyHandle: {
-                        type: "string";
+                        type: "function";
                         required: false;
                         collection: false;
                     };
@@ -1939,7 +1939,7 @@ export const RelationStateMachine: Klass<{
                         required: false;
                     };
                     propertyHandle: {
-                        type: "string";
+                        type: "function";
                         required: false;
                         collection: false;
                     };
@@ -1951,7 +1951,7 @@ export const RelationStateMachine: Klass<{
                 type: "string";
             };
             handle: {
-                type: "string";
+                type: "function";
                 collection: false;
                 required: true;
             };
@@ -1983,7 +1983,7 @@ export const RelationStateMachine: Klass<{
                 required: false;
             };
             propertyHandle: {
-                type: "string";
+                type: "function";
                 required: false;
                 collection: false;
             };
@@ -2017,7 +2017,7 @@ export const RelationStateNode: Klass<{
         required: false;
     };
     propertyHandle: {
-        type: "string";
+        type: "function";
         required: false;
         collection: false;
     };
@@ -2125,7 +2125,7 @@ export const RelationStateTransfer: Klass<{
                 required: false;
             };
             propertyHandle: {
-                type: "string";
+                type: "function";
                 required: false;
                 collection: false;
             };
@@ -2157,7 +2157,7 @@ export const RelationStateTransfer: Klass<{
                 required: false;
             };
             propertyHandle: {
-                type: "string";
+                type: "function";
                 required: false;
                 collection: false;
             };
@@ -2169,7 +2169,7 @@ export const RelationStateTransfer: Klass<{
         type: "string";
     };
     handle: {
-        type: "string";
+        type: "function";
         collection: false;
         required: true;
     };
@@ -2422,7 +2422,7 @@ export const WeightedSummation: Klass<{
         required: true;
     };
     matchRecordToWeight: {
-        type: "string";
+        type: "function";
         collection: false;
         required: true;
     };
@@ -2431,7 +2431,7 @@ export const WeightedSummation: Klass<{
 // Warnings were encountered during analysis:
 //
 // activity/Activity.ts:313:9 - (ae-forgotten-export) The symbol "UnwrappedActivityInstanceType" needs to be exported by the entry point index.d.ts
-// createClass.ts:49:9 - (ae-forgotten-export) The symbol "ClassMetaPublicItem" needs to be exported by the entry point index.d.ts
+// createClass.ts:48:9 - (ae-forgotten-export) The symbol "ClassMetaPublicItem" needs to be exported by the entry point index.d.ts
 
 // (No @packageDocumentation comment for this package)
 

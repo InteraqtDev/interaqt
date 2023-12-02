@@ -17,7 +17,7 @@ export const MapActivityToEntity = createClass({
             required: false
         },
         handle: {
-            type: 'string',
+            type: 'function',
             collection: false,
             required: true
         }
@@ -33,7 +33,7 @@ export const MapInteractionToRecord = createClass({
             required: true
         },
         handle: {
-            type: 'string',
+            type: 'function',
             collection: false,
             required: true
         }
@@ -54,7 +54,7 @@ export const MapInteractionToPropertyItem = createClass({
             required: true
         },
         computeSource: {
-            type: 'string',
+            type: 'function',
             collection: false,
             required: true
         }
@@ -115,7 +115,7 @@ export const RelationStateNode = createClass({
             required: false,
         },
         propertyHandle: {
-            type: 'string',
+            type: 'function',
             required: false,
             collection:false
         }
@@ -149,7 +149,7 @@ export const RelationStateTransfer = createClass({
             type: 'string',   // 支持 'enumeration' 和 'computeSource'
         },
         handle: {
-            type: 'string',
+            type: 'function',
             collection: false,
             required: true
         }
@@ -229,7 +229,7 @@ export const RelationBasedWeightedSummation = createClass({
         // 创建初始值的时候用于计算哪些 relation 是要  count 的
         // 这里 match 的是 relatedEntity
         matchRelationToWeight: {
-            type: 'string',
+            type: 'function',
             collection: false,
             required: true
         }
@@ -254,7 +254,7 @@ export const RelationCount = createClass({
         // 创建初始值的时候用于计算哪些 relation 是要  count 的
         // 这里 match 的是 relatedEntity
         matchExpression: {
-            type: 'string',
+            type: 'function',
             collection: false,
             required: true
         }
@@ -273,7 +273,7 @@ export const WeightedSummation = createClass({
             required: true
         },
         matchRecordToWeight: {
-            type: 'string',
+            type: 'function',
             collection: false,
             required: true
         }
@@ -289,7 +289,7 @@ export const Count = createClass({
             required: true
         },
         matchExpression: {
-            type: 'string',
+            type: 'function',
             collection: false,
             required: true
         }
@@ -318,7 +318,7 @@ export const RelationBasedEvery = createClass({
         // 创建初始值的时候用于计算哪些 relation 是要  count 的
         // 这里 match 的是 relatedEntity
         matchExpression: {
-            type: 'string',
+            type: 'function',
             collection: false,
             required: true
         },
@@ -347,7 +347,7 @@ export const RelationBasedAny = createClass({
         // 创建初始值的时候用于计算哪些 relation 是要  count 的
         // 这里 match 的是 relatedEntity
         matchExpression: {
-            type: 'string',
+            type: 'function',
             collection: false,
             required: true
         }
@@ -364,7 +364,7 @@ export const Every = createClass({
             required: true
         },
         matchExpression: {
-            type: 'string',
+            type: 'function',
             collection: false,
             required: true
         },
@@ -385,7 +385,7 @@ export const Any = createClass({
             required: true
         },
         matchExpression: {
-            type: 'string',
+            type: 'function',
             collection: false,
             required: true
         }

@@ -122,12 +122,12 @@ export const UserAttributives = createClass({
     }
 })
 
-export function createUserRoleAttributive({name, isRef = false}: { name: string, isRef?: boolean}, options?: KlassOptions|ReactiveKlassOptions) {
+export function createUserRoleAttributive({name, isRef = false}: { name?: string, isRef?: boolean}, options?: KlassOptions|ReactiveKlassOptions) {
     // TODO type?
     // @ts-ignore
     return new UserAttributive({
         name,
-        stringContent: `function(user) { return user.roles.includes('${name}')}`,
+        stringContent: name ? `function(user) { return user.roles.includes('${name}')}` : 'function anyone(){ return true}',
         isRef,
         isRole: true
     }, options)

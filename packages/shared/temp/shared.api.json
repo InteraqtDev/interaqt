@@ -437,7 +437,7 @@
             {
               "kind": "Reference",
               "text": "Atom",
-              "canonicalReference": "rata!Atom:type"
+              "canonicalReference": "data0!Atom:type"
             },
             {
               "kind": "Content",
@@ -446,7 +446,7 @@
             {
               "kind": "Reference",
               "text": "Atom",
-              "canonicalReference": "rata!Atom:type"
+              "canonicalReference": "data0!Atom:type"
             },
             {
               "kind": "Content",
@@ -473,7 +473,7 @@
             {
               "kind": "Reference",
               "text": "Atom",
-              "canonicalReference": "rata!Atom:type"
+              "canonicalReference": "data0!Atom:type"
             },
             {
               "kind": "Content",
@@ -482,7 +482,7 @@
             {
               "kind": "Reference",
               "text": "Atom",
-              "canonicalReference": "rata!Atom:type"
+              "canonicalReference": "data0!Atom:type"
             },
             {
               "kind": "Content",
@@ -491,7 +491,7 @@
             {
               "kind": "Reference",
               "text": "Atom",
-              "canonicalReference": "rata!Atom:type"
+              "canonicalReference": "data0!Atom:type"
             },
             {
               "kind": "Content",
@@ -500,7 +500,7 @@
             {
               "kind": "Reference",
               "text": "Atom",
-              "canonicalReference": "rata!Atom:type"
+              "canonicalReference": "data0!Atom:type"
             },
             {
               "kind": "Content",
@@ -536,7 +536,7 @@
             {
               "kind": "Reference",
               "text": "Atom",
-              "canonicalReference": "rata!Atom:type"
+              "canonicalReference": "data0!Atom:type"
             },
             {
               "kind": "Content",
@@ -558,7 +558,7 @@
             },
             {
               "kind": "Content",
-              "text": ">)[];\n        collection: false;\n        required: true;\n    };\n    matchExpression: {\n        type: \"string\";\n        collection: false;\n        required: true;\n    };\n}>"
+              "text": ">)[];\n        collection: false;\n        required: true;\n    };\n    matchExpression: {\n        type: \"function\";\n        collection: false;\n        required: true;\n    };\n}>"
             }
           ],
           "fileUrlPath": "IncrementalComputation.ts",
@@ -1814,7 +1814,7 @@
             {
               "kind": "Reference",
               "text": "Atom",
-              "canonicalReference": "rata!Atom:type"
+              "canonicalReference": "data0!Atom:type"
             },
             {
               "kind": "Content",
@@ -1860,7 +1860,7 @@
             {
               "kind": "Reference",
               "text": "Atom",
-              "canonicalReference": "rata!Atom:type"
+              "canonicalReference": "data0!Atom:type"
             },
             {
               "kind": "Content",
@@ -1869,7 +1869,7 @@
             {
               "kind": "Reference",
               "text": "Atom",
-              "canonicalReference": "rata!Atom:type"
+              "canonicalReference": "data0!Atom:type"
             },
             {
               "kind": "Content",
@@ -1896,7 +1896,7 @@
             {
               "kind": "Reference",
               "text": "Atom",
-              "canonicalReference": "rata!Atom:type"
+              "canonicalReference": "data0!Atom:type"
             },
             {
               "kind": "Content",
@@ -1905,7 +1905,7 @@
             {
               "kind": "Reference",
               "text": "Atom",
-              "canonicalReference": "rata!Atom:type"
+              "canonicalReference": "data0!Atom:type"
             },
             {
               "kind": "Content",
@@ -1914,7 +1914,7 @@
             {
               "kind": "Reference",
               "text": "Atom",
-              "canonicalReference": "rata!Atom:type"
+              "canonicalReference": "data0!Atom:type"
             },
             {
               "kind": "Content",
@@ -1923,7 +1923,7 @@
             {
               "kind": "Reference",
               "text": "Atom",
-              "canonicalReference": "rata!Atom:type"
+              "canonicalReference": "data0!Atom:type"
             },
             {
               "kind": "Content",
@@ -1959,7 +1959,7 @@
             {
               "kind": "Reference",
               "text": "Atom",
-              "canonicalReference": "rata!Atom:type"
+              "canonicalReference": "data0!Atom:type"
             },
             {
               "kind": "Content",
@@ -1981,7 +1981,7 @@
             },
             {
               "kind": "Content",
-              "text": ">)[];\n        collection: false;\n        required: true;\n    };\n    matchExpression: {\n        type: \"string\";\n        collection: false;\n        required: true;\n    };\n}>"
+              "text": ">)[];\n        collection: false;\n        required: true;\n    };\n    matchExpression: {\n        type: \"function\";\n        collection: false;\n        required: true;\n    };\n}>"
             }
           ],
           "fileUrlPath": "IncrementalComputation.ts",
@@ -2233,7 +2233,7 @@
             },
             {
               "kind": "Content",
-              "text": "{\n    name: string;\n    isRef?: boolean;\n}"
+              "text": "{\n    name?: string;\n    isRef?: boolean;\n}"
             },
             {
               "kind": "Content",
@@ -2493,7 +2493,7 @@
             {
               "kind": "Reference",
               "text": "Atom",
-              "canonicalReference": "rata!Atom:type"
+              "canonicalReference": "data0!Atom:type"
             },
             {
               "kind": "Content",
@@ -2502,7 +2502,7 @@
             {
               "kind": "Reference",
               "text": "Atom",
-              "canonicalReference": "rata!Atom:type"
+              "canonicalReference": "data0!Atom:type"
             },
             {
               "kind": "Content",
@@ -2529,7 +2529,7 @@
             {
               "kind": "Reference",
               "text": "Atom",
-              "canonicalReference": "rata!Atom:type"
+              "canonicalReference": "data0!Atom:type"
             },
             {
               "kind": "Content",
@@ -2538,7 +2538,7 @@
             {
               "kind": "Reference",
               "text": "Atom",
-              "canonicalReference": "rata!Atom:type"
+              "canonicalReference": "data0!Atom:type"
             },
             {
               "kind": "Content",
@@ -2547,7 +2547,7 @@
             {
               "kind": "Reference",
               "text": "Atom",
-              "canonicalReference": "rata!Atom:type"
+              "canonicalReference": "data0!Atom:type"
             },
             {
               "kind": "Content",
@@ -2556,7 +2556,7 @@
             {
               "kind": "Reference",
               "text": "Atom",
-              "canonicalReference": "rata!Atom:type"
+              "canonicalReference": "data0!Atom:type"
             },
             {
               "kind": "Content",
@@ -2592,7 +2592,7 @@
             {
               "kind": "Reference",
               "text": "Atom",
-              "canonicalReference": "rata!Atom:type"
+              "canonicalReference": "data0!Atom:type"
             },
             {
               "kind": "Content",
@@ -2832,7 +2832,7 @@
             {
               "kind": "Reference",
               "text": "Atom",
-              "canonicalReference": "rata!Atom:type"
+              "canonicalReference": "data0!Atom:type"
             },
             {
               "kind": "Content",
@@ -2841,7 +2841,7 @@
             {
               "kind": "Reference",
               "text": "Atom",
-              "canonicalReference": "rata!Atom:type"
+              "canonicalReference": "data0!Atom:type"
             },
             {
               "kind": "Content",
@@ -2868,7 +2868,7 @@
             {
               "kind": "Reference",
               "text": "Atom",
-              "canonicalReference": "rata!Atom:type"
+              "canonicalReference": "data0!Atom:type"
             },
             {
               "kind": "Content",
@@ -2877,7 +2877,7 @@
             {
               "kind": "Reference",
               "text": "Atom",
-              "canonicalReference": "rata!Atom:type"
+              "canonicalReference": "data0!Atom:type"
             },
             {
               "kind": "Content",
@@ -2886,7 +2886,7 @@
             {
               "kind": "Reference",
               "text": "Atom",
-              "canonicalReference": "rata!Atom:type"
+              "canonicalReference": "data0!Atom:type"
             },
             {
               "kind": "Content",
@@ -2895,7 +2895,7 @@
             {
               "kind": "Reference",
               "text": "Atom",
-              "canonicalReference": "rata!Atom:type"
+              "canonicalReference": "data0!Atom:type"
             },
             {
               "kind": "Content",
@@ -2931,7 +2931,7 @@
             {
               "kind": "Reference",
               "text": "Atom",
-              "canonicalReference": "rata!Atom:type"
+              "canonicalReference": "data0!Atom:type"
             },
             {
               "kind": "Content",
@@ -2953,7 +2953,7 @@
             },
             {
               "kind": "Content",
-              "text": ">)[];\n        collection: false;\n        required: true;\n    };\n    matchExpression: {\n        type: \"string\";\n        collection: false;\n        required: true;\n    };\n    notEmpty: {\n        type: \"boolean\";\n        collection: false;\n        required: false;\n    };\n}>"
+              "text": ">)[];\n        collection: false;\n        required: true;\n    };\n    matchExpression: {\n        type: \"function\";\n        collection: false;\n        required: true;\n    };\n    notEmpty: {\n        type: \"boolean\";\n        collection: false;\n        required: false;\n    };\n}>"
             }
           ],
           "fileUrlPath": "IncrementalComputation.ts",
@@ -4319,7 +4319,7 @@
             {
               "kind": "Reference",
               "text": "Atom",
-              "canonicalReference": "rata!Atom:type"
+              "canonicalReference": "data0!Atom:type"
             },
             {
               "kind": "Content",
@@ -4768,7 +4768,7 @@
             },
             {
               "kind": "Content",
-              "text": ">;\n        collection: true;\n        required: false;\n    };\n    handle: {\n        type: \"string\";\n        collection: false;\n        required: true;\n    };\n}>"
+              "text": ">;\n        collection: true;\n        required: false;\n    };\n    handle: {\n        type: \"function\";\n        collection: false;\n        required: true;\n    };\n}>"
             }
           ],
           "fileUrlPath": "IncrementalComputation.ts",
@@ -4823,7 +4823,7 @@
             },
             {
               "kind": "Content",
-              "text": ">;\n                collection: false;\n                required: true;\n            };\n            value: {\n                type: \"string\";\n                collection: false;\n                required: true;\n            };\n            computeSource: {\n                type: \"string\";\n                collection: false;\n                required: true;\n            };\n        }>;\n        collection: true;\n        required: true;\n    };\n    defaultValue: {\n        type: \"string\";\n        collection: false;\n        required: false;\n    };\n}>"
+              "text": ">;\n                collection: false;\n                required: true;\n            };\n            value: {\n                type: \"string\";\n                collection: false;\n                required: true;\n            };\n            computeSource: {\n                type: \"function\";\n                collection: false;\n                required: true;\n            };\n        }>;\n        collection: true;\n        required: true;\n    };\n    defaultValue: {\n        type: \"string\";\n        collection: false;\n        required: false;\n    };\n}>"
             }
           ],
           "fileUrlPath": "IncrementalComputation.ts",
@@ -4869,7 +4869,7 @@
             },
             {
               "kind": "Content",
-              "text": ">;\n        collection: false;\n        required: true;\n    };\n    value: {\n        type: \"string\";\n        collection: false;\n        required: true;\n    };\n    computeSource: {\n        type: \"string\";\n        collection: false;\n        required: true;\n    };\n}>"
+              "text": ">;\n        collection: false;\n        required: true;\n    };\n    value: {\n        type: \"string\";\n        collection: false;\n        required: true;\n    };\n    computeSource: {\n        type: \"function\";\n        collection: false;\n        required: true;\n    };\n}>"
             }
           ],
           "fileUrlPath": "IncrementalComputation.ts",
@@ -4915,7 +4915,7 @@
             },
             {
               "kind": "Content",
-              "text": ">;\n        collection: false;\n        required: true;\n    };\n    handle: {\n        type: \"string\";\n        collection: false;\n        required: true;\n    };\n}>"
+              "text": ">;\n        collection: false;\n        required: true;\n    };\n    handle: {\n        type: \"function\";\n        collection: false;\n        required: true;\n    };\n}>"
             }
           ],
           "fileUrlPath": "IncrementalComputation.ts",
@@ -5382,7 +5382,7 @@
             {
               "kind": "Reference",
               "text": "Atom",
-              "canonicalReference": "rata!Atom:type"
+              "canonicalReference": "data0!Atom:type"
             },
             {
               "kind": "Content",
@@ -5391,7 +5391,7 @@
             {
               "kind": "Reference",
               "text": "Atom",
-              "canonicalReference": "rata!Atom:type"
+              "canonicalReference": "data0!Atom:type"
             },
             {
               "kind": "Content",
@@ -5418,7 +5418,7 @@
             {
               "kind": "Reference",
               "text": "Atom",
-              "canonicalReference": "rata!Atom:type"
+              "canonicalReference": "data0!Atom:type"
             },
             {
               "kind": "Content",
@@ -5427,7 +5427,7 @@
             {
               "kind": "Reference",
               "text": "Atom",
-              "canonicalReference": "rata!Atom:type"
+              "canonicalReference": "data0!Atom:type"
             },
             {
               "kind": "Content",
@@ -5436,7 +5436,7 @@
             {
               "kind": "Reference",
               "text": "Atom",
-              "canonicalReference": "rata!Atom:type"
+              "canonicalReference": "data0!Atom:type"
             },
             {
               "kind": "Content",
@@ -5445,7 +5445,7 @@
             {
               "kind": "Reference",
               "text": "Atom",
-              "canonicalReference": "rata!Atom:type"
+              "canonicalReference": "data0!Atom:type"
             },
             {
               "kind": "Content",
@@ -5481,7 +5481,7 @@
             {
               "kind": "Reference",
               "text": "Atom",
-              "canonicalReference": "rata!Atom:type"
+              "canonicalReference": "data0!Atom:type"
             },
             {
               "kind": "Content",
@@ -5508,7 +5508,7 @@
             {
               "kind": "Reference",
               "text": "Atom",
-              "canonicalReference": "rata!Atom:type"
+              "canonicalReference": "data0!Atom:type"
             },
             {
               "kind": "Content",
@@ -5517,7 +5517,7 @@
             {
               "kind": "Reference",
               "text": "Atom",
-              "canonicalReference": "rata!Atom:type"
+              "canonicalReference": "data0!Atom:type"
             },
             {
               "kind": "Content",
@@ -5544,7 +5544,7 @@
             {
               "kind": "Reference",
               "text": "Atom",
-              "canonicalReference": "rata!Atom:type"
+              "canonicalReference": "data0!Atom:type"
             },
             {
               "kind": "Content",
@@ -5553,7 +5553,7 @@
             {
               "kind": "Reference",
               "text": "Atom",
-              "canonicalReference": "rata!Atom:type"
+              "canonicalReference": "data0!Atom:type"
             },
             {
               "kind": "Content",
@@ -5562,7 +5562,7 @@
             {
               "kind": "Reference",
               "text": "Atom",
-              "canonicalReference": "rata!Atom:type"
+              "canonicalReference": "data0!Atom:type"
             },
             {
               "kind": "Content",
@@ -5571,7 +5571,7 @@
             {
               "kind": "Reference",
               "text": "Atom",
-              "canonicalReference": "rata!Atom:type"
+              "canonicalReference": "data0!Atom:type"
             },
             {
               "kind": "Content",
@@ -5607,7 +5607,7 @@
             {
               "kind": "Reference",
               "text": "Atom",
-              "canonicalReference": "rata!Atom:type"
+              "canonicalReference": "data0!Atom:type"
             },
             {
               "kind": "Content",
@@ -5770,7 +5770,7 @@
             {
               "kind": "Reference",
               "text": "Atom",
-              "canonicalReference": "rata!Atom:type"
+              "canonicalReference": "data0!Atom:type"
             },
             {
               "kind": "Content",
@@ -5779,7 +5779,7 @@
             {
               "kind": "Reference",
               "text": "Atom",
-              "canonicalReference": "rata!Atom:type"
+              "canonicalReference": "data0!Atom:type"
             },
             {
               "kind": "Content",
@@ -5806,7 +5806,7 @@
             {
               "kind": "Reference",
               "text": "Atom",
-              "canonicalReference": "rata!Atom:type"
+              "canonicalReference": "data0!Atom:type"
             },
             {
               "kind": "Content",
@@ -5815,7 +5815,7 @@
             {
               "kind": "Reference",
               "text": "Atom",
-              "canonicalReference": "rata!Atom:type"
+              "canonicalReference": "data0!Atom:type"
             },
             {
               "kind": "Content",
@@ -5824,7 +5824,7 @@
             {
               "kind": "Reference",
               "text": "Atom",
-              "canonicalReference": "rata!Atom:type"
+              "canonicalReference": "data0!Atom:type"
             },
             {
               "kind": "Content",
@@ -5833,7 +5833,7 @@
             {
               "kind": "Reference",
               "text": "Atom",
-              "canonicalReference": "rata!Atom:type"
+              "canonicalReference": "data0!Atom:type"
             },
             {
               "kind": "Content",
@@ -5869,7 +5869,7 @@
             {
               "kind": "Reference",
               "text": "Atom",
-              "canonicalReference": "rata!Atom:type"
+              "canonicalReference": "data0!Atom:type"
             },
             {
               "kind": "Content",
@@ -5896,7 +5896,7 @@
             {
               "kind": "Reference",
               "text": "Atom",
-              "canonicalReference": "rata!Atom:type"
+              "canonicalReference": "data0!Atom:type"
             },
             {
               "kind": "Content",
@@ -5905,7 +5905,7 @@
             {
               "kind": "Reference",
               "text": "Atom",
-              "canonicalReference": "rata!Atom:type"
+              "canonicalReference": "data0!Atom:type"
             },
             {
               "kind": "Content",
@@ -5932,7 +5932,7 @@
             {
               "kind": "Reference",
               "text": "Atom",
-              "canonicalReference": "rata!Atom:type"
+              "canonicalReference": "data0!Atom:type"
             },
             {
               "kind": "Content",
@@ -5941,7 +5941,7 @@
             {
               "kind": "Reference",
               "text": "Atom",
-              "canonicalReference": "rata!Atom:type"
+              "canonicalReference": "data0!Atom:type"
             },
             {
               "kind": "Content",
@@ -5950,7 +5950,7 @@
             {
               "kind": "Reference",
               "text": "Atom",
-              "canonicalReference": "rata!Atom:type"
+              "canonicalReference": "data0!Atom:type"
             },
             {
               "kind": "Content",
@@ -5959,7 +5959,7 @@
             {
               "kind": "Reference",
               "text": "Atom",
-              "canonicalReference": "rata!Atom:type"
+              "canonicalReference": "data0!Atom:type"
             },
             {
               "kind": "Content",
@@ -5995,7 +5995,7 @@
             {
               "kind": "Reference",
               "text": "Atom",
-              "canonicalReference": "rata!Atom:type"
+              "canonicalReference": "data0!Atom:type"
             },
             {
               "kind": "Content",
@@ -6041,7 +6041,7 @@
             {
               "kind": "Reference",
               "text": "Atom",
-              "canonicalReference": "rata!Atom:type"
+              "canonicalReference": "data0!Atom:type"
             },
             {
               "kind": "Content",
@@ -6050,7 +6050,7 @@
             {
               "kind": "Reference",
               "text": "Atom",
-              "canonicalReference": "rata!Atom:type"
+              "canonicalReference": "data0!Atom:type"
             },
             {
               "kind": "Content",
@@ -6059,7 +6059,7 @@
             {
               "kind": "Reference",
               "text": "Atom",
-              "canonicalReference": "rata!Atom:type"
+              "canonicalReference": "data0!Atom:type"
             },
             {
               "kind": "Content",
@@ -6068,7 +6068,7 @@
             {
               "kind": "Reference",
               "text": "Atom",
-              "canonicalReference": "rata!Atom:type"
+              "canonicalReference": "data0!Atom:type"
             },
             {
               "kind": "Content",
@@ -6471,7 +6471,7 @@
             },
             {
               "kind": "Content",
-              "text": ">;\n        collection: false;\n        required: true;\n    };\n    relationDirection: {\n        type: \"string\";\n        collection: false;\n        required: true;\n        defaultValue: () => string;\n    };\n    matchExpression: {\n        type: \"string\";\n        collection: false;\n        required: true;\n    };\n}>"
+              "text": ">;\n        collection: false;\n        required: true;\n    };\n    relationDirection: {\n        type: \"string\";\n        collection: false;\n        required: true;\n        defaultValue: () => string;\n    };\n    matchExpression: {\n        type: \"function\";\n        collection: false;\n        required: true;\n    };\n}>"
             }
           ],
           "fileUrlPath": "IncrementalComputation.ts",
@@ -6517,7 +6517,7 @@
             },
             {
               "kind": "Content",
-              "text": ">;\n        collection: false;\n        required: true;\n    };\n    relationDirection: {\n        type: \"string\";\n        collection: false;\n        required: true;\n        defaultValue: () => string;\n    };\n    matchExpression: {\n        type: \"string\";\n        collection: false;\n        required: true;\n    };\n    notEmpty: {\n        type: \"boolean\";\n        collection: false;\n        required: false;\n    };\n}>"
+              "text": ">;\n        collection: false;\n        required: true;\n    };\n    relationDirection: {\n        type: \"string\";\n        collection: false;\n        required: true;\n        defaultValue: () => string;\n    };\n    matchExpression: {\n        type: \"function\";\n        collection: false;\n        required: true;\n    };\n    notEmpty: {\n        type: \"boolean\";\n        collection: false;\n        required: false;\n    };\n}>"
             }
           ],
           "fileUrlPath": "IncrementalComputation.ts",
@@ -6572,7 +6572,7 @@
             },
             {
               "kind": "Content",
-              "text": ">;\n                collection: false;\n                required: true;\n            };\n            relationDirection: {\n                type: \"string\";\n                collection: false;\n                required: true;\n                defaultValue: () => string;\n            };\n        }>;\n        collection: true;\n        required: true;\n    };\n    matchRelationToWeight: {\n        type: \"string\";\n        collection: false;\n        required: true;\n    };\n}>"
+              "text": ">;\n                collection: false;\n                required: true;\n            };\n            relationDirection: {\n                type: \"string\";\n                collection: false;\n                required: true;\n                defaultValue: () => string;\n            };\n        }>;\n        collection: true;\n        required: true;\n    };\n    matchRelationToWeight: {\n        type: \"function\";\n        collection: false;\n        required: true;\n    };\n}>"
             }
           ],
           "fileUrlPath": "IncrementalComputation.ts",
@@ -6618,7 +6618,7 @@
             },
             {
               "kind": "Content",
-              "text": ">;\n        collection: false;\n        required: true;\n    };\n    relationDirection: {\n        type: \"string\";\n        collection: false;\n        required: true;\n        defaultValue: () => string;\n    };\n    matchExpression: {\n        type: \"string\";\n        collection: false;\n        required: true;\n    };\n}>"
+              "text": ">;\n        collection: false;\n        required: true;\n    };\n    relationDirection: {\n        type: \"string\";\n        collection: false;\n        required: true;\n        defaultValue: () => string;\n    };\n    matchExpression: {\n        type: \"function\";\n        collection: false;\n        required: true;\n    };\n}>"
             }
           ],
           "fileUrlPath": "IncrementalComputation.ts",
@@ -6718,7 +6718,7 @@
             {
               "kind": "Reference",
               "text": "Atom",
-              "canonicalReference": "rata!Atom:type"
+              "canonicalReference": "data0!Atom:type"
             },
             {
               "kind": "Content",
@@ -6790,7 +6790,7 @@
             {
               "kind": "Reference",
               "text": "Atom",
-              "canonicalReference": "rata!Atom:type"
+              "canonicalReference": "data0!Atom:type"
             },
             {
               "kind": "Content",
@@ -6826,7 +6826,7 @@
             {
               "kind": "Reference",
               "text": "Atom",
-              "canonicalReference": "rata!Atom:type"
+              "canonicalReference": "data0!Atom:type"
             },
             {
               "kind": "Content",
@@ -6897,7 +6897,7 @@
             },
             {
               "kind": "Content",
-              "text": "<any>[];\n                        collection: false;\n                        required: true;\n                    };\n                }>;\n                collection: true;\n                required: false;\n            };\n            propertyHandle: {\n                type: \"string\";\n                required: false;\n                collection: false;\n            };\n        }>;\n        collection: true;\n        required: true;\n    };\n    transfers: {\n        type: "
+              "text": "<any>[];\n                        collection: false;\n                        required: true;\n                    };\n                }>;\n                collection: true;\n                required: false;\n            };\n            propertyHandle: {\n                type: \"function\";\n                required: false;\n                collection: false;\n            };\n        }>;\n        collection: true;\n        required: true;\n    };\n    transfers: {\n        type: "
             },
             {
               "kind": "Reference",
@@ -7230,7 +7230,7 @@
             },
             {
               "kind": "Content",
-              "text": "<any>[];\n                                collection: false;\n                                required: true;\n                            };\n                        }>;\n                        collection: true;\n                        required: false;\n                    };\n                    propertyHandle: {\n                        type: \"string\";\n                        required: false;\n                        collection: false;\n                    };\n                }>;\n                collection: false;\n                required: true;\n            };\n            toState: {\n                type: "
+              "text": "<any>[];\n                                collection: false;\n                                required: true;\n                            };\n                        }>;\n                        collection: true;\n                        required: false;\n                    };\n                    propertyHandle: {\n                        type: \"function\";\n                        required: false;\n                        collection: false;\n                    };\n                }>;\n                collection: false;\n                required: true;\n            };\n            toState: {\n                type: "
             },
             {
               "kind": "Reference",
@@ -7257,7 +7257,7 @@
             },
             {
               "kind": "Content",
-              "text": "<any>[];\n                                collection: false;\n                                required: true;\n                            };\n                        }>;\n                        collection: true;\n                        required: false;\n                    };\n                    propertyHandle: {\n                        type: \"string\";\n                        required: false;\n                        collection: false;\n                    };\n                }>;\n                collection: false;\n                required: true;\n            };\n            handleType: {\n                type: \"string\";\n            };\n            handle: {\n                type: \"string\";\n                collection: false;\n                required: true;\n            };\n        }>;\n        collection: true;\n        required: true;\n    };\n    defaultState: {\n        type: "
+              "text": "<any>[];\n                                collection: false;\n                                required: true;\n                            };\n                        }>;\n                        collection: true;\n                        required: false;\n                    };\n                    propertyHandle: {\n                        type: \"function\";\n                        required: false;\n                        collection: false;\n                    };\n                }>;\n                collection: false;\n                required: true;\n            };\n            handleType: {\n                type: \"string\";\n            };\n            handle: {\n                type: \"function\";\n                collection: false;\n                required: true;\n            };\n        }>;\n        collection: true;\n        required: true;\n    };\n    defaultState: {\n        type: "
             },
             {
               "kind": "Reference",
@@ -7284,7 +7284,7 @@
             },
             {
               "kind": "Content",
-              "text": "<any>[];\n                        collection: false;\n                        required: true;\n                    };\n                }>;\n                collection: true;\n                required: false;\n            };\n            propertyHandle: {\n                type: \"string\";\n                required: false;\n                collection: false;\n            };\n        }>;\n        collection: false;\n        required: true;\n    };\n}>"
+              "text": "<any>[];\n                        collection: false;\n                        required: true;\n                    };\n                }>;\n                collection: true;\n                required: false;\n            };\n            propertyHandle: {\n                type: \"function\";\n                required: false;\n                collection: false;\n            };\n        }>;\n        collection: false;\n        required: true;\n    };\n}>"
             }
           ],
           "fileUrlPath": "IncrementalComputation.ts",
@@ -7330,7 +7330,7 @@
             },
             {
               "kind": "Content",
-              "text": "<any>[];\n                collection: false;\n                required: true;\n            };\n        }>;\n        collection: true;\n        required: false;\n    };\n    propertyHandle: {\n        type: \"string\";\n        required: false;\n        collection: false;\n    };\n}>"
+              "text": "<any>[];\n                collection: false;\n                required: true;\n            };\n        }>;\n        collection: true;\n        required: false;\n    };\n    propertyHandle: {\n        type: \"function\";\n        required: false;\n        collection: false;\n    };\n}>"
             }
           ],
           "fileUrlPath": "IncrementalComputation.ts",
@@ -7682,7 +7682,7 @@
             },
             {
               "kind": "Content",
-              "text": "<any>[];\n                        collection: false;\n                        required: true;\n                    };\n                }>;\n                collection: true;\n                required: false;\n            };\n            propertyHandle: {\n                type: \"string\";\n                required: false;\n                collection: false;\n            };\n        }>;\n        collection: false;\n        required: true;\n    };\n    toState: {\n        type: "
+              "text": "<any>[];\n                        collection: false;\n                        required: true;\n                    };\n                }>;\n                collection: true;\n                required: false;\n            };\n            propertyHandle: {\n                type: \"function\";\n                required: false;\n                collection: false;\n            };\n        }>;\n        collection: false;\n        required: true;\n    };\n    toState: {\n        type: "
             },
             {
               "kind": "Reference",
@@ -7709,7 +7709,7 @@
             },
             {
               "kind": "Content",
-              "text": "<any>[];\n                        collection: false;\n                        required: true;\n                    };\n                }>;\n                collection: true;\n                required: false;\n            };\n            propertyHandle: {\n                type: \"string\";\n                required: false;\n                collection: false;\n            };\n        }>;\n        collection: false;\n        required: true;\n    };\n    handleType: {\n        type: \"string\";\n    };\n    handle: {\n        type: \"string\";\n        collection: false;\n        required: true;\n    };\n}>"
+              "text": "<any>[];\n                        collection: false;\n                        required: true;\n                    };\n                }>;\n                collection: true;\n                required: false;\n            };\n            propertyHandle: {\n                type: \"function\";\n                required: false;\n                collection: false;\n            };\n        }>;\n        collection: false;\n        required: true;\n    };\n    handleType: {\n        type: \"string\";\n    };\n    handle: {\n        type: \"function\";\n        collection: false;\n        required: true;\n    };\n}>"
             }
           ],
           "fileUrlPath": "IncrementalComputation.ts",
@@ -8104,7 +8104,7 @@
             {
               "kind": "Reference",
               "text": "Atom",
-              "canonicalReference": "rata!Atom:type"
+              "canonicalReference": "data0!Atom:type"
             },
             {
               "kind": "Content",
@@ -8113,7 +8113,7 @@
             {
               "kind": "Reference",
               "text": "Atom",
-              "canonicalReference": "rata!Atom:type"
+              "canonicalReference": "data0!Atom:type"
             },
             {
               "kind": "Content",
@@ -8122,7 +8122,7 @@
             {
               "kind": "Reference",
               "text": "Atom",
-              "canonicalReference": "rata!Atom:type"
+              "canonicalReference": "data0!Atom:type"
             },
             {
               "kind": "Content",
@@ -8131,7 +8131,7 @@
             {
               "kind": "Reference",
               "text": "Atom",
-              "canonicalReference": "rata!Atom:type"
+              "canonicalReference": "data0!Atom:type"
             },
             {
               "kind": "Content",
@@ -8836,7 +8836,7 @@
             {
               "kind": "Reference",
               "text": "Atom",
-              "canonicalReference": "rata!Atom:type"
+              "canonicalReference": "data0!Atom:type"
             },
             {
               "kind": "Content",
@@ -8845,7 +8845,7 @@
             {
               "kind": "Reference",
               "text": "Atom",
-              "canonicalReference": "rata!Atom:type"
+              "canonicalReference": "data0!Atom:type"
             },
             {
               "kind": "Content",
@@ -8872,7 +8872,7 @@
             {
               "kind": "Reference",
               "text": "Atom",
-              "canonicalReference": "rata!Atom:type"
+              "canonicalReference": "data0!Atom:type"
             },
             {
               "kind": "Content",
@@ -8881,7 +8881,7 @@
             {
               "kind": "Reference",
               "text": "Atom",
-              "canonicalReference": "rata!Atom:type"
+              "canonicalReference": "data0!Atom:type"
             },
             {
               "kind": "Content",
@@ -8890,7 +8890,7 @@
             {
               "kind": "Reference",
               "text": "Atom",
-              "canonicalReference": "rata!Atom:type"
+              "canonicalReference": "data0!Atom:type"
             },
             {
               "kind": "Content",
@@ -8899,7 +8899,7 @@
             {
               "kind": "Reference",
               "text": "Atom",
-              "canonicalReference": "rata!Atom:type"
+              "canonicalReference": "data0!Atom:type"
             },
             {
               "kind": "Content",
@@ -8935,7 +8935,7 @@
             {
               "kind": "Reference",
               "text": "Atom",
-              "canonicalReference": "rata!Atom:type"
+              "canonicalReference": "data0!Atom:type"
             },
             {
               "kind": "Content",
@@ -8957,7 +8957,7 @@
             },
             {
               "kind": "Content",
-              "text": ">)[];\n        collection: true;\n        required: true;\n    };\n    matchRecordToWeight: {\n        type: \"string\";\n        collection: false;\n        required: true;\n    };\n}>"
+              "text": ">)[];\n        collection: true;\n        required: true;\n    };\n    matchRecordToWeight: {\n        type: \"function\";\n        collection: false;\n        required: true;\n    };\n}>"
             }
           ],
           "fileUrlPath": "IncrementalComputation.ts",
