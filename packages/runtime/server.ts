@@ -1,6 +1,6 @@
 import Fastify from 'fastify'
 import {Controller, USER_ENTITY} from "./Controller.js";
-import {EventPayload, EventQuery, InteractionEventArgs} from "./types/interaction";
+import {EventPayload, EventQuery, InteractionEventArgs, EventUser} from "./types/interaction";
 import {MatchExp} from "@interaqt/storage";
 import cors from 'cors'
 import middie from '@fastify/middie'
@@ -22,8 +22,45 @@ type SyncUserBody = {
     userId: string,
 }
 
+export type DataAPIThis = {
+    system: Controller['system'],
+    user: EventUser
+}
 
-export async function startServer(controller: Controller, options: ServerOptions) {
+
+type DataAPI = ((this: DataAPIThis, ...rest: any[]) => any) & { params: any[] }
+
+type DataAPIs = {
+    [k:string] : DataAPI
+}
+
+type DataAPIClassParam<T extends any> = T & { fromValue: (value: any) => T }
+
+function parseDataAPIParams(rawParams: any[], api: DataAPI) {
+    const params = api.params
+    if (!params) {
+        return rawParams
+    }
+
+    return params.map((param, index) => {
+        const inputParam = rawParams[index]
+        if (typeof param === 'string') {
+            // 'string'|'number'|'boolean'|'object'|'undefined'|'null'
+            return inputParam[param]
+        } else if (typeof param === 'function') {
+            // 对象
+            if (!(param as DataAPIClassParam<any>).fromValue) {
+                throw new Error('Invalid Class param type, missing fromValue')
+            }
+            return (param as DataAPIClassParam<any>).fromValue(inputParam)
+        } else {
+            throw new Error('Invalid param type')
+        }
+    })
+}
+
+
+export async function startServer(controller: Controller, options: ServerOptions, dataAPIs: DataAPIs = {}) {
 
     // TODO log 中间件
     const fastify = Fastify({
@@ -90,7 +127,35 @@ export async function startServer(controller: Controller, options: ServerOptions
         return result
     })
 
+    // data api
+    fastify.post('/data/:apiName', async (request, reply) => {
+        // 1. JWT 鉴权。获取用户身份
+        const userId = await options.parseUserId(request.headers)
+        if (!userId) {
+            throw { statusCode: 401, message: 'Unauthorized' }
+        }
 
+        const user = await controller.system.storage.findOne(USER_ENTITY, MatchExp.atom({key:'id', value: ['=', userId]}), undefined, ['*'])
+        if (!user) {
+            throw { statusCode: 500, message: 'User not synced' }
+        }
+
+        const params = request.params as {apiName: string}
+        const api = dataAPIs[params.apiName]
+        if (!api) {
+            throw { statusCode: 404, message: `api ${params.apiName} not found` }
+        }
+
+        // 参数
+        const apiParams = parseDataAPIParams(request.body as any[], api)
+
+        return await dataAPIs[params.apiName].call({
+            system: controller.system,
+            user: user as EventUser
+        }, ...apiParams)
+    })
+
+    // 健康检测
     fastify.get('/ping', async (request, reply) => {
         reply.type('application/json').code(200)
         return { message: 'pong' }

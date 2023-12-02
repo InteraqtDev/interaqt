@@ -122,7 +122,7 @@ describe('map activity', () => {
             value: ['=', userB.name]
         })
 
-        const requests1 = await controller.system.storage.find('Request', requestMatch, undefined, ['handled', 'activityId', ['from',{attributeQuery:["name"]}], ['to', {attributeQuery:["name"]}], ['message', {attributeQuery:["content"]}]])
+        const requests1 = await controller.system.storage.find('Request', requestMatch, undefined, ['handled', ['activity', {attributeQuery: ['id']}], ['from',{attributeQuery:["name"]}], ['to', {attributeQuery:["name"]}], ['message', {attributeQuery:["content"]}]])
         expect(requests1.length).toBe(0)
         // 2. 交互顺序错误 approve
         // const res1 = createFriendRelationActivityCall.callInteraction(activityId, approveUUID, {user: userA})
@@ -138,12 +138,10 @@ describe('map activity', () => {
         const res2 = await controller.callActivityInteraction(makeFriendActivityUUID,  sendRequestUUID, activityId,{user: userA, payload})
         expect(res2.error).toBeUndefined()
 
-        const requests2 = await controller.system.storage.find('Request', requestMatch, undefined, ['handled', 'activityId', ['from',{attributeQuery:["name"]}], ['to', {attributeQuery:["name"]}], ['message', {attributeQuery:["content"]}]])
+        const requests2 = await controller.system.storage.find('Request', requestMatch, undefined, ['handled', ['activity', {attributeQuery: ['id']}], ['from',{attributeQuery:["name"]}], ['to', {attributeQuery:["name"]}], ['message', {attributeQuery:["content"]}]])
         expect(requests2.length).toBe(1)
         expect(!!requests2[0].handled).toBeFalsy()
-        // FIXME 为什么变成了字符串？？？
-
-        expect(requests2[0].activityId).toBe(activityId.toString())
+        expect(requests2[0].activity.id).toBe(activityId)
 
         const userB1 = (await system.storage.findOne('User', MatchExp.atom({
                 key:'id',
@@ -171,11 +169,10 @@ describe('map activity', () => {
         const res5 = await controller.callActivityInteraction(makeFriendActivityUUID, approveUUID, activityId, {user: userB})
         expect(res5.error).toBeUndefined()
 
-        const requests3 = await controller.system.storage.find('Request', requestMatch, undefined, ['handled', 'activityId', ['from',{attributeQuery:["name"]}], ['to', {attributeQuery:["name"]}], ['message', {attributeQuery:["content"]}]])
+        const requests3 = await controller.system.storage.find('Request', requestMatch, undefined, ['handled', ['activity', {attributeQuery: ['id']}], ['from',{attributeQuery:["name"]}], ['to', {attributeQuery:["name"]}], ['message', {attributeQuery:["content"]}]])
         expect(requests3.length).toBe(1)
         expect(!!requests3[0].handled).toBeTruthy()
-        // FIXME 为什么变成了字符串？？？存进去的数据就是 字符串了
-        expect(requests3[0].activityId).toBe(activityId.toString())
+        expect(requests3[0].activity.id).toBe(activityId)
 
         const userB2 = (await system.storage.findOne('User', MatchExp.atom({
             key:'id',

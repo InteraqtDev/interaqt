@@ -35,11 +35,11 @@ export class MapActivityToEntityHandle extends ComputedDataHandle {
     setupSchema() {
         const thisEntity = (this.dataContext.id as KlassInstance<typeof Entity, false>)
         // FIXME 废弃，检查 test 里面有咩有空
-        thisEntity!.properties!.push(Property.create({
-            name: 'activityId',
-            type: 'string',
-            collection: false
-        }))
+        // thisEntity!.properties!.push(Property.create({
+        //     name: 'activityId',
+        //     type: 'string',
+        //     collection: false
+        // }))
 
         this.controller.relations.push(Relation.create({
             entity1: thisEntity,
@@ -64,8 +64,13 @@ export class MapActivityToEntityHandle extends ComputedDataHandle {
         }
     }
     onCallInteraction = async (interactionEventArgs: InteractionEventArgs, activityId:string) => {
+        // const match = MatchExp.atom({
+        //     key: 'activityId',
+        //     value: ['=', activityId]
+        // })
+
         const match = MatchExp.atom({
-            key: 'activityId',
+            key: 'activity.id',
             value: ['=', activityId]
         })
 
@@ -98,14 +103,12 @@ export class MapActivityToEntityHandle extends ComputedDataHandle {
                     MatchExp.atom({ key: 'id', value: ['=', oldData.id]}),
                     {
                         ...newMappedItem,
-                        activityId
                     },
                 )
 
             } else {
                 await this.controller.system.storage.create(this.data!.name!, {
                     ...newMappedItem,
-                    activityId,
                     activity: {
                         id: activityId
                     }

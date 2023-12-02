@@ -2,7 +2,7 @@ import {beforeAll, describe, expect, test} from "vitest";
 import {Controller} from "../Controller.js";
 import {MonoSystem} from "../MonoSystem.js";
 import {
-    Activity,
+    Activity, BoolExp,
     createInstances,
     Entity,
     Interaction,
@@ -12,7 +12,8 @@ import {
     State
 } from "@interaqt/shared";
 import '../computedDataHandles/index.js'
-import {startServer} from "../server.js";
+import {DataAPIThis, startServer} from "../server.js";
+import {MatchAtom} from "@interaqt/storage";
 
 // 里面有所有必须的数据？
 type User = {
@@ -77,12 +78,24 @@ describe('server test', () => {
         userAId = 11
         userBId = 12
 
+        const getRequests = function(this: DataAPIThis, match: BoolExp<MatchAtom>) {
+            return this.system.storage.find('Request', match, undefined, ['*',
+                ['from', {attributeQuery: ["*"]}],
+                ['to', {
+                    attributeQuery: ["*", ["&", {attributeQuery:["*"]}]]
+                }]
+            ])
+        }
+        getRequests.params = [BoolExp<MatchAtom>]
+
         startServer(controller,  {
             port: 8082,
             parseUserId: async (headers) => {
                 // TODO: 从 headers 中获取 userId
                 return headers.userid
             }
+        }, {
+            getRequests
         })
     })
 
@@ -182,5 +195,22 @@ describe('server test', () => {
         expect(requests2[0].approved).toBeTruthy()
         expect(requests2[0].rejected).toBeFalsy()
         expect(requests2[0].result).toBe('approved')
+
+        // 验证 data api
+        const params = [
+            BoolExp.atom<MatchAtom>({
+                key: 'to.id',
+                value: ['=', userBId]
+            }).toValue()
+        ]
+        const resp4 = await post('http://localhost:8082/data/getRequests', params, {
+            "userid": userBId,
+        })
+        expect(resp4.status).toBe(200)
+        const requests3 = await resp4.json()
+        expect(requests3.length).toBe(1)
+        expect(requests3[0].id).toBe(requests2[0].id)
+        expect(requests3[0].to.id).toBe(userBId)
+
     })
 })
