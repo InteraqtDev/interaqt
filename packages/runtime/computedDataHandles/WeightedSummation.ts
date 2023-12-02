@@ -14,11 +14,11 @@ type RecordChangeEffect = {
 
 export class WeightedSummationHandle extends IncrementalComputedDataHandle {
     records: KlassInstance<typeof WeightedSummation, false>['records'] = []
-    mapRelationToWeight: (record: KlassInstance<typeof Entity, false> | KlassInstance<typeof Relation, false>, info: KlassInstance<any, false>) => number = () => 0
+    mapRelationToWeight!: (record: KlassInstance<typeof Entity, false> | KlassInstance<typeof Relation, false>, info: KlassInstance<any, false>) => number
     // 单独抽出来让下面能覆写
     parseComputedData(){
         const computedData = this.computedData as unknown as KlassInstance<typeof WeightedSummation, false>
-        this.mapRelationToWeight = this.parseMapRelationFunction(computedData.matchRecordToWeight!).bind(this.controller)
+        this.mapRelationToWeight = computedData.matchRecordToWeight!.bind(this.controller)
         this.records = computedData.records
     }
     getDefaultValue(newRecordId?: any): any {

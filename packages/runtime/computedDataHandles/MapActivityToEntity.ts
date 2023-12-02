@@ -16,7 +16,7 @@ export type MapSourceDataType = {
 
 export class MapActivityToEntityHandle extends ComputedDataHandle {
     data!: KlassInstance<typeof Entity, false>
-    mapItem: (data: MapSourceDataType[]) => any = () => undefined
+    mapItem!: (data: MapSourceDataType[]) => any
     interactionsToListen: KlassInstance<typeof Interaction, false>[] = []
     constructor(controller: Controller , computedData: KlassInstance<typeof ComputedData, false> , dataContext:  DataContext) {
         super(controller, computedData, dataContext);
@@ -30,7 +30,7 @@ export class MapActivityToEntityHandle extends ComputedDataHandle {
         this.interactionsToListen = computedData.triggerInteraction || getInteractions(computedData.sourceActivity!)
 
         this.data = this.dataContext.id as KlassInstance<typeof Entity, false>
-        this.mapItem = this.parseMapItemFunction(computedData.handle!)
+        this.mapItem = (computedData.handle! as unknown as (data: MapSourceDataType[]) => any).bind(this.controller)
     }
     setupSchema() {
         const thisEntity = (this.dataContext.id as KlassInstance<typeof Entity, false>)

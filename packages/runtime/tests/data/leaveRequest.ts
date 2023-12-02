@@ -65,12 +65,12 @@ const sendRequestRelation = Relation.create({
     relType: 'n:1',
     computedData:  MapInteractionToRecord.create({
         sourceInteraction: sendInteraction,
-        handle:`function map(event){
+        handle:function map(event: any){
 return {
     target: event.user,
     source: event.payload.request,
 }
-}`
+}
     }),
 })
 
@@ -199,14 +199,13 @@ const sendRequestTransfer = RelationStateTransfer.create({
     fromState: notReviewerState,
     toState: isReviewerState,
     handleType: 'computeSource',
-    handle: `
-async function(eventArgs) {
-    return {
-        source: eventArgs.payload.request,
-        target: eventArgs.payload.to
+    handle: async function(eventArgs) {
+        return {
+            source: eventArgs.payload.request,
+            target: eventArgs.payload.to
+        }
     }
-}
-`
+
 })
 
 const addReviewerTransfer = RelationStateTransfer.create({
@@ -214,16 +213,15 @@ const addReviewerTransfer = RelationStateTransfer.create({
     fromState: isReviewerState,
     toState: notReviewerState,
     handleType: 'computeSource',
-    handle: `
-async function(eventArgs, activityId) {
-    return eventArgs.payload.reviewer.map(reviewer => {
-        return {
-            source: eventArgs.payload.request,
-            target: reviewer
-        }
-    })
-}
-`
+    handle: async function(eventArgs, activityId) {
+        return eventArgs.payload.reviewer.map(reviewer => {
+            return {
+                source: eventArgs.payload.request,
+                target: reviewer
+            }
+        })
+    }
+
 })
 
 const transferReviewerTransfer = RelationStateTransfer.create({
@@ -231,14 +229,13 @@ const transferReviewerTransfer = RelationStateTransfer.create({
     fromState: isReviewerState,
     toState: notReviewerState,
     handleType: 'computeSource',
-    handle: `
-async function(eventArgs, activityId) {
-    return {
-        source: eventArgs.payload.request,
-        target: eventArgs.payload.reviewer
+    handle: async function(eventArgs, activityId) {
+        return {
+            source: eventArgs.payload.request,
+            target: eventArgs.payload.reviewer
+        }
     }
-}
-`
+
 })
 
 const transferFromReviewerTransfer = RelationStateTransfer.create({
@@ -246,14 +243,13 @@ const transferFromReviewerTransfer = RelationStateTransfer.create({
     fromState: notReviewerState,
     toState: isReviewerState,
     handleType: 'computeSource',
-    handle: `
-async function(eventArgs, activityId) {
-    return {
-        source: eventArgs.payload.request,
-        target: eventArgs.user
+    handle: async function(eventArgs, activityId) {
+        return {
+            source: eventArgs.payload.request,
+            target: eventArgs.user
+        }
     }
-}
-`
+
 })
 
 const reviewerRelationSM = RelationStateMachine.create({
@@ -280,22 +276,22 @@ const reviewerRelation = Relation.create({
                 MapInteractionToPropertyItem.create({
                     interaction: approveInteraction,
                     value: 'approved',
-                    computeSource: `(event) => {
+                    computeSource: function(event) {
                         return {
                             "source.id": event.payload.request.id,
                             "target.id": event.user.id
                         }
-                    }`
+                    }
                 }),
                 MapInteractionToPropertyItem.create({
                     interaction: rejectInteraction,
                     value: 'rejected',
-                    computeSource: `(event) => {
+                    computeSource: function(event)  {
                         return {
                             "source.id": event.payload.request.id,
                             "target.id": event.user.id
                         }
-                    }`
+                    }
                 })
             ],
         })
@@ -311,11 +307,11 @@ RequestEntity.properties.push(
             relation: reviewerRelation,
             relationDirection: 'source',
             notEmpty: true,
-            matchExpression:`
+            matchExpression:
             (_, relation) => {
                 return relation.result === 'approved'
             }
-    `
+
         })
     }),
     Property.create({
@@ -325,11 +321,11 @@ RequestEntity.properties.push(
         computedData: RelationBasedAny.create({
             relation: reviewerRelation,
             relationDirection: 'source',
-            matchExpression:`
+            matchExpression:
             (_, relation) => {
                 return relation.result === 'rejected'
             }
-    `
+
         })
     }),
     // Property.create({

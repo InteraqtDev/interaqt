@@ -10,7 +10,7 @@ import {RecordMutationEvent} from "../System.js";
 
 export class MapInteractionToRecordHandle extends ComputedDataHandle {
     data!: KlassInstance<typeof Entity, false>
-    mapItem: (data: InteractionEventArgs) => any = () => undefined
+    mapItem!: (data: InteractionEventArgs) => any
     sourceInteraction!: KlassInstance<typeof Interaction, false>
     constructor(controller: Controller , computedData: KlassInstance<typeof ComputedData, false> , dataContext:  DataContext) {
         super(controller, computedData, dataContext);
@@ -24,7 +24,8 @@ export class MapInteractionToRecordHandle extends ComputedDataHandle {
         this.sourceInteraction = computedData.sourceInteraction
 
         this.data = this.dataContext.id as KlassInstance<typeof Entity, false>
-        this.mapItem = this.parseMapItemFunction(computedData.handle!)
+        // this.mapItem = this.parseMapItemFunction(computedData.handle!)
+        this.mapItem = (computedData.handle! as unknown as (data: InteractionEventArgs) => any).bind(this.controller)
     }
     setupSchema() {
         (this.dataContext.id as KlassInstance<typeof Entity, false>)!.properties!.push(Property.create({

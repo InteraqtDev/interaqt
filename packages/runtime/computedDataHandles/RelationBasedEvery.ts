@@ -35,9 +35,9 @@ export class RelationBasedEveryHandle extends ComputedDataHandle {
             computedData: RelationCount.create({
                 relation: computedData.relation,
                 relationDirection: computedData.relationDirection,
-                matchExpression: `function ${totalCountField}(){
+                matchExpression: function(){
                     return true
-                }`
+                }
             })
         })
         this.dataContext.host?.properties!.push(totalCountProperty)

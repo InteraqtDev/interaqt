@@ -22,7 +22,8 @@ export class MapInteractionToPropertyHandle extends ComputedDataHandle {
         this.mapItems = new Map(computedData.items.map(({interaction, value, computeSource}) => {
             return [interaction, {
                 value,
-                computeSource: this.parseMapItemFunction(computeSource!)
+                // computeSource: this.parseMapItemFunction(computeSource!)
+                computeSource: (computeSource as (data: InteractionEventArgs, activityId?: string) => any).bind(this.controller)
             }]
         }))
     }

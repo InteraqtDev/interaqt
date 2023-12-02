@@ -40,8 +40,7 @@ export class RelationStateMachineHandle extends ComputedDataHandle {
         const computedData = this.computedData as unknown as KlassInstance<typeof RelationStateMachine, false>
         this.transfers = computedData.transfers
         computedData.transfers!.forEach(transfer => {
-            const parsedHandle = new Function('arg', 'activityId', `return (${transfer.handle}).call(this, arg, activityId)`) as TransferHandleFn
-            this.transferHandleFn!.set(transfer, parsedHandle)
+            this.transferHandleFn!.set(transfer, transfer.handle)
         })
     }
     addEventListener() {

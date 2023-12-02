@@ -31,7 +31,7 @@ export class EveryHandle extends ComputedDataHandle {
             collection: false,
             computedData: Count.create({
                 record: computedData.record,
-                matchExpression: `()=>true`
+                matchExpression: ()=>true
             })
         })
         this.controller.states.push(totalCountState)

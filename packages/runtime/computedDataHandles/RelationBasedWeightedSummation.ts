@@ -43,11 +43,11 @@ export class RelationBasedWeightedSummationHandle extends IncrementalComputedDat
     entityName!: string
     relationInfos!: WeightedSummationRelation[]
     relations!: KlassInstance<typeof RelationBasedWeightedSummation, false>["relations"]
-    mapRelationToWeight: (record: KlassInstance<typeof Entity, false>, relation: KlassInstance<typeof Relation, false>) => number = () => 0
+    mapRelationToWeight!: (record: KlassInstance<typeof Entity, false>, relation: KlassInstance<typeof Relation, false>) => number
     // 单独抽出来让下面能覆写
     parseComputedData(){
         const computedData = this.computedData as unknown as KlassInstance<typeof RelationBasedWeightedSummation, false>
-        this.mapRelationToWeight = this.parseMapRelationFunction(computedData.matchRelationToWeight!).bind(this.controller)
+        this.mapRelationToWeight = computedData.matchRelationToWeight!.bind(this.controller)
         this.entityName = this.dataContext.host!.name!
         this.relations = computedData.relations
     }

@@ -28,6 +28,7 @@ import {
     RelationBasedEvery, RelationBasedAny, Every, Any
 } from "@interaqt/shared";
 import {removeAllInstance, stringifyAllInstances} from "@interaqt/shared";
+import {Controller} from "../../Controller";
 
 const UserEntity = Entity.createReactive({ name: 'User' })
 const nameProperty = Property.createReactive({ name: 'name', type: PropertyTypes.String })
@@ -196,24 +197,23 @@ const addFriendTransfer = RelationStateTransfer.createReactive({
     fromState: notFriendState,
     toState: isFriendState,
     handleType: 'computeSource',
-    handle: `
-async function(eventArgs, activityId) {
+    handle: async function(this: Controller, eventArgs, activityId) {
 
-    const match = this.system.storage.queryHandle.createMatchFromAtom({
-        key: 'interactionName', 
-        value: ['=', 'sendRequest']
-    }).and({
-        key: 'activityId', 
-        value: ['=', activityId]
-    })
+        const match = this.system.storage.queryHandle.createMatchFromAtom({
+            key: 'interactionName',
+            value: ['=', 'sendRequest']
+        }).and({
+            key: 'activityId',
+            value: ['=', activityId]
+        })
 
-    const sendEvent = (await this.system.getEvent(match))[0]
-    return {
-        source: sendEvent.args.user,
-        target: eventArgs.user
+        const sendEvent = (await this.system.getEvent(match))[0]
+        return {
+            source: sendEvent.args.user,
+            target: eventArgs.user
+        }
     }
-}
-`
+
 })
 
 const deleteFriendTransfer = RelationStateTransfer.createReactive({
@@ -222,14 +222,13 @@ const deleteFriendTransfer = RelationStateTransfer.createReactive({
     fromState: isFriendState,
     toState: notFriendState,
     handleType: 'computeSource',
-    handle: `
-async function(eventArgs, activityId) {
-    return {
-        source: eventArgs.user,
-        target: eventArgs.payload.target
+    handle: async function(eventArgs, activityId) {
+        return {
+            source: eventArgs.user,
+            target: eventArgs.payload.target
+        }
     }
-}
-`
+
 })
 
 const friendRelationSM = RelationStateMachine.createReactive({
@@ -257,7 +256,7 @@ const friendRelation = Relation.createReactive({
 export const mapFriendActivityToRequest = MapActivityToEntity.createReactive({
     sourceActivity: activity,
     triggerInteraction: [sendInteraction, approveInteraction, rejectInteraction],
-    handle:`function map(stack){
+    handle:function map(stack){
         const sendRequestEvent = stack.find(i => i.interaction.name === 'sendRequest')
         
 if (!sendRequestEvent) { 
@@ -272,7 +271,7 @@ return {
     message: sendRequestEvent.data.payload.message,
     handled,
 }
-}`
+}
 })
 
 const requestEntity= Entity.createReactive({
@@ -308,7 +307,7 @@ const receivedRequestRelation = Relation.createReactive({
                 MapInteractionToPropertyItem.create({
                     interaction: approveInteraction,
                     value: 'approved',
-                    computeSource: `async (event, activityId) => {
+                    computeSource: async function(this:  Controller, event, activityId) {
                         
                         const match = this.system.storage.queryHandle.createMatchFromAtom({
                             key: 'activity.id',
@@ -320,12 +319,12 @@ const receivedRequestRelation = Relation.createReactive({
                             "source.id": request.id,
                             "target.id": event.user.id
                         }
-                    }`
+                    }
                 }),
                 MapInteractionToPropertyItem.create({
                     interaction: rejectInteraction,
                     value: 'rejected',
-                    computeSource: `async (event, activityId) => {
+                    computeSource: async function(this:  Controller,event, activityId)  {
                         
                         const match = this.system.storage.queryHandle.createMatchFromAtom({
                             key: 'activity.id',
@@ -338,7 +337,7 @@ const receivedRequestRelation = Relation.createReactive({
                             "source.id": request.id,
                             "target.id": event.user.id
                         }
-                    }`
+                    }
                 })
             ],
         })
@@ -354,11 +353,11 @@ requestEntity.properties.push(
             relation: receivedRequestRelation,
             relationDirection: 'source',
             notEmpty: true,
-            matchExpression:`
+            matchExpression:
             (_, relation) => {
                 return relation.result === 'approved'
             }
-    `
+
         })
     }),
     Property.create({
@@ -368,11 +367,11 @@ requestEntity.properties.push(
         computedData: RelationBasedAny.create({
             relation: receivedRequestRelation,
             relationDirection: 'source',
-            matchExpression:`
+            matchExpression:
             (_, relation) => {
                 return relation.result === 'rejected'
             }
-    `
+
         })
     }),
     // Property.create({
@@ -429,10 +428,10 @@ Relation.createReactive({
 const userTotalUnhandledRequest = RelationCount.createReactive({
     relation: receivedRequestRelation,
     relationDirection: 'target',
-    matchExpression: `
+    matchExpression:
 (request) => {
     return !request.handled
-}`
+}
     ,
 })
 
@@ -450,7 +449,7 @@ UserEntity.properties.push(Property.createReactive({
     computedData: RelationBasedEvery.createReactive({
         relation: sendRequestRelation,
         relationDirection: 'target',
-        matchExpression: `(request) => request.handled`
+        matchExpression: (request) => request.handled
     })
 }))
 
@@ -461,7 +460,7 @@ UserEntity.properties.push(Property.createReactive({
     computedData: RelationBasedAny.createReactive({
         relation: sendRequestRelation,
         relationDirection: 'target',
-        matchExpression: `(request) => request.handled`
+        matchExpression: (request) => request.handled
     })
 }))
 
@@ -469,7 +468,7 @@ UserEntity.properties.push(Property.createReactive({
 const userTotalFriendCount = RelationCount.createReactive({
     relation: friendRelation,
     relationDirection: 'source',
-    matchExpression: `() => true`
+    matchExpression: () => true
 })
 
 UserEntity.properties.push(Property.createReactive({
@@ -486,7 +485,7 @@ State.createReactive({
     collection: false,
     computedData: Count.createReactive({
         record: friendRelation,
-        matchExpression: `() => true`
+        matchExpression: () => true
     })
 })
 
@@ -496,9 +495,9 @@ State.createReactive({
     collection: false,
     computedData: Every.createReactive({
         record: requestEntity,
-        matchExpression: `(request) => {
+        matchExpression: (request) => {
         return request.handled
-        }`
+        }
     })
 })
 
@@ -508,9 +507,9 @@ State.createReactive({
     collection: false,
     computedData: Any.createReactive({
         record: requestEntity,
-        matchExpression: `(request) => {
+        matchExpression: (request) => {
         return request.handled
-        }`
+        }
     })
 })
 
