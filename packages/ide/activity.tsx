@@ -8,10 +8,10 @@ import {
     ActivityGroup,
     Payload, PayloadItem,
     Transfer, forEachInteraction
-} from "../shared/activity/Activity";
+} from "../shared/lib/activity/Activity";
 
 import {atom, computed, reactive} from "rata";
-import {Entity} from "../shared/entity/Entity";
+import {Entity} from "../shared/lib/entity/Entity";
 import {Code} from "./src/component/code/Code";
 import {Drawer} from "./src/component/util/Drawer";
 import {editor} from "monaco-editor";
@@ -21,8 +21,8 @@ import {
     User,Admin,Anonymous,
     Message
 } from './testdata/interaction'
-import {createUserRoleAttributive, UserAttributive, UserAttributives} from "../shared/user/User";
-import {KlassInstance, stringifyAllInstances} from "../shared/createClass";
+import {createUserRoleAttributive, UserAttributive, UserAttributives} from "../shared/lib/user/User";
+import {KlassInstance, stringifyAllInstances} from "../shared/lib/createClass";
 
 
 const userAttributiveOptions = reactive([NewAttr, New2Attr, New3Attr, OldAttr, Old2Attr, Old3Attr, OtherAttr])

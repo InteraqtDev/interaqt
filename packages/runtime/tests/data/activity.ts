@@ -1,33 +1,38 @@
 import {
-    BoolAtomData,
-    createUserRoleAttributive,
-    MapInteractionToProperty, MapInteractionToPropertyItem,
-    UserAttributive,
-    UserAttributives
-} from "@interaqt/shared";
-import {
     Action,
     Activity,
     ActivityGroup,
+    Any,
+    BoolAtomData,
+    Count,
+    createUserRoleAttributive,
+    Entity,
+    Every,
     Interaction,
+    MapActivityToEntity,
+    MapInteractionToProperty,
+    MapInteractionToPropertyItem,
     Payload,
     PayloadItem,
-    Transfer
-} from "@interaqt/shared";
-import {OtherAttr} from "./roles";
-import {Entity, Property, PropertyTypes, Relation} from "@interaqt/shared";
-import {State} from "@interaqt/shared";
-
-import {
+    Property,
+    PropertyTypes,
+    Relation,
+    RelationBasedAny,
+    RelationBasedEvery,
+    RelationCount,
     RelationStateMachine,
     RelationStateNode,
     RelationStateTransfer,
-    MapActivityToEntity,
-    RelationCount,
-    Count,
-    RelationBasedEvery, RelationBasedAny, Every, Any
+    removeAllInstance,
+    State,
+    stringifyAllInstances,
+    Transfer,
+    UserAttributive,
+    UserAttributives,
+    BoolExp
 } from "@interaqt/shared";
-import {removeAllInstance, stringifyAllInstances} from "@interaqt/shared";
+import { MatchAtom} from "@interaqt/storage";
+import {OtherAttr} from "./roles";
 import {Controller} from "../../Controller";
 
 const UserEntity = Entity.createReactive({ name: 'User' })
@@ -145,11 +150,12 @@ export const activity = Activity.createReactive({
 
 export const MyFriend = UserAttributive.createReactive({
     name: 'MyFriend',
-    stringContent: `
-async function MyFriend(target, { user }){
+    content:
+async function MyFriend(this: Controller, target, { user }){
+        debugger
     const linkInfo = this.system.storage.queryHandle.map.getLinkInfo('User', 'friends')
-      
-    const match = this.system.storage.queryHandle.createMatchFromAtom({
+      const {BoolExp} = this.globals
+    const match = BoolExp.atom({
         key: 'source.id', 
         value: ['=', user.id]
     }).and({
@@ -158,7 +164,7 @@ async function MyFriend(target, { user }){
     })
 
     return !!(await this.system.storage.findOneRelationByName(linkInfo.name, match))  
-}`
+}
 })
 
 export const deleteInteraction = Interaction.createReactive({
@@ -198,8 +204,8 @@ const addFriendTransfer = RelationStateTransfer.createReactive({
     toState: isFriendState,
     handleType: 'computeSource',
     handle: async function(this: Controller, eventArgs, activityId) {
-
-        const match = this.system.storage.queryHandle.createMatchFromAtom({
+        const { BoolExp } = this.globals
+        const match = BoolExp.atom({
             key: 'interactionName',
             value: ['=', 'sendRequest']
         }).and({
@@ -308,8 +314,8 @@ const receivedRequestRelation = Relation.createReactive({
                     interaction: approveInteraction,
                     value: 'approved',
                     computeSource: async function(this:  Controller, event, activityId) {
-                        
-                        const match = this.system.storage.queryHandle.createMatchFromAtom({
+                        const { BoolExp } = this.globals
+                        const match = BoolExp.atom({
                             key: 'activity.id',
                             value: ['=', activityId]
                         })
@@ -325,8 +331,8 @@ const receivedRequestRelation = Relation.createReactive({
                     interaction: rejectInteraction,
                     value: 'rejected',
                     computeSource: async function(this:  Controller,event, activityId)  {
-                        
-                        const match = this.system.storage.queryHandle.createMatchFromAtom({
+                        const { BoolExp } = this.globals
+                        const match = BoolExp.atom({
                             key: 'activity.id',
                             value: ['=', activityId]
                         })

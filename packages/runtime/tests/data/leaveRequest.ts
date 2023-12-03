@@ -15,6 +15,7 @@ import {
     RelationStateTransfer
 } from "@interaqt/shared";
 import {removeAllInstance, stringifyAllInstances} from "@interaqt/shared";
+import {Controller} from "../../Controller";
 
 const UserEntity = Entity.create({ name: 'User' })
 const nameProperty = Property.create({ name: 'name', type: PropertyTypes.String })
@@ -76,18 +77,18 @@ return {
 
 const MyAttr = UserAttributive.create({
     name: 'Mine',
-    stringContent:`
-    async function Mine(request, {user}) {
-        const match = this.system.storage.queryHandle.createMatchFromAtom({
+    content:
+    async function Mine(this: Controller, request, {user}) {
+        const {BoolExp}  = this.globals
+        const match = BoolExp.atom({
             key: 'id', 
             value: ['=', request.id]
         })
         const {to} = await this.system.storage.findOne('Request',match, undefined, [['to', {attributeQuery: ['id']}]] )
-        console.log(22222, user, to)
-        
+
         return user.id === to.id
     }
-    `
+
 })
 
 
@@ -214,7 +215,7 @@ const addReviewerTransfer = RelationStateTransfer.create({
     toState: notReviewerState,
     handleType: 'computeSource',
     handle: async function(eventArgs, activityId) {
-        return eventArgs.payload.reviewer.map(reviewer => {
+        return eventArgs.payload.reviewer.map((reviewer: any) => {
             return {
                 source: eventArgs.payload.request,
                 target: reviewer

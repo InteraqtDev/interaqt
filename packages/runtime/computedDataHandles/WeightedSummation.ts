@@ -24,8 +24,8 @@ export class WeightedSummationHandle extends IncrementalComputedDataHandle {
     getDefaultValue(newRecordId?: any): any {
         return 0
     }
-    parseMapRelationFunction(stringContent:string) {
-        return new Function('record', `return (${stringContent})(record)`)
+    parseMapRelationFunction(content:string) {
+        return new Function('record', `return (${content})(record)`)
     }
     async computeEffect(mutationEvent: RecordMutationEvent, mutationEvents: RecordMutationEvent[]): Promise<KlassInstance<any, false>|undefined> {
         return this.records!.find((record) => {

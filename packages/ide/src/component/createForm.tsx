@@ -1,6 +1,6 @@
 import {createElement, onDestroy} from "axii";
 import {atom, Atom, computed, destroyComputed, incEvery, incIndexBy, incMap, reactive, isAtom} from "rata";
-import {getDisplayValue, getUUID} from "../../../shared/createClass";
+import {getDisplayValue, getUUID} from "../../../shared/lib/createClass";
 
 type ConstraintsType =  {
     [k: string] : (...arg: any[]) => boolean

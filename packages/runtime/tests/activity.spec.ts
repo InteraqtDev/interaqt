@@ -1,10 +1,19 @@
 import {describe, test, expect, beforeEach} from "vitest";
 
 import { MonoSystem } from "../MonoSystem.js";
-import {createInstances, getInstance, KlassByName, KlassInstance, removeAllInstance} from "@interaqt/shared";
+import {
+    createInstances,
+    Entity,
+    getInstance, Interaction,
+    KlassByName,
+    KlassInstance,
+    Relation,
+    removeAllInstance, State
+} from "@interaqt/shared";
 
 import { Activity } from "@interaqt/shared";
 import {ActivityCall, ActivityGroupNode} from "../ActivityCall.js";
+import {Controller} from "../Controller";
 
 describe("activity state", () => {
     let createFriendRelationActivityCall: ActivityCall
@@ -34,7 +43,15 @@ describe("activity state", () => {
         await system.setup([], [])
         system.conceptClass = KlassByName
         const mainActivity = (getInstance(Activity) as KlassInstance<typeof Activity, false>[]).find(a => a.name === 'createFriendRelation')!
-        createFriendRelationActivityCall = new ActivityCall(mainActivity, system)
+        const controller = new Controller(
+            system,
+            [],
+            [],
+            [],
+            [],
+        )
+        // CAUTION 这里 controller 没什么用，只是作为 globals 注入的点。interaction  的各种 check 里面需要 controller 的 globals。
+        createFriendRelationActivityCall = new ActivityCall(mainActivity, controller)
 
         sendRequestUUID = createFriendRelationActivityCall.graph.head.uuid
         approveUUID = (createFriendRelationActivityCall.graph.tail as ActivityGroupNode).childSeqs![0].head.uuid

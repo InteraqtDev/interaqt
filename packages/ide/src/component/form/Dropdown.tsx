@@ -1,6 +1,6 @@
 import {onUpKey, onDownKey} from "axii";
 import {Atom, computed, incMap} from "rata";
-import {Klass} from "../../../../shared/createClass";
+import {Klass} from "../../../../shared/lib/createClass";
 
 export function Dropdown({ index, options}, { createElement, ref }) {
     const setNextIndex = () => {

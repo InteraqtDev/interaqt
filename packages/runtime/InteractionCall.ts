@@ -9,7 +9,7 @@ import {Klass, KlassInstance} from "@interaqt/shared";
 import {ActivityCall} from "./ActivityCall.js";
 import {someAsync} from "@interaqt/storage";
 import {Entity} from "@interaqt/shared";
-
+import {Controller} from "./Controller";
 
 type ConceptCheckStack = {
     type: string,
@@ -53,23 +53,25 @@ type EntityAttributiveAtom =  UserAttributiveAtom
 type HandleAttributive = (attributive: KlassInstance<typeof UserAttributive, false>) => Promise<boolean>
 
 type Attributive = {
-    stringContent: string,
+    content: (...args: any[]) => any
     name: string
 }
 
 export class InteractionCall {
-    constructor(public interaction: InteractionInstanceType, public system: System, public activitySeqCall?: ActivityCall) {
-
+    system: System
+    constructor(public interaction: InteractionInstanceType, public controller: Controller, public activitySeqCall?: ActivityCall) {
+        this.system = controller.system
     }
     async checkAttributive(inputAttributive: any, interactionEvent: InteractionEventArgs|undefined, attributiveTarget: any) {
         const  attributive = inputAttributive as unknown as Attributive
         assert(attributive, `can not find attributive: ${attributive.name}`)
-        if (attributive.stringContent) {
+        if (attributive.content) {
             // CAUTION! 第一参数应该是 User 它描述的 User（其实就是 event.user） 然后才是 event! this 指向当前，用户可以用 this.system 里面的东西来做任何查询操作
-            const testFn = new Function('attributiveTarget', 'event', `return (${attributive.stringContent}).call(this, attributiveTarget, event)`)
+            // const testFn = new Function('attributiveTarget', 'event', `return (${attributive.content}).call(this, attributiveTarget, event)`)
+            const testFn = attributive.content
             let result
             try {
-                result = await testFn.call(this, attributiveTarget, interactionEvent)
+                result = await testFn.call(this.controller, attributiveTarget, interactionEvent)
             } catch(e) {
                 console.warn(`check function throw`, e)
                 result = false

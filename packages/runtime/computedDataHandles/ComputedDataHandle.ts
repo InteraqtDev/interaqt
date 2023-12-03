@@ -71,11 +71,11 @@ export class ComputedDataHandle {
             }
         })
     }
-    parseComputeEffectFunction(stringContent: string) {
-        return new Function('sourceData', `return (${stringContent})(sourceData)`)
+    parseComputeEffectFunction(content: string) {
+        return new Function('sourceData', `return (${content})(sourceData)`)
     }
-    parseFullComputeFunction(stringContent: string) {
-        return new Function('sourceData', `return (${stringContent})(sourceData)`)
+    parseFullComputeFunction(content: string) {
+        return new Function('sourceData', `return (${content})(sourceData)`)
     }
     // parse 用户的 function 等。
     parseComputedData(){

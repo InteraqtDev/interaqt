@@ -1,5 +1,5 @@
 import {createElement, Component, configure} from "axii";
-import {deepClone} from "../../../shared/createClass";
+import {deepClone} from "../../../shared/lib/createClass";
 import {atom, Atom, computed, isAtom, reactive} from "rata";
 import {assert} from "../util";
 

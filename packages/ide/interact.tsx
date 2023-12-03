@@ -2,14 +2,14 @@
 import {createElement, createRoot} from "axii";
 import "./index.css"
 import {InteractionNode} from "./src/component/activity/InteractionNode";
-import {Action, Interaction, Payload} from "../shared/activity/Activity";
-import {UserAttributive, UserAttributives, createUserRoleAttributive} from '../shared/user/User'
+import {Action, Interaction, Payload} from "../shared/lib/activity/Activity";
+import {UserAttributive, UserAttributives, createUserRoleAttributive} from '../shared/lib/user/User'
 import {atom, computed, reactive} from "rata";
 import {Code} from "./src/component/code/Code";
 import {Drawer} from "./src/component/util/Drawer";
 import {editor} from "monaco-editor";
 import IStandaloneEditorConstructionOptions = editor.IStandaloneEditorConstructionOptions;
-import {KlassInstance, stringifyAllInstances} from "../shared/createClass";
+import {KlassInstance, stringifyAllInstances} from "../shared/lib/createClass";
 import {
     NewAttr, New2Attr, New3Attr, OldAttr, Old2Attr, Old3Attr, OtherAttr,
     User,Admin,Anonymous,

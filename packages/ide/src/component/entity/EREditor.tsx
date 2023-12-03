@@ -1,14 +1,14 @@
 /* @jsx createElement*/
 import {createElement} from "axii";
-import {Entity, Property, PropertyTypes, Relation} from "../../../../shared/entity/Entity";
+import {Entity, Property, PropertyTypes, Relation} from "../../../../shared/lib/entity/Entity";
 import {reactive, incMap, Atom, atom, computed} from 'rata'
 import {Column} from "./Column";
 import {IconAddProperty} from "../icons/Add";
 import {createFormForEntity, createFormForEntityProperty} from "../createFormForEntityProperty";
 import {createDialog, createDialogFooter} from "../createDialog";
-import {createClass, KlassInstance} from "../../../../shared/createClass";
+import {createClass, KlassInstance} from "../../../../shared/lib/createClass";
 import {Detail} from "./Detail";
-import {Activity} from "../../../../shared/activity/Activity";
+import {Activity} from "../../../../shared/lib/activity/Activity";
 
 type EREditorProps = {
     entities: KlassInstance<Entity, true>[],

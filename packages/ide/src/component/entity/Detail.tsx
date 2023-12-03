@@ -1,11 +1,11 @@
 import {atom, Atom, computed} from "rata";
-import {Entity, Property} from "../../../../shared/entity/Entity";
+import {Entity, Property} from "../../../../shared/lib/entity/Entity";
 import {Select} from "../form/Select";
-import {MapActivityToEntity} from "../../../../shared/IncrementalComputation";
+import {MapActivityToEntity} from "../../../../shared/lib/IncrementalComputation";
 import {createDraftControl} from "../createDraftControl";
-import {KlassInstance, Klass, ReactiveKlassInstance} from "../../../../shared/createClass";
+import {KlassInstance, Klass, ReactiveKlassInstance} from "../../../../shared/lib/createClass";
 import {Code} from "../code/Code";
-import {Activity} from "../../../../shared/activity/Activity";
+import {Activity} from "../../../../shared/lib/activity/Activity";
 
 type DetailProps = {
     target: Atom<typeof Entity|typeof Property>

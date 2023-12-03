@@ -20,8 +20,8 @@ export class RecordCountHandle extends WeightedSummationHandle {
         // @ts-ignore
         this.records = [computedData.record!]
     }
-    // parseMatchRelationFunction(stringContent:string) {
-    //     return new Function('record', `return (${stringContent})(record) ? 1 : 0`)
+    // parseMatchRelationFunction(content:string) {
+    //     return new Function('record', `return (${content})(record) ? 1 : 0`)
     // }
 }
 

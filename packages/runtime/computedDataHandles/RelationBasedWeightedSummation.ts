@@ -68,8 +68,8 @@ export class RelationBasedWeightedSummationHandle extends IncrementalComputedDat
         })
     }
 
-    parseMapRelationFunction(stringContent:string) {
-        return new Function('record','relation', `return (${stringContent})(record,relation)`)
+    parseMapRelationFunction(content:string) {
+        return new Function('record','relation', `return (${content})(record,relation)`)
     }
     // 这里不管是 relation 的变化，还是 relatedRecord 的变化，都会应该触发相应的 relation 重新计算权重差量
     async computeEffect(mutationEvent: RecordMutationEvent, mutationEvents: RecordMutationEvent[]): Promise<RelationChangeEffect[]|RelatedRecordChangeEffect[]|undefined> {

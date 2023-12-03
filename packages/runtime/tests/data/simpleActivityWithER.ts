@@ -134,43 +134,43 @@ return {
         "type": "UserAttributive",
         "options": {"isReactive": true},
         "uuid": "3b779ba8-6b15-4c49-9283-b46f91d56ce3",
-        "public": {"stringContent": "function New(){}", "name": "New", "isRef": null, "isRole": null}
+        "public": {"content": "function New(){}", "name": "New", "isRef": null, "isRole": null}
     }, {
         "type": "UserAttributive",
         "options": {"isReactive": true},
         "uuid": "7ff11a85-2147-4919-b24b-6c676a818f05",
-        "public": {"stringContent": "function New2(){}", "name": "New2", "isRef": null, "isRole": null}
+        "public": {"content": "function New2(){}", "name": "New2", "isRef": null, "isRole": null}
     }, {
         "type": "UserAttributive",
         "options": {"isReactive": true},
         "uuid": "5a369d19-fd73-4c9a-b81d-77c70129cd8a",
-        "public": {"stringContent": "function New3(){}", "name": "New3", "isRef": null, "isRole": null}
+        "public": {"content": "function New3(){}", "name": "New3", "isRef": null, "isRole": null}
     }, {
         "type": "UserAttributive",
         "options": {"isReactive": true},
         "uuid": "a99e36e0-6b69-4cc6-bc04-905e7e6634af",
-        "public": {"stringContent": "function Old(){}", "name": "Old", "isRef": null, "isRole": null}
+        "public": {"content": "function Old(){}", "name": "Old", "isRef": null, "isRole": null}
     }, {
         "type": "UserAttributive",
         "options": {"isReactive": true},
         "uuid": "521f2703-114c-477c-88b3-82bfaa81757e",
-        "public": {"stringContent": "function Old2(){}", "name": "Old2", "isRef": null, "isRole": null}
+        "public": {"content": "function Old2(){}", "name": "Old2", "isRef": null, "isRole": null}
     }, {
         "type": "UserAttributive",
         "options": {"isReactive": true},
         "uuid": "ded1c9db-db6a-4443-94c8-d439612bebda",
-        "public": {"stringContent": "function Old3(){}", "name": "Old3", "isRef": null, "isRole": null}
+        "public": {"content": "function Old3(){}", "name": "Old3", "isRef": null, "isRole": null}
     }, {
         "type": "UserAttributive",
         "options": {"isReactive": true},
         "uuid": "9f5324d1-d97b-4b70-8036-d8685f56b4e3",
-        "public": {"stringContent": "function Other(){}", "name": "Other", "isRef": null, "isRole": null}
+        "public": {"content": "function Other(){}", "name": "Other", "isRef": null, "isRole": null}
     }, {
         "type": "UserAttributive",
         "options": {"isReactive": true},
         "uuid": "205b488e-c2db-4bb1-be8e-b155aab9f94c",
         "public": {
-            "stringContent": "function({ user }) { return user.roles.includes('User')}",
+            "content": "function({ user }) { return user.roles.includes('User')}",
             "name": "User",
             "isRef": false,
             "isRole": true
@@ -180,7 +180,7 @@ return {
         "options": {"isReactive": true},
         "uuid": "aed5100d-971a-4d2b-9b60-24057f514348",
         "public": {
-            "stringContent": "function({ user }) { return user.roles.includes('Admin')}",
+            "content": "function({ user }) { return user.roles.includes('Admin')}",
             "name": "Admin",
             "isRef": false,
             "isRole": true
@@ -190,7 +190,7 @@ return {
         "options": {"isReactive": true},
         "uuid": "b2ad1cbd-5024-4b2f-8af3-4dd8010c4438",
         "public": {
-            "stringContent": "function({ user }) { return user.roles.includes('Anonymous')}",
+            "content": "function({ user }) { return user.roles.includes('Anonymous')}",
             "name": "Anonymous",
             "isRef": false,
             "isRole": true
@@ -200,7 +200,7 @@ return {
         "options": {"isReactive": true},
         "uuid": "55cda086-23a9-4fb8-89d1-8e9292c8baeb",
         "public": {
-            "stringContent": "function({ user }) { return user.roles.includes('user')}",
+            "content": "function({ user }) { return user.roles.includes('user')}",
             "name": "user",
             "isRef": false,
             "isRole": true
@@ -210,7 +210,7 @@ return {
         "options": {"isReactive": true},
         "uuid": "a2755426-ed1b-45d3-adea-4a41611686df",
         "public": {
-            "stringContent": "function({ user }) { return user.roles.includes('A')}",
+            "content": "function({ user }) { return user.roles.includes('A')}",
             "name": "A",
             "isRef": true,
             "isRole": true
@@ -220,7 +220,7 @@ return {
         "options": {"isReactive": true},
         "uuid": "efbac6ee-1edc-4576-a812-30c4d24fa89d",
         "public": {
-            "stringContent": "function({ user }) { return user.roles.includes('B')}",
+            "content": "function({ user }) { return user.roles.includes('B')}",
             "name": "B",
             "isRef": true,
             "isRole": true
@@ -230,7 +230,7 @@ return {
         "options": {"isReactive": true},
         "uuid": "257fbd84-31e8-4d28-a31a-6097dd785b6b",
         "public": {
-            "stringContent": "function({ user }) { return user.roles.includes('')}",
+            "content": "function({ user }) { return user.roles.includes('')}",
             "name": "",
             "isRef": true,
             "isRole": true
@@ -240,7 +240,7 @@ return {
         "options": {"isReactive": true},
         "uuid": "3a4b4278-a4c7-403f-9555-28d2514c8bf5",
         "public": {
-            "stringContent": "function({ user }) { return user.roles.includes('')}",
+            "content": "function({ user }) { return user.roles.includes('')}",
             "name": "",
             "isRef": true,
             "isRole": true
@@ -250,7 +250,7 @@ return {
         "options": {"isReactive": true},
         "uuid": "919284f8-37a9-4c54-8005-f42bfd5c54e1",
         "public": {
-            "stringContent": "function({ user }) { return user.roles.includes('')}",
+            "content": "function({ user }) { return user.roles.includes('')}",
             "name": "",
             "isRef": true,
             "isRole": true

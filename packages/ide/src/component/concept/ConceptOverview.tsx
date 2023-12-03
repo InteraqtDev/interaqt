@@ -3,10 +3,10 @@ import {atom, computed, incMap, reactive} from "rata";
 import {Code} from "../code/Code";
 import {editor} from "monaco-editor";
 import IStandaloneEditorConstructionOptions = editor.IStandaloneEditorConstructionOptions;
-import {Entity} from "../../../../shared/entity/Entity";
+import {Entity} from "../../../../shared/lib/entity/Entity";
 import {createFormForEntity} from "../createFormForEntityProperty";
 import {createDialog, createDialogFooter} from "../createDialog";
-import {RoleAttributive, EntityAttributive, Role} from "../../../../shared/activity/InteractionClass";
+import {RoleAttributive, EntityAttributive, Role} from "../../../../shared/lib/activity/InteractionClass";
 import {Drawer} from "../util/Drawer";
 
 type Concept = {

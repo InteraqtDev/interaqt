@@ -1,14 +1,11 @@
 import {System, SystemCallback} from "./System.js";
-import {Entity, Property, Relation} from "@interaqt/shared";
-import {Activity, Interaction} from "@interaqt/shared";
+import {Activity, ComputedData, Entity, Interaction, Klass, KlassInstance, Property, Relation, BoolExp} from "@interaqt/shared";
 import './computedDataHandles/index.js'
 import {ActivityCall} from "./ActivityCall.js";
 import {InteractionCall} from "./InteractionCall.js";
 import {InteractionEventArgs} from "./types/interaction";
-import {Klass, KlassInstance} from "@interaqt/shared";
 import {assert} from "./util.js";
 import {ComputedDataHandle, DataContext} from "./computedDataHandles/ComputedDataHandle.js";
-import {ComputedData} from "@interaqt/shared";
 
 
 export const USER_ENTITY = 'User'
@@ -19,6 +16,10 @@ export class Controller {
     public activityCallsByName = new Map<string, ActivityCall>()
     public interactionCallsByName = new Map<string, InteractionCall>()
     public interactionCalls = new Map<string, InteractionCall>()
+    // 因为很多 function 都会bind controller 作为 this，所以我们也把 controller 的 globals 作为注入全局工具的入口。
+    public globals = {
+        BoolExp
+    }
     constructor(
         public system: System,
         public entities: KlassInstance<typeof Entity, false>[],
@@ -27,8 +28,10 @@ export class Controller {
         public interactions: KlassInstance<typeof Interaction, false>[],
         public states: KlassInstance<typeof Property, false>[] = [])
     {
+        // FIXME 因为 public 里面的会在 constructor 后面才初始化，所以AcitivityCall 里面读不到 this.system
+        this.system = system
         activities.forEach(activity => {
-            const activityCall = new ActivityCall(activity, system)
+            const activityCall = new ActivityCall(activity, this)
             this.activityCalls.set(activity.uuid, activityCall)
             if (activity.name) {
                 this.activityCallsByName.set(activity.name, activityCall)
@@ -36,7 +39,7 @@ export class Controller {
         })
 
         interactions.forEach(interaction => {
-            const interactionCall = new InteractionCall(interaction, system)
+            const interactionCall = new InteractionCall(interaction, this)
             this.interactionCalls.set(interaction.uuid, interactionCall)
             if (interaction.name) {
                 this.interactionCallsByName.set(interaction.name, interactionCall)

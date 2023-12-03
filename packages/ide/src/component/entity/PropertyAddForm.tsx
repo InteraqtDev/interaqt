@@ -1,6 +1,6 @@
 /* @jsx createElement*/
 import {createElement} from "axii";
-import {Entity, Property, PropertyTypes} from "../../../../shared/entity/Entity";
+import {Entity, Property, PropertyTypes} from "../../../../shared/lib/entity/Entity";
 import {Atom, incMap} from 'rata'
 
 

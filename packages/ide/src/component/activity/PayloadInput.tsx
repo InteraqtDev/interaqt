@@ -5,12 +5,12 @@ import {AttributiveInput} from "./AttributiveInput";
 import {Checkbox} from "../form/Checkbox";
 import {Input} from "../form/Input";
 import {createDraftControl} from "../createDraftControl";
-import {EntityAttributive, EntityAttributives, Payload, PayloadItem} from "../../../../shared/activity/Activity";
-import { UserAttributive, UserAttributives } from "../../../../shared/user/User";
+import {EntityAttributive, EntityAttributives, Payload, PayloadItem} from "../../../../shared/lib/activity/Activity";
+import { UserAttributive, UserAttributives } from "../../../../shared/lib/user/User";
 import {Button} from "../form/Button";
 import {Select} from "../form/Select";
-import {Entity} from "../../../../shared/entity/Entity";
-import {KlassInstance} from "../../../../shared/createClass";
+import {Entity} from "../../../../shared/lib/entity/Entity";
+import {KlassInstance} from "../../../../shared/lib/createClass";
 
 
 type PayloadInputProps = {

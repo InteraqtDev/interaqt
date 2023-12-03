@@ -56,8 +56,8 @@ export class MapActivityToEntityHandle extends ComputedDataHandle {
         })
     }
 
-    parseMapItemFunction(stringContent: string) {
-        const body = new Function('sourceData', `return (${stringContent})(sourceData)`)
+    parseMapItemFunction(content: string) {
+        const body = new Function('sourceData', `return (${content})(sourceData)`)
 
         return (sourceData: MapSourceDataType[]) => {
             return body(sourceData)

@@ -2,43 +2,43 @@ import {createUserRoleAttributive, UserAttributive} from "@interaqt/shared";
 
 export const NewAttr = UserAttributive.createReactive({
     name: 'New',
-    stringContent: `function New(){}`
+    content: function New(){}
 })
 
 export const New2Attr = UserAttributive.createReactive({
     name: 'New2',
-    stringContent: `function New2(){}`
+    content: function New2(){}
 })
 
 export const New3Attr = UserAttributive.createReactive({
     name: 'New3',
-    stringContent: `function New3(){}`
+    content: function New3(){}
 })
 
 
 export const OldAttr = UserAttributive.createReactive({
     name: 'Old',
-    stringContent: `function Old(){}`
+    content: function Old(){}
 })
 
 export const Old2Attr = UserAttributive.createReactive({
     name: 'Old2',
-    stringContent: `function Old2(){}`
+    content: function Old2(){}
 })
 
 export const Old3Attr = UserAttributive.createReactive({
     name: 'Old3',
-    stringContent: `function Old3(){}`
+    content: function Old3(){}
 })
 
 export const OtherAttr = UserAttributive.createReactive({
     name: 'Other',
-    stringContent: `
+    content: 
 function Other(targetUser, { user }){ 
     return user.id !== targetUser.id 
 }
-`
-    // stringContent: `function Other(){}`
+
+    // content: `function Other(){}`
 })
 
 export const User = createUserRoleAttributive( {

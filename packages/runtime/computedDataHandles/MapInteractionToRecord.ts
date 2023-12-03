@@ -39,8 +39,8 @@ export class MapInteractionToRecordHandle extends ComputedDataHandle {
         this.controller.listen(this.sourceInteraction, this.onCallInteraction)
     }
 
-    parseMapItemFunction(stringContent: string) {
-        const body = new Function('sourceData', `return (${stringContent})(sourceData)`)
+    parseMapItemFunction(content: string) {
+        const body = new Function('sourceData', `return (${content})(sourceData)`)
 
         return (sourceData: InteractionEventArgs) => {
             return body(sourceData)

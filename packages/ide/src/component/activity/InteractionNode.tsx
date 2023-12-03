@@ -5,10 +5,10 @@ import {Select} from "../form/Select";
 import {ActionInput} from "./ActionInput";
 import {createDraftControl} from "../createDraftControl";
 import {Input} from "../form/Input";
-import {UserAttributive} from "../../../../shared/user/User";
+import {UserAttributive} from "../../../../shared/lib/user/User";
 import {Atom} from "rata";
-import {EntityAttributive, Interaction} from "../../../../shared/activity/Activity";
-import {Entity} from "../../../../shared/entity/Entity";
+import {EntityAttributive, Interaction} from "../../../../shared/lib/activity/Activity";
+import {Entity} from "../../../../shared/lib/entity/Entity";
 
 
 type InteractionNodeProps = {

@@ -15,6 +15,7 @@ import { InteractionCall, InteractionCallResponse} from "./InteractionCall.js";
 import {InteractionEventArgs} from "./types/interaction";
 import {UserAttributive} from "@interaqt/shared";
 import {MatchExp} from "@interaqt/storage";
+import {Controller} from "./Controller";
 
 
 
@@ -197,10 +198,10 @@ class ActivityState{
 
 export class ActivityCall {
     static cache = new Map<ActivityInstanceType, ActivityCall>()
-    static from = (activity: ActivityInstanceType, system: System) => {
+    static from = (activity: ActivityInstanceType, controller: Controller) => {
         let graph = ActivityCall.cache.get(activity)
         if (!graph) {
-            graph = new ActivityCall(activity, system)
+            graph = new ActivityCall(activity, controller)
             ActivityCall.cache.set(activity, graph)
         }
         return graph
@@ -210,7 +211,9 @@ export class ActivityCall {
     uuidToInteractionCall = new Map<string, InteractionCall>()
     interactionCallByName = new Map<string, InteractionCall>()
     rawToNode = new Map<InteractionInstanceType|ActivityGroupInstanceType|GatewayInstanceType, InteractionLikeNode|GatewayNode>()
-    constructor(public activity: ActivityInstanceType, public system: System) {
+    system: System
+    constructor(public activity: ActivityInstanceType, public controller: Controller) {
+        this.system = controller.system
         this.graph = this.buildGraph(activity)
     }
     buildGraph(activity: ActivityInstanceType, parentGroup?: ActivityGroupNode) : Seq {
@@ -221,7 +224,7 @@ export class ActivityCall {
             const node: InteractionNode = { content: interaction, next: null, uuid: interaction.uuid, parentGroup, parentSeq: seq as Seq, }
             this.uuidToNode.set(interaction.uuid, node)
             this.rawToNode.set(interaction, node)
-            const interactionCall = new InteractionCall(interaction, this.system, this)
+            const interactionCall = new InteractionCall(interaction, this.controller, this)
             this.uuidToInteractionCall.set(interaction.uuid, interactionCall)
             if (interaction.name!) {
                 this.interactionCallByName.set(interaction.name, interactionCall)

@@ -1,6 +1,6 @@
 /* @jsx createElement*/
 import {createElement} from "axii";
-import {Entity, Property, PropertyTypes, Relation} from "../../../../shared/entity/Entity";
+import {Entity, Property, PropertyTypes, Relation} from "../../../../shared/lib/entity/Entity";
 import {Atom, incMap} from 'rata'
 import {createDialog, createDialogFooter} from "../createDialog";
 import {createFormForEntity, createFormForEntityProperty} from "../createFormForEntityProperty";

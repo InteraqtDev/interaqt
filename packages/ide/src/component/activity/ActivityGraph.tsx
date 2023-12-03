@@ -9,9 +9,9 @@ import {InteractionEdge} from "./InteractionEdge";
 import {ActivityNode} from "./AcitivityNode";
 import hotkeys from "hotkeys-js";
 import {service} from "../service";
-import {EntityAttributive, Activity, forEachInteraction} from "../../../../shared/activity/Activity";
-import {UserAttributive} from "../../../../shared/user/User";
-import {Entity} from "../../../../shared/entity/Entity";
+import {EntityAttributive, Activity, forEachInteraction} from "../../../../shared/lib/activity/Activity";
+import {UserAttributive} from "../../../../shared/lib/user/User";
+import {Entity} from "../../../../shared/lib/entity/Entity";
 
 
 

@@ -32,8 +32,8 @@ export class MapInteractionToPropertyHandle extends ComputedDataHandle {
             this.controller.listen(interaction, (event, activityId) => this.onCallInteraction(interaction, event, activityId))
         })
     }
-    parseMapItemFunction(stringContent: string) {
-        const body = new Function('sourceData', 'activityId',  `return (${stringContent})(sourceData, activityId)`)
+    parseMapItemFunction(content: string) {
+        const body = new Function('sourceData', 'activityId',  `return (${content})(sourceData, activityId)`)
 
         return (sourceData: InteractionEventArgs, activityId?: string) => {
             return body.call(this.controller, sourceData, activityId)

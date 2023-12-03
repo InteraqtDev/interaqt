@@ -2,9 +2,9 @@
 import {createElement, createRoot} from "axii";
 import {atom, reactive} from "rata";
 import {EREditor} from "./src/component/entity/EREditor";
-import {Entity, Property, PropertyTypes, Relation} from "../shared/entity/Entity";
+import {Entity, Property, PropertyTypes, Relation} from "../shared/lib/entity/Entity";
 import "./index.css"
-import {createClass, createInstancesFromString, stringifyAllInstances} from "../shared/createClass";
+import {createClass, createInstancesFromString, stringifyAllInstances} from "../shared/lib/createClass";
 import {Checkbox} from "./src/component/form/Checkbox";
 import {Select} from "./src/component/form/Select";
 import {Input} from "./src/component/form/Input";
