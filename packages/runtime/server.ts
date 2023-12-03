@@ -61,7 +61,6 @@ function parseDataAPIParams(rawParams: any[], api: DataAPI) {
 
 
 export async function startServer(controller: Controller, options: ServerOptions, dataAPIs: DataAPIs = {}) {
-
     // TODO log 中间件
     const fastify = Fastify({
         logger: true
@@ -76,7 +75,9 @@ export async function startServer(controller: Controller, options: ServerOptions
     fastify.post('/user/sync', async (request, reply) => {
         const {userId} = request.body as SyncUserBody
         // TODO 验证 id 不能重复。 er 里面应该也要验证。这里只是为了防止重复创建
-        return await controller.system.storage.create(USER_ENTITY, {id: userId})
+        if(!(await controller.system.storage.findOne(USER_ENTITY, MatchExp.atom({key:'id', value: ['=', userId]}), undefined, ['*']))){
+            return await controller.system.storage.create(USER_ENTITY, {id: userId})
+        }
     })
 
 
@@ -90,9 +91,11 @@ export async function startServer(controller: Controller, options: ServerOptions
             throw { statusCode: 401, message: 'Unauthorized' }
         }
 
-        const user = await controller.system.storage.findOne(USER_ENTITY, MatchExp.atom({key:'id', value: ['=', userId]}), undefined, ['*'])
+        let user = await controller.system.storage.findOne(USER_ENTITY, MatchExp.atom({key:'id', value: ['=', userId]}), undefined, ['*'])
         if (!user) {
-            throw { statusCode: 500, message: 'User not synced' }
+            await controller.system.storage.create(USER_ENTITY, {id: userId})
+            // CAUTION 要重新查一次，因为会可能会有 computed data 默认值
+            user = await controller.system.storage.findOne(USER_ENTITY, MatchExp.atom({key:'id', value: ['=', userId]}), undefined, ['*'])
         }
 
         // FIXME 用户访问系统时的身份？？？有 user/admin/system ???
