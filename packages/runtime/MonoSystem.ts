@@ -1,7 +1,7 @@
 /// <reference types="rata" />
 
 import {
-    ACTIVITY_RECORD,
+    ACTIVITY_RECORD, Database,
     EVENT_RECORD,
     RecordChangeListener,
     RecordMutationEvent,
@@ -32,10 +32,10 @@ function JSONParse(value: string) {
 }
 
 class MonoStorage implements Storage{
-    db = new SQLiteDB()
     public queryHandle?: EntityQueryHandle
+    constructor(public db: Database) {
+    }
     public callbacks: Set<RecordChangeListener> = new Set()
-    public dbSetup?: DBSetup
     // CAUTION kv 结构数据的实现也用 er。这是系统约定，因为也需要  Record 事件！
     async get(concept: string, key: string, initialValue?: any) {
         const match = MatchExp.atom({key: 'key', value: ['=', key]}).and({  key: 'concept', value: ['=', concept] })
@@ -55,11 +55,10 @@ class MonoStorage implements Storage{
         }
     }
     async setup(entities: KlassInstance<typeof Entity, false>[], relations: KlassInstance<typeof Relation, false>[]) {
-
         await this.db.open()
-        this.dbSetup = new DBSetup(entities, relations, this.db)
-        await this.dbSetup.createTables()
-        this.queryHandle = new EntityQueryHandle( new EntityToTableMap(this.dbSetup.map), this.db)
+        const dbSetup = new DBSetup(entities, relations, this.db)
+        await dbSetup.createTables()
+        this.queryHandle = new EntityQueryHandle( new EntityToTableMap(dbSetup.map), this.db)
     }
     findOne(...arg:Parameters<EntityQueryHandle["findOne"]>) {
         return this.queryHandle!.findOne(...arg)
@@ -201,6 +200,11 @@ export const activityEntity = Entity.create({
 
 export class MonoSystem implements System {
     conceptClass: Map<string, ReturnType<typeof createClass>> = new Map()
+    storage: Storage
+    // TODO 外部传入 logger。默认用 winston?
+    constructor(db: Database = new SQLiteDB()) {
+        this.storage = new MonoStorage(db)
+    }
     async saveEvent(event: InteractionEvent) {
         return this.storage.create(EVENT_RECORD, {...event, args: JSONStringify(event.args||{})})
     }
@@ -239,9 +243,6 @@ export class MonoSystem implements System {
         }))
     }
     setup(entities: KlassInstance<typeof Entity, false>[], relations: KlassInstance<typeof Relation, false>[]){
-
-
         return this.storage.setup([...entities, systemEntity, eventEntity, activityEntity], relations)
     }
-    storage = new MonoStorage()
 }

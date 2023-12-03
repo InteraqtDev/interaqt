@@ -74,6 +74,7 @@ export type EntityIdRef = {
 export const ID_ATTR = 'id'
 export const ROW_ID_ATTR = '_rowId'
 export type Database = {
+    open: () => Promise<any>
     scheme: (sql:string, name?:string) => Promise<any>
     query: <T extends any>(sql: string, name?:string) => Promise<T[]>
     delete: <T extends any>(sql: string, name?:string) => Promise<T[]>

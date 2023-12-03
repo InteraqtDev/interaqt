@@ -152,7 +152,7 @@ export const MyFriend = UserAttributive.createReactive({
     name: 'MyFriend',
     content:
 async function MyFriend(this: Controller, target, { user }){
-        debugger
+        // FIXME
     const linkInfo = this.system.storage.queryHandle.map.getLinkInfo('User', 'friends')
       const {BoolExp} = this.globals
     const match = BoolExp.atom({
@@ -263,13 +263,13 @@ export const mapFriendActivityToRequest = MapActivityToEntity.createReactive({
     sourceActivity: activity,
     triggerInteraction: [sendInteraction, approveInteraction, rejectInteraction],
     handle:function map(stack){
-        const sendRequestEvent = stack.find(i => i.interaction.name === 'sendRequest')
+        const sendRequestEvent = stack.find((i:any) => i.interaction.name === 'sendRequest')
         
 if (!sendRequestEvent) { 
     return undefined
 }
 
-const handled = !!stack.find(i => i.interaction.name === 'approve' || i.interaction.name === 'reject')
+const handled = !!stack.find((i:any) => i.interaction.name === 'approve' || i.interaction.name === 'reject')
         
 return {
     from: sendRequestEvent.data.user,
