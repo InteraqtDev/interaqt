@@ -93,13 +93,9 @@ export async function startServer(controller: Controller, options: ServerOptions
 
         let user = await controller.system.storage.findOne(USER_ENTITY, MatchExp.atom({key:'id', value: ['=', userId]}), undefined, ['*'])
         if (!user) {
-            await controller.system.storage.create(USER_ENTITY, {id: userId})
-            // CAUTION 要重新查一次，因为会可能会有 computed data 默认值
-            user = await controller.system.storage.findOne(USER_ENTITY, MatchExp.atom({key:'id', value: ['=', userId]}), undefined, ['*'])
+            throw { statusCode: 500, message: 'User not synced' }
         }
 
-        // FIXME 用户访问系统时的身份？？？有 user/admin/system ???
-        user.roles = ['user']
 
         const eventArgs: InteractionEventArgs = {
             user,

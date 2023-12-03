@@ -35,12 +35,12 @@ import { MatchAtom} from "@interaqt/storage";
 import {OtherAttr} from "./roles";
 import {Controller} from "../../Controller";
 
-const UserEntity = Entity.createReactive({ name: 'User' })
-const nameProperty = Property.createReactive({ name: 'name', type: PropertyTypes.String })
-const ageProperty = Property.createReactive({ name: 'age', type: PropertyTypes.Number })
-UserEntity.properties.push(nameProperty, ageProperty)
+const userEntity = Entity.create({ name: 'User' })
+const nameProperty = Property.create({ name: 'name', type: PropertyTypes.String })
+const ageProperty = Property.create({ name: 'age', type: PropertyTypes.Number })
+userEntity.properties.push(nameProperty, ageProperty)
 
-export const Message = Entity.createReactive({
+export const messageEntity = Entity.create({
     name: 'Message',
     properties: [Property.create({
         name: 'content',
@@ -49,81 +49,81 @@ export const Message = Entity.createReactive({
     })]
 })
 
-export const globalUserRole = createUserRoleAttributive({name: 'user'}, {isReactive: true})
-const userRefA = createUserRoleAttributive({name: 'A', isRef: true}, {isReactive: true})
-export const userRefB = createUserRoleAttributive({name: 'B', isRef: true}, {isReactive: true})
-export const sendInteraction = Interaction.createReactive({
+export const globalUserRole = createUserRoleAttributive({})
+const userRefA = createUserRoleAttributive({name: 'A', isRef: true})
+export const userRefB = createUserRoleAttributive({name: 'B', isRef: true})
+export const sendInteraction = Interaction.create({
     name: 'sendRequest',
-    userAttributives: UserAttributives.createReactive({}),
+    userAttributives: UserAttributives.create({}),
     userRoleAttributive: globalUserRole,
     userRef: userRefA,
-    action: Action.createReactive({name: 'sendRequest'}),
-    payload: Payload.createReactive({
+    action: Action.create({name: 'sendRequest'}),
+    payload: Payload.create({
         items: [
-            PayloadItem.createReactive({
+            PayloadItem.create({
                 name: 'to',
-                attributives: UserAttributives.createReactive({
+                attributives: UserAttributives.create({
                     content: BoolAtomData.create({data: OtherAttr})
                 }),
                 base: globalUserRole,
                 itemRef: userRefB
             }),
-            PayloadItem.createReactive({
+            PayloadItem.create({
                 name: 'message',
-                base: Message,
-                itemRef: Entity.createReactive({name: '', isRef: true}),
+                base: messageEntity,
+                itemRef: Entity.create({name: '', isRef: true}),
             })
         ]
     })
 })
-export const approveInteraction = Interaction.createReactive({
+export const approveInteraction = Interaction.create({
     name: 'approve',
-    userAttributives: UserAttributives.createReactive({}),
+    userAttributives: UserAttributives.create({}),
     userRoleAttributive: userRefB,
-    userRef: createUserRoleAttributive({name: '', isRef: true}, {isReactive: true}),
-    action: Action.createReactive({name: 'approve'}),
-    payload: Payload.createReactive({})
+    userRef: createUserRoleAttributive({name: '', isRef: true}),
+    action: Action.create({name: 'approve'}),
+    payload: Payload.create({})
 })
-const rejectInteraction = Interaction.createReactive({
+const rejectInteraction = Interaction.create({
     name: 'reject',
-    userAttributives: UserAttributives.createReactive({}),
+    userAttributives: UserAttributives.create({}),
     userRoleAttributive: userRefB,
-    userRef: createUserRoleAttributive({name: '', isRef: true}, {isReactive: true}),
-    action: Action.createReactive({name: 'reject'}),
-    payload: Payload.createReactive({
+    userRef: createUserRoleAttributive({name: '', isRef: true}),
+    action: Action.create({name: 'reject'}),
+    payload: Payload.create({
         items: [
-            PayloadItem.createReactive({
+            PayloadItem.create({
                 name: 'reason',
-                base: Message,
-                itemRef: Entity.createReactive({name: '', isRef: true}),
+                base: messageEntity,
+                itemRef: Entity.create({name: '', isRef: true}),
             })
         ]
     })
 })
-const cancelInteraction = Interaction.createReactive({
+const cancelInteraction = Interaction.create({
     name: 'cancel',
-    userAttributives: UserAttributives.createReactive({}),
+    userAttributives: UserAttributives.create({}),
     userRoleAttributive: userRefA,
-    userRef: createUserRoleAttributive({name: '', isRef: true}, {isReactive: true}),
-    action: Action.createReactive({name: 'cancel'}),
-    payload: Payload.createReactive({})
+    userRef: createUserRoleAttributive({name: '', isRef: true}),
+    action: Action.create({name: 'cancel'}),
+    payload: Payload.create({})
 })
-const responseGroup = ActivityGroup.createReactive({
+const responseGroup = ActivityGroup.create({
     type: 'any',
     activities: [
-        Activity.createReactive({
+        Activity.create({
             name: "approveFriendRelation",
             interactions: [
                 approveInteraction
             ]
         }),
-        Activity.createReactive({
+        Activity.create({
             name: "rejectFriendRelation",
             interactions: [
                 rejectInteraction
             ]
         }),
-        Activity.createReactive({
+        Activity.create({
             name: "cancelFriendRelation",
             interactions: [
                 cancelInteraction
@@ -131,7 +131,7 @@ const responseGroup = ActivityGroup.createReactive({
         })
     ],
 })
-export const activity = Activity.createReactive({
+export const createFriendRelationActivity = Activity.create({
     name: "createFriendRelation",
     interactions: [
         sendInteraction
@@ -140,7 +140,7 @@ export const activity = Activity.createReactive({
         responseGroup
     ],
     transfers: [
-        Transfer.createReactive({
+        Transfer.create({
             name: 'fromSendToResponse',
             source: sendInteraction,
             target: responseGroup
@@ -148,7 +148,7 @@ export const activity = Activity.createReactive({
     ]
 })
 
-export const MyFriend = UserAttributive.createReactive({
+export const MyFriend = UserAttributive.create({
     name: 'MyFriend',
     content:
 async function MyFriend(this: Controller, target, { user }){
@@ -166,22 +166,22 @@ async function MyFriend(this: Controller, target, { user }){
 }
 })
 
-export const deleteInteraction = Interaction.createReactive({
+export const deleteInteraction = Interaction.create({
     name: 'deleteFriend',
-    userAttributives: UserAttributives.createReactive({}),
+    userAttributives: UserAttributives.create({}),
     userRoleAttributive: globalUserRole,
-    userRef: createUserRoleAttributive({name: '', isRef: true}, {isReactive: true}),
-    action: Action.createReactive({name: 'deleteFriend'}),
-    payload: Payload.createReactive({
+    userRef: createUserRoleAttributive({name: '', isRef: true}),
+    action: Action.create({name: 'deleteFriend'}),
+    payload: Payload.create({
         items: [
-            PayloadItem.createReactive({
+            PayloadItem.create({
                 name: 'target',
-                attributives: UserAttributives.createReactive({
+                attributives: UserAttributives.create({
                     content: BoolAtomData.create({data: MyFriend})
                 }),
                 base: globalUserRole,
                 isRef: true,
-                itemRef: Entity.createReactive({name: '', isRef: true}),
+                itemRef: Entity.create({name: '', isRef: true}),
             }),
         ]
     })
@@ -189,15 +189,15 @@ export const deleteInteraction = Interaction.createReactive({
 
 
 // friend 关系的状态机描述
-const notFriendState = RelationStateNode.createReactive({
+const notFriendState = RelationStateNode.create({
     hasRelation: false
 })
-const isFriendState = RelationStateNode.createReactive({
+const isFriendState = RelationStateNode.create({
     hasRelation: true
 })
 
-const addFriendTransfer = RelationStateTransfer.createReactive({
-    sourceActivity: activity,
+const addFriendTransfer = RelationStateTransfer.create({
+    sourceActivity: createFriendRelationActivity,
     triggerInteraction: approveInteraction,
     fromState: notFriendState,
     toState: isFriendState,
@@ -221,7 +221,7 @@ const addFriendTransfer = RelationStateTransfer.createReactive({
 
 })
 
-const deleteFriendTransfer = RelationStateTransfer.createReactive({
+const deleteFriendTransfer = RelationStateTransfer.create({
     // sourceActivity: activity,
     triggerInteraction: deleteInteraction,
     fromState: isFriendState,
@@ -236,7 +236,7 @@ const deleteFriendTransfer = RelationStateTransfer.createReactive({
 
 })
 
-const friendRelationSM = RelationStateMachine.createReactive({
+const friendRelationSM = RelationStateMachine.create({
     states: [notFriendState, isFriendState],
     transfers: [addFriendTransfer, deleteFriendTransfer],
     defaultState: notFriendState
@@ -247,10 +247,10 @@ const friendRelationSM = RelationStateMachine.createReactive({
 
 
 
-const friendRelation = Relation.createReactive({
-    entity1: UserEntity,
+const friendRelation = Relation.create({
+    entity1: userEntity,
     targetName1: 'friends',
-    entity2: UserEntity,
+    entity2: userEntity,
     targetName2: 'friends',
     relType: 'n:n',
     computedData: friendRelationSM
@@ -258,8 +258,8 @@ const friendRelation = Relation.createReactive({
 
 
 
-export const mapFriendActivityToRequest = MapActivityToEntity.createReactive({
-    sourceActivity: activity,
+export const mapFriendActivityToRequest = MapActivityToEntity.create({
+    sourceActivity: createFriendRelationActivity,
     triggerInteraction: [sendInteraction, approveInteraction, rejectInteraction],
     handle:function map(stack){
         const sendRequestEvent = stack.find((i:any) => i.interaction.name === 'sendRequest')
@@ -279,28 +279,28 @@ return {
 }
 })
 
-const requestEntity= Entity.createReactive({
+const requestEntity= Entity.create({
     name: 'Request',
     computedData: mapFriendActivityToRequest,
-    properties: [Property.createReactive({
+    properties: [Property.create({
         name: 'handled',
         type:'boolean',
         collection: false,
     })]
 })
 
-const sendRequestRelation = Relation.createReactive({
+const sendRequestRelation = Relation.create({
     entity1: requestEntity,
     targetName1: 'from',
-    entity2: UserEntity,
+    entity2: userEntity,
     targetName2: 'request',
     relType: 'n:1'
 })
 
-const receivedRequestRelation = Relation.createReactive({
+const receivedRequestRelation = Relation.create({
     entity1: requestEntity,
     targetName1: 'to',
-    entity2: UserEntity,
+    entity2: userEntity,
     targetName2: 'receivedRequest',
     relType: 'n:1',
     properties: [Property.create({
@@ -379,38 +379,6 @@ requestEntity.properties.push(
 
         })
     }),
-    // Property.create({
-    //         name: 'result',
-    //         type: 'string',
-    //         collection: false,
-    //         computedData: ComputedData.create({
-    //             computeEffect: `
-    //         (mutationEvent) => {
-    //             if(
-    //                 mutationEvent.type === 'update'
-    //                 &&
-    //                 mutationEvent.recordName === 'Request' &&
-    //                 (mutationEvent.record.approved !== undefined || mutationEvent.record.rejected !== undefined)
-    //             ){
-    //                 return mutationEvent.oldRecord.id
-    //             }
-    //
-    //         }
-    //         `,
-    //             computation:`
-    //         async (requestId) => {
-    //             const match = this.system.storage.queryHandle.createMatchFromAtom({
-    //                 key: 'id',
-    //                 value: ['=', requestId]
-    //             })
-    //
-    //             const request = await this.system.storage.findOne('Request', match, undefined, ['approved', 'rejected'])
-    //             return request.approved ? 'approved' : (request.rejected ? 'rejected' : 'pending')
-    //         }
-    // `
-    //     })
-    // }),
-    // 上面和下面两种写法都可以，机制不同。下面的实在 insert/update 的时候就直接计算了
     Property.create({
         name: 'result',
         type: 'string',
@@ -421,16 +389,16 @@ requestEntity.properties.push(
     }),
 )
 
-Relation.createReactive({
+const messageToRequestRelation = Relation.create({
     entity1: requestEntity,
     targetName1: 'message',
-    entity2: Message,
+    entity2: messageEntity,
     targetName2: 'request',
     relType: '1:1'
 })
 
 // 计算 unhandled request 的总数
-const userTotalUnhandledRequest = RelationCount.createReactive({
+const userTotalUnhandledRequest = RelationCount.create({
     relation: receivedRequestRelation,
     relationDirection: 'target',
     matchExpression:
@@ -440,29 +408,29 @@ const userTotalUnhandledRequest = RelationCount.createReactive({
     ,
 })
 
-UserEntity.properties.push(Property.createReactive({
+userEntity.properties.push(Property.create({
     name: 'totalUnhandledRequest',
     type: 'number',
     collection: false,
     computedData: userTotalUnhandledRequest
 }))
 
-UserEntity.properties.push(Property.createReactive({
+userEntity.properties.push(Property.create({
     name: 'everySendRequestHandled',
     type: 'boolean',
     collection: false,
-    computedData: RelationBasedEvery.createReactive({
+    computedData: RelationBasedEvery.create({
         relation: sendRequestRelation,
         relationDirection: 'target',
         matchExpression: (request) => request.handled
     })
 }))
 
-UserEntity.properties.push(Property.createReactive({
+userEntity.properties.push(Property.create({
     name: 'anySendRequestHandled',
     type: 'boolean',
     collection: false,
-    computedData: RelationBasedAny.createReactive({
+    computedData: RelationBasedAny.create({
         relation: sendRequestRelation,
         relationDirection: 'target',
         matchExpression: (request) => request.handled
@@ -470,13 +438,13 @@ UserEntity.properties.push(Property.createReactive({
 }))
 
 // 计算 total friend count
-const userTotalFriendCount = RelationCount.createReactive({
+const userTotalFriendCount = RelationCount.create({
     relation: friendRelation,
     relationDirection: 'source',
     matchExpression: () => true
 })
 
-UserEntity.properties.push(Property.createReactive({
+userEntity.properties.push(Property.create({
     name: 'totalFriendCount',
     type: 'number',
     collection: false,
@@ -484,21 +452,21 @@ UserEntity.properties.push(Property.createReactive({
 }))
 
 
-State.createReactive({
+const totalFriendRelationState = State.create({
     name: 'totalFriendRelation',
     type: 'number',
     collection: false,
-    computedData: Count.createReactive({
+    computedData: Count.create({
         record: friendRelation,
         matchExpression: () => true
     })
 })
 
-State.createReactive({
+const everyRequestHandledState = State.create({
     name: 'everyRequestHandled',
     type: 'boolean',
     collection: false,
-    computedData: Every.createReactive({
+    computedData: Every.create({
         record: requestEntity,
         matchExpression: (request) => {
         return request.handled
@@ -506,11 +474,11 @@ State.createReactive({
     })
 })
 
-State.createReactive({
+const anyRequestHandledState = State.create({
     name: 'anyRequestHandled',
     type: 'boolean',
     collection: false,
-    computedData: Any.createReactive({
+    computedData: Any.create({
         record: requestEntity,
         matchExpression: (request) => {
         return request.handled
