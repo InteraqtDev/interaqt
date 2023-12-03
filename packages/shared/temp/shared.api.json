@@ -647,7 +647,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n            stringContent: {\n                type: \"string\";\n            };\n            name: {\n                type: \"string\";\n            };\n            isRole: {\n                type: \"boolean\";\n            };\n            isRef: {\n                type: \"boolean\";\n            };\n        }>;\n        required: true;\n        collection: false;\n    };\n}>"
+              "text": "<{\n            stringContent: {\n                type: \"string\";\n            };\n            content: {\n                type: \"function\";\n            };\n            name: {\n                type: \"string\";\n            };\n            isRole: {\n                type: \"boolean\";\n            };\n            isRef: {\n                type: \"boolean\";\n            };\n        }>;\n        required: true;\n        collection: false;\n    };\n}>"
             }
           ],
           "fileUrlPath": "user/User.ts",
@@ -2375,7 +2375,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n    stringContent: {\n        type: \"string\";\n    };\n    name: {\n        type: \"string\";\n    };\n    isRole: {\n        type: \"boolean\";\n    };\n    isRef: {\n        type: \"boolean\";\n    };\n}> | import(\"../createClass.js\")."
+              "text": "<{\n    stringContent: {\n        type: \"string\";\n    };\n    content: {\n        type: \"function\";\n    };\n    name: {\n        type: \"string\";\n    };\n    isRole: {\n        type: \"boolean\";\n    };\n    isRef: {\n        type: \"boolean\";\n    };\n}> | import(\"../createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -2384,7 +2384,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n    stringContent: {\n        type: \"string\";\n    };\n    name: {\n        type: \"string\";\n    };\n    isRole: {\n        type: \"boolean\";\n    };\n    isRef: {\n        type: \"boolean\";\n    };\n}>"
+              "text": "<{\n    stringContent: {\n        type: \"string\";\n    };\n    content: {\n        type: \"function\";\n    };\n    name: {\n        type: \"string\";\n    };\n    isRole: {\n        type: \"boolean\";\n    };\n    isRef: {\n        type: \"boolean\";\n    };\n}>"
             },
             {
               "kind": "Content",
@@ -5394,7 +5394,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                                    stringContent: {\n                                        type: \"string\";\n                                    };\n                                    name: {\n                                        type: \"string\";\n                                    };\n                                    isRole: {\n                                        type: \"boolean\";\n                                    };\n                                    isRef: {\n                                        type: \"boolean\";\n                                    };\n                                }>;\n                                required: true;\n                                collection: false;\n                            };\n                        }> | "
+              "text": "<{\n                                    stringContent: {\n                                        type: \"string\";\n                                    };\n                                    content: {\n                                        type: \"function\";\n                                    };\n                                    name: {\n                                        type: \"string\";\n                                    };\n                                    isRole: {\n                                        type: \"boolean\";\n                                    };\n                                    isRef: {\n                                        type: \"boolean\";\n                                    };\n                                }>;\n                                required: true;\n                                collection: false;\n                            };\n                        }> | "
             },
             {
               "kind": "Reference",
@@ -5421,7 +5421,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                                            stringContent: {\n                                                type: \"string\";\n                                            };\n                                            name: {\n                                                type: \"string\";\n                                            };\n                                            isRole: {\n                                                type: \"boolean\";\n                                            };\n                                            isRef: {\n                                                type: \"boolean\";\n                                            };\n                                        }>;\n                                        required: true;\n                                        collection: false;\n                                    };\n                                }> | import(\"../user/User.js\")."
+              "text": "<{\n                                            stringContent: {\n                                                type: \"string\";\n                                            };\n                                            content: {\n                                                type: \"function\";\n                                            };\n                                            name: {\n                                                type: \"string\";\n                                            };\n                                            isRole: {\n                                                type: \"boolean\";\n                                            };\n                                            isRef: {\n                                                type: \"boolean\";\n                                            };\n                                        }>;\n                                        required: true;\n                                        collection: false;\n                                    };\n                                }> | import(\"../user/User.js\")."
             },
             {
               "kind": "Reference",
@@ -5448,7 +5448,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                                            stringContent: {\n                                                type: \"string\";\n                                            };\n                                            name: {\n                                                type: \"string\";\n                                            };\n                                            isRole: {\n                                                type: \"boolean\";\n                                            };\n                                            isRef: {\n                                                type: \"boolean\";\n                                            };\n                                        }>;\n                                        required: true;\n                                        collection: false;\n                                    };\n                                }> | import(\"../user/User.js\")."
+              "text": "<{\n                                            stringContent: {\n                                                type: \"string\";\n                                            };\n                                            content: {\n                                                type: \"function\";\n                                            };\n                                            name: {\n                                                type: \"string\";\n                                            };\n                                            isRole: {\n                                                type: \"boolean\";\n                                            };\n                                            isRef: {\n                                                type: \"boolean\";\n                                            };\n                                        }>;\n                                        required: true;\n                                        collection: false;\n                                    };\n                                }> | import(\"../user/User.js\")."
             },
             {
               "kind": "Reference",
@@ -5601,7 +5601,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                    stringContent: {\n                        type: \"string\";\n                    };\n                    name: {\n                        type: \"string\";\n                    };\n                    isRole: {\n                        type: \"boolean\";\n                    };\n                    isRef: {\n                        type: \"boolean\";\n                    };\n                }>)[];\n                required: true;\n                collection: false;\n            };\n            isRef: {\n                type: \"boolean\";\n                collection: false;\n                defaultValue: () => boolean;\n            };\n            required: {\n                type: \"boolean\";\n                collection: false;\n                defaultValue: () => boolean;\n            };\n            isCollection: {\n                type: \"boolean\";\n                collection: false;\n                defaultValue: () => boolean;\n            };\n            itemRef: {\n                collection: false;\n                required: false;\n                type: ("
+              "text": "<{\n                    stringContent: {\n                        type: \"string\";\n                    };\n                    content: {\n                        type: \"function\";\n                    };\n                    name: {\n                        type: \"string\";\n                    };\n                    isRole: {\n                        type: \"boolean\";\n                    };\n                    isRef: {\n                        type: \"boolean\";\n                    };\n                }>)[];\n                required: true;\n                collection: false;\n            };\n            isRef: {\n                type: \"boolean\";\n                collection: false;\n                defaultValue: () => boolean;\n            };\n            required: {\n                type: \"boolean\";\n                collection: false;\n                defaultValue: () => boolean;\n            };\n            isCollection: {\n                type: \"boolean\";\n                collection: false;\n                defaultValue: () => boolean;\n            };\n            itemRef: {\n                collection: false;\n                required: false;\n                type: ("
             },
             {
               "kind": "Reference",
@@ -5727,7 +5727,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                    stringContent: {\n                        type: \"string\";\n                    };\n                    name: {\n                        type: \"string\";\n                    };\n                    isRole: {\n                        type: \"boolean\";\n                    };\n                    isRef: {\n                        type: \"boolean\";\n                    };\n                }>)[];\n            };\n        }>;\n        collection: true;\n        required: true;\n        defaultValue: () => never[];\n    };\n}>"
+              "text": "<{\n                    stringContent: {\n                        type: \"string\";\n                    };\n                    content: {\n                        type: \"function\";\n                    };\n                    name: {\n                        type: \"string\";\n                    };\n                    isRole: {\n                        type: \"boolean\";\n                    };\n                    isRef: {\n                        type: \"boolean\";\n                    };\n                }>)[];\n            };\n        }>;\n        collection: true;\n        required: true;\n        defaultValue: () => never[];\n    };\n}>"
             }
           ],
           "fileUrlPath": "activity/Activity.ts",
@@ -5782,7 +5782,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                            stringContent: {\n                                type: \"string\";\n                            };\n                            name: {\n                                type: \"string\";\n                            };\n                            isRole: {\n                                type: \"boolean\";\n                            };\n                            isRef: {\n                                type: \"boolean\";\n                            };\n                        }>;\n                        required: true;\n                        collection: false;\n                    };\n                }> | "
+              "text": "<{\n                            stringContent: {\n                                type: \"string\";\n                            };\n                            content: {\n                                type: \"function\";\n                            };\n                            name: {\n                                type: \"string\";\n                            };\n                            isRole: {\n                                type: \"boolean\";\n                            };\n                            isRef: {\n                                type: \"boolean\";\n                            };\n                        }>;\n                        required: true;\n                        collection: false;\n                    };\n                }> | "
             },
             {
               "kind": "Reference",
@@ -5809,7 +5809,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                                    stringContent: {\n                                        type: \"string\";\n                                    };\n                                    name: {\n                                        type: \"string\";\n                                    };\n                                    isRole: {\n                                        type: \"boolean\";\n                                    };\n                                    isRef: {\n                                        type: \"boolean\";\n                                    };\n                                }>;\n                                required: true;\n                                collection: false;\n                            };\n                        }> | import(\"../user/User.js\")."
+              "text": "<{\n                                    stringContent: {\n                                        type: \"string\";\n                                    };\n                                    content: {\n                                        type: \"function\";\n                                    };\n                                    name: {\n                                        type: \"string\";\n                                    };\n                                    isRole: {\n                                        type: \"boolean\";\n                                    };\n                                    isRef: {\n                                        type: \"boolean\";\n                                    };\n                                }>;\n                                required: true;\n                                collection: false;\n                            };\n                        }> | import(\"../user/User.js\")."
             },
             {
               "kind": "Reference",
@@ -5836,7 +5836,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                                    stringContent: {\n                                        type: \"string\";\n                                    };\n                                    name: {\n                                        type: \"string\";\n                                    };\n                                    isRole: {\n                                        type: \"boolean\";\n                                    };\n                                    isRef: {\n                                        type: \"boolean\";\n                                    };\n                                }>;\n                                required: true;\n                                collection: false;\n                            };\n                        }> | import(\"../user/User.js\")."
+              "text": "<{\n                                    stringContent: {\n                                        type: \"string\";\n                                    };\n                                    content: {\n                                        type: \"function\";\n                                    };\n                                    name: {\n                                        type: \"string\";\n                                    };\n                                    isRole: {\n                                        type: \"boolean\";\n                                    };\n                                    isRef: {\n                                        type: \"boolean\";\n                                    };\n                                }>;\n                                required: true;\n                                collection: false;\n                            };\n                        }> | import(\"../user/User.js\")."
             },
             {
               "kind": "Reference",
@@ -5989,7 +5989,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n            stringContent: {\n                type: \"string\";\n            };\n            name: {\n                type: \"string\";\n            };\n            isRole: {\n                type: \"boolean\";\n            };\n            isRef: {\n                type: \"boolean\";\n            };\n        }>)[];\n        required: true;\n        collection: false;\n    };\n    isRef: {\n        type: \"boolean\";\n        collection: false;\n        defaultValue: () => boolean;\n    };\n    required: {\n        type: \"boolean\";\n        collection: false;\n        defaultValue: () => boolean;\n    };\n    isCollection: {\n        type: \"boolean\";\n        collection: false;\n        defaultValue: () => boolean;\n    };\n    itemRef: {\n        collection: false;\n        required: false;\n        type: ("
+              "text": "<{\n            stringContent: {\n                type: \"string\";\n            };\n            content: {\n                type: \"function\";\n            };\n            name: {\n                type: \"string\";\n            };\n            isRole: {\n                type: \"boolean\";\n            };\n            isRef: {\n                type: \"boolean\";\n            };\n        }>)[];\n        required: true;\n        collection: false;\n    };\n    isRef: {\n        type: \"boolean\";\n        collection: false;\n        defaultValue: () => boolean;\n    };\n    required: {\n        type: \"boolean\";\n        collection: false;\n        defaultValue: () => boolean;\n    };\n    isCollection: {\n        type: \"boolean\";\n        collection: false;\n        defaultValue: () => boolean;\n    };\n    itemRef: {\n        collection: false;\n        required: false;\n        type: ("
             },
             {
               "kind": "Reference",
@@ -6115,7 +6115,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n            stringContent: {\n                type: \"string\";\n            };\n            name: {\n                type: \"string\";\n            };\n            isRole: {\n                type: \"boolean\";\n            };\n            isRef: {\n                type: \"boolean\";\n            };\n        }>)[];\n    };\n}>"
+              "text": "<{\n            stringContent: {\n                type: \"string\";\n            };\n            content: {\n                type: \"function\";\n            };\n            name: {\n                type: \"string\";\n            };\n            isRole: {\n                type: \"boolean\";\n            };\n            isRef: {\n                type: \"boolean\";\n            };\n        }>)[];\n    };\n}>"
             }
           ],
           "fileUrlPath": "activity/Activity.ts",
@@ -8767,7 +8767,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n    stringContent: {\n        type: \"string\";\n    };\n    name: {\n        type: \"string\";\n    };\n    isRole: {\n        type: \"boolean\";\n    };\n    isRef: {\n        type: \"boolean\";\n    };\n}>"
+              "text": "<{\n    stringContent: {\n        type: \"string\";\n    };\n    content: {\n        type: \"function\";\n    };\n    name: {\n        type: \"string\";\n    };\n    isRole: {\n        type: \"boolean\";\n    };\n    isRef: {\n        type: \"boolean\";\n    };\n}>"
             }
           ],
           "fileUrlPath": "user/User.ts",
@@ -8843,7 +8843,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                    stringContent: {\n                        type: \"string\";\n                    };\n                    name: {\n                        type: \"string\";\n                    };\n                    isRole: {\n                        type: \"boolean\";\n                    };\n                    isRef: {\n                        type: \"boolean\";\n                    };\n                }>;\n                required: true;\n                collection: false;\n            };\n        }> | import(\"../createClass.js\")."
+              "text": "<{\n                    stringContent: {\n                        type: \"string\";\n                    };\n                    content: {\n                        type: \"function\";\n                    };\n                    name: {\n                        type: \"string\";\n                    };\n                    isRole: {\n                        type: \"boolean\";\n                    };\n                    isRef: {\n                        type: \"boolean\";\n                    };\n                }>;\n                required: true;\n                collection: false;\n            };\n        }> | import(\"../createClass.js\")."
             },
             {
               "kind": "Reference",

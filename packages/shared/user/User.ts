@@ -8,6 +8,9 @@ export const UserAttributive = createClass({
         stringContent: {
             type: 'string',
         },
+        content: {
+            type: 'function'
+        },
         name: {
             type: 'string'
         },
@@ -127,7 +130,9 @@ export function createUserRoleAttributive({name, isRef = false}: { name?: string
     // @ts-ignore
     return new UserAttributive({
         name,
-        stringContent: name ? `function(user) { return user.roles.includes('${name}')}` : 'function anyone(){ return true}',
+        content: name ?
+            new Function('user', `return user.roles.includes('${name}')`) :
+            function anyone(){ return true},
         isRef,
         isRole: true
     }, options)

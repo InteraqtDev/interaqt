@@ -146,6 +146,9 @@ type: Klass<    {
 stringContent: {
 type: "string";
 };
+content: {
+type: "function";
+};
 name: {
 type: "string";
 };
@@ -363,6 +366,9 @@ export function createUserRoleAttributive({ name, isRef }: {
 stringContent: {
 type: "string";
 };
+content: {
+type: "function";
+};
 name: {
 type: "string";
 };
@@ -375,6 +381,9 @@ type: "boolean";
 }> | ReactiveKlassInstance<    {
 stringContent: {
 type: "string";
+};
+content: {
+type: "function";
 };
 name: {
 type: "string";
@@ -936,6 +945,9 @@ export const Payload: Klass<{
                                     stringContent: {
                                         type: "string";
                                     };
+                                    content: {
+                                        type: "function";
+                                    };
                                     name: {
                                         type: "string";
                                     };
@@ -976,6 +988,9 @@ export const Payload: Klass<{
                                             stringContent: {
                                                 type: "string";
                                             };
+                                            content: {
+                                                type: "function";
+                                            };
                                             name: {
                                                 type: "string";
                                             };
@@ -1005,6 +1020,9 @@ export const Payload: Klass<{
                                         type: Klass<{
                                             stringContent: {
                                                 type: "string";
+                                            };
+                                            content: {
+                                                type: "function";
                                             };
                                             name: {
                                                 type: "string";
@@ -1106,6 +1124,9 @@ export const Payload: Klass<{
                 }> | Klass<{
                     stringContent: {
                         type: "string";
+                    };
+                    content: {
+                        type: "function";
                     };
                     name: {
                         type: "string";
@@ -1214,6 +1235,9 @@ export const Payload: Klass<{
                     stringContent: {
                         type: "string";
                     };
+                    content: {
+                        type: "function";
+                    };
                     name: {
                         type: "string";
                     };
@@ -1252,6 +1276,9 @@ export const PayloadItem: Klass<{
                         type: Klass<{
                             stringContent: {
                                 type: "string";
+                            };
+                            content: {
+                                type: "function";
                             };
                             name: {
                                 type: "string";
@@ -1293,6 +1320,9 @@ export const PayloadItem: Klass<{
                                     stringContent: {
                                         type: "string";
                                     };
+                                    content: {
+                                        type: "function";
+                                    };
                                     name: {
                                         type: "string";
                                     };
@@ -1322,6 +1352,9 @@ export const PayloadItem: Klass<{
                                 type: Klass<{
                                     stringContent: {
                                         type: "string";
+                                    };
+                                    content: {
+                                        type: "function";
                                     };
                                     name: {
                                         type: "string";
@@ -1423,6 +1456,9 @@ export const PayloadItem: Klass<{
         }> | Klass<{
             stringContent: {
                 type: "string";
+            };
+            content: {
+                type: "function";
             };
             name: {
                 type: "string";
@@ -1530,6 +1566,9 @@ export const PayloadItem: Klass<{
         }> | Klass<{
             stringContent: {
                 type: "string";
+            };
+            content: {
+                type: "function";
             };
             name: {
                 type: "string";
@@ -2292,6 +2331,9 @@ export const UserAttributive: Klass<    {
 stringContent: {
 type: "string";
 };
+content: {
+type: "function";
+};
 name: {
 type: "string";
 };
@@ -2323,6 +2365,9 @@ data: {
 type: Klass<    {
 stringContent: {
 type: "string";
+};
+content: {
+type: "function";
 };
 name: {
 type: "string";
