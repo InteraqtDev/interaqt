@@ -15,10 +15,8 @@ import { BoolExpressionRawData } from '@interaqt/shared';
 import { Concept } from '@interaqt/shared';
 import { ConceptInstance } from '@interaqt/shared';
 import { createClass } from '@interaqt/shared';
-import { DBSetup } from '@interaqt/storage';
 import { Entity } from '@interaqt/shared';
 import { EntityAttributive } from '@interaqt/shared';
-import { EntityQueryHandle } from '@interaqt/storage';
 import { GatewayInstanceType } from '@interaqt/shared';
 import { GatewayPublicType } from '@interaqt/shared';
 import { InertKlassInstance } from '@interaqt/shared';
@@ -28,12 +26,9 @@ import { InteractionPublicType } from '@interaqt/shared';
 import { Klass } from '@interaqt/shared';
 import { KlassInstance } from '@interaqt/shared';
 import { MatchExpressionData } from '@interaqt/storage';
-import { MutationEvent as MutationEvent_2 } from '@interaqt/storage';
 import { Property } from '@interaqt/shared';
 import { PropertyTypes } from '@interaqt/shared';
-import { RawEntityData } from '@interaqt/storage';
 import { ReactiveKlassInstance } from '@interaqt/shared';
-import { Record as Record_2 } from '@interaqt/storage';
 import { Relation } from '@interaqt/shared';
 import { RunResult } from 'sqlite3';
 import { TransferPublicType } from '@interaqt/shared';
@@ -154,6 +149,10 @@ export class Controller {
     // (undocumented)
     entities: KlassInstance<typeof Entity, false>[];
     // (undocumented)
+    globals: {
+        BoolExp: typeof BoolExp;
+    };
+    // (undocumented)
     interactionCalls: Map<string, InteractionCall>;
     // Warning: (ae-forgotten-export) The symbol "InteractionCall" needs to be exported by the entry point index.d.ts
     //
@@ -174,6 +173,12 @@ export class Controller {
     // (undocumented)
     system: System;
 }
+
+// @public (undocumented)
+export type DataAPIThis = {
+    system: Controller['system'];
+    user: EventUser;
+};
 
 // @public (undocumented)
 export const eventEntity: InertKlassInstance<    {
@@ -252,17 +257,14 @@ defaultValue: () => boolean;
 
 // @public (undocumented)
 export class MonoSystem implements System {
+    // Warning: (ae-forgotten-export) The symbol "Database" needs to be exported by the entry point index.d.ts
+    constructor(db?: Database);
     // (undocumented)
     conceptClass: Map<string, ReturnType<typeof createClass>>;
     // (undocumented)
     createActivity(activity: any): Promise<any>;
     // (undocumented)
-    getActivity(query?: MatchExpressionData): Promise<{
-        state: any;
-        refs: any;
-        id: string;
-        _rowId?: string | undefined;
-    }[]>;
+    getActivity(query?: MatchExpressionData): Promise<any[]>;
     // (undocumented)
     getEvent(query?: MatchExpressionData): Promise<InteractionEvent[]>;
     // Warning: (ae-forgotten-export) The symbol "InteractionEvent" needs to be exported by the entry point index.d.ts
@@ -270,17 +272,15 @@ export class MonoSystem implements System {
     // (undocumented)
     saveEvent(event: InteractionEvent): Promise<any>;
     // (undocumented)
-    setup(entities: KlassInstance<typeof Entity, false>[], relations: KlassInstance<typeof Relation, false>[]): Promise<void>;
-    // Warning: (ae-forgotten-export) The symbol "MonoStorage" needs to be exported by the entry point index.d.ts
+    setup(entities: KlassInstance<typeof Entity, false>[], relations: KlassInstance<typeof Relation, false>[]): any;
+    // Warning: (ae-forgotten-export) The symbol "Storage_2" needs to be exported by the entry point index.d.ts
     //
     // (undocumented)
-    storage: MonoStorage;
+    storage: Storage_2;
     // (undocumented)
     updateActivity(match: MatchExpressionData, activity: any): Promise<any>;
 }
 
-// Warning: (ae-forgotten-export) The symbol "Database" needs to be exported by the entry point index.d.ts
-//
 // @public (undocumented)
 export class SQLiteDB implements Database {
     constructor(file?: string, options?: number | undefined);
@@ -315,9 +315,10 @@ export class SQLiteDB implements Database {
 }
 
 // Warning: (ae-forgotten-export) The symbol "ServerOptions" needs to be exported by the entry point index.d.ts
+// Warning: (ae-forgotten-export) The symbol "DataAPIs" needs to be exported by the entry point index.d.ts
 //
 // @public (undocumented)
-export function startServer(controller: Controller, options: ServerOptions): Promise<void>;
+export function startServer(controller: Controller, options: ServerOptions, dataAPIs?: DataAPIs): Promise<void>;
 
 // @public (undocumented)
 export const systemEntity: InertKlassInstance<    {
@@ -399,7 +400,8 @@ export const USER_ENTITY = "User";
 
 // Warnings were encountered during analysis:
 //
-// Controller.ts:161:8 - (ae-forgotten-export) The symbol "ActivitySeqStateData" needs to be exported by the entry point index.d.ts
+// Controller.ts:164:8 - (ae-forgotten-export) The symbol "ActivitySeqStateData" needs to be exported by the entry point index.d.ts
+// server.ts:27:5 - (ae-forgotten-export) The symbol "EventUser" needs to be exported by the entry point index.d.ts
 
 // (No @packageDocumentation comment for this package)
 

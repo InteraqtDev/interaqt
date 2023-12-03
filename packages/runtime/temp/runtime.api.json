@@ -1202,6 +1202,45 @@
             },
             {
               "kind": "Property",
+              "canonicalReference": "@interaqt/runtime!Controller#globals:member",
+              "docComment": "",
+              "excerptTokens": [
+                {
+                  "kind": "Content",
+                  "text": "globals: "
+                },
+                {
+                  "kind": "Content",
+                  "text": "{\n        BoolExp: typeof "
+                },
+                {
+                  "kind": "Reference",
+                  "text": "BoolExp",
+                  "canonicalReference": "@interaqt/shared!BoolExp:class"
+                },
+                {
+                  "kind": "Content",
+                  "text": ";\n    }"
+                },
+                {
+                  "kind": "Content",
+                  "text": ";"
+                }
+              ],
+              "isReadonly": false,
+              "isOptional": false,
+              "releaseTag": "Public",
+              "name": "globals",
+              "propertyTypeTokenRange": {
+                "startIndex": 1,
+                "endIndex": 4
+              },
+              "isStatic": false,
+              "isProtected": false,
+              "isAbstract": false
+            },
+            {
+              "kind": "Property",
               "canonicalReference": "@interaqt/runtime!Controller#interactionCalls:member",
               "docComment": "",
               "excerptTokens": [
@@ -1556,6 +1595,50 @@
           "implementsTokenRanges": []
         },
         {
+          "kind": "TypeAlias",
+          "canonicalReference": "@interaqt/runtime!DataAPIThis:type",
+          "docComment": "",
+          "excerptTokens": [
+            {
+              "kind": "Content",
+              "text": "export type DataAPIThis = "
+            },
+            {
+              "kind": "Content",
+              "text": "{\n    system: "
+            },
+            {
+              "kind": "Reference",
+              "text": "Controller",
+              "canonicalReference": "@interaqt/runtime!Controller:class"
+            },
+            {
+              "kind": "Content",
+              "text": "['system'];\n    user: "
+            },
+            {
+              "kind": "Reference",
+              "text": "EventUser",
+              "canonicalReference": "@interaqt/runtime!~EventUser:type"
+            },
+            {
+              "kind": "Content",
+              "text": ";\n}"
+            },
+            {
+              "kind": "Content",
+              "text": ";"
+            }
+          ],
+          "fileUrlPath": "server.ts",
+          "releaseTag": "Public",
+          "name": "DataAPIThis",
+          "typeTokenRange": {
+            "startIndex": 1,
+            "endIndex": 6
+          }
+        },
+        {
           "kind": "Variable",
           "canonicalReference": "@interaqt/runtime!eventEntity:var",
           "docComment": "",
@@ -1721,6 +1804,39 @@
           "preserveMemberOrder": false,
           "members": [
             {
+              "kind": "Constructor",
+              "canonicalReference": "@interaqt/runtime!MonoSystem:constructor(1)",
+              "docComment": "/**\n * Constructs a new instance of the `MonoSystem` class\n */\n",
+              "excerptTokens": [
+                {
+                  "kind": "Content",
+                  "text": "constructor(db?: "
+                },
+                {
+                  "kind": "Reference",
+                  "text": "Database",
+                  "canonicalReference": "@interaqt/runtime!~Database:type"
+                },
+                {
+                  "kind": "Content",
+                  "text": ");"
+                }
+              ],
+              "releaseTag": "Public",
+              "isProtected": false,
+              "overloadIndex": 1,
+              "parameters": [
+                {
+                  "parameterName": "db",
+                  "parameterTypeTokenRange": {
+                    "startIndex": 1,
+                    "endIndex": 2
+                  },
+                  "isOptional": true
+                }
+              ]
+            },
+            {
               "kind": "Property",
               "canonicalReference": "@interaqt/runtime!MonoSystem#conceptClass:member",
               "docComment": "",
@@ -1851,7 +1967,7 @@
                 },
                 {
                   "kind": "Content",
-                  "text": "<{\n        state: any;\n        refs: any;\n        id: string;\n        _rowId?: string | undefined;\n    }[]>"
+                  "text": "<any[]>"
                 },
                 {
                   "kind": "Content",
@@ -2051,13 +2167,8 @@
                   "text": "): "
                 },
                 {
-                  "kind": "Reference",
-                  "text": "Promise",
-                  "canonicalReference": "!Promise:interface"
-                },
-                {
                   "kind": "Content",
-                  "text": "<void>"
+                  "text": "any"
                 },
                 {
                   "kind": "Content",
@@ -2067,7 +2178,7 @@
               "isStatic": false,
               "returnTypeTokenRange": {
                 "startIndex": 11,
-                "endIndex": 13
+                "endIndex": 12
               },
               "releaseTag": "Public",
               "isProtected": false,
@@ -2105,8 +2216,8 @@
                 },
                 {
                   "kind": "Reference",
-                  "text": "MonoStorage",
-                  "canonicalReference": "@interaqt/runtime!~MonoStorage:class"
+                  "text": "Storage",
+                  "canonicalReference": "@interaqt/runtime!~Storage_2:type"
                 },
                 {
                   "kind": "Content",
@@ -2940,6 +3051,15 @@
             },
             {
               "kind": "Content",
+              "text": ", dataAPIs?: "
+            },
+            {
+              "kind": "Reference",
+              "text": "DataAPIs",
+              "canonicalReference": "@interaqt/runtime!~DataAPIs:type"
+            },
+            {
+              "kind": "Content",
               "text": "): "
             },
             {
@@ -2958,8 +3078,8 @@
           ],
           "fileUrlPath": "server.ts",
           "returnTypeTokenRange": {
-            "startIndex": 5,
-            "endIndex": 7
+            "startIndex": 7,
+            "endIndex": 9
           },
           "releaseTag": "Public",
           "overloadIndex": 1,
@@ -2979,6 +3099,14 @@
                 "endIndex": 4
               },
               "isOptional": false
+            },
+            {
+              "parameterName": "dataAPIs",
+              "parameterTypeTokenRange": {
+                "startIndex": 5,
+                "endIndex": 6
+              },
+              "isOptional": true
             }
           ],
           "name": "startServer"

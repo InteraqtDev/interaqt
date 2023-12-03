@@ -152,9 +152,8 @@ export const MyFriend = UserAttributive.createReactive({
     name: 'MyFriend',
     content:
 async function MyFriend(this: Controller, target, { user }){
-        // FIXME
-    const linkInfo = this.system.storage.queryHandle.map.getLinkInfo('User', 'friends')
-      const {BoolExp} = this.globals
+    const relationName = this.system.storage.getRelationName('User', 'friends')
+    const {BoolExp} = this.globals
     const match = BoolExp.atom({
         key: 'source.id', 
         value: ['=', user.id]
@@ -163,7 +162,7 @@ async function MyFriend(this: Controller, target, { user }){
         value: ['=', target.id]
     })
 
-    return !!(await this.system.storage.findOneRelationByName(linkInfo.name, match))  
+    return !!(await this.system.storage.findOneRelationByName(relationName, match))
 }
 })
 
