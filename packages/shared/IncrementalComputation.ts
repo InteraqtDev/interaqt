@@ -3,7 +3,7 @@ import {Activity, Interaction} from "./activity/Activity.js";
 import {Entity, Property, Relation} from "./entity/Entity.js";
 import {State} from "./state/State.js";
 
-export const MapActivityToEntity = createClass({
+export const MapActivityToRecord = createClass({
     name: 'MapActivityToEntity',
     public: {
         sourceActivity: {
@@ -48,8 +48,8 @@ export const MapInteractionToPropertyItem = createClass({
             collection: false,
             required: true
         },
-        value: {
-            type: 'string',
+        handle: {
+            type: 'function',
             collection: false,
             required: true
         },
@@ -79,7 +79,7 @@ export const MapInteractionToProperty = createClass({
 
 // CAUTION 修补 Entity computedData 里面的类型
 Entity.public.computedData.type.push(
-    MapActivityToEntity as unknown as typeof ComputedData,
+    MapActivityToRecord as unknown as typeof ComputedData,
     MapInteractionToRecord as unknown as typeof ComputedData
 )
 

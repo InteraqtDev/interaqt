@@ -4564,12 +4564,12 @@
         },
         {
           "kind": "Variable",
-          "canonicalReference": "@interaqt/shared!MapActivityToEntity:var",
+          "canonicalReference": "@interaqt/shared!MapActivityToRecord:var",
           "docComment": "",
           "excerptTokens": [
             {
               "kind": "Content",
-              "text": "MapActivityToEntity: "
+              "text": "MapActivityToRecord: "
             },
             {
               "kind": "Reference",
@@ -4881,7 +4881,7 @@
           "fileUrlPath": "IncrementalComputation.ts",
           "isReadonly": true,
           "releaseTag": "Public",
-          "name": "MapActivityToEntity",
+          "name": "MapActivityToRecord",
           "variableTypeTokenRange": {
             "startIndex": 1,
             "endIndex": 69
@@ -4930,7 +4930,7 @@
             },
             {
               "kind": "Content",
-              "text": ">;\n                collection: false;\n                required: true;\n            };\n            value: {\n                type: \"string\";\n                collection: false;\n                required: true;\n            };\n            computeSource: {\n                type: \"function\";\n                collection: false;\n                required: true;\n            };\n        }>;\n        collection: true;\n        required: true;\n    };\n    defaultValue: {\n        type: \"string\";\n        collection: false;\n        required: false;\n    };\n}>"
+              "text": ">;\n                collection: false;\n                required: true;\n            };\n            handle: {\n                type: \"function\";\n                collection: false;\n                required: true;\n            };\n            computeSource: {\n                type: \"function\";\n                collection: false;\n                required: true;\n            };\n        }>;\n        collection: true;\n        required: true;\n    };\n    defaultValue: {\n        type: \"string\";\n        collection: false;\n        required: false;\n    };\n}>"
             }
           ],
           "fileUrlPath": "IncrementalComputation.ts",
@@ -4976,7 +4976,7 @@
             },
             {
               "kind": "Content",
-              "text": ">;\n        collection: false;\n        required: true;\n    };\n    value: {\n        type: \"string\";\n        collection: false;\n        required: true;\n    };\n    computeSource: {\n        type: \"function\";\n        collection: false;\n        required: true;\n    };\n}>"
+              "text": ">;\n        collection: false;\n        required: true;\n    };\n    handle: {\n        type: \"function\";\n        collection: false;\n        required: true;\n    };\n    computeSource: {\n        type: \"function\";\n        collection: false;\n        required: true;\n    };\n}>"
             }
           ],
           "fileUrlPath": "IncrementalComputation.ts",

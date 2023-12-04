@@ -760,7 +760,7 @@ export type KlassOptions = {
 export type KlassProp<REACTIVE extends boolean, COLLECTION extends true | false | undefined, T> = IfReactiveCollectionProp<REACTIVE, COLLECTION, T>;
 
 // @public (undocumented)
-export const MapActivityToEntity: Klass<{
+export const MapActivityToRecord: Klass<{
     sourceActivity: {
         type: Klass<{
             name: {
@@ -853,8 +853,8 @@ export const MapInteractionToProperty: Klass<{
                 collection: false;
                 required: true;
             };
-            value: {
-                type: "string";
+            handle: {
+                type: "function";
                 collection: false;
                 required: true;
             };
@@ -881,8 +881,8 @@ export const MapInteractionToPropertyItem: Klass<{
         collection: false;
         required: true;
     };
-    value: {
-        type: "string";
+    handle: {
+        type: "function";
         collection: false;
         required: true;
     };
