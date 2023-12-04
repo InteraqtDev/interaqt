@@ -907,6 +907,15 @@ export const MapInteractionToRecord: Klass<{
     };
 }>;
 
+// @public (undocumented)
+export const MapRecordMutationToRecord: Klass<{
+    handle: {
+        type: "function";
+        collection: false;
+        required: true;
+    };
+}>;
+
 // Warning: (ae-forgotten-export) The symbol "OmitNever" needs to be exported by the entry point index.d.ts
 // Warning: (ae-forgotten-export) The symbol "ExtractKlassTypes" needs to be exported by the entry point index.d.ts
 // Warning: (ae-forgotten-export) The symbol "PrimitivePropType" needs to be exported by the entry point index.d.ts

@@ -5035,6 +5035,34 @@
           }
         },
         {
+          "kind": "Variable",
+          "canonicalReference": "@interaqt/shared!MapRecordMutationToRecord:var",
+          "docComment": "",
+          "excerptTokens": [
+            {
+              "kind": "Content",
+              "text": "MapRecordMutationToRecord: "
+            },
+            {
+              "kind": "Reference",
+              "text": "Klass",
+              "canonicalReference": "@interaqt/shared!Klass:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<{\n    handle: {\n        type: \"function\";\n        collection: false;\n        required: true;\n    };\n}>"
+            }
+          ],
+          "fileUrlPath": "IncrementalComputation.ts",
+          "isReadonly": true,
+          "releaseTag": "Public",
+          "name": "MapRecordMutationToRecord",
+          "variableTypeTokenRange": {
+            "startIndex": 1,
+            "endIndex": 3
+          }
+        },
+        {
           "kind": "TypeAlias",
           "canonicalReference": "@interaqt/shared!OptionalProps:type",
           "docComment": "",

@@ -392,6 +392,17 @@ export const Any = createClass({
     }
 })
 
+export const MapRecordMutationToRecord = createClass({
+    name: 'MapRecordMutationToRecord',
+    public: {
+        handle: {
+            type: 'function',
+            collection: false,
+            required: true
+        }
+    }
+})
+
 
 // TODO Property 支持的 只增不减的 max/min/topN/
 //  TODO 支持 filter？就是 关系上 comptedData
