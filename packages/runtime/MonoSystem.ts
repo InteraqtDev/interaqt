@@ -113,12 +113,6 @@ class MonoStorage implements Storage{
     }
 }
 
-type EventQuery = {
-    interactionId?: string,
-    activityId?: string,
-}
-
-let id = 0
 
 
 // state 等系统配置数据的实体化
