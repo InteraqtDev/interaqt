@@ -28,12 +28,13 @@ export class Controller {
         public interactions: KlassInstance<typeof Interaction, false>[],
         public states: KlassInstance<typeof Property, false>[] = [])
     {
-        // FIXME 因为 public 里面的会在 constructor 后面才初始化，所以AcitivityCall 里面读不到 this.system
+        // CAUTION 因为 public 里面的会在 constructor 后面才初始化，所以ActivityCall 里面读不到 this.system
         this.system = system
         activities.forEach(activity => {
             const activityCall = new ActivityCall(activity, this)
             this.activityCalls.set(activity.uuid, activityCall)
             if (activity.name) {
+                assert(!this.activityCallsByName.has(activity.name), `activity name ${activity.name} is duplicated`)
                 this.activityCallsByName.set(activity.name, activityCall)
             }
         })
@@ -42,6 +43,7 @@ export class Controller {
             const interactionCall = new InteractionCall(interaction, this)
             this.interactionCalls.set(interaction.uuid, interactionCall)
             if (interaction.name) {
+                assert(!this.interactionCallsByName.has(interaction.name), `interaction name ${interaction.name} is duplicated`)
                 this.interactionCallsByName.set(interaction.name, interactionCall)
             }
         })

@@ -9,7 +9,7 @@ import {
     Entity,
     Every,
     Interaction,
-    MapActivityToEntity,
+    MapActivityToRecord,
     MapInteractionToProperty,
     MapInteractionToPropertyItem,
     Payload,
@@ -258,7 +258,7 @@ const friendRelation = Relation.create({
 
 
 
-export const mapFriendActivityToRequest = MapActivityToEntity.create({
+export const mapFriendActivityToRequest = MapActivityToRecord.create({
     sourceActivity: createFriendRelationActivity,
     triggerInteraction: [sendInteraction, approveInteraction, rejectInteraction],
     handle:function map(stack){
@@ -311,7 +311,7 @@ const receivedRequestRelation = Relation.create({
             items: [
                 MapInteractionToPropertyItem.create({
                     interaction: approveInteraction,
-                    value: 'approved',
+                    handle: () => 'approved',
                     computeSource: async function(this:  Controller, event, activityId) {
                         const { BoolExp } = this.globals
                         const match = BoolExp.atom({
@@ -328,7 +328,7 @@ const receivedRequestRelation = Relation.create({
                 }),
                 MapInteractionToPropertyItem.create({
                     interaction: rejectInteraction,
-                    value: 'rejected',
+                    handle: () => 'rejected',
                     computeSource: async function(this:  Controller,event, activityId)  {
                         const { BoolExp } = this.globals
                         const match = BoolExp.atom({

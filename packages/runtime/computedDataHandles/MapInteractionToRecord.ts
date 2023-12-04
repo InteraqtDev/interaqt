@@ -3,7 +3,7 @@ import {InteractionEvent, InteractionEventArgs} from "../types/interaction";
 import {Controller} from "../Controller.js";
 import { getInteractions, Interaction} from "@interaqt/shared";
 import {Entity, Property} from "@interaqt/shared";
-import {ComputedData, MapActivityToEntity, MapInteractionToRecord} from '@interaqt/shared'
+import {ComputedData, MapActivityToRecord, MapInteractionToRecord} from '@interaqt/shared'
 import {MatchExp} from '@interaqt/storage'
 import {ComputedDataHandle, DataContext} from "./ComputedDataHandle.js";
 import {RecordMutationEvent} from "../System.js";

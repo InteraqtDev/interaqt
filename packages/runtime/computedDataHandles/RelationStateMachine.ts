@@ -2,7 +2,7 @@ import {KlassInstance, Klass} from "@interaqt/shared";
 import {Entity, Relation} from "@interaqt/shared";
 import {
     ComputedData,
-    MapActivityToEntity,
+    MapActivityToRecord,
     RelationStateMachine,
     RelationStateTransfer
 } from '@interaqt/shared'

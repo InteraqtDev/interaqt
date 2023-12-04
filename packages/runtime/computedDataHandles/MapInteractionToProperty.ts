@@ -11,7 +11,7 @@ export class MapInteractionToPropertyHandle extends ComputedDataHandle {
     data!: KlassInstance<typeof Entity, false>
     mapItems!: Map<KlassInstance<typeof Interaction, false>, {
         computeSource: (data: InteractionEventArgs, activityId?: string) => any
-        value: any
+        handle: (data: InteractionEventArgs, activityId?: string) => any
     }>
     // FIXME 之后 从 listen interaction 也改成 监听 record 事件??
     computeEffect(mutationEvent: RecordMutationEvent, mutationEvents: RecordMutationEvent[]): any {
@@ -19,10 +19,9 @@ export class MapInteractionToPropertyHandle extends ComputedDataHandle {
     }
     parseComputedData() {
         const computedData = this.computedData as unknown as  KlassInstance<typeof MapInteractionToProperty, false>
-        this.mapItems = new Map(computedData.items.map(({interaction, value, computeSource}) => {
+        this.mapItems = new Map(computedData.items.map(({interaction, handle, computeSource}) => {
             return [interaction, {
-                value,
-                // computeSource: this.parseMapItemFunction(computeSource!)
+                handle,
                 computeSource: (computeSource as (data: InteractionEventArgs, activityId?: string) => any).bind(this.controller)
             }]
         }))
@@ -32,16 +31,10 @@ export class MapInteractionToPropertyHandle extends ComputedDataHandle {
             this.controller.listen(interaction, (event, activityId) => this.onCallInteraction(interaction, event, activityId))
         })
     }
-    parseMapItemFunction(content: string) {
-        const body = new Function('sourceData', 'activityId',  `return (${content})(sourceData, activityId)`)
-
-        return (sourceData: InteractionEventArgs, activityId?: string) => {
-            return body.call(this.controller, sourceData, activityId)
-        }
-    }
     onCallInteraction = async (interaction: KlassInstance<typeof Interaction, false>, interactionEventArgs: InteractionEventArgs, activityId?: string) => {
-        const {value, computeSource} = this.mapItems.get(interaction)!
+        const {handle, computeSource} = this.mapItems.get(interaction)!
         const source = await computeSource(interactionEventArgs, activityId)
+        const value = await handle.call(this.controller, interactionEventArgs, activityId)
         if (source) {
             const sources = Array.isArray(source) ? source : [source]
             for (const source of sources) {

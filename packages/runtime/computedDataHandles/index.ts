@@ -1,4 +1,4 @@
-import './MapActivityToEntity.js'
+import './MapActivityToRecord'
 import './MapInteractionToRecord.js'
 import './MapInteractionToProperty.js'
 import './RelationStateMachine.js'

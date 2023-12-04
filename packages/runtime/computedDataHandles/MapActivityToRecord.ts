@@ -3,7 +3,7 @@ import {InteractionEvent, InteractionEventArgs} from "../types/interaction";
 import {Controller} from "../Controller.js";
 import { getInteractions, Interaction} from "@interaqt/shared";
 import {Entity, Property} from "@interaqt/shared";
-import {ComputedData, MapActivityToEntity} from '@interaqt/shared'
+import {ComputedData, MapActivityToRecord} from '@interaqt/shared'
 import {MatchExp} from '@interaqt/storage'
 import {ComputedDataHandle, DataContext} from "./ComputedDataHandle.js";
 import {RecordMutationEvent} from "../System.js";
@@ -14,7 +14,7 @@ export type MapSourceDataType = {
     data: InteractionEventArgs
 }
 
-export class MapActivityToEntityHandle extends ComputedDataHandle {
+export class MapActivityToRecordHandle extends ComputedDataHandle {
     data!: KlassInstance<typeof Entity, false>
     mapItem!: (data: MapSourceDataType[]) => any
     interactionsToListen: KlassInstance<typeof Interaction, false>[] = []
@@ -26,7 +26,7 @@ export class MapActivityToEntityHandle extends ComputedDataHandle {
 
     }
     parseComputedData() {
-        const computedData = this.computedData as unknown as  KlassInstance<typeof MapActivityToEntity, false>
+        const computedData = this.computedData as unknown as  KlassInstance<typeof MapActivityToRecord, false>
         this.interactionsToListen = computedData.triggerInteraction || getInteractions(computedData.sourceActivity!)
 
         this.data = this.dataContext.id as KlassInstance<typeof Entity, false>
@@ -118,4 +118,4 @@ export class MapActivityToEntityHandle extends ComputedDataHandle {
     }
 }
 
-ComputedDataHandle.Handles.set(MapActivityToEntity, MapActivityToEntityHandle)
+ComputedDataHandle.Handles.set(MapActivityToRecord, MapActivityToRecordHandle)

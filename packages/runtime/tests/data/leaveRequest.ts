@@ -67,11 +67,11 @@ const sendRequestRelation = Relation.create({
     computedData:  MapInteractionToRecord.create({
         sourceInteraction: sendInteraction,
         handle:function map(event: any){
-return {
-    target: event.user,
-    source: event.payload.request,
-}
-}
+            return {
+                target: event.user,
+                source: event.payload.request,
+            }
+        }
     }),
 })
 
@@ -276,7 +276,7 @@ const reviewerRelation = Relation.create({
             items: [
                 MapInteractionToPropertyItem.create({
                     interaction: approveInteraction,
-                    value: 'approved',
+                    handle: () => 'approved',
                     computeSource: function(event) {
                         return {
                             "source.id": event.payload.request.id,
@@ -286,7 +286,7 @@ const reviewerRelation = Relation.create({
                 }),
                 MapInteractionToPropertyItem.create({
                     interaction: rejectInteraction,
-                    value: 'rejected',
+                    handle: () => 'rejected',
                     computeSource: function(event)  {
                         return {
                             "source.id": event.payload.request.id,
