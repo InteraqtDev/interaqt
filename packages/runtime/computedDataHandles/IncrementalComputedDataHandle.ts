@@ -1,11 +1,12 @@
 import {RecordMutationEvent} from "../System.js";
 import {MatchExp} from '@interaqt/storage'
 import {ComputedDataHandle} from "./ComputedDataHandle.js";
+import {assert} from "../util";
 
 export type StatePatch = {
     type: 'create' | 'update' | 'delete',
     value: any,
-    affectedId: string
+    affectedId?: string
 }
 
 export class IncrementalComputedDataHandle extends ComputedDataHandle {
@@ -49,7 +50,8 @@ export class IncrementalComputedDataHandle extends ComputedDataHandle {
             }
         } else if(this.computedDataType === 'entity' || this.computedDataType === 'relation'){
             // 不应该取原来的值，只能从事件中去做增量计算。这里可能生成很多 patch 操作
-            const statePatches = await this.computePatch(true, undefined, mutationEvent, mutationEvents) as StatePatch[]
+            const patchResult = await this.computePatch(true, undefined, mutationEvent, mutationEvents) as StatePatch[]
+            const statePatches = patchResult ? (Array.isArray(patchResult) ? patchResult : [patchResult]) : []
             for(let statePatch of statePatches){
                 await this.patchState(statePatch)
             }
@@ -62,22 +64,34 @@ export class IncrementalComputedDataHandle extends ComputedDataHandle {
         if (this.computedDataType === 'global') {
             // 更新全局 state
             await this.controller.system.storage.set('state', this.dataContext.id as string, statePatch.value)
-        } else {
+        } else if (this.computedDataType === 'property'){
             // 其他都是对 record 的操作
             const newData = {
                 [this.propertyName!]: statePatch.value
             }
+            assert(statePatch.affectedId !== undefined, 'affectedId must be defined')
+            const match = MatchExp.atom({key: 'id', value: ['=', statePatch.affectedId]})
+
             if (statePatch.type === 'create') {
-                await this.controller.system.storage.create(this.recordName!, newData)
+                await this.controller.system.storage.update(this.recordName!, match, newData)
             } else if (statePatch.type === 'update') {
-                const match = MatchExp.atom({key: 'id', value: ['=', statePatch.affectedId]})
                 // if (newData.approved_total_count!==undefined) debugger
                 await this.controller.system.storage.update(this.recordName!, match, newData)
             } else if (statePatch.type === 'delete') {
+                // 一个 property 的 incremental 计算，不会删除 record
+                await this.controller.system.storage.update(this.recordName!, match, {[this.propertyName!]: null})
+            }
+        } else {
+            // entity/relation
+            if (statePatch.type === 'create') {
+                await this.controller.system.storage.create(this.recordName!, statePatch.value)
+            } else if (statePatch.type === 'update') {
+                const match = MatchExp.atom({key: 'id', value: ['=', statePatch.affectedId]})
+                await this.controller.system.storage.update(this.recordName!, match, statePatch.value)
+            }else if(statePatch.type === 'delete'){
                 const match = MatchExp.atom({key: 'id', value: ['=', statePatch.affectedId]})
                 await this.controller.system.storage.delete(this.recordName!, match)
             }
-
         }
     }
 }

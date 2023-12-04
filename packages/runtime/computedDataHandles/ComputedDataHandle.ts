@@ -38,6 +38,8 @@ export class ComputedDataHandle {
             this.propertyName = (this.dataContext.id as KlassInstance<typeof Property, false>).name
         } else if (this.computedDataType === 'global') {
             this.stateName = this.dataContext.id as string
+        } else if (this.computedDataType === 'entity'|| this.computedDataType === 'relation') {
+            this.recordName = (this.dataContext.id as KlassInstance<typeof Entity, false>).name
         }
 
         this.setupSchema()
