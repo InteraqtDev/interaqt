@@ -48,7 +48,6 @@ export class Controller {
             }
         })
 
-
         // 初始化 各种 computed。
         // entity 的
         entities.forEach(entity => {
@@ -133,7 +132,7 @@ export class Controller {
 
         if (callbacks) {
             for(const callback of callbacks) {
-                await callback(...args, event)
+                await callback(event, ...args)
             }
         }
     }
@@ -142,7 +141,9 @@ export class Controller {
         assert(!!interactionCall,`cannot find interaction for ${interactionId}`)
         const result = await interactionCall.call(interactionEventArgs)
         if (!result.error) {
-            await this.dispatch(interactionCall.interaction, result.event!.args)
+            const effects: any[] = []
+            await this.dispatch(interactionCall.interaction, result.event!.args, effects, undefined)
+            result.effects = effects
         } else {
             console.error(result.error)
         }
@@ -154,7 +155,9 @@ export class Controller {
         const result = await activityCall.callInteraction(activityId, interactionCallId, interactionEventArgs)
 
         if (!result.error) {
-            await this.dispatch(activityCall.uuidToInteractionCall.get(interactionCallId)!.interaction, interactionEventArgs, activityId)
+            const effects: any[] = []
+            await this.dispatch(activityCall.uuidToInteractionCall.get(interactionCallId)!.interaction, interactionEventArgs, effects, activityId)
+            result.effects = effects
         } else {
             console.error(result.error)
         }

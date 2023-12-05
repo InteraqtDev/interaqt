@@ -7,6 +7,7 @@ import {ComputedData, MapActivityToRecord, MapInteractionToRecord} from '@intera
 import {MatchExp} from '@interaqt/storage'
 import {ComputedDataHandle, DataContext} from "./ComputedDataHandle.js";
 import {RecordMutationEvent} from "../System.js";
+import {InteractionCallResponse} from "../InteractionCall";
 
 export class MapInteractionToRecordHandle extends ComputedDataHandle {
     data!: KlassInstance<typeof Entity, false>
@@ -46,17 +47,24 @@ export class MapInteractionToRecordHandle extends ComputedDataHandle {
             return body(sourceData)
         }
     }
-    onCallInteraction = async (interactionEventArgs: InteractionEventArgs) => {
+    onCallInteraction = async (interaction: any, interactionEventArgs: InteractionEventArgs, effects: InteractionCallResponse["effects"]) => {
         const newMappedItem = this.mapItem(interactionEventArgs)
         // 只有 undefined 是被认为没准备好
         if (newMappedItem !== undefined) {
             // CAUTION 注意，这里的增量计算语义是 map one interaction to one relation。所以不会有更新的情况，因为 Interaction 不会更新。
             //  如果有更复杂的 computed Relation 需求，应该用别的
+            let result
             if (this.data instanceof Entity) {
-                await this.controller.system.storage.create( this.data.name, newMappedItem)
+                result = await this.controller.system.storage.create( this.data.name, newMappedItem)
+
             } else {
-                await this.controller.system.storage.addRelationByNameById( this.data.name, newMappedItem.source.id, newMappedItem.target.id, newMappedItem)
+                result = await this.controller.system.storage.addRelationByNameById( this.data.name, newMappedItem.source.id, newMappedItem.target.id, newMappedItem)
             }
+            effects!.push({
+                type: 'create',
+                recordName: this.data.name,
+                record: result
+            })
         }
     }
 }

@@ -38,8 +38,11 @@ export class AttributeError {
 
 export type InteractionCallResponse= {
     error?: any,
+    // 获取数据的 interaction 返回的数据
     data?: any,
     event?: InteractionEvent
+    // interaction 中产生的 record create/update 等行为
+    effects? : any[]
     sideEffects?: {
         [k: string]: any
     }

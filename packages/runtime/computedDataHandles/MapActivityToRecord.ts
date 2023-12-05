@@ -8,6 +8,7 @@ import {MatchExp} from '@interaqt/storage'
 import {ComputedDataHandle, DataContext} from "./ComputedDataHandle.js";
 import {RecordMutationEvent} from "../System.js";
 import {activityEntity} from "../MonoSystem.js";
+import {InteractionCallResponse} from "../InteractionCall";
 
 export type MapSourceDataType = {
     interaction: KlassInstance<typeof Interaction, false>,
@@ -63,7 +64,7 @@ export class MapActivityToRecordHandle extends ComputedDataHandle {
             return body(sourceData)
         }
     }
-    onCallInteraction = async (interactionEventArgs: InteractionEventArgs, activityId:string) => {
+    onCallInteraction = async (interaction: any, interactionEventArgs: InteractionEventArgs, effects: InteractionCallResponse["effects"], activityId:string) => {
         // const match = MatchExp.atom({
         //     key: 'activityId',
         //     value: ['=', activityId]
@@ -98,7 +99,7 @@ export class MapActivityToRecordHandle extends ComputedDataHandle {
             if (oldData){
                 // 已经有数据了。
                 // TODO 未来有没有可能有不需要更新的情况？
-                await this.controller.system.storage.update(
+                const result = await this.controller.system.storage.update(
                     this.data!.name!,
                     MatchExp.atom({ key: 'id', value: ['=', oldData.id]}),
                     {
@@ -106,12 +107,24 @@ export class MapActivityToRecordHandle extends ComputedDataHandle {
                     },
                 )
 
+                effects!.push({
+                    type: 'update',
+                    recordName: this.data!.name!,
+                    record: result
+                })
+
             } else {
-                await this.controller.system.storage.create(this.data!.name!, {
+                const result = await this.controller.system.storage.create(this.data!.name!, {
                     ...newMappedItem,
                     activity: {
                         id: activityId
                     }
+                })
+
+                effects!.push({
+                    type: 'create',
+                    recordName: this.data!.name!,
+                    record: result
                 })
             }
         }

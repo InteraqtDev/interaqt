@@ -68,8 +68,8 @@ const sendRequestRelation = Relation.create({
         sourceInteraction: sendInteraction,
         handle:function map(event: any){
             return {
-                target: event.user,
                 source: event.payload.request,
+                target: event.user,
             }
         }
     }),

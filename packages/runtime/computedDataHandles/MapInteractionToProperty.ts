@@ -6,6 +6,7 @@ import {MapInteractionToProperty} from '@interaqt/shared'
 import {MatchExp} from '@interaqt/storage'
 import {ComputedDataHandle} from "./ComputedDataHandle.js";
 import {RecordMutationEvent} from "../System.js";
+import {InteractionCallResponse} from "../InteractionCall";
 
 export class MapInteractionToPropertyHandle extends ComputedDataHandle {
     data!: KlassInstance<typeof Entity, false>
@@ -28,10 +29,10 @@ export class MapInteractionToPropertyHandle extends ComputedDataHandle {
     }
     addEventListener() {
         this.mapItems.forEach((_, interaction)=> {
-            this.controller.listen(interaction, (event, activityId) => this.onCallInteraction(interaction, event, activityId))
+            this.controller.listen(interaction, this.onCallInteraction)
         })
     }
-    onCallInteraction = async (interaction: KlassInstance<typeof Interaction, false>, interactionEventArgs: InteractionEventArgs, activityId?: string) => {
+    onCallInteraction = async (interaction: KlassInstance<typeof Interaction, false>, interactionEventArgs: InteractionEventArgs, effects: InteractionCallResponse["effects"],activityId?: string) => {
         const {handle, computeSource} = this.mapItems.get(interaction)!
         const source = await computeSource(interactionEventArgs, activityId)
         const value = await handle.call(this.controller, interactionEventArgs, activityId)
@@ -40,6 +41,11 @@ export class MapInteractionToPropertyHandle extends ComputedDataHandle {
             for (const source of sources) {
                 const match = MatchExp.fromObject(source)
                 const result = await this.controller.system.storage.update(this.recordName!, match, {[this.propertyName!]: value})
+                effects!.push({
+                    type: 'update',
+                    recordName: this.recordName!,
+                    record: result
+                })
             }
         }
     }

@@ -12,6 +12,7 @@ import {assert} from "../util.js";
 import {EntityIdRef, RecordMutationEvent} from '../System'
 import {MatchAtom, MatchExp} from '@interaqt/storage'
 import {ComputedDataHandle, DataContext} from "./ComputedDataHandle.js";
+import {InteractionCallResponse} from "../InteractionCall";
 
 
 type SourceTargetPair = [EntityIdRef, EntityIdRef][]
@@ -50,10 +51,8 @@ export class RelationStateMachineHandle extends ComputedDataHandle {
     listenInteractions() {
         // 遍历 transfer 来监听 interaction
         this.transfers.forEach(transfer => {
-            this.controller.listen(transfer.triggerInteraction, (...arg) => {
-                // @ts-ignore
-                return this.onCallInteraction(transfer, ...arg)
-            })
+            // @ts-ignore
+            this.controller.listen(transfer.triggerInteraction, (interaction: any, ...args:any[]) => this.onCallInteraction(transfer, ...args))
         })
     }
     getSourceTargetPairs(handleFnResult: ComputeSourceResult): SourceTargetPair {
@@ -80,7 +79,7 @@ export class RelationStateMachineHandle extends ComputedDataHandle {
         return []
 
     }
-    onCallInteraction = async (transfer: KlassInstance<typeof RelationStateTransfer, false>, interactionEventArgs: InteractionEventArgs, activityId?: string) => {
+    onCallInteraction = async (transfer: KlassInstance<typeof RelationStateTransfer, false>, interactionEventArgs: InteractionEventArgs, effects: InteractionCallResponse["effects"], activityId? :string) =>{
         // CAUTION 不能房子啊 constructor 里面因为它实在 controller 里面调用的，controller 还没准备好。
         const relationName = this.controller.system.storage.getRelationName(this.data!.entity1!.name, this.data!.targetName1)
         const handleFn = this.transferHandleFn!.get(transfer)!
@@ -122,12 +121,21 @@ export class RelationStateMachineHandle extends ComputedDataHandle {
 
                         if(!nextState.hasRelation) {
                             // 转移成删除
-
-                            await this.controller.system.storage.removeRelationByName(relationName, MatchExp.atom(matchExp))
+                            const result = await this.controller.system.storage.removeRelationByName(relationName, MatchExp.atom(matchExp))
+                            effects!.push({
+                                type: 'delete',
+                                recordName:relationName,
+                                record: result
+                            })
                         } else {
                             // TODO 除了 fixedProperties 还有 propertyHandle 来计算 动态的 property
                             const nextAttributes = Object.fromEntries(nextState.fixedProperties?.map(p => ([p.name, p.value])) || [])
-                            await this.controller.system.storage.updateRelationByName(relationName, MatchExp.atom(matchExp), nextAttributes)
+                            const result = await this.controller.system.storage.updateRelationByName(relationName, MatchExp.atom(matchExp), nextAttributes)
+                            effects!.push({
+                                type: 'update',
+                                recordName: relationName,
+                                record: result
+                            })
                         }
                     }
 
@@ -138,8 +146,14 @@ export class RelationStateMachineHandle extends ComputedDataHandle {
                         // 没有数据才说明匹配
                         // 转移 变成有
                         const nextAttributes = Object.fromEntries(nextState.fixedProperties?.map(p => ([p.name, p.value])) || [])
-                        await this.controller.system.storage.addRelationByNameById(relationName, sourceRef.id, targetRef.id, nextAttributes)
+                        const result = await this.controller.system.storage.addRelationByNameById(relationName, sourceRef.id, targetRef.id, nextAttributes)
+                        effects!.push({
+                            type: 'create',
+                            recordName: relationName,
+                            record: result
+                        })
                     } else {
+                        // TODO?
                     }
 
 
