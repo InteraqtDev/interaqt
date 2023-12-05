@@ -1,4 +1,4 @@
-import {Entity, Relation} from "@interaqt/shared";
+import {Entity, Property, Relation} from "@interaqt/shared";
 import {KlassInstance} from "@interaqt/shared";
 import {LinkMapItem, MapData, RecordAttribute, RecordMapItem, ValueAttribute} from "./EntityToTableMap.js";
 import {assert} from "../utils.js";
@@ -105,7 +105,7 @@ export class DBSetup {
 
 
     createRecord(entity: KlassInstance<typeof Entity, false>|KlassInstance<typeof Relation, false>, isRelation? :boolean) {
-        const attributes: {[k:string]: Omit<ValueAttribute, 'field'>} = Object.fromEntries(entity.properties!.map(property => [
+        const attributes: {[k:string]: Omit<ValueAttribute, 'field'>} = Object.fromEntries(entity.properties!.map((property: KlassInstance<typeof Property, false>) => [
             property.name,
             {
                 type: property.type,
