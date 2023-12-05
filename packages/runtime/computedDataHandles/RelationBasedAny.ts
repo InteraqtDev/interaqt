@@ -7,7 +7,7 @@ import {RelationBasedAny, RelationCount} from "@interaqt/shared";
 import {RecordMutationEvent} from "../System.js";
 
 export class RelationBasedAnyHandle extends ComputedDataHandle {
-    matchCountField: string = `${this.propertyName}_match_count`
+    matchCountField!: string
     setupSchema() {
         const computedData = this.computedData as KlassInstance<typeof RelationBasedAny, false>
         const matchCountField = `${this.propertyName}_match_count`
@@ -51,7 +51,7 @@ export class RelationBasedAnyHandle extends ComputedDataHandle {
 
     async isMatchCountMoreThan1(recordId: string) {
         const match = MatchExp.atom({key: 'id', value: ['=', recordId]})
-        const record = await this.controller.system.storage.findOne(this.recordName!, match, undefined, ['*'])!
+        const record = await this.controller.system.storage.findOne(this.recordName!, match, undefined, ['*'])
         return record[this.matchCountField] > 0
     }
 }
