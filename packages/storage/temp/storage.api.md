@@ -143,10 +143,10 @@ export type AttributeQueryDataRecordItem = [string, RecordQueryData, boolean?];
 // @public (undocumented)
 export type Database = {
     scheme: (sql: string, name?: string) => Promise<any>;
-    query: <T extends any>(sql: string, name?: string) => Promise<T[]>;
-    delete: <T extends any>(sql: string, name?: string) => Promise<T[]>;
-    insert: (sql: string, name?: string) => Promise<EntityIdRef>;
-    update: (sql: string, idField?: string, name?: string) => Promise<EntityIdRef[]>;
+    query: <T extends any>(sql: string, values: any[], name?: string) => Promise<T[]>;
+    delete: <T extends any>(sql: string, where: any[], name?: string) => Promise<T[]>;
+    insert: (sql: string, values: any[], name?: string) => Promise<EntityIdRef>;
+    update: (sql: string, values: any[], idField?: string, name?: string) => Promise<EntityIdRef[]>;
     getAutoId: (recordName: string) => Promise<string>;
 };
 
@@ -295,6 +295,7 @@ export type FieldMatchAtom = MatchAtom & {
     isInnerQuery?: boolean;
     fieldName?: [string, string];
     fieldValue?: string;
+    fieldParams?: any[];
     namePath?: string[];
     isFunctionMatch?: boolean;
 };
@@ -432,7 +433,7 @@ export class MatchExp {
     // (undocumented)
     getFinalFieldName(matchAttributePath: string[]): [string, string];
     // (undocumented)
-    getFinalFieldValue(isReferenceValue: boolean, value: [string, any]): string | undefined;
+    getFinalFieldValue(isReferenceValue: boolean, value: [string, any]): [string, any[]];
     // (undocumented)
     getReferenceFieldValue(valueStr: string): string;
     // (undocumented)
@@ -667,9 +668,9 @@ export class RecordQueryAgent {
     // (undocumented)
     buildSelectClause(queryFields: ReturnType<AttributeQuery["getValueAndXToOneRecordFields"]>, prefix?: string): string;
     // (undocumented)
-    buildWhereClause(fieldMatchExp: BoolExp<FieldMatchAtom> | null, prefix?: string): string;
+    buildWhereClause(fieldMatchExp: BoolExp<FieldMatchAtom> | null, prefix?: string): [string, any[]];
     // (undocumented)
-    buildXToOneFindQuery(recordQuery: RecordQuery, prefix?: string): string;
+    buildXToOneFindQuery(recordQuery: RecordQuery, prefix?: string): [string, any[]];
     // (undocumented)
     createRecord(newEntityData: NewRecordData, events?: MutationEvent_2[]): Promise<EntityIdRef>;
     // (undocumented)
@@ -711,7 +712,7 @@ export class RecordQueryAgent {
     // (undocumented)
     parseMatchExpressionValue(entityName: string, fieldMatchExp: BoolExp<FieldMatchAtom> | null, contextRootEntity?: string): BoolExp<FieldMatchAtom> | null;
     // (undocumented)
-    prepareFieldValue(value: any): string;
+    prepareFieldValue(value: any): any;
     // (undocumented)
     preprocessSameRowData(newEntityData: NewRecordData, isUpdate?: boolean, events?: MutationEvent_2[], oldRecord?: Record_2): Promise<NewRecordData>;
     // (undocumented)

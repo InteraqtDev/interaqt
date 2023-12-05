@@ -71,7 +71,7 @@ class RecordQueryRef {
 export class RecordQueryAgent {
     constructor(public map: EntityToTableMap, public database: Database) {}
     // 有 prefix 说明是比人的子查询
-    buildXToOneFindQuery(recordQuery: RecordQuery, prefix='') {
+    buildXToOneFindQuery(recordQuery: RecordQuery, prefix=''): [string, any[]] {
         // 从所有条件里面构建出 join clause
         const fieldQueryTree = recordQuery.attributeQuery!.xToOneQueryTree
 
@@ -81,21 +81,25 @@ export class RecordQueryAgent {
 
         const fieldMatchExp = recordQuery.matchExpression.buildFieldMatchExpression()
 
-        return `
+        const [whereClause, params] = this.buildWhereClause(this.parseMatchExpressionValue(recordQuery.recordName, fieldMatchExp , recordQuery.contextRootEntity),
+            prefix)
+
+
+        // FIXME 添加 modifier
+
+        return [`
 SELECT ${prefix ? '' : 'DISTINCT'}
 ${this.buildSelectClause(recordQuery.attributeQuery.getValueAndXToOneRecordFields(), prefix)}
 FROM
 ${this.buildFromClause(recordQuery.recordName, prefix)}
 ${this.buildJoinClause(joinTables, prefix)}
-${fieldMatchExp ? `
+
 WHERE
-${this.buildWhereClause( 
-    this.parseMatchExpressionValue(recordQuery.recordName, fieldMatchExp , recordQuery.contextRootEntity),
-    prefix
-)}
-` : ''}   
-`
-        // FIXME 添加 modifier
+${whereClause}
+`,
+  params ]
+
+
     }
     structureRawReturns(rawReturns: {[k:string]: any}[]) {
         return rawReturns.map(rawReturn => {
@@ -145,7 +149,8 @@ ${this.buildWhereClause(
 
         // findRecords 的一个 join 语句里面只能一次性搞定 x:1 的关联实体，以及关系上的 x:1 关联实体。
         // 1. 这里只通过合表或者 join  处理了 x:1 的关联查询。x:n 的查询是通过二次查询获取的。
-        const records = this.structureRawReturns(await this.database.query(this.buildXToOneFindQuery(entityQuery, ''), queryName)) as any[]
+        const [querySQL, params] = this.buildXToOneFindQuery(entityQuery, '')
+        const records = this.structureRawReturns(await this.database.query(querySQL, params, queryName)) as any[]
 
 
         // 如果当前的 query 有 label，那么下面任何遍历 record 的地方都要 Push stack。
@@ -446,20 +451,37 @@ ${this.buildWhereClause(
 `
         }).join('\n')
     }
-    buildWhereClause(fieldMatchExp: BoolExp<FieldMatchAtom>|null, prefix=''): string {
-        if (!fieldMatchExp) return '1=1'
+    buildWhereClause(fieldMatchExp: BoolExp<FieldMatchAtom>|null, prefix=''): [string, any[]] {
+        let sql = ``
+        const values = []
+        if (!fieldMatchExp) return ['1=?', [1]]
 
         if (fieldMatchExp.isAtom()) {
-            return fieldMatchExp.data.isInnerQuery ? fieldMatchExp.data.fieldValue! : `${this.withPrefix(prefix)}${fieldMatchExp.data.fieldName![0]}.${fieldMatchExp.data.fieldName![1]} ${fieldMatchExp.data.fieldValue}`
+            if (fieldMatchExp.data.isInnerQuery) {
+                sql = fieldMatchExp.data.fieldValue!
+                values.push(...fieldMatchExp.data.fieldParams!)
+            } else {
+                sql = `${this.withPrefix(prefix)}${fieldMatchExp.data.fieldName![0]}.${fieldMatchExp.data.fieldName![1]} ${fieldMatchExp.data.fieldValue}`
+                values.push(...fieldMatchExp.data.fieldParams!)
+            }
         } else {
             if (fieldMatchExp.isAnd()) {
-                return `(${this.buildWhereClause(fieldMatchExp.left, prefix)} AND ${this.buildWhereClause(fieldMatchExp.right, prefix)})`
+                const [leftSql, leftValues] = this.buildWhereClause(fieldMatchExp.left, prefix)
+                const [rightSql, rightValues] = this.buildWhereClause(fieldMatchExp.right, prefix)
+                sql =  `(${leftSql} AND ${rightSql})`
+                values.push(...leftValues, ...rightValues)
             } else  if (fieldMatchExp.isOr()) {
-                return `(${this.buildWhereClause(fieldMatchExp.left, prefix)} OR ${this.buildWhereClause(fieldMatchExp.right, prefix)})`
+                const [leftSql, leftValues] = this.buildWhereClause(fieldMatchExp.left, prefix)
+                const [rightSql, rightValues] = this.buildWhereClause(fieldMatchExp.right, prefix)
+                sql =  `(${leftSql} OR ${rightSql})`
+                values.push(...leftValues, ...rightValues)
             } else {
-                return `NOT (${this.buildWhereClause(fieldMatchExp.left, prefix)})`
+                const [leftSql, leftValues] = this.buildWhereClause(fieldMatchExp.left, prefix)
+                sql =  `NOT (${leftSql})`
+                values.push(...leftValues)
             }
         }
+        return [sql, values]
     }
 
     // 把 match 中的 exist 创建成子 sql
@@ -492,14 +514,17 @@ ${this.buildWhereClause(
                 contextRootEntity||entityName
             )
 
+            const [innerQuerySQL, innerParams] = this.buildXToOneFindQuery(existEntityQuery, currentAlias)
+
             return {
                 ...exp.data,
                 isInnerQuery: true,
                 fieldValue: `
 EXISTS (
-${this.buildXToOneFindQuery(existEntityQuery, currentAlias)}
+${innerQuerySQL}
 )
-`
+`,
+                fieldParams: innerParams
             }
         })
     }
@@ -741,13 +766,14 @@ ${this.buildXToOneFindQuery(existEntityQuery, currentAlias)}
 INSERT INTO ${this.map.getRecordTable(newEntityData.recordName)}
 (${sameRowNewFieldAndValue.map(f => f.field).join(',')})
 VALUES
-(${sameRowNewFieldAndValue.map(f => this.prepareFieldValue(f.value)).join(',')}) 
-`) as EntityIdRef
+(${sameRowNewFieldAndValue.map(f => '?').join(',')}) 
+`, sameRowNewFieldAndValue.map(f => this.prepareFieldValue(f.value))) as EntityIdRef
 
         return Object.assign(result,newEntityDataWithIdsWithFlashOutRecords.getData())
     }
     prepareFieldValue(value:any) {
-        return value === undefined ? 'null' : JSON.stringify(value)
+        // return value === undefined ? 'null' : JSON.stringify(value)
+        return value
     }
 
 
@@ -885,10 +911,10 @@ VALUES
 UPDATE ${this.map.getRecordTable(entityName)}
 SET
 ${columnAndValue.map(({field, value}) => `
-${field} = ${value}
+${field} = ?
 `).join(',')}
-WHERE ${idField} = (${JSON.stringify(idRef.id)})
-`, idField)
+WHERE ${idField} = (?)
+`, [...columnAndValue.map(({field, value}) => value), idRef.id], idField)
         }
         // 注意这里，使用要返回匹配的类，虽然可能没有更新数据。这样才能保证外部的逻辑比较一致。
         return idRef
@@ -922,7 +948,8 @@ WHERE ${idField} = (${JSON.stringify(idRef.id)})
             {
                 field,
                 /// TODO value 要考虑引用自身或者 related entity 其他 field 的情况？例如 age+5
-                value: JSON.stringify(value)
+                // value: JSON.stringify(value)
+                value: value
             }
         ))
 
@@ -1077,19 +1104,19 @@ WHERE ${idField} = (${JSON.stringify(idRef.id)})
                 if (hasSameRowData) {
                     // 存在同行 record，只能用 update
                     const fields = recordInfo.sameRowFields
-                    await this.database.delete(`
+                    await this.database.update(`
 UPDATE ${recordInfo.table}
-SET ${fields.map(field => `${field} = NULL`).join(',')}
-WHERE ${recordInfo.idField} IN (${records.map(({id}) => JSON.stringify(id)).join(',')})
-`, `use update to delete ${recordName} because of sameRowData`)
+SET ${fields.map(field => `${field} = ?`).join(',')}
+WHERE ${recordInfo.idField} IN (${records.map(({id}) => '?').join(',')})
+`, [...fields.map(field => null), ...records.map(({id}) =>id)], recordInfo.idField,`use update to delete ${recordName} because of sameRowData`)
 
                 } else {
                     // 不存在同行数据 record ，可以 delete row
 
                     await this.database.delete(`
 DELETE FROM ${recordInfo.table}
-WHERE ${recordInfo.idField} IN (${records.map(({id}) => JSON.stringify(id)).join(',')})
-`, `delete record ${recordInfo.name} as row`)
+WHERE ${recordInfo.idField} IN (${records.map(({id}) => '?').join(',')})
+`, [...records.map(({id}) => id)], `delete record ${recordInfo.name} as row`)
                 }
             }
             events?.push({

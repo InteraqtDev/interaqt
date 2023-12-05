@@ -73,9 +73,9 @@ export const ROW_ID_ATTR = '_rowId'
 export type Database = {
     open: () => Promise<any>
     scheme: (sql:string, name?:string) => Promise<any>
-    query: <T extends any>(sql: string, name?:string) => Promise<T[]>
-    delete: <T extends any>(sql: string, name?:string) => Promise<T[]>
-    insert: (sql: string, name?:string) => Promise<EntityIdRef>
-    update: (sql: string, idField?: string, name?:string) => Promise<EntityIdRef[]>
+    query: <T extends any>(sql: string, values: any[],name?:string) => Promise<T[]>
+    delete: <T extends any>(sql: string, where: any[], name?:string) => Promise<T[]>
+    insert: (sql: string, values: any[], name?:string) => Promise<EntityIdRef>
+    update: (sql: string, values: any[], idField?: string, name?:string) => Promise<EntityIdRef[]>
     getAutoId: (recordName: string) => Promise<string>
 }

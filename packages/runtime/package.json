@@ -1,6 +1,7 @@
 {
   "name": "@interaqt/runtime",
   "devDependencies": {
+    "@types/better-sqlite3": "^7.6.8",
     "rimraf": "^5.0.5",
     "typescript": "^5.2.2",
     "vite-tsconfig-paths": "^4.2.1",
@@ -24,6 +25,7 @@
     "@types/connect": "^3.4.38",
     "@types/cors": "^2.8.17",
     "acorn": "^8.10.0",
+    "better-sqlite3": "^9.2.2",
     "cors": "^2.8.5",
     "fastify": "^4.24.3",
     "promised-sqlite3": "^2.1.0",

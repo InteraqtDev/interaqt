@@ -400,7 +400,7 @@ export const USER_ENTITY = "User";
 
 // Warnings were encountered during analysis:
 //
-// Controller.ts:164:8 - (ae-forgotten-export) The symbol "ActivitySeqStateData" needs to be exported by the entry point index.d.ts
+// Controller.ts:179:8 - (ae-forgotten-export) The symbol "ActivitySeqStateData" needs to be exported by the entry point index.d.ts
 // server.ts:27:5 - (ae-forgotten-export) The symbol "EventUser" needs to be exported by the entry point index.d.ts
 
 // (No @packageDocumentation comment for this package)

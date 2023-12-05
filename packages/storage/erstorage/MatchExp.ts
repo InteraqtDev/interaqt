@@ -11,6 +11,7 @@ export type FieldMatchAtom = MatchAtom & {
     //  value 类型的
     fieldName?: [string, string],
     fieldValue?: string,
+    fieldParams? :any[]
     // entity 类型的
     namePath?: string[],
     isFunctionMatch?: boolean,
@@ -103,22 +104,31 @@ export class MatchExp {
         return `${tableAlias}.${rawFieldName}`
     }
 
-    getFinalFieldValue(isReferenceValue: boolean, value: [string, any]) {
-        let fieldValue
-        const simpleOp = ['=', '>', '<', '<=', '>=', 'like', 'not']
+    getFinalFieldValue(isReferenceValue: boolean, value: [string, any]): [string, any[]] {
+        let fieldValue =''
+        const fieldParams:any[] = []
+        const simpleOp = ['=', '>', '<', '<=', '>=', 'like']
 
-        if (simpleOp.includes(value[0])) {
-            fieldValue = `${value[0]} ${isReferenceValue ? this.getReferenceFieldValue(value[1]) : JSON.stringify(value[1])}`
+        if (simpleOp.includes(value[0]) || (value[0] === 'not' && value[1] !== null)) {
+            fieldValue = `${value[0]} ?`
+            fieldParams.push(isReferenceValue ? this.getReferenceFieldValue(value[1]) : value[1])
+        } else if((value[0] === 'not' && value[1] === null)) {
+            fieldValue = `not null`
         } else if (value[0].toLowerCase() === 'in') {
             assert(!isReferenceValue, 'reference value cannot use IN to match')
-            fieldValue = `IN (${value[1].map((x: any) => JSON.stringify(x)).join(',')})`
+            fieldValue = `IN (${value[1].map((x: any) => '?').join(',')})`
+            fieldParams.push(...value[1])
         } else if (value[0].toLowerCase() === 'between') {
-            fieldValue = `BETWEEN ${isReferenceValue ? this.getReferenceFieldValue(value[1][0]) : JSON.stringify(value[1][0])} AND ${isReferenceValue ? this.getReferenceFieldValue(value[1][1]) : JSON.stringify(value[1][1])}]`
+            fieldValue = `BETWEEN ? AND ?`
+            fieldParams.push(
+                isReferenceValue ? this.getReferenceFieldValue(value[1][0]) : value[1][0],
+                isReferenceValue ? this.getReferenceFieldValue(value[1][1]) : value[1][1]
+            )
         } else {
             assert(false, `unknown value expression ${JSON.stringify(value)}`)
         }
 
-        return fieldValue
+        return [fieldValue, fieldParams]
     }
 
     buildFieldMatchExpression(): BoolExp<FieldMatchAtom> | null {
@@ -147,13 +157,14 @@ export class MatchExp {
                 // CAUTION 路径中只可能有一个 n:n symmetric 关系。因为路径中有多个的在语义逻辑上就不正确。
                 //  有一个的情况还是用在 findRelatedRecords 的时候才有意义。因为它会通过 id 限定关系，而即使是 n:n 的关系，任意两个实体中只会有一个关系数据。所以这个时候能找到唯一的数据，是有意义的。
 
-                const fieldValue = this.getFinalFieldValue(exp.data.isReferenceValue!, exp.data.value)
+                const [fieldValue, fieldParams] = this.getFinalFieldValue(exp.data.isReferenceValue!, exp.data.value)
 
                 if (!symmetricPaths) {
                     return {
                         ...exp.data,
                         fieldName: this.getFinalFieldName(matchAttributePath),
-                        fieldValue
+                        fieldValue,
+                        fieldParams
                     }
                 }
 
@@ -161,11 +172,13 @@ export class MatchExp {
                 return BoolExp.atom<FieldMatchAtom>({
                     ...exp.data,
                     fieldName: this.getFinalFieldName(sourcePath!),
-                    fieldValue
+                    fieldValue,
+                    fieldParams
                 }).or({
                     ...exp.data,
                     fieldName: this.getFinalFieldName(targetPath!),
-                    fieldValue
+                    fieldValue,
+                    fieldParams
                 })
 
             } else {

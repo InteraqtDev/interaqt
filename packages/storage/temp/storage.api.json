@@ -2308,7 +2308,7 @@
             },
             {
               "kind": "Content",
-              "text": "<any>;\n    query: <T extends any>(sql: string, name?: string) => "
+              "text": "<any>;\n    query: <T extends any>(sql: string, values: any[], name?: string) => "
             },
             {
               "kind": "Reference",
@@ -2317,7 +2317,7 @@
             },
             {
               "kind": "Content",
-              "text": "<T[]>;\n    delete: <T extends any>(sql: string, name?: string) => "
+              "text": "<T[]>;\n    delete: <T extends any>(sql: string, where: any[], name?: string) => "
             },
             {
               "kind": "Reference",
@@ -2326,7 +2326,7 @@
             },
             {
               "kind": "Content",
-              "text": "<T[]>;\n    insert: (sql: string, name?: string) => "
+              "text": "<T[]>;\n    insert: (sql: string, values: any[], name?: string) => "
             },
             {
               "kind": "Reference",
@@ -2344,7 +2344,7 @@
             },
             {
               "kind": "Content",
-              "text": ">;\n    update: (sql: string, idField?: string, name?: string) => "
+              "text": ">;\n    update: (sql: string, values: any[], idField?: string, name?: string) => "
             },
             {
               "kind": "Reference",
@@ -6482,7 +6482,7 @@
             },
             {
               "kind": "Content",
-              "text": " & {\n    isInnerQuery?: boolean;\n    fieldName?: [string, string];\n    fieldValue?: string;\n    namePath?: string[];\n    isFunctionMatch?: boolean;\n}"
+              "text": " & {\n    isInnerQuery?: boolean;\n    fieldName?: [string, string];\n    fieldValue?: string;\n    fieldParams?: any[];\n    namePath?: string[];\n    isFunctionMatch?: boolean;\n}"
             },
             {
               "kind": "Content",
@@ -8381,7 +8381,7 @@
                 },
                 {
                   "kind": "Content",
-                  "text": "string | undefined"
+                  "text": "[string, any[]]"
                 },
                 {
                   "kind": "Content",
@@ -12205,7 +12205,7 @@
                 },
                 {
                   "kind": "Content",
-                  "text": "string"
+                  "text": "[string, any[]]"
                 },
                 {
                   "kind": "Content",
@@ -12270,7 +12270,7 @@
                 },
                 {
                   "kind": "Content",
-                  "text": "string"
+                  "text": "[string, any[]]"
                 },
                 {
                   "kind": "Content",
@@ -14023,7 +14023,7 @@
                 },
                 {
                   "kind": "Content",
-                  "text": "string"
+                  "text": "any"
                 },
                 {
                   "kind": "Content",

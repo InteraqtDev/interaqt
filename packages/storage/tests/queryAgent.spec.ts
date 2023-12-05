@@ -130,7 +130,8 @@ describe('query agent test', () => {
                 "User",
                 "User_name"
             ],
-            fieldValue: "= \"A\"",
+            fieldValue: "= ?",
+            fieldParams: ['A'],
             key: "name",
             value: ['=', 'A']
         })
@@ -163,17 +164,24 @@ describe('query agent test', () => {
         } as RecordQueryData)
 
         console.log(fieldMatchExpWithValue!.right.left.data.fieldValue)
+
+        const [leftQuery, leftParams] = queryAgent.buildXToOneFindQuery(innerEntityQuery, 'User_friends_SOURCE')
         expect(fieldMatchExpWithValue!.right.left.data.fieldValue).toBe(`
 EXISTS (
-${queryAgent.buildXToOneFindQuery(innerEntityQuery, 'User_friends_SOURCE')}
+${leftQuery}
 )
 `)
+        expect(fieldMatchExpWithValue!.right.left.data.fieldParams).toMatchObject(leftParams)
+
+        const [rightQuery, rightParams] = queryAgent.buildXToOneFindQuery(innerEntityQuery, 'User_friends_TARGET')
 
         expect(fieldMatchExpWithValue!.right.right.data.fieldValue).toBe(`
 EXISTS (
-${queryAgent.buildXToOneFindQuery(innerEntityQuery, 'User_friends_TARGET')}
+${rightQuery}
 )
 `)
+
+        expect(fieldMatchExpWithValue!.right.right.data.fieldParams).toMatchObject(rightParams)
     })
 
 
