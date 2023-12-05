@@ -1,4 +1,4 @@
-/// <reference types="rata" />
+/// <reference types="data0" />
 
 import {
     ACTIVITY_RECORD,

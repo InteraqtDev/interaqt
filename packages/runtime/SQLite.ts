@@ -8,7 +8,7 @@ class IDSystem {
         return this.db.scheme(`CREATE Table IF NOT EXISTS _IDS_ (last INTEGER, name TEXT)`)
     }
     async getAutoId(recordName: string) {
-        const lastId =  (await this.db.query<{last: number}>( `SELECT last FROM _IDS_ WHERE name = '${recordName}'`, ))[0]?.last
+        const lastId =  (await this.db.query<{last: number}>( `SELECT last FROM _IDS_ WHERE name = '${recordName}'`, [] ))[0]?.last
         const newId = (lastId || 0) +1
         if (lastId === undefined) {
             // FIXME 用上 insert 后  returning _rowid 有问题？
@@ -60,7 +60,7 @@ export class SQLiteDB implements Database{
         return this.db.prepare(sql).run()
     }
     close() {
-        return this.db.close()
+        this.db.close()
     }
     async getAutoId(recordName: string) {
         return this.idSystem.getAutoId(recordName)

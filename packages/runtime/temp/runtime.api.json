@@ -192,7 +192,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n    name: {\n        type: \"string\";\n        collection: false;\n        required: true;\n        constraints: {\n            nameFormat({ name }: {\n                name: import(\"rata\")."
+              "text": "<{\n    name: {\n        type: \"string\";\n        collection: false;\n        required: true;\n        constraints: {\n            nameFormat({ name }: {\n                name: import(\"data0\")."
             },
             {
               "kind": "Reference",
@@ -201,7 +201,7 @@
             },
             {
               "kind": "Content",
-              "text": "<string>;\n            }): import(\"rata\")."
+              "text": "<string>;\n            }): import(\"data0\")."
             },
             {
               "kind": "Reference",
@@ -228,7 +228,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n            name: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                constraints: {\n                    format({ name }: {\n                        name: import(\"rata\")."
+              "text": "<{\n            name: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                constraints: {\n                    format({ name }: {\n                        name: import(\"data0\")."
             },
             {
               "kind": "Reference",
@@ -237,7 +237,7 @@
             },
             {
               "kind": "Content",
-              "text": "<string>;\n                    }): import(\"rata\")."
+              "text": "<string>;\n                    }): import(\"data0\")."
             },
             {
               "kind": "Reference",
@@ -246,7 +246,7 @@
             },
             {
               "kind": "Content",
-              "text": "<boolean>;\n                    length({ name }: {\n                        name: import(\"rata\")."
+              "text": "<boolean>;\n                    length({ name }: {\n                        name: import(\"data0\")."
             },
             {
               "kind": "Reference",
@@ -255,7 +255,7 @@
             },
             {
               "kind": "Content",
-              "text": "<string>;\n                    }): import(\"rata\")."
+              "text": "<string>;\n                    }): import(\"data0\")."
             },
             {
               "kind": "Reference",
@@ -291,7 +291,7 @@
             },
             {
               "kind": "Content",
-              "text": "<any>[];\n                required: false;\n            };\n            computed: {\n                required: false;\n                type: \"function\";\n                collection: false;\n            };\n        }>;\n        collection: true;\n        required: true;\n        constraints: {\n            eachNameUnique({ properties }: any): import(\"rata\")."
+              "text": "<any>[];\n                required: false;\n            };\n            computed: {\n                required: false;\n                type: \"function\";\n                collection: false;\n            };\n        }>;\n        collection: true;\n        required: true;\n        constraints: {\n            eachNameUnique({ properties }: any): import(\"data0\")."
             },
             {
               "kind": "Reference",
@@ -1658,7 +1658,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n    name: {\n        type: \"string\";\n        collection: false;\n        required: true;\n        constraints: {\n            nameFormat({ name }: {\n                name: import(\"rata\")."
+              "text": "<{\n    name: {\n        type: \"string\";\n        collection: false;\n        required: true;\n        constraints: {\n            nameFormat({ name }: {\n                name: import(\"data0\")."
             },
             {
               "kind": "Reference",
@@ -1667,7 +1667,7 @@
             },
             {
               "kind": "Content",
-              "text": "<string>;\n            }): import(\"rata\")."
+              "text": "<string>;\n            }): import(\"data0\")."
             },
             {
               "kind": "Reference",
@@ -1694,7 +1694,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n            name: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                constraints: {\n                    format({ name }: {\n                        name: import(\"rata\")."
+              "text": "<{\n            name: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                constraints: {\n                    format({ name }: {\n                        name: import(\"data0\")."
             },
             {
               "kind": "Reference",
@@ -1703,7 +1703,7 @@
             },
             {
               "kind": "Content",
-              "text": "<string>;\n                    }): import(\"rata\")."
+              "text": "<string>;\n                    }): import(\"data0\")."
             },
             {
               "kind": "Reference",
@@ -1712,7 +1712,7 @@
             },
             {
               "kind": "Content",
-              "text": "<boolean>;\n                    length({ name }: {\n                        name: import(\"rata\")."
+              "text": "<boolean>;\n                    length({ name }: {\n                        name: import(\"data0\")."
             },
             {
               "kind": "Reference",
@@ -1721,7 +1721,7 @@
             },
             {
               "kind": "Content",
-              "text": "<string>;\n                    }): import(\"rata\")."
+              "text": "<string>;\n                    }): import(\"data0\")."
             },
             {
               "kind": "Reference",
@@ -1757,7 +1757,7 @@
             },
             {
               "kind": "Content",
-              "text": "<any>[];\n                required: false;\n            };\n            computed: {\n                required: false;\n                type: \"function\";\n                collection: false;\n            };\n        }>;\n        collection: true;\n        required: true;\n        constraints: {\n            eachNameUnique({ properties }: any): import(\"rata\")."
+              "text": "<any>[];\n                required: false;\n            };\n            computed: {\n                required: false;\n                type: \"function\";\n                collection: false;\n            };\n        }>;\n        collection: true;\n        required: true;\n        constraints: {\n            eachNameUnique({ properties }: any): import(\"data0\")."
             },
             {
               "kind": "Reference",
@@ -2357,8 +2357,13 @@
                   "text": ", options?: "
                 },
                 {
+                  "kind": "Reference",
+                  "text": "SQLite.Options",
+                  "canonicalReference": "@types/better-sqlite3!Database.Options:interface"
+                },
+                {
                   "kind": "Content",
-                  "text": "number | undefined"
+                  "text": " | undefined"
                 },
                 {
                   "kind": "Content",
@@ -2381,7 +2386,7 @@
                   "parameterName": "options",
                   "parameterTypeTokenRange": {
                     "startIndex": 3,
-                    "endIndex": 4
+                    "endIndex": 5
                   },
                   "isOptional": true
                 }
@@ -2397,13 +2402,8 @@
                   "text": "close(): "
                 },
                 {
-                  "kind": "Reference",
-                  "text": "Promise",
-                  "canonicalReference": "!Promise:interface"
-                },
-                {
                   "kind": "Content",
-                  "text": "<void>"
+                  "text": "void"
                 },
                 {
                   "kind": "Content",
@@ -2413,7 +2413,7 @@
               "isStatic": false,
               "returnTypeTokenRange": {
                 "startIndex": 1,
-                "endIndex": 3
+                "endIndex": 2
               },
               "releaseTag": "Public",
               "isProtected": false,
@@ -2434,8 +2434,21 @@
                 },
                 {
                   "kind": "Reference",
+                  "text": "InstanceType",
+                  "canonicalReference": "!InstanceType:type"
+                },
+                {
+                  "kind": "Content",
+                  "text": "<typeof "
+                },
+                {
+                  "kind": "Reference",
                   "text": "SQLite",
-                  "canonicalReference": "promised-sqlite3!AsyncDatabase:class"
+                  "canonicalReference": "@types/better-sqlite3!Database:var"
+                },
+                {
+                  "kind": "Content",
+                  "text": ">"
                 },
                 {
                   "kind": "Content",
@@ -2448,7 +2461,7 @@
               "name": "db",
               "propertyTypeTokenRange": {
                 "startIndex": 1,
-                "endIndex": 2
+                "endIndex": 5
               },
               "isStatic": false,
               "isProtected": false,
@@ -2466,6 +2479,14 @@
                 {
                   "kind": "Content",
                   "text": "string"
+                },
+                {
+                  "kind": "Content",
+                  "text": ", where: "
+                },
+                {
+                  "kind": "Content",
+                  "text": "any[]"
                 },
                 {
                   "kind": "Content",
@@ -2495,8 +2516,8 @@
               ],
               "isStatic": false,
               "returnTypeTokenRange": {
-                "startIndex": 5,
-                "endIndex": 7
+                "startIndex": 7,
+                "endIndex": 9
               },
               "releaseTag": "Public",
               "isProtected": false,
@@ -2511,10 +2532,18 @@
                   "isOptional": false
                 },
                 {
-                  "parameterName": "name",
+                  "parameterName": "where",
                   "parameterTypeTokenRange": {
                     "startIndex": 3,
                     "endIndex": 4
+                  },
+                  "isOptional": false
+                },
+                {
+                  "parameterName": "name",
+                  "parameterTypeTokenRange": {
+                    "startIndex": 5,
+                    "endIndex": 6
                   },
                   "isOptional": true
                 }
@@ -2652,6 +2681,14 @@
                 },
                 {
                   "kind": "Content",
+                  "text": ", values: "
+                },
+                {
+                  "kind": "Content",
+                  "text": "any[]"
+                },
+                {
+                  "kind": "Content",
                   "text": ", name?: "
                 },
                 {
@@ -2687,8 +2724,8 @@
               ],
               "isStatic": false,
               "returnTypeTokenRange": {
-                "startIndex": 5,
-                "endIndex": 9
+                "startIndex": 7,
+                "endIndex": 11
               },
               "releaseTag": "Public",
               "isProtected": false,
@@ -2703,10 +2740,18 @@
                   "isOptional": false
                 },
                 {
-                  "parameterName": "name",
+                  "parameterName": "values",
                   "parameterTypeTokenRange": {
                     "startIndex": 3,
                     "endIndex": 4
+                  },
+                  "isOptional": false
+                },
+                {
+                  "parameterName": "name",
+                  "parameterTypeTokenRange": {
+                    "startIndex": 5,
+                    "endIndex": 6
                   },
                   "isOptional": true
                 }
@@ -2761,8 +2806,13 @@
                   "text": "options?: "
                 },
                 {
+                  "kind": "Reference",
+                  "text": "SQLite.Options",
+                  "canonicalReference": "@types/better-sqlite3!Database.Options:interface"
+                },
+                {
                   "kind": "Content",
-                  "text": "number | undefined"
+                  "text": " | undefined"
                 },
                 {
                   "kind": "Content",
@@ -2775,7 +2825,7 @@
               "name": "options",
               "propertyTypeTokenRange": {
                 "startIndex": 1,
-                "endIndex": 2
+                "endIndex": 3
               },
               "isStatic": false,
               "isProtected": false,
@@ -2801,6 +2851,14 @@
                 {
                   "kind": "Content",
                   "text": "string"
+                },
+                {
+                  "kind": "Content",
+                  "text": ", where?: "
+                },
+                {
+                  "kind": "Content",
+                  "text": "any[]"
                 },
                 {
                   "kind": "Content",
@@ -2843,8 +2901,8 @@
               ],
               "isStatic": false,
               "returnTypeTokenRange": {
-                "startIndex": 7,
-                "endIndex": 9
+                "startIndex": 9,
+                "endIndex": 11
               },
               "releaseTag": "Public",
               "isProtected": false,
@@ -2859,10 +2917,18 @@
                   "isOptional": false
                 },
                 {
-                  "parameterName": "name",
+                  "parameterName": "where",
                   "parameterTypeTokenRange": {
                     "startIndex": 5,
                     "endIndex": 6
+                  },
+                  "isOptional": true
+                },
+                {
+                  "parameterName": "name",
+                  "parameterTypeTokenRange": {
+                    "startIndex": 7,
+                    "endIndex": 8
                   },
                   "isOptional": true
                 }
@@ -2895,12 +2961,12 @@
                 },
                 {
                   "kind": "Content",
-                  "text": "<import(\"sqlite3\")."
+                  "text": "<"
                 },
                 {
                   "kind": "Reference",
-                  "text": "RunResult",
-                  "canonicalReference": "sqlite3!RunResult:interface"
+                  "text": "SQLite.RunResult",
+                  "canonicalReference": "@types/better-sqlite3!Database.RunResult:interface"
                 },
                 {
                   "kind": "Content",
@@ -2948,6 +3014,14 @@
                 },
                 {
                   "kind": "Content",
+                  "text": ", values: "
+                },
+                {
+                  "kind": "Content",
+                  "text": "any[]"
+                },
+                {
+                  "kind": "Content",
                   "text": ", idField?: "
                 },
                 {
@@ -2982,8 +3056,8 @@
               ],
               "isStatic": false,
               "returnTypeTokenRange": {
-                "startIndex": 7,
-                "endIndex": 9
+                "startIndex": 9,
+                "endIndex": 11
               },
               "releaseTag": "Public",
               "isProtected": false,
@@ -2998,18 +3072,26 @@
                   "isOptional": false
                 },
                 {
-                  "parameterName": "idField",
+                  "parameterName": "values",
                   "parameterTypeTokenRange": {
                     "startIndex": 3,
                     "endIndex": 4
+                  },
+                  "isOptional": false
+                },
+                {
+                  "parameterName": "idField",
+                  "parameterTypeTokenRange": {
+                    "startIndex": 5,
+                    "endIndex": 6
                   },
                   "isOptional": true
                 },
                 {
                   "parameterName": "name",
                   "parameterTypeTokenRange": {
-                    "startIndex": 5,
-                    "endIndex": 6
+                    "startIndex": 7,
+                    "endIndex": 8
                   },
                   "isOptional": true
                 }
@@ -3131,7 +3213,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n    name: {\n        type: \"string\";\n        collection: false;\n        required: true;\n        constraints: {\n            nameFormat({ name }: {\n                name: import(\"rata\")."
+              "text": "<{\n    name: {\n        type: \"string\";\n        collection: false;\n        required: true;\n        constraints: {\n            nameFormat({ name }: {\n                name: import(\"data0\")."
             },
             {
               "kind": "Reference",
@@ -3140,7 +3222,7 @@
             },
             {
               "kind": "Content",
-              "text": "<string>;\n            }): import(\"rata\")."
+              "text": "<string>;\n            }): import(\"data0\")."
             },
             {
               "kind": "Reference",
@@ -3167,7 +3249,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n            name: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                constraints: {\n                    format({ name }: {\n                        name: import(\"rata\")."
+              "text": "<{\n            name: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                constraints: {\n                    format({ name }: {\n                        name: import(\"data0\")."
             },
             {
               "kind": "Reference",
@@ -3176,7 +3258,7 @@
             },
             {
               "kind": "Content",
-              "text": "<string>;\n                    }): import(\"rata\")."
+              "text": "<string>;\n                    }): import(\"data0\")."
             },
             {
               "kind": "Reference",
@@ -3185,7 +3267,7 @@
             },
             {
               "kind": "Content",
-              "text": "<boolean>;\n                    length({ name }: {\n                        name: import(\"rata\")."
+              "text": "<boolean>;\n                    length({ name }: {\n                        name: import(\"data0\")."
             },
             {
               "kind": "Reference",
@@ -3194,7 +3276,7 @@
             },
             {
               "kind": "Content",
-              "text": "<string>;\n                    }): import(\"rata\")."
+              "text": "<string>;\n                    }): import(\"data0\")."
             },
             {
               "kind": "Reference",
@@ -3230,7 +3312,7 @@
             },
             {
               "kind": "Content",
-              "text": "<any>[];\n                required: false;\n            };\n            computed: {\n                required: false;\n                type: \"function\";\n                collection: false;\n            };\n        }>;\n        collection: true;\n        required: true;\n        constraints: {\n            eachNameUnique({ properties }: any): import(\"rata\")."
+              "text": "<any>[];\n                required: false;\n            };\n            computed: {\n                required: false;\n                type: \"function\";\n                collection: false;\n            };\n        }>;\n        collection: true;\n        required: true;\n        constraints: {\n            eachNameUnique({ properties }: any): import(\"data0\")."
             },
             {
               "kind": "Reference",

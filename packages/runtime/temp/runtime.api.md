@@ -8,8 +8,7 @@ import { Activity } from '@interaqt/shared';
 import { ActivityGroupInstanceType } from '@interaqt/shared';
 import { ActivityGroupPublicType } from '@interaqt/shared';
 import { ActivityInstanceType } from '@interaqt/shared';
-import { AsyncDatabase } from 'promised-sqlite3';
-import { Atom } from 'rata';
+import { Atom } from 'data0';
 import { BoolExp } from '@interaqt/shared';
 import { BoolExpressionRawData } from '@interaqt/shared';
 import { Concept } from '@interaqt/shared';
@@ -30,7 +29,7 @@ import { Property } from '@interaqt/shared';
 import { PropertyTypes } from '@interaqt/shared';
 import { ReactiveKlassInstance } from '@interaqt/shared';
 import { Relation } from '@interaqt/shared';
-import { RunResult } from 'sqlite3';
+import SQLite from 'better-sqlite3';
 import { TransferPublicType } from '@interaqt/shared';
 import { UserAttributive } from '@interaqt/shared';
 
@@ -283,13 +282,13 @@ export class MonoSystem implements System {
 
 // @public (undocumented)
 export class SQLiteDB implements Database {
-    constructor(file?: string, options?: number | undefined);
+    constructor(file?: string, options?: SQLite.Options | undefined);
     // (undocumented)
-    close(): Promise<void>;
+    close(): void;
     // (undocumented)
-    db: AsyncDatabase;
+    db: InstanceType<typeof SQLite>;
     // (undocumented)
-    delete(sql: string, name?: string): Promise<any[]>;
+    delete(sql: string, where: any[], name?: string): Promise<any[]>;
     // (undocumented)
     file: string;
     // (undocumented)
@@ -301,17 +300,17 @@ export class SQLiteDB implements Database {
     // Warning: (ae-forgotten-export) The symbol "EntityIdRef" needs to be exported by the entry point index.d.ts
     //
     // (undocumented)
-    insert(sql: string, name?: string): Promise<EntityIdRef>;
+    insert(sql: string, values: any[], name?: string): Promise<EntityIdRef>;
     // (undocumented)
     open(): Promise<void>;
     // (undocumented)
-    options?: number | undefined;
+    options?: SQLite.Options | undefined;
     // (undocumented)
-    query<T extends any>(sql: string, name?: string): Promise<T[]>;
+    query<T extends any>(sql: string, where?: any[], name?: string): Promise<T[]>;
     // (undocumented)
-    scheme(sql: string): Promise<RunResult>;
+    scheme(sql: string): Promise<SQLite.RunResult>;
     // (undocumented)
-    update(sql: string, idField?: string, name?: string): Promise<any[]>;
+    update(sql: string, values: any[], idField?: string, name?: string): Promise<any[]>;
 }
 
 // Warning: (ae-forgotten-export) The symbol "ServerOptions" needs to be exported by the entry point index.d.ts
