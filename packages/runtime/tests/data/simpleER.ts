@@ -67,10 +67,10 @@ export const data = [{
     "options": {"isReactive": true, "uuid": "761d421d-6195-4977-a164-10d4e6d904b7"},
     "uuid": "761d421d-6195-4977-a164-10d4e6d904b7",
     "public": {
-        "entity1": "a0bc898b-1d6c-4c7f-a165-f27700fe0d34",
-        "targetName1": "owner",
-        "entity2": "86db284f-d284-4045-a0bc-2050903bdecf",
-        "targetName2": "file"
+        "source": "a0bc898b-1d6c-4c7f-a165-f27700fe0d34",
+        "sourceAttribute": "owner",
+        "target": "86db284f-d284-4045-a0bc-2050903bdecf",
+        "targetAttribute": "file"
     }
 }, {
     "type": "UserAttributive",

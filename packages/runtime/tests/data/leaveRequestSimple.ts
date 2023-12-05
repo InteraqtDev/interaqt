@@ -30,10 +30,10 @@ const UserEntity = Entity.create({
 })
 
 const supervisorRelation = Relation.create({
-    entity1: UserEntity,
-    targetName1: 'supervisor',
-    entity2: UserEntity,
-    targetName2: 'subordinate',
+    source: UserEntity,
+    sourceAttribute: 'supervisor',
+    target: UserEntity,
+    targetAttribute: 'subordinate',
     relType: 'n:1',
 })
 
@@ -84,10 +84,10 @@ export const approveInteraction = Interaction.create({
 
 
 const sendRequestRelation = Relation.create({
-    entity1: RequestEntity,
-    targetName1: 'from',
-    entity2: UserEntity,
-    targetName2: 'request',
+    source: RequestEntity,
+    sourceAttribute: 'from',
+    target: UserEntity,
+    targetAttribute: 'request',
     relType: 'n:1',
     computedData:  MapInteractionToRecord.create({
         sourceInteraction: createInteraction,
@@ -102,10 +102,10 @@ const sendRequestRelation = Relation.create({
 
 // 直属主管和 request 的 relation
 const reviewerRelation = Relation.create({
-    entity1: RequestEntity,
-    targetName1: 'reviewer',
-    entity2: UserEntity,
-    targetName2: 'request',
+    source: RequestEntity,
+    sourceAttribute: 'reviewer',
+    target: UserEntity,
+    targetAttribute: 'request',
     relType: 'n:n',
     computedData:  MapInteractionToRecord.create({
         sourceInteraction: createInteraction,

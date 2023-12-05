@@ -1,8 +1,6 @@
 import {RecordMutationEvent} from "../System.js";
 import {IncrementalComputedDataHandle, StatePatch} from "./IncrementalComputedDataHandle.js";
-import {KlassInstance} from "@interaqt/shared";
-import {Entity, Relation} from "@interaqt/shared";
-import {WeightedSummation} from "@interaqt/shared";
+import {Entity, KlassInstance, Relation, WeightedSummation} from "@interaqt/shared";
 import {MatchExp} from '@interaqt/storage'
 import {ComputedDataHandle} from "./ComputedDataHandle.js";
 

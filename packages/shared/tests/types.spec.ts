@@ -25,12 +25,12 @@ describe("createClass types", () => {
   test('relation types', () => {
 
       const relation = Relation.create({
-          entity1: Entity.create({ name: 'test'}),
-          entity2: Entity.create({ name: 'test2'}),
-          targetName1: 'to2',
-          targetName2: 'to1',
+          source: Entity.create({ name: 'test'}),
+          target: Entity.create({ name: 'test2'}),
+          sourceAttribute: 'to2',
+          targetAttribute: 'to1',
       })
-      assertType<string>(relation.entity1.name)
+      assertType<string>(relation.source.name)
   })
 
     test('activity types', () => {

@@ -1,7 +1,8 @@
 /// <reference types="rata" />
 
 import {
-    ACTIVITY_RECORD, Database,
+    ACTIVITY_RECORD,
+    Database,
     EVENT_RECORD,
     RecordChangeListener,
     RecordMutationEvent,
@@ -9,7 +10,7 @@ import {
     System,
     SYSTEM_RECORD
 } from "./System.js";
-import {InteractionEvent} from './types/interaction'
+import {InteractionEvent} from './types/interaction.js'
 import {createClass, Entity, KlassInstance, Property, Relation} from "@interaqt/shared";
 import {
     DBSetup,

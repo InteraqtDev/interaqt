@@ -1,9 +1,19 @@
 import {System, SystemCallback} from "./System.js";
-import {Activity, ComputedData, Entity, Interaction, Klass, KlassInstance, Property, Relation, BoolExp} from "@interaqt/shared";
+import {
+    Activity,
+    BoolExp,
+    ComputedData,
+    Entity,
+    Interaction,
+    Klass,
+    KlassInstance,
+    Property,
+    Relation
+} from "@interaqt/shared";
 import './computedDataHandles/index.js'
 import {ActivityCall} from "./ActivityCall.js";
 import {InteractionCall} from "./InteractionCall.js";
-import {InteractionEventArgs} from "./types/interaction";
+import {InteractionEventArgs} from "./types/interaction.js";
 import {assert} from "./util.js";
 import {ComputedDataHandle, DataContext} from "./computedDataHandles/ComputedDataHandle.js";
 

@@ -208,10 +208,10 @@ const friendRelationSM = RelationStateMachine.create({
     defaultState: notFriendState
 })
 export const friendRelation = Relation.create({
-    entity1: userEntity,
-    targetName1: 'friends',
-    entity2: userEntity,
-    targetName2: 'friends',
+    source: userEntity,
+    sourceAttribute: 'friends',
+    target: userEntity,
+    targetAttribute: 'friends',
     relType: 'n:n',
     computedData: friendRelationSM
 })

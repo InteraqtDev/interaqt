@@ -1,8 +1,8 @@
-import { parse as parseStr} from 'acorn'
-import {BoolExpression, BoolExpressionNodeTypes, OperatorNames, VariableNode} from "./types/boolExpression.js";
-import {assert, indexBy} from "./util.js";
+import {parse as parseStr} from 'acorn'
+import {BoolExpression, BoolExpressionNodeTypes, OperatorNames} from "./types/boolExpression.js";
+import {indexBy} from "./util.js";
 
- // @ts-ignore
+// @ts-ignore
 function astNodeToAttrNode(astNode, optionsByName): BoolExpression {
     if (astNode.type === "LogicalExpression") {
         return {

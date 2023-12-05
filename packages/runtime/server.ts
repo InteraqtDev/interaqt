@@ -1,6 +1,6 @@
 import Fastify from 'fastify'
 import {Controller, USER_ENTITY} from "./Controller.js";
-import {EventPayload, EventQuery, InteractionEventArgs, EventUser} from "./types/interaction";
+import {EventPayload, EventQuery, EventUser, InteractionEventArgs} from "./types/interaction.js";
 import {MatchExp} from "@interaqt/storage";
 import cors from 'cors'
 import middie from '@fastify/middie'

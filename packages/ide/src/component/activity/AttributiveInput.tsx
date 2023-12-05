@@ -1,4 +1,4 @@
-import {BoolExpression, BoolExpressionNodeTypes, OperatorNames, VariableNode} from "../../../../types/boolExpression";
+import {BoolExpression, BoolExpressionNodeTypes, OperatorNames, VariableNode} from "../../../../runtime/types/boolExpression";
 import { parse } from '../../../../runtime/boolExpression'
 import {atom, computed, incFilter, reactive} from "rata";
 import {nextJob} from "../../util";

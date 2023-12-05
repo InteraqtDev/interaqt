@@ -136,7 +136,7 @@ export type RelationPublic = {
         // fixme type
         computed: (relation: any) => any
     },
-    entity1: {
+    source: {
         // source 可以是 Entity 或者 relation
         // CAUTION 理论上应该改成 Entity 和 Relation 的交集，这里先强行这样实现了
         type: typeof Entity | Klass<RelationPublic>,
@@ -144,7 +144,7 @@ export type RelationPublic = {
         collection: false,
         options: () => (KlassInstance<typeof Entity, any>|KlassInstance<Klass<RelationPublic>, any>)[]
     },
-    targetName1: {
+    sourceAttribute: {
         type: 'string',
         required: true,
         collection: false,
@@ -152,13 +152,13 @@ export type RelationPublic = {
             [ruleName: string]: ((thisProp: any, thisEntity: object) => Atom<boolean> | boolean | any[]) | Function | string
         }
     }
-    entity2: {
+    target: {
         type: typeof Entity,
         required: true,
         collection: false,
         options: () => (KlassInstance<typeof Entity, any>|KlassInstance<Klass<RelationPublic>, any>)[]
     },
-    targetName2: {
+    targetAttribute: {
         type: 'string',
         required: true,
         collection: false,
@@ -207,10 +207,10 @@ export const Relation = createClass({
             collection: false,
             // fixme type
             computed: (relation: any) => {
-                return `${relation.entity1!.name}_${relation.targetName1}_${relation.targetName2}_${relation.entity2!.name}`
+                return `${relation.source!.name}_${relation.sourceAttribute}_${relation.targetAttribute}_${relation.target!.name}`
             }
         },
-        entity1: {
+        source: {
             // source 可以是 Entity 或者 relation
             // CAUTION 理论上应该改成 Entity 和 Relation 的交集，这里先强行这样实现了
             type: [Entity] as unknown as typeof Entity,
@@ -220,28 +220,28 @@ export const Relation = createClass({
                 return getInstance(Entity)
             }
         },
-        targetName1: {
+        sourceAttribute: {
             type: 'string',
             required: true,
             collection: false,
             constraints: {
                 nameNotSameWithProp(relation:KlassInstance<Klass<RelationPublic>, false>) {
                     return computed(() => {
-                        const {entity1, targetName1} = relation
-                        return entity1?.properties?.every((p) => {
-                            return p.name !== targetName1
+                        const {source, sourceAttribute} = relation
+                        return source?.properties?.every((p) => {
+                            return p.name !== sourceAttribute
                         })
                     })
                 },
                 nameUnique(relation:KlassInstance<Klass<RelationPublic>, false>) {
                     return computed(() => {
-                        const {entity1, entity2, targetName1, targetName2} = relation
-                        return !(entity1 === entity2 && targetName1 === targetName2)
+                        const {source, target, sourceAttribute, targetAttribute} = relation
+                        return !(source === target && sourceAttribute === targetAttribute)
                     })
                 }
             }
         },
-        entity2: {
+        target: {
             type: Entity,
             required: true,
             collection: false,
@@ -249,23 +249,23 @@ export const Relation = createClass({
                 return getInstance(Entity)
             }
         },
-        targetName2: {
+        targetAttribute: {
             type: 'string',
             required: true,
             collection: false,
             constraints: {
                 nameNotSameWithProp(relation:KlassInstance<Klass<RelationPublic>, false>) {
                     return computed(() => {
-                        const {entity2, targetName2} = relation
-                        return entity2?.properties?.every((p) => {
-                            return p.name !== targetName2
+                        const {target, targetAttribute} = relation
+                        return target?.properties?.every((p) => {
+                            return p.name !== targetAttribute
                         })
                     })
                 },
                 nameUnique(relation:KlassInstance<Klass<RelationPublic>, false>) {
                     return computed(() => {
-                        const {entity1, entity2, targetName1, targetName2} = relation
-                        return !(entity1 === entity2 && targetName1 === targetName2)
+                        const {source, target, sourceAttribute, targetAttribute} = relation
+                        return !(source === target && sourceAttribute === targetAttribute)
                     })
                 }
             }
@@ -323,4 +323,4 @@ export const Relation = createClass({
 // CAUTION Relation 可以作为 source
 // FIXME type relation 和 entity 的 public type 最好都单独定义
 // @ts-ignore
-Relation.public.entity1.type.push(Relation)
+Relation.public.source.type.push(Relation)

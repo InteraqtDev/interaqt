@@ -1,12 +1,9 @@
-import {KlassInstance} from "@interaqt/shared";
-import {InteractionEventArgs} from "../types/interaction";
-import {Interaction} from "@interaqt/shared";
-import {Entity} from "@interaqt/shared";
-import {MapInteractionToProperty} from '@interaqt/shared'
+import {Entity, Interaction, KlassInstance, MapInteractionToProperty} from "@interaqt/shared";
+import {InteractionEventArgs} from "../types/interaction.js";
 import {MatchExp} from '@interaqt/storage'
 import {ComputedDataHandle} from "./ComputedDataHandle.js";
 import {RecordMutationEvent} from "../System.js";
-import {InteractionCallResponse} from "../InteractionCall";
+import {InteractionCallResponse} from "../InteractionCall.js";
 
 export class MapInteractionToPropertyHandle extends ComputedDataHandle {
     data!: KlassInstance<typeof Entity, false>

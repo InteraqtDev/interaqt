@@ -1,10 +1,7 @@
-import {createClass, KlassInstance} from "@interaqt/shared";
-import { Entity, Relation } from "@interaqt/shared";
+import {createClass, Entity, KlassInstance, Relation} from "@interaqt/shared";
 // @ts-ignore
-import { InteractionEvent } from './types/interaction'
-import {Activity} from "@interaqt/shared";
+import {InteractionEvent} from './types/interaction.js'
 import {MatchExpressionData} from "@interaqt/storage";
-
 
 
 export interface Payload {

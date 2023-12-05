@@ -1,8 +1,6 @@
 import {RecordMutationEvent} from "../System.js";
 import {IncrementalComputedDataHandle, StatePatch} from "./IncrementalComputedDataHandle.js";
-import {KlassInstance} from "@interaqt/shared";
-import {Entity, Relation} from "@interaqt/shared";
-import {RelationBasedWeightedSummation} from "@interaqt/shared";
+import {Entity, KlassInstance, Relation, RelationBasedWeightedSummation} from "@interaqt/shared";
 import {MatchExp} from '@interaqt/storage'
 import {ComputedDataHandle} from "./ComputedDataHandle.js";
 
@@ -56,14 +54,14 @@ export class RelationBasedWeightedSummationHandle extends IncrementalComputedDat
     }
     async setupStates(): Promise<void> {
         this.relationInfos = this.relations!.map(({relation, relationDirection}) => {
-            const toCountAttributeName = relation![relationDirection==='source' ? 'targetName1': 'targetName2']!
+            const toCountAttributeName = relation![relationDirection==='source' ? 'sourceAttribute': 'targetAttribute']!
             return {
                 relationName: this.controller.system.storage.getRelationName(this.entityName, toCountAttributeName),
                 toCountAttributeName,
-                toCountEntityName: relation![relationDirection==='source' ? 'entity2': 'entity1']!.name!,
+                toCountEntityName: relation![relationDirection==='source' ? 'target': 'source']!.name!,
                 entityRelationAttribute : relationDirection! as 'source'|'target',
                 relatedEntityRelationAttribute: relationDirection === 'source' ? 'target': 'source',
-                isBidirectional : relation?.entity1 === relation?.entity2 && relation?.targetName1 === relation?.targetName2
+                isBidirectional : relation?.source === relation?.target && relation?.sourceAttribute === relation?.targetAttribute
             }
         })
     }

@@ -248,10 +248,10 @@ const friendRelationSM = RelationStateMachine.create({
 
 
 const friendRelation = Relation.create({
-    entity1: userEntity,
-    targetName1: 'friends',
-    entity2: userEntity,
-    targetName2: 'friends',
+    source: userEntity,
+    sourceAttribute: 'friends',
+    target: userEntity,
+    targetAttribute: 'friends',
     relType: 'n:n',
     computedData: friendRelationSM
 })
@@ -290,18 +290,18 @@ const requestEntity= Entity.create({
 })
 
 const sendRequestRelation = Relation.create({
-    entity1: requestEntity,
-    targetName1: 'from',
-    entity2: userEntity,
-    targetName2: 'request',
+    source: requestEntity,
+    sourceAttribute: 'from',
+    target: userEntity,
+    targetAttribute: 'request',
     relType: 'n:1'
 })
 
 const receivedRequestRelation = Relation.create({
-    entity1: requestEntity,
-    targetName1: 'to',
-    entity2: userEntity,
-    targetName2: 'receivedRequest',
+    source: requestEntity,
+    sourceAttribute: 'to',
+    target: userEntity,
+    targetAttribute: 'receivedRequest',
     relType: 'n:1',
     properties: [Property.create({
         name: 'result',
@@ -390,10 +390,10 @@ requestEntity.properties.push(
 )
 
 const messageToRequestRelation = Relation.create({
-    entity1: requestEntity,
-    targetName1: 'message',
-    entity2: messageEntity,
-    targetName2: 'request',
+    source: requestEntity,
+    sourceAttribute: 'message',
+    target: messageEntity,
+    targetAttribute: 'request',
     relType: '1:1'
 })
 

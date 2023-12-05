@@ -1,14 +1,8 @@
-import {KlassInstance, MapRecordMutationToRecord} from "@interaqt/shared";
-import {InteractionEvent, InteractionEventArgs} from "../types/interaction";
+import {ComputedData, Entity, Interaction, KlassInstance, MapRecordMutationToRecord} from "@interaqt/shared";
 import {Controller} from "../Controller.js";
-import { getInteractions, Interaction} from "@interaqt/shared";
-import {Entity, Property} from "@interaqt/shared";
-import {ComputedData, MapActivityToRecord, MapInteractionToRecord} from '@interaqt/shared'
-import {MatchExp, MutationEvent} from '@interaqt/storage'
 import {ComputedDataHandle, DataContext} from "./ComputedDataHandle.js";
 import {RecordMutationEvent} from "../System.js";
-import {IncrementalComputedDataHandle, StatePatch} from "./IncrementalComputedDataHandle";
-import {effect} from "../../../../rata/src/effect";
+import {IncrementalComputedDataHandle, StatePatch} from "./IncrementalComputedDataHandle.js";
 
 export class MapInteractionToRecordHandle extends IncrementalComputedDataHandle {
     data!: KlassInstance<typeof Entity, false>

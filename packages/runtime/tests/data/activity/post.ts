@@ -99,9 +99,9 @@ export const postRevisionEntity = Entity.create({
 })
 
 export const postRevisionRelation = Relation.create({
-    entity1: postEntity,
-    targetName1: 'revisions',
-    entity2: postRevisionEntity,
-    targetName2: 'current',
+    source: postEntity,
+    sourceAttribute: 'revisions',
+    target: postRevisionEntity,
+    targetAttribute: 'current',
     relType: '1:n',
 })

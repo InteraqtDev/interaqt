@@ -53,10 +53,10 @@ export const data = [{
     "options": {"isReactive": true},
     "uuid": "d801cce2-0c65-4d30-ad96-640808573162",
     "public": {
-        "entity1": "49226bbc-ec6a-4541-9020-633f26612588",
-        "targetName1": "owner",
-        "entity2": "ffd55e47-7fed-4979-8756-f5499b02fb86",
-        "targetName2": "profile",
+        "source": "49226bbc-ec6a-4541-9020-633f26612588",
+        "sourceAttribute": "owner",
+        "target": "ffd55e47-7fed-4979-8756-f5499b02fb86",
+        "targetAttribute": "profile",
         "relType": "1:1",
         "properties": []
     }
@@ -65,10 +65,10 @@ export const data = [{
     "options": {"isReactive": true},
     "uuid": "e9b4b736-5d64-4619-9495-f58e173a11d3",
     "public": {
-        "entity1": "ffd55e47-7fed-4979-8756-f5499b02fb86",
-        "targetName1": "leader",
-        "entity2": "ffd55e47-7fed-4979-8756-f5499b02fb86",
-        "targetName2": "member",
+        "source": "ffd55e47-7fed-4979-8756-f5499b02fb86",
+        "sourceAttribute": "leader",
+        "target": "ffd55e47-7fed-4979-8756-f5499b02fb86",
+        "targetAttribute": "member",
         "relType": "n:1",
         "properties": []
     }
@@ -77,10 +77,10 @@ export const data = [{
     "options": {"isReactive": true},
     "uuid": "f49cc3a7-c6dc-4d2b-99d7-f6b5a3d38edd",
     "public": {
-        "entity1": "ffd55e47-7fed-4979-8756-f5499b02fb86",
-        "targetName1": "friends",
-        "entity2": "ffd55e47-7fed-4979-8756-f5499b02fb86",
-        "targetName2": "friends",
+        "source": "ffd55e47-7fed-4979-8756-f5499b02fb86",
+        "sourceAttribute": "friends",
+        "target": "ffd55e47-7fed-4979-8756-f5499b02fb86",
+        "targetAttribute": "friends",
         "relType": "n:n",
         "properties": []
     }
@@ -89,10 +89,10 @@ export const data = [{
     "options": {"isReactive": true},
     "uuid": "6190a0f8-631e-417f-ac59-a7eda492d903",
     "public": {
-        "entity1": "ffd55e47-7fed-4979-8756-f5499b02fb86",
-        "targetName1": "item",
-        "entity2": "bf2fe51d-c938-452d-a4f9-fed37c00a784",
-        "targetName2": "owner",
+        "source": "ffd55e47-7fed-4979-8756-f5499b02fb86",
+        "sourceAttribute": "item",
+        "target": "bf2fe51d-c938-452d-a4f9-fed37c00a784",
+        "targetAttribute": "owner",
         "relType": "1:1",
         "properties": []
     }

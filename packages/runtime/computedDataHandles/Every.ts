@@ -1,8 +1,5 @@
 import {ComputedDataHandle} from "./ComputedDataHandle.js";
-import {KlassInstance, Klass} from "@interaqt/shared";
-import {State} from "@interaqt/shared";
-
-import {Every, Count} from "@interaqt/shared";
+import {Count, Every, KlassInstance, State} from "@interaqt/shared";
 import {RecordMutationEvent, SYSTEM_RECORD} from "../System.js";
 
 export class EveryHandle extends ComputedDataHandle {

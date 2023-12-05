@@ -1,7 +1,4 @@
-import {Entity, KlassInstance, Relation} from "@interaqt/shared";
-import {
-    RelationCount, RelationBasedWeightedSummation,
-} from '@interaqt/shared'
+import {Entity, KlassInstance, Relation, RelationBasedWeightedSummation, RelationCount} from "@interaqt/shared";
 import {RelationBasedWeightedSummationHandle} from "./RelationBasedWeightedSummation.js";
 import {ComputedDataHandle} from "./ComputedDataHandle.js";
 

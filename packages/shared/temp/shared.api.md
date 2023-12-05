@@ -1766,13 +1766,13 @@ export type RelationPublic = {
         collection: false;
         computed: (relation: any) => any;
     };
-    entity1: {
+    source: {
         type: typeof Entity | Klass<RelationPublic>;
         required: true;
         collection: false;
         options: () => (KlassInstance<typeof Entity, any> | KlassInstance<Klass<RelationPublic>, any>)[];
     };
-    targetName1: {
+    sourceAttribute: {
         type: 'string';
         required: true;
         collection: false;
@@ -1780,13 +1780,13 @@ export type RelationPublic = {
             [ruleName: string]: ((thisProp: any, thisEntity: object) => Atom<boolean> | boolean | any[]) | Function | string;
         };
     };
-    entity2: {
+    target: {
         type: typeof Entity;
         required: true;
         collection: false;
         options: () => (KlassInstance<typeof Entity, any> | KlassInstance<Klass<RelationPublic>, any>)[];
     };
-    targetName2: {
+    targetAttribute: {
         type: 'string';
         required: true;
         collection: false;

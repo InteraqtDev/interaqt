@@ -1,9 +1,6 @@
 import {ComputedDataHandle} from "./ComputedDataHandle.js";
-import {KlassInstance, Klass} from "@interaqt/shared";
+import {KlassInstance, Property, RelationBasedEvery, RelationCount} from "@interaqt/shared";
 import {MatchExp} from '@interaqt/storage'
-import {Entity, Property, Relation} from "@interaqt/shared";
-
-import {RelationBasedEvery, RelationCount} from "@interaqt/shared";
 import {RecordMutationEvent} from "../System.js";
 
 export class RelationBasedEveryHandle extends ComputedDataHandle {

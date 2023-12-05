@@ -1,18 +1,11 @@
-import {KlassInstance, Klass} from "@interaqt/shared";
-import {Entity, Relation} from "@interaqt/shared";
-import {
-    ComputedData,
-    MapActivityToRecord,
-    RelationStateMachine,
-    RelationStateTransfer
-} from '@interaqt/shared'
+import {ComputedData, KlassInstance, Relation, RelationStateMachine, RelationStateTransfer} from "@interaqt/shared";
 import {Controller} from "../Controller.js";
-import {InteractionEventArgs} from "../types/interaction";
+import {InteractionEventArgs} from "../types/interaction.js";
 import {assert} from "../util.js";
-import {EntityIdRef, RecordMutationEvent} from '../System'
+import {EntityIdRef, RecordMutationEvent} from '../System.js'
 import {MatchAtom, MatchExp} from '@interaqt/storage'
 import {ComputedDataHandle, DataContext} from "./ComputedDataHandle.js";
-import {InteractionCallResponse} from "../InteractionCall";
+import {InteractionCallResponse} from "../InteractionCall.js";
 
 
 type SourceTargetPair = [EntityIdRef, EntityIdRef][]
@@ -81,7 +74,7 @@ export class RelationStateMachineHandle extends ComputedDataHandle {
     }
     onCallInteraction = async (transfer: KlassInstance<typeof RelationStateTransfer, false>, interactionEventArgs: InteractionEventArgs, effects: InteractionCallResponse["effects"], activityId? :string) =>{
         // CAUTION 不能房子啊 constructor 里面因为它实在 controller 里面调用的，controller 还没准备好。
-        const relationName = this.controller.system.storage.getRelationName(this.data!.entity1!.name, this.data!.targetName1)
+        const relationName = this.controller.system.storage.getRelationName(this.data!.source!.name, this.data!.sourceAttribute)
         const handleFn = this.transferHandleFn!.get(transfer)!
         if (transfer.handleType === 'computeSource') {
             // 1. 执行 handle 来计算  source 和 target

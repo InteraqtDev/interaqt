@@ -1,22 +1,21 @@
 // 用来找下一状态的 工具类。
 
 import {
-    ActivityInstanceType,
-    InteractionInstanceType,
-    GatewayInstanceType,
-    TransferInstanceType,
-    ActivityGroupInstanceType,
     ActivityGroup,
+    ActivityGroupInstanceType,
+    ActivityInstanceType,
     Gateway,
+    GatewayInstanceType,
+    InteractionInstanceType,
+    TransferInstanceType,
+    UserAttributive,
 } from "@interaqt/shared";
 import {assert} from "./util.js";
 import {System} from "./System.js";
-import { InteractionCall, InteractionCallResponse} from "./InteractionCall.js";
-import {InteractionEventArgs} from "./types/interaction";
-import {UserAttributive} from "@interaqt/shared";
+import {InteractionCall, InteractionCallResponse} from "./InteractionCall.js";
+import {InteractionEventArgs} from "./types/interaction.js";
 import {MatchExp} from "@interaqt/storage";
-import {Controller} from "./Controller";
-
+import {Controller} from "./Controller.js";
 
 
 export type Seq = {

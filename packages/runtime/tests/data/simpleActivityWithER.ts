@@ -64,10 +64,10 @@ return {
     "options": {"isReactive": true},
     "uuid": "1126e507-a15c-4ab0-ab72-5f1858fb1f02",
     "public": {
-        "entity1": "5fc03461-076a-4195-8bb3-d276f3013cf4",
-        "targetName1": "friends",
-        "entity2": "5fc03461-076a-4195-8bb3-d276f3013cf4",
-        "targetName2": "friends",
+        "source": "5fc03461-076a-4195-8bb3-d276f3013cf4",
+        "sourceAttribute": "friends",
+        "target": "5fc03461-076a-4195-8bb3-d276f3013cf4",
+        "targetAttribute": "friends",
         "relType": "n:n",
         "properties": []
     }
@@ -76,10 +76,10 @@ return {
     "options": {"isReactive": true},
     "uuid": "3ade5885-e655-4e89-b736-fdc70b1b74d8",
     "public": {
-        "entity1": "42913934-59dd-43a6-9420-68f07fc38cbd",
-        "targetName1": "from",
-        "entity2": "5fc03461-076a-4195-8bb3-d276f3013cf4",
-        "targetName2": "request",
+        "source": "42913934-59dd-43a6-9420-68f07fc38cbd",
+        "sourceAttribute": "from",
+        "target": "5fc03461-076a-4195-8bb3-d276f3013cf4",
+        "targetAttribute": "request",
         "relType": "n:1",
         "properties": []
     }
@@ -88,10 +88,10 @@ return {
     "options": {"isReactive": true},
     "uuid": "a1a2e562-a378-431d-9b37-714fcd2f7bad",
     "public": {
-        "entity1": "42913934-59dd-43a6-9420-68f07fc38cbd",
-        "targetName1": "to",
-        "entity2": "5fc03461-076a-4195-8bb3-d276f3013cf4",
-        "targetName2": "receivedRequest",
+        "source": "42913934-59dd-43a6-9420-68f07fc38cbd",
+        "sourceAttribute": "to",
+        "target": "5fc03461-076a-4195-8bb3-d276f3013cf4",
+        "targetAttribute": "receivedRequest",
         "relType": "n:1",
         "properties": []
     }
@@ -100,10 +100,10 @@ return {
     "options": {"isReactive": true},
     "uuid": "d59c8f7e-1d46-4720-b8ea-28529c5c7827",
     "public": {
-        "entity1": "42913934-59dd-43a6-9420-68f07fc38cbd",
-        "targetName1": "message",
-        "entity2": "d29be9d4-3d07-4fa1-a887-e60655a281e3",
-        "targetName2": "request",
+        "source": "42913934-59dd-43a6-9420-68f07fc38cbd",
+        "sourceAttribute": "message",
+        "target": "d29be9d4-3d07-4fa1-a887-e60655a281e3",
+        "targetAttribute": "request",
         "relType": "1:1",
         "properties": []
     }

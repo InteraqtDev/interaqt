@@ -1,7 +1,7 @@
 import {RecordMutationEvent} from "../System.js";
 import {MatchExp} from '@interaqt/storage'
 import {ComputedDataHandle} from "./ComputedDataHandle.js";
-import {assert} from "../util";
+import {assert} from "../util.js";
 
 export type StatePatch = {
     type: 'create' | 'update' | 'delete',

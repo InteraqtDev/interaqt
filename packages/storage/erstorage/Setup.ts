@@ -132,10 +132,10 @@ export class DBSetup {
         return {
             table: relationName,
             relType: relation.relType!.split(':'),
-            sourceRecord: this.getRecordName(relation.entity1 as KlassInstance<typeof Entity, false>),
-            sourceAttribute: relation.targetName1,
-            targetRecord: this.getRecordName(relation.entity2!),
-            targetAttribute: relation.targetName2,
+            sourceRecord: this.getRecordName(relation.source as KlassInstance<typeof Entity, false>),
+            sourceAttribute: relation.sourceAttribute,
+            targetRecord: this.getRecordName(relation.target!),
+            targetAttribute: relation.targetAttribute,
             recordName: relationName,
             isTargetReliance: relation.isTargetReliance
         } as LinkMapItem
@@ -150,8 +150,8 @@ export class DBSetup {
             table: undefined, // 虚拟 link 没有表
             sourceRecord: relationEntityName,
             sourceAttribute: isSource ? 'source' : 'target',
-            targetRecord: isSource ? this.getRecordName(relation.entity1 as KlassInstance<typeof Entity, false>): this.getRecordName(relation.entity2!),
-            // targetRecord: isSource ? relation.entity1.name: relation.entity2.name,
+            targetRecord: isSource ? this.getRecordName(relation.source as KlassInstance<typeof Entity, false>): this.getRecordName(relation.target!),
+            // targetRecord: isSource ? relation.source.name: relation.target.name,
             targetAttribute: undefined, // 不能从 entity 来获取关系表
             // source 1:x1 -关联表- x2:1 target
             // 如果是 1: n 关系，x1 是 n，x2 是 1
