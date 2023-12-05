@@ -60,7 +60,7 @@ export class RelationBasedEveryHandle extends ComputedDataHandle {
         if (
             mutationEvent.recordName === this.recordName
             && mutationEvent.type === 'update'
-            && mutationEvent.record!.hasOwnProperty(this.totalCountField) || mutationEvent.record!.hasOwnProperty(this.matchCountField)
+            && (mutationEvent.record!.hasOwnProperty(this.totalCountField) || mutationEvent.record!.hasOwnProperty(this.matchCountField))
         ) {
             return mutationEvent.oldRecord!.id
         }

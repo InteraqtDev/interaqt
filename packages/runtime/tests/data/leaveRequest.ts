@@ -38,7 +38,6 @@ export const sendInteraction = Interaction.create({
     name: 'sendRequest',
     userAttributives: UserAttributives.create({}),
     userRoleAttributive: globalUserRole,
-    userRef: userRefA,
     action: Action.create({name: 'sendRequest'}),
     payload: Payload.create({
         items: [
@@ -97,7 +96,6 @@ export const approveInteraction = Interaction.create({
     name: 'approve',
     userAttributives: UserAttributives.create({}),
     userRoleAttributive: globalUserRole,
-    userRef: createUserRoleAttributive({name: '', isRef: true}, {isReactive: true}),
     action: Action.create({name: 'approve'}),
     payload: Payload.create({
         items: [
@@ -120,7 +118,6 @@ const rejectInteraction = Interaction.create({
     name: 'reject',
     userAttributives: UserAttributives.create({}),
     userRoleAttributive: globalUserRole,
-    userRef: createUserRoleAttributive({name: '', isRef: true}, {isReactive: true}),
     action: Action.create({name: 'reject'}),
     payload: Payload.create({
         items: [
@@ -360,7 +357,7 @@ RequestEntity.properties.push(
     // `
     //     })
     // }),
-    // 上面和下面两种写法都可以，机制不同。下面的实在 insert/update 的时候就直接计算了
+    // 上面和下面两种写法都可以，机制不同。下面的是在 insert/update 的时候就直接计算了
     Property.create({
         name: 'result',
         type: 'string',
