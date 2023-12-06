@@ -15,7 +15,7 @@ import {
     RelationStateTransfer
 } from "@interaqt/shared";
 import {removeAllInstance, stringifyAllInstances} from "@interaqt/shared";
-import {Controller} from "../../Controller";
+import {Controller} from "@interaqt/runtime";
 
 const UserEntity = Entity.create({ name: 'User' })
 const nameProperty = Property.create({ name: 'name', type: PropertyTypes.String })

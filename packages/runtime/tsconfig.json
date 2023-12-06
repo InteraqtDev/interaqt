@@ -16,7 +16,10 @@
     "esModuleInterop": true,
     "removeComments": false,
     "lib": ["esnext", "dom"],
-    "types": ["node"]
+    "types": ["node"],
+    "paths": {
+        "@interaqt/runtime": ["index.ts"]
+    }
   },
   "include": [
     "./",

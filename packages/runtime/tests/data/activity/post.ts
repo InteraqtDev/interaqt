@@ -1,26 +1,17 @@
 import {
-    Entity,
-    Property,
-    PropertyTypes,
-    RelationBasedEvery,
-    RelationBasedAny,
-    RelationCount,
-    MapInteractionToProperty,
-    Interaction,
     Action,
-    UserAttributives,
+    Entity,
+    Interaction,
+    MapInteractionToProperty,
     MapInteractionToPropertyItem,
+    MapRecordMutationToRecord,
     Payload,
     PayloadItem,
-    BoolAtomData,
-    MapInteractionToRecord, MapRecordMutationToRecord, Relation
+    Property,
+    PropertyTypes,
+    Relation
 } from "@interaqt/shared";
-import {globalUserRole, OtherAttr} from "./roles";
-import {approveInteraction, userRefB} from "./createFriendRelationActivity";
-import {Controller} from "../../../Controller";
-import {messageEntity} from "./messageEntity";
-import {sendInteraction} from "../leaveRequest";
-import {RecordMutationEvent} from "../../../System";
+import {Controller, RecordMutationEvent} from "@interaqt/runtime";
 
 export const postEntity = Entity.create({ name: 'Post' })
 

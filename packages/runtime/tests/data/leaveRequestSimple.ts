@@ -17,7 +17,7 @@ import {
     stringifyAllInstances,
     UserAttributives
 } from "@interaqt/shared";
-import {Controller} from "../../Controller";
+import {Controller} from "@interaqt/runtime";
 
 export const globalUserRole = createUserRoleAttributive({})
 

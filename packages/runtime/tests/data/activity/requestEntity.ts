@@ -1,6 +1,6 @@
 import {userEntity} from "./user.js";
 import {approveInteraction, mapFriendActivityToRequest, rejectInteraction} from "./createFriendRelationActivity.js";
-import {Controller} from "../../../Controller";
+import {Controller} from "@interaqt/runtime";
 import {
     Entity,
     MapInteractionToProperty,

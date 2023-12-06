@@ -1,4 +1,4 @@
-import {Controller} from "../../../Controller";
+import {Controller} from "@interaqt/runtime";
 import {globalUserRole, OtherAttr} from "./roles.js";
 import {userEntity} from "./user.js";
 import {
