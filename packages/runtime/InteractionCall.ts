@@ -279,8 +279,12 @@ export class InteractionCall {
         //     tryEvaluate("interaction condition error", interaction.condition, ...commonArgs)
         // }
     }
-    async runEffect() {
-
+    async runEffects(eventArgs: InteractionEventArgs, activityId: string|undefined, response: InteractionCallResponse) {
+        const sideEffects = this.interaction.sideEffects || []
+        for(let sideEffect of sideEffects) {
+            assert(!response.sideEffects![sideEffect.name],  `sideEffect name is duplicated: ${sideEffect.name}`)
+            response.sideEffects![sideEffect.name] = await sideEffect.handle.call(this.controller, eventArgs, activityId)
+        }
     }
     isGetInteraction() {
         return this.interaction.action === GetAction
@@ -343,7 +347,7 @@ export class InteractionCall {
             await this.saveEvent(event)
             response.event = event
             // effect
-            await this.runEffect()
+            await this.runEffects(interactionEventArgs, activityId, response)
             if (this.isGetInteraction()) {
                 await this.retrieveData(interactionEventArgs)
             }

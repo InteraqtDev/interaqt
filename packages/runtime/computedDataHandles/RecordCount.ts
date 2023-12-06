@@ -1,4 +1,4 @@
-import {Count, Entity, KlassInstance, Relation} from "@interaqt/shared";
+import {Count, Entity, KlassInstance, Relation, WeightedSummation} from "@interaqt/shared";
 import {ComputedDataHandle} from "./ComputedDataHandle.js";
 import {WeightedSummationHandle} from "./WeightedSummation.js";
 
@@ -13,13 +13,8 @@ export class RecordCountHandle extends WeightedSummationHandle {
         this.mapRelationToWeight = (record: KlassInstance<typeof Entity, false> | KlassInstance<typeof Relation, false>, info: KlassInstance<any, false>): number=>{
             return this.matchExpression(record, info) ? 1 : 0
         }
-        // FIXME type
-        // @ts-ignore
-        this.records = [computedData.record!]
+        this.records = [computedData.record!] as KlassInstance<typeof WeightedSummation, false>["records"]
     }
-    // parseMatchRelationFunction(content:string) {
-    //     return new Function('record', `return (${content})(record) ? 1 : 0`)
-    // }
 }
 
 ComputedDataHandle.Handles.set(Count, RecordCountHandle)
