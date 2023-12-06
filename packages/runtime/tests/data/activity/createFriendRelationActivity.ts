@@ -1,13 +1,14 @@
 import {Controller} from "@interaqt/runtime";
-import {globalUserRole, OtherAttr} from "./roles.js";
+import {OtherAttr} from "./roles.js";
 import {UserEntity} from "./user.js";
 import {
     Action,
     Activity,
     ActivityGroup,
-    BoolAtomData,
+    Attributive,
+    BoolExp,
+    boolExpToAttributives,
     createUserRoleAttributive,
-    Entity,
     Interaction,
     MapActivityToRecord,
     Payload,
@@ -16,9 +17,7 @@ import {
     RelationStateMachine,
     RelationStateNode,
     RelationStateTransfer,
-    Transfer,
-    UserAttributives,
-    UserAttributive
+    Transfer
 } from "@interaqt/shared";
 import {messageEntity} from "./messageEntity.js";
 
@@ -32,9 +31,11 @@ export const sendInteraction = Interaction.create({
         items: [
             PayloadItem.create({
                 name: 'to',
-                attributives: UserAttributives.create({
-                    content: BoolAtomData.create({data: OtherAttr})
-                }),
+                // attributives: Attributives.create({
+                //     content: BoolAtomData.create({data: OtherAttr})
+                // }),
+                // 这种写法和上面等价
+                attributives: boolExpToAttributives(BoolExp.atom(OtherAttr)),
                 base: UserEntity,
                 itemRef: userRefB
             }),
@@ -46,7 +47,7 @@ export const sendInteraction = Interaction.create({
     })
 })
 
-export const MyFriend = UserAttributive.create({
+export const MyFriend = Attributive.create({
     name: 'MyFriend',
     content:
         async function MyFriend(this: Controller, target, { user }){
@@ -137,9 +138,11 @@ export const deleteInteraction = Interaction.create({
         items: [
             PayloadItem.create({
                 name: 'target',
-                attributives: UserAttributives.create({
-                    content: BoolAtomData.create({data: MyFriend})
-                }),
+                // attributives: Attributives.create({
+                //     content: BoolAtomData.create({data: MyFriend})
+                // }),
+                // 支持上面这种形式，也支持单独一个 Attributive 写法
+                attributives: MyFriend,
                 base: UserEntity,
                 isRef: true,
             }),

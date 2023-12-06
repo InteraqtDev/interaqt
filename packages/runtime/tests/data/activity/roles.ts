@@ -1,6 +1,6 @@
-import {createUserRoleAttributive, UserAttributive} from "@interaqt/shared";
+import {createUserRoleAttributive, Attributive} from "@interaqt/shared";
 
-export const OtherAttr = UserAttributive.create({
+export const OtherAttr = Attributive.create({
     name: 'Other',
     content:
 function Other(targetUser, { user }){ 

@@ -31,7 +31,6 @@ import { ReactiveKlassInstance } from '@interaqt/shared';
 import { Relation } from '@interaqt/shared';
 import SQLite from 'better-sqlite3';
 import { TransferPublicType } from '@interaqt/shared';
-import { UserAttributive } from '@interaqt/shared';
 
 // @public (undocumented)
 export const ACTIVITY_RECORD = "_Activity_";
@@ -327,7 +326,14 @@ export const ROW_ID_ATTR = "_rowId";
 
 // @public (undocumented)
 export class SQLiteDB implements Database {
-    constructor(file?: string, options?: SQLite.Options | undefined);
+    constructor(file?: string, options?: (SQLite.Options & {
+        log: (msg: {
+            type: string;
+            name: string;
+            sql: string;
+            params?: any[] | undefined;
+        }) => any;
+    }) | undefined);
     // (undocumented)
     close(): void;
     // (undocumented)
@@ -345,16 +351,35 @@ export class SQLiteDB implements Database {
     // (undocumented)
     insert(sql: string, values: any[], name?: string): Promise<EntityIdRef>;
     // (undocumented)
+    log: (msg: {
+        type: string;
+        name: string;
+        sql: string;
+        params?: any[];
+    }) => any;
+    // (undocumented)
     open(): Promise<void>;
     // (undocumented)
-    options?: SQLite.Options | undefined;
+    options?: (SQLite.Options & {
+        log: (msg: {
+            type: string;
+            name: string;
+            sql: string;
+            params?: any[];
+        }) => any;
+    }) | undefined;
     // (undocumented)
     query<T extends any>(sql: string, where?: any[], name?: string): Promise<T[]>;
     // (undocumented)
-    scheme(sql: string): Promise<SQLite.RunResult>;
+    scheme(sql: string, name?: string): Promise<SQLite.RunResult>;
     // (undocumented)
     update(sql: string, values: any[], idField?: string, name?: string): Promise<any[]>;
 }
+
+// @public (undocumented)
+export type SQLiteDBOptions = Parameters<typeof SQLite>[1] & {
+    log: SQLiteDB['log'];
+};
 
 // Warning: (ae-forgotten-export) The symbol "ServerOptions" needs to be exported by the entry point index.d.ts
 // Warning: (ae-forgotten-export) The symbol "DataAPIs" needs to be exported by the entry point index.d.ts

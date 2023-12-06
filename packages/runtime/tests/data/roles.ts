@@ -1,37 +1,37 @@
-import {createUserRoleAttributive, UserAttributive} from "@interaqt/shared";
+import {createUserRoleAttributive, Attributive} from "@interaqt/shared";
 
-export const NewAttr = UserAttributive.create({
+export const NewAttr = Attributive.create({
     name: 'New',
     content: function New(){}
 })
 
-export const New2Attr = UserAttributive.create({
+export const New2Attr = Attributive.create({
     name: 'New2',
     content: function New2(){}
 })
 
-export const New3Attr = UserAttributive.create({
+export const New3Attr = Attributive.create({
     name: 'New3',
     content: function New3(){}
 })
 
 
-export const OldAttr = UserAttributive.create({
+export const OldAttr = Attributive.create({
     name: 'Old',
     content: function Old(){}
 })
 
-export const Old2Attr = UserAttributive.create({
+export const Old2Attr = Attributive.create({
     name: 'Old2',
     content: function Old2(){}
 })
 
-export const Old3Attr = UserAttributive.create({
+export const Old3Attr = Attributive.create({
     name: 'Old3',
     content: function Old3(){}
 })
 
-export const OtherAttr = UserAttributive.create({
+export const OtherAttr = Attributive.create({
     name: 'Other',
     content: 
 function Other(targetUser, { user }){ 

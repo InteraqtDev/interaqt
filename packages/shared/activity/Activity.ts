@@ -1,59 +1,8 @@
 import {createClass, Klass, KlassInstance, KlassInstancePrimitiveProps} from "../createClass.js";
 import {Entity} from "../entity/Entity.js";
-import {UserAttributive, UserAttributives} from "../user/User.js";
 
+import {Attributive, Attributives} from "../attributive";
 
-type EntityAttributivePublicType = {
-    name: {
-        type: 'string',
-        required:true
-    },
-    content: {
-        type: 'object',
-    },
-    stringContent: {
-        type: 'string',
-        required:true
-    },
-}
-
-export const EntityAttributive: Klass<EntityAttributivePublicType> = createClass({
-    name: 'EntityAttributive',
-    display: (obj: KlassInstance<Klass<EntityAttributivePublicType>, false>) => `${obj.name}`,
-    public:{
-        name: {
-            type: 'string',
-            required:true
-        },
-        // parse 之后的
-        content: {
-            type: 'object',
-        },
-        // 原始函数描述
-        stringContent: {
-            type: 'string',
-            required:true
-        },
-    }
-})
-
-type EntityAttributivesPublicType = {
-    content: {
-        type: 'object',
-        required:true
-    },
-}
-// EntityAttributive 的 bool 组合
-export const EntityAttributives: Klass<EntityAttributivesPublicType> = createClass({
-    name: 'EntityAttributives',
-    display: (obj:KlassInstance<Klass<EntityAttributivesPublicType>, false>) => `${obj.content}`,
-    public: {
-        content: {
-            type: 'object',
-            required:true
-        },
-    }
-})
 
 // 交互动作，因为以后可能有更多的关于交互动作的管理，所以应该是个对象，而不只是字符串名字。
 //  例如获取所有的 send xxx 类型的交互动作。
@@ -81,12 +30,12 @@ export const PayloadItem = createClass({
         },
         // 用于修饰后面的 UserAttributive 或者 Entity，类型根据 base 变化而变化
         attributives: {
-            type: [EntityAttributives, UserAttributives],
+            type: [Attributives, Attributive],
             collection: false,
         },
         // 当前 Item 的具体概念类型
         base: {
-            type: [UserAttributive, Entity],
+            type: Entity,
             required: true,
             collection: false,
         },
@@ -111,7 +60,7 @@ export const PayloadItem = createClass({
         itemRef: {
             collection: false,
             required: false,
-            type: [UserAttributive, Entity] as (typeof UserAttributive | typeof Entity)[],
+            type: [Attributive, Entity] as (typeof Attributive | typeof Entity)[],
         }
     }
 })
@@ -156,7 +105,7 @@ export type InteractionPublicType = {
     userAttributives: {
         required: false,
         collection: false,
-        type: (typeof UserAttributives|typeof UserAttributive)[],
+        type: (typeof Attributives|typeof Attributive)[],
     },
     // // 角色定语。例如 NORMAL_USER, ADMIN 等
     // userRoleAttributive : {
@@ -166,7 +115,7 @@ export type InteractionPublicType = {
     // },
     // 当前的用户的 alias 名字。这个地方应该改成 Alias 才更加好
     userRef: {
-        type: typeof UserAttributive,
+        type: typeof Attributive,
         collection: false,
     },
     action:  {
@@ -197,7 +146,7 @@ export const Interaction: Klass<InteractionPublicType> = createClass({
         },
         // 用户自定义的任何定语
         userAttributives: {
-            type: [UserAttributives, UserAttributive],
+            type: [Attributives, Attributive],
             required: false,
             collection: false,
         },
@@ -209,7 +158,7 @@ export const Interaction: Klass<InteractionPublicType> = createClass({
         // },
         // 当前的用户的 alias 名字。这个地方应该改成 Alias 才更加好
         userRef: {
-            type: UserAttributive,
+            type: Attributive,
             collection: false,
         },
         action:  {

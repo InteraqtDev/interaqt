@@ -1,4 +1,4 @@
-import {BoolAtomData, createUserRoleAttributive, UserAttributive, UserAttributives} from "@interaqt/shared";
+import {BoolAtomData, createUserRoleAttributive, Attributive, Attributives} from "@interaqt/shared";
 import {Action, Interaction, Payload, PayloadItem} from "@interaqt/shared";
 import {OtherAttr} from "./roles";
 import {Entity, Property, PropertyTypes, Relation} from "@interaqt/shared";
@@ -41,7 +41,7 @@ export const sendInteraction = Interaction.create({
         items: [
             PayloadItem.create({
                 name: 'to',
-                attributives: UserAttributives.create({
+                attributives: Attributives.create({
                     content: BoolAtomData.create({data: OtherAttr})
                 }),
                 base: UserEntity,
@@ -73,7 +73,7 @@ const sendRequestRelation = Relation.create({
     }),
 })
 
-const MyAttr = UserAttributive.create({
+const MyAttr = Attributive.create({
     name: 'Mine',
     content:
     async function Mine(this: Controller, request, {user}) {
@@ -99,7 +99,7 @@ export const approveInteraction = Interaction.create({
             PayloadItem.create({
                 name: 'request',
                 // FIXME 增加定语： 我的、未完成的
-                attributives: UserAttributives.create({
+                attributives: Attributives.create({
                     content: BoolAtomData.create({data: MyAttr})
                 }),
                 base: RequestEntity,
@@ -135,7 +135,7 @@ export const addReviewersInteraction = Interaction.create({
         items: [
             PayloadItem.create({
                 name: 'reviewers',
-                attributives: UserAttributives.create({
+                attributives: Attributives.create({
                     content: BoolAtomData.create({data: OtherAttr})
                 }),
                 isCollection: true,
@@ -161,7 +161,7 @@ export const transferReviewersInteraction = Interaction.create({
         items: [
             PayloadItem.create({
                 name: 'reviewer',
-                attributives: UserAttributives.create({
+                attributives: Attributives.create({
                     content: BoolAtomData.create({data: OtherAttr})
                 }),
                 base: UserEntity,

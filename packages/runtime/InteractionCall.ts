@@ -1,4 +1,6 @@
 import {
+    Attributive,
+    Attributives,
     BoolExp,
     BoolExpressionRawData,
     Concept,
@@ -6,13 +8,11 @@ import {
     ConceptInstance,
     DerivedConcept,
     Entity,
-    EntityAttributive,
-    EntityAttributives, ExpressionData,
+    ExpressionData,
     GetAction,
     InteractionInstanceType,
     Klass,
     KlassInstance,
-    UserAttributive, UserAttributives
 } from "@interaqt/shared";
 import {System} from "./System.js";
 import {EventUser, InteractionEvent, InteractionEventArgs} from "./types/interaction.js";
@@ -59,18 +59,18 @@ export type InteractionCallResponse= {
 }
 
 
-type UserAttributiveAtom = KlassInstance<typeof UserAttributive, false>
+type UserAttributiveAtom = KlassInstance<typeof Attributive, false>
 /// FIXME EntityAttributiveAtom 没有 isRole 字段
 type EntityAttributiveAtom =  UserAttributiveAtom
 
-type HandleAttributive = (attributive: KlassInstance<typeof UserAttributive, false>) => Promise<boolean>
+type HandleAttributive = (attributive: KlassInstance<typeof Attributive, false>) => Promise<boolean>
 
 type Attributive = {
     content: (...args: any[]) => any
     name: string
 }
 
-type CheckUserRef = (attributive: KlassInstance<typeof UserAttributive, false>, eventUser: EventUser, activityId: string) => Promise<boolean>
+type CheckUserRef = (attributive: KlassInstance<typeof Attributive, false>, eventUser: EventUser, activityId: string) => Promise<boolean>
 
 export class InteractionCall {
     system: System
@@ -102,12 +102,12 @@ export class InteractionCall {
         console.warn(`${attributive.name} not implemented`)
         return true
     }
-    async checkMixedAttributive(attributiveData: KlassInstance<typeof UserAttributive, false>, instance: ConceptInstance) {
+    async checkMixedAttributive(attributiveData: KlassInstance<typeof Attributive, false>, instance: ConceptInstance) {
         // const attributiveByName = indexBy((UserAttributive.instances as any[]).concat(Entity.instances), 'name')
         return Promise.resolve(true)
     }
-    createHandleAttributive(AttributiveClass: typeof UserAttributive| typeof EntityAttributive, interactionEvent: InteractionEventArgs, target: any) {
-        return (attributive: KlassInstance<typeof UserAttributive, false>) => {
+    createHandleAttributive(AttributiveClass: typeof Attributive| typeof Attributive, interactionEvent: InteractionEventArgs, target: any) {
+        return (attributive: KlassInstance<typeof Attributive, false>) => {
             return this.checkAttributive(attributive, interactionEvent, target)
         }
     }
@@ -116,15 +116,15 @@ export class InteractionCall {
         if (!this.interaction.userAttributives ) return true
 
         const userAttributiveCombined =
-            UserAttributives.is(this.interaction.userAttributives) ?
-                BoolExp.fromValue<KlassInstance<typeof UserAttributive, false>>(
-                    this.interaction.userAttributives!.content! as ExpressionData<KlassInstance<typeof UserAttributive, false>>
+            Attributives.is(this.interaction.userAttributives) ?
+                BoolExp.fromValue<KlassInstance<typeof Attributive, false>>(
+                    this.interaction.userAttributives!.content! as ExpressionData<KlassInstance<typeof Attributive, false>>
                 ) :
-                BoolExp.atom<KlassInstance<typeof UserAttributive, false>>(
-                    this.interaction.userAttributives as KlassInstance<typeof UserAttributive, false>
+                BoolExp.atom<KlassInstance<typeof Attributive, false>>(
+                    this.interaction.userAttributives as KlassInstance<typeof Attributive, false>
                 )
 
-        const checkHandle = (attributive: KlassInstance<typeof UserAttributive, false>) => {
+        const checkHandle = (attributive: KlassInstance<typeof Attributive, false>) => {
             if (attributive.isRef) {
                 return checkUserRef!(attributive, interactionEvent.user, activityId!)
             } else {
@@ -138,15 +138,15 @@ export class InteractionCall {
         throw new AttributeError('check user failed', res)
     }
     // 用来check attributive 形容的后面的  target 到底是不是那个概念的实例。
-    async checkConcept(instance: ConceptInstance, concept: Concept, attributives?: BoolExpressionRawData<KlassInstance<typeof UserAttributive, false>>, stack: ConceptCheckStack[] = []): Promise<ConceptCheckResponse> {
+    async checkConcept(instance: ConceptInstance, concept: Concept, attributives?: BoolExpressionRawData<KlassInstance<typeof Attributive, false>>, stack: ConceptCheckStack[] = []): Promise<ConceptCheckResponse> {
         const currentStack = stack.concat({type: 'concept', values: {attributives, concept}})
 
         const conceptRes = await this.isConcept(instance, concept, currentStack)
         if (conceptRes !== true) return conceptRes
 
         if (attributives) {
-            const handleAttributives = (attributive: KlassInstance<typeof UserAttributive, false>) => this.checkMixedAttributive(attributive, instance)
-            const attrMatchRes = await this.checkAttributives(new BoolExp<KlassInstance<typeof UserAttributive, false>>(attributives), handleAttributives , currentStack)
+            const handleAttributives = (attributive: KlassInstance<typeof Attributive, false>) => this.checkMixedAttributive(attributive, instance)
+            const attrMatchRes = await this.checkAttributives(new BoolExp<KlassInstance<typeof Attributive, false>>(attributives), handleAttributives , currentStack)
             if (attrMatchRes !== true) return attrMatchRes
         }
 
@@ -180,7 +180,7 @@ export class InteractionCall {
         } else {
             // TODO 好像废弃了，再检查一下，attributive 的check 直接就在 checkAttributive 做了
             // CAUTION 这里的 concept 是 Role/Entity 的实例. 例如 UserRole/AdminRole，实体例如 Post/Profile
-            if (UserAttributive.is(concept)) {
+            if (Attributive.is(concept)) {
                 // Role
                 return (await this.checkAttributive(concept, undefined, instance)) ? true : {name: concept.name, type: 'conceptCheck', stack: currentStack, error: 'role check error'}
             }
@@ -206,7 +206,7 @@ export class InteractionCall {
     isConceptAlias(concept: Concept) {
         return !!(concept as ConceptAlias).for
     }
-    async checkAttributives(attributives: BoolExp<KlassInstance<typeof UserAttributive, false>>, handleAttributive: HandleAttributive, stack: ConceptCheckStack[] = []) : Promise<ConceptCheckResponse>{
+    async checkAttributives(attributives: BoolExp<KlassInstance<typeof Attributive, false>>, handleAttributive: HandleAttributive, stack: ConceptCheckStack[] = []) : Promise<ConceptCheckResponse>{
         const result =  await attributives.evaluateAsync(handleAttributive)
         return result === true ? true : {name: '', type: 'matchAttributives', stack, error: result}
     }
@@ -253,16 +253,15 @@ export class InteractionCall {
 
 
             if (payloadDef.attributives) {
-                const rawAttributives = (payloadDef.attributives as KlassInstance<typeof EntityAttributives, false>).content
-                const attributives = isPayloadUser ?
-                    new BoolExp<UserAttributiveAtom>(rawAttributives  as BoolExpressionRawData<UserAttributiveAtom>):
-                    new BoolExp<EntityAttributiveAtom>(rawAttributives as BoolExpressionRawData<EntityAttributiveAtom>)
+                const attributives =  Attributives.is(payloadDef.attributives) ?
+                    new BoolExp<KlassInstance<typeof Attributive, false>>(payloadDef.attributives.content as BoolExpressionRawData<KlassInstance<typeof Attributive, false>>) :
+                    BoolExp.atom<KlassInstance<typeof Attributive, false>>(payloadDef.attributives as KlassInstance<typeof Attributive, false>)
 
                 // CAUTION 特别注意，这里不再区分是不是 collection，Attributive 永远是基于整体校验。
                 //  如果这里里面嗨哟校验单个，应该用户自己在 Attributive 里面做。
 
                 const handleAttribute = this.createHandleAttributive(
-                    isPayloadUser? UserAttributive : EntityAttributive,
+                    isPayloadUser? Attributive : Attributive,
                     interactionEvent,
                     payloadItem
                 )

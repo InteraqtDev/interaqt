@@ -8,7 +8,7 @@ import {
     GatewayInstanceType,
     InteractionInstanceType, KlassInstance,
     TransferInstanceType,
-    UserAttributive,
+    Attributive,
 } from "@interaqt/shared";
 import {assert} from "./util.js";
 import {System} from "./System.js";
@@ -390,7 +390,7 @@ export class ActivityCall {
         }
 
         interactionCall.interaction.payload?.items!.forEach((payloadDef) => {
-            if (UserAttributive.is(payloadDef.itemRef) && payloadDef.itemRef?.name && interactionEventArgs.payload![payloadDef.name!]) {
+            if (Attributive.is(payloadDef.itemRef) && payloadDef.itemRef?.name && interactionEventArgs.payload![payloadDef.name!]) {
                 const payloadItem = interactionEventArgs.payload![payloadDef.name!]
                 if (payloadDef.isCollection) {
                     if(!refs[payloadDef.itemRef!.name!]) refs[payloadDef.itemRef!.name!] = []
@@ -406,7 +406,7 @@ export class ActivityCall {
         await this.setActivity( activityId, {refs})
     }
 
-    checkUserRef = async (attributive: KlassInstance<typeof UserAttributive, false>, eventUser: EventUser, activityId: string): Promise<boolean> => {
+    checkUserRef = async (attributive: KlassInstance<typeof Attributive, false>, eventUser: EventUser, activityId: string): Promise<boolean> => {
         assert(attributive.isRef, 'attributive must be ref')
         const refs = (await this.getActivity(activityId))?.refs
         return refs[attributive.name!] === eventUser.id

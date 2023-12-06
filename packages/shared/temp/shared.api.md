@@ -134,7 +134,31 @@ export const Any: Klass<{
 export type AtomHandle<T> = (arg: T) => boolean | Promise<boolean>;
 
 // @public (undocumented)
-export const BoolAtomData: Klass<    {
+export const Attributive: Klass<    {
+stringContent: {
+type: "string";
+};
+content: {
+type: "function";
+};
+name: {
+type: "string";
+};
+isRef: {
+type: "boolean";
+};
+}>;
+
+// @public (undocumented)
+export class AttributiveBoolExp extends BoolExp<KlassInstance<typeof Attributive, false>> {
+    // (undocumented)
+    static toAttributives(obj?: BoolExp<KlassInstance<typeof Attributive, false>>): KlassInstance<typeof BoolAtomData, false> | UnwrappedBoolExpressionInstanceType | undefined;
+}
+
+// @public (undocumented)
+export const Attributives: Klass<    {
+content: {
+type: (Klass<    {
 type: {
 type: "string";
 required: true;
@@ -152,8 +176,37 @@ type: "function";
 name: {
 type: "string";
 };
-isRole: {
+isRef: {
 type: "boolean";
+};
+}>;
+required: true;
+collection: false;
+};
+}> | Klass<BoolExpressionDataPublic>)[];
+collection: false;
+required: false;
+};
+}>;
+
+// @public (undocumented)
+export const BoolAtomData: Klass<    {
+type: {
+type: "string";
+required: true;
+collection: false;
+defaultValue: () => string;
+};
+data: {
+type: Klass<    {
+stringContent: {
+type: "string";
+};
+content: {
+type: "function";
+};
+name: {
+type: "string";
 };
 isRef: {
 type: "boolean";
@@ -209,8 +262,6 @@ export class BoolExp<T> {
     toValue(): AtomData<T>;
 }
 
-// Warning: (ae-forgotten-export) The symbol "BoolExpressionDataPublic" needs to be exported by the entry point index.d.ts
-//
 // @public (undocumented)
 export const BoolExpressionData: Klass<BoolExpressionDataPublic>;
 
@@ -221,6 +272,40 @@ export type BoolExpressionRawData<T> = {
     left: ExpressionData<T>;
     right?: ExpressionData<T>;
 };
+
+// @public (undocumented)
+export function boolExpToAttributives(obj: BoolExp<KlassInstance<typeof Attributive, false>>): InertKlassInstance<    {
+content: {
+type: (Klass<    {
+type: {
+type: "string";
+required: true;
+collection: false;
+defaultValue: () => string;
+};
+data: {
+type: Klass<    {
+stringContent: {
+type: "string";
+};
+content: {
+type: "function";
+};
+name: {
+type: "string";
+};
+isRef: {
+type: "boolean";
+};
+}>;
+required: true;
+collection: false;
+};
+}> | Klass<BoolExpressionDataPublic>)[];
+collection: false;
+required: false;
+};
+}>;
 
 // @public (undocumented)
 export const ComputedData: Klass<{
@@ -372,9 +457,6 @@ type: "function";
 name: {
 type: "string";
 };
-isRole: {
-type: "boolean";
-};
 isRef: {
 type: "boolean";
 };
@@ -387,9 +469,6 @@ type: "function";
 };
 name: {
 type: "string";
-};
-isRole: {
-type: "boolean";
 };
 isRef: {
 type: "boolean";
@@ -481,25 +560,6 @@ export const Entity: Klass<{
         defaultValue: () => boolean;
     };
 }>;
-
-// Warning: (ae-forgotten-export) The symbol "EntityAttributivePublicType" needs to be exported by the entry point index.d.ts
-//
-// @public (undocumented)
-export const EntityAttributive: Klass<EntityAttributivePublicType>;
-
-// @public (undocumented)
-export type EntityAttributiveAtom = {
-    key: string;
-    [k: string]: any;
-};
-
-// Warning: (ae-forgotten-export) The symbol "EntityAttributivesPublicType" needs to be exported by the entry point index.d.ts
-//
-// @public (undocumented)
-export const EntityAttributives: Klass<EntityAttributivesPublicType>;
-
-// @public (undocumented)
-export type EntityAttributivesType = BoolExpressionRawData<EntityAttributiveAtom>;
 
 // @public (undocumented)
 export type EvaluateError = {
@@ -679,10 +739,10 @@ export type InteractionPublicType = {
     userAttributives: {
         required: false;
         collection: false;
-        type: (typeof UserAttributives | typeof UserAttributive)[];
+        type: (typeof Attributives | typeof Attributive)[];
     };
     userRef: {
-        type: typeof UserAttributive;
+        type: typeof Attributive;
         collection: false;
     };
     action: {
@@ -921,6 +981,19 @@ export const Payload: Klass<{
             };
             attributives: {
                 type: (Klass<{
+                    stringContent: {
+                        type: "string";
+                    };
+                    content: {
+                        type: "function";
+                    };
+                    name: {
+                        type: "string";
+                    };
+                    isRef: {
+                        type: "boolean";
+                    };
+                }> | Klass<{
                     content: {
                         type: (Klass<{
                             type: {
@@ -939,9 +1012,6 @@ export const Payload: Klass<{
                                     };
                                     name: {
                                         type: "string";
-                                    };
-                                    isRole: {
-                                        type: "boolean";
                                     };
                                     isRef: {
                                         type: "boolean";
@@ -965,68 +1035,62 @@ export const Payload: Klass<{
                                 defaultValue: () => "and";
                             };
                             left: {
-                                instanceType: Klass<{
-                                    type: {
-                                        type: "string";
-                                        required: true;
-                                        collection: false;
-                                        defaultValue: () => string;
-                                    };
-                                    data: {
-                                        type: Klass<{
-                                            stringContent: {
-                                                type: "string";
-                                            };
-                                            content: {
-                                                type: "function";
-                                            };
-                                            name: {
-                                                type: "string";
-                                            };
-                                            isRole: {
-                                                type: "boolean";
-                                            };
-                                            isRef: {
-                                                type: "boolean";
-                                            };
-                                        }>;
-                                        required: true;
-                                        collection: false;
-                                    };
-                                }> | UnwrappedBoolExpressionInstanceType;
+                                instanceType: UnwrappedBoolExpressionInstanceType | InertKlassInstance<    {
+                                type: {
+                                type: "string";
+                                required: true;
+                                collection: false;
+                                defaultValue: () => string;
+                                };
+                                data: {
+                                type: Klass<{
+                                stringContent: {
+                                type: "string";
+                                };
+                                content: {
+                                type: "function";
+                                };
+                                name: {
+                                type: "string";
+                                };
+                                isRef: {
+                                type: "boolean";
+                                };
+                                }>;
+                                required: true;
+                                collection: false;
+                                };
+                                }>;
                                 required: true;
                                 collection: false;
                             };
                             right: {
-                                instanceType: Klass<{
-                                    type: {
-                                        type: "string";
-                                        required: true;
-                                        collection: false;
-                                        defaultValue: () => string;
-                                    };
-                                    data: {
-                                        type: Klass<{
-                                            stringContent: {
-                                                type: "string";
-                                            };
-                                            content: {
-                                                type: "function";
-                                            };
-                                            name: {
-                                                type: "string";
-                                            };
-                                            isRole: {
-                                                type: "boolean";
-                                            };
-                                            isRef: {
-                                                type: "boolean";
-                                            };
-                                        }>;
-                                        required: true;
-                                        collection: false;
-                                    };
-                                }> | UnwrappedBoolExpressionInstanceType;
+                                instanceType: UnwrappedBoolExpressionInstanceType | InertKlassInstance<    {
+                                type: {
+                                type: "string";
+                                required: true;
+                                collection: false;
+                                defaultValue: () => string;
+                                };
+                                data: {
+                                type: Klass<{
+                                stringContent: {
+                                type: "string";
+                                };
+                                content: {
+                                type: "function";
+                                };
+                                name: {
+                                type: "string";
+                                };
+                                isRef: {
+                                type: "boolean";
+                                };
+                                }>;
+                                required: true;
+                                collection: false;
+                                };
+                                }>;
                                 required: false;
                                 collection: false;
                             };
@@ -1034,11 +1098,11 @@ export const Payload: Klass<{
                         collection: false;
                         required: false;
                     };
-                }> | Klass<EntityAttributivesPublicType>)[];
+                }>)[];
                 collection: false;
             };
             base: {
-                type: (Klass<{
+                type: Klass<{
                     name: {
                         type: "string";
                         collection: false;
@@ -1110,23 +1174,7 @@ export const Payload: Klass<{
                         type: "boolean";
                         defaultValue: () => boolean;
                     };
-                }> | Klass<{
-                    stringContent: {
-                        type: "string";
-                    };
-                    content: {
-                        type: "function";
-                    };
-                    name: {
-                        type: "string";
-                    };
-                    isRole: {
-                        type: "boolean";
-                    };
-                    isRef: {
-                        type: "boolean";
-                    };
-                }>)[];
+                }>;
                 required: true;
                 collection: false;
             };
@@ -1230,9 +1278,6 @@ export const Payload: Klass<{
                     name: {
                         type: "string";
                     };
-                    isRole: {
-                        type: "boolean";
-                    };
                     isRef: {
                         type: "boolean";
                     };
@@ -1253,6 +1298,19 @@ export const PayloadItem: Klass<{
     };
     attributives: {
         type: (Klass<{
+            stringContent: {
+                type: "string";
+            };
+            content: {
+                type: "function";
+            };
+            name: {
+                type: "string";
+            };
+            isRef: {
+                type: "boolean";
+            };
+        }> | Klass<{
             content: {
                 type: (Klass<{
                     type: {
@@ -1271,9 +1329,6 @@ export const PayloadItem: Klass<{
                             };
                             name: {
                                 type: "string";
-                            };
-                            isRole: {
-                                type: "boolean";
                             };
                             isRef: {
                                 type: "boolean";
@@ -1297,68 +1352,62 @@ export const PayloadItem: Klass<{
                         defaultValue: () => "and";
                     };
                     left: {
-                        instanceType: Klass<{
-                            type: {
-                                type: "string";
-                                required: true;
-                                collection: false;
-                                defaultValue: () => string;
-                            };
-                            data: {
-                                type: Klass<{
-                                    stringContent: {
-                                        type: "string";
-                                    };
-                                    content: {
-                                        type: "function";
-                                    };
-                                    name: {
-                                        type: "string";
-                                    };
-                                    isRole: {
-                                        type: "boolean";
-                                    };
-                                    isRef: {
-                                        type: "boolean";
-                                    };
-                                }>;
-                                required: true;
-                                collection: false;
-                            };
-                        }> | UnwrappedBoolExpressionInstanceType;
+                        instanceType: UnwrappedBoolExpressionInstanceType | InertKlassInstance<    {
+                        type: {
+                        type: "string";
+                        required: true;
+                        collection: false;
+                        defaultValue: () => string;
+                        };
+                        data: {
+                        type: Klass<{
+                        stringContent: {
+                        type: "string";
+                        };
+                        content: {
+                        type: "function";
+                        };
+                        name: {
+                        type: "string";
+                        };
+                        isRef: {
+                        type: "boolean";
+                        };
+                        }>;
+                        required: true;
+                        collection: false;
+                        };
+                        }>;
                         required: true;
                         collection: false;
                     };
                     right: {
-                        instanceType: Klass<{
-                            type: {
-                                type: "string";
-                                required: true;
-                                collection: false;
-                                defaultValue: () => string;
-                            };
-                            data: {
-                                type: Klass<{
-                                    stringContent: {
-                                        type: "string";
-                                    };
-                                    content: {
-                                        type: "function";
-                                    };
-                                    name: {
-                                        type: "string";
-                                    };
-                                    isRole: {
-                                        type: "boolean";
-                                    };
-                                    isRef: {
-                                        type: "boolean";
-                                    };
-                                }>;
-                                required: true;
-                                collection: false;
-                            };
-                        }> | UnwrappedBoolExpressionInstanceType;
+                        instanceType: UnwrappedBoolExpressionInstanceType | InertKlassInstance<    {
+                        type: {
+                        type: "string";
+                        required: true;
+                        collection: false;
+                        defaultValue: () => string;
+                        };
+                        data: {
+                        type: Klass<{
+                        stringContent: {
+                        type: "string";
+                        };
+                        content: {
+                        type: "function";
+                        };
+                        name: {
+                        type: "string";
+                        };
+                        isRef: {
+                        type: "boolean";
+                        };
+                        }>;
+                        required: true;
+                        collection: false;
+                        };
+                        }>;
                         required: false;
                         collection: false;
                     };
@@ -1366,11 +1415,11 @@ export const PayloadItem: Klass<{
                 collection: false;
                 required: false;
             };
-        }> | Klass<EntityAttributivesPublicType>)[];
+        }>)[];
         collection: false;
     };
     base: {
-        type: (Klass<{
+        type: Klass<{
             name: {
                 type: "string";
                 collection: false;
@@ -1442,23 +1491,7 @@ export const PayloadItem: Klass<{
                 type: "boolean";
                 defaultValue: () => boolean;
             };
-        }> | Klass<{
-            stringContent: {
-                type: "string";
-            };
-            content: {
-                type: "function";
-            };
-            name: {
-                type: "string";
-            };
-            isRole: {
-                type: "boolean";
-            };
-            isRef: {
-                type: "boolean";
-            };
-        }>)[];
+        }>;
         required: true;
         collection: false;
     };
@@ -1561,9 +1594,6 @@ export const PayloadItem: Klass<{
             };
             name: {
                 type: "string";
-            };
-            isRole: {
-                type: "boolean";
             };
             isRef: {
                 type: "boolean";
@@ -2282,71 +2312,6 @@ export type UnwrappedBoolExpressionInstanceType = {
 };
 
 // @public (undocumented)
-export const UserAttributive: Klass<    {
-stringContent: {
-type: "string";
-};
-content: {
-type: "function";
-};
-name: {
-type: "string";
-};
-isRole: {
-type: "boolean";
-};
-isRef: {
-type: "boolean";
-};
-}>;
-
-// @public (undocumented)
-export type UserAttributiveAtom = {
-    key: string;
-    [k: string]: any;
-};
-
-// @public (undocumented)
-export const UserAttributives: Klass<    {
-content: {
-type: (Klass<    {
-type: {
-type: "string";
-required: true;
-collection: false;
-defaultValue: () => string;
-};
-data: {
-type: Klass<    {
-stringContent: {
-type: "string";
-};
-content: {
-type: "function";
-};
-name: {
-type: "string";
-};
-isRole: {
-type: "boolean";
-};
-isRef: {
-type: "boolean";
-};
-}>;
-required: true;
-collection: false;
-};
-}> | Klass<BoolExpressionDataPublic>)[];
-collection: false;
-required: false;
-};
-}>;
-
-// @public (undocumented)
-export type UserAttributivesType = BoolExpressionRawData<UserAttributiveAtom>;
-
-// @public (undocumented)
 export const WeightedSummation: Klass<{
     records: {
         type: (Klass<{
@@ -2434,7 +2399,8 @@ export const WeightedSummation: Klass<{
 
 // Warnings were encountered during analysis:
 //
-// activity/Activity.ts:324:9 - (ae-forgotten-export) The symbol "UnwrappedActivityInstanceType" needs to be exported by the entry point index.d.ts
+// activity/Activity.ts:273:9 - (ae-forgotten-export) The symbol "UnwrappedActivityInstanceType" needs to be exported by the entry point index.d.ts
+// attributive.ts:126:1 - (ae-forgotten-export) The symbol "BoolExpressionDataPublic" needs to be exported by the entry point index.d.ts
 // createClass.ts:48:9 - (ae-forgotten-export) The symbol "ClassMetaPublicItem" needs to be exported by the entry point index.d.ts
 
 // (No @packageDocumentation comment for this package)

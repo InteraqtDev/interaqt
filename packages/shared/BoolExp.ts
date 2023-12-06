@@ -28,7 +28,11 @@ export class BoolExp<T> {
     public static atom<U>(data: U) {
         return new BoolExp<U>({ type: 'atom', data })
     }
-    constructor(public raw: ExpressionData<T>) {}
+    constructor(public raw: ExpressionData<T>) {
+        if (!raw) {
+            debugger
+        }
+    }
     isAtom() {
         return this.raw.type === 'atom'
     }

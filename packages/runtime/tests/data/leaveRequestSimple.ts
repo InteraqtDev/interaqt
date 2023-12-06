@@ -15,7 +15,7 @@ import {
     RelationCount,
     removeAllInstance,
     stringifyAllInstances,
-    UserAttributives
+    Attributives
 } from "@interaqt/shared";
 import {Controller} from "@interaqt/runtime";
 
