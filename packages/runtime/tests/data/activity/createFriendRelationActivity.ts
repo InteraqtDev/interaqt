@@ -1,6 +1,6 @@
 import {Controller} from "@interaqt/runtime";
 import {globalUserRole, OtherAttr} from "./roles.js";
-import {userEntity} from "./user.js";
+import {UserEntity} from "./user.js";
 import {
     Action,
     Activity,
@@ -35,7 +35,7 @@ export const sendInteraction = Interaction.create({
                 attributives: UserAttributives.create({
                     content: BoolAtomData.create({data: OtherAttr})
                 }),
-                base: globalUserRole,
+                base: UserEntity,
                 itemRef: userRefB
             }),
             PayloadItem.create({
@@ -140,7 +140,7 @@ export const deleteInteraction = Interaction.create({
                 attributives: UserAttributives.create({
                     content: BoolAtomData.create({data: MyFriend})
                 }),
-                base: globalUserRole,
+                base: UserEntity,
                 isRef: true,
             }),
         ]
@@ -197,9 +197,9 @@ const friendRelationSM = RelationStateMachine.create({
     defaultState: notFriendState
 })
 export const friendRelation = Relation.create({
-    source: userEntity,
+    source: UserEntity,
     sourceAttribute: 'friends',
-    target: userEntity,
+    target: UserEntity,
     targetAttribute: 'friends',
     relType: 'n:n',
     computedData: friendRelationSM

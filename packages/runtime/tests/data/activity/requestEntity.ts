@@ -1,4 +1,4 @@
-import {userEntity} from "./user.js";
+import {UserEntity} from "./user.js";
 import {approveInteraction, mapFriendActivityToRequest, rejectInteraction} from "./createFriendRelationActivity.js";
 import {Controller} from "@interaqt/runtime";
 import {
@@ -25,14 +25,14 @@ export const requestEntity = Entity.create({
 export const sendRequestRelation = Relation.create({
     source: requestEntity,
     sourceAttribute: 'from',
-    target: userEntity,
+    target: UserEntity,
     targetAttribute: 'request',
     relType: 'n:1'
 })
 export const receivedRequestRelation = Relation.create({
     source: requestEntity,
     sourceAttribute: 'to',
-    target: userEntity,
+    target: UserEntity,
     targetAttribute: 'receivedRequest',
     relType: 'n:1',
     properties: [Property.create({

@@ -19,7 +19,7 @@ import {EventUser, InteractionEvent, InteractionEventArgs} from "./types/interac
 import {assert, everyWithErrorAsync} from "./util.js";
 import {ActivityCall} from "./ActivityCall.js";
 import {someAsync} from "@interaqt/storage";
-import {Controller} from "./Controller.js";
+import {Controller, USER_ENTITY} from "./Controller.js";
 
 type ConceptCheckStack = {
     type: string,
@@ -178,6 +178,7 @@ export class InteractionCall {
                 return {name: concept.name, type: 'conceptAlias', stack: currentStack, error: errors}
             }
         } else {
+            // TODO 好像废弃了，再检查一下，attributive 的check 直接就在 checkAttributive 做了
             // CAUTION 这里的 concept 是 Role/Entity 的实例. 例如 UserRole/AdminRole，实体例如 Post/Profile
             if (UserAttributive.is(concept)) {
                 // Role
@@ -248,7 +249,7 @@ export class InteractionCall {
                 }
             }
 
-            const isPayloadUser = UserAttributive.is(payloadDef.base)
+            const isPayloadUser = payloadDef.base.name === USER_ENTITY
 
 
             if (payloadDef.attributives) {
@@ -297,7 +298,7 @@ export class InteractionCall {
         const payloadDefs = this.interaction.payload?.items || []
         const savedPayload: InteractionEventArgs["payload"] = {}
         for(let payloadDef of payloadDefs) {
-            const isPayloadUser = UserAttributive.is(payloadDef.base)
+            const isPayloadUser = payloadDef.base.name === USER_ENTITY
             if (!payloadDef.isRef && !isPayloadUser) {
                 const payloadItem = payload![payloadDef.name!]
                 if (payloadItem) {

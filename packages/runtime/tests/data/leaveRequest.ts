@@ -15,9 +15,9 @@ import {
     RelationStateTransfer
 } from "@interaqt/shared";
 import {removeAllInstance, stringifyAllInstances} from "@interaqt/shared";
-import {Controller} from "@interaqt/runtime";
+import {Controller, USER_ENTITY} from "@interaqt/runtime";
 
-const UserEntity = Entity.create({ name: 'User' })
+const UserEntity = Entity.create({ name: USER_ENTITY })
 const nameProperty = Property.create({ name: 'name', type: PropertyTypes.String })
 UserEntity.properties.push(nameProperty)
 
@@ -44,7 +44,8 @@ export const sendInteraction = Interaction.create({
                 attributives: UserAttributives.create({
                     content: BoolAtomData.create({data: OtherAttr})
                 }),
-                base: globalUserRole,
+                base: UserEntity,
+                isRef: true,
             }),
             PayloadItem.create({
                 name: 'request',
@@ -138,7 +139,8 @@ export const addReviewersInteraction = Interaction.create({
                     content: BoolAtomData.create({data: OtherAttr})
                 }),
                 isCollection: true,
-                base: globalUserRole,
+                base: UserEntity,
+                isRef:true,
             }),
             PayloadItem.create({
                 name: 'request',
@@ -162,7 +164,8 @@ export const transferReviewersInteraction = Interaction.create({
                 attributives: UserAttributives.create({
                     content: BoolAtomData.create({data: OtherAttr})
                 }),
-                base: globalUserRole,
+                base: UserEntity,
+                isRef: true
             }),
             PayloadItem.create({
                 name: 'request',

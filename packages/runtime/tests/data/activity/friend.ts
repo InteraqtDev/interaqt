@@ -1,6 +1,6 @@
 import {sendRequestRelation, userTotalUnhandledRequest} from "./requestEntity.js";
 import {friendRelation} from "./createFriendRelationActivity.js";
-import {userEntity} from "./user.js";
+import {UserEntity} from "./user.js";
 import {
     Action,
     Activity,
@@ -25,14 +25,14 @@ import {
     RelationCount
 } from "@interaqt/shared";
 
-userEntity.properties.push(Property.create({
+UserEntity.properties.push(Property.create({
     name: 'totalUnhandledRequest',
     type: 'number',
     collection: false,
     computedData: userTotalUnhandledRequest
 }))
 
-userEntity.properties.push(Property.create({
+UserEntity.properties.push(Property.create({
     name: 'everySendRequestHandled',
     type: 'boolean',
     collection: false,
@@ -43,7 +43,7 @@ userEntity.properties.push(Property.create({
     })
 }))
 
-userEntity.properties.push(Property.create({
+UserEntity.properties.push(Property.create({
     name: 'anySendRequestHandled',
     type: 'boolean',
     collection: false,
@@ -61,7 +61,7 @@ const userTotalFriendCount = RelationCount.create({
     matchExpression: () => true
 })
 
-userEntity.properties.push(Property.create({
+UserEntity.properties.push(Property.create({
     name: 'totalFriendCount',
     type: 'number',
     collection: false,
