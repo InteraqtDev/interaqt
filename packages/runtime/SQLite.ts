@@ -1,6 +1,6 @@
-// import { Database as SQLite } from "sqlite3";
 import SQLite from "better-sqlite3";
 import {Database, EntityIdRef, ROW_ID_ATTR} from "./System.js";
+import chalk from 'chalk';
 
 class IDSystem {
     constructor(public db: Database) {}
@@ -10,53 +10,91 @@ class IDSystem {
     async getAutoId(recordName: string) {
         const lastId =  (await this.db.query<{last: number}>( `SELECT last FROM _IDS_ WHERE name = '${recordName}'`, [] ))[0]?.last
         const newId = (lastId || 0) +1
+        const name =`set last id for ${recordName}: ${newId}`
         if (lastId === undefined) {
-            // FIXME 用上 insert 后  returning _rowid 有问题？
-            await this.db.scheme(`INSERT INTO _IDS_ (name, last) VALUES ('${recordName}', ${newId})`)
+            await this.db.scheme(`INSERT INTO _IDS_ (name, last) VALUES ('${recordName}', ${newId})`, name)
         } else {
-            await this.db.update(`UPDATE _IDS_ SET last = ? WHERE name = ?`, [newId, recordName])
+            await this.db.update(`UPDATE _IDS_ SET last = ? WHERE name = ?`, [newId, recordName], undefined, name)
         }
         return newId as unknown as string
     }
 }
 
+export type SQLiteDBOptions = Parameters<typeof SQLite>[1] & {log: SQLiteDB['log']}
+
+function defaultLog({type, name, sql, params}: Parameters<SQLiteDB['log']>[0]) {
+    const color = type === 'delete' ? chalk.bgRed.black :
+        type === 'insert' ? chalk.bgYellow.black:
+            type === 'update'? chalk.bgYellowBright.black:
+                type === 'query' ? chalk.bgGreen.black:
+                    chalk.bgBlue.white
+
+
+    console.log(`${color(`[${type}:${name}] `)} 
+${sql} 
+${color(`params: [${params?.map(x => JSON.stringify(x)).join(',')}]`)} 
+`)
+}
+
 export class SQLiteDB implements Database{
     db!: InstanceType<typeof SQLite>
     idSystem!: IDSystem
-    constructor(public file:string = ':memory:', public options?: Parameters<typeof SQLite>[1]) {
+    log: (msg: {type: string, name: string, sql: string, params?: any[]}) => any
+    constructor(public file:string = ':memory:', public options?: SQLiteDBOptions) {
         this.idSystem = new IDSystem(this)
+        this.log = this.options?.log || defaultLog
     }
     async open() {
         this.db = new SQLite(this.file, this.options)
         await this.idSystem.setup()
     }
     async query<T extends any>(sql:string, where: any[] =[], name= '')  {
-        console.log(`query==============${name}`)
-        // console.log(sql)
-        const finalValues = where.map(x => x===false ? 0 : x===true ? 1 : x)
-        return  this.db.prepare(sql).all(...finalValues) as T[]
+        const params = where.map(x => x===false ? 0 : x===true ? 1 : x)
+        this.log({
+            type:'query',
+            name,
+            sql,
+            params
+        })
+        return  this.db.prepare(sql).all(...params) as T[]
     }
     async update(sql:string,values: any[], idField?:string, name='') {
-        console.log(`update=============${name}`)
         const finalSQL = `${sql} ${idField ? `RETURNING ${idField} AS id`: ''}`
-        const finalValues = values.map(x => x===false ? 0 : x===true ? 1 : x)
-        return this.db.prepare(finalSQL).run(...finalValues)  as unknown as any[]
+        const params = values.map(x => x===false ? 0 : x===true ? 1 : x)
+        this.log({
+            type:'update',
+            name,
+            sql:finalSQL,
+            params
+        })
+        return this.db.prepare(finalSQL).run(...params)  as unknown as any[]
     }
     async insert (sql:string, values:any[], name='')  {
-        console.log(`insert==============${name}`)
-        // console.log(`${sql} RETURNING ${ROW_ID_ATTR}`)
-        const finalValues = values.map(x => x===false ? 0 : x===true ? 1 : x)
-        return  this.db.prepare(`${sql} RETURNING ${ROW_ID_ATTR}`).run(...finalValues) as unknown as EntityIdRef
+        const params = values.map(x => x===false ? 0 : x===true ? 1 : x)
+        this.log({
+            type:'insert',
+            name,
+            sql,
+            params
+        })
+        return  this.db.prepare(`${sql} RETURNING ${ROW_ID_ATTR}`).run(...params) as unknown as EntityIdRef
     }
     async delete (sql:string, where: any[], name='') {
-        console.log(`delete==============${name}`)
-        // console.log(sql)
-        const finalValues = where.map(x => x===false ? 0 : x===true ? 1 : x)
-        return this.db.prepare(sql).run(...finalValues) as unknown as  any[]
+        const params = where.map(x => x===false ? 0 : x===true ? 1 : x)
+        this.log({
+            type:'delete',
+            name,
+            sql,
+            params
+        })
+        return this.db.prepare(sql).run(...params) as unknown as  any[]
     }
-    async scheme(sql: string) {
-        console.log(`scheme=============`)
-        // console.log(sql)
+    async scheme(sql: string, name='') {
+        this.log({
+            type:'scheme',
+            name,
+            sql,
+        })
         return this.db.prepare(sql).run()
     }
     close() {
