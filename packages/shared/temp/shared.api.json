@@ -3891,7 +3891,7 @@
             },
             {
               "kind": "Content",
-              "text": "{\n    name: {\n        type: 'string';\n        collection: false;\n        required: true;\n    };\n    userAttributives: {\n        required: true;\n        collection: false;\n        type: typeof "
+              "text": "{\n    name: {\n        type: 'string';\n        collection: false;\n        required: true;\n    };\n    userAttributives: {\n        required: false;\n        collection: false;\n        type: (typeof "
             },
             {
               "kind": "Reference",
@@ -3900,7 +3900,7 @@
             },
             {
               "kind": "Content",
-              "text": ";\n    };\n    userRoleAttributive: {\n        type: typeof "
+              "text": " | typeof "
             },
             {
               "kind": "Reference",
@@ -3909,7 +3909,7 @@
             },
             {
               "kind": "Content",
-              "text": ";\n        collection: false;\n        required: true;\n    };\n    userRef: {\n        type: typeof "
+              "text": ")[];\n    };\n    userRef: {\n        type: typeof "
             },
             {
               "kind": "Reference",

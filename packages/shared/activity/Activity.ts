@@ -139,16 +139,16 @@ export type InteractionPublicType = {
     },
     // 用户自定义的任何定语
     userAttributives: {
-        required: true,
+        required: false,
         collection: false,
-        type: typeof UserAttributives,
+        type: (typeof UserAttributives|typeof UserAttributive)[],
     },
-    // 角色定语。例如 NORMAL_USER, ADMIN 等
-    userRoleAttributive : {
-        type: typeof UserAttributive,
-        collection: false,
-        required: true
-    },
+    // // 角色定语。例如 NORMAL_USER, ADMIN 等
+    // userRoleAttributive : {
+    //     type: typeof UserAttributive,
+    //     collection: false,
+    //     required: true
+    // },
     // 当前的用户的 alias 名字。这个地方应该改成 Alias 才更加好
     userRef: {
         type: typeof UserAttributive,
@@ -176,16 +176,16 @@ export const Interaction: Klass<InteractionPublicType> = createClass({
         },
         // 用户自定义的任何定语
         userAttributives: {
-            required: true,
+            type: [UserAttributives, UserAttributive],
+            required: false,
             collection: false,
-            type: UserAttributives,
         },
-        // 角色定语。例如 NORMAL_USER, ADMIN 等
-        userRoleAttributive : {
-            type: UserAttributive,
-            collection: false,
-            required: true
-        },
+        // // 角色定语。例如 NORMAL_USER, ADMIN 等
+        // userRoleAttributive : {
+        //     type: UserAttributive,
+        //     collection: false,
+        //     required: true
+        // },
         // 当前的用户的 alias 名字。这个地方应该改成 Alias 才更加好
         userRef: {
             type: UserAttributive,

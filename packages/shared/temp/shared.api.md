@@ -677,14 +677,9 @@ export type InteractionPublicType = {
         required: true;
     };
     userAttributives: {
-        required: true;
+        required: false;
         collection: false;
-        type: typeof UserAttributives;
-    };
-    userRoleAttributive: {
-        type: typeof UserAttributive;
-        collection: false;
-        required: true;
+        type: (typeof UserAttributives | typeof UserAttributive)[];
     };
     userRef: {
         type: typeof UserAttributive;
