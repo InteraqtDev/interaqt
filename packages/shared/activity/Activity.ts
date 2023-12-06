@@ -129,7 +129,22 @@ export const Payload = createClass({
         }
     }
 })
-
+//  执行的 side effect。通常需要和实现的系统进行约定。
+export const SideEffect = createClass({
+    name: 'SideEffect',
+    public: {
+        name: {
+            type: 'string',
+            required: true,
+            collection: false
+        },
+        handle: {
+            type: 'function',
+            required: true,
+            collection: false
+        }
+    }
+})
 
 export type InteractionPublicType = {
     name: {
@@ -162,7 +177,13 @@ export type InteractionPublicType = {
     payload: {
         type: typeof Payload,
         collection: false,
-    }
+    },
+    // 副作用
+    sideEffects: {
+        type: typeof SideEffect,
+        collection: true
+        defaultValue: (...args: any[]) => KlassInstance<typeof SideEffect, any>[]
+    },
 }
 
 export const Interaction: Klass<InteractionPublicType> = createClass({
@@ -199,7 +220,13 @@ export const Interaction: Klass<InteractionPublicType> = createClass({
         payload: {
             type: Payload,
             collection: false,
-        }
+        },
+        // 副作用
+        sideEffects: {
+            type: SideEffect,
+            collection: true,
+            defaultValue: (...args: any[]) => []
+        },
     }
 })
 
@@ -232,16 +259,7 @@ export const Event = createClass({
     }
 })
 
-//  执行的 side effect。通常需要和实现的系统进行约定。
-export const SideEffect = createClass({
-    name: 'SideEffect',
-    public: {
-        name: {
-            type: 'string',
-            required: true
-        }
-    }
-})
+
 
 // activity activityGroup transfer 互相引用了，所以 type 要单独写了。
 type ActivityPublicType = {
@@ -275,13 +293,7 @@ type ActivityPublicType = {
         type: typeof Event,
         collection: true
         defaultValue: (...args: any[]) => KlassInstance<typeof Event, any>[]
-    },
-    // 副作用
-    sideEffects: {
-        type: typeof SideEffect,
-        collection: true
-        defaultValue: (...args: any[]) => KlassInstance<typeof SideEffect, any>[]
-    },
+    }
 } 
 
 
@@ -298,7 +310,6 @@ type UnwrappedActivityInstanceType = {
     groups: KlassInstance<Klass<ActivityGroupPublicType>, any>[]
     gateways: KlassInstance<Klass<GatewayPublicType>, any>[]
     events: KlassInstance<typeof Event, any>[]
-    sideEffects: KlassInstance<typeof SideEffect, any>[]
 } & KlassInstancePrimitiveProps
 
 export type ActivityGroupPublicType = {
@@ -380,12 +391,7 @@ export const Activity: Klass<ActivityPublicType> = createClass({
             collection: true,
             defaultValue: (...args: any[]) => []
         },
-        // 副作用
-        sideEffects: {
-            type: SideEffect,
-            collection: true,
-            defaultValue: (...args: any[]) => []
-        },
+
     } as ActivityPublicType)
 })
 

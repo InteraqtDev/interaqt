@@ -694,6 +694,11 @@ export type InteractionPublicType = {
         type: typeof Payload;
         collection: false;
     };
+    sideEffects: {
+        type: typeof SideEffect;
+        collection: true;
+        defaultValue: (...args: any[]) => KlassInstance<typeof SideEffect, any>[];
+    };
 };
 
 // @public (undocumented)
@@ -784,26 +789,6 @@ export const MapActivityToRecord: Klass<{
                 defaultValue: (...args: any[]) => (InertKlassInstance<GatewayPublicType> | ReactiveKlassInstance<GatewayPublicType>)[];
             };
             events: {
-                type: Klass<{
-                    name: {
-                        type: "string";
-                        required: true;
-                    };
-                }>;
-                collection: true;
-                defaultValue: (...args: any[]) => (ReactiveKlassInstance<    {
-                name: {
-                type: "string";
-                required: true;
-                };
-                }> | InertKlassInstance<    {
-                name: {
-                type: "string";
-                required: true;
-                };
-                }>)[];
-            };
-            sideEffects: {
                 type: Klass<{
                     name: {
                         type: "string";
@@ -1901,26 +1886,6 @@ export const RelationStateMachine: Klass<{
                         };
                         }>)[];
                     };
-                    sideEffects: {
-                        type: Klass<{
-                            name: {
-                                type: "string";
-                                required: true;
-                            };
-                        }>;
-                        collection: true;
-                        defaultValue: (...args: any[]) => (ReactiveKlassInstance<    {
-                        name: {
-                        type: "string";
-                        required: true;
-                        };
-                        }> | InertKlassInstance<    {
-                        name: {
-                        type: "string";
-                        required: true;
-                        };
-                        }>)[];
-                    };
                 }>;
                 collection: false;
                 required: false;
@@ -2119,26 +2084,6 @@ export const RelationStateTransfer: Klass<{
                 };
                 }>)[];
             };
-            sideEffects: {
-                type: Klass<{
-                    name: {
-                        type: "string";
-                        required: true;
-                    };
-                }>;
-                collection: true;
-                defaultValue: (...args: any[]) => (ReactiveKlassInstance<    {
-                name: {
-                type: "string";
-                required: true;
-                };
-                }> | InertKlassInstance<    {
-                name: {
-                type: "string";
-                required: true;
-                };
-                }>)[];
-            };
         }>;
         collection: false;
         required: false;
@@ -2241,6 +2186,12 @@ export const SideEffect: Klass<{
     name: {
         type: "string";
         required: true;
+        collection: false;
+    };
+    handle: {
+        type: "function";
+        required: true;
+        collection: false;
     };
 }>;
 
@@ -2483,7 +2434,7 @@ export const WeightedSummation: Klass<{
 
 // Warnings were encountered during analysis:
 //
-// activity/Activity.ts:313:9 - (ae-forgotten-export) The symbol "UnwrappedActivityInstanceType" needs to be exported by the entry point index.d.ts
+// activity/Activity.ts:324:9 - (ae-forgotten-export) The symbol "UnwrappedActivityInstanceType" needs to be exported by the entry point index.d.ts
 // createClass.ts:48:9 - (ae-forgotten-export) The symbol "ClassMetaPublicItem" needs to be exported by the entry point index.d.ts
 
 // (No @packageDocumentation comment for this package)

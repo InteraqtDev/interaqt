@@ -3936,7 +3936,34 @@
             },
             {
               "kind": "Content",
-              "text": ";\n        collection: false;\n    };\n}"
+              "text": ";\n        collection: false;\n    };\n    sideEffects: {\n        type: typeof "
+            },
+            {
+              "kind": "Reference",
+              "text": "SideEffect",
+              "canonicalReference": "@interaqt/shared!SideEffect:var"
+            },
+            {
+              "kind": "Content",
+              "text": ";\n        collection: true;\n        defaultValue: (...args: any[]) => "
+            },
+            {
+              "kind": "Reference",
+              "text": "KlassInstance",
+              "canonicalReference": "@interaqt/shared!KlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<typeof "
+            },
+            {
+              "kind": "Reference",
+              "text": "SideEffect",
+              "canonicalReference": "@interaqt/shared!SideEffect:var"
+            },
+            {
+              "kind": "Content",
+              "text": ", any>[];\n    };\n}"
             },
             {
               "kind": "Content",
@@ -3948,7 +3975,7 @@
           "name": "InteractionPublicType",
           "typeTokenRange": {
             "startIndex": 1,
-            "endIndex": 12
+            "endIndex": 18
           }
         },
         {
@@ -4830,33 +4857,6 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                    name: {\n                        type: \"string\";\n                        required: true;\n                    };\n                }>)[];\n            };\n            sideEffects: {\n                type: "
-            },
-            {
-              "kind": "Reference",
-              "text": "Klass",
-              "canonicalReference": "@interaqt/shared!Klass:type"
-            },
-            {
-              "kind": "Content",
-              "text": "<{\n                    name: {\n                        type: \"string\";\n                        required: true;\n                    };\n                }>;\n                collection: true;\n                defaultValue: (...args: any[]) => (import(\"./createClass.js\")."
-            },
-            {
-              "kind": "Reference",
-              "text": "ReactiveKlassInstance",
-              "canonicalReference": "@interaqt/shared!ReactiveKlassInstance:type"
-            },
-            {
-              "kind": "Content",
-              "text": "<{\n                    name: {\n                        type: \"string\";\n                        required: true;\n                    };\n                }> | import(\"./createClass.js\")."
-            },
-            {
-              "kind": "Reference",
-              "text": "InertKlassInstance",
-              "canonicalReference": "@interaqt/shared!InertKlassInstance:type"
-            },
-            {
-              "kind": "Content",
               "text": "<{\n                    name: {\n                        type: \"string\";\n                        required: true;\n                    };\n                }>)[];\n            };\n        }>;\n        collection: false;\n        required: true;\n    };\n    triggerInteraction: {\n        type: "
             },
             {
@@ -4884,7 +4884,7 @@
           "name": "MapActivityToRecord",
           "variableTypeTokenRange": {
             "startIndex": 1,
-            "endIndex": 69
+            "endIndex": 63
           }
         },
         {
@@ -7293,33 +7293,6 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                            name: {\n                                type: \"string\";\n                                required: true;\n                            };\n                        }>)[];\n                    };\n                    sideEffects: {\n                        type: "
-            },
-            {
-              "kind": "Reference",
-              "text": "Klass",
-              "canonicalReference": "@interaqt/shared!Klass:type"
-            },
-            {
-              "kind": "Content",
-              "text": "<{\n                            name: {\n                                type: \"string\";\n                                required: true;\n                            };\n                        }>;\n                        collection: true;\n                        defaultValue: (...args: any[]) => (import(\"./createClass.js\")."
-            },
-            {
-              "kind": "Reference",
-              "text": "ReactiveKlassInstance",
-              "canonicalReference": "@interaqt/shared!ReactiveKlassInstance:type"
-            },
-            {
-              "kind": "Content",
-              "text": "<{\n                            name: {\n                                type: \"string\";\n                                required: true;\n                            };\n                        }> | import(\"./createClass.js\")."
-            },
-            {
-              "kind": "Reference",
-              "text": "InertKlassInstance",
-              "canonicalReference": "@interaqt/shared!InertKlassInstance:type"
-            },
-            {
-              "kind": "Content",
               "text": "<{\n                            name: {\n                                type: \"string\";\n                                required: true;\n                            };\n                        }>)[];\n                    };\n                }>;\n                collection: false;\n                required: false;\n            };\n            triggerInteraction: {\n                type: "
             },
             {
@@ -7428,7 +7401,7 @@
           "name": "RelationStateMachine",
           "variableTypeTokenRange": {
             "startIndex": 1,
-            "endIndex": 95
+            "endIndex": 89
           }
         },
         {
@@ -7745,33 +7718,6 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                    name: {\n                        type: \"string\";\n                        required: true;\n                    };\n                }>)[];\n            };\n            sideEffects: {\n                type: "
-            },
-            {
-              "kind": "Reference",
-              "text": "Klass",
-              "canonicalReference": "@interaqt/shared!Klass:type"
-            },
-            {
-              "kind": "Content",
-              "text": "<{\n                    name: {\n                        type: \"string\";\n                        required: true;\n                    };\n                }>;\n                collection: true;\n                defaultValue: (...args: any[]) => (import(\"./createClass.js\")."
-            },
-            {
-              "kind": "Reference",
-              "text": "ReactiveKlassInstance",
-              "canonicalReference": "@interaqt/shared!ReactiveKlassInstance:type"
-            },
-            {
-              "kind": "Content",
-              "text": "<{\n                    name: {\n                        type: \"string\";\n                        required: true;\n                    };\n                }> | import(\"./createClass.js\")."
-            },
-            {
-              "kind": "Reference",
-              "text": "InertKlassInstance",
-              "canonicalReference": "@interaqt/shared!InertKlassInstance:type"
-            },
-            {
-              "kind": "Content",
               "text": "<{\n                    name: {\n                        type: \"string\";\n                        required: true;\n                    };\n                }>)[];\n            };\n        }>;\n        collection: false;\n        required: false;\n    };\n    triggerInteraction: {\n        type: "
             },
             {
@@ -7853,7 +7799,7 @@
           "name": "RelationStateTransfer",
           "variableTypeTokenRange": {
             "startIndex": 1,
-            "endIndex": 81
+            "endIndex": 75
           }
         },
         {
@@ -8206,7 +8152,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n    name: {\n        type: \"string\";\n        required: true;\n    };\n}>"
+              "text": "<{\n    name: {\n        type: \"string\";\n        required: true;\n        collection: false;\n    };\n    handle: {\n        type: \"function\";\n        required: true;\n        collection: false;\n    };\n}>"
             }
           ],
           "fileUrlPath": "activity/Activity.ts",
