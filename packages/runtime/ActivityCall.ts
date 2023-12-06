@@ -3,17 +3,17 @@
 import {
     ActivityGroup,
     ActivityGroupInstanceType,
-    ActivityInstanceType,
+    ActivityInstanceType, Entity,
     Gateway,
     GatewayInstanceType,
-    InteractionInstanceType,
+    InteractionInstanceType, KlassInstance,
     TransferInstanceType,
     UserAttributive,
 } from "@interaqt/shared";
 import {assert} from "./util.js";
 import {System} from "./System.js";
 import {InteractionCall, InteractionCallResponse} from "./InteractionCall.js";
-import {InteractionEventArgs} from "./types/interaction.js";
+import {EventUser, InteractionEventArgs} from "./types/interaction.js";
 import {MatchExp} from "@interaqt/storage";
 import {Controller} from "./Controller.js";
 
@@ -342,6 +342,7 @@ export class ActivityCall {
         return node.parentSeq.tail === node
     }
 
+
     async callInteraction(activityId: string, uuid: string, interactionEventArgs: InteractionEventArgs) : Promise<InteractionCallResponse>{
         const activityStateData = await this.getState(activityId)
 
@@ -353,14 +354,14 @@ export class ActivityCall {
         }
 
         const interactionCall = this.uuidToInteractionCall.get(uuid)!
-        const userMatch= await this.checkUserRef(activityId, interactionCall.interaction, interactionEventArgs)
-        if (!userMatch) {
-            return {
-                error: `current user cannot call this interaction: activityId:${activityId}, interactionId: ${uuid}`
-            }
-        }
+        // const userMatch= await this.checkUserRef(activityId, interactionCall.interaction, interactionEventArgs)
+        // if (!userMatch) {
+        //     return {
+        //         error: `current user cannot call this interaction: activityId:${activityId}, interactionId: ${uuid}`
+        //     }
+        // }
 
-        const res = await interactionCall.call(interactionEventArgs, activityId)
+        const res = await interactionCall.call(interactionEventArgs, activityId, this.checkUserRef)
         if (res.error) {
             return res
         }
@@ -388,22 +389,27 @@ export class ActivityCall {
             refs[interactionCall.interaction.userRef?.name] = interactionEventArgs.user.id
         }
 
-        interactionCall.interaction.payload?.items!.forEach((payloadItem) => {
-            if (UserAttributive.is(payloadItem.itemRef) && payloadItem.itemRef?.name) {
-                refs[payloadItem.itemRef?.name] =  interactionEventArgs.payload![payloadItem.name!]!.id!
+        interactionCall.interaction.payload?.items!.forEach((payloadDef) => {
+            if (UserAttributive.is(payloadDef.itemRef) && payloadDef.itemRef?.name && interactionEventArgs.payload![payloadDef.name!]) {
+                const payloadItem = interactionEventArgs.payload![payloadDef.name!]
+                if (payloadDef.isCollection) {
+                    if(!refs[payloadDef.itemRef!.name!]) refs[payloadDef.itemRef!.name!] = []
+
+                    refs[payloadDef.itemRef!.name!].push(payloadItem.id)
+                } else {
+                    refs[payloadDef.itemRef!.name!] = payloadItem.id
+                }
             }
         })
 
         // await this.system.storage.set('ActivityRefs', activityId, refs)
         await this.setActivity( activityId, {refs})
     }
-    async checkUserRef(activityId: string, interaction: InteractionInstanceType, interactionEventArgs: InteractionEventArgs): Promise<boolean> {
-        // TODO 处理 userAttributives
-        if (!interaction.userRoleAttributive!.isRef) return true
 
-        // const refs = await this.system.storage.get('ActivityRefs', activityId)
+    checkUserRef = async (attributive: KlassInstance<typeof UserAttributive, false>, eventUser: EventUser, activityId: string): Promise<boolean> => {
+        assert(attributive.isRef, 'attributive must be ref')
         const refs = (await this.getActivity(activityId))?.refs
-        return refs[interaction.userRoleAttributive!.name!] === interactionEventArgs.user.id
+        return refs[attributive.name!] === eventUser.id
     }
 }
 

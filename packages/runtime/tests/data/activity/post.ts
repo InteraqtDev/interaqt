@@ -26,8 +26,6 @@ export const postEntity = Entity.create({ name: 'Post' })
 
 const createPostInteraction = Interaction.create({
     name: 'createPost',
-    userAttributives: UserAttributives.create({}),
-    userRoleAttributive: globalUserRole,
     action: Action.create({name: 'create'}),
     payload: Payload.create({
         items: [
@@ -42,8 +40,6 @@ const createPostInteraction = Interaction.create({
 
 const updatePostInteraction = Interaction.create({
     name: 'updatePost',
-    userAttributives: UserAttributives.create({}),
-    userRoleAttributive: globalUserRole,
     action: Action.create({name: 'update'}),
     payload: Payload.create({
         items: [

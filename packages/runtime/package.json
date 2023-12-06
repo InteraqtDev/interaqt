@@ -29,7 +29,6 @@
     "cors": "^2.8.5",
     "data0": "^1.0.0",
     "fastify": "^4.24.3",
-    "promised-sqlite3": "^2.1.0",
     "sqlite3": "^5.1.6"
   },
   "types": "./dist/index.d.ts",

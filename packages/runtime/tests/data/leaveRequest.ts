@@ -36,8 +36,6 @@ const RequestEntity= Entity.create({
 
 export const sendInteraction = Interaction.create({
     name: 'sendRequest',
-    userAttributives: UserAttributives.create({}),
-    userRoleAttributive: globalUserRole,
     action: Action.create({name: 'sendRequest'}),
     payload: Payload.create({
         items: [
@@ -94,8 +92,6 @@ const MyAttr = UserAttributive.create({
 // 同意
 export const approveInteraction = Interaction.create({
     name: 'approve',
-    userAttributives: UserAttributives.create({}),
-    userRoleAttributive: globalUserRole,
     action: Action.create({name: 'approve'}),
     payload: Payload.create({
         items: [
@@ -116,8 +112,6 @@ export const approveInteraction = Interaction.create({
 // 拒绝
 const rejectInteraction = Interaction.create({
     name: 'reject',
-    userAttributives: UserAttributives.create({}),
-    userRoleAttributive: globalUserRole,
     action: Action.create({name: 'reject'}),
     payload: Payload.create({
         items: [
@@ -134,8 +128,6 @@ const rejectInteraction = Interaction.create({
 // 加签
 export const addReviewersInteraction = Interaction.create({
     name: 'addReviewers',
-    userAttributives: UserAttributives.create({}),
-    userRoleAttributive: globalUserRole,
     userRef: createUserRoleAttributive({name: '', isRef: true}, {isReactive: true}),
     action: Action.create({name: 'addReviewers'}),
     payload: Payload.create({
@@ -161,8 +153,6 @@ export const addReviewersInteraction = Interaction.create({
 // 转移
 export const transferReviewersInteraction = Interaction.create({
     name: 'transferReviewer',
-    userAttributives: UserAttributives.create({}),
-    userRoleAttributive: globalUserRole,
     userRef: createUserRoleAttributive({name: '', isRef: true}, {isReactive: true}),
     action: Action.create({name: 'transferReviewer'}),
     payload: Payload.create({

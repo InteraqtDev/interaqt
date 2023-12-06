@@ -26,8 +26,6 @@ const userRefA = createUserRoleAttributive({name: 'A', isRef: true})
 export const userRefB = createUserRoleAttributive({name: 'B', isRef: true})
 export const sendInteraction = Interaction.create({
     name: 'sendRequest',
-    userAttributives: UserAttributives.create({}),
-    userRoleAttributive: globalUserRole,
     userRef: userRefA,
     action: Action.create({name: 'sendRequest'}),
     payload: Payload.create({
@@ -43,7 +41,6 @@ export const sendInteraction = Interaction.create({
             PayloadItem.create({
                 name: 'message',
                 base: messageEntity,
-                itemRef: Entity.create({name: '', isRef: true}),
             })
         ]
     })
@@ -68,16 +65,14 @@ export const MyFriend = UserAttributive.create({
 })
 export const approveInteraction = Interaction.create({
     name: 'approve',
-    userAttributives: UserAttributives.create({}),
-    userRoleAttributive: userRefB,
+    userAttributives: userRefB,
     userRef: createUserRoleAttributive({name: '', isRef: true}),
     action: Action.create({name: 'approve'}),
     payload: Payload.create({})
 })
 export const rejectInteraction = Interaction.create({
     name: 'reject',
-    userAttributives: UserAttributives.create({}),
-    userRoleAttributive: userRefB,
+    userAttributives: userRefB,
     userRef: createUserRoleAttributive({name: '', isRef: true}),
     action: Action.create({name: 'reject'}),
     payload: Payload.create({
@@ -85,15 +80,13 @@ export const rejectInteraction = Interaction.create({
             PayloadItem.create({
                 name: 'reason',
                 base: messageEntity,
-                itemRef: Entity.create({name: '', isRef: true}),
             })
         ]
     })
 })
 export const cancelInteraction = Interaction.create({
     name: 'cancel',
-    userAttributives: UserAttributives.create({}),
-    userRoleAttributive: userRefA,
+    userAttributives: userRefA,
     userRef: createUserRoleAttributive({name: '', isRef: true}),
     action: Action.create({name: 'cancel'}),
     payload: Payload.create({})
@@ -139,9 +132,6 @@ export const createFriendRelationActivity = Activity.create({
 })
 export const deleteInteraction = Interaction.create({
     name: 'deleteFriend',
-    userAttributives: UserAttributives.create({}),
-    userRoleAttributive: globalUserRole,
-    userRef: createUserRoleAttributive({name: '', isRef: true}),
     action: Action.create({name: 'deleteFriend'}),
     payload: Payload.create({
         items: [
@@ -152,7 +142,6 @@ export const deleteInteraction = Interaction.create({
                 }),
                 base: globalUserRole,
                 isRef: true,
-                itemRef: Entity.create({name: '', isRef: true}),
             }),
         ]
     })

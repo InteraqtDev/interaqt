@@ -7,15 +7,15 @@ import {
     DerivedConcept,
     Entity,
     EntityAttributive,
-    EntityAttributives,
+    EntityAttributives, ExpressionData,
     GetAction,
     InteractionInstanceType,
     Klass,
     KlassInstance,
-    UserAttributive
+    UserAttributive, UserAttributives
 } from "@interaqt/shared";
 import {System} from "./System.js";
-import {InteractionEvent, InteractionEventArgs} from "./types/interaction.js";
+import {EventUser, InteractionEvent, InteractionEventArgs} from "./types/interaction.js";
 import {assert, everyWithErrorAsync} from "./util.js";
 import {ActivityCall} from "./ActivityCall.js";
 import {someAsync} from "@interaqt/storage";
@@ -70,6 +70,8 @@ type Attributive = {
     name: string
 }
 
+type CheckUserRef = (attributive: KlassInstance<typeof UserAttributive, false>, eventUser: EventUser, activityId: string) => Promise<boolean>
+
 export class InteractionCall {
     system: System
     constructor(public interaction: InteractionInstanceType, public controller: Controller, public activitySeqCall?: ActivityCall) {
@@ -109,26 +111,27 @@ export class InteractionCall {
             return this.checkAttributive(attributive, interactionEvent, target)
         }
     }
-    async checkUser(interactionEvent: InteractionEventArgs) {
+    async checkUser(interactionEvent: InteractionEventArgs, activityId? :string, checkUserRef?:CheckUserRef) {
         let res: ConceptCheckResponse|true
-        if (this.interaction.userRoleAttributive!.isRef) {
-            // CAUTION 这里让 activity 自己在外部 check
-            res = true
-        } else {
+        if (!this.interaction.userAttributives ) return true
 
-            let userAttributiveCombined = BoolExp.atom<KlassInstance<typeof UserAttributive, false>>(
-                this.interaction.userRoleAttributive!
-            )
+        const userAttributiveCombined =
+            UserAttributives.is(this.interaction.userAttributives) ?
+                BoolExp.fromValue<KlassInstance<typeof UserAttributive, false>>(
+                    this.interaction.userAttributives!.content! as ExpressionData<KlassInstance<typeof UserAttributive, false>>
+                ) :
+                BoolExp.atom<KlassInstance<typeof UserAttributive, false>>(
+                    this.interaction.userAttributives as KlassInstance<typeof UserAttributive, false>
+                )
 
-            if (this.interaction.userAttributives!.content) {
-                userAttributiveCombined = userAttributiveCombined.and(this.interaction.userAttributives!.content)
-            }
-
-            const checkHandle = (attributive: KlassInstance<typeof UserAttributive, false>) => {
+        const checkHandle = (attributive: KlassInstance<typeof UserAttributive, false>) => {
+            if (attributive.isRef) {
+                return checkUserRef!(attributive, interactionEvent.user, activityId!)
+            } else {
                 return this.checkAttributive(attributive, interactionEvent, interactionEvent.user)
             }
-            res =  await this.checkAttributives(userAttributiveCombined, checkHandle, [])
         }
+        res =  await this.checkAttributives(userAttributiveCombined, checkHandle, [])
 
         if (res === true) return res
 
@@ -309,14 +312,14 @@ export class InteractionCall {
         // TODO
         // return this.system.storage.get(interactionEvent.payload, interactionEvent.query)
     }
-    async call(interactionEventArgs: InteractionEventArgs, activityId?: string): Promise<InteractionCallResponse> {
+    async call(interactionEventArgs: InteractionEventArgs, activityId?: string, checkUserRef?: CheckUserRef): Promise<InteractionCallResponse> {
         const response: InteractionCallResponse = {
             sideEffects: {},
         }
 
         try {
             await this.checkCondition(interactionEventArgs)
-            await this.checkUser(interactionEventArgs)
+            await this.checkUser(interactionEventArgs, activityId, checkUserRef)
             await this.checkPayload(interactionEventArgs)
         } catch(e) {
             response.error = e

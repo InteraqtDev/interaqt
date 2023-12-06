@@ -50,8 +50,6 @@ const RequestEntity= Entity.create({
 
 export const createInteraction = Interaction.create({
     name: 'createRequest',
-    userAttributives: UserAttributives.create({}),
-    userRoleAttributive: globalUserRole,
     action: Action.create({name: 'createRequest'}),
     payload: Payload.create({
         items: [
@@ -68,8 +66,6 @@ export const createInteraction = Interaction.create({
 // 同意
 export const approveInteraction = Interaction.create({
     name: 'approve',
-    userAttributives: UserAttributives.create({}),
-    userRoleAttributive: globalUserRole,
     action: Action.create({name: 'approve'}),
     payload: Payload.create({
         items: [

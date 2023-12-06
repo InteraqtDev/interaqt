@@ -1,5 +1,4 @@
 import {createClass, Entity, KlassInstance, Relation} from "@interaqt/shared";
-// @ts-ignore
 import {InteractionEvent} from './types/interaction.js'
 import {MatchExpressionData} from "@interaqt/storage";
 
