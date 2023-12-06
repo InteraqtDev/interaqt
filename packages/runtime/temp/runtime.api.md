@@ -34,6 +34,9 @@ import { TransferPublicType } from '@interaqt/shared';
 import { UserAttributive } from '@interaqt/shared';
 
 // @public (undocumented)
+export const ACTIVITY_RECORD = "_Activity_";
+
+// @public (undocumented)
 export const activityEntity: InertKlassInstance<    {
 name: {
 type: "string";
@@ -125,8 +128,6 @@ export class Controller {
     addComputedDataHandle(computedData: KlassInstance<any, false>, host: DataContext["host"], id: DataContext["id"]): void;
     // (undocumented)
     callActivityInteraction(activityCallId: string, interactionCallId: string, activityId: string, interactionEventArgs: InteractionEventArgs): Promise<InteractionCallResponse>;
-    // Warning: (ae-forgotten-export) The symbol "SystemCallback" needs to be exported by the entry point index.d.ts
-    //
     // (undocumented)
     callbacks: Map<any, Set<SystemCallback>>;
     // Warning: (ae-forgotten-export) The symbol "InteractionEventArgs" needs to be exported by the entry point index.d.ts
@@ -167,8 +168,6 @@ export class Controller {
     setup(): Promise<void>;
     // (undocumented)
     states: KlassInstance<typeof Property, false>[];
-    // Warning: (ae-forgotten-export) The symbol "System" needs to be exported by the entry point index.d.ts
-    //
     // (undocumented)
     system: System;
 }
@@ -178,6 +177,27 @@ export type DataAPIThis = {
     system: Controller['system'];
     user: EventUser;
 };
+
+// @public (undocumented)
+export type Database = {
+    open: () => Promise<any>;
+    scheme: (sql: string, name?: string) => Promise<any>;
+    query: <T extends any>(sql: string, values: any[], name?: string) => Promise<T[]>;
+    delete: <T extends any>(sql: string, where: any[], name?: string) => Promise<T[]>;
+    insert: (sql: string, values: any[], name?: string) => Promise<EntityIdRef>;
+    update: (sql: string, values: any[], idField?: string, name?: string) => Promise<EntityIdRef[]>;
+    getAutoId: (recordName: string) => Promise<string>;
+};
+
+// @public (undocumented)
+export type EntityIdRef = {
+    id: string;
+    [ROW_ID_ATTR]?: string;
+    [k: string]: any;
+};
+
+// @public (undocumented)
+export const EVENT_RECORD = "_Event_";
 
 // @public (undocumented)
 export const eventEntity: InertKlassInstance<    {
@@ -255,8 +275,10 @@ defaultValue: () => boolean;
 }>;
 
 // @public (undocumented)
+export const ID_ATTR = "id";
+
+// @public (undocumented)
 export class MonoSystem implements System {
-    // Warning: (ae-forgotten-export) The symbol "Database" needs to be exported by the entry point index.d.ts
     constructor(db?: Database);
     // (undocumented)
     conceptClass: Map<string, ReturnType<typeof createClass>>;
@@ -272,13 +294,36 @@ export class MonoSystem implements System {
     saveEvent(event: InteractionEvent): Promise<any>;
     // (undocumented)
     setup(entities: KlassInstance<typeof Entity, false>[], relations: KlassInstance<typeof Relation, false>[]): any;
-    // Warning: (ae-forgotten-export) The symbol "Storage_2" needs to be exported by the entry point index.d.ts
-    //
     // (undocumented)
     storage: Storage_2;
     // (undocumented)
     updateActivity(match: MatchExpressionData, activity: any): Promise<any>;
 }
+
+// @public (undocumented)
+export interface Payload {
+    // (undocumented)
+    [k: string]: any;
+}
+
+// @public (undocumented)
+export type RecordChangeListener = (mutationEvents: RecordMutationEvent[]) => any;
+
+// @public (undocumented)
+export type RecordMutationEvent = {
+    recordName: string;
+    type: 'create' | 'update' | 'delete';
+    keys?: string[];
+    record?: {
+        [key: string]: any;
+    };
+    oldRecord?: {
+        [key: string]: any;
+    };
+};
+
+// @public (undocumented)
+export const ROW_ID_ATTR = "_rowId";
 
 // @public (undocumented)
 export class SQLiteDB implements Database {
@@ -297,8 +342,6 @@ export class SQLiteDB implements Database {
     //
     // (undocumented)
     idSystem: IDSystem;
-    // Warning: (ae-forgotten-export) The symbol "EntityIdRef" needs to be exported by the entry point index.d.ts
-    //
     // (undocumented)
     insert(sql: string, values: any[], name?: string): Promise<EntityIdRef>;
     // (undocumented)
@@ -318,6 +361,52 @@ export class SQLiteDB implements Database {
 //
 // @public (undocumented)
 export function startServer(controller: Controller, options: ServerOptions, dataAPIs?: DataAPIs): Promise<void>;
+
+// @public (undocumented)
+type Storage_2 = {
+    get: (itemName: string, id: string, initialValue?: any) => Promise<any>;
+    set: (itemName: string, id: string, value: any) => Promise<any>;
+    setup: (entities: KlassInstance<typeof Entity, false>[], relations: KlassInstance<typeof Relation, false>[]) => any;
+    findOne: (entityName: string, ...arg: any[]) => Promise<any>;
+    update: (entityName: string, ...arg: any[]) => Promise<any>;
+    find: (entityName: string, ...arg: any[]) => Promise<any[]>;
+    create: (entityName: string, data: any) => Promise<any>;
+    delete: (entityName: string, data: any) => Promise<any>;
+    findOneRelationByName: (relationName: string, ...arg: any[]) => Promise<any>;
+    findRelationByName: (relationName: string, ...arg: any[]) => Promise<any>;
+    updateRelationByName: (relationName: string, ...arg: any[]) => Promise<any>;
+    removeRelationByName: (relationName: string, ...arg: any[]) => Promise<any>;
+    addRelationByNameById: (relationName: string, ...arg: any[]) => Promise<any>;
+    getRelationName: (...arg: any[]) => string;
+    listen: (callback: RecordChangeListener) => any;
+};
+export { Storage_2 as Storage }
+
+// @public (undocumented)
+export interface System {
+    // (undocumented)
+    conceptClass: Map<string, ReturnType<typeof createClass>>;
+    // (undocumented)
+    createActivity: (activity: any) => Promise<any>;
+    // (undocumented)
+    getActivity: (query?: MatchExpressionData) => Promise<any[]>;
+    // (undocumented)
+    getEvent: (query: any) => Promise<InteractionEvent[]>;
+    // (undocumented)
+    saveEvent: (interactionEvent: InteractionEvent) => Promise<any>;
+    // (undocumented)
+    setup: (entities: KlassInstance<typeof Entity, false>[], relations: KlassInstance<typeof Relation, false>[]) => Promise<any>;
+    // (undocumented)
+    storage: Storage_2;
+    // (undocumented)
+    updateActivity: (match: MatchExpressionData, activity: any) => Promise<any>;
+}
+
+// @public (undocumented)
+export const SYSTEM_RECORD = "_System_";
+
+// @public (undocumented)
+export type SystemCallback = (...arg: any[]) => any;
 
 // @public (undocumented)
 export const systemEntity: InertKlassInstance<    {

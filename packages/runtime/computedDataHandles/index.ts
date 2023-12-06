@@ -1,4 +1,4 @@
-import './MapActivityToRecord'
+import './MapActivityToRecord.js'
 import './MapInteractionToRecord.js'
 import './MapInteractionToProperty.js'
 import './MapRecordMutationToRecord.js'
