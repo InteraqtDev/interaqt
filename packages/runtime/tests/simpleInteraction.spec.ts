@@ -101,7 +101,14 @@ describe('map interaction', () => {
         const payload2 = {
             request: requests1[0]
         }
+
+        // 错误 c 自己同意
+
+        const res2w = await controller.callInteraction(approveRequestUUID,  {user: userC, payload: payload2})
+        expect(res2w.error).toBeDefined()
+
         const res2 = await controller.callInteraction(approveRequestUUID,  {user: userB, payload: payload2})
+        expect(res2.error).toBeUndefined()
         const requests2 = await controller.system.storage.find(
             'Request',
             undefined,

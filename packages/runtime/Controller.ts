@@ -149,13 +149,26 @@ export class Controller {
     async callInteraction(interactionId:string, interactionEventArgs: InteractionEventArgs) {
         const interactionCall = this.interactionCalls.get(interactionId)!
         assert(!!interactionCall,`cannot find interaction for ${interactionId}`)
+
+        await this.system.storage.beginTransaction(interactionCall.interaction.name)
         const result = await interactionCall.call(interactionEventArgs)
         if (!result.error) {
             const effects: any[] = []
-            await this.dispatch(interactionCall.interaction, result.event!.args, effects, undefined)
-            result.effects = effects
+            // TODO 也要记录 bug
+            try {
+                await this.dispatch(interactionCall.interaction, result.event!.args, effects, undefined)
+                result.effects = effects
+            }catch (error) {
+                result.error = error
+            }
         } else {
             console.error(result.error)
+        }
+
+        if (!result.error) {
+            await this.system.storage.commitTransaction()
+        }else{
+            await this.system.storage.rollbackTransaction()
         }
 
         return result

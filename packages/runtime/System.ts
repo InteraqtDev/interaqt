@@ -17,6 +17,11 @@ export const EVENT_RECORD = '_Event_'
 export const ACTIVITY_RECORD = '_Activity_'
 
 export type Storage = {
+    // transaction
+    beginTransaction: (transactionName?:string) => Promise<any>
+    commitTransaction: (transactionName?:string) => Promise<any>
+    rollbackTransaction: (transactionName?:string) => Promise<any>
+
     // kv 存储
     get: (itemName: string, id: string, initialValue?: any) => Promise<any>
     set: (itemName: string, id: string, value: any) => Promise<any>,

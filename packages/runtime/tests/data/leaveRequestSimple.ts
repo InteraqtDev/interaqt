@@ -15,7 +15,9 @@ import {
     RelationCount,
     removeAllInstance,
     stringifyAllInstances,
-    Attributives
+    Attributives,
+    BoolExp,
+    boolExpToAttributives, Attributive
 } from "@interaqt/shared";
 import {Controller} from "@interaqt/runtime";
 
@@ -72,7 +74,29 @@ export const approveInteraction = Interaction.create({
             PayloadItem.create({
                 name: 'request',
                 base: RequestEntity,
-                isRef: true
+                isRef: true,
+                attributives: boolExpToAttributives(BoolExp.atom(Attributive.create({
+                    name: 'Mine',
+                    content: async function(this: Controller, request, { user }){
+                        const relationName = this.system.storage.getRelationName('User', 'request')
+                        const {BoolExp} = this.globals
+                        const match = BoolExp.atom({
+                            key: 'source.id',
+                            value: ['=', request.id]
+                        }).and({
+                            key: 'target.id',
+                            value: ['=', user.id]
+                        })
+                        const relation = await this.system.storage.findOneRelationByName(relationName, match)
+                        // CAUTION 不能 return undefined，会被忽略
+                        return !!relation
+                    }
+                })).and(Attributive.create({
+                    name: 'Pending',
+                    content: async function(this: Controller, request, { user }){
+                        return request.result === 'pending'
+                    }
+                })))
             })
         ]
     })
