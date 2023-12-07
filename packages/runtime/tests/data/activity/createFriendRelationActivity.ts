@@ -31,10 +31,6 @@ export const sendInteraction = Interaction.create({
         items: [
             PayloadItem.create({
                 name: 'to',
-                // attributives: Attributives.create({
-                //     content: BoolAtomData.create({data: OtherAttr})
-                // }),
-                // 这种写法和上面等价
                 attributives: boolExpToAttributives(BoolExp.atom(OtherAttr)),
                 base: UserEntity,
                 itemRef: userRefB

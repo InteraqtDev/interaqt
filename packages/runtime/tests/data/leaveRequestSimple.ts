@@ -120,7 +120,7 @@ const sendRequestRelation = Relation.create({
     }),
 })
 
-// 直属主管和 request 的 relation
+// 主管和 request 的 relation
 const reviewerRelation = Relation.create({
     source: RequestEntity,
     sourceAttribute: 'reviewer',

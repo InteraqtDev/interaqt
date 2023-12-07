@@ -29,30 +29,17 @@ data = computation(events)
 
 直接使用 @interaqt/runtime 中的 server。
 
-### Quick Start Example
+```typescript
+import {MonoSystem,Controller, startServer} from "@interaqt/runtime";
 
-制作一个请假的简单应用。
-员工创建请假申请，主管和上级主管都审批成功后，申请生效。
+const system = new MonoSystem()
+const controller = new Controller(system, entities, relations, activities, interactions, states)
 
-### 定义系统中支持的用户交互
-
-- 用户创建请假申请
-- 上级主管审批
-- 上上级主管审批
-
-- 主管查看自己直属的请假单
-- 主管查看自己下属二级员工的请假单
-
-### 定义系统中的数据类型以及内容
-
-- 员工和主管的关系
-
-- 请假单和员工的关系
-- 请假单和直属主管的关系
-  - 定义数据
-  - 定义主管有多少未审批的请假单
-- 请假单和上上级主管的关系
-  - 有多少下级主管都未审批二级请假单
-
-### 获取数据
-
+startServer(controller, {
+  port: 3000,
+  parseUserId: async (headers: IncomingHttpHeaders) => {
+      return headers['x-user-id']
+    // return (await client.verifyJWTForAPI(headers)).sub
+  }
+})
+```
