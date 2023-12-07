@@ -13,7 +13,7 @@
     "type": "api-extractor run --verbose",
     "build-all": "npm run build && npm run type"
   },
-  "version": "1.0.0-alpha.1",
+  "version": "1.0.0-alpha.2",
   "main": "dist/index.js",
   "files": [
     "dist"
