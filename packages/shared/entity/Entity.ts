@@ -1,4 +1,4 @@
-import {Atom, computed, incPick, incUnique} from 'rata'
+import {Atom, computed, incPick, incUnique} from 'data0'
 import {createClass, getInstance, Klass, KlassInstance} from "../createClass.js";
 
 

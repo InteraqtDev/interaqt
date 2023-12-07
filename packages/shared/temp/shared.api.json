@@ -432,7 +432,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n            name: {\n                type: \"string\";\n                collection: false;\n                required: true;\n                constraints: {\n                    nameFormat({ name }: {\n                        name: import(\"rata\")."
+              "text": "<{\n            name: {\n                type: \"string\";\n                collection: false;\n                required: true;\n                constraints: {\n                    nameFormat({ name }: {\n                        name: import(\"data0\")."
             },
             {
               "kind": "Reference",
@@ -441,7 +441,7 @@
             },
             {
               "kind": "Content",
-              "text": "<string>;\n                    }): import(\"rata\")."
+              "text": "<string>;\n                    }): import(\"data0\")."
             },
             {
               "kind": "Reference",
@@ -468,7 +468,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                    name: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        constraints: {\n                            format({ name }: {\n                                name: import(\"rata\")."
+              "text": "<{\n                    name: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        constraints: {\n                            format({ name }: {\n                                name: import(\"data0\")."
             },
             {
               "kind": "Reference",
@@ -477,7 +477,7 @@
             },
             {
               "kind": "Content",
-              "text": "<string>;\n                            }): import(\"rata\")."
+              "text": "<string>;\n                            }): import(\"data0\")."
             },
             {
               "kind": "Reference",
@@ -486,7 +486,7 @@
             },
             {
               "kind": "Content",
-              "text": "<boolean>;\n                            length({ name }: {\n                                name: import(\"rata\")."
+              "text": "<boolean>;\n                            length({ name }: {\n                                name: import(\"data0\")."
             },
             {
               "kind": "Reference",
@@ -495,7 +495,7 @@
             },
             {
               "kind": "Content",
-              "text": "<string>;\n                            }): import(\"rata\")."
+              "text": "<string>;\n                            }): import(\"data0\")."
             },
             {
               "kind": "Reference",
@@ -531,7 +531,7 @@
             },
             {
               "kind": "Content",
-              "text": "<any>[];\n                        required: false;\n                    };\n                    computed: {\n                        required: false;\n                        type: \"function\";\n                        collection: false;\n                    };\n                }>;\n                collection: true;\n                required: true;\n                constraints: {\n                    eachNameUnique({ properties }: any): import(\"rata\")."
+              "text": "<any>[];\n                        required: false;\n                    };\n                    computed: {\n                        required: false;\n                        type: \"function\";\n                        collection: false;\n                    };\n                }>;\n                collection: true;\n                required: true;\n                constraints: {\n                    eachNameUnique({ properties }: any): import(\"data0\")."
             },
             {
               "kind": "Reference",
@@ -2323,7 +2323,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n            name: {\n                type: \"string\";\n                collection: false;\n                required: true;\n                constraints: {\n                    nameFormat({ name }: {\n                        name: import(\"rata\")."
+              "text": "<{\n            name: {\n                type: \"string\";\n                collection: false;\n                required: true;\n                constraints: {\n                    nameFormat({ name }: {\n                        name: import(\"data0\")."
             },
             {
               "kind": "Reference",
@@ -2332,7 +2332,7 @@
             },
             {
               "kind": "Content",
-              "text": "<string>;\n                    }): import(\"rata\")."
+              "text": "<string>;\n                    }): import(\"data0\")."
             },
             {
               "kind": "Reference",
@@ -2359,7 +2359,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                    name: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        constraints: {\n                            format({ name }: {\n                                name: import(\"rata\")."
+              "text": "<{\n                    name: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        constraints: {\n                            format({ name }: {\n                                name: import(\"data0\")."
             },
             {
               "kind": "Reference",
@@ -2368,7 +2368,7 @@
             },
             {
               "kind": "Content",
-              "text": "<string>;\n                            }): import(\"rata\")."
+              "text": "<string>;\n                            }): import(\"data0\")."
             },
             {
               "kind": "Reference",
@@ -2377,7 +2377,7 @@
             },
             {
               "kind": "Content",
-              "text": "<boolean>;\n                            length({ name }: {\n                                name: import(\"rata\")."
+              "text": "<boolean>;\n                            length({ name }: {\n                                name: import(\"data0\")."
             },
             {
               "kind": "Reference",
@@ -2386,7 +2386,7 @@
             },
             {
               "kind": "Content",
-              "text": "<string>;\n                            }): import(\"rata\")."
+              "text": "<string>;\n                            }): import(\"data0\")."
             },
             {
               "kind": "Reference",
@@ -2422,7 +2422,7 @@
             },
             {
               "kind": "Content",
-              "text": "<any>[];\n                        required: false;\n                    };\n                    computed: {\n                        required: false;\n                        type: \"function\";\n                        collection: false;\n                    };\n                }>;\n                collection: true;\n                required: true;\n                constraints: {\n                    eachNameUnique({ properties }: any): import(\"rata\")."
+              "text": "<any>[];\n                        required: false;\n                    };\n                    computed: {\n                        required: false;\n                        type: \"function\";\n                        collection: false;\n                    };\n                }>;\n                collection: true;\n                required: true;\n                constraints: {\n                    eachNameUnique({ properties }: any): import(\"data0\")."
             },
             {
               "kind": "Reference",
@@ -3155,7 +3155,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n            name: {\n                type: \"string\";\n                collection: false;\n                required: true;\n                constraints: {\n                    nameFormat({ name }: {\n                        name: import(\"rata\")."
+              "text": "<{\n            name: {\n                type: \"string\";\n                collection: false;\n                required: true;\n                constraints: {\n                    nameFormat({ name }: {\n                        name: import(\"data0\")."
             },
             {
               "kind": "Reference",
@@ -3164,7 +3164,7 @@
             },
             {
               "kind": "Content",
-              "text": "<string>;\n                    }): import(\"rata\")."
+              "text": "<string>;\n                    }): import(\"data0\")."
             },
             {
               "kind": "Reference",
@@ -3191,7 +3191,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                    name: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        constraints: {\n                            format({ name }: {\n                                name: import(\"rata\")."
+              "text": "<{\n                    name: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        constraints: {\n                            format({ name }: {\n                                name: import(\"data0\")."
             },
             {
               "kind": "Reference",
@@ -3200,7 +3200,7 @@
             },
             {
               "kind": "Content",
-              "text": "<string>;\n                            }): import(\"rata\")."
+              "text": "<string>;\n                            }): import(\"data0\")."
             },
             {
               "kind": "Reference",
@@ -3209,7 +3209,7 @@
             },
             {
               "kind": "Content",
-              "text": "<boolean>;\n                            length({ name }: {\n                                name: import(\"rata\")."
+              "text": "<boolean>;\n                            length({ name }: {\n                                name: import(\"data0\")."
             },
             {
               "kind": "Reference",
@@ -3218,7 +3218,7 @@
             },
             {
               "kind": "Content",
-              "text": "<string>;\n                            }): import(\"rata\")."
+              "text": "<string>;\n                            }): import(\"data0\")."
             },
             {
               "kind": "Reference",
@@ -3254,7 +3254,7 @@
             },
             {
               "kind": "Content",
-              "text": "<any>[];\n                        required: false;\n                    };\n                    computed: {\n                        required: false;\n                        type: \"function\";\n                        collection: false;\n                    };\n                }>;\n                collection: true;\n                required: true;\n                constraints: {\n                    eachNameUnique({ properties }: any): import(\"rata\")."
+              "text": "<any>[];\n                        required: false;\n                    };\n                    computed: {\n                        required: false;\n                        type: \"function\";\n                        collection: false;\n                    };\n                }>;\n                collection: true;\n                required: true;\n                constraints: {\n                    eachNameUnique({ properties }: any): import(\"data0\")."
             },
             {
               "kind": "Reference",
@@ -5724,7 +5724,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                    name: {\n                        type: \"string\";\n                        collection: false;\n                        required: true;\n                        constraints: {\n                            nameFormat({ name }: {\n                                name: import(\"rata\")."
+              "text": "<{\n                    name: {\n                        type: \"string\";\n                        collection: false;\n                        required: true;\n                        constraints: {\n                            nameFormat({ name }: {\n                                name: import(\"data0\")."
             },
             {
               "kind": "Reference",
@@ -5733,7 +5733,7 @@
             },
             {
               "kind": "Content",
-              "text": "<string>;\n                            }): import(\"rata\")."
+              "text": "<string>;\n                            }): import(\"data0\")."
             },
             {
               "kind": "Reference",
@@ -5760,7 +5760,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                            name: {\n                                type: \"string\";\n                                required: true;\n                                collection: false;\n                                constraints: {\n                                    format({ name }: {\n                                        name: import(\"rata\")."
+              "text": "<{\n                            name: {\n                                type: \"string\";\n                                required: true;\n                                collection: false;\n                                constraints: {\n                                    format({ name }: {\n                                        name: import(\"data0\")."
             },
             {
               "kind": "Reference",
@@ -5769,7 +5769,7 @@
             },
             {
               "kind": "Content",
-              "text": "<string>;\n                                    }): import(\"rata\")."
+              "text": "<string>;\n                                    }): import(\"data0\")."
             },
             {
               "kind": "Reference",
@@ -5778,7 +5778,7 @@
             },
             {
               "kind": "Content",
-              "text": "<boolean>;\n                                    length({ name }: {\n                                        name: import(\"rata\")."
+              "text": "<boolean>;\n                                    length({ name }: {\n                                        name: import(\"data0\")."
             },
             {
               "kind": "Reference",
@@ -5787,7 +5787,7 @@
             },
             {
               "kind": "Content",
-              "text": "<string>;\n                                    }): import(\"rata\")."
+              "text": "<string>;\n                                    }): import(\"data0\")."
             },
             {
               "kind": "Reference",
@@ -5823,7 +5823,7 @@
             },
             {
               "kind": "Content",
-              "text": "<any>[];\n                                required: false;\n                            };\n                            computed: {\n                                required: false;\n                                type: \"function\";\n                                collection: false;\n                            };\n                        }>;\n                        collection: true;\n                        required: true;\n                        constraints: {\n                            eachNameUnique({ properties }: any): import(\"rata\")."
+              "text": "<any>[];\n                                required: false;\n                            };\n                            computed: {\n                                required: false;\n                                type: \"function\";\n                                collection: false;\n                            };\n                        }>;\n                        collection: true;\n                        required: true;\n                        constraints: {\n                            eachNameUnique({ properties }: any): import(\"data0\")."
             },
             {
               "kind": "Reference",
@@ -5841,7 +5841,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                    name: {\n                        type: \"string\";\n                        collection: false;\n                        required: true;\n                        constraints: {\n                            nameFormat({ name }: {\n                                name: import(\"rata\")."
+              "text": "<{\n                    name: {\n                        type: \"string\";\n                        collection: false;\n                        required: true;\n                        constraints: {\n                            nameFormat({ name }: {\n                                name: import(\"data0\")."
             },
             {
               "kind": "Reference",
@@ -5850,7 +5850,7 @@
             },
             {
               "kind": "Content",
-              "text": "<string>;\n                            }): import(\"rata\")."
+              "text": "<string>;\n                            }): import(\"data0\")."
             },
             {
               "kind": "Reference",
@@ -5877,7 +5877,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                            name: {\n                                type: \"string\";\n                                required: true;\n                                collection: false;\n                                constraints: {\n                                    format({ name }: {\n                                        name: import(\"rata\")."
+              "text": "<{\n                            name: {\n                                type: \"string\";\n                                required: true;\n                                collection: false;\n                                constraints: {\n                                    format({ name }: {\n                                        name: import(\"data0\")."
             },
             {
               "kind": "Reference",
@@ -5886,7 +5886,7 @@
             },
             {
               "kind": "Content",
-              "text": "<string>;\n                                    }): import(\"rata\")."
+              "text": "<string>;\n                                    }): import(\"data0\")."
             },
             {
               "kind": "Reference",
@@ -5895,7 +5895,7 @@
             },
             {
               "kind": "Content",
-              "text": "<boolean>;\n                                    length({ name }: {\n                                        name: import(\"rata\")."
+              "text": "<boolean>;\n                                    length({ name }: {\n                                        name: import(\"data0\")."
             },
             {
               "kind": "Reference",
@@ -5904,7 +5904,7 @@
             },
             {
               "kind": "Content",
-              "text": "<string>;\n                                    }): import(\"rata\")."
+              "text": "<string>;\n                                    }): import(\"data0\")."
             },
             {
               "kind": "Reference",
@@ -5940,7 +5940,7 @@
             },
             {
               "kind": "Content",
-              "text": "<any>[];\n                                required: false;\n                            };\n                            computed: {\n                                required: false;\n                                type: \"function\";\n                                collection: false;\n                            };\n                        }>;\n                        collection: true;\n                        required: true;\n                        constraints: {\n                            eachNameUnique({ properties }: any): import(\"rata\")."
+              "text": "<any>[];\n                                required: false;\n                            };\n                            computed: {\n                                required: false;\n                                type: \"function\";\n                                collection: false;\n                            };\n                        }>;\n                        collection: true;\n                        required: true;\n                        constraints: {\n                            eachNameUnique({ properties }: any): import(\"data0\")."
             },
             {
               "kind": "Reference",
@@ -6094,7 +6094,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n            name: {\n                type: \"string\";\n                collection: false;\n                required: true;\n                constraints: {\n                    nameFormat({ name }: {\n                        name: import(\"rata\")."
+              "text": "<{\n            name: {\n                type: \"string\";\n                collection: false;\n                required: true;\n                constraints: {\n                    nameFormat({ name }: {\n                        name: import(\"data0\")."
             },
             {
               "kind": "Reference",
@@ -6103,7 +6103,7 @@
             },
             {
               "kind": "Content",
-              "text": "<string>;\n                    }): import(\"rata\")."
+              "text": "<string>;\n                    }): import(\"data0\")."
             },
             {
               "kind": "Reference",
@@ -6130,7 +6130,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                    name: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        constraints: {\n                            format({ name }: {\n                                name: import(\"rata\")."
+              "text": "<{\n                    name: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        constraints: {\n                            format({ name }: {\n                                name: import(\"data0\")."
             },
             {
               "kind": "Reference",
@@ -6139,7 +6139,7 @@
             },
             {
               "kind": "Content",
-              "text": "<string>;\n                            }): import(\"rata\")."
+              "text": "<string>;\n                            }): import(\"data0\")."
             },
             {
               "kind": "Reference",
@@ -6148,7 +6148,7 @@
             },
             {
               "kind": "Content",
-              "text": "<boolean>;\n                            length({ name }: {\n                                name: import(\"rata\")."
+              "text": "<boolean>;\n                            length({ name }: {\n                                name: import(\"data0\")."
             },
             {
               "kind": "Reference",
@@ -6157,7 +6157,7 @@
             },
             {
               "kind": "Content",
-              "text": "<string>;\n                            }): import(\"rata\")."
+              "text": "<string>;\n                            }): import(\"data0\")."
             },
             {
               "kind": "Reference",
@@ -6193,7 +6193,7 @@
             },
             {
               "kind": "Content",
-              "text": "<any>[];\n                        required: false;\n                    };\n                    computed: {\n                        required: false;\n                        type: \"function\";\n                        collection: false;\n                    };\n                }>;\n                collection: true;\n                required: true;\n                constraints: {\n                    eachNameUnique({ properties }: any): import(\"rata\")."
+              "text": "<any>[];\n                        required: false;\n                    };\n                    computed: {\n                        required: false;\n                        type: \"function\";\n                        collection: false;\n                    };\n                }>;\n                collection: true;\n                required: true;\n                constraints: {\n                    eachNameUnique({ properties }: any): import(\"data0\")."
             },
             {
               "kind": "Reference",
@@ -6211,7 +6211,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n            name: {\n                type: \"string\";\n                collection: false;\n                required: true;\n                constraints: {\n                    nameFormat({ name }: {\n                        name: import(\"rata\")."
+              "text": "<{\n            name: {\n                type: \"string\";\n                collection: false;\n                required: true;\n                constraints: {\n                    nameFormat({ name }: {\n                        name: import(\"data0\")."
             },
             {
               "kind": "Reference",
@@ -6220,7 +6220,7 @@
             },
             {
               "kind": "Content",
-              "text": "<string>;\n                    }): import(\"rata\")."
+              "text": "<string>;\n                    }): import(\"data0\")."
             },
             {
               "kind": "Reference",
@@ -6247,7 +6247,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                    name: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        constraints: {\n                            format({ name }: {\n                                name: import(\"rata\")."
+              "text": "<{\n                    name: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        constraints: {\n                            format({ name }: {\n                                name: import(\"data0\")."
             },
             {
               "kind": "Reference",
@@ -6256,7 +6256,7 @@
             },
             {
               "kind": "Content",
-              "text": "<string>;\n                            }): import(\"rata\")."
+              "text": "<string>;\n                            }): import(\"data0\")."
             },
             {
               "kind": "Reference",
@@ -6265,7 +6265,7 @@
             },
             {
               "kind": "Content",
-              "text": "<boolean>;\n                            length({ name }: {\n                                name: import(\"rata\")."
+              "text": "<boolean>;\n                            length({ name }: {\n                                name: import(\"data0\")."
             },
             {
               "kind": "Reference",
@@ -6274,7 +6274,7 @@
             },
             {
               "kind": "Content",
-              "text": "<string>;\n                            }): import(\"rata\")."
+              "text": "<string>;\n                            }): import(\"data0\")."
             },
             {
               "kind": "Reference",
@@ -6310,7 +6310,7 @@
             },
             {
               "kind": "Content",
-              "text": "<any>[];\n                        required: false;\n                    };\n                    computed: {\n                        required: false;\n                        type: \"function\";\n                        collection: false;\n                    };\n                }>;\n                collection: true;\n                required: true;\n                constraints: {\n                    eachNameUnique({ properties }: any): import(\"rata\")."
+              "text": "<any>[];\n                        required: false;\n                    };\n                    computed: {\n                        required: false;\n                        type: \"function\";\n                        collection: false;\n                    };\n                }>;\n                collection: true;\n                required: true;\n                constraints: {\n                    eachNameUnique({ properties }: any): import(\"data0\")."
             },
             {
               "kind": "Reference",
@@ -8837,7 +8837,7 @@
             },
             {
               "kind": "Content",
-              "text": "{\n    type: 'expression';\n    operator: 'and' | 'or' | 'not';\n    left: "
+              "text": "{\n    type: string;\n    operator: string;\n    left: "
             },
             {
               "kind": "Reference",
@@ -8931,7 +8931,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n            name: {\n                type: \"string\";\n                collection: false;\n                required: true;\n                constraints: {\n                    nameFormat({ name }: {\n                        name: import(\"rata\")."
+              "text": "<{\n            name: {\n                type: \"string\";\n                collection: false;\n                required: true;\n                constraints: {\n                    nameFormat({ name }: {\n                        name: import(\"data0\")."
             },
             {
               "kind": "Reference",
@@ -8940,7 +8940,7 @@
             },
             {
               "kind": "Content",
-              "text": "<string>;\n                    }): import(\"rata\")."
+              "text": "<string>;\n                    }): import(\"data0\")."
             },
             {
               "kind": "Reference",
@@ -8967,7 +8967,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                    name: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        constraints: {\n                            format({ name }: {\n                                name: import(\"rata\")."
+              "text": "<{\n                    name: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        constraints: {\n                            format({ name }: {\n                                name: import(\"data0\")."
             },
             {
               "kind": "Reference",
@@ -8976,7 +8976,7 @@
             },
             {
               "kind": "Content",
-              "text": "<string>;\n                            }): import(\"rata\")."
+              "text": "<string>;\n                            }): import(\"data0\")."
             },
             {
               "kind": "Reference",
@@ -8985,7 +8985,7 @@
             },
             {
               "kind": "Content",
-              "text": "<boolean>;\n                            length({ name }: {\n                                name: import(\"rata\")."
+              "text": "<boolean>;\n                            length({ name }: {\n                                name: import(\"data0\")."
             },
             {
               "kind": "Reference",
@@ -8994,7 +8994,7 @@
             },
             {
               "kind": "Content",
-              "text": "<string>;\n                            }): import(\"rata\")."
+              "text": "<string>;\n                            }): import(\"data0\")."
             },
             {
               "kind": "Reference",
@@ -9030,7 +9030,7 @@
             },
             {
               "kind": "Content",
-              "text": "<any>[];\n                        required: false;\n                    };\n                    computed: {\n                        required: false;\n                        type: \"function\";\n                        collection: false;\n                    };\n                }>;\n                collection: true;\n                required: true;\n                constraints: {\n                    eachNameUnique({ properties }: any): import(\"rata\")."
+              "text": "<any>[];\n                        required: false;\n                    };\n                    computed: {\n                        required: false;\n                        type: \"function\";\n                        collection: false;\n                    };\n                }>;\n                collection: true;\n                required: true;\n                constraints: {\n                    eachNameUnique({ properties }: any): import(\"data0\")."
             },
             {
               "kind": "Reference",

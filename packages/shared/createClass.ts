@@ -1,4 +1,4 @@
-import {atom, Atom, computed, isAtom, isReactive, rawStructureClone, reactive} from "rata";
+import {atom, Atom, computed, isAtom, isReactive, rawStructureClone, reactive} from "data0";
 import {isPlainObject, hasOwn, isObject, assert} from "./utils.js";
 import {toRaw, UnwrapReactive} from "rata";
 

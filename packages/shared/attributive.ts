@@ -61,8 +61,10 @@ export const BoolAtomData = createClass({
     }
 })
 export type UnwrappedBoolExpressionInstanceType = {
-    type: 'expression',
-    operator: 'and' | 'or' | 'not',
+    // type: 'expression',
+    // operator: 'and' | 'or' | 'not',
+    type: string,
+    operator: string,
     left: UnwrappedBoolExpressionInstanceType | KlassInstance<typeof BoolAtomData, any>,
     right?: UnwrappedBoolExpressionInstanceType | KlassInstance<typeof BoolAtomData, any>,
 }
@@ -135,7 +137,6 @@ export const Attributives = createClass({
 })
 
 export class AttributiveBoolExp extends BoolExp<KlassInstance<typeof Attributive, false>> {
-    // FIXME 类型系统有点怪
     static toAttributives(obj?: BoolExp<KlassInstance<typeof Attributive, false>>): KlassInstance<typeof BoolAtomData, false>|UnwrappedBoolExpressionInstanceType|undefined {
         if (!obj) return undefined
 
@@ -152,7 +153,7 @@ export class AttributiveBoolExp extends BoolExp<KlassInstance<typeof Attributive
             operator: expData.operator,
             left: AttributiveBoolExp.toAttributives(obj.left)!,
             right: AttributiveBoolExp.toAttributives(obj.right),
-        }) as UnwrappedBoolExpressionInstanceType
+        })
     }
 }
 

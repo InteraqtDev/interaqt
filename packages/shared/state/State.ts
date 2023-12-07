@@ -1,4 +1,4 @@
-import {computed, Atom} from 'rata'
+import {computed, Atom} from 'data0'
 import {createClass, Klass} from "../createClass.js";
 import { PropertyTypeMap, PropertyTypes} from "../entity/Entity.js";
 const validNameFormatExp = /^[a-zA-Z0-9_]+$/

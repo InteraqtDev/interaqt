@@ -4,7 +4,7 @@
 
 ```ts
 
-import { Atom } from 'rata';
+import { Atom } from 'data0';
 import { UnwrapReactive } from 'rata';
 
 // @public (undocumented)
@@ -2305,8 +2305,8 @@ export type UnwrapCollectionType<T extends Klass<any>[]> = {
 
 // @public (undocumented)
 export type UnwrappedBoolExpressionInstanceType = {
-    type: 'expression';
-    operator: 'and' | 'or' | 'not';
+    type: string;
+    operator: string;
     left: UnwrappedBoolExpressionInstanceType | KlassInstance<typeof BoolAtomData, any>;
     right?: UnwrappedBoolExpressionInstanceType | KlassInstance<typeof BoolAtomData, any>;
 };
@@ -2400,7 +2400,7 @@ export const WeightedSummation: Klass<{
 // Warnings were encountered during analysis:
 //
 // activity/Activity.ts:273:9 - (ae-forgotten-export) The symbol "UnwrappedActivityInstanceType" needs to be exported by the entry point index.d.ts
-// attributive.ts:126:1 - (ae-forgotten-export) The symbol "BoolExpressionDataPublic" needs to be exported by the entry point index.d.ts
+// attributive.ts:128:1 - (ae-forgotten-export) The symbol "BoolExpressionDataPublic" needs to be exported by the entry point index.d.ts
 // createClass.ts:48:9 - (ae-forgotten-export) The symbol "ClassMetaPublicItem" needs to be exported by the entry point index.d.ts
 
 // (No @packageDocumentation comment for this package)
