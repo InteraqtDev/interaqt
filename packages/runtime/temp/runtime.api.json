@@ -340,6 +340,50 @@
           }
         },
         {
+          "kind": "TypeAlias",
+          "canonicalReference": "@interaqt/runtime!APIBody:type",
+          "docComment": "",
+          "excerptTokens": [
+            {
+              "kind": "Content",
+              "text": "export type APIBody = "
+            },
+            {
+              "kind": "Content",
+              "text": "{\n    activity?: string;\n    interaction?: string;\n    activityId?: string;\n    payload?: "
+            },
+            {
+              "kind": "Reference",
+              "text": "EventPayload",
+              "canonicalReference": "@interaqt/runtime!~EventPayload:type"
+            },
+            {
+              "kind": "Content",
+              "text": ";\n    query?: "
+            },
+            {
+              "kind": "Reference",
+              "text": "EventQuery",
+              "canonicalReference": "@interaqt/runtime!~EventQuery:type"
+            },
+            {
+              "kind": "Content",
+              "text": ";\n}"
+            },
+            {
+              "kind": "Content",
+              "text": ";"
+            }
+          ],
+          "fileUrlPath": "server.ts",
+          "releaseTag": "Public",
+          "name": "APIBody",
+          "typeTokenRange": {
+            "startIndex": 1,
+            "endIndex": 6
+          }
+        },
+        {
           "kind": "Class",
           "canonicalReference": "@interaqt/runtime!Controller:class",
           "docComment": "",
@@ -1620,6 +1664,170 @@
             }
           ],
           "implementsTokenRanges": []
+        },
+        {
+          "kind": "Function",
+          "canonicalReference": "@interaqt/runtime!createDataAPI:function(1)",
+          "docComment": "",
+          "excerptTokens": [
+            {
+              "kind": "Content",
+              "text": "export declare function createDataAPI(handle: "
+            },
+            {
+              "kind": "Reference",
+              "text": "DataAPIHandle",
+              "canonicalReference": "@interaqt/runtime!DataAPIHandle:type"
+            },
+            {
+              "kind": "Content",
+              "text": ", params?: "
+            },
+            {
+              "kind": "Content",
+              "text": "any[]"
+            },
+            {
+              "kind": "Content",
+              "text": "): "
+            },
+            {
+              "kind": "Reference",
+              "text": "DataAPI",
+              "canonicalReference": "@interaqt/runtime!DataAPI:type"
+            },
+            {
+              "kind": "Content",
+              "text": ";"
+            }
+          ],
+          "fileUrlPath": "server.ts",
+          "returnTypeTokenRange": {
+            "startIndex": 5,
+            "endIndex": 6
+          },
+          "releaseTag": "Public",
+          "overloadIndex": 1,
+          "parameters": [
+            {
+              "parameterName": "handle",
+              "parameterTypeTokenRange": {
+                "startIndex": 1,
+                "endIndex": 2
+              },
+              "isOptional": false
+            },
+            {
+              "parameterName": "params",
+              "parameterTypeTokenRange": {
+                "startIndex": 3,
+                "endIndex": 4
+              },
+              "isOptional": true
+            }
+          ],
+          "name": "createDataAPI"
+        },
+        {
+          "kind": "TypeAlias",
+          "canonicalReference": "@interaqt/runtime!DataAPI:type",
+          "docComment": "",
+          "excerptTokens": [
+            {
+              "kind": "Content",
+              "text": "export type DataAPI = "
+            },
+            {
+              "kind": "Reference",
+              "text": "DataAPIHandle",
+              "canonicalReference": "@interaqt/runtime!DataAPIHandle:type"
+            },
+            {
+              "kind": "Content",
+              "text": " & {\n    params: any[];\n}"
+            },
+            {
+              "kind": "Content",
+              "text": ";"
+            }
+          ],
+          "fileUrlPath": "server.ts",
+          "releaseTag": "Public",
+          "name": "DataAPI",
+          "typeTokenRange": {
+            "startIndex": 1,
+            "endIndex": 3
+          }
+        },
+        {
+          "kind": "TypeAlias",
+          "canonicalReference": "@interaqt/runtime!DataAPIHandle:type",
+          "docComment": "",
+          "excerptTokens": [
+            {
+              "kind": "Content",
+              "text": "export type DataAPIHandle = "
+            },
+            {
+              "kind": "Content",
+              "text": "(this: "
+            },
+            {
+              "kind": "Reference",
+              "text": "DataAPIThis",
+              "canonicalReference": "@interaqt/runtime!DataAPIThis:type"
+            },
+            {
+              "kind": "Content",
+              "text": ", ...rest: any[]) => any"
+            },
+            {
+              "kind": "Content",
+              "text": ";"
+            }
+          ],
+          "fileUrlPath": "server.ts",
+          "releaseTag": "Public",
+          "name": "DataAPIHandle",
+          "typeTokenRange": {
+            "startIndex": 1,
+            "endIndex": 4
+          }
+        },
+        {
+          "kind": "TypeAlias",
+          "canonicalReference": "@interaqt/runtime!DataAPIs:type",
+          "docComment": "",
+          "excerptTokens": [
+            {
+              "kind": "Content",
+              "text": "export type DataAPIs = "
+            },
+            {
+              "kind": "Content",
+              "text": "{\n    [k: string]: "
+            },
+            {
+              "kind": "Reference",
+              "text": "DataAPI",
+              "canonicalReference": "@interaqt/runtime!DataAPI:type"
+            },
+            {
+              "kind": "Content",
+              "text": ";\n}"
+            },
+            {
+              "kind": "Content",
+              "text": ";"
+            }
+          ],
+          "fileUrlPath": "server.ts",
+          "releaseTag": "Public",
+          "name": "DataAPIs",
+          "typeTokenRange": {
+            "startIndex": 1,
+            "endIndex": 4
+          }
         },
         {
           "kind": "TypeAlias",
@@ -3715,7 +3923,7 @@
             {
               "kind": "Reference",
               "text": "DataAPIs",
-              "canonicalReference": "@interaqt/runtime!~DataAPIs:type"
+              "canonicalReference": "@interaqt/runtime!DataAPIs:type"
             },
             {
               "kind": "Content",

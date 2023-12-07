@@ -113,6 +113,15 @@ defaultValue: () => boolean;
 }>;
 
 // @public (undocumented)
+export type APIBody = {
+    activity?: string;
+    interaction?: string;
+    activityId?: string;
+    payload?: EventPayload;
+    query?: EventQuery;
+};
+
+// @public (undocumented)
 export class Controller {
     constructor(system: System, entities: KlassInstance<typeof Entity, false>[], relations: KlassInstance<typeof Relation, false>[], activities: KlassInstance<typeof Activity, false>[], interactions: KlassInstance<typeof Interaction, false>[], states?: KlassInstance<typeof Property, false>[]);
     // (undocumented)
@@ -172,6 +181,22 @@ export class Controller {
     // (undocumented)
     system: System;
 }
+
+// @public (undocumented)
+export function createDataAPI(handle: DataAPIHandle, params?: any[]): DataAPI;
+
+// @public (undocumented)
+export type DataAPI = DataAPIHandle & {
+    params: any[];
+};
+
+// @public (undocumented)
+export type DataAPIHandle = (this: DataAPIThis, ...rest: any[]) => any;
+
+// @public (undocumented)
+export type DataAPIs = {
+    [k: string]: DataAPI;
+};
 
 // @public (undocumented)
 export type DataAPIThis = {
@@ -379,7 +404,6 @@ export type SQLiteDBOptions = Parameters<typeof SQLite>[1] & {
 };
 
 // Warning: (ae-forgotten-export) The symbol "ServerOptions" needs to be exported by the entry point index.d.ts
-// Warning: (ae-forgotten-export) The symbol "DataAPIs" needs to be exported by the entry point index.d.ts
 //
 // @public (undocumented)
 export function startServer(controller: Controller, options: ServerOptions, dataAPIs?: DataAPIs): Promise<void>;
@@ -534,6 +558,8 @@ export const USER_ENTITY = "User";
 // Warnings were encountered during analysis:
 //
 // Controller.ts:216:8 - (ae-forgotten-export) The symbol "ActivitySeqStateData" needs to be exported by the entry point index.d.ts
+// server.ts:20:5 - (ae-forgotten-export) The symbol "EventPayload" needs to be exported by the entry point index.d.ts
+// server.ts:21:5 - (ae-forgotten-export) The symbol "EventQuery" needs to be exported by the entry point index.d.ts
 // server.ts:30:5 - (ae-forgotten-export) The symbol "EventUser" needs to be exported by the entry point index.d.ts
 
 // (No @packageDocumentation comment for this package)

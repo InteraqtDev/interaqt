@@ -4,7 +4,7 @@ import {EventPayload, EventQuery, EventUser, InteractionEventArgs} from "./types
 import {MatchExp} from "@interaqt/storage";
 import cors from 'cors'
 import middie from '@fastify/middie'
-import chalk from "chalk";
+import {assert} from "./util.js";
 
 type ServerOptions = {
     port: number,
@@ -13,7 +13,7 @@ type ServerOptions = {
     logger? : FastifyLoggerOptions
 }
 
-type APIBody = {
+export type APIBody = {
     activity?: string,
     interaction? : string,
     activityId?: string
@@ -30,10 +30,10 @@ export type DataAPIThis = {
     user: EventUser
 }
 
+export type DataAPIHandle = (this: DataAPIThis, ...rest: any[]) => any
+export type DataAPI = DataAPIHandle & { params: any[] }
 
-type DataAPI = ((this: DataAPIThis, ...rest: any[]) => any) & { params: any[] }
-
-type DataAPIs = {
+export type DataAPIs = {
     [k:string] : DataAPI
 }
 
@@ -165,5 +165,13 @@ export async function startServer(controller: Controller, options: ServerOptions
         if (err) throw err
         // Server is now listening on ${address}
     })
+}
+
+
+export function createDataAPI(handle: DataAPIHandle, params: any[] = []): DataAPI {
+    assert(handle.length === params.length, 'Invalid params length');
+
+    (handle as DataAPI).params = params
+    return handle as DataAPI
 }
 
