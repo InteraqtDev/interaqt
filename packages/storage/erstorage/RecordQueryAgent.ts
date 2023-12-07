@@ -536,7 +536,7 @@ ${innerQuerySQL}
         for( let mergedLinkTargetRecord of newRecordData.mergedLinkTargetNewRecords.concat(newRecordData.mergedLinkTargetRecordIdRefs)) {
             let newDepIdRef
             if (!mergedLinkTargetRecord.isRef()) {
-                newDepIdRef = await this.createRecord(mergedLinkTargetRecord, events)
+                newDepIdRef = await this.createRecord(mergedLinkTargetRecord, `create merged link dep record ${newRecordData.recordName}.${mergedLinkTargetRecord.info?.attributeName}`, events)
             } else {
                 newDepIdRef = mergedLinkTargetRecord.getRef()
             }
@@ -570,9 +570,9 @@ ${innerQuerySQL}
         return newRecordData.merge(newRecordDataWithDeps)
     }
 
-    async createRecord(newEntityData: NewRecordData, events?: MutationEvent[]) : Promise<EntityIdRef>{
+    async createRecord(newEntityData: NewRecordData, queryName?: string, events?: MutationEvent[]): Promise<EntityIdRef>{
         const newEntityDataWithDep = await this.createRecordDependency(newEntityData, events)
-        const newRecordIdRef = await this.insertSameRowData(newEntityDataWithDep, events)
+        const newRecordIdRef = await this.insertSameRowData(newEntityDataWithDep, queryName, events)
 
         const relianceResult = await this.handleCreationReliance(newEntityDataWithDep.merge(newRecordIdRef), events)
 
@@ -744,7 +744,7 @@ ${innerQuerySQL}
         // 2. 重新插入到新行
         for(let record of records) {
             const toMoveRecordData = new NewRecordData(this.map, toMoveRecordInfo.name, record[moveAttribute])
-            await this.insertSameRowData(toMoveRecordData)
+            await this.insertSameRowData(toMoveRecordData, undefined)
 
             // 3. 增加 delete 关系的事件
             events?.push({
@@ -757,7 +757,7 @@ ${innerQuerySQL}
 
     }
 
-    async insertSameRowData(newEntityData: NewRecordData, events?: MutationEvent[]): Promise<EntityIdRef>{
+    async insertSameRowData(newEntityData: NewRecordData, queryName?: string, events?: MutationEvent[]): Promise<EntityIdRef>{
         // 由于我们可以抢夺别人的关联实体，所以会产生一个 unlink 事件，所以 events 要传进去。
         const newEntityDataWithIdsWithFlashOutRecords = await this.preprocessSameRowData(newEntityData, false, events)
         // 3. 插入新行。
@@ -767,7 +767,7 @@ INSERT INTO ${this.map.getRecordTable(newEntityData.recordName)}
 (${sameRowNewFieldAndValue.map(f => f.field).join(',')})
 VALUES
 (${sameRowNewFieldAndValue.map(f => '?').join(',')}) 
-`, sameRowNewFieldAndValue.map(f => this.prepareFieldValue(f.value))) as EntityIdRef
+`, sameRowNewFieldAndValue.map(f => this.prepareFieldValue(f.value)), queryName) as EntityIdRef
 
         return Object.assign(result,newEntityDataWithIdsWithFlashOutRecords.getData())
     }
@@ -786,7 +786,7 @@ VALUES
             const newRecordDataWithMyId = record.merge({
                 [reverseAttribute] : currentIdRef
             })
-            const newRecordIdRef = await this.createRecord(newRecordDataWithMyId, events)
+            const newRecordIdRef = await this.createRecord(newRecordDataWithMyId, `create record ${newEntityData.recordName}.${record.info?.attributeName}`, events)
             if (record.info!.isXToMany) {
                 if (!newIdRefs[record.info!.attributeName]) {
                     newIdRefs[record.info!.attributeName!] = []
@@ -833,7 +833,7 @@ VALUES
 
         // 3. 处理完全独立的新数据和关系
         for( let record of newEntityData.isolatedNewRecords) {
-            const newRecordIdRef = await this.createRecord(record, events)
+            const newRecordIdRef = await this.createRecord(record, `create isolated related record ${newEntityData.recordName}.${record.info?.attributeName}`, events)
 
 
             const linkRawData: RawEntityData = record.linkRecordData?.getData() || {}
@@ -842,7 +842,7 @@ VALUES
                 target: record.info!.isRecordSource() ? newRecordIdRef : currentIdRef
             })
             const newLinkData = new NewRecordData(this.map, record.info!.linkName, linkRawData)
-            const newLinkRecord = await this.createRecord(newLinkData, events)
+            const newLinkRecord = await this.createRecord(newLinkData, `create isolated related link record ${newEntityData.recordName}.${record.info?.attributeName}`, events)
 
             if (record.info!.isXToMany) {
                 if (!newIdRefs[record.info!.attributeName]) {
@@ -877,7 +877,7 @@ VALUES
                 target: record.info!.isRecordSource() ? record.getRef() : currentIdRef
             })
             const newLinkData = new NewRecordData(this.map, record.info!.linkName, linkRawData)
-            const newLinkRecord = await this.createRecord(newLinkData, events)
+            const newLinkRecord = await this.createRecord(newLinkData, `create isolated related link record of old related ${newEntityData.recordName}.${record.info?.attributeName}`, events)
 
             if (record.info!.isXToMany) {
                 if (!newIdRefs[record.info!.attributeName]) {
@@ -1000,7 +1000,7 @@ WHERE ${idField} = (?)
             if (newRelatedEntityData.isRef()) {
                 finalRelatedEntityRef = newRelatedEntityData.getRef()
             } else {
-                finalRelatedEntityRef = await this.createRecord(newRelatedEntityData, events)
+                finalRelatedEntityRef = await this.createRecord(newRelatedEntityData, `create new related record for update ${newEntityData.recordName}.${newRelatedEntityData.info?.attributeName}`, events)
             }
 
             // FIXME 这里没有在更新的时候一次性写入，而是又通过 addLinkFromRecord 建立的关系。需要优化
@@ -1231,7 +1231,7 @@ WHERE ${recordInfo.idField} IN (${records.map(({id}) => '?').join(',')})
             ...attributes
         })
 
-        return this.createRecord(newLinkData, events)
+        return this.createRecord(newLinkData, `create link record ${linkInfo.name}`, events)
     }
 
 
@@ -1286,7 +1286,7 @@ WHERE ${recordInfo.idField} IN (${records.map(({id}) => '?').join(',')})
         const record = (await this.findRecords(RecordQuery.create(recordName, this.map, {
             matchExpression: match,
             attributeQuery
-        })))[0]
+        }), `find records for path ${recordName}.${attributePathStr}`))[0]
 
         // 如果找到了，把头也放进去。让数据格式整齐。
         return foundPath ? [record, ...foundPath] : undefined

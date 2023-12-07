@@ -52,12 +52,12 @@ export class EntityQueryHandle {
             },
         )
 
-        return this.agent.findRecords(entityQuery)
+        return this.agent.findRecords(entityQuery, `finding ${entityName} from handle`)
     }
 
     async create(entityName: string, rawData: RawEntityData, events?: MutationEvent[]): Promise<EntityIdRef> {
         const newEntityData = new NewRecordData(this.map, entityName, rawData)
-        return this.agent.createRecord(newEntityData, events)
+        return this.agent.createRecord(newEntityData, `create record ${entityName} from handle`, events)
     }
 
     // CAUTION 不能递归更新 relate entity 的 value，如果传入了 related entity 的值，说明是建立新的联系。
