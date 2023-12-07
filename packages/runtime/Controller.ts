@@ -150,39 +150,63 @@ export class Controller {
         const interactionCall = this.interactionCalls.get(interactionId)!
         assert(!!interactionCall,`cannot find interaction for ${interactionId}`)
 
+        // TODO log 的参数呢
+        this.system.logger.info({label: "interaction", message:interactionCall.interaction.name})
         await this.system.storage.beginTransaction(interactionCall.interaction.name)
         const result = await interactionCall.call(interactionEventArgs)
         if (!result.error) {
             const effects: any[] = []
-            // TODO 也要记录 bug
             try {
+                this.system.logger.silly({label: "effect", message:interactionCall.interaction.name})
                 await this.dispatch(interactionCall.interaction, result.event!.args, effects, undefined)
                 result.effects = effects
-            }catch (error) {
+            } catch (error) {
                 result.error = error
+                this.system.logger.error({label: "effect", message:interactionCall.interaction.name})
             }
         } else {
-            console.error(result.error)
+            // TODO log 的参数呢
+            this.system.logger.error({label: "interaction", message:interactionCall.interaction.name})
         }
 
         if (!result.error) {
-            await this.system.storage.commitTransaction()
-        }else{
-            await this.system.storage.rollbackTransaction()
+            await this.system.storage.commitTransaction(interactionCall.interaction.name)
+        } else{
+            await this.system.storage.rollbackTransaction(interactionCall.interaction.name)
         }
 
         return result
     }
     async callActivityInteraction(activityCallId:string, interactionCallId:string, activityId: string, interactionEventArgs: InteractionEventArgs) {
         const activityCall = this.activityCalls.get(activityCallId)!
-        const result = await activityCall.callInteraction(activityId, interactionCallId, interactionEventArgs)
+        assert(!!activityCall,`cannot find interaction for ${activityCallId}`)
+        const interactionCall = activityCall.uuidToInteractionCall.get(interactionCallId)
+        assert(!!interactionCall,`cannot find interaction for ${interactionCallId}`)
 
+        // TODO 参数呢
+        const interactionNameWithActivityName = `${activityCall.activity.name}:${interactionCall!.interaction.name}}`
+        this.system.logger.info({label: "activity", message:`${activityCall.activity.name}:${interactionCall!.interaction.name}}`})
+
+        await this.system.storage.beginTransaction(interactionNameWithActivityName)
+
+        const result = await activityCall.callInteraction(activityId, interactionCallId, interactionEventArgs)
         if (!result.error) {
             const effects: any[] = []
-            await this.dispatch(activityCall.uuidToInteractionCall.get(interactionCallId)!.interaction, interactionEventArgs, effects, activityId)
-            result.effects = effects
+            try {
+                await this.dispatch(activityCall.uuidToInteractionCall.get(interactionCallId)!.interaction, interactionEventArgs, effects, activityId)
+                result.effects = effects
+            } catch(error) {
+                result.error = error
+                this.system.logger.error({label: "effect", message:interactionNameWithActivityName})
+            }
         } else {
-            console.error(result.error)
+            this.system.logger.error({label: "activity", message:interactionNameWithActivityName})
+        }
+
+        if (!result.error) {
+            await this.system.storage.commitTransaction(interactionNameWithActivityName)
+        } else{
+            await this.system.storage.rollbackTransaction(interactionNameWithActivityName)
         }
 
         return result

@@ -55,6 +55,22 @@ export type RecordMutationEvent = {
     }
 }
 
+export type SystemLogger = {
+    error: (arg: SystemLogType) => any,
+    warn: (arg: SystemLogType) => any,
+    info: (arg: SystemLogType) => any,
+    http: (arg: SystemLogType) => any,
+    verbose: (arg: SystemLogType) => any,
+    debug: (arg: SystemLogType) => any,
+    silly: (arg: SystemLogType) => any,
+}
+
+export type SystemLogType = {
+    label: string,
+    message: string,
+    [k: string]: any
+}
+
 export interface System {
     getEvent: (query: any) => Promise<InteractionEvent[]>
     saveEvent: (interactionEvent: InteractionEvent) => Promise<any>
@@ -63,6 +79,7 @@ export interface System {
     getActivity:(query?: MatchExpressionData) => Promise<any[]>
     conceptClass: Map<string, ReturnType<typeof createClass>>
     storage: Storage
+    logger: SystemLogger
     setup: (entities: KlassInstance<typeof Entity, false>[], relations: KlassInstance<typeof Relation, false>[]) => Promise<any>
 }
 

@@ -8,7 +8,7 @@ import {
     RecordMutationEvent,
     Storage,
     System,
-    SYSTEM_RECORD
+    SYSTEM_RECORD, SystemLogger
 } from "./System.js";
 import {InteractionEvent} from './types/interaction.js'
 import {createClass, Entity, KlassInstance, Property, Relation} from "@interaqt/shared";
@@ -22,6 +22,7 @@ import {
     RawEntityData
 } from '@interaqt/storage'
 import {SQLiteDB} from "./SQLite.js";
+import winston from "winston";
 
 
 function JSONStringify(value:any) {
@@ -31,6 +32,7 @@ function JSONStringify(value:any) {
 function JSONParse(value: string) {
     return value === undefined ? undefined : JSON.parse(decodeURI(value))
 }
+
 
 class MonoStorage implements Storage{
     public queryHandle?: EntityQueryHandle
@@ -202,11 +204,19 @@ export const activityEntity = Entity.create({
     ]
 })
 
+
+
+const defaultLogger = winston.createLogger({
+    level: 'silly',
+    transports: [
+        new winston.transports.Console(),
+    ]
+})
+
 export class MonoSystem implements System {
     conceptClass: Map<string, ReturnType<typeof createClass>> = new Map()
     storage: Storage
-    // TODO 外部传入 logger。默认用 winston?
-    constructor(db: Database = new SQLiteDB()) {
+    constructor(db: Database = new SQLiteDB(), public logger: SystemLogger = defaultLogger) {
         this.storage = new MonoStorage(db)
     }
     async saveEvent(event: InteractionEvent) {
