@@ -629,7 +629,7 @@
             },
             {
               "kind": "Content",
-              "text": "import(\"./createClass\")."
+              "text": "import(\"./createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -809,7 +809,7 @@
             },
             {
               "kind": "Content",
-              "text": "import(\"./createClass\")."
+              "text": "import(\"./createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -818,7 +818,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n    content: {\n        type: (import(\"./createClass\")."
+              "text": "<{\n    content: {\n        type: (import(\"./createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -827,7 +827,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n            type: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                defaultValue: () => string;\n            };\n            data: {\n                type: import(\"./createClass\")."
+              "text": "<{\n            type: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                defaultValue: () => string;\n            };\n            data: {\n                type: import(\"./createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -836,7 +836,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                    stringContent: {\n                        type: \"string\";\n                    };\n                    content: {\n                        type: \"function\";\n                    };\n                    name: {\n                        type: \"string\";\n                    };\n                    isRef: {\n                        type: \"boolean\";\n                    };\n                }>;\n                required: true;\n                collection: false;\n            };\n        }> | import(\"./createClass\")."
+              "text": "<{\n                    stringContent: {\n                        type: \"string\";\n                    };\n                    content: {\n                        type: \"function\";\n                    };\n                    name: {\n                        type: \"string\";\n                    };\n                    isRef: {\n                        type: \"boolean\";\n                    };\n                }>;\n                required: true;\n                collection: false;\n            };\n        }> | import(\"./createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -877,7 +877,7 @@
             },
             {
               "kind": "Content",
-              "text": "import(\"./createClass\")."
+              "text": "import(\"./createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -886,7 +886,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n    type: {\n        type: \"string\";\n        required: true;\n        collection: false;\n        defaultValue: () => string;\n    };\n    data: {\n        type: import(\"./createClass\")."
+              "text": "<{\n    type: {\n        type: \"string\";\n        required: true;\n        collection: false;\n        defaultValue: () => string;\n    };\n    data: {\n        type: import(\"./createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -1868,7 +1868,7 @@
             },
             {
               "kind": "Content",
-              "text": "import(\"./createClass\")."
+              "text": "import(\"./createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -1997,7 +1997,7 @@
             },
             {
               "kind": "Content",
-              "text": "import(\"./createClass\")."
+              "text": "import(\"./createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -2006,7 +2006,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n    content: {\n        type: (import(\"./createClass\")."
+              "text": "<{\n    content: {\n        type: (import(\"./createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -2015,7 +2015,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n            type: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                defaultValue: () => string;\n            };\n            data: {\n                type: import(\"./createClass\")."
+              "text": "<{\n            type: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                defaultValue: () => string;\n            };\n            data: {\n                type: import(\"./createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -2024,7 +2024,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                    stringContent: {\n                        type: \"string\";\n                    };\n                    content: {\n                        type: \"function\";\n                    };\n                    name: {\n                        type: \"string\";\n                    };\n                    isRef: {\n                        type: \"boolean\";\n                    };\n                }>;\n                required: true;\n                collection: false;\n            };\n        }> | import(\"./createClass\")."
+              "text": "<{\n                    stringContent: {\n                        type: \"string\";\n                    };\n                    content: {\n                        type: \"function\";\n                    };\n                    name: {\n                        type: \"string\";\n                    };\n                    isRef: {\n                        type: \"boolean\";\n                    };\n                }>;\n                required: true;\n                collection: false;\n            };\n        }> | import(\"./createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -5661,7 +5661,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                            type: {\n                                type: \"string\";\n                                required: true;\n                                collection: false;\n                                defaultValue: () => \"expression\";\n                            };\n                            operator: {\n                                type: \"string\";\n                                required: true;\n                                collection: false;\n                                options: [\"and\", \"or\", \"not\"];\n                                defaultValue: () => \"and\";\n                            };\n                            left: {\n                                instanceType: import(\"../attributive\")."
+              "text": "<{\n                            type: {\n                                type: \"string\";\n                                required: true;\n                                collection: false;\n                                defaultValue: () => \"expression\";\n                            };\n                            operator: {\n                                type: \"string\";\n                                required: true;\n                                collection: false;\n                                options: [\"and\", \"or\", \"not\"];\n                                defaultValue: () => \"and\";\n                            };\n                            left: {\n                                instanceType: import(\"../attributive.js\")."
             },
             {
               "kind": "Reference",
@@ -5688,7 +5688,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                                            stringContent: {\n                                                type: \"string\";\n                                            };\n                                            content: {\n                                                type: \"function\";\n                                            };\n                                            name: {\n                                                type: \"string\";\n                                            };\n                                            isRef: {\n                                                type: \"boolean\";\n                                            };\n                                        }>;\n                                        required: true;\n                                        collection: false;\n                                    };\n                                }>;\n                                required: true;\n                                collection: false;\n                            };\n                            right: {\n                                instanceType: import(\"../attributive\")."
+              "text": "<{\n                                            stringContent: {\n                                                type: \"string\";\n                                            };\n                                            content: {\n                                                type: \"function\";\n                                            };\n                                            name: {\n                                                type: \"string\";\n                                            };\n                                            isRef: {\n                                                type: \"boolean\";\n                                            };\n                                        }>;\n                                        required: true;\n                                        collection: false;\n                                    };\n                                }>;\n                                required: true;\n                                collection: false;\n                            };\n                            right: {\n                                instanceType: import(\"../attributive.js\")."
             },
             {
               "kind": "Reference",
@@ -6031,7 +6031,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                    type: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        defaultValue: () => \"expression\";\n                    };\n                    operator: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        options: [\"and\", \"or\", \"not\"];\n                        defaultValue: () => \"and\";\n                    };\n                    left: {\n                        instanceType: import(\"../attributive\")."
+              "text": "<{\n                    type: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        defaultValue: () => \"expression\";\n                    };\n                    operator: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        options: [\"and\", \"or\", \"not\"];\n                        defaultValue: () => \"and\";\n                    };\n                    left: {\n                        instanceType: import(\"../attributive.js\")."
             },
             {
               "kind": "Reference",
@@ -6058,7 +6058,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                                    stringContent: {\n                                        type: \"string\";\n                                    };\n                                    content: {\n                                        type: \"function\";\n                                    };\n                                    name: {\n                                        type: \"string\";\n                                    };\n                                    isRef: {\n                                        type: \"boolean\";\n                                    };\n                                }>;\n                                required: true;\n                                collection: false;\n                            };\n                        }>;\n                        required: true;\n                        collection: false;\n                    };\n                    right: {\n                        instanceType: import(\"../attributive\")."
+              "text": "<{\n                                    stringContent: {\n                                        type: \"string\";\n                                    };\n                                    content: {\n                                        type: \"function\";\n                                    };\n                                    name: {\n                                        type: \"string\";\n                                    };\n                                    isRef: {\n                                        type: \"boolean\";\n                                    };\n                                }>;\n                                required: true;\n                                collection: false;\n                            };\n                        }>;\n                        required: true;\n                        collection: false;\n                    };\n                    right: {\n                        instanceType: import(\"../attributive.js\")."
             },
             {
               "kind": "Reference",
