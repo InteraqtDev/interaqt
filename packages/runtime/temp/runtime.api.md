@@ -9,13 +9,15 @@ import { ActivityGroupInstanceType } from '@interaqt/shared';
 import { ActivityGroupPublicType } from '@interaqt/shared';
 import { ActivityInstanceType } from '@interaqt/shared';
 import { Atom } from 'data0';
+import { Attributive } from '@interaqt/shared';
 import { BoolExp } from '@interaqt/shared';
 import { BoolExpressionRawData } from '@interaqt/shared';
 import { Concept } from '@interaqt/shared';
 import { ConceptInstance } from '@interaqt/shared';
+import cors from 'cors';
 import { createClass } from '@interaqt/shared';
 import { Entity } from '@interaqt/shared';
-import { EntityAttributive } from '@interaqt/shared';
+import { FastifyLoggerOptions } from 'fastify';
 import { GatewayInstanceType } from '@interaqt/shared';
 import { GatewayPublicType } from '@interaqt/shared';
 import { InertKlassInstance } from '@interaqt/shared';
@@ -278,7 +280,7 @@ export const ID_ATTR = "id";
 
 // @public (undocumented)
 export class MonoSystem implements System {
-    constructor(db?: Database);
+    constructor(db?: Database, logger?: SystemLogger);
     // (undocumented)
     conceptClass: Map<string, ReturnType<typeof createClass>>;
     // (undocumented)
@@ -287,6 +289,8 @@ export class MonoSystem implements System {
     getActivity(query?: MatchExpressionData): Promise<any[]>;
     // (undocumented)
     getEvent(query?: MatchExpressionData): Promise<InteractionEvent[]>;
+    // (undocumented)
+    logger: SystemLogger;
     // Warning: (ae-forgotten-export) The symbol "InteractionEvent" needs to be exported by the entry point index.d.ts
     //
     // (undocumented)
@@ -327,12 +331,7 @@ export const ROW_ID_ATTR = "_rowId";
 // @public (undocumented)
 export class SQLiteDB implements Database {
     constructor(file?: string, options?: (SQLite.Options & {
-        log: (msg: {
-            type: string;
-            name: string;
-            sql: string;
-            params?: any[] | undefined;
-        }) => any;
+        log: (msg: SQLiteDBLog) => any;
     }) | undefined);
     // (undocumented)
     close(): void;
@@ -351,22 +350,12 @@ export class SQLiteDB implements Database {
     // (undocumented)
     insert(sql: string, values: any[], name?: string): Promise<EntityIdRef>;
     // (undocumented)
-    log: (msg: {
-        type: string;
-        name: string;
-        sql: string;
-        params?: any[];
-    }) => any;
+    log: (msg: SQLiteDBLog) => any;
     // (undocumented)
     open(): Promise<void>;
     // (undocumented)
     options?: (SQLite.Options & {
-        log: (msg: {
-            type: string;
-            name: string;
-            sql: string;
-            params?: any[];
-        }) => any;
+        log: (msg: SQLiteDBLog) => any;
     }) | undefined;
     // (undocumented)
     query<T extends any>(sql: string, where?: any[], name?: string): Promise<T[]>;
@@ -375,6 +364,14 @@ export class SQLiteDB implements Database {
     // (undocumented)
     update(sql: string, values: any[], idField?: string, name?: string): Promise<any[]>;
 }
+
+// @public (undocumented)
+export type SQLiteDBLog = {
+    type: string;
+    name: string;
+    sql: string;
+    params?: any[];
+};
 
 // @public (undocumented)
 export type SQLiteDBOptions = Parameters<typeof SQLite>[1] & {
@@ -389,6 +386,9 @@ export function startServer(controller: Controller, options: ServerOptions, data
 
 // @public (undocumented)
 type Storage_2 = {
+    beginTransaction: (transactionName?: string) => Promise<any>;
+    commitTransaction: (transactionName?: string) => Promise<any>;
+    rollbackTransaction: (transactionName?: string) => Promise<any>;
     get: (itemName: string, id: string, initialValue?: any) => Promise<any>;
     set: (itemName: string, id: string, value: any) => Promise<any>;
     setup: (entities: KlassInstance<typeof Entity, false>[], relations: KlassInstance<typeof Relation, false>[]) => any;
@@ -417,6 +417,8 @@ export interface System {
     getActivity: (query?: MatchExpressionData) => Promise<any[]>;
     // (undocumented)
     getEvent: (query: any) => Promise<InteractionEvent[]>;
+    // (undocumented)
+    logger: SystemLogger;
     // (undocumented)
     saveEvent: (interactionEvent: InteractionEvent) => Promise<any>;
     // (undocumented)
@@ -509,12 +511,30 @@ defaultValue: () => boolean;
 }>;
 
 // @public (undocumented)
+export type SystemLogger = {
+    error: (arg: SystemLogType) => any;
+    warn: (arg: SystemLogType) => any;
+    info: (arg: SystemLogType) => any;
+    http: (arg: SystemLogType) => any;
+    verbose: (arg: SystemLogType) => any;
+    debug: (arg: SystemLogType) => any;
+    silly: (arg: SystemLogType) => any;
+};
+
+// @public (undocumented)
+export type SystemLogType = {
+    label: string;
+    message: string;
+    [k: string]: any;
+};
+
+// @public (undocumented)
 export const USER_ENTITY = "User";
 
 // Warnings were encountered during analysis:
 //
-// Controller.ts:179:8 - (ae-forgotten-export) The symbol "ActivitySeqStateData" needs to be exported by the entry point index.d.ts
-// server.ts:27:5 - (ae-forgotten-export) The symbol "EventUser" needs to be exported by the entry point index.d.ts
+// Controller.ts:216:8 - (ae-forgotten-export) The symbol "ActivitySeqStateData" needs to be exported by the entry point index.d.ts
+// server.ts:30:5 - (ae-forgotten-export) The symbol "EventUser" needs to be exported by the entry point index.d.ts
 
 // (No @packageDocumentation comment for this package)
 

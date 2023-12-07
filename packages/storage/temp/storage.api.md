@@ -672,7 +672,7 @@ export class RecordQueryAgent {
     // (undocumented)
     buildXToOneFindQuery(recordQuery: RecordQuery, prefix?: string): [string, any[]];
     // (undocumented)
-    createRecord(newEntityData: NewRecordData, events?: MutationEvent_2[]): Promise<EntityIdRef>;
+    createRecord(newEntityData: NewRecordData, queryName?: string, events?: MutationEvent_2[]): Promise<EntityIdRef>;
     // (undocumented)
     createRecordDependency(newRecordData: NewRecordData, events?: MutationEvent_2[]): Promise<NewRecordData>;
     // (undocumented)
@@ -706,7 +706,7 @@ export class RecordQueryAgent {
     // (undocumented)
     handleUpdateReliance(entityName: string, matchedEntity: EntityIdRef, newEntityData: NewRecordData, events?: MutationEvent_2[]): Promise<Record_2>;
     // (undocumented)
-    insertSameRowData(newEntityData: NewRecordData, events?: MutationEvent_2[]): Promise<EntityIdRef>;
+    insertSameRowData(newEntityData: NewRecordData, queryName?: string, events?: MutationEvent_2[]): Promise<EntityIdRef>;
     // (undocumented)
     map: EntityToTableMap;
     // (undocumented)

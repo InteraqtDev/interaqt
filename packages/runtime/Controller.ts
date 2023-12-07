@@ -184,8 +184,8 @@ export class Controller {
         assert(!!interactionCall,`cannot find interaction for ${interactionCallId}`)
 
         // TODO 参数呢
-        const interactionNameWithActivityName = `${activityCall.activity.name}:${interactionCall!.interaction.name}}`
-        this.system.logger.info({label: "activity", message:`${activityCall.activity.name}:${interactionCall!.interaction.name}}`})
+        const interactionNameWithActivityName = `${activityCall.activity.name}:${interactionCall!.interaction.name}`
+        this.system.logger.info({label: "activity", message:`${activityCall.activity.name}:${interactionCall!.interaction.name}`})
 
         await this.system.storage.beginTransaction(interactionNameWithActivityName)
 

@@ -22,7 +22,9 @@ import {
     RawEntityData
 } from '@interaqt/storage'
 import {SQLiteDB} from "./SQLite.js";
-import winston from "winston";
+import winston, {format} from "winston";
+const { combine, timestamp, label, printf } = format;
+import chalk from "chalk";
 
 
 function JSONStringify(value:any) {
@@ -204,12 +206,21 @@ export const activityEntity = Entity.create({
     ]
 })
 
-
+const printLine = printf(({ level, message, label, timestamp }) => {
+    return `${chalk.bgBlack.white(timestamp)} ${level === 'error' ? chalk.bgRed.white(level.padEnd(6, ' ')) : chalk.bgBlue.white(level.padEnd(6, ' '))} ${chalk.bgCyan.black(label.padEnd(11, ' '))} : ${message}`;
+});
 
 const defaultLogger = winston.createLogger({
     level: 'silly',
     transports: [
-        new winston.transports.Console(),
+        new winston.transports.Console({
+            format:combine(
+                timestamp({
+                    format: 'YYYY-MM-DD HH:mm:ss'
+                }),
+                printLine
+            ),
+        }),
     ]
 })
 

@@ -12323,6 +12323,14 @@
                 },
                 {
                   "kind": "Content",
+                  "text": ", queryName?: "
+                },
+                {
+                  "kind": "Content",
+                  "text": "string"
+                },
+                {
+                  "kind": "Content",
                   "text": ", events?: "
                 },
                 {
@@ -12363,8 +12371,8 @@
               ],
               "isStatic": false,
               "returnTypeTokenRange": {
-                "startIndex": 6,
-                "endIndex": 10
+                "startIndex": 8,
+                "endIndex": 12
               },
               "releaseTag": "Public",
               "isProtected": false,
@@ -12379,10 +12387,18 @@
                   "isOptional": false
                 },
                 {
-                  "parameterName": "events",
+                  "parameterName": "queryName",
                   "parameterTypeTokenRange": {
                     "startIndex": 3,
-                    "endIndex": 5
+                    "endIndex": 4
+                  },
+                  "isOptional": true
+                },
+                {
+                  "parameterName": "events",
+                  "parameterTypeTokenRange": {
+                    "startIndex": 5,
+                    "endIndex": 7
                   },
                   "isOptional": true
                 }
@@ -13797,6 +13813,14 @@
                 },
                 {
                   "kind": "Content",
+                  "text": ", queryName?: "
+                },
+                {
+                  "kind": "Content",
+                  "text": "string"
+                },
+                {
+                  "kind": "Content",
                   "text": ", events?: "
                 },
                 {
@@ -13837,8 +13861,8 @@
               ],
               "isStatic": false,
               "returnTypeTokenRange": {
-                "startIndex": 6,
-                "endIndex": 10
+                "startIndex": 8,
+                "endIndex": 12
               },
               "releaseTag": "Public",
               "isProtected": false,
@@ -13853,10 +13877,18 @@
                   "isOptional": false
                 },
                 {
-                  "parameterName": "events",
+                  "parameterName": "queryName",
                   "parameterTypeTokenRange": {
                     "startIndex": 3,
-                    "endIndex": 5
+                    "endIndex": 4
+                  },
+                  "isOptional": true
+                },
+                {
+                  "parameterName": "events",
+                  "parameterTypeTokenRange": {
+                    "startIndex": 5,
+                    "endIndex": 7
                   },
                   "isOptional": true
                 }

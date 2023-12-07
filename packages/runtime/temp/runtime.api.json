@@ -2042,6 +2042,15 @@
                 },
                 {
                   "kind": "Content",
+                  "text": ", logger?: "
+                },
+                {
+                  "kind": "Reference",
+                  "text": "SystemLogger",
+                  "canonicalReference": "@interaqt/runtime!SystemLogger:type"
+                },
+                {
+                  "kind": "Content",
                   "text": ");"
                 }
               ],
@@ -2054,6 +2063,14 @@
                   "parameterTypeTokenRange": {
                     "startIndex": 1,
                     "endIndex": 2
+                  },
+                  "isOptional": true
+                },
+                {
+                  "parameterName": "logger",
+                  "parameterTypeTokenRange": {
+                    "startIndex": 3,
+                    "endIndex": 4
                   },
                   "isOptional": true
                 }
@@ -2281,6 +2298,37 @@
               "isOptional": false,
               "isAbstract": false,
               "name": "getEvent"
+            },
+            {
+              "kind": "Property",
+              "canonicalReference": "@interaqt/runtime!MonoSystem#logger:member",
+              "docComment": "",
+              "excerptTokens": [
+                {
+                  "kind": "Content",
+                  "text": "logger: "
+                },
+                {
+                  "kind": "Reference",
+                  "text": "SystemLogger",
+                  "canonicalReference": "@interaqt/runtime!SystemLogger:type"
+                },
+                {
+                  "kind": "Content",
+                  "text": ";"
+                }
+              ],
+              "isReadonly": false,
+              "isOptional": false,
+              "releaseTag": "Public",
+              "name": "logger",
+              "propertyTypeTokenRange": {
+                "startIndex": 1,
+                "endIndex": 2
+              },
+              "isStatic": false,
+              "isProtected": false,
+              "isAbstract": false
             },
             {
               "kind": "Method",
@@ -2740,7 +2788,16 @@
                 },
                 {
                   "kind": "Content",
-                  "text": " & {\n        log: (msg: {\n            type: string;\n            name: string;\n            sql: string;\n            params?: any[] | undefined;\n        }) => any;\n    }) | undefined"
+                  "text": " & {\n        log: (msg: "
+                },
+                {
+                  "kind": "Reference",
+                  "text": "SQLiteDBLog",
+                  "canonicalReference": "@interaqt/runtime!SQLiteDBLog:type"
+                },
+                {
+                  "kind": "Content",
+                  "text": ") => any;\n    }) | undefined"
                 },
                 {
                   "kind": "Content",
@@ -2763,7 +2820,7 @@
                   "parameterName": "options",
                   "parameterTypeTokenRange": {
                     "startIndex": 3,
-                    "endIndex": 6
+                    "endIndex": 8
                   },
                   "isOptional": true
                 }
@@ -3148,7 +3205,16 @@
                 },
                 {
                   "kind": "Content",
-                  "text": "(msg: {\n        type: string;\n        name: string;\n        sql: string;\n        params?: any[];\n    }) => any"
+                  "text": "(msg: "
+                },
+                {
+                  "kind": "Reference",
+                  "text": "SQLiteDBLog",
+                  "canonicalReference": "@interaqt/runtime!SQLiteDBLog:type"
+                },
+                {
+                  "kind": "Content",
+                  "text": ") => any"
                 },
                 {
                   "kind": "Content",
@@ -3161,7 +3227,7 @@
               "name": "log",
               "propertyTypeTokenRange": {
                 "startIndex": 1,
-                "endIndex": 2
+                "endIndex": 4
               },
               "isStatic": false,
               "isProtected": false,
@@ -3223,7 +3289,16 @@
                 },
                 {
                   "kind": "Content",
-                  "text": " & {\n        log: (msg: {\n            type: string;\n            name: string;\n            sql: string;\n            params?: any[];\n        }) => any;\n    }) | undefined"
+                  "text": " & {\n        log: (msg: "
+                },
+                {
+                  "kind": "Reference",
+                  "text": "SQLiteDBLog",
+                  "canonicalReference": "@interaqt/runtime!SQLiteDBLog:type"
+                },
+                {
+                  "kind": "Content",
+                  "text": ") => any;\n    }) | undefined"
                 },
                 {
                   "kind": "Content",
@@ -3236,7 +3311,7 @@
               "name": "options",
               "propertyTypeTokenRange": {
                 "startIndex": 1,
-                "endIndex": 4
+                "endIndex": 6
               },
               "isStatic": false,
               "isProtected": false,
@@ -3537,6 +3612,32 @@
         },
         {
           "kind": "TypeAlias",
+          "canonicalReference": "@interaqt/runtime!SQLiteDBLog:type",
+          "docComment": "",
+          "excerptTokens": [
+            {
+              "kind": "Content",
+              "text": "export type SQLiteDBLog = "
+            },
+            {
+              "kind": "Content",
+              "text": "{\n    type: string;\n    name: string;\n    sql: string;\n    params?: any[];\n}"
+            },
+            {
+              "kind": "Content",
+              "text": ";"
+            }
+          ],
+          "fileUrlPath": "SQLite.ts",
+          "releaseTag": "Public",
+          "name": "SQLiteDBLog",
+          "typeTokenRange": {
+            "startIndex": 1,
+            "endIndex": 2
+          }
+        },
+        {
+          "kind": "TypeAlias",
           "canonicalReference": "@interaqt/runtime!SQLiteDBOptions:type",
           "docComment": "",
           "excerptTokens": [
@@ -3680,7 +3781,34 @@
             },
             {
               "kind": "Content",
-              "text": "{\n    get: (itemName: string, id: string, initialValue?: any) => "
+              "text": "{\n    beginTransaction: (transactionName?: string) => "
+            },
+            {
+              "kind": "Reference",
+              "text": "Promise",
+              "canonicalReference": "!Promise:interface"
+            },
+            {
+              "kind": "Content",
+              "text": "<any>;\n    commitTransaction: (transactionName?: string) => "
+            },
+            {
+              "kind": "Reference",
+              "text": "Promise",
+              "canonicalReference": "!Promise:interface"
+            },
+            {
+              "kind": "Content",
+              "text": "<any>;\n    rollbackTransaction: (transactionName?: string) => "
+            },
+            {
+              "kind": "Reference",
+              "text": "Promise",
+              "canonicalReference": "!Promise:interface"
+            },
+            {
+              "kind": "Content",
+              "text": "<any>;\n    get: (itemName: string, id: string, initialValue?: any) => "
             },
             {
               "kind": "Reference",
@@ -3845,7 +3973,7 @@
           "name": "Storage_2",
           "typeTokenRange": {
             "startIndex": 1,
-            "endIndex": 36
+            "endIndex": 42
           }
         },
         {
@@ -4064,6 +4192,34 @@
               "propertyTypeTokenRange": {
                 "startIndex": 1,
                 "endIndex": 6
+              }
+            },
+            {
+              "kind": "PropertySignature",
+              "canonicalReference": "@interaqt/runtime!System#logger:member",
+              "docComment": "",
+              "excerptTokens": [
+                {
+                  "kind": "Content",
+                  "text": "logger: "
+                },
+                {
+                  "kind": "Reference",
+                  "text": "SystemLogger",
+                  "canonicalReference": "@interaqt/runtime!SystemLogger:type"
+                },
+                {
+                  "kind": "Content",
+                  "text": ";"
+                }
+              ],
+              "isReadonly": false,
+              "isOptional": false,
+              "releaseTag": "Public",
+              "name": "logger",
+              "propertyTypeTokenRange": {
+                "startIndex": 1,
+                "endIndex": 2
               }
             },
             {
@@ -4423,6 +4579,121 @@
           "variableTypeTokenRange": {
             "startIndex": 1,
             "endIndex": 28
+          }
+        },
+        {
+          "kind": "TypeAlias",
+          "canonicalReference": "@interaqt/runtime!SystemLogger:type",
+          "docComment": "",
+          "excerptTokens": [
+            {
+              "kind": "Content",
+              "text": "export type SystemLogger = "
+            },
+            {
+              "kind": "Content",
+              "text": "{\n    error: (arg: "
+            },
+            {
+              "kind": "Reference",
+              "text": "SystemLogType",
+              "canonicalReference": "@interaqt/runtime!SystemLogType:type"
+            },
+            {
+              "kind": "Content",
+              "text": ") => any;\n    warn: (arg: "
+            },
+            {
+              "kind": "Reference",
+              "text": "SystemLogType",
+              "canonicalReference": "@interaqt/runtime!SystemLogType:type"
+            },
+            {
+              "kind": "Content",
+              "text": ") => any;\n    info: (arg: "
+            },
+            {
+              "kind": "Reference",
+              "text": "SystemLogType",
+              "canonicalReference": "@interaqt/runtime!SystemLogType:type"
+            },
+            {
+              "kind": "Content",
+              "text": ") => any;\n    http: (arg: "
+            },
+            {
+              "kind": "Reference",
+              "text": "SystemLogType",
+              "canonicalReference": "@interaqt/runtime!SystemLogType:type"
+            },
+            {
+              "kind": "Content",
+              "text": ") => any;\n    verbose: (arg: "
+            },
+            {
+              "kind": "Reference",
+              "text": "SystemLogType",
+              "canonicalReference": "@interaqt/runtime!SystemLogType:type"
+            },
+            {
+              "kind": "Content",
+              "text": ") => any;\n    debug: (arg: "
+            },
+            {
+              "kind": "Reference",
+              "text": "SystemLogType",
+              "canonicalReference": "@interaqt/runtime!SystemLogType:type"
+            },
+            {
+              "kind": "Content",
+              "text": ") => any;\n    silly: (arg: "
+            },
+            {
+              "kind": "Reference",
+              "text": "SystemLogType",
+              "canonicalReference": "@interaqt/runtime!SystemLogType:type"
+            },
+            {
+              "kind": "Content",
+              "text": ") => any;\n}"
+            },
+            {
+              "kind": "Content",
+              "text": ";"
+            }
+          ],
+          "fileUrlPath": "System.ts",
+          "releaseTag": "Public",
+          "name": "SystemLogger",
+          "typeTokenRange": {
+            "startIndex": 1,
+            "endIndex": 16
+          }
+        },
+        {
+          "kind": "TypeAlias",
+          "canonicalReference": "@interaqt/runtime!SystemLogType:type",
+          "docComment": "",
+          "excerptTokens": [
+            {
+              "kind": "Content",
+              "text": "export type SystemLogType = "
+            },
+            {
+              "kind": "Content",
+              "text": "{\n    label: string;\n    message: string;\n    [k: string]: any;\n}"
+            },
+            {
+              "kind": "Content",
+              "text": ";"
+            }
+          ],
+          "fileUrlPath": "System.ts",
+          "releaseTag": "Public",
+          "name": "SystemLogType",
+          "typeTokenRange": {
+            "startIndex": 1,
+            "endIndex": 2
           }
         },
         {

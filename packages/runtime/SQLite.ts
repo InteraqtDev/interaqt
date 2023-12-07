@@ -31,10 +31,10 @@ function defaultLog({type, name, sql, params}: Parameters<SQLiteDB['log']>[0]) {
                     chalk.bgBlue.white
 
 
-    console.log(`${color(`[${type}:${name}] `)} 
-${sql} 
-${color(`params: [${params?.map(x => JSON.stringify(x)).join(',')}]`)} 
-`)
+//     console.log(`${color(`[${type}:${name}] `)}
+// ${sql}
+// ${color(`params: [${params?.map(x => JSON.stringify(x)).join(',')}]`)}
+// `)
 }
 
 export class SQLiteDB implements Database{

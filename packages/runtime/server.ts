@@ -1,13 +1,16 @@
-import Fastify from 'fastify'
+import Fastify, {FastifyLoggerOptions} from 'fastify'
 import {Controller, USER_ENTITY} from "./Controller.js";
 import {EventPayload, EventQuery, EventUser, InteractionEventArgs} from "./types/interaction.js";
 import {MatchExp} from "@interaqt/storage";
 import cors from 'cors'
 import middie from '@fastify/middie'
+import chalk from "chalk";
 
 type ServerOptions = {
     port: number,
     parseUserId: (headers: any) => Promise<string | undefined>
+    cors? : Parameters<typeof cors>[0]
+    logger? : FastifyLoggerOptions
 }
 
 type APIBody = {
@@ -61,20 +64,18 @@ function parseDataAPIParams(rawParams: any[], api: DataAPI) {
 
 
 export async function startServer(controller: Controller, options: ServerOptions, dataAPIs: DataAPIs = {}) {
-    // TODO log 中间件
     const fastify = Fastify({
-        logger: true
+        logger: options.logger||true
     })
 
     await fastify.register(middie)
-    // TODO 可配置 cors
-    fastify.use(cors())
+    fastify.use(cors(options.cors))
 
     // listen 外部系统的用户创建，同步到我们的系统中。
     // CAUTION webhook 的模式最适合 id 由外部分配。这也意味着我们的系统中不允许自己创建用户！！！。不然 id 同步会出大问题！！！
     fastify.post('/user/sync', async (request, reply) => {
         const {userId} = request.body as SyncUserBody
-        // TODO 验证 id 不能重复。 er 里面应该也要验证。这里只是为了防止重复创建
+        // 验证 id 不能重复。 er 里面应该也要验证。这里只是为了防止重复创建
         if(!(await controller.system.storage.findOne(USER_ENTITY, MatchExp.atom({key:'id', value: ['=', userId]}), undefined, ['*']))){
             return await controller.system.storage.create(USER_ENTITY, {id: userId})
         }
