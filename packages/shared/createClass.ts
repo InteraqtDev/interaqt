@@ -1,6 +1,5 @@
-import {atom, Atom, computed, isAtom, isReactive, rawStructureClone, reactive} from "data0";
-import {isPlainObject, hasOwn, isObject, assert} from "./utils.js";
-import {toRaw, UnwrapReactive} from "rata";
+import {atom, Atom, computed, isAtom, isReactive, rawStructureClone, reactive, toRaw, UnwrapReactive} from "data0";
+import {assert, hasOwn, isObject, isPlainObject} from "./utils.js";
 
 type PrimitivePropType = 'string'|'number'|'boolean'| 'object'|'function'
 type DefaultValueType = (...args: any[]) => any

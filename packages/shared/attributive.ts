@@ -1,5 +1,5 @@
-import {createClass, KlassInstance} from "./createClass";
-import {BoolExp, BoolExpressionRawData} from "./BoolExp";
+import {createClass, KlassInstance} from "./createClass.js";
+import {BoolExp, BoolExpressionRawData} from "./BoolExp.js";
 
 
 // Role/RoleAttributive/Entity 是 ConceptType

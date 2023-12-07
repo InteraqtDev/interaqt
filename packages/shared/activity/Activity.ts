@@ -1,7 +1,6 @@
 import {createClass, Klass, KlassInstance, KlassInstancePrimitiveProps} from "../createClass.js";
 import {Entity} from "../entity/Entity.js";
-
-import {Attributive, Attributives} from "../attributive";
+import {Attributive, Attributives} from "../attributive.js";
 
 
 // 交互动作，因为以后可能有更多的关于交互动作的管理，所以应该是个对象，而不只是字符串名字。
