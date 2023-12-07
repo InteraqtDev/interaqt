@@ -241,14 +241,22 @@ export class InteractionCall {
                 }
             }
 
+            const itemMatch = BoolExp.atom({
+                key: 'id',
+                value: ['=', payloadItem.id]
+            })
+
+            const fullPayloadItem = payloadDef.isRef ?
+                await this.system.storage.findOne(payloadDef.base.name, itemMatch, undefined, ['*']) :
+                payloadItem
 
             if (payloadDef.isCollection) {
-                const result = await everyWithErrorAsync(payloadItem,(item => this.checkConcept(item, payloadDef.base as KlassInstance<typeof Entity, false>)))
+                const result = await everyWithErrorAsync(fullPayloadItem,(item => this.checkConcept(item, payloadDef.base as KlassInstance<typeof Entity, false>)))
                 if (result! == true) {
                     throw new AttributeError(`${payloadDef.name} check concept failed`, result)
                 }
             } else {
-                const result = await this.checkConcept(payloadItem, payloadDef.base as KlassInstance<typeof Entity, false>)
+                const result = await this.checkConcept(fullPayloadItem, payloadDef.base as KlassInstance<typeof Entity, false>)
                 if (result !== true) {
                     throw new AttributeError(`${payloadDef.name} check concept failed`, result)
                 }
@@ -268,11 +276,11 @@ export class InteractionCall {
                 const handleAttribute = this.createHandleAttributive(
                     isPayloadUser? Attributive : Attributive,
                     interactionEvent,
-                    payloadItem
+                    fullPayloadItem
                 )
                 const result = await this.checkAttributives(attributives, handleAttribute)
                 if (result !== true ) {
-                    throw new AttributeError(`${payloadDef.name} not match attributive`, { payload: payloadItem, result})
+                    throw new AttributeError(`${payloadDef.name} not match attributive`, { payload: fullPayloadItem, result})
                 }
             }
 

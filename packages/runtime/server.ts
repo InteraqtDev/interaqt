@@ -31,7 +31,12 @@ export type DataAPIThis = {
 }
 
 export type DataAPIHandle = (this: DataAPIThis, ...rest: any[]) => any
-export type DataAPI = DataAPIHandle & { params: any[] }
+export type DataAPIConfig = {
+    params?: any[],
+    allowAnonymous?: boolean
+}
+export type DataAPI = DataAPIHandle & DataAPIConfig
+
 
 export type DataAPIs = {
     [k:string] : DataAPI
@@ -45,17 +50,19 @@ function parseDataAPIParams(rawParams: any[], api: DataAPI) {
         return rawParams
     }
 
-    return params.map((param, index) => {
-        const inputParam = rawParams[index]
+    return rawParams.map((rawParam, index) =>{
+        const param = params[index]
+        if (param === undefined) return rawParam
+
         if (typeof param === 'string') {
             // 'string'|'number'|'boolean'|'object'|'undefined'|'null'
-            return inputParam[param]
+            return rawParam
         } else if (typeof param === 'function') {
             // 对象
             if (!(param as DataAPIClassParam<any>).fromValue) {
                 throw new Error('Invalid Class param type, missing fromValue')
             }
-            return (param as DataAPIClassParam<any>).fromValue(inputParam)
+            return (param as DataAPIClassParam<any>).fromValue(rawParam)
         } else {
             throw new Error('Invalid param type')
         }
@@ -129,16 +136,6 @@ export async function startServer(controller: Controller, options: ServerOptions
 
     // data api
     fastify.post('/data/:apiName', async (request, reply) => {
-        // 1. JWT 鉴权。获取用户身份
-        const userId = await options.parseUserId(request.headers)
-        if (!userId) {
-            throw { statusCode: 401, message: 'Unauthorized' }
-        }
-
-        const user = await controller.system.storage.findOne(USER_ENTITY, MatchExp.atom({key:'id', value: ['=', userId]}), undefined, ['*'])
-        if (!user) {
-            throw { statusCode: 500, message: 'User not synced' }
-        }
 
         const params = request.params as {apiName: string}
         const api = dataAPIs[params.apiName]
@@ -146,13 +143,29 @@ export async function startServer(controller: Controller, options: ServerOptions
             throw { statusCode: 404, message: `api ${params.apiName} not found` }
         }
 
+        let user
+        if (!api.allowAnonymous) {
+            // 1. JWT 鉴权。获取用户身份
+            const userId = await options.parseUserId(request.headers)
+            if (!userId) {
+                throw { statusCode: 401, message: 'Unauthorized' }
+            }
+
+            user = await controller.system.storage.findOne(USER_ENTITY, MatchExp.atom({key:'id', value: ['=', userId]}), undefined, ['*'])
+            if (!user) {
+                throw { statusCode: 500, message: 'User not synced' }
+            }
+        }
+
         // 参数
         const apiParams = parseDataAPIParams(request.body as any[], api)
 
-        return await dataAPIs[params.apiName].call({
+        const result= await dataAPIs[params.apiName].call({
             system: controller.system,
             user: user as EventUser
         }, ...apiParams)
+
+        return result
     })
 
     // 健康检测
@@ -168,10 +181,13 @@ export async function startServer(controller: Controller, options: ServerOptions
 }
 
 
-export function createDataAPI(handle: DataAPIHandle, params: any[] = []): DataAPI {
-    assert(handle.length === params.length, 'Invalid params length');
-
-    (handle as DataAPI).params = params
-    return handle as DataAPI
+export function createDataAPI(handle: DataAPIHandle, config: DataAPIConfig = {}): DataAPI {
+    assert(!(handle as DataAPI).params, `handle seem to be already a api`)
+    const { params = [],  allowAnonymous = false } = config
+    assert(handle.length === (params.length || 0), 'Invalid params length');
+    const api = handle as DataAPI
+    api.params = params;
+    api.allowAnonymous = allowAnonymous
+    return api
 }
 

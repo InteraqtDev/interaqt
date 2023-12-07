@@ -13,7 +13,7 @@
     "type": "api-extractor run --verbose",
     "build-all": "npm run build && npm run type"
   },
-  "version": "1.0.0-alpha.4",
+  "version": "1.0.0-alpha.5",
   "main": "dist/index.js",
   "files": [
     "dist"
@@ -22,6 +22,8 @@
   "license": "MIT",
   "dependencies": {
     "@fastify/middie": "^8.3.0",
+    "@interaqt/shared": "^1.0.0",
+    "@interaqt/storage": "^1.0.0",
     "@types/connect": "^3.4.38",
     "@types/cors": "^2.8.17",
     "acorn": "^8.10.0",
@@ -30,9 +32,7 @@
     "cors": "^2.8.5",
     "data0": "^1.0.0",
     "fastify": "^4.24.3",
-    "winston": "^3.11.0",
-    "@interaqt/shared": "^1.0.0",
-    "@interaqt/storage": "^1.0.0"
+    "winston": "^3.11.0"
   },
   "types": "./dist/index.d.ts",
   "typings": "./dist/index.d.ts",

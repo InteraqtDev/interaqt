@@ -183,11 +183,15 @@ export class Controller {
 }
 
 // @public (undocumented)
-export function createDataAPI(handle: DataAPIHandle, params?: any[]): DataAPI;
+export function createDataAPI(handle: DataAPIHandle, config?: DataAPIConfig): DataAPI;
 
 // @public (undocumented)
-export type DataAPI = DataAPIHandle & {
-    params: any[];
+export type DataAPI = DataAPIHandle & DataAPIConfig;
+
+// @public (undocumented)
+export type DataAPIConfig = {
+    params?: any[];
+    allowAnonymous?: boolean;
 };
 
 // @public (undocumented)
