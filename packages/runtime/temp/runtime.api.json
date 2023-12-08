@@ -1558,7 +1558,15 @@
               "excerptTokens": [
                 {
                   "kind": "Content",
-                  "text": "setup(): "
+                  "text": "setup(install?: "
+                },
+                {
+                  "kind": "Content",
+                  "text": "boolean"
+                },
+                {
+                  "kind": "Content",
+                  "text": "): "
                 },
                 {
                   "kind": "Reference",
@@ -1576,13 +1584,22 @@
               ],
               "isStatic": false,
               "returnTypeTokenRange": {
-                "startIndex": 1,
-                "endIndex": 3
+                "startIndex": 3,
+                "endIndex": 5
               },
               "releaseTag": "Public",
               "isProtected": false,
               "overloadIndex": 1,
-              "parameters": [],
+              "parameters": [
+                {
+                  "parameterName": "install",
+                  "parameterTypeTokenRange": {
+                    "startIndex": 1,
+                    "endIndex": 2
+                  },
+                  "isOptional": true
+                }
+              ],
               "isOptional": false,
               "isAbstract": false,
               "name": "setup"
@@ -2675,6 +2692,14 @@
                 },
                 {
                   "kind": "Content",
+                  "text": ", install?: "
+                },
+                {
+                  "kind": "Content",
+                  "text": "boolean"
+                },
+                {
+                  "kind": "Content",
                   "text": "): "
                 },
                 {
@@ -2688,8 +2713,8 @@
               ],
               "isStatic": false,
               "returnTypeTokenRange": {
-                "startIndex": 11,
-                "endIndex": 12
+                "startIndex": 13,
+                "endIndex": 14
               },
               "releaseTag": "Public",
               "isProtected": false,
@@ -2710,6 +2735,14 @@
                     "endIndex": 10
                   },
                   "isOptional": false
+                },
+                {
+                  "parameterName": "install",
+                  "parameterTypeTokenRange": {
+                    "startIndex": 11,
+                    "endIndex": 12
+                  },
+                  "isOptional": true
                 }
               ],
               "isOptional": false,
@@ -4102,7 +4135,7 @@
             },
             {
               "kind": "Content",
-              "text": ", false>[]) => any;\n    findOne: (entityName: string, ...arg: any[]) => "
+              "text": ", false>[], createTables?: boolean) => any;\n    findOne: (entityName: string, ...arg: any[]) => "
             },
             {
               "kind": "Reference",
@@ -4554,7 +4587,7 @@
                 },
                 {
                   "kind": "Content",
-                  "text": ", false>[]) => "
+                  "text": ", false>[], install?: boolean) => "
                 },
                 {
                   "kind": "Reference",

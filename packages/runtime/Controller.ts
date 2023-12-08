@@ -105,13 +105,13 @@ export class Controller {
             new Handle(this, computedData, dataContext)
         )
     }
-    async setup() {
+    async setup(install?: boolean) {
         // 1. setup 数据库
         for(const handle of this.computedDataHandles) {
             handle.parseComputedData()
         }
         // CAUTION 注意这里的 entities/relations 可能被 IncrementalComputationHandle 修改过了
-        await this.system.setup(this.entities, this.relations)
+        await this.system.setup(this.entities, this.relations, install)
 
         // 2. 增量计算的字段设置初始值
         for(const handle of this.computedDataHandles) {

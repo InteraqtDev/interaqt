@@ -40,7 +40,7 @@ describe("activity state", () => {
 
         createInstances(data, false)
         system = new MonoSystem()
-        await system.setup([], [])
+        await system.setup([], [], true)
         system.conceptClass = KlassByName
         const mainActivity = (getInstance(Activity) as KlassInstance<typeof Activity, false>[]).find(a => a.name === 'createFriendRelation')!
         const controller = new Controller(

@@ -175,7 +175,7 @@ export class Controller {
     // (undocumented)
     relations: KlassInstance<typeof Relation, false>[];
     // (undocumented)
-    setup(): Promise<void>;
+    setup(install?: boolean): Promise<void>;
     // (undocumented)
     states: KlassInstance<typeof Property, false>[];
     // (undocumented)
@@ -325,7 +325,7 @@ export class MonoSystem implements System {
     // (undocumented)
     saveEvent(event: InteractionEvent): Promise<any>;
     // (undocumented)
-    setup(entities: KlassInstance<typeof Entity, false>[], relations: KlassInstance<typeof Relation, false>[]): any;
+    setup(entities: KlassInstance<typeof Entity, false>[], relations: KlassInstance<typeof Relation, false>[], install?: boolean): any;
     // (undocumented)
     storage: Storage_2;
     // (undocumented)
@@ -419,7 +419,7 @@ type Storage_2 = {
     rollbackTransaction: (transactionName?: string) => Promise<any>;
     get: (itemName: string, id: string, initialValue?: any) => Promise<any>;
     set: (itemName: string, id: string, value: any) => Promise<any>;
-    setup: (entities: KlassInstance<typeof Entity, false>[], relations: KlassInstance<typeof Relation, false>[]) => any;
+    setup: (entities: KlassInstance<typeof Entity, false>[], relations: KlassInstance<typeof Relation, false>[], createTables?: boolean) => any;
     findOne: (entityName: string, ...arg: any[]) => Promise<any>;
     update: (entityName: string, ...arg: any[]) => Promise<any>;
     find: (entityName: string, ...arg: any[]) => Promise<any[]>;
@@ -450,7 +450,7 @@ export interface System {
     // (undocumented)
     saveEvent: (interactionEvent: InteractionEvent) => Promise<any>;
     // (undocumented)
-    setup: (entities: KlassInstance<typeof Entity, false>[], relations: KlassInstance<typeof Relation, false>[]) => Promise<any>;
+    setup: (entities: KlassInstance<typeof Entity, false>[], relations: KlassInstance<typeof Relation, false>[], install?: boolean) => Promise<any>;
     // (undocumented)
     storage: Storage_2;
     // (undocumented)

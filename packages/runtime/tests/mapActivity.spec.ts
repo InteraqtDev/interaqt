@@ -56,7 +56,7 @@ describe('map activity', () => {
             [...Interaction.instances],
             [...State.instances]
         )
-        await controller.setup()
+        await controller.setup(true)
 
         createFriendRelationActivityCall = controller.activityCallsByName.get('createFriendRelation')!
         makeFriendActivityUUID = createFriendRelationActivityCall.activity.uuid

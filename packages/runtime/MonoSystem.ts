@@ -68,10 +68,10 @@ class MonoStorage implements Storage{
             return this.create(SYSTEM_RECORD, { concept, key: key.toString(), value: encodeURI(JSON.stringify(value))})
         }
     }
-    async setup(entities: KlassInstance<typeof Entity, false>[], relations: KlassInstance<typeof Relation, false>[]) {
+    async setup(entities: KlassInstance<typeof Entity, false>[], relations: KlassInstance<typeof Relation, false>[], createTables = false) {
         await this.db.open()
         const dbSetup = new DBSetup(entities, relations, this.db)
-        await dbSetup.createTables()
+        if (createTables) await dbSetup.createTables()
         this.queryHandle = new EntityQueryHandle( new EntityToTableMap(dbSetup.map), this.db)
     }
     findOne(...arg:Parameters<EntityQueryHandle["findOne"]>) {
@@ -267,7 +267,7 @@ export class MonoSystem implements System {
             refs: JSONParse(activity.refs),
         }))
     }
-    setup(entities: KlassInstance<typeof Entity, false>[], relations: KlassInstance<typeof Relation, false>[]){
-        return this.storage.setup([...entities, systemEntity, eventEntity, activityEntity], relations)
+    setup(entities: KlassInstance<typeof Entity, false>[], relations: KlassInstance<typeof Relation, false>[], install = false){
+        return this.storage.setup([...entities, systemEntity, eventEntity, activityEntity], relations, install)
     }
 }

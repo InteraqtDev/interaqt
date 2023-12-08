@@ -40,7 +40,7 @@ describe('map interaction', () => {
             interactions,
             []
         )
-        await controller.setup()
+        await controller.setup(true)
         createRequestUUID = Interaction.instances!.find(i => i.name === 'createRequest')!.uuid
         approveRequestUUID = Interaction.instances!.find(i => i.name === 'approve')!.uuid
 

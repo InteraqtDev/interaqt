@@ -25,9 +25,8 @@ export type Storage = {
     // kv 存储
     get: (itemName: string, id: string, initialValue?: any) => Promise<any>
     set: (itemName: string, id: string, value: any) => Promise<any>,
-
     // er存储
-    setup: (entities: KlassInstance<typeof Entity, false>[], relations: KlassInstance<typeof Relation, false>[]) => any
+    setup: (entities: KlassInstance<typeof Entity, false>[], relations: KlassInstance<typeof Relation, false>[], createTables?: boolean) => any
     findOne: (entityName: string, ...arg: any[]) => Promise<any>,
     update: (entityName: string, ...arg: any[]) => Promise<any>,
     find: (entityName: string, ...arg: any[]) => Promise<any[]>,
@@ -80,7 +79,7 @@ export interface System {
     conceptClass: Map<string, ReturnType<typeof createClass>>
     storage: Storage
     logger: SystemLogger
-    setup: (entities: KlassInstance<typeof Entity, false>[], relations: KlassInstance<typeof Relation, false>[]) => Promise<any>
+    setup: (entities: KlassInstance<typeof Entity, false>[], relations: KlassInstance<typeof Relation, false>[], install?: boolean) => Promise<any>
 }
 
 export type EntityIdRef = {

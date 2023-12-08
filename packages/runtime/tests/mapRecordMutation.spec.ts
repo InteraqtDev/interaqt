@@ -51,7 +51,7 @@ describe('map interaction', () => {
             [...Interaction.instances],
             [...State.instances]
         )
-        await controller.setup()
+        await controller.setup(true)
         createPostUUID = Interaction.instances!.find(i => i.name === 'createPost')!.uuid
         updatePostUUID = Interaction.instances!.find(i => i.name === 'updatePost')!.uuid
 

@@ -71,7 +71,7 @@ describe('server test', () => {
             [...Interaction.instances],
             [...State.instances]
         )
-        await controller.setup()
+        await controller.setup(true)
         sendRequestUUID = Interaction.instances!.find(i => i.name === 'sendRequest')!.uuid
         approveRequestUUID = Interaction.instances!.find(i => i.name === 'approve')!.uuid
 
