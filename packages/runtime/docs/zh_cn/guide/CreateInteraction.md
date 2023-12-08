@@ -4,7 +4,7 @@
 
 Interaction 是用户可以执行的交互动作，近似等于一个 post api。
 和其他 Web 框架不同的是，我们不需要声明当 interaction 发生时，应该如何处理数据。
-而是在数据定义中反向引用 Interaction，具体见 [Use Computed Data](./UseComputedData.md)
+而是在数据定义中反向引用 Interaction，具体见 [Use Computed Data](UseComputedData.md)
 
 一个简单的交友 interaction 如下:
 

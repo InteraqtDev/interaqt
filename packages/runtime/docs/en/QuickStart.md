@@ -12,6 +12,7 @@
 data = computation(events)
 ```
 
+
 With this paradigm, we consistently describe what the data in the system is, and with a single line of code manipulating data, a complete application can be implemented. The intuitive features include:
 - Almost achieving the implementation of software once the requirements are modeled.
 - No manually written code for data changes, thus eliminating bugs due to human error.
