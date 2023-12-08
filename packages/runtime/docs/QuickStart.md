@@ -5,8 +5,6 @@
 @interaqt/runtime 是一个全新的应用框架。
 为了便于理解，可以简单的当成 Web Framework + ORM/ CMS + BPM Engine 的替代品。
 
-
-
 ## 为什么创造 @interaqt/runtime
 
 @interaqt/runtime 实现一种更简单，但也更难实现的范式：
@@ -23,23 +21,44 @@ data = computation(events)
 - 将需求建模后，它的代码，软件架构可以开始实现自动生成，不再依赖于人的经验。
 - 需求不变，但架构可以随着数据量、并发数自动变化。
 
-## 快速认识 @interaqt/runtime
+## 使用 @interaqt/runtime
 
-### 安装
+### Step1: 安装
 
-直接使用 @interaqt/runtime 中的 server。
+```bash
+npm install @interaqt/runtime@1.0.0-alpha.9 // latest version: 1.0.0-alpha.9
+```
+
+### Step2: 创建一个 install.js 文件用于初始化数据库
+```typescript
+import {MonoSystem, Controller, SQLiteDB} from "@interaqt/runtime";
+import {entities, interactions, relations, activities, states} from './app/index.js'
+
+const db = new SQLiteDB('database.db')
+const system = new MonoSystem(db)
+const controller = new Controller(system, entities, relations, activities, interactions, states)
+await controller.setup(true)
+```
+
+
+### Step3: 创建一个 server.js 文件用于启动应用
 
 ```typescript
 import {MonoSystem,Controller, startServer} from "@interaqt/runtime";
+import {entities, interactions, relations, activities, states} from './app/index.js'
 
+const db = new SQLiteDB('database.db')
 const system = new MonoSystem()
 const controller = new Controller(system, entities, relations, activities, interactions, states)
+await controller.setup()
 
 startServer(controller, {
   port: 3000,
   parseUserId: async (headers: IncomingHttpHeaders) => {
+      // 鉴权。可以通过下面的方式来模拟用户
       return headers['x-user-id']
-    // return (await client.verifyJWTForAPI(headers)).sub
   }
 })
 ```
+
+应用定义请参考应用 [https://github.com/InteraqtDev/feique](https://github.com/InteraqtDev/feique)。
