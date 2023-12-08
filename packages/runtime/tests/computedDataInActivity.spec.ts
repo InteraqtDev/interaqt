@@ -139,8 +139,8 @@ describe('computed data in activity', () => {
         expect(anyRequestHandled).toBeFalsy()
 
         // 1. 创建 A 与 B 交友的 activity
-        const { activityId, state } = await controller.createActivity(makeFriendActivityUUID)
-
+        const { data } = await controller.createActivity(makeFriendActivityUUID)
+        const {activityId, state} = data
         // 查询 request 数据
         const requestMatch = MatchExp.atom({
             key: 'from.name',
@@ -229,7 +229,7 @@ describe('computed data in activity', () => {
         expect(totalFriendRelation2).toBe(0)
 
         // c 与 d 发起请求
-        const { activityId: activity11 } = await controller.createActivity(makeFriendActivityUUID)
+        const activity11  = (await controller.createActivity(makeFriendActivityUUID)).data.activityId
         const payload11 = {
             to: userB,
             message: {
@@ -240,7 +240,7 @@ describe('computed data in activity', () => {
         expect(res11.error).toBeUndefined()
 
 
-        const { activityId: activity12 } = await controller.createActivity(makeFriendActivityUUID)
+        const activity12 = (await controller.createActivity(makeFriendActivityUUID)).data.activityId
         const payload12 = {
             to: userB,
             message: {

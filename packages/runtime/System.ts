@@ -3,10 +3,6 @@ import {InteractionEvent} from './types/interaction.js'
 import {MatchExpressionData} from "@interaqt/storage";
 
 
-export interface Payload {
-    [k: string]: any
-}
-
 export type SystemCallback =  (...arg: any[]) => any
 
 
@@ -56,12 +52,9 @@ export type RecordMutationEvent = {
 
 export type SystemLogger = {
     error: (arg: SystemLogType) => any,
-    warn: (arg: SystemLogType) => any,
     info: (arg: SystemLogType) => any,
-    http: (arg: SystemLogType) => any,
-    verbose: (arg: SystemLogType) => any,
     debug: (arg: SystemLogType) => any,
-    silly: (arg: SystemLogType) => any,
+    child:(fixed: object) => SystemLogger,
 }
 
 export type SystemLogType = {
@@ -90,8 +83,15 @@ export type EntityIdRef = {
 
 export const ID_ATTR = 'id'
 export const ROW_ID_ATTR = '_rowId'
+
+export type DatabaseLogger = {
+    info: (arg: {type: string, name: string, sql: string, params?: any[]}) => any,
+    child:(fixed: object) => DatabaseLogger,
+}
+
 export type Database = {
     open: () => Promise<any>
+    logger: DatabaseLogger
     scheme: (sql:string, name?:string) => Promise<any>
     query: <T extends any>(sql: string, values: any[],name?:string) => Promise<T[]>
     delete: <T extends any>(sql: string, where: any[], name?:string) => Promise<T[]>

@@ -17,7 +17,6 @@ export type EventQuery = {
     [k: string] : any
 }
 
-// TODO 根据每个 interaction 的定义来推断 payload 的与运行时数据类型
 export type InteractionEventArgs = {
     user: EventUser,
     payload?: EventPayload,

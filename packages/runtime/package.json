@@ -7,7 +7,7 @@
     "vitest": "^0.34.6"
   },
   "scripts": {
-    "test": "vitest",
+    "test": "vitest | pino-pretty",
     "build": "rimraf dist && tsc -p ./tsconfig.prod.json",
     "type": "api-extractor run --verbose",
     "build-all": "npm run build && npm run type"
@@ -23,15 +23,16 @@
     "@fastify/middie": "^8.3.0",
     "@interaqt/shared": "^1.0.2",
     "@interaqt/storage": "^1.0.1",
+    "@types/better-sqlite3": "^7.6.8",
     "@types/connect": "^3.4.38",
     "@types/cors": "^2.8.17",
-    "@types/better-sqlite3": "^7.6.8",
     "acorn": "^8.10.0",
     "better-sqlite3": "^9.2.2",
     "chalk": "^5.3.0",
     "cors": "^2.8.5",
     "data0": "^1.0.0",
     "fastify": "^4.24.3",
+    "pino": "^8.16.2",
     "winston": "^3.11.0"
   },
   "types": "./dist/index.d.ts",

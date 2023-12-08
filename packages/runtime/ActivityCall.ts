@@ -15,7 +15,7 @@ import {System} from "./System.js";
 import {InteractionCall, InteractionCallResponse} from "./InteractionCall.js";
 import {EventUser, InteractionEventArgs} from "./types/interaction.js";
 import {MatchExp} from "@interaqt/storage";
-import {Controller} from "./Controller.js";
+import {Controller, InteractionContext} from "./Controller.js";
 
 
 export type Seq = {

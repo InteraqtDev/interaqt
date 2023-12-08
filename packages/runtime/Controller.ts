@@ -12,13 +12,18 @@ import {
 } from "@interaqt/shared";
 import './computedDataHandles/index.js'
 import {ActivityCall} from "./ActivityCall.js";
-import {InteractionCall} from "./InteractionCall.js";
+import {InteractionCall, InteractionCallResponse} from "./InteractionCall.js";
 import {InteractionEventArgs} from "./types/interaction.js";
 import {assert} from "./util.js";
 import {ComputedDataHandle, DataContext} from "./computedDataHandles/ComputedDataHandle.js";
-
+import { asyncInteractionContext} from "./asyncInteractionContext.js";
 
 export const USER_ENTITY = 'User'
+
+export type InteractionContext = {
+    logContext?: any
+    [k: string]: any
+}
 
 export class Controller {
     public computedDataHandles = new Set<ComputedDataHandle>()
@@ -147,26 +152,28 @@ export class Controller {
         }
     }
     async callInteraction(interactionId:string, interactionEventArgs: InteractionEventArgs) {
+        const context= asyncInteractionContext.getStore() as InteractionContext
+        const logger = this.system.logger.child(context?.logContext || {})
+
         const interactionCall = this.interactionCalls.get(interactionId)!
         assert(!!interactionCall,`cannot find interaction for ${interactionId}`)
 
-        // TODO log 的参数呢
-        this.system.logger.info({label: "interaction", message:interactionCall.interaction.name})
+
+        logger.info({label: "interaction", message:interactionCall.interaction.name})
         await this.system.storage.beginTransaction(interactionCall.interaction.name)
-        const result = await interactionCall.call(interactionEventArgs)
+        const result = await interactionCall.call(interactionEventArgs )
         if (!result.error) {
             const effects: any[] = []
             try {
-                this.system.logger.silly({label: "effect", message:interactionCall.interaction.name})
+                logger.info({label: "effect", message:interactionCall.interaction.name})
                 await this.dispatch(interactionCall.interaction, result.event!.args, effects, undefined)
                 result.effects = effects
             } catch (error) {
                 result.error = error
-                this.system.logger.error({label: "effect", message:interactionCall.interaction.name})
+                logger.error({label: "effect", message:interactionCall.interaction.name})
             }
         } else {
-            // TODO log 的参数呢
-            this.system.logger.error({label: "interaction", message:interactionCall.interaction.name})
+            logger.error({label: "interaction", message:interactionCall.interaction.name})
         }
 
         if (!result.error) {
@@ -178,14 +185,16 @@ export class Controller {
         return result
     }
     async callActivityInteraction(activityCallId:string, interactionCallId:string, activityId: string, interactionEventArgs: InteractionEventArgs) {
+        const context= asyncInteractionContext.getStore() as InteractionContext
+        const logger = this.system.logger.child(context?.logContext || {})
+
         const activityCall = this.activityCalls.get(activityCallId)!
         assert(!!activityCall,`cannot find interaction for ${activityCallId}`)
         const interactionCall = activityCall.uuidToInteractionCall.get(interactionCallId)
         assert(!!interactionCall,`cannot find interaction for ${interactionCallId}`)
 
-        // TODO 参数呢
         const interactionNameWithActivityName = `${activityCall.activity.name}:${interactionCall!.interaction.name}`
-        this.system.logger.info({label: "activity", message:`${activityCall.activity.name}:${interactionCall!.interaction.name}`})
+        logger.info({label: "activity", message:`${activityCall.activity.name}:${interactionCall!.interaction.name}`})
 
         await this.system.storage.beginTransaction(interactionNameWithActivityName)
 
@@ -197,10 +206,10 @@ export class Controller {
                 result.effects = effects
             } catch(error) {
                 result.error = error
-                this.system.logger.error({label: "effect", message:interactionNameWithActivityName})
+                logger.error({label: "effect", message:interactionNameWithActivityName})
             }
         } else {
-            this.system.logger.error({label: "activity", message:interactionNameWithActivityName})
+            logger.error({label: "activity", message:interactionNameWithActivityName})
         }
 
         if (!result.error) {
@@ -211,9 +220,23 @@ export class Controller {
 
         return result
     }
-    createActivity(activityCallId:string) {
+    async createActivity(activityCallId:string) {
+        const context= asyncInteractionContext.getStore() as InteractionContext
+        const logger = this.system.logger.child(context?.logContext || {})
+
         const activityCall = this.activityCalls.get(activityCallId)!
-        return activityCall.create()
+        assert(!!activityCall,`cannot find interaction for ${activityCallId}`)
+
+        logger.info({label: "activity", message:`${activityCall.activity.name}:create`})
+
+        const result: InteractionCallResponse = {}
+        try {
+           result.data = await activityCall.create()
+        } catch (error) {
+            result.error = error
+            logger.error({label: "activity", message:`${activityCall.activity.name}:create`})
+        }
+        return result
     }
 }
 

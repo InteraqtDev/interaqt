@@ -105,7 +105,8 @@ describe('map activity', () => {
         expect(totalFriendRelation).toBe(0)
 
         // 1. 创建 activity
-        const { activityId, state } = await controller.createActivity(makeFriendActivityUUID)
+        const { data } = await controller.createActivity(makeFriendActivityUUID)
+        const {activityId, state} = data
         expect(activityId).not.toBe(null)
         expect(state.current!.uuid).toBe(sendRequestUUID)
         expect(approveUUID).not.toBe(null)

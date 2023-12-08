@@ -1,6 +1,9 @@
 import SQLite from "better-sqlite3";
-import {Database, EntityIdRef, ROW_ID_ATTR} from "./System.js";
+import {Database, DatabaseLogger, EntityIdRef, ROW_ID_ATTR, SystemLogger} from "./System.js";
 import chalk from 'chalk';
+import { asyncInteractionContext } from "./asyncInteractionContext.js";
+import pino from "pino";
+import {InteractionContext} from "./Controller";
 
 class IDSystem {
     constructor(public db: Database) {}
@@ -20,38 +23,26 @@ class IDSystem {
     }
 }
 
-export type SQLiteDBOptions = Parameters<typeof SQLite>[1] & {log: SQLiteDB['log']}
-export type SQLiteDBLog = {type: string, name: string, sql: string, params?: any[]}
-
-function defaultLog({type, name, sql, params}: Parameters<SQLiteDB['log']>[0]) {
-    const color = type === 'delete' ? chalk.bgRed.black :
-        type === 'insert' ? chalk.bgYellow.black:
-            type === 'update'? chalk.bgYellowBright.black:
-                type === 'query' ? chalk.bgGreen.black:
-                    chalk.bgBlue.white
-
-
-//     console.log(`${color(`[${type}:${name}] `)}
-// ${sql}
-// ${color(`params: [${params?.map(x => JSON.stringify(x)).join(',')}]`)}
-// `)
-}
+export type SQLiteDBOptions = Parameters<typeof SQLite>[1] & { logger :DatabaseLogger }
 
 export class SQLiteDB implements Database{
     db!: InstanceType<typeof SQLite>
     idSystem!: IDSystem
-    log: (msg: SQLiteDBLog) => any
+    logger: DatabaseLogger
     constructor(public file:string = ':memory:', public options?: SQLiteDBOptions) {
         this.idSystem = new IDSystem(this)
-        this.log = this.options?.log || defaultLog
+        this.logger = this.options?.logger || pino()
     }
     async open() {
         this.db = new SQLite(this.file, this.options)
         await this.idSystem.setup()
     }
     async query<T extends any>(sql:string, where: any[] =[], name= '')  {
+        const context= asyncInteractionContext.getStore() as InteractionContext
+        const logger = this.logger.child(context?.logContext || {})
+
         const params = where.map(x => x===false ? 0 : x===true ? 1 : x)
-        this.log({
+        logger.info({
             type:'query',
             name,
             sql,
@@ -60,9 +51,11 @@ export class SQLiteDB implements Database{
         return  this.db.prepare(sql).all(...params) as T[]
     }
     async update(sql:string,values: any[], idField?:string, name='') {
+        const context= asyncInteractionContext.getStore() as InteractionContext
+        const logger = this.logger.child(context?.logContext || {})
         const finalSQL = `${sql} ${idField ? `RETURNING ${idField} AS id`: ''}`
         const params = values.map(x => x===false ? 0 : x===true ? 1 : x)
-        this.log({
+        logger.info({
             type:'update',
             name,
             sql:finalSQL,
@@ -71,9 +64,10 @@ export class SQLiteDB implements Database{
         return this.db.prepare(finalSQL).run(...params)  as unknown as any[]
     }
     async insert (sql:string, values:any[], name='')  {
-        if (!name) debugger
+        const context= asyncInteractionContext.getStore() as InteractionContext
+        const logger = this.logger.child(context?.logContext || {})
         const params = values.map(x => x===false ? 0 : x===true ? 1 : x)
-        this.log({
+        logger.info({
             type:'insert',
             name,
             sql,
@@ -82,8 +76,10 @@ export class SQLiteDB implements Database{
         return  this.db.prepare(`${sql} RETURNING ${ROW_ID_ATTR}`).run(...params) as unknown as EntityIdRef
     }
     async delete (sql:string, where: any[], name='') {
+        const context= asyncInteractionContext.getStore() as InteractionContext
+        const logger = this.logger.child(context?.logContext || {})
         const params = where.map(x => x===false ? 0 : x===true ? 1 : x)
-        this.log({
+        logger.info({
             type:'delete',
             name,
             sql,
@@ -92,7 +88,9 @@ export class SQLiteDB implements Database{
         return this.db.prepare(sql).run(...params) as unknown as  any[]
     }
     async scheme(sql: string, name='') {
-        this.log({
+        const context= asyncInteractionContext.getStore() as InteractionContext
+        const logger = this.logger.child(context?.logContext || {})
+        logger.info({
             type:'scheme',
             name,
             sql,

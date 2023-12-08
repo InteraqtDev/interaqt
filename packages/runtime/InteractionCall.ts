@@ -19,7 +19,7 @@ import {EventUser, InteractionEvent, InteractionEventArgs} from "./types/interac
 import {assert, everyWithErrorAsync} from "./util.js";
 import {ActivityCall} from "./ActivityCall.js";
 import {someAsync} from "@interaqt/storage";
-import {Controller, USER_ENTITY} from "./Controller.js";
+import {Controller, InteractionContext, USER_ENTITY} from "./Controller.js";
 
 type ConceptCheckStack = {
     type: string,
@@ -343,7 +343,7 @@ export class InteractionCall {
         // TODO
         // return this.system.storage.get(interactionEvent.payload, interactionEvent.query)
     }
-    async call(interactionEventArgs: InteractionEventArgs, activityId?: string, checkUserRef?: CheckUserRef): Promise<InteractionCallResponse> {
+    async call(interactionEventArgs: InteractionEventArgs, activityId?: string, checkUserRef?: CheckUserRef, context?: InteractionContext): Promise<InteractionCallResponse> {
         const response: InteractionCallResponse = {
             sideEffects: {},
         }

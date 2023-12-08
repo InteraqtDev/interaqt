@@ -32,5 +32,6 @@
     "./SQLite.ts",
     "./util.ts",
     "./server.ts",
+    "./asyncInteractionContext.ts",
   ]
 }

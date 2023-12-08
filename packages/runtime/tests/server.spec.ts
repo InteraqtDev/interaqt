@@ -134,11 +134,12 @@ describe('server test', () => {
 
 
         // a 创建活动
-        const {activityId} = await (await post('http://localhost:8082/api', {
+        const {data} = await (await post('http://localhost:8082/api', {
             activity: 'createFriendRelation'
         }, {
             "userid": userAId,
         })).json()
+        const {activityId} = data
 
         // 3. a 发起 sendFriendRequest
         const payload = {

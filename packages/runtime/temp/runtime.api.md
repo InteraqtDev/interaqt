@@ -4,35 +4,25 @@
 
 ```ts
 
-import { Activity } from '@interaqt/shared';
-import { ActivityGroupInstanceType } from '@interaqt/shared';
-import { ActivityGroupPublicType } from '@interaqt/shared';
-import { ActivityInstanceType } from '@interaqt/shared';
 import { Atom } from 'data0';
-import { Attributive } from '@interaqt/shared';
-import { BoolExp } from '@interaqt/shared';
-import { BoolExpressionRawData } from '@interaqt/shared';
-import { Concept } from '@interaqt/shared';
-import { ConceptInstance } from '@interaqt/shared';
 import cors from 'cors';
-import { createClass } from '@interaqt/shared';
-import { Entity } from '@interaqt/shared';
 import { FastifyLoggerOptions } from 'fastify';
-import { GatewayInstanceType } from '@interaqt/shared';
-import { GatewayPublicType } from '@interaqt/shared';
-import { InertKlassInstance } from '@interaqt/shared';
-import { Interaction } from '@interaqt/shared';
-import { InteractionInstanceType } from '@interaqt/shared';
-import { InteractionPublicType } from '@interaqt/shared';
-import { Klass } from '@interaqt/shared';
-import { KlassInstance } from '@interaqt/shared';
 import { MatchExpressionData } from '@interaqt/storage';
-import { Property } from '@interaqt/shared';
-import { PropertyTypes } from '@interaqt/shared';
-import { ReactiveKlassInstance } from '@interaqt/shared';
-import { Relation } from '@interaqt/shared';
 import SQLite from 'better-sqlite3';
-import { TransferPublicType } from '@interaqt/shared';
+import { UnwrapReactive } from 'data0';
+
+// @public (undocumented)
+export const Action: Klass<{
+    name: {
+        type: "string";
+        required: true;
+    };
+}>;
+
+// Warning: (ae-forgotten-export) The symbol "ActivityPublicType" needs to be exported by the entry point index.d.ts
+//
+// @public (undocumented)
+export const Activity: Klass<ActivityPublicType>;
 
 // @public (undocumented)
 export const ACTIVITY_RECORD = "_Activity_";
@@ -113,12 +103,338 @@ defaultValue: () => boolean;
 }>;
 
 // @public (undocumented)
+export const ActivityGroup: Klass<ActivityGroupPublicType>;
+
+// @public (undocumented)
+export type ActivityGroupInstanceType = KlassInstance<Klass<ActivityGroupPublicType>, false>;
+
+// @public (undocumented)
+export type ActivityGroupPublicType = {
+    type: {
+        type: 'string';
+        required: true;
+        collection: false;
+    };
+    activities: {
+        instanceType: UnwrappedActivityInstanceType;
+        required: false;
+        collection: true;
+        defaultValue: (...args: any[]) => UnwrappedActivityInstanceType[];
+    };
+};
+
+// @public (undocumented)
+export type ActivityInstanceType = KlassInstance<typeof Activity, false>;
+
+// @public (undocumented)
+export const Any: Klass<{
+    record: {
+        type: (Klass<{
+            name: {
+                type: "string";
+                collection: false;
+                required: true;
+                constraints: {
+                    nameFormat({ name }: {
+                        name: Atom<string>;
+                    }): Atom<boolean>;
+                };
+            };
+            computedData: {
+                type: Klass<any>[];
+                collection: false;
+                required: false;
+            };
+            properties: {
+                type: Klass<{
+                    name: {
+                        type: "string";
+                        required: true;
+                        collection: false;
+                        constraints: {
+                            format({ name }: {
+                                name: Atom<string>;
+                            }): Atom<boolean>;
+                            length({ name }: {
+                                name: Atom<string>;
+                            }): Atom<boolean>;
+                        };
+                    };
+                    type: {
+                        type: "string";
+                        required: true;
+                        collection: false;
+                        options: PropertyTypes[];
+                    };
+                    collection: {
+                        type: "boolean";
+                        required: true;
+                        collection: false;
+                        defaultValue(): boolean;
+                    };
+                    args: {
+                        computedType: (values: {
+                            type: PropertyTypes;
+                        }) => string;
+                    };
+                    computedData: {
+                        collection: false;
+                        type: Klass<any>[];
+                        required: false;
+                    };
+                    computed: {
+                        required: false;
+                        type: "function";
+                        collection: false;
+                    };
+                }>;
+                collection: true;
+                required: true;
+                constraints: {
+                    eachNameUnique({ properties }: any): Atom<boolean>;
+                };
+                defaultValue(): never[];
+            };
+            isRef: {
+                required: true;
+                collection: false;
+                type: "boolean";
+                defaultValue: () => boolean;
+            };
+        }> | Klass<RelationPublic>)[];
+        collection: false;
+        required: true;
+    };
+    matchExpression: {
+        type: "function";
+        collection: false;
+        required: true;
+    };
+}>;
+
+// @public (undocumented)
 export type APIBody = {
     activity?: string;
     interaction?: string;
     activityId?: string;
     payload?: EventPayload;
     query?: EventQuery;
+};
+
+// @public (undocumented)
+export type AtomHandle<T> = (arg: T) => boolean | Promise<boolean>;
+
+// @public (undocumented)
+export const Attributive: Klass<    {
+    stringContent: {
+        type: "string";
+    };
+    content: {
+        type: "function";
+    };
+    name: {
+        type: "string";
+    };
+    isRef: {
+        type: "boolean";
+    };
+}>;
+
+// @public (undocumented)
+export class AttributiveBoolExp extends BoolExp<KlassInstance<typeof Attributive, false>> {
+    // (undocumented)
+    static toAttributives(obj?: BoolExp<KlassInstance<typeof Attributive, false>>): KlassInstance<typeof BoolAtomData, false> | UnwrappedBoolExpressionInstanceType | undefined;
+}
+
+// @public (undocumented)
+export const Attributives: Klass<    {
+    content: {
+        type: (Klass<    {
+            type: {
+                type: "string";
+                required: true;
+                collection: false;
+                defaultValue: () => string;
+            };
+            data: {
+                type: Klass<    {
+                    stringContent: {
+                        type: "string";
+                    };
+                    content: {
+                        type: "function";
+                    };
+                    name: {
+                        type: "string";
+                    };
+                    isRef: {
+                        type: "boolean";
+                    };
+                }>;
+                required: true;
+                collection: false;
+            };
+        }> | Klass<BoolExpressionDataPublic>)[];
+        collection: false;
+        required: false;
+    };
+}>;
+
+// @public (undocumented)
+export const BoolAtomData: Klass<    {
+    type: {
+        type: "string";
+        required: true;
+        collection: false;
+        defaultValue: () => string;
+    };
+    data: {
+        type: Klass<    {
+            stringContent: {
+                type: "string";
+            };
+            content: {
+                type: "function";
+            };
+            name: {
+                type: "string";
+            };
+            isRef: {
+                type: "boolean";
+            };
+        }>;
+        required: true;
+        collection: false;
+    };
+}>;
+
+// @public (undocumented)
+export class BoolExp<T> {
+    constructor(raw: ExpressionData<T>);
+    // (undocumented)
+    and(atomValueOrExp: any): BoolExp<T>;
+    // (undocumented)
+    static atom<U>(data: U): BoolExp<U>;
+    // (undocumented)
+    get data(): T;
+    // (undocumented)
+    evaluate(atomHandle: AtomHandle<T>, stack?: any[], inverse?: boolean): true | EvaluateError;
+    // (undocumented)
+    evaluateAsync(atomHandle: AtomHandle<T>, stack?: any[], inverse?: boolean): Promise<true | EvaluateError>;
+    // (undocumented)
+    static fromValue<T>(value: ExpressionData<T>): BoolExp<T>;
+    // (undocumented)
+    isAnd(): boolean;
+    // (undocumented)
+    isAtom(): boolean;
+    // (undocumented)
+    isExpression(): boolean;
+    // (undocumented)
+    isNot(): boolean;
+    // (undocumented)
+    isOr(): boolean;
+    // (undocumented)
+    get left(): BoolExp<T>;
+    // Warning: (ae-forgotten-export) The symbol "MapFn" needs to be exported by the entry point index.d.ts
+    //
+    // (undocumented)
+    map<U>(fn: MapFn<T, U>, context?: string[]): BoolExp<U>;
+    // (undocumented)
+    not(): BoolExp<T>;
+    // (undocumented)
+    or(atomValueOrExp: any): BoolExp<T>;
+    // (undocumented)
+    raw: ExpressionData<T>;
+    // (undocumented)
+    get right(): BoolExp<T>;
+    // Warning: (ae-forgotten-export) The symbol "AtomData" needs to be exported by the entry point index.d.ts
+    //
+    // (undocumented)
+    toValue(): AtomData<T>;
+}
+
+// @public (undocumented)
+export const BoolExpressionData: Klass<BoolExpressionDataPublic>;
+
+// @public (undocumented)
+export type BoolExpressionRawData<T> = {
+    type: 'expression';
+    operator: 'and' | 'not' | 'or';
+    left: ExpressionData<T>;
+    right?: ExpressionData<T>;
+};
+
+// @public (undocumented)
+export function boolExpToAttributives(obj: BoolExp<KlassInstance<typeof Attributive, false>>): InertKlassInstance<    {
+    content: {
+        type: (Klass<    {
+            type: {
+                type: "string";
+                required: true;
+                collection: false;
+                defaultValue: () => string;
+            };
+            data: {
+                type: Klass<    {
+                    stringContent: {
+                        type: "string";
+                    };
+                    content: {
+                        type: "function";
+                    };
+                    name: {
+                        type: "string";
+                    };
+                    isRef: {
+                        type: "boolean";
+                    };
+                }>;
+                required: true;
+                collection: false;
+            };
+        }> | Klass<BoolExpressionDataPublic>)[];
+        collection: false;
+        required: false;
+    };
+}>;
+
+// @public (undocumented)
+export const ComputedData: Klass<{
+    computeEffect: {
+        type: "string";
+        collection: false;
+        required: true;
+    };
+    computation: {
+        type: "string";
+        collection: false;
+        required: true;
+    };
+}>;
+
+// @public (undocumented)
+export interface Concept {
+    // (undocumented)
+    name: string;
+}
+
+// @public (undocumented)
+export interface ConceptAlias extends Concept {
+    // (undocumented)
+    for: Concept[];
+}
+
+// @public (undocumented)
+export type ConceptInstance = any;
+
+// @public (undocumented)
+export type ConceptType = {};
+
+// @public (undocumented)
+export const constraints: {
+    entityNameUnique({ entities }: {
+        entities: (typeof Entity)[];
+    }): Atom<boolean>;
 };
 
 // @public (undocumented)
@@ -150,10 +466,7 @@ export class Controller {
     // (undocumented)
     computedDataHandles: Set<ComputedDataHandle>;
     // (undocumented)
-    createActivity(activityCallId: string): Promise<{
-        activityId: any;
-        state: ActivitySeqStateData;
-    }>;
+    createActivity(activityCallId: string): Promise<InteractionCallResponse>;
     // (undocumented)
     dispatch(event: any, ...args: any[]): Promise<void>;
     // (undocumented)
@@ -183,7 +496,136 @@ export class Controller {
 }
 
 // @public (undocumented)
+export const Count: Klass<{
+    record: {
+        type: (Klass<{
+            name: {
+                type: "string";
+                collection: false;
+                required: true;
+                constraints: {
+                    nameFormat({ name }: {
+                        name: Atom<string>;
+                    }): Atom<boolean>;
+                };
+            };
+            computedData: {
+                type: Klass<any>[];
+                collection: false;
+                required: false;
+            };
+            properties: {
+                type: Klass<{
+                    name: {
+                        type: "string";
+                        required: true;
+                        collection: false;
+                        constraints: {
+                            format({ name }: {
+                                name: Atom<string>;
+                            }): Atom<boolean>;
+                            length({ name }: {
+                                name: Atom<string>;
+                            }): Atom<boolean>;
+                        };
+                    };
+                    type: {
+                        type: "string";
+                        required: true;
+                        collection: false;
+                        options: PropertyTypes[];
+                    };
+                    collection: {
+                        type: "boolean";
+                        required: true;
+                        collection: false;
+                        defaultValue(): boolean;
+                    };
+                    args: {
+                        computedType: (values: {
+                            type: PropertyTypes;
+                        }) => string;
+                    };
+                    computedData: {
+                        collection: false;
+                        type: Klass<any>[];
+                        required: false;
+                    };
+                    computed: {
+                        required: false;
+                        type: "function";
+                        collection: false;
+                    };
+                }>;
+                collection: true;
+                required: true;
+                constraints: {
+                    eachNameUnique({ properties }: any): Atom<boolean>;
+                };
+                defaultValue(): never[];
+            };
+            isRef: {
+                required: true;
+                collection: false;
+                type: "boolean";
+                defaultValue: () => boolean;
+            };
+        }> | Klass<RelationPublic>)[];
+        collection: false;
+        required: true;
+    };
+    matchExpression: {
+        type: "function";
+        collection: false;
+        required: true;
+    };
+}>;
+
+// @public (undocumented)
+export function createClass<T extends KlassMeta>(metadata: T): Klass<T['public']>;
+
+// @public (undocumented)
 export function createDataAPI(handle: DataAPIHandle, config?: DataAPIConfig): DataAPI;
+
+// Warning: (ae-forgotten-export) The symbol "KlassRawInstanceDataType" needs to be exported by the entry point index.d.ts
+//
+// @public (undocumented)
+export function createInstances(objects: KlassRawInstanceDataType[], reactiveForce?: boolean): Map<string, InertKlassInstance<any> | ReactiveKlassInstance<any>>;
+
+// @public (undocumented)
+export function createInstancesFromString(objStr: string): Map<string, InertKlassInstance<any> | ReactiveKlassInstance<any>>;
+
+// @public (undocumented)
+export function createUserRoleAttributive({ name, isRef }: {
+    name?: string;
+    isRef?: boolean;
+}, options?: KlassOptions | ReactiveKlassOptions): InertKlassInstance<    {
+    stringContent: {
+        type: "string";
+    };
+    content: {
+        type: "function";
+    };
+    name: {
+        type: "string";
+    };
+    isRef: {
+        type: "boolean";
+    };
+}> | ReactiveKlassInstance<    {
+    stringContent: {
+        type: "string";
+    };
+    content: {
+        type: "function";
+    };
+    name: {
+        type: "string";
+    };
+    isRef: {
+        type: "boolean";
+    };
+}>;
 
 // @public (undocumented)
 export type DataAPI = DataAPIHandle & DataAPIConfig;
@@ -211,6 +653,7 @@ export type DataAPIThis = {
 // @public (undocumented)
 export type Database = {
     open: () => Promise<any>;
+    logger: DatabaseLogger;
     scheme: (sql: string, name?: string) => Promise<any>;
     query: <T extends any>(sql: string, values: any[], name?: string) => Promise<T[]>;
     delete: <T extends any>(sql: string, where: any[], name?: string) => Promise<T[]>;
@@ -220,11 +663,125 @@ export type Database = {
 };
 
 // @public (undocumented)
+export type DatabaseLogger = {
+    info: (arg: {
+        type: string;
+        name: string;
+        sql: string;
+        params?: any[];
+    }) => any;
+    child: (fixed: object) => DatabaseLogger;
+};
+
+// @public (undocumented)
+export function deepClone<T>(obj: T, deepCloneKlass?: boolean): T;
+
+// @public (undocumented)
+export interface DerivedConcept extends Concept {
+    // (undocumented)
+    attributive?: any;
+    // (undocumented)
+    base?: Concept;
+}
+
+// @public (undocumented)
+export const Entity: Klass<{
+    name: {
+        type: "string";
+        collection: false;
+        required: true;
+        constraints: {
+            nameFormat({ name }: {
+                name: Atom<string>;
+            }): Atom<boolean>;
+        };
+    };
+    computedData: {
+        type: Klass<any>[];
+        collection: false;
+        required: false;
+    };
+    properties: {
+        type: Klass<{
+            name: {
+                type: "string";
+                required: true;
+                collection: false;
+                constraints: {
+                    format({ name }: {
+                        name: Atom<string>;
+                    }): Atom<boolean>;
+                    length({ name }: {
+                        name: Atom<string>;
+                    }): Atom<boolean>;
+                };
+            };
+            type: {
+                type: "string";
+                required: true;
+                collection: false;
+                options: PropertyTypes[];
+            };
+            collection: {
+                type: "boolean";
+                required: true;
+                collection: false;
+                defaultValue(): boolean;
+            };
+            args: {
+                computedType: (values: {
+                    type: PropertyTypes;
+                }) => string;
+            };
+            computedData: {
+                collection: false;
+                type: Klass<any>[];
+                required: false;
+            };
+            computed: {
+                required: false;
+                type: "function";
+                collection: false;
+            };
+        }>;
+        collection: true;
+        required: true;
+        constraints: {
+            eachNameUnique({ properties }: any): Atom<boolean>;
+        };
+        defaultValue(): never[];
+    };
+    isRef: {
+        required: true;
+        collection: false;
+        type: "boolean";
+        defaultValue: () => boolean;
+    };
+}>;
+
+// @public (undocumented)
 export type EntityIdRef = {
     id: string;
     [ROW_ID_ATTR]?: string;
     [k: string]: any;
 };
+
+// @public (undocumented)
+export type EvaluateError = {
+    data: any;
+    stack: any[];
+    error: any;
+    inverse: boolean;
+};
+
+// @public (undocumented)
+const Event_2: Klass<{
+    name: {
+        type: "string";
+        required: true;
+    };
+}>;
+export { Event_2 as Event }
 
 // @public (undocumented)
 export const EVENT_RECORD = "_Event_";
@@ -305,7 +862,391 @@ defaultValue: () => boolean;
 }>;
 
 // @public (undocumented)
+export const Every: Klass<{
+    record: {
+        type: (Klass<{
+            name: {
+                type: "string";
+                collection: false;
+                required: true;
+                constraints: {
+                    nameFormat({ name }: {
+                        name: Atom<string>;
+                    }): Atom<boolean>;
+                };
+            };
+            computedData: {
+                type: Klass<any>[];
+                collection: false;
+                required: false;
+            };
+            properties: {
+                type: Klass<{
+                    name: {
+                        type: "string";
+                        required: true;
+                        collection: false;
+                        constraints: {
+                            format({ name }: {
+                                name: Atom<string>;
+                            }): Atom<boolean>;
+                            length({ name }: {
+                                name: Atom<string>;
+                            }): Atom<boolean>;
+                        };
+                    };
+                    type: {
+                        type: "string";
+                        required: true;
+                        collection: false;
+                        options: PropertyTypes[];
+                    };
+                    collection: {
+                        type: "boolean";
+                        required: true;
+                        collection: false;
+                        defaultValue(): boolean;
+                    };
+                    args: {
+                        computedType: (values: {
+                            type: PropertyTypes;
+                        }) => string;
+                    };
+                    computedData: {
+                        collection: false;
+                        type: Klass<any>[];
+                        required: false;
+                    };
+                    computed: {
+                        required: false;
+                        type: "function";
+                        collection: false;
+                    };
+                }>;
+                collection: true;
+                required: true;
+                constraints: {
+                    eachNameUnique({ properties }: any): Atom<boolean>;
+                };
+                defaultValue(): never[];
+            };
+            isRef: {
+                required: true;
+                collection: false;
+                type: "boolean";
+                defaultValue: () => boolean;
+            };
+        }> | Klass<RelationPublic>)[];
+        collection: false;
+        required: true;
+    };
+    matchExpression: {
+        type: "function";
+        collection: false;
+        required: true;
+    };
+    notEmpty: {
+        type: "boolean";
+        collection: false;
+        required: false;
+    };
+}>;
+
+// @public (undocumented)
+export type ExpressionData<T> = BoolExpressionRawData<T> | AtomData<T>;
+
+// @public (undocumented)
+export function findRootActivity(interaction: InteractionInstanceType): ActivityInstanceType | null;
+
+// @public (undocumented)
+export function forEachInteraction(activity: ActivityInstanceType, handle: (i: InteractionInstanceType, g?: ActivityGroupInstanceType) => any, parenGroup?: ActivityGroupInstanceType): void;
+
+// @public (undocumented)
+export const Gateway: Klass<GatewayPublicType>;
+
+// @public (undocumented)
+export type GatewayInstanceType = KlassInstance<typeof Gateway, false>;
+
+// @public (undocumented)
+export type GatewayPublicType = {
+    name: {
+        type: 'string';
+        required: true;
+    };
+};
+
+// @public (undocumented)
+export const GetAction: InertKlassInstance<    {
+    name: {
+        type: "string";
+        required: true;
+    };
+}> | ReactiveKlassInstance<    {
+    name: {
+        type: "string";
+        required: true;
+    };
+}>;
+
+// @public (undocumented)
+export function getDisplayValue(obj: InertKlassInstance<any>): string | undefined;
+
+// @public (undocumented)
+export function getInstance<T extends Klass<any>>(Type: T): KlassInstance<T, any>[];
+
+// @public (undocumented)
+export function getInteractions(activity: ActivityInstanceType): InertKlassInstance<InteractionPublicType>[];
+
+// @public (undocumented)
+export function getUUID(obj: InertKlassInstance<any>): string;
+
+// @public (undocumented)
 export const ID_ATTR = "id";
+
+// @public (undocumented)
+export type InertKlassInstance<T extends NonNullable<KlassMeta["public"]>> = InertKlassInstanceProps<T> & KlassInstancePrimitiveProps;
+
+// @public (undocumented)
+export type InertKlassInstanceProps<T extends NonNullable<KlassMeta["public"]>> = OptionalProps<T, false, false> & RequiredProps<T, false, false>;
+
+// @public (undocumented)
+export const Interaction: Klass<InteractionPublicType>;
+
+// @public (undocumented)
+export type InteractionContext = {
+    logContext?: any;
+    [k: string]: any;
+};
+
+// @public (undocumented)
+export type InteractionInstanceType = KlassInstance<typeof Interaction, false>;
+
+// @public (undocumented)
+export type InteractionPublicType = {
+    name: {
+        type: 'string';
+        collection: false;
+        required: true;
+    };
+    userAttributives: {
+        required: false;
+        collection: false;
+        type: (typeof Attributives | typeof Attributive)[];
+    };
+    userRef: {
+        type: typeof Attributive;
+        collection: false;
+    };
+    action: {
+        type: typeof Action;
+        collection: false;
+        required: true;
+    };
+    payload: {
+        type: typeof Payload;
+        collection: false;
+    };
+    sideEffects: {
+        type: typeof SideEffect;
+        collection: true;
+        defaultValue: (...args: any[]) => KlassInstance<typeof SideEffect, any>[];
+    };
+};
+
+// @public (undocumented)
+export type Klass<T extends NonNullable<KlassMeta["public"]>> = {
+    new <U extends KlassOptions | ReactiveKlassOptions>(arg: object, options?: U): U extends ReactiveKlassOptions ? ReactiveKlassInstance<T> : InertKlassInstance<T>;
+    create: (arg: KlassInstanceArgs<T>, options?: KlassOptions) => InertKlassInstance<T>;
+    createReactive: (arg: KlassInstanceArgs<T>, options?: KlassOptions) => ReactiveKlassInstance<T>;
+    displayName: string;
+    isKlass: true;
+    public: T;
+    constraints: KlassMeta['constraints'];
+    instances: KlassInstance<Klass<T>, any>[];
+    display?: KlassMeta['display'];
+    stringify: (instance: InertKlassInstance<T> | ReactiveKlassInstance<T>) => string;
+    parse: () => InertKlassInstance<T>;
+    check: (data: object) => boolean;
+    is: (arg: any) => boolean;
+    clone: <V>(obj: V, deep: boolean) => V;
+};
+
+// @public (undocumented)
+export const KlassByName: Map<string, Klass<any>>;
+
+// @public (undocumented)
+export type KlassInstance<T extends Klass<any>, U extends boolean> = U extends true ? ReactiveKlassInstance<T["public"]> : InertKlassInstance<T["public"]>;
+
+// @public (undocumented)
+export type KlassInstanceArgs<T extends NonNullable<KlassMeta["public"]>> = OptionalProps<T, false, true> & RequiredProps<T, false, true>;
+
+// @public (undocumented)
+export type KlassInstancePrimitiveProps = {
+    uuid: string;
+    _options: KlassOptions;
+    _type: string;
+};
+
+// @public (undocumented)
+export type KlassMeta = {
+    name: string;
+    display?: (obj: any) => string;
+    constraints?: {
+        [ruleName: string]: (thisInstance: object, allInstance: object[]) => Atom<boolean> | boolean;
+    };
+    public: {
+        [key: string]: ClassMetaPublicItem;
+    };
+    is?: (obj: any) => boolean;
+};
+
+// @public (undocumented)
+export type KlassOptions = {
+    isReactive?: false;
+    uuid?: string;
+};
+
+// Warning: (ae-forgotten-export) The symbol "IfReactiveCollectionProp" needs to be exported by the entry point index.d.ts
+//
+// @public (undocumented)
+export type KlassProp<REACTIVE extends boolean, COLLECTION extends true | false | undefined, T> = IfReactiveCollectionProp<REACTIVE, COLLECTION, T>;
+
+// @public (undocumented)
+export const MapActivityToRecord: Klass<{
+    sourceActivity: {
+        type: Klass<{
+            name: {
+                type: "string";
+                collection: false;
+                required: true;
+            };
+            interactions: {
+                type: Klass<InteractionPublicType>;
+                collection: true;
+                defaultValue: (...args: any[]) => (InertKlassInstance<InteractionPublicType> | ReactiveKlassInstance<InteractionPublicType>)[];
+            };
+            transfers: {
+                type: Klass<TransferPublicType>;
+                collection: true;
+                defaultValue: (...args: any[]) => (ReactiveKlassInstance<TransferPublicType> | InertKlassInstance<TransferPublicType>)[];
+            };
+            groups: {
+                type: Klass<ActivityGroupPublicType>;
+                collection: true;
+                defaultValue: (...args: any[]) => (InertKlassInstance<ActivityGroupPublicType> | ReactiveKlassInstance<ActivityGroupPublicType>)[];
+            };
+            gateways: {
+                type: Klass<GatewayPublicType>;
+                collection: true;
+                defaultValue: (...args: any[]) => (InertKlassInstance<GatewayPublicType> | ReactiveKlassInstance<GatewayPublicType>)[];
+            };
+            events: {
+                type: Klass<{
+                    name: {
+                        type: "string";
+                        required: true;
+                    };
+                }>;
+                collection: true;
+                defaultValue: (...args: any[]) => (ReactiveKlassInstance<    {
+                    name: {
+                        type: "string";
+                        required: true;
+                    };
+                }> | InertKlassInstance<    {
+                    name: {
+                        type: "string";
+                        required: true;
+                    };
+                }>)[];
+            };
+        }>;
+        collection: false;
+        required: true;
+    };
+    triggerInteraction: {
+        type: Klass<InteractionPublicType>;
+        collection: true;
+        required: false;
+    };
+    handle: {
+        type: "function";
+        collection: false;
+        required: true;
+    };
+}>;
+
+// @public (undocumented)
+export const MapInteractionToProperty: Klass<{
+    items: {
+        type: Klass<{
+            interaction: {
+                type: Klass<InteractionPublicType>;
+                collection: false;
+                required: true;
+            };
+            handle: {
+                type: "function";
+                collection: false;
+                required: true;
+            };
+            computeSource: {
+                type: "function";
+                collection: false;
+                required: true;
+            };
+        }>;
+        collection: true;
+        required: true;
+    };
+    defaultValue: {
+        type: "string";
+        collection: false;
+        required: false;
+    };
+}>;
+
+// @public (undocumented)
+export const MapInteractionToPropertyItem: Klass<{
+    interaction: {
+        type: Klass<InteractionPublicType>;
+        collection: false;
+        required: true;
+    };
+    handle: {
+        type: "function";
+        collection: false;
+        required: true;
+    };
+    computeSource: {
+        type: "function";
+        collection: false;
+        required: true;
+    };
+}>;
+
+// @public (undocumented)
+export const MapInteractionToRecord: Klass<{
+    sourceInteraction: {
+        type: Klass<InteractionPublicType>;
+        collection: false;
+        required: true;
+    };
+    handle: {
+        type: "function";
+        collection: false;
+        required: true;
+    };
+}>;
+
+// @public (undocumented)
+export const MapRecordMutationToRecord: Klass<{
+    handle: {
+        type: "function";
+        collection: false;
+        required: true;
+    };
+}>;
 
 // @public (undocumented)
 export class MonoSystem implements System {
@@ -332,11 +1273,723 @@ export class MonoSystem implements System {
     updateActivity(match: MatchExpressionData, activity: any): Promise<any>;
 }
 
+// Warning: (ae-forgotten-export) The symbol "OmitNever" needs to be exported by the entry point index.d.ts
+// Warning: (ae-forgotten-export) The symbol "ExtractKlassTypes" needs to be exported by the entry point index.d.ts
+// Warning: (ae-forgotten-export) The symbol "PrimitivePropType" needs to be exported by the entry point index.d.ts
+// Warning: (ae-forgotten-export) The symbol "PrimitivePropertyMap" needs to be exported by the entry point index.d.ts
+//
 // @public (undocumented)
-export interface Payload {
+export type OptionalProps<T extends NonNullable<KlassMeta["public"]>, REACTIVE extends true | false, IS_ARG extends true | false> = Partial<OmitNever<{
+    [Key in keyof T]: RequireWithoutDefaultAndComputed<T[Key], IS_ARG> extends true ? never : (T[Key]["instanceType"] extends Object ? KlassProp<REACTIVE, T[Key]["collection"], T[Key]["instanceType"]> : (T[Key]['type'] extends Klass<any> ? KlassProp<REACTIVE, T[Key]["collection"], InertKlassInstance<T[Key]['type']['public']>> : T[Key]['type'] extends Klass<any>[] ? ExtractKlassTypes<REACTIVE, T[Key]["collection"], T[Key]['type']> : T[Key]['type'] extends PrimitivePropType ? KlassProp<REACTIVE, T[Key]["collection"], PrimitivePropertyMap[T[Key]['type']]> : never));
+}>>;
+
+// Warning: (ae-forgotten-export) The symbol "ParseAtomNameToObjectType" needs to be exported by the entry point index.d.ts
+//
+// @public (undocumented)
+export function parse<T>(exp: string, options?: any[], parseAtomNameToObject?: ParseAtomNameToObjectType): BoolExp<T>;
+
+// @public (undocumented)
+export const Payload: Klass<{
+    items: {
+        type: Klass<{
+            name: {
+                type: "string";
+                required: true;
+            };
+            attributives: {
+                type: (Klass<{
+                    stringContent: {
+                        type: "string";
+                    };
+                    content: {
+                        type: "function";
+                    };
+                    name: {
+                        type: "string";
+                    };
+                    isRef: {
+                        type: "boolean";
+                    };
+                }> | Klass<{
+                    content: {
+                        type: (Klass<{
+                            type: {
+                                type: "string";
+                                required: true;
+                                collection: false;
+                                defaultValue: () => string;
+                            };
+                            data: {
+                                type: Klass<{
+                                    stringContent: {
+                                        type: "string";
+                                    };
+                                    content: {
+                                        type: "function";
+                                    };
+                                    name: {
+                                        type: "string";
+                                    };
+                                    isRef: {
+                                        type: "boolean";
+                                    };
+                                }>;
+                                required: true;
+                                collection: false;
+                            };
+                        }> | Klass<{
+                            type: {
+                                type: "string";
+                                required: true;
+                                collection: false;
+                                defaultValue: () => "expression";
+                            };
+                            operator: {
+                                type: "string";
+                                required: true;
+                                collection: false;
+                                options: ["and", "or", "not"];
+                                defaultValue: () => "and";
+                            };
+                            left: {
+                                instanceType: UnwrappedBoolExpressionInstanceType | InertKlassInstance<    {
+                                    type: {
+                                        type: "string";
+                                        required: true;
+                                        collection: false;
+                                        defaultValue: () => string;
+                                    };
+                                    data: {
+                                        type: Klass<{
+                                            stringContent: {
+                                                type: "string";
+                                            };
+                                            content: {
+                                                type: "function";
+                                            };
+                                            name: {
+                                                type: "string";
+                                            };
+                                            isRef: {
+                                                type: "boolean";
+                                            };
+                                        }>;
+                                        required: true;
+                                        collection: false;
+                                    };
+                                }>;
+                                required: true;
+                                collection: false;
+                            };
+                            right: {
+                                instanceType: UnwrappedBoolExpressionInstanceType | InertKlassInstance<    {
+                                    type: {
+                                        type: "string";
+                                        required: true;
+                                        collection: false;
+                                        defaultValue: () => string;
+                                    };
+                                    data: {
+                                        type: Klass<{
+                                            stringContent: {
+                                                type: "string";
+                                            };
+                                            content: {
+                                                type: "function";
+                                            };
+                                            name: {
+                                                type: "string";
+                                            };
+                                            isRef: {
+                                                type: "boolean";
+                                            };
+                                        }>;
+                                        required: true;
+                                        collection: false;
+                                    };
+                                }>;
+                                required: false;
+                                collection: false;
+                            };
+                        }>)[];
+                        collection: false;
+                        required: false;
+                    };
+                }>)[];
+                collection: false;
+            };
+            base: {
+                type: Klass<{
+                    name: {
+                        type: "string";
+                        collection: false;
+                        required: true;
+                        constraints: {
+                            nameFormat({ name }: {
+                                name: Atom<string>;
+                            }): Atom<boolean>;
+                        };
+                    };
+                    computedData: {
+                        type: Klass<any>[];
+                        collection: false;
+                        required: false;
+                    };
+                    properties: {
+                        type: Klass<{
+                            name: {
+                                type: "string";
+                                required: true;
+                                collection: false;
+                                constraints: {
+                                    format({ name }: {
+                                        name: Atom<string>;
+                                    }): Atom<boolean>;
+                                    length({ name }: {
+                                        name: Atom<string>;
+                                    }): Atom<boolean>;
+                                };
+                            };
+                            type: {
+                                type: "string";
+                                required: true;
+                                collection: false;
+                                options: PropertyTypes[];
+                            };
+                            collection: {
+                                type: "boolean";
+                                required: true;
+                                collection: false;
+                                defaultValue(): boolean;
+                            };
+                            args: {
+                                computedType: (values: {
+                                    type: PropertyTypes;
+                                }) => string;
+                            };
+                            computedData: {
+                                collection: false;
+                                type: Klass<any>[];
+                                required: false;
+                            };
+                            computed: {
+                                required: false;
+                                type: "function";
+                                collection: false;
+                            };
+                        }>;
+                        collection: true;
+                        required: true;
+                        constraints: {
+                            eachNameUnique({ properties }: any): Atom<boolean>;
+                        };
+                        defaultValue(): never[];
+                    };
+                    isRef: {
+                        required: true;
+                        collection: false;
+                        type: "boolean";
+                        defaultValue: () => boolean;
+                    };
+                }>;
+                required: true;
+                collection: false;
+            };
+            isRef: {
+                type: "boolean";
+                collection: false;
+                defaultValue: () => boolean;
+            };
+            required: {
+                type: "boolean";
+                collection: false;
+                defaultValue: () => boolean;
+            };
+            isCollection: {
+                type: "boolean";
+                collection: false;
+                defaultValue: () => boolean;
+            };
+            itemRef: {
+                collection: false;
+                required: false;
+                type: (Klass<{
+                    name: {
+                        type: "string";
+                        collection: false;
+                        required: true;
+                        constraints: {
+                            nameFormat({ name }: {
+                                name: Atom<string>;
+                            }): Atom<boolean>;
+                        };
+                    };
+                    computedData: {
+                        type: Klass<any>[];
+                        collection: false;
+                        required: false;
+                    };
+                    properties: {
+                        type: Klass<{
+                            name: {
+                                type: "string";
+                                required: true;
+                                collection: false;
+                                constraints: {
+                                    format({ name }: {
+                                        name: Atom<string>;
+                                    }): Atom<boolean>;
+                                    length({ name }: {
+                                        name: Atom<string>;
+                                    }): Atom<boolean>;
+                                };
+                            };
+                            type: {
+                                type: "string";
+                                required: true;
+                                collection: false;
+                                options: PropertyTypes[];
+                            };
+                            collection: {
+                                type: "boolean";
+                                required: true;
+                                collection: false;
+                                defaultValue(): boolean;
+                            };
+                            args: {
+                                computedType: (values: {
+                                    type: PropertyTypes;
+                                }) => string;
+                            };
+                            computedData: {
+                                collection: false;
+                                type: Klass<any>[];
+                                required: false;
+                            };
+                            computed: {
+                                required: false;
+                                type: "function";
+                                collection: false;
+                            };
+                        }>;
+                        collection: true;
+                        required: true;
+                        constraints: {
+                            eachNameUnique({ properties }: any): Atom<boolean>;
+                        };
+                        defaultValue(): never[];
+                    };
+                    isRef: {
+                        required: true;
+                        collection: false;
+                        type: "boolean";
+                        defaultValue: () => boolean;
+                    };
+                }> | Klass<{
+                    stringContent: {
+                        type: "string";
+                    };
+                    content: {
+                        type: "function";
+                    };
+                    name: {
+                        type: "string";
+                    };
+                    isRef: {
+                        type: "boolean";
+                    };
+                }>)[];
+            };
+        }>;
+        collection: true;
+        required: true;
+        defaultValue: () => never[];
+    };
+}>;
+
+// @public (undocumented)
+export const PayloadItem: Klass<{
+    name: {
+        type: "string";
+        required: true;
+    };
+    attributives: {
+        type: (Klass<{
+            stringContent: {
+                type: "string";
+            };
+            content: {
+                type: "function";
+            };
+            name: {
+                type: "string";
+            };
+            isRef: {
+                type: "boolean";
+            };
+        }> | Klass<{
+            content: {
+                type: (Klass<{
+                    type: {
+                        type: "string";
+                        required: true;
+                        collection: false;
+                        defaultValue: () => string;
+                    };
+                    data: {
+                        type: Klass<{
+                            stringContent: {
+                                type: "string";
+                            };
+                            content: {
+                                type: "function";
+                            };
+                            name: {
+                                type: "string";
+                            };
+                            isRef: {
+                                type: "boolean";
+                            };
+                        }>;
+                        required: true;
+                        collection: false;
+                    };
+                }> | Klass<{
+                    type: {
+                        type: "string";
+                        required: true;
+                        collection: false;
+                        defaultValue: () => "expression";
+                    };
+                    operator: {
+                        type: "string";
+                        required: true;
+                        collection: false;
+                        options: ["and", "or", "not"];
+                        defaultValue: () => "and";
+                    };
+                    left: {
+                        instanceType: UnwrappedBoolExpressionInstanceType | InertKlassInstance<    {
+                            type: {
+                                type: "string";
+                                required: true;
+                                collection: false;
+                                defaultValue: () => string;
+                            };
+                            data: {
+                                type: Klass<{
+                                    stringContent: {
+                                        type: "string";
+                                    };
+                                    content: {
+                                        type: "function";
+                                    };
+                                    name: {
+                                        type: "string";
+                                    };
+                                    isRef: {
+                                        type: "boolean";
+                                    };
+                                }>;
+                                required: true;
+                                collection: false;
+                            };
+                        }>;
+                        required: true;
+                        collection: false;
+                    };
+                    right: {
+                        instanceType: UnwrappedBoolExpressionInstanceType | InertKlassInstance<    {
+                            type: {
+                                type: "string";
+                                required: true;
+                                collection: false;
+                                defaultValue: () => string;
+                            };
+                            data: {
+                                type: Klass<{
+                                    stringContent: {
+                                        type: "string";
+                                    };
+                                    content: {
+                                        type: "function";
+                                    };
+                                    name: {
+                                        type: "string";
+                                    };
+                                    isRef: {
+                                        type: "boolean";
+                                    };
+                                }>;
+                                required: true;
+                                collection: false;
+                            };
+                        }>;
+                        required: false;
+                        collection: false;
+                    };
+                }>)[];
+                collection: false;
+                required: false;
+            };
+        }>)[];
+        collection: false;
+    };
+    base: {
+        type: Klass<{
+            name: {
+                type: "string";
+                collection: false;
+                required: true;
+                constraints: {
+                    nameFormat({ name }: {
+                        name: Atom<string>;
+                    }): Atom<boolean>;
+                };
+            };
+            computedData: {
+                type: Klass<any>[];
+                collection: false;
+                required: false;
+            };
+            properties: {
+                type: Klass<{
+                    name: {
+                        type: "string";
+                        required: true;
+                        collection: false;
+                        constraints: {
+                            format({ name }: {
+                                name: Atom<string>;
+                            }): Atom<boolean>;
+                            length({ name }: {
+                                name: Atom<string>;
+                            }): Atom<boolean>;
+                        };
+                    };
+                    type: {
+                        type: "string";
+                        required: true;
+                        collection: false;
+                        options: PropertyTypes[];
+                    };
+                    collection: {
+                        type: "boolean";
+                        required: true;
+                        collection: false;
+                        defaultValue(): boolean;
+                    };
+                    args: {
+                        computedType: (values: {
+                            type: PropertyTypes;
+                        }) => string;
+                    };
+                    computedData: {
+                        collection: false;
+                        type: Klass<any>[];
+                        required: false;
+                    };
+                    computed: {
+                        required: false;
+                        type: "function";
+                        collection: false;
+                    };
+                }>;
+                collection: true;
+                required: true;
+                constraints: {
+                    eachNameUnique({ properties }: any): Atom<boolean>;
+                };
+                defaultValue(): never[];
+            };
+            isRef: {
+                required: true;
+                collection: false;
+                type: "boolean";
+                defaultValue: () => boolean;
+            };
+        }>;
+        required: true;
+        collection: false;
+    };
+    isRef: {
+        type: "boolean";
+        collection: false;
+        defaultValue: () => boolean;
+    };
+    required: {
+        type: "boolean";
+        collection: false;
+        defaultValue: () => boolean;
+    };
+    isCollection: {
+        type: "boolean";
+        collection: false;
+        defaultValue: () => boolean;
+    };
+    itemRef: {
+        collection: false;
+        required: false;
+        type: (Klass<{
+            name: {
+                type: "string";
+                collection: false;
+                required: true;
+                constraints: {
+                    nameFormat({ name }: {
+                        name: Atom<string>;
+                    }): Atom<boolean>;
+                };
+            };
+            computedData: {
+                type: Klass<any>[];
+                collection: false;
+                required: false;
+            };
+            properties: {
+                type: Klass<{
+                    name: {
+                        type: "string";
+                        required: true;
+                        collection: false;
+                        constraints: {
+                            format({ name }: {
+                                name: Atom<string>;
+                            }): Atom<boolean>;
+                            length({ name }: {
+                                name: Atom<string>;
+                            }): Atom<boolean>;
+                        };
+                    };
+                    type: {
+                        type: "string";
+                        required: true;
+                        collection: false;
+                        options: PropertyTypes[];
+                    };
+                    collection: {
+                        type: "boolean";
+                        required: true;
+                        collection: false;
+                        defaultValue(): boolean;
+                    };
+                    args: {
+                        computedType: (values: {
+                            type: PropertyTypes;
+                        }) => string;
+                    };
+                    computedData: {
+                        collection: false;
+                        type: Klass<any>[];
+                        required: false;
+                    };
+                    computed: {
+                        required: false;
+                        type: "function";
+                        collection: false;
+                    };
+                }>;
+                collection: true;
+                required: true;
+                constraints: {
+                    eachNameUnique({ properties }: any): Atom<boolean>;
+                };
+                defaultValue(): never[];
+            };
+            isRef: {
+                required: true;
+                collection: false;
+                type: "boolean";
+                defaultValue: () => boolean;
+            };
+        }> | Klass<{
+            stringContent: {
+                type: "string";
+            };
+            content: {
+                type: "function";
+            };
+            name: {
+                type: "string";
+            };
+            isRef: {
+                type: "boolean";
+            };
+        }>)[];
+    };
+}>;
+
+// @public (undocumented)
+export const Property: Klass<{
+    name: {
+        type: "string";
+        required: true;
+        collection: false;
+        constraints: {
+            format({ name }: {
+                name: Atom<string>;
+            }): Atom<boolean>;
+            length({ name }: {
+                name: Atom<string>;
+            }): Atom<boolean>;
+        };
+    };
+    type: {
+        type: "string";
+        required: true;
+        collection: false;
+        options: PropertyTypes[];
+    };
+    collection: {
+        type: "boolean";
+        required: true;
+        collection: false;
+        defaultValue(): boolean;
+    };
+    args: {
+        computedType: (values: {
+            type: PropertyTypes;
+        }) => string;
+    };
+    computedData: {
+        collection: false;
+        type: Klass<any>[];
+        required: false;
+    };
+    computed: {
+        required: false;
+        type: "function";
+        collection: false;
+    };
+}>;
+
+// @public (undocumented)
+export const PropertyTypeMap: {
+    string: string;
+    number: string;
+    boolean: string;
+};
+
+// @public (undocumented)
+export enum PropertyTypes {
     // (undocumented)
-    [k: string]: any;
+    Boolean = "boolean",
+    // (undocumented)
+    Number = "number",
+    // (undocumented)
+    String = "string"
 }
+
+// @public (undocumented)
+export type ReactiveKlassInstance<T extends NonNullable<KlassMeta["public"]>> = ReactiveKlassInstanceProps<T> & KlassInstancePrimitiveProps;
+
+// @public (undocumented)
+export type ReactiveKlassInstanceProps<T extends NonNullable<KlassMeta["public"]>> = OptionalProps<T, true, false> & RequiredProps<T, true, false>;
+
+// @public (undocumented)
+export type ReactiveKlassOptions = Omit<KlassOptions, 'isReactive'> & {
+    isReactive: true;
+};
 
 // @public (undocumented)
 export type RecordChangeListener = (mutationEvents: RecordMutationEvent[]) => any;
@@ -355,12 +2008,563 @@ export type RecordMutationEvent = {
 };
 
 // @public (undocumented)
+export const Relation: Klass<RelationPublic>;
+
+// @public (undocumented)
+export const RelationBasedAny: Klass<{
+    relation: {
+        type: Klass<RelationPublic>;
+        collection: false;
+        required: true;
+    };
+    relationDirection: {
+        type: "string";
+        collection: false;
+        required: true;
+        defaultValue: () => string;
+    };
+    matchExpression: {
+        type: "function";
+        collection: false;
+        required: true;
+    };
+}>;
+
+// @public (undocumented)
+export const RelationBasedEvery: Klass<{
+    relation: {
+        type: Klass<RelationPublic>;
+        collection: false;
+        required: true;
+    };
+    relationDirection: {
+        type: "string";
+        collection: false;
+        required: true;
+        defaultValue: () => string;
+    };
+    matchExpression: {
+        type: "function";
+        collection: false;
+        required: true;
+    };
+    notEmpty: {
+        type: "boolean";
+        collection: false;
+        required: false;
+    };
+}>;
+
+// @public (undocumented)
+export const RelationBasedWeightedSummation: Klass<{
+    relations: {
+        type: Klass<{
+            relation: {
+                type: Klass<RelationPublic>;
+                collection: false;
+                required: true;
+            };
+            relationDirection: {
+                type: "string";
+                collection: false;
+                required: true;
+                defaultValue: () => string;
+            };
+        }>;
+        collection: true;
+        required: true;
+    };
+    matchRelationToWeight: {
+        type: "function";
+        collection: false;
+        required: true;
+    };
+}>;
+
+// @public (undocumented)
+export const RelationCount: Klass<{
+    relation: {
+        type: Klass<RelationPublic>;
+        collection: false;
+        required: true;
+    };
+    relationDirection: {
+        type: "string";
+        collection: false;
+        required: true;
+        defaultValue: () => string;
+    };
+    matchExpression: {
+        type: "function";
+        collection: false;
+        required: true;
+    };
+}>;
+
+// @public (undocumented)
+export type RelationPublic = {
+    name: {
+        type: 'string';
+        required: false;
+        collection: false;
+        computed: (relation: any) => any;
+    };
+    source: {
+        type: typeof Entity | Klass<RelationPublic>;
+        required: true;
+        collection: false;
+        options: () => (KlassInstance<typeof Entity, any> | KlassInstance<Klass<RelationPublic>, any>)[];
+    };
+    sourceAttribute: {
+        type: 'string';
+        required: true;
+        collection: false;
+        constraints: {
+            [ruleName: string]: ((thisProp: any, thisEntity: object) => Atom<boolean> | boolean | any[]) | Function | string;
+        };
+    };
+    target: {
+        type: typeof Entity;
+        required: true;
+        collection: false;
+        options: () => (KlassInstance<typeof Entity, any> | KlassInstance<Klass<RelationPublic>, any>)[];
+    };
+    targetAttribute: {
+        type: 'string';
+        required: true;
+        collection: false;
+        constraints: {
+            [ruleName: string]: ((thisProp: any, thisEntity: object) => Atom<boolean> | boolean | any[]) | Function | string;
+        };
+    };
+    isTargetReliance: {
+        type: 'boolean';
+        required: true;
+        collection: false;
+        defaultValue: () => boolean;
+    };
+    relType: {
+        type: 'string';
+        collection: false;
+        required: true;
+        options: () => string[];
+        defaultValue: () => [string];
+    };
+    computedData: {
+        type: Klass<any>[];
+        collection: false;
+        required: false;
+    };
+    properties: {
+        type: typeof Property;
+        collection: true;
+        required: true;
+        constraints: {
+            [ruleName: string]: ((thisProp: any, thisEntity: object) => Atom<boolean> | boolean | any[]) | Function | string;
+        };
+        defaultValue: () => any[];
+    };
+};
+
+// @public (undocumented)
+export const RelationStateMachine: Klass<{
+    states: {
+        type: Klass<{
+            hasRelation: {
+                type: "boolean";
+                required: true;
+                collection: false;
+            };
+            fixedProperties: {
+                type: Klass<{
+                    name: {
+                        type: "string";
+                        collection: false;
+                        required: true;
+                    };
+                    value: {
+                        type: Klass<any>[];
+                        collection: false;
+                        required: true;
+                    };
+                }>;
+                collection: true;
+                required: false;
+            };
+            propertyHandle: {
+                type: "function";
+                required: false;
+                collection: false;
+            };
+        }>;
+        collection: true;
+        required: true;
+    };
+    transfers: {
+        type: Klass<{
+            sourceActivity: {
+                type: Klass<{
+                    name: {
+                        type: "string";
+                        collection: false;
+                        required: true;
+                    };
+                    interactions: {
+                        type: Klass<InteractionPublicType>;
+                        collection: true;
+                        defaultValue: (...args: any[]) => (InertKlassInstance<InteractionPublicType> | ReactiveKlassInstance<InteractionPublicType>)[];
+                    };
+                    transfers: {
+                        type: Klass<TransferPublicType>;
+                        collection: true;
+                        defaultValue: (...args: any[]) => (ReactiveKlassInstance<TransferPublicType> | InertKlassInstance<TransferPublicType>)[];
+                    };
+                    groups: {
+                        type: Klass<ActivityGroupPublicType>;
+                        collection: true;
+                        defaultValue: (...args: any[]) => (InertKlassInstance<ActivityGroupPublicType> | ReactiveKlassInstance<ActivityGroupPublicType>)[];
+                    };
+                    gateways: {
+                        type: Klass<GatewayPublicType>;
+                        collection: true;
+                        defaultValue: (...args: any[]) => (InertKlassInstance<GatewayPublicType> | ReactiveKlassInstance<GatewayPublicType>)[];
+                    };
+                    events: {
+                        type: Klass<{
+                            name: {
+                                type: "string";
+                                required: true;
+                            };
+                        }>;
+                        collection: true;
+                        defaultValue: (...args: any[]) => (ReactiveKlassInstance<    {
+                            name: {
+                                type: "string";
+                                required: true;
+                            };
+                        }> | InertKlassInstance<    {
+                            name: {
+                                type: "string";
+                                required: true;
+                            };
+                        }>)[];
+                    };
+                }>;
+                collection: false;
+                required: false;
+            };
+            triggerInteraction: {
+                type: Klass<InteractionPublicType>;
+                collection: false;
+                required: true;
+            };
+            fromState: {
+                type: Klass<{
+                    hasRelation: {
+                        type: "boolean";
+                        required: true;
+                        collection: false;
+                    };
+                    fixedProperties: {
+                        type: Klass<{
+                            name: {
+                                type: "string";
+                                collection: false;
+                                required: true;
+                            };
+                            value: {
+                                type: Klass<any>[];
+                                collection: false;
+                                required: true;
+                            };
+                        }>;
+                        collection: true;
+                        required: false;
+                    };
+                    propertyHandle: {
+                        type: "function";
+                        required: false;
+                        collection: false;
+                    };
+                }>;
+                collection: false;
+                required: true;
+            };
+            toState: {
+                type: Klass<{
+                    hasRelation: {
+                        type: "boolean";
+                        required: true;
+                        collection: false;
+                    };
+                    fixedProperties: {
+                        type: Klass<{
+                            name: {
+                                type: "string";
+                                collection: false;
+                                required: true;
+                            };
+                            value: {
+                                type: Klass<any>[];
+                                collection: false;
+                                required: true;
+                            };
+                        }>;
+                        collection: true;
+                        required: false;
+                    };
+                    propertyHandle: {
+                        type: "function";
+                        required: false;
+                        collection: false;
+                    };
+                }>;
+                collection: false;
+                required: true;
+            };
+            handleType: {
+                type: "string";
+            };
+            handle: {
+                type: "function";
+                collection: false;
+                required: true;
+            };
+        }>;
+        collection: true;
+        required: true;
+    };
+    defaultState: {
+        type: Klass<{
+            hasRelation: {
+                type: "boolean";
+                required: true;
+                collection: false;
+            };
+            fixedProperties: {
+                type: Klass<{
+                    name: {
+                        type: "string";
+                        collection: false;
+                        required: true;
+                    };
+                    value: {
+                        type: Klass<any>[];
+                        collection: false;
+                        required: true;
+                    };
+                }>;
+                collection: true;
+                required: false;
+            };
+            propertyHandle: {
+                type: "function";
+                required: false;
+                collection: false;
+            };
+        }>;
+        collection: false;
+        required: true;
+    };
+}>;
+
+// @public (undocumented)
+export const RelationStateNode: Klass<{
+    hasRelation: {
+        type: "boolean";
+        required: true;
+        collection: false;
+    };
+    fixedProperties: {
+        type: Klass<{
+            name: {
+                type: "string";
+                collection: false;
+                required: true;
+            };
+            value: {
+                type: Klass<any>[];
+                collection: false;
+                required: true;
+            };
+        }>;
+        collection: true;
+        required: false;
+    };
+    propertyHandle: {
+        type: "function";
+        required: false;
+        collection: false;
+    };
+}>;
+
+// @public (undocumented)
+export const RelationStateTransfer: Klass<{
+    sourceActivity: {
+        type: Klass<{
+            name: {
+                type: "string";
+                collection: false;
+                required: true;
+            };
+            interactions: {
+                type: Klass<InteractionPublicType>;
+                collection: true;
+                defaultValue: (...args: any[]) => (InertKlassInstance<InteractionPublicType> | ReactiveKlassInstance<InteractionPublicType>)[];
+            };
+            transfers: {
+                type: Klass<TransferPublicType>;
+                collection: true;
+                defaultValue: (...args: any[]) => (ReactiveKlassInstance<TransferPublicType> | InertKlassInstance<TransferPublicType>)[];
+            };
+            groups: {
+                type: Klass<ActivityGroupPublicType>;
+                collection: true;
+                defaultValue: (...args: any[]) => (InertKlassInstance<ActivityGroupPublicType> | ReactiveKlassInstance<ActivityGroupPublicType>)[];
+            };
+            gateways: {
+                type: Klass<GatewayPublicType>;
+                collection: true;
+                defaultValue: (...args: any[]) => (InertKlassInstance<GatewayPublicType> | ReactiveKlassInstance<GatewayPublicType>)[];
+            };
+            events: {
+                type: Klass<{
+                    name: {
+                        type: "string";
+                        required: true;
+                    };
+                }>;
+                collection: true;
+                defaultValue: (...args: any[]) => (ReactiveKlassInstance<    {
+                    name: {
+                        type: "string";
+                        required: true;
+                    };
+                }> | InertKlassInstance<    {
+                    name: {
+                        type: "string";
+                        required: true;
+                    };
+                }>)[];
+            };
+        }>;
+        collection: false;
+        required: false;
+    };
+    triggerInteraction: {
+        type: Klass<InteractionPublicType>;
+        collection: false;
+        required: true;
+    };
+    fromState: {
+        type: Klass<{
+            hasRelation: {
+                type: "boolean";
+                required: true;
+                collection: false;
+            };
+            fixedProperties: {
+                type: Klass<{
+                    name: {
+                        type: "string";
+                        collection: false;
+                        required: true;
+                    };
+                    value: {
+                        type: Klass<any>[];
+                        collection: false;
+                        required: true;
+                    };
+                }>;
+                collection: true;
+                required: false;
+            };
+            propertyHandle: {
+                type: "function";
+                required: false;
+                collection: false;
+            };
+        }>;
+        collection: false;
+        required: true;
+    };
+    toState: {
+        type: Klass<{
+            hasRelation: {
+                type: "boolean";
+                required: true;
+                collection: false;
+            };
+            fixedProperties: {
+                type: Klass<{
+                    name: {
+                        type: "string";
+                        collection: false;
+                        required: true;
+                    };
+                    value: {
+                        type: Klass<any>[];
+                        collection: false;
+                        required: true;
+                    };
+                }>;
+                collection: true;
+                required: false;
+            };
+            propertyHandle: {
+                type: "function";
+                required: false;
+                collection: false;
+            };
+        }>;
+        collection: false;
+        required: true;
+    };
+    handleType: {
+        type: "string";
+    };
+    handle: {
+        type: "function";
+        collection: false;
+        required: true;
+    };
+}>;
+
+// @public (undocumented)
+export function removeAllInstance(): void;
+
+// @public (undocumented)
+export type RequiredProps<T extends NonNullable<KlassMeta["public"]>, REACTIVE extends true | false, IS_ARG extends true | false> = OmitNever<{
+    [Key in keyof T]: RequireWithoutDefaultAndComputed<T[Key], IS_ARG> extends true ? (T[Key]["instanceType"] extends Object ? KlassProp<REACTIVE, T[Key]["collection"], T[Key]["instanceType"]> : (T[Key]['type'] extends Klass<any> ? KlassProp<REACTIVE, T[Key]["collection"], InertKlassInstance<T[Key]['type']['public']>> : T[Key]['type'] extends Klass<any>[] ? ExtractKlassTypes<REACTIVE, T[Key]["collection"], T[Key]['type']> : T[Key]['type'] extends PrimitivePropType ? KlassProp<REACTIVE, T[Key]["collection"], PrimitivePropertyMap[T[Key]['type']]> : never)) : never;
+}>;
+
+// Warning: (ae-forgotten-export) The symbol "DefaultValueType" needs to be exported by the entry point index.d.ts
+// Warning: (ae-forgotten-export) The symbol "ComputedValueType" needs to be exported by the entry point index.d.ts
+//
+// @public (undocumented)
+export type RequireWithoutDefaultAndComputed<T extends ClassMetaPublicItem, IS_ARG extends true | false> = IS_ARG extends true ? (T["defaultValue"] extends DefaultValueType ? false : T["computed"] extends ComputedValueType ? false : T["required"] extends true ? true : false) : (T["defaultValue"] extends DefaultValueType ? true : T["computed"] extends ComputedValueType ? true : T["required"] extends true ? true : false);
+
+// @public (undocumented)
 export const ROW_ID_ATTR = "_rowId";
+
+// @public (undocumented)
+export const SideEffect: Klass<{
+    name: {
+        type: "string";
+        required: true;
+        collection: false;
+    };
+    handle: {
+        type: "function";
+        required: true;
+        collection: false;
+    };
+}>;
 
 // @public (undocumented)
 export class SQLiteDB implements Database {
     constructor(file?: string, options?: (SQLite.Options & {
-        log: (msg: SQLiteDBLog) => any;
+        logger: DatabaseLogger;
     }) | undefined);
     // (undocumented)
     close(): void;
@@ -379,12 +2583,12 @@ export class SQLiteDB implements Database {
     // (undocumented)
     insert(sql: string, values: any[], name?: string): Promise<EntityIdRef>;
     // (undocumented)
-    log: (msg: SQLiteDBLog) => any;
+    logger: DatabaseLogger;
     // (undocumented)
     open(): Promise<void>;
     // (undocumented)
     options?: (SQLite.Options & {
-        log: (msg: SQLiteDBLog) => any;
+        logger: DatabaseLogger;
     }) | undefined;
     // (undocumented)
     query<T extends any>(sql: string, where?: any[], name?: string): Promise<T[]>;
@@ -395,22 +2599,53 @@ export class SQLiteDB implements Database {
 }
 
 // @public (undocumented)
-export type SQLiteDBLog = {
-    type: string;
-    name: string;
-    sql: string;
-    params?: any[];
-};
-
-// @public (undocumented)
 export type SQLiteDBOptions = Parameters<typeof SQLite>[1] & {
-    log: SQLiteDB['log'];
+    logger: DatabaseLogger;
 };
 
 // Warning: (ae-forgotten-export) The symbol "ServerOptions" needs to be exported by the entry point index.d.ts
 //
 // @public (undocumented)
 export function startServer(controller: Controller, options: ServerOptions, dataAPIs?: DataAPIs): Promise<void>;
+
+// @public (undocumented)
+export const State: Klass<{
+    name: {
+        type: "string";
+        required: true;
+        collection: false;
+        constraints: {
+            format({ name }: {
+                name: Atom<string>;
+            }): Atom<boolean>;
+            length({ name }: {
+                name: Atom<string>;
+            }): Atom<boolean>;
+        };
+    };
+    type: {
+        type: "string";
+        required: true;
+        collection: false;
+        options: PropertyTypes[];
+    };
+    collection: {
+        type: "boolean";
+        required: true;
+        collection: false;
+        defaultValue(): boolean;
+    };
+    args: {
+        computedType: (values: {
+            type: PropertyTypes;
+        }) => string;
+    };
+    computedData: {
+        collection: false;
+        type: Klass<any>[];
+        required: false;
+    };
+}>;
 
 // @public (undocumented)
 type Storage_2 = {
@@ -434,6 +2669,15 @@ type Storage_2 = {
     listen: (callback: RecordChangeListener) => any;
 };
 export { Storage_2 as Storage }
+
+// @public (undocumented)
+export function stringifyAllInstances(): string;
+
+// @public (undocumented)
+export function stringifyAttribute(obj: any): any;
+
+// @public (undocumented)
+export function stringifyInstance(obj: InertKlassInstance<any>): string;
 
 // @public (undocumented)
 export interface System {
@@ -541,12 +2785,9 @@ defaultValue: () => boolean;
 // @public (undocumented)
 export type SystemLogger = {
     error: (arg: SystemLogType) => any;
-    warn: (arg: SystemLogType) => any;
     info: (arg: SystemLogType) => any;
-    http: (arg: SystemLogType) => any;
-    verbose: (arg: SystemLogType) => any;
     debug: (arg: SystemLogType) => any;
-    silly: (arg: SystemLogType) => any;
+    child: (fixed: object) => SystemLogger;
 };
 
 // @public (undocumented)
@@ -557,14 +2798,140 @@ export type SystemLogType = {
 };
 
 // @public (undocumented)
+export const Transfer: Klass<TransferPublicType>;
+
+// @public (undocumented)
+export type TransferInstanceType = KlassInstance<typeof Transfer, false>;
+
+// @public (undocumented)
+export type TransferPublicType = {
+    name: {
+        type: 'string';
+        required: true;
+        collection: false;
+    };
+    source: {
+        type: (Klass<InteractionPublicType> | Klass<ActivityGroupPublicType> | Klass<GatewayPublicType>)[];
+        required: true;
+        collection: false;
+    };
+    target: {
+        type: (Klass<InteractionPublicType> | Klass<ActivityGroupPublicType> | Klass<GatewayPublicType>)[];
+        required: true;
+        collection: false;
+    };
+};
+
+// @public (undocumented)
+export type UnwrapCollectionType<T extends Klass<any>[]> = {
+    [Key in keyof T]: T[Key]["public"];
+}[keyof T][number];
+
+// @public (undocumented)
+export type UnwrappedBoolExpressionInstanceType = {
+    type: string;
+    operator: string;
+    left: UnwrappedBoolExpressionInstanceType | KlassInstance<typeof BoolAtomData, any>;
+    right?: UnwrappedBoolExpressionInstanceType | KlassInstance<typeof BoolAtomData, any>;
+};
+
+// @public (undocumented)
 export const USER_ENTITY = "User";
+
+// @public (undocumented)
+export const WeightedSummation: Klass<{
+    records: {
+        type: (Klass<{
+            name: {
+                type: "string";
+                collection: false;
+                required: true;
+                constraints: {
+                    nameFormat({ name }: {
+                        name: Atom<string>;
+                    }): Atom<boolean>;
+                };
+            };
+            computedData: {
+                type: Klass<any>[];
+                collection: false;
+                required: false;
+            };
+            properties: {
+                type: Klass<{
+                    name: {
+                        type: "string";
+                        required: true;
+                        collection: false;
+                        constraints: {
+                            format({ name }: {
+                                name: Atom<string>;
+                            }): Atom<boolean>;
+                            length({ name }: {
+                                name: Atom<string>;
+                            }): Atom<boolean>;
+                        };
+                    };
+                    type: {
+                        type: "string";
+                        required: true;
+                        collection: false;
+                        options: PropertyTypes[];
+                    };
+                    collection: {
+                        type: "boolean";
+                        required: true;
+                        collection: false;
+                        defaultValue(): boolean;
+                    };
+                    args: {
+                        computedType: (values: {
+                            type: PropertyTypes;
+                        }) => string;
+                    };
+                    computedData: {
+                        collection: false;
+                        type: Klass<any>[];
+                        required: false;
+                    };
+                    computed: {
+                        required: false;
+                        type: "function";
+                        collection: false;
+                    };
+                }>;
+                collection: true;
+                required: true;
+                constraints: {
+                    eachNameUnique({ properties }: any): Atom<boolean>;
+                };
+                defaultValue(): never[];
+            };
+            isRef: {
+                required: true;
+                collection: false;
+                type: "boolean";
+                defaultValue: () => boolean;
+            };
+        }> | Klass<RelationPublic>)[];
+        collection: true;
+        required: true;
+    };
+    matchRecordToWeight: {
+        type: "function";
+        collection: false;
+        required: true;
+    };
+}>;
 
 // Warnings were encountered during analysis:
 //
-// Controller.ts:216:8 - (ae-forgotten-export) The symbol "ActivitySeqStateData" needs to be exported by the entry point index.d.ts
-// server.ts:20:5 - (ae-forgotten-export) The symbol "EventPayload" needs to be exported by the entry point index.d.ts
-// server.ts:21:5 - (ae-forgotten-export) The symbol "EventQuery" needs to be exported by the entry point index.d.ts
-// server.ts:30:5 - (ae-forgotten-export) The symbol "EventUser" needs to be exported by the entry point index.d.ts
+// node_modules/@interaqt/shared/dist/index.d.ts:24:9 - (ae-forgotten-export) The symbol "UnwrappedActivityInstanceType" needs to be exported by the entry point index.d.ts
+// node_modules/@interaqt/shared/dist/index.d.ts:179:1 - (ae-forgotten-export) The symbol "BoolExpressionDataPublic" needs to be exported by the entry point index.d.ts
+// node_modules/@interaqt/shared/dist/index.d.ts:799:9 - (ae-forgotten-export) The symbol "ClassMetaPublicItem" needs to be exported by the entry point index.d.ts
+// server.ts:21:5 - (ae-forgotten-export) The symbol "EventPayload" needs to be exported by the entry point index.d.ts
+// server.ts:22:5 - (ae-forgotten-export) The symbol "EventQuery" needs to be exported by the entry point index.d.ts
+// server.ts:31:5 - (ae-forgotten-export) The symbol "EventUser" needs to be exported by the entry point index.d.ts
 
 // (No @packageDocumentation comment for this package)
 
