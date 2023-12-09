@@ -25,7 +25,7 @@ More importantly, the reason for creating @interaqt/runtime is:
 ### Step 1: Installation
 
 ```bash
-npm install @interaqt/runtime@1.0.0-alpha.9 // latest version: 1.0.0-alpha.9
+npm install @interaqt/runtime@0.8.0 // latest version: 0.8.0
 ```
 
 ### Step 2: Create an install.js file for initializing the database
