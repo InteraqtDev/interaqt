@@ -29,7 +29,7 @@ try {
   buildAll()
   const newVersion = execSync(`npm version ${version}`)
   execSync('git add ./')
-  execSync(`git commit -m "release: @interaqt/runtime ${newVersion}"`)
+  execSync(`git commit -m "release: @interaqt/storage ${newVersion}"`)
   execSync('git push')
   execSync(`npm publish ./`)
 } catch (e) {
