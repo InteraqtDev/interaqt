@@ -1,6 +1,8 @@
 import {createClass, Klass, KlassInstance, KlassInstancePrimitiveProps} from "../createClass.js";
-import {Entity} from "../entity/Entity.js";
-import {Attributive, Attributives, Condition, Conditions} from "../attributive.js";
+import {Entity, Relation} from "../entity/Entity.js";
+import {Attributive, Attributives, } from "../attributive.js";
+import {Condition, Conditions} from './Condition.js'
+import {Computation, DataAttributive, DataAttributives, Query} from "./Data";
 
 
 // 交互动作，因为以后可能有更多的关于交互动作的管理，所以应该是个对象，而不只是字符串名字。
@@ -131,6 +133,21 @@ export type InteractionPublicType = {
         collection: true
         defaultValue: (...args: any[]) => KlassInstance<typeof SideEffect, any>[]
     },
+    dataAttributives: {
+      required: false,
+      collection: false,
+      type: (typeof DataAttributive|typeof DataAttributives)[],
+    },
+    data: {
+        type: (typeof Entity|typeof Relation|typeof Computation)[],
+        required: false,
+        collection: false
+    },
+    query: {
+        type: typeof Query,
+        collection: false,
+    }
+
 }
 
 export const Interaction: Klass<InteractionPublicType> = createClass({
@@ -143,7 +160,7 @@ export const Interaction: Klass<InteractionPublicType> = createClass({
             required: true
         },
         conditions: {
-            type: [Attributives, Attributive],
+            type: [Conditions, Condition],
             required: false,
             collection: false,
         },
@@ -173,6 +190,21 @@ export const Interaction: Klass<InteractionPublicType> = createClass({
             collection: true,
             defaultValue: (...args: any[]) => []
         },
+        dataAttributives: {
+            type: [DataAttributive, DataAttributives],
+            required: false,
+            collection: false,
+        },
+        data: {
+            type: [Entity, Relation, Computation],
+            required: false,
+            collection: false
+        },
+        query : {
+            type: Query,
+            required: false,
+            collection: false
+        }
     }
 })
 

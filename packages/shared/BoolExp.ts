@@ -1,6 +1,7 @@
 import {Expression, ExpressionStatement, parse as parseStr} from 'acorn'
 import {assert, indexBy} from "./utils.js";
-
+import {createClass, Klass, KlassInstance, KlassMeta} from "./createClass.js";
+//
 type AtomData<T> = {
     type: 'atom',
     data: T
@@ -221,3 +222,69 @@ export function parse<T>(exp: string, options: any[] = [], parseAtomNameToObject
         astNodeToBoolExpressionNode<T>((ast.body[0] as ExpressionStatement).expression, optionsByName, parseAtomNameToObject)
     )
 }
+
+type CommonAtomPublic = {
+    content: {
+        type: 'function',
+        required: true,
+        collection: false
+    }
+}
+
+export const  BoolAtomData = createClass({
+    name: 'BoolAtomData',
+    public: {
+        type: {
+            type: 'string',
+            required: true,
+            collection: false,
+            defaultValue: () => 'atom'
+        },
+        data: {
+            instanceType: {} as unknown as (KlassInstance<Klass<CommonAtomPublic>, any>),
+            required: true,
+            collection: false,
+        }
+    }
+})
+
+
+
+export type UnwrappedBoolExpressionInstanceType<T extends NonNullable<KlassMeta["public"]>>  = {
+// type UnwrappedBoolExpressionInstanceType<T extends NonNullable<KlassMeta["public"]>>  = {
+    type: string,
+    operator: string,
+    left: UnwrappedBoolExpressionInstanceType<T> | KlassInstance<typeof BoolAtomData, false>,
+    right?: UnwrappedBoolExpressionInstanceType<T> | KlassInstance<typeof BoolAtomData, false>,
+}
+
+export const BoolExpressionData = createClass({
+    name: 'BoolExpressionData',
+    public: {
+        type: {
+            type: 'string',
+            required: true,
+            collection: false,
+            defaultValue: () => 'expression'
+        },
+        operator: {
+            type: 'string',
+            required: true,
+            collection: false,
+            options: ['and', 'or', 'not'],
+            defaultValue: () => 'and'
+        },
+        left: {
+            instanceType: {} as unknown as (KlassInstance<typeof BoolAtomData, false> | UnwrappedBoolExpressionInstanceType<any>),
+            required: true,
+            collection: false,
+        },
+        right: {
+            instanceType: {} as unknown as (KlassInstance<typeof BoolAtomData, false> | UnwrappedBoolExpressionInstanceType<any>),
+            required: false,
+            collection: false,
+        }
+    }
+})
+
+

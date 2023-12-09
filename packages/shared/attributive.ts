@@ -1,5 +1,6 @@
 import {createClass, KlassInstance} from "./createClass.js";
-import {BoolExp, BoolExpressionRawData} from "./BoolExp.js";
+import {BoolExp, BoolExpressionRawData, BoolExpressionData, BoolAtomData} from "./BoolExp.js";
+// import {BoolExp, BoolExpressionRawData} from "./BoolExp.js";
 
 
 // Role/RoleAttributive/Entity 是 ConceptType
@@ -22,7 +23,6 @@ export interface ConceptAlias extends Concept {
 
 export type ConceptInstance = any
 
-
 export const Attributive = createClass({
     name: 'Attributive',
     display: (obj) => `${obj.name}`,
@@ -31,7 +31,9 @@ export const Attributive = createClass({
             type: 'string',
         },
         content: {
-            type: 'function'
+            type: 'function',
+            required: true,
+            collection: false
         },
         name: {
             type: 'string'
@@ -42,85 +44,6 @@ export const Attributive = createClass({
             type: 'boolean'
         },
     }
-})
-
-export const BoolAtomData = createClass({
-    name: 'BoolAtomData',
-    public: {
-        type: {
-            type: 'string',
-            required: true,
-            collection: false,
-            defaultValue: () => 'atom'
-        },
-        data: {
-            type: Attributive,
-            required: true,
-            collection: false,
-        }
-    }
-})
-export type UnwrappedBoolExpressionInstanceType = {
-    // type: 'expression',
-    // operator: 'and' | 'or' | 'not',
-    type: string,
-    operator: string,
-    left: UnwrappedBoolExpressionInstanceType | KlassInstance<typeof BoolAtomData, any>,
-    right?: UnwrappedBoolExpressionInstanceType | KlassInstance<typeof BoolAtomData, any>,
-}
-type BoolExpressionDataPublic = {
-    type: {
-        type: 'string',
-        required: true,
-        collection: false,
-        defaultValue: () => 'expression'
-    },
-    operator: {
-        type: 'string',
-        required: true,
-        collection: false,
-        options: ['and', 'or', 'not'],
-        defaultValue: () => 'and'
-    },
-    left: {
-        // type: (typeof BoolAtomData | Klass<BoolExpressionDataPublic>)[],
-        instanceType: (KlassInstance<typeof BoolAtomData, false>  | UnwrappedBoolExpressionInstanceType),
-        required: true,
-        collection: false,
-    },
-    right: {
-        instanceType: (KlassInstance<typeof BoolAtomData, false> | UnwrappedBoolExpressionInstanceType),
-        required: false,
-        collection: false,
-    }
-}
-export const BoolExpressionData = createClass({
-    name: 'BoolExpressionData',
-    public: {
-        type: {
-            type: 'string',
-            required: true,
-            collection: false,
-            defaultValue: () => 'expression'
-        },
-        operator: {
-            type: 'string',
-            required: true,
-            collection: false,
-            options: ['and', 'or', 'not'],
-            defaultValue: () => 'and'
-        },
-        left: {
-            instanceType: {} as unknown as (typeof BoolAtomData | UnwrappedBoolExpressionInstanceType),
-            required: true,
-            collection: false,
-        },
-        right: {
-            instanceType: {} as unknown as (typeof BoolAtomData | UnwrappedBoolExpressionInstanceType),
-            required: false,
-            collection: false,
-        }
-    } as BoolExpressionDataPublic
 })
 
 export const Attributives = createClass({
@@ -136,39 +59,29 @@ export const Attributives = createClass({
     }
 })
 
-export class AttributiveBoolExp extends BoolExp<KlassInstance<typeof Attributive, false>> {
-    static toAttributives(obj?: BoolExp<KlassInstance<typeof Attributive, false>>): KlassInstance<typeof BoolAtomData, false>|UnwrappedBoolExpressionInstanceType|undefined {
-        if (!obj) return undefined
+function toAttributives(obj?: BoolExp<KlassInstance<typeof Attributive, false>>): KlassInstance<typeof BoolAtomData, false>|KlassInstance<typeof BoolExpressionData, false>|undefined {
+    if (!obj) return undefined
 
-        if (obj.raw.type === 'atom') {
-            return BoolAtomData.create({
-                type: 'atom',
-                data: obj.raw.data
-            })
-        }
-
-        const expData = obj.raw as BoolExpressionRawData<KlassInstance<typeof Attributive, false>>
-        return BoolExpressionData.create({
-            type: 'expression',
-            operator: expData.operator,
-            left: AttributiveBoolExp.toAttributives(obj.left)!,
-            right: AttributiveBoolExp.toAttributives(obj.right),
+    if (obj.raw.type === 'atom') {
+        return BoolAtomData.create({
+            type: 'atom',
+            data: obj.raw.data!
         })
     }
+
+    const expData = obj.raw as BoolExpressionRawData<KlassInstance<typeof Attributive, false>>
+    return BoolExpressionData.create({
+        type: 'expression',
+        operator: expData.operator,
+        left: toAttributives(obj.left)!,
+        right: toAttributives(obj.right),
+    })
 }
 
 
 export function boolExpToAttributives(obj: BoolExp<KlassInstance<typeof Attributive, false>>) {
-    // if (obj.raw.type === 'atom') {
-    //     return obj.raw.data
-    // }
-
     return Attributives.create({
-        content: AttributiveBoolExp.toAttributives(obj) as KlassInstance<typeof BoolExpressionData, false>
+        content: toAttributives(obj) as KlassInstance<typeof BoolExpressionData, false>
     })
 }
 
-// CAUTION 直接复用，但是取个不同的名字，有更强的语义
-export const Condition = Attributive
-export const Conditions = Attributives
-export const boolExpToConditions = boolExpToAttributives

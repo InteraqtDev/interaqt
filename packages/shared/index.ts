@@ -1,5 +1,7 @@
 export * from './entity/Entity.js'
 export * from './activity/Activity.js'
+export * from './activity/Condition.js'
+export * from './activity/Data.js'
 export * from './state/State.js'
 export * from './user/User.js'
 export * from './createClass.js'

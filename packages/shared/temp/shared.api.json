@@ -638,7 +638,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n    stringContent: {\n        type: \"string\";\n    };\n    content: {\n        type: \"function\";\n    };\n    name: {\n        type: \"string\";\n    };\n    isRef: {\n        type: \"boolean\";\n    };\n}>"
+              "text": "<{\n    stringContent: {\n        type: \"string\";\n    };\n    content: {\n        type: \"function\";\n        required: true;\n        collection: false;\n    };\n    name: {\n        type: \"string\";\n    };\n    isRef: {\n        type: \"boolean\";\n    };\n}>"
             }
           ],
           "fileUrlPath": "attributive.ts",
@@ -649,154 +649,6 @@
             "startIndex": 1,
             "endIndex": 4
           }
-        },
-        {
-          "kind": "Class",
-          "canonicalReference": "@interaqt/shared!AttributiveBoolExp:class",
-          "docComment": "",
-          "excerptTokens": [
-            {
-              "kind": "Content",
-              "text": "export declare class AttributiveBoolExp extends "
-            },
-            {
-              "kind": "Reference",
-              "text": "BoolExp",
-              "canonicalReference": "@interaqt/shared!BoolExp:class"
-            },
-            {
-              "kind": "Content",
-              "text": "<"
-            },
-            {
-              "kind": "Reference",
-              "text": "KlassInstance",
-              "canonicalReference": "@interaqt/shared!KlassInstance:type"
-            },
-            {
-              "kind": "Content",
-              "text": "<typeof "
-            },
-            {
-              "kind": "Reference",
-              "text": "Attributive",
-              "canonicalReference": "@interaqt/shared!Attributive:var"
-            },
-            {
-              "kind": "Content",
-              "text": ", false>>"
-            },
-            {
-              "kind": "Content",
-              "text": " "
-            }
-          ],
-          "fileUrlPath": "attributive.ts",
-          "releaseTag": "Public",
-          "isAbstract": false,
-          "name": "AttributiveBoolExp",
-          "preserveMemberOrder": false,
-          "members": [
-            {
-              "kind": "Method",
-              "canonicalReference": "@interaqt/shared!AttributiveBoolExp.toAttributives:member(1)",
-              "docComment": "",
-              "excerptTokens": [
-                {
-                  "kind": "Content",
-                  "text": "static toAttributives(obj?: "
-                },
-                {
-                  "kind": "Reference",
-                  "text": "BoolExp",
-                  "canonicalReference": "@interaqt/shared!BoolExp:class"
-                },
-                {
-                  "kind": "Content",
-                  "text": "<"
-                },
-                {
-                  "kind": "Reference",
-                  "text": "KlassInstance",
-                  "canonicalReference": "@interaqt/shared!KlassInstance:type"
-                },
-                {
-                  "kind": "Content",
-                  "text": "<typeof "
-                },
-                {
-                  "kind": "Reference",
-                  "text": "Attributive",
-                  "canonicalReference": "@interaqt/shared!Attributive:var"
-                },
-                {
-                  "kind": "Content",
-                  "text": ", false>>"
-                },
-                {
-                  "kind": "Content",
-                  "text": "): "
-                },
-                {
-                  "kind": "Reference",
-                  "text": "KlassInstance",
-                  "canonicalReference": "@interaqt/shared!KlassInstance:type"
-                },
-                {
-                  "kind": "Content",
-                  "text": "<typeof "
-                },
-                {
-                  "kind": "Reference",
-                  "text": "BoolAtomData",
-                  "canonicalReference": "@interaqt/shared!BoolAtomData:var"
-                },
-                {
-                  "kind": "Content",
-                  "text": ", false> | "
-                },
-                {
-                  "kind": "Reference",
-                  "text": "UnwrappedBoolExpressionInstanceType",
-                  "canonicalReference": "@interaqt/shared!UnwrappedBoolExpressionInstanceType:type"
-                },
-                {
-                  "kind": "Content",
-                  "text": " | undefined"
-                },
-                {
-                  "kind": "Content",
-                  "text": ";"
-                }
-              ],
-              "isStatic": true,
-              "returnTypeTokenRange": {
-                "startIndex": 8,
-                "endIndex": 14
-              },
-              "releaseTag": "Public",
-              "isProtected": false,
-              "overloadIndex": 1,
-              "parameters": [
-                {
-                  "parameterName": "obj",
-                  "parameterTypeTokenRange": {
-                    "startIndex": 1,
-                    "endIndex": 7
-                  },
-                  "isOptional": true
-                }
-              ],
-              "isOptional": false,
-              "isAbstract": false,
-              "name": "toAttributives"
-            }
-          ],
-          "extendsTokenRange": {
-            "startIndex": 1,
-            "endIndex": 7
-          },
-          "implementsTokenRanges": []
         },
         {
           "kind": "Variable",
@@ -827,7 +679,25 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n            type: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                defaultValue: () => string;\n            };\n            data: {\n                type: import(\"./createClass.js\")."
+              "text": "<{\n            type: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                defaultValue: () => string;\n            };\n            data: {\n                instanceType: import(\"./createClass.js\")."
+            },
+            {
+              "kind": "Reference",
+              "text": "ReactiveKlassInstance",
+              "canonicalReference": "@interaqt/shared!ReactiveKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<{\n                    content: {\n                        type: \"function\";\n                        required: true;\n                        collection: false;\n                    };\n                }> | import(\"./createClass.js\")."
+            },
+            {
+              "kind": "Reference",
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/shared!InertKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<{\n                    content: {\n                        type: \"function\";\n                        required: true;\n                        collection: false;\n                    };\n                }>;\n                required: true;\n                collection: false;\n            };\n        }> | import(\"./createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -836,25 +706,79 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                    stringContent: {\n                        type: \"string\";\n                    };\n                    content: {\n                        type: \"function\";\n                    };\n                    name: {\n                        type: \"string\";\n                    };\n                    isRef: {\n                        type: \"boolean\";\n                    };\n                }>;\n                required: true;\n                collection: false;\n            };\n        }> | import(\"./createClass.js\")."
+              "text": "<{\n            type: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                defaultValue: () => string;\n            };\n            operator: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                options: string[];\n                defaultValue: () => string;\n            };\n            left: {\n                instanceType: import(\"./createClass.js\")."
             },
             {
               "kind": "Reference",
-              "text": "Klass",
-              "canonicalReference": "@interaqt/shared!Klass:type"
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/shared!InertKlassInstance:type"
             },
             {
               "kind": "Content",
-              "text": "<"
+              "text": "<{\n                    type: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        defaultValue: () => string;\n                    };\n                    data: {\n                        instanceType: import(\"./createClass.js\")."
             },
             {
               "kind": "Reference",
-              "text": "BoolExpressionDataPublic",
-              "canonicalReference": "@interaqt/shared!~BoolExpressionDataPublic:type"
+              "text": "ReactiveKlassInstance",
+              "canonicalReference": "@interaqt/shared!ReactiveKlassInstance:type"
             },
             {
               "kind": "Content",
-              "text": ">)[];\n        collection: false;\n        required: false;\n    };\n}>"
+              "text": "<{\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }> | import(\"./createClass.js\")."
+            },
+            {
+              "kind": "Reference",
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/shared!InertKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<{\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }>;\n                        required: true;\n                        collection: false;\n                    };\n                }> | import(\"./BoolExp.js\")."
+            },
+            {
+              "kind": "Reference",
+              "text": "UnwrappedBoolExpressionInstanceType",
+              "canonicalReference": "@interaqt/shared!UnwrappedBoolExpressionInstanceType:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<any>;\n                required: true;\n                collection: false;\n            };\n            right: {\n                instanceType: import(\"./createClass.js\")."
+            },
+            {
+              "kind": "Reference",
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/shared!InertKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<{\n                    type: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        defaultValue: () => string;\n                    };\n                    data: {\n                        instanceType: import(\"./createClass.js\")."
+            },
+            {
+              "kind": "Reference",
+              "text": "ReactiveKlassInstance",
+              "canonicalReference": "@interaqt/shared!ReactiveKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<{\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }> | import(\"./createClass.js\")."
+            },
+            {
+              "kind": "Reference",
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/shared!InertKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<{\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }>;\n                        required: true;\n                        collection: false;\n                    };\n                }> | import(\"./BoolExp.js\")."
+            },
+            {
+              "kind": "Reference",
+              "text": "UnwrappedBoolExpressionInstanceType",
+              "canonicalReference": "@interaqt/shared!UnwrappedBoolExpressionInstanceType:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<any>;\n                required: false;\n                collection: false;\n            };\n        }>)[];\n        collection: false;\n        required: false;\n    };\n}>"
             }
           ],
           "fileUrlPath": "attributive.ts",
@@ -863,7 +787,7 @@
           "name": "Attributives",
           "variableTypeTokenRange": {
             "startIndex": 1,
-            "endIndex": 12
+            "endIndex": 28
           }
         },
         {
@@ -876,35 +800,58 @@
               "text": "BoolAtomData: "
             },
             {
-              "kind": "Content",
-              "text": "import(\"./createClass.js\")."
-            },
-            {
               "kind": "Reference",
               "text": "Klass",
               "canonicalReference": "@interaqt/shared!Klass:type"
             },
             {
               "kind": "Content",
-              "text": "<{\n    type: {\n        type: \"string\";\n        required: true;\n        collection: false;\n        defaultValue: () => string;\n    };\n    data: {\n        type: import(\"./createClass.js\")."
+              "text": "<{\n    type: {\n        type: \"string\";\n        required: true;\n        collection: false;\n        defaultValue: () => string;\n    };\n    data: {\n        instanceType: import(\"./createClass.js\")."
             },
             {
               "kind": "Reference",
-              "text": "Klass",
-              "canonicalReference": "@interaqt/shared!Klass:type"
+              "text": "ReactiveKlassInstance",
+              "canonicalReference": "@interaqt/shared!ReactiveKlassInstance:type"
             },
             {
               "kind": "Content",
-              "text": "<{\n            stringContent: {\n                type: \"string\";\n            };\n            content: {\n                type: \"function\";\n            };\n            name: {\n                type: \"string\";\n            };\n            isRef: {\n                type: \"boolean\";\n            };\n        }>;\n        required: true;\n        collection: false;\n    };\n}>"
+              "text": "<"
+            },
+            {
+              "kind": "Reference",
+              "text": "CommonAtomPublic",
+              "canonicalReference": "@interaqt/shared!~CommonAtomPublic:type"
+            },
+            {
+              "kind": "Content",
+              "text": "> | import(\"./createClass.js\")."
+            },
+            {
+              "kind": "Reference",
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/shared!InertKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<"
+            },
+            {
+              "kind": "Reference",
+              "text": "CommonAtomPublic",
+              "canonicalReference": "@interaqt/shared!~CommonAtomPublic:type"
+            },
+            {
+              "kind": "Content",
+              "text": ">;\n        required: true;\n        collection: false;\n    };\n}>"
             }
           ],
-          "fileUrlPath": "attributive.ts",
+          "fileUrlPath": "BoolExp.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "BoolAtomData",
           "variableTypeTokenRange": {
             "startIndex": 1,
-            "endIndex": 6
+            "endIndex": 11
           }
         },
         {
@@ -1867,13 +1814,27 @@
               "text": "BoolExpressionData: "
             },
             {
-              "kind": "Content",
-              "text": "import(\"./createClass.js\")."
-            },
-            {
               "kind": "Reference",
               "text": "Klass",
               "canonicalReference": "@interaqt/shared!Klass:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<{\n    type: {\n        type: \"string\";\n        required: true;\n        collection: false;\n        defaultValue: () => string;\n    };\n    operator: {\n        type: \"string\";\n        required: true;\n        collection: false;\n        options: string[];\n        defaultValue: () => string;\n    };\n    left: {\n        instanceType: import(\"./createClass.js\")."
+            },
+            {
+              "kind": "Reference",
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/shared!InertKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<{\n            type: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                defaultValue: () => string;\n            };\n            data: {\n                instanceType: import(\"./createClass.js\")."
+            },
+            {
+              "kind": "Reference",
+              "text": "ReactiveKlassInstance",
+              "canonicalReference": "@interaqt/shared!ReactiveKlassInstance:type"
             },
             {
               "kind": "Content",
@@ -1881,21 +1842,102 @@
             },
             {
               "kind": "Reference",
-              "text": "BoolExpressionDataPublic",
-              "canonicalReference": "@interaqt/shared!~BoolExpressionDataPublic:type"
+              "text": "CommonAtomPublic",
+              "canonicalReference": "@interaqt/shared!~CommonAtomPublic:type"
             },
             {
               "kind": "Content",
-              "text": ">"
+              "text": "> | import(\"./createClass.js\")."
+            },
+            {
+              "kind": "Reference",
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/shared!InertKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<"
+            },
+            {
+              "kind": "Reference",
+              "text": "CommonAtomPublic",
+              "canonicalReference": "@interaqt/shared!~CommonAtomPublic:type"
+            },
+            {
+              "kind": "Content",
+              "text": ">;\n                required: true;\n                collection: false;\n            };\n        }> | "
+            },
+            {
+              "kind": "Reference",
+              "text": "UnwrappedBoolExpressionInstanceType",
+              "canonicalReference": "@interaqt/shared!UnwrappedBoolExpressionInstanceType:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<any>;\n        required: true;\n        collection: false;\n    };\n    right: {\n        instanceType: import(\"./createClass.js\")."
+            },
+            {
+              "kind": "Reference",
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/shared!InertKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<{\n            type: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                defaultValue: () => string;\n            };\n            data: {\n                instanceType: import(\"./createClass.js\")."
+            },
+            {
+              "kind": "Reference",
+              "text": "ReactiveKlassInstance",
+              "canonicalReference": "@interaqt/shared!ReactiveKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<"
+            },
+            {
+              "kind": "Reference",
+              "text": "CommonAtomPublic",
+              "canonicalReference": "@interaqt/shared!~CommonAtomPublic:type"
+            },
+            {
+              "kind": "Content",
+              "text": "> | import(\"./createClass.js\")."
+            },
+            {
+              "kind": "Reference",
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/shared!InertKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<"
+            },
+            {
+              "kind": "Reference",
+              "text": "CommonAtomPublic",
+              "canonicalReference": "@interaqt/shared!~CommonAtomPublic:type"
+            },
+            {
+              "kind": "Content",
+              "text": ">;\n                required: true;\n                collection: false;\n            };\n        }> | "
+            },
+            {
+              "kind": "Reference",
+              "text": "UnwrappedBoolExpressionInstanceType",
+              "canonicalReference": "@interaqt/shared!UnwrappedBoolExpressionInstanceType:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<any>;\n        required: false;\n        collection: false;\n    };\n}>"
             }
           ],
-          "fileUrlPath": "attributive.ts",
+          "fileUrlPath": "BoolExp.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "BoolExpressionData",
           "variableTypeTokenRange": {
             "startIndex": 1,
-            "endIndex": 6
+            "endIndex": 27
           }
         },
         {
@@ -2015,7 +2057,25 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n            type: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                defaultValue: () => string;\n            };\n            data: {\n                type: import(\"./createClass.js\")."
+              "text": "<{\n            type: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                defaultValue: () => string;\n            };\n            data: {\n                instanceType: import(\"./createClass.js\")."
+            },
+            {
+              "kind": "Reference",
+              "text": "ReactiveKlassInstance",
+              "canonicalReference": "@interaqt/shared!ReactiveKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<{\n                    content: {\n                        type: \"function\";\n                        required: true;\n                        collection: false;\n                    };\n                }> | import(\"./createClass.js\")."
+            },
+            {
+              "kind": "Reference",
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/shared!InertKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<{\n                    content: {\n                        type: \"function\";\n                        required: true;\n                        collection: false;\n                    };\n                }>;\n                required: true;\n                collection: false;\n            };\n        }> | import(\"./createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -2024,25 +2084,79 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                    stringContent: {\n                        type: \"string\";\n                    };\n                    content: {\n                        type: \"function\";\n                    };\n                    name: {\n                        type: \"string\";\n                    };\n                    isRef: {\n                        type: \"boolean\";\n                    };\n                }>;\n                required: true;\n                collection: false;\n            };\n        }> | import(\"./createClass.js\")."
+              "text": "<{\n            type: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                defaultValue: () => string;\n            };\n            operator: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                options: string[];\n                defaultValue: () => string;\n            };\n            left: {\n                instanceType: import(\"./createClass.js\")."
             },
             {
               "kind": "Reference",
-              "text": "Klass",
-              "canonicalReference": "@interaqt/shared!Klass:type"
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/shared!InertKlassInstance:type"
             },
             {
               "kind": "Content",
-              "text": "<"
+              "text": "<{\n                    type: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        defaultValue: () => string;\n                    };\n                    data: {\n                        instanceType: import(\"./createClass.js\")."
             },
             {
               "kind": "Reference",
-              "text": "BoolExpressionDataPublic",
-              "canonicalReference": "@interaqt/shared!~BoolExpressionDataPublic:type"
+              "text": "ReactiveKlassInstance",
+              "canonicalReference": "@interaqt/shared!ReactiveKlassInstance:type"
             },
             {
               "kind": "Content",
-              "text": ">)[];\n        collection: false;\n        required: false;\n    };\n}>"
+              "text": "<{\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }> | import(\"./createClass.js\")."
+            },
+            {
+              "kind": "Reference",
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/shared!InertKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<{\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }>;\n                        required: true;\n                        collection: false;\n                    };\n                }> | import(\"./BoolExp.js\")."
+            },
+            {
+              "kind": "Reference",
+              "text": "UnwrappedBoolExpressionInstanceType",
+              "canonicalReference": "@interaqt/shared!UnwrappedBoolExpressionInstanceType:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<any>;\n                required: true;\n                collection: false;\n            };\n            right: {\n                instanceType: import(\"./createClass.js\")."
+            },
+            {
+              "kind": "Reference",
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/shared!InertKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<{\n                    type: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        defaultValue: () => string;\n                    };\n                    data: {\n                        instanceType: import(\"./createClass.js\")."
+            },
+            {
+              "kind": "Reference",
+              "text": "ReactiveKlassInstance",
+              "canonicalReference": "@interaqt/shared!ReactiveKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<{\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }> | import(\"./createClass.js\")."
+            },
+            {
+              "kind": "Reference",
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/shared!InertKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<{\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }>;\n                        required: true;\n                        collection: false;\n                    };\n                }> | import(\"./BoolExp.js\")."
+            },
+            {
+              "kind": "Reference",
+              "text": "UnwrappedBoolExpressionInstanceType",
+              "canonicalReference": "@interaqt/shared!UnwrappedBoolExpressionInstanceType:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<any>;\n                required: false;\n                collection: false;\n            };\n        }>)[];\n        collection: false;\n        required: false;\n    };\n}>"
             },
             {
               "kind": "Content",
@@ -2052,7 +2166,7 @@
           "fileUrlPath": "attributive.ts",
           "returnTypeTokenRange": {
             "startIndex": 8,
-            "endIndex": 19
+            "endIndex": 35
           },
           "releaseTag": "Public",
           "overloadIndex": 1,
@@ -2069,31 +2183,405 @@
           "name": "boolExpToAttributives"
         },
         {
-          "kind": "Variable",
-          "canonicalReference": "@interaqt/shared!boolExpToConditions:var",
+          "kind": "Function",
+          "canonicalReference": "@interaqt/shared!boolExpToConditions:function(1)",
           "docComment": "",
           "excerptTokens": [
             {
               "kind": "Content",
-              "text": "boolExpToConditions: "
-            },
-            {
-              "kind": "Content",
-              "text": "typeof "
+              "text": "export declare function boolExpToConditions(obj: "
             },
             {
               "kind": "Reference",
-              "text": "boolExpToAttributives",
-              "canonicalReference": "@interaqt/shared!boolExpToAttributives:function"
+              "text": "BoolExp",
+              "canonicalReference": "@interaqt/shared!BoolExp:class"
+            },
+            {
+              "kind": "Content",
+              "text": "<"
+            },
+            {
+              "kind": "Reference",
+              "text": "KlassInstance",
+              "canonicalReference": "@interaqt/shared!KlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<typeof "
+            },
+            {
+              "kind": "Reference",
+              "text": "Condition",
+              "canonicalReference": "@interaqt/shared!Condition:var"
+            },
+            {
+              "kind": "Content",
+              "text": ", false>>"
+            },
+            {
+              "kind": "Content",
+              "text": "): "
+            },
+            {
+              "kind": "Content",
+              "text": "import(\"../createClass\")."
+            },
+            {
+              "kind": "Reference",
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/shared!InertKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<{\n    content: {\n        type: (import(\"../createClass\")."
+            },
+            {
+              "kind": "Reference",
+              "text": "Klass",
+              "canonicalReference": "@interaqt/shared!Klass:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<{\n            type: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                defaultValue: () => string;\n            };\n            data: {\n                instanceType: import(\"../createClass\")."
+            },
+            {
+              "kind": "Reference",
+              "text": "ReactiveKlassInstance",
+              "canonicalReference": "@interaqt/shared!ReactiveKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<{\n                    content: {\n                        type: \"function\";\n                        required: true;\n                        collection: false;\n                    };\n                }> | import(\"../createClass\")."
+            },
+            {
+              "kind": "Reference",
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/shared!InertKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<{\n                    content: {\n                        type: \"function\";\n                        required: true;\n                        collection: false;\n                    };\n                }>;\n                required: true;\n                collection: false;\n            };\n        }> | import(\"../createClass\")."
+            },
+            {
+              "kind": "Reference",
+              "text": "Klass",
+              "canonicalReference": "@interaqt/shared!Klass:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<{\n            type: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                defaultValue: () => string;\n            };\n            operator: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                options: string[];\n                defaultValue: () => string;\n            };\n            left: {\n                instanceType: import(\"../createClass\")."
+            },
+            {
+              "kind": "Reference",
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/shared!InertKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<{\n                    type: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        defaultValue: () => string;\n                    };\n                    data: {\n                        instanceType: import(\"../createClass\")."
+            },
+            {
+              "kind": "Reference",
+              "text": "ReactiveKlassInstance",
+              "canonicalReference": "@interaqt/shared!ReactiveKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<{\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }> | import(\"../createClass\")."
+            },
+            {
+              "kind": "Reference",
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/shared!InertKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<{\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }>;\n                        required: true;\n                        collection: false;\n                    };\n                }> | import(\"../BoolExp\")."
+            },
+            {
+              "kind": "Reference",
+              "text": "UnwrappedBoolExpressionInstanceType",
+              "canonicalReference": "@interaqt/shared!UnwrappedBoolExpressionInstanceType:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<any>;\n                required: true;\n                collection: false;\n            };\n            right: {\n                instanceType: import(\"../createClass\")."
+            },
+            {
+              "kind": "Reference",
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/shared!InertKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<{\n                    type: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        defaultValue: () => string;\n                    };\n                    data: {\n                        instanceType: import(\"../createClass\")."
+            },
+            {
+              "kind": "Reference",
+              "text": "ReactiveKlassInstance",
+              "canonicalReference": "@interaqt/shared!ReactiveKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<{\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }> | import(\"../createClass\")."
+            },
+            {
+              "kind": "Reference",
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/shared!InertKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<{\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }>;\n                        required: true;\n                        collection: false;\n                    };\n                }> | import(\"../BoolExp\")."
+            },
+            {
+              "kind": "Reference",
+              "text": "UnwrappedBoolExpressionInstanceType",
+              "canonicalReference": "@interaqt/shared!UnwrappedBoolExpressionInstanceType:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<any>;\n                required: false;\n                collection: false;\n            };\n        }>)[];\n        collection: false;\n        required: false;\n    };\n}>"
+            },
+            {
+              "kind": "Content",
+              "text": ";"
             }
           ],
-          "fileUrlPath": "attributive.ts",
+          "fileUrlPath": "activity/Condition.ts",
+          "returnTypeTokenRange": {
+            "startIndex": 8,
+            "endIndex": 35
+          },
+          "releaseTag": "Public",
+          "overloadIndex": 1,
+          "parameters": [
+            {
+              "parameterName": "obj",
+              "parameterTypeTokenRange": {
+                "startIndex": 1,
+                "endIndex": 7
+              },
+              "isOptional": false
+            }
+          ],
+          "name": "boolExpToConditions"
+        },
+        {
+          "kind": "Function",
+          "canonicalReference": "@interaqt/shared!boolExpToDataAttributives:function(1)",
+          "docComment": "",
+          "excerptTokens": [
+            {
+              "kind": "Content",
+              "text": "export declare function boolExpToDataAttributives(obj: "
+            },
+            {
+              "kind": "Reference",
+              "text": "BoolExp",
+              "canonicalReference": "@interaqt/shared!BoolExp:class"
+            },
+            {
+              "kind": "Content",
+              "text": "<"
+            },
+            {
+              "kind": "Reference",
+              "text": "KlassInstance",
+              "canonicalReference": "@interaqt/shared!KlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<typeof "
+            },
+            {
+              "kind": "Reference",
+              "text": "DataAttributive",
+              "canonicalReference": "@interaqt/shared!DataAttributive:var"
+            },
+            {
+              "kind": "Content",
+              "text": ", false>>"
+            },
+            {
+              "kind": "Content",
+              "text": "): "
+            },
+            {
+              "kind": "Content",
+              "text": "import(\"../createClass\")."
+            },
+            {
+              "kind": "Reference",
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/shared!InertKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<{\n    content: {\n        type: (import(\"../createClass\")."
+            },
+            {
+              "kind": "Reference",
+              "text": "Klass",
+              "canonicalReference": "@interaqt/shared!Klass:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<{\n            type: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                defaultValue: () => string;\n            };\n            data: {\n                instanceType: import(\"../createClass\")."
+            },
+            {
+              "kind": "Reference",
+              "text": "ReactiveKlassInstance",
+              "canonicalReference": "@interaqt/shared!ReactiveKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<{\n                    content: {\n                        type: \"function\";\n                        required: true;\n                        collection: false;\n                    };\n                }> | import(\"../createClass\")."
+            },
+            {
+              "kind": "Reference",
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/shared!InertKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<{\n                    content: {\n                        type: \"function\";\n                        required: true;\n                        collection: false;\n                    };\n                }>;\n                required: true;\n                collection: false;\n            };\n        }> | import(\"../createClass\")."
+            },
+            {
+              "kind": "Reference",
+              "text": "Klass",
+              "canonicalReference": "@interaqt/shared!Klass:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<{\n            type: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                defaultValue: () => string;\n            };\n            operator: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                options: string[];\n                defaultValue: () => string;\n            };\n            left: {\n                instanceType: import(\"../createClass\")."
+            },
+            {
+              "kind": "Reference",
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/shared!InertKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<{\n                    type: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        defaultValue: () => string;\n                    };\n                    data: {\n                        instanceType: import(\"../createClass\")."
+            },
+            {
+              "kind": "Reference",
+              "text": "ReactiveKlassInstance",
+              "canonicalReference": "@interaqt/shared!ReactiveKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<{\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }> | import(\"../createClass\")."
+            },
+            {
+              "kind": "Reference",
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/shared!InertKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<{\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }>;\n                        required: true;\n                        collection: false;\n                    };\n                }> | import(\"../BoolExp\")."
+            },
+            {
+              "kind": "Reference",
+              "text": "UnwrappedBoolExpressionInstanceType",
+              "canonicalReference": "@interaqt/shared!UnwrappedBoolExpressionInstanceType:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<any>;\n                required: true;\n                collection: false;\n            };\n            right: {\n                instanceType: import(\"../createClass\")."
+            },
+            {
+              "kind": "Reference",
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/shared!InertKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<{\n                    type: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        defaultValue: () => string;\n                    };\n                    data: {\n                        instanceType: import(\"../createClass\")."
+            },
+            {
+              "kind": "Reference",
+              "text": "ReactiveKlassInstance",
+              "canonicalReference": "@interaqt/shared!ReactiveKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<{\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }> | import(\"../createClass\")."
+            },
+            {
+              "kind": "Reference",
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/shared!InertKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<{\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }>;\n                        required: true;\n                        collection: false;\n                    };\n                }> | import(\"../BoolExp\")."
+            },
+            {
+              "kind": "Reference",
+              "text": "UnwrappedBoolExpressionInstanceType",
+              "canonicalReference": "@interaqt/shared!UnwrappedBoolExpressionInstanceType:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<any>;\n                required: false;\n                collection: false;\n            };\n        }>)[];\n        collection: false;\n        required: false;\n    };\n}>"
+            },
+            {
+              "kind": "Content",
+              "text": ";"
+            }
+          ],
+          "fileUrlPath": "activity/Data.ts",
+          "returnTypeTokenRange": {
+            "startIndex": 8,
+            "endIndex": 35
+          },
+          "releaseTag": "Public",
+          "overloadIndex": 1,
+          "parameters": [
+            {
+              "parameterName": "obj",
+              "parameterTypeTokenRange": {
+                "startIndex": 1,
+                "endIndex": 7
+              },
+              "isOptional": false
+            }
+          ],
+          "name": "boolExpToDataAttributives"
+        },
+        {
+          "kind": "Variable",
+          "canonicalReference": "@interaqt/shared!Computation:var",
+          "docComment": "",
+          "excerptTokens": [
+            {
+              "kind": "Content",
+              "text": "Computation: "
+            },
+            {
+              "kind": "Content",
+              "text": "import(\"../createClass\")."
+            },
+            {
+              "kind": "Reference",
+              "text": "Klass",
+              "canonicalReference": "@interaqt/shared!Klass:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<{\n    content: {\n        type: \"function\";\n        required: true;\n        collection: false;\n    };\n    name: {\n        type: \"string\";\n    };\n}>"
+            }
+          ],
+          "fileUrlPath": "activity/Data.ts",
           "isReadonly": true,
           "releaseTag": "Public",
-          "name": "boolExpToConditions",
+          "name": "Computation",
           "variableTypeTokenRange": {
             "startIndex": 1,
-            "endIndex": 3
+            "endIndex": 4
           }
         },
         {
@@ -2296,7 +2784,7 @@
             },
             {
               "kind": "Content",
-              "text": "import(\"./createClass.js\")."
+              "text": "import(\"../createClass\")."
             },
             {
               "kind": "Reference",
@@ -2305,10 +2793,10 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n    stringContent: {\n        type: \"string\";\n    };\n    content: {\n        type: \"function\";\n    };\n    name: {\n        type: \"string\";\n    };\n    isRef: {\n        type: \"boolean\";\n    };\n}>"
+              "text": "<{\n    content: {\n        type: \"function\";\n        required: true;\n        collection: false;\n    };\n    name: {\n        type: \"string\";\n    };\n}>"
             }
           ],
-          "fileUrlPath": "attributive.ts",
+          "fileUrlPath": "activity/Condition.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "Condition",
@@ -2328,7 +2816,7 @@
             },
             {
               "kind": "Content",
-              "text": "import(\"./createClass.js\")."
+              "text": "import(\"../createClass\")."
             },
             {
               "kind": "Reference",
@@ -2337,7 +2825,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n    content: {\n        type: (import(\"./createClass.js\")."
+              "text": "<{\n    content: {\n        type: (import(\"../createClass\")."
             },
             {
               "kind": "Reference",
@@ -2346,7 +2834,25 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n            type: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                defaultValue: () => string;\n            };\n            data: {\n                type: import(\"./createClass.js\")."
+              "text": "<{\n            type: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                defaultValue: () => string;\n            };\n            data: {\n                instanceType: import(\"../createClass\")."
+            },
+            {
+              "kind": "Reference",
+              "text": "ReactiveKlassInstance",
+              "canonicalReference": "@interaqt/shared!ReactiveKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<{\n                    content: {\n                        type: \"function\";\n                        required: true;\n                        collection: false;\n                    };\n                }> | import(\"../createClass\")."
+            },
+            {
+              "kind": "Reference",
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/shared!InertKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<{\n                    content: {\n                        type: \"function\";\n                        required: true;\n                        collection: false;\n                    };\n                }>;\n                required: true;\n                collection: false;\n            };\n        }> | import(\"../createClass\")."
             },
             {
               "kind": "Reference",
@@ -2355,34 +2861,88 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                    stringContent: {\n                        type: \"string\";\n                    };\n                    content: {\n                        type: \"function\";\n                    };\n                    name: {\n                        type: \"string\";\n                    };\n                    isRef: {\n                        type: \"boolean\";\n                    };\n                }>;\n                required: true;\n                collection: false;\n            };\n        }> | import(\"./createClass.js\")."
+              "text": "<{\n            type: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                defaultValue: () => string;\n            };\n            operator: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                options: string[];\n                defaultValue: () => string;\n            };\n            left: {\n                instanceType: import(\"../createClass\")."
             },
             {
               "kind": "Reference",
-              "text": "Klass",
-              "canonicalReference": "@interaqt/shared!Klass:type"
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/shared!InertKlassInstance:type"
             },
             {
               "kind": "Content",
-              "text": "<"
+              "text": "<{\n                    type: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        defaultValue: () => string;\n                    };\n                    data: {\n                        instanceType: import(\"../createClass\")."
             },
             {
               "kind": "Reference",
-              "text": "BoolExpressionDataPublic",
-              "canonicalReference": "@interaqt/shared!~BoolExpressionDataPublic:type"
+              "text": "ReactiveKlassInstance",
+              "canonicalReference": "@interaqt/shared!ReactiveKlassInstance:type"
             },
             {
               "kind": "Content",
-              "text": ">)[];\n        collection: false;\n        required: false;\n    };\n}>"
+              "text": "<{\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }> | import(\"../createClass\")."
+            },
+            {
+              "kind": "Reference",
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/shared!InertKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<{\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }>;\n                        required: true;\n                        collection: false;\n                    };\n                }> | import(\"../BoolExp\")."
+            },
+            {
+              "kind": "Reference",
+              "text": "UnwrappedBoolExpressionInstanceType",
+              "canonicalReference": "@interaqt/shared!UnwrappedBoolExpressionInstanceType:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<any>;\n                required: true;\n                collection: false;\n            };\n            right: {\n                instanceType: import(\"../createClass\")."
+            },
+            {
+              "kind": "Reference",
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/shared!InertKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<{\n                    type: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        defaultValue: () => string;\n                    };\n                    data: {\n                        instanceType: import(\"../createClass\")."
+            },
+            {
+              "kind": "Reference",
+              "text": "ReactiveKlassInstance",
+              "canonicalReference": "@interaqt/shared!ReactiveKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<{\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }> | import(\"../createClass\")."
+            },
+            {
+              "kind": "Reference",
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/shared!InertKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<{\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }>;\n                        required: true;\n                        collection: false;\n                    };\n                }> | import(\"../BoolExp\")."
+            },
+            {
+              "kind": "Reference",
+              "text": "UnwrappedBoolExpressionInstanceType",
+              "canonicalReference": "@interaqt/shared!UnwrappedBoolExpressionInstanceType:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<any>;\n                required: false;\n                collection: false;\n            };\n        }>)[];\n        collection: false;\n        required: false;\n    };\n}>"
             }
           ],
-          "fileUrlPath": "attributive.ts",
+          "fileUrlPath": "activity/Condition.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "Conditions",
           "variableTypeTokenRange": {
             "startIndex": 1,
-            "endIndex": 12
+            "endIndex": 28
           }
         },
         {
@@ -2864,7 +3424,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n    stringContent: {\n        type: \"string\";\n    };\n    content: {\n        type: \"function\";\n    };\n    name: {\n        type: \"string\";\n    };\n    isRef: {\n        type: \"boolean\";\n    };\n}> | import(\"../createClass.js\")."
+              "text": "<{\n    stringContent: {\n        type: \"string\";\n    };\n    content: {\n        type: \"function\";\n        required: true;\n        collection: false;\n    };\n    name: {\n        type: \"string\";\n    };\n    isRef: {\n        type: \"boolean\";\n    };\n}> | import(\"../createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -2873,7 +3433,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n    stringContent: {\n        type: \"string\";\n    };\n    content: {\n        type: \"function\";\n    };\n    name: {\n        type: \"string\";\n    };\n    isRef: {\n        type: \"boolean\";\n    };\n}>"
+              "text": "<{\n    stringContent: {\n        type: \"string\";\n    };\n    content: {\n        type: \"function\";\n        required: true;\n        collection: false;\n    };\n    name: {\n        type: \"string\";\n    };\n    isRef: {\n        type: \"boolean\";\n    };\n}>"
             },
             {
               "kind": "Content",
@@ -2906,6 +3466,178 @@
             }
           ],
           "name": "createUserRoleAttributive"
+        },
+        {
+          "kind": "Variable",
+          "canonicalReference": "@interaqt/shared!DataAttributive:var",
+          "docComment": "",
+          "excerptTokens": [
+            {
+              "kind": "Content",
+              "text": "DataAttributive: "
+            },
+            {
+              "kind": "Content",
+              "text": "import(\"../createClass\")."
+            },
+            {
+              "kind": "Reference",
+              "text": "Klass",
+              "canonicalReference": "@interaqt/shared!Klass:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<{\n    content: {\n        type: \"function\";\n        required: true;\n        collection: false;\n    };\n    name: {\n        type: \"string\";\n    };\n}>"
+            }
+          ],
+          "fileUrlPath": "activity/Data.ts",
+          "isReadonly": true,
+          "releaseTag": "Public",
+          "name": "DataAttributive",
+          "variableTypeTokenRange": {
+            "startIndex": 1,
+            "endIndex": 4
+          }
+        },
+        {
+          "kind": "Variable",
+          "canonicalReference": "@interaqt/shared!DataAttributives:var",
+          "docComment": "",
+          "excerptTokens": [
+            {
+              "kind": "Content",
+              "text": "DataAttributives: "
+            },
+            {
+              "kind": "Content",
+              "text": "import(\"../createClass\")."
+            },
+            {
+              "kind": "Reference",
+              "text": "Klass",
+              "canonicalReference": "@interaqt/shared!Klass:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<{\n    content: {\n        type: (import(\"../createClass\")."
+            },
+            {
+              "kind": "Reference",
+              "text": "Klass",
+              "canonicalReference": "@interaqt/shared!Klass:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<{\n            type: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                defaultValue: () => string;\n            };\n            data: {\n                instanceType: import(\"../createClass\")."
+            },
+            {
+              "kind": "Reference",
+              "text": "ReactiveKlassInstance",
+              "canonicalReference": "@interaqt/shared!ReactiveKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<{\n                    content: {\n                        type: \"function\";\n                        required: true;\n                        collection: false;\n                    };\n                }> | import(\"../createClass\")."
+            },
+            {
+              "kind": "Reference",
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/shared!InertKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<{\n                    content: {\n                        type: \"function\";\n                        required: true;\n                        collection: false;\n                    };\n                }>;\n                required: true;\n                collection: false;\n            };\n        }> | import(\"../createClass\")."
+            },
+            {
+              "kind": "Reference",
+              "text": "Klass",
+              "canonicalReference": "@interaqt/shared!Klass:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<{\n            type: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                defaultValue: () => string;\n            };\n            operator: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                options: string[];\n                defaultValue: () => string;\n            };\n            left: {\n                instanceType: import(\"../createClass\")."
+            },
+            {
+              "kind": "Reference",
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/shared!InertKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<{\n                    type: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        defaultValue: () => string;\n                    };\n                    data: {\n                        instanceType: import(\"../createClass\")."
+            },
+            {
+              "kind": "Reference",
+              "text": "ReactiveKlassInstance",
+              "canonicalReference": "@interaqt/shared!ReactiveKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<{\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }> | import(\"../createClass\")."
+            },
+            {
+              "kind": "Reference",
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/shared!InertKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<{\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }>;\n                        required: true;\n                        collection: false;\n                    };\n                }> | import(\"../BoolExp\")."
+            },
+            {
+              "kind": "Reference",
+              "text": "UnwrappedBoolExpressionInstanceType",
+              "canonicalReference": "@interaqt/shared!UnwrappedBoolExpressionInstanceType:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<any>;\n                required: true;\n                collection: false;\n            };\n            right: {\n                instanceType: import(\"../createClass\")."
+            },
+            {
+              "kind": "Reference",
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/shared!InertKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<{\n                    type: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        defaultValue: () => string;\n                    };\n                    data: {\n                        instanceType: import(\"../createClass\")."
+            },
+            {
+              "kind": "Reference",
+              "text": "ReactiveKlassInstance",
+              "canonicalReference": "@interaqt/shared!ReactiveKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<{\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }> | import(\"../createClass\")."
+            },
+            {
+              "kind": "Reference",
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/shared!InertKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<{\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }>;\n                        required: true;\n                        collection: false;\n                    };\n                }> | import(\"../BoolExp\")."
+            },
+            {
+              "kind": "Reference",
+              "text": "UnwrappedBoolExpressionInstanceType",
+              "canonicalReference": "@interaqt/shared!UnwrappedBoolExpressionInstanceType:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<any>;\n                required: false;\n                collection: false;\n            };\n        }>)[];\n        collection: false;\n        required: false;\n    };\n}>"
+            }
+          ],
+          "fileUrlPath": "activity/Data.ts",
+          "isReadonly": true,
+          "releaseTag": "Public",
+          "name": "DataAttributives",
+          "variableTypeTokenRange": {
+            "startIndex": 1,
+            "endIndex": 28
+          }
         },
         {
           "kind": "Function",
@@ -4330,7 +5062,61 @@
             },
             {
               "kind": "Content",
-              "text": ", any>[];\n    };\n}"
+              "text": ", any>[];\n    };\n    dataAttributives: {\n        required: false;\n        collection: false;\n        type: (typeof "
+            },
+            {
+              "kind": "Reference",
+              "text": "DataAttributive",
+              "canonicalReference": "@interaqt/shared!DataAttributive:var"
+            },
+            {
+              "kind": "Content",
+              "text": " | typeof "
+            },
+            {
+              "kind": "Reference",
+              "text": "DataAttributives",
+              "canonicalReference": "@interaqt/shared!DataAttributives:var"
+            },
+            {
+              "kind": "Content",
+              "text": ")[];\n    };\n    data: {\n        type: (typeof "
+            },
+            {
+              "kind": "Reference",
+              "text": "Entity",
+              "canonicalReference": "@interaqt/shared!Entity:var"
+            },
+            {
+              "kind": "Content",
+              "text": " | typeof "
+            },
+            {
+              "kind": "Reference",
+              "text": "Relation",
+              "canonicalReference": "@interaqt/shared!Relation:var"
+            },
+            {
+              "kind": "Content",
+              "text": " | typeof "
+            },
+            {
+              "kind": "Reference",
+              "text": "Computation",
+              "canonicalReference": "@interaqt/shared!Computation:var"
+            },
+            {
+              "kind": "Content",
+              "text": ")[];\n        required: false;\n        collection: false;\n    };\n    query: {\n        type: typeof "
+            },
+            {
+              "kind": "Reference",
+              "text": "Query",
+              "canonicalReference": "@interaqt/shared!Query:var"
+            },
+            {
+              "kind": "Content",
+              "text": ";\n        collection: false;\n    };\n}"
             },
             {
               "kind": "Content",
@@ -4342,7 +5128,7 @@
           "name": "InteractionPublicType",
           "typeTokenRange": {
             "startIndex": 1,
-            "endIndex": 22
+            "endIndex": 34
           }
         },
         {
@@ -5771,7 +6557,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                    stringContent: {\n                        type: \"string\";\n                    };\n                    content: {\n                        type: \"function\";\n                    };\n                    name: {\n                        type: \"string\";\n                    };\n                    isRef: {\n                        type: \"boolean\";\n                    };\n                }> | "
+              "text": "<{\n                    stringContent: {\n                        type: \"string\";\n                    };\n                    content: {\n                        type: \"function\";\n                        required: true;\n                        collection: false;\n                    };\n                    name: {\n                        type: \"string\";\n                    };\n                    isRef: {\n                        type: \"boolean\";\n                    };\n                }> | "
             },
             {
               "kind": "Reference",
@@ -5789,34 +6575,16 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                            type: {\n                                type: \"string\";\n                                required: true;\n                                collection: false;\n                                defaultValue: () => string;\n                            };\n                            data: {\n                                type: "
+              "text": "<{\n                            type: {\n                                type: \"string\";\n                                required: true;\n                                collection: false;\n                                defaultValue: () => string;\n                            };\n                            data: {\n                                instanceType: import(\"../createClass.js\")."
             },
             {
               "kind": "Reference",
-              "text": "Klass",
-              "canonicalReference": "@interaqt/shared!Klass:type"
+              "text": "ReactiveKlassInstance",
+              "canonicalReference": "@interaqt/shared!ReactiveKlassInstance:type"
             },
             {
               "kind": "Content",
-              "text": "<{\n                                    stringContent: {\n                                        type: \"string\";\n                                    };\n                                    content: {\n                                        type: \"function\";\n                                    };\n                                    name: {\n                                        type: \"string\";\n                                    };\n                                    isRef: {\n                                        type: \"boolean\";\n                                    };\n                                }>;\n                                required: true;\n                                collection: false;\n                            };\n                        }> | "
-            },
-            {
-              "kind": "Reference",
-              "text": "Klass",
-              "canonicalReference": "@interaqt/shared!Klass:type"
-            },
-            {
-              "kind": "Content",
-              "text": "<{\n                            type: {\n                                type: \"string\";\n                                required: true;\n                                collection: false;\n                                defaultValue: () => \"expression\";\n                            };\n                            operator: {\n                                type: \"string\";\n                                required: true;\n                                collection: false;\n                                options: [\"and\", \"or\", \"not\"];\n                                defaultValue: () => \"and\";\n                            };\n                            left: {\n                                instanceType: import(\"../attributive.js\")."
-            },
-            {
-              "kind": "Reference",
-              "text": "UnwrappedBoolExpressionInstanceType",
-              "canonicalReference": "@interaqt/shared!UnwrappedBoolExpressionInstanceType:type"
-            },
-            {
-              "kind": "Content",
-              "text": " | import(\"../createClass.js\")."
+              "text": "<{\n                                    content: {\n                                        type: \"function\";\n                                        required: true;\n                                        collection: false;\n                                    };\n                                }> | import(\"../createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -5825,7 +6593,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                                    type: {\n                                        type: \"string\";\n                                        required: true;\n                                        collection: false;\n                                        defaultValue: () => string;\n                                    };\n                                    data: {\n                                        type: "
+              "text": "<{\n                                    content: {\n                                        type: \"function\";\n                                        required: true;\n                                        collection: false;\n                                    };\n                                }>;\n                                required: true;\n                                collection: false;\n                            };\n                        }> | "
             },
             {
               "kind": "Reference",
@@ -5834,16 +6602,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                                            stringContent: {\n                                                type: \"string\";\n                                            };\n                                            content: {\n                                                type: \"function\";\n                                            };\n                                            name: {\n                                                type: \"string\";\n                                            };\n                                            isRef: {\n                                                type: \"boolean\";\n                                            };\n                                        }>;\n                                        required: true;\n                                        collection: false;\n                                    };\n                                }>;\n                                required: true;\n                                collection: false;\n                            };\n                            right: {\n                                instanceType: import(\"../attributive.js\")."
-            },
-            {
-              "kind": "Reference",
-              "text": "UnwrappedBoolExpressionInstanceType",
-              "canonicalReference": "@interaqt/shared!UnwrappedBoolExpressionInstanceType:type"
-            },
-            {
-              "kind": "Content",
-              "text": " | import(\"../createClass.js\")."
+              "text": "<{\n                            type: {\n                                type: \"string\";\n                                required: true;\n                                collection: false;\n                                defaultValue: () => string;\n                            };\n                            operator: {\n                                type: \"string\";\n                                required: true;\n                                collection: false;\n                                options: string[];\n                                defaultValue: () => string;\n                            };\n                            left: {\n                                instanceType: import(\"../createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -5852,16 +6611,70 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                                    type: {\n                                        type: \"string\";\n                                        required: true;\n                                        collection: false;\n                                        defaultValue: () => string;\n                                    };\n                                    data: {\n                                        type: "
+              "text": "<{\n                                    type: {\n                                        type: \"string\";\n                                        required: true;\n                                        collection: false;\n                                        defaultValue: () => string;\n                                    };\n                                    data: {\n                                        instanceType: import(\"../createClass.js\")."
             },
             {
               "kind": "Reference",
-              "text": "Klass",
-              "canonicalReference": "@interaqt/shared!Klass:type"
+              "text": "ReactiveKlassInstance",
+              "canonicalReference": "@interaqt/shared!ReactiveKlassInstance:type"
             },
             {
               "kind": "Content",
-              "text": "<{\n                                            stringContent: {\n                                                type: \"string\";\n                                            };\n                                            content: {\n                                                type: \"function\";\n                                            };\n                                            name: {\n                                                type: \"string\";\n                                            };\n                                            isRef: {\n                                                type: \"boolean\";\n                                            };\n                                        }>;\n                                        required: true;\n                                        collection: false;\n                                    };\n                                }>;\n                                required: false;\n                                collection: false;\n                            };\n                        }>)[];\n                        collection: false;\n                        required: false;\n                    };\n                }>)[];\n                collection: false;\n            };\n            base: {\n                type: "
+              "text": "<{\n                                            content: {\n                                                type: \"function\";\n                                                required: true;\n                                                collection: false;\n                                            };\n                                        }> | import(\"../createClass.js\")."
+            },
+            {
+              "kind": "Reference",
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/shared!InertKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<{\n                                            content: {\n                                                type: \"function\";\n                                                required: true;\n                                                collection: false;\n                                            };\n                                        }>;\n                                        required: true;\n                                        collection: false;\n                                    };\n                                }> | import(\"../BoolExp.js\")."
+            },
+            {
+              "kind": "Reference",
+              "text": "UnwrappedBoolExpressionInstanceType",
+              "canonicalReference": "@interaqt/shared!UnwrappedBoolExpressionInstanceType:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<any>;\n                                required: true;\n                                collection: false;\n                            };\n                            right: {\n                                instanceType: import(\"../createClass.js\")."
+            },
+            {
+              "kind": "Reference",
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/shared!InertKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<{\n                                    type: {\n                                        type: \"string\";\n                                        required: true;\n                                        collection: false;\n                                        defaultValue: () => string;\n                                    };\n                                    data: {\n                                        instanceType: import(\"../createClass.js\")."
+            },
+            {
+              "kind": "Reference",
+              "text": "ReactiveKlassInstance",
+              "canonicalReference": "@interaqt/shared!ReactiveKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<{\n                                            content: {\n                                                type: \"function\";\n                                                required: true;\n                                                collection: false;\n                                            };\n                                        }> | import(\"../createClass.js\")."
+            },
+            {
+              "kind": "Reference",
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/shared!InertKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<{\n                                            content: {\n                                                type: \"function\";\n                                                required: true;\n                                                collection: false;\n                                            };\n                                        }>;\n                                        required: true;\n                                        collection: false;\n                                    };\n                                }> | import(\"../BoolExp.js\")."
+            },
+            {
+              "kind": "Reference",
+              "text": "UnwrappedBoolExpressionInstanceType",
+              "canonicalReference": "@interaqt/shared!UnwrappedBoolExpressionInstanceType:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<any>;\n                                required: false;\n                                collection: false;\n                            };\n                        }>)[];\n                        collection: false;\n                        required: false;\n                    };\n                }>)[];\n                collection: false;\n            };\n            base: {\n                type: "
             },
             {
               "kind": "Reference",
@@ -6104,7 +6917,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                    stringContent: {\n                        type: \"string\";\n                    };\n                    content: {\n                        type: \"function\";\n                    };\n                    name: {\n                        type: \"string\";\n                    };\n                    isRef: {\n                        type: \"boolean\";\n                    };\n                }>)[];\n            };\n        }>;\n        collection: true;\n        required: true;\n        defaultValue: () => never[];\n    };\n}>"
+              "text": "<{\n                    stringContent: {\n                        type: \"string\";\n                    };\n                    content: {\n                        type: \"function\";\n                        required: true;\n                        collection: false;\n                    };\n                    name: {\n                        type: \"string\";\n                    };\n                    isRef: {\n                        type: \"boolean\";\n                    };\n                }>)[];\n            };\n        }>;\n        collection: true;\n        required: true;\n        defaultValue: () => never[];\n    };\n}>"
             }
           ],
           "fileUrlPath": "activity/Activity.ts",
@@ -6113,7 +6926,7 @@
           "name": "Payload",
           "variableTypeTokenRange": {
             "startIndex": 1,
-            "endIndex": 81
+            "endIndex": 87
           }
         },
         {
@@ -6141,7 +6954,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n            stringContent: {\n                type: \"string\";\n            };\n            content: {\n                type: \"function\";\n            };\n            name: {\n                type: \"string\";\n            };\n            isRef: {\n                type: \"boolean\";\n            };\n        }> | "
+              "text": "<{\n            stringContent: {\n                type: \"string\";\n            };\n            content: {\n                type: \"function\";\n                required: true;\n                collection: false;\n            };\n            name: {\n                type: \"string\";\n            };\n            isRef: {\n                type: \"boolean\";\n            };\n        }> | "
             },
             {
               "kind": "Reference",
@@ -6159,34 +6972,16 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                    type: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        defaultValue: () => string;\n                    };\n                    data: {\n                        type: "
+              "text": "<{\n                    type: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        defaultValue: () => string;\n                    };\n                    data: {\n                        instanceType: import(\"../createClass.js\")."
             },
             {
               "kind": "Reference",
-              "text": "Klass",
-              "canonicalReference": "@interaqt/shared!Klass:type"
+              "text": "ReactiveKlassInstance",
+              "canonicalReference": "@interaqt/shared!ReactiveKlassInstance:type"
             },
             {
               "kind": "Content",
-              "text": "<{\n                            stringContent: {\n                                type: \"string\";\n                            };\n                            content: {\n                                type: \"function\";\n                            };\n                            name: {\n                                type: \"string\";\n                            };\n                            isRef: {\n                                type: \"boolean\";\n                            };\n                        }>;\n                        required: true;\n                        collection: false;\n                    };\n                }> | "
-            },
-            {
-              "kind": "Reference",
-              "text": "Klass",
-              "canonicalReference": "@interaqt/shared!Klass:type"
-            },
-            {
-              "kind": "Content",
-              "text": "<{\n                    type: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        defaultValue: () => \"expression\";\n                    };\n                    operator: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        options: [\"and\", \"or\", \"not\"];\n                        defaultValue: () => \"and\";\n                    };\n                    left: {\n                        instanceType: import(\"../attributive.js\")."
-            },
-            {
-              "kind": "Reference",
-              "text": "UnwrappedBoolExpressionInstanceType",
-              "canonicalReference": "@interaqt/shared!UnwrappedBoolExpressionInstanceType:type"
-            },
-            {
-              "kind": "Content",
-              "text": " | import(\"../createClass.js\")."
+              "text": "<{\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }> | import(\"../createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -6195,7 +6990,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                            type: {\n                                type: \"string\";\n                                required: true;\n                                collection: false;\n                                defaultValue: () => string;\n                            };\n                            data: {\n                                type: "
+              "text": "<{\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }>;\n                        required: true;\n                        collection: false;\n                    };\n                }> | "
             },
             {
               "kind": "Reference",
@@ -6204,16 +6999,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                                    stringContent: {\n                                        type: \"string\";\n                                    };\n                                    content: {\n                                        type: \"function\";\n                                    };\n                                    name: {\n                                        type: \"string\";\n                                    };\n                                    isRef: {\n                                        type: \"boolean\";\n                                    };\n                                }>;\n                                required: true;\n                                collection: false;\n                            };\n                        }>;\n                        required: true;\n                        collection: false;\n                    };\n                    right: {\n                        instanceType: import(\"../attributive.js\")."
-            },
-            {
-              "kind": "Reference",
-              "text": "UnwrappedBoolExpressionInstanceType",
-              "canonicalReference": "@interaqt/shared!UnwrappedBoolExpressionInstanceType:type"
-            },
-            {
-              "kind": "Content",
-              "text": " | import(\"../createClass.js\")."
+              "text": "<{\n                    type: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        defaultValue: () => string;\n                    };\n                    operator: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        options: string[];\n                        defaultValue: () => string;\n                    };\n                    left: {\n                        instanceType: import(\"../createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -6222,16 +7008,70 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                            type: {\n                                type: \"string\";\n                                required: true;\n                                collection: false;\n                                defaultValue: () => string;\n                            };\n                            data: {\n                                type: "
+              "text": "<{\n                            type: {\n                                type: \"string\";\n                                required: true;\n                                collection: false;\n                                defaultValue: () => string;\n                            };\n                            data: {\n                                instanceType: import(\"../createClass.js\")."
             },
             {
               "kind": "Reference",
-              "text": "Klass",
-              "canonicalReference": "@interaqt/shared!Klass:type"
+              "text": "ReactiveKlassInstance",
+              "canonicalReference": "@interaqt/shared!ReactiveKlassInstance:type"
             },
             {
               "kind": "Content",
-              "text": "<{\n                                    stringContent: {\n                                        type: \"string\";\n                                    };\n                                    content: {\n                                        type: \"function\";\n                                    };\n                                    name: {\n                                        type: \"string\";\n                                    };\n                                    isRef: {\n                                        type: \"boolean\";\n                                    };\n                                }>;\n                                required: true;\n                                collection: false;\n                            };\n                        }>;\n                        required: false;\n                        collection: false;\n                    };\n                }>)[];\n                collection: false;\n                required: false;\n            };\n        }>)[];\n        collection: false;\n    };\n    base: {\n        type: "
+              "text": "<{\n                                    content: {\n                                        type: \"function\";\n                                        required: true;\n                                        collection: false;\n                                    };\n                                }> | import(\"../createClass.js\")."
+            },
+            {
+              "kind": "Reference",
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/shared!InertKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<{\n                                    content: {\n                                        type: \"function\";\n                                        required: true;\n                                        collection: false;\n                                    };\n                                }>;\n                                required: true;\n                                collection: false;\n                            };\n                        }> | import(\"../BoolExp.js\")."
+            },
+            {
+              "kind": "Reference",
+              "text": "UnwrappedBoolExpressionInstanceType",
+              "canonicalReference": "@interaqt/shared!UnwrappedBoolExpressionInstanceType:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<any>;\n                        required: true;\n                        collection: false;\n                    };\n                    right: {\n                        instanceType: import(\"../createClass.js\")."
+            },
+            {
+              "kind": "Reference",
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/shared!InertKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<{\n                            type: {\n                                type: \"string\";\n                                required: true;\n                                collection: false;\n                                defaultValue: () => string;\n                            };\n                            data: {\n                                instanceType: import(\"../createClass.js\")."
+            },
+            {
+              "kind": "Reference",
+              "text": "ReactiveKlassInstance",
+              "canonicalReference": "@interaqt/shared!ReactiveKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<{\n                                    content: {\n                                        type: \"function\";\n                                        required: true;\n                                        collection: false;\n                                    };\n                                }> | import(\"../createClass.js\")."
+            },
+            {
+              "kind": "Reference",
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/shared!InertKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<{\n                                    content: {\n                                        type: \"function\";\n                                        required: true;\n                                        collection: false;\n                                    };\n                                }>;\n                                required: true;\n                                collection: false;\n                            };\n                        }> | import(\"../BoolExp.js\")."
+            },
+            {
+              "kind": "Reference",
+              "text": "UnwrappedBoolExpressionInstanceType",
+              "canonicalReference": "@interaqt/shared!UnwrappedBoolExpressionInstanceType:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<any>;\n                        required: false;\n                        collection: false;\n                    };\n                }>)[];\n                collection: false;\n                required: false;\n            };\n        }>)[];\n        collection: false;\n    };\n    base: {\n        type: "
             },
             {
               "kind": "Reference",
@@ -6474,7 +7314,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n            stringContent: {\n                type: \"string\";\n            };\n            content: {\n                type: \"function\";\n            };\n            name: {\n                type: \"string\";\n            };\n            isRef: {\n                type: \"boolean\";\n            };\n        }>)[];\n    };\n}>"
+              "text": "<{\n            stringContent: {\n                type: \"string\";\n            };\n            content: {\n                type: \"function\";\n                required: true;\n                collection: false;\n            };\n            name: {\n                type: \"string\";\n            };\n            isRef: {\n                type: \"boolean\";\n            };\n        }>)[];\n    };\n}>"
             }
           ],
           "fileUrlPath": "activity/Activity.ts",
@@ -6483,7 +7323,7 @@
           "name": "PayloadItem",
           "variableTypeTokenRange": {
             "startIndex": 1,
-            "endIndex": 79
+            "endIndex": 85
           }
         },
         {
@@ -6679,6 +7519,79 @@
               "name": "String"
             }
           ]
+        },
+        {
+          "kind": "Variable",
+          "canonicalReference": "@interaqt/shared!Query:var",
+          "docComment": "",
+          "excerptTokens": [
+            {
+              "kind": "Content",
+              "text": "Query: "
+            },
+            {
+              "kind": "Content",
+              "text": "import(\"../createClass\")."
+            },
+            {
+              "kind": "Reference",
+              "text": "Klass",
+              "canonicalReference": "@interaqt/shared!Klass:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<{\n    items: {\n        type: import(\"../createClass\")."
+            },
+            {
+              "kind": "Reference",
+              "text": "Klass",
+              "canonicalReference": "@interaqt/shared!Klass:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<{\n            name: {\n                type: \"string\";\n                required: true;\n                collection: false;\n            };\n            value: {\n                type: \"string\";\n                required: true;\n                collection: false;\n            };\n        }>[];\n        required: true;\n        collection: true;\n    };\n}>"
+            }
+          ],
+          "fileUrlPath": "activity/Data.ts",
+          "isReadonly": true,
+          "releaseTag": "Public",
+          "name": "Query",
+          "variableTypeTokenRange": {
+            "startIndex": 1,
+            "endIndex": 6
+          }
+        },
+        {
+          "kind": "Variable",
+          "canonicalReference": "@interaqt/shared!QueryItem:var",
+          "docComment": "",
+          "excerptTokens": [
+            {
+              "kind": "Content",
+              "text": "QueryItem: "
+            },
+            {
+              "kind": "Content",
+              "text": "import(\"../createClass\")."
+            },
+            {
+              "kind": "Reference",
+              "text": "Klass",
+              "canonicalReference": "@interaqt/shared!Klass:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<{\n    name: {\n        type: \"string\";\n        required: true;\n        collection: false;\n    };\n    value: {\n        type: \"string\";\n        required: true;\n        collection: false;\n    };\n}>"
+            }
+          ],
+          "fileUrlPath": "activity/Data.ts",
+          "isReadonly": true,
+          "releaseTag": "Public",
+          "name": "QueryItem",
+          "variableTypeTokenRange": {
+            "startIndex": 1,
+            "endIndex": 4
+          }
         },
         {
           "kind": "TypeAlias",
@@ -8979,7 +9892,29 @@
           "excerptTokens": [
             {
               "kind": "Content",
-              "text": "export type UnwrappedBoolExpressionInstanceType = "
+              "text": "export type UnwrappedBoolExpressionInstanceType<T extends "
+            },
+            {
+              "kind": "Reference",
+              "text": "NonNullable",
+              "canonicalReference": "!NonNullable:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<"
+            },
+            {
+              "kind": "Reference",
+              "text": "KlassMeta",
+              "canonicalReference": "@interaqt/shared!KlassMeta:type"
+            },
+            {
+              "kind": "Content",
+              "text": "[\"public\"]>"
+            },
+            {
+              "kind": "Content",
+              "text": "> = "
             },
             {
               "kind": "Content",
@@ -8992,7 +9927,7 @@
             },
             {
               "kind": "Content",
-              "text": " | "
+              "text": "<T> | "
             },
             {
               "kind": "Reference",
@@ -9010,7 +9945,7 @@
             },
             {
               "kind": "Content",
-              "text": ", any>;\n    right?: "
+              "text": ", false>;\n    right?: "
             },
             {
               "kind": "Reference",
@@ -9019,7 +9954,7 @@
             },
             {
               "kind": "Content",
-              "text": " | "
+              "text": "<T> | "
             },
             {
               "kind": "Reference",
@@ -9037,19 +9972,32 @@
             },
             {
               "kind": "Content",
-              "text": ", any>;\n}"
+              "text": ", false>;\n}"
             },
             {
               "kind": "Content",
               "text": ";"
             }
           ],
-          "fileUrlPath": "attributive.ts",
+          "fileUrlPath": "BoolExp.ts",
           "releaseTag": "Public",
           "name": "UnwrappedBoolExpressionInstanceType",
+          "typeParameters": [
+            {
+              "typeParameterName": "T",
+              "constraintTokenRange": {
+                "startIndex": 1,
+                "endIndex": 5
+              },
+              "defaultTypeTokenRange": {
+                "startIndex": 0,
+                "endIndex": 0
+              }
+            }
+          ],
           "typeTokenRange": {
-            "startIndex": 1,
-            "endIndex": 14
+            "startIndex": 6,
+            "endIndex": 19
           }
         },
         {
