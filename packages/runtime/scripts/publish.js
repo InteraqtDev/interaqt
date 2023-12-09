@@ -5,7 +5,10 @@ if (!version) {
   throw new Error('Missing version argument')
 }
 
-console.log(execSync('git status ./ --porcelain').toString())
+const gitStatus = execSync('git status ./ --porcelain').toString().trim()
+const isClean = gitStatus  === ''
+
+console.log(isClean, gitStatus)
 
 //
 // try {
