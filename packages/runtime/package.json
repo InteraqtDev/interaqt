@@ -12,12 +12,12 @@
     "build": "rimraf dist && tsc -p ./tsconfig.prod.json",
     "type": "api-extractor run --silent",
     "build-all": "npm run build && npm run type",
-    "publish": "node ./scripts/publish.js",
-    "patch": "node ./scripts/publish.js patch",
-    "minor": "node ./scripts/publish.js minor",
-    "major": "node ./scripts/publish.js major"
+    "release": "node scripts/release.js",
+    "patch": "node scripts/release.js patch",
+    "minor": "node scripts/release.js minor",
+    "major": "node scripts/release.js major"
   },
-  "version": "0.8.0",
+  "version": "0.8.1",
   "main": "dist/index.js",
   "files": [
     "dist"
