@@ -27,7 +27,9 @@ try {
   // 去除 link
   execSync('npm install')
   buildAll()
-  execSync(`npm version ${version}`)
+  const newVersion = execSync(`npm version ${version}`)
+  execSync('git add ./')
+  execSync(`git commit -m "release: version ${newVersion}"`)
   execSync('git push')
   execSync(`npm publish ./`)
 } catch (e) {
