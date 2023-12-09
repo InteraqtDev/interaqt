@@ -5,7 +5,7 @@ import {
     BoolExpressionRawData,
     Concept,
     ConceptAlias,
-    ConceptInstance,
+    ConceptInstance, Condition, Conditions,
     DerivedConcept,
     Entity,
     ExpressionData,
@@ -29,7 +29,6 @@ type ConceptCheckStack = {
 }
 
 
-
 export type ConceptCheckResponse = AtomError |true
 
 type AtomError = {
@@ -42,6 +41,11 @@ type AtomError = {
 
 
 export class AttributeError {
+    constructor(public type: string, public error: any) {
+    }
+}
+
+export class ConditionError {
     constructor(public type: string, public error: any) {
     }
 }
@@ -84,7 +88,6 @@ export class InteractionCall {
     }
     async checkAttributive(inputAttributive: any, interactionEvent: InteractionEventArgs|undefined, attributiveTarget: any) {
         const  attributive = inputAttributive as unknown as Attributive
-        assert(attributive, `can not find attributive: ${attributive.name}`)
         if (attributive.content) {
             // CAUTION! 第一参数应该是 User 它描述的 User（其实就是 event.user） 然后才是 event! this 指向当前，用户可以用 this.system 里面的东西来做任何查询操作
             // const testFn = new Function('attributiveTarget', 'event', `return (${attributive.content}).call(this, attributiveTarget, event)`)
@@ -99,12 +102,13 @@ export class InteractionCall {
 
 
             if ( result === undefined ) {
-                console.warn(`attributive ${attributive.name} returned undefined, maybe not implemented, we will return true for temp`)
+                console.warn(`attributive ${attributive.name} returned undefined, maybe not implemented, we will return true for now`)
                 return true
             }
             return result
+        } else {
+            console.warn(`${attributive.name} not implemented`)
         }
-        console.warn(`${attributive.name} not implemented`)
         return true
     }
     async checkMixedAttributive(attributiveData: KlassInstance<typeof Attributive, false>, instance: ConceptInstance) {
@@ -211,6 +215,7 @@ export class InteractionCall {
     isConceptAlias(concept: Concept) {
         return !!(concept as ConceptAlias).for
     }
+
     async checkAttributives(attributives: BoolExp<KlassInstance<typeof Attributive, false>>, handleAttributive: HandleAttributive, stack: ConceptCheckStack[] = []) : Promise<ConceptCheckResponse>{
         const result =  await attributives.evaluateAsync(handleAttributive)
         return result === true ? true : {name: '', type: 'matchAttributives', stack, error: result}
@@ -299,11 +304,42 @@ export class InteractionCall {
             }
         }
     }
+
     async checkCondition(interactionEvent: InteractionEventArgs) {
-        // TODO
-        // if (this.interaction.condition ) {
-        //     tryEvaluate("interaction condition error", interaction.condition, ...commonArgs)
-        // }
+        if (this.interaction.conditions ) {
+            const conditions =  Conditions.is(this.interaction.conditions) ?
+                new BoolExp<KlassInstance<typeof Condition, false>>(this.interaction.conditions.content as BoolExpressionRawData<KlassInstance<typeof Condition, false>>) :
+                BoolExp.atom<KlassInstance<typeof Attributive, false>>(this.interaction.conditions as KlassInstance<typeof Condition, false>)
+
+
+            const handleAttribute = async (condition: KlassInstance<typeof Condition, false>) => {
+                if (condition.content) {
+                    const testFn = condition.content
+                    let result
+                    try {
+                        result = await testFn.call(this.controller, interactionEvent)
+                    } catch(e) {
+                        console.warn(`check function throw`, e)
+                        result = false
+                    }
+
+                    if ( result === undefined ) {
+                        console.warn(`condition ${condition.name} returned undefined, maybe not implemented, we will return true for now`)
+                        return true
+                    }
+                    return result
+                } else {
+                    console.warn(`${condition.name} not implemented`)
+                }
+                return true
+            }
+
+            const result =  await conditions.evaluateAsync(handleAttribute)
+
+            if (result !== true ) {
+                throw new ConditionError(`condition check failed`, result)
+            }
+        }
     }
     // CAUTION sideEffect 是并行的。如果要串行，用户应该自己写在一个里面
     async runEffects(eventArgs: InteractionEventArgs, activityId: string|undefined, response: InteractionCallResponse) {
