@@ -308,6 +308,9 @@ required: false;
 }>;
 
 // @public (undocumented)
+export const boolExpToConditions: typeof boolExpToAttributives;
+
+// @public (undocumented)
 export const ComputedData: Klass<{
     computeEffect: {
         type: "string";
@@ -338,6 +341,56 @@ export type ConceptInstance = any;
 
 // @public (undocumented)
 export type ConceptType = {};
+
+// @public (undocumented)
+export const Condition: Klass<    {
+stringContent: {
+type: "string";
+};
+content: {
+type: "function";
+};
+name: {
+type: "string";
+};
+isRef: {
+type: "boolean";
+};
+}>;
+
+// @public (undocumented)
+export const Conditions: Klass<    {
+content: {
+type: (Klass<    {
+type: {
+type: "string";
+required: true;
+collection: false;
+defaultValue: () => string;
+};
+data: {
+type: Klass<    {
+stringContent: {
+type: "string";
+};
+content: {
+type: "function";
+};
+name: {
+type: "string";
+};
+isRef: {
+type: "boolean";
+};
+}>;
+required: true;
+collection: false;
+};
+}> | Klass<BoolExpressionDataPublic>)[];
+collection: false;
+required: false;
+};
+}>;
 
 // @public (undocumented)
 export const constraints: {
@@ -735,6 +788,11 @@ export type InteractionPublicType = {
         type: 'string';
         collection: false;
         required: true;
+    };
+    conditions: {
+        required: false;
+        collection: false;
+        type: (typeof Conditions | typeof Condition)[];
     };
     userAttributives: {
         required: false;
@@ -2399,7 +2457,7 @@ export const WeightedSummation: Klass<{
 
 // Warnings were encountered during analysis:
 //
-// activity/Activity.ts:272:9 - (ae-forgotten-export) The symbol "UnwrappedActivityInstanceType" needs to be exported by the entry point index.d.ts
+// activity/Activity.ts:270:9 - (ae-forgotten-export) The symbol "UnwrappedActivityInstanceType" needs to be exported by the entry point index.d.ts
 // attributive.ts:128:1 - (ae-forgotten-export) The symbol "BoolExpressionDataPublic" needs to be exported by the entry point index.d.ts
 // createClass.ts:47:9 - (ae-forgotten-export) The symbol "ClassMetaPublicItem" needs to be exported by the entry point index.d.ts
 

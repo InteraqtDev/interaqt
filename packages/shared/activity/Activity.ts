@@ -1,6 +1,6 @@
 import {createClass, Klass, KlassInstance, KlassInstancePrimitiveProps} from "../createClass.js";
 import {Entity} from "../entity/Entity.js";
-import {Attributive, Attributives} from "../attributive.js";
+import {Attributive, Attributives, Condition, Conditions} from "../attributive.js";
 
 
 // 交互动作，因为以后可能有更多的关于交互动作的管理，所以应该是个对象，而不只是字符串名字。
@@ -100,18 +100,17 @@ export type InteractionPublicType = {
         collection: false,
         required: true
     },
+    conditions: {
+        required: false,
+        collection: false,
+        type: (typeof Conditions|typeof Condition)[],
+    },
     // 用户自定义的任何定语
     userAttributives: {
         required: false,
         collection: false,
         type: (typeof Attributives|typeof Attributive)[],
     },
-    // // 角色定语。例如 NORMAL_USER, ADMIN 等
-    // userRoleAttributive : {
-    //     type: typeof UserAttributive,
-    //     collection: false,
-    //     required: true
-    // },
     // 当前的用户的 alias 名字。这个地方应该改成 Alias 才更加好
     userRef: {
         type: typeof Attributive,
@@ -143,18 +142,17 @@ export const Interaction: Klass<InteractionPublicType> = createClass({
             collection: false,
             required: true
         },
+        conditions: {
+            type: [Attributives, Attributive],
+            required: false,
+            collection: false,
+        },
         // 用户自定义的任何定语
         userAttributives: {
             type: [Attributives, Attributive],
             required: false,
             collection: false,
         },
-        // // 角色定语。例如 NORMAL_USER, ADMIN 等
-        // userRoleAttributive : {
-        //     type: UserAttributive,
-        //     collection: false,
-        //     required: true
-        // },
         // 当前的用户的 alias 名字。这个地方应该改成 Alias 才更加好
         userRef: {
             type: Attributive,

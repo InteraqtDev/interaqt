@@ -167,3 +167,8 @@ export function boolExpToAttributives(obj: BoolExp<KlassInstance<typeof Attribut
         content: AttributiveBoolExp.toAttributives(obj) as KlassInstance<typeof BoolExpressionData, false>
     })
 }
+
+// CAUTION 直接复用，但是取个不同的名字，有更强的语义
+export const Condition = Attributive
+export const Conditions = Attributives
+export const boolExpToConditions = boolExpToAttributives
