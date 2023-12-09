@@ -7,16 +7,19 @@ if (!version) {
 
 const gitStatus = execSync('git status ./ --porcelain').toString().trim()
 const isClean = gitStatus  === ''
+if (!isClean) {
+  throw new Error('Working tree is not clean')
+}
 
-console.log(isClean, gitStatus)
 
-//
-// try {
-//   // 去除 link
-//   execSync('npm install')
-//   execSync('npm run build-all')
-//   execSync(`npm version ${version}`)
-// } catch (e) {
-//   console.error(e)
-//   process.exit(1)
-// }
+try {
+  // 去除 link
+  execSync('npm install')
+  execSync('npm run build-all')
+  execSync(`npm version ${version}`)
+  execSync('git push')
+  execSync(`npm publish ./`)
+} catch (e) {
+  console.error(e)
+  process.exit(1)
+}
