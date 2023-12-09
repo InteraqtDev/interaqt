@@ -270,20 +270,33 @@ export class InteractionCall {
                     new BoolExp<KlassInstance<typeof Attributive, false>>(payloadDef.attributives.content as BoolExpressionRawData<KlassInstance<typeof Attributive, false>>) :
                     BoolExp.atom<KlassInstance<typeof Attributive, false>>(payloadDef.attributives as KlassInstance<typeof Attributive, false>)
 
-                // CAUTION 特别注意，这里不再区分是不是 collection，Attributive 永远是基于整体校验。
-                //  如果这里里面嗨哟校验单个，应该用户自己在 Attributive 里面做。
+                // 作为整体是否合法应该放到 condition 里面做
+                if (payloadDef.isCollection) {
+                    const result = await everyWithErrorAsync(payloadItem, (item => {
+                        const handleAttribute = this.createHandleAttributive(
+                            Attributive,
+                            interactionEvent,
+                            item
+                        )
 
-                const handleAttribute = this.createHandleAttributive(
-                    isPayloadUser? Attributive : Attributive,
-                    interactionEvent,
-                    fullPayloadItem
-                )
-                const result = await this.checkAttributives(attributives, handleAttribute)
-                if (result !== true ) {
-                    throw new AttributeError(`${payloadDef.name} not match attributive`, { payload: fullPayloadItem, result})
+                        return this.checkAttributives(attributives, handleAttribute)
+                    }))
+
+                    if (result !== true) {
+                        throw new AttributeError(`${payloadDef.name} not every item match attribute`, payloadItem)
+                    }
+                } else {
+                    const handleAttribute = this.createHandleAttributive(
+                        Attributive,
+                        interactionEvent,
+                        payloadItem
+                    )
+                    const result = await this.checkAttributives(attributives, handleAttribute)
+                    if (result !== true ) {
+                        throw new AttributeError(`${payloadDef.name} not match attributive`, { payload: payloadItem, result})
+                    }
                 }
             }
-
         }
     }
     async checkCondition(interactionEvent: InteractionEventArgs) {
