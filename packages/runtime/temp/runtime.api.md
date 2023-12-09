@@ -4,6 +4,9 @@
 
 ```ts
 
+/// <reference types="node" />
+
+import { AsyncLocalStorage } from 'async_hooks';
 import { Atom } from 'data0';
 import cors from 'cors';
 import { FastifyLoggerOptions } from 'fastify';
@@ -222,6 +225,9 @@ export type APIBody = {
 };
 
 // @public (undocumented)
+export const asyncInteractionContext: AsyncLocalStorage<unknown>;
+
+// @public (undocumented)
 export type AtomHandle<T> = (arg: T) => boolean | Promise<boolean>;
 
 // @public (undocumented)
@@ -241,12 +247,6 @@ export const Attributive: Klass<    {
 }>;
 
 // @public (undocumented)
-export class AttributiveBoolExp extends BoolExp<KlassInstance<typeof Attributive, false>> {
-    // (undocumented)
-    static toAttributives(obj?: BoolExp<KlassInstance<typeof Attributive, false>>): KlassInstance<typeof BoolAtomData, false> | UnwrappedBoolExpressionInstanceType | undefined;
-}
-
-// @public (undocumented)
 export const Attributives: Klass<    {
     content: {
         type: (Klass<    {
@@ -257,31 +257,66 @@ export const Attributives: Klass<    {
                 defaultValue: () => string;
             };
             data: {
-                type: Klass<    {
-                    stringContent: {
-                        type: "string";
-                    };
-                    content: {
-                        type: "function";
-                    };
-                    name: {
-                        type: "string";
-                    };
-                    isRef: {
-                        type: "boolean";
-                    };
-                }>;
+                instanceType: InertKlassInstance<any> | ReactiveKlassInstance<any>;
                 required: true;
                 collection: false;
             };
-        }> | Klass<BoolExpressionDataPublic>)[];
+        }> | Klass<    {
+            type: {
+                type: "string";
+                required: true;
+                collection: false;
+                defaultValue: () => string;
+            };
+            operator: {
+                type: "string";
+                required: true;
+                collection: false;
+                options: string[];
+                defaultValue: () => string;
+            };
+            left: {
+                instanceType: InertKlassInstance<    {
+                    type: {
+                        type: "string";
+                        required: true;
+                        collection: false;
+                        defaultValue: () => string;
+                    };
+                    data: {
+                        instanceType: InertKlassInstance<any> | ReactiveKlassInstance<any>;
+                        required: true;
+                        collection: false;
+                    };
+                }> | UnwrappedBoolExpressionInstanceType<any>;
+                required: true;
+                collection: false;
+            };
+            right: {
+                instanceType: InertKlassInstance<    {
+                    type: {
+                        type: "string";
+                        required: true;
+                        collection: false;
+                        defaultValue: () => string;
+                    };
+                    data: {
+                        instanceType: InertKlassInstance<any> | ReactiveKlassInstance<any>;
+                        required: true;
+                        collection: false;
+                    };
+                }> | UnwrappedBoolExpressionInstanceType<any>;
+                required: false;
+                collection: false;
+            };
+        }>)[];
         collection: false;
         required: false;
     };
 }>;
 
 // @public (undocumented)
-export const BoolAtomData: Klass<    {
+export const BoolAtomData: Klass<{
     type: {
         type: "string";
         required: true;
@@ -289,20 +324,7 @@ export const BoolAtomData: Klass<    {
         defaultValue: () => string;
     };
     data: {
-        type: Klass<    {
-            stringContent: {
-                type: "string";
-            };
-            content: {
-                type: "function";
-            };
-            name: {
-                type: "string";
-            };
-            isRef: {
-                type: "boolean";
-            };
-        }>;
+        instanceType: InertKlassInstance<any> | ReactiveKlassInstance<any>;
         required: true;
         collection: false;
     };
@@ -354,7 +376,55 @@ export class BoolExp<T> {
 }
 
 // @public (undocumented)
-export const BoolExpressionData: Klass<BoolExpressionDataPublic>;
+export const BoolExpressionData: Klass<{
+    type: {
+        type: "string";
+        required: true;
+        collection: false;
+        defaultValue: () => string;
+    };
+    operator: {
+        type: "string";
+        required: true;
+        collection: false;
+        options: string[];
+        defaultValue: () => string;
+    };
+    left: {
+        instanceType: InertKlassInstance<    {
+            type: {
+                type: "string";
+                required: true;
+                collection: false;
+                defaultValue: () => string;
+            };
+            data: {
+                instanceType: InertKlassInstance<any> | ReactiveKlassInstance<any>;
+                required: true;
+                collection: false;
+            };
+        }> | UnwrappedBoolExpressionInstanceType<any>;
+        required: true;
+        collection: false;
+    };
+    right: {
+        instanceType: InertKlassInstance<    {
+            type: {
+                type: "string";
+                required: true;
+                collection: false;
+                defaultValue: () => string;
+            };
+            data: {
+                instanceType: InertKlassInstance<any> | ReactiveKlassInstance<any>;
+                required: true;
+                collection: false;
+            };
+        }> | UnwrappedBoolExpressionInstanceType<any>;
+        required: false;
+        collection: false;
+    };
+}>;
 
 // @public (undocumented)
 export type BoolExpressionRawData<T> = {
@@ -375,28 +445,66 @@ export function boolExpToAttributives(obj: BoolExp<KlassInstance<typeof Attribut
                 defaultValue: () => string;
             };
             data: {
-                type: Klass<    {
-                    stringContent: {
-                        type: "string";
-                    };
-                    content: {
-                        type: "function";
-                    };
-                    name: {
-                        type: "string";
-                    };
-                    isRef: {
-                        type: "boolean";
-                    };
-                }>;
+                instanceType: InertKlassInstance<any> | ReactiveKlassInstance<any>;
                 required: true;
                 collection: false;
             };
-        }> | Klass<BoolExpressionDataPublic>)[];
+        }> | Klass<    {
+            type: {
+                type: "string";
+                required: true;
+                collection: false;
+                defaultValue: () => string;
+            };
+            operator: {
+                type: "string";
+                required: true;
+                collection: false;
+                options: string[];
+                defaultValue: () => string;
+            };
+            left: {
+                instanceType: InertKlassInstance<    {
+                    type: {
+                        type: "string";
+                        required: true;
+                        collection: false;
+                        defaultValue: () => string;
+                    };
+                    data: {
+                        instanceType: InertKlassInstance<any> | ReactiveKlassInstance<any>;
+                        required: true;
+                        collection: false;
+                    };
+                }> | UnwrappedBoolExpressionInstanceType<any>;
+                required: true;
+                collection: false;
+            };
+            right: {
+                instanceType: InertKlassInstance<    {
+                    type: {
+                        type: "string";
+                        required: true;
+                        collection: false;
+                        defaultValue: () => string;
+                    };
+                    data: {
+                        instanceType: InertKlassInstance<any> | ReactiveKlassInstance<any>;
+                        required: true;
+                        collection: false;
+                    };
+                }> | UnwrappedBoolExpressionInstanceType<any>;
+                required: false;
+                collection: false;
+            };
+        }>)[];
         collection: false;
         required: false;
     };
 }>;
+
+// @public (undocumented)
+export const boolExpToConditions: typeof boolExpToAttributives;
 
 // @public (undocumented)
 export const ComputedData: Klass<{
@@ -429,6 +537,91 @@ export type ConceptInstance = any;
 
 // @public (undocumented)
 export type ConceptType = {};
+
+// @public (undocumented)
+export const Condition: Klass<    {
+    stringContent: {
+        type: "string";
+    };
+    content: {
+        type: "function";
+    };
+    name: {
+        type: "string";
+    };
+    isRef: {
+        type: "boolean";
+    };
+}>;
+
+// @public (undocumented)
+export const Conditions: Klass<    {
+    content: {
+        type: (Klass<    {
+            type: {
+                type: "string";
+                required: true;
+                collection: false;
+                defaultValue: () => string;
+            };
+            data: {
+                instanceType: InertKlassInstance<any> | ReactiveKlassInstance<any>;
+                required: true;
+                collection: false;
+            };
+        }> | Klass<    {
+            type: {
+                type: "string";
+                required: true;
+                collection: false;
+                defaultValue: () => string;
+            };
+            operator: {
+                type: "string";
+                required: true;
+                collection: false;
+                options: string[];
+                defaultValue: () => string;
+            };
+            left: {
+                instanceType: InertKlassInstance<    {
+                    type: {
+                        type: "string";
+                        required: true;
+                        collection: false;
+                        defaultValue: () => string;
+                    };
+                    data: {
+                        instanceType: InertKlassInstance<any> | ReactiveKlassInstance<any>;
+                        required: true;
+                        collection: false;
+                    };
+                }> | UnwrappedBoolExpressionInstanceType<any>;
+                required: true;
+                collection: false;
+            };
+            right: {
+                instanceType: InertKlassInstance<    {
+                    type: {
+                        type: "string";
+                        required: true;
+                        collection: false;
+                        defaultValue: () => string;
+                    };
+                    data: {
+                        instanceType: InertKlassInstance<any> | ReactiveKlassInstance<any>;
+                        required: true;
+                        collection: false;
+                    };
+                }> | UnwrappedBoolExpressionInstanceType<any>;
+                required: false;
+                collection: false;
+            };
+        }>)[];
+        collection: false;
+        required: false;
+    };
+}>;
 
 // @public (undocumented)
 export const constraints: {
@@ -1028,6 +1221,11 @@ export type InteractionPublicType = {
         collection: false;
         required: true;
     };
+    conditions: {
+        required: false;
+        collection: false;
+        type: (typeof Conditions | typeof Condition)[];
+    };
     userAttributives: {
         required: false;
         collection: false;
@@ -1320,20 +1518,7 @@ export const Payload: Klass<{
                                 defaultValue: () => string;
                             };
                             data: {
-                                type: Klass<{
-                                    stringContent: {
-                                        type: "string";
-                                    };
-                                    content: {
-                                        type: "function";
-                                    };
-                                    name: {
-                                        type: "string";
-                                    };
-                                    isRef: {
-                                        type: "boolean";
-                                    };
-                                }>;
+                                instanceType: InertKlassInstance<any> | ReactiveKlassInstance<any>;
                                 required: true;
                                 collection: false;
                             };
@@ -1342,17 +1527,17 @@ export const Payload: Klass<{
                                 type: "string";
                                 required: true;
                                 collection: false;
-                                defaultValue: () => "expression";
+                                defaultValue: () => string;
                             };
                             operator: {
                                 type: "string";
                                 required: true;
                                 collection: false;
-                                options: ["and", "or", "not"];
-                                defaultValue: () => "and";
+                                options: string[];
+                                defaultValue: () => string;
                             };
                             left: {
-                                instanceType: UnwrappedBoolExpressionInstanceType | InertKlassInstance<    {
+                                instanceType: InertKlassInstance<    {
                                     type: {
                                         type: "string";
                                         required: true;
@@ -1360,29 +1545,16 @@ export const Payload: Klass<{
                                         defaultValue: () => string;
                                     };
                                     data: {
-                                        type: Klass<{
-                                            stringContent: {
-                                                type: "string";
-                                            };
-                                            content: {
-                                                type: "function";
-                                            };
-                                            name: {
-                                                type: "string";
-                                            };
-                                            isRef: {
-                                                type: "boolean";
-                                            };
-                                        }>;
+                                        instanceType: InertKlassInstance<any> | ReactiveKlassInstance<any>;
                                         required: true;
                                         collection: false;
                                     };
-                                }>;
+                                }> | UnwrappedBoolExpressionInstanceType<any>;
                                 required: true;
                                 collection: false;
                             };
                             right: {
-                                instanceType: UnwrappedBoolExpressionInstanceType | InertKlassInstance<    {
+                                instanceType: InertKlassInstance<    {
                                     type: {
                                         type: "string";
                                         required: true;
@@ -1390,24 +1562,11 @@ export const Payload: Klass<{
                                         defaultValue: () => string;
                                     };
                                     data: {
-                                        type: Klass<{
-                                            stringContent: {
-                                                type: "string";
-                                            };
-                                            content: {
-                                                type: "function";
-                                            };
-                                            name: {
-                                                type: "string";
-                                            };
-                                            isRef: {
-                                                type: "boolean";
-                                            };
-                                        }>;
+                                        instanceType: InertKlassInstance<any> | ReactiveKlassInstance<any>;
                                         required: true;
                                         collection: false;
                                     };
-                                }>;
+                                }> | UnwrappedBoolExpressionInstanceType<any>;
                                 required: false;
                                 collection: false;
                             };
@@ -1637,20 +1796,7 @@ export const PayloadItem: Klass<{
                         defaultValue: () => string;
                     };
                     data: {
-                        type: Klass<{
-                            stringContent: {
-                                type: "string";
-                            };
-                            content: {
-                                type: "function";
-                            };
-                            name: {
-                                type: "string";
-                            };
-                            isRef: {
-                                type: "boolean";
-                            };
-                        }>;
+                        instanceType: InertKlassInstance<any> | ReactiveKlassInstance<any>;
                         required: true;
                         collection: false;
                     };
@@ -1659,17 +1805,17 @@ export const PayloadItem: Klass<{
                         type: "string";
                         required: true;
                         collection: false;
-                        defaultValue: () => "expression";
+                        defaultValue: () => string;
                     };
                     operator: {
                         type: "string";
                         required: true;
                         collection: false;
-                        options: ["and", "or", "not"];
-                        defaultValue: () => "and";
+                        options: string[];
+                        defaultValue: () => string;
                     };
                     left: {
-                        instanceType: UnwrappedBoolExpressionInstanceType | InertKlassInstance<    {
+                        instanceType: InertKlassInstance<    {
                             type: {
                                 type: "string";
                                 required: true;
@@ -1677,29 +1823,16 @@ export const PayloadItem: Klass<{
                                 defaultValue: () => string;
                             };
                             data: {
-                                type: Klass<{
-                                    stringContent: {
-                                        type: "string";
-                                    };
-                                    content: {
-                                        type: "function";
-                                    };
-                                    name: {
-                                        type: "string";
-                                    };
-                                    isRef: {
-                                        type: "boolean";
-                                    };
-                                }>;
+                                instanceType: InertKlassInstance<any> | ReactiveKlassInstance<any>;
                                 required: true;
                                 collection: false;
                             };
-                        }>;
+                        }> | UnwrappedBoolExpressionInstanceType<any>;
                         required: true;
                         collection: false;
                     };
                     right: {
-                        instanceType: UnwrappedBoolExpressionInstanceType | InertKlassInstance<    {
+                        instanceType: InertKlassInstance<    {
                             type: {
                                 type: "string";
                                 required: true;
@@ -1707,24 +1840,11 @@ export const PayloadItem: Klass<{
                                 defaultValue: () => string;
                             };
                             data: {
-                                type: Klass<{
-                                    stringContent: {
-                                        type: "string";
-                                    };
-                                    content: {
-                                        type: "function";
-                                    };
-                                    name: {
-                                        type: "string";
-                                    };
-                                    isRef: {
-                                        type: "boolean";
-                                    };
-                                }>;
+                                instanceType: InertKlassInstance<any> | ReactiveKlassInstance<any>;
                                 required: true;
                                 collection: false;
                             };
-                        }>;
+                        }> | UnwrappedBoolExpressionInstanceType<any>;
                         required: false;
                         collection: false;
                     };
@@ -2828,11 +2948,11 @@ export type UnwrapCollectionType<T extends Klass<any>[]> = {
 }[keyof T][number];
 
 // @public (undocumented)
-export type UnwrappedBoolExpressionInstanceType = {
+export type UnwrappedBoolExpressionInstanceType<T extends NonNullable<KlassMeta["public"]>> = {
     type: string;
     operator: string;
-    left: UnwrappedBoolExpressionInstanceType | KlassInstance<typeof BoolAtomData, any>;
-    right?: UnwrappedBoolExpressionInstanceType | KlassInstance<typeof BoolAtomData, any>;
+    left: UnwrappedBoolExpressionInstanceType<T> | KlassInstance<Klass<T>, any>;
+    right?: UnwrappedBoolExpressionInstanceType<T> | KlassInstance<Klass<T>, any>;
 };
 
 // @public (undocumented)
@@ -2926,12 +3046,11 @@ export const WeightedSummation: Klass<{
 
 // Warnings were encountered during analysis:
 //
-// node_modules/@interaqt/shared/dist/index.d.ts:24:9 - (ae-forgotten-export) The symbol "UnwrappedActivityInstanceType" needs to be exported by the entry point index.d.ts
-// node_modules/@interaqt/shared/dist/index.d.ts:179:1 - (ae-forgotten-export) The symbol "BoolExpressionDataPublic" needs to be exported by the entry point index.d.ts
-// node_modules/@interaqt/shared/dist/index.d.ts:799:9 - (ae-forgotten-export) The symbol "ClassMetaPublicItem" needs to be exported by the entry point index.d.ts
 // server.ts:21:5 - (ae-forgotten-export) The symbol "EventPayload" needs to be exported by the entry point index.d.ts
 // server.ts:22:5 - (ae-forgotten-export) The symbol "EventQuery" needs to be exported by the entry point index.d.ts
 // server.ts:31:5 - (ae-forgotten-export) The symbol "EventUser" needs to be exported by the entry point index.d.ts
+// /Users/camus/Work/interaqt/packages/shared/index.ts:8:33 - (ae-forgotten-export) The symbol "UnwrappedActivityInstanceType" needs to be exported by the entry point index.d.ts
+// /Users/camus/Work/interaqt/packages/shared/index.ts:8:33 - (ae-forgotten-export) The symbol "ClassMetaPublicItem" needs to be exported by the entry point index.d.ts
 
 // (No @packageDocumentation comment for this package)
 

@@ -191,7 +191,7 @@
               "text": "<{\n    name: {\n        type: \"string\";\n        required: true;\n    };\n}>"
             }
           ],
-          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
+          "fileUrlPath": "../shared/index.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "Action",
@@ -255,7 +255,7 @@
               "text": ">"
             }
           ],
-          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
+          "fileUrlPath": "../shared/index.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "Activity",
@@ -432,7 +432,7 @@
               "text": ">"
             }
           ],
-          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
+          "fileUrlPath": "../shared/index.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "ActivityGroup",
@@ -482,7 +482,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
+          "fileUrlPath": "../shared/index.ts",
           "releaseTag": "Public",
           "name": "ActivityGroupInstanceType",
           "typeTokenRange": {
@@ -526,7 +526,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
+          "fileUrlPath": "../shared/index.ts",
           "releaseTag": "Public",
           "name": "ActivityGroupPublicType",
           "typeTokenRange": {
@@ -566,7 +566,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
+          "fileUrlPath": "../shared/index.ts",
           "releaseTag": "Public",
           "name": "ActivityInstanceType",
           "typeTokenRange": {
@@ -728,7 +728,7 @@
               "text": ">)[];\n        collection: false;\n        required: true;\n    };\n    matchExpression: {\n        type: \"function\";\n        collection: false;\n        required: true;\n    };\n}>"
             }
           ],
-          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
+          "fileUrlPath": "../shared/index.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "Any",
@@ -782,6 +782,34 @@
           }
         },
         {
+          "kind": "Variable",
+          "canonicalReference": "@interaqt/runtime!asyncInteractionContext:var",
+          "docComment": "",
+          "excerptTokens": [
+            {
+              "kind": "Content",
+              "text": "asyncInteractionContext: "
+            },
+            {
+              "kind": "Reference",
+              "text": "AsyncLocalStorage",
+              "canonicalReference": "!\"\\\"async_hooks\\\"\".AsyncLocalStorage:class"
+            },
+            {
+              "kind": "Content",
+              "text": "<unknown>"
+            }
+          ],
+          "fileUrlPath": "asyncInteractionContext.ts",
+          "isReadonly": true,
+          "releaseTag": "Public",
+          "name": "asyncInteractionContext",
+          "variableTypeTokenRange": {
+            "startIndex": 1,
+            "endIndex": 3
+          }
+        },
+        {
           "kind": "TypeAlias",
           "canonicalReference": "@interaqt/runtime!AtomHandle:type",
           "docComment": "",
@@ -808,7 +836,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
+          "fileUrlPath": "../shared/index.ts",
           "releaseTag": "Public",
           "name": "AtomHandle",
           "typeParameters": [
@@ -848,7 +876,7 @@
               "text": "<    {\nstringContent: {\ntype: \"string\";\n};\ncontent: {\ntype: \"function\";\n};\nname: {\ntype: \"string\";\n};\nisRef: {\ntype: \"boolean\";\n};\n}>"
             }
           ],
-          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
+          "fileUrlPath": "../shared/index.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "Attributive",
@@ -856,154 +884,6 @@
             "startIndex": 1,
             "endIndex": 3
           }
-        },
-        {
-          "kind": "Class",
-          "canonicalReference": "@interaqt/runtime!AttributiveBoolExp:class",
-          "docComment": "",
-          "excerptTokens": [
-            {
-              "kind": "Content",
-              "text": "export declare class AttributiveBoolExp extends "
-            },
-            {
-              "kind": "Reference",
-              "text": "BoolExp",
-              "canonicalReference": "@interaqt/runtime!BoolExp:class"
-            },
-            {
-              "kind": "Content",
-              "text": "<"
-            },
-            {
-              "kind": "Reference",
-              "text": "KlassInstance",
-              "canonicalReference": "@interaqt/runtime!KlassInstance:type"
-            },
-            {
-              "kind": "Content",
-              "text": "<typeof "
-            },
-            {
-              "kind": "Reference",
-              "text": "Attributive",
-              "canonicalReference": "@interaqt/runtime!Attributive:var"
-            },
-            {
-              "kind": "Content",
-              "text": ", false>>"
-            },
-            {
-              "kind": "Content",
-              "text": " "
-            }
-          ],
-          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
-          "releaseTag": "Public",
-          "isAbstract": false,
-          "name": "AttributiveBoolExp",
-          "preserveMemberOrder": false,
-          "members": [
-            {
-              "kind": "Method",
-              "canonicalReference": "@interaqt/runtime!AttributiveBoolExp.toAttributives:member(1)",
-              "docComment": "",
-              "excerptTokens": [
-                {
-                  "kind": "Content",
-                  "text": "static toAttributives(obj?: "
-                },
-                {
-                  "kind": "Reference",
-                  "text": "BoolExp",
-                  "canonicalReference": "@interaqt/runtime!BoolExp:class"
-                },
-                {
-                  "kind": "Content",
-                  "text": "<"
-                },
-                {
-                  "kind": "Reference",
-                  "text": "KlassInstance",
-                  "canonicalReference": "@interaqt/runtime!KlassInstance:type"
-                },
-                {
-                  "kind": "Content",
-                  "text": "<typeof "
-                },
-                {
-                  "kind": "Reference",
-                  "text": "Attributive",
-                  "canonicalReference": "@interaqt/runtime!Attributive:var"
-                },
-                {
-                  "kind": "Content",
-                  "text": ", false>>"
-                },
-                {
-                  "kind": "Content",
-                  "text": "): "
-                },
-                {
-                  "kind": "Reference",
-                  "text": "KlassInstance",
-                  "canonicalReference": "@interaqt/runtime!KlassInstance:type"
-                },
-                {
-                  "kind": "Content",
-                  "text": "<typeof "
-                },
-                {
-                  "kind": "Reference",
-                  "text": "BoolAtomData",
-                  "canonicalReference": "@interaqt/runtime!BoolAtomData:var"
-                },
-                {
-                  "kind": "Content",
-                  "text": ", false> | "
-                },
-                {
-                  "kind": "Reference",
-                  "text": "UnwrappedBoolExpressionInstanceType",
-                  "canonicalReference": "@interaqt/runtime!UnwrappedBoolExpressionInstanceType:type"
-                },
-                {
-                  "kind": "Content",
-                  "text": " | undefined"
-                },
-                {
-                  "kind": "Content",
-                  "text": ";"
-                }
-              ],
-              "isStatic": true,
-              "returnTypeTokenRange": {
-                "startIndex": 8,
-                "endIndex": 14
-              },
-              "releaseTag": "Public",
-              "isProtected": false,
-              "overloadIndex": 1,
-              "parameters": [
-                {
-                  "parameterName": "obj",
-                  "parameterTypeTokenRange": {
-                    "startIndex": 1,
-                    "endIndex": 7
-                  },
-                  "isOptional": true
-                }
-              ],
-              "isOptional": false,
-              "isAbstract": false,
-              "name": "toAttributives"
-            }
-          ],
-          "extendsTokenRange": {
-            "startIndex": 1,
-            "endIndex": 7
-          },
-          "implementsTokenRanges": []
         },
         {
           "kind": "Variable",
@@ -1030,7 +910,25 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\ntype: {\ntype: \"string\";\nrequired: true;\ncollection: false;\ndefaultValue: () => string;\n};\ndata: {\ntype: "
+              "text": "<    {\ntype: {\ntype: \"string\";\nrequired: true;\ncollection: false;\ndefaultValue: () => string;\n};\ndata: {\ninstanceType: "
+            },
+            {
+              "kind": "Reference",
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/runtime!InertKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<any> | "
+            },
+            {
+              "kind": "Reference",
+              "text": "ReactiveKlassInstance",
+              "canonicalReference": "@interaqt/runtime!ReactiveKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<any>;\nrequired: true;\ncollection: false;\n};\n}> | "
             },
             {
               "kind": "Reference",
@@ -1039,34 +937,88 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\nstringContent: {\ntype: \"string\";\n};\ncontent: {\ntype: \"function\";\n};\nname: {\ntype: \"string\";\n};\nisRef: {\ntype: \"boolean\";\n};\n}>;\nrequired: true;\ncollection: false;\n};\n}> | "
+              "text": "<    {\ntype: {\ntype: \"string\";\nrequired: true;\ncollection: false;\ndefaultValue: () => string;\n};\noperator: {\ntype: \"string\";\nrequired: true;\ncollection: false;\noptions: string[];\ndefaultValue: () => string;\n};\nleft: {\ninstanceType: "
             },
             {
               "kind": "Reference",
-              "text": "Klass",
-              "canonicalReference": "@interaqt/runtime!Klass:type"
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/runtime!InertKlassInstance:type"
             },
             {
               "kind": "Content",
-              "text": "<"
+              "text": "<    {\ntype: {\ntype: \"string\";\nrequired: true;\ncollection: false;\ndefaultValue: () => string;\n};\ndata: {\ninstanceType: "
             },
             {
               "kind": "Reference",
-              "text": "BoolExpressionDataPublic",
-              "canonicalReference": "@interaqt/runtime!BoolExpressionDataPublic:type"
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/runtime!InertKlassInstance:type"
             },
             {
               "kind": "Content",
-              "text": ">)[];\ncollection: false;\nrequired: false;\n};\n}>"
+              "text": "<any> | "
+            },
+            {
+              "kind": "Reference",
+              "text": "ReactiveKlassInstance",
+              "canonicalReference": "@interaqt/runtime!ReactiveKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<any>;\nrequired: true;\ncollection: false;\n};\n}> | "
+            },
+            {
+              "kind": "Reference",
+              "text": "UnwrappedBoolExpressionInstanceType",
+              "canonicalReference": "@interaqt/runtime!UnwrappedBoolExpressionInstanceType:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<any>;\nrequired: true;\ncollection: false;\n};\nright: {\ninstanceType: "
+            },
+            {
+              "kind": "Reference",
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/runtime!InertKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<    {\ntype: {\ntype: \"string\";\nrequired: true;\ncollection: false;\ndefaultValue: () => string;\n};\ndata: {\ninstanceType: "
+            },
+            {
+              "kind": "Reference",
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/runtime!InertKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<any> | "
+            },
+            {
+              "kind": "Reference",
+              "text": "ReactiveKlassInstance",
+              "canonicalReference": "@interaqt/runtime!ReactiveKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<any>;\nrequired: true;\ncollection: false;\n};\n}> | "
+            },
+            {
+              "kind": "Reference",
+              "text": "UnwrappedBoolExpressionInstanceType",
+              "canonicalReference": "@interaqt/runtime!UnwrappedBoolExpressionInstanceType:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<any>;\nrequired: false;\ncollection: false;\n};\n}>)[];\ncollection: false;\nrequired: false;\n};\n}>"
             }
           ],
-          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
+          "fileUrlPath": "../shared/index.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "Attributives",
           "variableTypeTokenRange": {
             "startIndex": 1,
-            "endIndex": 11
+            "endIndex": 27
           }
         },
         {
@@ -1085,25 +1037,34 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\ntype: {\ntype: \"string\";\nrequired: true;\ncollection: false;\ndefaultValue: () => string;\n};\ndata: {\ntype: "
+              "text": "<{\n    type: {\n        type: \"string\";\n        required: true;\n        collection: false;\n        defaultValue: () => string;\n    };\n    data: {\n        instanceType: "
             },
             {
               "kind": "Reference",
-              "text": "Klass",
-              "canonicalReference": "@interaqt/runtime!Klass:type"
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/runtime!InertKlassInstance:type"
             },
             {
               "kind": "Content",
-              "text": "<    {\nstringContent: {\ntype: \"string\";\n};\ncontent: {\ntype: \"function\";\n};\nname: {\ntype: \"string\";\n};\nisRef: {\ntype: \"boolean\";\n};\n}>;\nrequired: true;\ncollection: false;\n};\n}>"
+              "text": "<any> | "
+            },
+            {
+              "kind": "Reference",
+              "text": "ReactiveKlassInstance",
+              "canonicalReference": "@interaqt/runtime!ReactiveKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<any>;\n        required: true;\n        collection: false;\n    };\n}>"
             }
           ],
-          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
+          "fileUrlPath": "../shared/index.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "BoolAtomData",
           "variableTypeTokenRange": {
             "startIndex": 1,
-            "endIndex": 5
+            "endIndex": 7
           }
         },
         {
@@ -1116,7 +1077,7 @@
               "text": "export declare class BoolExp<T> "
             }
           ],
-          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
+          "fileUrlPath": "../shared/index.ts",
           "releaseTag": "Public",
           "typeParameters": [
             {
@@ -2072,25 +2033,88 @@
             },
             {
               "kind": "Content",
-              "text": "<"
+              "text": "<{\n    type: {\n        type: \"string\";\n        required: true;\n        collection: false;\n        defaultValue: () => string;\n    };\n    operator: {\n        type: \"string\";\n        required: true;\n        collection: false;\n        options: string[];\n        defaultValue: () => string;\n    };\n    left: {\n        instanceType: "
             },
             {
               "kind": "Reference",
-              "text": "BoolExpressionDataPublic",
-              "canonicalReference": "@interaqt/runtime!BoolExpressionDataPublic:type"
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/runtime!InertKlassInstance:type"
             },
             {
               "kind": "Content",
-              "text": ">"
+              "text": "<    {\n        type: {\n        type: \"string\";\n        required: true;\n        collection: false;\n        defaultValue: () => string;\n        };\n        data: {\n        instanceType: "
+            },
+            {
+              "kind": "Reference",
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/runtime!InertKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<any> | "
+            },
+            {
+              "kind": "Reference",
+              "text": "ReactiveKlassInstance",
+              "canonicalReference": "@interaqt/runtime!ReactiveKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<any>;\n        required: true;\n        collection: false;\n        };\n        }> | "
+            },
+            {
+              "kind": "Reference",
+              "text": "UnwrappedBoolExpressionInstanceType",
+              "canonicalReference": "@interaqt/runtime!UnwrappedBoolExpressionInstanceType:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<any>;\n        required: true;\n        collection: false;\n    };\n    right: {\n        instanceType: "
+            },
+            {
+              "kind": "Reference",
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/runtime!InertKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<    {\n        type: {\n        type: \"string\";\n        required: true;\n        collection: false;\n        defaultValue: () => string;\n        };\n        data: {\n        instanceType: "
+            },
+            {
+              "kind": "Reference",
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/runtime!InertKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<any> | "
+            },
+            {
+              "kind": "Reference",
+              "text": "ReactiveKlassInstance",
+              "canonicalReference": "@interaqt/runtime!ReactiveKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<any>;\n        required: true;\n        collection: false;\n        };\n        }> | "
+            },
+            {
+              "kind": "Reference",
+              "text": "UnwrappedBoolExpressionInstanceType",
+              "canonicalReference": "@interaqt/runtime!UnwrappedBoolExpressionInstanceType:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<any>;\n        required: false;\n        collection: false;\n    };\n}>"
             }
           ],
-          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
+          "fileUrlPath": "../shared/index.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "BoolExpressionData",
           "variableTypeTokenRange": {
             "startIndex": 1,
-            "endIndex": 5
+            "endIndex": 19
           }
         },
         {
@@ -2129,7 +2153,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
+          "fileUrlPath": "../shared/index.ts",
           "releaseTag": "Public",
           "name": "BoolExpressionRawData",
           "typeParameters": [
@@ -2206,7 +2230,25 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\ntype: {\ntype: \"string\";\nrequired: true;\ncollection: false;\ndefaultValue: () => string;\n};\ndata: {\ntype: "
+              "text": "<    {\ntype: {\ntype: \"string\";\nrequired: true;\ncollection: false;\ndefaultValue: () => string;\n};\ndata: {\ninstanceType: "
+            },
+            {
+              "kind": "Reference",
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/runtime!InertKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<any> | "
+            },
+            {
+              "kind": "Reference",
+              "text": "ReactiveKlassInstance",
+              "canonicalReference": "@interaqt/runtime!ReactiveKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<any>;\nrequired: true;\ncollection: false;\n};\n}> | "
             },
             {
               "kind": "Reference",
@@ -2215,35 +2257,89 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\nstringContent: {\ntype: \"string\";\n};\ncontent: {\ntype: \"function\";\n};\nname: {\ntype: \"string\";\n};\nisRef: {\ntype: \"boolean\";\n};\n}>;\nrequired: true;\ncollection: false;\n};\n}> | "
+              "text": "<    {\ntype: {\ntype: \"string\";\nrequired: true;\ncollection: false;\ndefaultValue: () => string;\n};\noperator: {\ntype: \"string\";\nrequired: true;\ncollection: false;\noptions: string[];\ndefaultValue: () => string;\n};\nleft: {\ninstanceType: "
             },
             {
               "kind": "Reference",
-              "text": "Klass",
-              "canonicalReference": "@interaqt/runtime!Klass:type"
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/runtime!InertKlassInstance:type"
             },
             {
               "kind": "Content",
-              "text": "<"
+              "text": "<    {\ntype: {\ntype: \"string\";\nrequired: true;\ncollection: false;\ndefaultValue: () => string;\n};\ndata: {\ninstanceType: "
             },
             {
               "kind": "Reference",
-              "text": "BoolExpressionDataPublic",
-              "canonicalReference": "@interaqt/runtime!BoolExpressionDataPublic:type"
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/runtime!InertKlassInstance:type"
             },
             {
               "kind": "Content",
-              "text": ">)[];\ncollection: false;\nrequired: false;\n};\n}>"
+              "text": "<any> | "
+            },
+            {
+              "kind": "Reference",
+              "text": "ReactiveKlassInstance",
+              "canonicalReference": "@interaqt/runtime!ReactiveKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<any>;\nrequired: true;\ncollection: false;\n};\n}> | "
+            },
+            {
+              "kind": "Reference",
+              "text": "UnwrappedBoolExpressionInstanceType",
+              "canonicalReference": "@interaqt/runtime!UnwrappedBoolExpressionInstanceType:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<any>;\nrequired: true;\ncollection: false;\n};\nright: {\ninstanceType: "
+            },
+            {
+              "kind": "Reference",
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/runtime!InertKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<    {\ntype: {\ntype: \"string\";\nrequired: true;\ncollection: false;\ndefaultValue: () => string;\n};\ndata: {\ninstanceType: "
+            },
+            {
+              "kind": "Reference",
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/runtime!InertKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<any> | "
+            },
+            {
+              "kind": "Reference",
+              "text": "ReactiveKlassInstance",
+              "canonicalReference": "@interaqt/runtime!ReactiveKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<any>;\nrequired: true;\ncollection: false;\n};\n}> | "
+            },
+            {
+              "kind": "Reference",
+              "text": "UnwrappedBoolExpressionInstanceType",
+              "canonicalReference": "@interaqt/runtime!UnwrappedBoolExpressionInstanceType:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<any>;\nrequired: false;\ncollection: false;\n};\n}>)[];\ncollection: false;\nrequired: false;\n};\n}>"
             },
             {
               "kind": "Content",
               "text": ";"
             }
           ],
-          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
+          "fileUrlPath": "../shared/index.ts",
           "returnTypeTokenRange": {
             "startIndex": 8,
-            "endIndex": 18
+            "endIndex": 34
           },
           "releaseTag": "Public",
           "overloadIndex": 1,
@@ -2258,6 +2354,34 @@
             }
           ],
           "name": "boolExpToAttributives"
+        },
+        {
+          "kind": "Variable",
+          "canonicalReference": "@interaqt/runtime!boolExpToConditions:var",
+          "docComment": "",
+          "excerptTokens": [
+            {
+              "kind": "Content",
+              "text": "boolExpToConditions: "
+            },
+            {
+              "kind": "Content",
+              "text": "typeof "
+            },
+            {
+              "kind": "Reference",
+              "text": "boolExpToAttributives",
+              "canonicalReference": "@interaqt/runtime!boolExpToAttributives:function"
+            }
+          ],
+          "fileUrlPath": "../shared/index.ts",
+          "isReadonly": true,
+          "releaseTag": "Public",
+          "name": "boolExpToConditions",
+          "variableTypeTokenRange": {
+            "startIndex": 1,
+            "endIndex": 3
+          }
         },
         {
           "kind": "Variable",
@@ -2278,7 +2402,7 @@
               "text": "<{\n    computeEffect: {\n        type: \"string\";\n        collection: false;\n        required: true;\n    };\n    computation: {\n        type: \"string\";\n        collection: false;\n        required: true;\n    };\n}>"
             }
           ],
-          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
+          "fileUrlPath": "../shared/index.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "ComputedData",
@@ -2297,7 +2421,7 @@
               "text": "export declare interface Concept "
             }
           ],
-          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
+          "fileUrlPath": "../shared/index.ts",
           "releaseTag": "Public",
           "name": "Concept",
           "preserveMemberOrder": false,
@@ -2351,7 +2475,7 @@
               "text": " "
             }
           ],
-          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
+          "fileUrlPath": "../shared/index.ts",
           "releaseTag": "Public",
           "name": "ConceptAlias",
           "preserveMemberOrder": false,
@@ -2414,7 +2538,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
+          "fileUrlPath": "../shared/index.ts",
           "releaseTag": "Public",
           "name": "ConceptInstance",
           "typeTokenRange": {
@@ -2440,12 +2564,176 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
+          "fileUrlPath": "../shared/index.ts",
           "releaseTag": "Public",
           "name": "ConceptType",
           "typeTokenRange": {
             "startIndex": 1,
             "endIndex": 2
+          }
+        },
+        {
+          "kind": "Variable",
+          "canonicalReference": "@interaqt/runtime!Condition:var",
+          "docComment": "",
+          "excerptTokens": [
+            {
+              "kind": "Content",
+              "text": "Condition: "
+            },
+            {
+              "kind": "Reference",
+              "text": "Klass",
+              "canonicalReference": "@interaqt/runtime!Klass:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<    {\nstringContent: {\ntype: \"string\";\n};\ncontent: {\ntype: \"function\";\n};\nname: {\ntype: \"string\";\n};\nisRef: {\ntype: \"boolean\";\n};\n}>"
+            }
+          ],
+          "fileUrlPath": "../shared/index.ts",
+          "isReadonly": true,
+          "releaseTag": "Public",
+          "name": "Condition",
+          "variableTypeTokenRange": {
+            "startIndex": 1,
+            "endIndex": 3
+          }
+        },
+        {
+          "kind": "Variable",
+          "canonicalReference": "@interaqt/runtime!Conditions:var",
+          "docComment": "",
+          "excerptTokens": [
+            {
+              "kind": "Content",
+              "text": "Conditions: "
+            },
+            {
+              "kind": "Reference",
+              "text": "Klass",
+              "canonicalReference": "@interaqt/runtime!Klass:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<    {\ncontent: {\ntype: ("
+            },
+            {
+              "kind": "Reference",
+              "text": "Klass",
+              "canonicalReference": "@interaqt/runtime!Klass:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<    {\ntype: {\ntype: \"string\";\nrequired: true;\ncollection: false;\ndefaultValue: () => string;\n};\ndata: {\ninstanceType: "
+            },
+            {
+              "kind": "Reference",
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/runtime!InertKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<any> | "
+            },
+            {
+              "kind": "Reference",
+              "text": "ReactiveKlassInstance",
+              "canonicalReference": "@interaqt/runtime!ReactiveKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<any>;\nrequired: true;\ncollection: false;\n};\n}> | "
+            },
+            {
+              "kind": "Reference",
+              "text": "Klass",
+              "canonicalReference": "@interaqt/runtime!Klass:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<    {\ntype: {\ntype: \"string\";\nrequired: true;\ncollection: false;\ndefaultValue: () => string;\n};\noperator: {\ntype: \"string\";\nrequired: true;\ncollection: false;\noptions: string[];\ndefaultValue: () => string;\n};\nleft: {\ninstanceType: "
+            },
+            {
+              "kind": "Reference",
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/runtime!InertKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<    {\ntype: {\ntype: \"string\";\nrequired: true;\ncollection: false;\ndefaultValue: () => string;\n};\ndata: {\ninstanceType: "
+            },
+            {
+              "kind": "Reference",
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/runtime!InertKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<any> | "
+            },
+            {
+              "kind": "Reference",
+              "text": "ReactiveKlassInstance",
+              "canonicalReference": "@interaqt/runtime!ReactiveKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<any>;\nrequired: true;\ncollection: false;\n};\n}> | "
+            },
+            {
+              "kind": "Reference",
+              "text": "UnwrappedBoolExpressionInstanceType",
+              "canonicalReference": "@interaqt/runtime!UnwrappedBoolExpressionInstanceType:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<any>;\nrequired: true;\ncollection: false;\n};\nright: {\ninstanceType: "
+            },
+            {
+              "kind": "Reference",
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/runtime!InertKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<    {\ntype: {\ntype: \"string\";\nrequired: true;\ncollection: false;\ndefaultValue: () => string;\n};\ndata: {\ninstanceType: "
+            },
+            {
+              "kind": "Reference",
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/runtime!InertKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<any> | "
+            },
+            {
+              "kind": "Reference",
+              "text": "ReactiveKlassInstance",
+              "canonicalReference": "@interaqt/runtime!ReactiveKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<any>;\nrequired: true;\ncollection: false;\n};\n}> | "
+            },
+            {
+              "kind": "Reference",
+              "text": "UnwrappedBoolExpressionInstanceType",
+              "canonicalReference": "@interaqt/runtime!UnwrappedBoolExpressionInstanceType:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<any>;\nrequired: false;\ncollection: false;\n};\n}>)[];\ncollection: false;\nrequired: false;\n};\n}>"
+            }
+          ],
+          "fileUrlPath": "../shared/index.ts",
+          "isReadonly": true,
+          "releaseTag": "Public",
+          "name": "Conditions",
+          "variableTypeTokenRange": {
+            "startIndex": 1,
+            "endIndex": 27
           }
         },
         {
@@ -2480,7 +2768,7 @@
               "text": "<boolean>;\n}"
             }
           ],
-          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
+          "fileUrlPath": "../shared/index.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "constraints",
@@ -3942,7 +4230,7 @@
               "text": ">)[];\n        collection: false;\n        required: true;\n    };\n    matchExpression: {\n        type: \"function\";\n        collection: false;\n        required: true;\n    };\n}>"
             }
           ],
-          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
+          "fileUrlPath": "../shared/index.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "Count",
@@ -3991,7 +4279,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
+          "fileUrlPath": "../shared/index.ts",
           "returnTypeTokenRange": {
             "startIndex": 5,
             "endIndex": 7
@@ -4149,7 +4437,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
+          "fileUrlPath": "../shared/index.ts",
           "returnTypeTokenRange": {
             "startIndex": 6,
             "endIndex": 12
@@ -4225,7 +4513,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
+          "fileUrlPath": "../shared/index.ts",
           "returnTypeTokenRange": {
             "startIndex": 3,
             "endIndex": 9
@@ -4302,7 +4590,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
+          "fileUrlPath": "../shared/index.ts",
           "returnTypeTokenRange": {
             "startIndex": 7,
             "endIndex": 11
@@ -4690,7 +4978,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
+          "fileUrlPath": "../shared/index.ts",
           "returnTypeTokenRange": {
             "startIndex": 5,
             "endIndex": 6
@@ -4749,7 +5037,7 @@
               "text": " "
             }
           ],
-          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
+          "fileUrlPath": "../shared/index.ts",
           "releaseTag": "Public",
           "name": "DerivedConcept",
           "preserveMemberOrder": false,
@@ -4944,7 +5232,7 @@
               "text": "<boolean>;\n        };\n        defaultValue(): never[];\n    };\n    isRef: {\n        required: true;\n        collection: false;\n        type: \"boolean\";\n        defaultValue: () => boolean;\n    };\n}>"
             }
           ],
-          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
+          "fileUrlPath": "../shared/index.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "Entity",
@@ -5006,7 +5294,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
+          "fileUrlPath": "../shared/index.ts",
           "releaseTag": "Public",
           "name": "EvaluateError",
           "typeTokenRange": {
@@ -5033,7 +5321,7 @@
               "text": "<{\n    name: {\n        type: \"string\";\n        required: true;\n    };\n}>"
             }
           ],
-          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
+          "fileUrlPath": "../shared/index.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "Event_2",
@@ -5363,7 +5651,7 @@
               "text": ">)[];\n        collection: false;\n        required: true;\n    };\n    matchExpression: {\n        type: \"function\";\n        collection: false;\n        required: true;\n    };\n    notEmpty: {\n        type: \"boolean\";\n        collection: false;\n        required: false;\n    };\n}>"
             }
           ],
-          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
+          "fileUrlPath": "../shared/index.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "Every",
@@ -5404,7 +5692,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
+          "fileUrlPath": "../shared/index.ts",
           "releaseTag": "Public",
           "name": "ExpressionData",
           "typeParameters": [
@@ -5457,7 +5745,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
+          "fileUrlPath": "../shared/index.ts",
           "returnTypeTokenRange": {
             "startIndex": 3,
             "endIndex": 5
@@ -5538,7 +5826,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
+          "fileUrlPath": "../shared/index.ts",
           "returnTypeTokenRange": {
             "startIndex": 11,
             "endIndex": 12
@@ -5601,7 +5889,7 @@
               "text": ">"
             }
           ],
-          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
+          "fileUrlPath": "../shared/index.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "Gateway",
@@ -5642,7 +5930,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
+          "fileUrlPath": "../shared/index.ts",
           "releaseTag": "Public",
           "name": "GatewayInstanceType",
           "typeTokenRange": {
@@ -5668,7 +5956,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
+          "fileUrlPath": "../shared/index.ts",
           "releaseTag": "Public",
           "name": "GatewayPublicType",
           "typeTokenRange": {
@@ -5704,7 +5992,7 @@
               "text": "<    {\nname: {\ntype: \"string\";\nrequired: true;\n};\n}>"
             }
           ],
-          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
+          "fileUrlPath": "../shared/index.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "GetAction",
@@ -5744,7 +6032,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
+          "fileUrlPath": "../shared/index.ts",
           "returnTypeTokenRange": {
             "startIndex": 4,
             "endIndex": 5
@@ -5807,7 +6095,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
+          "fileUrlPath": "../shared/index.ts",
           "returnTypeTokenRange": {
             "startIndex": 6,
             "endIndex": 8
@@ -5880,7 +6168,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
+          "fileUrlPath": "../shared/index.ts",
           "returnTypeTokenRange": {
             "startIndex": 3,
             "endIndex": 7
@@ -5930,7 +6218,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
+          "fileUrlPath": "../shared/index.ts",
           "returnTypeTokenRange": {
             "startIndex": 4,
             "endIndex": 5
@@ -6026,7 +6314,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
+          "fileUrlPath": "../shared/index.ts",
           "releaseTag": "Public",
           "name": "InertKlassInstance",
           "typeParameters": [
@@ -6101,7 +6389,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
+          "fileUrlPath": "../shared/index.ts",
           "releaseTag": "Public",
           "name": "InertKlassInstanceProps",
           "typeParameters": [
@@ -6150,7 +6438,7 @@
               "text": ">"
             }
           ],
-          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
+          "fileUrlPath": "../shared/index.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "Interaction",
@@ -6217,7 +6505,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
+          "fileUrlPath": "../shared/index.ts",
           "releaseTag": "Public",
           "name": "InteractionInstanceType",
           "typeTokenRange": {
@@ -6236,7 +6524,25 @@
             },
             {
               "kind": "Content",
-              "text": "{\n    name: {\n        type: 'string';\n        collection: false;\n        required: true;\n    };\n    userAttributives: {\n        required: false;\n        collection: false;\n        type: (typeof "
+              "text": "{\n    name: {\n        type: 'string';\n        collection: false;\n        required: true;\n    };\n    conditions: {\n        required: false;\n        collection: false;\n        type: (typeof "
+            },
+            {
+              "kind": "Reference",
+              "text": "Conditions",
+              "canonicalReference": "@interaqt/runtime!Conditions:var"
+            },
+            {
+              "kind": "Content",
+              "text": " | typeof "
+            },
+            {
+              "kind": "Reference",
+              "text": "Condition",
+              "canonicalReference": "@interaqt/runtime!Condition:var"
+            },
+            {
+              "kind": "Content",
+              "text": ")[];\n    };\n    userAttributives: {\n        required: false;\n        collection: false;\n        type: (typeof "
             },
             {
               "kind": "Reference",
@@ -6315,12 +6621,12 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
+          "fileUrlPath": "../shared/index.ts",
           "releaseTag": "Public",
           "name": "InteractionPublicType",
           "typeTokenRange": {
             "startIndex": 1,
-            "endIndex": 18
+            "endIndex": 22
           }
         },
         {
@@ -6525,7 +6831,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
+          "fileUrlPath": "../shared/index.ts",
           "releaseTag": "Public",
           "name": "Klass",
           "typeParameters": [
@@ -6574,7 +6880,7 @@
               "text": "<any>>"
             }
           ],
-          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
+          "fileUrlPath": "../shared/index.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "KlassByName",
@@ -6640,7 +6946,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
+          "fileUrlPath": "../shared/index.ts",
           "releaseTag": "Public",
           "name": "KlassInstance",
           "typeParameters": [
@@ -6726,7 +7032,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
+          "fileUrlPath": "../shared/index.ts",
           "releaseTag": "Public",
           "name": "KlassInstanceArgs",
           "typeParameters": [
@@ -6774,7 +7080,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
+          "fileUrlPath": "../shared/index.ts",
           "releaseTag": "Public",
           "name": "KlassInstancePrimitiveProps",
           "typeTokenRange": {
@@ -6818,7 +7124,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
+          "fileUrlPath": "../shared/index.ts",
           "releaseTag": "Public",
           "name": "KlassMeta",
           "typeTokenRange": {
@@ -6844,7 +7150,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
+          "fileUrlPath": "../shared/index.ts",
           "releaseTag": "Public",
           "name": "KlassOptions",
           "typeTokenRange": {
@@ -6891,7 +7197,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
+          "fileUrlPath": "../shared/index.ts",
           "releaseTag": "Public",
           "name": "KlassProp",
           "typeParameters": [
@@ -7223,7 +7529,7 @@
               "text": ">;\n        collection: true;\n        required: false;\n    };\n    handle: {\n        type: \"function\";\n        collection: false;\n        required: true;\n    };\n}>"
             }
           ],
-          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
+          "fileUrlPath": "../shared/index.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "MapActivityToRecord",
@@ -7278,7 +7584,7 @@
               "text": ">;\n                collection: false;\n                required: true;\n            };\n            handle: {\n                type: \"function\";\n                collection: false;\n                required: true;\n            };\n            computeSource: {\n                type: \"function\";\n                collection: false;\n                required: true;\n            };\n        }>;\n        collection: true;\n        required: true;\n    };\n    defaultValue: {\n        type: \"string\";\n        collection: false;\n        required: false;\n    };\n}>"
             }
           ],
-          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
+          "fileUrlPath": "../shared/index.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "MapInteractionToProperty",
@@ -7324,7 +7630,7 @@
               "text": ">;\n        collection: false;\n        required: true;\n    };\n    handle: {\n        type: \"function\";\n        collection: false;\n        required: true;\n    };\n    computeSource: {\n        type: \"function\";\n        collection: false;\n        required: true;\n    };\n}>"
             }
           ],
-          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
+          "fileUrlPath": "../shared/index.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "MapInteractionToPropertyItem",
@@ -7370,7 +7676,7 @@
               "text": ">;\n        collection: false;\n        required: true;\n    };\n    handle: {\n        type: \"function\";\n        collection: false;\n        required: true;\n    };\n}>"
             }
           ],
-          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
+          "fileUrlPath": "../shared/index.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "MapInteractionToRecord",
@@ -7398,7 +7704,7 @@
               "text": "<{\n    handle: {\n        type: \"function\";\n        collection: false;\n        required: true;\n    };\n}>"
             }
           ],
-          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
+          "fileUrlPath": "../shared/index.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "MapRecordMutationToRecord",
@@ -8176,7 +8482,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
+          "fileUrlPath": "../shared/index.ts",
           "releaseTag": "Public",
           "name": "OptionalProps",
           "typeParameters": [
@@ -8267,7 +8573,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
+          "fileUrlPath": "../shared/index.ts",
           "returnTypeTokenRange": {
             "startIndex": 7,
             "endIndex": 9
@@ -8367,34 +8673,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                            type: {\n                                type: \"string\";\n                                required: true;\n                                collection: false;\n                                defaultValue: () => string;\n                            };\n                            data: {\n                                type: "
-            },
-            {
-              "kind": "Reference",
-              "text": "Klass",
-              "canonicalReference": "@interaqt/runtime!Klass:type"
-            },
-            {
-              "kind": "Content",
-              "text": "<{\n                                    stringContent: {\n                                        type: \"string\";\n                                    };\n                                    content: {\n                                        type: \"function\";\n                                    };\n                                    name: {\n                                        type: \"string\";\n                                    };\n                                    isRef: {\n                                        type: \"boolean\";\n                                    };\n                                }>;\n                                required: true;\n                                collection: false;\n                            };\n                        }> | "
-            },
-            {
-              "kind": "Reference",
-              "text": "Klass",
-              "canonicalReference": "@interaqt/runtime!Klass:type"
-            },
-            {
-              "kind": "Content",
-              "text": "<{\n                            type: {\n                                type: \"string\";\n                                required: true;\n                                collection: false;\n                                defaultValue: () => \"expression\";\n                            };\n                            operator: {\n                                type: \"string\";\n                                required: true;\n                                collection: false;\n                                options: [\"and\", \"or\", \"not\"];\n                                defaultValue: () => \"and\";\n                            };\n                            left: {\n                                instanceType: "
-            },
-            {
-              "kind": "Reference",
-              "text": "UnwrappedBoolExpressionInstanceType",
-              "canonicalReference": "@interaqt/runtime!UnwrappedBoolExpressionInstanceType:type"
-            },
-            {
-              "kind": "Content",
-              "text": " | "
+              "text": "<{\n                            type: {\n                                type: \"string\";\n                                required: true;\n                                collection: false;\n                                defaultValue: () => string;\n                            };\n                            data: {\n                                instanceType: "
             },
             {
               "kind": "Reference",
@@ -8403,7 +8682,16 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n                                type: {\n                                type: \"string\";\n                                required: true;\n                                collection: false;\n                                defaultValue: () => string;\n                                };\n                                data: {\n                                type: "
+              "text": "<any> | "
+            },
+            {
+              "kind": "Reference",
+              "text": "ReactiveKlassInstance",
+              "canonicalReference": "@interaqt/runtime!ReactiveKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<any>;\n                                required: true;\n                                collection: false;\n                            };\n                        }> | "
             },
             {
               "kind": "Reference",
@@ -8412,16 +8700,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                                stringContent: {\n                                type: \"string\";\n                                };\n                                content: {\n                                type: \"function\";\n                                };\n                                name: {\n                                type: \"string\";\n                                };\n                                isRef: {\n                                type: \"boolean\";\n                                };\n                                }>;\n                                required: true;\n                                collection: false;\n                                };\n                                }>;\n                                required: true;\n                                collection: false;\n                            };\n                            right: {\n                                instanceType: "
-            },
-            {
-              "kind": "Reference",
-              "text": "UnwrappedBoolExpressionInstanceType",
-              "canonicalReference": "@interaqt/runtime!UnwrappedBoolExpressionInstanceType:type"
-            },
-            {
-              "kind": "Content",
-              "text": " | "
+              "text": "<{\n                            type: {\n                                type: \"string\";\n                                required: true;\n                                collection: false;\n                                defaultValue: () => string;\n                            };\n                            operator: {\n                                type: \"string\";\n                                required: true;\n                                collection: false;\n                                options: string[];\n                                defaultValue: () => string;\n                            };\n                            left: {\n                                instanceType: "
             },
             {
               "kind": "Reference",
@@ -8430,16 +8709,70 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n                                type: {\n                                type: \"string\";\n                                required: true;\n                                collection: false;\n                                defaultValue: () => string;\n                                };\n                                data: {\n                                type: "
+              "text": "<    {\n                                type: {\n                                type: \"string\";\n                                required: true;\n                                collection: false;\n                                defaultValue: () => string;\n                                };\n                                data: {\n                                instanceType: "
             },
             {
               "kind": "Reference",
-              "text": "Klass",
-              "canonicalReference": "@interaqt/runtime!Klass:type"
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/runtime!InertKlassInstance:type"
             },
             {
               "kind": "Content",
-              "text": "<{\n                                stringContent: {\n                                type: \"string\";\n                                };\n                                content: {\n                                type: \"function\";\n                                };\n                                name: {\n                                type: \"string\";\n                                };\n                                isRef: {\n                                type: \"boolean\";\n                                };\n                                }>;\n                                required: true;\n                                collection: false;\n                                };\n                                }>;\n                                required: false;\n                                collection: false;\n                            };\n                        }>)[];\n                        collection: false;\n                        required: false;\n                    };\n                }>)[];\n                collection: false;\n            };\n            base: {\n                type: "
+              "text": "<any> | "
+            },
+            {
+              "kind": "Reference",
+              "text": "ReactiveKlassInstance",
+              "canonicalReference": "@interaqt/runtime!ReactiveKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<any>;\n                                required: true;\n                                collection: false;\n                                };\n                                }> | "
+            },
+            {
+              "kind": "Reference",
+              "text": "UnwrappedBoolExpressionInstanceType",
+              "canonicalReference": "@interaqt/runtime!UnwrappedBoolExpressionInstanceType:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<any>;\n                                required: true;\n                                collection: false;\n                            };\n                            right: {\n                                instanceType: "
+            },
+            {
+              "kind": "Reference",
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/runtime!InertKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<    {\n                                type: {\n                                type: \"string\";\n                                required: true;\n                                collection: false;\n                                defaultValue: () => string;\n                                };\n                                data: {\n                                instanceType: "
+            },
+            {
+              "kind": "Reference",
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/runtime!InertKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<any> | "
+            },
+            {
+              "kind": "Reference",
+              "text": "ReactiveKlassInstance",
+              "canonicalReference": "@interaqt/runtime!ReactiveKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<any>;\n                                required: true;\n                                collection: false;\n                                };\n                                }> | "
+            },
+            {
+              "kind": "Reference",
+              "text": "UnwrappedBoolExpressionInstanceType",
+              "canonicalReference": "@interaqt/runtime!UnwrappedBoolExpressionInstanceType:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<any>;\n                                required: false;\n                                collection: false;\n                            };\n                        }>)[];\n                        collection: false;\n                        required: false;\n                    };\n                }>)[];\n                collection: false;\n            };\n            base: {\n                type: "
             },
             {
               "kind": "Reference",
@@ -8685,13 +9018,13 @@
               "text": "<{\n                    stringContent: {\n                        type: \"string\";\n                    };\n                    content: {\n                        type: \"function\";\n                    };\n                    name: {\n                        type: \"string\";\n                    };\n                    isRef: {\n                        type: \"boolean\";\n                    };\n                }>)[];\n            };\n        }>;\n        collection: true;\n        required: true;\n        defaultValue: () => never[];\n    };\n}>"
             }
           ],
-          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
+          "fileUrlPath": "../shared/index.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "Payload",
           "variableTypeTokenRange": {
             "startIndex": 1,
-            "endIndex": 81
+            "endIndex": 87
           }
         },
         {
@@ -8737,34 +9070,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                    type: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        defaultValue: () => string;\n                    };\n                    data: {\n                        type: "
-            },
-            {
-              "kind": "Reference",
-              "text": "Klass",
-              "canonicalReference": "@interaqt/runtime!Klass:type"
-            },
-            {
-              "kind": "Content",
-              "text": "<{\n                            stringContent: {\n                                type: \"string\";\n                            };\n                            content: {\n                                type: \"function\";\n                            };\n                            name: {\n                                type: \"string\";\n                            };\n                            isRef: {\n                                type: \"boolean\";\n                            };\n                        }>;\n                        required: true;\n                        collection: false;\n                    };\n                }> | "
-            },
-            {
-              "kind": "Reference",
-              "text": "Klass",
-              "canonicalReference": "@interaqt/runtime!Klass:type"
-            },
-            {
-              "kind": "Content",
-              "text": "<{\n                    type: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        defaultValue: () => \"expression\";\n                    };\n                    operator: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        options: [\"and\", \"or\", \"not\"];\n                        defaultValue: () => \"and\";\n                    };\n                    left: {\n                        instanceType: "
-            },
-            {
-              "kind": "Reference",
-              "text": "UnwrappedBoolExpressionInstanceType",
-              "canonicalReference": "@interaqt/runtime!UnwrappedBoolExpressionInstanceType:type"
-            },
-            {
-              "kind": "Content",
-              "text": " | "
+              "text": "<{\n                    type: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        defaultValue: () => string;\n                    };\n                    data: {\n                        instanceType: "
             },
             {
               "kind": "Reference",
@@ -8773,7 +9079,16 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n                        type: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        defaultValue: () => string;\n                        };\n                        data: {\n                        type: "
+              "text": "<any> | "
+            },
+            {
+              "kind": "Reference",
+              "text": "ReactiveKlassInstance",
+              "canonicalReference": "@interaqt/runtime!ReactiveKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<any>;\n                        required: true;\n                        collection: false;\n                    };\n                }> | "
             },
             {
               "kind": "Reference",
@@ -8782,16 +9097,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                        stringContent: {\n                        type: \"string\";\n                        };\n                        content: {\n                        type: \"function\";\n                        };\n                        name: {\n                        type: \"string\";\n                        };\n                        isRef: {\n                        type: \"boolean\";\n                        };\n                        }>;\n                        required: true;\n                        collection: false;\n                        };\n                        }>;\n                        required: true;\n                        collection: false;\n                    };\n                    right: {\n                        instanceType: "
-            },
-            {
-              "kind": "Reference",
-              "text": "UnwrappedBoolExpressionInstanceType",
-              "canonicalReference": "@interaqt/runtime!UnwrappedBoolExpressionInstanceType:type"
-            },
-            {
-              "kind": "Content",
-              "text": " | "
+              "text": "<{\n                    type: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        defaultValue: () => string;\n                    };\n                    operator: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        options: string[];\n                        defaultValue: () => string;\n                    };\n                    left: {\n                        instanceType: "
             },
             {
               "kind": "Reference",
@@ -8800,16 +9106,70 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n                        type: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        defaultValue: () => string;\n                        };\n                        data: {\n                        type: "
+              "text": "<    {\n                        type: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        defaultValue: () => string;\n                        };\n                        data: {\n                        instanceType: "
             },
             {
               "kind": "Reference",
-              "text": "Klass",
-              "canonicalReference": "@interaqt/runtime!Klass:type"
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/runtime!InertKlassInstance:type"
             },
             {
               "kind": "Content",
-              "text": "<{\n                        stringContent: {\n                        type: \"string\";\n                        };\n                        content: {\n                        type: \"function\";\n                        };\n                        name: {\n                        type: \"string\";\n                        };\n                        isRef: {\n                        type: \"boolean\";\n                        };\n                        }>;\n                        required: true;\n                        collection: false;\n                        };\n                        }>;\n                        required: false;\n                        collection: false;\n                    };\n                }>)[];\n                collection: false;\n                required: false;\n            };\n        }>)[];\n        collection: false;\n    };\n    base: {\n        type: "
+              "text": "<any> | "
+            },
+            {
+              "kind": "Reference",
+              "text": "ReactiveKlassInstance",
+              "canonicalReference": "@interaqt/runtime!ReactiveKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<any>;\n                        required: true;\n                        collection: false;\n                        };\n                        }> | "
+            },
+            {
+              "kind": "Reference",
+              "text": "UnwrappedBoolExpressionInstanceType",
+              "canonicalReference": "@interaqt/runtime!UnwrappedBoolExpressionInstanceType:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<any>;\n                        required: true;\n                        collection: false;\n                    };\n                    right: {\n                        instanceType: "
+            },
+            {
+              "kind": "Reference",
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/runtime!InertKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<    {\n                        type: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        defaultValue: () => string;\n                        };\n                        data: {\n                        instanceType: "
+            },
+            {
+              "kind": "Reference",
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/runtime!InertKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<any> | "
+            },
+            {
+              "kind": "Reference",
+              "text": "ReactiveKlassInstance",
+              "canonicalReference": "@interaqt/runtime!ReactiveKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<any>;\n                        required: true;\n                        collection: false;\n                        };\n                        }> | "
+            },
+            {
+              "kind": "Reference",
+              "text": "UnwrappedBoolExpressionInstanceType",
+              "canonicalReference": "@interaqt/runtime!UnwrappedBoolExpressionInstanceType:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<any>;\n                        required: false;\n                        collection: false;\n                    };\n                }>)[];\n                collection: false;\n                required: false;\n            };\n        }>)[];\n        collection: false;\n    };\n    base: {\n        type: "
             },
             {
               "kind": "Reference",
@@ -9055,13 +9415,13 @@
               "text": "<{\n            stringContent: {\n                type: \"string\";\n            };\n            content: {\n                type: \"function\";\n            };\n            name: {\n                type: \"string\";\n            };\n            isRef: {\n                type: \"boolean\";\n            };\n        }>)[];\n    };\n}>"
             }
           ],
-          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
+          "fileUrlPath": "../shared/index.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "PayloadItem",
           "variableTypeTokenRange": {
             "startIndex": 1,
-            "endIndex": 79
+            "endIndex": 85
           }
         },
         {
@@ -9146,7 +9506,7 @@
               "text": "<any>[];\n        required: false;\n    };\n    computed: {\n        required: false;\n        type: \"function\";\n        collection: false;\n    };\n}>"
             }
           ],
-          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
+          "fileUrlPath": "../shared/index.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "Property",
@@ -9169,7 +9529,7 @@
               "text": "{\n    string: string;\n    number: string;\n    boolean: string;\n}"
             }
           ],
-          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
+          "fileUrlPath": "../shared/index.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "PropertyTypeMap",
@@ -9188,7 +9548,7 @@
               "text": "export declare enum PropertyTypes "
             }
           ],
-          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
+          "fileUrlPath": "../shared/index.ts",
           "releaseTag": "Public",
           "name": "PropertyTypes",
           "preserveMemberOrder": false,
@@ -9308,7 +9668,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
+          "fileUrlPath": "../shared/index.ts",
           "releaseTag": "Public",
           "name": "ReactiveKlassInstance",
           "typeParameters": [
@@ -9383,7 +9743,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
+          "fileUrlPath": "../shared/index.ts",
           "releaseTag": "Public",
           "name": "ReactiveKlassInstanceProps",
           "typeParameters": [
@@ -9436,7 +9796,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
+          "fileUrlPath": "../shared/index.ts",
           "releaseTag": "Public",
           "name": "ReactiveKlassOptions",
           "typeTokenRange": {
@@ -9533,7 +9893,7 @@
               "text": ">"
             }
           ],
-          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
+          "fileUrlPath": "../shared/index.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "Relation",
@@ -9579,7 +9939,7 @@
               "text": ">;\n        collection: false;\n        required: true;\n    };\n    relationDirection: {\n        type: \"string\";\n        collection: false;\n        required: true;\n        defaultValue: () => string;\n    };\n    matchExpression: {\n        type: \"function\";\n        collection: false;\n        required: true;\n    };\n}>"
             }
           ],
-          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
+          "fileUrlPath": "../shared/index.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "RelationBasedAny",
@@ -9625,7 +9985,7 @@
               "text": ">;\n        collection: false;\n        required: true;\n    };\n    relationDirection: {\n        type: \"string\";\n        collection: false;\n        required: true;\n        defaultValue: () => string;\n    };\n    matchExpression: {\n        type: \"function\";\n        collection: false;\n        required: true;\n    };\n    notEmpty: {\n        type: \"boolean\";\n        collection: false;\n        required: false;\n    };\n}>"
             }
           ],
-          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
+          "fileUrlPath": "../shared/index.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "RelationBasedEvery",
@@ -9680,7 +10040,7 @@
               "text": ">;\n                collection: false;\n                required: true;\n            };\n            relationDirection: {\n                type: \"string\";\n                collection: false;\n                required: true;\n                defaultValue: () => string;\n            };\n        }>;\n        collection: true;\n        required: true;\n    };\n    matchRelationToWeight: {\n        type: \"function\";\n        collection: false;\n        required: true;\n    };\n}>"
             }
           ],
-          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
+          "fileUrlPath": "../shared/index.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "RelationBasedWeightedSummation",
@@ -9726,7 +10086,7 @@
               "text": ">;\n        collection: false;\n        required: true;\n    };\n    relationDirection: {\n        type: \"string\";\n        collection: false;\n        required: true;\n        defaultValue: () => string;\n    };\n    matchExpression: {\n        type: \"function\";\n        collection: false;\n        required: true;\n    };\n}>"
             }
           ],
-          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
+          "fileUrlPath": "../shared/index.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "RelationCount",
@@ -9951,7 +10311,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
+          "fileUrlPath": "../shared/index.ts",
           "releaseTag": "Public",
           "name": "RelationPublic",
           "typeTokenRange": {
@@ -10365,7 +10725,7 @@
               "text": "<any>[];\n                        collection: false;\n                        required: true;\n                    };\n                }>;\n                collection: true;\n                required: false;\n            };\n            propertyHandle: {\n                type: \"function\";\n                required: false;\n                collection: false;\n            };\n        }>;\n        collection: false;\n        required: true;\n    };\n}>"
             }
           ],
-          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
+          "fileUrlPath": "../shared/index.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "RelationStateMachine",
@@ -10411,7 +10771,7 @@
               "text": "<any>[];\n                collection: false;\n                required: true;\n            };\n        }>;\n        collection: true;\n        required: false;\n    };\n    propertyHandle: {\n        type: \"function\";\n        required: false;\n        collection: false;\n    };\n}>"
             }
           ],
-          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
+          "fileUrlPath": "../shared/index.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "RelationStateNode",
@@ -10763,7 +11123,7 @@
               "text": "<any>[];\n                        collection: false;\n                        required: true;\n                    };\n                }>;\n                collection: true;\n                required: false;\n            };\n            propertyHandle: {\n                type: \"function\";\n                required: false;\n                collection: false;\n            };\n        }>;\n        collection: false;\n        required: true;\n    };\n    handleType: {\n        type: \"string\";\n    };\n    handle: {\n        type: \"function\";\n        collection: false;\n        required: true;\n    };\n}>"
             }
           ],
-          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
+          "fileUrlPath": "../shared/index.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "RelationStateTransfer",
@@ -10790,7 +11150,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
+          "fileUrlPath": "../shared/index.ts",
           "returnTypeTokenRange": {
             "startIndex": 1,
             "endIndex": 2
@@ -10960,7 +11320,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
+          "fileUrlPath": "../shared/index.ts",
           "releaseTag": "Public",
           "name": "RequiredProps",
           "typeParameters": [
@@ -11074,7 +11434,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
+          "fileUrlPath": "../shared/index.ts",
           "releaseTag": "Public",
           "name": "RequireWithoutDefaultAndComputed",
           "typeParameters": [
@@ -11152,7 +11512,7 @@
               "text": "<{\n    name: {\n        type: \"string\";\n        required: true;\n        collection: false;\n    };\n    handle: {\n        type: \"function\";\n        required: true;\n        collection: false;\n    };\n}>"
             }
           ],
-          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
+          "fileUrlPath": "../shared/index.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "SideEffect",
@@ -12244,7 +12604,7 @@
               "text": "<any>[];\n        required: false;\n    };\n}>"
             }
           ],
-          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
+          "fileUrlPath": "../shared/index.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "State",
@@ -12477,7 +12837,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
+          "fileUrlPath": "../shared/index.ts",
           "returnTypeTokenRange": {
             "startIndex": 1,
             "endIndex": 2
@@ -12513,7 +12873,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
+          "fileUrlPath": "../shared/index.ts",
           "returnTypeTokenRange": {
             "startIndex": 3,
             "endIndex": 4
@@ -12563,7 +12923,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
+          "fileUrlPath": "../shared/index.ts",
           "returnTypeTokenRange": {
             "startIndex": 4,
             "endIndex": 5
@@ -13303,7 +13663,7 @@
               "text": ">"
             }
           ],
-          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
+          "fileUrlPath": "../shared/index.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "Transfer",
@@ -13344,7 +13704,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
+          "fileUrlPath": "../shared/index.ts",
           "releaseTag": "Public",
           "name": "TransferInstanceType",
           "typeTokenRange": {
@@ -13478,7 +13838,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
+          "fileUrlPath": "../shared/index.ts",
           "releaseTag": "Public",
           "name": "TransferPublicType",
           "typeTokenRange": {
@@ -13517,7 +13877,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
+          "fileUrlPath": "../shared/index.ts",
           "releaseTag": "Public",
           "name": "UnwrapCollectionType",
           "typeParameters": [
@@ -13545,7 +13905,29 @@
           "excerptTokens": [
             {
               "kind": "Content",
-              "text": "export declare type UnwrappedBoolExpressionInstanceType = "
+              "text": "export declare type UnwrappedBoolExpressionInstanceType<T extends "
+            },
+            {
+              "kind": "Reference",
+              "text": "NonNullable",
+              "canonicalReference": "!NonNullable:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<"
+            },
+            {
+              "kind": "Reference",
+              "text": "KlassMeta",
+              "canonicalReference": "@interaqt/runtime!KlassMeta:type"
+            },
+            {
+              "kind": "Content",
+              "text": "[\"public\"]>"
+            },
+            {
+              "kind": "Content",
+              "text": "> = "
             },
             {
               "kind": "Content",
@@ -13558,7 +13940,7 @@
             },
             {
               "kind": "Content",
-              "text": " | "
+              "text": "<T> | "
             },
             {
               "kind": "Reference",
@@ -13567,16 +13949,16 @@
             },
             {
               "kind": "Content",
-              "text": "<typeof "
+              "text": "<"
             },
             {
               "kind": "Reference",
-              "text": "BoolAtomData",
-              "canonicalReference": "@interaqt/runtime!BoolAtomData:var"
+              "text": "Klass",
+              "canonicalReference": "@interaqt/runtime!Klass:type"
             },
             {
               "kind": "Content",
-              "text": ", any>;\n    right?: "
+              "text": "<T>, any>;\n    right?: "
             },
             {
               "kind": "Reference",
@@ -13585,7 +13967,7 @@
             },
             {
               "kind": "Content",
-              "text": " | "
+              "text": "<T> | "
             },
             {
               "kind": "Reference",
@@ -13594,28 +13976,41 @@
             },
             {
               "kind": "Content",
-              "text": "<typeof "
+              "text": "<"
             },
             {
               "kind": "Reference",
-              "text": "BoolAtomData",
-              "canonicalReference": "@interaqt/runtime!BoolAtomData:var"
+              "text": "Klass",
+              "canonicalReference": "@interaqt/runtime!Klass:type"
             },
             {
               "kind": "Content",
-              "text": ", any>;\n}"
+              "text": "<T>, any>;\n}"
             },
             {
               "kind": "Content",
               "text": ";"
             }
           ],
-          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
+          "fileUrlPath": "../shared/index.ts",
           "releaseTag": "Public",
           "name": "UnwrappedBoolExpressionInstanceType",
+          "typeParameters": [
+            {
+              "typeParameterName": "T",
+              "constraintTokenRange": {
+                "startIndex": 1,
+                "endIndex": 5
+              },
+              "defaultTypeTokenRange": {
+                "startIndex": 0,
+                "endIndex": 0
+              }
+            }
+          ],
           "typeTokenRange": {
-            "startIndex": 1,
-            "endIndex": 14
+            "startIndex": 6,
+            "endIndex": 19
           }
         },
         {
@@ -13799,7 +14194,7 @@
               "text": ">)[];\n        collection: true;\n        required: true;\n    };\n    matchRecordToWeight: {\n        type: \"function\";\n        collection: false;\n        required: true;\n    };\n}>"
             }
           ],
-          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
+          "fileUrlPath": "../shared/index.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "WeightedSummation",

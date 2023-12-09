@@ -8,11 +8,12 @@ import {
     ConceptInstance, Condition, Conditions,
     DerivedConcept,
     Entity,
+    Relation,
     ExpressionData,
     GetAction,
     InteractionInstanceType,
     Klass,
-    KlassInstance,
+    KlassInstance, DataAttributives, DataAttributive, Computation,
 } from "@interaqt/shared";
 import {System} from "./System.js";
 import {EventUser, InteractionEvent, InteractionEventArgs} from "./types/interaction.js";
@@ -309,10 +310,12 @@ export class InteractionCall {
         if (this.interaction.conditions ) {
             const conditions =  Conditions.is(this.interaction.conditions) ?
                 new BoolExp<KlassInstance<typeof Condition, false>>(this.interaction.conditions.content as BoolExpressionRawData<KlassInstance<typeof Condition, false>>) :
-                BoolExp.atom<KlassInstance<typeof Attributive, false>>(this.interaction.conditions as KlassInstance<typeof Condition, false>)
+                BoolExp.atom<KlassInstance<typeof Condition, false>>(this.interaction.conditions as KlassInstance<typeof Condition, false>)
 
 
             const handleAttribute = async (condition: KlassInstance<typeof Condition, false>) => {
+                if (!condition) return true
+
                 if (condition.content) {
                     const testFn = condition.content
                     let result
@@ -389,8 +392,36 @@ export class InteractionCall {
         return savedPayload
     }
     async retrieveData(interactionEvent: InteractionEventArgs) {
-        // TODO
-        // return this.system.storage.get(interactionEvent.payload, interactionEvent.query)
+        const matchFn = DataAttributives.is(this.interaction.dataAttributives) ?
+            BoolExp.fromValue<KlassInstance<typeof DataAttributive, false>>(
+                this.interaction.dataAttributives!.content! as ExpressionData<KlassInstance<typeof DataAttributive, false>>
+            ) :
+            BoolExp.atom<KlassInstance<typeof DataAttributive, false>>(
+                this.interaction.dataAttributives as KlassInstance<typeof DataAttributive, false>
+            )
+
+        const match = matchFn.map((dataAttributiveAtom) => {
+            const { content: createMatch } = dataAttributiveAtom.toValue().data
+            return createMatch.call(this.controller, interactionEvent)
+        })
+
+        let data: any
+        if (Entity.is(this.interaction.data) || Relation.is(this.interaction.data)) {
+            const recordName = (this.interaction.data as KlassInstance<typeof Entity, false>).name
+            const {modifier: fixedModifier, attributeQuery: fixedAttributeQuery} = Object.fromEntries(this.interaction.query?.items?.map(item => [item.name, item.value as any]) || [])
+            const modifier = {...(interactionEvent.query?.modifier||{}), ...(fixedModifier||{})}
+            // TODO 怎么判断 attributeQuery 是在 fixed 的q范围里面？？？？
+            const attributeQuery = interactionEvent.query?.attributeQuery || []
+            data= await this.system.storage.find(recordName, match, modifier, attributeQuery)
+        } else if (Computation.is(this.interaction.data)){
+            // computation
+            const { content: computation } = this.interaction.data as KlassInstance<typeof Computation, false>
+            data= await computation.call(this.controller, match, interactionEvent.query, interactionEvent )
+        } else {
+            assert(false,`unknown data type ${this.interaction.data}`)
+        }
+
+        return data
     }
     async call(interactionEventArgs: InteractionEventArgs, activityId?: string, checkUserRef?: CheckUserRef, context?: InteractionContext): Promise<InteractionCallResponse> {
         const response: InteractionCallResponse = {
@@ -424,7 +455,7 @@ export class InteractionCall {
             // effect
             await this.runEffects(interactionEventArgs, activityId, response)
             if (this.isGetInteraction()) {
-                await this.retrieveData(interactionEventArgs)
+                response.data = await this.retrieveData(interactionEventArgs)
             }
         }
 

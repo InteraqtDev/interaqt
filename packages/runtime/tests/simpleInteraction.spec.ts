@@ -1,13 +1,9 @@
 import {beforeEach, describe, expect, test} from "vitest";
 import {Controller} from "../Controller.js";
 import {MonoSystem} from "../MonoSystem.js";
-import {createInstances, KlassByName, removeAllInstance} from "@interaqt/shared";
-import {Activity, Interaction} from "@interaqt/shared";
-import {Entity, Relation} from "@interaqt/shared";
-import {State} from "@interaqt/shared";
+import {Interaction, KlassByName, removeAllInstance} from "@interaqt/shared";
 import '../computedDataHandles/index.js'
 import {MatchExp} from '@interaqt/storage'
-import {AttributeError} from "../InteractionCall.js";
 
 // 里面有所有必须的数据？
 type User = {
@@ -21,6 +17,7 @@ describe('map interaction', () => {
     let system: MonoSystem
     let createRequestUUID: string
     let approveRequestUUID: string
+    let getMyPendingRequestsUUID: string
     let controller: Controller
 
     let userAId: string
@@ -43,6 +40,7 @@ describe('map interaction', () => {
         await controller.setup(true)
         createRequestUUID = Interaction.instances!.find(i => i.name === 'createRequest')!.uuid
         approveRequestUUID = Interaction.instances!.find(i => i.name === 'approve')!.uuid
+        getMyPendingRequestsUUID = Interaction.instances!.find(i => i.name === 'getMyPendingRequests')!.uuid
 
         const userARef = await system.storage.create('User', {name: 'A'})
         userAId = userARef.id
@@ -103,7 +101,6 @@ describe('map interaction', () => {
         }
 
         // 错误 c 自己同意
-
         const res2w = await controller.callInteraction(approveRequestUUID,  {user: userC, payload: payload2})
         expect(res2w.error).toBeDefined()
 
@@ -121,18 +118,31 @@ describe('map interaction', () => {
         expect(requests2[0].approved).toBeFalsy()
         expect(requests2[0].result).toBe('pending')
 
+        // 获取 getMyPendingRequestsUUID
+        const res3 = await controller.callInteraction(getMyPendingRequestsUUID,  {user: userA, query: { attributeQuery: ['*', ['reviewer', {attributeQuery: ['*']}]]}})
+        expect(res3.error).toBeUndefined()
+        const data = res3.data
+        expect(data.length).toBe(1)
+        expect(data[0].approved_match_count).toBe(1)
+        expect(data[0].approved_total_count).toBe(2)
+        expect(data[0].approved).toBeFalsy()
+        expect(data[0].result).toBe('pending')
+        expect(data[0].reviewer.length).toBe(2)
+        expect(data[0].reviewer.find((reviewer: any) => reviewer.id === userAId)).toBeDefined()
+
         // a 同意
-        const res3 = await controller.callInteraction(approveRequestUUID,  {user: userA, payload: payload2})
-        const requests3 = await controller.system.storage.find(
+        const res4 = await controller.callInteraction(approveRequestUUID,  {user: userA, payload: payload2})
+        expect(res4.error).toBeUndefined()
+        const requests4 = await controller.system.storage.find(
             'Request',
             undefined,
             undefined,
             ['*']
         )
-        expect(requests3.length).toBe(1)
-        expect(requests3[0].approved_match_count).toBe(2)
-        expect(requests3[0].approved_total_count).toBe(2)
-        expect(requests3[0].approved).toBeTruthy()
-        expect(requests3[0].result).toBe('approved')
+        expect(requests4.length).toBe(1)
+        expect(requests4[0].approved_match_count).toBe(2)
+        expect(requests4[0].approved_total_count).toBe(2)
+        expect(requests4[0].approved).toBeTruthy()
+        expect(requests4[0].result).toBe('approved')
     })
 })
