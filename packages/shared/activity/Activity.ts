@@ -2,7 +2,7 @@ import {createClass, Klass, KlassInstance, KlassInstancePrimitiveProps} from "..
 import {Entity, Relation} from "../entity/Entity.js";
 import {Attributive, Attributives, } from "../attributive.js";
 import {Condition, Conditions} from './Condition.js'
-import {Computation, DataAttributive, DataAttributives, Query} from "./Data";
+import {Computation, DataAttributive, DataAttributives, Query} from "./Data.js";
 
 
 // 交互动作，因为以后可能有更多的关于交互动作的管理，所以应该是个对象，而不只是字符串名字。

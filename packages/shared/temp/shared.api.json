@@ -2224,7 +2224,7 @@
             },
             {
               "kind": "Content",
-              "text": "import(\"../createClass\")."
+              "text": "import(\"../createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -2233,7 +2233,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n    content: {\n        type: (import(\"../createClass\")."
+              "text": "<{\n    content: {\n        type: (import(\"../createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -2242,7 +2242,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n            type: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                defaultValue: () => string;\n            };\n            data: {\n                instanceType: import(\"../createClass\")."
+              "text": "<{\n            type: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                defaultValue: () => string;\n            };\n            data: {\n                instanceType: import(\"../createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -2251,7 +2251,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                    content: {\n                        type: \"function\";\n                        required: true;\n                        collection: false;\n                    };\n                }> | import(\"../createClass\")."
+              "text": "<{\n                    content: {\n                        type: \"function\";\n                        required: true;\n                        collection: false;\n                    };\n                }> | import(\"../createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -2260,7 +2260,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                    content: {\n                        type: \"function\";\n                        required: true;\n                        collection: false;\n                    };\n                }>;\n                required: true;\n                collection: false;\n            };\n        }> | import(\"../createClass\")."
+              "text": "<{\n                    content: {\n                        type: \"function\";\n                        required: true;\n                        collection: false;\n                    };\n                }>;\n                required: true;\n                collection: false;\n            };\n        }> | import(\"../createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -2269,7 +2269,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n            type: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                defaultValue: () => string;\n            };\n            operator: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                options: string[];\n                defaultValue: () => string;\n            };\n            left: {\n                instanceType: import(\"../createClass\")."
+              "text": "<{\n            type: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                defaultValue: () => string;\n            };\n            operator: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                options: string[];\n                defaultValue: () => string;\n            };\n            left: {\n                instanceType: import(\"../createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -2278,7 +2278,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                    type: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        defaultValue: () => string;\n                    };\n                    data: {\n                        instanceType: import(\"../createClass\")."
+              "text": "<{\n                    type: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        defaultValue: () => string;\n                    };\n                    data: {\n                        instanceType: import(\"../createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -2287,7 +2287,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }> | import(\"../createClass\")."
+              "text": "<{\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }> | import(\"../createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -2296,7 +2296,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }>;\n                        required: true;\n                        collection: false;\n                    };\n                }> | import(\"../BoolExp\")."
+              "text": "<{\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }>;\n                        required: true;\n                        collection: false;\n                    };\n                }> | import(\"../BoolExp.js\")."
             },
             {
               "kind": "Reference",
@@ -2305,7 +2305,7 @@
             },
             {
               "kind": "Content",
-              "text": "<any>;\n                required: true;\n                collection: false;\n            };\n            right: {\n                instanceType: import(\"../createClass\")."
+              "text": "<any>;\n                required: true;\n                collection: false;\n            };\n            right: {\n                instanceType: import(\"../createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -2314,7 +2314,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                    type: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        defaultValue: () => string;\n                    };\n                    data: {\n                        instanceType: import(\"../createClass\")."
+              "text": "<{\n                    type: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        defaultValue: () => string;\n                    };\n                    data: {\n                        instanceType: import(\"../createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -2323,7 +2323,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }> | import(\"../createClass\")."
+              "text": "<{\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }> | import(\"../createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -2332,7 +2332,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }>;\n                        required: true;\n                        collection: false;\n                    };\n                }> | import(\"../BoolExp\")."
+              "text": "<{\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }>;\n                        required: true;\n                        collection: false;\n                    };\n                }> | import(\"../BoolExp.js\")."
             },
             {
               "kind": "Reference",
@@ -2409,7 +2409,7 @@
             },
             {
               "kind": "Content",
-              "text": "import(\"../createClass\")."
+              "text": "import(\"../createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -2418,7 +2418,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n    content: {\n        type: (import(\"../createClass\")."
+              "text": "<{\n    content: {\n        type: (import(\"../createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -2427,7 +2427,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n            type: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                defaultValue: () => string;\n            };\n            data: {\n                instanceType: import(\"../createClass\")."
+              "text": "<{\n            type: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                defaultValue: () => string;\n            };\n            data: {\n                instanceType: import(\"../createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -2436,7 +2436,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                    content: {\n                        type: \"function\";\n                        required: true;\n                        collection: false;\n                    };\n                }> | import(\"../createClass\")."
+              "text": "<{\n                    content: {\n                        type: \"function\";\n                        required: true;\n                        collection: false;\n                    };\n                }> | import(\"../createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -2445,7 +2445,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                    content: {\n                        type: \"function\";\n                        required: true;\n                        collection: false;\n                    };\n                }>;\n                required: true;\n                collection: false;\n            };\n        }> | import(\"../createClass\")."
+              "text": "<{\n                    content: {\n                        type: \"function\";\n                        required: true;\n                        collection: false;\n                    };\n                }>;\n                required: true;\n                collection: false;\n            };\n        }> | import(\"../createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -2454,7 +2454,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n            type: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                defaultValue: () => string;\n            };\n            operator: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                options: string[];\n                defaultValue: () => string;\n            };\n            left: {\n                instanceType: import(\"../createClass\")."
+              "text": "<{\n            type: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                defaultValue: () => string;\n            };\n            operator: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                options: string[];\n                defaultValue: () => string;\n            };\n            left: {\n                instanceType: import(\"../createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -2463,7 +2463,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                    type: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        defaultValue: () => string;\n                    };\n                    data: {\n                        instanceType: import(\"../createClass\")."
+              "text": "<{\n                    type: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        defaultValue: () => string;\n                    };\n                    data: {\n                        instanceType: import(\"../createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -2472,7 +2472,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }> | import(\"../createClass\")."
+              "text": "<{\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }> | import(\"../createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -2481,7 +2481,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }>;\n                        required: true;\n                        collection: false;\n                    };\n                }> | import(\"../BoolExp\")."
+              "text": "<{\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }>;\n                        required: true;\n                        collection: false;\n                    };\n                }> | import(\"../BoolExp.js\")."
             },
             {
               "kind": "Reference",
@@ -2490,7 +2490,7 @@
             },
             {
               "kind": "Content",
-              "text": "<any>;\n                required: true;\n                collection: false;\n            };\n            right: {\n                instanceType: import(\"../createClass\")."
+              "text": "<any>;\n                required: true;\n                collection: false;\n            };\n            right: {\n                instanceType: import(\"../createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -2499,7 +2499,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                    type: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        defaultValue: () => string;\n                    };\n                    data: {\n                        instanceType: import(\"../createClass\")."
+              "text": "<{\n                    type: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        defaultValue: () => string;\n                    };\n                    data: {\n                        instanceType: import(\"../createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -2508,7 +2508,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }> | import(\"../createClass\")."
+              "text": "<{\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }> | import(\"../createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -2517,7 +2517,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }>;\n                        required: true;\n                        collection: false;\n                    };\n                }> | import(\"../BoolExp\")."
+              "text": "<{\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }>;\n                        required: true;\n                        collection: false;\n                    };\n                }> | import(\"../BoolExp.js\")."
             },
             {
               "kind": "Reference",
@@ -2563,7 +2563,7 @@
             },
             {
               "kind": "Content",
-              "text": "import(\"../createClass\")."
+              "text": "import(\"../createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -2784,7 +2784,7 @@
             },
             {
               "kind": "Content",
-              "text": "import(\"../createClass\")."
+              "text": "import(\"../createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -2816,7 +2816,7 @@
             },
             {
               "kind": "Content",
-              "text": "import(\"../createClass\")."
+              "text": "import(\"../createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -2825,7 +2825,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n    content: {\n        type: (import(\"../createClass\")."
+              "text": "<{\n    content: {\n        type: (import(\"../createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -2834,7 +2834,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n            type: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                defaultValue: () => string;\n            };\n            data: {\n                instanceType: import(\"../createClass\")."
+              "text": "<{\n            type: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                defaultValue: () => string;\n            };\n            data: {\n                instanceType: import(\"../createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -2843,7 +2843,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                    content: {\n                        type: \"function\";\n                        required: true;\n                        collection: false;\n                    };\n                }> | import(\"../createClass\")."
+              "text": "<{\n                    content: {\n                        type: \"function\";\n                        required: true;\n                        collection: false;\n                    };\n                }> | import(\"../createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -2852,7 +2852,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                    content: {\n                        type: \"function\";\n                        required: true;\n                        collection: false;\n                    };\n                }>;\n                required: true;\n                collection: false;\n            };\n        }> | import(\"../createClass\")."
+              "text": "<{\n                    content: {\n                        type: \"function\";\n                        required: true;\n                        collection: false;\n                    };\n                }>;\n                required: true;\n                collection: false;\n            };\n        }> | import(\"../createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -2861,7 +2861,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n            type: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                defaultValue: () => string;\n            };\n            operator: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                options: string[];\n                defaultValue: () => string;\n            };\n            left: {\n                instanceType: import(\"../createClass\")."
+              "text": "<{\n            type: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                defaultValue: () => string;\n            };\n            operator: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                options: string[];\n                defaultValue: () => string;\n            };\n            left: {\n                instanceType: import(\"../createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -2870,7 +2870,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                    type: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        defaultValue: () => string;\n                    };\n                    data: {\n                        instanceType: import(\"../createClass\")."
+              "text": "<{\n                    type: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        defaultValue: () => string;\n                    };\n                    data: {\n                        instanceType: import(\"../createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -2879,7 +2879,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }> | import(\"../createClass\")."
+              "text": "<{\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }> | import(\"../createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -2888,7 +2888,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }>;\n                        required: true;\n                        collection: false;\n                    };\n                }> | import(\"../BoolExp\")."
+              "text": "<{\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }>;\n                        required: true;\n                        collection: false;\n                    };\n                }> | import(\"../BoolExp.js\")."
             },
             {
               "kind": "Reference",
@@ -2897,7 +2897,7 @@
             },
             {
               "kind": "Content",
-              "text": "<any>;\n                required: true;\n                collection: false;\n            };\n            right: {\n                instanceType: import(\"../createClass\")."
+              "text": "<any>;\n                required: true;\n                collection: false;\n            };\n            right: {\n                instanceType: import(\"../createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -2906,7 +2906,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                    type: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        defaultValue: () => string;\n                    };\n                    data: {\n                        instanceType: import(\"../createClass\")."
+              "text": "<{\n                    type: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        defaultValue: () => string;\n                    };\n                    data: {\n                        instanceType: import(\"../createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -2915,7 +2915,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }> | import(\"../createClass\")."
+              "text": "<{\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }> | import(\"../createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -2924,7 +2924,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }>;\n                        required: true;\n                        collection: false;\n                    };\n                }> | import(\"../BoolExp\")."
+              "text": "<{\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }>;\n                        required: true;\n                        collection: false;\n                    };\n                }> | import(\"../BoolExp.js\")."
             },
             {
               "kind": "Reference",
@@ -3478,7 +3478,7 @@
             },
             {
               "kind": "Content",
-              "text": "import(\"../createClass\")."
+              "text": "import(\"../createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -3510,7 +3510,7 @@
             },
             {
               "kind": "Content",
-              "text": "import(\"../createClass\")."
+              "text": "import(\"../createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -3519,7 +3519,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n    content: {\n        type: (import(\"../createClass\")."
+              "text": "<{\n    content: {\n        type: (import(\"../createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -3528,7 +3528,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n            type: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                defaultValue: () => string;\n            };\n            data: {\n                instanceType: import(\"../createClass\")."
+              "text": "<{\n            type: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                defaultValue: () => string;\n            };\n            data: {\n                instanceType: import(\"../createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -3537,7 +3537,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                    content: {\n                        type: \"function\";\n                        required: true;\n                        collection: false;\n                    };\n                }> | import(\"../createClass\")."
+              "text": "<{\n                    content: {\n                        type: \"function\";\n                        required: true;\n                        collection: false;\n                    };\n                }> | import(\"../createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -3546,7 +3546,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                    content: {\n                        type: \"function\";\n                        required: true;\n                        collection: false;\n                    };\n                }>;\n                required: true;\n                collection: false;\n            };\n        }> | import(\"../createClass\")."
+              "text": "<{\n                    content: {\n                        type: \"function\";\n                        required: true;\n                        collection: false;\n                    };\n                }>;\n                required: true;\n                collection: false;\n            };\n        }> | import(\"../createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -3555,7 +3555,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n            type: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                defaultValue: () => string;\n            };\n            operator: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                options: string[];\n                defaultValue: () => string;\n            };\n            left: {\n                instanceType: import(\"../createClass\")."
+              "text": "<{\n            type: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                defaultValue: () => string;\n            };\n            operator: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                options: string[];\n                defaultValue: () => string;\n            };\n            left: {\n                instanceType: import(\"../createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -3564,7 +3564,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                    type: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        defaultValue: () => string;\n                    };\n                    data: {\n                        instanceType: import(\"../createClass\")."
+              "text": "<{\n                    type: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        defaultValue: () => string;\n                    };\n                    data: {\n                        instanceType: import(\"../createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -3573,7 +3573,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }> | import(\"../createClass\")."
+              "text": "<{\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }> | import(\"../createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -3582,7 +3582,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }>;\n                        required: true;\n                        collection: false;\n                    };\n                }> | import(\"../BoolExp\")."
+              "text": "<{\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }>;\n                        required: true;\n                        collection: false;\n                    };\n                }> | import(\"../BoolExp.js\")."
             },
             {
               "kind": "Reference",
@@ -3591,7 +3591,7 @@
             },
             {
               "kind": "Content",
-              "text": "<any>;\n                required: true;\n                collection: false;\n            };\n            right: {\n                instanceType: import(\"../createClass\")."
+              "text": "<any>;\n                required: true;\n                collection: false;\n            };\n            right: {\n                instanceType: import(\"../createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -3600,7 +3600,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                    type: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        defaultValue: () => string;\n                    };\n                    data: {\n                        instanceType: import(\"../createClass\")."
+              "text": "<{\n                    type: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        defaultValue: () => string;\n                    };\n                    data: {\n                        instanceType: import(\"../createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -3609,7 +3609,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }> | import(\"../createClass\")."
+              "text": "<{\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }> | import(\"../createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -3618,7 +3618,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }>;\n                        required: true;\n                        collection: false;\n                    };\n                }> | import(\"../BoolExp\")."
+              "text": "<{\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }>;\n                        required: true;\n                        collection: false;\n                    };\n                }> | import(\"../BoolExp.js\")."
             },
             {
               "kind": "Reference",
@@ -7531,7 +7531,7 @@
             },
             {
               "kind": "Content",
-              "text": "import(\"../createClass\")."
+              "text": "import(\"../createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -7540,7 +7540,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n    items: {\n        type: import(\"../createClass\")."
+              "text": "<{\n    items: {\n        type: import(\"../createClass.js\")."
             },
             {
               "kind": "Reference",
@@ -7572,7 +7572,7 @@
             },
             {
               "kind": "Content",
-              "text": "import(\"../createClass\")."
+              "text": "import(\"../createClass.js\")."
             },
             {
               "kind": "Reference",

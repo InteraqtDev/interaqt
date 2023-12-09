@@ -1,5 +1,5 @@
-import {createClass, KlassInstance} from "../createClass";
-import {BoolExp, BoolExpressionRawData, BoolExpressionData, BoolAtomData} from "../BoolExp";
+import {createClass, KlassInstance} from "../createClass.js";
+import {BoolExp, BoolExpressionRawData, BoolExpressionData, BoolAtomData} from "../BoolExp.js";
 
 
 export const DataAttributive = createClass({
