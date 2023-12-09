@@ -1,6 +1,7 @@
 {
   "name": "@interaqt/runtime",
   "devDependencies": {
+    "@microsoft/api-extractor": "^7.38.5",
     "rimraf": "^5.0.5",
     "typescript": "^5.2.2",
     "vite-tsconfig-paths": "^4.2.1",
@@ -9,7 +10,7 @@
   "scripts": {
     "test": "vitest | pino-pretty",
     "build": "rimraf dist && tsc -p ./tsconfig.prod.json",
-    "type": "api-extractor run --verbose",
+    "type": "api-extractor run --silent",
     "build-all": "npm run build && npm run type",
     "publish": "node ./scripts/publish.js",
     "patch": "node ./scripts/publish.js patch",

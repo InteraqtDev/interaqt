@@ -1,7 +1,7 @@
 {
   "metadata": {
     "toolPackage": "@microsoft/api-extractor",
-    "toolVersion": "7.38.3",
+    "toolVersion": "7.38.5",
     "schemaVersion": 1011,
     "oldestForwardsCompatibleVersion": 1001,
     "tsdocConfig": {
@@ -191,7 +191,7 @@
               "text": "<{\n    name: {\n        type: \"string\";\n        required: true;\n    };\n}>"
             }
           ],
-          "fileUrlPath": "../shared/index.ts",
+          "fileUrlPath": "index.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "Action",
@@ -214,7 +214,7 @@
               "text": "\"_Activity_\""
             }
           ],
-          "fileUrlPath": "System.ts",
+          "fileUrlPath": "index.ts",
           "initializerTokenRange": {
             "startIndex": 1,
             "endIndex": 2
@@ -248,14 +248,14 @@
             {
               "kind": "Reference",
               "text": "ActivityPublicType",
-              "canonicalReference": "@interaqt/runtime!ActivityPublicType:type"
+              "canonicalReference": "@interaqt/runtime!~ActivityPublicType:type"
             },
             {
               "kind": "Content",
               "text": ">"
             }
           ],
-          "fileUrlPath": "../shared/index.ts",
+          "fileUrlPath": "index.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "Activity",
@@ -274,17 +274,13 @@
               "text": "activityEntity: "
             },
             {
-              "kind": "Content",
-              "text": "import(\"@interaqt/shared\")."
-            },
-            {
               "kind": "Reference",
               "text": "InertKlassInstance",
               "canonicalReference": "@interaqt/runtime!InertKlassInstance:type"
             },
             {
               "kind": "Content",
-              "text": "<{\n    name: {\n        type: \"string\";\n        collection: false;\n        required: true;\n        constraints: {\n            nameFormat({ name }: {\n                name: import(\"data0\")."
+              "text": "<    {\n    name: {\n        type: \"string\";\n        collection: false;\n        required: true;\n        constraints: {\n            nameFormat({ name }: {\n                name: "
             },
             {
               "kind": "Reference",
@@ -293,7 +289,7 @@
             },
             {
               "kind": "Content",
-              "text": "<string>;\n            }): import(\"data0\")."
+              "text": "<string>;\n            }): "
             },
             {
               "kind": "Reference",
@@ -302,7 +298,7 @@
             },
             {
               "kind": "Content",
-              "text": "<boolean>;\n        };\n    };\n    computedData: {\n        type: import(\"@interaqt/shared\")."
+              "text": "<boolean>;\n        };\n    };\n    computedData: {\n        type: "
             },
             {
               "kind": "Reference",
@@ -311,7 +307,7 @@
             },
             {
               "kind": "Content",
-              "text": "<any>[];\n        collection: false;\n        required: false;\n    };\n    properties: {\n        type: import(\"@interaqt/shared\")."
+              "text": "<any>[];\n        collection: false;\n        required: false;\n    };\n    properties: {\n        type: "
             },
             {
               "kind": "Reference",
@@ -320,7 +316,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n            name: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                constraints: {\n                    format({ name }: {\n                        name: import(\"data0\")."
+              "text": "<    {\n            name: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                constraints: {\n                    format({ name }: {\n                        name: "
             },
             {
               "kind": "Reference",
@@ -329,7 +325,7 @@
             },
             {
               "kind": "Content",
-              "text": "<string>;\n                    }): import(\"data0\")."
+              "text": "<string>;\n                    }): "
             },
             {
               "kind": "Reference",
@@ -338,7 +334,7 @@
             },
             {
               "kind": "Content",
-              "text": "<boolean>;\n                    length({ name }: {\n                        name: import(\"data0\")."
+              "text": "<boolean>;\n                    length({ name }: {\n                        name: "
             },
             {
               "kind": "Reference",
@@ -347,7 +343,7 @@
             },
             {
               "kind": "Content",
-              "text": "<string>;\n                    }): import(\"data0\")."
+              "text": "<string>;\n                    }): "
             },
             {
               "kind": "Reference",
@@ -356,7 +352,7 @@
             },
             {
               "kind": "Content",
-              "text": "<boolean>;\n                };\n            };\n            type: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                options: import(\"@interaqt/shared\")."
+              "text": "<boolean>;\n                };\n            };\n            type: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                options: "
             },
             {
               "kind": "Reference",
@@ -365,7 +361,7 @@
             },
             {
               "kind": "Content",
-              "text": "[];\n            };\n            collection: {\n                type: \"boolean\";\n                required: true;\n                collection: false;\n                defaultValue(): boolean;\n            };\n            args: {\n                computedType: (values: {\n                    type: import(\"@interaqt/shared\")."
+              "text": "[];\n            };\n            collection: {\n                type: \"boolean\";\n                required: true;\n                collection: false;\n                defaultValue(): boolean;\n            };\n            args: {\n                computedType: (values: {\n                    type: "
             },
             {
               "kind": "Reference",
@@ -374,7 +370,7 @@
             },
             {
               "kind": "Content",
-              "text": ";\n                }) => string;\n            };\n            computedData: {\n                collection: false;\n                type: import(\"@interaqt/shared\")."
+              "text": ";\n                }) => string;\n            };\n            computedData: {\n                collection: false;\n                type: "
             },
             {
               "kind": "Reference",
@@ -383,7 +379,7 @@
             },
             {
               "kind": "Content",
-              "text": "<any>[];\n                required: false;\n            };\n            computed: {\n                required: false;\n                type: \"function\";\n                collection: false;\n            };\n        }>;\n        collection: true;\n        required: true;\n        constraints: {\n            eachNameUnique({ properties }: any): import(\"data0\")."
+              "text": "<any>[];\n                required: false;\n            };\n            computed: {\n                required: false;\n                type: \"function\";\n                collection: false;\n            };\n        }>;\n        collection: true;\n        required: true;\n        constraints: {\n            eachNameUnique({ properties }: any): "
             },
             {
               "kind": "Reference",
@@ -395,13 +391,13 @@
               "text": "<boolean>;\n        };\n        defaultValue(): never[];\n    };\n    isRef: {\n        required: true;\n        collection: false;\n        type: \"boolean\";\n        defaultValue: () => boolean;\n    };\n}>"
             }
           ],
-          "fileUrlPath": "MonoSystem.ts",
+          "fileUrlPath": "index.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "activityEntity",
           "variableTypeTokenRange": {
             "startIndex": 1,
-            "endIndex": 28
+            "endIndex": 27
           }
         },
         {
@@ -432,7 +428,7 @@
               "text": ">"
             }
           ],
-          "fileUrlPath": "../shared/index.ts",
+          "fileUrlPath": "index.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "ActivityGroup",
@@ -482,7 +478,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "../shared/index.ts",
+          "fileUrlPath": "index.ts",
           "releaseTag": "Public",
           "name": "ActivityGroupInstanceType",
           "typeTokenRange": {
@@ -506,7 +502,7 @@
             {
               "kind": "Reference",
               "text": "UnwrappedActivityInstanceType",
-              "canonicalReference": "@interaqt/runtime!UnwrappedActivityInstanceType:type"
+              "canonicalReference": "@interaqt/runtime!~UnwrappedActivityInstanceType:type"
             },
             {
               "kind": "Content",
@@ -515,7 +511,7 @@
             {
               "kind": "Reference",
               "text": "UnwrappedActivityInstanceType",
-              "canonicalReference": "@interaqt/runtime!UnwrappedActivityInstanceType:type"
+              "canonicalReference": "@interaqt/runtime!~UnwrappedActivityInstanceType:type"
             },
             {
               "kind": "Content",
@@ -526,7 +522,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "../shared/index.ts",
+          "fileUrlPath": "index.ts",
           "releaseTag": "Public",
           "name": "ActivityGroupPublicType",
           "typeTokenRange": {
@@ -566,7 +562,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "../shared/index.ts",
+          "fileUrlPath": "index.ts",
           "releaseTag": "Public",
           "name": "ActivityInstanceType",
           "typeTokenRange": {
@@ -728,7 +724,7 @@
               "text": ">)[];\n        collection: false;\n        required: true;\n    };\n    matchExpression: {\n        type: \"function\";\n        collection: false;\n        required: true;\n    };\n}>"
             }
           ],
-          "fileUrlPath": "../shared/index.ts",
+          "fileUrlPath": "index.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "Any",
@@ -744,7 +740,7 @@
           "excerptTokens": [
             {
               "kind": "Content",
-              "text": "export type APIBody = "
+              "text": "export declare type APIBody = "
             },
             {
               "kind": "Content",
@@ -773,7 +769,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "server.ts",
+          "fileUrlPath": "index.ts",
           "releaseTag": "Public",
           "name": "APIBody",
           "typeTokenRange": {
@@ -800,7 +796,7 @@
               "text": "<unknown>"
             }
           ],
-          "fileUrlPath": "asyncInteractionContext.ts",
+          "fileUrlPath": "index.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "asyncInteractionContext",
@@ -836,7 +832,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "../shared/index.ts",
+          "fileUrlPath": "index.ts",
           "releaseTag": "Public",
           "name": "AtomHandle",
           "typeParameters": [
@@ -873,10 +869,10 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\nstringContent: {\ntype: \"string\";\n};\ncontent: {\ntype: \"function\";\n};\nname: {\ntype: \"string\";\n};\nisRef: {\ntype: \"boolean\";\n};\n}>"
+              "text": "<    {\n    stringContent: {\n        type: \"string\";\n    };\n    content: {\n        type: \"function\";\n        required: true;\n        collection: false;\n    };\n    name: {\n        type: \"string\";\n    };\n    isRef: {\n        type: \"boolean\";\n    };\n}>"
             }
           ],
-          "fileUrlPath": "../shared/index.ts",
+          "fileUrlPath": "index.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "Attributive",
@@ -901,7 +897,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\ncontent: {\ntype: ("
+              "text": "<    {\n    content: {\n        type: ("
             },
             {
               "kind": "Reference",
@@ -910,16 +906,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\ntype: {\ntype: \"string\";\nrequired: true;\ncollection: false;\ndefaultValue: () => string;\n};\ndata: {\ninstanceType: "
-            },
-            {
-              "kind": "Reference",
-              "text": "InertKlassInstance",
-              "canonicalReference": "@interaqt/runtime!InertKlassInstance:type"
-            },
-            {
-              "kind": "Content",
-              "text": "<any> | "
+              "text": "<    {\n            type: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                defaultValue: () => string;\n            };\n            data: {\n                instanceType: "
             },
             {
               "kind": "Reference",
@@ -928,7 +915,16 @@
             },
             {
               "kind": "Content",
-              "text": "<any>;\nrequired: true;\ncollection: false;\n};\n}> | "
+              "text": "<    {\n                    content: {\n                        type: \"function\";\n                        required: true;\n                        collection: false;\n                    };\n                }> | "
+            },
+            {
+              "kind": "Reference",
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/runtime!InertKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<    {\n                    content: {\n                        type: \"function\";\n                        required: true;\n                        collection: false;\n                    };\n                }>;\n                required: true;\n                collection: false;\n            };\n        }> | "
             },
             {
               "kind": "Reference",
@@ -937,7 +933,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\ntype: {\ntype: \"string\";\nrequired: true;\ncollection: false;\ndefaultValue: () => string;\n};\noperator: {\ntype: \"string\";\nrequired: true;\ncollection: false;\noptions: string[];\ndefaultValue: () => string;\n};\nleft: {\ninstanceType: "
+              "text": "<    {\n            type: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                defaultValue: () => string;\n            };\n            operator: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                options: string[];\n                defaultValue: () => string;\n            };\n            left: {\n                instanceType: "
             },
             {
               "kind": "Reference",
@@ -946,16 +942,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\ntype: {\ntype: \"string\";\nrequired: true;\ncollection: false;\ndefaultValue: () => string;\n};\ndata: {\ninstanceType: "
-            },
-            {
-              "kind": "Reference",
-              "text": "InertKlassInstance",
-              "canonicalReference": "@interaqt/runtime!InertKlassInstance:type"
-            },
-            {
-              "kind": "Content",
-              "text": "<any> | "
+              "text": "<    {\n                    type: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        defaultValue: () => string;\n                    };\n                    data: {\n                        instanceType: "
             },
             {
               "kind": "Reference",
@@ -964,7 +951,16 @@
             },
             {
               "kind": "Content",
-              "text": "<any>;\nrequired: true;\ncollection: false;\n};\n}> | "
+              "text": "<    {\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }> | "
+            },
+            {
+              "kind": "Reference",
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/runtime!InertKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<    {\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }>;\n                        required: true;\n                        collection: false;\n                    };\n                }> | "
             },
             {
               "kind": "Reference",
@@ -973,7 +969,7 @@
             },
             {
               "kind": "Content",
-              "text": "<any>;\nrequired: true;\ncollection: false;\n};\nright: {\ninstanceType: "
+              "text": "<any>;\n                required: true;\n                collection: false;\n            };\n            right: {\n                instanceType: "
             },
             {
               "kind": "Reference",
@@ -982,16 +978,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\ntype: {\ntype: \"string\";\nrequired: true;\ncollection: false;\ndefaultValue: () => string;\n};\ndata: {\ninstanceType: "
-            },
-            {
-              "kind": "Reference",
-              "text": "InertKlassInstance",
-              "canonicalReference": "@interaqt/runtime!InertKlassInstance:type"
-            },
-            {
-              "kind": "Content",
-              "text": "<any> | "
+              "text": "<    {\n                    type: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        defaultValue: () => string;\n                    };\n                    data: {\n                        instanceType: "
             },
             {
               "kind": "Reference",
@@ -1000,7 +987,16 @@
             },
             {
               "kind": "Content",
-              "text": "<any>;\nrequired: true;\ncollection: false;\n};\n}> | "
+              "text": "<    {\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }> | "
+            },
+            {
+              "kind": "Reference",
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/runtime!InertKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<    {\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }>;\n                        required: true;\n                        collection: false;\n                    };\n                }> | "
             },
             {
               "kind": "Reference",
@@ -1009,10 +1005,10 @@
             },
             {
               "kind": "Content",
-              "text": "<any>;\nrequired: false;\ncollection: false;\n};\n}>)[];\ncollection: false;\nrequired: false;\n};\n}>"
+              "text": "<any>;\n                required: false;\n                collection: false;\n            };\n        }>)[];\n        collection: false;\n        required: false;\n    };\n}>"
             }
           ],
-          "fileUrlPath": "../shared/index.ts",
+          "fileUrlPath": "index.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "Attributives",
@@ -1041,30 +1037,48 @@
             },
             {
               "kind": "Reference",
-              "text": "InertKlassInstance",
-              "canonicalReference": "@interaqt/runtime!InertKlassInstance:type"
-            },
-            {
-              "kind": "Content",
-              "text": "<any> | "
-            },
-            {
-              "kind": "Reference",
               "text": "ReactiveKlassInstance",
               "canonicalReference": "@interaqt/runtime!ReactiveKlassInstance:type"
             },
             {
               "kind": "Content",
-              "text": "<any>;\n        required: true;\n        collection: false;\n    };\n}>"
+              "text": "<"
+            },
+            {
+              "kind": "Reference",
+              "text": "CommonAtomPublic",
+              "canonicalReference": "@interaqt/runtime!~CommonAtomPublic:type"
+            },
+            {
+              "kind": "Content",
+              "text": "> | "
+            },
+            {
+              "kind": "Reference",
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/runtime!InertKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<"
+            },
+            {
+              "kind": "Reference",
+              "text": "CommonAtomPublic",
+              "canonicalReference": "@interaqt/runtime!~CommonAtomPublic:type"
+            },
+            {
+              "kind": "Content",
+              "text": ">;\n        required: true;\n        collection: false;\n    };\n}>"
             }
           ],
-          "fileUrlPath": "../shared/index.ts",
+          "fileUrlPath": "index.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "BoolAtomData",
           "variableTypeTokenRange": {
             "startIndex": 1,
-            "endIndex": 7
+            "endIndex": 11
           }
         },
         {
@@ -1077,7 +1091,7 @@
               "text": "export declare class BoolExp<T> "
             }
           ],
-          "fileUrlPath": "../shared/index.ts",
+          "fileUrlPath": "index.ts",
           "releaseTag": "Public",
           "typeParameters": [
             {
@@ -1744,7 +1758,7 @@
                 {
                   "kind": "Reference",
                   "text": "MapFn",
-                  "canonicalReference": "@interaqt/runtime!MapFn:type"
+                  "canonicalReference": "@interaqt/runtime!~MapFn:type"
                 },
                 {
                   "kind": "Content",
@@ -1990,7 +2004,7 @@
                 {
                   "kind": "Reference",
                   "text": "AtomData",
-                  "canonicalReference": "@interaqt/runtime!AtomData:type"
+                  "canonicalReference": "@interaqt/runtime!~AtomData:type"
                 },
                 {
                   "kind": "Content",
@@ -2042,16 +2056,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n        type: {\n        type: \"string\";\n        required: true;\n        collection: false;\n        defaultValue: () => string;\n        };\n        data: {\n        instanceType: "
-            },
-            {
-              "kind": "Reference",
-              "text": "InertKlassInstance",
-              "canonicalReference": "@interaqt/runtime!InertKlassInstance:type"
-            },
-            {
-              "kind": "Content",
-              "text": "<any> | "
+              "text": "<    {\n            type: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                defaultValue: () => string;\n            };\n            data: {\n                instanceType: "
             },
             {
               "kind": "Reference",
@@ -2060,7 +2065,34 @@
             },
             {
               "kind": "Content",
-              "text": "<any>;\n        required: true;\n        collection: false;\n        };\n        }> | "
+              "text": "<"
+            },
+            {
+              "kind": "Reference",
+              "text": "CommonAtomPublic",
+              "canonicalReference": "@interaqt/runtime!~CommonAtomPublic:type"
+            },
+            {
+              "kind": "Content",
+              "text": "> | "
+            },
+            {
+              "kind": "Reference",
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/runtime!InertKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<"
+            },
+            {
+              "kind": "Reference",
+              "text": "CommonAtomPublic",
+              "canonicalReference": "@interaqt/runtime!~CommonAtomPublic:type"
+            },
+            {
+              "kind": "Content",
+              "text": ">;\n                required: true;\n                collection: false;\n            };\n        }> | "
             },
             {
               "kind": "Reference",
@@ -2078,16 +2110,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n        type: {\n        type: \"string\";\n        required: true;\n        collection: false;\n        defaultValue: () => string;\n        };\n        data: {\n        instanceType: "
-            },
-            {
-              "kind": "Reference",
-              "text": "InertKlassInstance",
-              "canonicalReference": "@interaqt/runtime!InertKlassInstance:type"
-            },
-            {
-              "kind": "Content",
-              "text": "<any> | "
+              "text": "<    {\n            type: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                defaultValue: () => string;\n            };\n            data: {\n                instanceType: "
             },
             {
               "kind": "Reference",
@@ -2096,7 +2119,34 @@
             },
             {
               "kind": "Content",
-              "text": "<any>;\n        required: true;\n        collection: false;\n        };\n        }> | "
+              "text": "<"
+            },
+            {
+              "kind": "Reference",
+              "text": "CommonAtomPublic",
+              "canonicalReference": "@interaqt/runtime!~CommonAtomPublic:type"
+            },
+            {
+              "kind": "Content",
+              "text": "> | "
+            },
+            {
+              "kind": "Reference",
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/runtime!InertKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<"
+            },
+            {
+              "kind": "Reference",
+              "text": "CommonAtomPublic",
+              "canonicalReference": "@interaqt/runtime!~CommonAtomPublic:type"
+            },
+            {
+              "kind": "Content",
+              "text": ">;\n                required: true;\n                collection: false;\n            };\n        }> | "
             },
             {
               "kind": "Reference",
@@ -2108,13 +2158,13 @@
               "text": "<any>;\n        required: false;\n        collection: false;\n    };\n}>"
             }
           ],
-          "fileUrlPath": "../shared/index.ts",
+          "fileUrlPath": "index.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "BoolExpressionData",
           "variableTypeTokenRange": {
             "startIndex": 1,
-            "endIndex": 19
+            "endIndex": 27
           }
         },
         {
@@ -2153,7 +2203,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "../shared/index.ts",
+          "fileUrlPath": "index.ts",
           "releaseTag": "Public",
           "name": "BoolExpressionRawData",
           "typeParameters": [
@@ -2221,7 +2271,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\ncontent: {\ntype: ("
+              "text": "<    {\n    content: {\n        type: ("
             },
             {
               "kind": "Reference",
@@ -2230,16 +2280,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\ntype: {\ntype: \"string\";\nrequired: true;\ncollection: false;\ndefaultValue: () => string;\n};\ndata: {\ninstanceType: "
-            },
-            {
-              "kind": "Reference",
-              "text": "InertKlassInstance",
-              "canonicalReference": "@interaqt/runtime!InertKlassInstance:type"
-            },
-            {
-              "kind": "Content",
-              "text": "<any> | "
+              "text": "<    {\n            type: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                defaultValue: () => string;\n            };\n            data: {\n                instanceType: "
             },
             {
               "kind": "Reference",
@@ -2248,7 +2289,16 @@
             },
             {
               "kind": "Content",
-              "text": "<any>;\nrequired: true;\ncollection: false;\n};\n}> | "
+              "text": "<    {\n                    content: {\n                        type: \"function\";\n                        required: true;\n                        collection: false;\n                    };\n                }> | "
+            },
+            {
+              "kind": "Reference",
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/runtime!InertKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<    {\n                    content: {\n                        type: \"function\";\n                        required: true;\n                        collection: false;\n                    };\n                }>;\n                required: true;\n                collection: false;\n            };\n        }> | "
             },
             {
               "kind": "Reference",
@@ -2257,7 +2307,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\ntype: {\ntype: \"string\";\nrequired: true;\ncollection: false;\ndefaultValue: () => string;\n};\noperator: {\ntype: \"string\";\nrequired: true;\ncollection: false;\noptions: string[];\ndefaultValue: () => string;\n};\nleft: {\ninstanceType: "
+              "text": "<    {\n            type: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                defaultValue: () => string;\n            };\n            operator: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                options: string[];\n                defaultValue: () => string;\n            };\n            left: {\n                instanceType: "
             },
             {
               "kind": "Reference",
@@ -2266,16 +2316,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\ntype: {\ntype: \"string\";\nrequired: true;\ncollection: false;\ndefaultValue: () => string;\n};\ndata: {\ninstanceType: "
-            },
-            {
-              "kind": "Reference",
-              "text": "InertKlassInstance",
-              "canonicalReference": "@interaqt/runtime!InertKlassInstance:type"
-            },
-            {
-              "kind": "Content",
-              "text": "<any> | "
+              "text": "<    {\n                    type: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        defaultValue: () => string;\n                    };\n                    data: {\n                        instanceType: "
             },
             {
               "kind": "Reference",
@@ -2284,7 +2325,16 @@
             },
             {
               "kind": "Content",
-              "text": "<any>;\nrequired: true;\ncollection: false;\n};\n}> | "
+              "text": "<    {\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }> | "
+            },
+            {
+              "kind": "Reference",
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/runtime!InertKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<    {\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }>;\n                        required: true;\n                        collection: false;\n                    };\n                }> | "
             },
             {
               "kind": "Reference",
@@ -2293,7 +2343,7 @@
             },
             {
               "kind": "Content",
-              "text": "<any>;\nrequired: true;\ncollection: false;\n};\nright: {\ninstanceType: "
+              "text": "<any>;\n                required: true;\n                collection: false;\n            };\n            right: {\n                instanceType: "
             },
             {
               "kind": "Reference",
@@ -2302,16 +2352,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\ntype: {\ntype: \"string\";\nrequired: true;\ncollection: false;\ndefaultValue: () => string;\n};\ndata: {\ninstanceType: "
-            },
-            {
-              "kind": "Reference",
-              "text": "InertKlassInstance",
-              "canonicalReference": "@interaqt/runtime!InertKlassInstance:type"
-            },
-            {
-              "kind": "Content",
-              "text": "<any> | "
+              "text": "<    {\n                    type: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        defaultValue: () => string;\n                    };\n                    data: {\n                        instanceType: "
             },
             {
               "kind": "Reference",
@@ -2320,7 +2361,16 @@
             },
             {
               "kind": "Content",
-              "text": "<any>;\nrequired: true;\ncollection: false;\n};\n}> | "
+              "text": "<    {\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }> | "
+            },
+            {
+              "kind": "Reference",
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/runtime!InertKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<    {\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }>;\n                        required: true;\n                        collection: false;\n                    };\n                }> | "
             },
             {
               "kind": "Reference",
@@ -2329,14 +2379,14 @@
             },
             {
               "kind": "Content",
-              "text": "<any>;\nrequired: false;\ncollection: false;\n};\n}>)[];\ncollection: false;\nrequired: false;\n};\n}>"
+              "text": "<any>;\n                required: false;\n                collection: false;\n            };\n        }>)[];\n        collection: false;\n        required: false;\n    };\n}>"
             },
             {
               "kind": "Content",
               "text": ";"
             }
           ],
-          "fileUrlPath": "../shared/index.ts",
+          "fileUrlPath": "index.ts",
           "returnTypeTokenRange": {
             "startIndex": 8,
             "endIndex": 34
@@ -2356,28 +2406,390 @@
           "name": "boolExpToAttributives"
         },
         {
-          "kind": "Variable",
-          "canonicalReference": "@interaqt/runtime!boolExpToConditions:var",
+          "kind": "Function",
+          "canonicalReference": "@interaqt/runtime!boolExpToConditions:function(1)",
           "docComment": "",
           "excerptTokens": [
             {
               "kind": "Content",
-              "text": "boolExpToConditions: "
-            },
-            {
-              "kind": "Content",
-              "text": "typeof "
+              "text": "export declare function boolExpToConditions(obj: "
             },
             {
               "kind": "Reference",
-              "text": "boolExpToAttributives",
-              "canonicalReference": "@interaqt/runtime!boolExpToAttributives:function"
+              "text": "BoolExp",
+              "canonicalReference": "@interaqt/runtime!BoolExp:class"
+            },
+            {
+              "kind": "Content",
+              "text": "<"
+            },
+            {
+              "kind": "Reference",
+              "text": "KlassInstance",
+              "canonicalReference": "@interaqt/runtime!KlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<typeof "
+            },
+            {
+              "kind": "Reference",
+              "text": "Condition",
+              "canonicalReference": "@interaqt/runtime!Condition:var"
+            },
+            {
+              "kind": "Content",
+              "text": ", false>>"
+            },
+            {
+              "kind": "Content",
+              "text": "): "
+            },
+            {
+              "kind": "Reference",
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/runtime!InertKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<    {\n    content: {\n        type: ("
+            },
+            {
+              "kind": "Reference",
+              "text": "Klass",
+              "canonicalReference": "@interaqt/runtime!Klass:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<    {\n            type: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                defaultValue: () => string;\n            };\n            data: {\n                instanceType: "
+            },
+            {
+              "kind": "Reference",
+              "text": "ReactiveKlassInstance",
+              "canonicalReference": "@interaqt/runtime!ReactiveKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<    {\n                    content: {\n                        type: \"function\";\n                        required: true;\n                        collection: false;\n                    };\n                }> | "
+            },
+            {
+              "kind": "Reference",
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/runtime!InertKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<    {\n                    content: {\n                        type: \"function\";\n                        required: true;\n                        collection: false;\n                    };\n                }>;\n                required: true;\n                collection: false;\n            };\n        }> | "
+            },
+            {
+              "kind": "Reference",
+              "text": "Klass",
+              "canonicalReference": "@interaqt/runtime!Klass:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<    {\n            type: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                defaultValue: () => string;\n            };\n            operator: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                options: string[];\n                defaultValue: () => string;\n            };\n            left: {\n                instanceType: "
+            },
+            {
+              "kind": "Reference",
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/runtime!InertKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<    {\n                    type: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        defaultValue: () => string;\n                    };\n                    data: {\n                        instanceType: "
+            },
+            {
+              "kind": "Reference",
+              "text": "ReactiveKlassInstance",
+              "canonicalReference": "@interaqt/runtime!ReactiveKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<    {\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }> | "
+            },
+            {
+              "kind": "Reference",
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/runtime!InertKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<    {\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }>;\n                        required: true;\n                        collection: false;\n                    };\n                }> | "
+            },
+            {
+              "kind": "Reference",
+              "text": "UnwrappedBoolExpressionInstanceType",
+              "canonicalReference": "@interaqt/runtime!UnwrappedBoolExpressionInstanceType:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<any>;\n                required: true;\n                collection: false;\n            };\n            right: {\n                instanceType: "
+            },
+            {
+              "kind": "Reference",
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/runtime!InertKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<    {\n                    type: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        defaultValue: () => string;\n                    };\n                    data: {\n                        instanceType: "
+            },
+            {
+              "kind": "Reference",
+              "text": "ReactiveKlassInstance",
+              "canonicalReference": "@interaqt/runtime!ReactiveKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<    {\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }> | "
+            },
+            {
+              "kind": "Reference",
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/runtime!InertKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<    {\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }>;\n                        required: true;\n                        collection: false;\n                    };\n                }> | "
+            },
+            {
+              "kind": "Reference",
+              "text": "UnwrappedBoolExpressionInstanceType",
+              "canonicalReference": "@interaqt/runtime!UnwrappedBoolExpressionInstanceType:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<any>;\n                required: false;\n                collection: false;\n            };\n        }>)[];\n        collection: false;\n        required: false;\n    };\n}>"
+            },
+            {
+              "kind": "Content",
+              "text": ";"
             }
           ],
-          "fileUrlPath": "../shared/index.ts",
+          "fileUrlPath": "index.ts",
+          "returnTypeTokenRange": {
+            "startIndex": 8,
+            "endIndex": 34
+          },
+          "releaseTag": "Public",
+          "overloadIndex": 1,
+          "parameters": [
+            {
+              "parameterName": "obj",
+              "parameterTypeTokenRange": {
+                "startIndex": 1,
+                "endIndex": 7
+              },
+              "isOptional": false
+            }
+          ],
+          "name": "boolExpToConditions"
+        },
+        {
+          "kind": "Function",
+          "canonicalReference": "@interaqt/runtime!boolExpToDataAttributives:function(1)",
+          "docComment": "",
+          "excerptTokens": [
+            {
+              "kind": "Content",
+              "text": "export declare function boolExpToDataAttributives(obj: "
+            },
+            {
+              "kind": "Reference",
+              "text": "BoolExp",
+              "canonicalReference": "@interaqt/runtime!BoolExp:class"
+            },
+            {
+              "kind": "Content",
+              "text": "<"
+            },
+            {
+              "kind": "Reference",
+              "text": "KlassInstance",
+              "canonicalReference": "@interaqt/runtime!KlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<typeof "
+            },
+            {
+              "kind": "Reference",
+              "text": "DataAttributive",
+              "canonicalReference": "@interaqt/runtime!DataAttributive:var"
+            },
+            {
+              "kind": "Content",
+              "text": ", false>>"
+            },
+            {
+              "kind": "Content",
+              "text": "): "
+            },
+            {
+              "kind": "Reference",
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/runtime!InertKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<    {\n    content: {\n        type: ("
+            },
+            {
+              "kind": "Reference",
+              "text": "Klass",
+              "canonicalReference": "@interaqt/runtime!Klass:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<    {\n            type: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                defaultValue: () => string;\n            };\n            data: {\n                instanceType: "
+            },
+            {
+              "kind": "Reference",
+              "text": "ReactiveKlassInstance",
+              "canonicalReference": "@interaqt/runtime!ReactiveKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<    {\n                    content: {\n                        type: \"function\";\n                        required: true;\n                        collection: false;\n                    };\n                }> | "
+            },
+            {
+              "kind": "Reference",
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/runtime!InertKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<    {\n                    content: {\n                        type: \"function\";\n                        required: true;\n                        collection: false;\n                    };\n                }>;\n                required: true;\n                collection: false;\n            };\n        }> | "
+            },
+            {
+              "kind": "Reference",
+              "text": "Klass",
+              "canonicalReference": "@interaqt/runtime!Klass:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<    {\n            type: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                defaultValue: () => string;\n            };\n            operator: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                options: string[];\n                defaultValue: () => string;\n            };\n            left: {\n                instanceType: "
+            },
+            {
+              "kind": "Reference",
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/runtime!InertKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<    {\n                    type: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        defaultValue: () => string;\n                    };\n                    data: {\n                        instanceType: "
+            },
+            {
+              "kind": "Reference",
+              "text": "ReactiveKlassInstance",
+              "canonicalReference": "@interaqt/runtime!ReactiveKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<    {\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }> | "
+            },
+            {
+              "kind": "Reference",
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/runtime!InertKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<    {\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }>;\n                        required: true;\n                        collection: false;\n                    };\n                }> | "
+            },
+            {
+              "kind": "Reference",
+              "text": "UnwrappedBoolExpressionInstanceType",
+              "canonicalReference": "@interaqt/runtime!UnwrappedBoolExpressionInstanceType:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<any>;\n                required: true;\n                collection: false;\n            };\n            right: {\n                instanceType: "
+            },
+            {
+              "kind": "Reference",
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/runtime!InertKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<    {\n                    type: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        defaultValue: () => string;\n                    };\n                    data: {\n                        instanceType: "
+            },
+            {
+              "kind": "Reference",
+              "text": "ReactiveKlassInstance",
+              "canonicalReference": "@interaqt/runtime!ReactiveKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<    {\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }> | "
+            },
+            {
+              "kind": "Reference",
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/runtime!InertKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<    {\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }>;\n                        required: true;\n                        collection: false;\n                    };\n                }> | "
+            },
+            {
+              "kind": "Reference",
+              "text": "UnwrappedBoolExpressionInstanceType",
+              "canonicalReference": "@interaqt/runtime!UnwrappedBoolExpressionInstanceType:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<any>;\n                required: false;\n                collection: false;\n            };\n        }>)[];\n        collection: false;\n        required: false;\n    };\n}>"
+            },
+            {
+              "kind": "Content",
+              "text": ";"
+            }
+          ],
+          "fileUrlPath": "index.ts",
+          "returnTypeTokenRange": {
+            "startIndex": 8,
+            "endIndex": 34
+          },
+          "releaseTag": "Public",
+          "overloadIndex": 1,
+          "parameters": [
+            {
+              "parameterName": "obj",
+              "parameterTypeTokenRange": {
+                "startIndex": 1,
+                "endIndex": 7
+              },
+              "isOptional": false
+            }
+          ],
+          "name": "boolExpToDataAttributives"
+        },
+        {
+          "kind": "Variable",
+          "canonicalReference": "@interaqt/runtime!Computation:var",
+          "docComment": "",
+          "excerptTokens": [
+            {
+              "kind": "Content",
+              "text": "Computation: "
+            },
+            {
+              "kind": "Reference",
+              "text": "Klass",
+              "canonicalReference": "@interaqt/runtime!Klass:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<    {\n    content: {\n        type: \"function\";\n        required: true;\n        collection: false;\n    };\n    name: {\n        type: \"string\";\n    };\n}>"
+            }
+          ],
+          "fileUrlPath": "index.ts",
           "isReadonly": true,
           "releaseTag": "Public",
-          "name": "boolExpToConditions",
+          "name": "Computation",
           "variableTypeTokenRange": {
             "startIndex": 1,
             "endIndex": 3
@@ -2402,7 +2814,7 @@
               "text": "<{\n    computeEffect: {\n        type: \"string\";\n        collection: false;\n        required: true;\n    };\n    computation: {\n        type: \"string\";\n        collection: false;\n        required: true;\n    };\n}>"
             }
           ],
-          "fileUrlPath": "../shared/index.ts",
+          "fileUrlPath": "index.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "ComputedData",
@@ -2421,7 +2833,7 @@
               "text": "export declare interface Concept "
             }
           ],
-          "fileUrlPath": "../shared/index.ts",
+          "fileUrlPath": "index.ts",
           "releaseTag": "Public",
           "name": "Concept",
           "preserveMemberOrder": false,
@@ -2475,7 +2887,7 @@
               "text": " "
             }
           ],
-          "fileUrlPath": "../shared/index.ts",
+          "fileUrlPath": "index.ts",
           "releaseTag": "Public",
           "name": "ConceptAlias",
           "preserveMemberOrder": false,
@@ -2538,7 +2950,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "../shared/index.ts",
+          "fileUrlPath": "index.ts",
           "releaseTag": "Public",
           "name": "ConceptInstance",
           "typeTokenRange": {
@@ -2564,7 +2976,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "../shared/index.ts",
+          "fileUrlPath": "index.ts",
           "releaseTag": "Public",
           "name": "ConceptType",
           "typeTokenRange": {
@@ -2588,10 +3000,10 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\nstringContent: {\ntype: \"string\";\n};\ncontent: {\ntype: \"function\";\n};\nname: {\ntype: \"string\";\n};\nisRef: {\ntype: \"boolean\";\n};\n}>"
+              "text": "<    {\n    content: {\n        type: \"function\";\n        required: true;\n        collection: false;\n    };\n    name: {\n        type: \"string\";\n    };\n}>"
             }
           ],
-          "fileUrlPath": "../shared/index.ts",
+          "fileUrlPath": "index.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "Condition",
@@ -2616,7 +3028,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\ncontent: {\ntype: ("
+              "text": "<    {\n    content: {\n        type: ("
             },
             {
               "kind": "Reference",
@@ -2625,16 +3037,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\ntype: {\ntype: \"string\";\nrequired: true;\ncollection: false;\ndefaultValue: () => string;\n};\ndata: {\ninstanceType: "
-            },
-            {
-              "kind": "Reference",
-              "text": "InertKlassInstance",
-              "canonicalReference": "@interaqt/runtime!InertKlassInstance:type"
-            },
-            {
-              "kind": "Content",
-              "text": "<any> | "
+              "text": "<    {\n            type: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                defaultValue: () => string;\n            };\n            data: {\n                instanceType: "
             },
             {
               "kind": "Reference",
@@ -2643,7 +3046,16 @@
             },
             {
               "kind": "Content",
-              "text": "<any>;\nrequired: true;\ncollection: false;\n};\n}> | "
+              "text": "<    {\n                    content: {\n                        type: \"function\";\n                        required: true;\n                        collection: false;\n                    };\n                }> | "
+            },
+            {
+              "kind": "Reference",
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/runtime!InertKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<    {\n                    content: {\n                        type: \"function\";\n                        required: true;\n                        collection: false;\n                    };\n                }>;\n                required: true;\n                collection: false;\n            };\n        }> | "
             },
             {
               "kind": "Reference",
@@ -2652,7 +3064,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\ntype: {\ntype: \"string\";\nrequired: true;\ncollection: false;\ndefaultValue: () => string;\n};\noperator: {\ntype: \"string\";\nrequired: true;\ncollection: false;\noptions: string[];\ndefaultValue: () => string;\n};\nleft: {\ninstanceType: "
+              "text": "<    {\n            type: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                defaultValue: () => string;\n            };\n            operator: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                options: string[];\n                defaultValue: () => string;\n            };\n            left: {\n                instanceType: "
             },
             {
               "kind": "Reference",
@@ -2661,16 +3073,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\ntype: {\ntype: \"string\";\nrequired: true;\ncollection: false;\ndefaultValue: () => string;\n};\ndata: {\ninstanceType: "
-            },
-            {
-              "kind": "Reference",
-              "text": "InertKlassInstance",
-              "canonicalReference": "@interaqt/runtime!InertKlassInstance:type"
-            },
-            {
-              "kind": "Content",
-              "text": "<any> | "
+              "text": "<    {\n                    type: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        defaultValue: () => string;\n                    };\n                    data: {\n                        instanceType: "
             },
             {
               "kind": "Reference",
@@ -2679,7 +3082,16 @@
             },
             {
               "kind": "Content",
-              "text": "<any>;\nrequired: true;\ncollection: false;\n};\n}> | "
+              "text": "<    {\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }> | "
+            },
+            {
+              "kind": "Reference",
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/runtime!InertKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<    {\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }>;\n                        required: true;\n                        collection: false;\n                    };\n                }> | "
             },
             {
               "kind": "Reference",
@@ -2688,7 +3100,7 @@
             },
             {
               "kind": "Content",
-              "text": "<any>;\nrequired: true;\ncollection: false;\n};\nright: {\ninstanceType: "
+              "text": "<any>;\n                required: true;\n                collection: false;\n            };\n            right: {\n                instanceType: "
             },
             {
               "kind": "Reference",
@@ -2697,16 +3109,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\ntype: {\ntype: \"string\";\nrequired: true;\ncollection: false;\ndefaultValue: () => string;\n};\ndata: {\ninstanceType: "
-            },
-            {
-              "kind": "Reference",
-              "text": "InertKlassInstance",
-              "canonicalReference": "@interaqt/runtime!InertKlassInstance:type"
-            },
-            {
-              "kind": "Content",
-              "text": "<any> | "
+              "text": "<    {\n                    type: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        defaultValue: () => string;\n                    };\n                    data: {\n                        instanceType: "
             },
             {
               "kind": "Reference",
@@ -2715,7 +3118,16 @@
             },
             {
               "kind": "Content",
-              "text": "<any>;\nrequired: true;\ncollection: false;\n};\n}> | "
+              "text": "<    {\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }> | "
+            },
+            {
+              "kind": "Reference",
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/runtime!InertKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<    {\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }>;\n                        required: true;\n                        collection: false;\n                    };\n                }> | "
             },
             {
               "kind": "Reference",
@@ -2724,10 +3136,10 @@
             },
             {
               "kind": "Content",
-              "text": "<any>;\nrequired: false;\ncollection: false;\n};\n}>)[];\ncollection: false;\nrequired: false;\n};\n}>"
+              "text": "<any>;\n                required: false;\n                collection: false;\n            };\n        }>)[];\n        collection: false;\n        required: false;\n    };\n}>"
             }
           ],
-          "fileUrlPath": "../shared/index.ts",
+          "fileUrlPath": "index.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "Conditions",
@@ -2768,7 +3180,7 @@
               "text": "<boolean>;\n}"
             }
           ],
-          "fileUrlPath": "../shared/index.ts",
+          "fileUrlPath": "index.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "constraints",
@@ -2787,7 +3199,7 @@
               "text": "export declare class Controller "
             }
           ],
-          "fileUrlPath": "Controller.ts",
+          "fileUrlPath": "index.ts",
           "releaseTag": "Public",
           "isAbstract": false,
           "name": "Controller",
@@ -4230,7 +4642,7 @@
               "text": ">)[];\n        collection: false;\n        required: true;\n    };\n    matchExpression: {\n        type: \"function\";\n        collection: false;\n        required: true;\n    };\n}>"
             }
           ],
-          "fileUrlPath": "../shared/index.ts",
+          "fileUrlPath": "index.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "Count",
@@ -4279,7 +4691,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "../shared/index.ts",
+          "fileUrlPath": "index.ts",
           "returnTypeTokenRange": {
             "startIndex": 5,
             "endIndex": 7
@@ -4348,7 +4760,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "server.ts",
+          "fileUrlPath": "index.ts",
           "returnTypeTokenRange": {
             "startIndex": 5,
             "endIndex": 6
@@ -4387,7 +4799,7 @@
             {
               "kind": "Reference",
               "text": "KlassRawInstanceDataType",
-              "canonicalReference": "@interaqt/runtime!KlassRawInstanceDataType:type"
+              "canonicalReference": "@interaqt/runtime!~KlassRawInstanceDataType:type"
             },
             {
               "kind": "Content",
@@ -4437,7 +4849,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "../shared/index.ts",
+          "fileUrlPath": "index.ts",
           "returnTypeTokenRange": {
             "startIndex": 6,
             "endIndex": 12
@@ -4513,7 +4925,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "../shared/index.ts",
+          "fileUrlPath": "index.ts",
           "returnTypeTokenRange": {
             "startIndex": 3,
             "endIndex": 9
@@ -4574,7 +4986,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\nstringContent: {\ntype: \"string\";\n};\ncontent: {\ntype: \"function\";\n};\nname: {\ntype: \"string\";\n};\nisRef: {\ntype: \"boolean\";\n};\n}> | "
+              "text": "<    {\n    stringContent: {\n        type: \"string\";\n    };\n    content: {\n        type: \"function\";\n        required: true;\n        collection: false;\n    };\n    name: {\n        type: \"string\";\n    };\n    isRef: {\n        type: \"boolean\";\n    };\n}> | "
             },
             {
               "kind": "Reference",
@@ -4583,14 +4995,14 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\nstringContent: {\ntype: \"string\";\n};\ncontent: {\ntype: \"function\";\n};\nname: {\ntype: \"string\";\n};\nisRef: {\ntype: \"boolean\";\n};\n}>"
+              "text": "<    {\n    stringContent: {\n        type: \"string\";\n    };\n    content: {\n        type: \"function\";\n        required: true;\n        collection: false;\n    };\n    name: {\n        type: \"string\";\n    };\n    isRef: {\n        type: \"boolean\";\n    };\n}>"
             },
             {
               "kind": "Content",
               "text": ";"
             }
           ],
-          "fileUrlPath": "../shared/index.ts",
+          "fileUrlPath": "index.ts",
           "returnTypeTokenRange": {
             "startIndex": 7,
             "endIndex": 11
@@ -4624,7 +5036,7 @@
           "excerptTokens": [
             {
               "kind": "Content",
-              "text": "export type DataAPI = "
+              "text": "export declare type DataAPI = "
             },
             {
               "kind": "Reference",
@@ -4645,7 +5057,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "server.ts",
+          "fileUrlPath": "index.ts",
           "releaseTag": "Public",
           "name": "DataAPI",
           "typeTokenRange": {
@@ -4660,7 +5072,7 @@
           "excerptTokens": [
             {
               "kind": "Content",
-              "text": "export type DataAPIConfig = "
+              "text": "export declare type DataAPIConfig = "
             },
             {
               "kind": "Content",
@@ -4671,7 +5083,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "server.ts",
+          "fileUrlPath": "index.ts",
           "releaseTag": "Public",
           "name": "DataAPIConfig",
           "typeTokenRange": {
@@ -4686,7 +5098,7 @@
           "excerptTokens": [
             {
               "kind": "Content",
-              "text": "export type DataAPIHandle = "
+              "text": "export declare type DataAPIHandle = "
             },
             {
               "kind": "Content",
@@ -4706,7 +5118,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "server.ts",
+          "fileUrlPath": "index.ts",
           "releaseTag": "Public",
           "name": "DataAPIHandle",
           "typeTokenRange": {
@@ -4721,7 +5133,7 @@
           "excerptTokens": [
             {
               "kind": "Content",
-              "text": "export type DataAPIs = "
+              "text": "export declare type DataAPIs = "
             },
             {
               "kind": "Content",
@@ -4741,7 +5153,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "server.ts",
+          "fileUrlPath": "index.ts",
           "releaseTag": "Public",
           "name": "DataAPIs",
           "typeTokenRange": {
@@ -4756,7 +5168,7 @@
           "excerptTokens": [
             {
               "kind": "Content",
-              "text": "export type DataAPIThis = "
+              "text": "export declare type DataAPIThis = "
             },
             {
               "kind": "Content",
@@ -4785,12 +5197,176 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "server.ts",
+          "fileUrlPath": "index.ts",
           "releaseTag": "Public",
           "name": "DataAPIThis",
           "typeTokenRange": {
             "startIndex": 1,
             "endIndex": 6
+          }
+        },
+        {
+          "kind": "Variable",
+          "canonicalReference": "@interaqt/runtime!DataAttributive:var",
+          "docComment": "",
+          "excerptTokens": [
+            {
+              "kind": "Content",
+              "text": "DataAttributive: "
+            },
+            {
+              "kind": "Reference",
+              "text": "Klass",
+              "canonicalReference": "@interaqt/runtime!Klass:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<    {\n    content: {\n        type: \"function\";\n        required: true;\n        collection: false;\n    };\n    name: {\n        type: \"string\";\n    };\n}>"
+            }
+          ],
+          "fileUrlPath": "index.ts",
+          "isReadonly": true,
+          "releaseTag": "Public",
+          "name": "DataAttributive",
+          "variableTypeTokenRange": {
+            "startIndex": 1,
+            "endIndex": 3
+          }
+        },
+        {
+          "kind": "Variable",
+          "canonicalReference": "@interaqt/runtime!DataAttributives:var",
+          "docComment": "",
+          "excerptTokens": [
+            {
+              "kind": "Content",
+              "text": "DataAttributives: "
+            },
+            {
+              "kind": "Reference",
+              "text": "Klass",
+              "canonicalReference": "@interaqt/runtime!Klass:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<    {\n    content: {\n        type: ("
+            },
+            {
+              "kind": "Reference",
+              "text": "Klass",
+              "canonicalReference": "@interaqt/runtime!Klass:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<    {\n            type: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                defaultValue: () => string;\n            };\n            data: {\n                instanceType: "
+            },
+            {
+              "kind": "Reference",
+              "text": "ReactiveKlassInstance",
+              "canonicalReference": "@interaqt/runtime!ReactiveKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<    {\n                    content: {\n                        type: \"function\";\n                        required: true;\n                        collection: false;\n                    };\n                }> | "
+            },
+            {
+              "kind": "Reference",
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/runtime!InertKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<    {\n                    content: {\n                        type: \"function\";\n                        required: true;\n                        collection: false;\n                    };\n                }>;\n                required: true;\n                collection: false;\n            };\n        }> | "
+            },
+            {
+              "kind": "Reference",
+              "text": "Klass",
+              "canonicalReference": "@interaqt/runtime!Klass:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<    {\n            type: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                defaultValue: () => string;\n            };\n            operator: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                options: string[];\n                defaultValue: () => string;\n            };\n            left: {\n                instanceType: "
+            },
+            {
+              "kind": "Reference",
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/runtime!InertKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<    {\n                    type: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        defaultValue: () => string;\n                    };\n                    data: {\n                        instanceType: "
+            },
+            {
+              "kind": "Reference",
+              "text": "ReactiveKlassInstance",
+              "canonicalReference": "@interaqt/runtime!ReactiveKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<    {\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }> | "
+            },
+            {
+              "kind": "Reference",
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/runtime!InertKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<    {\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }>;\n                        required: true;\n                        collection: false;\n                    };\n                }> | "
+            },
+            {
+              "kind": "Reference",
+              "text": "UnwrappedBoolExpressionInstanceType",
+              "canonicalReference": "@interaqt/runtime!UnwrappedBoolExpressionInstanceType:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<any>;\n                required: true;\n                collection: false;\n            };\n            right: {\n                instanceType: "
+            },
+            {
+              "kind": "Reference",
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/runtime!InertKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<    {\n                    type: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        defaultValue: () => string;\n                    };\n                    data: {\n                        instanceType: "
+            },
+            {
+              "kind": "Reference",
+              "text": "ReactiveKlassInstance",
+              "canonicalReference": "@interaqt/runtime!ReactiveKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<    {\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }> | "
+            },
+            {
+              "kind": "Reference",
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/runtime!InertKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<    {\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }>;\n                        required: true;\n                        collection: false;\n                    };\n                }> | "
+            },
+            {
+              "kind": "Reference",
+              "text": "UnwrappedBoolExpressionInstanceType",
+              "canonicalReference": "@interaqt/runtime!UnwrappedBoolExpressionInstanceType:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<any>;\n                required: false;\n                collection: false;\n            };\n        }>)[];\n        collection: false;\n        required: false;\n    };\n}>"
+            }
+          ],
+          "fileUrlPath": "index.ts",
+          "isReadonly": true,
+          "releaseTag": "Public",
+          "name": "DataAttributives",
+          "variableTypeTokenRange": {
+            "startIndex": 1,
+            "endIndex": 27
           }
         },
         {
@@ -4800,7 +5376,7 @@
           "excerptTokens": [
             {
               "kind": "Content",
-              "text": "export type Database = "
+              "text": "export declare type Database = "
             },
             {
               "kind": "Content",
@@ -4901,7 +5477,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "System.ts",
+          "fileUrlPath": "index.ts",
           "releaseTag": "Public",
           "name": "Database",
           "typeTokenRange": {
@@ -4916,7 +5492,7 @@
           "excerptTokens": [
             {
               "kind": "Content",
-              "text": "export type DatabaseLogger = "
+              "text": "export declare type DatabaseLogger = "
             },
             {
               "kind": "Content",
@@ -4936,7 +5512,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "System.ts",
+          "fileUrlPath": "index.ts",
           "releaseTag": "Public",
           "name": "DatabaseLogger",
           "typeTokenRange": {
@@ -4978,7 +5554,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "../shared/index.ts",
+          "fileUrlPath": "index.ts",
           "returnTypeTokenRange": {
             "startIndex": 5,
             "endIndex": 6
@@ -5037,7 +5613,7 @@
               "text": " "
             }
           ],
-          "fileUrlPath": "../shared/index.ts",
+          "fileUrlPath": "index.ts",
           "releaseTag": "Public",
           "name": "DerivedConcept",
           "preserveMemberOrder": false,
@@ -5232,7 +5808,7 @@
               "text": "<boolean>;\n        };\n        defaultValue(): never[];\n    };\n    isRef: {\n        required: true;\n        collection: false;\n        type: \"boolean\";\n        defaultValue: () => boolean;\n    };\n}>"
             }
           ],
-          "fileUrlPath": "../shared/index.ts",
+          "fileUrlPath": "index.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "Entity",
@@ -5248,7 +5824,7 @@
           "excerptTokens": [
             {
               "kind": "Content",
-              "text": "export type EntityIdRef = "
+              "text": "export declare type EntityIdRef = "
             },
             {
               "kind": "Content",
@@ -5268,7 +5844,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "System.ts",
+          "fileUrlPath": "index.ts",
           "releaseTag": "Public",
           "name": "EntityIdRef",
           "typeTokenRange": {
@@ -5294,7 +5870,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "../shared/index.ts",
+          "fileUrlPath": "index.ts",
           "releaseTag": "Public",
           "name": "EvaluateError",
           "typeTokenRange": {
@@ -5321,7 +5897,7 @@
               "text": "<{\n    name: {\n        type: \"string\";\n        required: true;\n    };\n}>"
             }
           ],
-          "fileUrlPath": "../shared/index.ts",
+          "fileUrlPath": "index.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "Event_2",
@@ -5344,7 +5920,7 @@
               "text": "\"_Event_\""
             }
           ],
-          "fileUrlPath": "System.ts",
+          "fileUrlPath": "index.ts",
           "initializerTokenRange": {
             "startIndex": 1,
             "endIndex": 2
@@ -5367,17 +5943,13 @@
               "text": "eventEntity: "
             },
             {
-              "kind": "Content",
-              "text": "import(\"@interaqt/shared\")."
-            },
-            {
               "kind": "Reference",
               "text": "InertKlassInstance",
               "canonicalReference": "@interaqt/runtime!InertKlassInstance:type"
             },
             {
               "kind": "Content",
-              "text": "<{\n    name: {\n        type: \"string\";\n        collection: false;\n        required: true;\n        constraints: {\n            nameFormat({ name }: {\n                name: import(\"data0\")."
+              "text": "<    {\n    name: {\n        type: \"string\";\n        collection: false;\n        required: true;\n        constraints: {\n            nameFormat({ name }: {\n                name: "
             },
             {
               "kind": "Reference",
@@ -5386,7 +5958,7 @@
             },
             {
               "kind": "Content",
-              "text": "<string>;\n            }): import(\"data0\")."
+              "text": "<string>;\n            }): "
             },
             {
               "kind": "Reference",
@@ -5395,7 +5967,7 @@
             },
             {
               "kind": "Content",
-              "text": "<boolean>;\n        };\n    };\n    computedData: {\n        type: import(\"@interaqt/shared\")."
+              "text": "<boolean>;\n        };\n    };\n    computedData: {\n        type: "
             },
             {
               "kind": "Reference",
@@ -5404,7 +5976,7 @@
             },
             {
               "kind": "Content",
-              "text": "<any>[];\n        collection: false;\n        required: false;\n    };\n    properties: {\n        type: import(\"@interaqt/shared\")."
+              "text": "<any>[];\n        collection: false;\n        required: false;\n    };\n    properties: {\n        type: "
             },
             {
               "kind": "Reference",
@@ -5413,7 +5985,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n            name: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                constraints: {\n                    format({ name }: {\n                        name: import(\"data0\")."
+              "text": "<    {\n            name: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                constraints: {\n                    format({ name }: {\n                        name: "
             },
             {
               "kind": "Reference",
@@ -5422,7 +5994,7 @@
             },
             {
               "kind": "Content",
-              "text": "<string>;\n                    }): import(\"data0\")."
+              "text": "<string>;\n                    }): "
             },
             {
               "kind": "Reference",
@@ -5431,7 +6003,7 @@
             },
             {
               "kind": "Content",
-              "text": "<boolean>;\n                    length({ name }: {\n                        name: import(\"data0\")."
+              "text": "<boolean>;\n                    length({ name }: {\n                        name: "
             },
             {
               "kind": "Reference",
@@ -5440,7 +6012,7 @@
             },
             {
               "kind": "Content",
-              "text": "<string>;\n                    }): import(\"data0\")."
+              "text": "<string>;\n                    }): "
             },
             {
               "kind": "Reference",
@@ -5449,7 +6021,7 @@
             },
             {
               "kind": "Content",
-              "text": "<boolean>;\n                };\n            };\n            type: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                options: import(\"@interaqt/shared\")."
+              "text": "<boolean>;\n                };\n            };\n            type: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                options: "
             },
             {
               "kind": "Reference",
@@ -5458,7 +6030,7 @@
             },
             {
               "kind": "Content",
-              "text": "[];\n            };\n            collection: {\n                type: \"boolean\";\n                required: true;\n                collection: false;\n                defaultValue(): boolean;\n            };\n            args: {\n                computedType: (values: {\n                    type: import(\"@interaqt/shared\")."
+              "text": "[];\n            };\n            collection: {\n                type: \"boolean\";\n                required: true;\n                collection: false;\n                defaultValue(): boolean;\n            };\n            args: {\n                computedType: (values: {\n                    type: "
             },
             {
               "kind": "Reference",
@@ -5467,7 +6039,7 @@
             },
             {
               "kind": "Content",
-              "text": ";\n                }) => string;\n            };\n            computedData: {\n                collection: false;\n                type: import(\"@interaqt/shared\")."
+              "text": ";\n                }) => string;\n            };\n            computedData: {\n                collection: false;\n                type: "
             },
             {
               "kind": "Reference",
@@ -5476,7 +6048,7 @@
             },
             {
               "kind": "Content",
-              "text": "<any>[];\n                required: false;\n            };\n            computed: {\n                required: false;\n                type: \"function\";\n                collection: false;\n            };\n        }>;\n        collection: true;\n        required: true;\n        constraints: {\n            eachNameUnique({ properties }: any): import(\"data0\")."
+              "text": "<any>[];\n                required: false;\n            };\n            computed: {\n                required: false;\n                type: \"function\";\n                collection: false;\n            };\n        }>;\n        collection: true;\n        required: true;\n        constraints: {\n            eachNameUnique({ properties }: any): "
             },
             {
               "kind": "Reference",
@@ -5488,13 +6060,13 @@
               "text": "<boolean>;\n        };\n        defaultValue(): never[];\n    };\n    isRef: {\n        required: true;\n        collection: false;\n        type: \"boolean\";\n        defaultValue: () => boolean;\n    };\n}>"
             }
           ],
-          "fileUrlPath": "MonoSystem.ts",
+          "fileUrlPath": "index.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "eventEntity",
           "variableTypeTokenRange": {
             "startIndex": 1,
-            "endIndex": 28
+            "endIndex": 27
           }
         },
         {
@@ -5651,7 +6223,7 @@
               "text": ">)[];\n        collection: false;\n        required: true;\n    };\n    matchExpression: {\n        type: \"function\";\n        collection: false;\n        required: true;\n    };\n    notEmpty: {\n        type: \"boolean\";\n        collection: false;\n        required: false;\n    };\n}>"
             }
           ],
-          "fileUrlPath": "../shared/index.ts",
+          "fileUrlPath": "index.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "Every",
@@ -5681,7 +6253,7 @@
             {
               "kind": "Reference",
               "text": "AtomData",
-              "canonicalReference": "@interaqt/runtime!AtomData:type"
+              "canonicalReference": "@interaqt/runtime!~AtomData:type"
             },
             {
               "kind": "Content",
@@ -5692,7 +6264,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "../shared/index.ts",
+          "fileUrlPath": "index.ts",
           "releaseTag": "Public",
           "name": "ExpressionData",
           "typeParameters": [
@@ -5745,7 +6317,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "../shared/index.ts",
+          "fileUrlPath": "index.ts",
           "returnTypeTokenRange": {
             "startIndex": 3,
             "endIndex": 5
@@ -5826,7 +6398,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "../shared/index.ts",
+          "fileUrlPath": "index.ts",
           "returnTypeTokenRange": {
             "startIndex": 11,
             "endIndex": 12
@@ -5889,7 +6461,7 @@
               "text": ">"
             }
           ],
-          "fileUrlPath": "../shared/index.ts",
+          "fileUrlPath": "index.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "Gateway",
@@ -5930,7 +6502,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "../shared/index.ts",
+          "fileUrlPath": "index.ts",
           "releaseTag": "Public",
           "name": "GatewayInstanceType",
           "typeTokenRange": {
@@ -5956,7 +6528,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "../shared/index.ts",
+          "fileUrlPath": "index.ts",
           "releaseTag": "Public",
           "name": "GatewayPublicType",
           "typeTokenRange": {
@@ -5980,7 +6552,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\nname: {\ntype: \"string\";\nrequired: true;\n};\n}> | "
+              "text": "<    {\n    name: {\n        type: \"string\";\n        required: true;\n    };\n}> | "
             },
             {
               "kind": "Reference",
@@ -5989,10 +6561,10 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\nname: {\ntype: \"string\";\nrequired: true;\n};\n}>"
+              "text": "<    {\n    name: {\n        type: \"string\";\n        required: true;\n    };\n}>"
             }
           ],
-          "fileUrlPath": "../shared/index.ts",
+          "fileUrlPath": "index.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "GetAction",
@@ -6032,7 +6604,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "../shared/index.ts",
+          "fileUrlPath": "index.ts",
           "returnTypeTokenRange": {
             "startIndex": 4,
             "endIndex": 5
@@ -6095,7 +6667,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "../shared/index.ts",
+          "fileUrlPath": "index.ts",
           "returnTypeTokenRange": {
             "startIndex": 6,
             "endIndex": 8
@@ -6168,7 +6740,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "../shared/index.ts",
+          "fileUrlPath": "index.ts",
           "returnTypeTokenRange": {
             "startIndex": 3,
             "endIndex": 7
@@ -6218,7 +6790,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "../shared/index.ts",
+          "fileUrlPath": "index.ts",
           "returnTypeTokenRange": {
             "startIndex": 4,
             "endIndex": 5
@@ -6251,7 +6823,7 @@
               "text": "\"id\""
             }
           ],
-          "fileUrlPath": "System.ts",
+          "fileUrlPath": "index.ts",
           "initializerTokenRange": {
             "startIndex": 1,
             "endIndex": 2
@@ -6314,7 +6886,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "../shared/index.ts",
+          "fileUrlPath": "index.ts",
           "releaseTag": "Public",
           "name": "InertKlassInstance",
           "typeParameters": [
@@ -6389,7 +6961,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "../shared/index.ts",
+          "fileUrlPath": "index.ts",
           "releaseTag": "Public",
           "name": "InertKlassInstanceProps",
           "typeParameters": [
@@ -6438,7 +7010,7 @@
               "text": ">"
             }
           ],
-          "fileUrlPath": "../shared/index.ts",
+          "fileUrlPath": "index.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "Interaction",
@@ -6454,7 +7026,7 @@
           "excerptTokens": [
             {
               "kind": "Content",
-              "text": "export type InteractionContext = "
+              "text": "export declare type InteractionContext = "
             },
             {
               "kind": "Content",
@@ -6465,7 +7037,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "Controller.ts",
+          "fileUrlPath": "index.ts",
           "releaseTag": "Public",
           "name": "InteractionContext",
           "typeTokenRange": {
@@ -6505,7 +7077,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "../shared/index.ts",
+          "fileUrlPath": "index.ts",
           "releaseTag": "Public",
           "name": "InteractionInstanceType",
           "typeTokenRange": {
@@ -6614,19 +7186,73 @@
             },
             {
               "kind": "Content",
-              "text": ", any>[];\n    };\n}"
+              "text": ", any>[];\n    };\n    dataAttributives: {\n        required: false;\n        collection: false;\n        type: (typeof "
+            },
+            {
+              "kind": "Reference",
+              "text": "DataAttributive",
+              "canonicalReference": "@interaqt/runtime!DataAttributive:var"
+            },
+            {
+              "kind": "Content",
+              "text": " | typeof "
+            },
+            {
+              "kind": "Reference",
+              "text": "DataAttributives",
+              "canonicalReference": "@interaqt/runtime!DataAttributives:var"
+            },
+            {
+              "kind": "Content",
+              "text": ")[];\n    };\n    data: {\n        type: (typeof "
+            },
+            {
+              "kind": "Reference",
+              "text": "Entity",
+              "canonicalReference": "@interaqt/runtime!Entity:var"
+            },
+            {
+              "kind": "Content",
+              "text": " | typeof "
+            },
+            {
+              "kind": "Reference",
+              "text": "Relation",
+              "canonicalReference": "@interaqt/runtime!Relation:var"
+            },
+            {
+              "kind": "Content",
+              "text": " | typeof "
+            },
+            {
+              "kind": "Reference",
+              "text": "Computation",
+              "canonicalReference": "@interaqt/runtime!Computation:var"
+            },
+            {
+              "kind": "Content",
+              "text": ")[];\n        required: false;\n        collection: false;\n    };\n    query: {\n        type: typeof "
+            },
+            {
+              "kind": "Reference",
+              "text": "Query",
+              "canonicalReference": "@interaqt/runtime!Query:var"
+            },
+            {
+              "kind": "Content",
+              "text": ";\n        collection: false;\n    };\n}"
             },
             {
               "kind": "Content",
               "text": ";"
             }
           ],
-          "fileUrlPath": "../shared/index.ts",
+          "fileUrlPath": "index.ts",
           "releaseTag": "Public",
           "name": "InteractionPublicType",
           "typeTokenRange": {
             "startIndex": 1,
-            "endIndex": 22
+            "endIndex": 34
           }
         },
         {
@@ -6831,7 +7457,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "../shared/index.ts",
+          "fileUrlPath": "index.ts",
           "releaseTag": "Public",
           "name": "Klass",
           "typeParameters": [
@@ -6880,7 +7506,7 @@
               "text": "<any>>"
             }
           ],
-          "fileUrlPath": "../shared/index.ts",
+          "fileUrlPath": "index.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "KlassByName",
@@ -6946,7 +7572,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "../shared/index.ts",
+          "fileUrlPath": "index.ts",
           "releaseTag": "Public",
           "name": "KlassInstance",
           "typeParameters": [
@@ -7032,7 +7658,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "../shared/index.ts",
+          "fileUrlPath": "index.ts",
           "releaseTag": "Public",
           "name": "KlassInstanceArgs",
           "typeParameters": [
@@ -7080,7 +7706,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "../shared/index.ts",
+          "fileUrlPath": "index.ts",
           "releaseTag": "Public",
           "name": "KlassInstancePrimitiveProps",
           "typeTokenRange": {
@@ -7113,7 +7739,7 @@
             {
               "kind": "Reference",
               "text": "ClassMetaPublicItem",
-              "canonicalReference": "@interaqt/runtime!ClassMetaPublicItem:type"
+              "canonicalReference": "@interaqt/runtime!~ClassMetaPublicItem:type"
             },
             {
               "kind": "Content",
@@ -7124,7 +7750,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "../shared/index.ts",
+          "fileUrlPath": "index.ts",
           "releaseTag": "Public",
           "name": "KlassMeta",
           "typeTokenRange": {
@@ -7150,7 +7776,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "../shared/index.ts",
+          "fileUrlPath": "index.ts",
           "releaseTag": "Public",
           "name": "KlassOptions",
           "typeTokenRange": {
@@ -7186,7 +7812,7 @@
             {
               "kind": "Reference",
               "text": "IfReactiveCollectionProp",
-              "canonicalReference": "@interaqt/runtime!IfReactiveCollectionProp:type"
+              "canonicalReference": "@interaqt/runtime!~IfReactiveCollectionProp:type"
             },
             {
               "kind": "Content",
@@ -7197,7 +7823,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "../shared/index.ts",
+          "fileUrlPath": "index.ts",
           "releaseTag": "Public",
           "name": "KlassProp",
           "typeParameters": [
@@ -7499,7 +8125,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n                name: {\n                type: \"string\";\n                required: true;\n                };\n                }> | "
+              "text": "<    {\n                    name: {\n                        type: \"string\";\n                        required: true;\n                    };\n                }> | "
             },
             {
               "kind": "Reference",
@@ -7508,7 +8134,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n                name: {\n                type: \"string\";\n                required: true;\n                };\n                }>)[];\n            };\n        }>;\n        collection: false;\n        required: true;\n    };\n    triggerInteraction: {\n        type: "
+              "text": "<    {\n                    name: {\n                        type: \"string\";\n                        required: true;\n                    };\n                }>)[];\n            };\n        }>;\n        collection: false;\n        required: true;\n    };\n    triggerInteraction: {\n        type: "
             },
             {
               "kind": "Reference",
@@ -7529,7 +8155,7 @@
               "text": ">;\n        collection: true;\n        required: false;\n    };\n    handle: {\n        type: \"function\";\n        collection: false;\n        required: true;\n    };\n}>"
             }
           ],
-          "fileUrlPath": "../shared/index.ts",
+          "fileUrlPath": "index.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "MapActivityToRecord",
@@ -7584,7 +8210,7 @@
               "text": ">;\n                collection: false;\n                required: true;\n            };\n            handle: {\n                type: \"function\";\n                collection: false;\n                required: true;\n            };\n            computeSource: {\n                type: \"function\";\n                collection: false;\n                required: true;\n            };\n        }>;\n        collection: true;\n        required: true;\n    };\n    defaultValue: {\n        type: \"string\";\n        collection: false;\n        required: false;\n    };\n}>"
             }
           ],
-          "fileUrlPath": "../shared/index.ts",
+          "fileUrlPath": "index.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "MapInteractionToProperty",
@@ -7630,7 +8256,7 @@
               "text": ">;\n        collection: false;\n        required: true;\n    };\n    handle: {\n        type: \"function\";\n        collection: false;\n        required: true;\n    };\n    computeSource: {\n        type: \"function\";\n        collection: false;\n        required: true;\n    };\n}>"
             }
           ],
-          "fileUrlPath": "../shared/index.ts",
+          "fileUrlPath": "index.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "MapInteractionToPropertyItem",
@@ -7676,7 +8302,7 @@
               "text": ">;\n        collection: false;\n        required: true;\n    };\n    handle: {\n        type: \"function\";\n        collection: false;\n        required: true;\n    };\n}>"
             }
           ],
-          "fileUrlPath": "../shared/index.ts",
+          "fileUrlPath": "index.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "MapInteractionToRecord",
@@ -7704,7 +8330,7 @@
               "text": "<{\n    handle: {\n        type: \"function\";\n        collection: false;\n        required: true;\n    };\n}>"
             }
           ],
-          "fileUrlPath": "../shared/index.ts",
+          "fileUrlPath": "index.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "MapRecordMutationToRecord",
@@ -7732,7 +8358,7 @@
               "text": " "
             }
           ],
-          "fileUrlPath": "MonoSystem.ts",
+          "fileUrlPath": "index.ts",
           "releaseTag": "Public",
           "isAbstract": false,
           "name": "MonoSystem",
@@ -8215,7 +8841,7 @@
                 },
                 {
                   "kind": "Reference",
-                  "text": "Storage",
+                  "text": "Storage_2",
                   "canonicalReference": "@interaqt/runtime!Storage_2:type"
                 },
                 {
@@ -8372,7 +8998,7 @@
             {
               "kind": "Reference",
               "text": "OmitNever",
-              "canonicalReference": "@interaqt/runtime!OmitNever:type"
+              "canonicalReference": "@interaqt/runtime!~OmitNever:type"
             },
             {
               "kind": "Content",
@@ -8444,7 +9070,7 @@
             {
               "kind": "Reference",
               "text": "ExtractKlassTypes",
-              "canonicalReference": "@interaqt/runtime!ExtractKlassTypes:type"
+              "canonicalReference": "@interaqt/runtime!~ExtractKlassTypes:type"
             },
             {
               "kind": "Content",
@@ -8453,7 +9079,7 @@
             {
               "kind": "Reference",
               "text": "PrimitivePropType",
-              "canonicalReference": "@interaqt/runtime!PrimitivePropType:type"
+              "canonicalReference": "@interaqt/runtime!~PrimitivePropType:type"
             },
             {
               "kind": "Content",
@@ -8471,7 +9097,7 @@
             {
               "kind": "Reference",
               "text": "PrimitivePropertyMap",
-              "canonicalReference": "@interaqt/runtime!PrimitivePropertyMap:interface"
+              "canonicalReference": "@interaqt/runtime!~PrimitivePropertyMap:interface"
             },
             {
               "kind": "Content",
@@ -8482,7 +9108,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "../shared/index.ts",
+          "fileUrlPath": "index.ts",
           "releaseTag": "Public",
           "name": "OptionalProps",
           "typeParameters": [
@@ -8553,7 +9179,7 @@
             {
               "kind": "Reference",
               "text": "ParseAtomNameToObjectType",
-              "canonicalReference": "@interaqt/runtime!ParseAtomNameToObjectType:type"
+              "canonicalReference": "@interaqt/runtime!~ParseAtomNameToObjectType:type"
             },
             {
               "kind": "Content",
@@ -8573,7 +9199,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "../shared/index.ts",
+          "fileUrlPath": "index.ts",
           "returnTypeTokenRange": {
             "startIndex": 7,
             "endIndex": 9
@@ -8655,7 +9281,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                    stringContent: {\n                        type: \"string\";\n                    };\n                    content: {\n                        type: \"function\";\n                    };\n                    name: {\n                        type: \"string\";\n                    };\n                    isRef: {\n                        type: \"boolean\";\n                    };\n                }> | "
+              "text": "<{\n                    stringContent: {\n                        type: \"string\";\n                    };\n                    content: {\n                        type: \"function\";\n                        required: true;\n                        collection: false;\n                    };\n                    name: {\n                        type: \"string\";\n                    };\n                    isRef: {\n                        type: \"boolean\";\n                    };\n                }> | "
             },
             {
               "kind": "Reference",
@@ -8677,21 +9303,21 @@
             },
             {
               "kind": "Reference",
-              "text": "InertKlassInstance",
-              "canonicalReference": "@interaqt/runtime!InertKlassInstance:type"
-            },
-            {
-              "kind": "Content",
-              "text": "<any> | "
-            },
-            {
-              "kind": "Reference",
               "text": "ReactiveKlassInstance",
               "canonicalReference": "@interaqt/runtime!ReactiveKlassInstance:type"
             },
             {
               "kind": "Content",
-              "text": "<any>;\n                                required: true;\n                                collection: false;\n                            };\n                        }> | "
+              "text": "<    {\n                                    content: {\n                                        type: \"function\";\n                                        required: true;\n                                        collection: false;\n                                    };\n                                }> | "
+            },
+            {
+              "kind": "Reference",
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/runtime!InertKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<    {\n                                    content: {\n                                        type: \"function\";\n                                        required: true;\n                                        collection: false;\n                                    };\n                                }>;\n                                required: true;\n                                collection: false;\n                            };\n                        }> | "
             },
             {
               "kind": "Reference",
@@ -8709,16 +9335,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n                                type: {\n                                type: \"string\";\n                                required: true;\n                                collection: false;\n                                defaultValue: () => string;\n                                };\n                                data: {\n                                instanceType: "
-            },
-            {
-              "kind": "Reference",
-              "text": "InertKlassInstance",
-              "canonicalReference": "@interaqt/runtime!InertKlassInstance:type"
-            },
-            {
-              "kind": "Content",
-              "text": "<any> | "
+              "text": "<    {\n                                    type: {\n                                        type: \"string\";\n                                        required: true;\n                                        collection: false;\n                                        defaultValue: () => string;\n                                    };\n                                    data: {\n                                        instanceType: "
             },
             {
               "kind": "Reference",
@@ -8727,7 +9344,16 @@
             },
             {
               "kind": "Content",
-              "text": "<any>;\n                                required: true;\n                                collection: false;\n                                };\n                                }> | "
+              "text": "<    {\n                                            content: {\n                                                type: \"function\";\n                                                required: true;\n                                                collection: false;\n                                            };\n                                        }> | "
+            },
+            {
+              "kind": "Reference",
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/runtime!InertKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<    {\n                                            content: {\n                                                type: \"function\";\n                                                required: true;\n                                                collection: false;\n                                            };\n                                        }>;\n                                        required: true;\n                                        collection: false;\n                                    };\n                                }> | "
             },
             {
               "kind": "Reference",
@@ -8745,16 +9371,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n                                type: {\n                                type: \"string\";\n                                required: true;\n                                collection: false;\n                                defaultValue: () => string;\n                                };\n                                data: {\n                                instanceType: "
-            },
-            {
-              "kind": "Reference",
-              "text": "InertKlassInstance",
-              "canonicalReference": "@interaqt/runtime!InertKlassInstance:type"
-            },
-            {
-              "kind": "Content",
-              "text": "<any> | "
+              "text": "<    {\n                                    type: {\n                                        type: \"string\";\n                                        required: true;\n                                        collection: false;\n                                        defaultValue: () => string;\n                                    };\n                                    data: {\n                                        instanceType: "
             },
             {
               "kind": "Reference",
@@ -8763,7 +9380,16 @@
             },
             {
               "kind": "Content",
-              "text": "<any>;\n                                required: true;\n                                collection: false;\n                                };\n                                }> | "
+              "text": "<    {\n                                            content: {\n                                                type: \"function\";\n                                                required: true;\n                                                collection: false;\n                                            };\n                                        }> | "
+            },
+            {
+              "kind": "Reference",
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/runtime!InertKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<    {\n                                            content: {\n                                                type: \"function\";\n                                                required: true;\n                                                collection: false;\n                                            };\n                                        }>;\n                                        required: true;\n                                        collection: false;\n                                    };\n                                }> | "
             },
             {
               "kind": "Reference",
@@ -9015,10 +9641,10 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                    stringContent: {\n                        type: \"string\";\n                    };\n                    content: {\n                        type: \"function\";\n                    };\n                    name: {\n                        type: \"string\";\n                    };\n                    isRef: {\n                        type: \"boolean\";\n                    };\n                }>)[];\n            };\n        }>;\n        collection: true;\n        required: true;\n        defaultValue: () => never[];\n    };\n}>"
+              "text": "<{\n                    stringContent: {\n                        type: \"string\";\n                    };\n                    content: {\n                        type: \"function\";\n                        required: true;\n                        collection: false;\n                    };\n                    name: {\n                        type: \"string\";\n                    };\n                    isRef: {\n                        type: \"boolean\";\n                    };\n                }>)[];\n            };\n        }>;\n        collection: true;\n        required: true;\n        defaultValue: () => never[];\n    };\n}>"
             }
           ],
-          "fileUrlPath": "../shared/index.ts",
+          "fileUrlPath": "index.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "Payload",
@@ -9052,7 +9678,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n            stringContent: {\n                type: \"string\";\n            };\n            content: {\n                type: \"function\";\n            };\n            name: {\n                type: \"string\";\n            };\n            isRef: {\n                type: \"boolean\";\n            };\n        }> | "
+              "text": "<{\n            stringContent: {\n                type: \"string\";\n            };\n            content: {\n                type: \"function\";\n                required: true;\n                collection: false;\n            };\n            name: {\n                type: \"string\";\n            };\n            isRef: {\n                type: \"boolean\";\n            };\n        }> | "
             },
             {
               "kind": "Reference",
@@ -9074,21 +9700,21 @@
             },
             {
               "kind": "Reference",
-              "text": "InertKlassInstance",
-              "canonicalReference": "@interaqt/runtime!InertKlassInstance:type"
-            },
-            {
-              "kind": "Content",
-              "text": "<any> | "
-            },
-            {
-              "kind": "Reference",
               "text": "ReactiveKlassInstance",
               "canonicalReference": "@interaqt/runtime!ReactiveKlassInstance:type"
             },
             {
               "kind": "Content",
-              "text": "<any>;\n                        required: true;\n                        collection: false;\n                    };\n                }> | "
+              "text": "<    {\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }> | "
+            },
+            {
+              "kind": "Reference",
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/runtime!InertKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<    {\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }>;\n                        required: true;\n                        collection: false;\n                    };\n                }> | "
             },
             {
               "kind": "Reference",
@@ -9106,16 +9732,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n                        type: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        defaultValue: () => string;\n                        };\n                        data: {\n                        instanceType: "
-            },
-            {
-              "kind": "Reference",
-              "text": "InertKlassInstance",
-              "canonicalReference": "@interaqt/runtime!InertKlassInstance:type"
-            },
-            {
-              "kind": "Content",
-              "text": "<any> | "
+              "text": "<    {\n                            type: {\n                                type: \"string\";\n                                required: true;\n                                collection: false;\n                                defaultValue: () => string;\n                            };\n                            data: {\n                                instanceType: "
             },
             {
               "kind": "Reference",
@@ -9124,7 +9741,16 @@
             },
             {
               "kind": "Content",
-              "text": "<any>;\n                        required: true;\n                        collection: false;\n                        };\n                        }> | "
+              "text": "<    {\n                                    content: {\n                                        type: \"function\";\n                                        required: true;\n                                        collection: false;\n                                    };\n                                }> | "
+            },
+            {
+              "kind": "Reference",
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/runtime!InertKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<    {\n                                    content: {\n                                        type: \"function\";\n                                        required: true;\n                                        collection: false;\n                                    };\n                                }>;\n                                required: true;\n                                collection: false;\n                            };\n                        }> | "
             },
             {
               "kind": "Reference",
@@ -9142,16 +9768,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n                        type: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        defaultValue: () => string;\n                        };\n                        data: {\n                        instanceType: "
-            },
-            {
-              "kind": "Reference",
-              "text": "InertKlassInstance",
-              "canonicalReference": "@interaqt/runtime!InertKlassInstance:type"
-            },
-            {
-              "kind": "Content",
-              "text": "<any> | "
+              "text": "<    {\n                            type: {\n                                type: \"string\";\n                                required: true;\n                                collection: false;\n                                defaultValue: () => string;\n                            };\n                            data: {\n                                instanceType: "
             },
             {
               "kind": "Reference",
@@ -9160,7 +9777,16 @@
             },
             {
               "kind": "Content",
-              "text": "<any>;\n                        required: true;\n                        collection: false;\n                        };\n                        }> | "
+              "text": "<    {\n                                    content: {\n                                        type: \"function\";\n                                        required: true;\n                                        collection: false;\n                                    };\n                                }> | "
+            },
+            {
+              "kind": "Reference",
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/runtime!InertKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<    {\n                                    content: {\n                                        type: \"function\";\n                                        required: true;\n                                        collection: false;\n                                    };\n                                }>;\n                                required: true;\n                                collection: false;\n                            };\n                        }> | "
             },
             {
               "kind": "Reference",
@@ -9412,10 +10038,10 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n            stringContent: {\n                type: \"string\";\n            };\n            content: {\n                type: \"function\";\n            };\n            name: {\n                type: \"string\";\n            };\n            isRef: {\n                type: \"boolean\";\n            };\n        }>)[];\n    };\n}>"
+              "text": "<{\n            stringContent: {\n                type: \"string\";\n            };\n            content: {\n                type: \"function\";\n                required: true;\n                collection: false;\n            };\n            name: {\n                type: \"string\";\n            };\n            isRef: {\n                type: \"boolean\";\n            };\n        }>)[];\n    };\n}>"
             }
           ],
-          "fileUrlPath": "../shared/index.ts",
+          "fileUrlPath": "index.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "PayloadItem",
@@ -9506,7 +10132,7 @@
               "text": "<any>[];\n        required: false;\n    };\n    computed: {\n        required: false;\n        type: \"function\";\n        collection: false;\n    };\n}>"
             }
           ],
-          "fileUrlPath": "../shared/index.ts",
+          "fileUrlPath": "index.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "Property",
@@ -9529,7 +10155,7 @@
               "text": "{\n    string: string;\n    number: string;\n    boolean: string;\n}"
             }
           ],
-          "fileUrlPath": "../shared/index.ts",
+          "fileUrlPath": "index.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "PropertyTypeMap",
@@ -9548,7 +10174,7 @@
               "text": "export declare enum PropertyTypes "
             }
           ],
-          "fileUrlPath": "../shared/index.ts",
+          "fileUrlPath": "index.ts",
           "releaseTag": "Public",
           "name": "PropertyTypes",
           "preserveMemberOrder": false,
@@ -9619,6 +10245,71 @@
           ]
         },
         {
+          "kind": "Variable",
+          "canonicalReference": "@interaqt/runtime!Query:var",
+          "docComment": "",
+          "excerptTokens": [
+            {
+              "kind": "Content",
+              "text": "Query: "
+            },
+            {
+              "kind": "Reference",
+              "text": "Klass",
+              "canonicalReference": "@interaqt/runtime!Klass:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<    {\n    items: {\n        type: "
+            },
+            {
+              "kind": "Reference",
+              "text": "Klass",
+              "canonicalReference": "@interaqt/runtime!Klass:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<    {\n            name: {\n                type: \"string\";\n                required: true;\n                collection: false;\n            };\n            value: {\n                type: \"string\";\n                required: true;\n                collection: false;\n            };\n        }>[];\n        required: true;\n        collection: true;\n    };\n}>"
+            }
+          ],
+          "fileUrlPath": "index.ts",
+          "isReadonly": true,
+          "releaseTag": "Public",
+          "name": "Query",
+          "variableTypeTokenRange": {
+            "startIndex": 1,
+            "endIndex": 5
+          }
+        },
+        {
+          "kind": "Variable",
+          "canonicalReference": "@interaqt/runtime!QueryItem:var",
+          "docComment": "",
+          "excerptTokens": [
+            {
+              "kind": "Content",
+              "text": "QueryItem: "
+            },
+            {
+              "kind": "Reference",
+              "text": "Klass",
+              "canonicalReference": "@interaqt/runtime!Klass:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<    {\n    name: {\n        type: \"string\";\n        required: true;\n        collection: false;\n    };\n    value: {\n        type: \"string\";\n        required: true;\n        collection: false;\n    };\n}>"
+            }
+          ],
+          "fileUrlPath": "index.ts",
+          "isReadonly": true,
+          "releaseTag": "Public",
+          "name": "QueryItem",
+          "variableTypeTokenRange": {
+            "startIndex": 1,
+            "endIndex": 3
+          }
+        },
+        {
           "kind": "TypeAlias",
           "canonicalReference": "@interaqt/runtime!ReactiveKlassInstance:type",
           "docComment": "",
@@ -9668,7 +10359,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "../shared/index.ts",
+          "fileUrlPath": "index.ts",
           "releaseTag": "Public",
           "name": "ReactiveKlassInstance",
           "typeParameters": [
@@ -9743,7 +10434,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "../shared/index.ts",
+          "fileUrlPath": "index.ts",
           "releaseTag": "Public",
           "name": "ReactiveKlassInstanceProps",
           "typeParameters": [
@@ -9796,7 +10487,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "../shared/index.ts",
+          "fileUrlPath": "index.ts",
           "releaseTag": "Public",
           "name": "ReactiveKlassOptions",
           "typeTokenRange": {
@@ -9811,7 +10502,7 @@
           "excerptTokens": [
             {
               "kind": "Content",
-              "text": "export type RecordChangeListener = "
+              "text": "export declare type RecordChangeListener = "
             },
             {
               "kind": "Content",
@@ -9831,7 +10522,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "System.ts",
+          "fileUrlPath": "index.ts",
           "releaseTag": "Public",
           "name": "RecordChangeListener",
           "typeTokenRange": {
@@ -9846,7 +10537,7 @@
           "excerptTokens": [
             {
               "kind": "Content",
-              "text": "export type RecordMutationEvent = "
+              "text": "export declare type RecordMutationEvent = "
             },
             {
               "kind": "Content",
@@ -9857,7 +10548,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "System.ts",
+          "fileUrlPath": "index.ts",
           "releaseTag": "Public",
           "name": "RecordMutationEvent",
           "typeTokenRange": {
@@ -9893,7 +10584,7 @@
               "text": ">"
             }
           ],
-          "fileUrlPath": "../shared/index.ts",
+          "fileUrlPath": "index.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "Relation",
@@ -9939,7 +10630,7 @@
               "text": ">;\n        collection: false;\n        required: true;\n    };\n    relationDirection: {\n        type: \"string\";\n        collection: false;\n        required: true;\n        defaultValue: () => string;\n    };\n    matchExpression: {\n        type: \"function\";\n        collection: false;\n        required: true;\n    };\n}>"
             }
           ],
-          "fileUrlPath": "../shared/index.ts",
+          "fileUrlPath": "index.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "RelationBasedAny",
@@ -9985,7 +10676,7 @@
               "text": ">;\n        collection: false;\n        required: true;\n    };\n    relationDirection: {\n        type: \"string\";\n        collection: false;\n        required: true;\n        defaultValue: () => string;\n    };\n    matchExpression: {\n        type: \"function\";\n        collection: false;\n        required: true;\n    };\n    notEmpty: {\n        type: \"boolean\";\n        collection: false;\n        required: false;\n    };\n}>"
             }
           ],
-          "fileUrlPath": "../shared/index.ts",
+          "fileUrlPath": "index.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "RelationBasedEvery",
@@ -10040,7 +10731,7 @@
               "text": ">;\n                collection: false;\n                required: true;\n            };\n            relationDirection: {\n                type: \"string\";\n                collection: false;\n                required: true;\n                defaultValue: () => string;\n            };\n        }>;\n        collection: true;\n        required: true;\n    };\n    matchRelationToWeight: {\n        type: \"function\";\n        collection: false;\n        required: true;\n    };\n}>"
             }
           ],
-          "fileUrlPath": "../shared/index.ts",
+          "fileUrlPath": "index.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "RelationBasedWeightedSummation",
@@ -10086,7 +10777,7 @@
               "text": ">;\n        collection: false;\n        required: true;\n    };\n    relationDirection: {\n        type: \"string\";\n        collection: false;\n        required: true;\n        defaultValue: () => string;\n    };\n    matchExpression: {\n        type: \"function\";\n        collection: false;\n        required: true;\n    };\n}>"
             }
           ],
-          "fileUrlPath": "../shared/index.ts",
+          "fileUrlPath": "index.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "RelationCount",
@@ -10311,7 +11002,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "../shared/index.ts",
+          "fileUrlPath": "index.ts",
           "releaseTag": "Public",
           "name": "RelationPublic",
           "typeTokenRange": {
@@ -10614,7 +11305,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n                        name: {\n                        type: \"string\";\n                        required: true;\n                        };\n                        }> | "
+              "text": "<    {\n                            name: {\n                                type: \"string\";\n                                required: true;\n                            };\n                        }> | "
             },
             {
               "kind": "Reference",
@@ -10623,7 +11314,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n                        name: {\n                        type: \"string\";\n                        required: true;\n                        };\n                        }>)[];\n                    };\n                }>;\n                collection: false;\n                required: false;\n            };\n            triggerInteraction: {\n                type: "
+              "text": "<    {\n                            name: {\n                                type: \"string\";\n                                required: true;\n                            };\n                        }>)[];\n                    };\n                }>;\n                collection: false;\n                required: false;\n            };\n            triggerInteraction: {\n                type: "
             },
             {
               "kind": "Reference",
@@ -10725,7 +11416,7 @@
               "text": "<any>[];\n                        collection: false;\n                        required: true;\n                    };\n                }>;\n                collection: true;\n                required: false;\n            };\n            propertyHandle: {\n                type: \"function\";\n                required: false;\n                collection: false;\n            };\n        }>;\n        collection: false;\n        required: true;\n    };\n}>"
             }
           ],
-          "fileUrlPath": "../shared/index.ts",
+          "fileUrlPath": "index.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "RelationStateMachine",
@@ -10771,7 +11462,7 @@
               "text": "<any>[];\n                collection: false;\n                required: true;\n            };\n        }>;\n        collection: true;\n        required: false;\n    };\n    propertyHandle: {\n        type: \"function\";\n        required: false;\n        collection: false;\n    };\n}>"
             }
           ],
-          "fileUrlPath": "../shared/index.ts",
+          "fileUrlPath": "index.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "RelationStateNode",
@@ -11039,7 +11730,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n                name: {\n                type: \"string\";\n                required: true;\n                };\n                }> | "
+              "text": "<    {\n                    name: {\n                        type: \"string\";\n                        required: true;\n                    };\n                }> | "
             },
             {
               "kind": "Reference",
@@ -11048,7 +11739,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n                name: {\n                type: \"string\";\n                required: true;\n                };\n                }>)[];\n            };\n        }>;\n        collection: false;\n        required: false;\n    };\n    triggerInteraction: {\n        type: "
+              "text": "<    {\n                    name: {\n                        type: \"string\";\n                        required: true;\n                    };\n                }>)[];\n            };\n        }>;\n        collection: false;\n        required: false;\n    };\n    triggerInteraction: {\n        type: "
             },
             {
               "kind": "Reference",
@@ -11123,7 +11814,7 @@
               "text": "<any>[];\n                        collection: false;\n                        required: true;\n                    };\n                }>;\n                collection: true;\n                required: false;\n            };\n            propertyHandle: {\n                type: \"function\";\n                required: false;\n                collection: false;\n            };\n        }>;\n        collection: false;\n        required: true;\n    };\n    handleType: {\n        type: \"string\";\n    };\n    handle: {\n        type: \"function\";\n        collection: false;\n        required: true;\n    };\n}>"
             }
           ],
-          "fileUrlPath": "../shared/index.ts",
+          "fileUrlPath": "index.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "RelationStateTransfer",
@@ -11150,7 +11841,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "../shared/index.ts",
+          "fileUrlPath": "index.ts",
           "returnTypeTokenRange": {
             "startIndex": 1,
             "endIndex": 2
@@ -11210,7 +11901,7 @@
             {
               "kind": "Reference",
               "text": "OmitNever",
-              "canonicalReference": "@interaqt/runtime!OmitNever:type"
+              "canonicalReference": "@interaqt/runtime!~OmitNever:type"
             },
             {
               "kind": "Content",
@@ -11282,7 +11973,7 @@
             {
               "kind": "Reference",
               "text": "ExtractKlassTypes",
-              "canonicalReference": "@interaqt/runtime!ExtractKlassTypes:type"
+              "canonicalReference": "@interaqt/runtime!~ExtractKlassTypes:type"
             },
             {
               "kind": "Content",
@@ -11291,7 +11982,7 @@
             {
               "kind": "Reference",
               "text": "PrimitivePropType",
-              "canonicalReference": "@interaqt/runtime!PrimitivePropType:type"
+              "canonicalReference": "@interaqt/runtime!~PrimitivePropType:type"
             },
             {
               "kind": "Content",
@@ -11309,7 +12000,7 @@
             {
               "kind": "Reference",
               "text": "PrimitivePropertyMap",
-              "canonicalReference": "@interaqt/runtime!PrimitivePropertyMap:interface"
+              "canonicalReference": "@interaqt/runtime!~PrimitivePropertyMap:interface"
             },
             {
               "kind": "Content",
@@ -11320,7 +12011,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "../shared/index.ts",
+          "fileUrlPath": "index.ts",
           "releaseTag": "Public",
           "name": "RequiredProps",
           "typeParameters": [
@@ -11375,7 +12066,7 @@
             {
               "kind": "Reference",
               "text": "ClassMetaPublicItem",
-              "canonicalReference": "@interaqt/runtime!ClassMetaPublicItem:type"
+              "canonicalReference": "@interaqt/runtime!~ClassMetaPublicItem:type"
             },
             {
               "kind": "Content",
@@ -11396,7 +12087,7 @@
             {
               "kind": "Reference",
               "text": "DefaultValueType",
-              "canonicalReference": "@interaqt/runtime!DefaultValueType:type"
+              "canonicalReference": "@interaqt/runtime!~DefaultValueType:type"
             },
             {
               "kind": "Content",
@@ -11405,7 +12096,7 @@
             {
               "kind": "Reference",
               "text": "ComputedValueType",
-              "canonicalReference": "@interaqt/runtime!ComputedValueType:type"
+              "canonicalReference": "@interaqt/runtime!~ComputedValueType:type"
             },
             {
               "kind": "Content",
@@ -11414,7 +12105,7 @@
             {
               "kind": "Reference",
               "text": "DefaultValueType",
-              "canonicalReference": "@interaqt/runtime!DefaultValueType:type"
+              "canonicalReference": "@interaqt/runtime!~DefaultValueType:type"
             },
             {
               "kind": "Content",
@@ -11423,7 +12114,7 @@
             {
               "kind": "Reference",
               "text": "ComputedValueType",
-              "canonicalReference": "@interaqt/runtime!ComputedValueType:type"
+              "canonicalReference": "@interaqt/runtime!~ComputedValueType:type"
             },
             {
               "kind": "Content",
@@ -11434,7 +12125,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "../shared/index.ts",
+          "fileUrlPath": "index.ts",
           "releaseTag": "Public",
           "name": "RequireWithoutDefaultAndComputed",
           "typeParameters": [
@@ -11480,7 +12171,7 @@
               "text": "\"_rowId\""
             }
           ],
-          "fileUrlPath": "System.ts",
+          "fileUrlPath": "index.ts",
           "initializerTokenRange": {
             "startIndex": 1,
             "endIndex": 2
@@ -11512,7 +12203,7 @@
               "text": "<{\n    name: {\n        type: \"string\";\n        required: true;\n        collection: false;\n    };\n    handle: {\n        type: \"function\";\n        required: true;\n        collection: false;\n    };\n}>"
             }
           ],
-          "fileUrlPath": "../shared/index.ts",
+          "fileUrlPath": "index.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "SideEffect",
@@ -11540,7 +12231,7 @@
               "text": " "
             }
           ],
-          "fileUrlPath": "SQLite.ts",
+          "fileUrlPath": "index.ts",
           "releaseTag": "Public",
           "isAbstract": false,
           "name": "SQLiteDB",
@@ -12395,7 +13086,7 @@
           "excerptTokens": [
             {
               "kind": "Content",
-              "text": "export type SQLiteDBOptions = "
+              "text": "export declare type SQLiteDBOptions = "
             },
             {
               "kind": "Reference",
@@ -12429,7 +13120,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "SQLite.ts",
+          "fileUrlPath": "index.ts",
           "releaseTag": "Public",
           "name": "SQLiteDBOptions",
           "typeTokenRange": {
@@ -12487,7 +13178,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "server.ts",
+          "fileUrlPath": "index.ts",
           "returnTypeTokenRange": {
             "startIndex": 7,
             "endIndex": 9
@@ -12604,7 +13295,7 @@
               "text": "<any>[];\n        required: false;\n    };\n}>"
             }
           ],
-          "fileUrlPath": "../shared/index.ts",
+          "fileUrlPath": "index.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "State",
@@ -12620,7 +13311,7 @@
           "excerptTokens": [
             {
               "kind": "Content",
-              "text": "export type Storage = "
+              "text": "declare type Storage_2 = "
             },
             {
               "kind": "Content",
@@ -12811,7 +13502,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "System.ts",
+          "fileUrlPath": "index.ts",
           "releaseTag": "Public",
           "name": "Storage_2",
           "typeTokenRange": {
@@ -12837,7 +13528,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "../shared/index.ts",
+          "fileUrlPath": "index.ts",
           "returnTypeTokenRange": {
             "startIndex": 1,
             "endIndex": 2
@@ -12873,7 +13564,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "../shared/index.ts",
+          "fileUrlPath": "index.ts",
           "returnTypeTokenRange": {
             "startIndex": 3,
             "endIndex": 4
@@ -12923,7 +13614,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "../shared/index.ts",
+          "fileUrlPath": "index.ts",
           "returnTypeTokenRange": {
             "startIndex": 4,
             "endIndex": 5
@@ -12956,7 +13647,7 @@
               "text": "\"_System_\""
             }
           ],
-          "fileUrlPath": "System.ts",
+          "fileUrlPath": "index.ts",
           "initializerTokenRange": {
             "startIndex": 1,
             "endIndex": 2
@@ -12976,10 +13667,10 @@
           "excerptTokens": [
             {
               "kind": "Content",
-              "text": "export interface System "
+              "text": "export declare interface System "
             }
           ],
-          "fileUrlPath": "System.ts",
+          "fileUrlPath": "index.ts",
           "releaseTag": "Public",
           "name": "System",
           "preserveMemberOrder": false,
@@ -13316,7 +14007,7 @@
                 },
                 {
                   "kind": "Reference",
-                  "text": "Storage",
+                  "text": "Storage_2",
                   "canonicalReference": "@interaqt/runtime!Storage_2:type"
                 },
                 {
@@ -13388,7 +14079,7 @@
           "excerptTokens": [
             {
               "kind": "Content",
-              "text": "export type SystemCallback = "
+              "text": "export declare type SystemCallback = "
             },
             {
               "kind": "Content",
@@ -13399,7 +14090,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "System.ts",
+          "fileUrlPath": "index.ts",
           "releaseTag": "Public",
           "name": "SystemCallback",
           "typeTokenRange": {
@@ -13417,17 +14108,13 @@
               "text": "systemEntity: "
             },
             {
-              "kind": "Content",
-              "text": "import(\"@interaqt/shared\")."
-            },
-            {
               "kind": "Reference",
               "text": "InertKlassInstance",
               "canonicalReference": "@interaqt/runtime!InertKlassInstance:type"
             },
             {
               "kind": "Content",
-              "text": "<{\n    name: {\n        type: \"string\";\n        collection: false;\n        required: true;\n        constraints: {\n            nameFormat({ name }: {\n                name: import(\"data0\")."
+              "text": "<    {\n    name: {\n        type: \"string\";\n        collection: false;\n        required: true;\n        constraints: {\n            nameFormat({ name }: {\n                name: "
             },
             {
               "kind": "Reference",
@@ -13436,7 +14123,7 @@
             },
             {
               "kind": "Content",
-              "text": "<string>;\n            }): import(\"data0\")."
+              "text": "<string>;\n            }): "
             },
             {
               "kind": "Reference",
@@ -13445,7 +14132,7 @@
             },
             {
               "kind": "Content",
-              "text": "<boolean>;\n        };\n    };\n    computedData: {\n        type: import(\"@interaqt/shared\")."
+              "text": "<boolean>;\n        };\n    };\n    computedData: {\n        type: "
             },
             {
               "kind": "Reference",
@@ -13454,7 +14141,7 @@
             },
             {
               "kind": "Content",
-              "text": "<any>[];\n        collection: false;\n        required: false;\n    };\n    properties: {\n        type: import(\"@interaqt/shared\")."
+              "text": "<any>[];\n        collection: false;\n        required: false;\n    };\n    properties: {\n        type: "
             },
             {
               "kind": "Reference",
@@ -13463,7 +14150,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n            name: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                constraints: {\n                    format({ name }: {\n                        name: import(\"data0\")."
+              "text": "<    {\n            name: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                constraints: {\n                    format({ name }: {\n                        name: "
             },
             {
               "kind": "Reference",
@@ -13472,7 +14159,7 @@
             },
             {
               "kind": "Content",
-              "text": "<string>;\n                    }): import(\"data0\")."
+              "text": "<string>;\n                    }): "
             },
             {
               "kind": "Reference",
@@ -13481,7 +14168,7 @@
             },
             {
               "kind": "Content",
-              "text": "<boolean>;\n                    length({ name }: {\n                        name: import(\"data0\")."
+              "text": "<boolean>;\n                    length({ name }: {\n                        name: "
             },
             {
               "kind": "Reference",
@@ -13490,7 +14177,7 @@
             },
             {
               "kind": "Content",
-              "text": "<string>;\n                    }): import(\"data0\")."
+              "text": "<string>;\n                    }): "
             },
             {
               "kind": "Reference",
@@ -13499,7 +14186,7 @@
             },
             {
               "kind": "Content",
-              "text": "<boolean>;\n                };\n            };\n            type: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                options: import(\"@interaqt/shared\")."
+              "text": "<boolean>;\n                };\n            };\n            type: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                options: "
             },
             {
               "kind": "Reference",
@@ -13508,7 +14195,7 @@
             },
             {
               "kind": "Content",
-              "text": "[];\n            };\n            collection: {\n                type: \"boolean\";\n                required: true;\n                collection: false;\n                defaultValue(): boolean;\n            };\n            args: {\n                computedType: (values: {\n                    type: import(\"@interaqt/shared\")."
+              "text": "[];\n            };\n            collection: {\n                type: \"boolean\";\n                required: true;\n                collection: false;\n                defaultValue(): boolean;\n            };\n            args: {\n                computedType: (values: {\n                    type: "
             },
             {
               "kind": "Reference",
@@ -13517,7 +14204,7 @@
             },
             {
               "kind": "Content",
-              "text": ";\n                }) => string;\n            };\n            computedData: {\n                collection: false;\n                type: import(\"@interaqt/shared\")."
+              "text": ";\n                }) => string;\n            };\n            computedData: {\n                collection: false;\n                type: "
             },
             {
               "kind": "Reference",
@@ -13526,7 +14213,7 @@
             },
             {
               "kind": "Content",
-              "text": "<any>[];\n                required: false;\n            };\n            computed: {\n                required: false;\n                type: \"function\";\n                collection: false;\n            };\n        }>;\n        collection: true;\n        required: true;\n        constraints: {\n            eachNameUnique({ properties }: any): import(\"data0\")."
+              "text": "<any>[];\n                required: false;\n            };\n            computed: {\n                required: false;\n                type: \"function\";\n                collection: false;\n            };\n        }>;\n        collection: true;\n        required: true;\n        constraints: {\n            eachNameUnique({ properties }: any): "
             },
             {
               "kind": "Reference",
@@ -13538,13 +14225,13 @@
               "text": "<boolean>;\n        };\n        defaultValue(): never[];\n    };\n    isRef: {\n        required: true;\n        collection: false;\n        type: \"boolean\";\n        defaultValue: () => boolean;\n    };\n}>"
             }
           ],
-          "fileUrlPath": "MonoSystem.ts",
+          "fileUrlPath": "index.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "systemEntity",
           "variableTypeTokenRange": {
             "startIndex": 1,
-            "endIndex": 28
+            "endIndex": 27
           }
         },
         {
@@ -13554,7 +14241,7 @@
           "excerptTokens": [
             {
               "kind": "Content",
-              "text": "export type SystemLogger = "
+              "text": "export declare type SystemLogger = "
             },
             {
               "kind": "Content",
@@ -13601,7 +14288,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "System.ts",
+          "fileUrlPath": "index.ts",
           "releaseTag": "Public",
           "name": "SystemLogger",
           "typeTokenRange": {
@@ -13616,7 +14303,7 @@
           "excerptTokens": [
             {
               "kind": "Content",
-              "text": "export type SystemLogType = "
+              "text": "export declare type SystemLogType = "
             },
             {
               "kind": "Content",
@@ -13627,7 +14314,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "System.ts",
+          "fileUrlPath": "index.ts",
           "releaseTag": "Public",
           "name": "SystemLogType",
           "typeTokenRange": {
@@ -13663,7 +14350,7 @@
               "text": ">"
             }
           ],
-          "fileUrlPath": "../shared/index.ts",
+          "fileUrlPath": "index.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "Transfer",
@@ -13704,7 +14391,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "../shared/index.ts",
+          "fileUrlPath": "index.ts",
           "releaseTag": "Public",
           "name": "TransferInstanceType",
           "typeTokenRange": {
@@ -13838,7 +14525,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "../shared/index.ts",
+          "fileUrlPath": "index.ts",
           "releaseTag": "Public",
           "name": "TransferPublicType",
           "typeTokenRange": {
@@ -13877,7 +14564,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "../shared/index.ts",
+          "fileUrlPath": "index.ts",
           "releaseTag": "Public",
           "name": "UnwrapCollectionType",
           "typeParameters": [
@@ -13949,16 +14636,16 @@
             },
             {
               "kind": "Content",
-              "text": "<"
+              "text": "<typeof "
             },
             {
               "kind": "Reference",
-              "text": "Klass",
-              "canonicalReference": "@interaqt/runtime!Klass:type"
+              "text": "BoolAtomData",
+              "canonicalReference": "@interaqt/runtime!BoolAtomData:var"
             },
             {
               "kind": "Content",
-              "text": "<T>, any>;\n    right?: "
+              "text": ", false>;\n    right?: "
             },
             {
               "kind": "Reference",
@@ -13976,23 +14663,23 @@
             },
             {
               "kind": "Content",
-              "text": "<"
+              "text": "<typeof "
             },
             {
               "kind": "Reference",
-              "text": "Klass",
-              "canonicalReference": "@interaqt/runtime!Klass:type"
+              "text": "BoolAtomData",
+              "canonicalReference": "@interaqt/runtime!BoolAtomData:var"
             },
             {
               "kind": "Content",
-              "text": "<T>, any>;\n}"
+              "text": ", false>;\n}"
             },
             {
               "kind": "Content",
               "text": ";"
             }
           ],
-          "fileUrlPath": "../shared/index.ts",
+          "fileUrlPath": "index.ts",
           "releaseTag": "Public",
           "name": "UnwrappedBoolExpressionInstanceType",
           "typeParameters": [
@@ -14027,7 +14714,7 @@
               "text": "\"User\""
             }
           ],
-          "fileUrlPath": "Controller.ts",
+          "fileUrlPath": "index.ts",
           "initializerTokenRange": {
             "startIndex": 1,
             "endIndex": 2
@@ -14194,7 +14881,7 @@
               "text": ">)[];\n        collection: true;\n        required: true;\n    };\n    matchRecordToWeight: {\n        type: \"function\";\n        collection: false;\n        required: true;\n    };\n}>"
             }
           ],
-          "fileUrlPath": "../shared/index.ts",
+          "fileUrlPath": "index.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "WeightedSummation",
