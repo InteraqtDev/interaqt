@@ -320,7 +320,7 @@ export type TransferPublicType = {
         collection: false
     },
     target: {
-        type: (Klass<InteractionPublicType>| Klass<ActivityGroupPublicType>| Klass<GatewayPublicType>| typeof ActivityEndType)[]
+        type: (Klass<InteractionPublicType>| Klass<ActivityGroupPublicType>| Klass<GatewayPublicType>)[]
         required: true
         collection: false
     }
@@ -393,13 +393,6 @@ export const ActivityGroup: Klass<ActivityGroupPublicType> = createClass({
     }
 })
 
-export const ActivityEndType = createClass({
-    name: 'ActivityEnd',
-    public: {}
-})
-
-// 全局统一的 ActivityEnd 节点
-export const ActivityEnd = ActivityEndType.create({})
 
 export const Transfer: Klass<TransferPublicType> = createClass({
     name: 'Transfer',
@@ -415,7 +408,7 @@ export const Transfer: Klass<TransferPublicType> = createClass({
             collection: false
         },
         target: {
-            type: [Interaction, ActivityGroup, Gateway, ActivityEndType],
+            type: [Interaction, ActivityGroup, Gateway],
             required: true,
             collection: false
         }
@@ -451,8 +444,3 @@ export function getInteractions(activity: ActivityInstanceType) {
 export function findRootActivity(interaction: InteractionInstanceType): ActivityInstanceType|null {
     return null
 }
-
-// activity 的 action
-export const ActivityCreateAction = Action.create({
-    name: 'create'
-})
