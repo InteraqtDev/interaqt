@@ -49,10 +49,10 @@ export class MapActivityToRecordHandle extends ComputedDataHandle {
 
         this.controller.relations.push(Relation.create({
             source: thisEntity,
-            sourceAttribute: 'activity',
+            sourceProperty: 'activity',
             target: activityEntity,
             relType: '1:1',
-            targetAttribute: thisEntity.name.toLowerCase(),
+            targetProperty: thisEntity.name.toLowerCase(),
         }))
     }
     addEventListener() {

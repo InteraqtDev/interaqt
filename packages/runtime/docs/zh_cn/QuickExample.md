@@ -18,9 +18,9 @@ const UserEntity = Entity.create({
 
 const supervisorRelation = Relation.create({
   source: UserEntity,
-  sourceAttribute: 'supervisor',
+  sourceProperty: 'supervisor',
   target: UserEntity,
-  targetAttribute: 'subordinate',
+  targetProperty: 'subordinate',
   relType: 'n:1',
 })
 ```
@@ -64,9 +64,9 @@ Step4: 定义主管和请求之间的关系，以及审批状态。可用于让�
 ```typescript
 const reviewerRelation = Relation.create({
   source: RequestEntity,
-  sourceAttribute: 'reviewer',
+  sourceProperty: 'reviewer',
   target: UserEntity,
-  targetAttribute: 'request',
+  targetProperty: 'request',
   relType: 'n:n',
   computedData:  MapInteractionToRecord.create({
     sourceInteraction: createInteraction,

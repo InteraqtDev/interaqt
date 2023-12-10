@@ -36,9 +36,9 @@ const UserEntity = Entity.create({
 
 const supervisorRelation = Relation.create({
     source: UserEntity,
-    sourceAttribute: 'supervisor',
+    sourceProperty: 'supervisor',
     target: UserEntity,
-    targetAttribute: 'subordinate',
+    targetProperty: 'subordinate',
     relType: 'n:1',
 })
 
@@ -107,9 +107,9 @@ export const approveInteraction = Interaction.create({
 
 const sendRequestRelation = Relation.create({
     source: RequestEntity,
-    sourceAttribute: 'from',
+    sourceProperty: 'from',
     target: UserEntity,
-    targetAttribute: 'request',
+    targetProperty: 'request',
     relType: 'n:1',
     computedData: MapInteractionToRecord.create({
         sourceInteraction: createInteraction,
@@ -125,9 +125,9 @@ const sendRequestRelation = Relation.create({
 // 主管和 request 的 relation
 const reviewerRelation = Relation.create({
     source: RequestEntity,
-    sourceAttribute: 'reviewer',
+    sourceProperty: 'reviewer',
     target: UserEntity,
-    targetAttribute: 'request',
+    targetProperty: 'request',
     relType: 'n:n',
     computedData: MapInteractionToRecord.create({
         sourceInteraction: createInteraction,

@@ -197,9 +197,9 @@ const friendRelationSM = RelationStateMachine.create({
 })
 export const friendRelation = Relation.create({
     source: UserEntity,
-    sourceAttribute: 'friends',
+    sourceProperty: 'friends',
     target: UserEntity,
-    targetAttribute: 'friends',
+    targetProperty: 'friends',
     relType: 'n:n',
     computedData: friendRelationSM
 })

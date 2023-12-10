@@ -54,14 +54,14 @@ export class RelationBasedWeightedSummationHandle extends IncrementalComputedDat
     }
     async setupStates(): Promise<void> {
         this.relationInfos = this.relations!.map(({relation, relationDirection}) => {
-            const toCountAttributeName = relation![relationDirection==='source' ? 'sourceAttribute': 'targetAttribute']!
+            const toCountAttributeName = relation![relationDirection==='source' ? 'sourceProperty': 'targetProperty']!
             return {
                 relationName: this.controller.system.storage.getRelationName(this.entityName, toCountAttributeName),
                 toCountAttributeName,
                 toCountEntityName: relation![relationDirection==='source' ? 'target': 'source']!.name!,
                 entityRelationAttribute : relationDirection! as 'source'|'target',
                 relatedEntityRelationAttribute: relationDirection === 'source' ? 'target': 'source',
-                isBidirectional : relation?.source === relation?.target && relation?.sourceAttribute === relation?.targetAttribute
+                isBidirectional : relation?.source === relation?.target && relation?.sourceProperty === relation?.targetProperty
             }
         })
     }

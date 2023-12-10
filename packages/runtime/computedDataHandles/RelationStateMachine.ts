@@ -74,7 +74,7 @@ export class RelationStateMachineHandle extends ComputedDataHandle {
     }
     onCallInteraction = async (transfer: KlassInstance<typeof RelationStateTransfer, false>, interactionEventArgs: InteractionEventArgs, effects: InteractionCallResponse["effects"], activityId? :string) =>{
         // CAUTION 不能房子啊 constructor 里面因为它实在 controller 里面调用的，controller 还没准备好。
-        const relationName = this.controller.system.storage.getRelationName(this.data!.source!.name, this.data!.sourceAttribute)
+        const relationName = this.controller.system.storage.getRelationName(this.data!.source!.name, this.data!.sourceProperty)
         const handleFn = this.transferHandleFn!.get(transfer)!
         if (transfer.handleType === 'computeSource') {
             // 1. 执行 handle 来计算  source 和 target

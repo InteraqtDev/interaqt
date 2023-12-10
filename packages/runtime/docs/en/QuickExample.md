@@ -18,9 +18,9 @@ const UserEntity = Entity.create({
 
 const supervisorRelation = Relation.create({
     source: UserEntity,
-    sourceAttribute: 'supervisor',
+    sourceProperty: 'supervisor',
     target: UserEntity,
-    targetAttribute: 'subordinate',
+    targetProperty: 'subordinate',
     relType: 'n:1',
 })
 ```
@@ -62,9 +62,9 @@ Step 4: Define the relationship between supervisors and requests, as well as the
 ```typescript
 const reviewerRelation = Relation.create({
     source: RequestEntity,
-    sourceAttribute: 'reviewer',
+    sourceProperty: 'reviewer',
     target: UserEntity,
-    targetAttribute: 'request',
+    targetProperty: 'request',
     relType: 'n:n',
     computedData:  MapInteractionToRecord.create({
         sourceInteraction: createInteraction,

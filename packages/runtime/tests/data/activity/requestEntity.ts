@@ -24,16 +24,16 @@ export const requestEntity = Entity.create({
 })
 export const sendRequestRelation = Relation.create({
     source: requestEntity,
-    sourceAttribute: 'from',
+    sourceProperty: 'from',
     target: UserEntity,
-    targetAttribute: 'request',
+    targetProperty: 'request',
     relType: 'n:1'
 })
 export const receivedRequestRelation = Relation.create({
     source: requestEntity,
-    sourceAttribute: 'to',
+    sourceProperty: 'to',
     target: UserEntity,
-    targetAttribute: 'receivedRequest',
+    targetProperty: 'receivedRequest',
     relType: 'n:1',
     properties: [Property.create({
         name: 'result',
@@ -82,9 +82,9 @@ export const receivedRequestRelation = Relation.create({
 })
 export const messageToRequestRelation = Relation.create({
     source: requestEntity,
-    sourceAttribute: 'message',
+    sourceProperty: 'message',
     target: messageEntity,
-    targetAttribute: 'request',
+    targetProperty: 'request',
     relType: '1:1'
 })
 // 计算 unhandled request 的总数

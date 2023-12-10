@@ -58,9 +58,9 @@ export const sendInteraction = Interaction.create({
 
 const sendRequestRelation = Relation.create({
     source: RequestEntity,
-    sourceAttribute: 'from',
+    sourceProperty: 'from',
     target: UserEntity,
-    targetAttribute: 'request',
+    targetProperty: 'request',
     relType: 'n:1',
     computedData:  MapInteractionToRecord.create({
         sourceInteraction: sendInteraction,
@@ -253,9 +253,9 @@ const reviewerRelationSM = RelationStateMachine.create({
 // 是否是 reviewer
 const reviewerRelation = Relation.create({
     source: RequestEntity,
-    sourceAttribute: 'to',
+    sourceProperty: 'to',
     target: UserEntity,
-    targetAttribute: 'request',
+    targetProperty: 'request',
     relType: 'n:1',
     computedData:  reviewerRelationSM,
     properties: [Property.create({
