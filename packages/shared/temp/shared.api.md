@@ -21,20 +21,6 @@ export const Action: Klass<{
 export const Activity: Klass<ActivityPublicType>;
 
 // @public (undocumented)
-export const ActivityCreateAction: InertKlassInstance<    {
-name: {
-type: "string";
-required: true;
-};
-}>;
-
-// @public (undocumented)
-export const ActivityEnd: InertKlassInstance<    {}>;
-
-// @public (undocumented)
-export const ActivityEndType: Klass<{}>;
-
-// @public (undocumented)
 export const ActivityGroup: Klass<ActivityGroupPublicType>;
 
 // @public (undocumented)
@@ -2994,7 +2980,7 @@ export type TransferPublicType = {
         collection: false;
     };
     target: {
-        type: (Klass<InteractionPublicType> | Klass<ActivityGroupPublicType> | Klass<GatewayPublicType> | typeof ActivityEndType)[];
+        type: (Klass<InteractionPublicType> | Klass<ActivityGroupPublicType> | Klass<GatewayPublicType>)[];
         required: true;
         collection: false;
     };

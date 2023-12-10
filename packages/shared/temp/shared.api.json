@@ -239,98 +239,6 @@
         },
         {
           "kind": "Variable",
-          "canonicalReference": "@interaqt/shared!ActivityCreateAction:var",
-          "docComment": "",
-          "excerptTokens": [
-            {
-              "kind": "Content",
-              "text": "ActivityCreateAction: "
-            },
-            {
-              "kind": "Content",
-              "text": "import(\"../createClass.js\")."
-            },
-            {
-              "kind": "Reference",
-              "text": "InertKlassInstance",
-              "canonicalReference": "@interaqt/shared!InertKlassInstance:type"
-            },
-            {
-              "kind": "Content",
-              "text": "<{\n    name: {\n        type: \"string\";\n        required: true;\n    };\n}>"
-            }
-          ],
-          "fileUrlPath": "activity/Activity.ts",
-          "isReadonly": true,
-          "releaseTag": "Public",
-          "name": "ActivityCreateAction",
-          "variableTypeTokenRange": {
-            "startIndex": 1,
-            "endIndex": 4
-          }
-        },
-        {
-          "kind": "Variable",
-          "canonicalReference": "@interaqt/shared!ActivityEnd:var",
-          "docComment": "",
-          "excerptTokens": [
-            {
-              "kind": "Content",
-              "text": "ActivityEnd: "
-            },
-            {
-              "kind": "Content",
-              "text": "import(\"../createClass.js\")."
-            },
-            {
-              "kind": "Reference",
-              "text": "InertKlassInstance",
-              "canonicalReference": "@interaqt/shared!InertKlassInstance:type"
-            },
-            {
-              "kind": "Content",
-              "text": "<{}>"
-            }
-          ],
-          "fileUrlPath": "activity/Activity.ts",
-          "isReadonly": true,
-          "releaseTag": "Public",
-          "name": "ActivityEnd",
-          "variableTypeTokenRange": {
-            "startIndex": 1,
-            "endIndex": 4
-          }
-        },
-        {
-          "kind": "Variable",
-          "canonicalReference": "@interaqt/shared!ActivityEndType:var",
-          "docComment": "",
-          "excerptTokens": [
-            {
-              "kind": "Content",
-              "text": "ActivityEndType: "
-            },
-            {
-              "kind": "Reference",
-              "text": "Klass",
-              "canonicalReference": "@interaqt/shared!Klass:type"
-            },
-            {
-              "kind": "Content",
-              "text": "<{}>"
-            }
-          ],
-          "fileUrlPath": "activity/Activity.ts",
-          "isReadonly": true,
-          "releaseTag": "Public",
-          "name": "ActivityEndType",
-          "variableTypeTokenRange": {
-            "startIndex": 1,
-            "endIndex": 3
-          }
-        },
-        {
-          "kind": "Variable",
           "canonicalReference": "@interaqt/shared!ActivityGroup:var",
           "docComment": "",
           "excerptTokens": [
@@ -9910,16 +9818,7 @@
             },
             {
               "kind": "Content",
-              "text": "> | typeof "
-            },
-            {
-              "kind": "Reference",
-              "text": "ActivityEndType",
-              "canonicalReference": "@interaqt/shared!ActivityEndType:var"
-            },
-            {
-              "kind": "Content",
-              "text": ")[];\n        required: true;\n        collection: false;\n    };\n}"
+              "text": ">)[];\n        required: true;\n        collection: false;\n    };\n}"
             },
             {
               "kind": "Content",
@@ -9931,7 +9830,7 @@
           "name": "TransferPublicType",
           "typeTokenRange": {
             "startIndex": 1,
-            "endIndex": 28
+            "endIndex": 26
           }
         },
         {
