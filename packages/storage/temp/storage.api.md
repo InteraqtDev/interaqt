@@ -843,9 +843,9 @@ export type ValueAttribute = {
 
 // Warnings were encountered during analysis:
 //
-// erstorage/EntityToTableMap.ts:74:5 - (ae-forgotten-export) The symbol "RecordMap" needs to be exported by the entry point index.d.ts
-// erstorage/EntityToTableMap.ts:75:5 - (ae-forgotten-export) The symbol "LinkMap" needs to be exported by the entry point index.d.ts
-// erstorage/Setup.ts:16:19 - (ae-forgotten-export) The symbol "ColumnData" needs to be exported by the entry point index.d.ts
+// index.ts:13:36 - (ae-forgotten-export) The symbol "RecordMap" needs to be exported by the entry point index.d.ts
+// index.ts:13:36 - (ae-forgotten-export) The symbol "LinkMap" needs to be exported by the entry point index.d.ts
+// index.ts:13:36 - (ae-forgotten-export) The symbol "ColumnData" needs to be exported by the entry point index.d.ts
 
 // (No @packageDocumentation comment for this package)
 
