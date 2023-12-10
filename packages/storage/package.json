@@ -4,6 +4,7 @@
   "type": "module",
   "version": "1.0.1",
   "devDependencies": {
+    "@microsoft/api-extractor": "^7.38.5",
     "@vitest/coverage-v8": "^0.34.6",
     "rimraf": "^5.0.5",
     "vite-tsconfig-paths": "^4.2.1",
@@ -23,6 +24,7 @@
     "build": "rimraf dist && tsc -p ./tsconfig.prod.json",
     "type": "api-extractor run",
     "build-all": "npm run build && npm run type",
+    "release": "node scripts/release.js",
     "coverage": "vitest --coverage"
   },
   "types": "./dist/index.d.ts",
