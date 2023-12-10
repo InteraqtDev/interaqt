@@ -16,6 +16,7 @@
   "scripts": {
     "build": "rimraf dist && tsc -p ./tsconfig.prod.json",
     "type": "api-extractor run",
+    "release": "node scripts/release.js",
     "build-all": "npm run build && npm run type",
     "test": "vitest --typecheck"
   },
