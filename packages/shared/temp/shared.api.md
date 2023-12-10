@@ -2470,7 +2470,7 @@ export type RelationPublic = {
         collection: false;
         options: () => (KlassInstance<typeof Entity, any> | KlassInstance<Klass<RelationPublic>, any>)[];
     };
-    sourceAttribute: {
+    sourceProperty: {
         type: 'string';
         required: true;
         collection: false;
@@ -2484,7 +2484,7 @@ export type RelationPublic = {
         collection: false;
         options: () => (KlassInstance<typeof Entity, any> | KlassInstance<Klass<RelationPublic>, any>)[];
     };
-    targetAttribute: {
+    targetProperty: {
         type: 'string';
         required: true;
         collection: false;

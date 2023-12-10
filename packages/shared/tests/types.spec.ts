@@ -27,8 +27,8 @@ describe("createClass types", () => {
       const relation = Relation.create({
           source: Entity.create({ name: 'test'}),
           target: Entity.create({ name: 'test2'}),
-          sourceAttribute: 'to2',
-          targetAttribute: 'to1',
+          sourceProperty: 'to2',
+          targetProperty: 'to1',
       })
       assertType<string>(relation.source.name)
   })

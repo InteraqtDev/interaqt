@@ -144,7 +144,7 @@ export type RelationPublic = {
         collection: false,
         options: () => (KlassInstance<typeof Entity, any>|KlassInstance<Klass<RelationPublic>, any>)[]
     },
-    sourceAttribute: {
+    sourceProperty: {
         type: 'string',
         required: true,
         collection: false,
@@ -158,7 +158,7 @@ export type RelationPublic = {
         collection: false,
         options: () => (KlassInstance<typeof Entity, any>|KlassInstance<Klass<RelationPublic>, any>)[]
     },
-    targetAttribute: {
+    targetProperty: {
         type: 'string',
         required: true,
         collection: false,
@@ -207,7 +207,7 @@ export const Relation = createClass({
             collection: false,
             // fixme type
             computed: (relation: any) => {
-                return `${relation.source!.name}_${relation.sourceAttribute}_${relation.targetAttribute}_${relation.target!.name}`
+                return `${relation.source!.name}_${relation.sourceProperty}_${relation.targetProperty}_${relation.target!.name}`
             }
         },
         source: {
@@ -220,23 +220,23 @@ export const Relation = createClass({
                 return getInstance(Entity)
             }
         },
-        sourceAttribute: {
+        sourceProperty: {
             type: 'string',
             required: true,
             collection: false,
             constraints: {
                 nameNotSameWithProp(relation:KlassInstance<Klass<RelationPublic>, false>) {
                     return computed(() => {
-                        const {source, sourceAttribute} = relation
+                        const {source, sourceProperty} = relation
                         return source?.properties?.every((p) => {
-                            return p.name !== sourceAttribute
+                            return p.name !== sourceProperty
                         })
                     })
                 },
                 nameUnique(relation:KlassInstance<Klass<RelationPublic>, false>) {
                     return computed(() => {
-                        const {source, target, sourceAttribute, targetAttribute} = relation
-                        return !(source === target && sourceAttribute === targetAttribute)
+                        const {source, target, sourceProperty, targetProperty} = relation
+                        return !(source === target && sourceProperty === targetProperty)
                     })
                 }
             }
@@ -249,23 +249,23 @@ export const Relation = createClass({
                 return getInstance(Entity)
             }
         },
-        targetAttribute: {
+        targetProperty: {
             type: 'string',
             required: true,
             collection: false,
             constraints: {
                 nameNotSameWithProp(relation:KlassInstance<Klass<RelationPublic>, false>) {
                     return computed(() => {
-                        const {target, targetAttribute} = relation
+                        const {target, targetProperty} = relation
                         return target?.properties?.every((p) => {
-                            return p.name !== targetAttribute
+                            return p.name !== targetProperty
                         })
                     })
                 },
                 nameUnique(relation:KlassInstance<Klass<RelationPublic>, false>) {
                     return computed(() => {
-                        const {source, target, sourceAttribute, targetAttribute} = relation
-                        return !(source === target && sourceAttribute === targetAttribute)
+                        const {source, target, sourceProperty, targetProperty} = relation
+                        return !(source === target && sourceProperty === targetProperty)
                     })
                 }
             }

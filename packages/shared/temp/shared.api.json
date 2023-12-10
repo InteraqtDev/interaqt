@@ -8092,7 +8092,7 @@
             },
             {
               "kind": "Content",
-              "text": ">, any>)[];\n    };\n    sourceAttribute: {\n        type: 'string';\n        required: true;\n        collection: false;\n        constraints: {\n            [ruleName: string]: ((thisProp: any, thisEntity: object) => "
+              "text": ">, any>)[];\n    };\n    sourceProperty: {\n        type: 'string';\n        required: true;\n        collection: false;\n        constraints: {\n            [ruleName: string]: ((thisProp: any, thisEntity: object) => "
             },
             {
               "kind": "Reference",
@@ -8164,7 +8164,7 @@
             },
             {
               "kind": "Content",
-              "text": ">, any>)[];\n    };\n    targetAttribute: {\n        type: 'string';\n        required: true;\n        collection: false;\n        constraints: {\n            [ruleName: string]: ((thisProp: any, thisEntity: object) => "
+              "text": ">, any>)[];\n    };\n    targetProperty: {\n        type: 'string';\n        required: true;\n        collection: false;\n        constraints: {\n            [ruleName: string]: ((thisProp: any, thisEntity: object) => "
             },
             {
               "kind": "Reference",
