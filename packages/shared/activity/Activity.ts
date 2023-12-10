@@ -445,3 +445,8 @@ export function getInteractions(activity: ActivityInstanceType) {
 export function findRootActivity(interaction: InteractionInstanceType): ActivityInstanceType|null {
     return null
 }
+
+// activity 的 action
+export const ActivityCreateAction = Action.create({
+    name: 'create'
+})
