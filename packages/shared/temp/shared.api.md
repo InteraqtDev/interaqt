@@ -29,6 +29,12 @@ required: true;
 }>;
 
 // @public (undocumented)
+export const ActivityEnd: InertKlassInstance<    {}>;
+
+// @public (undocumented)
+export const ActivityEndType: Klass<{}>;
+
+// @public (undocumented)
 export const ActivityGroup: Klass<ActivityGroupPublicType>;
 
 // @public (undocumented)
@@ -2988,7 +2994,7 @@ export type TransferPublicType = {
         collection: false;
     };
     target: {
-        type: (Klass<InteractionPublicType> | Klass<ActivityGroupPublicType> | Klass<GatewayPublicType>)[];
+        type: (Klass<InteractionPublicType> | Klass<ActivityGroupPublicType> | Klass<GatewayPublicType> | typeof ActivityEndType)[];
         required: true;
         collection: false;
     };
