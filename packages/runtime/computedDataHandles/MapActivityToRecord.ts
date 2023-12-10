@@ -7,12 +7,11 @@ import {
     MapActivityToRecord,
     Relation
 } from "@interaqt/shared";
-import {InteractionEventArgs} from "../types/interaction";
+import {InteractionEventArgs} from "../types/interaction.js";
 import {Controller} from "../Controller.js";
 import {MatchExp} from '@interaqt/storage'
 import {ComputedDataHandle, DataContext} from "./ComputedDataHandle.js";
-import {RecordMutationEvent} from "../System.js";
-import {activityEntity} from "../MonoSystem.js";
+import {activityEntity, RecordMutationEvent} from "../System.js";
 import {InteractionCallResponse} from "../InteractionCall.js";
 
 export type MapSourceDataType = {
@@ -23,29 +22,24 @@ export type MapSourceDataType = {
 export class MapActivityToRecordHandle extends ComputedDataHandle {
     data!: KlassInstance<typeof Entity, false>
     mapItem!: (data: MapSourceDataType[]) => any
-    interactionsToListen: KlassInstance<typeof Interaction, false>[] = []
+    allInteractions!: KlassInstance<typeof Interaction, false>[]
+    interactionsToListen!: KlassInstance<typeof Interaction, false>[]
     constructor(controller: Controller , computedData: KlassInstance<typeof ComputedData, false> , dataContext:  DataContext) {
         super(controller, computedData, dataContext);
     }
-    // FIXME 之后 从 listen interaction 也改成 监听 record 事件
     computeEffect(mutationEvent: RecordMutationEvent, mutationEvents: RecordMutationEvent[]): any {
-
+        return undefined
     }
     parseComputedData() {
         const computedData = this.computedData as unknown as  KlassInstance<typeof MapActivityToRecord, false>
-        this.interactionsToListen = computedData.triggerInteraction || getInteractions(computedData.sourceActivity!)
+        this.allInteractions = getInteractions(computedData.sourceActivity!)
+        this.interactionsToListen = computedData.triggerInteraction ||this.allInteractions
 
         this.data = this.dataContext.id as KlassInstance<typeof Entity, false>
         this.mapItem = (computedData.handle! as unknown as (data: MapSourceDataType[]) => any).bind(this.controller)
     }
     setupSchema() {
         const thisEntity = (this.dataContext.id as KlassInstance<typeof Entity, false>)
-        // FIXME 废弃，检查 test 里面有咩有空
-        // thisEntity!.properties!.push(Property.create({
-        //     name: 'activityId',
-        //     type: 'string',
-        //     collection: false
-        // }))
 
         this.controller.relations.push(Relation.create({
             source: thisEntity,
@@ -62,25 +56,14 @@ export class MapActivityToRecordHandle extends ComputedDataHandle {
         })
     }
 
-    parseMapItemFunction(content: string) {
-        const body = new Function('sourceData', `return (${content})(sourceData)`)
 
-        return (sourceData: MapSourceDataType[]) => {
-            return body(sourceData)
-        }
-    }
     onCallInteraction = async (interaction: any, interactionEventArgs: InteractionEventArgs, effects: InteractionCallResponse["effects"], activityId:string) => {
-        // const match = MatchExp.atom({
-        //     key: 'activityId',
-        //     value: ['=', activityId]
-        // })
 
         const match = MatchExp.atom({
             key: 'activity.id',
             value: ['=', activityId]
         })
 
-        // FIXME 上面更改成用关系了，这里也要跟着改。不再用 activityId, 而是用 关系
         // 还没有数据，尝试执行 map 函数看能不能得到数据
         const eventMatch = MatchExp.atom({
             key: 'activityId',
@@ -89,7 +72,7 @@ export class MapActivityToRecordHandle extends ComputedDataHandle {
         const allInteractionEvents = await this.controller.system.getEvent(eventMatch)
         const sourceData: MapSourceDataType[] = allInteractionEvents.map(event => {
             return {
-                interaction: this.controller.interactionCalls.get(event.interactionId)!.interaction,
+                interaction: this.allInteractions.find(i => i.uuid === event.interactionId)!,
                 data: event.args
             }
         })

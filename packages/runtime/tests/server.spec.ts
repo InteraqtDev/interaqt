@@ -2,7 +2,8 @@ import {beforeAll, describe, expect, test} from "vitest";
 import {Controller} from "../Controller.js";
 import {MonoSystem} from "../MonoSystem.js";
 import {
-    Activity, BoolExp,
+    Activity,
+    BoolExp,
     createInstances,
     Entity,
     Interaction,

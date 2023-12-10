@@ -2,16 +2,20 @@
 
 import {
     ACTIVITY_RECORD,
+    activityEntity,
     Database,
     EVENT_RECORD,
+    eventEntity,
     RecordChangeListener,
     RecordMutationEvent,
     Storage,
     System,
-    SYSTEM_RECORD, SystemLogger
+    SYSTEM_RECORD,
+    systemEntity,
+    SystemLogger
 } from "./System.js";
 import {InteractionEvent} from './types/interaction.js'
-import {createClass, Entity, KlassInstance, Property, Relation} from "@interaqt/shared";
+import {createClass, Entity, KlassInstance, Relation} from "@interaqt/shared";
 import {
     DBSetup,
     EntityQueryHandle,
@@ -125,83 +129,6 @@ class MonoStorage implements Storage{
 }
 
 
-
-// state 等系统配置数据的实体化
-// FIXME 应该独立到外部
-export const systemEntity = Entity.create({
-    name: SYSTEM_RECORD,
-    properties: [
-        Property.create({
-            name: 'concept',
-            type: 'string',
-            collection: false,
-        }),
-        Property.create({
-            name: 'key',
-            type: 'string',
-            collection: false,
-        }),
-        Property.create({
-            name: 'value',
-            type: 'string',
-            collection: false,
-        })
-    ]
-})
-
-// event 的实体化
-export const eventEntity = Entity.create({
-    name: EVENT_RECORD,
-    properties: [
-        Property.create({
-            name: 'interactionId',
-            type: 'string',
-            collection: false,
-        }),
-        Property.create({
-            name: 'interactionName',
-            type: 'string',
-            collection: false,
-        }),
-        Property.create({
-            name: 'activityId',
-            type: 'string',
-            collection: false,
-        }),
-        Property.create({
-            name: 'args',
-            type: 'string',
-            collection: false,
-        })
-    ]
-})
-
-// activity 数据
-export const activityEntity = Entity.create({
-    name: ACTIVITY_RECORD,
-    properties: [
-        Property.create({
-            name: 'name',
-            type: 'string',
-            collection: false,
-        }),
-        Property.create({
-            name: 'uuid',
-            type: 'string',
-            collection: false,
-        }),
-        Property.create({
-            name: 'state',
-            type: 'string',
-            collection: false,
-        }),
-        Property.create({
-            name: 'refs',
-            type: 'string',
-            collection: false,
-        })
-    ]
-})
 
 const defaultLogger = pino()
 

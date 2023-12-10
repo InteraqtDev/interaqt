@@ -1,4 +1,4 @@
-import {createClass, Entity, KlassInstance, Relation} from "@interaqt/shared";
+import {createClass, Entity, KlassInstance, Property, Relation} from "@interaqt/shared";
 import {InteractionEvent} from './types/interaction.js'
 import {MatchExpressionData} from "@interaqt/storage";
 
@@ -98,4 +98,77 @@ export type Database = {
     insert: (sql: string, values: any[], name?:string) => Promise<EntityIdRef>
     update: (sql: string, values: any[], idField?: string, name?:string) => Promise<EntityIdRef[]>
     getAutoId: (recordName: string) => Promise<string>
-}
+} // activity 数据
+// state 等系统配置数据的实体化
+// FIXME 应该独立到外部
+export const systemEntity = Entity.create({
+    name: SYSTEM_RECORD,
+    properties: [
+        Property.create({
+            name: 'concept',
+            type: 'string',
+            collection: false,
+        }),
+        Property.create({
+            name: 'key',
+            type: 'string',
+            collection: false,
+        }),
+        Property.create({
+            name: 'value',
+            type: 'string',
+            collection: false,
+        })
+    ]
+})
+// event 的实体化
+export const eventEntity = Entity.create({
+    name: EVENT_RECORD,
+    properties: [
+        Property.create({
+            name: 'interactionId',
+            type: 'string',
+            collection: false,
+        }),
+        Property.create({
+            name: 'interactionName',
+            type: 'string',
+            collection: false,
+        }),
+        Property.create({
+            name: 'activityId',
+            type: 'string',
+            collection: false,
+        }),
+        Property.create({
+            name: 'args',
+            type: 'string',
+            collection: false,
+        })
+    ]
+})
+export const activityEntity = Entity.create({
+    name: ACTIVITY_RECORD,
+    properties: [
+        Property.create({
+            name: 'name',
+            type: 'string',
+            collection: false,
+        }),
+        Property.create({
+            name: 'uuid',
+            type: 'string',
+            collection: false,
+        }),
+        Property.create({
+            name: 'state',
+            type: 'string',
+            collection: false,
+        }),
+        Property.create({
+            name: 'refs',
+            type: 'string',
+            collection: false,
+        })
+    ]
+})
