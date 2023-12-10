@@ -13,7 +13,7 @@ if (!isClean) {
   throw new Error('Working tree is not clean')
 }
 
-function buildAll() {
+function buildTypes() {
   const extractorConfig = ExtractorConfig.loadFileAndPrepare('api-extractor.json');
   const extractorResult = Extractor.invoke(extractorConfig, {
     showVerboseMessages: true
@@ -26,10 +26,11 @@ function buildAll() {
 try {
   // 去除 link
   execSync('npm install')
-  buildAll()
+  execSync('npm run build')
+  buildTypes()
   const newVersion = execSync(`npm version ${version}`)
   execSync('git add ./')
-  execSync(`git commit -m "release: @interaqt/storage ${newVersion}"`)
+  execSync(`git commit -m "release: @interaqt/shared ${newVersion}"`)
   execSync('git push')
   execSync(`npm publish ./`)
 } catch (e) {
