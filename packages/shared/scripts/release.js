@@ -26,6 +26,7 @@ function buildAll() {
 try {
   // 去除 link
   execSync('npm install')
+  execSync('rm -rf ./dist')
   buildAll()
   const newVersion = execSync(`npm version ${version}`)
   execSync('git add ./')
