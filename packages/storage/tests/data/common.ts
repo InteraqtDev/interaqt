@@ -26,9 +26,9 @@ export function createCommonData(): { entities: KlassInstance<typeof Entity, fal
 
     Relation.create({
         source: fileEntity,
-        sourceAttribute: 'owner',
+        sourceProperty: 'owner',
         target: userEntity,
-        targetAttribute: 'file',
+        targetProperty: 'file',
         relType: 'n:1',
         properties: [
             Property.create({ name: 'viewed', type: PropertyTypes.Number })
@@ -37,9 +37,9 @@ export function createCommonData(): { entities: KlassInstance<typeof Entity, fal
 
     Relation.create({
         source: profileEntity,
-        sourceAttribute: 'owner',
+        sourceProperty: 'owner',
         target: userEntity,
-        targetAttribute: 'profile',
+        targetProperty: 'profile',
         relType: '1:1',
         properties: [
             Property.create({ name: 'viewed', type: PropertyTypes.Number })
@@ -49,9 +49,9 @@ export function createCommonData(): { entities: KlassInstance<typeof Entity, fal
 
     Relation.create({
         source: userEntity,
-        sourceAttribute: 'leader',
+        sourceProperty: 'leader',
         target: userEntity,
-        targetAttribute: 'member',
+        targetProperty: 'member',
         relType: 'n:1'
     })
 
@@ -60,9 +60,9 @@ export function createCommonData(): { entities: KlassInstance<typeof Entity, fal
 
     const friendRelation = Relation.create({
         source: userEntity,
-        sourceAttribute: 'friends',
+        sourceProperty: 'friends',
         target: userEntity,
-        targetAttribute: 'friends',
+        targetProperty: 'friends',
         relType: 'n:n',
         properties: [
             Property.create({ name: 'level', type: PropertyTypes.Number })
@@ -78,9 +78,9 @@ export function createCommonData(): { entities: KlassInstance<typeof Entity, fal
 
     Relation.create({
         source: userEntity,
-        sourceAttribute: 'item',
+        sourceProperty: 'item',
         target: itemEntity,
-        targetAttribute: 'owner',
+        targetProperty: 'owner',
         relType: '1:1',
         isTargetReliance: true
     })
@@ -107,9 +107,9 @@ export function createCommonData(): { entities: KlassInstance<typeof Entity, fal
 
     const teamRelation = Relation.create({
         source: userEntity,
-        sourceAttribute: 'teams',
+        sourceProperty: 'teams',
         target: teamEntity,
-        targetAttribute: 'members',
+        targetProperty: 'members',
         relType: 'n:n',
         properties: [
             Property.create({ name: 'role', type: PropertyTypes.String}),
@@ -118,25 +118,25 @@ export function createCommonData(): { entities: KlassInstance<typeof Entity, fal
 
     Relation.create({
         source: teamRelation,
-        sourceAttribute: 'base',
+        sourceProperty: 'base',
         target: locEntity,
-        targetAttribute: 'belong',
+        targetProperty: 'belong',
         relType: '1:1',
     })
 
     Relation.create({
         source: teamRelation,
-        sourceAttribute: 'matches',
+        sourceProperty: 'matches',
         target: matchEntity,
-        targetAttribute: 'host',
+        targetProperty: 'host',
         relType: '1:n',
     })
 
     Relation.create({
         source: teamRelation,
-        sourceAttribute: 'participates',
+        sourceProperty: 'participates',
         target: matchEntity,
-        targetAttribute: 'participants',
+        targetProperty: 'participants',
         relType: 'n:n',
     })
 
@@ -150,9 +150,9 @@ export function createCommonData(): { entities: KlassInstance<typeof Entity, fal
 
     Relation.create({
         source: userEntity,
-        sourceAttribute: 'powers',
+        sourceProperty: 'powers',
         target: powerEntity,
-        targetAttribute: 'owner',
+        targetProperty: 'owner',
         relType: '1:n',
         isTargetReliance: true
     })
@@ -170,18 +170,18 @@ export function createCommonData(): { entities: KlassInstance<typeof Entity, fal
     // group and group relation
     Relation.create({
         source: departmentEntity,
-        sourceAttribute: 'parent',
+        sourceProperty: 'parent',
         target: departmentEntity,
-        targetAttribute: 'children',
+        targetProperty: 'children',
         relType: 'n:1',
     })
 
     // // group and user relation
     // Relation.create({
     //     source: groupEntity,
-    //     sourceAttribute: 'members',
+    //     sourceProperty: 'members',
     //     target: userEntity,
-    //     targetAttribute: 'groups',
+    //     targetProperty: 'groups',
     //     relType: 'n:n',
     //     properties: [
     //         Property.create({ name: 'role', type: PropertyTypes.String })

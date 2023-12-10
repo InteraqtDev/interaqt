@@ -1,7 +1,7 @@
 {
   "metadata": {
     "toolPackage": "@microsoft/api-extractor",
-    "toolVersion": "7.38.3",
+    "toolVersion": "7.38.5",
     "schemaVersion": 1011,
     "oldestForwardsCompatibleVersion": 1001,
     "tsdocConfig": {
@@ -7458,12 +7458,12 @@
             },
             {
               "kind": "Property",
-              "canonicalReference": "@interaqt/storage!LinkInfo#sourceAttribute:member",
+              "canonicalReference": "@interaqt/storage!LinkInfo#sourceProperty:member",
               "docComment": "",
               "excerptTokens": [
                 {
                   "kind": "Content",
-                  "text": "get sourceAttribute(): "
+                  "text": "get sourceProperty(): "
                 },
                 {
                   "kind": "Content",
@@ -7477,7 +7477,7 @@
               "isReadonly": true,
               "isOptional": false,
               "releaseTag": "Public",
-              "name": "sourceAttribute",
+              "name": "sourceProperty",
               "propertyTypeTokenRange": {
                 "startIndex": 1,
                 "endIndex": 2
@@ -7579,12 +7579,12 @@
             },
             {
               "kind": "Property",
-              "canonicalReference": "@interaqt/storage!LinkInfo#targetAttribute:member",
+              "canonicalReference": "@interaqt/storage!LinkInfo#targetProperty:member",
               "docComment": "",
               "excerptTokens": [
                 {
                   "kind": "Content",
-                  "text": "get targetAttribute(): "
+                  "text": "get targetProperty(): "
                 },
                 {
                   "kind": "Content",
@@ -7598,7 +7598,7 @@
               "isReadonly": true,
               "isOptional": false,
               "releaseTag": "Public",
-              "name": "targetAttribute",
+              "name": "targetProperty",
               "propertyTypeTokenRange": {
                 "startIndex": 1,
                 "endIndex": 2
@@ -7682,7 +7682,7 @@
             },
             {
               "kind": "Content",
-              "text": "{\n    relType: [string, string];\n    sourceRecord: string;\n    sourceAttribute: string;\n    targetRecord: string;\n    targetAttribute: string | undefined;\n    isSourceRelation?: boolean;\n    recordName?: string;\n    mergedTo?: 'source' | 'target' | 'combined';\n    table?: string;\n    sourceField?: string;\n    targetField?: string;\n    isTargetReliance?: boolean;\n}"
+              "text": "{\n    relType: [string, string];\n    sourceRecord: string;\n    sourceProperty: string;\n    targetRecord: string;\n    targetProperty: string | undefined;\n    isSourceRelation?: boolean;\n    recordName?: string;\n    mergedTo?: 'source' | 'target' | 'combined';\n    table?: string;\n    sourceField?: string;\n    targetField?: string;\n    isTargetReliance?: boolean;\n}"
             },
             {
               "kind": "Content",

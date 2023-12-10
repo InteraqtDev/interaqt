@@ -133,9 +133,9 @@ export class DBSetup {
             table: relationName,
             relType: relation.relType!.split(':'),
             sourceRecord: this.getRecordName(relation.source as KlassInstance<typeof Entity, false>),
-            sourceAttribute: relation.sourceAttribute,
+            sourceProperty: relation.sourceProperty,
             targetRecord: this.getRecordName(relation.target!),
-            targetAttribute: relation.targetAttribute,
+            targetProperty: relation.targetProperty,
             recordName: relationName,
             isTargetReliance: relation.isTargetReliance
         } as LinkMapItem
@@ -149,10 +149,10 @@ export class DBSetup {
         return {
             table: undefined, // 虚拟 link 没有表
             sourceRecord: relationEntityName,
-            sourceAttribute: isSource ? 'source' : 'target',
+            sourceProperty: isSource ? 'source' : 'target',
             targetRecord: isSource ? this.getRecordName(relation.source as KlassInstance<typeof Entity, false>): this.getRecordName(relation.target!),
             // targetRecord: isSource ? relation.source.name: relation.target.name,
-            targetAttribute: undefined, // 不能从 entity 来获取关系表
+            targetProperty: undefined, // 不能从 entity 来获取关系表
             // source 1:x1 -关联表- x2:1 target
             // 如果是 1: n 关系，x1 是 n，x2 是 1
             // 如果是 n: 1 关系，x1 是 1，x2 是 n
@@ -195,8 +195,8 @@ export class DBSetup {
 
         // 3. 根据 Link 补充 record attribute 到 record 里面。方便之后的查询。
         Object.entries(this.map.links).forEach(([relation, relationData]) => {
-            assert(!relationData.isSourceRelation || (relationData.sourceAttribute === 'source' || relationData.sourceAttribute === 'target'), 'virtual relation sourceAttribute should only be source/target')
-            this.map.records[relationData.sourceRecord].attributes[relationData.sourceAttribute] = {
+            assert(!relationData.isSourceRelation || (relationData.sourceProperty === 'source' || relationData.sourceProperty === 'target'), 'virtual relation sourceProperty should only be source/target')
+            this.map.records[relationData.sourceRecord].attributes[relationData.sourceProperty] = {
                 type: 'id',
                 isRecord:true,
                 relType: relationData.relType,
@@ -208,9 +208,9 @@ export class DBSetup {
             } as RecordAttribute
 
             // CAUTION 关联查询时，不可能出现从实体来获取一个关系的情况，语义不正确。
-            assert(!(relationData.isSourceRelation && relationData.targetAttribute), 'virtual relation should not have targetAttribute')
-            if (relationData.targetAttribute) {
-                this.map.records[relationData.targetRecord].attributes[relationData.targetAttribute] = {
+            assert(!(relationData.isSourceRelation && relationData.targetProperty), 'virtual relation should not have targetProperty')
+            if (relationData.targetProperty) {
+                this.map.records[relationData.targetRecord].attributes[relationData.targetProperty] = {
                     type: 'id',
                     isRecord:true,
                     // CAUTION 这里翻转了！在 AttributeInfo 中方便判断。不能用 Array.reverse()，因为不会返回新数组。
@@ -409,9 +409,9 @@ export class DBSetup {
                 record.attributes.target.field = `${recordName}_target`
             } else if (link.mergedTo === 'source') {
                 // field 名字以 sourceRecord 里面的称呼为主
-                record.attributes.target.field = `${link.sourceRecord}_${link.sourceAttribute}`
+                record.attributes.target.field = `${link.sourceRecord}_${link.sourceProperty}`
             } else if (link.mergedTo === 'target') {
-                record.attributes.source.field = `${link.targetRecord}_${link.targetAttribute}`
+                record.attributes.source.field = `${link.targetRecord}_${link.targetProperty}`
             } else {
                 // combined 情况
                 // const sourceRecord = this.map.records[link.sourceRecord]

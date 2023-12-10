@@ -41,9 +41,9 @@ describe("db setup", () => {
             mergedTo: 'combined',
             relType: ['1','1'],
             sourceRecord: 'User',
-            sourceAttribute: 'item',
+            sourceProperty: 'item',
             targetRecord: 'Item',
-            targetAttribute: 'owner',
+            targetProperty: 'owner',
             recordName: 'User_item_owner_Item',
             isTargetReliance: true
         })
@@ -71,9 +71,9 @@ describe("db setup", () => {
         expect(setup.map.links.Profile_owner_profile_User).toMatchObject({
             relType: ['1', '1'],
             sourceRecord: 'Profile',
-            sourceAttribute: 'owner',
+            sourceProperty: 'owner',
             targetRecord: 'User',
-            targetAttribute: 'profile',
+            targetProperty: 'profile',
             mergedTo: 'combined',
         })
 
@@ -117,9 +117,9 @@ describe("db setup", () => {
             isSourceRelation: true,
             relType: ['1', '1'],
             sourceRecord: 'Profile_owner_profile_User',
-            sourceAttribute: 'source',
+            sourceProperty: 'source',
             targetRecord: 'Profile',
-            targetAttribute: undefined,
+            targetProperty: undefined,
             mergedTo: 'combined',
         })
 
@@ -127,9 +127,9 @@ describe("db setup", () => {
             isSourceRelation: true,
             relType: ['1', '1'],
             sourceRecord: 'Profile_owner_profile_User',
-            sourceAttribute: 'target',
+            sourceProperty: 'target',
             targetRecord: 'User',
-            targetAttribute: undefined,
+            targetProperty: undefined,
             mergedTo: 'combined',
         })
 
@@ -171,9 +171,9 @@ describe("db setup", () => {
         expect(setup.map.links.File_owner_file_User).toMatchObject({
             relType: ['n', '1'],
             sourceRecord: 'File',
-            sourceAttribute: 'owner',
+            sourceProperty: 'owner',
             targetRecord: 'User',
-            targetAttribute: 'file',
+            targetProperty: 'file',
             mergedTo: 'source',
         })
 
@@ -182,9 +182,9 @@ describe("db setup", () => {
             relType: ['1', '1'],
             isSourceRelation:true,
             sourceRecord: 'File_owner_file_User',
-            sourceAttribute: 'source',
+            sourceProperty: 'source',
             targetRecord: 'File',
-            targetAttribute: undefined,
+            targetProperty: undefined,
             mergedTo: 'combined',
         })
 
@@ -192,9 +192,9 @@ describe("db setup", () => {
             relType: ['n', '1'],
             isSourceRelation:true,
             sourceRecord: 'File_owner_file_User',
-            sourceAttribute: 'target',
+            sourceProperty: 'target',
             targetRecord: 'User',
-            targetAttribute: undefined,
+            targetProperty: undefined,
             mergedTo: 'source',
         })
 
@@ -219,9 +219,9 @@ describe("db setup", () => {
             table: setup.map.records.User_friends_friends_User.table,
             relType: ['n', 'n'],
             sourceRecord: 'User',
-            sourceAttribute: 'friends',
+            sourceProperty: 'friends',
             targetRecord: 'User',
-            targetAttribute: 'friends',
+            targetProperty: 'friends',
         })
         expect(setup.map.records.User_friends_friends_User.attributes.source.field).toBe('User_friends_friends_User_source')
         expect(setup.map.records.User_friends_friends_User.attributes.target.field).toBe('User_friends_friends_User_target')
@@ -233,9 +233,9 @@ describe("db setup", () => {
             relType: ['n', '1'],
             isSourceRelation:true,
             sourceRecord: 'User_friends_friends_User',
-            sourceAttribute: 'source',
+            sourceProperty: 'source',
             targetRecord: 'User',
-            targetAttribute: undefined,
+            targetProperty: undefined,
             mergedTo: 'source',
         })
 
@@ -244,9 +244,9 @@ describe("db setup", () => {
             relType: ['n', '1'],
             isSourceRelation:true,
             sourceRecord: 'User_friends_friends_User',
-            sourceAttribute: 'target',
+            sourceProperty: 'target',
             targetRecord: 'User',
-            targetAttribute: undefined,
+            targetProperty: undefined,
             mergedTo: 'source',
         })
 

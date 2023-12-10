@@ -48,9 +48,9 @@ type RecordMap = {
 export type LinkMapItem = {
     relType: [string, string]
     sourceRecord: string,
-    sourceAttribute: string,
+    sourceProperty: string,
     targetRecord: string,
-    targetAttribute: string|undefined,
+    targetProperty: string|undefined,
     // 用来判断这个 relation 是不是 virtual 的，是的话为 true.
     isSourceRelation?: boolean,
     // 这个 link 是否有个对应的 record. 当这个 link 是根据 Relation 创建的时候就有这个。
@@ -58,7 +58,7 @@ export type LinkMapItem = {
     recordName?: string,
     mergedTo? : 'source'|'target'|'combined',
     table?: string,
-    // CAUTION 特别注意，这里的 sourceField 和 targetField 和 sourceAttribute 一样，是指站在 source 的角度去看，存的是关联实体(target)的 id. 不要搞成了自己的 id 。
+    // CAUTION 特别注意，这里的 sourceField 和 targetField 和 sourceProperty 一样，是指站在 source 的角度去看，存的是关联实体(target)的 id. 不要搞成了自己的 id 。
     //  当发生表合并时，他们表示的是在合并的表里面的 field。根据往合并情况不同，sourceField/targetField 都可能不存在。
     sourceField?: string,
     targetField?: string,
@@ -324,10 +324,10 @@ export class EntityToTableMap {
         assert(this.data.records[entityName], `entity ${entityName} not found`)
         const relationName = (this.data.records[entityName].attributes[attribute] as RecordAttribute).linkName
         const relationData = this.data.links[relationName]
-        if (relationData.sourceRecord === entityName && relationData.sourceAttribute === attribute) {
-            return relationData.targetAttribute!
-        } else if (relationData.targetRecord === entityName && relationData.targetAttribute === attribute) {
-            return relationData.sourceAttribute
+        if (relationData.sourceRecord === entityName && relationData.sourceProperty === attribute) {
+            return relationData.targetProperty!
+        } else if (relationData.targetRecord === entityName && relationData.targetProperty === attribute) {
+            return relationData.sourceProperty
         } else {
             assert(false, `wrong relation data ${entityName}.${attribute}`)
             return ''

@@ -50,12 +50,12 @@ export class LinkInfo {
         return this.data.targetRecord
     }
 
-    get sourceAttribute() {
-        return this.data.sourceAttribute
+    get sourceProperty() {
+        return this.data.sourceProperty
     }
 
-    get targetAttribute() {
-        return this.data.targetAttribute
+    get targetProperty() {
+        return this.data.targetProperty
     }
 
     get record(): RecordMapItem {
@@ -97,10 +97,10 @@ export class LinkInfo {
     }
 
     isSymmetric() {
-        return this.data.sourceRecord === this.data.targetRecord && this.data.sourceAttribute === this.data.targetAttribute
+        return this.data.sourceRecord === this.data.targetRecord && this.data.sourceProperty === this.data.targetProperty
     }
     isRelationSource(recordName: string, attribute: string) {
-        return this.data.sourceRecord === recordName && this.data.sourceAttribute === attribute
+        return this.data.sourceRecord === recordName && this.data.sourceProperty === attribute
     }
 
 

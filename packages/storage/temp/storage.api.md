@@ -365,7 +365,7 @@ export class LinkInfo {
     // (undocumented)
     get recordInfo(): RecordInfo;
     // (undocumented)
-    get sourceAttribute(): string;
+    get sourceProperty(): string;
     // (undocumented)
     get sourceRecord(): string;
     // (undocumented)
@@ -373,7 +373,7 @@ export class LinkInfo {
     // (undocumented)
     get table(): string;
     // (undocumented)
-    get targetAttribute(): string | undefined;
+    get targetProperty(): string | undefined;
     // (undocumented)
     get targetRecord(): string;
     // (undocumented)
@@ -384,9 +384,9 @@ export class LinkInfo {
 export type LinkMapItem = {
     relType: [string, string];
     sourceRecord: string;
-    sourceAttribute: string;
+    sourceProperty: string;
     targetRecord: string;
-    targetAttribute: string | undefined;
+    targetProperty: string | undefined;
     isSourceRelation?: boolean;
     recordName?: string;
     mergedTo?: 'source' | 'target' | 'combined';

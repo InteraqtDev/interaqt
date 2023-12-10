@@ -9,16 +9,16 @@ export const entityToTableMapData: MapData = {
                 "1"
             ],
             "sourceRecord": "File",
-            "sourceAttribute": "owner",
+            "sourceProperty": "owner",
             "targetRecord": "User",
-            "targetAttribute": "file",
+            "targetProperty": "file",
             "recordName": "File_owner_file_User",
             "mergedTo": "source"
         },
         "File_owner_file_User_source": {
             "table": "File_owner_file_User_source",
             "sourceRecord": "File_owner_file_User",
-            "sourceAttribute": "source",
+            "sourceProperty": "source",
             "targetRecord": "File",
             "relType": [
                 "1",
@@ -30,7 +30,7 @@ export const entityToTableMapData: MapData = {
         "File_owner_file_User_target": {
             "table": "File_owner_file_User_target",
             "sourceRecord": "File_owner_file_User",
-            "sourceAttribute": "target",
+            "sourceProperty": "target",
             "targetRecord": "User",
             "relType": [
                 "n",
@@ -46,16 +46,16 @@ export const entityToTableMapData: MapData = {
                 "1"
             ],
             "sourceRecord": "Profile",
-            "sourceAttribute": "owner",
+            "sourceProperty": "owner",
             "targetRecord": "User",
-            "targetAttribute": "profile",
+            "targetProperty": "profile",
             "recordName": "Profile_owner_profile_User",
             "mergedTo": "combined"
         },
         "Profile_owner_profile_User_source": {
             "table": "Profile_owner_profile_User_source",
             "sourceRecord": "Profile_owner_profile_User",
-            "sourceAttribute": "source",
+            "sourceProperty": "source",
             "targetRecord": "Profile",
             "relType": [
                 "1",
@@ -67,7 +67,7 @@ export const entityToTableMapData: MapData = {
         "Profile_owner_profile_User_target": {
             "table": "Profile_owner_profile_User_target",
             "sourceRecord": "Profile_owner_profile_User",
-            "sourceAttribute": "target",
+            "sourceProperty": "target",
             "targetRecord": "User",
             "relType": [
                 "1",
@@ -83,16 +83,16 @@ export const entityToTableMapData: MapData = {
                 "1"
             ],
             "sourceRecord": "User",
-            "sourceAttribute": "leader",
+            "sourceProperty": "leader",
             "targetRecord": "User",
-            "targetAttribute": "member",
+            "targetProperty": "member",
             "recordName": "User_leader_member_User",
             "mergedTo": "source"
         },
         "User_leader_member_User_source": {
             "table": "User_leader_member_User_source",
             "sourceRecord": "User_leader_member_User",
-            "sourceAttribute": "source",
+            "sourceProperty": "source",
             "targetRecord": "User",
             "relType": [
                 "1",
@@ -104,7 +104,7 @@ export const entityToTableMapData: MapData = {
         "User_leader_member_User_target": {
             "table": "User_leader_member_User_target",
             "sourceRecord": "User_leader_member_User",
-            "sourceAttribute": "target",
+            "sourceProperty": "target",
             "targetRecord": "User",
             "relType": [
                 "n",
@@ -120,15 +120,15 @@ export const entityToTableMapData: MapData = {
                 "n"
             ],
             "sourceRecord": "User",
-            "sourceAttribute": "friends",
+            "sourceProperty": "friends",
             "targetRecord": "User",
-            "targetAttribute": "friends",
+            "targetProperty": "friends",
             "recordName": "User_friends_friends_User"
         },
         "User_friends_friends_User_source": {
             "table": "User_friends_friends_User_source",
             "sourceRecord": "User_friends_friends_User",
-            "sourceAttribute": "source",
+            "sourceProperty": "source",
             "targetRecord": "User",
             "relType": [
                 "n",
@@ -140,7 +140,7 @@ export const entityToTableMapData: MapData = {
         "User_friends_friends_User_target": {
             "table": "User_friends_friends_User_target",
             "sourceRecord": "User_friends_friends_User",
-            "sourceAttribute": "target",
+            "sourceProperty": "target",
             "targetRecord": "User",
             "relType": [
                 "n",
@@ -156,16 +156,16 @@ export const entityToTableMapData: MapData = {
                 "1"
             ],
             "sourceRecord": "User",
-            "sourceAttribute": "item",
+            "sourceProperty": "item",
             "targetRecord": "Item",
-            "targetAttribute": "owner",
+            "targetProperty": "owner",
             "recordName": "User_item_owner_Item",
             "mergedTo": "combined"
         },
         "User_item_owner_Item_source": {
             "table": "User_item_owner_Item_source",
             "sourceRecord": "User_item_owner_Item",
-            "sourceAttribute": "source",
+            "sourceProperty": "source",
             "targetRecord": "User",
             "relType": [
                 "1",
@@ -177,7 +177,7 @@ export const entityToTableMapData: MapData = {
         "User_item_owner_Item_target": {
             "table": "User_item_owner_Item_target",
             "sourceRecord": "User_item_owner_Item",
-            "sourceAttribute": "target",
+            "sourceProperty": "target",
             "targetRecord": "Item",
             "relType": [
                 "1",
