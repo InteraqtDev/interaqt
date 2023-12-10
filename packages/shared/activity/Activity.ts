@@ -429,10 +429,8 @@ export type TransferInstanceType = KlassInstance<typeof Transfer, false>
 
 
 export function forEachInteraction(activity: ActivityInstanceType, handle:(i:InteractionInstanceType, g?: ActivityGroupInstanceType) => any, parenGroup?: ActivityGroupInstanceType) {
-    console.log(activity.name)
     activity.interactions.forEach(i => handle(i, parenGroup))
     activity.groups.forEach(group => {
-        group.type = 'parallel'
         group.activities!.forEach(sub => forEachInteraction(sub, handle, group))
     })
 }
