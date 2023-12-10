@@ -21,6 +21,14 @@ export const Action: Klass<{
 export const Activity: Klass<ActivityPublicType>;
 
 // @public (undocumented)
+export const ActivityCreateAction: InertKlassInstance<    {
+name: {
+type: "string";
+required: true;
+};
+}>;
+
+// @public (undocumented)
 export const ActivityGroup: Klass<ActivityGroupPublicType>;
 
 // @public (undocumented)
