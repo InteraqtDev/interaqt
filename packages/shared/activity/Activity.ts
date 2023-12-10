@@ -393,7 +393,7 @@ export const ActivityGroup: Klass<ActivityGroupPublicType> = createClass({
     }
 })
 
-const ActivityEndType = createClass({
+export const ActivityEndType = createClass({
     name: 'ActivityEnd',
     public: {}
 })
