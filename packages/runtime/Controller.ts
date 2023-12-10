@@ -184,7 +184,7 @@ export class Controller {
 
         return result
     }
-    async callActivityInteraction(activityCallId:string, interactionCallId:string, activityId: string, interactionEventArgs: InteractionEventArgs) {
+    async callActivityInteraction(activityCallId:string, interactionCallId:string, activityId: string|undefined, interactionEventArgs: InteractionEventArgs) {
         const context= asyncInteractionContext.getStore() as InteractionContext
         const logger = this.system.logger.child(context?.logContext || {})
 
@@ -202,7 +202,8 @@ export class Controller {
         if (!result.error) {
             const effects: any[] = []
             try {
-                await this.dispatch(activityCall.uuidToInteractionCall.get(interactionCallId)!.interaction, interactionEventArgs, effects, activityId)
+                const maybeNewActivityId = activityId || result.data?.activityId
+                await this.dispatch(activityCall.uuidToInteractionCall.get(interactionCallId)!.interaction, interactionEventArgs, effects, maybeNewActivityId)
                 result.effects = effects
             } catch(error) {
                 result.error = error
@@ -218,24 +219,6 @@ export class Controller {
             await this.system.storage.rollbackTransaction(interactionNameWithActivityName)
         }
 
-        return result
-    }
-    async createActivity(activityCallId:string) {
-        const context= asyncInteractionContext.getStore() as InteractionContext
-        const logger = this.system.logger.child(context?.logContext || {})
-
-        const activityCall = this.activityCalls.get(activityCallId)!
-        assert(!!activityCall,`cannot find interaction for ${activityCallId}`)
-
-        logger.info({label: "activity", message:`${activityCall.activity.name}:create`})
-
-        const result: InteractionCallResponse = {}
-        try {
-           result.data = await activityCall.create()
-        } catch (error) {
-            result.error = error
-            logger.error({label: "activity", message:`${activityCall.activity.name}:create`})
-        }
         return result
     }
 }

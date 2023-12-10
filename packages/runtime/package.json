@@ -10,7 +10,7 @@
   "scripts": {
     "test": "vitest | pino-pretty",
     "build": "rimraf dist && tsc -p ./tsconfig.prod.json",
-    "type": "api-extractor run --silent",
+    "type": "api-extractor run",
     "build-all": "npm run build && npm run type",
     "release": "node scripts/release.js",
     "patch": "node scripts/release.js patch",
@@ -26,7 +26,7 @@
   "license": "MIT",
   "dependencies": {
     "@fastify/middie": "^8.3.0",
-    "@interaqt/shared": "^1.0.8",
+    "@interaqt/shared": "^1.0.11",
     "@interaqt/storage": "^1.0.2",
     "@types/better-sqlite3": "^7.6.8",
     "@types/connect": "^3.4.38",

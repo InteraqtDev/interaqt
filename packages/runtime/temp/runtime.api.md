@@ -971,7 +971,7 @@ export class Controller {
     // (undocumented)
     addComputedDataHandle(computedData: KlassInstance<any, false>, host: DataContext["host"], id: DataContext["id"]): void;
     // (undocumented)
-    callActivityInteraction(activityCallId: string, interactionCallId: string, activityId: string, interactionEventArgs: InteractionEventArgs): Promise<InteractionCallResponse>;
+    callActivityInteraction(activityCallId: string, interactionCallId: string, activityId: string | undefined, interactionEventArgs: InteractionEventArgs): Promise<InteractionCallResponse>;
     // (undocumented)
     callbacks: Map<any, Set<SystemCallback>>;
     // Warning: (ae-forgotten-export) The symbol "InteractionEventArgs" needs to be exported by the entry point index.d.ts
@@ -983,8 +983,6 @@ export class Controller {
     //
     // (undocumented)
     computedDataHandles: Set<ComputedDataHandle>;
-    // (undocumented)
-    createActivity(activityCallId: string): Promise<InteractionCallResponse>;
     // (undocumented)
     dispatch(event: any, ...args: any[]): Promise<void>;
     // (undocumented)

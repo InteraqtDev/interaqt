@@ -138,9 +138,6 @@ describe('computed data in activity', () => {
         expect(everyRequestHandled).toBeTruthy()
         expect(anyRequestHandled).toBeFalsy()
 
-        // 1. 创建 A 与 B 交友的 activity
-        const { data } = await controller.createActivity(makeFriendActivityUUID)
-        const {activityId, state} = data
         // 查询 request 数据
         const requestMatch = MatchExp.atom({
             key: 'from.name',
@@ -157,8 +154,10 @@ describe('computed data in activity', () => {
                 content: 'let use make friend'
             }
         }
-        const res2 = await controller.callActivityInteraction(makeFriendActivityUUID,  sendRequestUUID, activityId,{user: userA, payload})
+        const res2 = await controller.callActivityInteraction(makeFriendActivityUUID,  sendRequestUUID, undefined,{user: userA, payload})
         expect(res2.error).toBeUndefined()
+        const { activityId} = res2.data
+
 
         const userB1 = (await system.storage.findOne('User', MatchExp.atom({
                 key:'id',
@@ -229,26 +228,27 @@ describe('computed data in activity', () => {
         expect(totalFriendRelation2).toBe(0)
 
         // c 与 d 发起请求
-        const activity11  = (await controller.createActivity(makeFriendActivityUUID)).data.activityId
         const payload11 = {
             to: userB,
             message: {
                 content: 'let use make friend'
             }
         }
-        const res11 = await controller.callActivityInteraction(makeFriendActivityUUID,  sendRequestUUID, activity11,{user: userC, payload: payload11})
+        const res11 = await controller.callActivityInteraction(makeFriendActivityUUID,  sendRequestUUID, undefined,{user: userC, payload: payload11})
         expect(res11.error).toBeUndefined()
+        const activity11 = res11.data.activityId
 
 
-        const activity12 = (await controller.createActivity(makeFriendActivityUUID)).data.activityId
         const payload12 = {
             to: userB,
             message: {
                 content: 'let use make friend'
             }
         }
-        const res12 = await controller.callActivityInteraction(makeFriendActivityUUID,  sendRequestUUID, activity12,{user: userD, payload: payload12})
+        const res12 = await controller.callActivityInteraction(makeFriendActivityUUID,  sendRequestUUID, undefined,{user: userD, payload: payload12})
         expect(res12.error).toBeUndefined()
+        const activity12 = res12.data.activityId
+
 
         const userB12 = (await system.storage.findOne('User', MatchExp.atom({
             key:'id',

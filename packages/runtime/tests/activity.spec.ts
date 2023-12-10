@@ -1,17 +1,7 @@
-import {describe, test, expect, beforeEach} from "vitest";
+import {beforeEach, describe, expect, test} from "vitest";
 
-import { MonoSystem } from "../MonoSystem.js";
-import {
-    createInstances,
-    Entity,
-    getInstance, Interaction,
-    KlassByName,
-    KlassInstance,
-    Relation,
-    removeAllInstance, State
-} from "@interaqt/shared";
-
-import { Activity } from "@interaqt/shared";
+import {MonoSystem} from "../MonoSystem.js";
+import {Activity, createInstances, getInstance, KlassByName, KlassInstance, removeAllInstance} from "@interaqt/shared";
 import {ActivityCall, ActivityGroupNode} from "../ActivityCall.js";
 import {Controller} from "../Controller";
 
@@ -61,9 +51,10 @@ describe("activity state", () => {
 
     test("call friend request activity with approve response", async () => {
         // 1. 创建 activity
-        const { activityId, state } = await  createFriendRelationActivityCall.create()
-        expect(activityId).not.toBe(null)
-        expect(state.current!.uuid).toBe(sendRequestUUID)
+        // const { activityId, state } = await  createFriendRelationActivityCall.create()
+        // expect(activityId).not.toBe(null)
+        // expect(state.current!.uuid).toBe(sendRequestUUID)
+        let activityId
         expect(approveUUID).not.toBe(null)
         expect(rejectUUID).not.toBe(null)
         expect(cancelUUID).not.toBe(null)
@@ -80,6 +71,8 @@ describe("activity state", () => {
         // 3. a 发起 sendFriendRequest
         const res2 = await createFriendRelationActivityCall.callInteraction(activityId, sendRequestUUID, {user: userA, payload: {to: userB}})
         expect(res2.error).toBeUndefined()
+        activityId = res2.data.activityId
+
 
         // 4. 交互顺序错误 a sendFriendRequest
         const res3 =await  createFriendRelationActivityCall.callInteraction(activityId, sendRequestUUID, {user: userA})

@@ -247,29 +247,35 @@ export class InteractionCall {
                 }
             }
 
-            const itemMatch = BoolExp.atom({
-                key: 'id',
-                value: ['=', payloadItem.id]
-            })
-
-            const fullPayloadItem = payloadDef.isRef ?
-                await this.system.storage.findOne(payloadDef.base.name, itemMatch, undefined, ['*']) :
-                payloadItem
 
             if (payloadDef.isCollection) {
-                const result = await everyWithErrorAsync(fullPayloadItem,(item => this.checkConcept(item, payloadDef.base as KlassInstance<typeof Entity, false>)))
+                const result = await everyWithErrorAsync(payloadItem,(item => this.checkConcept(item, payloadDef.base as KlassInstance<typeof Entity, false>)))
                 if (result! == true) {
                     throw new AttributeError(`${payloadDef.name} check concept failed`, result)
                 }
             } else {
-                const result = await this.checkConcept(fullPayloadItem, payloadDef.base as KlassInstance<typeof Entity, false>)
+                const result = await this.checkConcept(payloadItem, payloadDef.base as KlassInstance<typeof Entity, false>)
                 if (result !== true) {
                     throw new AttributeError(`${payloadDef.name} check concept failed`, result)
                 }
             }
 
-            const isPayloadUser = payloadDef.base.name === USER_ENTITY
+            let fullPayloadItem: any|any[] = payloadItem
+            if (payloadDef.isRef) {
+                const itemMatch = payloadDef.isCollection ?
+                    BoolExp.atom({
+                        key: 'id',
+                        value: ['in', payloadItem.map((item: any) => item.id)]
+                    }) :
+                    BoolExp.atom({
+                        key: 'id',
+                        value: ['=', payloadItem.id]
+                    })
 
+                fullPayloadItem = payloadDef.isCollection ?
+                    await this.system.storage.find(payloadDef.base.name, itemMatch, undefined, ['*']) :
+                    await this.system.storage.findOne(payloadDef.base.name, itemMatch, undefined, ['*'])
+            }
 
             if (payloadDef.attributives) {
                 const attributives =  Attributives.is(payloadDef.attributives) ?
@@ -278,7 +284,7 @@ export class InteractionCall {
 
                 // 作为整体是否合法应该放到 condition 里面做
                 if (payloadDef.isCollection) {
-                    const result = await everyWithErrorAsync(payloadItem, (item => {
+                    const result = await everyWithErrorAsync(fullPayloadItem, (item => {
                         const handleAttribute = this.createHandleAttributive(
                             Attributive,
                             interactionEvent,
@@ -289,17 +295,17 @@ export class InteractionCall {
                     }))
 
                     if (result !== true) {
-                        throw new AttributeError(`${payloadDef.name} not every item match attribute`, payloadItem)
+                        throw new AttributeError(`${payloadDef.name} not every item match attribute`, fullPayloadItem)
                     }
                 } else {
                     const handleAttribute = this.createHandleAttributive(
                         Attributive,
                         interactionEvent,
-                        payloadItem
+                        fullPayloadItem
                     )
                     const result = await this.checkAttributives(attributives, handleAttribute)
                     if (result !== true ) {
-                        throw new AttributeError(`${payloadDef.name} not match attributive`, { payload: payloadItem, result})
+                        throw new AttributeError(`${payloadDef.name} not match attributive`, { payload: fullPayloadItem, result})
                     }
                 }
             }
@@ -423,18 +429,24 @@ export class InteractionCall {
 
         return data
     }
-    async call(interactionEventArgs: InteractionEventArgs, activityId?: string, checkUserRef?: CheckUserRef, context?: InteractionContext): Promise<InteractionCallResponse> {
-        const response: InteractionCallResponse = {
-            sideEffects: {},
-        }
-
+    async check(interactionEventArgs: InteractionEventArgs, activityId?: string, checkUserRef?: CheckUserRef, context?: InteractionContext): Promise<InteractionCallResponse["error"]> {
+        let error
         try {
             await this.checkCondition(interactionEventArgs)
             await this.checkUser(interactionEventArgs, activityId, checkUserRef)
             await this.checkPayload(interactionEventArgs)
         } catch(e) {
-            response.error = e
+            error = e
         }
+        return error
+    }
+
+    async call(interactionEventArgs: InteractionEventArgs, activityId?: string, checkUserRef?: CheckUserRef, context?: InteractionContext): Promise<InteractionCallResponse> {
+        const response: InteractionCallResponse = {
+            sideEffects: {},
+        }
+
+        response.error  = await this.check(interactionEventArgs, activityId, checkUserRef, context)
 
         if (!response.error) {
             const savedPayload = await this.savePayload(interactionEventArgs.payload)

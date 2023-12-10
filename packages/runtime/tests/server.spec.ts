@@ -61,7 +61,6 @@ describe('server test', () => {
          * message: Message
          */
 
-
         system = new MonoSystem()
         system.conceptClass = KlassByName
         controller = new Controller(
@@ -134,13 +133,6 @@ describe('server test', () => {
         }
 
 
-        // a 创建活动
-        const {data} = await (await post('http://localhost:8082/api', {
-            activity: 'createFriendRelation'
-        }, {
-            "userid": userAId,
-        })).json()
-        const {activityId} = data
 
         // 3. a 发起 sendFriendRequest
         const payload = {
@@ -152,13 +144,13 @@ describe('server test', () => {
 
         const resp2 = await post('http://localhost:8082/api', {
             activity: 'createFriendRelation',
-            activityId,
             interaction: 'sendRequest',
             payload
         }, {
             "userid": userAId,
         })
         expect(resp2.status).toBe(200)
+        const {activityId} = (await resp2.json()).data
 
         const requests1 = await controller.system.storage.find('Request', undefined, undefined, ['*', ['from', {attributeQuery: ["*"]}], ['to', {attributeQuery: ["*"]}]])
         expect(requests1.length).toBe(1)

@@ -1,29 +1,28 @@
-// 用来找下一状态的 工具类。
-
 import {
     ActivityGroup,
     ActivityGroupInstanceType,
-    ActivityInstanceType, Entity,
+    ActivityInstanceType,
+    Attributive,
     Gateway,
     GatewayInstanceType,
-    InteractionInstanceType, KlassInstance,
+    InteractionInstanceType,
+    KlassInstance,
     TransferInstanceType,
-    Attributive,
 } from "@interaqt/shared";
 import {assert} from "./util.js";
 import {System} from "./System.js";
 import {InteractionCall, InteractionCallResponse} from "./InteractionCall.js";
 import {EventUser, InteractionEventArgs} from "./types/interaction.js";
 import {MatchExp} from "@interaqt/storage";
-import {Controller, InteractionContext} from "./Controller.js";
+import {Controller} from "./Controller.js";
 
 
 export type Seq = {
-    head: InteractionLikeNode,
-    tail: InteractionLikeNode
+    head: InteractionNode|ActivityGroupNode,
+    tail: InteractionNode|ActivityGroupNode
 }
 
-export type InteractionLikeNode = {
+export type InteractionLikeNodeBase = {
     uuid: string
     next: GraphNode|null,
     prev?: GraphNode,
@@ -33,14 +32,14 @@ export type InteractionLikeNode = {
 export type InteractionNode = {
     content: InteractionInstanceType,
     parentGroup?: ActivityGroupNode
-} & InteractionLikeNode
+} & InteractionLikeNodeBase
 
 
 export type ActivityGroupNode = {
     content: ActivityGroupInstanceType,
     parentGroup?: ActivityGroupNode
     childSeqs?: Seq[],
-} & InteractionLikeNode
+} & InteractionLikeNodeBase
 
 
 
@@ -51,7 +50,7 @@ export type GatewayNode = {
     next: GraphNode[],
 }
 
-export type GraphNode = InteractionLikeNode|GatewayNode
+export type GraphNode = InteractionNode|ActivityGroupNode|GatewayNode
 
 
 export type ActivitySeqStateData = {
@@ -66,7 +65,7 @@ export type InteractionStateData = {
 
 
 class ActivitySeqState {
-    public static createInitialState(headNode: InteractionLikeNode) :ActivitySeqStateData {
+    public static createInitialState(headNode: InteractionLikeNodeBase) :ActivitySeqStateData {
         return {
             current: InteractionState.createInitialState(headNode)
         }
@@ -96,11 +95,11 @@ class ActivitySeqState {
         return (this.current!.children as ActivitySeqState[])?.find(child => child.findStateNode(uuid))?.current
     }
     transferToNext(uuid: string) {
-        const node = this.graph.getNodeByUUID(uuid) as InteractionLikeNode
+        const node = this.graph.getNodeByUUID(uuid) as InteractionLikeNodeBase
         delete this.current
         // TODO 一路执行 gateway
         if (node.next) {
-            const nextState = InteractionState.createInitialState(node.next as InteractionLikeNode)
+            const nextState = InteractionState.createInitialState(node.next as InteractionLikeNodeBase)
             this.current = InteractionState.create(nextState, this.graph, this)
         }
 
@@ -120,7 +119,7 @@ class InteractionState {
     public isGroup?: boolean
 
     public children?: ActivitySeqState[]
-    public static createInitialState(node: InteractionLikeNode) {
+    public static createInitialState(node: InteractionLikeNodeBase) {
         const state : InteractionStateData = {uuid: node.uuid}
         if (ActivityGroup.is((node as ActivityGroupNode).content)) {
             state.children = (node as ActivityGroupNode).childSeqs!.map(seqNode =>  ActivitySeqState.createInitialState(seqNode.head))
@@ -145,7 +144,7 @@ class InteractionState {
         }
     }
     // CAUTION 这里 this.node 兼容了 state root 伪造成 ActivityStateNode
-    constructor(public node:InteractionLikeNode|null, public graph: ActivityCall, public parent?: ActivitySeqState) {}
+    constructor(public node:InteractionLikeNodeBase|null, public graph: ActivityCall, public parent?: ActivitySeqState) {}
     toJSON(): any {
         return {
             uuid: this.node!.uuid,
@@ -169,7 +168,7 @@ class InteractionState {
 // 用这个对象来做 state 计算， ActivitySeq 只是一个入口，提供基本的 图 的能力
 class ActivityState{
     public root: ActivitySeqState
-    public static createInitialState(headNode: InteractionLikeNode) {
+    public static createInitialState(headNode: InteractionLikeNodeBase) {
         return ActivitySeqState.createInitialState(headNode)
     }
     constructor(data: ActivitySeqStateData, public graph: ActivityCall) {
@@ -206,10 +205,10 @@ export class ActivityCall {
         return graph
     }
     graph:Seq
-    uuidToNode = new Map<string, InteractionLikeNode|GatewayNode>()
+    uuidToNode = new Map<string, GraphNode>()
     uuidToInteractionCall = new Map<string, InteractionCall>()
     interactionCallByName = new Map<string, InteractionCall>()
-    rawToNode = new Map<InteractionInstanceType|ActivityGroupInstanceType|GatewayInstanceType, InteractionLikeNode|GatewayNode>()
+    rawToNode = new Map<InteractionInstanceType|ActivityGroupInstanceType|GatewayInstanceType, GraphNode>()
     system: System
     constructor(public activity: ActivityInstanceType, public controller: Controller) {
         this.system = controller.system
@@ -282,17 +281,14 @@ export class ActivityCall {
         if (candidateEnd.size !== 1 ) throw new Error(`end node must be one, current: ${candidateEnd.size}`)
 
         Object.assign((seq as Seq), {
-            head :  this.rawToNode.get([...candidateStart.values()][0]!) as InteractionLikeNode,
-            tail : this.rawToNode.get([...candidateEnd.values()][0]!)  as InteractionLikeNode
+            head :  this.rawToNode.get([...candidateStart.values()][0]!) as InteractionNode|ActivityGroupNode,
+            tail : this.rawToNode.get([...candidateEnd.values()][0]!)  as InteractionNode|ActivityGroupNode
         })
 
         return seq as Seq
     }
     async create() {
-        // const activityId = this.system.util.uuid()
         const initialStateData = ActivityState.createInitialState(this.graph.head)
-        // await this.system.storage.set('ActivityState', activityId, initialStateData)
-        // await this.system.storage.set('ActivityRefs', activityId, {})
 
         const activity = await this.system.createActivity({
             name: this.activity.name,
@@ -334,51 +330,65 @@ export class ActivityCall {
         return await this.system.updateActivity(match, {state: state})
     }
     isStartNode(uuid: string) {
-        const node = this.uuidToNode.get(uuid) as InteractionLikeNode
+        const node = this.uuidToNode.get(uuid) as InteractionLikeNodeBase
         return node.parentSeq.head === node
     }
     isEndNode(uuid: string) {
-        const node = this.uuidToNode.get(uuid) as InteractionLikeNode
+        const node = this.uuidToNode.get(uuid) as InteractionLikeNodeBase
         return node.parentSeq.tail === node
     }
 
+    isActivityHead(interaction: InteractionInstanceType, head: InteractionLikeNodeBase = this.graph.head): boolean {
+        if (ActivityGroup.is(this.graph.head.content)) {
+            // group 是个控制单元，控制的是结束不是开始，所以任何一个头都可以算头。
+            return !!(this.graph.head as ActivityGroupNode).childSeqs?.some(seq => this.isActivityHead(interaction, seq.head))
+        } else {
+            return interaction === this.graph.head.content
+        }
+    }
 
-    async callInteraction(activityId: string, uuid: string, interactionEventArgs: InteractionEventArgs) : Promise<InteractionCallResponse>{
-        const activityStateData = await this.getState(activityId)
+    async callInteraction(inputActivityId: string|undefined, uuid: string, interactionEventArgs: InteractionEventArgs) : Promise<InteractionCallResponse>{
+        const interactionCall = this.uuidToInteractionCall.get(uuid)!
 
-        const state = new ActivityState(activityStateData, this)
-        if(!state.isInteractionAvailable(uuid)) {
-            return {
-                error: `interaction ${uuid} not available`
+        let activityId = inputActivityId
+
+        // 如果 不是头，就要立刻去找 state 并且校验。
+        if (this.isActivityHead(interactionCall.interaction) ) {
+            if ( !activityId){
+                // 如果 是头，那么要等 interactionCall 的 check 过了才创建 state
+                const error = await interactionCall.check(interactionEventArgs, inputActivityId, this.checkUserRef)
+                if (error) return { error }
+
+                activityId = (await this.create()).activityId
             }
+        } else {
+            if(!inputActivityId) return { error: 'activityId must be provided for non-head interaction of an activity'}
         }
 
-        const interactionCall = this.uuidToInteractionCall.get(uuid)!
-        // const userMatch= await this.checkUserRef(activityId, interactionCall.interaction, interactionEventArgs)
-        // if (!userMatch) {
-        //     return {
-        //         error: `current user cannot call this interaction: activityId:${activityId}, interactionId: ${uuid}`
-        //     }
-        // }
+        const state = new ActivityState(await this.getState(activityId!), this)
+        if(!state.isInteractionAvailable(uuid)) return { error: `interaction ${uuid} not available`}
 
-        const res = await interactionCall.call(interactionEventArgs, activityId, this.checkUserRef)
+        const res = await interactionCall.call(interactionEventArgs, activityId!, this.checkUserRef)
         if (res.error) {
             return res
         }
 
         // 如果有 ref，要保存下来，方便后面 interactionCall 的时候通过 checkUserRef 去取
-        await this.saveUserRefs(activityId, interactionCall, interactionEventArgs)
+        await this.saveUserRefs(activityId!, interactionCall, interactionEventArgs)
 
         const result = state.completeInteraction(uuid)
         assert(result, 'change activity state failed')
         // 完成了。存新的 state。
         const nextState = state.toJSON()
         // await this.system.storage.set('ActivityState', activityId, nextState)
-        await this.setActivity( activityId, {'state':nextState})
+        await this.setActivity( activityId!, {'state':nextState})
 
 
         return {
-            data: nextState
+            data: {
+                activityId,
+                nextState
+            }
         }
     }
     // TODO 我们没有处理 interaction 循环的情况

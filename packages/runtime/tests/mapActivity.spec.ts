@@ -104,15 +104,6 @@ describe('map activity', () => {
 
         expect(totalFriendRelation).toBe(0)
 
-        // 1. 创建 activity
-        const { data } = await controller.createActivity(makeFriendActivityUUID)
-        const {activityId, state} = data
-        expect(activityId).not.toBe(null)
-        expect(state.current!.uuid).toBe(sendRequestUUID)
-        expect(approveUUID).not.toBe(null)
-        expect(rejectUUID).not.toBe(null)
-        expect(cancelUUID).not.toBe(null)
-
 
         // 查询 request 数据
         const requestMatch = MatchExp.atom({
@@ -136,8 +127,9 @@ describe('map activity', () => {
                 content: 'let use make friend'
             }
         }
-        const res2 = await controller.callActivityInteraction(makeFriendActivityUUID,  sendRequestUUID, activityId,{user: userA, payload})
+        const res2 = await controller.callActivityInteraction(makeFriendActivityUUID,  sendRequestUUID, undefined,{user: userA, payload})
         expect(res2.error).toBeUndefined()
+        const activityId = res2.data.activityId
 
         const requests2 = await controller.system.storage.find('Request', requestMatch, undefined, ['handled', ['activity', {attributeQuery: ['id']}], ['from',{attributeQuery:["name"]}], ['to', {attributeQuery:["name"]}], ['message', {attributeQuery:["content"]}]])
         expect(requests2.length).toBe(1)
