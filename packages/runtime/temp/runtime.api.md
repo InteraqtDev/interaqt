@@ -32,77 +32,77 @@ export const ACTIVITY_RECORD = "_Activity_";
 
 // @public (undocumented)
 export const activityEntity: InertKlassInstance<    {
-    name: {
-        type: "string";
-        collection: false;
-        required: true;
-        constraints: {
-            nameFormat({ name }: {
-                name: Atom<string>;
-            }): Atom<boolean>;
-        };
-    };
-    computedData: {
-        type: Klass<any>[];
-        collection: false;
-        required: false;
-    };
-    properties: {
-        type: Klass<    {
-            name: {
-                type: "string";
-                required: true;
-                collection: false;
-                constraints: {
-                    format({ name }: {
-                        name: Atom<string>;
-                    }): Atom<boolean>;
-                    length({ name }: {
-                        name: Atom<string>;
-                    }): Atom<boolean>;
-                };
-            };
-            type: {
-                type: "string";
-                required: true;
-                collection: false;
-                options: PropertyTypes[];
-            };
-            collection: {
-                type: "boolean";
-                required: true;
-                collection: false;
-                defaultValue(): boolean;
-            };
-            args: {
-                computedType: (values: {
-                    type: PropertyTypes;
-                }) => string;
-            };
-            computedData: {
-                collection: false;
-                type: Klass<any>[];
-                required: false;
-            };
-            computed: {
-                required: false;
-                type: "function";
-                collection: false;
-            };
-        }>;
-        collection: true;
-        required: true;
-        constraints: {
-            eachNameUnique({ properties }: any): Atom<boolean>;
-        };
-        defaultValue(): never[];
-    };
-    isRef: {
-        required: true;
-        collection: false;
-        type: "boolean";
-        defaultValue: () => boolean;
-    };
+name: {
+type: "string";
+collection: false;
+required: true;
+constraints: {
+nameFormat({ name }: {
+name: Atom<string>;
+}): Atom<boolean>;
+};
+};
+computedData: {
+type: Klass<any>[];
+collection: false;
+required: false;
+};
+properties: {
+type: Klass<    {
+name: {
+type: "string";
+required: true;
+collection: false;
+constraints: {
+format({ name }: {
+name: Atom<string>;
+}): Atom<boolean>;
+length({ name }: {
+name: Atom<string>;
+}): Atom<boolean>;
+};
+};
+type: {
+type: "string";
+required: true;
+collection: false;
+options: PropertyTypes[];
+};
+collection: {
+type: "boolean";
+required: true;
+collection: false;
+defaultValue(): boolean;
+};
+args: {
+computedType: (values: {
+type: PropertyTypes;
+}) => string;
+};
+computedData: {
+collection: false;
+type: Klass<any>[];
+required: false;
+};
+computed: {
+required: false;
+type: "function";
+collection: false;
+};
+}>;
+collection: true;
+required: true;
+constraints: {
+eachNameUnique({ properties }: any): Atom<boolean>;
+};
+defaultValue(): never[];
+};
+isRef: {
+required: true;
+collection: false;
+type: "boolean";
+defaultValue: () => boolean;
+};
 }>;
 
 // @public (undocumented)
@@ -1427,77 +1427,77 @@ export const EVENT_RECORD = "_Event_";
 
 // @public (undocumented)
 export const eventEntity: InertKlassInstance<    {
-    name: {
-        type: "string";
-        collection: false;
-        required: true;
-        constraints: {
-            nameFormat({ name }: {
-                name: Atom<string>;
-            }): Atom<boolean>;
-        };
-    };
-    computedData: {
-        type: Klass<any>[];
-        collection: false;
-        required: false;
-    };
-    properties: {
-        type: Klass<    {
-            name: {
-                type: "string";
-                required: true;
-                collection: false;
-                constraints: {
-                    format({ name }: {
-                        name: Atom<string>;
-                    }): Atom<boolean>;
-                    length({ name }: {
-                        name: Atom<string>;
-                    }): Atom<boolean>;
-                };
-            };
-            type: {
-                type: "string";
-                required: true;
-                collection: false;
-                options: PropertyTypes[];
-            };
-            collection: {
-                type: "boolean";
-                required: true;
-                collection: false;
-                defaultValue(): boolean;
-            };
-            args: {
-                computedType: (values: {
-                    type: PropertyTypes;
-                }) => string;
-            };
-            computedData: {
-                collection: false;
-                type: Klass<any>[];
-                required: false;
-            };
-            computed: {
-                required: false;
-                type: "function";
-                collection: false;
-            };
-        }>;
-        collection: true;
-        required: true;
-        constraints: {
-            eachNameUnique({ properties }: any): Atom<boolean>;
-        };
-        defaultValue(): never[];
-    };
-    isRef: {
-        required: true;
-        collection: false;
-        type: "boolean";
-        defaultValue: () => boolean;
-    };
+name: {
+type: "string";
+collection: false;
+required: true;
+constraints: {
+nameFormat({ name }: {
+name: Atom<string>;
+}): Atom<boolean>;
+};
+};
+computedData: {
+type: Klass<any>[];
+collection: false;
+required: false;
+};
+properties: {
+type: Klass<    {
+name: {
+type: "string";
+required: true;
+collection: false;
+constraints: {
+format({ name }: {
+name: Atom<string>;
+}): Atom<boolean>;
+length({ name }: {
+name: Atom<string>;
+}): Atom<boolean>;
+};
+};
+type: {
+type: "string";
+required: true;
+collection: false;
+options: PropertyTypes[];
+};
+collection: {
+type: "boolean";
+required: true;
+collection: false;
+defaultValue(): boolean;
+};
+args: {
+computedType: (values: {
+type: PropertyTypes;
+}) => string;
+};
+computedData: {
+collection: false;
+type: Klass<any>[];
+required: false;
+};
+computed: {
+required: false;
+type: "function";
+collection: false;
+};
+}>;
+collection: true;
+required: true;
+constraints: {
+eachNameUnique({ properties }: any): Atom<boolean>;
+};
+defaultValue(): never[];
+};
+isRef: {
+required: true;
+collection: false;
+type: "boolean";
+defaultValue: () => boolean;
+};
 }>;
 
 // @public (undocumented)
@@ -3403,77 +3403,77 @@ export type SystemCallback = (...arg: any[]) => any;
 
 // @public (undocumented)
 export const systemEntity: InertKlassInstance<    {
-    name: {
-        type: "string";
-        collection: false;
-        required: true;
-        constraints: {
-            nameFormat({ name }: {
-                name: Atom<string>;
-            }): Atom<boolean>;
-        };
-    };
-    computedData: {
-        type: Klass<any>[];
-        collection: false;
-        required: false;
-    };
-    properties: {
-        type: Klass<    {
-            name: {
-                type: "string";
-                required: true;
-                collection: false;
-                constraints: {
-                    format({ name }: {
-                        name: Atom<string>;
-                    }): Atom<boolean>;
-                    length({ name }: {
-                        name: Atom<string>;
-                    }): Atom<boolean>;
-                };
-            };
-            type: {
-                type: "string";
-                required: true;
-                collection: false;
-                options: PropertyTypes[];
-            };
-            collection: {
-                type: "boolean";
-                required: true;
-                collection: false;
-                defaultValue(): boolean;
-            };
-            args: {
-                computedType: (values: {
-                    type: PropertyTypes;
-                }) => string;
-            };
-            computedData: {
-                collection: false;
-                type: Klass<any>[];
-                required: false;
-            };
-            computed: {
-                required: false;
-                type: "function";
-                collection: false;
-            };
-        }>;
-        collection: true;
-        required: true;
-        constraints: {
-            eachNameUnique({ properties }: any): Atom<boolean>;
-        };
-        defaultValue(): never[];
-    };
-    isRef: {
-        required: true;
-        collection: false;
-        type: "boolean";
-        defaultValue: () => boolean;
-    };
+name: {
+type: "string";
+collection: false;
+required: true;
+constraints: {
+nameFormat({ name }: {
+name: Atom<string>;
+}): Atom<boolean>;
+};
+};
+computedData: {
+type: Klass<any>[];
+collection: false;
+required: false;
+};
+properties: {
+type: Klass<    {
+name: {
+type: "string";
+required: true;
+collection: false;
+constraints: {
+format({ name }: {
+name: Atom<string>;
+}): Atom<boolean>;
+length({ name }: {
+name: Atom<string>;
+}): Atom<boolean>;
+};
+};
+type: {
+type: "string";
+required: true;
+collection: false;
+options: PropertyTypes[];
+};
+collection: {
+type: "boolean";
+required: true;
+collection: false;
+defaultValue(): boolean;
+};
+args: {
+computedType: (values: {
+type: PropertyTypes;
+}) => string;
+};
+computedData: {
+collection: false;
+type: Klass<any>[];
+required: false;
+};
+computed: {
+required: false;
+type: "function";
+collection: false;
+};
+}>;
+collection: true;
+required: true;
+constraints: {
+eachNameUnique({ properties }: any): Atom<boolean>;
+};
+defaultValue(): never[];
+};
+isRef: {
+required: true;
+collection: false;
+type: "boolean";
+defaultValue: () => boolean;
+};
 }>;
 
 // @public (undocumented)
@@ -3620,12 +3620,12 @@ export const WeightedSummation: Klass<{
 
 // Warnings were encountered during analysis:
 //
-// index.ts:7:33 - (ae-forgotten-export) The symbol "UnwrappedActivityInstanceType" needs to be exported by the entry point index.d.ts
-// index.ts:7:33 - (ae-forgotten-export) The symbol "EventPayload" needs to be exported by the entry point index.d.ts
-// index.ts:7:33 - (ae-forgotten-export) The symbol "EventQuery" needs to be exported by the entry point index.d.ts
-// index.ts:7:33 - (ae-forgotten-export) The symbol "CommonAtomPublic" needs to be exported by the entry point index.d.ts
-// index.ts:7:33 - (ae-forgotten-export) The symbol "EventUser" needs to be exported by the entry point index.d.ts
-// index.ts:7:33 - (ae-forgotten-export) The symbol "ClassMetaPublicItem" needs to be exported by the entry point index.d.ts
+// node_modules/@interaqt/shared/dist/index.d.ts:24:9 - (ae-forgotten-export) The symbol "UnwrappedActivityInstanceType" needs to be exported by the entry point index.d.ts
+// node_modules/@interaqt/shared/dist/index.d.ts:287:9 - (ae-forgotten-export) The symbol "CommonAtomPublic" needs to be exported by the entry point index.d.ts
+// node_modules/@interaqt/shared/dist/index.d.ts:1428:9 - (ae-forgotten-export) The symbol "ClassMetaPublicItem" needs to be exported by the entry point index.d.ts
+// server.ts:21:5 - (ae-forgotten-export) The symbol "EventPayload" needs to be exported by the entry point index.d.ts
+// server.ts:22:5 - (ae-forgotten-export) The symbol "EventQuery" needs to be exported by the entry point index.d.ts
+// server.ts:31:5 - (ae-forgotten-export) The symbol "EventUser" needs to be exported by the entry point index.d.ts
 
 // (No @packageDocumentation comment for this package)
 

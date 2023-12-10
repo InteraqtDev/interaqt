@@ -191,7 +191,7 @@
               "text": "<{\n    name: {\n        type: \"string\";\n        required: true;\n    };\n}>"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "Action",
@@ -214,7 +214,7 @@
               "text": "\"_Activity_\""
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "System.ts",
           "initializerTokenRange": {
             "startIndex": 1,
             "endIndex": 2
@@ -248,14 +248,14 @@
             {
               "kind": "Reference",
               "text": "ActivityPublicType",
-              "canonicalReference": "@interaqt/runtime!~ActivityPublicType:type"
+              "canonicalReference": "@interaqt/runtime!ActivityPublicType:type"
             },
             {
               "kind": "Content",
               "text": ">"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "Activity",
@@ -274,13 +274,17 @@
               "text": "activityEntity: "
             },
             {
+              "kind": "Content",
+              "text": "import(\"@interaqt/shared\")."
+            },
+            {
               "kind": "Reference",
               "text": "InertKlassInstance",
               "canonicalReference": "@interaqt/runtime!InertKlassInstance:type"
             },
             {
               "kind": "Content",
-              "text": "<    {\n    name: {\n        type: \"string\";\n        collection: false;\n        required: true;\n        constraints: {\n            nameFormat({ name }: {\n                name: "
+              "text": "<{\n    name: {\n        type: \"string\";\n        collection: false;\n        required: true;\n        constraints: {\n            nameFormat({ name }: {\n                name: import(\"data0\")."
             },
             {
               "kind": "Reference",
@@ -289,7 +293,7 @@
             },
             {
               "kind": "Content",
-              "text": "<string>;\n            }): "
+              "text": "<string>;\n            }): import(\"data0\")."
             },
             {
               "kind": "Reference",
@@ -298,7 +302,7 @@
             },
             {
               "kind": "Content",
-              "text": "<boolean>;\n        };\n    };\n    computedData: {\n        type: "
+              "text": "<boolean>;\n        };\n    };\n    computedData: {\n        type: import(\"@interaqt/shared\")."
             },
             {
               "kind": "Reference",
@@ -307,7 +311,7 @@
             },
             {
               "kind": "Content",
-              "text": "<any>[];\n        collection: false;\n        required: false;\n    };\n    properties: {\n        type: "
+              "text": "<any>[];\n        collection: false;\n        required: false;\n    };\n    properties: {\n        type: import(\"@interaqt/shared\")."
             },
             {
               "kind": "Reference",
@@ -316,7 +320,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n            name: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                constraints: {\n                    format({ name }: {\n                        name: "
+              "text": "<{\n            name: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                constraints: {\n                    format({ name }: {\n                        name: import(\"data0\")."
             },
             {
               "kind": "Reference",
@@ -325,7 +329,7 @@
             },
             {
               "kind": "Content",
-              "text": "<string>;\n                    }): "
+              "text": "<string>;\n                    }): import(\"data0\")."
             },
             {
               "kind": "Reference",
@@ -334,7 +338,7 @@
             },
             {
               "kind": "Content",
-              "text": "<boolean>;\n                    length({ name }: {\n                        name: "
+              "text": "<boolean>;\n                    length({ name }: {\n                        name: import(\"data0\")."
             },
             {
               "kind": "Reference",
@@ -343,7 +347,7 @@
             },
             {
               "kind": "Content",
-              "text": "<string>;\n                    }): "
+              "text": "<string>;\n                    }): import(\"data0\")."
             },
             {
               "kind": "Reference",
@@ -352,7 +356,7 @@
             },
             {
               "kind": "Content",
-              "text": "<boolean>;\n                };\n            };\n            type: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                options: "
+              "text": "<boolean>;\n                };\n            };\n            type: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                options: import(\"@interaqt/shared\")."
             },
             {
               "kind": "Reference",
@@ -361,7 +365,7 @@
             },
             {
               "kind": "Content",
-              "text": "[];\n            };\n            collection: {\n                type: \"boolean\";\n                required: true;\n                collection: false;\n                defaultValue(): boolean;\n            };\n            args: {\n                computedType: (values: {\n                    type: "
+              "text": "[];\n            };\n            collection: {\n                type: \"boolean\";\n                required: true;\n                collection: false;\n                defaultValue(): boolean;\n            };\n            args: {\n                computedType: (values: {\n                    type: import(\"@interaqt/shared\")."
             },
             {
               "kind": "Reference",
@@ -370,7 +374,7 @@
             },
             {
               "kind": "Content",
-              "text": ";\n                }) => string;\n            };\n            computedData: {\n                collection: false;\n                type: "
+              "text": ";\n                }) => string;\n            };\n            computedData: {\n                collection: false;\n                type: import(\"@interaqt/shared\")."
             },
             {
               "kind": "Reference",
@@ -379,7 +383,7 @@
             },
             {
               "kind": "Content",
-              "text": "<any>[];\n                required: false;\n            };\n            computed: {\n                required: false;\n                type: \"function\";\n                collection: false;\n            };\n        }>;\n        collection: true;\n        required: true;\n        constraints: {\n            eachNameUnique({ properties }: any): "
+              "text": "<any>[];\n                required: false;\n            };\n            computed: {\n                required: false;\n                type: \"function\";\n                collection: false;\n            };\n        }>;\n        collection: true;\n        required: true;\n        constraints: {\n            eachNameUnique({ properties }: any): import(\"data0\")."
             },
             {
               "kind": "Reference",
@@ -391,13 +395,13 @@
               "text": "<boolean>;\n        };\n        defaultValue(): never[];\n    };\n    isRef: {\n        required: true;\n        collection: false;\n        type: \"boolean\";\n        defaultValue: () => boolean;\n    };\n}>"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "System.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "activityEntity",
           "variableTypeTokenRange": {
             "startIndex": 1,
-            "endIndex": 27
+            "endIndex": 28
           }
         },
         {
@@ -428,7 +432,7 @@
               "text": ">"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "ActivityGroup",
@@ -478,7 +482,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "releaseTag": "Public",
           "name": "ActivityGroupInstanceType",
           "typeTokenRange": {
@@ -502,7 +506,7 @@
             {
               "kind": "Reference",
               "text": "UnwrappedActivityInstanceType",
-              "canonicalReference": "@interaqt/runtime!~UnwrappedActivityInstanceType:type"
+              "canonicalReference": "@interaqt/runtime!UnwrappedActivityInstanceType:type"
             },
             {
               "kind": "Content",
@@ -511,7 +515,7 @@
             {
               "kind": "Reference",
               "text": "UnwrappedActivityInstanceType",
-              "canonicalReference": "@interaqt/runtime!~UnwrappedActivityInstanceType:type"
+              "canonicalReference": "@interaqt/runtime!UnwrappedActivityInstanceType:type"
             },
             {
               "kind": "Content",
@@ -522,7 +526,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "releaseTag": "Public",
           "name": "ActivityGroupPublicType",
           "typeTokenRange": {
@@ -562,7 +566,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "releaseTag": "Public",
           "name": "ActivityInstanceType",
           "typeTokenRange": {
@@ -724,7 +728,7 @@
               "text": ">)[];\n        collection: false;\n        required: true;\n    };\n    matchExpression: {\n        type: \"function\";\n        collection: false;\n        required: true;\n    };\n}>"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "Any",
@@ -740,7 +744,7 @@
           "excerptTokens": [
             {
               "kind": "Content",
-              "text": "export declare type APIBody = "
+              "text": "export type APIBody = "
             },
             {
               "kind": "Content",
@@ -769,7 +773,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "server.ts",
           "releaseTag": "Public",
           "name": "APIBody",
           "typeTokenRange": {
@@ -796,7 +800,7 @@
               "text": "<unknown>"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "asyncInteractionContext.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "asyncInteractionContext",
@@ -832,7 +836,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "releaseTag": "Public",
           "name": "AtomHandle",
           "typeParameters": [
@@ -869,10 +873,10 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n    stringContent: {\n        type: \"string\";\n    };\n    content: {\n        type: \"function\";\n        required: true;\n        collection: false;\n    };\n    name: {\n        type: \"string\";\n    };\n    isRef: {\n        type: \"boolean\";\n    };\n}>"
+              "text": "<    {\nstringContent: {\ntype: \"string\";\n};\ncontent: {\ntype: \"function\";\nrequired: true;\ncollection: false;\n};\nname: {\ntype: \"string\";\n};\nisRef: {\ntype: \"boolean\";\n};\n}>"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "Attributive",
@@ -897,7 +901,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n    content: {\n        type: ("
+              "text": "<    {\ncontent: {\ntype: ("
             },
             {
               "kind": "Reference",
@@ -906,7 +910,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n            type: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                defaultValue: () => string;\n            };\n            data: {\n                instanceType: "
+              "text": "<    {\ntype: {\ntype: \"string\";\nrequired: true;\ncollection: false;\ndefaultValue: () => string;\n};\ndata: {\ninstanceType: "
             },
             {
               "kind": "Reference",
@@ -915,7 +919,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n                    content: {\n                        type: \"function\";\n                        required: true;\n                        collection: false;\n                    };\n                }> | "
+              "text": "<    {\ncontent: {\ntype: \"function\";\nrequired: true;\ncollection: false;\n};\n}> | "
             },
             {
               "kind": "Reference",
@@ -924,7 +928,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n                    content: {\n                        type: \"function\";\n                        required: true;\n                        collection: false;\n                    };\n                }>;\n                required: true;\n                collection: false;\n            };\n        }> | "
+              "text": "<    {\ncontent: {\ntype: \"function\";\nrequired: true;\ncollection: false;\n};\n}>;\nrequired: true;\ncollection: false;\n};\n}> | "
             },
             {
               "kind": "Reference",
@@ -933,7 +937,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n            type: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                defaultValue: () => string;\n            };\n            operator: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                options: string[];\n                defaultValue: () => string;\n            };\n            left: {\n                instanceType: "
+              "text": "<    {\ntype: {\ntype: \"string\";\nrequired: true;\ncollection: false;\ndefaultValue: () => string;\n};\noperator: {\ntype: \"string\";\nrequired: true;\ncollection: false;\noptions: string[];\ndefaultValue: () => string;\n};\nleft: {\ninstanceType: "
             },
             {
               "kind": "Reference",
@@ -942,7 +946,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n                    type: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        defaultValue: () => string;\n                    };\n                    data: {\n                        instanceType: "
+              "text": "<    {\ntype: {\ntype: \"string\";\nrequired: true;\ncollection: false;\ndefaultValue: () => string;\n};\ndata: {\ninstanceType: "
             },
             {
               "kind": "Reference",
@@ -951,7 +955,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }> | "
+              "text": "<    {\ncontent: {\ntype: \"function\";\nrequired: true;\ncollection: false;\n};\n}> | "
             },
             {
               "kind": "Reference",
@@ -960,7 +964,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }>;\n                        required: true;\n                        collection: false;\n                    };\n                }> | "
+              "text": "<    {\ncontent: {\ntype: \"function\";\nrequired: true;\ncollection: false;\n};\n}>;\nrequired: true;\ncollection: false;\n};\n}> | "
             },
             {
               "kind": "Reference",
@@ -969,7 +973,7 @@
             },
             {
               "kind": "Content",
-              "text": "<any>;\n                required: true;\n                collection: false;\n            };\n            right: {\n                instanceType: "
+              "text": "<any>;\nrequired: true;\ncollection: false;\n};\nright: {\ninstanceType: "
             },
             {
               "kind": "Reference",
@@ -978,7 +982,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n                    type: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        defaultValue: () => string;\n                    };\n                    data: {\n                        instanceType: "
+              "text": "<    {\ntype: {\ntype: \"string\";\nrequired: true;\ncollection: false;\ndefaultValue: () => string;\n};\ndata: {\ninstanceType: "
             },
             {
               "kind": "Reference",
@@ -987,7 +991,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }> | "
+              "text": "<    {\ncontent: {\ntype: \"function\";\nrequired: true;\ncollection: false;\n};\n}> | "
             },
             {
               "kind": "Reference",
@@ -996,7 +1000,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }>;\n                        required: true;\n                        collection: false;\n                    };\n                }> | "
+              "text": "<    {\ncontent: {\ntype: \"function\";\nrequired: true;\ncollection: false;\n};\n}>;\nrequired: true;\ncollection: false;\n};\n}> | "
             },
             {
               "kind": "Reference",
@@ -1005,10 +1009,10 @@
             },
             {
               "kind": "Content",
-              "text": "<any>;\n                required: false;\n                collection: false;\n            };\n        }>)[];\n        collection: false;\n        required: false;\n    };\n}>"
+              "text": "<any>;\nrequired: false;\ncollection: false;\n};\n}>)[];\ncollection: false;\nrequired: false;\n};\n}>"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "Attributives",
@@ -1047,7 +1051,7 @@
             {
               "kind": "Reference",
               "text": "CommonAtomPublic",
-              "canonicalReference": "@interaqt/runtime!~CommonAtomPublic:type"
+              "canonicalReference": "@interaqt/runtime!CommonAtomPublic:type"
             },
             {
               "kind": "Content",
@@ -1065,14 +1069,14 @@
             {
               "kind": "Reference",
               "text": "CommonAtomPublic",
-              "canonicalReference": "@interaqt/runtime!~CommonAtomPublic:type"
+              "canonicalReference": "@interaqt/runtime!CommonAtomPublic:type"
             },
             {
               "kind": "Content",
               "text": ">;\n        required: true;\n        collection: false;\n    };\n}>"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "BoolAtomData",
@@ -1091,7 +1095,7 @@
               "text": "export declare class BoolExp<T> "
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "releaseTag": "Public",
           "typeParameters": [
             {
@@ -1758,7 +1762,7 @@
                 {
                   "kind": "Reference",
                   "text": "MapFn",
-                  "canonicalReference": "@interaqt/runtime!~MapFn:type"
+                  "canonicalReference": "@interaqt/runtime!MapFn:type"
                 },
                 {
                   "kind": "Content",
@@ -2004,7 +2008,7 @@
                 {
                   "kind": "Reference",
                   "text": "AtomData",
-                  "canonicalReference": "@interaqt/runtime!~AtomData:type"
+                  "canonicalReference": "@interaqt/runtime!AtomData:type"
                 },
                 {
                   "kind": "Content",
@@ -2056,7 +2060,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n            type: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                defaultValue: () => string;\n            };\n            data: {\n                instanceType: "
+              "text": "<    {\n        type: {\n        type: \"string\";\n        required: true;\n        collection: false;\n        defaultValue: () => string;\n        };\n        data: {\n        instanceType: "
             },
             {
               "kind": "Reference",
@@ -2070,7 +2074,7 @@
             {
               "kind": "Reference",
               "text": "CommonAtomPublic",
-              "canonicalReference": "@interaqt/runtime!~CommonAtomPublic:type"
+              "canonicalReference": "@interaqt/runtime!CommonAtomPublic:type"
             },
             {
               "kind": "Content",
@@ -2088,11 +2092,11 @@
             {
               "kind": "Reference",
               "text": "CommonAtomPublic",
-              "canonicalReference": "@interaqt/runtime!~CommonAtomPublic:type"
+              "canonicalReference": "@interaqt/runtime!CommonAtomPublic:type"
             },
             {
               "kind": "Content",
-              "text": ">;\n                required: true;\n                collection: false;\n            };\n        }> | "
+              "text": ">;\n        required: true;\n        collection: false;\n        };\n        }> | "
             },
             {
               "kind": "Reference",
@@ -2110,7 +2114,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n            type: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                defaultValue: () => string;\n            };\n            data: {\n                instanceType: "
+              "text": "<    {\n        type: {\n        type: \"string\";\n        required: true;\n        collection: false;\n        defaultValue: () => string;\n        };\n        data: {\n        instanceType: "
             },
             {
               "kind": "Reference",
@@ -2124,7 +2128,7 @@
             {
               "kind": "Reference",
               "text": "CommonAtomPublic",
-              "canonicalReference": "@interaqt/runtime!~CommonAtomPublic:type"
+              "canonicalReference": "@interaqt/runtime!CommonAtomPublic:type"
             },
             {
               "kind": "Content",
@@ -2142,11 +2146,11 @@
             {
               "kind": "Reference",
               "text": "CommonAtomPublic",
-              "canonicalReference": "@interaqt/runtime!~CommonAtomPublic:type"
+              "canonicalReference": "@interaqt/runtime!CommonAtomPublic:type"
             },
             {
               "kind": "Content",
-              "text": ">;\n                required: true;\n                collection: false;\n            };\n        }> | "
+              "text": ">;\n        required: true;\n        collection: false;\n        };\n        }> | "
             },
             {
               "kind": "Reference",
@@ -2158,7 +2162,7 @@
               "text": "<any>;\n        required: false;\n        collection: false;\n    };\n}>"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "BoolExpressionData",
@@ -2203,7 +2207,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "releaseTag": "Public",
           "name": "BoolExpressionRawData",
           "typeParameters": [
@@ -2271,7 +2275,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n    content: {\n        type: ("
+              "text": "<    {\ncontent: {\ntype: ("
             },
             {
               "kind": "Reference",
@@ -2280,7 +2284,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n            type: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                defaultValue: () => string;\n            };\n            data: {\n                instanceType: "
+              "text": "<    {\ntype: {\ntype: \"string\";\nrequired: true;\ncollection: false;\ndefaultValue: () => string;\n};\ndata: {\ninstanceType: "
             },
             {
               "kind": "Reference",
@@ -2289,7 +2293,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n                    content: {\n                        type: \"function\";\n                        required: true;\n                        collection: false;\n                    };\n                }> | "
+              "text": "<    {\ncontent: {\ntype: \"function\";\nrequired: true;\ncollection: false;\n};\n}> | "
             },
             {
               "kind": "Reference",
@@ -2298,7 +2302,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n                    content: {\n                        type: \"function\";\n                        required: true;\n                        collection: false;\n                    };\n                }>;\n                required: true;\n                collection: false;\n            };\n        }> | "
+              "text": "<    {\ncontent: {\ntype: \"function\";\nrequired: true;\ncollection: false;\n};\n}>;\nrequired: true;\ncollection: false;\n};\n}> | "
             },
             {
               "kind": "Reference",
@@ -2307,7 +2311,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n            type: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                defaultValue: () => string;\n            };\n            operator: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                options: string[];\n                defaultValue: () => string;\n            };\n            left: {\n                instanceType: "
+              "text": "<    {\ntype: {\ntype: \"string\";\nrequired: true;\ncollection: false;\ndefaultValue: () => string;\n};\noperator: {\ntype: \"string\";\nrequired: true;\ncollection: false;\noptions: string[];\ndefaultValue: () => string;\n};\nleft: {\ninstanceType: "
             },
             {
               "kind": "Reference",
@@ -2316,7 +2320,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n                    type: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        defaultValue: () => string;\n                    };\n                    data: {\n                        instanceType: "
+              "text": "<    {\ntype: {\ntype: \"string\";\nrequired: true;\ncollection: false;\ndefaultValue: () => string;\n};\ndata: {\ninstanceType: "
             },
             {
               "kind": "Reference",
@@ -2325,7 +2329,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }> | "
+              "text": "<    {\ncontent: {\ntype: \"function\";\nrequired: true;\ncollection: false;\n};\n}> | "
             },
             {
               "kind": "Reference",
@@ -2334,7 +2338,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }>;\n                        required: true;\n                        collection: false;\n                    };\n                }> | "
+              "text": "<    {\ncontent: {\ntype: \"function\";\nrequired: true;\ncollection: false;\n};\n}>;\nrequired: true;\ncollection: false;\n};\n}> | "
             },
             {
               "kind": "Reference",
@@ -2343,7 +2347,7 @@
             },
             {
               "kind": "Content",
-              "text": "<any>;\n                required: true;\n                collection: false;\n            };\n            right: {\n                instanceType: "
+              "text": "<any>;\nrequired: true;\ncollection: false;\n};\nright: {\ninstanceType: "
             },
             {
               "kind": "Reference",
@@ -2352,7 +2356,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n                    type: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        defaultValue: () => string;\n                    };\n                    data: {\n                        instanceType: "
+              "text": "<    {\ntype: {\ntype: \"string\";\nrequired: true;\ncollection: false;\ndefaultValue: () => string;\n};\ndata: {\ninstanceType: "
             },
             {
               "kind": "Reference",
@@ -2361,7 +2365,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }> | "
+              "text": "<    {\ncontent: {\ntype: \"function\";\nrequired: true;\ncollection: false;\n};\n}> | "
             },
             {
               "kind": "Reference",
@@ -2370,7 +2374,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }>;\n                        required: true;\n                        collection: false;\n                    };\n                }> | "
+              "text": "<    {\ncontent: {\ntype: \"function\";\nrequired: true;\ncollection: false;\n};\n}>;\nrequired: true;\ncollection: false;\n};\n}> | "
             },
             {
               "kind": "Reference",
@@ -2379,14 +2383,14 @@
             },
             {
               "kind": "Content",
-              "text": "<any>;\n                required: false;\n                collection: false;\n            };\n        }>)[];\n        collection: false;\n        required: false;\n    };\n}>"
+              "text": "<any>;\nrequired: false;\ncollection: false;\n};\n}>)[];\ncollection: false;\nrequired: false;\n};\n}>"
             },
             {
               "kind": "Content",
               "text": ";"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "returnTypeTokenRange": {
             "startIndex": 8,
             "endIndex": 34
@@ -2452,7 +2456,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n    content: {\n        type: ("
+              "text": "<    {\ncontent: {\ntype: ("
             },
             {
               "kind": "Reference",
@@ -2461,7 +2465,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n            type: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                defaultValue: () => string;\n            };\n            data: {\n                instanceType: "
+              "text": "<    {\ntype: {\ntype: \"string\";\nrequired: true;\ncollection: false;\ndefaultValue: () => string;\n};\ndata: {\ninstanceType: "
             },
             {
               "kind": "Reference",
@@ -2470,7 +2474,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n                    content: {\n                        type: \"function\";\n                        required: true;\n                        collection: false;\n                    };\n                }> | "
+              "text": "<    {\ncontent: {\ntype: \"function\";\nrequired: true;\ncollection: false;\n};\n}> | "
             },
             {
               "kind": "Reference",
@@ -2479,7 +2483,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n                    content: {\n                        type: \"function\";\n                        required: true;\n                        collection: false;\n                    };\n                }>;\n                required: true;\n                collection: false;\n            };\n        }> | "
+              "text": "<    {\ncontent: {\ntype: \"function\";\nrequired: true;\ncollection: false;\n};\n}>;\nrequired: true;\ncollection: false;\n};\n}> | "
             },
             {
               "kind": "Reference",
@@ -2488,7 +2492,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n            type: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                defaultValue: () => string;\n            };\n            operator: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                options: string[];\n                defaultValue: () => string;\n            };\n            left: {\n                instanceType: "
+              "text": "<    {\ntype: {\ntype: \"string\";\nrequired: true;\ncollection: false;\ndefaultValue: () => string;\n};\noperator: {\ntype: \"string\";\nrequired: true;\ncollection: false;\noptions: string[];\ndefaultValue: () => string;\n};\nleft: {\ninstanceType: "
             },
             {
               "kind": "Reference",
@@ -2497,7 +2501,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n                    type: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        defaultValue: () => string;\n                    };\n                    data: {\n                        instanceType: "
+              "text": "<    {\ntype: {\ntype: \"string\";\nrequired: true;\ncollection: false;\ndefaultValue: () => string;\n};\ndata: {\ninstanceType: "
             },
             {
               "kind": "Reference",
@@ -2506,7 +2510,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }> | "
+              "text": "<    {\ncontent: {\ntype: \"function\";\nrequired: true;\ncollection: false;\n};\n}> | "
             },
             {
               "kind": "Reference",
@@ -2515,7 +2519,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }>;\n                        required: true;\n                        collection: false;\n                    };\n                }> | "
+              "text": "<    {\ncontent: {\ntype: \"function\";\nrequired: true;\ncollection: false;\n};\n}>;\nrequired: true;\ncollection: false;\n};\n}> | "
             },
             {
               "kind": "Reference",
@@ -2524,7 +2528,7 @@
             },
             {
               "kind": "Content",
-              "text": "<any>;\n                required: true;\n                collection: false;\n            };\n            right: {\n                instanceType: "
+              "text": "<any>;\nrequired: true;\ncollection: false;\n};\nright: {\ninstanceType: "
             },
             {
               "kind": "Reference",
@@ -2533,7 +2537,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n                    type: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        defaultValue: () => string;\n                    };\n                    data: {\n                        instanceType: "
+              "text": "<    {\ntype: {\ntype: \"string\";\nrequired: true;\ncollection: false;\ndefaultValue: () => string;\n};\ndata: {\ninstanceType: "
             },
             {
               "kind": "Reference",
@@ -2542,7 +2546,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }> | "
+              "text": "<    {\ncontent: {\ntype: \"function\";\nrequired: true;\ncollection: false;\n};\n}> | "
             },
             {
               "kind": "Reference",
@@ -2551,7 +2555,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }>;\n                        required: true;\n                        collection: false;\n                    };\n                }> | "
+              "text": "<    {\ncontent: {\ntype: \"function\";\nrequired: true;\ncollection: false;\n};\n}>;\nrequired: true;\ncollection: false;\n};\n}> | "
             },
             {
               "kind": "Reference",
@@ -2560,14 +2564,14 @@
             },
             {
               "kind": "Content",
-              "text": "<any>;\n                required: false;\n                collection: false;\n            };\n        }>)[];\n        collection: false;\n        required: false;\n    };\n}>"
+              "text": "<any>;\nrequired: false;\ncollection: false;\n};\n}>)[];\ncollection: false;\nrequired: false;\n};\n}>"
             },
             {
               "kind": "Content",
               "text": ";"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "returnTypeTokenRange": {
             "startIndex": 8,
             "endIndex": 34
@@ -2633,7 +2637,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n    content: {\n        type: ("
+              "text": "<    {\ncontent: {\ntype: ("
             },
             {
               "kind": "Reference",
@@ -2642,7 +2646,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n            type: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                defaultValue: () => string;\n            };\n            data: {\n                instanceType: "
+              "text": "<    {\ntype: {\ntype: \"string\";\nrequired: true;\ncollection: false;\ndefaultValue: () => string;\n};\ndata: {\ninstanceType: "
             },
             {
               "kind": "Reference",
@@ -2651,7 +2655,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n                    content: {\n                        type: \"function\";\n                        required: true;\n                        collection: false;\n                    };\n                }> | "
+              "text": "<    {\ncontent: {\ntype: \"function\";\nrequired: true;\ncollection: false;\n};\n}> | "
             },
             {
               "kind": "Reference",
@@ -2660,7 +2664,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n                    content: {\n                        type: \"function\";\n                        required: true;\n                        collection: false;\n                    };\n                }>;\n                required: true;\n                collection: false;\n            };\n        }> | "
+              "text": "<    {\ncontent: {\ntype: \"function\";\nrequired: true;\ncollection: false;\n};\n}>;\nrequired: true;\ncollection: false;\n};\n}> | "
             },
             {
               "kind": "Reference",
@@ -2669,7 +2673,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n            type: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                defaultValue: () => string;\n            };\n            operator: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                options: string[];\n                defaultValue: () => string;\n            };\n            left: {\n                instanceType: "
+              "text": "<    {\ntype: {\ntype: \"string\";\nrequired: true;\ncollection: false;\ndefaultValue: () => string;\n};\noperator: {\ntype: \"string\";\nrequired: true;\ncollection: false;\noptions: string[];\ndefaultValue: () => string;\n};\nleft: {\ninstanceType: "
             },
             {
               "kind": "Reference",
@@ -2678,7 +2682,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n                    type: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        defaultValue: () => string;\n                    };\n                    data: {\n                        instanceType: "
+              "text": "<    {\ntype: {\ntype: \"string\";\nrequired: true;\ncollection: false;\ndefaultValue: () => string;\n};\ndata: {\ninstanceType: "
             },
             {
               "kind": "Reference",
@@ -2687,7 +2691,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }> | "
+              "text": "<    {\ncontent: {\ntype: \"function\";\nrequired: true;\ncollection: false;\n};\n}> | "
             },
             {
               "kind": "Reference",
@@ -2696,7 +2700,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }>;\n                        required: true;\n                        collection: false;\n                    };\n                }> | "
+              "text": "<    {\ncontent: {\ntype: \"function\";\nrequired: true;\ncollection: false;\n};\n}>;\nrequired: true;\ncollection: false;\n};\n}> | "
             },
             {
               "kind": "Reference",
@@ -2705,7 +2709,7 @@
             },
             {
               "kind": "Content",
-              "text": "<any>;\n                required: true;\n                collection: false;\n            };\n            right: {\n                instanceType: "
+              "text": "<any>;\nrequired: true;\ncollection: false;\n};\nright: {\ninstanceType: "
             },
             {
               "kind": "Reference",
@@ -2714,7 +2718,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n                    type: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        defaultValue: () => string;\n                    };\n                    data: {\n                        instanceType: "
+              "text": "<    {\ntype: {\ntype: \"string\";\nrequired: true;\ncollection: false;\ndefaultValue: () => string;\n};\ndata: {\ninstanceType: "
             },
             {
               "kind": "Reference",
@@ -2723,7 +2727,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }> | "
+              "text": "<    {\ncontent: {\ntype: \"function\";\nrequired: true;\ncollection: false;\n};\n}> | "
             },
             {
               "kind": "Reference",
@@ -2732,7 +2736,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }>;\n                        required: true;\n                        collection: false;\n                    };\n                }> | "
+              "text": "<    {\ncontent: {\ntype: \"function\";\nrequired: true;\ncollection: false;\n};\n}>;\nrequired: true;\ncollection: false;\n};\n}> | "
             },
             {
               "kind": "Reference",
@@ -2741,14 +2745,14 @@
             },
             {
               "kind": "Content",
-              "text": "<any>;\n                required: false;\n                collection: false;\n            };\n        }>)[];\n        collection: false;\n        required: false;\n    };\n}>"
+              "text": "<any>;\nrequired: false;\ncollection: false;\n};\n}>)[];\ncollection: false;\nrequired: false;\n};\n}>"
             },
             {
               "kind": "Content",
               "text": ";"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "returnTypeTokenRange": {
             "startIndex": 8,
             "endIndex": 34
@@ -2783,10 +2787,10 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n    content: {\n        type: \"function\";\n        required: true;\n        collection: false;\n    };\n    name: {\n        type: \"string\";\n    };\n}>"
+              "text": "<    {\ncontent: {\ntype: \"function\";\nrequired: true;\ncollection: false;\n};\nname: {\ntype: \"string\";\n};\n}>"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "Computation",
@@ -2814,7 +2818,7 @@
               "text": "<{\n    computeEffect: {\n        type: \"string\";\n        collection: false;\n        required: true;\n    };\n    computation: {\n        type: \"string\";\n        collection: false;\n        required: true;\n    };\n}>"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "ComputedData",
@@ -2833,7 +2837,7 @@
               "text": "export declare interface Concept "
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "releaseTag": "Public",
           "name": "Concept",
           "preserveMemberOrder": false,
@@ -2887,7 +2891,7 @@
               "text": " "
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "releaseTag": "Public",
           "name": "ConceptAlias",
           "preserveMemberOrder": false,
@@ -2950,7 +2954,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "releaseTag": "Public",
           "name": "ConceptInstance",
           "typeTokenRange": {
@@ -2976,7 +2980,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "releaseTag": "Public",
           "name": "ConceptType",
           "typeTokenRange": {
@@ -3000,10 +3004,10 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n    content: {\n        type: \"function\";\n        required: true;\n        collection: false;\n    };\n    name: {\n        type: \"string\";\n    };\n}>"
+              "text": "<    {\ncontent: {\ntype: \"function\";\nrequired: true;\ncollection: false;\n};\nname: {\ntype: \"string\";\n};\n}>"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "Condition",
@@ -3028,7 +3032,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n    content: {\n        type: ("
+              "text": "<    {\ncontent: {\ntype: ("
             },
             {
               "kind": "Reference",
@@ -3037,7 +3041,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n            type: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                defaultValue: () => string;\n            };\n            data: {\n                instanceType: "
+              "text": "<    {\ntype: {\ntype: \"string\";\nrequired: true;\ncollection: false;\ndefaultValue: () => string;\n};\ndata: {\ninstanceType: "
             },
             {
               "kind": "Reference",
@@ -3046,7 +3050,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n                    content: {\n                        type: \"function\";\n                        required: true;\n                        collection: false;\n                    };\n                }> | "
+              "text": "<    {\ncontent: {\ntype: \"function\";\nrequired: true;\ncollection: false;\n};\n}> | "
             },
             {
               "kind": "Reference",
@@ -3055,7 +3059,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n                    content: {\n                        type: \"function\";\n                        required: true;\n                        collection: false;\n                    };\n                }>;\n                required: true;\n                collection: false;\n            };\n        }> | "
+              "text": "<    {\ncontent: {\ntype: \"function\";\nrequired: true;\ncollection: false;\n};\n}>;\nrequired: true;\ncollection: false;\n};\n}> | "
             },
             {
               "kind": "Reference",
@@ -3064,7 +3068,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n            type: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                defaultValue: () => string;\n            };\n            operator: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                options: string[];\n                defaultValue: () => string;\n            };\n            left: {\n                instanceType: "
+              "text": "<    {\ntype: {\ntype: \"string\";\nrequired: true;\ncollection: false;\ndefaultValue: () => string;\n};\noperator: {\ntype: \"string\";\nrequired: true;\ncollection: false;\noptions: string[];\ndefaultValue: () => string;\n};\nleft: {\ninstanceType: "
             },
             {
               "kind": "Reference",
@@ -3073,7 +3077,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n                    type: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        defaultValue: () => string;\n                    };\n                    data: {\n                        instanceType: "
+              "text": "<    {\ntype: {\ntype: \"string\";\nrequired: true;\ncollection: false;\ndefaultValue: () => string;\n};\ndata: {\ninstanceType: "
             },
             {
               "kind": "Reference",
@@ -3082,7 +3086,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }> | "
+              "text": "<    {\ncontent: {\ntype: \"function\";\nrequired: true;\ncollection: false;\n};\n}> | "
             },
             {
               "kind": "Reference",
@@ -3091,7 +3095,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }>;\n                        required: true;\n                        collection: false;\n                    };\n                }> | "
+              "text": "<    {\ncontent: {\ntype: \"function\";\nrequired: true;\ncollection: false;\n};\n}>;\nrequired: true;\ncollection: false;\n};\n}> | "
             },
             {
               "kind": "Reference",
@@ -3100,7 +3104,7 @@
             },
             {
               "kind": "Content",
-              "text": "<any>;\n                required: true;\n                collection: false;\n            };\n            right: {\n                instanceType: "
+              "text": "<any>;\nrequired: true;\ncollection: false;\n};\nright: {\ninstanceType: "
             },
             {
               "kind": "Reference",
@@ -3109,7 +3113,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n                    type: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        defaultValue: () => string;\n                    };\n                    data: {\n                        instanceType: "
+              "text": "<    {\ntype: {\ntype: \"string\";\nrequired: true;\ncollection: false;\ndefaultValue: () => string;\n};\ndata: {\ninstanceType: "
             },
             {
               "kind": "Reference",
@@ -3118,7 +3122,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }> | "
+              "text": "<    {\ncontent: {\ntype: \"function\";\nrequired: true;\ncollection: false;\n};\n}> | "
             },
             {
               "kind": "Reference",
@@ -3127,7 +3131,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }>;\n                        required: true;\n                        collection: false;\n                    };\n                }> | "
+              "text": "<    {\ncontent: {\ntype: \"function\";\nrequired: true;\ncollection: false;\n};\n}>;\nrequired: true;\ncollection: false;\n};\n}> | "
             },
             {
               "kind": "Reference",
@@ -3136,10 +3140,10 @@
             },
             {
               "kind": "Content",
-              "text": "<any>;\n                required: false;\n                collection: false;\n            };\n        }>)[];\n        collection: false;\n        required: false;\n    };\n}>"
+              "text": "<any>;\nrequired: false;\ncollection: false;\n};\n}>)[];\ncollection: false;\nrequired: false;\n};\n}>"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "Conditions",
@@ -3180,7 +3184,7 @@
               "text": "<boolean>;\n}"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "constraints",
@@ -3199,7 +3203,7 @@
               "text": "export declare class Controller "
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "Controller.ts",
           "releaseTag": "Public",
           "isAbstract": false,
           "name": "Controller",
@@ -4642,7 +4646,7 @@
               "text": ">)[];\n        collection: false;\n        required: true;\n    };\n    matchExpression: {\n        type: \"function\";\n        collection: false;\n        required: true;\n    };\n}>"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "Count",
@@ -4691,7 +4695,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "returnTypeTokenRange": {
             "startIndex": 5,
             "endIndex": 7
@@ -4760,7 +4764,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "server.ts",
           "returnTypeTokenRange": {
             "startIndex": 5,
             "endIndex": 6
@@ -4799,7 +4803,7 @@
             {
               "kind": "Reference",
               "text": "KlassRawInstanceDataType",
-              "canonicalReference": "@interaqt/runtime!~KlassRawInstanceDataType:type"
+              "canonicalReference": "@interaqt/runtime!KlassRawInstanceDataType:type"
             },
             {
               "kind": "Content",
@@ -4849,7 +4853,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "returnTypeTokenRange": {
             "startIndex": 6,
             "endIndex": 12
@@ -4925,7 +4929,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "returnTypeTokenRange": {
             "startIndex": 3,
             "endIndex": 9
@@ -4986,7 +4990,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n    stringContent: {\n        type: \"string\";\n    };\n    content: {\n        type: \"function\";\n        required: true;\n        collection: false;\n    };\n    name: {\n        type: \"string\";\n    };\n    isRef: {\n        type: \"boolean\";\n    };\n}> | "
+              "text": "<    {\nstringContent: {\ntype: \"string\";\n};\ncontent: {\ntype: \"function\";\nrequired: true;\ncollection: false;\n};\nname: {\ntype: \"string\";\n};\nisRef: {\ntype: \"boolean\";\n};\n}> | "
             },
             {
               "kind": "Reference",
@@ -4995,14 +4999,14 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n    stringContent: {\n        type: \"string\";\n    };\n    content: {\n        type: \"function\";\n        required: true;\n        collection: false;\n    };\n    name: {\n        type: \"string\";\n    };\n    isRef: {\n        type: \"boolean\";\n    };\n}>"
+              "text": "<    {\nstringContent: {\ntype: \"string\";\n};\ncontent: {\ntype: \"function\";\nrequired: true;\ncollection: false;\n};\nname: {\ntype: \"string\";\n};\nisRef: {\ntype: \"boolean\";\n};\n}>"
             },
             {
               "kind": "Content",
               "text": ";"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "returnTypeTokenRange": {
             "startIndex": 7,
             "endIndex": 11
@@ -5036,7 +5040,7 @@
           "excerptTokens": [
             {
               "kind": "Content",
-              "text": "export declare type DataAPI = "
+              "text": "export type DataAPI = "
             },
             {
               "kind": "Reference",
@@ -5057,7 +5061,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "server.ts",
           "releaseTag": "Public",
           "name": "DataAPI",
           "typeTokenRange": {
@@ -5072,7 +5076,7 @@
           "excerptTokens": [
             {
               "kind": "Content",
-              "text": "export declare type DataAPIConfig = "
+              "text": "export type DataAPIConfig = "
             },
             {
               "kind": "Content",
@@ -5083,7 +5087,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "server.ts",
           "releaseTag": "Public",
           "name": "DataAPIConfig",
           "typeTokenRange": {
@@ -5098,7 +5102,7 @@
           "excerptTokens": [
             {
               "kind": "Content",
-              "text": "export declare type DataAPIHandle = "
+              "text": "export type DataAPIHandle = "
             },
             {
               "kind": "Content",
@@ -5118,7 +5122,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "server.ts",
           "releaseTag": "Public",
           "name": "DataAPIHandle",
           "typeTokenRange": {
@@ -5133,7 +5137,7 @@
           "excerptTokens": [
             {
               "kind": "Content",
-              "text": "export declare type DataAPIs = "
+              "text": "export type DataAPIs = "
             },
             {
               "kind": "Content",
@@ -5153,7 +5157,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "server.ts",
           "releaseTag": "Public",
           "name": "DataAPIs",
           "typeTokenRange": {
@@ -5168,7 +5172,7 @@
           "excerptTokens": [
             {
               "kind": "Content",
-              "text": "export declare type DataAPIThis = "
+              "text": "export type DataAPIThis = "
             },
             {
               "kind": "Content",
@@ -5197,7 +5201,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "server.ts",
           "releaseTag": "Public",
           "name": "DataAPIThis",
           "typeTokenRange": {
@@ -5221,10 +5225,10 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n    content: {\n        type: \"function\";\n        required: true;\n        collection: false;\n    };\n    name: {\n        type: \"string\";\n    };\n}>"
+              "text": "<    {\ncontent: {\ntype: \"function\";\nrequired: true;\ncollection: false;\n};\nname: {\ntype: \"string\";\n};\n}>"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "DataAttributive",
@@ -5249,7 +5253,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n    content: {\n        type: ("
+              "text": "<    {\ncontent: {\ntype: ("
             },
             {
               "kind": "Reference",
@@ -5258,7 +5262,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n            type: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                defaultValue: () => string;\n            };\n            data: {\n                instanceType: "
+              "text": "<    {\ntype: {\ntype: \"string\";\nrequired: true;\ncollection: false;\ndefaultValue: () => string;\n};\ndata: {\ninstanceType: "
             },
             {
               "kind": "Reference",
@@ -5267,7 +5271,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n                    content: {\n                        type: \"function\";\n                        required: true;\n                        collection: false;\n                    };\n                }> | "
+              "text": "<    {\ncontent: {\ntype: \"function\";\nrequired: true;\ncollection: false;\n};\n}> | "
             },
             {
               "kind": "Reference",
@@ -5276,7 +5280,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n                    content: {\n                        type: \"function\";\n                        required: true;\n                        collection: false;\n                    };\n                }>;\n                required: true;\n                collection: false;\n            };\n        }> | "
+              "text": "<    {\ncontent: {\ntype: \"function\";\nrequired: true;\ncollection: false;\n};\n}>;\nrequired: true;\ncollection: false;\n};\n}> | "
             },
             {
               "kind": "Reference",
@@ -5285,7 +5289,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n            type: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                defaultValue: () => string;\n            };\n            operator: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                options: string[];\n                defaultValue: () => string;\n            };\n            left: {\n                instanceType: "
+              "text": "<    {\ntype: {\ntype: \"string\";\nrequired: true;\ncollection: false;\ndefaultValue: () => string;\n};\noperator: {\ntype: \"string\";\nrequired: true;\ncollection: false;\noptions: string[];\ndefaultValue: () => string;\n};\nleft: {\ninstanceType: "
             },
             {
               "kind": "Reference",
@@ -5294,7 +5298,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n                    type: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        defaultValue: () => string;\n                    };\n                    data: {\n                        instanceType: "
+              "text": "<    {\ntype: {\ntype: \"string\";\nrequired: true;\ncollection: false;\ndefaultValue: () => string;\n};\ndata: {\ninstanceType: "
             },
             {
               "kind": "Reference",
@@ -5303,7 +5307,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }> | "
+              "text": "<    {\ncontent: {\ntype: \"function\";\nrequired: true;\ncollection: false;\n};\n}> | "
             },
             {
               "kind": "Reference",
@@ -5312,7 +5316,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }>;\n                        required: true;\n                        collection: false;\n                    };\n                }> | "
+              "text": "<    {\ncontent: {\ntype: \"function\";\nrequired: true;\ncollection: false;\n};\n}>;\nrequired: true;\ncollection: false;\n};\n}> | "
             },
             {
               "kind": "Reference",
@@ -5321,7 +5325,7 @@
             },
             {
               "kind": "Content",
-              "text": "<any>;\n                required: true;\n                collection: false;\n            };\n            right: {\n                instanceType: "
+              "text": "<any>;\nrequired: true;\ncollection: false;\n};\nright: {\ninstanceType: "
             },
             {
               "kind": "Reference",
@@ -5330,7 +5334,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n                    type: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        defaultValue: () => string;\n                    };\n                    data: {\n                        instanceType: "
+              "text": "<    {\ntype: {\ntype: \"string\";\nrequired: true;\ncollection: false;\ndefaultValue: () => string;\n};\ndata: {\ninstanceType: "
             },
             {
               "kind": "Reference",
@@ -5339,7 +5343,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }> | "
+              "text": "<    {\ncontent: {\ntype: \"function\";\nrequired: true;\ncollection: false;\n};\n}> | "
             },
             {
               "kind": "Reference",
@@ -5348,7 +5352,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }>;\n                        required: true;\n                        collection: false;\n                    };\n                }> | "
+              "text": "<    {\ncontent: {\ntype: \"function\";\nrequired: true;\ncollection: false;\n};\n}>;\nrequired: true;\ncollection: false;\n};\n}> | "
             },
             {
               "kind": "Reference",
@@ -5357,10 +5361,10 @@
             },
             {
               "kind": "Content",
-              "text": "<any>;\n                required: false;\n                collection: false;\n            };\n        }>)[];\n        collection: false;\n        required: false;\n    };\n}>"
+              "text": "<any>;\nrequired: false;\ncollection: false;\n};\n}>)[];\ncollection: false;\nrequired: false;\n};\n}>"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "DataAttributives",
@@ -5376,7 +5380,7 @@
           "excerptTokens": [
             {
               "kind": "Content",
-              "text": "export declare type Database = "
+              "text": "export type Database = "
             },
             {
               "kind": "Content",
@@ -5477,7 +5481,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "System.ts",
           "releaseTag": "Public",
           "name": "Database",
           "typeTokenRange": {
@@ -5492,7 +5496,7 @@
           "excerptTokens": [
             {
               "kind": "Content",
-              "text": "export declare type DatabaseLogger = "
+              "text": "export type DatabaseLogger = "
             },
             {
               "kind": "Content",
@@ -5512,7 +5516,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "System.ts",
           "releaseTag": "Public",
           "name": "DatabaseLogger",
           "typeTokenRange": {
@@ -5554,7 +5558,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "returnTypeTokenRange": {
             "startIndex": 5,
             "endIndex": 6
@@ -5613,7 +5617,7 @@
               "text": " "
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "releaseTag": "Public",
           "name": "DerivedConcept",
           "preserveMemberOrder": false,
@@ -5808,7 +5812,7 @@
               "text": "<boolean>;\n        };\n        defaultValue(): never[];\n    };\n    isRef: {\n        required: true;\n        collection: false;\n        type: \"boolean\";\n        defaultValue: () => boolean;\n    };\n}>"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "Entity",
@@ -5824,7 +5828,7 @@
           "excerptTokens": [
             {
               "kind": "Content",
-              "text": "export declare type EntityIdRef = "
+              "text": "export type EntityIdRef = "
             },
             {
               "kind": "Content",
@@ -5844,7 +5848,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "System.ts",
           "releaseTag": "Public",
           "name": "EntityIdRef",
           "typeTokenRange": {
@@ -5870,7 +5874,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "releaseTag": "Public",
           "name": "EvaluateError",
           "typeTokenRange": {
@@ -5897,7 +5901,7 @@
               "text": "<{\n    name: {\n        type: \"string\";\n        required: true;\n    };\n}>"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "Event_2",
@@ -5920,7 +5924,7 @@
               "text": "\"_Event_\""
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "System.ts",
           "initializerTokenRange": {
             "startIndex": 1,
             "endIndex": 2
@@ -5943,13 +5947,17 @@
               "text": "eventEntity: "
             },
             {
+              "kind": "Content",
+              "text": "import(\"@interaqt/shared\")."
+            },
+            {
               "kind": "Reference",
               "text": "InertKlassInstance",
               "canonicalReference": "@interaqt/runtime!InertKlassInstance:type"
             },
             {
               "kind": "Content",
-              "text": "<    {\n    name: {\n        type: \"string\";\n        collection: false;\n        required: true;\n        constraints: {\n            nameFormat({ name }: {\n                name: "
+              "text": "<{\n    name: {\n        type: \"string\";\n        collection: false;\n        required: true;\n        constraints: {\n            nameFormat({ name }: {\n                name: import(\"data0\")."
             },
             {
               "kind": "Reference",
@@ -5958,7 +5966,7 @@
             },
             {
               "kind": "Content",
-              "text": "<string>;\n            }): "
+              "text": "<string>;\n            }): import(\"data0\")."
             },
             {
               "kind": "Reference",
@@ -5967,7 +5975,7 @@
             },
             {
               "kind": "Content",
-              "text": "<boolean>;\n        };\n    };\n    computedData: {\n        type: "
+              "text": "<boolean>;\n        };\n    };\n    computedData: {\n        type: import(\"@interaqt/shared\")."
             },
             {
               "kind": "Reference",
@@ -5976,7 +5984,7 @@
             },
             {
               "kind": "Content",
-              "text": "<any>[];\n        collection: false;\n        required: false;\n    };\n    properties: {\n        type: "
+              "text": "<any>[];\n        collection: false;\n        required: false;\n    };\n    properties: {\n        type: import(\"@interaqt/shared\")."
             },
             {
               "kind": "Reference",
@@ -5985,7 +5993,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n            name: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                constraints: {\n                    format({ name }: {\n                        name: "
+              "text": "<{\n            name: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                constraints: {\n                    format({ name }: {\n                        name: import(\"data0\")."
             },
             {
               "kind": "Reference",
@@ -5994,7 +6002,7 @@
             },
             {
               "kind": "Content",
-              "text": "<string>;\n                    }): "
+              "text": "<string>;\n                    }): import(\"data0\")."
             },
             {
               "kind": "Reference",
@@ -6003,7 +6011,7 @@
             },
             {
               "kind": "Content",
-              "text": "<boolean>;\n                    length({ name }: {\n                        name: "
+              "text": "<boolean>;\n                    length({ name }: {\n                        name: import(\"data0\")."
             },
             {
               "kind": "Reference",
@@ -6012,7 +6020,7 @@
             },
             {
               "kind": "Content",
-              "text": "<string>;\n                    }): "
+              "text": "<string>;\n                    }): import(\"data0\")."
             },
             {
               "kind": "Reference",
@@ -6021,7 +6029,7 @@
             },
             {
               "kind": "Content",
-              "text": "<boolean>;\n                };\n            };\n            type: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                options: "
+              "text": "<boolean>;\n                };\n            };\n            type: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                options: import(\"@interaqt/shared\")."
             },
             {
               "kind": "Reference",
@@ -6030,7 +6038,7 @@
             },
             {
               "kind": "Content",
-              "text": "[];\n            };\n            collection: {\n                type: \"boolean\";\n                required: true;\n                collection: false;\n                defaultValue(): boolean;\n            };\n            args: {\n                computedType: (values: {\n                    type: "
+              "text": "[];\n            };\n            collection: {\n                type: \"boolean\";\n                required: true;\n                collection: false;\n                defaultValue(): boolean;\n            };\n            args: {\n                computedType: (values: {\n                    type: import(\"@interaqt/shared\")."
             },
             {
               "kind": "Reference",
@@ -6039,7 +6047,7 @@
             },
             {
               "kind": "Content",
-              "text": ";\n                }) => string;\n            };\n            computedData: {\n                collection: false;\n                type: "
+              "text": ";\n                }) => string;\n            };\n            computedData: {\n                collection: false;\n                type: import(\"@interaqt/shared\")."
             },
             {
               "kind": "Reference",
@@ -6048,7 +6056,7 @@
             },
             {
               "kind": "Content",
-              "text": "<any>[];\n                required: false;\n            };\n            computed: {\n                required: false;\n                type: \"function\";\n                collection: false;\n            };\n        }>;\n        collection: true;\n        required: true;\n        constraints: {\n            eachNameUnique({ properties }: any): "
+              "text": "<any>[];\n                required: false;\n            };\n            computed: {\n                required: false;\n                type: \"function\";\n                collection: false;\n            };\n        }>;\n        collection: true;\n        required: true;\n        constraints: {\n            eachNameUnique({ properties }: any): import(\"data0\")."
             },
             {
               "kind": "Reference",
@@ -6060,13 +6068,13 @@
               "text": "<boolean>;\n        };\n        defaultValue(): never[];\n    };\n    isRef: {\n        required: true;\n        collection: false;\n        type: \"boolean\";\n        defaultValue: () => boolean;\n    };\n}>"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "System.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "eventEntity",
           "variableTypeTokenRange": {
             "startIndex": 1,
-            "endIndex": 27
+            "endIndex": 28
           }
         },
         {
@@ -6223,7 +6231,7 @@
               "text": ">)[];\n        collection: false;\n        required: true;\n    };\n    matchExpression: {\n        type: \"function\";\n        collection: false;\n        required: true;\n    };\n    notEmpty: {\n        type: \"boolean\";\n        collection: false;\n        required: false;\n    };\n}>"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "Every",
@@ -6253,7 +6261,7 @@
             {
               "kind": "Reference",
               "text": "AtomData",
-              "canonicalReference": "@interaqt/runtime!~AtomData:type"
+              "canonicalReference": "@interaqt/runtime!AtomData:type"
             },
             {
               "kind": "Content",
@@ -6264,7 +6272,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "releaseTag": "Public",
           "name": "ExpressionData",
           "typeParameters": [
@@ -6317,7 +6325,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "returnTypeTokenRange": {
             "startIndex": 3,
             "endIndex": 5
@@ -6398,7 +6406,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "returnTypeTokenRange": {
             "startIndex": 11,
             "endIndex": 12
@@ -6461,7 +6469,7 @@
               "text": ">"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "Gateway",
@@ -6502,7 +6510,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "releaseTag": "Public",
           "name": "GatewayInstanceType",
           "typeTokenRange": {
@@ -6528,7 +6536,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "releaseTag": "Public",
           "name": "GatewayPublicType",
           "typeTokenRange": {
@@ -6552,7 +6560,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n    name: {\n        type: \"string\";\n        required: true;\n    };\n}> | "
+              "text": "<    {\nname: {\ntype: \"string\";\nrequired: true;\n};\n}> | "
             },
             {
               "kind": "Reference",
@@ -6561,10 +6569,10 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n    name: {\n        type: \"string\";\n        required: true;\n    };\n}>"
+              "text": "<    {\nname: {\ntype: \"string\";\nrequired: true;\n};\n}>"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "GetAction",
@@ -6604,7 +6612,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "returnTypeTokenRange": {
             "startIndex": 4,
             "endIndex": 5
@@ -6667,7 +6675,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "returnTypeTokenRange": {
             "startIndex": 6,
             "endIndex": 8
@@ -6740,7 +6748,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "returnTypeTokenRange": {
             "startIndex": 3,
             "endIndex": 7
@@ -6790,7 +6798,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "returnTypeTokenRange": {
             "startIndex": 4,
             "endIndex": 5
@@ -6823,7 +6831,7 @@
               "text": "\"id\""
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "System.ts",
           "initializerTokenRange": {
             "startIndex": 1,
             "endIndex": 2
@@ -6886,7 +6894,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "releaseTag": "Public",
           "name": "InertKlassInstance",
           "typeParameters": [
@@ -6961,7 +6969,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "releaseTag": "Public",
           "name": "InertKlassInstanceProps",
           "typeParameters": [
@@ -7010,7 +7018,7 @@
               "text": ">"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "Interaction",
@@ -7026,7 +7034,7 @@
           "excerptTokens": [
             {
               "kind": "Content",
-              "text": "export declare type InteractionContext = "
+              "text": "export type InteractionContext = "
             },
             {
               "kind": "Content",
@@ -7037,7 +7045,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "Controller.ts",
           "releaseTag": "Public",
           "name": "InteractionContext",
           "typeTokenRange": {
@@ -7077,7 +7085,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "releaseTag": "Public",
           "name": "InteractionInstanceType",
           "typeTokenRange": {
@@ -7247,7 +7255,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "releaseTag": "Public",
           "name": "InteractionPublicType",
           "typeTokenRange": {
@@ -7457,7 +7465,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "releaseTag": "Public",
           "name": "Klass",
           "typeParameters": [
@@ -7506,7 +7514,7 @@
               "text": "<any>>"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "KlassByName",
@@ -7572,7 +7580,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "releaseTag": "Public",
           "name": "KlassInstance",
           "typeParameters": [
@@ -7658,7 +7666,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "releaseTag": "Public",
           "name": "KlassInstanceArgs",
           "typeParameters": [
@@ -7706,7 +7714,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "releaseTag": "Public",
           "name": "KlassInstancePrimitiveProps",
           "typeTokenRange": {
@@ -7739,7 +7747,7 @@
             {
               "kind": "Reference",
               "text": "ClassMetaPublicItem",
-              "canonicalReference": "@interaqt/runtime!~ClassMetaPublicItem:type"
+              "canonicalReference": "@interaqt/runtime!ClassMetaPublicItem:type"
             },
             {
               "kind": "Content",
@@ -7750,7 +7758,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "releaseTag": "Public",
           "name": "KlassMeta",
           "typeTokenRange": {
@@ -7776,7 +7784,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "releaseTag": "Public",
           "name": "KlassOptions",
           "typeTokenRange": {
@@ -7812,7 +7820,7 @@
             {
               "kind": "Reference",
               "text": "IfReactiveCollectionProp",
-              "canonicalReference": "@interaqt/runtime!~IfReactiveCollectionProp:type"
+              "canonicalReference": "@interaqt/runtime!IfReactiveCollectionProp:type"
             },
             {
               "kind": "Content",
@@ -7823,7 +7831,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "releaseTag": "Public",
           "name": "KlassProp",
           "typeParameters": [
@@ -8125,7 +8133,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n                    name: {\n                        type: \"string\";\n                        required: true;\n                    };\n                }> | "
+              "text": "<    {\n                name: {\n                type: \"string\";\n                required: true;\n                };\n                }> | "
             },
             {
               "kind": "Reference",
@@ -8134,7 +8142,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n                    name: {\n                        type: \"string\";\n                        required: true;\n                    };\n                }>)[];\n            };\n        }>;\n        collection: false;\n        required: true;\n    };\n    triggerInteraction: {\n        type: "
+              "text": "<    {\n                name: {\n                type: \"string\";\n                required: true;\n                };\n                }>)[];\n            };\n        }>;\n        collection: false;\n        required: true;\n    };\n    triggerInteraction: {\n        type: "
             },
             {
               "kind": "Reference",
@@ -8155,7 +8163,7 @@
               "text": ">;\n        collection: true;\n        required: false;\n    };\n    handle: {\n        type: \"function\";\n        collection: false;\n        required: true;\n    };\n}>"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "MapActivityToRecord",
@@ -8210,7 +8218,7 @@
               "text": ">;\n                collection: false;\n                required: true;\n            };\n            handle: {\n                type: \"function\";\n                collection: false;\n                required: true;\n            };\n            computeSource: {\n                type: \"function\";\n                collection: false;\n                required: true;\n            };\n        }>;\n        collection: true;\n        required: true;\n    };\n    defaultValue: {\n        type: \"string\";\n        collection: false;\n        required: false;\n    };\n}>"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "MapInteractionToProperty",
@@ -8256,7 +8264,7 @@
               "text": ">;\n        collection: false;\n        required: true;\n    };\n    handle: {\n        type: \"function\";\n        collection: false;\n        required: true;\n    };\n    computeSource: {\n        type: \"function\";\n        collection: false;\n        required: true;\n    };\n}>"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "MapInteractionToPropertyItem",
@@ -8302,7 +8310,7 @@
               "text": ">;\n        collection: false;\n        required: true;\n    };\n    handle: {\n        type: \"function\";\n        collection: false;\n        required: true;\n    };\n}>"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "MapInteractionToRecord",
@@ -8330,7 +8338,7 @@
               "text": "<{\n    handle: {\n        type: \"function\";\n        collection: false;\n        required: true;\n    };\n}>"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "MapRecordMutationToRecord",
@@ -8358,7 +8366,7 @@
               "text": " "
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "MonoSystem.ts",
           "releaseTag": "Public",
           "isAbstract": false,
           "name": "MonoSystem",
@@ -8841,7 +8849,7 @@
                 },
                 {
                   "kind": "Reference",
-                  "text": "Storage_2",
+                  "text": "Storage",
                   "canonicalReference": "@interaqt/runtime!Storage_2:type"
                 },
                 {
@@ -8998,7 +9006,7 @@
             {
               "kind": "Reference",
               "text": "OmitNever",
-              "canonicalReference": "@interaqt/runtime!~OmitNever:type"
+              "canonicalReference": "@interaqt/runtime!OmitNever:type"
             },
             {
               "kind": "Content",
@@ -9070,7 +9078,7 @@
             {
               "kind": "Reference",
               "text": "ExtractKlassTypes",
-              "canonicalReference": "@interaqt/runtime!~ExtractKlassTypes:type"
+              "canonicalReference": "@interaqt/runtime!ExtractKlassTypes:type"
             },
             {
               "kind": "Content",
@@ -9079,7 +9087,7 @@
             {
               "kind": "Reference",
               "text": "PrimitivePropType",
-              "canonicalReference": "@interaqt/runtime!~PrimitivePropType:type"
+              "canonicalReference": "@interaqt/runtime!PrimitivePropType:type"
             },
             {
               "kind": "Content",
@@ -9097,7 +9105,7 @@
             {
               "kind": "Reference",
               "text": "PrimitivePropertyMap",
-              "canonicalReference": "@interaqt/runtime!~PrimitivePropertyMap:interface"
+              "canonicalReference": "@interaqt/runtime!PrimitivePropertyMap:interface"
             },
             {
               "kind": "Content",
@@ -9108,7 +9116,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "releaseTag": "Public",
           "name": "OptionalProps",
           "typeParameters": [
@@ -9179,7 +9187,7 @@
             {
               "kind": "Reference",
               "text": "ParseAtomNameToObjectType",
-              "canonicalReference": "@interaqt/runtime!~ParseAtomNameToObjectType:type"
+              "canonicalReference": "@interaqt/runtime!ParseAtomNameToObjectType:type"
             },
             {
               "kind": "Content",
@@ -9199,7 +9207,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "returnTypeTokenRange": {
             "startIndex": 7,
             "endIndex": 9
@@ -9308,7 +9316,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n                                    content: {\n                                        type: \"function\";\n                                        required: true;\n                                        collection: false;\n                                    };\n                                }> | "
+              "text": "<    {\n                                content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                                };\n                                }> | "
             },
             {
               "kind": "Reference",
@@ -9317,7 +9325,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n                                    content: {\n                                        type: \"function\";\n                                        required: true;\n                                        collection: false;\n                                    };\n                                }>;\n                                required: true;\n                                collection: false;\n                            };\n                        }> | "
+              "text": "<    {\n                                content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                                };\n                                }>;\n                                required: true;\n                                collection: false;\n                            };\n                        }> | "
             },
             {
               "kind": "Reference",
@@ -9335,7 +9343,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n                                    type: {\n                                        type: \"string\";\n                                        required: true;\n                                        collection: false;\n                                        defaultValue: () => string;\n                                    };\n                                    data: {\n                                        instanceType: "
+              "text": "<    {\n                                type: {\n                                type: \"string\";\n                                required: true;\n                                collection: false;\n                                defaultValue: () => string;\n                                };\n                                data: {\n                                instanceType: "
             },
             {
               "kind": "Reference",
@@ -9344,7 +9352,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n                                            content: {\n                                                type: \"function\";\n                                                required: true;\n                                                collection: false;\n                                            };\n                                        }> | "
+              "text": "<    {\n                                content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                                };\n                                }> | "
             },
             {
               "kind": "Reference",
@@ -9353,7 +9361,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n                                            content: {\n                                                type: \"function\";\n                                                required: true;\n                                                collection: false;\n                                            };\n                                        }>;\n                                        required: true;\n                                        collection: false;\n                                    };\n                                }> | "
+              "text": "<    {\n                                content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                                };\n                                }>;\n                                required: true;\n                                collection: false;\n                                };\n                                }> | "
             },
             {
               "kind": "Reference",
@@ -9371,7 +9379,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n                                    type: {\n                                        type: \"string\";\n                                        required: true;\n                                        collection: false;\n                                        defaultValue: () => string;\n                                    };\n                                    data: {\n                                        instanceType: "
+              "text": "<    {\n                                type: {\n                                type: \"string\";\n                                required: true;\n                                collection: false;\n                                defaultValue: () => string;\n                                };\n                                data: {\n                                instanceType: "
             },
             {
               "kind": "Reference",
@@ -9380,7 +9388,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n                                            content: {\n                                                type: \"function\";\n                                                required: true;\n                                                collection: false;\n                                            };\n                                        }> | "
+              "text": "<    {\n                                content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                                };\n                                }> | "
             },
             {
               "kind": "Reference",
@@ -9389,7 +9397,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n                                            content: {\n                                                type: \"function\";\n                                                required: true;\n                                                collection: false;\n                                            };\n                                        }>;\n                                        required: true;\n                                        collection: false;\n                                    };\n                                }> | "
+              "text": "<    {\n                                content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                                };\n                                }>;\n                                required: true;\n                                collection: false;\n                                };\n                                }> | "
             },
             {
               "kind": "Reference",
@@ -9644,7 +9652,7 @@
               "text": "<{\n                    stringContent: {\n                        type: \"string\";\n                    };\n                    content: {\n                        type: \"function\";\n                        required: true;\n                        collection: false;\n                    };\n                    name: {\n                        type: \"string\";\n                    };\n                    isRef: {\n                        type: \"boolean\";\n                    };\n                }>)[];\n            };\n        }>;\n        collection: true;\n        required: true;\n        defaultValue: () => never[];\n    };\n}>"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "Payload",
@@ -9705,7 +9713,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }> | "
+              "text": "<    {\n                        content: {\n                        type: \"function\";\n                        required: true;\n                        collection: false;\n                        };\n                        }> | "
             },
             {
               "kind": "Reference",
@@ -9714,7 +9722,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n                            content: {\n                                type: \"function\";\n                                required: true;\n                                collection: false;\n                            };\n                        }>;\n                        required: true;\n                        collection: false;\n                    };\n                }> | "
+              "text": "<    {\n                        content: {\n                        type: \"function\";\n                        required: true;\n                        collection: false;\n                        };\n                        }>;\n                        required: true;\n                        collection: false;\n                    };\n                }> | "
             },
             {
               "kind": "Reference",
@@ -9732,7 +9740,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n                            type: {\n                                type: \"string\";\n                                required: true;\n                                collection: false;\n                                defaultValue: () => string;\n                            };\n                            data: {\n                                instanceType: "
+              "text": "<    {\n                        type: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        defaultValue: () => string;\n                        };\n                        data: {\n                        instanceType: "
             },
             {
               "kind": "Reference",
@@ -9741,7 +9749,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n                                    content: {\n                                        type: \"function\";\n                                        required: true;\n                                        collection: false;\n                                    };\n                                }> | "
+              "text": "<    {\n                        content: {\n                        type: \"function\";\n                        required: true;\n                        collection: false;\n                        };\n                        }> | "
             },
             {
               "kind": "Reference",
@@ -9750,7 +9758,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n                                    content: {\n                                        type: \"function\";\n                                        required: true;\n                                        collection: false;\n                                    };\n                                }>;\n                                required: true;\n                                collection: false;\n                            };\n                        }> | "
+              "text": "<    {\n                        content: {\n                        type: \"function\";\n                        required: true;\n                        collection: false;\n                        };\n                        }>;\n                        required: true;\n                        collection: false;\n                        };\n                        }> | "
             },
             {
               "kind": "Reference",
@@ -9768,7 +9776,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n                            type: {\n                                type: \"string\";\n                                required: true;\n                                collection: false;\n                                defaultValue: () => string;\n                            };\n                            data: {\n                                instanceType: "
+              "text": "<    {\n                        type: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        defaultValue: () => string;\n                        };\n                        data: {\n                        instanceType: "
             },
             {
               "kind": "Reference",
@@ -9777,7 +9785,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n                                    content: {\n                                        type: \"function\";\n                                        required: true;\n                                        collection: false;\n                                    };\n                                }> | "
+              "text": "<    {\n                        content: {\n                        type: \"function\";\n                        required: true;\n                        collection: false;\n                        };\n                        }> | "
             },
             {
               "kind": "Reference",
@@ -9786,7 +9794,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n                                    content: {\n                                        type: \"function\";\n                                        required: true;\n                                        collection: false;\n                                    };\n                                }>;\n                                required: true;\n                                collection: false;\n                            };\n                        }> | "
+              "text": "<    {\n                        content: {\n                        type: \"function\";\n                        required: true;\n                        collection: false;\n                        };\n                        }>;\n                        required: true;\n                        collection: false;\n                        };\n                        }> | "
             },
             {
               "kind": "Reference",
@@ -10041,7 +10049,7 @@
               "text": "<{\n            stringContent: {\n                type: \"string\";\n            };\n            content: {\n                type: \"function\";\n                required: true;\n                collection: false;\n            };\n            name: {\n                type: \"string\";\n            };\n            isRef: {\n                type: \"boolean\";\n            };\n        }>)[];\n    };\n}>"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "PayloadItem",
@@ -10132,7 +10140,7 @@
               "text": "<any>[];\n        required: false;\n    };\n    computed: {\n        required: false;\n        type: \"function\";\n        collection: false;\n    };\n}>"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "Property",
@@ -10155,7 +10163,7 @@
               "text": "{\n    string: string;\n    number: string;\n    boolean: string;\n}"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "PropertyTypeMap",
@@ -10174,7 +10182,7 @@
               "text": "export declare enum PropertyTypes "
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "releaseTag": "Public",
           "name": "PropertyTypes",
           "preserveMemberOrder": false,
@@ -10260,7 +10268,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n    items: {\n        type: "
+              "text": "<    {\nitems: {\ntype: "
             },
             {
               "kind": "Reference",
@@ -10269,10 +10277,10 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n            name: {\n                type: \"string\";\n                required: true;\n                collection: false;\n            };\n            value: {\n                type: \"string\";\n                required: true;\n                collection: false;\n            };\n        }>[];\n        required: true;\n        collection: true;\n    };\n}>"
+              "text": "<    {\nname: {\ntype: \"string\";\nrequired: true;\ncollection: false;\n};\nvalue: {\ntype: \"string\";\nrequired: true;\ncollection: false;\n};\n}>[];\nrequired: true;\ncollection: true;\n};\n}>"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "Query",
@@ -10297,10 +10305,10 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n    name: {\n        type: \"string\";\n        required: true;\n        collection: false;\n    };\n    value: {\n        type: \"string\";\n        required: true;\n        collection: false;\n    };\n}>"
+              "text": "<    {\nname: {\ntype: \"string\";\nrequired: true;\ncollection: false;\n};\nvalue: {\ntype: \"string\";\nrequired: true;\ncollection: false;\n};\n}>"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "QueryItem",
@@ -10359,7 +10367,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "releaseTag": "Public",
           "name": "ReactiveKlassInstance",
           "typeParameters": [
@@ -10434,7 +10442,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "releaseTag": "Public",
           "name": "ReactiveKlassInstanceProps",
           "typeParameters": [
@@ -10487,7 +10495,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "releaseTag": "Public",
           "name": "ReactiveKlassOptions",
           "typeTokenRange": {
@@ -10502,7 +10510,7 @@
           "excerptTokens": [
             {
               "kind": "Content",
-              "text": "export declare type RecordChangeListener = "
+              "text": "export type RecordChangeListener = "
             },
             {
               "kind": "Content",
@@ -10522,7 +10530,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "System.ts",
           "releaseTag": "Public",
           "name": "RecordChangeListener",
           "typeTokenRange": {
@@ -10537,7 +10545,7 @@
           "excerptTokens": [
             {
               "kind": "Content",
-              "text": "export declare type RecordMutationEvent = "
+              "text": "export type RecordMutationEvent = "
             },
             {
               "kind": "Content",
@@ -10548,7 +10556,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "System.ts",
           "releaseTag": "Public",
           "name": "RecordMutationEvent",
           "typeTokenRange": {
@@ -10584,7 +10592,7 @@
               "text": ">"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "Relation",
@@ -10630,7 +10638,7 @@
               "text": ">;\n        collection: false;\n        required: true;\n    };\n    relationDirection: {\n        type: \"string\";\n        collection: false;\n        required: true;\n        defaultValue: () => string;\n    };\n    matchExpression: {\n        type: \"function\";\n        collection: false;\n        required: true;\n    };\n}>"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "RelationBasedAny",
@@ -10676,7 +10684,7 @@
               "text": ">;\n        collection: false;\n        required: true;\n    };\n    relationDirection: {\n        type: \"string\";\n        collection: false;\n        required: true;\n        defaultValue: () => string;\n    };\n    matchExpression: {\n        type: \"function\";\n        collection: false;\n        required: true;\n    };\n    notEmpty: {\n        type: \"boolean\";\n        collection: false;\n        required: false;\n    };\n}>"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "RelationBasedEvery",
@@ -10731,7 +10739,7 @@
               "text": ">;\n                collection: false;\n                required: true;\n            };\n            relationDirection: {\n                type: \"string\";\n                collection: false;\n                required: true;\n                defaultValue: () => string;\n            };\n        }>;\n        collection: true;\n        required: true;\n    };\n    matchRelationToWeight: {\n        type: \"function\";\n        collection: false;\n        required: true;\n    };\n}>"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "RelationBasedWeightedSummation",
@@ -10777,7 +10785,7 @@
               "text": ">;\n        collection: false;\n        required: true;\n    };\n    relationDirection: {\n        type: \"string\";\n        collection: false;\n        required: true;\n        defaultValue: () => string;\n    };\n    matchExpression: {\n        type: \"function\";\n        collection: false;\n        required: true;\n    };\n}>"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "RelationCount",
@@ -11002,7 +11010,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "releaseTag": "Public",
           "name": "RelationPublic",
           "typeTokenRange": {
@@ -11305,7 +11313,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n                            name: {\n                                type: \"string\";\n                                required: true;\n                            };\n                        }> | "
+              "text": "<    {\n                        name: {\n                        type: \"string\";\n                        required: true;\n                        };\n                        }> | "
             },
             {
               "kind": "Reference",
@@ -11314,7 +11322,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n                            name: {\n                                type: \"string\";\n                                required: true;\n                            };\n                        }>)[];\n                    };\n                }>;\n                collection: false;\n                required: false;\n            };\n            triggerInteraction: {\n                type: "
+              "text": "<    {\n                        name: {\n                        type: \"string\";\n                        required: true;\n                        };\n                        }>)[];\n                    };\n                }>;\n                collection: false;\n                required: false;\n            };\n            triggerInteraction: {\n                type: "
             },
             {
               "kind": "Reference",
@@ -11416,7 +11424,7 @@
               "text": "<any>[];\n                        collection: false;\n                        required: true;\n                    };\n                }>;\n                collection: true;\n                required: false;\n            };\n            propertyHandle: {\n                type: \"function\";\n                required: false;\n                collection: false;\n            };\n        }>;\n        collection: false;\n        required: true;\n    };\n}>"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "RelationStateMachine",
@@ -11462,7 +11470,7 @@
               "text": "<any>[];\n                collection: false;\n                required: true;\n            };\n        }>;\n        collection: true;\n        required: false;\n    };\n    propertyHandle: {\n        type: \"function\";\n        required: false;\n        collection: false;\n    };\n}>"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "RelationStateNode",
@@ -11730,7 +11738,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n                    name: {\n                        type: \"string\";\n                        required: true;\n                    };\n                }> | "
+              "text": "<    {\n                name: {\n                type: \"string\";\n                required: true;\n                };\n                }> | "
             },
             {
               "kind": "Reference",
@@ -11739,7 +11747,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n                    name: {\n                        type: \"string\";\n                        required: true;\n                    };\n                }>)[];\n            };\n        }>;\n        collection: false;\n        required: false;\n    };\n    triggerInteraction: {\n        type: "
+              "text": "<    {\n                name: {\n                type: \"string\";\n                required: true;\n                };\n                }>)[];\n            };\n        }>;\n        collection: false;\n        required: false;\n    };\n    triggerInteraction: {\n        type: "
             },
             {
               "kind": "Reference",
@@ -11814,7 +11822,7 @@
               "text": "<any>[];\n                        collection: false;\n                        required: true;\n                    };\n                }>;\n                collection: true;\n                required: false;\n            };\n            propertyHandle: {\n                type: \"function\";\n                required: false;\n                collection: false;\n            };\n        }>;\n        collection: false;\n        required: true;\n    };\n    handleType: {\n        type: \"string\";\n    };\n    handle: {\n        type: \"function\";\n        collection: false;\n        required: true;\n    };\n}>"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "RelationStateTransfer",
@@ -11841,7 +11849,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "returnTypeTokenRange": {
             "startIndex": 1,
             "endIndex": 2
@@ -11901,7 +11909,7 @@
             {
               "kind": "Reference",
               "text": "OmitNever",
-              "canonicalReference": "@interaqt/runtime!~OmitNever:type"
+              "canonicalReference": "@interaqt/runtime!OmitNever:type"
             },
             {
               "kind": "Content",
@@ -11973,7 +11981,7 @@
             {
               "kind": "Reference",
               "text": "ExtractKlassTypes",
-              "canonicalReference": "@interaqt/runtime!~ExtractKlassTypes:type"
+              "canonicalReference": "@interaqt/runtime!ExtractKlassTypes:type"
             },
             {
               "kind": "Content",
@@ -11982,7 +11990,7 @@
             {
               "kind": "Reference",
               "text": "PrimitivePropType",
-              "canonicalReference": "@interaqt/runtime!~PrimitivePropType:type"
+              "canonicalReference": "@interaqt/runtime!PrimitivePropType:type"
             },
             {
               "kind": "Content",
@@ -12000,7 +12008,7 @@
             {
               "kind": "Reference",
               "text": "PrimitivePropertyMap",
-              "canonicalReference": "@interaqt/runtime!~PrimitivePropertyMap:interface"
+              "canonicalReference": "@interaqt/runtime!PrimitivePropertyMap:interface"
             },
             {
               "kind": "Content",
@@ -12011,7 +12019,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "releaseTag": "Public",
           "name": "RequiredProps",
           "typeParameters": [
@@ -12066,7 +12074,7 @@
             {
               "kind": "Reference",
               "text": "ClassMetaPublicItem",
-              "canonicalReference": "@interaqt/runtime!~ClassMetaPublicItem:type"
+              "canonicalReference": "@interaqt/runtime!ClassMetaPublicItem:type"
             },
             {
               "kind": "Content",
@@ -12087,7 +12095,7 @@
             {
               "kind": "Reference",
               "text": "DefaultValueType",
-              "canonicalReference": "@interaqt/runtime!~DefaultValueType:type"
+              "canonicalReference": "@interaqt/runtime!DefaultValueType:type"
             },
             {
               "kind": "Content",
@@ -12096,7 +12104,7 @@
             {
               "kind": "Reference",
               "text": "ComputedValueType",
-              "canonicalReference": "@interaqt/runtime!~ComputedValueType:type"
+              "canonicalReference": "@interaqt/runtime!ComputedValueType:type"
             },
             {
               "kind": "Content",
@@ -12105,7 +12113,7 @@
             {
               "kind": "Reference",
               "text": "DefaultValueType",
-              "canonicalReference": "@interaqt/runtime!~DefaultValueType:type"
+              "canonicalReference": "@interaqt/runtime!DefaultValueType:type"
             },
             {
               "kind": "Content",
@@ -12114,7 +12122,7 @@
             {
               "kind": "Reference",
               "text": "ComputedValueType",
-              "canonicalReference": "@interaqt/runtime!~ComputedValueType:type"
+              "canonicalReference": "@interaqt/runtime!ComputedValueType:type"
             },
             {
               "kind": "Content",
@@ -12125,7 +12133,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "releaseTag": "Public",
           "name": "RequireWithoutDefaultAndComputed",
           "typeParameters": [
@@ -12171,7 +12179,7 @@
               "text": "\"_rowId\""
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "System.ts",
           "initializerTokenRange": {
             "startIndex": 1,
             "endIndex": 2
@@ -12203,7 +12211,7 @@
               "text": "<{\n    name: {\n        type: \"string\";\n        required: true;\n        collection: false;\n    };\n    handle: {\n        type: \"function\";\n        required: true;\n        collection: false;\n    };\n}>"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "SideEffect",
@@ -12231,7 +12239,7 @@
               "text": " "
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "SQLite.ts",
           "releaseTag": "Public",
           "isAbstract": false,
           "name": "SQLiteDB",
@@ -13086,7 +13094,7 @@
           "excerptTokens": [
             {
               "kind": "Content",
-              "text": "export declare type SQLiteDBOptions = "
+              "text": "export type SQLiteDBOptions = "
             },
             {
               "kind": "Reference",
@@ -13120,7 +13128,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "SQLite.ts",
           "releaseTag": "Public",
           "name": "SQLiteDBOptions",
           "typeTokenRange": {
@@ -13178,7 +13186,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "server.ts",
           "returnTypeTokenRange": {
             "startIndex": 7,
             "endIndex": 9
@@ -13295,7 +13303,7 @@
               "text": "<any>[];\n        required: false;\n    };\n}>"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "State",
@@ -13311,7 +13319,7 @@
           "excerptTokens": [
             {
               "kind": "Content",
-              "text": "declare type Storage_2 = "
+              "text": "export type Storage = "
             },
             {
               "kind": "Content",
@@ -13502,7 +13510,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "System.ts",
           "releaseTag": "Public",
           "name": "Storage_2",
           "typeTokenRange": {
@@ -13528,7 +13536,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "returnTypeTokenRange": {
             "startIndex": 1,
             "endIndex": 2
@@ -13564,7 +13572,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "returnTypeTokenRange": {
             "startIndex": 3,
             "endIndex": 4
@@ -13614,7 +13622,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "returnTypeTokenRange": {
             "startIndex": 4,
             "endIndex": 5
@@ -13647,7 +13655,7 @@
               "text": "\"_System_\""
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "System.ts",
           "initializerTokenRange": {
             "startIndex": 1,
             "endIndex": 2
@@ -13667,10 +13675,10 @@
           "excerptTokens": [
             {
               "kind": "Content",
-              "text": "export declare interface System "
+              "text": "export interface System "
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "System.ts",
           "releaseTag": "Public",
           "name": "System",
           "preserveMemberOrder": false,
@@ -14007,7 +14015,7 @@
                 },
                 {
                   "kind": "Reference",
-                  "text": "Storage_2",
+                  "text": "Storage",
                   "canonicalReference": "@interaqt/runtime!Storage_2:type"
                 },
                 {
@@ -14079,7 +14087,7 @@
           "excerptTokens": [
             {
               "kind": "Content",
-              "text": "export declare type SystemCallback = "
+              "text": "export type SystemCallback = "
             },
             {
               "kind": "Content",
@@ -14090,7 +14098,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "System.ts",
           "releaseTag": "Public",
           "name": "SystemCallback",
           "typeTokenRange": {
@@ -14108,13 +14116,17 @@
               "text": "systemEntity: "
             },
             {
+              "kind": "Content",
+              "text": "import(\"@interaqt/shared\")."
+            },
+            {
               "kind": "Reference",
               "text": "InertKlassInstance",
               "canonicalReference": "@interaqt/runtime!InertKlassInstance:type"
             },
             {
               "kind": "Content",
-              "text": "<    {\n    name: {\n        type: \"string\";\n        collection: false;\n        required: true;\n        constraints: {\n            nameFormat({ name }: {\n                name: "
+              "text": "<{\n    name: {\n        type: \"string\";\n        collection: false;\n        required: true;\n        constraints: {\n            nameFormat({ name }: {\n                name: import(\"data0\")."
             },
             {
               "kind": "Reference",
@@ -14123,7 +14135,7 @@
             },
             {
               "kind": "Content",
-              "text": "<string>;\n            }): "
+              "text": "<string>;\n            }): import(\"data0\")."
             },
             {
               "kind": "Reference",
@@ -14132,7 +14144,7 @@
             },
             {
               "kind": "Content",
-              "text": "<boolean>;\n        };\n    };\n    computedData: {\n        type: "
+              "text": "<boolean>;\n        };\n    };\n    computedData: {\n        type: import(\"@interaqt/shared\")."
             },
             {
               "kind": "Reference",
@@ -14141,7 +14153,7 @@
             },
             {
               "kind": "Content",
-              "text": "<any>[];\n        collection: false;\n        required: false;\n    };\n    properties: {\n        type: "
+              "text": "<any>[];\n        collection: false;\n        required: false;\n    };\n    properties: {\n        type: import(\"@interaqt/shared\")."
             },
             {
               "kind": "Reference",
@@ -14150,7 +14162,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n            name: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                constraints: {\n                    format({ name }: {\n                        name: "
+              "text": "<{\n            name: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                constraints: {\n                    format({ name }: {\n                        name: import(\"data0\")."
             },
             {
               "kind": "Reference",
@@ -14159,7 +14171,7 @@
             },
             {
               "kind": "Content",
-              "text": "<string>;\n                    }): "
+              "text": "<string>;\n                    }): import(\"data0\")."
             },
             {
               "kind": "Reference",
@@ -14168,7 +14180,7 @@
             },
             {
               "kind": "Content",
-              "text": "<boolean>;\n                    length({ name }: {\n                        name: "
+              "text": "<boolean>;\n                    length({ name }: {\n                        name: import(\"data0\")."
             },
             {
               "kind": "Reference",
@@ -14177,7 +14189,7 @@
             },
             {
               "kind": "Content",
-              "text": "<string>;\n                    }): "
+              "text": "<string>;\n                    }): import(\"data0\")."
             },
             {
               "kind": "Reference",
@@ -14186,7 +14198,7 @@
             },
             {
               "kind": "Content",
-              "text": "<boolean>;\n                };\n            };\n            type: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                options: "
+              "text": "<boolean>;\n                };\n            };\n            type: {\n                type: \"string\";\n                required: true;\n                collection: false;\n                options: import(\"@interaqt/shared\")."
             },
             {
               "kind": "Reference",
@@ -14195,7 +14207,7 @@
             },
             {
               "kind": "Content",
-              "text": "[];\n            };\n            collection: {\n                type: \"boolean\";\n                required: true;\n                collection: false;\n                defaultValue(): boolean;\n            };\n            args: {\n                computedType: (values: {\n                    type: "
+              "text": "[];\n            };\n            collection: {\n                type: \"boolean\";\n                required: true;\n                collection: false;\n                defaultValue(): boolean;\n            };\n            args: {\n                computedType: (values: {\n                    type: import(\"@interaqt/shared\")."
             },
             {
               "kind": "Reference",
@@ -14204,7 +14216,7 @@
             },
             {
               "kind": "Content",
-              "text": ";\n                }) => string;\n            };\n            computedData: {\n                collection: false;\n                type: "
+              "text": ";\n                }) => string;\n            };\n            computedData: {\n                collection: false;\n                type: import(\"@interaqt/shared\")."
             },
             {
               "kind": "Reference",
@@ -14213,7 +14225,7 @@
             },
             {
               "kind": "Content",
-              "text": "<any>[];\n                required: false;\n            };\n            computed: {\n                required: false;\n                type: \"function\";\n                collection: false;\n            };\n        }>;\n        collection: true;\n        required: true;\n        constraints: {\n            eachNameUnique({ properties }: any): "
+              "text": "<any>[];\n                required: false;\n            };\n            computed: {\n                required: false;\n                type: \"function\";\n                collection: false;\n            };\n        }>;\n        collection: true;\n        required: true;\n        constraints: {\n            eachNameUnique({ properties }: any): import(\"data0\")."
             },
             {
               "kind": "Reference",
@@ -14225,13 +14237,13 @@
               "text": "<boolean>;\n        };\n        defaultValue(): never[];\n    };\n    isRef: {\n        required: true;\n        collection: false;\n        type: \"boolean\";\n        defaultValue: () => boolean;\n    };\n}>"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "System.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "systemEntity",
           "variableTypeTokenRange": {
             "startIndex": 1,
-            "endIndex": 27
+            "endIndex": 28
           }
         },
         {
@@ -14241,7 +14253,7 @@
           "excerptTokens": [
             {
               "kind": "Content",
-              "text": "export declare type SystemLogger = "
+              "text": "export type SystemLogger = "
             },
             {
               "kind": "Content",
@@ -14288,7 +14300,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "System.ts",
           "releaseTag": "Public",
           "name": "SystemLogger",
           "typeTokenRange": {
@@ -14303,7 +14315,7 @@
           "excerptTokens": [
             {
               "kind": "Content",
-              "text": "export declare type SystemLogType = "
+              "text": "export type SystemLogType = "
             },
             {
               "kind": "Content",
@@ -14314,7 +14326,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "System.ts",
           "releaseTag": "Public",
           "name": "SystemLogType",
           "typeTokenRange": {
@@ -14350,7 +14362,7 @@
               "text": ">"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "Transfer",
@@ -14391,7 +14403,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "releaseTag": "Public",
           "name": "TransferInstanceType",
           "typeTokenRange": {
@@ -14525,7 +14537,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "releaseTag": "Public",
           "name": "TransferPublicType",
           "typeTokenRange": {
@@ -14564,7 +14576,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "releaseTag": "Public",
           "name": "UnwrapCollectionType",
           "typeParameters": [
@@ -14679,7 +14691,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "releaseTag": "Public",
           "name": "UnwrappedBoolExpressionInstanceType",
           "typeParameters": [
@@ -14714,7 +14726,7 @@
               "text": "\"User\""
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "Controller.ts",
           "initializerTokenRange": {
             "startIndex": 1,
             "endIndex": 2
@@ -14881,7 +14893,7 @@
               "text": ">)[];\n        collection: true;\n        required: true;\n    };\n    matchRecordToWeight: {\n        type: \"function\";\n        collection: false;\n        required: true;\n    };\n}>"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "isReadonly": true,
           "releaseTag": "Public",
           "name": "WeightedSummation",
