@@ -26,12 +26,9 @@ type SyncUserBody = {
     userId: string,
 }
 
-export type DataAPIThis = {
-    system: Controller['system'],
-    user: EventUser
-}
+export type DataAPIContext = { user: EventUser }
 
-export type DataAPIHandle = (this: DataAPIThis, ...rest: any[]) => any
+export type DataAPIHandle = (this: Controller, context: DataAPIContext, ...rest: any[]) => any
 export type DataAPIConfig = {
     params?: any[],
     allowAnonymous?: boolean
@@ -172,8 +169,7 @@ export async function startServer(controller: Controller, options: ServerOptions
         // 参数
         const apiParams = parseDataAPIParams(request.body as any[], api)
 
-        const result= await dataAPIs[params.apiName].call({
-            system: controller.system,
+        const result = await dataAPIs[params.apiName].call(controller, {
             user: user as EventUser
         }, ...apiParams)
 

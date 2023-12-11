@@ -4,7 +4,7 @@ import {MonoSystem} from "../MonoSystem.js";
 import {
     Activity,
     BoolExp,
-    createInstances,
+    createInstances, DataAPIContext,
     Entity,
     Interaction,
     KlassByName,
@@ -12,7 +12,7 @@ import {
     removeAllInstance,
     State
 } from "@interaqt/runtime";
-import {DataAPIThis, startServer} from "../server.js";
+import {startServer} from "../server.js";
 import {MatchAtom} from "@interaqt/storage";
 
 // 里面有所有必须的数据？
@@ -77,7 +77,7 @@ describe('server test', () => {
         userAId = 11
         userBId = 12
 
-        const getRequests = function(this: DataAPIThis, match: BoolExp<MatchAtom>) {
+        const getRequests = function(this: Controller, context: DataAPIContext, match: BoolExp<MatchAtom>) {
             return this.system.storage.find('Request', match, undefined, ['*',
                 ['from', {attributeQuery: ["*"]}],
                 ['to', {
