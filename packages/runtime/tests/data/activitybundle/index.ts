@@ -14,6 +14,7 @@ import {
     Attributive,
     BoolExp,
     boolExpToAttributives,
+    Controller,
     Count,
     createUserRoleAttributive,
     Entity,
@@ -27,6 +28,7 @@ import {
     PayloadItem,
     Property,
     PropertyTypes,
+    RecordMutationEvent,
     Relation,
     RelationBasedAny,
     RelationBasedEvery,
@@ -38,7 +40,8 @@ import {
     State,
     stringifyAllInstances,
     Transfer,
-    Controller, RecordMutationEvent, USER_ENTITY} from "@interaqt/runtime";
+    USER_ENTITY
+} from "@interaqt/runtime";
 
 const userRefA = createUserRoleAttributive({name: 'A', isRef: true})
 

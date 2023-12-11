@@ -11,8 +11,7 @@ import {
     Relation,
     removeAllInstance,
     State
-} from "@interaqt/shared";
-import '../computedDataHandles/index.js'
+} from "@interaqt/runtime";
 import {DataAPIThis, startServer} from "../server.js";
 import {MatchAtom} from "@interaqt/storage";
 

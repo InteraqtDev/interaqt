@@ -1,9 +1,7 @@
 import {beforeEach, describe, expect, test} from "vitest";
 import {Controller} from "../Controller.js";
 import {MonoSystem} from "../MonoSystem.js";
-import {Interaction, KlassByName, removeAllInstance} from "@interaqt/shared";
-import '../computedDataHandles/index.js'
-import {MatchExp} from '@interaqt/storage'
+import {BoolExp, Interaction, KlassByName, removeAllInstance} from "@interaqt/runtime";
 
 // 里面有所有必须的数据？
 type User = {
@@ -57,7 +55,7 @@ describe('map interaction', () => {
 
 
         const userC: User = {
-            ...await system.storage.findOne('User', MatchExp.atom({
+            ...await system.storage.findOne('User', BoolExp.atom({
                 key: 'id',
                 value: ['=', userCId]
             }), undefined, ['*']),
@@ -82,12 +80,12 @@ describe('map interaction', () => {
         expect(requests1[0].result).toBe('pending')
 
 
-        const userA: User = await system.storage.findOne('User', MatchExp.atom({
+        const userA: User = await system.storage.findOne('User', BoolExp.atom({
                 key: 'id',
                 value: ['=', userAId]
             }), undefined, ['*'])
 
-        const userB: User = await system.storage.findOne('User', MatchExp.atom({
+        const userB: User = await system.storage.findOne('User', BoolExp.atom({
                 key: 'id',
                 value: ['=', userBId]
             }), undefined, ['*'])

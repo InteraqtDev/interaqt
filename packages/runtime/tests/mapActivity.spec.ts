@@ -2,12 +2,17 @@ import {beforeEach, describe, expect, test} from "vitest";
 import {Controller} from "../Controller.js";
 import {ActivityCall, ActivityGroupNode} from "../ActivityCall.js";
 import {MonoSystem} from "../MonoSystem.js";
-import {createInstances, KlassByName, removeAllInstance} from "@interaqt/shared";
-import {Activity, Interaction} from "@interaqt/shared";
-import {Entity, Relation} from "@interaqt/shared";
-import {State} from "@interaqt/shared";
-import '../computedDataHandles/index.js'
-import {MatchExp} from '@interaqt/storage'
+import {
+    Activity,
+    createInstances,
+    Entity,
+    Interaction,
+    KlassByName,
+    Relation,
+    removeAllInstance,
+    State,
+    BoolExp
+} from "@interaqt/runtime";
 
 // 里面有所有必须的数据？
 type User = {
@@ -78,7 +83,7 @@ describe('map activity', () => {
     test('make friend activity', async () => {
         // 0. 验证初始数据
         const userA: User = {
-            ...await system.storage.findOne('User', MatchExp.atom({
+            ...await system.storage.findOne('User', BoolExp.atom({
                 key:'id',
                 value: ['=', userAId]
             }), undefined, ['*']),
@@ -86,7 +91,7 @@ describe('map activity', () => {
         }
 
         const userB: User = {
-            ...await system.storage.findOne('User', MatchExp.atom({
+            ...await system.storage.findOne('User', BoolExp.atom({
                 key:'id',
                 value: ['=', userBId]
             }), undefined, ['*']),
@@ -106,7 +111,7 @@ describe('map activity', () => {
 
 
         // 查询 request 数据
-        const requestMatch = MatchExp.atom({
+        const requestMatch = BoolExp.atom({
             key: 'from.name',
             value: ['=', userA.name]
         }).and({
@@ -136,13 +141,13 @@ describe('map activity', () => {
         expect(!!requests2[0].handled).toBeFalsy()
         expect(requests2[0].activity.id).toBe(activityId)
 
-        const userB1 = (await system.storage.findOne('User', MatchExp.atom({
+        const userB1 = (await system.storage.findOne('User', BoolExp.atom({
                 key:'id',
                 value: ['=', userBId]
             }), undefined, ['*']))
         expect(userB1.totalUnhandledRequest).toBe(1)
 
-        const userA1 = (await system.storage.findOne('User', MatchExp.atom({
+        const userA1 = (await system.storage.findOne('User', BoolExp.atom({
             key:'id',
             value: ['=', userAId]
         }), undefined, ['*']))
@@ -167,14 +172,14 @@ describe('map activity', () => {
         expect(!!requests3[0].handled).toBeTruthy()
         expect(requests3[0].activity.id).toBe(activityId)
 
-        const userB2 = (await system.storage.findOne('User', MatchExp.atom({
+        const userB2 = (await system.storage.findOne('User', BoolExp.atom({
             key:'id',
             value: ['=', userBId]
         }), undefined, ['*']))
         expect(userB2.totalUnhandledRequest).toBe(0)
         expect(userB2.totalFriendCount).toBe(1)
 
-        const userA2 = (await system.storage.findOne('User', MatchExp.atom({
+        const userA2 = (await system.storage.findOne('User', BoolExp.atom({
             key:'id',
             value: ['=', userAId]
         }), undefined, ['*']))
@@ -217,13 +222,13 @@ describe('map activity', () => {
         const friendRelations2 = await controller.system.storage.findRelationByName(relationName, undefined, undefined, [['source', {attributeQuery: ['name', 'age']}], ['target', {attributeQuery: ['name', 'age']}]])
         expect(friendRelations2.length).toBe(0)
 
-        const userB3 = (await system.storage.findOne('User', MatchExp.atom({
+        const userB3 = (await system.storage.findOne('User', BoolExp.atom({
             key:'id',
             value: ['=', userBId]
         }), undefined, ['*']))
         expect(userB3.totalFriendCount).toBe(0)
 
-        const userA3 = (await system.storage.findOne('User', MatchExp.atom({
+        const userA3 = (await system.storage.findOne('User', BoolExp.atom({
             key:'id',
             value: ['=', userAId]
         }), undefined, ['*']))

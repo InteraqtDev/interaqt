@@ -1,7 +1,7 @@
 import {UserEntity} from "./user.js";
 import {approveInteraction, mapFriendActivityToRequest, rejectInteraction} from "./createFriendRelationActivity.js";
-import {Controller} from "@interaqt/runtime";
 import {
+    Controller,
     Entity,
     MapInteractionToProperty,
     MapInteractionToPropertyItem,
@@ -10,7 +10,7 @@ import {
     RelationBasedAny,
     RelationBasedEvery,
     RelationCount
-} from "@interaqt/shared";
+} from "@interaqt/runtime";
 import {messageEntity} from "./messageEntity.js";
 
 export const requestEntity = Entity.create({

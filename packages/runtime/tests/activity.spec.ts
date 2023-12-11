@@ -1,9 +1,8 @@
 import {beforeEach, describe, expect, test} from "vitest";
 
 import {MonoSystem} from "../MonoSystem.js";
-import {Activity, createInstances, getInstance, KlassByName, KlassInstance, removeAllInstance} from "@interaqt/shared";
+import {Activity, createInstances, getInstance, KlassByName, KlassInstance, removeAllInstance, Controller} from "@interaqt/runtime";
 import {ActivityCall, ActivityGroupNode} from "../ActivityCall.js";
-import {Controller} from "../Controller";
 
 describe("activity state", () => {
     let createFriendRelationActivityCall: ActivityCall

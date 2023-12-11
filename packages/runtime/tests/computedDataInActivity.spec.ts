@@ -11,7 +11,7 @@ import {
     Relation,
     removeAllInstance,
     State
-} from "@interaqt/shared";
+} from "@interaqt/runtime";
 import '../computedDataHandles/index.js'
 import {MatchExp} from '@interaqt/storage'
 
@@ -156,7 +156,7 @@ describe('computed data in activity', () => {
         }
         const res2 = await controller.callActivityInteraction(makeFriendActivityUUID,  sendRequestUUID, undefined,{user: userA, payload})
         expect(res2.error).toBeUndefined()
-        const { activityId} = res2.context!
+        const { activityId } = res2.context!
 
 
         const userB1 = (await system.storage.findOne('User', MatchExp.atom({

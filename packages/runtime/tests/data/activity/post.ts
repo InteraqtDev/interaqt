@@ -1,5 +1,6 @@
 import {
     Action,
+    Controller,
     Entity,
     Interaction,
     MapInteractionToProperty,
@@ -9,9 +10,9 @@ import {
     PayloadItem,
     Property,
     PropertyTypes,
+    RecordMutationEvent,
     Relation
-} from "@interaqt/shared";
-import {Controller, RecordMutationEvent} from "@interaqt/runtime";
+} from "@interaqt/runtime";
 
 export const postEntity = Entity.create({ name: 'Post' })
 

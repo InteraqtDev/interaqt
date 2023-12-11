@@ -1,13 +1,17 @@
 import {beforeEach, describe, expect, test} from "vitest";
 import {Controller} from "../Controller.js";
 import {MonoSystem} from "../MonoSystem.js";
-import {createInstances, KlassByName, removeAllInstance} from "@interaqt/shared";
-import {Activity, Interaction} from "@interaqt/shared";
-import {Entity, Relation} from "@interaqt/shared";
-import {State} from "@interaqt/shared";
-import '../computedDataHandles/index.js'
-import {MatchExp} from '@interaqt/storage'
-import {AttributeError} from "../InteractionCall.js";
+import {
+    Activity,
+    BoolExp,
+    createInstances,
+    Entity,
+    Interaction,
+    KlassByName,
+    Relation,
+    removeAllInstance,
+    State
+} from "@interaqt/runtime";
 
 // 里面有所有必须的数据？
 type User = {
@@ -63,7 +67,7 @@ describe('map interaction', () => {
     test('map interaction to relation', async () => {
         // 0. 验证初始数据
         const userA: User = {
-            ...await system.storage.findOne('User', MatchExp.atom({
+            ...await system.storage.findOne('User', BoolExp.atom({
                 key: 'id',
                 value: ['=', userAId]
             }), undefined, ['*']),

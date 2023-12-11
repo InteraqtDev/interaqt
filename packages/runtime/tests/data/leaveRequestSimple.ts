@@ -4,11 +4,13 @@ import {
     BoolExp,
     boolExpToAttributives,
     boolExpToDataAttributives,
+    Controller,
     createUserRoleAttributive,
     DataAttributive,
     Entity,
     GetAction,
     Interaction,
+    InteractionEventArgs,
     MapInteractionToProperty,
     MapInteractionToPropertyItem,
     MapInteractionToRecord,
@@ -19,9 +21,7 @@ import {
     Relation,
     RelationBasedAny,
     RelationBasedEvery,
-    RelationCount,
-    Controller,
-    InteractionEventArgs
+    RelationCount
 } from "@interaqt/runtime";
 
 export const globalUserRole = createUserRoleAttributive({})

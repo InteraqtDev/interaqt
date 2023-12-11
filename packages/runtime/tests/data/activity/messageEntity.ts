@@ -1,4 +1,4 @@
-import {Entity, Property} from "@interaqt/shared";
+import {Entity, Property} from "@interaqt/runtime";
 
 export const messageEntity = Entity.create({
     name: 'Message',

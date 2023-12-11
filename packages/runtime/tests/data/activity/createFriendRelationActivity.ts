@@ -1,6 +1,3 @@
-import {Controller} from "@interaqt/runtime";
-import {OtherAttr} from "./roles.js";
-import {UserEntity} from "./user.js";
 import {
     Action,
     Activity,
@@ -8,6 +5,7 @@ import {
     Attributive,
     BoolExp,
     boolExpToAttributives,
+    Controller,
     createUserRoleAttributive,
     Interaction,
     MapActivityToRecord,
@@ -18,7 +16,9 @@ import {
     RelationStateNode,
     RelationStateTransfer,
     Transfer
-} from "@interaqt/shared";
+} from "@interaqt/runtime";
+import {OtherAttr} from "./roles.js";
+import {UserEntity} from "./user.js";
 import {messageEntity} from "./messageEntity.js";
 
 const userRefA = createUserRoleAttributive({name: 'A', isRef: true})

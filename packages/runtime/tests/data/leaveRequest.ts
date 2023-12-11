@@ -1,21 +1,30 @@
-import {BoolAtomData, createUserRoleAttributive, Attributive, Attributives} from "@interaqt/shared";
-import {Action, Interaction, Payload, PayloadItem} from "@interaqt/shared";
-import {OtherAttr} from "./roles";
-import {Entity, Property, PropertyTypes, Relation} from "@interaqt/shared";
-
 import {
-    ComputedData,
+    Action,
+    Attributive,
+    Attributives,
+    BoolAtomData,
+    Controller,
+    createUserRoleAttributive,
+    Entity,
+    Interaction,
     MapInteractionToProperty,
     MapInteractionToPropertyItem,
     MapInteractionToRecord,
+    Payload,
+    PayloadItem,
+    Property,
+    PropertyTypes,
+    Relation,
     RelationBasedAny,
     RelationBasedEvery,
     RelationStateMachine,
     RelationStateNode,
-    RelationStateTransfer
-} from "@interaqt/shared";
-import {removeAllInstance, stringifyAllInstances} from "@interaqt/shared";
-import {Controller, USER_ENTITY} from "@interaqt/runtime";
+    RelationStateTransfer,
+    removeAllInstance,
+    stringifyAllInstances,
+    USER_ENTITY
+} from "@interaqt/runtime";
+import {OtherAttr} from "./roles";
 
 const UserEntity = Entity.create({ name: USER_ENTITY })
 const nameProperty = Property.create({ name: 'name', type: PropertyTypes.String })
