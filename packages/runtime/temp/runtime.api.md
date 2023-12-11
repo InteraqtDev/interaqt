@@ -974,7 +974,6 @@ export class Controller {
     callActivityInteraction(activityCallId: string, interactionCallId: string, activityId: string | undefined, interactionEventArgs: InteractionEventArgs): Promise<InteractionCallResponse>;
     // (undocumented)
     callbacks: Map<any, Set<SystemCallback>>;
-    // Warning: (ae-forgotten-export) The symbol "InteractionEventArgs" needs to be exported by the entry point index.d.ts
     // Warning: (ae-forgotten-export) The symbol "InteractionCallResponse" needs to be exported by the entry point index.d.ts
     //
     // (undocumented)
@@ -1499,6 +1498,23 @@ defaultValue: () => boolean;
 }>;
 
 // @public (undocumented)
+export type EventPayload = {
+    [k: string]: any;
+};
+
+// @public
+export type EventQuery = {
+    [k: string]: any;
+};
+
+// @public (undocumented)
+export type EventUser = {
+    [k: string]: any;
+    id: string;
+    roles: string[];
+};
+
+// @public (undocumented)
 export const Every: Klass<{
     record: {
         type: (Klass<{
@@ -1653,6 +1669,21 @@ export const Interaction: Klass<InteractionPublicType>;
 export type InteractionContext = {
     logContext?: any;
     [k: string]: any;
+};
+
+// @public (undocumented)
+export type InteractionEvent = {
+    interactionId: string;
+    interactionName: string;
+    activityId?: string;
+    args: InteractionEventArgs;
+};
+
+// @public (undocumented)
+export type InteractionEventArgs = {
+    user: EventUser;
+    payload?: EventPayload;
+    query?: EventQuery;
 };
 
 // @public (undocumented)
@@ -1917,8 +1948,6 @@ export class MonoSystem implements System {
     getEvent(query?: MatchExpressionData): Promise<InteractionEvent[]>;
     // (undocumented)
     logger: SystemLogger;
-    // Warning: (ae-forgotten-export) The symbol "InteractionEvent" needs to be exported by the entry point index.d.ts
-    //
     // (undocumented)
     saveEvent(event: InteractionEvent): Promise<any>;
     // (undocumented)
@@ -3621,9 +3650,6 @@ export const WeightedSummation: Klass<{
 // node_modules/@interaqt/shared/dist/index.d.ts:24:9 - (ae-forgotten-export) The symbol "UnwrappedActivityInstanceType" needs to be exported by the entry point index.d.ts
 // node_modules/@interaqt/shared/dist/index.d.ts:287:9 - (ae-forgotten-export) The symbol "CommonAtomPublic" needs to be exported by the entry point index.d.ts
 // node_modules/@interaqt/shared/dist/index.d.ts:1428:9 - (ae-forgotten-export) The symbol "ClassMetaPublicItem" needs to be exported by the entry point index.d.ts
-// server.ts:21:5 - (ae-forgotten-export) The symbol "EventPayload" needs to be exported by the entry point index.d.ts
-// server.ts:22:5 - (ae-forgotten-export) The symbol "EventQuery" needs to be exported by the entry point index.d.ts
-// server.ts:31:5 - (ae-forgotten-export) The symbol "EventUser" needs to be exported by the entry point index.d.ts
 
 // (No @packageDocumentation comment for this package)
 
