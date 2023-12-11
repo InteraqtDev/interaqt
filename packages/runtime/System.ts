@@ -13,6 +13,8 @@ export const EVENT_RECORD = '_Event_'
 export const ACTIVITY_RECORD = '_Activity_'
 
 export type Storage = {
+    // 将 entity 映射到表结构的 map
+    map: any
     // transaction
     beginTransaction: (transactionName?:string) => Promise<any>
     commitTransaction: (transactionName?:string) => Promise<any>

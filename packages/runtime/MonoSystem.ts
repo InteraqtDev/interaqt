@@ -38,6 +38,7 @@ function JSONParse(value: string) {
 
 
 class MonoStorage implements Storage{
+    public map!: DBSetup["map"]
     public queryHandle?: EntityQueryHandle
     constructor(public db: Database) {
     }
@@ -74,6 +75,8 @@ class MonoStorage implements Storage{
         const dbSetup = new DBSetup(entities, relations, this.db)
         if (createTables) await dbSetup.createTables()
         this.queryHandle = new EntityQueryHandle( new EntityToTableMap(dbSetup.map), this.db)
+
+        this.map = dbSetup.map
     }
     findOne(...arg:Parameters<EntityQueryHandle["findOne"]>) {
         return this.queryHandle!.findOne(...arg)
