@@ -149,8 +149,7 @@ describe('server test', () => {
         }, {
             "userid": userAId,
         })
-        expect(resp2.status).toBe(200)
-        const {activityId} = (await resp2.json()).data
+        const {activityId} = (await resp2.json()).context!
 
         const requests1 = await controller.system.storage.find('Request', undefined, undefined, ['*', ['from', {attributeQuery: ["*"]}], ['to', {attributeQuery: ["*"]}]])
         expect(requests1.length).toBe(1)

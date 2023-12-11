@@ -66,12 +66,12 @@ export type InteractionCallResponse= {
     sideEffects?: {
         [k: string]: SideEffectResult
     }
+    // interaction 附加产生的上下文，例如 activityId
+    context?: {
+        [k: string]: any
+    }
 }
 
-
-type UserAttributiveAtom = KlassInstance<typeof Attributive, false>
-/// FIXME EntityAttributiveAtom 没有 isRole 字段
-type EntityAttributiveAtom =  UserAttributiveAtom
 
 type HandleAttributive = (attributive: KlassInstance<typeof Attributive, false>) => Promise<boolean>
 

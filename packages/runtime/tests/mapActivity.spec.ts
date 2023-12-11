@@ -129,7 +129,7 @@ describe('map activity', () => {
         }
         const res2 = await controller.callActivityInteraction(makeFriendActivityUUID,  sendRequestUUID, undefined,{user: userA, payload})
         expect(res2.error).toBeUndefined()
-        const activityId = res2.data.activityId
+        const activityId = res2.context!.activityId
 
         const requests2 = await controller.system.storage.find('Request', requestMatch, undefined, ['handled', ['activity', {attributeQuery: ['id']}], ['from',{attributeQuery:["name"]}], ['to', {attributeQuery:["name"]}], ['message', {attributeQuery:["content"]}]])
         expect(requests2.length).toBe(1)

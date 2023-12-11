@@ -71,7 +71,7 @@ describe("activity state", () => {
         // 3. a 发起 sendFriendRequest
         const res2 = await createFriendRelationActivityCall.callInteraction(activityId, sendRequestUUID, {user: userA, payload: {to: userB}})
         expect(res2.error).toBeUndefined()
-        activityId = res2.data.activityId
+        activityId = res2.context!.activityId
 
 
         // 4. 交互顺序错误 a sendFriendRequest

@@ -385,7 +385,7 @@ export class ActivityCall {
 
 
         return {
-            data: {
+            context: {
                 activityId,
                 nextState
             }

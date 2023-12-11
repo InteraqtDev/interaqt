@@ -156,7 +156,7 @@ describe('computed data in activity', () => {
         }
         const res2 = await controller.callActivityInteraction(makeFriendActivityUUID,  sendRequestUUID, undefined,{user: userA, payload})
         expect(res2.error).toBeUndefined()
-        const { activityId} = res2.data
+        const { activityId} = res2.context!
 
 
         const userB1 = (await system.storage.findOne('User', MatchExp.atom({
@@ -236,7 +236,7 @@ describe('computed data in activity', () => {
         }
         const res11 = await controller.callActivityInteraction(makeFriendActivityUUID,  sendRequestUUID, undefined,{user: userC, payload: payload11})
         expect(res11.error).toBeUndefined()
-        const activity11 = res11.data.activityId
+        const activity11 = res11.context!.activityId
 
 
         const payload12 = {
@@ -247,7 +247,7 @@ describe('computed data in activity', () => {
         }
         const res12 = await controller.callActivityInteraction(makeFriendActivityUUID,  sendRequestUUID, undefined,{user: userD, payload: payload12})
         expect(res12.error).toBeUndefined()
-        const activity12 = res12.data.activityId
+        const activity12 = res12.context!.activityId
 
 
         const userB12 = (await system.storage.findOne('User', MatchExp.atom({

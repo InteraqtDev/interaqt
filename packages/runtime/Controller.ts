@@ -202,7 +202,7 @@ export class Controller {
         if (!result.error) {
             const effects: any[] = []
             try {
-                const maybeNewActivityId = activityId || result.data?.activityId
+                const maybeNewActivityId = activityId || result.context?.activityId
                 await this.dispatch(activityCall.uuidToInteractionCall.get(interactionCallId)!.interaction, interactionEventArgs, effects, maybeNewActivityId)
                 result.effects = effects
             } catch(error) {
