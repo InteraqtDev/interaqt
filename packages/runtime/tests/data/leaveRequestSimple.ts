@@ -19,10 +19,10 @@ import {
     Relation,
     RelationBasedAny,
     RelationBasedEvery,
-    RelationCount
-} from "@interaqt/shared";
-import {Controller} from "@interaqt/runtime";
-import {InteractionEventArgs} from "../../types/interaction";
+    RelationCount,
+    Controller,
+    InteractionEventArgs
+} from "@interaqt/runtime";
 
 export const globalUserRole = createUserRoleAttributive({})
 

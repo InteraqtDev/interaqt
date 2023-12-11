@@ -25,40 +25,49 @@ data = computation(events)
 
 ### Step1: 安装
 
+使用 npx 创建一个新的 interaqt 应用。
+
 ```bash
-npm install @interaqt/runtime@1.0.0-alpha.9 // latest version: 1.0.0-alpha.9
+npx create-interaqt-app newInteraqtApp
+cd newInteraqtApp
 ```
 
-### Step2: 创建一个 install.js 文件用于初始化数据库
-```typescript
-import {MonoSystem, Controller, SQLiteDB} from "@interaqt/runtime";
-import {entities, interactions, relations, activities, states} from './app/index.js'
-
-const db = new SQLiteDB('database.db')
-const system = new MonoSystem(db)
-const controller = new Controller(system, entities, relations, activities, interactions, states)
-await controller.setup(true)
+进入到新创建的应用目录，你讲得到如下目录结构：
+```
+├── app
+│    └── index.ts
+├── dashboard
+├── data.ts
+├── database.db
+├── install.ts
+├── package.json
+├── server.ts
+└── // 其他不重要的文件
 ```
 
+其中 
+- app 目录下是你的整个应用的定义
+- dashboard 是一个可选的应用管理界面
+- data.ts 是你的初始化数据
+- database.db 是你的 SQLite 数据库文件
+- install.ts 是初始化数据库的脚本
+- server.ts 是启动应用的脚本
 
-### Step3: 创建一个 server.js 文件用于启动应用
+### Step2: 使用预定义命令初始化数据库和启动项目
 
-```typescript
-import {MonoSystem,Controller, startServer} from "@interaqt/runtime";
-import {entities, interactions, relations, activities, states} from './app/index.js'
+package.json 中已经预定好初始化数据库和启动的命令。我们可以直接使用
 
-const db = new SQLiteDB('database.db')
-const system = new MonoSystem()
-const controller = new Controller(system, entities, relations, activities, interactions, states)
-await controller.setup()
-
-startServer(controller, {
-  port: 3000,
-  parseUserId: async (headers: IncomingHttpHeaders) => {
-      // 鉴权。可以通过下面的方式来模拟用户
-      return headers['x-user-id']
-  }
-})
+```bash
+npm run install  // 初始化数据库
+npm start  // 启动项目
 ```
 
-应用定义请参考应用 [https://github.com/InteraqtDev/feique](https://github.com/InteraqtDev/feique)。
+完成启动后，你将可以通过 `http://localhost:3000/api` 接口。
+你可以通过以下命令启动 dashboard 管理界面来查看所有信息
+
+```bash
+cd dashboard
+npm start
+```
+
+应用示例请参考 [https://github.com/InteraqtDev/feique](https://github.com/InteraqtDev/feique)。

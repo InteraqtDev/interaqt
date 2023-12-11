@@ -63,3 +63,6 @@ boolExpToAttributives(
 )
 ```
 
+## 创建 GET Interaction 获取数据
+
+

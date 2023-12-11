@@ -2,7 +2,9 @@
 
 制作一个请假的简单应用。
 员工创建请假申请，主管和上级主管都审批成功后，申请生效。
-开始这一步之前，请确保你已经按照 [Quick Start](QuickStart.md) 中的正确创建了 `server.ts`。
+开始这一步之前，请确保你已经按照 [Quick Start](QuickStart.md) 中的正确创建了项目。
+
+接下来步骤中的代码都将在 `app/index.ts` 中完成。
 
 ## 定义系统中的基本数据类型和交互动作
 
@@ -218,32 +220,42 @@ RequestEntity.properties.push(
 在这段代码中，我们通过更多的 computed data 类型 `RelationBasedEvery` 和 `RelationBasedAny` 来定义了 Request 
 是否都被同意`approved`，或者有人拒绝`rejected`，并通过 `Property.computed` 创建了一个 string 类型、可用于数据库筛选的计算字段 `result`。
 
-Step7: 实现查看待审批申请的 data api
-在这一步中，我们要回到 `server.ts` ，在 `startServer` api 中传入我们自定义的 data api。
-
+Step7: 实现查看待审批申请的 get interaction
 ```typescript
-import {Controller, DataAPIThis, createDataAPI, BoolExp} from "@interaqt/runtime";
-const apis = {
-    getPendingRequests: createDataAPI(function (this: DataAPIThis) {
-        const match = BoolExp.atom({
+const MineDataAttr = DataAttributive.create({
+    name: 'MyData',
+    content: (event: InteractionEventArgs) => {
+        return {
             key: 'reviewer.id',
-            value: ['=', id]
-        }).and({
-            key: 'reviewer.&.result',
-            value: ['=', 'pending']
-        })
-        return this.system.storage.findOne('Request', match, undefined, ['*'])
-    })
-}
-
-startServer(controller, {
-    port,
-    parseUserId: async (headers: IncomingHttpHeaders) => {
-        // 模拟用户
-        return headers['x-user-id'] as string
+            value: ['=', event.user.id]
+        }
     }
-}, apis)
-```
+})
 
-在这里我们通过 `createDataAPI` 创建了一个用于获取 “等待我审批” 的请求的 data api，这个 api 将可以通过
-`post: /data/getPendingRequests` 来调用。
+const PendingDataAttr = DataAttributive.create({
+    name: 'PendingData',
+    content: (event: InteractionEventArgs) => {
+        return {
+            key: 'result',
+            value: ['=', 'pending']
+        }
+    }
+})
+
+// 查看 我的、未处理的 request
+const getMyPendingRequests = Interaction.create({
+    name: 'getMyPendingRequests',
+    action: GetAction,
+    dataAttributives: boolExpToDataAttributives(BoolExp.atom(MineDataAttr).and(PendingDataAttr)),
+    data: RequestEntity,
+})
+```
+在这一步中我们顶一个 getMyPendingRequests 交互动作，用于获取等待当前用户审批的申请。
+
+Step8: 在前端使用接口触发交互动作
+
+所有的交互动作都会产生独立的接口：
+```
+/api/[interaction-name]
+```
+可通过前端访问。你可以可以通过 dashboard 管理界面来查看所有的交互动作接口以及实体关系信息。
