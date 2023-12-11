@@ -1156,17 +1156,16 @@ export type DataAPIConfig = {
 };
 
 // @public (undocumented)
-export type DataAPIHandle = (this: DataAPIThis, ...rest: any[]) => any;
+export type DataAPIContext = {
+    user: EventUser;
+};
+
+// @public (undocumented)
+export type DataAPIHandle = (this: Controller, context: DataAPIContext, ...rest: any[]) => any;
 
 // @public (undocumented)
 export type DataAPIs = {
     [k: string]: DataAPI;
-};
-
-// @public (undocumented)
-export type DataAPIThis = {
-    system: Controller['system'];
-    user: EventUser;
 };
 
 // @public (undocumented)
