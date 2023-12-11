@@ -13427,7 +13427,7 @@
             },
             {
               "kind": "Content",
-              "text": "{\n    beginTransaction: (transactionName?: string) => "
+              "text": "{\n    map: any;\n    beginTransaction: (transactionName?: string) => "
             },
             {
               "kind": "Reference",

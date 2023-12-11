@@ -3369,6 +3369,7 @@ export const State: Klass<{
 
 // @public (undocumented)
 type Storage_2 = {
+    map: any;
     beginTransaction: (transactionName?: string) => Promise<any>;
     commitTransaction: (transactionName?: string) => Promise<any>;
     rollbackTransaction: (transactionName?: string) => Promise<any>;
