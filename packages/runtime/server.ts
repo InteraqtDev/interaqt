@@ -192,7 +192,8 @@ export async function startServer(controller: Controller, options: ServerOptions
 export function createDataAPI(handle: DataAPIHandle, config: DataAPIConfig = {}): DataAPI {
     assert(!(handle as DataAPI).params, `handle seem to be already a api`)
     const { params = [],  allowAnonymous = false } = config
-    assert(handle.length === (params.length || 0), 'Invalid params length');
+    // 这里的 handle 会默认注入第一个参数为 context，所以下面的判断是 +2
+    assert(handle.length < (params.length || 0) + 2, 'Invalid params length');
     const api = handle as DataAPI
     api.params = params;
     api.allowAnonymous = allowAnonymous
