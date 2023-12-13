@@ -1,6 +1,6 @@
 import {Expression, ExpressionStatement, parse as parseStr} from 'acorn'
 import {assert, indexBy} from "./utils.js";
-import {createClass, Klass, KlassInstance, KlassMeta} from "./createClass.js";
+import {createClass, Klass, KlassInstance, KlassInstancePrimitiveProps, KlassMeta} from "./createClass.js";
 //
 type AtomData<T> = {
     type: 'atom',
@@ -256,7 +256,7 @@ export type UnwrappedBoolExpressionInstanceType<T extends NonNullable<KlassMeta[
     operator: string,
     left: UnwrappedBoolExpressionInstanceType<T> | KlassInstance<typeof BoolAtomData, false>,
     right?: UnwrappedBoolExpressionInstanceType<T> | KlassInstance<typeof BoolAtomData, false>,
-}
+} & KlassInstancePrimitiveProps
 
 export const BoolExpressionData = createClass({
     name: 'BoolExpressionData',
