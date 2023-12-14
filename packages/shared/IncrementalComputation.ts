@@ -3,114 +3,7 @@ import {Activity, Interaction} from "./activity/Activity.js";
 import {Entity, Property, Relation} from "./entity/Entity.js";
 import {State} from "./state/State.js";
 
-export const MapActivityToRecord = createClass({
-    name: 'MapActivityToEntity',
-    public: {
-        sourceActivity: {
-            type: Activity,
-            collection: false,
-            required: true
-        },
-        triggerInteraction: {
-            type: Interaction,
-            collection: true,
-            required: false
-        },
-        handle: {
-            type: 'function',
-            collection: false,
-            required: true
-        }
-    }
-})
 
-
-export const MapInteractionItem = createClass({
-    name: 'MapInteractionItem',
-    public: {
-        interaction: {
-            type: Interaction,
-            collection: false,
-            required: true
-        },
-        handle: {
-            type: 'function',
-            collection: false,
-            required: true
-        },
-        computeTarget: {
-            type: 'function',
-            collection: false,
-            required: false
-        }
-    }
-})
-
-export const MapInteraction = createClass({
-    name: 'MapInteraction',
-    public: {
-        items: {
-            type: MapInteractionItem,
-            collection: true,
-            required: true
-        },
-        defaultValue: {
-            type: 'string',
-            collection: false,
-            required: false
-        }
-    }
-})
-
-
-export const MapActivityItem = createClass({
-    name: 'MapActivityItem',
-    public: {
-        activity: {
-            type: Activity,
-            collection: false,
-            required: true
-        },
-        triggerInteractions: {
-            type: Interaction,
-            collection: true,
-            required:false
-        },
-        handle: {
-            type: 'function',
-            collection: false,
-            required: true
-        },
-        computeTarget: {
-            type: 'function',
-            collection: false,
-            required: false
-        }
-    }
-})
-
-export const MapActivity = createClass({
-    name: 'MapActivity',
-    public: {
-        items: {
-            type: MapActivityItem,
-            collection: true,
-            required: true
-        },
-        defaultValue: {
-            type: 'string',
-            collection: false,
-            required: false
-        }
-    }
-})
-
-// CAUTION 修补 Entity computedData 里面的类型
-Entity.public.computedData.type.push(
-    MapActivityToRecord as unknown as typeof ComputedData,
-    MapInteraction as unknown as typeof ComputedData,
-    MapActivity as unknown as typeof ComputedData
-)
 
 
 const FixedProperty = createClass({
@@ -421,16 +314,130 @@ export const Any = createClass({
     }
 })
 
-export const MapRecordMutationToRecord = createClass({
-    name: 'MapRecordMutationToRecord',
+
+
+export const MapInteractionItem = createClass({
+    name: 'MapInteractionItem',
+    public: {
+        interaction: {
+            type: Interaction,
+            collection: false,
+            required: true
+        },
+        handle: {
+            type: 'function',
+            collection: false,
+            required: true
+        },
+        computeTarget: {
+            type: 'function',
+            collection: false,
+            required: false
+        }
+    }
+})
+
+export const MapInteraction = createClass({
+    name: 'MapInteraction',
+    public: {
+        items: {
+            type: MapInteractionItem,
+            collection: true,
+            required: true
+        },
+        defaultValue: {
+            type: 'string',
+            collection: false,
+            required: false
+        }
+    }
+})
+
+
+export const MapActivityItem = createClass({
+    name: 'MapActivityItem',
+    public: {
+        activity: {
+            type: Activity,
+            collection: false,
+            required: true
+        },
+        triggerInteractions: {
+            type: Interaction,
+            collection: true,
+            required:false
+        },
+        handle: {
+            type: 'function',
+            collection: false,
+            required: true
+        },
+        computeTarget: {
+            type: 'function',
+            collection: false,
+            required: false
+        }
+    }
+})
+
+export const MapActivity = createClass({
+    name: 'MapActivity',
+    public: {
+        items: {
+            type: MapActivityItem,
+            collection: true,
+            required: true
+        },
+        defaultValue: {
+            type: 'string',
+            collection: false,
+            required: false
+        }
+    }
+})
+
+export const MapRecordMutation = createClass({
+    name: 'MapRecordMutation',
     public: {
         handle: {
             type: 'function',
             collection: false,
             required: true
+        },
+        computeTarget: {
+            type: 'function',
+            collection: false,
+            required: false
         }
     }
 })
+
+
+
+// CAUTION 修补 Entity computedData 里面的类型
+Entity.public.computedData.type.push(
+    MapInteraction as unknown as typeof ComputedData,
+    MapActivity as unknown as typeof ComputedData,
+    MapRecordMutation as unknown as typeof ComputedData,
+)
+
+Relation.public.computedData.type.push(
+    MapInteraction as unknown as typeof ComputedData,
+    MapActivity as unknown as typeof ComputedData,
+    MapRecordMutation as unknown as typeof ComputedData,
+)
+
+Property.public.computedData.type.push(
+    MapInteraction as unknown as typeof ComputedData,
+    MapActivity as unknown as typeof ComputedData,
+    MapRecordMutation as unknown as typeof ComputedData,
+)
+
+State.public.computedData.type.push(
+    MapInteraction as unknown as typeof ComputedData,
+    MapActivity as unknown as typeof ComputedData,
+    MapRecordMutation as unknown as typeof ComputedData,
+)
 
 
 // TODO Property 支持的 只增不减的 max/min/topN/
