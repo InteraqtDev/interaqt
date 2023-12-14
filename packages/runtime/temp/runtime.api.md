@@ -1798,8 +1798,89 @@ export type KlassOptions = {
 export type KlassProp<REACTIVE extends boolean, COLLECTION extends true | false | undefined, T> = IfReactiveCollectionProp<REACTIVE, COLLECTION, T>;
 
 // @public (undocumented)
-export const MapActivityToRecord: Klass<{
-    sourceActivity: {
+export const MapActivity: Klass<{
+    items: {
+        type: Klass<{
+            activity: {
+                type: Klass<{
+                    name: {
+                        type: "string";
+                        collection: false;
+                        required: true;
+                    };
+                    interactions: {
+                        type: Klass<InteractionPublicType>;
+                        collection: true;
+                        defaultValue: (...args: any[]) => (InertKlassInstance<InteractionPublicType> | ReactiveKlassInstance<InteractionPublicType>)[];
+                    };
+                    transfers: {
+                        type: Klass<TransferPublicType>;
+                        collection: true;
+                        defaultValue: (...args: any[]) => (ReactiveKlassInstance<TransferPublicType> | InertKlassInstance<TransferPublicType>)[];
+                    };
+                    groups: {
+                        type: Klass<ActivityGroupPublicType>;
+                        collection: true;
+                        defaultValue: (...args: any[]) => (InertKlassInstance<ActivityGroupPublicType> | ReactiveKlassInstance<ActivityGroupPublicType>)[];
+                    };
+                    gateways: {
+                        type: Klass<GatewayPublicType>;
+                        collection: true;
+                        defaultValue: (...args: any[]) => (InertKlassInstance<GatewayPublicType> | ReactiveKlassInstance<GatewayPublicType>)[];
+                    };
+                    events: {
+                        type: Klass<{
+                            name: {
+                                type: "string";
+                                required: true;
+                            };
+                        }>;
+                        collection: true;
+                        defaultValue: (...args: any[]) => (ReactiveKlassInstance<    {
+                            name: {
+                                type: "string";
+                                required: true;
+                            };
+                        }> | InertKlassInstance<    {
+                            name: {
+                                type: "string";
+                                required: true;
+                            };
+                        }>)[];
+                    };
+                }>;
+                collection: false;
+                required: true;
+            };
+            triggerInteractions: {
+                type: Klass<InteractionPublicType>;
+                collection: true;
+                required: false;
+            };
+            handle: {
+                type: "function";
+                collection: false;
+                required: true;
+            };
+            computeTarget: {
+                type: "function";
+                collection: false;
+                required: false;
+            };
+        }>;
+        collection: true;
+        required: true;
+    };
+    defaultValue: {
+        type: "string";
+        collection: false;
+        required: false;
+    };
+}>;
+
+// @public (undocumented)
+export const MapActivityItem: Klass<{
+    activity: {
         type: Klass<{
             name: {
                 type: "string";
@@ -1850,7 +1931,7 @@ export const MapActivityToRecord: Klass<{
         collection: false;
         required: true;
     };
-    triggerInteraction: {
+    triggerInteractions: {
         type: Klass<InteractionPublicType>;
         collection: true;
         required: false;
@@ -1860,10 +1941,15 @@ export const MapActivityToRecord: Klass<{
         collection: false;
         required: true;
     };
+    computeTarget: {
+        type: "function";
+        collection: false;
+        required: false;
+    };
 }>;
 
 // @public (undocumented)
-export const MapInteractionToProperty: Klass<{
+export const MapInteraction: Klass<{
     items: {
         type: Klass<{
             interaction: {
@@ -1876,10 +1962,10 @@ export const MapInteractionToProperty: Klass<{
                 collection: false;
                 required: true;
             };
-            computeSource: {
+            computeTarget: {
                 type: "function";
                 collection: false;
-                required: true;
+                required: false;
             };
         }>;
         collection: true;
@@ -1893,7 +1979,7 @@ export const MapInteractionToProperty: Klass<{
 }>;
 
 // @public (undocumented)
-export const MapInteractionToPropertyItem: Klass<{
+export const MapInteractionItem: Klass<{
     interaction: {
         type: Klass<InteractionPublicType>;
         collection: false;
@@ -1904,33 +1990,24 @@ export const MapInteractionToPropertyItem: Klass<{
         collection: false;
         required: true;
     };
-    computeSource: {
+    computeTarget: {
         type: "function";
         collection: false;
-        required: true;
+        required: false;
     };
 }>;
 
 // @public (undocumented)
-export const MapInteractionToRecord: Klass<{
-    sourceInteraction: {
-        type: Klass<InteractionPublicType>;
-        collection: false;
-        required: true;
-    };
+export const MapRecordMutation: Klass<{
     handle: {
         type: "function";
         collection: false;
         required: true;
     };
-}>;
-
-// @public (undocumented)
-export const MapRecordMutationToRecord: Klass<{
-    handle: {
+    computeTarget: {
         type: "function";
         collection: false;
-        required: true;
+        required: false;
     };
 }>;
 
@@ -3554,7 +3631,7 @@ export type UnwrappedBoolExpressionInstanceType<T extends NonNullable<KlassMeta[
     operator: string;
     left: UnwrappedBoolExpressionInstanceType<T> | KlassInstance<typeof BoolAtomData, false>;
     right?: UnwrappedBoolExpressionInstanceType<T> | KlassInstance<typeof BoolAtomData, false>;
-};
+} & KlassInstancePrimitiveProps;
 
 // @public (undocumented)
 export const USER_ENTITY = "User";

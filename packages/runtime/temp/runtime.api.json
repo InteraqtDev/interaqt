@@ -7980,12 +7980,12 @@
         },
         {
           "kind": "Variable",
-          "canonicalReference": "@interaqt/runtime!MapActivityToRecord:var",
+          "canonicalReference": "@interaqt/runtime!MapActivity:var",
           "docComment": "",
           "excerptTokens": [
             {
               "kind": "Content",
-              "text": "MapActivityToRecord: "
+              "text": "MapActivity: "
             },
             {
               "kind": "Reference",
@@ -7994,7 +7994,314 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n    sourceActivity: {\n        type: "
+              "text": "<{\n    items: {\n        type: "
+            },
+            {
+              "kind": "Reference",
+              "text": "Klass",
+              "canonicalReference": "@interaqt/runtime!Klass:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<{\n            activity: {\n                type: "
+            },
+            {
+              "kind": "Reference",
+              "text": "Klass",
+              "canonicalReference": "@interaqt/runtime!Klass:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<{\n                    name: {\n                        type: \"string\";\n                        collection: false;\n                        required: true;\n                    };\n                    interactions: {\n                        type: "
+            },
+            {
+              "kind": "Reference",
+              "text": "Klass",
+              "canonicalReference": "@interaqt/runtime!Klass:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<"
+            },
+            {
+              "kind": "Reference",
+              "text": "InteractionPublicType",
+              "canonicalReference": "@interaqt/runtime!InteractionPublicType:type"
+            },
+            {
+              "kind": "Content",
+              "text": ">;\n                        collection: true;\n                        defaultValue: (...args: any[]) => ("
+            },
+            {
+              "kind": "Reference",
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/runtime!InertKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<"
+            },
+            {
+              "kind": "Reference",
+              "text": "InteractionPublicType",
+              "canonicalReference": "@interaqt/runtime!InteractionPublicType:type"
+            },
+            {
+              "kind": "Content",
+              "text": "> | "
+            },
+            {
+              "kind": "Reference",
+              "text": "ReactiveKlassInstance",
+              "canonicalReference": "@interaqt/runtime!ReactiveKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<"
+            },
+            {
+              "kind": "Reference",
+              "text": "InteractionPublicType",
+              "canonicalReference": "@interaqt/runtime!InteractionPublicType:type"
+            },
+            {
+              "kind": "Content",
+              "text": ">)[];\n                    };\n                    transfers: {\n                        type: "
+            },
+            {
+              "kind": "Reference",
+              "text": "Klass",
+              "canonicalReference": "@interaqt/runtime!Klass:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<"
+            },
+            {
+              "kind": "Reference",
+              "text": "TransferPublicType",
+              "canonicalReference": "@interaqt/runtime!TransferPublicType:type"
+            },
+            {
+              "kind": "Content",
+              "text": ">;\n                        collection: true;\n                        defaultValue: (...args: any[]) => ("
+            },
+            {
+              "kind": "Reference",
+              "text": "ReactiveKlassInstance",
+              "canonicalReference": "@interaqt/runtime!ReactiveKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<"
+            },
+            {
+              "kind": "Reference",
+              "text": "TransferPublicType",
+              "canonicalReference": "@interaqt/runtime!TransferPublicType:type"
+            },
+            {
+              "kind": "Content",
+              "text": "> | "
+            },
+            {
+              "kind": "Reference",
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/runtime!InertKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<"
+            },
+            {
+              "kind": "Reference",
+              "text": "TransferPublicType",
+              "canonicalReference": "@interaqt/runtime!TransferPublicType:type"
+            },
+            {
+              "kind": "Content",
+              "text": ">)[];\n                    };\n                    groups: {\n                        type: "
+            },
+            {
+              "kind": "Reference",
+              "text": "Klass",
+              "canonicalReference": "@interaqt/runtime!Klass:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<"
+            },
+            {
+              "kind": "Reference",
+              "text": "ActivityGroupPublicType",
+              "canonicalReference": "@interaqt/runtime!ActivityGroupPublicType:type"
+            },
+            {
+              "kind": "Content",
+              "text": ">;\n                        collection: true;\n                        defaultValue: (...args: any[]) => ("
+            },
+            {
+              "kind": "Reference",
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/runtime!InertKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<"
+            },
+            {
+              "kind": "Reference",
+              "text": "ActivityGroupPublicType",
+              "canonicalReference": "@interaqt/runtime!ActivityGroupPublicType:type"
+            },
+            {
+              "kind": "Content",
+              "text": "> | "
+            },
+            {
+              "kind": "Reference",
+              "text": "ReactiveKlassInstance",
+              "canonicalReference": "@interaqt/runtime!ReactiveKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<"
+            },
+            {
+              "kind": "Reference",
+              "text": "ActivityGroupPublicType",
+              "canonicalReference": "@interaqt/runtime!ActivityGroupPublicType:type"
+            },
+            {
+              "kind": "Content",
+              "text": ">)[];\n                    };\n                    gateways: {\n                        type: "
+            },
+            {
+              "kind": "Reference",
+              "text": "Klass",
+              "canonicalReference": "@interaqt/runtime!Klass:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<"
+            },
+            {
+              "kind": "Reference",
+              "text": "GatewayPublicType",
+              "canonicalReference": "@interaqt/runtime!GatewayPublicType:type"
+            },
+            {
+              "kind": "Content",
+              "text": ">;\n                        collection: true;\n                        defaultValue: (...args: any[]) => ("
+            },
+            {
+              "kind": "Reference",
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/runtime!InertKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<"
+            },
+            {
+              "kind": "Reference",
+              "text": "GatewayPublicType",
+              "canonicalReference": "@interaqt/runtime!GatewayPublicType:type"
+            },
+            {
+              "kind": "Content",
+              "text": "> | "
+            },
+            {
+              "kind": "Reference",
+              "text": "ReactiveKlassInstance",
+              "canonicalReference": "@interaqt/runtime!ReactiveKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<"
+            },
+            {
+              "kind": "Reference",
+              "text": "GatewayPublicType",
+              "canonicalReference": "@interaqt/runtime!GatewayPublicType:type"
+            },
+            {
+              "kind": "Content",
+              "text": ">)[];\n                    };\n                    events: {\n                        type: "
+            },
+            {
+              "kind": "Reference",
+              "text": "Klass",
+              "canonicalReference": "@interaqt/runtime!Klass:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<{\n                            name: {\n                                type: \"string\";\n                                required: true;\n                            };\n                        }>;\n                        collection: true;\n                        defaultValue: (...args: any[]) => ("
+            },
+            {
+              "kind": "Reference",
+              "text": "ReactiveKlassInstance",
+              "canonicalReference": "@interaqt/runtime!ReactiveKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<    {\n                        name: {\n                        type: \"string\";\n                        required: true;\n                        };\n                        }> | "
+            },
+            {
+              "kind": "Reference",
+              "text": "InertKlassInstance",
+              "canonicalReference": "@interaqt/runtime!InertKlassInstance:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<    {\n                        name: {\n                        type: \"string\";\n                        required: true;\n                        };\n                        }>)[];\n                    };\n                }>;\n                collection: false;\n                required: true;\n            };\n            triggerInteractions: {\n                type: "
+            },
+            {
+              "kind": "Reference",
+              "text": "Klass",
+              "canonicalReference": "@interaqt/runtime!Klass:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<"
+            },
+            {
+              "kind": "Reference",
+              "text": "InteractionPublicType",
+              "canonicalReference": "@interaqt/runtime!InteractionPublicType:type"
+            },
+            {
+              "kind": "Content",
+              "text": ">;\n                collection: true;\n                required: false;\n            };\n            handle: {\n                type: \"function\";\n                collection: false;\n                required: true;\n            };\n            computeTarget: {\n                type: \"function\";\n                collection: false;\n                required: false;\n            };\n        }>;\n        collection: true;\n        required: true;\n    };\n    defaultValue: {\n        type: \"string\";\n        collection: false;\n        required: false;\n    };\n}>"
+            }
+          ],
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
+          "isReadonly": true,
+          "releaseTag": "Public",
+          "name": "MapActivity",
+          "variableTypeTokenRange": {
+            "startIndex": 1,
+            "endIndex": 65
+          }
+        },
+        {
+          "kind": "Variable",
+          "canonicalReference": "@interaqt/runtime!MapActivityItem:var",
+          "docComment": "",
+          "excerptTokens": [
+            {
+              "kind": "Content",
+              "text": "MapActivityItem: "
+            },
+            {
+              "kind": "Reference",
+              "text": "Klass",
+              "canonicalReference": "@interaqt/runtime!Klass:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<{\n    activity: {\n        type: "
             },
             {
               "kind": "Reference",
@@ -8246,7 +8553,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n                name: {\n                type: \"string\";\n                required: true;\n                };\n                }>)[];\n            };\n        }>;\n        collection: false;\n        required: true;\n    };\n    triggerInteraction: {\n        type: "
+              "text": "<    {\n                name: {\n                type: \"string\";\n                required: true;\n                };\n                }>)[];\n            };\n        }>;\n        collection: false;\n        required: true;\n    };\n    triggerInteractions: {\n        type: "
             },
             {
               "kind": "Reference",
@@ -8264,13 +8571,13 @@
             },
             {
               "kind": "Content",
-              "text": ">;\n        collection: true;\n        required: false;\n    };\n    handle: {\n        type: \"function\";\n        collection: false;\n        required: true;\n    };\n}>"
+              "text": ">;\n        collection: true;\n        required: false;\n    };\n    handle: {\n        type: \"function\";\n        collection: false;\n        required: true;\n    };\n    computeTarget: {\n        type: \"function\";\n        collection: false;\n        required: false;\n    };\n}>"
             }
           ],
           "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "isReadonly": true,
           "releaseTag": "Public",
-          "name": "MapActivityToRecord",
+          "name": "MapActivityItem",
           "variableTypeTokenRange": {
             "startIndex": 1,
             "endIndex": 63
@@ -8278,12 +8585,12 @@
         },
         {
           "kind": "Variable",
-          "canonicalReference": "@interaqt/runtime!MapInteractionToProperty:var",
+          "canonicalReference": "@interaqt/runtime!MapInteraction:var",
           "docComment": "",
           "excerptTokens": [
             {
               "kind": "Content",
-              "text": "MapInteractionToProperty: "
+              "text": "MapInteraction: "
             },
             {
               "kind": "Reference",
@@ -8319,13 +8626,13 @@
             },
             {
               "kind": "Content",
-              "text": ">;\n                collection: false;\n                required: true;\n            };\n            handle: {\n                type: \"function\";\n                collection: false;\n                required: true;\n            };\n            computeSource: {\n                type: \"function\";\n                collection: false;\n                required: true;\n            };\n        }>;\n        collection: true;\n        required: true;\n    };\n    defaultValue: {\n        type: \"string\";\n        collection: false;\n        required: false;\n    };\n}>"
+              "text": ">;\n                collection: false;\n                required: true;\n            };\n            handle: {\n                type: \"function\";\n                collection: false;\n                required: true;\n            };\n            computeTarget: {\n                type: \"function\";\n                collection: false;\n                required: false;\n            };\n        }>;\n        collection: true;\n        required: true;\n    };\n    defaultValue: {\n        type: \"string\";\n        collection: false;\n        required: false;\n    };\n}>"
             }
           ],
           "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "isReadonly": true,
           "releaseTag": "Public",
-          "name": "MapInteractionToProperty",
+          "name": "MapInteraction",
           "variableTypeTokenRange": {
             "startIndex": 1,
             "endIndex": 9
@@ -8333,12 +8640,12 @@
         },
         {
           "kind": "Variable",
-          "canonicalReference": "@interaqt/runtime!MapInteractionToPropertyItem:var",
+          "canonicalReference": "@interaqt/runtime!MapInteractionItem:var",
           "docComment": "",
           "excerptTokens": [
             {
               "kind": "Content",
-              "text": "MapInteractionToPropertyItem: "
+              "text": "MapInteractionItem: "
             },
             {
               "kind": "Reference",
@@ -8365,13 +8672,13 @@
             },
             {
               "kind": "Content",
-              "text": ">;\n        collection: false;\n        required: true;\n    };\n    handle: {\n        type: \"function\";\n        collection: false;\n        required: true;\n    };\n    computeSource: {\n        type: \"function\";\n        collection: false;\n        required: true;\n    };\n}>"
+              "text": ">;\n        collection: false;\n        required: true;\n    };\n    handle: {\n        type: \"function\";\n        collection: false;\n        required: true;\n    };\n    computeTarget: {\n        type: \"function\";\n        collection: false;\n        required: false;\n    };\n}>"
             }
           ],
           "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "isReadonly": true,
           "releaseTag": "Public",
-          "name": "MapInteractionToPropertyItem",
+          "name": "MapInteractionItem",
           "variableTypeTokenRange": {
             "startIndex": 1,
             "endIndex": 7
@@ -8379,12 +8686,12 @@
         },
         {
           "kind": "Variable",
-          "canonicalReference": "@interaqt/runtime!MapInteractionToRecord:var",
+          "canonicalReference": "@interaqt/runtime!MapRecordMutation:var",
           "docComment": "",
           "excerptTokens": [
             {
               "kind": "Content",
-              "text": "MapInteractionToRecord: "
+              "text": "MapRecordMutation: "
             },
             {
               "kind": "Reference",
@@ -8393,59 +8700,13 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n    sourceInteraction: {\n        type: "
-            },
-            {
-              "kind": "Reference",
-              "text": "Klass",
-              "canonicalReference": "@interaqt/runtime!Klass:type"
-            },
-            {
-              "kind": "Content",
-              "text": "<"
-            },
-            {
-              "kind": "Reference",
-              "text": "InteractionPublicType",
-              "canonicalReference": "@interaqt/runtime!InteractionPublicType:type"
-            },
-            {
-              "kind": "Content",
-              "text": ">;\n        collection: false;\n        required: true;\n    };\n    handle: {\n        type: \"function\";\n        collection: false;\n        required: true;\n    };\n}>"
+              "text": "<{\n    handle: {\n        type: \"function\";\n        collection: false;\n        required: true;\n    };\n    computeTarget: {\n        type: \"function\";\n        collection: false;\n        required: false;\n    };\n}>"
             }
           ],
           "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
           "isReadonly": true,
           "releaseTag": "Public",
-          "name": "MapInteractionToRecord",
-          "variableTypeTokenRange": {
-            "startIndex": 1,
-            "endIndex": 7
-          }
-        },
-        {
-          "kind": "Variable",
-          "canonicalReference": "@interaqt/runtime!MapRecordMutationToRecord:var",
-          "docComment": "",
-          "excerptTokens": [
-            {
-              "kind": "Content",
-              "text": "MapRecordMutationToRecord: "
-            },
-            {
-              "kind": "Reference",
-              "text": "Klass",
-              "canonicalReference": "@interaqt/runtime!Klass:type"
-            },
-            {
-              "kind": "Content",
-              "text": "<{\n    handle: {\n        type: \"function\";\n        collection: false;\n        required: true;\n    };\n}>"
-            }
-          ],
-          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
-          "isReadonly": true,
-          "releaseTag": "Public",
-          "name": "MapRecordMutationToRecord",
+          "name": "MapRecordMutation",
           "variableTypeTokenRange": {
             "startIndex": 1,
             "endIndex": 3
@@ -14788,7 +15049,12 @@
             },
             {
               "kind": "Content",
-              "text": ", false>;\n}"
+              "text": ", false>;\n} & "
+            },
+            {
+              "kind": "Reference",
+              "text": "KlassInstancePrimitiveProps",
+              "canonicalReference": "@interaqt/runtime!KlassInstancePrimitiveProps:type"
             },
             {
               "kind": "Content",
@@ -14813,7 +15079,7 @@
           ],
           "typeTokenRange": {
             "startIndex": 6,
-            "endIndex": 19
+            "endIndex": 20
           }
         },
         {
