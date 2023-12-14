@@ -71,6 +71,11 @@ export const MapActivityItem = createClass({
             collection: false,
             required: true
         },
+        triggerInteractions: {
+            type: Interaction,
+            collection: true,
+            required:false
+        },
         handle: {
             type: 'function',
             collection: false,
