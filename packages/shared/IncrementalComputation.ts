@@ -66,7 +66,7 @@ export const MapInteraction = createClass({
 export const MapActivityItem = createClass({
     name: 'MapActivityItem',
     public: {
-        interaction: {
+        activity: {
             type: Activity,
             collection: false,
             required: true
