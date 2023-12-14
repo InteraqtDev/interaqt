@@ -8,7 +8,6 @@ import {
     Controller,
     createUserRoleAttributive,
     Interaction,
-    MapActivityToRecord,
     MapActivity,
     MapActivityItem,
     Payload,

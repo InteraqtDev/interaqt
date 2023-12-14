@@ -1,6 +1,6 @@
 import './MapInteraction.js'
 import './MapActivity.js'
-import './MapRecordMutationToRecord.js'
+import './MapRecordMutation.js'
 import './RelationStateMachine.js'
 import './RelationBasedWeightedSummation.js'
 import './RelationCount.js'

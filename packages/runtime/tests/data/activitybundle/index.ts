@@ -24,7 +24,7 @@ import {
     MapActivityItem,
     MapInteraction,
     MapInteractionItem,
-    MapRecordMutationToRecord,
+    MapRecordMutation,
     Payload,
     PayloadItem,
     Property,
@@ -438,7 +438,7 @@ export const postRevisionEntity = Entity.create({
         // 这里测试 title 不可更新，所以 revision 里面不记录。
         Property.create({name: 'content', type: PropertyTypes.String})
     ],
-    computedData: MapRecordMutationToRecord.create({
+    computedData: MapRecordMutation.create({
         handle: async function (this: Controller, event: RecordMutationEvent, events: RecordMutationEvent[]) {
             if (event.type === 'update' && event.recordName === 'Post') {
                 return {

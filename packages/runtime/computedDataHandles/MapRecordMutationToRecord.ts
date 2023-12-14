@@ -7,7 +7,6 @@ import {IncrementalComputedDataHandle, StatePatch} from "./IncrementalComputedDa
 export class MapInteractionToRecordHandle extends IncrementalComputedDataHandle {
     data!: KlassInstance<typeof Entity, false>
     mapItem!: (mutationEvent: RecordMutationEvent, mutationEvents: RecordMutationEvent[]) => any
-    sourceInteraction!: KlassInstance<typeof Interaction, false>
     constructor(controller: Controller , computedData: KlassInstance<typeof ComputedData, false> , dataContext:  DataContext) {
         super(controller, computedData, dataContext);
     }
