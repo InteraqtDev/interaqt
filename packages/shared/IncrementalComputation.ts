@@ -77,10 +77,49 @@ export const MapInteractionToProperty = createClass({
     }
 })
 
+
+export const MapInteractionItem = createClass({
+    name: 'MapInteractionToPropertyItem',
+    public: {
+        interaction: {
+            type: Interaction,
+            collection: false,
+            required: true
+        },
+        handle: {
+            type: 'function',
+            collection: false,
+            required: true
+        },
+        computeTarget: {
+            type: 'function',
+            collection: false,
+            required: false
+        }
+    }
+})
+
+export const MapInteraction = createClass({
+    name: 'MapInteraction',
+    public: {
+        items: {
+            type: MapInteractionItem,
+            collection: true,
+            required: true
+        },
+        defaultValue: {
+            type: 'string',
+            collection: false,
+            required: false
+        }
+    }
+})
+
 // CAUTION 修补 Entity computedData 里面的类型
 Entity.public.computedData.type.push(
     MapActivityToRecord as unknown as typeof ComputedData,
-    MapInteractionToRecord as unknown as typeof ComputedData
+    MapInteractionToRecord as unknown as typeof ComputedData,
+    MapInteraction as unknown as typeof ComputedData
 )
 
 
