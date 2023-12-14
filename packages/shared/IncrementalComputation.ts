@@ -79,7 +79,7 @@ export const MapInteractionToProperty = createClass({
 
 
 export const MapInteractionItem = createClass({
-    name: 'MapInteractionToPropertyItem',
+    name: 'MapInteractionItem',
     public: {
         interaction: {
             type: Interaction,
