@@ -3,8 +3,8 @@ import {
     Controller,
     Entity,
     Interaction,
-    MapInteractionToProperty,
-    MapInteractionToPropertyItem,
+    MapInteraction,
+    MapInteractionItem,
     MapRecordMutationToRecord,
     Payload,
     PayloadItem,
@@ -50,12 +50,12 @@ postEntity.properties.push(
     Property.create({
         name: 'content',
         type: PropertyTypes.String,
-        computedData: MapInteractionToProperty.create({
+        computedData: MapInteraction.create({
             items: [
-                MapInteractionToPropertyItem.create({
+                MapInteractionItem.create({
                     interaction: updatePostInteraction,
                     handle: (event) => { return event.payload.post.content },
-                    computeSource: async function (this: Controller, event) {
+                    computeTarget: async function (this: Controller, event) {
                         return event.payload.post.id
                     }
                 }),

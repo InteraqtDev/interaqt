@@ -3,8 +3,8 @@ import {approveInteraction, mapFriendActivityToRequest, rejectInteraction} from 
 import {
     Controller,
     Entity,
-    MapInteractionToProperty,
-    MapInteractionToPropertyItem,
+    MapInteractionItem,
+    MapInteraction,
     Property,
     Relation,
     RelationBasedAny,
@@ -39,12 +39,12 @@ export const receivedRequestRelation = Relation.create({
         name: 'result',
         type: 'string',
         collection: false,
-        computedData: MapInteractionToProperty.create({
+        computedData: MapInteraction.create({
             items: [
-                MapInteractionToPropertyItem.create({
+                MapInteractionItem.create({
                     interaction: approveInteraction,
                     handle: () => 'approved',
-                    computeSource: async function (this: Controller, event, activityId) {
+                    computeTarget: async function (this: Controller, event, activityId) {
                         const {BoolExp} = this.globals
                         const match = BoolExp.atom({
                             key: 'activity.id',
@@ -58,10 +58,10 @@ export const receivedRequestRelation = Relation.create({
                         }
                     }
                 }),
-                MapInteractionToPropertyItem.create({
+                MapInteractionItem.create({
                     interaction: rejectInteraction,
                     handle: () => 'rejected',
-                    computeSource: async function (this: Controller, event, activityId) {
+                    computeTarget: async function (this: Controller, event, activityId) {
                         const {BoolExp} = this.globals
                         const match = BoolExp.atom({
                             key: 'activity.id',

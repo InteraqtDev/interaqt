@@ -11,9 +11,8 @@ import {
     GetAction,
     Interaction,
     InteractionEventArgs,
-    MapInteractionToProperty,
-    MapInteractionToPropertyItem,
-    MapInteractionToRecord,
+    MapInteraction,
+    MapInteractionItem,
     Payload,
     PayloadItem,
     Property,
@@ -111,14 +110,18 @@ const sendRequestRelation = Relation.create({
     target: UserEntity,
     targetProperty: 'request',
     relType: 'n:1',
-    computedData: MapInteractionToRecord.create({
-        sourceInteraction: createInteraction,
-        handle: function map(event: any) {
-            return {
-                source: event.payload.request,
-                target: event.user,
-            }
-        }
+    computedData: MapInteraction.create({
+        items: [
+            MapInteractionItem.create({
+                interaction: createInteraction,
+                handle: function map(event: any) {
+                    return {
+                        source: event.payload.request,
+                        target: event.user,
+                    }
+                }
+            }),
+        ]
     }),
 })
 
@@ -129,34 +132,66 @@ const reviewerRelation = Relation.create({
     target: UserEntity,
     targetProperty: 'request',
     relType: 'n:n',
-    computedData: MapInteractionToRecord.create({
-        sourceInteraction: createInteraction,
-        handle: async function map(this: Controller, event: any) {
-            const {BoolExp} = this.globals
+    computedData: MapInteraction.create({
+        items: [
+            MapInteractionItem.create({
+                interaction: createInteraction,
+                handle: async function map(this: Controller, event: any) {
+                    const {BoolExp} = this.globals
 
-            const match = BoolExp.atom({
-                key: 'id',
-                value: ['=', event.user.id]
-            })
+                    const match = BoolExp.atom({
+                        key: 'id',
+                        value: ['=', event.user.id]
+                    })
 
-            const {supervisor} = await this.system.storage.findOne(
-                'User',
-                match,
-                undefined,
-                [
-                    ['supervisor', {attributeQuery: [['supervisor', {attributeQuery: ['*']}]]}],
-                ]
-            )
+                    const {supervisor} = await this.system.storage.findOne(
+                        'User',
+                        match,
+                        undefined,
+                        [
+                            ['supervisor', {attributeQuery: [['supervisor', {attributeQuery: ['*']}]]}],
+                        ]
+                    )
 
-            return [{
-                source: event.payload.request,
-                target: supervisor,
-            }, {
-                source: event.payload.request,
-                isSecond: true,
-                target: supervisor.supervisor,
-            }]
-        }
+                    return [{
+                        source: event.payload.request,
+                        target: supervisor,
+                    }, {
+                        source: event.payload.request,
+                        isSecond: true,
+                        target: supervisor.supervisor,
+                    }]
+                }
+            }),
+        ],
+
+        // sourceInteraction: createInteraction,
+        // handle: async function map(this: Controller, event: any) {
+        //     const {BoolExp} = this.globals
+        //
+        //     const match = BoolExp.atom({
+        //         key: 'id',
+        //         value: ['=', event.user.id]
+        //     })
+        //
+        //     const {supervisor} = await this.system.storage.findOne(
+        //         'User',
+        //         match,
+        //         undefined,
+        //         [
+        //             ['supervisor', {attributeQuery: [['supervisor', {attributeQuery: ['*']}]]}],
+        //         ]
+        //     )
+        //
+        //     return [{
+        //         source: event.payload.request,
+        //         target: supervisor,
+        //     }, {
+        //         source: event.payload.request,
+        //         isSecond: true,
+        //         target: supervisor.supervisor,
+        //     }]
+        // }
     }),
     properties: [
         Property.create({
@@ -168,12 +203,12 @@ const reviewerRelation = Relation.create({
             name: 'result',
             type: 'string',
             collection: false,
-            computedData: MapInteractionToProperty.create({
+            computedData: MapInteraction.create({
                 items: [
-                    MapInteractionToPropertyItem.create({
+                    MapInteractionItem.create({
                         interaction: approveInteraction,
                         handle: () => 'approved',
-                        computeSource: async function (this: Controller, event) {
+                        computeTarget: async function (this: Controller, event) {
 
                             return {
                                 "source.id": event.payload.request.id,

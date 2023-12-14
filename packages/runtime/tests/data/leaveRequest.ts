@@ -7,9 +7,8 @@ import {
     createUserRoleAttributive,
     Entity,
     Interaction,
-    MapInteractionToProperty,
-    MapInteractionToPropertyItem,
-    MapInteractionToRecord,
+    MapInteraction,
+    MapInteractionItem,
     Payload,
     PayloadItem,
     Property,
@@ -71,14 +70,26 @@ const sendRequestRelation = Relation.create({
     target: UserEntity,
     targetProperty: 'request',
     relType: 'n:1',
-    computedData:  MapInteractionToRecord.create({
-        sourceInteraction: sendInteraction,
-        handle:function map(event: any){
-            return {
-                source: event.payload.request,
-                target: event.user,
-            }
-        }
+    computedData:  MapInteraction.create({
+        items: [
+            MapInteractionItem.create({
+                interaction: sendInteraction,
+                handle:function map(event: any){
+                    return {
+                        source: event.payload.request,
+                        target: event.user,
+                    }
+                }
+
+            })
+        ],
+        // sourceInteraction: sendInteraction,
+        // handle:function map(event: any){
+        //     return {
+        //         source: event.payload.request,
+        //         target: event.user,
+        //     }
+        // }
     }),
 })
 
@@ -271,22 +282,22 @@ const reviewerRelation = Relation.create({
         name: 'result',
         type: 'string',
         collection: false,
-        computedData: MapInteractionToProperty.create({
+        computedData: MapInteraction.create({
             items: [
-                MapInteractionToPropertyItem.create({
+                MapInteractionItem.create({
                     interaction: approveInteraction,
                     handle: () => 'approved',
-                    computeSource: function(event) {
+                    computeTarget: function(event) {
                         return {
                             "source.id": event.payload.request.id,
                             "target.id": event.user.id
                         }
                     }
                 }),
-                MapInteractionToPropertyItem.create({
+                MapInteractionItem.create({
                     interaction: rejectInteraction,
                     handle: () => 'rejected',
-                    computeSource: function(event)  {
+                    computeTarget: function(event)  {
                         return {
                             "source.id": event.payload.request.id,
                             "target.id": event.user.id

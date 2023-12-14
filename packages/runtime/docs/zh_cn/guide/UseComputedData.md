@@ -14,8 +14,8 @@ export const requestEntity = Entity.create({
     name: 'Request',
     computedData: MapActivityToRecord.create({
         sourceActivity: createFriendRelationActivity,
-        triggerInteraction: [sendInteraction, approveInteraction, rejectInteraction],
-        handle: function map(stack) {
+        triggerInteraction: [sendInteraction, approveInteraction, rejectInteraction],  // 触发数据计算的 interation
+        handle: function map(stack) {  // 计算数据的函数
             const sendRequestEvent = stack.find((i: any) => i.interaction.name === 'sendRequest')
 
             if (!sendRequestEvent) {
@@ -46,11 +46,18 @@ const sendRequestRelation = Relation.create({
     target: UserEntity,
     targetProperty: 'request',
     relType: 'n:1',
+    properties: [
+        Property.create({
+            name: 'createdAt',
+            type: 'string'
+        })
+    ],
     computedData: MapInteractionToRecord.create({
         sourceInteraction: createInteraction,
         handle: function map(event: any) {
             return {
                 source: event.payload.request,
+                createdAt: Date.now().toString(), // 记录在关系上的数据。
                 target: event.user,
             }
         }
@@ -66,7 +73,6 @@ const sendRequestRelation = Relation.create({
 const postRevisionEntity = Entity.create({
     name: 'PostRevision',
     properties: [
-        // 这里测试 title 不可更新，所以 revision 里面不记录。
         Property.create({ name: 'content', type: PropertyTypes.String })
     ],
     computedData: MapRecordMutationToRecord.create({
@@ -165,12 +171,11 @@ Property.create({
     type: 'string',
     collection: false,
     computedData: MapInteractionToProperty.create({
-        items: [
+        items: [                                    // 可以监听多种 Interaction，有多种计算值的方式。
             MapInteractionToPropertyItem.create({
-                interaction: approveInteraction,
-                handle: () => 'approved',
-                computeSource: async function (this: Controller, event) {
-
+                interaction: approveInteraction,   // 监听的 Interaction
+                handle: () => 'approved',          // 监听的 Interaction 触发时，计算得到的 property 值
+                computeSource: async function (this: Controller, event) {   // 根据 interaction event 计算出受影响的记录
                     return {
                         "source.id": event.payload.request.id,
                         "target.id": event.user.id

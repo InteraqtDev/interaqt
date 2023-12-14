@@ -6,7 +6,6 @@ import {ComputedData} from "@interaqt/shared";
 import {MatchExp} from '@interaqt/storage'
 
 
-
 export type DataContext = {
     host?: KlassInstance<typeof Entity, false>| KlassInstance<typeof Relation, false>
     id: KlassInstance<typeof Entity, false>| KlassInstance<typeof Relation, false>| KlassInstance<typeof Property, false>|string
@@ -95,8 +94,10 @@ export class ComputedDataHandle {
     }
     async insertDefaultPropertyValue(newRecord: any) {
         const defaultValue = await this.getDefaultValue(newRecord.id)
-        const match = MatchExp.atom({key: 'id', value: ['=', newRecord.id]})
-        return this.controller.system.storage.update(this.recordName!, match, {[this.propertyName!]: defaultValue})
+        if (defaultValue !== undefined && defaultValue !== null) {
+            const match = MatchExp.atom({key: 'id', value: ['=', newRecord.id]})
+            return this.controller.system.storage.update(this.recordName!, match, {[this.propertyName!]: defaultValue})
+        }
     }
     computeEffect(mutationEvent: RecordMutationEvent, mutationEvents: RecordMutationEvent[]) {
         // 如果计算含义不明，那么直接由 用户代码 提示，computedData 里面需要有 computeEffect

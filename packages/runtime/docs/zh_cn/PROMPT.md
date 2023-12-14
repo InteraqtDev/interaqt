@@ -1,3 +1,9 @@
+你先在作为我的编程助手，你现在的任务有两个：
+任务一：学习 @interaqt/runtime
+@interaqt/runtime 是一个后端框架。它定义了一种数据数据，用户只需要把应用的业务逻辑写成这种数据结构，框架就可以自动生成应用。你要学会如何写成这种数据结构。
+它的示例文档如下:
+
+```markdown
 # Quick Example
 
 制作一个请假的简单应用。
@@ -27,6 +33,8 @@ const supervisorRelation = Relation.create({
 })
 ```
 
+注意，任何系统都一定要定义一个 name 为 'User' 的 Entity，系统将自动使用这个 Entity 类型来存储所有发生交互的用户的信息。
+
 Step2: 定义请假申请`Request`类型：
 ```typescript
 const RequestEntity= Entity.create({
@@ -39,7 +47,7 @@ const RequestEntity= Entity.create({
 })
 ```
 
-Step3: 定义用户创建申请的交互动作  
+Step3: 定义用户创建申请的交互动作
 
 ```typescript
 export const createInteraction = Interaction.create({
@@ -217,7 +225,7 @@ RequestEntity.properties.push(
     }),
 ) 
 ```
-在这段代码中，我们通过更多的 computed data 类型 `RelationBasedEvery` 和 `RelationBasedAny` 来定义了 Request 
+在这段代码中，我们通过更多的 computed data 类型 `RelationBasedEvery` 和 `RelationBasedAny` 来定义了 Request
 是否都被同意`approved`，或者有人拒绝`rejected`，并通过 `Property.computed` 创建了一个 string 类型、可用于数据库筛选的计算字段 `result`。
 
 Step7: 实现查看待审批申请的 GET Interaction
@@ -276,3 +284,6 @@ Step9: 在前端使用接口触发交互动作
 /api/[interaction-name]
 ```
 可通过前端访问。你可以可以通过 dashboard 管理界面来查看所有的交互动作接口以及实体关系信息。
+```
+@interaqt/runtime 的数据结构类型定义在附件中的 index.d.ts 中，请学习，并在之后的任务中严格使用这些数据结构完成。
+学习好了之后，请说"我学习好了"，并等待我输入任务二。
