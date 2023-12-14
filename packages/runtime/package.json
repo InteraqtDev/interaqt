@@ -26,7 +26,7 @@
   "license": "MIT",
   "dependencies": {
     "@fastify/middie": "^8.3.0",
-    "@interaqt/shared": "^1.0.15",
+    "@interaqt/shared": "^1.0.17",
     "@interaqt/storage": "^1.0.2",
     "@types/better-sqlite3": "^7.6.8",
     "@types/connect": "^3.4.38",

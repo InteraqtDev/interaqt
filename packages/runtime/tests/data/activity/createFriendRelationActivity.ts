@@ -9,6 +9,8 @@ import {
     createUserRoleAttributive,
     Interaction,
     MapActivityToRecord,
+    MapActivity,
+    MapActivityItem,
     Payload,
     PayloadItem,
     Relation,
@@ -203,23 +205,47 @@ export const friendRelation = Relation.create({
     relType: 'n:n',
     computedData: friendRelationSM
 })
-export const mapFriendActivityToRequest = MapActivityToRecord.create({
-    sourceActivity: createFriendRelationActivity,
-    triggerInteraction: [sendInteraction, approveInteraction, rejectInteraction],
-    handle: function map(stack) {
-        const sendRequestEvent = stack.find((i: any) => i.interaction.name === 'sendRequest')
 
-        if (!sendRequestEvent) {
-            return undefined
-        }
 
-        const handled = !!stack.find((i: any) => i.interaction.name === 'approve' || i.interaction.name === 'reject')
+export const mapFriendActivityToRequest = MapActivity.create({
+    items: [
+        MapActivityItem.create({
+            activity: createFriendRelationActivity,
+            triggerInteractions: [sendInteraction, approveInteraction, rejectInteraction],
+            handle: function (stack) {
+                const sendRequestEvent = stack.find((i: any) => i.interaction.name === 'sendRequest')
 
-        return {
-            from: sendRequestEvent.data.user,
-            to: sendRequestEvent.data.payload.to,
-            message: sendRequestEvent.data.payload.message,
-            handled,
-        }
-    }
+                if (!sendRequestEvent) {
+                    return undefined
+                }
+
+                const handled = !!stack.find((i: any) => i.interaction.name === 'approve' || i.interaction.name === 'reject')
+
+                return {
+                    from: sendRequestEvent.data.user,
+                    to: sendRequestEvent.data.payload.to,
+                    message: sendRequestEvent.data.payload.message,
+                    handled,
+                }
+            }
+        })
+    ],
+    // sourceActivity: createFriendRelationActivity,
+    // triggerInteraction: [sendInteraction, approveInteraction, rejectInteraction],
+    // handle: function map(stack) {
+    //     const sendRequestEvent = stack.find((i: any) => i.interaction.name === 'sendRequest')
+    //
+    //     if (!sendRequestEvent) {
+    //         return undefined
+    //     }
+    //
+    //     const handled = !!stack.find((i: any) => i.interaction.name === 'approve' || i.interaction.name === 'reject')
+    //
+    //     return {
+    //         from: sendRequestEvent.data.user,
+    //         to: sendRequestEvent.data.payload.to,
+    //         message: sendRequestEvent.data.payload.message,
+    //         handled,
+    //     }
+    // }
 })

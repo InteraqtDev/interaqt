@@ -22,6 +22,8 @@ export const requestEntity = Entity.create({
         collection: false,
     })]
 })
+
+
 export const sendRequestRelation = Relation.create({
     source: requestEntity,
     sourceProperty: 'from',

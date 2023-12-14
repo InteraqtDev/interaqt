@@ -1,5 +1,5 @@
 import './MapInteraction.js'
-import './MapActivityToRecord.js'
+import './MapActivity.js'
 import './MapRecordMutationToRecord.js'
 import './RelationStateMachine.js'
 import './RelationBasedWeightedSummation.js'

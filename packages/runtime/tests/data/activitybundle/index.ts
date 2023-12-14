@@ -20,9 +20,10 @@ import {
     Entity,
     Every,
     Interaction,
-    MapActivityToRecord,
-    MapInteractionToProperty,
-    MapInteractionToPropertyItem,
+    MapActivity,
+    MapActivityItem,
+    MapInteraction,
+    MapInteractionItem,
     MapRecordMutationToRecord,
     Payload,
     PayloadItem,
@@ -252,25 +253,31 @@ export const friendRelation = Relation.create({
     relType: 'n:n',
     computedData: friendRelationSM
 })
-export const mapFriendActivityToRequest = MapActivityToRecord.create({
-    sourceActivity: createFriendRelationActivity,
-    triggerInteraction: [sendInteraction, approveInteraction, rejectInteraction],
-    handle: function map(stack) {
-        const sendRequestEvent = stack.find((i: any) => i.interaction.name === 'sendRequest')
+export const mapFriendActivityToRequest = MapActivity.create({
+    items: [
+        MapActivityItem.create({
+            activity: createFriendRelationActivity,
+            triggerInteractions: [sendInteraction, approveInteraction, rejectInteraction],
 
-        if (!sendRequestEvent) {
-            return undefined
-        }
+            handle: (stack) => {
+                const sendRequestEvent = stack.find((i: any) => i.interaction.name === 'sendRequest')
 
-        const handled = !!stack.find((i: any) => i.interaction.name === 'approve' || i.interaction.name === 'reject')
+                if (!sendRequestEvent) {
+                    return undefined
+                }
 
-        return {
-            from: sendRequestEvent.data.user,
-            to: sendRequestEvent.data.payload.to,
-            message: sendRequestEvent.data.payload.message,
-            handled,
-        }
-    }
+                const handled = !!stack.find((i: any) => i.interaction.name === 'approve' || i.interaction.name === 'reject')
+
+                return {
+                    from: sendRequestEvent.data.user,
+                    to: sendRequestEvent.data.payload.to,
+                    message: sendRequestEvent.data.payload.message,
+                    handled,
+                }
+            }
+        })
+    ],
+
 })
 
 export const requestEntity = Entity.create({
@@ -299,12 +306,12 @@ export const receivedRequestRelation = Relation.create({
         name: 'result',
         type: 'string',
         collection: false,
-        computedData: MapInteractionToProperty.create({
+        computedData: MapInteraction.create({
             items: [
-                MapInteractionToPropertyItem.create({
+                MapInteractionItem.create({
                     interaction: approveInteraction,
                     handle: () => 'approved',
-                    computeSource: async function (this: Controller, event, activityId) {
+                    computeTarget: async function (this: Controller, event, activityId) {
                         const {BoolExp} = this.globals
                         const match = BoolExp.atom({
                             key: 'activity.id',
@@ -318,10 +325,10 @@ export const receivedRequestRelation = Relation.create({
                         }
                     }
                 }),
-                MapInteractionToPropertyItem.create({
+                MapInteractionItem.create({
                     interaction: rejectInteraction,
                     handle: () => 'rejected',
-                    computeSource: async function (this: Controller, event, activityId) {
+                    computeTarget: async function (this: Controller, event, activityId) {
                         const {BoolExp} = this.globals
                         const match = BoolExp.atom({
                             key: 'activity.id',
@@ -457,12 +464,12 @@ postEntity.properties.push(
     Property.create({
         name: 'content',
         type: PropertyTypes.String,
-        computedData: MapInteractionToProperty.create({
+        computedData: MapInteraction.create({
             items: [
-                MapInteractionToPropertyItem.create({
+                MapInteractionItem.create({
                     interaction: updatePostInteraction,
                     handle: (event) => { return event.payload.post.content },
-                    computeSource: async function (this: Controller, event) {
+                    computeTarget: async function (this: Controller, event) {
                         return event.payload.post.id
                     }
                 }),

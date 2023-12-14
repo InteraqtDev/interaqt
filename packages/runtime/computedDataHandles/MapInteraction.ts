@@ -77,7 +77,7 @@ export class MapInteractionHandle extends ComputedDataHandle {
                 // CAUTION 注意，这里的增量计算语义是 map one interaction to one relation。所以不会有更新的情况，因为 Interaction 不会更新。
                 //  如果有更复杂的 computed Relation 需求，应该用别的
                 let result
-                if (this.data instanceof Entity) {
+                if (this.computedDataType === 'entity') {
                     if(newMappedItem.id) {
                         const match = MatchExp.atom({key: 'id', value: ['=', newMappedItem.id]})
                         result = await this.controller.system.storage.update( this.recordName!, match, newMappedItem)
