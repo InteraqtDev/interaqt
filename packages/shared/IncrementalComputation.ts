@@ -24,59 +24,6 @@ export const MapActivityToRecord = createClass({
     }
 })
 
-export const MapInteractionToRecord = createClass({
-    name: 'MapInteractionToRecord',
-    public: {
-        sourceInteraction: {
-            type: Interaction,
-            collection: false,
-            required: true
-        },
-        handle: {
-            type: 'function',
-            collection: false,
-            required: true
-        }
-    }
-})
-
-export const MapInteractionToPropertyItem = createClass({
-    name: 'MapInteractionToPropertyItem',
-    public: {
-        interaction: {
-            type: Interaction,
-            collection: false,
-            required: true
-        },
-        handle: {
-            type: 'function',
-            collection: false,
-            required: true
-        },
-        computeSource: {
-            type: 'function',
-            collection: false,
-            required: true
-        }
-    }
-})
-
-export const MapInteractionToProperty = createClass({
-    name: 'MapInteractionToProperty',
-    public: {
-        items: {
-            type: MapInteractionToPropertyItem,
-            collection: true,
-            required: true
-        },
-        defaultValue: {
-            type: 'string',
-            collection: false,
-            required: false
-        }
-    }
-})
-
 
 export const MapInteractionItem = createClass({
     name: 'MapInteractionItem',
@@ -115,11 +62,49 @@ export const MapInteraction = createClass({
     }
 })
 
+
+export const MapActivityItem = createClass({
+    name: 'MapActivityItem',
+    public: {
+        interaction: {
+            type: Activity,
+            collection: false,
+            required: true
+        },
+        handle: {
+            type: 'function',
+            collection: false,
+            required: true
+        },
+        computeTarget: {
+            type: 'function',
+            collection: false,
+            required: false
+        }
+    }
+})
+
+export const MapActivity = createClass({
+    name: 'MapActivity',
+    public: {
+        items: {
+            type: MapActivityItem,
+            collection: true,
+            required: true
+        },
+        defaultValue: {
+            type: 'string',
+            collection: false,
+            required: false
+        }
+    }
+})
+
 // CAUTION 修补 Entity computedData 里面的类型
 Entity.public.computedData.type.push(
     MapActivityToRecord as unknown as typeof ComputedData,
-    MapInteractionToRecord as unknown as typeof ComputedData,
-    MapInteraction as unknown as typeof ComputedData
+    MapInteraction as unknown as typeof ComputedData,
+    MapActivity as unknown as typeof ComputedData
 )
 
 
