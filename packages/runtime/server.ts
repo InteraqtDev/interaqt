@@ -52,7 +52,7 @@ function parseDataAPIParams(rawParams: any[], api: DataAPI) {
         const param = params[index]
         if (param === undefined) return rawParam
 
-        if (typeof param === 'string') {
+        if (typeof param === 'string' || rawParam === undefined || rawParam === null) {
             // 'string'|'number'|'boolean'|'object'|'undefined'|'null'
             return rawParam
         } else if (typeof param === 'function') {
