@@ -12,18 +12,15 @@ type RecordChangeEffect = {
 
 export class WeightedSummationHandle extends IncrementalComputedDataHandle {
     records: KlassInstance<typeof WeightedSummation, false>['records'] = []
-    mapRelationToWeight!: (record: KlassInstance<typeof Entity, false> | KlassInstance<typeof Relation, false>, info: KlassInstance<any, false>) => number
+    mapRecordToWeight!: (record: KlassInstance<typeof Entity, false> | KlassInstance<typeof Relation, false>, info: KlassInstance<any, false>) => number
     // 单独抽出来让下面能覆写
     parseComputedData(){
         const computedData = this.computedData as unknown as KlassInstance<typeof WeightedSummation, false>
-        this.mapRelationToWeight = computedData.matchRecordToWeight!.bind(this.controller)
+        this.mapRecordToWeight = computedData.matchRecordToWeight!.bind(this.controller)
         this.records = computedData.records
     }
     getDefaultValue(newRecordId?: any): any {
         return 0
-    }
-    parseMapRelationFunction(content:string) {
-        return new Function('record', `return (${content})(record)`)
     }
     async computeEffect(mutationEvent: RecordMutationEvent, mutationEvents: RecordMutationEvent[]): Promise<KlassInstance<any, false>|undefined> {
         return this.records!.find((record) => {
@@ -60,11 +57,11 @@ export class WeightedSummationHandle extends IncrementalComputedDataHandle {
         }
 
         if (currentRecord) {
-            currentWeight = this.mapRelationToWeight(currentRecord, effect )
+            currentWeight = this.mapRecordToWeight(currentRecord, effect )
         }
 
         if (oldRecord) {
-            originWeight = this.mapRelationToWeight(oldRecord as KlassInstance<typeof Entity, false>, effect)
+            originWeight = this.mapRecordToWeight(oldRecord as KlassInstance<typeof Entity, false>, effect)
         }
 
         if(currentWeight !== originWeight) {

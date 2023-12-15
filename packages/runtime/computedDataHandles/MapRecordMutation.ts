@@ -6,8 +6,8 @@ import {IncrementalComputedDataHandle, StatePatch} from "./IncrementalComputedDa
 
 export class MapInteractionHandle extends IncrementalComputedDataHandle {
     data!: KlassInstance<typeof Entity, false>
-    mapItem!: (mutationEvent: RecordMutationEvent, mutationEvents: RecordMutationEvent[]) => any
-    computeTarget?: (mutationEvent: RecordMutationEvent, mutationEvents: RecordMutationEvent[]) => any
+    mapItem!: (mutationEvent: RecordMutationEvent, mutationEvents: RecordMutationEvent[], lastValue: any) => any
+    computeTarget?: (mutationEvent: RecordMutationEvent, mutationEvents: RecordMutationEvent[], lastValue: any) => any
     constructor(controller: Controller , computedData: KlassInstance<typeof ComputedData, false> , dataContext:  DataContext) {
         super(controller, computedData, dataContext);
     }
@@ -22,14 +22,14 @@ export class MapInteractionHandle extends IncrementalComputedDataHandle {
     }
 
     async computePatch(effect: any, lastValue: any, mutationEvent: RecordMutationEvent, mutationEvents: RecordMutationEvent[]): Promise<StatePatch | StatePatch[] | undefined> {
-        const newValue = await this.mapItem.call(this.controller, mutationEvent, mutationEvents)
+        const newValue = await this.mapItem.call(this.controller, mutationEvent, mutationEvents, lastValue)
         if (this.computedDataType === 'global') {
             return {
                 type: 'update',
                 value: newValue
             }
         } else if(this.computedDataType === 'property'){
-            const affected = await this.mapItem.call(this.controller, mutationEvent, mutationEvents)
+            const affected = await this.computeTarget!.call(this.controller, mutationEvent, mutationEvents, lastValue)
             if (affected?.id) {
                 return {
                     type: 'update',
@@ -49,7 +49,6 @@ export class MapInteractionHandle extends IncrementalComputedDataHandle {
 
         }
     }
-
 }
 
 ComputedDataHandle.Handles.set(MapRecordMutation, MapInteractionHandle)

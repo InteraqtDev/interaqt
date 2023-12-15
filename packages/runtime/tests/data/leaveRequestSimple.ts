@@ -164,34 +164,6 @@ const reviewerRelation = Relation.create({
                 }
             }),
         ],
-
-        // sourceInteraction: createInteraction,
-        // handle: async function map(this: Controller, event: any) {
-        //     const {BoolExp} = this.globals
-        //
-        //     const match = BoolExp.atom({
-        //         key: 'id',
-        //         value: ['=', event.user.id]
-        //     })
-        //
-        //     const {supervisor} = await this.system.storage.findOne(
-        //         'User',
-        //         match,
-        //         undefined,
-        //         [
-        //             ['supervisor', {attributeQuery: [['supervisor', {attributeQuery: ['*']}]]}],
-        //         ]
-        //     )
-        //
-        //     return [{
-        //         source: event.payload.request,
-        //         target: supervisor,
-        //     }, {
-        //         source: event.payload.request,
-        //         isSecond: true,
-        //         target: supervisor.supervisor,
-        //     }]
-        // }
     }),
     properties: [
         Property.create({

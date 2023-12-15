@@ -26,9 +26,8 @@ export class RelationStateMachineHandle extends ComputedDataHandle {
     validateState() {
         // FIXME 理论上在一个状态机中，任何状态都应该是能用属性完全独立区别开的。最好在这里验证一下。
     }
-    // FIXME 之后 从 listen interaction 也改成 监听 record 事件
     computeEffect(mutationEvent: RecordMutationEvent, mutationEvents: RecordMutationEvent[]): any {
-
+        return undefined
     }
     parseComputedData() {
         const computedData = this.computedData as unknown as KlassInstance<typeof RelationStateMachine, false>

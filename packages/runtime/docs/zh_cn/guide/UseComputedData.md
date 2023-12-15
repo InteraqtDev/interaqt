@@ -6,37 +6,45 @@ Computed Data 是 @interaqt/runtime 中的核心概念，@interaqt/runtime 提�
 
 ## 用来表示 Entity/Relation 数据的 computed data
 
-### MapActivityToRecord
-为每一个的 activity 创建一个 Entity/Relation。通常用于将一个 activity 中的信息都整合起来。
-示例：将 "createFriendRelation" 活动中的所有信息整合成一个名为 Request 的实体。
+### MapActivity
+
+将每一个 activity 映射成 一个 Entity/Relation/State 或者某一个 Entity/Relation 的 Property。
+它通常用于将一个 activity 中的信息都整合起来的场景。
+例如：将 "createFriendRelation" 活动中的所有信息整合成一个名为 Request 的实体：
 ```typescript
 export const requestEntity = Entity.create({
     name: 'Request',
-    computedData: MapActivityToRecord.create({
-        sourceActivity: createFriendRelationActivity,
-        triggerInteraction: [sendInteraction, approveInteraction, rejectInteraction],  // 触发数据计算的 interation
-        handle: function map(stack) {  // 计算数据的函数
-            const sendRequestEvent = stack.find((i: any) => i.interaction.name === 'sendRequest')
+    computedData: MapActivity.create({
+        items: [
+            MapActivityItem.create({
+                activity: createFriendRelationActivity,
+                triggerInteractions: [sendInteraction, approveInteraction, rejectInteraction],  // 触发数据计算的 interation
+                handle: function map(stack) {  // 计算数据的函数
+                    const sendRequestEvent = stack.find((i: any) => i.interaction.name === 'sendRequest')
 
-            if (!sendRequestEvent) {
-                return undefined
-            }
+                    if (!sendRequestEvent) {
+                        return undefined
+                    }
 
-            const handled = !!stack.find((i: any) => i.interaction.name === 'approve' || i.interaction.name === 'reject')
+                    const handled = !!stack.find((i: any) => i.interaction.name === 'approve' || i.interaction.name === 'reject')
 
-            return {
-                from: sendRequestEvent.data.user,
-                to: sendRequestEvent.data.payload.to,
-                message: sendRequestEvent.data.payload.message,
-                handled,
-            }
-        }
+                    return {
+                        from: sendRequestEvent.data.user,
+                        to: sendRequestEvent.data.payload.to,
+                        message: sendRequestEvent.data.payload.message,
+                        handled,
+                    }
+                }
+            })
+        ]
     })
 })
 ```
 
-### MapInteractionToRecord
-为每一个 interaction 创建一个 Entity/Relation。通常用于将一个 interaction 中的用户信息和 Payload 关联起来。
+### MapInteraction
+
+将每一个 interaction 映射成一个 Entity/Relation/State 或者某一个 Entity/Relation 的 Property。
+通常用于将一个 interaction 中的用户信息和 Payload 关联起来，或者记录 Interaction 中的信息。
 
 示例：将发送申请的用户和发送的申请关联起来，创建 relation 数据
 ```typescript
@@ -52,22 +60,50 @@ const sendRequestRelation = Relation.create({
             type: 'string'
         })
     ],
-    computedData: MapInteractionToRecord.create({
-        sourceInteraction: createInteraction,
-        handle: function map(event: any) {
-            return {
-                source: event.payload.request,
-                createdAt: Date.now().toString(), // 记录在关系上的数据。
-                target: event.user,
-            }
-        }
+    computedData: MapInteraction.create({
+        items: [
+            MapInteractionItem.create({
+                interaction: createInteraction,   // 监听的 Interaction
+                handle: function map(event: any) {
+                    return {
+                        source: event.payload.request,
+                        createdAt: Date.now().toString(), // 记录在关系上的数据。
+                        target: event.user,
+                    }
+                }
+            }),
+        ],
     }),
 })
 ```
 
-### MapRecordMutationToRecord
+也可以用于记录 interaction 上 payload 的信息。
+示例：一旦用户执行了同意操作，就在用户和申请的 relation 的  result 字段上记录下来
+```typescript
+Property.create({
+    name: 'result',
+    type: 'string',
+    collection: false,
+    computedData: MapInteraction.create({
+        items: [                                    // 可以监听多种 Interaction，有多种计算值的方式。
+            MapInteractionItem.create({
+                interaction: approveInteraction,   // 监听的 Interaction
+                handle: () => 'approved',          // 监听的 Interaction 触发时，计算得到的 property 值
+                computeSource: async function (this: Controller, event) {   // 根据 interaction event 计算出受影响的记录
+                    return {
+                        "source.id": event.payload.request.id,
+                        "target.id": event.user.id
+                    }
+                }
+            }),
+        ],
+    })
+})
+```
 
-将 RecordMutation 转换为 Entity/Relation。通常用于记录变更，可以利用它来为变更的记录产生历史版本。
+### MapRecordMutation
+
+将 RecordMutation 映射成 一个 Entity/Relation/State 或者某一个 Entity/Relation 的 Property。通常用于记录变更，可以利用它来为变更的记录产生历史版本。
 示例：为每次 post 的修改都产生一个历史版本
 ```typescript
 const postRevisionEntity = Entity.create({
@@ -75,7 +111,7 @@ const postRevisionEntity = Entity.create({
     properties: [
         Property.create({ name: 'content', type: PropertyTypes.String })
     ],
-    computedData: MapRecordMutationToRecord.create({
+    computedData: MapRecordMutation.create({
         handle: async function (this: Controller, event:RecordMutationEvent, events: RecordMutationEvent[]) {
             if (event.type === 'update' && event.recordName === 'Post') {
                 return {
@@ -101,6 +137,7 @@ const postRevisionEntity = Entity.create({
 ### RelationBasedAny
 
 创建一个 bool 字段，用来表示当前实体的某一个 relation 类型的相关实体以及关联关系上的数据是否存在一个满足条件。
+它只能用在 Property 上。
 示例: “当前申请是否被拒绝”。
 ```typescript
 Property.create({
@@ -122,6 +159,7 @@ Property.create({
 ### RelationBasedEvery
 
 创建一个 bool 字段，用来表示当前实体的某一个 relation 类型的相关实体以及关联关系上的数据是否每一个都满足条件。
+它只能用在 Property 上。
 示例 “当前申请是否通过”。
 ```typescript
 Property.create({
@@ -143,6 +181,8 @@ Property.create({
 
 ### RelationCount
 用于计算实体的某个 Relation 的已有数据的总和。
+它只能用在 Property 上。
+
 示例：我有多少未处理的请求
 ```typescript
 Property.create({
@@ -161,36 +201,15 @@ Property.create({
 
 ### RelationBasedWeightedSummation
 基于某一个 Relation 类型的关联实体和关系上的数据进行加权计算。
+它只能用在 Property 上。
 
-### MapInteractionToProperty
-将 Interaction 映射成实体上的字段。通常用于记录 interaction 上 payload 的信息。
-例如：一旦用户执行了同意操作，就在用户和申请的 relation 的  result 字段上记录下来
-```typescript
-Property.create({
-    name: 'result',
-    type: 'string',
-    collection: false,
-    computedData: MapInteractionToProperty.create({
-        items: [                                    // 可以监听多种 Interaction，有多种计算值的方式。
-            MapInteractionToPropertyItem.create({
-                interaction: approveInteraction,   // 监听的 Interaction
-                handle: () => 'approved',          // 监听的 Interaction 触发时，计算得到的 property 值
-                computeSource: async function (this: Controller, event) {   // 根据 interaction event 计算出受影响的记录
-                    return {
-                        "source.id": event.payload.request.id,
-                        "target.id": event.user.id
-                    }
-                }
-            }),
-        ],
-    })
-})
-```
 
 ### 用来表示全局字段的 computed data
 
 ### Any
 是否某种 Record 存在一个数据满足条件。
+它只能用在 State 上。
+
 示例：全局是否有任何一个申请被处理了：
 ```typescript
 const anyRequestHandledState = State.create({
@@ -206,8 +225,10 @@ const anyRequestHandledState = State.create({
 })
 ```
 
-### Every
+### Every`
 是否某种 Record 的所有数据都满足条件。
+它只能用在 State 上。
+
 示例：全局是否所有的申请都被处理了：
 ```typescript
 const everyRequestHandledState = State.create({
@@ -223,8 +244,10 @@ const everyRequestHandledState = State.create({
 })
 ```
 
-### RecordCount
+### Count
 统计某种 Record 的总数
+它只能用在 State 上。
+
 示例：全局所有的朋友关系总数
 ```typescript
 const totalFriendRelationState = State.create({
@@ -239,13 +262,72 @@ const totalFriendRelationState = State.create({
 ```
 
 ### WeightedSummation
-基于所有 Record 的加权计算
+基于所有 Record 的加权计算。
+它只能用在 State 上。
 
-## 自定义 computed data
+示例：假设系统中有一种实体叫 Request，它有 `approved` 和 `rejected` 两个 boolean 属性。我们希望定义个全局叫做 approveX 的值，
+它是所有 Request 的加权计算总和，approved 为 true 的 Request 权重为 +2，rejected 为 true 的 Request 权重为 -1。
 
-### ComputedDataHandle
-所有的 computed data 都是通过 ComputedDataHandle 来实现的。你可以通过继承 ComputedDataHandle 来实现自己的 computed data。
+```typescript
+const approveXState = State.create({
+    name: 'approveX',
+    type: 'number',
+    collection: false,
+    computedData: WeightedSummation.create({
+        records: [requestEntity],
+        matchRecordToWeight: (request) => {
+            return request.approved ? 2 : (request.rejected ? -1 : 0)
+        }
+    })
+})
+```
 
-### IncrementalComputedDataHandle
-IncrementalComputedDataHandle 是 ComputedDataHandle 的子类，它提供了一些增量计算的工具来帮助你实现 computed data。
+注意，我们可以把多种 Record 混合在一起计算，用户需要自己在 matchRecordToWeight 函数中区分 Record 的类型。
+
+
+## Entity/Relation 基于自身 Property 的 computed
+有时我们的 Entity/Relation 会有一些属性是能直接基于其他属性计算出来的，如果我们希望能在被查找时作为匹配条件，那么就要在创建 Property 时直接使用 computed 字段。
+示例：Request 实体上已有类型为 boolean 的 approved 和 rejected 属性，我们希望还有一个 string 类型的属性 `result`，根据 approved 和 rejected 计算出来。
+```typescript
+RequestEntity.properties.push(
+    Property.create({
+        name: 'approved',
+        type: 'boolean',
+        collection: false,
+        computedData: RelationBasedEvery.create({
+            relation: reviewerRelation,
+            relationDirection: 'source',
+            notEmpty: true,
+            matchExpression:
+                (_, relation) => {
+                    return relation.result === 'approved'
+                }
+        })
+    }),
+    Property.create({
+        name: 'rejected',
+        type: 'boolean',
+        collection: false,
+        computedData: RelationBasedAny.create({
+            relation: reviewerRelation,
+            relationDirection: 'source',
+            matchExpression:
+                (_, relation) => {
+                    return relation.result === 'rejected'
+                }
+        })
+    }),
+    Property.create({
+        name: 'result',
+        type: 'string',
+        collection: false,
+        computed: (request: any) => {
+            // 这里可以直接读取到 request 的值，并进行计算
+            return request.approved ? 'approved' : (request.rejected ? 'rejected' : 'pending')
+        }
+    }),
+)
+```
+
+record 新建或者更新的时候，具有 `computed` 属性的  Property 都会自动重新计算。
 
