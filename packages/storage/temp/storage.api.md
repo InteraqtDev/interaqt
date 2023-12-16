@@ -455,15 +455,25 @@ export type MergeLinks = string[];
 
 // @public (undocumented)
 export class Modifier {
-    constructor(entityName: string, map: EntityToTableMap, data: ModifierData, fromRelation?: boolean | undefined);
+    constructor(recordName: string, map: EntityToTableMap, data: ModifierData, fromRelation?: boolean | undefined);
     // (undocumented)
     data: ModifierData;
     // (undocumented)
-    entityName: string;
-    // (undocumented)
     fromRelation?: boolean | undefined;
     // (undocumented)
+    get limit(): number | undefined;
+    // (undocumented)
     map: EntityToTableMap;
+    // (undocumented)
+    get offset(): number | undefined;
+    // (undocumented)
+    get orderBy(): {
+        attribute: string;
+        recordName: string;
+        order: string;
+    }[];
+    // (undocumented)
+    recordName: string;
 }
 
 // @public (undocumented)
@@ -672,6 +682,8 @@ export class RecordQueryAgent {
     buildFromClause(entityName: string, prefix?: string): string;
     // (undocumented)
     buildJoinClause(joinTables: JoinTables, prefix?: string): string;
+    // (undocumented)
+    buildModifierClause(modifier: Modifier, prefix?: string): string;
     // (undocumented)
     buildSelectClause(queryFields: ReturnType<AttributeQuery["getValueAndXToOneRecordFields"]>, prefix?: string): string;
     // (undocumented)
