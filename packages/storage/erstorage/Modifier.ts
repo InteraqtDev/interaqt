@@ -9,10 +9,24 @@ export type ModifierData = {
 }
 
 export class Modifier {
-    constructor(public entityName: string, public map: EntityToTableMap, public data: ModifierData, public fromRelation?: boolean) {
+    constructor(public recordName: string, public map: EntityToTableMap, public data: ModifierData, public fromRelation?: boolean) {
     }
 
-    // derive(overwrite: ModifierData) {
-    //     return new Modifier(this.entityName, this.map, {...this.data, ...overwrite})
-    // }
+    get limit() {
+        return this.data?.limit
+    }
+
+    get offset() {
+        return this.data?.offset
+    }
+
+    get orderBy() {
+        return Object.entries(this.data?.orderBy || {}).map(([k, v]) => {
+            return {
+                attribute: k,
+                recordName: this.recordName,
+                order: v
+            }
+        })
+    }
 }

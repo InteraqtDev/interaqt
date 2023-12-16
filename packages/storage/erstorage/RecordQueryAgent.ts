@@ -6,6 +6,7 @@ import {FieldMatchAtom, MatchAtom, MatchExp, MatchExpressionData} from "./MatchE
 import {AttributeQuery, AttributeQueryData, AttributeQueryDataRecordItem} from "./AttributeQuery.js";
 import {LINK_SYMBOL, RecordQuery, RecordQueryTree} from "./RecordQuery.js";
 import {NewRecordData, RawEntityData} from "./NewRecordData.js";
+import {Modifier} from "./Modifier.js";
 
 
 export type MutationEvent = {
@@ -85,8 +86,6 @@ export class RecordQueryAgent {
             prefix)
 
 
-        // FIXME 添加 modifier
-
         return [`
 SELECT ${prefix ? '' : 'DISTINCT'}
 ${this.buildSelectClause(recordQuery.attributeQuery.getValueAndXToOneRecordFields(), prefix)}
@@ -96,11 +95,31 @@ ${this.buildJoinClause(joinTables, prefix)}
 
 WHERE
 ${whereClause}
+
+${this.buildModifierClause(recordQuery.modifier, prefix)}
 `,
   params ]
 
 
     }
+    buildModifierClause(modifier: Modifier, prefix?: string) {
+        const {limit, offset, orderBy} = modifier
+        const clauses = []
+        if (limit) {
+            clauses.push(`LIMIT ${limit}`)
+        }
+        if (offset) {
+            clauses.push(`OFFSET ${offset}`)
+        }
+
+        if (orderBy.length) {
+            clauses.push(`ORDER BY ${orderBy.map(({attribute, recordName, order}) => `\`${this.withPrefix(prefix)}${recordName}.${attribute}\` ${order}`).join(',')}`)
+        }
+
+        return clauses.join('\n')
+    }
+
+
     structureRawReturns(rawReturns: {[k:string]: any}[], JSONFields: string[]) {
         return rawReturns.map(rawReturn => {
             const obj = {}
