@@ -8,9 +8,13 @@ import {LINK_SYMBOL} from "./RecordQuery.js";
 export type ValueAttribute = {
     //entityType
     type: string,
+    collection?: boolean,
+
     // 没有的话就继承上面的
     table?: string,
     field: string,
+    // 数据库字段类型
+    fieldType?: string,
     computed?: (record: any) => any
 }
 

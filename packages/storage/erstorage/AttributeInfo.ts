@@ -17,8 +17,17 @@ export class AttributeInfo {
         return !(this.data as RecordAttribute).isRecord
     }
 
+    get isCollection() {
+        return this.isValue && (this.data as ValueAttribute).collection
+    }
+
     get isComputed() {
         return this.isValue && (this.data as ValueAttribute).computed
+    }
+
+    get fieldType() {
+        if (this.isRecord) throw new Error('not a value attribute')
+        return (this.data as ValueAttribute).fieldType
     }
 
     get computed() {

@@ -17,7 +17,7 @@
     "typescript": "^5.2.2"
   },
   "dependencies": {
-    "@interaqt/shared": "^1.0.2"
+    "@interaqt/shared": "^1.0.19"
   },
   "scripts": {
     "test": "vitest",

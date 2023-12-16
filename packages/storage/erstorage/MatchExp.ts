@@ -2,6 +2,7 @@ import {BoolExp} from "@interaqt/shared";
 import {EntityToTableMap} from "./EntityToTableMap.js";
 import {assert} from "../utils.js";
 import {RecordQueryTree} from "./RecordQuery.js";
+import {Database} from "./EntityQueryHandle.js";
 
 export type MatchAtom = { key: string, value: [string, any], isReferenceValue?: boolean }
 export type MatchExpressionData = BoolExp<MatchAtom>
@@ -104,10 +105,10 @@ export class MatchExp {
         return `${tableAlias}.${rawFieldName}`
     }
 
-    getFinalFieldValue(isReferenceValue: boolean, value: [string, any]): [string, any[]] {
+    getFinalFieldValue(isReferenceValue: boolean, key: string, value: [string, any], fieldName:string, fieldType?: string, db?: Database): [string, any[]] {
         let fieldValue =''
         const fieldParams:any[] = []
-        const simpleOp = ['=', '>', '<', '<=', '>=', 'like']
+        const simpleOp = ['=', '>', '<', '<=', '>=', 'like', '!=']
 
         if (simpleOp.includes(value[0]) || (value[0] === 'not' && value[1] !== null)) {
             fieldValue = `${value[0]} ?`
@@ -125,13 +126,29 @@ export class MatchExp {
                 isReferenceValue ? this.getReferenceFieldValue(value[1][1]) : value[1][1]
             )
         } else {
-            assert(false, `unknown value expression ${JSON.stringify(value)}`)
+
+
+            let result
+            if (db) {
+                // JSON 操作符写法等由外部具体 db 实现
+                // FIXME 如果外部不知 value 的具体格式，又怎么知道这是一个 referenceValue ？？？这里要重新设计
+                result = db.parseMatchExpression?.(key, value, fieldName, fieldType!, isReferenceValue, this.getReferenceFieldValue.bind(this))
+            }
+
+            if (result) {
+                fieldValue = result.fieldValue
+                fieldParams.push(...(result.fieldParams || []))
+            } else{
+                assert(result, `unknown value expression ${JSON.stringify(value)}`)
+
+            }
+
         }
 
         return [fieldValue, fieldParams]
     }
 
-    buildFieldMatchExpression(): BoolExp<FieldMatchAtom> | null {
+    buildFieldMatchExpression(db?: Database): BoolExp<FieldMatchAtom> | null {
         if (!this.data) return null
         // 1. 所有 key 要 build 成 field
         // 2. x:n 关系中的 EXIST 要增加查询范围限制，要把 value 中对上层引用也 build 成 field。
@@ -157,12 +174,13 @@ export class MatchExp {
                 // CAUTION 路径中只可能有一个 n:n symmetric 关系。因为路径中有多个的在语义逻辑上就不正确。
                 //  有一个的情况还是用在 findRelatedRecords 的时候才有意义。因为它会通过 id 限定关系，而即使是 n:n 的关系，任意两个实体中只会有一个关系数据。所以这个时候能找到唯一的数据，是有意义的。
 
-                const [fieldValue, fieldParams] = this.getFinalFieldValue(exp.data.isReferenceValue!, exp.data.value)
+                const fieldNamePath = this.getFinalFieldName(matchAttributePath)
+                const [fieldValue, fieldParams] = this.getFinalFieldValue(exp.data.isReferenceValue!, exp.data.key,  exp.data.value, fieldNamePath.join('.'), attributeInfo.fieldType, db)
 
                 if (!symmetricPaths) {
                     return {
                         ...exp.data,
-                        fieldName: this.getFinalFieldName(matchAttributePath),
+                        fieldName: fieldNamePath,
                         fieldValue,
                         fieldParams
                     }

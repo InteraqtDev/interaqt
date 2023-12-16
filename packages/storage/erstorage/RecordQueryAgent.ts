@@ -79,7 +79,7 @@ export class RecordQueryAgent {
         const finalQueryTree = fieldQueryTree.merge(matchQueryTree)
         const joinTables = this.getJoinTables(finalQueryTree, [recordQuery.recordName])
 
-        const fieldMatchExp = recordQuery.matchExpression.buildFieldMatchExpression()
+        const fieldMatchExp = recordQuery.matchExpression.buildFieldMatchExpression(this.database)
 
         const [whereClause, params] = this.buildWhereClause(this.parseMatchExpressionValue(recordQuery.recordName, fieldMatchExp , recordQuery.contextRootEntity),
             prefix)
@@ -101,12 +101,16 @@ ${whereClause}
 
 
     }
-    structureRawReturns(rawReturns: {[k:string]: any}[]) {
+    structureRawReturns(rawReturns: {[k:string]: any}[], JSONFields: string[]) {
         return rawReturns.map(rawReturn => {
             const obj = {}
             Object.entries(rawReturn).forEach(([key, value]) => {
                 // CAUTION 注意这里去掉了最开始的 entityName
-                setByPath(obj, key.split('.').slice(1, Infinity), value)
+                const attributePath = key.split('.').slice(1, Infinity)
+                if (attributePath.length === 1 && JSONFields.includes(attributePath[0]) && typeof value === 'string') {
+                    value = JSON.parse(value)
+                }
+                setByPath(obj, attributePath, value)
             })
             return obj
         })
@@ -150,7 +154,7 @@ ${whereClause}
         // findRecords 的一个 join 语句里面只能一次性搞定 x:1 的关联实体，以及关系上的 x:1 关联实体。
         // 1. 这里只通过合表或者 join  处理了 x:1 的关联查询。x:n 的查询是通过二次查询获取的。
         const [querySQL, params] = this.buildXToOneFindQuery(entityQuery, '')
-        const records = this.structureRawReturns(await this.database.query(querySQL, params, queryName)) as any[]
+        const records = this.structureRawReturns(await this.database.query(querySQL, params, queryName), this.map.getRecordInfo(entityQuery.recordName).JSONFields) as any[]
 
 
         // 如果当前的 query 有 label，那么下面任何遍历 record 的地方都要 Push stack。

@@ -7,6 +7,8 @@ import {Database, ID_ATTR, ROW_ID_ATTR} from "./EntityQueryHandle.js";
 type ColumnData = {
     name:string,
     type:string,
+    fieldType?:string,
+    collection?:boolean,
     notNull?: boolean,
 }
 
@@ -110,6 +112,7 @@ export class DBSetup {
             {
                 type: property.type,
                 computed: property.computed,
+                collection: property.collection,
             }
         ]))
 
@@ -390,7 +393,9 @@ export class DBSetup {
             record.table = this.recordToTableMap.get(recordName)!
             Object.entries(record.attributes).forEach(([attributeName, attributeData]) => {
                 if ((attributeData as RecordAttribute).isRecord) return
-                attributeData.field = `${recordName}_${attributeName}`
+                const valueAttributeData = attributeData as ValueAttribute
+                valueAttributeData.field = `${recordName}_${attributeName}`
+                valueAttributeData.fieldType = this.getDBFieldType(valueAttributeData.type, valueAttributeData.collection)
             })
         })
 
@@ -438,17 +443,22 @@ export class DBSetup {
                 if (!attribute.field || this.tables[record.table].columns[attribute.field]) return
                 this.tables[record.table].columns[attribute.field] = {
                     name: (attribute as ValueAttribute).field,
-                    type: (attribute as ValueAttribute).type
+                    type: (attribute as ValueAttribute).type,
+                    fieldType: (attribute as ValueAttribute).fieldType,
                 }
             })
         })
     }
-    getDBFieldType(type: string) {
+    getDBFieldType(type: string, collection?: boolean) {
+        // FIXME 由外部来决定
+
         if (type === 'pk') {
             // TODO 不同的引擎不同，这里是 sqlite 的写法
             return 'INTEGER PRIMARY KEY'
         } else if (type === 'id') {
             return 'INT'
+        } else if (collection || type === 'object') {
+            return 'JSON'
         } else if (type === 'string') {
             return 'TEXT'
         } else if (type === 'boolean') {
@@ -462,7 +472,7 @@ export class DBSetup {
             `
 CREATE TABLE ${tableName} (
 ${Object.values(this.tables[tableName].columns).map(column => (`
-    ${column.name} ${this.getDBFieldType(column.type)}`)).join(',')}
+    ${column.name} ${column.fieldType}`)).join(',')}
 )
 `
         ))

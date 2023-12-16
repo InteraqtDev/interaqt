@@ -7,6 +7,7 @@ import {RecordQuery} from "./RecordQuery.js";
 import {NewRecordData, RawEntityData} from "./NewRecordData.js";
 import {MutationEvent, RecordQueryAgent} from "./RecordQueryAgent.js";
 
+
 export const ROW_ID_ATTR = '_rowId'
 export const ID_ATTR = 'id'
 
@@ -22,6 +23,7 @@ export type Database = {
     insert: (sql: string, values: any[], name?:string) => Promise<EntityIdRef>
     update: (sql: string, values: any[], idField?: string, name?:string) => Promise<EntityIdRef[]>
     getAutoId: (recordName: string) => Promise<string>
+    parseMatchExpression?: (key: string, value: [string, any], fieldName: string, fieldType: string, isReferenceValue: boolean, getReferenceFieldValue:(v: string) => string) => any
 }
 
 export class EntityQueryHandle {

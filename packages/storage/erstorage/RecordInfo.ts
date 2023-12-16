@@ -1,5 +1,5 @@
 import {AttributeInfo} from "./AttributeInfo.js";
-import {EntityToTableMap, RecordAttribute, RecordMapItem} from "./EntityToTableMap.js";
+import {EntityToTableMap, RecordAttribute, RecordMapItem, ValueAttribute} from "./EntityToTableMap.js";
 
 export class RecordInfo {
     data: RecordMapItem
@@ -24,6 +24,12 @@ export class RecordInfo {
 
     get idField() {
         return this.data.attributes.id.field
+    }
+
+    get JSONFields() {
+        return Object.entries(this.data.attributes).filter(([, attribute]) => {
+            return !(attribute as RecordAttribute).isRecord && ((attribute as ValueAttribute ).collection || (attribute as ValueAttribute).type === 'object')
+        }).map(([attributeName]) => attributeName)
     }
 
     get sameRowFields(): string[] {
