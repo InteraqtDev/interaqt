@@ -65,66 +65,66 @@ Step4: 定义主管和请求之间的关系，以及审批状态。可用于让�
 
 ```typescript
 const reviewerRelation = Relation.create({
-  source: RequestEntity,
-  sourceProperty: 'reviewer',
-  target: UserEntity,
-  targetProperty: 'request',
-  relType: 'n:n',
-  computedData:  MapInteractionToRecord.create({
-    sourceInteraction: createInteraction,
-    handle: async function map(this: Controller, event: any){
-      const { BoolExp} = this.globals
+    source: RequestEntity,
+    sourceProperty: 'reviewer',
+    target: UserEntity,
+    targetProperty: 'request',
+    relType: 'n:n',
+    computedData: MapInteractionToRecord.create({
+        sourceInteraction: createInteraction,
+        map: async function map(this: Controller, event: any) {
+            const {BoolExp} = this.globals
 
-      const match = BoolExp.atom({
-        key: 'id',
-        value: ['=', event.user.id]
-      })
+            const match = BoolExp.atom({
+                key: 'id',
+                value: ['=', event.user.id]
+            })
 
-      const { supervisor } = await this.system.storage.findOne(
-              'User',
-              match,
-              undefined,
-              [
-                ['supervisor', { attributeQuery: [['supervisor', { attributeQuery: ['*']}]]}],
-              ]
-      )
+            const {supervisor} = await this.system.storage.findOne(
+                'User',
+                match,
+                undefined,
+                [
+                    ['supervisor', {attributeQuery: [['supervisor', {attributeQuery: ['*']}]]}],
+                ]
+            )
 
-      return [{
-        source: event.payload.request,
-        target: supervisor,
-      }, {
-        source: event.payload.request,
-        isSecond: true,
-        target: supervisor.supervisor,
-      }]
-    }
-  }),
-  properties: [
-    Property.create({
-      name: 'isSecond',
-      type: 'boolean',
-      collection: false,
+            return [{
+                source: event.payload.request,
+                target: supervisor,
+            }, {
+                source: event.payload.request,
+                isSecond: true,
+                target: supervisor.supervisor,
+            }]
+        }
     }),
-    Property.create({
-      name: 'result',
-      type: 'string',
-      collection: false,
-      computedData: MapInteractionToProperty.create({
-        items: [
-          MapInteractionToPropertyItem.create({
-            interaction: approveInteraction,
-            handle: () => 'approved',
-            computeSource: async function(this: Controller, event) {
-              return {
-                "source.id": event.payload.request.id,
-                "target.id": event.user.id
-              }
-            }
-          }),
-        ],
-      })
-    })
-  ]
+    properties: [
+        Property.create({
+            name: 'isSecond',
+            type: 'boolean',
+            collection: false,
+        }),
+        Property.create({
+            name: 'result',
+            type: 'string',
+            collection: false,
+            computedData: MapInteractionToProperty.create({
+                items: [
+                    MapInteractionToPropertyItem.create({
+                        interaction: approveInteraction,
+                        map: () => 'approved',
+                        computeSource: async function (this: Controller, event) {
+                            return {
+                                "source.id": event.payload.request.id,
+                                "target.id": event.user.id
+                            }
+                        }
+                    }),
+                ],
+            })
+        })
+    ]
 })
 ```
 
@@ -190,7 +190,7 @@ RequestEntity.properties.push(
         relation: reviewerRelation,
         relationDirection: 'source',
         notEmpty: true,
-        matchExpression: (_, relation) => {
+        match: (_, relation) => {
           return relation.result === 'approved'
         }
       })
@@ -202,7 +202,7 @@ RequestEntity.properties.push(
       computedData: RelationBasedAny.create({
         relation: reviewerRelation,
         relationDirection: 'source',
-        matchExpression:(_, relation) => {
+        match:(_, relation) => {
           return relation.result === 'rejected'
         }
       })
@@ -262,7 +262,7 @@ const totalApprovedState = State.create({
   computedData: RelationCount.create({
     relation: reviewerRelation,
     relationDirection: 'source',
-    matchExpression: (_, relation) => {
+    match: (_, relation) => {
       return relation.result === 'approved'
     }
   })

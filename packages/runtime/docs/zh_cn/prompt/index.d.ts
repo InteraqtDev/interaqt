@@ -310,7 +310,7 @@ export declare const Any: Klass<{
         collection: false;
         required: true;
     };
-    matchExpression: {
+    match: {
         type: "function";
         collection: false;
         required: true;
@@ -483,7 +483,7 @@ export declare class BoolExp<T> {
     constructor(raw: ExpressionData<T>);
     isAtom(): boolean;
     get left(): BoolExp<T>;
-    get right(): BoolExp<T>;
+    get right(): BoolExp<T> | undefined;
     get data(): T;
     toValue(): AtomData<T>;
     static fromValue<T>(value: ExpressionData<T>): BoolExp<T>;
@@ -1192,7 +1192,7 @@ export declare const Count: Klass<{
         collection: false;
         required: true;
     };
-    matchExpression: {
+    match: {
         type: "function";
         collection: false;
         required: true;
@@ -1383,6 +1383,7 @@ export declare type Database = {
     insert: (sql: string, values: any[], name?: string) => Promise<EntityIdRef>;
     update: (sql: string, values: any[], idField?: string, name?: string) => Promise<EntityIdRef[]>;
     getAutoId: (recordName: string) => Promise<string>;
+    parseMatchExpression?: (key: string, value: [string, any], fieldName: string, fieldType: string, isReferenceValue: boolean, getReferenceFieldValue: (v: string) => string) => any;
 };
 
 export declare type DatabaseLogger = {
@@ -1675,7 +1676,7 @@ export declare const Every: Klass<{
         collection: false;
         required: true;
     };
-    matchExpression: {
+    match: {
         type: "function";
         collection: false;
         required: true;
@@ -1994,7 +1995,7 @@ export declare const MapActivity: Klass<{
                 collection: true;
                 required: false;
             };
-            handle: {
+            map: {
                 type: "function";
                 collection: false;
                 required: true;
@@ -2072,7 +2073,7 @@ export declare const MapActivityItem: Klass<{
         collection: true;
         required: false;
     };
-    handle: {
+    map: {
         type: "function";
         collection: false;
         required: true;
@@ -2094,7 +2095,7 @@ export declare const MapInteraction: Klass<{
                 collection: false;
                 required: true;
             };
-            handle: {
+            map: {
                 type: "function";
                 collection: false;
                 required: true;
@@ -2121,7 +2122,7 @@ export declare const MapInteractionItem: Klass<{
         collection: false;
         required: true;
     };
-    handle: {
+    map: {
         type: "function";
         collection: false;
         required: true;
@@ -2134,7 +2135,7 @@ export declare const MapInteractionItem: Klass<{
 }>;
 
 export declare const MapRecordMutation: Klass<{
-    handle: {
+    map: {
         type: "function";
         collection: false;
         required: true;
@@ -2959,7 +2960,7 @@ export declare const RelationBasedAny: Klass<{
         required: true;
         defaultValue: () => string;
     };
-    matchExpression: {
+    match: {
         type: "function";
         collection: false;
         required: true;
@@ -2978,7 +2979,7 @@ export declare const RelationBasedEvery: Klass<{
         required: true;
         defaultValue: () => string;
     };
-    matchExpression: {
+    match: {
         type: "function";
         collection: false;
         required: true;
@@ -3027,7 +3028,7 @@ export declare const RelationCount: Klass<{
         required: true;
         defaultValue: () => string;
     };
-    matchExpression: {
+    match: {
         type: "function";
         collection: false;
         required: true;
@@ -3518,6 +3519,10 @@ export declare class SQLiteDB implements Database {
     scheme(sql: string, name?: string): Promise<SQLite.RunResult>;
     close(): void;
     getAutoId(recordName: string): Promise<string>;
+    parseMatchExpression(key: string, value: [string, string], fieldName: string, fieldType: string, isReferenceValue: boolean, getReferenceFieldValue: (v: string) => string): {
+        fieldValue: string;
+        fieldParams: string[];
+    } | undefined;
 }
 
 export declare type SQLiteDBOptions = Parameters<typeof SQLite>[1] & {

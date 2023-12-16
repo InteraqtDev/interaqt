@@ -224,7 +224,7 @@ computedData 表示的是"当前数据"应该是如何计算出来的。
 
 ```typescript
 postRevisionEntity.computedData = MapRecordMutation.create({
-   handle: async function (this: Controller, event:RecordMutationEvent, events: RecordMutationEvent[]) {
+    map: async function (this: Controller, event:RecordMutationEvent, events: RecordMutationEvent[]) {
       if (event.type === 'update' && event.recordName === 'Post') {
          return {
             content: event.oldRecord!.content,
@@ -263,7 +263,7 @@ requestApprovedProp.computedData = RelationBasedEvery.create({
    relation: reviewerRelation,
    relationDirection: 'source',
    notEmpty: true,
-   matchExpression:
+   match:
            (_, relation) => {
               return relation.result === 'approved'
            }
@@ -272,7 +272,7 @@ requestApprovedProp.computedData = RelationBasedEvery.create({
 requestRejectedProp.computedData= RelationBasedAny.create({
    relation: reviewerRelation,
    relationDirection: 'source',
-   matchExpression:
+   match:
            (_, relation) => {
               return relation.result === 'rejected'
            }
@@ -293,7 +293,7 @@ sendRequestRelation.computedData = MapInteraction.create({
    items: [
       MapInteractionItem.create({
          interaction: createInteraction,
-         handle: function map(event: any) {
+          map: function map(event: any) {
             return {
                source: event.payload.request,
                target: event.user,
@@ -538,7 +538,7 @@ sendRequestRelation.computedData = MapInteraction.create({
     items: [
         MapInteractionItem.create({
             interaction: createInteraction,
-            handle: function map(event: any) {
+            map: function map(event: any) {
                 return {
                     source: event.payload.request,
                     target: event.user,
@@ -553,7 +553,7 @@ reviewerRelation.computedData =  MapInteraction.create({
     items: [
         MapInteractionItem.create({
             interaction: createInteraction,
-            handle: async function map(this: Controller, event: any) {
+            map: async function map(this: Controller, event: any) {
                 const {BoolExp} = this.globals
 
                 const match = BoolExp.atom({
@@ -587,7 +587,7 @@ reviewerResultProp.computedData= MapInteraction.create({
     items: [
         MapInteractionItem.create({
             interaction: approveInteraction,
-            handle: () => 'approved',
+            map: () => 'approved',
             computeTarget: async function (this: Controller, event) {
 
                 return {
@@ -603,7 +603,7 @@ requestApprovedProp.computedData = RelationBasedEvery.create({
     relation: reviewerRelation,
     relationDirection: 'source',
     notEmpty: true,
-    matchExpression:
+    match:
         (_, relation) => {
             return relation.result === 'approved'
         }
@@ -612,7 +612,7 @@ requestApprovedProp.computedData = RelationBasedEvery.create({
 requestRejectedProp.computedData= RelationBasedAny.create({
     relation: reviewerRelation,
     relationDirection: 'source',
-    matchExpression:
+    match:
         (_, relation) => {
             return relation.result === 'rejected'
         }
@@ -626,7 +626,7 @@ reviewerResultProp.computed =  (request: any) => {
 userPendingRequestCountProp.computedData = RelationCount.create({
     relation: reviewerRelation,
     relationDirection: 'target',
-    matchExpression: function (request, relation) {
+    match: function (request, relation) {
         return request.result === 'pending'
     }
 })
@@ -634,7 +634,7 @@ userPendingRequestCountProp.computedData = RelationCount.create({
 userPendingSubRequestCountProp.computedData= RelationCount.create({
     relation: reviewerRelation,
     relationDirection: 'target',
-    matchExpression: function (request, relation) {
+    match: function (request, relation) {
         return relation.isSecond && request.result === 'pending'
     }
 })

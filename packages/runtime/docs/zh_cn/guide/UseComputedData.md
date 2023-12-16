@@ -19,7 +19,7 @@ export const requestEntity = Entity.create({
             MapActivityItem.create({
                 activity: createFriendRelationActivity,
                 triggerInteractions: [sendInteraction, approveInteraction, rejectInteraction],  // 触发数据计算的 interation
-                handle: function map(stack) {  // 计算数据的函数
+                map: function map(stack) {  // 计算数据的函数
                     const sendRequestEvent = stack.find((i: any) => i.interaction.name === 'sendRequest')
 
                     if (!sendRequestEvent) {
@@ -64,7 +64,7 @@ const sendRequestRelation = Relation.create({
         items: [
             MapInteractionItem.create({
                 interaction: createInteraction,   // 监听的 Interaction
-                handle: function map(event: any) {
+                map: function map(event: any) {
                     return {
                         source: event.payload.request,
                         createdAt: Date.now().toString(), // 记录在关系上的数据。
@@ -88,7 +88,7 @@ Property.create({
         items: [                                    // 可以监听多种 Interaction，有多种计算值的方式。
             MapInteractionItem.create({
                 interaction: approveInteraction,   // 监听的 Interaction
-                handle: () => 'approved',          // 监听的 Interaction 触发时，计算得到的 property 值
+                map: () => 'approved',          // 监听的 Interaction 触发时，计算得到的 property 值
                 computeSource: async function (this: Controller, event) {   // 根据 interaction event 计算出受影响的记录
                     return {
                         "source.id": event.payload.request.id,
@@ -112,7 +112,7 @@ const postRevisionEntity = Entity.create({
         Property.create({ name: 'content', type: PropertyTypes.String })
     ],
     computedData: MapRecordMutation.create({
-        handle: async function (this: Controller, event:RecordMutationEvent, events: RecordMutationEvent[]) {
+        map: async function (this: Controller, event:RecordMutationEvent, events: RecordMutationEvent[]) {
             if (event.type === 'update' && event.recordName === 'Post') {
                 return {
                     content: event.oldRecord!.content,
@@ -147,7 +147,7 @@ Property.create({
     computedData: RelationBasedAny.create({
         relation: receivedRequestRelation,
         relationDirection: 'source',
-        matchExpression:
+        match:
             (_, relation) => {
                 return relation.result === 'rejected'
             }
@@ -170,7 +170,7 @@ Property.create({
         relation: receivedRequestRelation,
         relationDirection: 'source',
         notEmpty: true,
-        matchExpression:
+        match:
             (_, relation) => {
                 return relation.result === 'approved'
             }
@@ -192,7 +192,7 @@ Property.create({
     computedData: RelationCount.create({
         relation: reviewerRelation,
         relationDirection: 'target',
-        matchExpression: function (request, relation) {
+        match: function (request, relation) {
             return request.result === 'pending'
         }
     })
@@ -218,7 +218,7 @@ const anyRequestHandledState = State.create({
     collection: false,
     computedData: Any.create({
         record: requestEntity,
-        matchExpression: (request) => {
+        match: (request) => {
             return request.handled
         }
     })
@@ -237,7 +237,7 @@ const everyRequestHandledState = State.create({
     collection: false,
     computedData: Every.create({
         record: requestEntity,
-        matchExpression: (request) => {
+        match: (request) => {
             return request.handled
         }
     })
@@ -256,7 +256,7 @@ const totalFriendRelationState = State.create({
     collection: false,
     computedData: Count.create({
         record: friendRelation,
-        matchExpression: () => true
+        match: () => true
     })
 })
 ```
@@ -298,7 +298,7 @@ RequestEntity.properties.push(
             relation: reviewerRelation,
             relationDirection: 'source',
             notEmpty: true,
-            matchExpression:
+            match:
                 (_, relation) => {
                     return relation.result === 'approved'
                 }
@@ -311,7 +311,7 @@ RequestEntity.properties.push(
         computedData: RelationBasedAny.create({
             relation: reviewerRelation,
             relationDirection: 'source',
-            matchExpression:
+            match:
                 (_, relation) => {
                     return relation.result === 'rejected'
                 }
