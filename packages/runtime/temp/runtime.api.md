@@ -1295,6 +1295,7 @@ export type Database = {
     insert: (sql: string, values: any[], name?: string) => Promise<EntityIdRef>;
     update: (sql: string, values: any[], idField?: string, name?: string) => Promise<EntityIdRef[]>;
     getAutoId: (recordName: string) => Promise<string>;
+    parseMatchExpression?: (key: string, value: [string, any], fieldName: string, fieldType: string, isReferenceValue: boolean, getReferenceFieldValue: (v: string) => string) => any;
 };
 
 // @public (undocumented)
@@ -3387,6 +3388,11 @@ export class SQLiteDB implements Database {
     options?: (SQLite.Options & {
         logger: DatabaseLogger;
     }) | undefined;
+    // (undocumented)
+    parseMatchExpression(key: string, value: [string, string], fieldName: string, fieldType: string, isReferenceValue: boolean, getReferenceFieldValue: (v: string) => string): {
+        fieldValue: string;
+        fieldParams: string[];
+    } | undefined;
     // (undocumented)
     query<T extends any>(sql: string, where?: any[], name?: string): Promise<T[]>;
     // (undocumented)
