@@ -725,7 +725,7 @@
             },
             {
               "kind": "Content",
-              "text": ">)[];\n        collection: false;\n        required: true;\n    };\n    matchExpression: {\n        type: \"function\";\n        collection: false;\n        required: true;\n    };\n}>"
+              "text": ">)[];\n        collection: false;\n        required: true;\n    };\n    match: {\n        type: \"function\";\n        collection: false;\n        required: true;\n    };\n}>"
             }
           ],
           "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
@@ -1977,7 +1977,7 @@
                 },
                 {
                   "kind": "Content",
-                  "text": "<T>"
+                  "text": "<T> | undefined"
                 },
                 {
                   "kind": "Content",
@@ -4581,7 +4581,7 @@
             },
             {
               "kind": "Content",
-              "text": ">)[];\n        collection: false;\n        required: true;\n    };\n    matchExpression: {\n        type: \"function\";\n        collection: false;\n        required: true;\n    };\n}>"
+              "text": ">)[];\n        collection: false;\n        required: true;\n    };\n    match: {\n        type: \"function\";\n        collection: false;\n        required: true;\n    };\n}>"
             }
           ],
           "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
@@ -6244,7 +6244,7 @@
             },
             {
               "kind": "Content",
-              "text": ">)[];\n        collection: false;\n        required: true;\n    };\n    matchExpression: {\n        type: \"function\";\n        collection: false;\n        required: true;\n    };\n    notEmpty: {\n        type: \"boolean\";\n        collection: false;\n        required: false;\n    };\n}>"
+              "text": ">)[];\n        collection: false;\n        required: true;\n    };\n    match: {\n        type: \"function\";\n        collection: false;\n        required: true;\n    };\n    notEmpty: {\n        type: \"boolean\";\n        collection: false;\n        required: false;\n    };\n}>"
             }
           ],
           "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
@@ -8273,7 +8273,7 @@
             },
             {
               "kind": "Content",
-              "text": ">;\n                collection: true;\n                required: false;\n            };\n            handle: {\n                type: \"function\";\n                collection: false;\n                required: true;\n            };\n            computeTarget: {\n                type: \"function\";\n                collection: false;\n                required: false;\n            };\n        }>;\n        collection: true;\n        required: true;\n    };\n    defaultValue: {\n        type: \"string\";\n        collection: false;\n        required: false;\n    };\n}>"
+              "text": ">;\n                collection: true;\n                required: false;\n            };\n            map: {\n                type: \"function\";\n                collection: false;\n                required: true;\n            };\n            computeTarget: {\n                type: \"function\";\n                collection: false;\n                required: false;\n            };\n        }>;\n        collection: true;\n        required: true;\n    };\n    defaultValue: {\n        type: \"string\";\n        collection: false;\n        required: false;\n    };\n}>"
             }
           ],
           "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
@@ -8571,7 +8571,7 @@
             },
             {
               "kind": "Content",
-              "text": ">;\n        collection: true;\n        required: false;\n    };\n    handle: {\n        type: \"function\";\n        collection: false;\n        required: true;\n    };\n    computeTarget: {\n        type: \"function\";\n        collection: false;\n        required: false;\n    };\n}>"
+              "text": ">;\n        collection: true;\n        required: false;\n    };\n    map: {\n        type: \"function\";\n        collection: false;\n        required: true;\n    };\n    computeTarget: {\n        type: \"function\";\n        collection: false;\n        required: false;\n    };\n}>"
             }
           ],
           "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
@@ -8626,7 +8626,7 @@
             },
             {
               "kind": "Content",
-              "text": ">;\n                collection: false;\n                required: true;\n            };\n            handle: {\n                type: \"function\";\n                collection: false;\n                required: true;\n            };\n            computeTarget: {\n                type: \"function\";\n                collection: false;\n                required: false;\n            };\n        }>;\n        collection: true;\n        required: true;\n    };\n    defaultValue: {\n        type: \"string\";\n        collection: false;\n        required: false;\n    };\n}>"
+              "text": ">;\n                collection: false;\n                required: true;\n            };\n            map: {\n                type: \"function\";\n                collection: false;\n                required: true;\n            };\n            computeTarget: {\n                type: \"function\";\n                collection: false;\n                required: false;\n            };\n        }>;\n        collection: true;\n        required: true;\n    };\n    defaultValue: {\n        type: \"string\";\n        collection: false;\n        required: false;\n    };\n}>"
             }
           ],
           "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
@@ -8672,7 +8672,7 @@
             },
             {
               "kind": "Content",
-              "text": ">;\n        collection: false;\n        required: true;\n    };\n    handle: {\n        type: \"function\";\n        collection: false;\n        required: true;\n    };\n    computeTarget: {\n        type: \"function\";\n        collection: false;\n        required: false;\n    };\n}>"
+              "text": ">;\n        collection: false;\n        required: true;\n    };\n    map: {\n        type: \"function\";\n        collection: false;\n        required: true;\n    };\n    computeTarget: {\n        type: \"function\";\n        collection: false;\n        required: false;\n    };\n}>"
             }
           ],
           "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
@@ -8700,7 +8700,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n    handle: {\n        type: \"function\";\n        collection: false;\n        required: true;\n    };\n    computeTarget: {\n        type: \"function\";\n        collection: false;\n        required: false;\n    };\n}>"
+              "text": "<{\n    map: {\n        type: \"function\";\n        collection: false;\n        required: true;\n    };\n    computeTarget: {\n        type: \"function\";\n        collection: false;\n        required: false;\n    };\n}>"
             }
           ],
           "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
@@ -11000,7 +11000,7 @@
             },
             {
               "kind": "Content",
-              "text": ">;\n        collection: false;\n        required: true;\n    };\n    relationDirection: {\n        type: \"string\";\n        collection: false;\n        required: true;\n        defaultValue: () => string;\n    };\n    matchExpression: {\n        type: \"function\";\n        collection: false;\n        required: true;\n    };\n}>"
+              "text": ">;\n        collection: false;\n        required: true;\n    };\n    relationDirection: {\n        type: \"string\";\n        collection: false;\n        required: true;\n        defaultValue: () => string;\n    };\n    match: {\n        type: \"function\";\n        collection: false;\n        required: true;\n    };\n}>"
             }
           ],
           "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
@@ -11046,7 +11046,7 @@
             },
             {
               "kind": "Content",
-              "text": ">;\n        collection: false;\n        required: true;\n    };\n    relationDirection: {\n        type: \"string\";\n        collection: false;\n        required: true;\n        defaultValue: () => string;\n    };\n    matchExpression: {\n        type: \"function\";\n        collection: false;\n        required: true;\n    };\n    notEmpty: {\n        type: \"boolean\";\n        collection: false;\n        required: false;\n    };\n}>"
+              "text": ">;\n        collection: false;\n        required: true;\n    };\n    relationDirection: {\n        type: \"string\";\n        collection: false;\n        required: true;\n        defaultValue: () => string;\n    };\n    match: {\n        type: \"function\";\n        collection: false;\n        required: true;\n    };\n    notEmpty: {\n        type: \"boolean\";\n        collection: false;\n        required: false;\n    };\n}>"
             }
           ],
           "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
@@ -11147,7 +11147,7 @@
             },
             {
               "kind": "Content",
-              "text": ">;\n        collection: false;\n        required: true;\n    };\n    relationDirection: {\n        type: \"string\";\n        collection: false;\n        required: true;\n        defaultValue: () => string;\n    };\n    matchExpression: {\n        type: \"function\";\n        collection: false;\n        required: true;\n    };\n}>"
+              "text": ">;\n        collection: false;\n        required: true;\n    };\n    relationDirection: {\n        type: \"string\";\n        collection: false;\n        required: true;\n        defaultValue: () => string;\n    };\n    match: {\n        type: \"function\";\n        collection: false;\n        required: true;\n    };\n}>"
             }
           ],
           "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",

@@ -208,7 +208,7 @@ export const Any: Klass<{
         collection: false;
         required: true;
     };
-    matchExpression: {
+    match: {
         type: "function";
         collection: false;
         required: true;
@@ -406,7 +406,7 @@ export class BoolExp<T> {
     // (undocumented)
     raw: ExpressionData<T>;
     // (undocumented)
-    get right(): BoolExp<T>;
+    get right(): BoolExp<T> | undefined;
     // Warning: (ae-forgotten-export) The symbol "AtomData" needs to be exported by the entry point index.d.ts
     //
     // (undocumented)
@@ -1089,7 +1089,7 @@ export const Count: Klass<{
         collection: false;
         required: true;
     };
-    matchExpression: {
+    match: {
         type: "function";
         collection: false;
         required: true;
@@ -1593,7 +1593,7 @@ export const Every: Klass<{
         collection: false;
         required: true;
     };
-    matchExpression: {
+    match: {
         type: "function";
         collection: false;
         required: true;
@@ -1858,7 +1858,7 @@ export const MapActivity: Klass<{
                 collection: true;
                 required: false;
             };
-            handle: {
+            map: {
                 type: "function";
                 collection: false;
                 required: true;
@@ -1937,7 +1937,7 @@ export const MapActivityItem: Klass<{
         collection: true;
         required: false;
     };
-    handle: {
+    map: {
         type: "function";
         collection: false;
         required: true;
@@ -1958,7 +1958,7 @@ export const MapInteraction: Klass<{
                 collection: false;
                 required: true;
             };
-            handle: {
+            map: {
                 type: "function";
                 collection: false;
                 required: true;
@@ -1986,7 +1986,7 @@ export const MapInteractionItem: Klass<{
         collection: false;
         required: true;
     };
-    handle: {
+    map: {
         type: "function";
         collection: false;
         required: true;
@@ -2000,7 +2000,7 @@ export const MapInteractionItem: Klass<{
 
 // @public (undocumented)
 export const MapRecordMutation: Klass<{
-    handle: {
+    map: {
         type: "function";
         collection: false;
         required: true;
@@ -2821,7 +2821,7 @@ export const RelationBasedAny: Klass<{
         required: true;
         defaultValue: () => string;
     };
-    matchExpression: {
+    match: {
         type: "function";
         collection: false;
         required: true;
@@ -2841,7 +2841,7 @@ export const RelationBasedEvery: Klass<{
         required: true;
         defaultValue: () => string;
     };
-    matchExpression: {
+    match: {
         type: "function";
         collection: false;
         required: true;
@@ -2892,7 +2892,7 @@ export const RelationCount: Klass<{
         required: true;
         defaultValue: () => string;
     };
-    matchExpression: {
+    match: {
         type: "function";
         collection: false;
         required: true;
