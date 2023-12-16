@@ -24,9 +24,9 @@ export class MapInteractionHandle extends ComputedDataHandle {
     }
     parseComputedData() {
         const computedData = this.computedData as unknown as  KlassInstance<typeof MapInteraction, false>
-        this.mapItems = new Map(computedData.items.map(({interaction, handle, computeTarget}) => {
+        this.mapItems = new Map(computedData.items.map(({interaction, map, computeTarget}) => {
             return [interaction, {
-                handle,
+                handle: map,
                 computeTarget: (computeTarget as (data: InteractionEventArgs, activityId?: string) => any)?.bind(this.controller)
             }]
         }))

@@ -19,7 +19,7 @@ export class RelationBasedEveryHandle extends ComputedDataHandle {
             computedData: RelationCount.create({
                 relation: computedData.relation,
                 relationDirection: computedData.relationDirection,
-                matchExpression: computedData.matchExpression
+                match: computedData.match
             })
         })
         this.dataContext.host?.properties!.push(matchCountProperty)
@@ -32,7 +32,7 @@ export class RelationBasedEveryHandle extends ComputedDataHandle {
             computedData: RelationCount.create({
                 relation: computedData.relation,
                 relationDirection: computedData.relationDirection,
-                matchExpression: function(){
+                match: function(){
                     return true
                 }
             })

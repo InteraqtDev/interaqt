@@ -13,7 +13,7 @@ export class RelationBasedAnyHandle extends ComputedDataHandle {
             collection: false,
             computedData: Count.create({
                 record: computedData.record,
-                matchExpression: computedData.matchExpression
+                match: computedData.match
             })
         })
         this.controller.states.push(matchCountState)

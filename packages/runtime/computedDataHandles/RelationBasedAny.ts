@@ -16,7 +16,7 @@ export class RelationBasedAnyHandle extends ComputedDataHandle {
             computedData: RelationCount.create({
                 relation: computedData.relation,
                 relationDirection: computedData.relationDirection,
-                matchExpression: computedData.matchExpression
+                match: computedData.match
             })
         })
         this.dataContext.host?.properties!.push(matchCountProperty)

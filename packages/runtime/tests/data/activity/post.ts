@@ -54,7 +54,7 @@ postEntity.properties.push(
             items: [
                 MapInteractionItem.create({
                     interaction: updatePostInteraction,
-                    handle: (event) => { return event.payload.post.content },
+                    map: (event) => { return event.payload.post.content },
                     computeTarget: async function (this: Controller, event) {
                         return event.payload.post.id
                     }
@@ -73,7 +73,7 @@ export const postRevisionEntity = Entity.create({
         Property.create({ name: 'content', type: PropertyTypes.String })
     ],
     computedData: MapRecordMutation.create({
-      handle: async function (this: Controller, event:RecordMutationEvent, events: RecordMutationEvent[]) {
+      map: async function (this: Controller, event:RecordMutationEvent, events: RecordMutationEvent[]) {
           if (event.type === 'update' && event.recordName === 'Post') {
               return {
                   content: event.oldRecord!.content,

@@ -31,9 +31,9 @@ export class MapActivityHandle extends ComputedDataHandle {
     }
     parseComputedData() {
         const computedData = this.computedData as unknown as  KlassInstance<typeof MapActivity, false>
-        this.mapItems = new Map(computedData.items.map(({activity, handle, computeTarget, triggerInteractions}) => {
+        this.mapItems = new Map(computedData.items.map(({activity, map, computeTarget, triggerInteractions}) => {
             return [activity, {
-                handle,
+                handle: map,
                 computeTarget: (computeTarget as (data: InteractionEventArgs, activityId?: string) => any)?.bind(this.controller),
                 triggerInteractions: triggerInteractions || getInteractions(activity!)
             }]

@@ -211,7 +211,7 @@ export const mapFriendActivityToRequest = MapActivity.create({
         MapActivityItem.create({
             activity: createFriendRelationActivity,
             triggerInteractions: [sendInteraction, approveInteraction, rejectInteraction],
-            handle: function (stack) {
+            map: function (stack) {
                 const sendRequestEvent = stack.find((i: any) => i.interaction.name === 'sendRequest')
 
                 if (!sendRequestEvent) {
@@ -229,22 +229,5 @@ export const mapFriendActivityToRequest = MapActivity.create({
             }
         })
     ],
-    // sourceActivity: createFriendRelationActivity,
-    // triggerInteraction: [sendInteraction, approveInteraction, rejectInteraction],
-    // handle: function map(stack) {
-    //     const sendRequestEvent = stack.find((i: any) => i.interaction.name === 'sendRequest')
-    //
-    //     if (!sendRequestEvent) {
-    //         return undefined
-    //     }
-    //
-    //     const handled = !!stack.find((i: any) => i.interaction.name === 'approve' || i.interaction.name === 'reject')
-    //
-    //     return {
-    //         from: sendRequestEvent.data.user,
-    //         to: sendRequestEvent.data.payload.to,
-    //         message: sendRequestEvent.data.payload.message,
-    //         handled,
-    //     }
-    // }
+
 })

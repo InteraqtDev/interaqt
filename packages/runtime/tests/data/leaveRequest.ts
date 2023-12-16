@@ -74,7 +74,7 @@ const sendRequestRelation = Relation.create({
         items: [
             MapInteractionItem.create({
                 interaction: sendInteraction,
-                handle:function map(event: any){
+                map:function map(event: any){
                     return {
                         source: event.payload.request,
                         target: event.user,
@@ -286,7 +286,7 @@ const reviewerRelation = Relation.create({
             items: [
                 MapInteractionItem.create({
                     interaction: approveInteraction,
-                    handle: () => 'approved',
+                    map: () => 'approved',
                     computeTarget: function(event) {
                         return {
                             "source.id": event.payload.request.id,
@@ -296,7 +296,7 @@ const reviewerRelation = Relation.create({
                 }),
                 MapInteractionItem.create({
                     interaction: rejectInteraction,
-                    handle: () => 'rejected',
+                    map: () => 'rejected',
                     computeTarget: function(event)  {
                         return {
                             "source.id": event.payload.request.id,
@@ -318,7 +318,7 @@ RequestEntity.properties.push(
             relation: reviewerRelation,
             relationDirection: 'source',
             notEmpty: true,
-            matchExpression:
+            match:
             (_, relation) => {
                 return relation.result === 'approved'
             }
@@ -332,7 +332,7 @@ RequestEntity.properties.push(
         computedData: RelationBasedAny.create({
             relation: reviewerRelation,
             relationDirection: 'source',
-            matchExpression:
+            match:
             (_, relation) => {
                 return relation.result === 'rejected'
             }

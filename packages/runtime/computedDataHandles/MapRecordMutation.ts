@@ -14,7 +14,7 @@ export class MapInteractionHandle extends IncrementalComputedDataHandle {
     parseComputedData() {
         const computedData = this.computedData as unknown as  KlassInstance<typeof MapRecordMutation, false>
         this.data = this.dataContext.id as KlassInstance<typeof Entity, false>
-        this.mapItem = (computedData.handle! as (mutationEvent: RecordMutationEvent, mutationEvents: RecordMutationEvent[]) => any ).bind(this.controller)
+        this.mapItem = (computedData.map! as (mutationEvent: RecordMutationEvent, mutationEvents: RecordMutationEvent[]) => any ).bind(this.controller)
         this.computeTarget = computedData.computeTarget?.bind(this.controller)
     }
     computeEffect(mutationEvent: RecordMutationEvent, mutationEvents: RecordMutationEvent[]): any {

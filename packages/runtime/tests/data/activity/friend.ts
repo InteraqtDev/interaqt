@@ -17,7 +17,7 @@ UserEntity.properties.push(Property.create({
     computedData: RelationBasedEvery.create({
         relation: sendRequestRelation,
         relationDirection: 'target',
-        matchExpression: (request) => request.handled
+        match: (request) => request.handled
     })
 }))
 
@@ -28,7 +28,7 @@ UserEntity.properties.push(Property.create({
     computedData: RelationBasedAny.create({
         relation: sendRequestRelation,
         relationDirection: 'target',
-        matchExpression: (request) => request.handled
+        match: (request) => request.handled
     })
 }))
 
@@ -36,7 +36,7 @@ UserEntity.properties.push(Property.create({
 const userTotalFriendCount = RelationCount.create({
     relation: friendRelation,
     relationDirection: 'source',
-    matchExpression: () => true
+    match: () => true
 })
 
 UserEntity.properties.push(Property.create({

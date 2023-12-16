@@ -8,7 +8,7 @@ const totalFriendRelationState = State.create({
     collection: false,
     computedData: Count.create({
         record: friendRelation,
-        matchExpression: () => true
+        match: () => true
     })
 })
 const everyRequestHandledState = State.create({
@@ -17,7 +17,7 @@ const everyRequestHandledState = State.create({
     collection: false,
     computedData: Every.create({
         record: requestEntity,
-        matchExpression: (request) => {
+        match: (request) => {
             return request.handled
         }
     })
@@ -28,7 +28,7 @@ const anyRequestHandledState = State.create({
     collection: false,
     computedData: Any.create({
         record: requestEntity,
-        matchExpression: (request) => {
+        match: (request) => {
             return request.handled
         }
     })

@@ -259,7 +259,7 @@ export const mapFriendActivityToRequest = MapActivity.create({
             activity: createFriendRelationActivity,
             triggerInteractions: [sendInteraction, approveInteraction, rejectInteraction],
 
-            handle: (stack) => {
+            map: (stack) => {
                 const sendRequestEvent = stack.find((i: any) => i.interaction.name === 'sendRequest')
 
                 if (!sendRequestEvent) {
@@ -310,7 +310,7 @@ export const receivedRequestRelation = Relation.create({
             items: [
                 MapInteractionItem.create({
                     interaction: approveInteraction,
-                    handle: () => 'approved',
+                    map: () => 'approved',
                     computeTarget: async function (this: Controller, event, activityId) {
                         const {BoolExp} = this.globals
                         const match = BoolExp.atom({
@@ -327,7 +327,7 @@ export const receivedRequestRelation = Relation.create({
                 }),
                 MapInteractionItem.create({
                     interaction: rejectInteraction,
-                    handle: () => 'rejected',
+                    map: () => 'rejected',
                     computeTarget: async function (this: Controller, event, activityId) {
                         const {BoolExp} = this.globals
                         const match = BoolExp.atom({
@@ -358,7 +358,7 @@ export const messageToRequestRelation = Relation.create({
 export const userTotalUnhandledRequest = RelationCount.create({
     relation: receivedRequestRelation,
     relationDirection: 'target',
-    matchExpression:
+    match:
         (request) => {
             return !request.handled
         }
@@ -378,7 +378,7 @@ UserEntity.properties.push(Property.create({
     computedData: RelationBasedEvery.create({
         relation: sendRequestRelation,
         relationDirection: 'target',
-        matchExpression: (request) => request.handled
+        match: (request) => request.handled
     })
 }))
 
@@ -389,7 +389,7 @@ UserEntity.properties.push(Property.create({
     computedData: RelationBasedAny.create({
         relation: sendRequestRelation,
         relationDirection: 'target',
-        matchExpression: (request) => request.handled
+        match: (request) => request.handled
     })
 }))
 
@@ -397,7 +397,7 @@ UserEntity.properties.push(Property.create({
 const userTotalFriendCount = RelationCount.create({
     relation: friendRelation,
     relationDirection: 'source',
-    matchExpression: () => true
+    match: () => true
 })
 
 UserEntity.properties.push(Property.create({
@@ -439,7 +439,7 @@ export const postRevisionEntity = Entity.create({
         Property.create({name: 'content', type: PropertyTypes.String})
     ],
     computedData: MapRecordMutation.create({
-        handle: async function (this: Controller, event: RecordMutationEvent, events: RecordMutationEvent[]) {
+        map: async function (this: Controller, event: RecordMutationEvent, events: RecordMutationEvent[]) {
             if (event.type === 'update' && event.recordName === 'Post') {
                 return {
                     content: event.oldRecord!.content,
@@ -468,7 +468,7 @@ postEntity.properties.push(
             items: [
                 MapInteractionItem.create({
                     interaction: updatePostInteraction,
-                    handle: (event) => { return event.payload.post.content },
+                    map: (event) => { return event.payload.post.content },
                     computeTarget: async function (this: Controller, event) {
                         return event.payload.post.id
                     }
@@ -483,7 +483,7 @@ const totalFriendRelationState = State.create({
     collection: false,
     computedData: Count.create({
         record: friendRelation,
-        matchExpression: () => true
+        match: () => true
     })
 })
 const everyRequestHandledState = State.create({
@@ -492,7 +492,7 @@ const everyRequestHandledState = State.create({
     collection: false,
     computedData: Every.create({
         record: requestEntity,
-        matchExpression: (request) => {
+        match: (request) => {
             return request.handled
         }
     })
@@ -503,7 +503,7 @@ const anyRequestHandledState = State.create({
     collection: false,
     computedData: Any.create({
         record: requestEntity,
-        matchExpression: (request) => {
+        match: (request) => {
             return request.handled
         }
     })
@@ -525,7 +525,7 @@ requestEntity.properties.push(
             relation: receivedRequestRelation,
             relationDirection: 'source',
             notEmpty: true,
-            matchExpression:
+            match:
                 (_, relation) => {
                     return relation.result === 'approved'
                 }
@@ -539,7 +539,7 @@ requestEntity.properties.push(
         computedData: RelationBasedAny.create({
             relation: receivedRequestRelation,
             relationDirection: 'source',
-            matchExpression:
+            match:
                 (_, relation) => {
                     return relation.result === 'rejected'
                 }

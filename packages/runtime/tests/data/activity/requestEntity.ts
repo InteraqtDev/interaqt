@@ -45,7 +45,7 @@ export const receivedRequestRelation = Relation.create({
             items: [
                 MapInteractionItem.create({
                     interaction: approveInteraction,
-                    handle: () => 'approved',
+                    map: () => 'approved',
                     computeTarget: async function (this: Controller, event, activityId) {
                         const {BoolExp} = this.globals
                         const match = BoolExp.atom({
@@ -62,7 +62,7 @@ export const receivedRequestRelation = Relation.create({
                 }),
                 MapInteractionItem.create({
                     interaction: rejectInteraction,
-                    handle: () => 'rejected',
+                    map: () => 'rejected',
                     computeTarget: async function (this: Controller, event, activityId) {
                         const {BoolExp} = this.globals
                         const match = BoolExp.atom({
@@ -93,7 +93,7 @@ export const messageToRequestRelation = Relation.create({
 export const userTotalUnhandledRequest = RelationCount.create({
     relation: receivedRequestRelation,
     relationDirection: 'target',
-    matchExpression:
+    match:
         (request) => {
             return !request.handled
         }
@@ -110,7 +110,7 @@ requestEntity.properties.push(
             relation: receivedRequestRelation,
             relationDirection: 'source',
             notEmpty: true,
-            matchExpression:
+            match:
                 (_, relation) => {
                     return relation.result === 'approved'
                 }
@@ -124,7 +124,7 @@ requestEntity.properties.push(
         computedData: RelationBasedAny.create({
             relation: receivedRequestRelation,
             relationDirection: 'source',
-            matchExpression:
+            match:
                 (_, relation) => {
                     return relation.result === 'rejected'
                 }

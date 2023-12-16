@@ -10,7 +10,7 @@ export class RelationCountHandle extends RelationBasedWeightedSummationHandle {
     matchExpression!: (record: KlassInstance<typeof Entity, false>, relation: KlassInstance<typeof Relation, false>) => boolean
     parseComputedData(){
         const computedData = this.computedData as  KlassInstance<typeof RelationCount, false>
-        this.matchExpression = computedData.matchExpression!.bind(this.controller)
+        this.matchExpression = computedData.match!.bind(this.controller)
         this.mapRelationToWeight = (record: KlassInstance<typeof Entity, false>, relation: KlassInstance<typeof Relation, false>): number=>{
             return this.matchExpression(record, relation) ? 1 : 0
         }
