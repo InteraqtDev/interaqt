@@ -471,12 +471,12 @@ ${whereClause}
         } else {
             if (fieldMatchExp.isAnd()) {
                 const [leftSql, leftValues] = this.buildWhereClause(fieldMatchExp.left, prefix)
-                const [rightSql, rightValues] = this.buildWhereClause(fieldMatchExp.right, prefix)
+                const [rightSql, rightValues] = this.buildWhereClause(fieldMatchExp.right!, prefix)
                 sql =  `(${leftSql} AND ${rightSql})`
                 values.push(...leftValues, ...rightValues)
             } else  if (fieldMatchExp.isOr()) {
                 const [leftSql, leftValues] = this.buildWhereClause(fieldMatchExp.left, prefix)
-                const [rightSql, rightValues] = this.buildWhereClause(fieldMatchExp.right, prefix)
+                const [rightSql, rightValues] = this.buildWhereClause(fieldMatchExp.right!, prefix)
                 sql =  `(${leftSql} OR ${rightSql})`
                 values.push(...leftValues, ...rightValues)
             } else {
