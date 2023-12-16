@@ -175,7 +175,7 @@ export const RelationCount = createClass({
         },
         // 创建初始值的时候用于计算哪些 relation 是要  count 的
         // 这里 match 的是 relatedEntity
-        matchExpression: {
+        match: {
             type: 'function',
             collection: false,
             required: true
@@ -210,7 +210,7 @@ export const Count = createClass({
             collection: false,
             required: true
         },
-        matchExpression: {
+        match: {
             type: 'function',
             collection: false,
             required: true
@@ -239,7 +239,7 @@ export const RelationBasedEvery = createClass({
         },
         // 创建初始值的时候用于计算哪些 relation 是要  count 的
         // 这里 match 的是 relatedEntity
-        matchExpression: {
+        match: {
             type: 'function',
             collection: false,
             required: true
@@ -268,7 +268,7 @@ export const RelationBasedAny = createClass({
         },
         // 创建初始值的时候用于计算哪些 relation 是要  count 的
         // 这里 match 的是 relatedEntity
-        matchExpression: {
+        match: {
             type: 'function',
             collection: false,
             required: true
@@ -285,7 +285,7 @@ export const Every = createClass({
             collection: false,
             required: true
         },
-        matchExpression: {
+        match: {
             type: 'function',
             collection: false,
             required: true
@@ -306,7 +306,7 @@ export const Any = createClass({
             collection: false,
             required: true
         },
-        matchExpression: {
+        match: {
             type: 'function',
             collection: false,
             required: true
@@ -324,7 +324,7 @@ export const MapInteractionItem = createClass({
             collection: false,
             required: true
         },
-        handle: {
+        map: {
             type: 'function',
             collection: false,
             required: true
@@ -367,7 +367,7 @@ export const MapActivityItem = createClass({
             collection: true,
             required:false
         },
-        handle: {
+        map: {
             type: 'function',
             collection: false,
             required: true
@@ -399,7 +399,7 @@ export const MapActivity = createClass({
 export const MapRecordMutation = createClass({
     name: 'MapRecordMutation',
     public: {
-        handle: {
+        map: {
             type: 'function',
             collection: false,
             required: true
