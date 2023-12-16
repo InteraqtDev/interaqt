@@ -40,8 +40,8 @@ export class BoolExp<T> {
     get left() {
         return new BoolExp<T>((this.raw as BoolExpressionRawData<T>).left)
     }
-    get right() {
-        return new BoolExp<T>((this.raw as BoolExpressionRawData<T>).right!)
+    get right(): BoolExp<T>|undefined {
+        return (this.raw as BoolExpressionRawData<T>).right ? new BoolExp<T>((this.raw as BoolExpressionRawData<T>).right!) : undefined
     }
     get data() {
         return (this.raw as AtomData<T>).data
@@ -99,7 +99,7 @@ export class BoolExp<T> {
             if (this.isNot()) {
                 return newLeft.not()
             } else {
-                const newRight = this.right.map(fn, ['right'])
+                const newRight = this.right!.map(fn, ['right'])
                 return this.isAnd() ? newLeft.and(newRight) : newLeft.or(newRight)
             }
         } else {
@@ -122,14 +122,14 @@ export class BoolExp<T> {
         if (this.isOr()) {
             const leftResult = this.left.evaluate(atomHandle, currentStack)
             if (leftResult === true) return true
-            return this.right.evaluate(atomHandle, currentStack)
+            return this.right!.evaluate(atomHandle, currentStack)
         }
 
         if (this.isAnd()) {
             const leftResult = this.left.evaluate(atomHandle, currentStack)
             if (leftResult !== true) return leftResult
 
-            return this.right.evaluate(atomHandle, currentStack)
+            return this.right!.evaluate(atomHandle, currentStack)
         }
 
         if (this.isNot()) {
@@ -153,14 +153,14 @@ export class BoolExp<T> {
         if (this.isOr()) {
             const leftResult = await this.left.evaluateAsync(atomHandle, currentStack)
             if (leftResult === true) return true
-            return this.right.evaluateAsync(atomHandle, currentStack)
+            return this.right!.evaluateAsync(atomHandle, currentStack)
         }
 
         if (this.isAnd()) {
             const leftResult = await this.left.evaluateAsync(atomHandle, currentStack)
             if (leftResult !== true) return leftResult
 
-            return this.right.evaluateAsync(atomHandle, currentStack)
+            return this.right!.evaluateAsync(atomHandle, currentStack)
         }
 
         if (this.isNot()) {
