@@ -99,7 +99,9 @@ export type Database = {
     delete: <T extends any>(sql: string, where: any[], name?:string) => Promise<T[]>
     insert: (sql: string, values: any[], name?:string) => Promise<EntityIdRef>
     update: (sql: string, values: any[], idField?: string, name?:string) => Promise<EntityIdRef[]>
-    getAutoId: (recordName: string) => Promise<string>
+    getAutoId: (recordName: string) => Promise<string>,
+    parseMatchExpression?: (key: string, value: [string, any], fieldName: string, fieldType: string, isReferenceValue: boolean, getReferenceFieldValue:(v: string) => string) => any
+
 } // activity 数据
 // state 等系统配置数据的实体化
 // FIXME 应该独立到外部

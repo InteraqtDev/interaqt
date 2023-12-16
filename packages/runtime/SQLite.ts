@@ -54,7 +54,9 @@ export class SQLiteDB implements Database{
         const context= asyncInteractionContext.getStore() as InteractionContext
         const logger = this.logger.child(context?.logContext || {})
         const finalSQL = `${sql} ${idField ? `RETURNING ${idField} AS id`: ''}`
-        const params = values.map(x => x===false ? 0 : x===true ? 1 : x)
+        const params = values.map(x => {
+            return (typeof x === 'object' && x !==null) ? JSON.stringify(x) : x===false ? 0 : x===true ? 1 : x
+        })
         logger.info({
             type:'update',
             name,
@@ -66,7 +68,9 @@ export class SQLiteDB implements Database{
     async insert (sql:string, values:any[], name='')  {
         const context= asyncInteractionContext.getStore() as InteractionContext
         const logger = this.logger.child(context?.logContext || {})
-        const params = values.map(x => x===false ? 0 : x===true ? 1 : x)
+        const params = values.map(x => {
+            return (typeof x === 'object' && x !==null) ? JSON.stringify(x) : x===false ? 0 : x===true ? 1 : x
+        })
         logger.info({
             type:'insert',
             name,
@@ -102,5 +106,19 @@ export class SQLiteDB implements Database{
     }
     async getAutoId(recordName: string) {
         return this.idSystem.getAutoId(recordName)
+    }
+    parseMatchExpression(key: string, value:[string, string], fieldName: string, fieldType: string, isReferenceValue: boolean, getReferenceFieldValue: (v: string) => string) {
+        if (fieldType === 'JSON') {
+            if (value[0].toLowerCase() === 'contains') {
+                return {
+                    fieldValue: `NOT NULL AND EXISTS (
+    SELECT 1
+    FROM json_each(${fieldName})
+    WHERE json_each.value = ?
+)`,
+                    fieldParams: [value[1]]
+                }
+            }
+        }
     }
 }
