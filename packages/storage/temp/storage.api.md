@@ -24,6 +24,8 @@ export class AttributeInfo {
     // (undocumented)
     get field(): string | undefined;
     // (undocumented)
+    get fieldType(): string | undefined;
+    // (undocumented)
     getAttribute(name: string): AttributeInfo;
     // (undocumented)
     getLinkInfo(): LinkInfo;
@@ -31,6 +33,8 @@ export class AttributeInfo {
     getRecordInfo(): RecordInfo;
     // (undocumented)
     getReverseInfo(): AttributeInfo | undefined;
+    // (undocumented)
+    get isCollection(): boolean | undefined;
     // (undocumented)
     get isComputed(): false | ((record: any) => any) | undefined;
     // (undocumented)
@@ -148,6 +152,7 @@ export type Database = {
     insert: (sql: string, values: any[], name?: string) => Promise<EntityIdRef>;
     update: (sql: string, values: any[], idField?: string, name?: string) => Promise<EntityIdRef[]>;
     getAutoId: (recordName: string) => Promise<string>;
+    parseMatchExpression?: (key: string, value: [string, any], fieldName: string, fieldType: string, isReferenceValue: boolean, getReferenceFieldValue: (v: string) => string) => any;
 };
 
 // @public (undocumented)
@@ -178,7 +183,7 @@ export class DBSetup {
     // (undocumented)
     entities: KlassInstance<typeof Entity, false>[];
     // (undocumented)
-    getDBFieldType(type: string): string;
+    getDBFieldType(type: string, collection?: boolean): string;
     // (undocumented)
     getRecordName(rawRecord: KlassInstance<typeof Entity, false> | KlassInstance<typeof Relation, false>): string;
     // (undocumented)
@@ -417,7 +422,7 @@ export class MatchExp {
     // (undocumented)
     static atom(condition: MatchAtom): BoolExp<MatchAtom>;
     // (undocumented)
-    buildFieldMatchExpression(): BoolExp<FieldMatchAtom> | null;
+    buildFieldMatchExpression(db?: Database): BoolExp<FieldMatchAtom> | null;
     // (undocumented)
     buildQueryTree(matchData: MatchExpressionData, recordQueryTree: RecordQueryTree): void;
     // (undocumented)
@@ -433,7 +438,7 @@ export class MatchExp {
     // (undocumented)
     getFinalFieldName(matchAttributePath: string[]): [string, string];
     // (undocumented)
-    getFinalFieldValue(isReferenceValue: boolean, value: [string, any]): [string, any[]];
+    getFinalFieldValue(isReferenceValue: boolean, key: string, value: [string, any], fieldName: string, fieldType?: string, db?: Database): [string, any[]];
     // (undocumented)
     getReferenceFieldValue(valueStr: string): string;
     // (undocumented)
@@ -581,6 +586,8 @@ export class RecordInfo {
     // (undocumented)
     get isRelation(): boolean | undefined;
     // (undocumented)
+    get JSONFields(): string[];
+    // (undocumented)
     get managedRecordAttributes(): AttributeInfo[];
     // (undocumented)
     map: EntityToTableMap;
@@ -720,7 +727,7 @@ export class RecordQueryAgent {
     // (undocumented)
     structureRawReturns(rawReturns: {
         [k: string]: any;
-    }[]): {}[];
+    }[], JSONFields: string[]): {}[];
     // (undocumented)
     unlink(linkName: string, matchExpressionData: MatchExpressionData, moveSource?: boolean, reason?: string, events?: MutationEvent_2[]): Promise<void | Record_2[]>;
     // (undocumented)
@@ -836,16 +843,18 @@ export type TableData = {
 // @public (undocumented)
 export type ValueAttribute = {
     type: string;
+    collection?: boolean;
     table?: string;
     field: string;
+    fieldType?: string;
     computed?: (record: any) => any;
 };
 
 // Warnings were encountered during analysis:
 //
-// index.ts:13:36 - (ae-forgotten-export) The symbol "RecordMap" needs to be exported by the entry point index.d.ts
-// index.ts:13:36 - (ae-forgotten-export) The symbol "LinkMap" needs to be exported by the entry point index.d.ts
-// index.ts:13:36 - (ae-forgotten-export) The symbol "ColumnData" needs to be exported by the entry point index.d.ts
+// erstorage/EntityToTableMap.ts:78:5 - (ae-forgotten-export) The symbol "RecordMap" needs to be exported by the entry point index.d.ts
+// erstorage/EntityToTableMap.ts:79:5 - (ae-forgotten-export) The symbol "LinkMap" needs to be exported by the entry point index.d.ts
+// erstorage/Setup.ts:18:19 - (ae-forgotten-export) The symbol "ColumnData" needs to be exported by the entry point index.d.ts
 
 // (No @packageDocumentation comment for this package)
 

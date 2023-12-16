@@ -186,7 +186,7 @@
               "text": "\"*\""
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "erstorage/RecordQuery.ts",
           "initializerTokenRange": {
             "startIndex": 1,
             "endIndex": 2
@@ -209,7 +209,7 @@
               "text": "export declare class AttributeInfo "
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "erstorage/AttributeInfo.ts",
           "releaseTag": "Public",
           "isAbstract": false,
           "name": "AttributeInfo",
@@ -427,6 +427,36 @@
               "isAbstract": false
             },
             {
+              "kind": "Property",
+              "canonicalReference": "@interaqt/storage!AttributeInfo#fieldType:member",
+              "docComment": "",
+              "excerptTokens": [
+                {
+                  "kind": "Content",
+                  "text": "get fieldType(): "
+                },
+                {
+                  "kind": "Content",
+                  "text": "string | undefined"
+                },
+                {
+                  "kind": "Content",
+                  "text": ";"
+                }
+              ],
+              "isReadonly": true,
+              "isOptional": false,
+              "releaseTag": "Public",
+              "name": "fieldType",
+              "propertyTypeTokenRange": {
+                "startIndex": 1,
+                "endIndex": 2
+              },
+              "isStatic": false,
+              "isProtected": false,
+              "isAbstract": false
+            },
+            {
               "kind": "Method",
               "canonicalReference": "@interaqt/storage!AttributeInfo#getAttribute:member(1)",
               "docComment": "",
@@ -485,6 +515,10 @@
                   "text": "getLinkInfo(): "
                 },
                 {
+                  "kind": "Content",
+                  "text": "import(\"./LinkInfo.js\")."
+                },
+                {
                   "kind": "Reference",
                   "text": "LinkInfo",
                   "canonicalReference": "@interaqt/storage!LinkInfo:class"
@@ -497,7 +531,7 @@
               "isStatic": false,
               "returnTypeTokenRange": {
                 "startIndex": 1,
-                "endIndex": 2
+                "endIndex": 3
               },
               "releaseTag": "Public",
               "isProtected": false,
@@ -517,6 +551,10 @@
                   "text": "getRecordInfo(): "
                 },
                 {
+                  "kind": "Content",
+                  "text": "import(\"./RecordInfo.js\")."
+                },
+                {
                   "kind": "Reference",
                   "text": "RecordInfo",
                   "canonicalReference": "@interaqt/storage!RecordInfo:class"
@@ -529,7 +567,7 @@
               "isStatic": false,
               "returnTypeTokenRange": {
                 "startIndex": 1,
-                "endIndex": 2
+                "endIndex": 3
               },
               "releaseTag": "Public",
               "isProtected": false,
@@ -574,6 +612,36 @@
               "isOptional": false,
               "isAbstract": false,
               "name": "getReverseInfo"
+            },
+            {
+              "kind": "Property",
+              "canonicalReference": "@interaqt/storage!AttributeInfo#isCollection:member",
+              "docComment": "",
+              "excerptTokens": [
+                {
+                  "kind": "Content",
+                  "text": "get isCollection(): "
+                },
+                {
+                  "kind": "Content",
+                  "text": "boolean | undefined"
+                },
+                {
+                  "kind": "Content",
+                  "text": ";"
+                }
+              ],
+              "isReadonly": true,
+              "isOptional": false,
+              "releaseTag": "Public",
+              "name": "isCollection",
+              "propertyTypeTokenRange": {
+                "startIndex": 1,
+                "endIndex": 2
+              },
+              "isStatic": false,
+              "isProtected": false,
+              "isAbstract": false
             },
             {
               "kind": "Property",
@@ -1346,7 +1414,7 @@
               "text": "export declare class AttributeQuery "
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "erstorage/AttributeQuery.ts",
           "releaseTag": "Public",
           "isAbstract": false,
           "name": "AttributeQuery",
@@ -2190,7 +2258,7 @@
           "excerptTokens": [
             {
               "kind": "Content",
-              "text": "export declare type AttributeQueryData = "
+              "text": "export type AttributeQueryData = "
             },
             {
               "kind": "Reference",
@@ -2206,7 +2274,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "erstorage/AttributeQuery.ts",
           "releaseTag": "Public",
           "name": "AttributeQueryData",
           "typeTokenRange": {
@@ -2221,7 +2289,7 @@
           "excerptTokens": [
             {
               "kind": "Content",
-              "text": "export declare type AttributeQueryDataItem = "
+              "text": "export type AttributeQueryDataItem = "
             },
             {
               "kind": "Content",
@@ -2237,7 +2305,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "erstorage/AttributeQuery.ts",
           "releaseTag": "Public",
           "name": "AttributeQueryDataItem",
           "typeTokenRange": {
@@ -2252,7 +2320,7 @@
           "excerptTokens": [
             {
               "kind": "Content",
-              "text": "export declare type AttributeQueryDataRecordItem = "
+              "text": "export type AttributeQueryDataRecordItem = "
             },
             {
               "kind": "Content",
@@ -2272,7 +2340,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "erstorage/AttributeQuery.ts",
           "releaseTag": "Public",
           "name": "AttributeQueryDataRecordItem",
           "typeTokenRange": {
@@ -2287,7 +2355,7 @@
           "excerptTokens": [
             {
               "kind": "Content",
-              "text": "export declare type Database = "
+              "text": "export type Database = "
             },
             {
               "kind": "Content",
@@ -2363,14 +2431,14 @@
             },
             {
               "kind": "Content",
-              "text": "<string>;\n}"
+              "text": "<string>;\n    parseMatchExpression?: (key: string, value: [string, any], fieldName: string, fieldType: string, isReferenceValue: boolean, getReferenceFieldValue: (v: string) => string) => any;\n}"
             },
             {
               "kind": "Content",
               "text": ";"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "erstorage/EntityQueryHandle.ts",
           "releaseTag": "Public",
           "name": "Database",
           "typeTokenRange": {
@@ -2388,7 +2456,7 @@
               "text": "export declare class DBSetup "
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "erstorage/Setup.ts",
           "releaseTag": "Public",
           "isAbstract": false,
           "name": "DBSetup",
@@ -3193,6 +3261,14 @@
                 },
                 {
                   "kind": "Content",
+                  "text": ", collection?: "
+                },
+                {
+                  "kind": "Content",
+                  "text": "boolean"
+                },
+                {
+                  "kind": "Content",
                   "text": "): "
                 },
                 {
@@ -3206,8 +3282,8 @@
               ],
               "isStatic": false,
               "returnTypeTokenRange": {
-                "startIndex": 3,
-                "endIndex": 4
+                "startIndex": 5,
+                "endIndex": 6
               },
               "releaseTag": "Public",
               "isProtected": false,
@@ -3220,6 +3296,14 @@
                     "endIndex": 2
                   },
                   "isOptional": false
+                },
+                {
+                  "parameterName": "collection",
+                  "parameterTypeTokenRange": {
+                    "startIndex": 3,
+                    "endIndex": 4
+                  },
+                  "isOptional": true
                 }
               ],
               "isOptional": false,
@@ -3785,7 +3869,7 @@
           "excerptTokens": [
             {
               "kind": "Content",
-              "text": "export declare type EntityIdRef = "
+              "text": "export type EntityIdRef = "
             },
             {
               "kind": "Content",
@@ -3805,7 +3889,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "erstorage/EntityQueryHandle.ts",
           "releaseTag": "Public",
           "name": "EntityIdRef",
           "typeTokenRange": {
@@ -3823,7 +3907,7 @@
               "text": "export declare class EntityQueryHandle "
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "erstorage/EntityQueryHandle.ts",
           "releaseTag": "Public",
           "isAbstract": false,
           "name": "EntityQueryHandle",
@@ -3931,7 +4015,7 @@
                 },
                 {
                   "kind": "Reference",
-                  "text": "MutationEvent_2",
+                  "text": "MutationEvent",
                   "canonicalReference": "@interaqt/storage!MutationEvent_2:type"
                 },
                 {
@@ -4071,7 +4155,7 @@
                 },
                 {
                   "kind": "Reference",
-                  "text": "MutationEvent_2",
+                  "text": "MutationEvent",
                   "canonicalReference": "@interaqt/storage!MutationEvent_2:type"
                 },
                 {
@@ -4218,7 +4302,7 @@
                 },
                 {
                   "kind": "Reference",
-                  "text": "MutationEvent_2",
+                  "text": "MutationEvent",
                   "canonicalReference": "@interaqt/storage!MutationEvent_2:type"
                 },
                 {
@@ -4322,13 +4406,17 @@
                   "text": "): "
                 },
                 {
+                  "kind": "Content",
+                  "text": "import(\"@interaqt/shared\")."
+                },
+                {
                   "kind": "Reference",
                   "text": "BoolExp",
                   "canonicalReference": "@interaqt/shared!BoolExp:class"
                 },
                 {
                   "kind": "Content",
-                  "text": "<"
+                  "text": "<import(\"./MatchExp.js\")."
                 },
                 {
                   "kind": "Reference",
@@ -4347,7 +4435,7 @@
               "isStatic": false,
               "returnTypeTokenRange": {
                 "startIndex": 6,
-                "endIndex": 10
+                "endIndex": 11
               },
               "releaseTag": "Public",
               "isProtected": false,
@@ -4425,7 +4513,7 @@
                 },
                 {
                   "kind": "Reference",
-                  "text": "MutationEvent_2",
+                  "text": "MutationEvent",
                   "canonicalReference": "@interaqt/storage!MutationEvent_2:type"
                 },
                 {
@@ -4443,11 +4531,11 @@
                 },
                 {
                   "kind": "Content",
-                  "text": "<"
+                  "text": "<import(\"./RecordQueryAgent.js\")."
                 },
                 {
                   "kind": "Reference",
-                  "text": "Record_2",
+                  "text": "Record",
                   "canonicalReference": "@interaqt/storage!Record_2:type"
                 },
                 {
@@ -4548,11 +4636,11 @@
                 },
                 {
                   "kind": "Content",
-                  "text": "<"
+                  "text": "<import(\"./RecordQueryAgent.js\")."
                 },
                 {
                   "kind": "Reference",
-                  "text": "Record_2",
+                  "text": "Record",
                   "canonicalReference": "@interaqt/storage!Record_2:type"
                 },
                 {
@@ -4661,11 +4749,11 @@
                 },
                 {
                   "kind": "Content",
-                  "text": "<"
+                  "text": "<import(\"./RecordQueryAgent.js\")."
                 },
                 {
                   "kind": "Reference",
-                  "text": "Record_2",
+                  "text": "Record",
                   "canonicalReference": "@interaqt/storage!Record_2:type"
                 },
                 {
@@ -4774,11 +4862,11 @@
                 },
                 {
                   "kind": "Content",
-                  "text": "<"
+                  "text": "<import(\"./RecordQueryAgent.js\")."
                 },
                 {
                   "kind": "Reference",
-                  "text": "Record_2",
+                  "text": "Record",
                   "canonicalReference": "@interaqt/storage!Record_2:type"
                 },
                 {
@@ -4884,11 +4972,11 @@
                 },
                 {
                   "kind": "Content",
-                  "text": "<"
+                  "text": "<import(\"./RecordQueryAgent.js\")."
                 },
                 {
                   "kind": "Reference",
-                  "text": "Record_2",
+                  "text": "Record",
                   "canonicalReference": "@interaqt/storage!Record_2:type"
                 },
                 {
@@ -4997,11 +5085,11 @@
                 },
                 {
                   "kind": "Content",
-                  "text": "<"
+                  "text": "<import(\"./RecordQueryAgent.js\")."
                 },
                 {
                   "kind": "Reference",
-                  "text": "Record_2",
+                  "text": "Record",
                   "canonicalReference": "@interaqt/storage!Record_2:type"
                 },
                 {
@@ -5182,7 +5270,7 @@
                 },
                 {
                   "kind": "Reference",
-                  "text": "MutationEvent_2",
+                  "text": "MutationEvent",
                   "canonicalReference": "@interaqt/storage!MutationEvent_2:type"
                 },
                 {
@@ -5200,11 +5288,11 @@
                 },
                 {
                   "kind": "Content",
-                  "text": "<void | "
+                  "text": "<void | import(\"./RecordQueryAgent.js\")."
                 },
                 {
                   "kind": "Reference",
-                  "text": "Record_2",
+                  "text": "Record",
                   "canonicalReference": "@interaqt/storage!Record_2:type"
                 },
                 {
@@ -5291,7 +5379,7 @@
                 },
                 {
                   "kind": "Reference",
-                  "text": "MutationEvent_2",
+                  "text": "MutationEvent",
                   "canonicalReference": "@interaqt/storage!MutationEvent_2:type"
                 },
                 {
@@ -5309,11 +5397,11 @@
                 },
                 {
                   "kind": "Content",
-                  "text": "<"
+                  "text": "<import(\"./RecordQueryAgent.js\")."
                 },
                 {
                   "kind": "Reference",
-                  "text": "Record_2",
+                  "text": "Record",
                   "canonicalReference": "@interaqt/storage!Record_2:type"
                 },
                 {
@@ -5408,7 +5496,7 @@
                 },
                 {
                   "kind": "Reference",
-                  "text": "MutationEvent_2",
+                  "text": "MutationEvent",
                   "canonicalReference": "@interaqt/storage!MutationEvent_2:type"
                 },
                 {
@@ -5426,11 +5514,11 @@
                 },
                 {
                   "kind": "Content",
-                  "text": "<"
+                  "text": "<import(\"./RecordQueryAgent.js\")."
                 },
                 {
                   "kind": "Reference",
-                  "text": "Record_2",
+                  "text": "Record",
                   "canonicalReference": "@interaqt/storage!Record_2:type"
                 },
                 {
@@ -5501,7 +5589,7 @@
               "text": "export declare class EntityToTableMap "
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "erstorage/EntityToTableMap.ts",
           "releaseTag": "Public",
           "isAbstract": false,
           "name": "EntityToTableMap",
@@ -6461,7 +6549,7 @@
           "excerptTokens": [
             {
               "kind": "Content",
-              "text": "export declare type FieldMatchAtom = "
+              "text": "export type FieldMatchAtom = "
             },
             {
               "kind": "Reference",
@@ -6477,7 +6565,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "erstorage/MatchExp.ts",
           "releaseTag": "Public",
           "name": "FieldMatchAtom",
           "typeTokenRange": {
@@ -6511,7 +6599,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "erstorage/util.ts",
           "returnTypeTokenRange": {
             "startIndex": 3,
             "endIndex": 4
@@ -6557,7 +6645,7 @@
               "text": "\"id\""
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "erstorage/EntityQueryHandle.ts",
           "initializerTokenRange": {
             "startIndex": 1,
             "endIndex": 2
@@ -6577,7 +6665,7 @@
           "excerptTokens": [
             {
               "kind": "Content",
-              "text": "export declare type JoinTables = "
+              "text": "export type JoinTables = "
             },
             {
               "kind": "Content",
@@ -6588,7 +6676,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "erstorage/RecordQueryAgent.ts",
           "releaseTag": "Public",
           "name": "JoinTables",
           "typeTokenRange": {
@@ -6610,7 +6698,7 @@
               "text": "\"&\""
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "erstorage/RecordQuery.ts",
           "initializerTokenRange": {
             "startIndex": 1,
             "endIndex": 2
@@ -6633,7 +6721,7 @@
               "text": "export declare class LinkInfo "
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "erstorage/LinkInfo.ts",
           "releaseTag": "Public",
           "isAbstract": false,
           "name": "LinkInfo",
@@ -7666,7 +7754,7 @@
           "excerptTokens": [
             {
               "kind": "Content",
-              "text": "export declare type LinkMapItem = "
+              "text": "export type LinkMapItem = "
             },
             {
               "kind": "Content",
@@ -7677,7 +7765,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "erstorage/EntityToTableMap.ts",
           "releaseTag": "Public",
           "name": "LinkMapItem",
           "typeTokenRange": {
@@ -7692,7 +7780,7 @@
           "excerptTokens": [
             {
               "kind": "Content",
-              "text": "export declare type MapData = "
+              "text": "export type MapData = "
             },
             {
               "kind": "Content",
@@ -7721,7 +7809,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "erstorage/EntityToTableMap.ts",
           "releaseTag": "Public",
           "name": "MapData",
           "typeTokenRange": {
@@ -7736,7 +7824,7 @@
           "excerptTokens": [
             {
               "kind": "Content",
-              "text": "export declare type MatchAtom = "
+              "text": "export type MatchAtom = "
             },
             {
               "kind": "Content",
@@ -7747,7 +7835,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "erstorage/MatchExp.ts",
           "releaseTag": "Public",
           "name": "MatchAtom",
           "typeTokenRange": {
@@ -7765,7 +7853,7 @@
               "text": "export declare class MatchExp "
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "erstorage/MatchExp.ts",
           "releaseTag": "Public",
           "isAbstract": false,
           "name": "MatchExp",
@@ -8002,7 +8090,16 @@
               "excerptTokens": [
                 {
                   "kind": "Content",
-                  "text": "buildFieldMatchExpression(): "
+                  "text": "buildFieldMatchExpression(db?: "
+                },
+                {
+                  "kind": "Reference",
+                  "text": "Database",
+                  "canonicalReference": "@interaqt/storage!Database:type"
+                },
+                {
+                  "kind": "Content",
+                  "text": "): "
                 },
                 {
                   "kind": "Reference",
@@ -8029,13 +8126,22 @@
               ],
               "isStatic": false,
               "returnTypeTokenRange": {
-                "startIndex": 1,
-                "endIndex": 5
+                "startIndex": 3,
+                "endIndex": 7
               },
               "releaseTag": "Public",
               "isProtected": false,
               "overloadIndex": 1,
-              "parameters": [],
+              "parameters": [
+                {
+                  "parameterName": "db",
+                  "parameterTypeTokenRange": {
+                    "startIndex": 1,
+                    "endIndex": 2
+                  },
+                  "isOptional": true
+                }
+              ],
               "isOptional": false,
               "isAbstract": false,
               "name": "buildFieldMatchExpression"
@@ -8357,11 +8463,44 @@
                 },
                 {
                   "kind": "Content",
+                  "text": ", key: "
+                },
+                {
+                  "kind": "Content",
+                  "text": "string"
+                },
+                {
+                  "kind": "Content",
                   "text": ", value: "
                 },
                 {
                   "kind": "Content",
                   "text": "[string, any]"
+                },
+                {
+                  "kind": "Content",
+                  "text": ", fieldName: "
+                },
+                {
+                  "kind": "Content",
+                  "text": "string"
+                },
+                {
+                  "kind": "Content",
+                  "text": ", fieldType?: "
+                },
+                {
+                  "kind": "Content",
+                  "text": "string"
+                },
+                {
+                  "kind": "Content",
+                  "text": ", db?: "
+                },
+                {
+                  "kind": "Reference",
+                  "text": "Database",
+                  "canonicalReference": "@interaqt/storage!Database:type"
                 },
                 {
                   "kind": "Content",
@@ -8378,8 +8517,8 @@
               ],
               "isStatic": false,
               "returnTypeTokenRange": {
-                "startIndex": 5,
-                "endIndex": 6
+                "startIndex": 13,
+                "endIndex": 14
               },
               "releaseTag": "Public",
               "isProtected": false,
@@ -8394,12 +8533,44 @@
                   "isOptional": false
                 },
                 {
-                  "parameterName": "value",
+                  "parameterName": "key",
                   "parameterTypeTokenRange": {
                     "startIndex": 3,
                     "endIndex": 4
                   },
                   "isOptional": false
+                },
+                {
+                  "parameterName": "value",
+                  "parameterTypeTokenRange": {
+                    "startIndex": 5,
+                    "endIndex": 6
+                  },
+                  "isOptional": false
+                },
+                {
+                  "parameterName": "fieldName",
+                  "parameterTypeTokenRange": {
+                    "startIndex": 7,
+                    "endIndex": 8
+                  },
+                  "isOptional": false
+                },
+                {
+                  "parameterName": "fieldType",
+                  "parameterTypeTokenRange": {
+                    "startIndex": 9,
+                    "endIndex": 10
+                  },
+                  "isOptional": true
+                },
+                {
+                  "parameterName": "db",
+                  "parameterTypeTokenRange": {
+                    "startIndex": 11,
+                    "endIndex": 12
+                  },
+                  "isOptional": true
                 }
               ],
               "isOptional": false,
@@ -8526,7 +8697,7 @@
           "excerptTokens": [
             {
               "kind": "Content",
-              "text": "export declare type MatchExpressionData = "
+              "text": "export type MatchExpressionData = "
             },
             {
               "kind": "Reference",
@@ -8551,7 +8722,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "erstorage/MatchExp.ts",
           "releaseTag": "Public",
           "name": "MatchExpressionData",
           "typeTokenRange": {
@@ -8566,7 +8737,7 @@
           "excerptTokens": [
             {
               "kind": "Content",
-              "text": "export declare type MergeLinks = "
+              "text": "export type MergeLinks = "
             },
             {
               "kind": "Content",
@@ -8577,7 +8748,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "erstorage/Setup.ts",
           "releaseTag": "Public",
           "name": "MergeLinks",
           "typeTokenRange": {
@@ -8595,7 +8766,7 @@
               "text": "export declare class Modifier "
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "erstorage/Modifier.ts",
           "releaseTag": "Public",
           "isAbstract": false,
           "name": "Modifier",
@@ -8815,7 +8986,7 @@
           "excerptTokens": [
             {
               "kind": "Content",
-              "text": "export declare type ModifierData = "
+              "text": "export type ModifierData = "
             },
             {
               "kind": "Content",
@@ -8826,7 +8997,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "erstorage/Modifier.ts",
           "releaseTag": "Public",
           "name": "ModifierData",
           "typeTokenRange": {
@@ -8841,7 +9012,7 @@
           "excerptTokens": [
             {
               "kind": "Content",
-              "text": "declare type MutationEvent_2 = "
+              "text": "export type MutationEvent = "
             },
             {
               "kind": "Content",
@@ -8849,7 +9020,7 @@
             },
             {
               "kind": "Reference",
-              "text": "Record_2",
+              "text": "Record",
               "canonicalReference": "@interaqt/storage!Record_2:type"
             },
             {
@@ -8858,7 +9029,7 @@
             },
             {
               "kind": "Reference",
-              "text": "Record_2",
+              "text": "Record",
               "canonicalReference": "@interaqt/storage!Record_2:type"
             },
             {
@@ -8870,7 +9041,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "erstorage/RecordQueryAgent.ts",
           "releaseTag": "Public",
           "name": "MutationEvent_2",
           "typeTokenRange": {
@@ -8888,7 +9059,7 @@
               "text": "export declare class NewRecordData "
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "erstorage/NewRecordData.ts",
           "releaseTag": "Public",
           "isAbstract": false,
           "name": "NewRecordData",
@@ -9167,7 +9338,7 @@
                 },
                 {
                   "kind": "Reference",
-                  "text": "Record_2",
+                  "text": "Record",
                   "canonicalReference": "@interaqt/storage!Record_2:type"
                 },
                 {
@@ -9239,7 +9410,7 @@
                 },
                 {
                   "kind": "Reference",
-                  "text": "Record_2",
+                  "text": "Record",
                   "canonicalReference": "@interaqt/storage!Record_2:type"
                 },
                 {
@@ -9806,7 +9977,7 @@
           "excerptTokens": [
             {
               "kind": "Content",
-              "text": "export declare type RawEntityData = "
+              "text": "export type RawEntityData = "
             },
             {
               "kind": "Content",
@@ -9817,7 +9988,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "erstorage/NewRecordData.ts",
           "releaseTag": "Public",
           "name": "RawEntityData",
           "typeTokenRange": {
@@ -9832,7 +10003,7 @@
           "excerptTokens": [
             {
               "kind": "Content",
-              "text": "declare type Record_2 = "
+              "text": "export type Record = "
             },
             {
               "kind": "Reference",
@@ -9848,7 +10019,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "erstorage/RecordQueryAgent.ts",
           "releaseTag": "Public",
           "name": "Record_2",
           "typeTokenRange": {
@@ -9863,7 +10034,7 @@
           "excerptTokens": [
             {
               "kind": "Content",
-              "text": "export declare type RecordAttribute = "
+              "text": "export type RecordAttribute = "
             },
             {
               "kind": "Content",
@@ -9874,7 +10045,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "erstorage/EntityToTableMap.ts",
           "releaseTag": "Public",
           "name": "RecordAttribute",
           "typeTokenRange": {
@@ -9892,7 +10063,7 @@
               "text": "export declare class RecordInfo "
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "erstorage/RecordInfo.ts",
           "releaseTag": "Public",
           "isAbstract": false,
           "name": "RecordInfo",
@@ -10214,6 +10385,36 @@
               "isOptional": false,
               "releaseTag": "Public",
               "name": "isRelation",
+              "propertyTypeTokenRange": {
+                "startIndex": 1,
+                "endIndex": 2
+              },
+              "isStatic": false,
+              "isProtected": false,
+              "isAbstract": false
+            },
+            {
+              "kind": "Property",
+              "canonicalReference": "@interaqt/storage!RecordInfo#JSONFields:member",
+              "docComment": "",
+              "excerptTokens": [
+                {
+                  "kind": "Content",
+                  "text": "get JSONFields(): "
+                },
+                {
+                  "kind": "Content",
+                  "text": "string[]"
+                },
+                {
+                  "kind": "Content",
+                  "text": ";"
+                }
+              ],
+              "isReadonly": true,
+              "isOptional": false,
+              "releaseTag": "Public",
+              "name": "JSONFields",
               "propertyTypeTokenRange": {
                 "startIndex": 1,
                 "endIndex": 2
@@ -10598,7 +10799,7 @@
           "excerptTokens": [
             {
               "kind": "Content",
-              "text": "export declare type RecordMapItem = "
+              "text": "export type RecordMapItem = "
             },
             {
               "kind": "Content",
@@ -10627,7 +10828,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "erstorage/EntityToTableMap.ts",
           "releaseTag": "Public",
           "name": "RecordMapItem",
           "typeTokenRange": {
@@ -10645,7 +10846,7 @@
               "text": "export declare class RecordQuery "
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "erstorage/RecordQuery.ts",
           "releaseTag": "Public",
           "isAbstract": false,
           "name": "RecordQuery",
@@ -11593,7 +11794,7 @@
               "text": "export declare class RecordQueryAgent "
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "erstorage/RecordQueryAgent.ts",
           "releaseTag": "Public",
           "isAbstract": false,
           "name": "RecordQueryAgent",
@@ -11701,7 +11902,7 @@
                 },
                 {
                   "kind": "Reference",
-                  "text": "MutationEvent_2",
+                  "text": "MutationEvent",
                   "canonicalReference": "@interaqt/storage!MutationEvent_2:type"
                 },
                 {
@@ -11849,7 +12050,7 @@
                 },
                 {
                   "kind": "Reference",
-                  "text": "MutationEvent_2",
+                  "text": "MutationEvent",
                   "canonicalReference": "@interaqt/storage!MutationEvent_2:type"
                 },
                 {
@@ -12323,7 +12524,7 @@
                 },
                 {
                   "kind": "Reference",
-                  "text": "MutationEvent_2",
+                  "text": "MutationEvent",
                   "canonicalReference": "@interaqt/storage!MutationEvent_2:type"
                 },
                 {
@@ -12415,7 +12616,7 @@
                 },
                 {
                   "kind": "Reference",
-                  "text": "MutationEvent_2",
+                  "text": "MutationEvent",
                   "canonicalReference": "@interaqt/storage!MutationEvent_2:type"
                 },
                 {
@@ -12542,7 +12743,7 @@
                 },
                 {
                   "kind": "Reference",
-                  "text": "MutationEvent_2",
+                  "text": "MutationEvent",
                   "canonicalReference": "@interaqt/storage!MutationEvent_2:type"
                 },
                 {
@@ -12637,7 +12838,7 @@
                 },
                 {
                   "kind": "Reference",
-                  "text": "MutationEvent_2",
+                  "text": "MutationEvent",
                   "canonicalReference": "@interaqt/storage!MutationEvent_2:type"
                 },
                 {
@@ -12728,7 +12929,7 @@
                 },
                 {
                   "kind": "Reference",
-                  "text": "MutationEvent_2",
+                  "text": "MutationEvent",
                   "canonicalReference": "@interaqt/storage!MutationEvent_2:type"
                 },
                 {
@@ -12758,7 +12959,7 @@
                 },
                 {
                   "kind": "Reference",
-                  "text": "Record_2",
+                  "text": "Record",
                   "canonicalReference": "@interaqt/storage!Record_2:type"
                 },
                 {
@@ -12848,7 +13049,7 @@
                 },
                 {
                   "kind": "Reference",
-                  "text": "MutationEvent_2",
+                  "text": "MutationEvent",
                   "canonicalReference": "@interaqt/storage!MutationEvent_2:type"
                 },
                 {
@@ -12987,7 +13188,7 @@
                 },
                 {
                   "kind": "Reference",
-                  "text": "Record_2",
+                  "text": "Record",
                   "canonicalReference": "@interaqt/storage!Record_2:type"
                 },
                 {
@@ -13108,7 +13309,7 @@
                 },
                 {
                   "kind": "Reference",
-                  "text": "Record_2",
+                  "text": "Record",
                   "canonicalReference": "@interaqt/storage!Record_2:type"
                 },
                 {
@@ -13237,7 +13438,7 @@
                 },
                 {
                   "kind": "Reference",
-                  "text": "Record_2",
+                  "text": "Record",
                   "canonicalReference": "@interaqt/storage!Record_2:type"
                 },
                 {
@@ -13331,7 +13532,7 @@
                 },
                 {
                   "kind": "Reference",
-                  "text": "MutationEvent_2",
+                  "text": "MutationEvent",
                   "canonicalReference": "@interaqt/storage!MutationEvent_2:type"
                 },
                 {
@@ -13513,7 +13714,7 @@
                 },
                 {
                   "kind": "Reference",
-                  "text": "MutationEvent_2",
+                  "text": "MutationEvent",
                   "canonicalReference": "@interaqt/storage!MutationEvent_2:type"
                 },
                 {
@@ -13596,7 +13797,7 @@
                 },
                 {
                   "kind": "Reference",
-                  "text": "MutationEvent_2",
+                  "text": "MutationEvent",
                   "canonicalReference": "@interaqt/storage!MutationEvent_2:type"
                 },
                 {
@@ -13705,7 +13906,7 @@
                 },
                 {
                   "kind": "Reference",
-                  "text": "MutationEvent_2",
+                  "text": "MutationEvent",
                   "canonicalReference": "@interaqt/storage!MutationEvent_2:type"
                 },
                 {
@@ -13727,7 +13928,7 @@
                 },
                 {
                   "kind": "Reference",
-                  "text": "Record_2",
+                  "text": "Record",
                   "canonicalReference": "@interaqt/storage!Record_2:type"
                 },
                 {
@@ -13813,7 +14014,7 @@
                 },
                 {
                   "kind": "Reference",
-                  "text": "MutationEvent_2",
+                  "text": "MutationEvent",
                   "canonicalReference": "@interaqt/storage!MutationEvent_2:type"
                 },
                 {
@@ -14100,7 +14301,7 @@
                 },
                 {
                   "kind": "Reference",
-                  "text": "MutationEvent_2",
+                  "text": "MutationEvent",
                   "canonicalReference": "@interaqt/storage!MutationEvent_2:type"
                 },
                 {
@@ -14113,7 +14314,7 @@
                 },
                 {
                   "kind": "Reference",
-                  "text": "Record_2",
+                  "text": "Record",
                   "canonicalReference": "@interaqt/storage!Record_2:type"
                 },
                 {
@@ -14225,7 +14426,7 @@
                 },
                 {
                   "kind": "Reference",
-                  "text": "MutationEvent_2",
+                  "text": "MutationEvent",
                   "canonicalReference": "@interaqt/storage!MutationEvent_2:type"
                 },
                 {
@@ -14311,6 +14512,14 @@
                 },
                 {
                   "kind": "Content",
+                  "text": ", JSONFields: "
+                },
+                {
+                  "kind": "Content",
+                  "text": "string[]"
+                },
+                {
+                  "kind": "Content",
                   "text": "): "
                 },
                 {
@@ -14324,8 +14533,8 @@
               ],
               "isStatic": false,
               "returnTypeTokenRange": {
-                "startIndex": 3,
-                "endIndex": 4
+                "startIndex": 5,
+                "endIndex": 6
               },
               "releaseTag": "Public",
               "isProtected": false,
@@ -14336,6 +14545,14 @@
                   "parameterTypeTokenRange": {
                     "startIndex": 1,
                     "endIndex": 2
+                  },
+                  "isOptional": false
+                },
+                {
+                  "parameterName": "JSONFields",
+                  "parameterTypeTokenRange": {
+                    "startIndex": 3,
+                    "endIndex": 4
                   },
                   "isOptional": false
                 }
@@ -14388,7 +14605,7 @@
                 },
                 {
                   "kind": "Reference",
-                  "text": "MutationEvent_2",
+                  "text": "MutationEvent",
                   "canonicalReference": "@interaqt/storage!MutationEvent_2:type"
                 },
                 {
@@ -14410,7 +14627,7 @@
                 },
                 {
                   "kind": "Reference",
-                  "text": "Record_2",
+                  "text": "Record",
                   "canonicalReference": "@interaqt/storage!Record_2:type"
                 },
                 {
@@ -14513,7 +14730,7 @@
                 },
                 {
                   "kind": "Reference",
-                  "text": "MutationEvent_2",
+                  "text": "MutationEvent",
                   "canonicalReference": "@interaqt/storage!MutationEvent_2:type"
                 },
                 {
@@ -14535,7 +14752,7 @@
                 },
                 {
                   "kind": "Reference",
-                  "text": "Record_2",
+                  "text": "Record",
                   "canonicalReference": "@interaqt/storage!Record_2:type"
                 },
                 {
@@ -14707,7 +14924,7 @@
                 },
                 {
                   "kind": "Reference",
-                  "text": "Record_2",
+                  "text": "Record",
                   "canonicalReference": "@interaqt/storage!Record_2:type"
                 },
                 {
@@ -14725,7 +14942,7 @@
                 },
                 {
                   "kind": "Reference",
-                  "text": "MutationEvent_2",
+                  "text": "MutationEvent",
                   "canonicalReference": "@interaqt/storage!MutationEvent_2:type"
                 },
                 {
@@ -14863,7 +15080,7 @@
           "excerptTokens": [
             {
               "kind": "Content",
-              "text": "export declare type RecordQueryData = "
+              "text": "export type RecordQueryData = "
             },
             {
               "kind": "Content",
@@ -14919,7 +15136,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "erstorage/RecordQuery.ts",
           "releaseTag": "Public",
           "name": "RecordQueryData",
           "typeTokenRange": {
@@ -14937,7 +15154,7 @@
               "text": "export declare class RecordQueryTree "
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "erstorage/RecordQuery.ts",
           "releaseTag": "Public",
           "isAbstract": false,
           "name": "RecordQueryTree",
@@ -15716,7 +15933,7 @@
               "text": "export declare class RecursiveContext "
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "erstorage/RecordQueryAgent.ts",
           "releaseTag": "Public",
           "isAbstract": false,
           "name": "RecursiveContext",
@@ -16049,7 +16266,7 @@
               "text": "\":root\""
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "erstorage/RecordQueryAgent.ts",
           "initializerTokenRange": {
             "startIndex": 1,
             "endIndex": 2
@@ -16076,7 +16293,7 @@
               "text": "\"_rowId\""
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "erstorage/EntityQueryHandle.ts",
           "initializerTokenRange": {
             "startIndex": 1,
             "endIndex": 2
@@ -16137,7 +16354,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "erstorage/util.ts",
           "returnTypeTokenRange": {
             "startIndex": 7,
             "endIndex": 9
@@ -16184,7 +16401,7 @@
           "excerptTokens": [
             {
               "kind": "Content",
-              "text": "export declare type TableData = "
+              "text": "export type TableData = "
             },
             {
               "kind": "Content",
@@ -16204,7 +16421,7 @@
               "text": ";"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "erstorage/Setup.ts",
           "releaseTag": "Public",
           "name": "TableData",
           "typeTokenRange": {
@@ -16219,18 +16436,18 @@
           "excerptTokens": [
             {
               "kind": "Content",
-              "text": "export declare type ValueAttribute = "
+              "text": "export type ValueAttribute = "
             },
             {
               "kind": "Content",
-              "text": "{\n    type: string;\n    table?: string;\n    field: string;\n    computed?: (record: any) => any;\n}"
+              "text": "{\n    type: string;\n    collection?: boolean;\n    table?: string;\n    field: string;\n    fieldType?: string;\n    computed?: (record: any) => any;\n}"
             },
             {
               "kind": "Content",
               "text": ";"
             }
           ],
-          "fileUrlPath": "index.ts",
+          "fileUrlPath": "erstorage/EntityToTableMap.ts",
           "releaseTag": "Public",
           "name": "ValueAttribute",
           "typeTokenRange": {
