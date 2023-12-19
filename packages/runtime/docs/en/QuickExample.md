@@ -252,15 +252,14 @@ Some data is global. We can define it using State.create. For example, how many 
 
 ```typescript
 const totalApprovedState = State.create({
-  name: 'totalApproved',
-  type: 'number',
-  computedData: RelationCount.create({
-    relation: reviewerRelation,
-    relationDirection: 'source',
-    match: (_, relation) => {
-      return relation.result === 'approved'
-    }
-  })
+    name: 'totalApproved',
+    type: 'number',
+    computedData: Count.create({
+        record: RequestEntity,
+        match: (request) => {
+            return request.result === 'approved'
+        }
+    })
 })
 ```
 

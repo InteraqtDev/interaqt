@@ -1,4 +1,4 @@
-# Quick Example
+**# Quick Example
 
 制作一个请假的简单应用。
 员工创建请假申请，主管和上级主管都审批成功后，申请生效。
@@ -257,15 +257,14 @@ Step8: 定义全局状态
 
 ```typescript
 const totalApprovedState = State.create({
-  name: 'totalApproved',
-  type: 'number',
-  computedData: RelationCount.create({
-    relation: reviewerRelation,
-    relationDirection: 'source',
-    match: (_, relation) => {
-      return relation.result === 'approved'
-    }
-  })
+    name: 'totalApproved',
+    type: 'number',
+    computedData: Count.create({
+        record: RequestEntity,
+        match: (request) => {
+            return request.result === 'approved'
+        }
+    })
 })
 ```
 
@@ -275,4 +274,4 @@ Step9: 在前端使用接口触发交互动作
 ```
 /api/[interaction-name]
 ```
-可通过前端访问。你可以可以通过 dashboard 管理界面来查看所有的交互动作接口以及实体关系信息。
+可通过前端访问。你可以可以通过 dashboard 管理界面来查看所有的交互动作接口以及实体关系信息。**

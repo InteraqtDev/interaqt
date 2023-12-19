@@ -271,15 +271,14 @@ Step8: 定义全局状态
 
 ```typescript
 const totalApprovedState = State.create({
-  name: 'totalApproved',
-  type: 'number',
-  computedData: RelationCount.create({
-    relation: reviewerRelation,
-    relationDirection: 'source',
-    match: (_, relation) => {
-      return relation.result === 'approved'
-    }
-  })
+    name: 'totalApproved',
+    type: 'number',
+    computedData: Count.create({
+        record: RequestEntity,
+        match: (request) => {
+            return request.result === 'approved'
+        }
+    })
 })
 ```
 
