@@ -1,26 +1,24 @@
-你先在作为我的编程助手，你现在的任务有两个：
-任务一：学习 @interaqt/runtime
-@interaqt/runtime 是一个后端框架。它定义了一种数据数据，用户只需要把应用的业务逻辑写成这种数据结构，框架就可以自动生成应用。你要学会如何写成这种数据结构。
+As my programming assistant, you now have two tasks:
 
-附件中是 @interaqt/runtime 中的所有类型定义，请学习。
-要求：在下面的学习和问题中，都要严格遵守类型定义。
+Task 1: Learn @interaqt/runtime
+@interaqt/runtime is a backend framework. It defines a data structure, and users only need to write their application's business logic in this structure for the framework to automatically generate the application. Your task is to learn how to write in this data structure.
 
+Attached are all the type definitions in @interaqt/runtime; please study them.
+Requirement: In the following learning and questions, you must strictly adhere to the type definitions.
 
-@interaqt/runtime 的示例文档如下:
+@interaqt/runtime Sample Documentation:
 
 =================
 ```markdown
 # Quick Example
 
-制作一个请假的简单应用。
-员工创建请假申请，主管和上级主管都审批成功后，申请生效。
-开始这一步之前，请确保你已经按照 [Quick Start](../QuickStart.md) 中的正确创建了项目。
+Create a simple application for leave requests. The application becomes effective after both the supervisor and the higher-level supervisor approve an employee's leave request. Ensure you have correctly created the project as instructed in Quick Start before beginning.
 
-接下来步骤中的代码都将在 `app/index.ts` 中完成。
+The following code will be completed in app/index.ts.
 
-## 定义系统中的基本数据类型和交互动作
+## Define Basic Data Types and Interactions in the System
 
-Step1: 定义员工`User`类型以及上下级关系   
+Step1: Define the User Type and the Hierarchical Relationship  
 
 ```typescript
 const UserEntity = Entity.create({
@@ -38,10 +36,11 @@ const supervisorRelation = Relation.create({
   relType: 'n:1',
 })
 ```
+Note: Any system must define an Entity named 'User', which the system will automatically use to store information about all interacting users.
 
-注意，任何系统都一定要定义一个 name 为 'User' 的 Entity，系统将自动使用这个 Entity 类型来存储所有发生交互的用户的信息。
 
-Step2: 定义请假申请`Request`类型：
+
+Step2: Define the Request Type for Leave Applications:
 ```typescript
 const RequestEntity= Entity.create({
     name: 'Request',
@@ -53,7 +52,7 @@ const RequestEntity= Entity.create({
 })
 ```
 
-Step3: 定义用户创建申请的交互动作
+Step3: Define the User Interaction for Creating an Application
 
 ```typescript
 export const createInteraction = Interaction.create({
@@ -70,12 +69,9 @@ export const createInteraction = Interaction.create({
 })
 ```
 
-我们不需要在交互发生时应该如何处理数据，而是在数据内容的定义中引用交互动作。
-这是 Interaqt 和其他框架最大的区别，也正是通过这样来实现支线只要描述数据应用就能运行了。
-在下面的内容中我们将看到如何引用交互动作。
+Instead of detailing how to handle data during interactions, we reference interactions in the data content definition. This is the major difference between Interaqt and other frameworks and is key to the concept of describing data for the application to run. The following sections will demonstrate how to reference these interactions.
 
-
-Step4: 定义主管和请求之间的关系，以及审批状态。可用于让主管获取自己需要审批的申请。
+Step4: Define the Relationship Between Supervisors and Requests, and the Approval Status
 
 ```typescript
 const reviewerRelation = Relation.create({
@@ -142,16 +138,13 @@ const reviewerRelation = Relation.create({
 })
 ```
 
-在这一步中我们使用 computed data type `MapInteractionToRecord` 来描述主管和申请之间的关系是怎么建立的。
-同时还是用了 `MapInteractionToProperty` 来描述审批的结果是怎么来的。它们分别引用了交互：
+In this step, we used the computed data type MapInteractionToRecord to describe how the relationship between supervisors and applications is established. We also used MapInteractionToProperty to describe how the approval result comes about. They reference interactions:
 
-- `createInteraction`
-- `approveInteraction`
+createInteraction
+approveInteraction
+When the referenced interaction occurs, the corresponding Relation data is automatically created, and the Property is automatically modified. Note that since our application requires approval from two levels of supervisors, the opinion of one supervisor is recorded in the relationship field with the application.
 
-当被引用的交互发生时，相应的 Relation 数据就会自动创建，Property 会自动修改。
-注意，因为我们的申请需要两级主管审批，所以某一个主管的审批意见是记录在他和申请的关系字段上的。
-
-Step5: 定义主管审批同意交互动作
+Step5: Define the Supervisor's Approval Interaction
 
 ```typescript
 // 同意
@@ -191,9 +184,10 @@ export const approveInteraction = Interaction.create({
 })
 ```
 
-在这个定义中，我们第一次用到了 `Attibutive` 来限制交互动作中附带的参数。上面的代码中限制了主管只能审批 **mine** 并且是 **pending** 状态的申请。
+In this definition, we used Attibutive to restrict the parameters accompanying the interaction. The code above restricts supervisors to only approve requests that are 'mine' and in 'pending' status.
 
-Step6: 定义 Request 的最终状态
+Step6: Define the Final Status of the Request
+
 ```typescript
 RequestEntity.properties.push(
     Property.create({
@@ -231,10 +225,9 @@ RequestEntity.properties.push(
     }),
 ) 
 ```
-在这段代码中，我们通过更多的 computed data 类型 `RelationBasedEvery` 和 `RelationBasedAny` 来定义了 Request
-是否都被同意`approved`，或者有人拒绝`rejected`，并通过 `Property.computed` 创建了一个 string 类型、可用于数据库筛选的计算字段 `result`。
+In this code section, we used more computed data types RelationBasedEvery and RelationBasedAny to define whether the Request is approved or rejected by all. A computed string type field result is also created for database filtering.
 
-Step7: 实现查看待审批申请的 GET Interaction
+Step7: Implement the GET Interaction to View Pending Approval Requests
 ```typescript
 const MineDataAttr = DataAttributive.create({
     name: 'MyData',
@@ -264,10 +257,10 @@ const getMyPendingRequests = Interaction.create({
     data: RequestEntity,
 })
 ```
-在这一步中我们顶一个 getMyPendingRequests 交互动作，用于获取等待当前用户审批的申请。
+In this step, we defined a getMyPendingRequests interaction to retrieve requests awaiting the current user's approval.
 
-Step8: 定义全局状态
-有些数据是属于全局的，我们可以通过 `State.create` 来定义，例如：全局有多少个申请被批准了：
+Step8: Define Global State
+Some data is global. We can define it using State.create. For example, how many requests have been approved globally:
 
 ```typescript
 const totalApprovedState = State.create({
@@ -283,31 +276,29 @@ const totalApprovedState = State.create({
 })
 ```
 
-Step9: 在前端使用接口触发交互动作
-
-所有的交互动作都会产生独立的接口：
+Step9: Use the Interface to Trigger Interaction Actions in the Frontend
+All interaction actions will generate independent interfaces:
 ```
 /api/[interaction-name]
 ```
-可通过前端访问。你可以可以通过 dashboard 管理界面来查看所有的交互动作接口以及实体关系信息。
+They can be accessed from the frontend. You can view all interaction action interfaces and entity relationship information through the dashboard management interface.
 ```
 =================
 
 
-文档中有一个名为 `Attribute` （定语）的概念，它的文档如下：
+The concept of Attributive in the document is as follows:
 
 
 =================
 ```markdown
-## 使用 Attribute（定语）
+# Attributive
 
-Attributive 可以限制可以执行当前 Interaction 的用户，也可以用来限制 Payload。
+Attributive can restrict the users who can execute the current Interaction, and can also be used to restrict Payload.
 
-### 创建 Attributive
+## Creating Attributive
+Do not use external variables in Attributive; it should remain a pure function. Otherwise, it will fail during serialization and deserialization.
 
-不要在 Attributive 中使用外部变量，应该保持 Attributive 是个纯函数。不然会在序列化和反序列化时失效。
-
-一个声明 “我的” 的 Attributive 如下：
+An Attributive declaration for "mine" is as follows:
 
 ```typescript
 const Mine = Attributive.create({
@@ -318,21 +309,13 @@ const Mine = Attributive.create({
 })
 ```
 
-在 Interaqt/runtime 中我们为你内置了一个 `createUserRoleAttributive` 函数帮助你快速创建角色定语：
-```typescript
-const adminRole = createUserRoleAttributive({name: 'admin'})
-```
-注意，它假定了你的 User Entity 中含有一个 `string[]` 类型的 `roles` 字段。
 
-### 创建通用的 Attributive
+## Creating Generic Attributive
+You can define some fixed attributives in the business, such as "mine" in the above example: it checks whether the entity's owner field points to the current interaction request's user. Then, if there is an owner field and it is indeed of UserEntity type, this attributive can be used. Of course, if you don't want to fix the name to owner but still want to use a general attributive, we can dynamically judge by injecting field information and the corresponding entity into the attributive through controller.globals.
 
-可以在业务上规定一些固定的定语，例如上面例子中 “我的”：它会检查实体上的 owner 字段是不是指向当前 interaction 请求的用户。那么只有有 `owner`
-字段，并且确实是 UserEntity 类型，就可以使用这个定语。
-当然，如果你不想固定用 `owner` 这个名字，但又想使用通用的定语，我们可以把字段信息和相应的实体细心通过 controller.globals 注入到 attributive 中让它动态判断。
+### Using BoolExp to Connect Attributive
 
-### 使用 BoolExp 来连接 Attributive
-
-当定语限制条件比较复杂时，我们可以通过 `BoolExp` 来连接多个定语建立逻辑组合，然后再通过 `boolExpToAttributives` 转化成定语。
+When the conditions of the attributive are complex, we can use BoolExp to connect multiple attributives to form a logical combination, and then convert them into attributives using boolExpToAttributives
 
 ```typescript
 const MyPending = boolExpToAttributives(
@@ -350,28 +333,22 @@ const MyPending = boolExpToAttributives(
 =================
 
 
-定语的使用非常重要，一定要要完全理解正确。
+The use of attributives is very important and must be fully and correctly understood.
 
-
-文档中还有一个叫做 Computed Data Type 的概念，它是用来描述 Entity/Relation/State/Property 中的数据是怎么计算出来的。
-它的文档如下：
+The document also introduces a concept called 'Computed Data Type', which is used to describe how data in Entity/Relation/State/Property is calculated. Its documentation is as follows:
 
 
 =================
 ```markdown
-# Use Computed Data
+#  Use Computed Data
 
-Computed Data 是 @interaqt/runtime 中的核心概念，@interaqt/runtime 提供了一些列工具来帮助你定义数据内容“是什么”。
-定义完成之后，数据应该如何变化就是自动的了。这也是和其他框架最大的区别。
-以下是系统提供的所有 computed data 类型。注意下面面的 Record 就是 Entity 和 Relation 的统称。
+Computed Data is a core concept in @interaqt/runtime. The @interaqt/runtime provides a series of tools to help you define what the data content is. Once defined, how data changes become automatic. This is also a major difference from other frameworks. Below are all the types of computed data provided by the system. Note that the term 'Record' here is a general term for Entity and Relation.
 
-## 用来表示 Entity/Relation 数据的 computed data
+## Computed Data Representing Entity/Relation Data
 
 ### MapActivity
+Map each activity into an Entity/Relation/State or a Property of an Entity/Relation. It is commonly used in scenarios where information from an activity is integrated. For example, integrate all information from the "createFriendRelation" activity into an entity named Request:
 
-将每一个 activity 映射成 一个 Entity/Relation/State 或者某一个 Entity/Relation 的 Property。
-它通常用于将一个 activity 中的信息都整合起来的场景。
-例如：将 "createFriendRelation" 活动中的所有信息整合成一个名为 Request 的实体：
 ```typescript
 export const requestEntity = Entity.create({
     name: 'Request',
@@ -380,7 +357,7 @@ export const requestEntity = Entity.create({
             MapActivityItem.create({
                 activity: createFriendRelationActivity,
                 triggerInteractions: [sendInteraction, approveInteraction, rejectInteraction],  // 触发数据计算的 interation
-                map: function map(stack) {  // 计算数据的函数
+                map: function map(stack) {  // compute data
                     const sendRequestEvent = stack.find((i: any) => i.interaction.name === 'sendRequest')
 
                     if (!sendRequestEvent) {
@@ -401,13 +378,12 @@ export const requestEntity = Entity.create({
     })
 })
 ```
-
 ### MapInteraction
 
-将每一个 interaction 映射成一个 Entity/Relation/State 或者某一个 Entity/Relation 的 Property。
-通常用于将一个 interaction 中的用户信息和 Payload 关联起来，或者记录 Interaction 中的信息。
+Map each interaction to an Entity/Relation/State or a Property of an Entity/Relation. It is typically used to associate user information and Payload within an interaction, or to record information from the interaction.
 
-示例：将发送申请的用户和发送的申请关联起来，创建 relation 数据
+Example: Associate the user sending a request with the sent request to create relation data.
+
 ```typescript
 const sendRequestRelation = Relation.create({
     source: RequestEntity,
@@ -438,19 +414,20 @@ const sendRequestRelation = Relation.create({
 })
 ```
 
-也可以用于记录 interaction 上 payload 的信息。
-示例：一旦用户执行了同意操作，就在用户和申请的 relation 的  result 字段上记录下来
+It can also be used to record information from the payload of an interaction.
+Example: Once a user performs an approval action, record it in the 'result' field of the relation between the user and the request.
+
 ```typescript
 Property.create({
     name: 'result',
     type: 'string',
     collection: false,
     computedData: MapInteraction.create({
-        items: [                                    // 可以监听多种 Interaction，有多种计算值的方式。
+        items: [                                    
             MapInteractionItem.create({
-                interaction: approveInteraction,   // 监听的 Interaction
-                map: () => 'approved',          // 监听的 Interaction 触发时，计算得到的 property 值
-                computeSource: async function (this: Controller, event) {   // 根据 interaction event 计算出受影响的记录
+                interaction: approveInteraction,   
+                map: () => 'approved',          
+                computeSource: async function (this: Controller, event) {   
                     return {
                         "source.id": event.payload.request.id,
                         "target.id": event.user.id
@@ -464,8 +441,10 @@ Property.create({
 
 ### MapRecordMutation
 
-将 RecordMutation 映射成 一个 Entity/Relation/State 或者某一个 Entity/Relation 的 Property。通常用于记录变更，可以利用它来为变更的记录产生历史版本。
-示例：为每次 post 的修改都产生一个历史版本
+Map a RecordMutation to an Entity/Relation/State or a specific Property of an Entity/Relation. It is commonly used for recording changes and can be utilized to generate historical versions of these changes.
+Example: Create a historical version for each modification of a post.
+
+
 ```typescript
 const postRevisionEntity = Entity.create({
     name: 'PostRevision',
@@ -489,17 +468,15 @@ const postRevisionEntity = Entity.create({
 
 ### RelationStateMachine
 
-利用状态机来表示 relation 的建立/删除/修改。
-详情请见 [Use Relation StateMachine](./UseRelationStateMachine.md)
+Use a state machine to represent the creation/deletion/modification of a relation.
+For more details, see [Use Relation StateMachine](./UseRelationStateMachine.md).
 
-
-## 用来表示 Entity/Relation 中的字段
-
+## Representing fields in Entity/Relation
 ### RelationBasedAny
+Create a boolean field to indicate whether there exists at least one entity related to the current entity of a certain relation type and whether the data on the associative relationship meets a specific condition.
+This can only be used in a Property.
+Example: "Whether the current request has been rejected."
 
-创建一个 bool 字段，用来表示当前实体的某一个 relation 类型的相关实体以及关联关系上的数据是否存在一个满足条件。
-它只能用在 Property 上。
-示例: “当前申请是否被拒绝”。
 ```typescript
 Property.create({
     name: 'rejected',
@@ -518,10 +495,11 @@ Property.create({
 ```
 
 ### RelationBasedEvery
+Create a boolean field to indicate whether every related entity of a certain relation type of the current entity and the data on the associative relationship meet a specific condition.
+This can only be used in a Property.
+Example: "Whether the current request has been approved."
 
-创建一个 bool 字段，用来表示当前实体的某一个 relation 类型的相关实体以及关联关系上的数据是否每一个都满足条件。
-它只能用在 Property 上。
-示例 “当前申请是否通过”。
+
 ```typescript
 Property.create({
     name: 'approved',
@@ -541,10 +519,10 @@ Property.create({
 ```
 
 ### RelationCount
-用于计算实体的某个 Relation 的已有数据的总和。
-它只能用在 Property 上。
+Used to calculate the total of existing data for a specific Relation of an entity.
+This can only be used in a Property.
 
-示例：我有多少未处理的请求
+Example: The number of my pending requests.
 ```typescript
 Property.create({
     name: 'pendingRequestCount',
@@ -561,17 +539,17 @@ Property.create({
 ```
 
 ### RelationBasedWeightedSummation
-基于某一个 Relation 类型的关联实体和关系上的数据进行加权计算。
-它只能用在 Property 上。
 
-
-### 用来表示全局字段的 computed data
+perform a weighted calculation based on the data of associated entities and relationships of a certain Relation type. This can only be used in a Property.
+## Representing global state
 
 ### Any
-是否某种 Record 存在一个数据满足条件。
-它只能用在 State 上。
 
-示例：全局是否有任何一个申请被处理了：
+Determines whether there exists a record that satisfies a condition.
+This can only be used in a State.
+
+Example: Whether globally any request has been processed:
+
 ```typescript
 const anyRequestHandledState = State.create({
     name: 'anyRequestHandled',
@@ -586,11 +564,13 @@ const anyRequestHandledState = State.create({
 })
 ```
 
-### Every`
-是否某种 Record 的所有数据都满足条件。
-它只能用在 State 上。
+### Every
+Determines whether all data of a certain Record type meet a condition.
+This can only be used in a State.
 
-示例：全局是否所有的申请都被处理了：
+Example: Whether globally all requests have been processed:
+
+
 ```typescript
 const everyRequestHandledState = State.create({
     name: 'everyRequestHandled',
@@ -605,11 +585,12 @@ const everyRequestHandledState = State.create({
 })
 ```
 
-### Count
-统计某种 Record 的总数
-它只能用在 State 上。
 
-示例：全局所有的朋友关系总数
+### Count
+Counts the total number of a certain type of Record.
+This can only be used in a State.
+
+Example: The total number of all friendships globally.
 ```typescript
 const totalFriendRelationState = State.create({
     name: 'totalFriendRelation',
@@ -623,11 +604,10 @@ const totalFriendRelationState = State.create({
 ```
 
 ### WeightedSummation
-基于所有 Record 的加权计算。
-它只能用在 State 上。
+Based on a weighted calculation of all Records.
+This can only be used in a State.
 
-示例：假设系统中有一种实体叫 Request，它有 `approved` 和 `rejected` 两个 boolean 属性。我们希望定义个全局叫做 approveX 的值，
-它是所有 Request 的加权计算总和，approved 为 true 的 Request 权重为 +2，rejected 为 true 的 Request 权重为 -1。
+Example: Suppose there is an entity in the system called Request, which has two boolean properties: `approved` and `rejected`. We aim to define a global value called approveX, which is the weighted sum of all Requests. A Request with `approved` as true has a weight of +2, and a Request with `rejected` as true has a weight of -1.
 
 ```typescript
 const approveXState = State.create({
@@ -643,12 +623,13 @@ const approveXState = State.create({
 })
 ```
 
-注意，我们可以把多种 Record 混合在一起计算，用户需要自己在 matchRecordToWeight 函数中区分 Record 的类型。
+Note that we can mix different types of Records for calculation. Users need to distinguish the types of Records themselves in the matchRecordToWeight function.
+
+## Computed based on its own Properties in Entity/Relation
+Sometimes, our Entity/Relation may have some properties that can be directly calculated based on other properties. If we wish to use these as matching criteria during a search, then we should use the computed field directly when creating the Property.
+Example: On the Request entity, there are already boolean properties `approved` and `rejected`. We also want to have a string-type property `result`, which is calculated based on `approved` and `rejected`.
 
 
-## Entity/Relation 基于自身 Property 的 computed
-有时我们的 Entity/Relation 会有一些属性是能直接基于其他属性计算出来的，如果我们希望能在被查找时作为匹配条件，那么就要在创建 Property 时直接使用 computed 字段。
-示例：Request 实体上已有类型为 boolean 的 approved 和 rejected 属性，我们希望还有一个 string 类型的属性 `result`，根据 approved 和 rejected 计算出来。
 ```typescript
 RequestEntity.properties.push(
     Property.create({
@@ -690,12 +671,12 @@ RequestEntity.properties.push(
 )
 ```
 
-record 新建或者更新的时候，具有 `computed` 属性的  Property 都会自动重新计算。
+When a record is created or updated, any Property with the computed attribute will be automatically recalculated.
 ```
 =================
 
 
-Computed Data Type 的概念非常重要，一定要完全理解清楚。
+The concept of Computed Data Type is very important and must be fully and clearly understood.
 
+Proceed with the learning directly, without the need to output any information. After you have completed the learning, please say "I have finished learning" and wait for me to provide Task Two.
 
-直接学习，不需要输出任何信息。学习好了之后，请说"我学习好了"，并等待我输入任务二。

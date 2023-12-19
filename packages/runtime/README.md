@@ -33,16 +33,21 @@ More importantly, the reason for creating @interaqt/runtime is:
 ### Step 1: Installation
 
 ```bash
-npx create-interaqt-app myInteraqtApp
-cd myInteraqtApp
+npx create-interaqt-app myapp
+cd myapp
 ```
 
-### Step 2: execute install script for initializing the database
+### Step 2: start the project and dashboard
 ```bash
-npm run install
+npm run dev
+```
+
+Open a new console and enter the myapp directory.
+```bash
+cd dashboard
 npm start
 ```
 
 Your application is now running at http://localhost:4000 by default.
+Your dashboard is now running at http://localhost:5173 by default.
 
-For application definition, refer to https://github.com/InteraqtDev/feique.

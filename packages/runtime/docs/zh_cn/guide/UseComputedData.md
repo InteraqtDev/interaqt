@@ -77,7 +77,7 @@ const sendRequestRelation = Relation.create({
 })
 ```
 
-也可以用于记录 interaction 上 payload 的信息。
+它也可以用于记录 interaction 上 payload 的信息。
 示例：一旦用户执行了同意操作，就在用户和申请的 relation 的  result 字段上记录下来
 ```typescript
 Property.create({
@@ -225,7 +225,7 @@ const anyRequestHandledState = State.create({
 })
 ```
 
-### Every`
+### Every
 是否某种 Record 的所有数据都满足条件。
 它只能用在 State 上。
 
