@@ -441,19 +441,19 @@ export function createClass<T extends KlassMeta>(metadata: T) : Klass<T['public'
 }
 
 export function getUUID(obj: InertKlassInstance<any>): string {
-    return (isAtom(obj) ? obj().uuid : obj.uuid) || ''
+    return (isAtom(obj) ? (obj() as any).uuid : obj.uuid) || ''
 }
 
 
 export function getDisplayValue( obj: InertKlassInstance<any>) {
-    const rawObj: InertKlassInstance<any> = isAtom(obj) ? obj() : obj
+    const rawObj: InertKlassInstance<any> = isAtom(obj) ? obj() as any : obj
     return (rawObj.constructor as Klass<any>).display?.(rawObj)
 }
 
 // FIXME 这里没法指定要不要 clone Klass 里面的 引用，现在默认就是不 copy
 export function deepClone<T>(obj: T, deepCloneKlass?: boolean): T{
     // 优先处理 reactive 节点，因为下面的 instance 判断会覆盖
-    if (isAtom(obj)) return atom(deepClone(obj()))
+    if (isAtom(obj)) return atom(deepClone(obj())) as T
     if (isReactive(obj)) return reactive(deepClone(toRaw(obj)) as object) as T
 
 

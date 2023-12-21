@@ -1,18 +1,23 @@
-import {atom, Atom, computed} from "rata";
-import {Entity, Property} from "../../../../shared/lib/entity/Entity";
-import {Select} from "../form/Select";
-import {MapActivityToEntity} from "../../../../shared/lib/IncrementalComputation";
-import {createDraftControl} from "../createDraftControl";
-import {KlassInstance, Klass, ReactiveKlassInstance} from "../../../../shared/lib/createClass";
-import {Code} from "../code/Code";
-import {Activity} from "../../../../shared/lib/activity/Activity";
+import { atom, Atom, computed } from "data0";
+import {
+    Entity,
+    Property,
+    MapActivityToEntity,
+    KlassInstance,
+    Klass,
+    ReactiveKlassInstance,
+    Activity
+} from "@interaqt/shared";
+import { Select } from "../form/Select";
+import { createDraftControl } from "../createDraftControl";
+import { Code } from "../code/Code";
 
 type DetailProps = {
-    target: Atom<typeof Entity|typeof Property>
+    target: Atom<typeof Entity | typeof Property>
 }
 
-export function Detail({ target, activities }: DetailProps, {createElement}) {
-    return () => Entity.is(target()) ? <EntityDetail entity={target()} activities={activities}/> : <div>请选中</div>
+export function Detail({ target, activities }: DetailProps, { createElement }) {
+    return () => Entity.is(target()) ? <EntityDetail entity={target()} activities={activities} /> : <div>请选中</div>
 }
 
 // TODO
@@ -23,7 +28,7 @@ type EntityDetailProp = {
     activities: (typeof Activity)[]
 }
 
-export function EntityDetail({ entity, activities }: EntityDetailProp, {createElement}) {
+export function EntityDetail({ entity, activities }: EntityDetailProp, { createElement }) {
 
     const incrementalForms = new Map([[MapActivityToEntity, MapActivityToEntityForm]])
 
@@ -64,22 +69,22 @@ export function EntityDetail({ entity, activities }: EntityDetailProp, {createEl
                 if (!FormCom || !data) return null
 
                 // TODO 这里不同的 form 需要不同的 prop，怎么处理？？？？
-                return <FormCom data={data} activities={activities}/>
+                return <FormCom data={data} activities={activities} />
             }}
         </div>
 
     </div>
 }
 
-export function MapActivityToEntityForm({ data, activities }, {createElement}) {
+export function MapActivityToEntityForm({ data, activities }, { createElement }) {
     return (
         <div>
             <div>computed data </div>
             <div>
-                <Select value={data.source} options={activities} display={(activity) => activity?.name()}/>
+                <Select value={data.source} options={activities} display={(activity) => activity?.name()} />
             </div>
             <div>
-                <Code value={data.handle} options={{language: 'javascript'}}/>
+                <Code value={data.handle} options={{ language: 'javascript' }} />
             </div>
         </div>
     )

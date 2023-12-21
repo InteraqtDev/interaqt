@@ -1,15 +1,15 @@
 /* @jsx createElement*/
-import {createElement} from "axii";
-import {Entity, Property, PropertyTypes} from "../../../../shared/lib/entity/Entity";
-import {Atom, incMap} from 'rata'
+import { createElement } from "axii";
+import { Atom, incMap } from 'data0'
+import { Entity, Property, PropertyTypes } from "@interaqt/shared";
 
 
 type columnProp = {
     entity: Entity,
-    opener?: { entity: Entity, prop: Property}
+    opener?: { entity: Entity, prop: Property }
 }
 
-export function PropertyAddForm({ entity } : columnProp) {
+export function PropertyAddForm({ entity }: columnProp) {
     return (
         <form>
             <div className="space-y-12">
@@ -62,7 +62,7 @@ export function PropertyAddForm({ entity } : columnProp) {
                                         </div>
                                         <div className="text-sm leading-6">
                                             <label htmlFor="multiple"
-                                                   className="font-medium text-gray-900">multiple</label>
+                                                className="font-medium text-gray-900">multiple</label>
                                         </div>
                                     </div>
                                 </div>

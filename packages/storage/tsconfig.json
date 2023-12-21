@@ -14,10 +14,10 @@
     "jsx": "preserve",
     "allowSyntheticDefaultImports": true,
     "forceConsistentCasingInFileNames": true,
-    "allowJs": true,
-    "include": [
-      "./erstorage",
-      "./test"
-    ]
-  }
+    "allowJs": true
+  },
+  "include": [
+    "./erstorage",
+    "./test"
+  ]
 }

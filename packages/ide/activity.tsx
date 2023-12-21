@@ -1,28 +1,34 @@
 /* @jsx createElement*/
-import {createElement, createRoot} from "axii";
-import "./index.css"
-import {ActivityGraph} from "./src/component/activity/ActivityGraph";
+import { createElement, createRoot } from "axii";
+import { atom, computed, reactive } from "data0";
+import { editor } from "monaco-editor";
 import {
-    Action, Activity,
+    Action,
+    Activity,
     Interaction,
     ActivityGroup,
-    Payload, PayloadItem,
-    Transfer, forEachInteraction
-} from "../shared/lib/activity/Activity";
-
-import {atom, computed, reactive} from "rata";
-import {Entity} from "../shared/lib/entity/Entity";
-import {Code} from "./src/component/code/Code";
-import {Drawer} from "./src/component/util/Drawer";
-import {editor} from "monaco-editor";
+    Payload,
+    PayloadItem,
+    Transfer,
+    forEachInteraction,
+    Entity,
+    KlassInstance,
+    stringifyAllInstances,
+    createUserRoleAttributive,
+    UserAttributive,
+    UserAttributives,
+} from "@interaqt/shared";
+import { ActivityGraph } from "./src/component/activity/ActivityGraph";
+import { Code } from "./src/component/code/Code";
+import { Drawer } from "./src/component/util/Drawer";
 import IStandaloneEditorConstructionOptions = editor.IStandaloneEditorConstructionOptions;
 import {
     NewAttr, New2Attr, New3Attr, OldAttr, Old2Attr, Old3Attr, OtherAttr,
-    User,Admin,Anonymous,
+    User, Admin, Anonymous,
     Message
 } from './testdata/interaction'
-import {createUserRoleAttributive, UserAttributive, UserAttributives} from "../shared/lib/user/User";
-import {KlassInstance, stringifyAllInstances} from "../shared/lib/createClass";
+
+import "./index.css"
 
 
 const userAttributiveOptions = reactive([NewAttr, New2Attr, New3Attr, OldAttr, Old2Attr, Old3Attr, OtherAttr])
@@ -31,10 +37,10 @@ const roleAttributiveOptions = reactive([User, Admin, Anonymous])
 
 const entities = reactive([Message])
 const entityAttributives = reactive([])
-export const globalUserRole = createUserRoleAttributive({ name: 'user'}, {isReactive: true})
+export const globalUserRole = createUserRoleAttributive({ name: 'user' }, { isReactive: true })
 
-const userRefA = createUserRoleAttributive({name: 'A', isRef: true}, {isReactive:true})
-const userRefB = createUserRoleAttributive({name: 'B', isRef: true}, {isReactive:true})
+const userRefA = createUserRoleAttributive({ name: 'A', isRef: true }, { isReactive: true })
+const userRefB = createUserRoleAttributive({ name: 'B', isRef: true }, { isReactive: true })
 
 
 
@@ -43,7 +49,7 @@ const sendInteraction = Interaction.createReactive({
     userAttributives: UserAttributives.createReactive({}),
     userRoleAttributive: globalUserRole,
     userRef: userRefA,
-    action: Action.createReactive({ name: 'sendRequest'}),
+    action: Action.createReactive({ name: 'sendRequest' }),
     payload: Payload.createReactive({
         items: [
             PayloadItem.createReactive({
@@ -56,7 +62,7 @@ const sendInteraction = Interaction.createReactive({
             PayloadItem.createReactive({
                 name: 'message',
                 base: Message,
-                itemRef: Entity.createReactive({name: '', isRef: true}),
+                itemRef: Entity.createReactive({ name: '', isRef: true }),
             })
         ]
     })
@@ -69,8 +75,8 @@ const approveInteraction = Interaction.createReactive({
     name: 'approve',
     userAttributives: UserAttributives.createReactive({}),
     userRoleAttributive: userRefB,
-    userRef: createUserRoleAttributive({name: '', isRef: true}, {isReactive:true}),
-    action: Action.createReactive({ name: 'approve'}),
+    userRef: createUserRoleAttributive({ name: '', isRef: true }, { isReactive: true }),
+    action: Action.createReactive({ name: 'approve' }),
     payload: Payload.createReactive({})
 })
 
@@ -78,14 +84,14 @@ const rejectInteraction = Interaction.createReactive({
     name: 'reject',
     userAttributives: UserAttributives.createReactive({}),
     userRoleAttributive: userRefB,
-    userRef: createUserRoleAttributive({name: '', isRef: true}, {isReactive:true}),
-    action: Action.createReactive({ name: 'reject'}),
+    userRef: createUserRoleAttributive({ name: '', isRef: true }, { isReactive: true }),
+    action: Action.createReactive({ name: 'reject' }),
     payload: Payload.createReactive({
         items: [
             PayloadItem.createReactive({
                 name: 'reason',
                 base: Message,
-                itemRef: Entity.createReactive({name: '', isRef: true}),
+                itemRef: Entity.createReactive({ name: '', isRef: true }),
             })
         ]
     })
@@ -95,8 +101,8 @@ const cancelInteraction = Interaction.createReactive({
     name: 'cancel',
     userAttributives: UserAttributives.createReactive({}),
     userRoleAttributive: userRefA,
-    userRef: createUserRoleAttributive({name: '', isRef: true}, {isReactive:true}),
-    action: Action.createReactive({ name: 'cancel'}),
+    userRef: createUserRoleAttributive({ name: '', isRef: true }, { isReactive: true }),
+    action: Action.createReactive({ name: 'cancel' }),
     payload: Payload.createReactive({})
 })
 
@@ -122,7 +128,7 @@ const responseGroup = ActivityGroup.createReactive({
 })
 
 
-const activity= Activity.createReactive({
+const activity = Activity.createReactive({
     name: "createFriendRelation",
     interactions: [
         sendInteraction
@@ -143,7 +149,7 @@ const activity= Activity.createReactive({
 const userRolesAndUserRefs = computed(() => {
     const refRoles = []
     forEachInteraction(activity, (interaction: ReturnType<typeof Interaction.createReactive>) => {
-        if (interaction.userRef()?.name() ) {
+        if (interaction.userRef()?.name()) {
             refRoles.push(interaction.userRef())
         }
         // TODO 支持深层嵌套的 payload 格式
@@ -180,7 +186,7 @@ root.render(<div>
         selectedAttributive={selected}
     />
     <Drawer title={title} visible={codeVisible}>
-        {() => selected() ?  <Code options={{value: selected().stringContent() || '', ...options}} />  : null}
+        {() => selected() ? <Code options={{ value: selected().stringContent() || '', ...options }} /> : null}
     </Drawer>
 </div>)
 

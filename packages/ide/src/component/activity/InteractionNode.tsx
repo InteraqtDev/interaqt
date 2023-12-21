@@ -1,14 +1,17 @@
-import {createElement} from "axii";
-import {AttributiveInput} from "./AttributiveInput";
-import {PayloadInput} from "./PayloadInput";
-import {Select} from "../form/Select";
-import {ActionInput} from "./ActionInput";
-import {createDraftControl} from "../createDraftControl";
-import {Input} from "../form/Input";
-import {UserAttributive} from "../../../../shared/lib/user/User";
-import {Atom} from "rata";
-import {EntityAttributive, Interaction} from "../../../../shared/lib/activity/Activity";
-import {Entity} from "../../../../shared/lib/entity/Entity";
+import { createElement } from "axii";
+import { Atom } from "data0";
+import {
+    UserAttributive,
+    EntityAttributive,
+    Interaction,
+    Entity
+} from '@interaqt/shared';
+import { AttributiveInput } from "./AttributiveInput";
+import { PayloadInput } from "./PayloadInput";
+import { Select } from "../form/Select";
+import { ActionInput } from "./ActionInput";
+import { createDraftControl } from "../createDraftControl";
+import { Input } from "../form/Input";
 
 
 type InteractionNodeProps = {
@@ -20,7 +23,7 @@ type InteractionNodeProps = {
     selectedAttributive: Atom<any>
 }
 
-export function InteractionNode({ interaction, roleAttributiveOptions, entities, userAttributiveOptions, entityAttributives, selectedAttributive } : InteractionNodeProps){
+export function InteractionNode({ interaction, roleAttributiveOptions, entities, userAttributiveOptions, entityAttributives, selectedAttributive }: InteractionNodeProps) {
 
     const renderActionDraftControl = createDraftControl(ActionInput, {
         pushEvent: 'input:onBlur'
@@ -30,7 +33,7 @@ export function InteractionNode({ interaction, roleAttributiveOptions, entities,
 
     console.log(interaction.payload().uuid)
     return (
-        <div style={{border: '1px blue dashed', display: 'inline-block'}} classNames="overflow-visible">
+        <div style={{ border: '1px blue dashed', display: 'inline-block' }} classNames="overflow-visible">
             <div>
                 <AttributiveInput
                     value={interaction.userAttributives}
@@ -44,9 +47,9 @@ export function InteractionNode({ interaction, roleAttributiveOptions, entities,
                 })}
             </div>
             <div>
-                {renderActionDraftControl({ value: interaction.action().name})}
+                {renderActionDraftControl({ value: interaction.action().name })}
             </div>
-            <div style={{ width: 200}}>
+            <div style={{ width: 200 }}>
                 <PayloadInput
                     value={interaction.payload}
                     roleAttributiveOptions={roleAttributiveOptions}

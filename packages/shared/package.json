@@ -6,7 +6,7 @@
   "devDependencies": {
     "@microsoft/api-extractor": "^7.38.5",
     "rimraf": "^5.0.5",
-    "vitest": "^1.0.0-beta.4"
+    "vitest": "^0.34.6"
   },
   "files": [
     "dist"
@@ -19,7 +19,7 @@
     "type": "api-extractor run",
     "release": "node scripts/release.js",
     "build-all": "npm run build && npm run type",
-    "test": "vitest --typecheck"
+    "test": "vitest"
   },
   "dependencies": {
     "acorn": "^8.10.0",

@@ -2,7 +2,7 @@
 // richText 的 value 是有业务语义的数据结构，这里的 value 就是 element children
 
 
-import {atom, computed} from "rata";
+import {atom, computed} from "data0";
 
 function getSelectionRange() {
     const selection = window.getSelection()

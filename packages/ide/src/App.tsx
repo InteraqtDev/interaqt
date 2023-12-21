@@ -1,4 +1,4 @@
-import { atom } from 'rata'
+import { atom } from 'data0'
 import Sidebar from "./Sidebar";
 import Navbar from "./Navbar";
 

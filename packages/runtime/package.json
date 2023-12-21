@@ -2,6 +2,7 @@
   "name": "@interaqt/runtime",
   "devDependencies": {
     "@microsoft/api-extractor": "^7.38.5",
+    "pino-pretty": "^10.3.0",
     "rimraf": "^5.0.5",
     "typescript": "^5.2.2",
     "vite-tsconfig-paths": "^4.2.1",

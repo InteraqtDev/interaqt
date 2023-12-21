@@ -2,7 +2,7 @@ import {createElement, InjectHandles} from "axii";
 import * as monaco from 'monaco-editor/esm/vs/editor/editor.api';
 import './useWorker';
 import {IMarkdownString} from "monaco-editor/esm/vs/editor/editor.api";
-import {atom, Atom} from "rata";
+import {atom, Atom} from "data0";
 
 type HoverProp = { match : (...arg: any[]) => any, contents: (...arg: any[]) => IMarkdownString[]}
 

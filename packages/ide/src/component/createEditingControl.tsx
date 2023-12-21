@@ -1,6 +1,6 @@
 import { createElement} from "axii";
 import {Component} from "../global";
-import {atom} from "rata";
+import {atom} from "data0";
 
 
 type EditDef = {

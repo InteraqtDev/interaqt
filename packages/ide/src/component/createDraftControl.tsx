@@ -1,34 +1,34 @@
-import {createElement, Component, configure} from "axii";
-import {deepClone} from "../../../shared/lib/createClass";
-import {atom, Atom, computed, isAtom, reactive} from "rata";
-import {assert} from "../util";
+import { createElement, Component, configure } from "axii";
+import { atom, Atom, computed, isAtom, reactive } from "data0";
+import { deepClone } from "@interaqt/shared";
+import { assert } from "../util";
 
 type Options = {
     pushEvent: string,
     constraints?: {},
-    toControlValue? : (value: any) => any,
-    toDraft? : (controlValue: any) => any,
+    toControlValue?: (value: any) => any,
+    toDraft?: (controlValue: any) => any,
 }
 
 type RenderControlArg = {
     [k: string]: any,
     value: Atom,
-    children? :any
-    errors? :any[]
+    children?: any
+    errors?: any[]
 }
 
 export function createDraftControl(Component: Component, options?: Options) {
-    return function renderControl({value, children, errors = reactive([]), ...restProps}: RenderControlArg) {
+    return function renderControl({ value, children, errors = reactive([]), ...restProps }: RenderControlArg) {
         assert(isAtom(value), 'draft only accept atom value')
 
-        const controlValue = atom(options?.toControlValue? options.toControlValue(value()) : deepClone(value()))
+        const controlValue = atom(options?.toControlValue ? options.toControlValue(value()) : deepClone(value()))
 
         function updateValue() {
             let toDraftError
             let draftValue
             try {
                 draftValue = options?.toDraft ? options.toDraft(controlValue()) : controlValue()
-            } catch(e) {
+            } catch (e) {
                 toDraftError = e
             }
 
@@ -39,7 +39,7 @@ export function createDraftControl(Component: Component, options?: Options) {
                 errors!.splice(0, Infinity)
                 value(nextValue)
             } else {
-                errors!.splice(0, Infinity, { type: 'toDraftError'})
+                errors!.splice(0, Infinity, { type: 'toDraftError' })
             }
             return
         }

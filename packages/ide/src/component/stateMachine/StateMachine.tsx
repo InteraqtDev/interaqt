@@ -1,7 +1,7 @@
 import {createElement} from "axii";
 import { StateNode } from "./StateNode";
 import {Graph} from "../graph/graph";
-import {reactive} from "rata";
+import {reactive} from "data0";
 import {GraphOptions} from "@antv/g6";
 import {EventEdge} from "./EventEdge";
 

@@ -1,17 +1,17 @@
 /* @jsx createElement*/
-import {createElement} from "axii";
-import {Entity, Property, PropertyTypes, Relation} from "../../../../shared/lib/entity/Entity";
-import {Atom, incMap} from 'rata'
-import {createDialog, createDialogFooter} from "../createDialog";
-import {createFormForEntity, createFormForEntityProperty} from "../createFormForEntityProperty";
-import {RelationEntityMap} from "./EREditor";
-import {IconAddProperty} from "../icons/Add";
+import { createElement } from "axii";
+import { Atom, incMap } from 'data0'
+import { Entity, Property, PropertyTypes, Relation } from "@interaqt/shared";
+import { createDialog, createDialogFooter } from "../createDialog";
+import { createFormForEntity, createFormForEntityProperty } from "../createFormForEntityProperty";
+import { RelationEntityMap } from "./EREditor";
+import { IconAddProperty } from "../icons/Add";
 
 
 type columnProp = {
     entity: Entity,
     index: Atom<number>,
-    opener?: { entity: Entity, prop: Property}
+    opener?: { entity: Entity, prop: Property }
     openRelatedEntity: (relationName: string) => void,
     selected: Atom<Property>,
     relationsByEntity: RelationEntityMap
@@ -20,7 +20,7 @@ type columnProp = {
 
 
 
-export function Column({ entity, opener, selected, openRelatedEntity, relationsByEntity, addRelation } : columnProp) {
+export function Column({ entity, opener, selected, openRelatedEntity, relationsByEntity, addRelation }: columnProp) {
 
 
     const { fieldValues: newProperty, node: addPropertyForm } = createFormForEntityProperty(Entity, 'properties', entity)
@@ -30,22 +30,22 @@ export function Column({ entity, opener, selected, openRelatedEntity, relationsB
     }
     const [propertyAddDialogVisible, propertyAddDialog] = createDialog(
         addPropertyForm,
-        createDialogFooter([{ text: 'Submit', onClick: onAddProperty}, { text: 'Cancel', onClick: () => propertyAddDialogVisible(false)}])
+        createDialogFooter([{ text: 'Submit', onClick: onAddProperty }, { text: 'Cancel', onClick: () => propertyAddDialogVisible(false) }])
     )
-    const showPropertyAddDialog = () =>  propertyAddDialogVisible(true)
+    const showPropertyAddDialog = () => propertyAddDialogVisible(true)
     // setTimeout(() => showPropertyAddDialog())
 
 
 
-    const { fieldValues: newEntity, node: addRelationForm } = createFormForEntity(Relation, { fixedValues: { entity1: entity }})
+    const { fieldValues: newEntity, node: addRelationForm } = createFormForEntity(Relation, { fixedValues: { entity1: entity } })
     const onAddRelation = () => {
         addRelation(Relation.createReactive(newEntity))
     }
     const [relationAddDialogVisible, relationAddDialog] = createDialog(
         addRelationForm,
-        createDialogFooter([{ text: 'Submit', onClick: onAddRelation}, { text: 'Cancel', onClick: () => relationAddDialogVisible(false)}])
+        createDialogFooter([{ text: 'Submit', onClick: onAddRelation }, { text: 'Cancel', onClick: () => relationAddDialogVisible(false) }])
     )
-    const showRelationAddDialog = () =>  relationAddDialogVisible(true)
+    const showRelationAddDialog = () => relationAddDialogVisible(true)
 
     // setTimeout(() => {
     //     showRelationAddDialog()
@@ -77,13 +77,13 @@ export function Column({ entity, opener, selected, openRelatedEntity, relationsB
             </div>
             <div className="">
                 {incMap(entity.properties, (property: Property) => (
-                    <div  className={() => `p-6 border-b-2 cursor-pointer ${property === selected() ? 'border-indigo-500 ' :'border-slate-200'}`}>
+                    <div className={() => `p-6 border-b-2 cursor-pointer ${property === selected() ? 'border-indigo-500 ' : 'border-slate-200'}`}>
                         <span>{property.name}</span>
-                        <span>{property.type === PropertyTypes.Relation ? `[${(property.args).entity.name}]` : '' }</span>
+                        <span>{property.type === PropertyTypes.Relation ? `[${(property.args).entity.name}]` : ''}</span>
                     </div>
                 ))}
                 {() => Array.from(relationsByEntity.get(entity).entries()).map(([relationName, [targetName, targetEntity]]) => (
-                    <div onClick={() => openRelatedEntity(relationName)} className={() => `p-6 border-b-2 cursor-pointer ${relationName === selected() ? 'border-indigo-500 ' :'border-slate-200'}`}>
+                    <div onClick={() => openRelatedEntity(relationName)} className={() => `p-6 border-b-2 cursor-pointer ${relationName === selected() ? 'border-indigo-500 ' : 'border-slate-200'}`}>
                         <span>{relationName}</span>
                         <span>[{targetEntity.name}.{targetName}]</span>
                     </div>

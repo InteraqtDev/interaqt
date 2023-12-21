@@ -1,6 +1,6 @@
 import {BoolExpression, BoolExpressionNodeTypes, OperatorNames, VariableNode} from "../../../../runtime/types/boolExpression";
 import { parse } from '../../../../runtime/boolExpression'
-import {atom, computed, incFilter, reactive} from "rata";
+import {atom, computed, incFilter, reactive} from "data0";
 import {nextJob} from "../../util";
 import {createDraftControl} from "../createDraftControl";
 import {Contenteditable, replaceLastText} from "../contenteditable/Contenteditable";
