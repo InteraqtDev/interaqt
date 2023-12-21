@@ -33,39 +33,20 @@ More importantly, the reason for creating @interaqt/runtime is:
 ### Step 1: Installation
 
 ```bash
-npm install @interaqt/runtime@0.8.0 // latest version: 0.8.0
+npx create-interaqt-app myapp
+cd myapp
 ```
 
-### Step 2: Create an install.js file for initializing the database
-```typescript
-import {MonoSystem, Controller, SQLiteDB} from "@interaqt/runtime";
-import {entities, interactions, relations, activities, states} from './app/index.js'
-
-const db = new SQLiteDB('database.db')
-const system = new MonoSystem(db)
-const controller = new Controller(system, entities, relations, activities, interactions, states)
-await controller.setup(true)
+### Step 2: start the project and dashboard
+```bash
+npm run dev
 ```
 
-
-### Step 3: Create a server.js file to start the application
-
-```typescript
-import {MonoSystem,Controller, startServer} from "@interaqt/runtime";
-import {entities, interactions, relations, activities, states} from './app/index.js'
-
-const db = new SQLiteDB('database.db')
-const system = new MonoSystem()
-const controller = new Controller(system, entities, relations, activities, interactions, states)
-await controller.setup()
-
-startServer(controller, {
-  port: 3000,
-  parseUserId: async (headers: IncomingHttpHeaders) => {
-      // use your own authentication method
-      return headers['x-user-id']
-  }
-})
+Open a new console and enter the myapp directory.
+```bash
+cd dashboard
+npm start
 ```
 
-For application definition, refer to https://github.com/InteraqtDev/feique.
+Your application is now running at http://localhost:4000 by default.
+Your dashboard is now running at http://localhost:5173 by default.

@@ -70,4 +70,3 @@ cd dashboard
 npm start
 ```
 
-应用示例请参考 [https://github.com/InteraqtDev/feique](https://github.com/InteraqtDev/feique)。
