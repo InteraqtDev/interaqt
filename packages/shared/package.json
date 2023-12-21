@@ -19,7 +19,8 @@
     "type": "api-extractor run",
     "release": "node scripts/release.js",
     "build-all": "npm run build && npm run type",
-    "test": "vitest"
+    "test": "vitest",
+    "test:run": "vitest run"
   },
   "dependencies": {
     "acorn": "^8.10.0",

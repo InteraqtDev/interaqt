@@ -1,0 +1,19 @@
+{
+    "name": "interaqt",
+    "private": true,
+    "version": "1.0.0",
+    "description": "The only right tool for AI generating code.",
+    "scripts": {
+        "build": "pnpm --filter '@interaqt/*' build",
+        "test": "pnpm --filter '@interaqt/*' test:run",
+        "release": "pnpm --filter '@interaqt/*' release"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git@github.com:InteraqtDev/interaqt.git"
+    },
+    "license": "MIT",
+    "workspaces": [
+        "packages"
+    ]
+}
