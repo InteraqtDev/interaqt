@@ -1,2 +1,4 @@
 import crypto from 'node:crypto';
-globalThis.crypto = crypto;
+if (globalThis && !globalThis.crypto) {
+    globalThis.crypto = crypto;
+}
