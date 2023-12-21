@@ -1,7 +1,6 @@
 import { createElement} from "axii";
-import {Component} from "../global";
 import {atom} from "data0";
-
+import {Component} from "../global";
 
 type EditDef = {
     pull: () => {}

@@ -1,4 +1,3 @@
-import '../code/useWorker';
 import { InjectHandles, Props } from "axii";
 import { computed, incConcat, incMap, Atom } from "data0";
 import {
@@ -11,6 +10,7 @@ import {
     KlassInstance,
     Entity,
 } from "@interaqt/shared";
+import '../code/useWorker';
 import { AttributiveInput } from "./AttributiveInput";
 import { Checkbox } from "../form/Checkbox";
 import { Input } from "../form/Input";

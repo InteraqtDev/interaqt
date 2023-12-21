@@ -11,11 +11,12 @@ import {
     stringifyAllInstances
 } from "@interaqt/shared";
 import { EREditor } from "./src/component/entity/EREditor";
-import "./index.css"
 import { Checkbox } from "./src/component/form/Checkbox";
 import { Select } from "./src/component/form/Select";
 import { Input } from "./src/component/form/Input";
 import { createDraftControl } from "./src/component/createDraftControl";
+
+import "./index.css"
 
 const root = createRoot(document.getElementById('root')!)
 

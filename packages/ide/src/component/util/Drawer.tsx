@@ -1,5 +1,5 @@
-import {Close} from "../icons/Close";
 import {onSelf} from "axii";
+import {Close} from "../icons/Close";
 
 export function Drawer({ title, visible, children }, {createElement}) {
 

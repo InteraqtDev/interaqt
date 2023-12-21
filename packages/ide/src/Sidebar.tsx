@@ -1,5 +1,3 @@
-
-
 import LogoIcon from "./assets/logo";
 import CollapseIcon from "./assets/collapse";
 import ActivityIcon from "./assets/activity";
