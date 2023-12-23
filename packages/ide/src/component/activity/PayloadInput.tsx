@@ -1,16 +1,22 @@
+import { InjectHandles, Props } from "axii";
+import { computed, incConcat, incMap, Atom } from "data0";
+import {
+    EntityAttributive,
+    EntityAttributives,
+    Payload,
+    PayloadItem,
+    UserAttributive,
+    UserAttributives,
+    KlassInstance,
+    Entity,
+} from "@interaqt/shared";
 import '../code/useWorker';
-import {InjectHandles, Props} from "axii";
-import {computed, incConcat, incMap, Atom} from "rata";
-import {AttributiveInput} from "./AttributiveInput";
-import {Checkbox} from "../form/Checkbox";
-import {Input} from "../form/Input";
-import {createDraftControl} from "../createDraftControl";
-import {EntityAttributive, EntityAttributives, Payload, PayloadItem} from "../../../../shared/lib/activity/Activity";
-import { UserAttributive, UserAttributives } from "../../../../shared/lib/user/User";
-import {Button} from "../form/Button";
-import {Select} from "../form/Select";
-import {Entity} from "../../../../shared/lib/entity/Entity";
-import {KlassInstance} from "../../../../shared/lib/createClass";
+import { AttributiveInput } from "./AttributiveInput";
+import { Checkbox } from "../form/Checkbox";
+import { Input } from "../form/Input";
+import { createDraftControl } from "../createDraftControl";
+import { Button } from "../form/Button";
+import { Select } from "../form/Select";
 
 
 type PayloadInputProps = {
@@ -22,14 +28,14 @@ type PayloadInputProps = {
     selectedAttributive: Atom<any>
 }
 
-export function PayloadInput({ value, roleAttributiveOptions, entities, userAttributiveOptions, entityAttributives, selectedAttributive}: PayloadInputProps, { createElement }: InjectHandles) {
+export function PayloadInput({ value, roleAttributiveOptions, entities, userAttributiveOptions, entityAttributives, selectedAttributive }: PayloadInputProps, { createElement }: InjectHandles) {
     const onAddClick = () => {
         value().items.push(PayloadItem.createReactive({ name: '', base: null, attributive: null, alias: '' }))
     }
 
     return <div>
         {incMap(value().items, (i) => {
-            const item = i as unknown as  ReturnType<typeof PayloadItem.createReactive>
+            const item = i as unknown as ReturnType<typeof PayloadItem.createReactive>
 
             const renderNameDraftControl = createDraftControl(Input)
             const aliasDraftControl = createDraftControl(Input)
@@ -65,8 +71,8 @@ export function PayloadInput({ value, roleAttributiveOptions, entities, userAttr
                         placeholder: 'key'
                     })}
                     <span>:</span>
-                    <AttributiveInput value={item.attributives} options={attributiveOptions} selectedAttributive={selectedAttributive}/>
-                    <Select placeholder={ 'choose'}
+                    <AttributiveInput value={item.attributives} options={attributiveOptions} selectedAttributive={selectedAttributive} />
+                    <Select placeholder={'choose'}
                         value={item.base}
                         options={incConcat(roleAttributiveOptions, entities)}
                         display={(item) => item.name}

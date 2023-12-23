@@ -1,22 +1,30 @@
 /* @jsx createElement*/
-import {createElement, createRoot} from "axii";
-import "./index.css"
-import {InteractionNode} from "./src/component/activity/InteractionNode";
-import {Action, Interaction, Payload} from "../shared/lib/activity/Activity";
-import {UserAttributive, UserAttributives, createUserRoleAttributive} from '../shared/lib/user/User'
-import {atom, computed, reactive} from "rata";
-import {Code} from "./src/component/code/Code";
-import {Drawer} from "./src/component/util/Drawer";
-import {editor} from "monaco-editor";
+import { createElement, createRoot } from "axii";
+import { atom, computed, reactive } from "data0";
+import { editor } from "monaco-editor";
+import {
+    Action,
+    Interaction,
+    Payload,
+    createUserRoleAttributive,
+    UserAttributive,
+    UserAttributives,
+    KlassInstance,
+    stringifyAllInstances 
+} from "@interaqt/shared";
+import { InteractionNode } from "./src/component/activity/InteractionNode";
+import { Code } from "./src/component/code/Code";
+import { Drawer } from "./src/component/util/Drawer";
 import IStandaloneEditorConstructionOptions = editor.IStandaloneEditorConstructionOptions;
-import {KlassInstance, stringifyAllInstances} from "../shared/lib/createClass";
 import {
     NewAttr, New2Attr, New3Attr, OldAttr, Old2Attr, Old3Attr, OtherAttr,
-    User,Admin,Anonymous,
+    User, Admin, Anonymous,
     Message
 } from './testdata/interaction'
 
-export const globalUserRole = createUserRoleAttributive({ name: 'user'}, {isReactive: true})
+import "./index.css"
+
+export const globalUserRole = createUserRoleAttributive({ name: 'user' }, { isReactive: true })
 
 const sendInteraction = Interaction.createReactive({
     name: 'sendRequest',
@@ -24,8 +32,8 @@ const sendInteraction = Interaction.createReactive({
         // TODO 写个 attributive
     }),
     userRoleAttributive: globalUserRole,
-    userRef: createUserRoleAttributive({name: 'A', isRef: true}, {isReactive:true}),
-    action: Action.createReactive({ name: 'sendRequest'}),
+    userRef: createUserRoleAttributive({ name: 'A', isRef: true }, { isReactive: true }),
+    action: Action.createReactive({ name: 'sendRequest' }),
     payload: Payload.createReactive({
         items: []
     })
@@ -55,7 +63,7 @@ const options: IStandaloneEditorConstructionOptions = {
     }
 }
 
-root.on('selectConcept',(concept) => {
+root.on('selectConcept', (concept) => {
     selected(concept)
     codeVisible(true)
 })
@@ -71,7 +79,7 @@ root.render(<div>
         selectedAttributive={selected}
     />
     <Drawer title={title} visible={codeVisible}>
-        {() => selected() ?  <Code options={{value: selected().stringContent() || '', ...options}} />  : null}
+        {() => selected() ? <Code options={{ value: selected().stringContent() || '', ...options }} /> : null}
     </Drawer>
 </div>)
 

@@ -1,6 +1,6 @@
 /* @jsx createElement*/
 import {createElement} from "axii";
-import { atom } from "rata";
+import { atom } from "data0";
 
 
 export function createDialog(content: any, footer: any) {

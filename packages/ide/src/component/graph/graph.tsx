@@ -8,7 +8,7 @@ import {
     IG6GraphEvent,
     INode
 } from '@antv/g6'
-import {atom, Atom, computed, incIndexBy, incMap, isReactive, TrackOpTypes, TriggerOpTypes} from "rata";
+import {atom, Atom, computed, incIndexBy, incMap, isReactive, TrackOpTypes, TriggerOpTypes} from "data0";
 import {hasOwn} from "../../util";
 
 

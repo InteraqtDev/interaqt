@@ -1,5 +1,5 @@
 import {createElement, propTypes} from "axii";
-import {atom, incMap, reactive} from "rata";
+import {atom, incMap, reactive} from "data0";
 
 export function Input({ value, placeholder, errors = [], label = atom(''), tooltip = atom('') }) {
     return (

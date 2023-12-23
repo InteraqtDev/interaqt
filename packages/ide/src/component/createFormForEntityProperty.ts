@@ -1,6 +1,5 @@
+import {reactive} from "data0";
 import {createForm, FormStaticFieldType} from "./createForm";
-import {reactive} from "rata";
-
 
 type FormFieldTypeOrGroup = FormStaticFieldType | { name: string, children: FormFieldTypeOrGroup[] } | FormFieldTypeOrGroup[]
 

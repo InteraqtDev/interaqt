@@ -1,17 +1,21 @@
 
 
-import {createElement} from "axii";
-import { InteractionNode } from "./InteractionNode";
-import {Graph} from "../graph/graph";
-import {Atom, atom, computed, incMap, reactive} from "rata";
-import {GraphOptions} from "@antv/g6";
-import {InteractionEdge} from "./InteractionEdge";
-import {ActivityNode} from "./AcitivityNode";
+import { createElement } from "axii";
+import { Atom, atom, computed, incMap } from "data0";
 import hotkeys from "hotkeys-js";
-import {service} from "../service";
-import {EntityAttributive, Activity, forEachInteraction} from "../../../../shared/lib/activity/Activity";
-import {UserAttributive} from "../../../../shared/lib/user/User";
-import {Entity} from "../../../../shared/lib/entity/Entity";
+import { GraphOptions } from "@antv/g6";
+import {
+    EntityAttributive,
+    Activity,
+    forEachInteraction,
+    UserAttributive,
+    Entity,
+} from "@interaqt/shared"
+import { InteractionNode } from "./InteractionNode";
+import { Graph } from "../graph/graph";
+import { InteractionEdge } from "./InteractionEdge";
+import { ActivityNode } from "./AcitivityNode";
+import { service } from "../service";
 
 
 
@@ -24,7 +28,7 @@ type ActivityGraphProps = {
     selectedAttributive: Atom<any>
 }
 // FIXME 目前没有递归处理 group
-export function ActivityGraph({ value, roleAttributiveOptions, entities, userAttributiveOptions, entityAttributives, selectedAttributive  }: ActivityGraphProps) {
+export function ActivityGraph({ value, roleAttributiveOptions, entities, userAttributiveOptions, entityAttributives, selectedAttributive }: ActivityGraphProps) {
     // TODO concat 如何仍然保持 incremental ?
     const nodes = computed(() => {
         const result = []
@@ -44,7 +48,7 @@ export function ActivityGraph({ value, roleAttributiveOptions, entities, userAtt
         selectedAttributive
     }
 
-    const combos = incMap(value.groups, group => ({ id: group.uuid, isGroup: true, raw: group}))
+    const combos = incMap(value.groups, group => ({ id: group.uuid, isGroup: true, raw: group }))
 
     const edges = incMap(value.transfers, transfer => ({
         id: crypto.randomUUID(),
@@ -54,6 +58,7 @@ export function ActivityGraph({ value, roleAttributiveOptions, entities, userAtt
 
 
     let sourceAnchorIdx, targetAnchorIdx;
+
     // TODO 外部配置
     const options: Omit<GraphOptions, 'container'> = {
         width: 800,
@@ -138,5 +143,5 @@ export function ActivityGraph({ value, roleAttributiveOptions, entities, userAtt
     })
 
 
-    return <Graph options={options} nodes={nodes} edges={edges} combos={combos} Combo={ActivityNode} Component={ActivityNode} nodeProps={nodeProps} isEditingNode={isEditingNode} Edge={InteractionEdge} canvasEventListeners={listeners}/>
+    return <Graph options={options} nodes={nodes} edges={edges} combos={combos} Combo={ActivityNode} Component={ActivityNode} nodeProps={nodeProps} isEditingNode={isEditingNode} Edge={InteractionEdge} canvasEventListeners={listeners} />
 }

@@ -16,12 +16,8 @@
     "esModuleInterop": true,
     "removeComments": false,
     "lib": ["esnext", "dom"],
-    "types": ["jest/globals", "node"],
+    "types": ["@jest/globals", "node"],
     "rootDir": ".",
-    "paths": {
-      "rata": ["../../../rata/src"],
-      "axii": ["../../../axii/src"]
-    },
     "jsx": "react",
     "jsxFactory": "createElement",
     "jsxFragmentFactory": "Fragment"

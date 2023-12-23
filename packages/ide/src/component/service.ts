@@ -1,4 +1,3 @@
-
 export const service = createService('http://localhost:3000/api')
 
 type ServiceType = {

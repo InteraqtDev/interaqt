@@ -1,10 +1,7 @@
-import {createClass, Klass} from "./createClass.js";
-import {Activity, Interaction} from "./activity/Activity.js";
-import {Entity, Property, Relation} from "./entity/Entity.js";
-import {State} from "./state/State.js";
-
-
-
+import { createClass, Klass } from "./createClass.js";
+import { Activity, Interaction } from "./activity/Activity.js";
+import { Entity, Property, Relation } from "./entity/Entity.js";
+import { State } from "./state/State.js";
 
 const FixedProperty = createClass({
     name: 'RelationFixedProperty',
@@ -12,7 +9,7 @@ const FixedProperty = createClass({
         name: {
             type: 'string',
             collection: false,
-            required:true
+            required: true
         },
         value: {
             type: [] as Klass<any>[], // 可以是任何
@@ -28,7 +25,7 @@ export const RelationStateNode = createClass({
         hasRelation: {
             type: 'boolean',
             required: true,
-            collection:false
+            collection: false
         },
         // 用来标记一个 独特的 state。
         fixedProperties: {
@@ -39,7 +36,7 @@ export const RelationStateNode = createClass({
         propertyHandle: {
             type: 'function',
             required: false,
-            collection:false
+            collection: false
         }
     }
 })
@@ -89,8 +86,8 @@ export const RelationStateMachine = createClass({
         },
         transfers: {
             type: RelationStateTransfer,
-            collection:true,
-            required:true
+            collection: true,
+            required: true
         },
         defaultState: {
             type: RelationStateNode,
@@ -365,7 +362,7 @@ export const MapActivityItem = createClass({
         triggerInteractions: {
             type: Interaction,
             collection: true,
-            required:false
+            required: false
         },
         map: {
             type: 'function',

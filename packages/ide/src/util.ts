@@ -1,5 +1,3 @@
-
-
 type PlainObject = {
   [k: string] : any
 }

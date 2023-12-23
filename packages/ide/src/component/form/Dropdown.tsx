@@ -1,10 +1,10 @@
-import {onUpKey, onDownKey} from "axii";
-import {Atom, computed, incMap} from "rata";
-import {Klass} from "../../../../shared/lib/createClass";
+import { onUpKey, onDownKey } from "axii";
+import { Atom, computed, incMap } from "data0";
+import { Klass } from "@interaqt/shared";
 
-export function Dropdown({ index, options}, { createElement, ref }) {
+export function Dropdown({ index, options }, { createElement, ref }) {
     const setNextIndex = () => {
-        if (index() < options.length -1) index(index()+1)
+        if (index() < options.length - 1) index(index() + 1)
     }
 
     const setPrevIndex = () => {
@@ -22,7 +22,7 @@ export function Dropdown({ index, options}, { createElement, ref }) {
                 return {
                     'bg-indigo-500': isCurrent,
                     'text-white': isCurrent,
-                    'cursor-pointer' : true,
+                    'cursor-pointer': true,
                     'hover:bg-indigo-100': !isCurrent
                 }
             }

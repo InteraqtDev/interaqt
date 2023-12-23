@@ -1,6 +1,6 @@
 import {createElement, propTypes} from "axii";
+import {atom, incMap, reactive} from "data0";
 import {ArrowIcon} from "../icons/Arrow";
-import {atom, incMap, reactive} from "rata";
 import {CheckIcon} from "../icons/Check";
 import {mapClassNameToObject} from "../../util";
 

@@ -1,13 +1,13 @@
-import { createElement} from "axii";
-import {atom, computed, incMap, reactive} from "rata";
-import {Code} from "../code/Code";
-import {editor} from "monaco-editor";
+import { createElement } from "axii";
+import { atom, computed, incMap, reactive } from "data0";
+import { editor } from "monaco-editor";
+import { RoleAttributive, EntityAttributive, Role } from "@interaqt/shared";
+import { Code } from "../code/Code";
+import { createFormForEntity } from "../createFormForEntityProperty";
+import { createDialog, createDialogFooter } from "../createDialog";
+import { Drawer } from "../util/Drawer";
+
 import IStandaloneEditorConstructionOptions = editor.IStandaloneEditorConstructionOptions;
-import {Entity} from "../../../../shared/lib/entity/Entity";
-import {createFormForEntity} from "../createFormForEntityProperty";
-import {createDialog, createDialogFooter} from "../createDialog";
-import {RoleAttributive, EntityAttributive, Role} from "../../../../shared/lib/activity/InteractionClass";
-import {Drawer} from "../util/Drawer";
 
 type Concept = {
     name: string,
@@ -23,15 +23,15 @@ type Attributive = {
 
 
 // 测试数据
-const User = Role.createReactive( {
+const User = Role.createReactive({
     name: 'User'
 })
 
-const Admin = Role.createReactive( {
+const Admin = Role.createReactive({
     name: 'Admin'
 })
 
-const Anonymous = Role.createReactive( {
+const Anonymous = Role.createReactive({
     name: 'Anonymous'
 })
 
@@ -45,7 +45,7 @@ const OldAttr = RoleAttributive.createReactive({
     stringContent: `function Old(){}`
 })
 
-export function ConceptOverview({ roles = reactive([User, Admin, Anonymous]), attributives = reactive([NewAttr, OldAttr])}) {
+export function ConceptOverview({ roles = reactive([User, Admin, Anonymous]), attributives = reactive([NewAttr, OldAttr]) }) {
     const selected = atom(null)
     const codeVisible = atom(false)
 
@@ -59,7 +59,7 @@ export function ConceptOverview({ roles = reactive([User, Admin, Anonymous]), at
     }
 
 
-    const { fieldValues: newRoleAttr, node: addEntityForm } = createFormForEntity(RoleAttributive, {fields: ['name']})
+    const { fieldValues: newRoleAttr, node: addEntityForm } = createFormForEntity(RoleAttributive, { fields: ['name'] })
     const onSubmitClick = () => {
         console.log(newRoleAttr)
         attributives.push(RoleAttributive.createReactive(newRoleAttr))
@@ -68,7 +68,7 @@ export function ConceptOverview({ roles = reactive([User, Admin, Anonymous]), at
 
     const [roleAttrCreateDialogVisible, attrCreateDialog] = createDialog(
         addEntityForm,
-        createDialogFooter([{ text: 'Submit', onClick: onSubmitClick}, { text: 'Cancel', onClick: () => roleAttrCreateDialogVisible(false)}])
+        createDialogFooter([{ text: 'Submit', onClick: onSubmitClick }, { text: 'Cancel', onClick: () => roleAttrCreateDialogVisible(false) }])
     )
 
 
@@ -81,7 +81,7 @@ export function ConceptOverview({ roles = reactive([User, Admin, Anonymous]), at
         <div>
             <h1 className="text-lg font-bold">Roles</h1>
             <button type="button"
-                    className="rounded bg-indigo-600 px-2 py-1 text-xs font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600">
+                className="rounded bg-indigo-600 px-2 py-1 text-xs font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600">
                 create
             </button>
             {incMap(roles, (role) => (
@@ -93,8 +93,8 @@ export function ConceptOverview({ roles = reactive([User, Admin, Anonymous]), at
         <div>
             <h1 className="text-lg font-bold">Role Attributives</h1>
             <button type="button"
-                    onClick={() => roleAttrCreateDialogVisible(true)}
-                    className="rounded bg-indigo-600 px-2 py-1 text-xs font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600">
+                onClick={() => roleAttrCreateDialogVisible(true)}
+                className="rounded bg-indigo-600 px-2 py-1 text-xs font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600">
                 create
             </button>
             {attrCreateDialog}
@@ -118,7 +118,7 @@ export function ConceptOverview({ roles = reactive([User, Admin, Anonymous]), at
 
 
         <Drawer title={title} visible={codeVisible}>
-            {() => selected() ?  <Code options={{value: selected().stringContent() || '', ...options}} />  : null}
+            {() => selected() ? <Code options={{ value: selected().stringContent() || '', ...options }} /> : null}
         </Drawer>
     </div>)
 }

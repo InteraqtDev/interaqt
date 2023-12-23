@@ -1,17 +1,17 @@
-import {expect} from '@jest/globals'
-import {createElement} from './src/DOM'
-import {Context} from "./src/Host";
+import { expect } from '@jest/globals'
+import { createElement } from './src/DOM'
+import { Context } from "./src/Host";
 
 // Global compile-time constants
 declare var __DEV__: boolean
 
 // for tests
 declare module 'expect' {
-    interface AsymmetricMatchers extends expect{
-        toShallowEqual(toMatch: string|number): void;
+    interface AsymmetricMatchers extends expect {
+        toShallowEqual(toMatch: string | number): void;
     }
     interface Matchers<R> {
-        toShallowEqual(toMatch: string|number): R;
+        toShallowEqual(toMatch: string | number): R;
     }
 }
 
@@ -31,10 +31,10 @@ type InjectHandles = {
     context: Context
 }
 
-export type Component = (props?: Props, injectHandles?: InjectHandles) => HTMLElement|Text|DocumentFragment|null|undefined|string|number|Function|JSX.Element
+export type Component = (props?: Props, injectHandles?: InjectHandles) => HTMLElement | Text | DocumentFragment | null | undefined | string | number | Function | JSX.Element
 export type ComponentNode = {
     type: Component,
-    props : Props,
+    props: Props,
     children: any
 }
 
@@ -46,7 +46,7 @@ declare global {
             // @ts-ignore suppress ts:2374 = Duplicate string index signature.
             [name: string]: any
         }
-        interface Element extends  ComponentNode {}
+        interface Element extends ComponentNode { }
     }
 }
 

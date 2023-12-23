@@ -1,4 +1,4 @@
-import {atom} from "rata";
+import {atom} from "data0";
 
 export function Checkbox({value, label, tooltip = atom('')}, {createElement}) {
     return (
