@@ -1,23 +1,31 @@
-import {expect, test, describe, afterEach, beforeAll, beforeEach} from "vitest";
-import { createCommonData} from "./data/common";
+import {afterEach, beforeEach, describe, expect, test} from "vitest";
+import {createCommonData} from "./data/common";
 import {DBSetup} from "../erstorage/Setup.js";
-import { SQLiteDB } from '../../runtime/SQLite'
+import {SQLiteDB} from '../../runtime/SQLite'
 import {EntityToTableMap} from "../erstorage/EntityToTableMap.js";
 import {MatchExp} from "../erstorage/MatchExp.js";
 import {EntityQueryHandle} from "../erstorage/EntityQueryHandle.js";
 import {MutationEvent} from "../erstorage/RecordQueryAgent.js";
 import {LINK_SYMBOL} from "../erstorage/RecordQuery.js";
+import TestLogger from "./testLogger.js";
 
 describe('many to many', () => {
     let db: SQLiteDB
     let setup
+    let logger
     let handle: EntityQueryHandle
 
     beforeEach(async () => {
         const { entities, relations } = createCommonData()
+        logger = new TestLogger('', true)
+
         // @ts-ignore
-        db = new SQLiteDB()
+        db = new SQLiteDB(':memory:', {logger})
         await db.open()
+
+
+
+
         setup = new DBSetup(entities, relations, db)
         await setup.createTables()
         handle = new EntityQueryHandle(new EntityToTableMap(setup.map), db)
@@ -72,6 +80,8 @@ describe('many to many', () => {
             ['name', 'age', ['teams', { attributeQuery: ['teamName']}]]
         )
 
+        // 查出来可能序不对
+        findUser.teams = findUser.teams.sort((a:any, b:any) => a.teamName > b.teamName ? 1 : -1)
         expect(findUser).toMatchObject(rawData)
 
         expect(events.length).toBe(5)
@@ -145,6 +155,7 @@ describe('many to many', () => {
             ['name', 'age', ['teams', { attributeQuery: ['teamName']}]]
         )
 
+        findUser.teams = findUser.teams.sort((a:any, b:any) => a.teamName > b.teamName ? 1 : -1)
         expect(findUser).toMatchObject({
             name: 'aaa',
             age: 17,
@@ -239,14 +250,12 @@ describe('many to many', () => {
                 type: "delete",
                 recordName: "User_teams_members_Team",
                 record: {
-                    role: null,
                     id: userA.teams[0][LINK_SYMBOL].id
                 }
             }, {
                 type: "delete",
                 recordName: "User_teams_members_Team",
                 record: {
-                    role: null,
                     id: userA.teams[1][LINK_SYMBOL].id
                 }
             }, {
@@ -316,6 +325,8 @@ describe('many to many', () => {
             MatchExp.atom({ key: 'id', value: ['=', userA.id]}), {},
             ['name', 'age', ['teams', { attributeQuery: ['teamName']}]]
         )
+
+        findUser.teams = findUser.teams.sort((a:any, b:any) => a.teamName > b.teamName ? 1 : -1)
 
         expect(findUser).toMatchObject({
             name: 'bbb',
@@ -414,6 +425,7 @@ describe('many to many', () => {
             ['name', 'age', ['teams', { attributeQuery: ['teamName']}]]
         )
 
+        findUser.teams = findUser.teams.sort((a:any, b:any) => a.teamName > b.teamName ? 1 : -1)
         expect(findUser).toMatchObject({
             name: 'bbb',
             age: 17,
@@ -444,14 +456,12 @@ describe('many to many', () => {
                 type: "delete",
                 recordName: "User_teams_members_Team",
                 record: {
-                    role: null,
                     id: userA.teams[0][LINK_SYMBOL].id
                 }
             }, {
                 type: "delete",
                 recordName: "User_teams_members_Team",
                 record: {
-                    role: null,
                     id: userA.teams[1][LINK_SYMBOL].id
                 }
             }, {

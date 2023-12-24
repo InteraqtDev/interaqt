@@ -3,20 +3,33 @@ import { createCommonData} from "./data/common";
 import {DBSetup} from "../erstorage/Setup.js";
 import { SQLiteDB } from '../../runtime/SQLite'
 import {EntityToTableMap} from "../erstorage/EntityToTableMap.js";
-import {MatchExp} from "../erstorage/MatchExp.js";
 import {EntityQueryHandle} from "../erstorage/EntityQueryHandle.js";
+import TestLogger from "./testLogger.js";
 
 
 describe('modifier test', () => {
     let db: SQLiteDB
     let setup
+    let logger
     let entityQueryHandle: EntityQueryHandle
 
     beforeEach(async () => {
         const { entities, relations } = createCommonData()
+        logger = new TestLogger('', true)
         // @ts-ignore
-        db = new SQLiteDB()
+        db = new SQLiteDB(':memory:', {logger})
         await db.open()
+
+        // logger.enable()
+        // db = new PostgreSQLDB('test', {
+        //     host:'127.0.0.1',
+        //     port: 5432,
+        //     user: 'postgres',
+        //     password: 'rootroot',
+        //     logger
+        // })
+        // await db.open(true)
+
         setup = new DBSetup(entities, relations, db)
         await setup.createTables()
         entityQueryHandle = new EntityQueryHandle(new EntityToTableMap(setup.map), db)

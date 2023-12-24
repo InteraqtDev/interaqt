@@ -22,6 +22,8 @@ describe('one to many', () => {
         // @ts-ignore
         db = new SQLiteDB(':memory:', {logger})
         await db.open()
+
+
         setup = new DBSetup(entities, relations, db)
         await setup.createTables()
         entityQueryHandle = new EntityQueryHandle(new EntityToTableMap(setup.map), db)
@@ -338,14 +340,18 @@ describe('one to many', () => {
 
         const findUsers2 = await entityQueryHandle.find('User',
             undefined,
-            {},
+            {
+                orderBy: {
+                    age: 'ASC'
+                }
+            },
             ['name', 'age', ['leader', {attributeQuery: ['name', 'age']}]]
         )
         expect(findUsers2.length).toBe(2)
         expect(findUsers2[0].name).toBe('m1')
-        expect(findUsers2[0].leader.id).toBe(null)
+        expect(findUsers2[0].leader).toBeUndefined()
         expect(findUsers2[1].name).toBe('m2')
-        expect(findUsers2[1].leader.id).toBe(null)
+        expect(findUsers2[1].leader).toBeUndefined()
 
         //1:n reliance 要被连带删除
         const findPowers = await entityQueryHandle.find('Power', undefined, undefined, ['powerName'])

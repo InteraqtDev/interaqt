@@ -14,10 +14,12 @@
     "jsx": "preserve",
     "allowSyntheticDefaultImports": true,
     "forceConsistentCasingInFileNames": true,
-    "allowJs": true
+    "allowJs": true,
+    "types": ["node"]
   },
   "include": [
     "./erstorage",
+    "./",
     "./test"
   ]
 }

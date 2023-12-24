@@ -101,7 +101,7 @@ export class RecordQueryAgent {
 
 
         return [`
-SELECT ${prefix ? '' : 'DISTINCT'}
+SELECT
 ${this.buildSelectClause(recordQuery.attributeQuery.getValueAndXToOneRecordFields(), prefix)}
 FROM
 ${this.buildFromClause(recordQuery.recordName, prefix)}
@@ -128,7 +128,7 @@ ${this.buildModifierClause(recordQuery.modifier, prefix)}
         }
 
         if (orderBy.length) {
-            clauses.push(`ORDER BY ${orderBy.map(({attribute, recordName, order}) => `\`${this.withPrefix(prefix)}${recordName}.${attribute}\` ${order}`).join(',')}`)
+            clauses.push(`ORDER BY ${orderBy.map(({attribute, recordName, order}) => `"${this.withPrefix(prefix)}${recordName}.${attribute}" ${order}`).join(',')}`)
         }
 
         return clauses.join('\n')
@@ -144,7 +144,9 @@ ${this.buildModifierClause(recordQuery.modifier, prefix)}
                 if (attributePath.length === 1 && JSONFields.includes(attributePath[0]) && typeof value === 'string') {
                     value = JSON.parse(value)
                 }
-                setByPath(obj, attributePath, value)
+                if (value !== null) {
+                    setByPath(obj, attributePath, value)
+                }
             })
             return obj
         })
@@ -479,19 +481,19 @@ ${this.buildModifierClause(recordQuery.modifier, prefix)}
         if (!queryFields.length) return '1'
         // CAUTION 所有 entity 都要 select id
         return queryFields.map(({tableAliasAndField, attribute, nameContext}) => (
-            `${this.withPrefix(prefix)}${tableAliasAndField[0]}.${tableAliasAndField[1]} AS \`${this.withPrefix(prefix)}${nameContext.join(".")}.${attribute}\``
+            `"${this.withPrefix(prefix)}${tableAliasAndField[0]}"."${tableAliasAndField[1]}" AS "${this.withPrefix(prefix)}${nameContext.join(".")}.${attribute}"`
         )).join(',\n')
     }
 
     buildFromClause(entityName: string, prefix = '') {
-        return `${this.map.getRecordTable(entityName)} AS \`${this.withPrefix(prefix)}${entityName}\``
+        return `"${this.map.getRecordTable(entityName)}" AS "${this.withPrefix(prefix)}${entityName}"`
     }
 
     buildJoinClause(joinTables: JoinTables, prefix = '') {
         return joinTables.map(({joinSource, joinIdField, joinTarget}) => {
-            return `LEFT JOIN ${joinTarget[0]} AS 
-\`${this.withPrefix(prefix)}${joinTarget[1]}\` ON 
-\`${this.withPrefix(prefix)}${joinSource[1]}\`.${joinIdField[0]} = \`${this.withPrefix(prefix)}${joinTarget[1]}\`.${joinIdField[1]}
+            return `LEFT JOIN "${joinTarget[0]}" AS 
+"${this.withPrefix(prefix)}${joinTarget[1]}" ON 
+"${this.withPrefix(prefix)}${joinSource[1]}"."${joinIdField[0]}" = "${this.withPrefix(prefix)}${joinTarget[1]}"."${joinIdField[1]}"
 `
         }).join('\n')
     }
@@ -506,7 +508,7 @@ ${this.buildModifierClause(recordQuery.modifier, prefix)}
                 sql = fieldMatchExp.data.fieldValue!
                 values.push(...fieldMatchExp.data.fieldParams!)
             } else {
-                sql = `${this.withPrefix(prefix)}${fieldMatchExp.data.fieldName![0]}.${fieldMatchExp.data.fieldName![1]} ${fieldMatchExp.data.fieldValue}`
+                sql = `"${this.withPrefix(prefix)}${fieldMatchExp.data.fieldName![0]}"."${fieldMatchExp.data.fieldName![1]}" ${fieldMatchExp.data.fieldValue}`
                 values.push(...fieldMatchExp.data.fieldParams!)
             }
         } else {
@@ -811,8 +813,8 @@ ${innerQuerySQL}
         const sameRowNewFieldAndValue = newEntityDataWithIdsWithFlashOutRecords.getSameRowFieldAndValue()
         const p = this.getPlaceholder()
         const result = await this.database.insert(`
-INSERT INTO ${this.map.getRecordTable(newEntityData.recordName)}
-(${sameRowNewFieldAndValue.map(f => f.field).join(',')})
+INSERT INTO "${this.map.getRecordTable(newEntityData.recordName)}"
+(${sameRowNewFieldAndValue.map(f => `"${f.field}"`).join(',')})
 VALUES
 (${sameRowNewFieldAndValue.map(f => p()).join(',')}) 
 `, sameRowNewFieldAndValue.map(f => this.prepareFieldValue(f.value)), queryName) as EntityIdRef
@@ -960,12 +962,12 @@ VALUES
         // CAUTION update 语句可以有 别名和 join，但似乎 SET 里面不能用主表的 别名!!!
         if (columnAndValue.length) {
             await this.database.update(`
-UPDATE ${this.map.getRecordTable(entityName)}
+UPDATE "${this.map.getRecordTable(entityName)}"
 SET
 ${columnAndValue.map(({field, value}) => `
-${field} = ${p()}
+"${field}" = ${p()}
 `).join(',')}
-WHERE ${idField} = (${p()})
+WHERE "${idField}" = (${p()})
 `, [...columnAndValue.map(({field, value}) => value), idRef.id], idField)
         }
         // 注意这里，使用要返回匹配的类，虽然可能没有更新数据。这样才能保证外部的逻辑比较一致。
@@ -1161,17 +1163,17 @@ WHERE ${idField} = (${p()})
                     const p = this.getPlaceholder()
                     const fields = recordInfo.sameRowFields
                     await this.database.update(`
-UPDATE ${recordInfo.table}
-SET ${fields.map(field => `${field} = ${p()}`).join(',')}
-WHERE ${recordInfo.idField} IN (${records.map(({id}) => p()).join(',')})
+UPDATE "${recordInfo.table}"
+SET ${fields.map(field => `"${field}" = ${p()}`).join(',')}
+WHERE "${recordInfo.idField}" IN (${records.map(({id}) => p()).join(',')})
 `, [...fields.map(field => null), ...records.map(({id}) => id)], recordInfo.idField, `use update to delete ${recordName} because of sameRowData`)
 
                 } else {
                     // 不存在同行数据 record ，可以 delete row
                     const p = this.getPlaceholder()
                     await this.database.delete(`
-DELETE FROM ${recordInfo.table}
-WHERE ${recordInfo.idField} IN (${records.map(({id}) => p()).join(',')})
+DELETE FROM "${recordInfo.table}"
+WHERE "${recordInfo.idField}" IN (${records.map(({id}) => p()).join(',')})
 `, [...records.map(({id}) => id)], `delete record ${recordInfo.name} as row`)
                 }
             }

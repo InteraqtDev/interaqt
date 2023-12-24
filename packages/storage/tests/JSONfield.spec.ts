@@ -1,17 +1,18 @@
-import {expect, test, describe, afterEach, beforeAll, beforeEach} from "vitest";
-import { createCommonData} from "./data/common";
+import {afterEach, beforeEach, describe, expect, test} from "vitest";
 import {DBSetup} from "../erstorage/Setup.js";
-import { SQLiteDB } from '../../runtime/SQLite'
+// @ts-ignore
+import {SQLiteDB} from '../../runtime/SQLite.js'
 import {EntityToTableMap} from "../erstorage/EntityToTableMap.js";
 import {MatchExp} from "../erstorage/MatchExp.js";
 import {EntityQueryHandle} from "../erstorage/EntityQueryHandle.js";
-import {MutationEvent} from "../erstorage/RecordQueryAgent.js";
 import {Entity, Property} from "@interaqt/shared";
+import TestLogger from "./testLogger.js";
 
 describe('json field test', () => {
     let db: SQLiteDB
     let setup
     let handle: EntityQueryHandle
+    let logger
 
     beforeEach(async () => {
         const userEntity = Entity.create({
@@ -28,8 +29,9 @@ describe('json field test', () => {
                 })
             ]
         })
+        logger = new TestLogger('', true)
         // @ts-ignore
-        db = new SQLiteDB()
+        db = new SQLiteDB(':memory:', {logger})
         await db.open()
         setup = new DBSetup([userEntity], [], db)
         await setup.createTables()

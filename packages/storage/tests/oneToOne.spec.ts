@@ -210,10 +210,8 @@ describe('one to one', () => {
 
         expect(findProfile).toMatchObject({
             title: 'f1',
-            owner: {
-                id: null
-            }
         })
+        expect(findProfile.owner).toBeUndefined()
 
         const findItems = await entityQueryHandle.find('Item',
             undefined, {},
@@ -301,12 +299,9 @@ describe('one to one', () => {
         expect(findProfiles2.length).toBe(1)
         expect(findProfiles2[0]).toMatchObject({
             title: 'f1',
-            id: userA.profile.id,
-            owner: {
-                id: null,
-                name: null,
-            }
+            id: userA.profile.id
         })
+        expect(findProfiles2[0].owner).toBeUndefined()
 
         const profiles = await entityQueryHandle.find('Profile',
             undefined,
@@ -320,7 +315,6 @@ describe('one to one', () => {
                 "type": "delete",
                 "recordName": "Profile_owner_profile_User",
                 "record": {
-                    "viewed": null,
                     "id": 1,
                 }
             },
@@ -411,11 +405,9 @@ describe('one to one', () => {
         expect(findProfiles2.length).toBe(1)
         expect(findProfiles2[0]).toMatchObject({
             title: 'f1',
-            owner: {
-                id: null,
-                name: null,
-            }
         })
+        expect(findProfiles2[0].owner).toBeUndefined()
+
 
         expect(events).toMatchObject([
             {

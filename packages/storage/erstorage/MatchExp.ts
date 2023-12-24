@@ -115,7 +115,7 @@ export class MatchExp {
             fieldValue = `${value[0]} ${p()}`
             fieldParams = [isReferenceValue ? this.getReferenceFieldValue(value[1]) : value[1]]
         } else if((value[0] === 'not' && value[1] === null)) {
-            fieldValue = `not null`
+            fieldValue = `IS NOT NULL`
         } else if (value[0].toLowerCase() === 'in') {
             assert(!isReferenceValue, 'reference value cannot use IN to match')
             fieldValue = `IN (${value[1].map((x: any) => p()).join(',')})`
@@ -185,6 +185,9 @@ export class MatchExp {
                     }
                 }
 
+                // 这里一定要再生成一次，应为需要不同的 placeholder。
+                const [fieldValue2, fieldParams2] = this.getFinalFieldValue(exp.data.isReferenceValue!, exp.data.key,  exp.data.value, fieldNamePath.join('.'), attributeInfo.fieldType, p, db)
+
                 // CAUTION 注意这里 length -2 是因为  namePath 里面有 this.entityName
                 return BoolExp.atom<FieldMatchAtom>({
                     ...exp.data,
@@ -194,8 +197,8 @@ export class MatchExp {
                 }).or({
                     ...exp.data,
                     fieldName: this.getFinalFieldName(targetPath!),
-                    fieldValue,
-                    fieldParams
+                    fieldValue: fieldValue2,
+                    fieldParams: fieldParams2
                 })
 
             } else {

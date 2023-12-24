@@ -1,5 +1,5 @@
-import {expect, test, describe} from "vitest";
-import {EntityToTableMap, MapData} from "../erstorage/EntityToTableMap.js";
+import {describe, expect, test} from "vitest";
+import {EntityToTableMap} from "../erstorage/EntityToTableMap.js";
 import {entityToTableMapData} from './data/mapData'
 import {AttributeQuery, AttributeQueryData} from "../erstorage/AttributeQuery.js";
 import {RecordQueryTree} from "../erstorage/RecordQuery.js";

@@ -1,5 +1,5 @@
 import {expect, test, describe} from "vitest";
-import fs from 'fs'
+import {existsSync, unlinkSync} from 'fs'
 
 import {DBSetup} from "../erstorage/Setup.js";
 import {RecordQueryAgent} from "../erstorage/RecordQueryAgent.js";
@@ -14,12 +14,14 @@ const { entities, relations } = createCommonData()
 
 
 describe("db setup", () => {
-    test('validate 1:1 relation map', () => {
+    test('validate 1:1 relation map', async () => {
+        const db = new SQLiteDB()
+        await db.open()
         // Profile & User
         const clues = [
             'Profile.owner',
         ]
-        const setup = new DBSetup(entities, relations, undefined, clues);
+        const setup = new DBSetup(entities, relations, db, clues);
         // console.log(JSON.stringify(setup.map, null, 4))
         // 应该是 三表 合一
         expect(setup.map.records.User).toBeDefined()
@@ -137,12 +139,14 @@ describe("db setup", () => {
 
     })
 
-    test('validate n:1 relation map', () => {
+    test('validate n:1 relation map', async () => {
         const clues = [
             'Profile.owner',
         ]
+        const db = new SQLiteDB()
+        await db.open()
         // File & User
-        const setup = new DBSetup(entities, relations, undefined, clues);
+        const setup = new DBSetup(entities, relations, db, clues);
         expect(setup.map.records.User).toBeDefined()
         expect(setup.map.records.File).toBeDefined()
         expect(setup.map.records.User.table).not.toBe(setup.map.records.File.table)
@@ -201,9 +205,11 @@ describe("db setup", () => {
     })
 
 
-    test('validate n:n relation map', () => {
+    test('validate n:n relation map', async () => {
         // User & User friends 关系
-        const setup = new DBSetup(entities, relations);
+        const db = new SQLiteDB()
+        await db.open()
+        const setup = new DBSetup(entities, relations, db);
         expect(setup.map.records.User).toBeDefined()
         expect(setup.map.records.User.attributes.friends).toMatchObject({
             isRecord: true,
@@ -254,8 +260,8 @@ describe("db setup", () => {
 
     test('create table', async () => {
         const file = "test-create.sqlite"
-        if (fs.existsSync(file)) {
-            fs.unlinkSync(file)
+        if (existsSync(file)) {
+            unlinkSync(file)
         }
 
         // @ts-ignore
@@ -263,8 +269,6 @@ describe("db setup", () => {
         await db.open()
         const setup = new DBSetup(entities, relations, db )
         await setup.createTables()
-        // console.log(1111111111, setup.map)
-        // console.log(222222222, setup.tables)
         // TODO 查询表结构
     })
 

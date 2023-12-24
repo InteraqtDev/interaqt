@@ -25,7 +25,8 @@ export type Database = {
     update: (sql: string, values: any[], idField?: string, name?:string) => Promise<EntityIdRef[]>
     getAutoId: (recordName: string) => Promise<string>
     parseMatchExpression?: (key: string, value: [string, any], fieldName: string, fieldType: string, isReferenceValue: boolean, getReferenceFieldValue:(v: string) => string, genPlaceholder: (name?: string) => string) => any
-    getPlaceholder?: () => (name?:string) => string
+    getPlaceholder?: () => (name?:string) => string,
+    mapToDBFieldType: (type: string, collection?: boolean) => string
 }
 
 export class EntityQueryHandle {

@@ -1,7 +1,7 @@
-import {expect, test, describe, afterEach, beforeEach} from "vitest";
-import { createCommonData} from "./data/common";
+import {afterEach, beforeEach, describe, expect, test} from "vitest";
+import {createCommonData} from "./data/common";
 import {DBSetup} from "../erstorage/Setup.js";
-import { SQLiteDB } from '../../runtime/SQLite'
+import {SQLiteDB} from '../../runtime/SQLite'
 import {EntityToTableMap} from "../erstorage/EntityToTableMap.js";
 import {removeAllInstance} from '@interaqt/shared'
 import {MatchExp} from "../erstorage/MatchExp.js";

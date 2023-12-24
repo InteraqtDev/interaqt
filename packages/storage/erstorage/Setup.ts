@@ -22,6 +22,26 @@ export type TableData = {
 
 export type MergeLinks = string[]
 
+function defaultGetDBFieldType(type: string, collection?: boolean) {
+    if (type === 'pk') {
+        // TODO 不同的引擎不同，这里是 sqlite 的写法
+        return 'INTEGER PRIMARY KEY'
+    } else if (type === 'id') {
+        return 'INT'
+    } else if (collection || type === 'object') {
+        return 'JSON'
+    } else if (type === 'string') {
+        return 'TEXT'
+    } else if (type === 'boolean') {
+        return 'INT(2)'
+    } else if(type === 'number'){
+        return "INT"
+    }else{
+        return type
+    }
+}
+
+
 export class DBSetup {
     public recordToTableMap = new Map<string,string>()
     public tableToRecordsMap = new Map<string, Set<string>>()
@@ -345,39 +365,6 @@ export class DBSetup {
             }
         })
 
-        // Object.entries(this.map.links).forEach(([relationName, relationData]) => {
-        //     const {relType, sourceRecord, targetRecord, isSourceRelation} = relationData
-        //     // n:n 不合表，先排除
-        //     if (relType.includes('1')) {
-        //         // FIXME  - 如果 A 和 B 有两个关系的都是 1:1，只能按照其中一个关系三表合一，不然逻辑上有问题。
-        //         if (relType[0] === '1' && relType[1] === '1') {
-        //             // 1:1 关系。并且 entity 不同样。真正的三表合一 。往 source 方向合表
-        //             if (sourceRecord !== targetRecord) {
-        //                 this.joinTables(sourceRecord, targetRecord)
-        //                 this.relationToJoinEntity.set(relationName, sourceRecord)
-        //                 relationData.mergedTo = 'combined'
-        //                 // 这种情况是共用 id 了，而且 mergeTo 其实不区分谁是 source 谁是 target 了。
-        //             } else {
-        //                 assert(!isSourceRelation, 'virtual relation cannot reach here')
-        //                 // 1:1 关系，entity 相同，无法合表。仍然是 relation 往 source 方向
-        //                 this.relationToJoinEntity.set(relationName, sourceRecord )
-        //                 relationData.mergedTo = 'source'
-        //             }
-        //
-        //         } else if (relType[0] === 'n') {
-        //             // n:1，合并关系表到 source
-        //             this.relationToJoinEntity.set(relationName, sourceRecord )
-        //             relationData.mergedTo = 'source'
-        //         } else {
-        //             // 1:n 合并关系表到 target
-        //             assert(!isSourceRelation, `virtual relation can not merge to target, relType: [${relType[0]} : ${relType[1]}]`)
-        //             this.relationToJoinEntity.set(relationName, targetRecord)
-        //             relationData.mergedTo = 'target'
-        //         }
-        //     } else {
-        //         assert(!isSourceRelation, 'virtual relation can not be n:n')
-        //     }
-        // })
 
         // TODO  独立字段的处理
     }
@@ -395,12 +382,13 @@ export class DBSetup {
                 if ((attributeData as RecordAttribute).isRecord) return
                 const valueAttributeData = attributeData as ValueAttribute
                 valueAttributeData.field = `${recordName}_${attributeName}`
-                valueAttributeData.fieldType = this.getDBFieldType(valueAttributeData.type, valueAttributeData.collection)
+                valueAttributeData.fieldType = this.database!.mapToDBFieldType(valueAttributeData.type, valueAttributeData.collection)
             })
         })
 
-        // 2.1 给所有 links 分配 table
+        // 2.1 给所有 relation record 的 table 信息同步到 map.link 上
         Object.entries(this.map.links).forEach(([linkName, link]) => {
+            if (link.isSourceRelation) return
             link.table = this.recordToTableMap.get(linkName)!
         })
 
@@ -409,14 +397,23 @@ export class DBSetup {
         Object.entries(this.map.records).forEach(([recordName, record]) => {
             if( !record.isRelation) return
             const link = this.map.links[recordName]
+            const sourceAttribute = record.attributes.source as ValueAttribute
+            const targetAttribute = record.attributes.target as ValueAttribute
             if (!link.mergedTo ) {
-                record.attributes.source.field = `${recordName}_source`
-                record.attributes.target.field = `${recordName}_target`
+                sourceAttribute.field = `${recordName}_source`
+                sourceAttribute.fieldType = this.database!.mapToDBFieldType(sourceAttribute.type, false)
+
+                targetAttribute.field = `${recordName}_target`
+                targetAttribute.fieldType = this.database!.mapToDBFieldType(targetAttribute.type, false)
             } else if (link.mergedTo === 'source') {
                 // field 名字以 sourceRecord 里面的称呼为主
-                record.attributes.target.field = `${link.sourceRecord}_${link.sourceProperty}`
+                targetAttribute.field = `${link.sourceRecord}_${link.sourceProperty}`
+                targetAttribute.fieldType = this.database!.mapToDBFieldType(targetAttribute.type, false)
+
             } else if (link.mergedTo === 'target') {
-                record.attributes.source.field = `${link.targetRecord}_${link.targetProperty}`
+                sourceAttribute.field = `${link.targetRecord}_${link.targetProperty}`
+                sourceAttribute.fieldType = this.database!.mapToDBFieldType(sourceAttribute.type, false)
+
             } else {
                 // combined 情况
                 // const sourceRecord = this.map.records[link.sourceRecord]
@@ -433,7 +430,8 @@ export class DBSetup {
                 this.tables[record.table] = { columns: {
                     [ROW_ID_ATTR]: {
                         name: ROW_ID_ATTR,
-                        type: 'pk'
+                        type: 'pk',
+                        fieldType: this.database!.mapToDBFieldType('pk'),
                     }
                 }}
             }
@@ -441,6 +439,9 @@ export class DBSetup {
             // 有分配 field 的都说明在这张表内
             Object.entries(record.attributes).forEach(([attributeName, attribute]) => {
                 if (!attribute.field || this.tables[record.table].columns[attribute.field]) return
+                if(!(attribute as ValueAttribute).fieldType) {
+                    throw new Error(`fieldType not found for ${(attribute as ValueAttribute).field} ${(attribute as ValueAttribute).type}`)
+                }
                 this.tables[record.table].columns[attribute.field] = {
                     name: (attribute as ValueAttribute).field,
                     type: (attribute as ValueAttribute).type,
@@ -449,30 +450,13 @@ export class DBSetup {
             })
         })
     }
-    getDBFieldType(type: string, collection?: boolean) {
-        // FIXME 由外部来决定
 
-        if (type === 'pk') {
-            // TODO 不同的引擎不同，这里是 sqlite 的写法
-            return 'INTEGER PRIMARY KEY'
-        } else if (type === 'id') {
-            return 'INT'
-        } else if (collection || type === 'object') {
-            return 'JSON'
-        } else if (type === 'string') {
-            return 'TEXT'
-        } else if (type === 'boolean') {
-            return 'INT(2)'
-        } else {
-            return type
-        }
-    }
     createTableSQL() {
         return Object.keys(this.tables).map(tableName => (
             `
-CREATE TABLE ${tableName} (
+CREATE TABLE "${tableName}" (
 ${Object.values(this.tables[tableName].columns).map(column => (`
-    ${column.name} ${column.fieldType}`)).join(',')}
+    "${column.name}" ${column.fieldType}`)).join(',')}
 )
 `
         ))

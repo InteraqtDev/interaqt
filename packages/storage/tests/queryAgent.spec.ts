@@ -1,13 +1,11 @@
-import {expect, test, describe} from "vitest";
-import {
-    RecordQueryAgent
-} from "../erstorage/RecordQueryAgent.js";
-import { SQLiteDB } from '../../runtime/SQLite'
-import {EntityToTableMap, MapData} from "../erstorage/EntityToTableMap.js";
+import {describe, expect, test} from "vitest";
+import {RecordQueryAgent} from "../erstorage/RecordQueryAgent.js";
+import {SQLiteDB} from '../../runtime/SQLite'
+import {EntityToTableMap} from "../erstorage/EntityToTableMap.js";
 import {entityToTableMapData} from "./data/mapData";
 import {MatchExp, MatchExpressionData} from "../erstorage/MatchExp.js";
 import {AttributeQuery, AttributeQueryData} from "../erstorage/AttributeQuery.js";
-import {RecordQueryData, RecordQuery} from "../erstorage/RecordQuery.js";
+import {RecordQuery, RecordQueryData} from "../erstorage/RecordQuery.js";
 
 
 const database = new SQLiteDB()
@@ -96,7 +94,7 @@ describe('query agent test', () => {
         const matchExp = new MatchExp('User', entityToTableMap, matchExpData)
         const queryAgent = new RecordQueryAgent(entityToTableMap, database)
         const fieldMatchExp = matchExp.buildFieldMatchExpression(() => '?')
-        const fieldMatchExpWithValue = queryAgent.parseMatchExpressionValue('User', fieldMatchExp!)
+        const fieldMatchExpWithValue = queryAgent.parseMatchExpressionValue('User', fieldMatchExp!, undefined, () => '?')
 
         const joinExp = queryAgent.getJoinTables(matchExp.xToOneQueryTree, ['User'])
         expect(joinExp).toMatchObject([
@@ -138,13 +136,13 @@ describe('query agent test', () => {
 
 
         // 因为 friend 是 对称关系，所以要分裂成了两个
-        expect(fieldMatchExpWithValue!.right.isOr()).toBe(true)
+        expect(fieldMatchExpWithValue!.right!.isOr()).toBe(true)
 
-        expect(fieldMatchExpWithValue!.right.left.data).toMatchObject({
+        expect(fieldMatchExpWithValue!.right!.left!.data).toMatchObject({
             isFunctionMatch: true,
             namePath: ['User', 'friends:source']
         })
-        expect(fieldMatchExpWithValue!.right.right.data).toMatchObject({
+        expect(fieldMatchExpWithValue!.right!.right!.data).toMatchObject({
             isFunctionMatch: true,
             namePath: ['User', 'friends:target']
         })
@@ -163,25 +161,25 @@ describe('query agent test', () => {
             })
         } as RecordQueryData)
 
-        console.log(fieldMatchExpWithValue!.right.left.data.fieldValue)
+        console.log(fieldMatchExpWithValue!.right!.left.data.fieldValue)
 
         const [leftQuery, leftParams] = queryAgent.buildXToOneFindQuery(innerEntityQuery, 'User_friends_SOURCE')
-        expect(fieldMatchExpWithValue!.right.left.data.fieldValue).toBe(`
+        expect(fieldMatchExpWithValue!.right!.left.data.fieldValue).toBe(`
 EXISTS (
 ${leftQuery}
 )
 `)
-        expect(fieldMatchExpWithValue!.right.left.data.fieldParams).toMatchObject(leftParams)
+        expect(fieldMatchExpWithValue!.right!.left.data.fieldParams).toMatchObject(leftParams)
 
         const [rightQuery, rightParams] = queryAgent.buildXToOneFindQuery(innerEntityQuery, 'User_friends_TARGET')
 
-        expect(fieldMatchExpWithValue!.right.right.data.fieldValue).toBe(`
+        expect(fieldMatchExpWithValue!.right!.right!.data.fieldValue).toBe(`
 EXISTS (
 ${rightQuery}
 )
 `)
 
-        expect(fieldMatchExpWithValue!.right.right.data.fieldParams).toMatchObject(rightParams)
+        expect(fieldMatchExpWithValue!.right!.right!.data.fieldParams).toMatchObject(rightParams)
     })
 
 
