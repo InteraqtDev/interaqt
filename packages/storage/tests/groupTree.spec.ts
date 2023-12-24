@@ -5,8 +5,7 @@ import {SQLiteDB} from '../../runtime/SQLite'
 import {EntityToTableMap} from "../erstorage/EntityToTableMap.js";
 import {MatchExp} from "../erstorage/MatchExp.js";
 import {EntityQueryHandle} from "../erstorage/EntityQueryHandle.js";
-import {MutationEvent, RecursiveContext} from "../erstorage/RecordQueryAgent.js";
-import {LINK_SYMBOL} from "../erstorage/RecordQuery.js";
+import {RecursiveContext} from "../erstorage/RecordQueryAgent.js";
 
 describe('group tree', () => {
     let db: SQLiteDB

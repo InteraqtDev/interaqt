@@ -7,17 +7,20 @@ import {MatchExp} from "../erstorage/MatchExp.js";
 import {EntityQueryHandle} from "../erstorage/EntityQueryHandle.js";
 import {MutationEvent} from "../erstorage/RecordQueryAgent.js";
 import {LINK_SYMBOL} from "../erstorage/RecordQuery.js";
+import TestLogger from "./testLogger.js";
 
 
 describe('one to one', () => {
     let db: SQLiteDB
     let setup
+    let logger
     let entityQueryHandle: EntityQueryHandle
 
     beforeEach(async () => {
         const { entities, relations } = createCommonData()
+        logger = new TestLogger('', true)
         // @ts-ignore
-        db = new SQLiteDB()
+        db = new SQLiteDB(':memory:', {logger: logger} )
         await db.open()
         setup = new DBSetup(entities, relations, db, ['Profile.owner'])
         await setup.createTables()
@@ -79,7 +82,7 @@ describe('one to one', () => {
                 title: 'f1'
             }
         })
-        console.log(events)
+
         expect(events).toMatchObject([{
             type: "create",
             recordName: "User",
@@ -111,7 +114,6 @@ describe('one to one', () => {
         const profileA = await entityQueryHandle.create('Profile', {title:'f1'})
         const events: MutationEvent[] = []
         const userA = await entityQueryHandle.create('User', {name:'a1', age:12, profile: profileA}, events)
-
         const findUser = await entityQueryHandle.findOne('User',
             MatchExp.atom({ key: 'id', value: ['=', userA.id]}),
             {},

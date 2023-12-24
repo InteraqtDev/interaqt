@@ -7,16 +7,20 @@ import {MatchExp} from "../erstorage/MatchExp.js";
 import {EntityQueryHandle} from "../erstorage/EntityQueryHandle.js";
 import {MutationEvent} from "../erstorage/RecordQueryAgent.js";
 import {LINK_SYMBOL} from "../erstorage/RecordQuery.js";
+import TestLogger from "./testLogger.js";
 
 describe('one to many', () => {
     let db: SQLiteDB
     let setup: DBSetup
+    let logger
     let entityQueryHandle: EntityQueryHandle
 
     beforeEach(async () => {
         const { entities, relations } = createCommonData()
+        logger = new TestLogger('', true)
+
         // @ts-ignore
-        db = new SQLiteDB()
+        db = new SQLiteDB(':memory:', {logger})
         await db.open()
         setup = new DBSetup(entities, relations, db)
         await setup.createTables()
