@@ -76,12 +76,16 @@ class RecordQueryRef {
 
 }
 
+export type PlaceholderGen = (name?: string) => string
+
 export class RecordQueryAgent {
+    getPlaceholder: () => PlaceholderGen
     constructor(public map: EntityToTableMap, public database: Database) {
+        this.getPlaceholder = database.getPlaceholder || (() => (name?:string) => `?`)
     }
 
     // 有 prefix 说明是比人的子查询
-    buildXToOneFindQuery(recordQuery: RecordQuery, prefix = ''): [string, any[]] {
+    buildXToOneFindQuery(recordQuery: RecordQuery, prefix = '', parentP?:PlaceholderGen): [string, any[]] {
         // 从所有条件里面构建出 join clause
         const fieldQueryTree = recordQuery.attributeQuery!.xToOneQueryTree
 
@@ -89,10 +93,11 @@ export class RecordQueryAgent {
         const finalQueryTree = fieldQueryTree.merge(matchQueryTree)
         const joinTables = this.getJoinTables(finalQueryTree, [recordQuery.recordName])
 
-        const fieldMatchExp = recordQuery.matchExpression.buildFieldMatchExpression(this.database)
+        const p = parentP||this.getPlaceholder()
 
-        const [whereClause, params] = this.buildWhereClause(this.parseMatchExpressionValue(recordQuery.recordName, fieldMatchExp, recordQuery.contextRootEntity),
-            prefix)
+        const fieldMatchExp = recordQuery.matchExpression.buildFieldMatchExpression(p, this.database)
+
+        const [whereClause, params] = this.buildWhereClause(this.parseMatchExpressionValue(recordQuery.recordName, fieldMatchExp, recordQuery.contextRootEntity, p), prefix, p)
 
 
         return [`
@@ -459,9 +464,6 @@ ${this.buildModifierClause(recordQuery.modifier, prefix)}
 
                 result.push(...this.getJoinTables(subQueryTree.parentLinkQueryTree, linkNamePath, linkParentInfo))
 
-                // subQueryTree.parentLinkQueryTree.forEachRecords(linkSubQueryTree => {
-                //     console.log(7777777, linkSubQueryTree.recordName, linkSubQueryTree.getData(),  linkNamePath, linkParentInfo)
-                // })
             }
         })
 
@@ -494,10 +496,10 @@ ${this.buildModifierClause(recordQuery.modifier, prefix)}
         }).join('\n')
     }
 
-    buildWhereClause(fieldMatchExp: BoolExp<FieldMatchAtom> | null, prefix = ''): [string, any[]] {
+    buildWhereClause(fieldMatchExp: BoolExp<FieldMatchAtom> | null, prefix = '', p: PlaceholderGen): [string, any[]] {
         let sql = ``
         const values = []
-        if (!fieldMatchExp) return ['1=?', [1]]
+        if (!fieldMatchExp) return [`1=${p()}`, [1]]
 
         if (fieldMatchExp.isAtom()) {
             if (fieldMatchExp.data.isInnerQuery) {
@@ -509,17 +511,17 @@ ${this.buildModifierClause(recordQuery.modifier, prefix)}
             }
         } else {
             if (fieldMatchExp.isAnd()) {
-                const [leftSql, leftValues] = this.buildWhereClause(fieldMatchExp.left, prefix)
-                const [rightSql, rightValues] = this.buildWhereClause(fieldMatchExp.right!, prefix)
+                const [leftSql, leftValues] = this.buildWhereClause(fieldMatchExp.left, prefix, p)
+                const [rightSql, rightValues] = this.buildWhereClause(fieldMatchExp.right!, prefix, p)
                 sql = `(${leftSql} AND ${rightSql})`
                 values.push(...leftValues, ...rightValues)
             } else if (fieldMatchExp.isOr()) {
-                const [leftSql, leftValues] = this.buildWhereClause(fieldMatchExp.left, prefix)
-                const [rightSql, rightValues] = this.buildWhereClause(fieldMatchExp.right!, prefix)
+                const [leftSql, leftValues] = this.buildWhereClause(fieldMatchExp.left, prefix, p)
+                const [rightSql, rightValues] = this.buildWhereClause(fieldMatchExp.right!, prefix, p)
                 sql = `(${leftSql} OR ${rightSql})`
                 values.push(...leftValues, ...rightValues)
             } else {
-                const [leftSql, leftValues] = this.buildWhereClause(fieldMatchExp.left, prefix)
+                const [leftSql, leftValues] = this.buildWhereClause(fieldMatchExp.left, prefix, p)
                 sql = `NOT (${leftSql})`
                 values.push(...leftValues)
             }
@@ -528,7 +530,7 @@ ${this.buildModifierClause(recordQuery.modifier, prefix)}
     }
 
     // 把 match 中的 exist 创建成子 sql
-    parseMatchExpressionValue(entityName: string, fieldMatchExp: BoolExp<FieldMatchAtom> | null, contextRootEntity?: string): BoolExp<FieldMatchAtom> | null {
+    parseMatchExpressionValue(entityName: string, fieldMatchExp: BoolExp<FieldMatchAtom> | null, contextRootEntity: string|undefined, p: PlaceholderGen): BoolExp<FieldMatchAtom> | null {
         if (!fieldMatchExp) return null
 
         return fieldMatchExp.map((exp: BoolExp<FieldMatchAtom>, context: string[]) => {
@@ -557,7 +559,7 @@ ${this.buildModifierClause(recordQuery.modifier, prefix)}
                 contextRootEntity || entityName
             )
 
-            const [innerQuerySQL, innerParams] = this.buildXToOneFindQuery(existEntityQuery, currentAlias)
+            const [innerQuerySQL, innerParams] = this.buildXToOneFindQuery(existEntityQuery, currentAlias, p)
 
             return {
                 ...exp.data,
@@ -807,11 +809,12 @@ ${innerQuerySQL}
         const newEntityDataWithIdsWithFlashOutRecords = await this.preprocessSameRowData(newEntityData, false, events)
         // 3. 插入新行。
         const sameRowNewFieldAndValue = newEntityDataWithIdsWithFlashOutRecords.getSameRowFieldAndValue()
+        const p = this.getPlaceholder()
         const result = await this.database.insert(`
 INSERT INTO ${this.map.getRecordTable(newEntityData.recordName)}
 (${sameRowNewFieldAndValue.map(f => f.field).join(',')})
 VALUES
-(${sameRowNewFieldAndValue.map(f => '?').join(',')}) 
+(${sameRowNewFieldAndValue.map(f => p()).join(',')}) 
 `, sameRowNewFieldAndValue.map(f => this.prepareFieldValue(f.value)), queryName) as EntityIdRef
 
         return Object.assign(result, newEntityDataWithIdsWithFlashOutRecords.getData())
@@ -953,16 +956,16 @@ VALUES
         // TODO 要更新拆表出去的 field
 
         const idField = this.map.getInfo(entityName, 'id').field
-
+        const p = this.getPlaceholder()
         // CAUTION update 语句可以有 别名和 join，但似乎 SET 里面不能用主表的 别名!!!
         if (columnAndValue.length) {
             await this.database.update(`
 UPDATE ${this.map.getRecordTable(entityName)}
 SET
 ${columnAndValue.map(({field, value}) => `
-${field} = ?
+${field} = ${p()}
 `).join(',')}
-WHERE ${idField} = (?)
+WHERE ${idField} = (${p()})
 `, [...columnAndValue.map(({field, value}) => value), idRef.id], idField)
         }
         // 注意这里，使用要返回匹配的类，虽然可能没有更新数据。这样才能保证外部的逻辑比较一致。
@@ -1155,19 +1158,20 @@ WHERE ${idField} = (?)
 
                 if (hasSameRowData) {
                     // 存在同行 record，只能用 update
+                    const p = this.getPlaceholder()
                     const fields = recordInfo.sameRowFields
                     await this.database.update(`
 UPDATE ${recordInfo.table}
-SET ${fields.map(field => `${field} = ?`).join(',')}
-WHERE ${recordInfo.idField} IN (${records.map(({id}) => '?').join(',')})
+SET ${fields.map(field => `${field} = ${p()}`).join(',')}
+WHERE ${recordInfo.idField} IN (${records.map(({id}) => p()).join(',')})
 `, [...fields.map(field => null), ...records.map(({id}) => id)], recordInfo.idField, `use update to delete ${recordName} because of sameRowData`)
 
                 } else {
                     // 不存在同行数据 record ，可以 delete row
-
+                    const p = this.getPlaceholder()
                     await this.database.delete(`
 DELETE FROM ${recordInfo.table}
-WHERE ${recordInfo.idField} IN (${records.map(({id}) => '?').join(',')})
+WHERE ${recordInfo.idField} IN (${records.map(({id}) => p()).join(',')})
 `, [...records.map(({id}) => id)], `delete record ${recordInfo.name} as row`)
                 }
             }

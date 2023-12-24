@@ -95,7 +95,7 @@ describe('query agent test', () => {
 
         const matchExp = new MatchExp('User', entityToTableMap, matchExpData)
         const queryAgent = new RecordQueryAgent(entityToTableMap, database)
-        const fieldMatchExp = matchExp.buildFieldMatchExpression()
+        const fieldMatchExp = matchExp.buildFieldMatchExpression(() => '?')
         const fieldMatchExpWithValue = queryAgent.parseMatchExpressionValue('User', fieldMatchExp!)
 
         const joinExp = queryAgent.getJoinTables(matchExp.xToOneQueryTree, ['User'])

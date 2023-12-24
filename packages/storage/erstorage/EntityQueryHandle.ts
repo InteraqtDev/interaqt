@@ -16,6 +16,7 @@ export type EntityIdRef = {
     [ROW_ID_ATTR]? : string,
     [k:string]: any
 }
+
 export type Database = {
     scheme: (sql:string, name?:string) => Promise<any>
     query: <T extends any>(sql: string,values: any[], name?:string) => Promise<T[]>
@@ -23,7 +24,8 @@ export type Database = {
     insert: (sql: string, values: any[], name?:string) => Promise<EntityIdRef>
     update: (sql: string, values: any[], idField?: string, name?:string) => Promise<EntityIdRef[]>
     getAutoId: (recordName: string) => Promise<string>
-    parseMatchExpression?: (key: string, value: [string, any], fieldName: string, fieldType: string, isReferenceValue: boolean, getReferenceFieldValue:(v: string) => string) => any
+    parseMatchExpression?: (key: string, value: [string, any], fieldName: string, fieldType: string, isReferenceValue: boolean, getReferenceFieldValue:(v: string) => string, genPlaceholder: (name?: string) => string) => any
+    getPlaceholder?: () => (name?:string) => string
 }
 
 export class EntityQueryHandle {

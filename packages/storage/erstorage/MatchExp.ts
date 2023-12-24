@@ -3,6 +3,7 @@ import {EntityToTableMap} from "./EntityToTableMap.js";
 import {assert} from "../utils.js";
 import {RecordQueryTree} from "./RecordQuery.js";
 import {Database} from "./EntityQueryHandle.js";
+import {PlaceholderGen} from "./RecordQueryAgent.js";
 
 export type MatchAtom = { key: string, value: [string, any], isReferenceValue?: boolean }
 export type MatchExpressionData = BoolExp<MatchAtom>
@@ -105,39 +106,37 @@ export class MatchExp {
         return `${tableAlias}.${rawFieldName}`
     }
 
-    getFinalFieldValue(isReferenceValue: boolean, key: string, value: [string, any], fieldName:string, fieldType?: string, db?: Database): [string, any[]] {
+    getFinalFieldValue(isReferenceValue: boolean, key: string, value: [string, any], fieldName:string, fieldType: string|undefined, p: PlaceholderGen, db?: Database): [string, any[]] {
         let fieldValue =''
-        const fieldParams:any[] = []
+        let fieldParams:any[] = []
         const simpleOp = ['=', '>', '<', '<=', '>=', 'like', '!=']
 
         if (simpleOp.includes(value[0]) || (value[0] === 'not' && value[1] !== null)) {
-            fieldValue = `${value[0]} ?`
-            fieldParams.push(isReferenceValue ? this.getReferenceFieldValue(value[1]) : value[1])
+            fieldValue = `${value[0]} ${p()}`
+            fieldParams = [isReferenceValue ? this.getReferenceFieldValue(value[1]) : value[1]]
         } else if((value[0] === 'not' && value[1] === null)) {
             fieldValue = `not null`
         } else if (value[0].toLowerCase() === 'in') {
             assert(!isReferenceValue, 'reference value cannot use IN to match')
-            fieldValue = `IN (${value[1].map((x: any) => '?').join(',')})`
-            fieldParams.push(...value[1])
+            fieldValue = `IN (${value[1].map((x: any) => p()).join(',')})`
+            fieldParams = value[1]
         } else if (value[0].toLowerCase() === 'between') {
-            fieldValue = `BETWEEN ? AND ?`
-            fieldParams.push(
+            fieldValue = `BETWEEN ${p()} AND ${p()}`
+            fieldParams = [
                 isReferenceValue ? this.getReferenceFieldValue(value[1][0]) : value[1][0],
                 isReferenceValue ? this.getReferenceFieldValue(value[1][1]) : value[1][1]
-            )
+            ]
         } else {
-
-
             let result
             if (db) {
                 // JSON 操作符写法等由外部具体 db 实现
                 // FIXME 如果外部不知 value 的具体格式，又怎么知道这是一个 referenceValue ？？？这里要重新设计
-                result = db.parseMatchExpression?.(key, value, fieldName, fieldType!, isReferenceValue, this.getReferenceFieldValue.bind(this))
+                result = db.parseMatchExpression?.(key, value, fieldName, fieldType!, isReferenceValue, this.getReferenceFieldValue.bind(this), p)
             }
 
             if (result) {
                 fieldValue = result.fieldValue
-                fieldParams.push(...(result.fieldParams || []))
+                fieldParams = result.fieldParams || []
             } else{
                 assert(result, `unknown value expression ${JSON.stringify(value)}`)
 
@@ -145,10 +144,10 @@ export class MatchExp {
 
         }
 
-        return [fieldValue, fieldParams]
+        return [fieldValue, fieldParams!]
     }
 
-    buildFieldMatchExpression(db?: Database): BoolExp<FieldMatchAtom> | null {
+    buildFieldMatchExpression(p: PlaceholderGen, db?: Database): BoolExp<FieldMatchAtom> | null {
         if (!this.data) return null
         // 1. 所有 key 要 build 成 field
         // 2. x:n 关系中的 EXIST 要增加查询范围限制，要把 value 中对上层引用也 build 成 field。
@@ -175,7 +174,7 @@ export class MatchExp {
                 //  有一个的情况还是用在 findRelatedRecords 的时候才有意义。因为它会通过 id 限定关系，而即使是 n:n 的关系，任意两个实体中只会有一个关系数据。所以这个时候能找到唯一的数据，是有意义的。
 
                 const fieldNamePath = this.getFinalFieldName(matchAttributePath)
-                const [fieldValue, fieldParams] = this.getFinalFieldValue(exp.data.isReferenceValue!, exp.data.key,  exp.data.value, fieldNamePath.join('.'), attributeInfo.fieldType, db)
+                const [fieldValue, fieldParams] = this.getFinalFieldValue(exp.data.isReferenceValue!, exp.data.key,  exp.data.value, fieldNamePath.join('.'), attributeInfo.fieldType, p, db)
 
                 if (!symmetricPaths) {
                     return {
