@@ -1,40 +1,62 @@
 import SQLite from "better-sqlite3";
-import {Database, DatabaseLogger, EntityIdRef, ROW_ID_ATTR} from "./System.js";
-import {asyncInteractionContext} from "./asyncInteractionContext.js";
+import {Database, DatabaseLogger, EntityIdRef, ROW_ID_ATTR, SystemLogger} from "./System.js";
+import { Client, type ClientConfig, type QueryResult } from 'pg'
+import { asyncInteractionContext } from "./asyncInteractionContext.js";
 import pino from "pino";
 import {InteractionContext} from "./Controller";
 
 class IDSystem {
     constructor(public db: Database) {}
     setup() {
-        return this.db.scheme(`CREATE Table IF NOT EXISTS _IDS_ (last INTEGER, name TEXT)`)
+        return this.db.scheme(`CREATE Table IF NOT EXISTS "_IDS_" (last INTEGER, name TEXT)`)
     }
     async getAutoId(recordName: string) {
-        const lastId =  (await this.db.query<{last: number}>( `SELECT last FROM _IDS_ WHERE name = '${recordName}'`, [], `finding last id of ${recordName}` ))[0]?.last
+        const lastId =  (await this.db.query<{last: number}>( `SELECT last FROM "_IDS_" WHERE name = '${recordName}'`, [], `finding last id of ${recordName}` ))[0]?.last
         const newId = (lastId || 0) +1
         const name =`set last id for ${recordName}: ${newId}`
         if (lastId === undefined) {
-            await this.db.scheme(`INSERT INTO _IDS_ (name, last) VALUES ('${recordName}', ${newId})`, name)
+            await this.db.scheme(`INSERT INTO "_IDS_" (name, last) VALUES ('${recordName}', ${newId})`, name)
         } else {
-            await this.db.update(`UPDATE _IDS_ SET last = ? WHERE name = ?`, [newId, recordName], undefined, name)
+            await this.db.update(`UPDATE "_IDS_" SET last = $1 WHERE name = $2`, [newId, recordName], undefined, name)
         }
         return newId as unknown as string
     }
 }
 
-export type SQLiteDBOptions = Parameters<typeof SQLite>[1] & { logger :DatabaseLogger }
+export type PostgreSQLDBConfig = Omit<ClientConfig, 'database'> & { logger? :DatabaseLogger }
 
-export class SQLiteDB implements Database{
-    db!: InstanceType<typeof SQLite>
+export class PostgreSQLDB implements Database{
     idSystem!: IDSystem
     logger: DatabaseLogger
-    constructor(public file:string = ':memory:', public options?: SQLiteDBOptions) {
+    db: Client
+    constructor(public database:string, public options: PostgreSQLDBConfig = {}) {
         this.idSystem = new IDSystem(this)
         this.logger = this.options?.logger || pino()
+        this.db = new Client({
+            ...options,
+        })
     }
-    async open() {
-        this.db = new SQLite(this.file, this.options)
+    async open(forceDrop = false) {
+        await this.db.connect()
+        // 要不要有存在 就删掉的？
+        // SELECT 'DROP DATABASE your_database_name' WHERE EXISTS (SELECT FROM pg_database WHERE dataname = 'your_database_name');
+        const databaseExist = await this.db.query(`SELECT FROM pg_database WHERE datname = '${this.database}'`)
+        if (databaseExist.rows.length === 0) {
+            await this.db.query(`CREATE DATABASE ${this.database}`)
+        } else {
+            if (forceDrop) {
+                await this.db.query(`DROP DATABASE ${this.database}`)
+                await this.db.query(`CREATE DATABASE ${this.database}`)
+            }
+            this.db = new Client({
+                ...this.options,
+                database: this.database
+            })
+            await this.db.connect()
+        }
+
         await this.idSystem.setup()
+
     }
     async query<T extends any>(sql:string, where: any[] =[], name= '')  {
         const context= asyncInteractionContext.getStore() as InteractionContext
@@ -47,12 +69,12 @@ export class SQLiteDB implements Database{
             sql,
             params
         })
-        return  this.db.prepare(sql).all(...params) as T[]
+        return  (await this.db.query(sql, params)).rows as T[]
     }
-    async update(sql:string,values: any[], idField?:string, name='') {
+    async update<T extends any>(sql:string,values: any[], idField?:string, name='') {
         const context= asyncInteractionContext.getStore() as InteractionContext
         const logger = this.logger.child(context?.logContext || {})
-        const finalSQL = `${sql} ${idField ? `RETURNING ${idField} AS id`: ''}`
+        const finalSQL = `${sql} ${idField ? `RETURNING "${idField}" AS id`: ''}`
         const params = values.map(x => {
             return (typeof x === 'object' && x !==null) ? JSON.stringify(x) : x===false ? 0 : x===true ? 1 : x
         })
@@ -62,9 +84,9 @@ export class SQLiteDB implements Database{
             sql:finalSQL,
             params
         })
-        return this.db.prepare(finalSQL).run(...params)  as unknown as any[]
+        return  (await this.db.query(sql, params)).rows as T[]
     }
-    async insert (sql:string, values:any[], name='')  {
+    async insert(sql:string, values:any[], name='')  {
         const context= asyncInteractionContext.getStore() as InteractionContext
         const logger = this.logger.child(context?.logContext || {})
         const params = values.map(x => {
@@ -76,9 +98,11 @@ export class SQLiteDB implements Database{
             sql,
             params
         })
-        return  this.db.prepare(`${sql} RETURNING ${ROW_ID_ATTR}`).run(...params) as unknown as EntityIdRef
+
+        const finalSQL = `${sql} RETURNING "${ROW_ID_ATTR}"`
+        return (await this.db.query(finalSQL, params)).rows[0] as EntityIdRef
     }
-    async delete (sql:string, where: any[], name='') {
+    async delete<T extends any> (sql:string, where: any[], name='') {
         const context= asyncInteractionContext.getStore() as InteractionContext
         const logger = this.logger.child(context?.logContext || {})
         const params = where.map(x => x===false ? 0 : x===true ? 1 : x)
@@ -88,7 +112,7 @@ export class SQLiteDB implements Database{
             sql,
             params
         })
-        return this.db.prepare(sql).run(...params) as unknown as  any[]
+        return  (await this.db.query(sql, params)).rows as T[]
     }
     async scheme(sql: string, name='') {
         const context= asyncInteractionContext.getStore() as InteractionContext
@@ -98,10 +122,10 @@ export class SQLiteDB implements Database{
             name,
             sql,
         })
-        return this.db.prepare(sql).run()
+        return  await this.db.query(sql)
     }
     close() {
-        this.db.close()
+        return this.db.end()
     }
     async getAutoId(recordName: string) {
         return this.idSystem.getAutoId(recordName)
@@ -109,20 +133,25 @@ export class SQLiteDB implements Database{
     parseMatchExpression(key: string, value:[string, string], fieldName: string, fieldType: string, isReferenceValue: boolean, getReferenceFieldValue: (v: string) => string, p: () => string) {
         if (fieldType === 'JSON') {
             if (value[0].toLowerCase() === 'contains') {
+                const fieldNameWithQuotes = fieldName.split('.').map(x => `"${x}"`).join('.')
                 return {
-                    fieldValue: `NOT NULL AND EXISTS (
-    SELECT 1
-    FROM json_each(${fieldName})
-    WHERE json_each.value = ${p()}
-)`,
+                    fieldValue: `IS NOT NULL AND ${p()} = ANY (SELECT json_array_elements_text(${fieldNameWithQuotes}))`,
                     fieldParams: [value[1]]
                 }
             }
         }
     }
+
+    getPlaceholder() {
+        let index = 0
+        return () => {
+            index++
+            return `$${index}`
+        }
+    }
     mapToDBFieldType(type: string, collection?: boolean) {
         if (type === 'pk') {
-            return 'INTEGER PRIMARY KEY'
+            return 'INT GENERATED ALWAYS AS IDENTITY'
         } else if (type === 'id') {
             return 'INT'
         } else if (collection || type === 'object') {

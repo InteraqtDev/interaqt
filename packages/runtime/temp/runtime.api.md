@@ -414,6 +414,9 @@ export class BoolExp<T> {
 }
 
 // @public (undocumented)
+export type BoolExpression = GroupNode | VariableNode;
+
+// @public (undocumented)
 export const BoolExpressionData: Klass<{
     type: {
         type: "string";
@@ -463,6 +466,14 @@ export const BoolExpressionData: Klass<{
         collection: false;
     };
 }>;
+
+// @public (undocumented)
+export const enum BoolExpressionNodeTypes {
+    // (undocumented)
+    group = "group",
+    // (undocumented)
+    variable = "variable"
+}
 
 // @public (undocumented)
 export type BoolExpressionRawData<T> = {
@@ -1295,7 +1306,9 @@ export type Database = {
     insert: (sql: string, values: any[], name?: string) => Promise<EntityIdRef>;
     update: (sql: string, values: any[], idField?: string, name?: string) => Promise<EntityIdRef[]>;
     getAutoId: (recordName: string) => Promise<string>;
-    parseMatchExpression?: (key: string, value: [string, any], fieldName: string, fieldType: string, isReferenceValue: boolean, getReferenceFieldValue: (v: string) => string) => any;
+    parseMatchExpression?: (key: string, value: [string, any], fieldName: string, fieldType: string, isReferenceValue: boolean, getReferenceFieldValue: (v: string) => string, genPlaceholder: (name?: string) => string) => any;
+    getPlaceholder?: () => (name?: string) => string;
+    mapToDBFieldType: (type: string, collection?: boolean) => string;
 };
 
 // @public (undocumented)
@@ -1652,6 +1665,14 @@ export function getInteractions(activity: ActivityInstanceType): InertKlassInsta
 
 // @public (undocumented)
 export function getUUID(obj: InertKlassInstance<any>): string;
+
+// @public (undocumented)
+export type GroupNode = {
+    type: BoolExpressionNodeTypes.group;
+    op: string;
+    left: BoolExpression;
+    right?: BoolExpression;
+};
 
 // @public (undocumented)
 export const ID_ATTR = "id";
@@ -2034,6 +2055,13 @@ export class MonoSystem implements System {
     // (undocumented)
     updateActivity(match: MatchExpressionData, activity: any): Promise<any>;
 }
+
+// @public (undocumented)
+export const OperatorNames: {
+    '||': string;
+    '&&': string;
+    '!': string;
+};
 
 // Warning: (ae-forgotten-export) The symbol "OmitNever" needs to be exported by the entry point index.d.ts
 // Warning: (ae-forgotten-export) The symbol "ExtractKlassTypes" needs to be exported by the entry point index.d.ts
@@ -3383,13 +3411,15 @@ export class SQLiteDB implements Database {
     // (undocumented)
     logger: DatabaseLogger;
     // (undocumented)
+    mapToDBFieldType(type: string, collection?: boolean): string;
+    // (undocumented)
     open(): Promise<void>;
     // (undocumented)
     options?: (SQLite.Options & {
         logger: DatabaseLogger;
     }) | undefined;
     // (undocumented)
-    parseMatchExpression(key: string, value: [string, string], fieldName: string, fieldType: string, isReferenceValue: boolean, getReferenceFieldValue: (v: string) => string): {
+    parseMatchExpression(key: string, value: [string, string], fieldName: string, fieldType: string, isReferenceValue: boolean, getReferenceFieldValue: (v: string) => string, p: () => string): {
         fieldValue: string;
         fieldParams: string[];
     } | undefined;
@@ -3641,6 +3671,13 @@ export type UnwrappedBoolExpressionInstanceType<T extends NonNullable<KlassMeta[
 
 // @public (undocumented)
 export const USER_ENTITY = "User";
+
+// @public (undocumented)
+export type VariableNode = {
+    type: BoolExpressionNodeTypes.variable;
+    name: string;
+    [k: string]: any;
+};
 
 // @public (undocumented)
 export const WeightedSummation: Klass<{

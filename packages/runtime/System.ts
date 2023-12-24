@@ -91,6 +91,7 @@ export type DatabaseLogger = {
     child:(fixed: object) => DatabaseLogger,
 }
 
+// FIXME 这里应该继承自 storage？
 export type Database = {
     open: () => Promise<any>
     logger: DatabaseLogger
@@ -100,7 +101,9 @@ export type Database = {
     insert: (sql: string, values: any[], name?:string) => Promise<EntityIdRef>
     update: (sql: string, values: any[], idField?: string, name?:string) => Promise<EntityIdRef[]>
     getAutoId: (recordName: string) => Promise<string>,
-    parseMatchExpression?: (key: string, value: [string, any], fieldName: string, fieldType: string, isReferenceValue: boolean, getReferenceFieldValue:(v: string) => string) => any
+    parseMatchExpression?: (key: string, value: [string, any], fieldName: string, fieldType: string, isReferenceValue: boolean, getReferenceFieldValue:(v: string) => string, genPlaceholder: (name?: string) => string) => any
+    getPlaceholder?: () => (name?:string) => string,
+    mapToDBFieldType: (type: string, collection?: boolean) => string
 
 } // activity 数据
 // state 等系统配置数据的实体化
