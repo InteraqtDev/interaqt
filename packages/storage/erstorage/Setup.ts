@@ -22,25 +22,6 @@ export type TableData = {
 
 export type MergeLinks = string[]
 
-function defaultGetDBFieldType(type: string, collection?: boolean) {
-    if (type === 'pk') {
-        // TODO 不同的引擎不同，这里是 sqlite 的写法
-        return 'INTEGER PRIMARY KEY'
-    } else if (type === 'id') {
-        return 'INT'
-    } else if (collection || type === 'object') {
-        return 'JSON'
-    } else if (type === 'string') {
-        return 'TEXT'
-    } else if (type === 'boolean') {
-        return 'INT(2)'
-    } else if(type === 'number'){
-        return "INT"
-    }else{
-        return type
-    }
-}
-
 
 export class DBSetup {
     public recordToTableMap = new Map<string,string>()
