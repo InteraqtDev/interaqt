@@ -152,7 +152,9 @@ export type Database = {
     insert: (sql: string, values: any[], name?: string) => Promise<EntityIdRef>;
     update: (sql: string, values: any[], idField?: string, name?: string) => Promise<EntityIdRef[]>;
     getAutoId: (recordName: string) => Promise<string>;
-    parseMatchExpression?: (key: string, value: [string, any], fieldName: string, fieldType: string, isReferenceValue: boolean, getReferenceFieldValue: (v: string) => string) => any;
+    parseMatchExpression?: (key: string, value: [string, any], fieldName: string, fieldType: string, isReferenceValue: boolean, getReferenceFieldValue: (v: string) => string, genPlaceholder: (name?: string) => string) => any;
+    getPlaceholder?: () => (name?: string) => string;
+    mapToDBFieldType: (type: string, collection?: boolean) => string;
 };
 
 // @public (undocumented)
@@ -182,8 +184,6 @@ export class DBSetup {
     database?: Database | undefined;
     // (undocumented)
     entities: KlassInstance<typeof Entity, false>[];
-    // (undocumented)
-    getDBFieldType(type: string, collection?: boolean): string;
     // (undocumented)
     getRecordName(rawRecord: KlassInstance<typeof Entity, false> | KlassInstance<typeof Relation, false>): string;
     // (undocumented)
@@ -422,7 +422,7 @@ export class MatchExp {
     // (undocumented)
     static atom(condition: MatchAtom): BoolExp<MatchAtom>;
     // (undocumented)
-    buildFieldMatchExpression(db?: Database): BoolExp<FieldMatchAtom> | null;
+    buildFieldMatchExpression(p: PlaceholderGen, db?: Database): BoolExp<FieldMatchAtom> | null;
     // (undocumented)
     buildQueryTree(matchData: MatchExpressionData, recordQueryTree: RecordQueryTree): void;
     // (undocumented)
@@ -438,7 +438,7 @@ export class MatchExp {
     // (undocumented)
     getFinalFieldName(matchAttributePath: string[]): [string, string];
     // (undocumented)
-    getFinalFieldValue(isReferenceValue: boolean, key: string, value: [string, any], fieldName: string, fieldType?: string, db?: Database): [string, any[]];
+    getFinalFieldValue(isReferenceValue: boolean, key: string, value: [string, any], fieldName: string, fieldType: string | undefined, p: PlaceholderGen, db?: Database): [string, any[]];
     // (undocumented)
     getReferenceFieldValue(valueStr: string): string;
     // (undocumented)
@@ -551,6 +551,9 @@ export class NewRecordData {
     // (undocumented)
     valueAttributes: AttributeInfo[];
 }
+
+// @public (undocumented)
+export type PlaceholderGen = (name?: string) => string;
 
 // @public (undocumented)
 export type RawEntityData = {
@@ -687,9 +690,9 @@ export class RecordQueryAgent {
     // (undocumented)
     buildSelectClause(queryFields: ReturnType<AttributeQuery["getValueAndXToOneRecordFields"]>, prefix?: string): string;
     // (undocumented)
-    buildWhereClause(fieldMatchExp: BoolExp<FieldMatchAtom> | null, prefix?: string): [string, any[]];
+    buildWhereClause(fieldMatchExp: BoolExp<FieldMatchAtom> | null, prefix: string | undefined, p: PlaceholderGen): [string, any[]];
     // (undocumented)
-    buildXToOneFindQuery(recordQuery: RecordQuery, prefix?: string): [string, any[]];
+    buildXToOneFindQuery(recordQuery: RecordQuery, prefix?: string, parentP?: PlaceholderGen): [string, any[]];
     // (undocumented)
     createRecord(newEntityData: NewRecordData, queryName?: string, events?: MutationEvent_2[]): Promise<EntityIdRef>;
     // (undocumented)
@@ -719,6 +722,8 @@ export class RecordQueryAgent {
     // (undocumented)
     getJoinTables(queryTree: RecordQueryTree, context?: string[], parentInfos?: [string, string, string]): JoinTables;
     // (undocumented)
+    getPlaceholder: () => PlaceholderGen;
+    // (undocumented)
     handleCreationReliance(newEntityData: NewRecordData, events?: MutationEvent_2[]): Promise<object>;
     // (undocumented)
     handleDeletedRecordReliance(recordName: string, record: EntityIdRef, events?: MutationEvent_2[]): Promise<EntityIdRef>;
@@ -729,7 +734,7 @@ export class RecordQueryAgent {
     // (undocumented)
     map: EntityToTableMap;
     // (undocumented)
-    parseMatchExpressionValue(entityName: string, fieldMatchExp: BoolExp<FieldMatchAtom> | null, contextRootEntity?: string): BoolExp<FieldMatchAtom> | null;
+    parseMatchExpressionValue(entityName: string, fieldMatchExp: BoolExp<FieldMatchAtom> | null, contextRootEntity: string | undefined, p: PlaceholderGen): BoolExp<FieldMatchAtom> | null;
     // (undocumented)
     prepareFieldValue(value: any): any;
     // (undocumented)

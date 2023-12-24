@@ -2,7 +2,7 @@
   "name": "@interaqt/storage",
   "module": "index.ts",
   "type": "module",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "devDependencies": {
     "@microsoft/api-extractor": "^7.38.5",
     "@vitest/coverage-v8": "^0.34.6",
