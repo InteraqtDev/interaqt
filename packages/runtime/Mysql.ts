@@ -1,5 +1,5 @@
-import {Database, DatabaseLogger, EntityIdRef, ROW_ID_ATTR} from "./System.js";
-import {Client, type ClientConfig} from 'pg'
+import {Database, DatabaseLogger, EntityIdRef} from "./System.js";
+import mysql, {type Connection, type ConnectionOptions, RowDataPacket} from 'mysql2/promise'
 import {asyncInteractionContext} from "./asyncInteractionContext.js";
 import pino from "pino";
 import {InteractionContext} from "./Controller";
@@ -7,7 +7,7 @@ import {InteractionContext} from "./Controller";
 class IDSystem {
     constructor(public db: Database) {}
     setup() {
-        return this.db.scheme(`CREATE Table IF NOT EXISTS "_IDS_" (last INTEGER, name TEXT)`)
+        return this.db.scheme(`CREATE Table IF NOT EXISTS _IDS_ (last INTEGER, name TEXT)`)
     }
     async getAutoId(recordName: string) {
         const lastId =  (await this.db.query<{last: number}>( `SELECT last FROM "_IDS_" WHERE name = '${recordName}'`, [], `finding last id of ${recordName}` ))[0]?.last
@@ -16,43 +16,44 @@ class IDSystem {
         if (lastId === undefined) {
             await this.db.scheme(`INSERT INTO "_IDS_" (name, last) VALUES ('${recordName}', ${newId})`, name)
         } else {
-            await this.db.update(`UPDATE "_IDS_" SET last = $1 WHERE name = $2`, [newId, recordName], undefined, name)
+            await this.db.update(`UPDATE "_IDS_" SET last = ? WHERE name = ?`, [newId, recordName], undefined, name)
         }
         return newId as unknown as string
     }
 }
 
-export type PostgreSQLDBConfig = Omit<ClientConfig, 'database'> & { logger? :DatabaseLogger }
+export type PostgreSQLDBConfig = Omit<ConnectionOptions, 'database'> & { logger? :DatabaseLogger }
 
-export class PostgreSQLDB implements Database{
+export class MysqlDB implements Database{
     idSystem!: IDSystem
     logger: DatabaseLogger
-    db: Client
+    db!: Connection
     constructor(public database:string, public options: PostgreSQLDBConfig = {}) {
         this.idSystem = new IDSystem(this)
         this.logger = this.options?.logger || pino()
-        this.db = new Client({
-            ...options,
-        })
     }
     async open(forceDrop = false) {
+        const options = {...this.options}
+        delete options.logger
+        this.db = await mysql.createConnection({
+            ...this.options,
+        })
         await this.db.connect()
-        // 要不要有存在 就删掉的？
-        // SELECT 'DROP DATABASE your_database_name' WHERE EXISTS (SELECT FROM pg_database WHERE dataname = 'your_database_name');
-        const databaseExist = await this.db.query(`SELECT FROM pg_database WHERE datname = '${this.database}'`)
-        if (databaseExist.rows.length === 0) {
+        const [rows] = await this.db.query(`SHOW DATABASES LIKE '${this.database}'`)
+        if ((rows as RowDataPacket[]).length === 0) {
             await this.db.query(`CREATE DATABASE ${this.database}`)
         } else {
             if (forceDrop) {
                 await this.db.query(`DROP DATABASE ${this.database}`)
                 await this.db.query(`CREATE DATABASE ${this.database}`)
             }
-            this.db = new Client({
+            this.db = await mysql.createConnection({
                 ...this.options,
                 database: this.database
             })
             await this.db.connect()
         }
+        await this.db.query(`SET sql_mode='ANSI_QUOTES'`)
 
         await this.idSystem.setup()
 
@@ -68,7 +69,7 @@ export class PostgreSQLDB implements Database{
             sql,
             params
         })
-        return  (await this.db.query(sql, params)).rows as T[]
+        return  (await this.db.query(sql, params))[0] as T[]
     }
     async update<T extends any>(sql:string,values: any[], idField?:string, name='') {
         const context= asyncInteractionContext.getStore() as InteractionContext
@@ -83,7 +84,7 @@ export class PostgreSQLDB implements Database{
             sql:finalSQL,
             params
         })
-        return  (await this.db.query(sql, params)).rows as T[]
+        return  (await this.db.query(sql, params))[0] as T[]
     }
     async insert(sql:string, values:any[], name='')  {
         const context= asyncInteractionContext.getStore() as InteractionContext
@@ -91,6 +92,7 @@ export class PostgreSQLDB implements Database{
         const params = values.map(x => {
             return (typeof x === 'object' && x !==null) ? JSON.stringify(x) : x===false ? 0 : x===true ? 1 : x
         })
+
         logger.info({
             type:'insert',
             name,
@@ -98,8 +100,10 @@ export class PostgreSQLDB implements Database{
             params
         })
 
-        const finalSQL = `${sql} RETURNING "${ROW_ID_ATTR}"`
-        return (await this.db.query(finalSQL, params)).rows[0] as EntityIdRef
+        await this.db.query(sql, params)
+        const [rows] = (await this.db.query(`SELECT LAST_INSERT_ID();`))
+        const insertedId = (rows as RowDataPacket[])[0]['LAST_INSERT_ID()']
+        return {id: insertedId} as EntityIdRef
     }
     async delete<T extends any> (sql:string, where: any[], name='') {
         const context= asyncInteractionContext.getStore() as InteractionContext
@@ -111,7 +115,7 @@ export class PostgreSQLDB implements Database{
             sql,
             params
         })
-        return  (await this.db.query(sql, params)).rows as T[]
+        return  (await this.db.query(sql, params))[0] as T[]
     }
     async scheme(sql: string, name='') {
         const context= asyncInteractionContext.getStore() as InteractionContext
@@ -134,23 +138,21 @@ export class PostgreSQLDB implements Database{
             if (value[0].toLowerCase() === 'contains') {
                 const fieldNameWithQuotes = fieldName.split('.').map(x => `"${x}"`).join('.')
                 return {
-                    fieldValue: `IS NOT NULL AND ${p()} = ANY (SELECT json_array_elements_text(${fieldNameWithQuotes}))`,
-                    fieldParams: [value[1]]
+                    fieldValue: `IS NOT NULL AND JSON_CONTAINS(${fieldNameWithQuotes}, '${JSON.stringify(value[1])}', '$')`,
+                    fieldParams: []
                 }
             }
         }
     }
 
     getPlaceholder() {
-        let index = 0
         return () => {
-            index++
-            return `$${index}`
+            return '?'
         }
     }
     mapToDBFieldType(type: string, collection?: boolean) {
         if (type === 'pk') {
-            return 'INT GENERATED ALWAYS AS IDENTITY'
+            return 'INT AUTO_INCREMENT PRIMARY KEY'
         } else if (type === 'id') {
             return 'INT'
         } else if (collection || type === 'object') {
