@@ -26,6 +26,11 @@ describe('json field test', () => {
                     name: 'roles',
                     type: 'string',
                     collection: true
+                }),
+                Property.create( {
+                    name: 'scores',
+                    type: 'number',
+                    collection: true
                 })
             ]
         })
@@ -33,6 +38,7 @@ describe('json field test', () => {
         // @ts-ignore
         db = new SQLiteDB(':memory:', {logger})
         await db.open()
+
         setup = new DBSetup([userEntity], [], db)
         await setup.createTables()
         handle = new EntityQueryHandle(new EntityToTableMap(setup.map), db)
@@ -43,7 +49,7 @@ describe('json field test', () => {
         await db.close()
     })
 
-    test('create many to many data:create self', async () => {
+    test('string array', async () => {
 
         const userA = await handle.create('User', {name: 'aaa', roles: ['admin', 'user']})
         const userB = await handle.create('User', {name: 'aaa', roles: ['admin', 'supervisor']})
@@ -61,8 +67,12 @@ describe('json field test', () => {
         const findUser4 = await handle.find('User', MatchExp.atom({key: 'roles', value: ['contains', 'supervisor']}).not(), undefined, ['*'])
         expect(findUser4.length).toBe(1)
         expect(findUser4[0].roles).toEqual(['admin', 'user'])
+    })
 
-
+    test('number array', async () => {
+        const userA = await handle.create('User', {name: 'aaa', scores: [1,2,3]})
+        const findUser2 = await handle.find('User', MatchExp.atom({key: 'scores', value: ['contains', 2]}), undefined, ['*'])
+        expect(findUser2.length).toBe(1)
     })
 })
 

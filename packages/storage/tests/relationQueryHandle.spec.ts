@@ -6,19 +6,24 @@ import {EntityToTableMap} from "../erstorage/EntityToTableMap.js";
 import {removeAllInstance} from '@interaqt/shared'
 import {MatchExp} from "../erstorage/MatchExp.js";
 import {EntityQueryHandle} from "../erstorage/EntityQueryHandle.js";
+import TestLogger from "./testLogger.js";
 
 
 describe('find relation', () => {
     let db: SQLiteDB
     let setup
     let handle: EntityQueryHandle
+    let logger
 
     beforeEach(async () => {
         removeAllInstance()
         const { entities, relations } = createCommonData()
+        logger = new TestLogger('', true)
+
         // @ts-ignore
-        db = new SQLiteDB()
+        db = new SQLiteDB(':memory:', {logger: logger} )
         await db.open()
+
         setup = new DBSetup(entities, relations, db)
         await setup.createTables()
         handle = new EntityQueryHandle(new EntityToTableMap(setup.map), db)
@@ -138,7 +143,7 @@ describe('find relation', () => {
             key: 'target.name',
             value: ['=', 'aaa']
         })
-        const result1 = await handle.findRelationByName(relationName, match1, undefined, [['source', { attributeQuery: ['name', 'age']}], ['target', {attributeQuery: ['name', 'age']}]])
+        const result1 = await handle.findRelationByName(relationName, match1, {orderBy: { id: 'ASC'}}, [['source', { attributeQuery: ['name', 'age']}], ['target', {attributeQuery: ['name', 'age']}]])
         //
         expect( result1.length).toBe(2)
         expect( result1[0].target.name).toBe('aaa')
