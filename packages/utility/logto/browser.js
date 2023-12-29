@@ -1,13 +1,13 @@
 import LogtoClient from '@logto/browser';
 export class Client {
-    constructor(endpoint, appId, api_addr) {
+    constructor(endpoint, appId, interaqtEndpoint) {
         this.endpoint = endpoint;
         this.appId = appId;
-        this.api_addr = api_addr;
+        this.interaqtEndpoint = interaqtEndpoint;
         this.post = async (data) => {
             if (!this.token)
                 await this.getToken();
-            return (await fetch(`${this.api_addr}`, {
+            return (await fetch(this.interactionAddr, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -16,14 +16,15 @@ export class Client {
                 body: JSON.stringify(data)
             })).json();
         };
+        this.interactionAddr = `${this.interaqtEndpoint}/interaction`;
         this.client = new LogtoClient({
             endpoint: this.endpoint,
             appId: this.appId,
-            resources: [this.api_addr]
+            resources: [this.interactionAddr]
         });
     }
     async getToken() {
-        this.token = await this.client.getAccessToken(this.api_addr);
+        this.token = await this.client.getAccessToken(this.interactionAddr);
     }
 }
 //# sourceMappingURL=browser.js.map
