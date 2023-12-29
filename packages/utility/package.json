@@ -1,0 +1,31 @@
+{
+  "name": "@interaqt/utility",
+  "version": "0.8.0",
+  "description": "interaqt utility",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "build": "node ./scripts/build.js",
+    "release": "node scripts/release.js"
+  },
+  "author": "sskyy <skyking_H@hotmail.com>",
+  "license": "MIT",
+  "dependencies": {
+    "@logto/browser": "^2.2.1",
+    "@types/node": "^20.10.5",
+    "jose": "^5.2.0",
+    "querystring": "^0.2.1"
+  },
+  "exports": {
+    "./logto/*": "./dist/logto/*.js",
+    "./logto/server.js": "./dist/logto/server.js",
+    "./logto/browser.js": "./dist/logto/browser.js",
+    "./logto/server.d.ts": "./dist/logto/server.d.ts",
+    "./logto/browser.d.ts": "./dist/logto/browser.d.ts",
+    "./logto/*.d.ts.map": "./dist/logto/*.d.ts.map"
+  },
+  "devDependencies": {
+    "@microsoft/api-extractor": "^7.39.0",
+    "rimraf": "^5.0.5"
+  }
+}
