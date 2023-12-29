@@ -16,6 +16,9 @@
     "jose": "^5.2.0",
     "querystring": "^0.2.1"
   },
+  "publishConfig": {
+    "access": "public"
+  },
   "exports": {
     "./logto/*": "./dist/logto/*.js",
     "./logto/server.js": "./dist/logto/server.js",
