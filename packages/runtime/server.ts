@@ -95,12 +95,13 @@ export async function startServer(controller: Controller, options: ServerOptions
         const {userId} = request.body as SyncUserBody
         // 验证 id 不能重复。 er 里面应该也要验证。这里只是为了防止重复创建
         if(!(await controller.system.storage.findOne(USER_ENTITY, MatchExp.atom({key:'id', value: ['=', userId]}), undefined, ['*']))){
+            // TODO 从 user 中获取必要的字段
             return await controller.system.storage.create(USER_ENTITY, {id: userId})
         }
     }))
 
 
-    fastify.post('/api',  withLogContext(async (request,  reply) => {
+    fastify.post('/interaction',  withLogContext(async (request,  reply) => {
 
         // 转发到 controller
             const {activity : activityName, activityId, interaction: interactionName, payload, query} = request.body as APIBody
@@ -144,7 +145,7 @@ export async function startServer(controller: Controller, options: ServerOptions
     }))
 
     // data api
-    fastify.post('/data/:apiName', withLogContext(async (request, reply) => {
+    fastify.post('/api/:apiName', withLogContext(async (request, reply) => {
 
         const params = request.params as {apiName: string}
         const api = dataAPIs[params.apiName]
