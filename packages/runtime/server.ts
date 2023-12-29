@@ -10,6 +10,7 @@ import {asyncInteractionContext} from "./asyncInteractionContext.js";
 type ServerOptions = {
     port: number,
     parseUserId: (headers: any) => Promise<string | undefined>
+    mapUserEntity?:(syncBody: any) => { id:string }
     cors? : Parameters<typeof cors>[0]
     logger? : FastifyLoggerOptions
 }
@@ -81,6 +82,12 @@ function withLogContext(asyncHandle: (request: FastifyRequest, reply: FastifyRep
     }
 }
 
+const defaultMapUserEntity = (syncBody: any) => {
+    return {
+        id: syncBody.userId
+    }
+}
+
 export async function startServer(controller: Controller, options: ServerOptions, dataAPIs: DataAPIs = {}) {
     const fastify = Fastify({
         logger: options.logger||true
@@ -89,14 +96,16 @@ export async function startServer(controller: Controller, options: ServerOptions
     await fastify.register(middie)
     fastify.use(cors(options.cors))
 
+    const mapUserEntity = options.mapUserEntity || defaultMapUserEntity
+
     // listen 外部系统的用户创建，同步到我们的系统中。
     // CAUTION webhook 的模式最适合 id 由外部分配。这也意味着我们的系统中不允许自己创建用户！！！。不然 id 同步会出大问题！！！
     fastify.post('/user/sync', withLogContext(async (request, reply) => {
-        const {userId} = request.body as SyncUserBody
+        const newUserData = mapUserEntity(request.body)
         // 验证 id 不能重复。 er 里面应该也要验证。这里只是为了防止重复创建
-        if(!(await controller.system.storage.findOne(USER_ENTITY, MatchExp.atom({key:'id', value: ['=', userId]}), undefined, ['*']))){
+        if(!(await controller.system.storage.findOne(USER_ENTITY, MatchExp.atom({key:'id', value: ['=', newUserData.id]}), undefined, ['*']))){
             // TODO 从 user 中获取必要的字段
-            return await controller.system.storage.create(USER_ENTITY, {id: userId})
+            return await controller.system.storage.create(USER_ENTITY, newUserData)
         }
     }))
 
