@@ -20,7 +20,7 @@
     "access": "public"
   },
   "exports": {
-    "./logto/*": "./logto/*.js",
+    "./logto/*": "./logto/*.js"
   },
   "devDependencies": {
     "@microsoft/api-extractor": "^7.39.0",
