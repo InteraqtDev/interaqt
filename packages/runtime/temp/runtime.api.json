@@ -5113,7 +5113,7 @@
             },
             {
               "kind": "Content",
-              "text": "{\n    params?: any[];\n    allowAnonymous?: boolean;\n}"
+              "text": "{\n    params?: any[] | {};\n    useNamedParams?: boolean;\n    allowAnonymous?: boolean;\n}"
             },
             {
               "kind": "Content",

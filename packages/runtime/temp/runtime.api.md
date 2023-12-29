@@ -1162,7 +1162,8 @@ export type DataAPI = DataAPIHandle & DataAPIConfig;
 
 // @public (undocumented)
 export type DataAPIConfig = {
-    params?: any[];
+    params?: any[] | {};
+    useNamedParams?: boolean;
     allowAnonymous?: boolean;
 };
 
