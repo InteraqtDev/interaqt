@@ -23,7 +23,7 @@ export class Client {
         });
     }
     async getToken() {
-        this.token = await this.client.getAccessToken();
+        this.token = await this.client.getAccessToken(this.api_addr);
     }
 }
 //# sourceMappingURL=browser.js.map
