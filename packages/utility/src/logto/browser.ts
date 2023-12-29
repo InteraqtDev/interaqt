@@ -11,7 +11,7 @@ export class Client {
         })
     }
     async getToken() {
-        this.token =  await this.client.getAccessToken()
+        this.token =  await this.client.getAccessToken(this.api_addr)
     }
     post = async (data:any) => {
         if (!this.token) await this.getToken()
