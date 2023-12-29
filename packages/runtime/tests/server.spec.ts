@@ -141,7 +141,7 @@ describe('server test', () => {
             }
         }
 
-        const resp2 = await post('http://localhost:8082/api', {
+        const resp2 = await post('http://localhost:8082/interaction', {
             activity: 'createFriendRelation',
             interaction: 'sendRequest',
             payload
@@ -162,7 +162,7 @@ describe('server test', () => {
         // // 4. b 接受
         const payload2 = {}
 
-        const resp3 = await post('http://localhost:8082/api', {
+        const resp3 = await post('http://localhost:8082/interaction', {
             activity: 'createFriendRelation',
             activityId,
             interaction: 'approve',
@@ -195,7 +195,7 @@ describe('server test', () => {
                 value: ['=', userBId]
             }).toValue()
         ]
-        const resp4 = await post('http://localhost:8082/data/getRequests', params, {
+        const resp4 = await post('http://localhost:8082/api/getRequests', params, {
             "userid": userBId,
         })
         expect(resp4.status).toBe(200)

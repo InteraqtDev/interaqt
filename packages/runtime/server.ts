@@ -10,7 +10,6 @@ import {asyncInteractionContext} from "./asyncInteractionContext.js";
 type ServerOptions = {
     port: number,
     parseUserId: (headers: any) => Promise<string | undefined>
-    mapUserEntity?:(syncBody: any) => { id:string }
     cors? : Parameters<typeof cors>[0]
     logger? : FastifyLoggerOptions
 }
@@ -31,7 +30,8 @@ export type DataAPIContext = { user: EventUser }
 
 export type DataAPIHandle = (this: Controller, context: DataAPIContext, ...rest: any[]) => any
 export type DataAPIConfig = {
-    params?: any[],
+    params?: any[]|{},
+    useNamedParams? :boolean,
     allowAnonymous?: boolean
 }
 export type DataAPI = DataAPIHandle & DataAPIConfig
@@ -43,29 +43,59 @@ export type DataAPIs = {
 
 type DataAPIClassParam<T extends any> = T & { fromValue: (value: any) => T }
 
-function parseDataAPIParams(rawParams: any[], api: DataAPI) {
-    const params = api.params
-    if (!params) {
-        return rawParams
+function parseDataAPIParams(inputParams: DataAPIConfig["params"], api: DataAPI): DataAPIConfig["params"] {
+    if (!api.params) {
+        return inputParams
     }
 
-    return rawParams.map((rawParam, index) =>{
-        const param = params[index]
-        if (param === undefined) return rawParam
+    if (api.useNamedParams) {
+        const params = api.params as {[k:string]:any}
+        const objectParams = inputParams as {[k:string]:any}
 
-        if (typeof param === 'string' || rawParam === undefined || rawParam === null) {
-            // 'string'|'number'|'boolean'|'object'|'undefined'|'null'
-            return rawParam
-        } else if (typeof param === 'function') {
-            // 对象
-            if (!(param as DataAPIClassParam<any>).fromValue) {
-                throw new Error('Invalid Class param type, missing fromValue')
+        return Object.fromEntries(Object.entries(objectParams).map(([key, inputParam]) => {
+            const param = params[key]
+
+            if (param === undefined) return [key, inputParam]
+
+            if (typeof param === 'string' || inputParam === undefined || inputParam === null) {
+                // 'string'|'number'|'boolean'|'object'|'undefined'|'null'
+                return [key, inputParam]
+            } else if (typeof param === 'function') {
+                // 对象
+                if (!(param as DataAPIClassParam<any>).fromValue) {
+                    throw new Error('Invalid Class param type, missing fromValue')
+                }
+                return [key, (param as DataAPIClassParam<any>).fromValue(inputParam)]
+            } else {
+                throw new Error('Invalid param type')
             }
-            return (param as DataAPIClassParam<any>).fromValue(rawParam)
-        } else {
-            throw new Error('Invalid param type')
-        }
-    })
+
+        }))
+
+    } else {
+        const params = api.params as any[]
+
+        const arrayParams = inputParams as any[]
+        return arrayParams.map((inputParam, index) =>{
+            const param = params[index]
+            if (param === undefined) return inputParam
+
+            if (typeof param === 'string' || inputParam === undefined || inputParam === null) {
+                // 'string'|'number'|'boolean'|'object'|'undefined'|'null'
+                return inputParam
+            } else if (typeof param === 'function') {
+                // 对象
+                if (!(param as DataAPIClassParam<any>).fromValue) {
+                    throw new Error('Invalid Class param type, missing fromValue')
+                }
+                return (param as DataAPIClassParam<any>).fromValue(inputParam)
+            } else {
+                throw new Error('Invalid param type')
+            }
+        })
+    }
+
+
 }
 
 
@@ -82,11 +112,6 @@ function withLogContext(asyncHandle: (request: FastifyRequest, reply: FastifyRep
     }
 }
 
-const defaultMapUserEntity = (syncBody: any) => {
-    return {
-        id: syncBody.userId
-    }
-}
 
 export async function startServer(controller: Controller, options: ServerOptions, dataAPIs: DataAPIs = {}) {
     const fastify = Fastify({
@@ -95,19 +120,6 @@ export async function startServer(controller: Controller, options: ServerOptions
 
     await fastify.register(middie)
     fastify.use(cors(options.cors))
-
-    const mapUserEntity = options.mapUserEntity || defaultMapUserEntity
-
-    // listen 外部系统的用户创建，同步到我们的系统中。
-    // CAUTION webhook 的模式最适合 id 由外部分配。这也意味着我们的系统中不允许自己创建用户！！！。不然 id 同步会出大问题！！！
-    fastify.post('/user/sync', withLogContext(async (request, reply) => {
-        const newUserData = mapUserEntity(request.body)
-        // 验证 id 不能重复。 er 里面应该也要验证。这里只是为了防止重复创建
-        if(!(await controller.system.storage.findOne(USER_ENTITY, MatchExp.atom({key:'id', value: ['=', newUserData.id]}), undefined, ['*']))){
-            // TODO 从 user 中获取必要的字段
-            return await controller.system.storage.create(USER_ENTITY, newUserData)
-        }
-    }))
 
 
     fastify.post('/interaction',  withLogContext(async (request,  reply) => {
@@ -177,11 +189,18 @@ export async function startServer(controller: Controller, options: ServerOptions
         }
 
         // 参数
-        const apiParams = parseDataAPIParams(request.body as any[], api)
+        const apiParams = parseDataAPIParams(request.body as DataAPIConfig["params"], api)
 
-        const result = await dataAPIs[params.apiName].call(controller, {
-            user: user as EventUser
-        }, ...apiParams)
+        let result
+        if(api.useNamedParams) {
+            result = await dataAPIs[params.apiName].call(controller, {
+                user: user as EventUser
+            }, apiParams)
+        }else {
+            result = await dataAPIs[params.apiName].call(controller, {
+                user: user as EventUser
+            }, ...(apiParams as any[]))
+        }
 
         return result
     }))
@@ -201,12 +220,18 @@ export async function startServer(controller: Controller, options: ServerOptions
 
 export function createDataAPI(handle: DataAPIHandle, config: DataAPIConfig = {}): DataAPI {
     assert(!(handle as DataAPI).params, `handle seem to be already a api`)
-    const { params = [],  allowAnonymous = false } = config
-    // 这里的 handle 会默认注入第一个参数为 context，所以下面的判断是 +2
-    assert(handle.length < (params.length || 0) + 2, 'Invalid params length');
+    const { params,  allowAnonymous = false, useNamedParams = false } = config
+
+    if (!useNamedParams) {
+        const arrayParams = (params||[]) as any[]
+        // 这里的 handle 会默认注入第一个参数为 context，所以下面的判断是 +2
+        assert(handle.length < (arrayParams.length || 0) + 2, `Invalid params length, handle length :${handle.length}, params length: ${arrayParams.length}`)
+    }
+
     const api = handle as DataAPI
-    api.params = params;
+    api.params = params
     api.allowAnonymous = allowAnonymous
+    api.useNamedParams = useNamedParams
     return api
 }
 
