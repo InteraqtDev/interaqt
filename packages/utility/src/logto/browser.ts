@@ -3,20 +3,22 @@ import LogtoClient from '@logto/browser';
 export class Client {
     token?: string
     public client: LogtoClient
-    constructor(public endpoint: string, public appId: string, public api_addr: string) {
+    public interactionAddr: string
+    constructor(public endpoint: string, public appId: string, public interaqtEndpoint: string) {
+        this.interactionAddr = `${this.interaqtEndpoint}/interaction`
         this.client =  new LogtoClient({
             endpoint: this.endpoint,
             appId: this.appId,
-            resources:[this.api_addr]
+            resources:[this.interactionAddr]
         })
     }
     async getToken() {
-        this.token =  await this.client.getAccessToken(this.api_addr)
+        this.token =  await this.client.getAccessToken(this.interactionAddr)
     }
     post = async (data:any) => {
         if (!this.token) await this.getToken()
 
-        return (await fetch(`${this.api_addr}`, {
+        return (await fetch(this.interactionAddr, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
