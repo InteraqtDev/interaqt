@@ -29,6 +29,16 @@ export class BoolExp<T> {
     public static atom<U>(data: U) {
         return new BoolExp<U>({ type: 'atom', data })
     }
+    public static and<U>(...atomValues:U[]) {
+        const atomValueWithoutUndefined = atomValues.filter(v => !!v)
+        const [first, ...rest] = atomValueWithoutUndefined
+        return rest.reduce((acc, cur) => acc.and(cur), BoolExp.atom(first))
+    }
+    public static or<U>(...atomValues:U[]) {
+        const atomValueWithoutUndefined = atomValues.filter(v => !!v)
+        const [first, ...rest] = atomValueWithoutUndefined
+        return rest.reduce((acc, cur) => acc.or(cur), BoolExp.atom(first))
+    }
     constructor(public raw: ExpressionData<T>) {
         if (!raw) {
             debugger
