@@ -7,6 +7,10 @@
 Better application framework for LLM era.
 </p>
 
+<p align="center">
+<a href="https://interaqt.dev">https://interaqt.dev</a>
+</p>
+
 # 1. What is Interaqt?
 
 Interaqt is a project dedicated to separating application business logic from its specific implementation. 
@@ -81,6 +85,10 @@ Visit our website for more details.
 
 [https://interaqt.dev](https://interaqt.dev)
 
-# Contributing
+# 5. Support Us
+We invite you to subscribe to our release event or star our project on GitHub.
+Your valuable feedback will help us launch even faster!
+
+# 6. Contributing
 
 All of Interaqt's code is open source, and we welcome contributions in any form. If you have any ideas or find any bugs at this stage, please let us know through an [Issue](https://github.com/InteraqtDev/interaqt/issues).
