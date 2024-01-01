@@ -1206,6 +1206,72 @@
             },
             {
               "kind": "Method",
+              "canonicalReference": "@interaqt/runtime!BoolExp.and:member(1)",
+              "docComment": "",
+              "excerptTokens": [
+                {
+                  "kind": "Content",
+                  "text": "static and<U>(...atomValues: "
+                },
+                {
+                  "kind": "Content",
+                  "text": "U[]"
+                },
+                {
+                  "kind": "Content",
+                  "text": "): "
+                },
+                {
+                  "kind": "Reference",
+                  "text": "BoolExp",
+                  "canonicalReference": "@interaqt/runtime!BoolExp:class"
+                },
+                {
+                  "kind": "Content",
+                  "text": "<U>"
+                },
+                {
+                  "kind": "Content",
+                  "text": ";"
+                }
+              ],
+              "typeParameters": [
+                {
+                  "typeParameterName": "U",
+                  "constraintTokenRange": {
+                    "startIndex": 0,
+                    "endIndex": 0
+                  },
+                  "defaultTypeTokenRange": {
+                    "startIndex": 0,
+                    "endIndex": 0
+                  }
+                }
+              ],
+              "isStatic": true,
+              "returnTypeTokenRange": {
+                "startIndex": 3,
+                "endIndex": 5
+              },
+              "releaseTag": "Public",
+              "isProtected": false,
+              "overloadIndex": 1,
+              "parameters": [
+                {
+                  "parameterName": "atomValues",
+                  "parameterTypeTokenRange": {
+                    "startIndex": 1,
+                    "endIndex": 2
+                  },
+                  "isOptional": false
+                }
+              ],
+              "isOptional": false,
+              "isAbstract": false,
+              "name": "and"
+            },
+            {
+              "kind": "Method",
               "canonicalReference": "@interaqt/runtime!BoolExp.atom:member(1)",
               "docComment": "",
               "excerptTokens": [
@@ -1488,6 +1554,70 @@
               "isOptional": false,
               "isAbstract": false,
               "name": "evaluateAsync"
+            },
+            {
+              "kind": "Method",
+              "canonicalReference": "@interaqt/runtime!BoolExp#find:member(1)",
+              "docComment": "",
+              "excerptTokens": [
+                {
+                  "kind": "Content",
+                  "text": "find(matchFn: "
+                },
+                {
+                  "kind": "Content",
+                  "text": "(atom: T, context: string[]) => boolean"
+                },
+                {
+                  "kind": "Content",
+                  "text": ", context: "
+                },
+                {
+                  "kind": "Content",
+                  "text": "any[]"
+                },
+                {
+                  "kind": "Content",
+                  "text": "): "
+                },
+                {
+                  "kind": "Content",
+                  "text": "T | undefined"
+                },
+                {
+                  "kind": "Content",
+                  "text": ";"
+                }
+              ],
+              "isStatic": false,
+              "returnTypeTokenRange": {
+                "startIndex": 5,
+                "endIndex": 6
+              },
+              "releaseTag": "Public",
+              "isProtected": false,
+              "overloadIndex": 1,
+              "parameters": [
+                {
+                  "parameterName": "matchFn",
+                  "parameterTypeTokenRange": {
+                    "startIndex": 1,
+                    "endIndex": 2
+                  },
+                  "isOptional": false
+                },
+                {
+                  "parameterName": "context",
+                  "parameterTypeTokenRange": {
+                    "startIndex": 3,
+                    "endIndex": 4
+                  },
+                  "isOptional": false
+                }
+              ],
+              "isOptional": false,
+              "isAbstract": false,
+              "name": "find"
             },
             {
               "kind": "Method",
@@ -1915,6 +2045,72 @@
               "parameters": [
                 {
                   "parameterName": "atomValueOrExp",
+                  "parameterTypeTokenRange": {
+                    "startIndex": 1,
+                    "endIndex": 2
+                  },
+                  "isOptional": false
+                }
+              ],
+              "isOptional": false,
+              "isAbstract": false,
+              "name": "or"
+            },
+            {
+              "kind": "Method",
+              "canonicalReference": "@interaqt/runtime!BoolExp.or:member(1)",
+              "docComment": "",
+              "excerptTokens": [
+                {
+                  "kind": "Content",
+                  "text": "static or<U>(...atomValues: "
+                },
+                {
+                  "kind": "Content",
+                  "text": "U[]"
+                },
+                {
+                  "kind": "Content",
+                  "text": "): "
+                },
+                {
+                  "kind": "Reference",
+                  "text": "BoolExp",
+                  "canonicalReference": "@interaqt/runtime!BoolExp:class"
+                },
+                {
+                  "kind": "Content",
+                  "text": "<U>"
+                },
+                {
+                  "kind": "Content",
+                  "text": ";"
+                }
+              ],
+              "typeParameters": [
+                {
+                  "typeParameterName": "U",
+                  "constraintTokenRange": {
+                    "startIndex": 0,
+                    "endIndex": 0
+                  },
+                  "defaultTypeTokenRange": {
+                    "startIndex": 0,
+                    "endIndex": 0
+                  }
+                }
+              ],
+              "isStatic": true,
+              "returnTypeTokenRange": {
+                "startIndex": 3,
+                "endIndex": 5
+              },
+              "releaseTag": "Public",
+              "isProtected": false,
+              "overloadIndex": 1,
+              "parameters": [
+                {
+                  "parameterName": "atomValues",
                   "parameterTypeTokenRange": {
                     "startIndex": 1,
                     "endIndex": 2

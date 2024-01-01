@@ -372,6 +372,8 @@ export const BoolAtomData: Klass<{
 export class BoolExp<T> {
     constructor(raw: ExpressionData<T>);
     // (undocumented)
+    static and<U>(...atomValues: U[]): BoolExp<U>;
+    // (undocumented)
     and(atomValueOrExp: any): BoolExp<T>;
     // (undocumented)
     static atom<U>(data: U): BoolExp<U>;
@@ -381,6 +383,8 @@ export class BoolExp<T> {
     evaluate(atomHandle: AtomHandle<T>, stack?: any[], inverse?: boolean): true | EvaluateError;
     // (undocumented)
     evaluateAsync(atomHandle: AtomHandle<T>, stack?: any[], inverse?: boolean): Promise<true | EvaluateError>;
+    // (undocumented)
+    find(matchFn: (atom: T, context: string[]) => boolean, context: any[]): T | undefined;
     // (undocumented)
     static fromValue<T>(value: ExpressionData<T>): BoolExp<T>;
     // (undocumented)
@@ -401,6 +405,8 @@ export class BoolExp<T> {
     map<U>(fn: MapFn<T, U>, context?: string[]): BoolExp<U>;
     // (undocumented)
     not(): BoolExp<T>;
+    // (undocumented)
+    static or<U>(...atomValues: U[]): BoolExp<U>;
     // (undocumented)
     or(atomValueOrExp: any): BoolExp<T>;
     // (undocumented)
@@ -3770,7 +3776,7 @@ export const WeightedSummation: Klass<{
 //
 // node_modules/@interaqt/shared/dist/index.d.ts:24:9 - (ae-forgotten-export) The symbol "UnwrappedActivityInstanceType" needs to be exported by the entry point index.d.ts
 // node_modules/@interaqt/shared/dist/index.d.ts:287:9 - (ae-forgotten-export) The symbol "CommonAtomPublic" needs to be exported by the entry point index.d.ts
-// node_modules/@interaqt/shared/dist/index.d.ts:1428:9 - (ae-forgotten-export) The symbol "ClassMetaPublicItem" needs to be exported by the entry point index.d.ts
+// node_modules/@interaqt/shared/dist/index.d.ts:1431:9 - (ae-forgotten-export) The symbol "ClassMetaPublicItem" needs to be exported by the entry point index.d.ts
 
 // (No @packageDocumentation comment for this package)
 
