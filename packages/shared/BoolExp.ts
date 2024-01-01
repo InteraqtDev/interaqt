@@ -118,6 +118,22 @@ export class BoolExp<T> {
             return newAtomData instanceof BoolExp ? newAtomData : BoolExp.atom<U>(newAtomData)
         }
     }
+    find(matchFn: (atom: T, context:string[]) => boolean, context: any[]): T|undefined {
+        if(this.isAtom()) {
+            const matched = matchFn(this.data, context)
+            if (matched) {
+                return this.data
+            }
+        } else {
+            const leftMatched = this.left.find(matchFn, context.concat(this))
+            if (leftMatched) {
+                return leftMatched
+            }
+            if (this.right) {
+                return this.right.find(matchFn, context.concat(this))
+            }
+        }
+    }
     evaluate(atomHandle: AtomHandle<T>, stack :any[] = [], inverse: boolean = false): true|EvaluateError {
 
         const currentStack = stack.concat(this.raw)
