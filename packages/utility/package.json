@@ -11,6 +11,7 @@
   "author": "sskyy <skyking_H@hotmail.com>",
   "license": "MIT",
   "dependencies": {
+    "@interaqt/runtime": "^0.8.23",
     "@logto/browser": "^2.2.1",
     "@types/node": "^20.10.5",
     "jose": "^5.2.0",
@@ -24,6 +25,9 @@
   },
   "devDependencies": {
     "@microsoft/api-extractor": "^7.39.0",
-    "rimraf": "^5.0.5"
+    "data0": "^1.0.4",
+    "rimraf": "^5.0.5",
+    "vite-tsconfig-paths": "^4.2.3",
+    "vitest": "^1.1.1"
   }
 }
