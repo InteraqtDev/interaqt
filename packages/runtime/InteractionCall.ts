@@ -398,15 +398,18 @@ export class InteractionCall {
         return savedPayload
     }
     async retrieveData(interactionEvent: InteractionEventArgs) {
-        const matchFn = DataAttributives.is(this.interaction.dataAttributives) ?
-            BoolExp.fromValue<KlassInstance<typeof DataAttributive, false>>(
-                this.interaction.dataAttributives!.content! as ExpressionData<KlassInstance<typeof DataAttributive, false>>
+        const matchFn = this.interaction.dataAttributives ?
+            (DataAttributives.is(this.interaction.dataAttributives) ?
+                BoolExp.fromValue<KlassInstance<typeof DataAttributive, false>>(
+                    this.interaction.dataAttributives!.content! as ExpressionData<KlassInstance<typeof DataAttributive, false>>
+                ) :
+                BoolExp.atom<KlassInstance<typeof DataAttributive, false>>(
+                    this.interaction.dataAttributives as KlassInstance<typeof DataAttributive, false>
+                )
             ) :
-            BoolExp.atom<KlassInstance<typeof DataAttributive, false>>(
-                this.interaction.dataAttributives as KlassInstance<typeof DataAttributive, false>
-            )
+            undefined
 
-        const match = matchFn.map((dataAttributiveAtom) => {
+        const match = matchFn?.map((dataAttributiveAtom) => {
             const { content: createMatch } = dataAttributiveAtom.toValue().data
             return createMatch.call(this.controller, interactionEvent)
         })
@@ -419,7 +422,7 @@ export class InteractionCall {
             // TODO 怎么判断 attributeQuery 是在 fixed 的q范围里面？？？？
             const attributeQuery = interactionEvent.query?.attributeQuery || []
             const matchInQuery = interactionEvent.query?.match ? BoolExp.fromValue(interactionEvent.query?.match) : undefined
-            const finalMatch = matchInQuery ? match.and(matchInQuery) : match
+            const finalMatch = (matchInQuery && match) ? match.and(matchInQuery) : (match || matchInQuery)
             data = await this.system.storage.find(recordName, finalMatch, modifier, attributeQuery)
         } else if (Computation.is(this.interaction.data)){
             // computation
