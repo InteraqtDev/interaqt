@@ -418,7 +418,9 @@ export class InteractionCall {
             const modifier = {...(interactionEvent.query?.modifier||{}), ...(fixedModifier||{})}
             // TODO 怎么判断 attributeQuery 是在 fixed 的q范围里面？？？？
             const attributeQuery = interactionEvent.query?.attributeQuery || []
-            data= await this.system.storage.find(recordName, match, modifier, attributeQuery)
+            const matchInQuery = interactionEvent.query?.match ? BoolExp.fromValue(interactionEvent.query?.match) : undefined
+            const finalMatch = matchInQuery ? match.and(matchInQuery) : match
+            data = await this.system.storage.find(recordName, finalMatch, modifier, attributeQuery)
         } else if (Computation.is(this.interaction.data)){
             // computation
             const { content: computation } = this.interaction.data as KlassInstance<typeof Computation, false>
