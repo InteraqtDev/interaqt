@@ -8,9 +8,15 @@
 
 import { AsyncLocalStorage } from 'async_hooks';
 import { Atom } from 'data0';
+import { Client } from 'pg';
+import { ClientConfig } from 'pg';
+import { Connection } from 'mysql2/promise';
+import { ConnectionOptions } from 'mysql2/promise';
 import cors from 'cors';
 import { FastifyLoggerOptions } from 'fastify';
 import { MatchExpressionData } from '@interaqt/storage';
+import mysql from 'mysql2/promise';
+import { QueryResult } from 'pg';
 import SQLite from 'better-sqlite3';
 import { UnwrapReactive } from 'data0';
 
@@ -2064,6 +2070,53 @@ export class MonoSystem implements System {
 }
 
 // @public (undocumented)
+export class MysqlDB implements Database {
+    constructor(database: string, options?: MysqlDBConfig);
+    // (undocumented)
+    close(): Promise<void>;
+    // (undocumented)
+    database: string;
+    // (undocumented)
+    db: Connection;
+    // (undocumented)
+    delete<T extends any>(sql: string, where: any[], name?: string): Promise<T[]>;
+    // (undocumented)
+    getAutoId(recordName: string): Promise<string>;
+    // (undocumented)
+    getPlaceholder(): () => string;
+    // Warning: (ae-forgotten-export) The symbol "IDSystem_3" needs to be exported by the entry point index.d.ts
+    //
+    // (undocumented)
+    idSystem: IDSystem_3;
+    // (undocumented)
+    insert(sql: string, values: any[], name?: string): Promise<EntityIdRef>;
+    // (undocumented)
+    logger: DatabaseLogger;
+    // (undocumented)
+    mapToDBFieldType(type: string, collection?: boolean): string;
+    // (undocumented)
+    open(forceDrop?: boolean): Promise<void>;
+    // (undocumented)
+    options: MysqlDBConfig;
+    // (undocumented)
+    parseMatchExpression(key: string, value: [string, string], fieldName: string, fieldType: string, isReferenceValue: boolean, getReferenceFieldValue: (v: string) => string, p: () => string): {
+        fieldValue: string;
+        fieldParams: never[];
+    } | undefined;
+    // (undocumented)
+    query<T extends any>(sql: string, where?: any[], name?: string): Promise<T[]>;
+    // (undocumented)
+    scheme(sql: string, name?: string): Promise<[mysql.OkPacket | mysql.RowDataPacket[] | mysql.RowDataPacket[][] | mysql.OkPacket[] | mysql.ProcedureCallPacket | mysql.ResultSetHeader[], mysql.FieldPacket[]]>;
+    // (undocumented)
+    update<T extends any>(sql: string, values: any[], idField?: string, name?: string): Promise<T[]>;
+}
+
+// @public (undocumented)
+export type MysqlDBConfig = Omit<ConnectionOptions, 'database'> & {
+    logger?: DatabaseLogger;
+};
+
+// @public (undocumented)
 export const OperatorNames: {
     '||': string;
     '&&': string;
@@ -2717,6 +2770,53 @@ export const PayloadItem: Klass<{
         }>)[];
     };
 }>;
+
+// @public (undocumented)
+export class PostgreSQLDB implements Database {
+    constructor(database: string, options?: PostgreSQLDBConfig);
+    // (undocumented)
+    close(): Promise<void>;
+    // (undocumented)
+    database: string;
+    // (undocumented)
+    db: Client;
+    // (undocumented)
+    delete<T extends any>(sql: string, where: any[], name?: string): Promise<T[]>;
+    // (undocumented)
+    getAutoId(recordName: string): Promise<string>;
+    // (undocumented)
+    getPlaceholder(): () => string;
+    // Warning: (ae-forgotten-export) The symbol "IDSystem_2" needs to be exported by the entry point index.d.ts
+    //
+    // (undocumented)
+    idSystem: IDSystem_2;
+    // (undocumented)
+    insert(sql: string, values: any[], name?: string): Promise<EntityIdRef>;
+    // (undocumented)
+    logger: DatabaseLogger;
+    // (undocumented)
+    mapToDBFieldType(type: string, collection?: boolean): string;
+    // (undocumented)
+    open(forceDrop?: boolean): Promise<void>;
+    // (undocumented)
+    options: PostgreSQLDBConfig;
+    // (undocumented)
+    parseMatchExpression(key: string, value: [string, string], fieldName: string, fieldType: string, isReferenceValue: boolean, getReferenceFieldValue: (v: string) => string, p: () => string): {
+        fieldValue: string;
+        fieldParams: string[];
+    } | undefined;
+    // (undocumented)
+    query<T extends any>(sql: string, where?: any[], name?: string): Promise<T[]>;
+    // (undocumented)
+    scheme(sql: string, name?: string): Promise<QueryResult<any>>;
+    // (undocumented)
+    update<T extends any>(sql: string, values: any[], idField?: string, name?: string): Promise<T[]>;
+}
+
+// @public (undocumented)
+export type PostgreSQLDBConfig = Omit<ClientConfig, 'database'> & {
+    logger?: DatabaseLogger;
+};
 
 // @public (undocumented)
 export const Property: Klass<{
