@@ -22,13 +22,13 @@ class IDSystem {
     }
 }
 
-export type PostgreSQLDBConfig = Omit<ConnectionOptions, 'database'> & { logger? :DatabaseLogger }
+export type MysqlDBConfig = Omit<ConnectionOptions, 'database'> & { logger? :DatabaseLogger }
 
 export class MysqlDB implements Database{
     idSystem!: IDSystem
     logger: DatabaseLogger
     db!: Connection
-    constructor(public database:string, public options: PostgreSQLDBConfig = {}) {
+    constructor(public database:string, public options: MysqlDBConfig = {}) {
         this.idSystem = new IDSystem(this)
         this.logger = this.options?.logger || pino()
     }
@@ -163,6 +163,8 @@ export class MysqlDB implements Database{
             return 'INT(2)'
         } else if(type === 'number'){
             return "INT"
+        }else if(type === 'timestamp'){
+            return "TIMESTAMP"
         }else{
             return type
         }

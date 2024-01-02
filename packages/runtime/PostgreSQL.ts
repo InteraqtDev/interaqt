@@ -161,6 +161,8 @@ export class PostgreSQLDB implements Database{
             return 'INT(2)'
         } else if(type === 'number'){
             return "INT"
+        }else if(type === 'timestamp'){
+            return "TIMESTAMP"
         }else{
             return type
         }

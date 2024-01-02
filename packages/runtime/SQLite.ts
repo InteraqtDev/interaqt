@@ -133,6 +133,8 @@ export class SQLiteDB implements Database{
             return 'INT(2)'
         } else if(type === 'number'){
             return "INT"
+        }else if(type === 'timestamp'){
+            return "INT"
         }else{
             return type
         }

@@ -10,7 +10,8 @@ import {
     KlassByName,
     Relation,
     removeAllInstance,
-    State
+    State,
+    createDataAPI
 } from "@interaqt/runtime";
 import {startServer} from "../server.js";
 import {MatchAtom} from "@interaqt/storage";
@@ -77,15 +78,18 @@ describe('server test', () => {
         userAId = 11
         userBId = 12
 
-        const getRequests = function(this: Controller, context: DataAPIContext, match: BoolExp<MatchAtom>) {
+        const getRequests = createDataAPI(function(this: Controller, context: DataAPIContext, match: BoolExp<MatchAtom>) {
             return this.system.storage.find('Request', match, undefined, ['*',
                 ['from', {attributeQuery: ["*"]}],
                 ['to', {
                     attributeQuery: ["*", ["&", {attributeQuery:["*"]}]]
                 }]
             ])
-        }
-        getRequests.params = [BoolExp<MatchAtom>]
+        }, { params: [BoolExp<MatchAtom>]})
+
+        const syncUser = createDataAPI(function syncUser(this: Controller, context: DataAPIContext, body: any) {
+            return this.system.storage.create('User', { id: body.userId })
+        }, {allowAnonymous:true, useNamedParams: true})
 
         startServer(controller,  {
             port: 8082,
@@ -94,7 +98,8 @@ describe('server test', () => {
                 return headers.userid
             }
         }, {
-            getRequests
+            getRequests,
+            syncUser
         })
     })
 
@@ -105,14 +110,14 @@ describe('server test', () => {
         expect(await response.json()).toMatchObject({ message: 'pong' })
 
         // 1. 创建用户 a
-        const resp1 = await post('http://localhost:8082/user/sync', {
+        const resp1 = await post('http://localhost:8082/api/syncUser', {
             userId: userAId
         })
         expect(resp1.status).toBe(200)
 
 
         // 2. 创建用户 b
-        await post('http://localhost:8082/user/sync', {
+        await post('http://localhost:8082/api/syncUser', {
             userId: userBId
         })
 
