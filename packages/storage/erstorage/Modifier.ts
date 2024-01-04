@@ -2,7 +2,7 @@ import {EntityToTableMap} from "./EntityToTableMap.js";
 
 export type ModifierData = {
     orderBy?: {
-        [k: string]: string
+        [k: string]: 'ASC'|'DESC'
     },
     limit?: number,
     offset?: number
