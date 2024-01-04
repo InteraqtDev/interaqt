@@ -136,9 +136,9 @@ export type ActivityGroupPublicType = {
 export type ActivityInstanceType = KlassInstance<typeof Activity, false>;
 
 // @public (undocumented)
-export const Any: Klass<{
+export const Any: Klass<    {
     record: {
-        type: (Klass<{
+        type: (Klass<    {
             name: {
                 type: "string";
                 collection: false;
@@ -155,7 +155,7 @@ export const Any: Klass<{
                 required: false;
             };
             properties: {
-                type: Klass<{
+                type: Klass<    {
                     name: {
                         type: "string";
                         required: true;
@@ -823,7 +823,7 @@ export const Computation: Klass<    {
 }>;
 
 // @public (undocumented)
-export const ComputedData: Klass<{
+export const ComputedData: Klass<    {
     computeEffect: {
         type: "string";
         collection: false;
@@ -1034,9 +1034,9 @@ export class Controller {
 }
 
 // @public (undocumented)
-export const Count: Klass<{
+export const Count: Klass<    {
     record: {
-        type: (Klass<{
+        type: (Klass<    {
             name: {
                 type: "string";
                 collection: false;
@@ -1053,7 +1053,7 @@ export const Count: Klass<{
                 required: false;
             };
             properties: {
-                type: Klass<{
+                type: Klass<    {
                     name: {
                         type: "string";
                         required: true;
@@ -1541,9 +1541,9 @@ export type EventUser = {
 };
 
 // @public (undocumented)
-export const Every: Klass<{
+export const Every: Klass<    {
     record: {
-        type: (Klass<{
+        type: (Klass<    {
             name: {
                 type: "string";
                 collection: false;
@@ -1560,7 +1560,7 @@ export const Every: Klass<{
                 required: false;
             };
             properties: {
-                type: Klass<{
+                type: Klass<    {
                     name: {
                         type: "string";
                         required: true;
@@ -1833,11 +1833,11 @@ export type KlassOptions = {
 export type KlassProp<REACTIVE extends boolean, COLLECTION extends true | false | undefined, T> = IfReactiveCollectionProp<REACTIVE, COLLECTION, T>;
 
 // @public (undocumented)
-export const MapActivity: Klass<{
+export const MapActivity: Klass<    {
     items: {
-        type: Klass<{
+        type: Klass<    {
             activity: {
-                type: Klass<{
+                type: Klass<    {
                     name: {
                         type: "string";
                         collection: false;
@@ -1864,7 +1864,7 @@ export const MapActivity: Klass<{
                         defaultValue: (...args: any[]) => (InertKlassInstance<GatewayPublicType> | ReactiveKlassInstance<GatewayPublicType>)[];
                     };
                     events: {
-                        type: Klass<{
+                        type: Klass<    {
                             name: {
                                 type: "string";
                                 required: true;
@@ -1914,9 +1914,9 @@ export const MapActivity: Klass<{
 }>;
 
 // @public (undocumented)
-export const MapActivityItem: Klass<{
+export const MapActivityItem: Klass<    {
     activity: {
-        type: Klass<{
+        type: Klass<    {
             name: {
                 type: "string";
                 collection: false;
@@ -1943,7 +1943,7 @@ export const MapActivityItem: Klass<{
                 defaultValue: (...args: any[]) => (InertKlassInstance<GatewayPublicType> | ReactiveKlassInstance<GatewayPublicType>)[];
             };
             events: {
-                type: Klass<{
+                type: Klass<    {
                     name: {
                         type: "string";
                         required: true;
@@ -1984,9 +1984,9 @@ export const MapActivityItem: Klass<{
 }>;
 
 // @public (undocumented)
-export const MapInteraction: Klass<{
+export const MapInteraction: Klass<    {
     items: {
-        type: Klass<{
+        type: Klass<    {
             interaction: {
                 type: Klass<InteractionPublicType>;
                 collection: false;
@@ -2014,7 +2014,7 @@ export const MapInteraction: Klass<{
 }>;
 
 // @public (undocumented)
-export const MapInteractionItem: Klass<{
+export const MapInteractionItem: Klass<    {
     interaction: {
         type: Klass<InteractionPublicType>;
         collection: false;
@@ -2033,7 +2033,7 @@ export const MapInteractionItem: Klass<{
 }>;
 
 // @public (undocumented)
-export const MapRecordMutation: Klass<{
+export const MapRecordMutation: Klass<    {
     map: {
         type: "function";
         collection: false;
@@ -2127,10 +2127,11 @@ export const OperatorNames: {
 // Warning: (ae-forgotten-export) The symbol "ExtractKlassTypes" needs to be exported by the entry point index.d.ts
 // Warning: (ae-forgotten-export) The symbol "PrimitivePropType" needs to be exported by the entry point index.d.ts
 // Warning: (ae-forgotten-export) The symbol "PrimitivePropertyMap" needs to be exported by the entry point index.d.ts
+// Warning: (ae-forgotten-export) The symbol "ExtractPrimitiveTypes" needs to be exported by the entry point index.d.ts
 //
 // @public (undocumented)
 export type OptionalProps<T extends NonNullable<KlassMeta["public"]>, REACTIVE extends true | false, IS_ARG extends true | false> = Partial<OmitNever<{
-    [Key in keyof T]: RequireWithoutDefaultAndComputed<T[Key], IS_ARG> extends true ? never : (T[Key]["instanceType"] extends Object ? KlassProp<REACTIVE, T[Key]["collection"], T[Key]["instanceType"]> : (T[Key]['type'] extends Klass<any> ? KlassProp<REACTIVE, T[Key]["collection"], InertKlassInstance<T[Key]['type']['public']>> : T[Key]['type'] extends Klass<any>[] ? ExtractKlassTypes<REACTIVE, T[Key]["collection"], T[Key]['type']> : T[Key]['type'] extends PrimitivePropType ? KlassProp<REACTIVE, T[Key]["collection"], PrimitivePropertyMap[T[Key]['type']]> : never));
+    [Key in keyof T]: RequireWithoutDefaultAndComputed<T[Key], IS_ARG> extends true ? never : (T[Key]["instanceType"] extends Object ? KlassProp<REACTIVE, T[Key]["collection"], T[Key]["instanceType"]> : (T[Key]['type'] extends Klass<any> ? KlassProp<REACTIVE, T[Key]["collection"], InertKlassInstance<T[Key]['type']['public']>> : T[Key]['type'] extends Klass<any>[] ? ExtractKlassTypes<REACTIVE, T[Key]["collection"], T[Key]['type']> : T[Key]['type'] extends PrimitivePropType ? KlassProp<REACTIVE, T[Key]["collection"], PrimitivePropertyMap[T[Key]['type']]> : T[Key]['type'] extends PrimitivePropType[] ? ExtractPrimitiveTypes<REACTIVE, T[Key]["collection"], T[Key]['type']> : never));
 }>>;
 
 // Warning: (ae-forgotten-export) The symbol "ParseAtomNameToObjectType" needs to be exported by the entry point index.d.ts
@@ -2944,7 +2945,7 @@ export type RecordMutationEvent = {
 export const Relation: Klass<RelationPublic>;
 
 // @public (undocumented)
-export const RelationBasedAny: Klass<{
+export const RelationBasedAny: Klass<    {
     relation: {
         type: Klass<RelationPublic>;
         collection: false;
@@ -2964,7 +2965,7 @@ export const RelationBasedAny: Klass<{
 }>;
 
 // @public (undocumented)
-export const RelationBasedEvery: Klass<{
+export const RelationBasedEvery: Klass<    {
     relation: {
         type: Klass<RelationPublic>;
         collection: false;
@@ -2989,9 +2990,9 @@ export const RelationBasedEvery: Klass<{
 }>;
 
 // @public (undocumented)
-export const RelationBasedWeightedSummation: Klass<{
+export const RelationBasedWeightedSummation: Klass<    {
     relations: {
-        type: Klass<{
+        type: Klass<    {
             relation: {
                 type: Klass<RelationPublic>;
                 collection: false;
@@ -3015,7 +3016,7 @@ export const RelationBasedWeightedSummation: Klass<{
 }>;
 
 // @public (undocumented)
-export const RelationCount: Klass<{
+export const RelationCount: Klass<    {
     relation: {
         type: Klass<RelationPublic>;
         collection: false;
@@ -3100,375 +3101,11 @@ export type RelationPublic = {
 };
 
 // @public (undocumented)
-export const RelationStateMachine: Klass<{
-    states: {
-        type: Klass<{
-            hasRelation: {
-                type: "boolean";
-                required: true;
-                collection: false;
-            };
-            fixedProperties: {
-                type: Klass<{
-                    name: {
-                        type: "string";
-                        collection: false;
-                        required: true;
-                    };
-                    value: {
-                        type: Klass<any>[];
-                        collection: false;
-                        required: true;
-                    };
-                }>;
-                collection: true;
-                required: false;
-            };
-            propertyHandle: {
-                type: "function";
-                required: false;
-                collection: false;
-            };
-        }>;
-        collection: true;
-        required: true;
-    };
-    transfers: {
-        type: Klass<{
-            sourceActivity: {
-                type: Klass<{
-                    name: {
-                        type: "string";
-                        collection: false;
-                        required: true;
-                    };
-                    interactions: {
-                        type: Klass<InteractionPublicType>;
-                        collection: true;
-                        defaultValue: (...args: any[]) => (InertKlassInstance<InteractionPublicType> | ReactiveKlassInstance<InteractionPublicType>)[];
-                    };
-                    transfers: {
-                        type: Klass<TransferPublicType>;
-                        collection: true;
-                        defaultValue: (...args: any[]) => (ReactiveKlassInstance<TransferPublicType> | InertKlassInstance<TransferPublicType>)[];
-                    };
-                    groups: {
-                        type: Klass<ActivityGroupPublicType>;
-                        collection: true;
-                        defaultValue: (...args: any[]) => (InertKlassInstance<ActivityGroupPublicType> | ReactiveKlassInstance<ActivityGroupPublicType>)[];
-                    };
-                    gateways: {
-                        type: Klass<GatewayPublicType>;
-                        collection: true;
-                        defaultValue: (...args: any[]) => (InertKlassInstance<GatewayPublicType> | ReactiveKlassInstance<GatewayPublicType>)[];
-                    };
-                    events: {
-                        type: Klass<{
-                            name: {
-                                type: "string";
-                                required: true;
-                            };
-                        }>;
-                        collection: true;
-                        defaultValue: (...args: any[]) => (ReactiveKlassInstance<    {
-                            name: {
-                                type: "string";
-                                required: true;
-                            };
-                        }> | InertKlassInstance<    {
-                            name: {
-                                type: "string";
-                                required: true;
-                            };
-                        }>)[];
-                    };
-                }>;
-                collection: false;
-                required: false;
-            };
-            triggerInteraction: {
-                type: Klass<InteractionPublicType>;
-                collection: false;
-                required: true;
-            };
-            fromState: {
-                type: Klass<{
-                    hasRelation: {
-                        type: "boolean";
-                        required: true;
-                        collection: false;
-                    };
-                    fixedProperties: {
-                        type: Klass<{
-                            name: {
-                                type: "string";
-                                collection: false;
-                                required: true;
-                            };
-                            value: {
-                                type: Klass<any>[];
-                                collection: false;
-                                required: true;
-                            };
-                        }>;
-                        collection: true;
-                        required: false;
-                    };
-                    propertyHandle: {
-                        type: "function";
-                        required: false;
-                        collection: false;
-                    };
-                }>;
-                collection: false;
-                required: true;
-            };
-            toState: {
-                type: Klass<{
-                    hasRelation: {
-                        type: "boolean";
-                        required: true;
-                        collection: false;
-                    };
-                    fixedProperties: {
-                        type: Klass<{
-                            name: {
-                                type: "string";
-                                collection: false;
-                                required: true;
-                            };
-                            value: {
-                                type: Klass<any>[];
-                                collection: false;
-                                required: true;
-                            };
-                        }>;
-                        collection: true;
-                        required: false;
-                    };
-                    propertyHandle: {
-                        type: "function";
-                        required: false;
-                        collection: false;
-                    };
-                }>;
-                collection: false;
-                required: true;
-            };
-            handleType: {
-                type: "string";
-            };
-            handle: {
-                type: "function";
-                collection: false;
-                required: true;
-            };
-        }>;
-        collection: true;
-        required: true;
-    };
-    defaultState: {
-        type: Klass<{
-            hasRelation: {
-                type: "boolean";
-                required: true;
-                collection: false;
-            };
-            fixedProperties: {
-                type: Klass<{
-                    name: {
-                        type: "string";
-                        collection: false;
-                        required: true;
-                    };
-                    value: {
-                        type: Klass<any>[];
-                        collection: false;
-                        required: true;
-                    };
-                }>;
-                collection: true;
-                required: false;
-            };
-            propertyHandle: {
-                type: "function";
-                required: false;
-                collection: false;
-            };
-        }>;
-        collection: false;
-        required: true;
-    };
-}>;
-
-// @public (undocumented)
-export const RelationStateNode: Klass<{
-    hasRelation: {
-        type: "boolean";
-        required: true;
-        collection: false;
-    };
-    fixedProperties: {
-        type: Klass<{
-            name: {
-                type: "string";
-                collection: false;
-                required: true;
-            };
-            value: {
-                type: Klass<any>[];
-                collection: false;
-                required: true;
-            };
-        }>;
-        collection: true;
-        required: false;
-    };
-    propertyHandle: {
-        type: "function";
-        required: false;
-        collection: false;
-    };
-}>;
-
-// @public (undocumented)
-export const RelationStateTransfer: Klass<{
-    sourceActivity: {
-        type: Klass<{
-            name: {
-                type: "string";
-                collection: false;
-                required: true;
-            };
-            interactions: {
-                type: Klass<InteractionPublicType>;
-                collection: true;
-                defaultValue: (...args: any[]) => (InertKlassInstance<InteractionPublicType> | ReactiveKlassInstance<InteractionPublicType>)[];
-            };
-            transfers: {
-                type: Klass<TransferPublicType>;
-                collection: true;
-                defaultValue: (...args: any[]) => (ReactiveKlassInstance<TransferPublicType> | InertKlassInstance<TransferPublicType>)[];
-            };
-            groups: {
-                type: Klass<ActivityGroupPublicType>;
-                collection: true;
-                defaultValue: (...args: any[]) => (InertKlassInstance<ActivityGroupPublicType> | ReactiveKlassInstance<ActivityGroupPublicType>)[];
-            };
-            gateways: {
-                type: Klass<GatewayPublicType>;
-                collection: true;
-                defaultValue: (...args: any[]) => (InertKlassInstance<GatewayPublicType> | ReactiveKlassInstance<GatewayPublicType>)[];
-            };
-            events: {
-                type: Klass<{
-                    name: {
-                        type: "string";
-                        required: true;
-                    };
-                }>;
-                collection: true;
-                defaultValue: (...args: any[]) => (ReactiveKlassInstance<    {
-                    name: {
-                        type: "string";
-                        required: true;
-                    };
-                }> | InertKlassInstance<    {
-                    name: {
-                        type: "string";
-                        required: true;
-                    };
-                }>)[];
-            };
-        }>;
-        collection: false;
-        required: false;
-    };
-    triggerInteraction: {
-        type: Klass<InteractionPublicType>;
-        collection: false;
-        required: true;
-    };
-    fromState: {
-        type: Klass<{
-            hasRelation: {
-                type: "boolean";
-                required: true;
-                collection: false;
-            };
-            fixedProperties: {
-                type: Klass<{
-                    name: {
-                        type: "string";
-                        collection: false;
-                        required: true;
-                    };
-                    value: {
-                        type: Klass<any>[];
-                        collection: false;
-                        required: true;
-                    };
-                }>;
-                collection: true;
-                required: false;
-            };
-            propertyHandle: {
-                type: "function";
-                required: false;
-                collection: false;
-            };
-        }>;
-        collection: false;
-        required: true;
-    };
-    toState: {
-        type: Klass<{
-            hasRelation: {
-                type: "boolean";
-                required: true;
-                collection: false;
-            };
-            fixedProperties: {
-                type: Klass<{
-                    name: {
-                        type: "string";
-                        collection: false;
-                        required: true;
-                    };
-                    value: {
-                        type: Klass<any>[];
-                        collection: false;
-                        required: true;
-                    };
-                }>;
-                collection: true;
-                required: false;
-            };
-            propertyHandle: {
-                type: "function";
-                required: false;
-                collection: false;
-            };
-        }>;
-        collection: false;
-        required: true;
-    };
-    handleType: {
-        type: "string";
-    };
-    handle: {
-        type: "function";
-        collection: false;
-        required: true;
-    };
-}>;
-
-// @public (undocumented)
 export function removeAllInstance(): void;
 
 // @public (undocumented)
 export type RequiredProps<T extends NonNullable<KlassMeta["public"]>, REACTIVE extends true | false, IS_ARG extends true | false> = OmitNever<{
-    [Key in keyof T]: RequireWithoutDefaultAndComputed<T[Key], IS_ARG> extends true ? (T[Key]["instanceType"] extends Object ? KlassProp<REACTIVE, T[Key]["collection"], T[Key]["instanceType"]> : (T[Key]['type'] extends Klass<any> ? KlassProp<REACTIVE, T[Key]["collection"], InertKlassInstance<T[Key]['type']['public']>> : T[Key]['type'] extends Klass<any>[] ? ExtractKlassTypes<REACTIVE, T[Key]["collection"], T[Key]['type']> : T[Key]['type'] extends PrimitivePropType ? KlassProp<REACTIVE, T[Key]["collection"], PrimitivePropertyMap[T[Key]['type']]> : never)) : never;
+    [Key in keyof T]: RequireWithoutDefaultAndComputed<T[Key], IS_ARG> extends true ? (T[Key]["instanceType"] extends Object ? KlassProp<REACTIVE, T[Key]["collection"], T[Key]["instanceType"]> : (T[Key]['type'] extends Klass<any> ? KlassProp<REACTIVE, T[Key]["collection"], InertKlassInstance<T[Key]['type']['public']>> : T[Key]['type'] extends Klass<any>[] ? ExtractKlassTypes<REACTIVE, T[Key]["collection"], T[Key]['type']> : T[Key]['type'] extends PrimitivePropType ? KlassProp<REACTIVE, T[Key]["collection"], PrimitivePropertyMap[T[Key]['type']]> : T[Key]['type'] extends PrimitivePropType[] ? ExtractPrimitiveTypes<REACTIVE, T[Key]["collection"], T[Key]['type']> : never)) : never;
 }>;
 
 // Warning: (ae-forgotten-export) The symbol "DefaultValueType" needs to be exported by the entry point index.d.ts
@@ -3584,6 +3221,156 @@ export const State: Klass<{
         collection: false;
         type: Klass<any>[];
         required: false;
+    };
+}>;
+
+// @public (undocumented)
+export const StateMachine: Klass<    {
+    states: {
+        type: Klass<    {
+            value: {
+                type: ("string" | "number" | "boolean" | "object" | "null")[];
+                collection: false;
+                required: false;
+            };
+            propertyHandle: {
+                type: "function";
+                required: false;
+                collection: false;
+            };
+        }>;
+        collection: true;
+        required: true;
+    };
+    transfers: {
+        type: Klass<    {
+            triggerInteraction: {
+                type: Klass<InteractionPublicType>;
+                collection: false;
+                required: true;
+            };
+            fromState: {
+                type: Klass<    {
+                    value: {
+                        type: ("string" | "number" | "boolean" | "object" | "null")[];
+                        collection: false;
+                        required: false;
+                    };
+                    propertyHandle: {
+                        type: "function";
+                        required: false;
+                        collection: false;
+                    };
+                }>;
+                collection: false;
+                required: true;
+            };
+            toState: {
+                type: Klass<    {
+                    value: {
+                        type: ("string" | "number" | "boolean" | "object" | "null")[];
+                        collection: false;
+                        required: false;
+                    };
+                    propertyHandle: {
+                        type: "function";
+                        required: false;
+                        collection: false;
+                    };
+                }>;
+                collection: false;
+                required: true;
+            };
+            handleType: {
+                type: "string";
+            };
+            handle: {
+                type: "function";
+                collection: false;
+                required: true;
+            };
+        }>;
+        collection: true;
+        required: true;
+    };
+    defaultState: {
+        type: Klass<    {
+            value: {
+                type: ("string" | "number" | "boolean" | "object" | "null")[];
+                collection: false;
+                required: false;
+            };
+            propertyHandle: {
+                type: "function";
+                required: false;
+                collection: false;
+            };
+        }>;
+        collection: false;
+        required: true;
+    };
+}>;
+
+// @public (undocumented)
+export const StateNode: Klass<    {
+    value: {
+        type: ("string" | "number" | "boolean" | "object" | "null")[];
+        collection: false;
+        required: false;
+    };
+    propertyHandle: {
+        type: "function";
+        required: false;
+        collection: false;
+    };
+}>;
+
+// @public (undocumented)
+export const StateTransfer: Klass<    {
+    triggerInteraction: {
+        type: Klass<InteractionPublicType>;
+        collection: false;
+        required: true;
+    };
+    fromState: {
+        type: Klass<    {
+            value: {
+                type: ("string" | "number" | "boolean" | "object" | "null")[];
+                collection: false;
+                required: false;
+            };
+            propertyHandle: {
+                type: "function";
+                required: false;
+                collection: false;
+            };
+        }>;
+        collection: false;
+        required: true;
+    };
+    toState: {
+        type: Klass<    {
+            value: {
+                type: ("string" | "number" | "boolean" | "object" | "null")[];
+                collection: false;
+                required: false;
+            };
+            propertyHandle: {
+                type: "function";
+                required: false;
+                collection: false;
+            };
+        }>;
+        collection: false;
+        required: true;
+    };
+    handleType: {
+        type: "string";
+    };
+    handle: {
+        type: "function";
+        collection: false;
+        required: true;
     };
 }>;
 
@@ -3787,9 +3574,9 @@ export type VariableNode = {
 };
 
 // @public (undocumented)
-export const WeightedSummation: Klass<{
+export const WeightedSummation: Klass<    {
     records: {
-        type: (Klass<{
+        type: (Klass<    {
             name: {
                 type: "string";
                 collection: false;
@@ -3806,7 +3593,7 @@ export const WeightedSummation: Klass<{
                 required: false;
             };
             properties: {
-                type: Klass<{
+                type: Klass<    {
                     name: {
                         type: "string";
                         required: true;
@@ -3876,7 +3663,7 @@ export const WeightedSummation: Klass<{
 //
 // node_modules/@interaqt/shared/dist/index.d.ts:24:9 - (ae-forgotten-export) The symbol "UnwrappedActivityInstanceType" needs to be exported by the entry point index.d.ts
 // node_modules/@interaqt/shared/dist/index.d.ts:287:9 - (ae-forgotten-export) The symbol "CommonAtomPublic" needs to be exported by the entry point index.d.ts
-// node_modules/@interaqt/shared/dist/index.d.ts:1431:9 - (ae-forgotten-export) The symbol "ClassMetaPublicItem" needs to be exported by the entry point index.d.ts
+// node_modules/@interaqt/shared/dist/index.d.ts:1433:9 - (ae-forgotten-export) The symbol "ClassMetaPublicItem" needs to be exported by the entry point index.d.ts
 
 // (No @packageDocumentation comment for this package)
 

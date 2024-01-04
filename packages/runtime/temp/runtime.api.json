@@ -590,7 +590,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n    record: {\n        type: ("
+              "text": "<    {\nrecord: {\ntype: ("
             },
             {
               "kind": "Reference",
@@ -599,7 +599,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n            name: {\n                type: \"string\";\n                collection: false;\n                required: true;\n                constraints: {\n                    nameFormat({ name }: {\n                        name: "
+              "text": "<    {\nname: {\ntype: \"string\";\ncollection: false;\nrequired: true;\nconstraints: {\nnameFormat({ name }: {\nname: "
             },
             {
               "kind": "Reference",
@@ -608,7 +608,7 @@
             },
             {
               "kind": "Content",
-              "text": "<string>;\n                    }): "
+              "text": "<string>;\n}): "
             },
             {
               "kind": "Reference",
@@ -617,7 +617,7 @@
             },
             {
               "kind": "Content",
-              "text": "<boolean>;\n                };\n            };\n            computedData: {\n                type: "
+              "text": "<boolean>;\n};\n};\ncomputedData: {\ntype: "
             },
             {
               "kind": "Reference",
@@ -626,7 +626,7 @@
             },
             {
               "kind": "Content",
-              "text": "<any>[];\n                collection: false;\n                required: false;\n            };\n            properties: {\n                type: "
+              "text": "<any>[];\ncollection: false;\nrequired: false;\n};\nproperties: {\ntype: "
             },
             {
               "kind": "Reference",
@@ -635,7 +635,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                    name: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        constraints: {\n                            format({ name }: {\n                                name: "
+              "text": "<    {\nname: {\ntype: \"string\";\nrequired: true;\ncollection: false;\nconstraints: {\nformat({ name }: {\nname: "
             },
             {
               "kind": "Reference",
@@ -644,7 +644,7 @@
             },
             {
               "kind": "Content",
-              "text": "<string>;\n                            }): "
+              "text": "<string>;\n}): "
             },
             {
               "kind": "Reference",
@@ -653,7 +653,7 @@
             },
             {
               "kind": "Content",
-              "text": "<boolean>;\n                            length({ name }: {\n                                name: "
+              "text": "<boolean>;\nlength({ name }: {\nname: "
             },
             {
               "kind": "Reference",
@@ -662,7 +662,7 @@
             },
             {
               "kind": "Content",
-              "text": "<string>;\n                            }): "
+              "text": "<string>;\n}): "
             },
             {
               "kind": "Reference",
@@ -671,7 +671,7 @@
             },
             {
               "kind": "Content",
-              "text": "<boolean>;\n                        };\n                    };\n                    type: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        options: "
+              "text": "<boolean>;\n};\n};\ntype: {\ntype: \"string\";\nrequired: true;\ncollection: false;\noptions: "
             },
             {
               "kind": "Reference",
@@ -680,7 +680,7 @@
             },
             {
               "kind": "Content",
-              "text": "[];\n                    };\n                    collection: {\n                        type: \"boolean\";\n                        required: true;\n                        collection: false;\n                        defaultValue(): boolean;\n                    };\n                    args: {\n                        computedType: (values: {\n                            type: "
+              "text": "[];\n};\ncollection: {\ntype: \"boolean\";\nrequired: true;\ncollection: false;\ndefaultValue(): boolean;\n};\nargs: {\ncomputedType: (values: {\ntype: "
             },
             {
               "kind": "Reference",
@@ -689,7 +689,7 @@
             },
             {
               "kind": "Content",
-              "text": ";\n                        }) => string;\n                    };\n                    computedData: {\n                        collection: false;\n                        type: "
+              "text": ";\n}) => string;\n};\ncomputedData: {\ncollection: false;\ntype: "
             },
             {
               "kind": "Reference",
@@ -698,7 +698,7 @@
             },
             {
               "kind": "Content",
-              "text": "<any>[];\n                        required: false;\n                    };\n                    computed: {\n                        required: false;\n                        type: \"function\";\n                        collection: false;\n                    };\n                }>;\n                collection: true;\n                required: true;\n                constraints: {\n                    eachNameUnique({ properties }: any): "
+              "text": "<any>[];\nrequired: false;\n};\ncomputed: {\nrequired: false;\ntype: \"function\";\ncollection: false;\n};\n}>;\ncollection: true;\nrequired: true;\nconstraints: {\neachNameUnique({ properties }: any): "
             },
             {
               "kind": "Reference",
@@ -707,7 +707,7 @@
             },
             {
               "kind": "Content",
-              "text": "<boolean>;\n                };\n                defaultValue(): never[];\n            };\n            isRef: {\n                required: true;\n                collection: false;\n                type: \"boolean\";\n                defaultValue: () => boolean;\n            };\n        }> | "
+              "text": "<boolean>;\n};\ndefaultValue(): never[];\n};\nisRef: {\nrequired: true;\ncollection: false;\ntype: \"boolean\";\ndefaultValue: () => boolean;\n};\n}> | "
             },
             {
               "kind": "Reference",
@@ -725,7 +725,7 @@
             },
             {
               "kind": "Content",
-              "text": ">)[];\n        collection: false;\n        required: true;\n    };\n    match: {\n        type: \"function\";\n        collection: false;\n        required: true;\n    };\n}>"
+              "text": ">)[];\ncollection: false;\nrequired: true;\n};\nmatch: {\ntype: \"function\";\ncollection: false;\nrequired: true;\n};\n}>"
             }
           ],
           "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
@@ -3106,7 +3106,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n    computeEffect: {\n        type: \"string\";\n        collection: false;\n        required: true;\n    };\n    computation: {\n        type: \"string\";\n        collection: false;\n        required: true;\n    };\n}>"
+              "text": "<    {\ncomputeEffect: {\ntype: \"string\";\ncollection: false;\nrequired: true;\n};\ncomputation: {\ntype: \"string\";\ncollection: false;\nrequired: true;\n};\n}>"
             }
           ],
           "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
@@ -4737,7 +4737,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n    record: {\n        type: ("
+              "text": "<    {\nrecord: {\ntype: ("
             },
             {
               "kind": "Reference",
@@ -4746,7 +4746,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n            name: {\n                type: \"string\";\n                collection: false;\n                required: true;\n                constraints: {\n                    nameFormat({ name }: {\n                        name: "
+              "text": "<    {\nname: {\ntype: \"string\";\ncollection: false;\nrequired: true;\nconstraints: {\nnameFormat({ name }: {\nname: "
             },
             {
               "kind": "Reference",
@@ -4755,7 +4755,7 @@
             },
             {
               "kind": "Content",
-              "text": "<string>;\n                    }): "
+              "text": "<string>;\n}): "
             },
             {
               "kind": "Reference",
@@ -4764,7 +4764,7 @@
             },
             {
               "kind": "Content",
-              "text": "<boolean>;\n                };\n            };\n            computedData: {\n                type: "
+              "text": "<boolean>;\n};\n};\ncomputedData: {\ntype: "
             },
             {
               "kind": "Reference",
@@ -4773,7 +4773,7 @@
             },
             {
               "kind": "Content",
-              "text": "<any>[];\n                collection: false;\n                required: false;\n            };\n            properties: {\n                type: "
+              "text": "<any>[];\ncollection: false;\nrequired: false;\n};\nproperties: {\ntype: "
             },
             {
               "kind": "Reference",
@@ -4782,7 +4782,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                    name: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        constraints: {\n                            format({ name }: {\n                                name: "
+              "text": "<    {\nname: {\ntype: \"string\";\nrequired: true;\ncollection: false;\nconstraints: {\nformat({ name }: {\nname: "
             },
             {
               "kind": "Reference",
@@ -4791,7 +4791,7 @@
             },
             {
               "kind": "Content",
-              "text": "<string>;\n                            }): "
+              "text": "<string>;\n}): "
             },
             {
               "kind": "Reference",
@@ -4800,7 +4800,7 @@
             },
             {
               "kind": "Content",
-              "text": "<boolean>;\n                            length({ name }: {\n                                name: "
+              "text": "<boolean>;\nlength({ name }: {\nname: "
             },
             {
               "kind": "Reference",
@@ -4809,7 +4809,7 @@
             },
             {
               "kind": "Content",
-              "text": "<string>;\n                            }): "
+              "text": "<string>;\n}): "
             },
             {
               "kind": "Reference",
@@ -4818,7 +4818,7 @@
             },
             {
               "kind": "Content",
-              "text": "<boolean>;\n                        };\n                    };\n                    type: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        options: "
+              "text": "<boolean>;\n};\n};\ntype: {\ntype: \"string\";\nrequired: true;\ncollection: false;\noptions: "
             },
             {
               "kind": "Reference",
@@ -4827,7 +4827,7 @@
             },
             {
               "kind": "Content",
-              "text": "[];\n                    };\n                    collection: {\n                        type: \"boolean\";\n                        required: true;\n                        collection: false;\n                        defaultValue(): boolean;\n                    };\n                    args: {\n                        computedType: (values: {\n                            type: "
+              "text": "[];\n};\ncollection: {\ntype: \"boolean\";\nrequired: true;\ncollection: false;\ndefaultValue(): boolean;\n};\nargs: {\ncomputedType: (values: {\ntype: "
             },
             {
               "kind": "Reference",
@@ -4836,7 +4836,7 @@
             },
             {
               "kind": "Content",
-              "text": ";\n                        }) => string;\n                    };\n                    computedData: {\n                        collection: false;\n                        type: "
+              "text": ";\n}) => string;\n};\ncomputedData: {\ncollection: false;\ntype: "
             },
             {
               "kind": "Reference",
@@ -4845,7 +4845,7 @@
             },
             {
               "kind": "Content",
-              "text": "<any>[];\n                        required: false;\n                    };\n                    computed: {\n                        required: false;\n                        type: \"function\";\n                        collection: false;\n                    };\n                }>;\n                collection: true;\n                required: true;\n                constraints: {\n                    eachNameUnique({ properties }: any): "
+              "text": "<any>[];\nrequired: false;\n};\ncomputed: {\nrequired: false;\ntype: \"function\";\ncollection: false;\n};\n}>;\ncollection: true;\nrequired: true;\nconstraints: {\neachNameUnique({ properties }: any): "
             },
             {
               "kind": "Reference",
@@ -4854,7 +4854,7 @@
             },
             {
               "kind": "Content",
-              "text": "<boolean>;\n                };\n                defaultValue(): never[];\n            };\n            isRef: {\n                required: true;\n                collection: false;\n                type: \"boolean\";\n                defaultValue: () => boolean;\n            };\n        }> | "
+              "text": "<boolean>;\n};\ndefaultValue(): never[];\n};\nisRef: {\nrequired: true;\ncollection: false;\ntype: \"boolean\";\ndefaultValue: () => boolean;\n};\n}> | "
             },
             {
               "kind": "Reference",
@@ -4872,7 +4872,7 @@
             },
             {
               "kind": "Content",
-              "text": ">)[];\n        collection: false;\n        required: true;\n    };\n    match: {\n        type: \"function\";\n        collection: false;\n        required: true;\n    };\n}>"
+              "text": ">)[];\ncollection: false;\nrequired: true;\n};\nmatch: {\ntype: \"function\";\ncollection: false;\nrequired: true;\n};\n}>"
             }
           ],
           "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
@@ -6400,7 +6400,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n    record: {\n        type: ("
+              "text": "<    {\nrecord: {\ntype: ("
             },
             {
               "kind": "Reference",
@@ -6409,7 +6409,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n            name: {\n                type: \"string\";\n                collection: false;\n                required: true;\n                constraints: {\n                    nameFormat({ name }: {\n                        name: "
+              "text": "<    {\nname: {\ntype: \"string\";\ncollection: false;\nrequired: true;\nconstraints: {\nnameFormat({ name }: {\nname: "
             },
             {
               "kind": "Reference",
@@ -6418,7 +6418,7 @@
             },
             {
               "kind": "Content",
-              "text": "<string>;\n                    }): "
+              "text": "<string>;\n}): "
             },
             {
               "kind": "Reference",
@@ -6427,7 +6427,7 @@
             },
             {
               "kind": "Content",
-              "text": "<boolean>;\n                };\n            };\n            computedData: {\n                type: "
+              "text": "<boolean>;\n};\n};\ncomputedData: {\ntype: "
             },
             {
               "kind": "Reference",
@@ -6436,7 +6436,7 @@
             },
             {
               "kind": "Content",
-              "text": "<any>[];\n                collection: false;\n                required: false;\n            };\n            properties: {\n                type: "
+              "text": "<any>[];\ncollection: false;\nrequired: false;\n};\nproperties: {\ntype: "
             },
             {
               "kind": "Reference",
@@ -6445,7 +6445,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                    name: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        constraints: {\n                            format({ name }: {\n                                name: "
+              "text": "<    {\nname: {\ntype: \"string\";\nrequired: true;\ncollection: false;\nconstraints: {\nformat({ name }: {\nname: "
             },
             {
               "kind": "Reference",
@@ -6454,7 +6454,7 @@
             },
             {
               "kind": "Content",
-              "text": "<string>;\n                            }): "
+              "text": "<string>;\n}): "
             },
             {
               "kind": "Reference",
@@ -6463,7 +6463,7 @@
             },
             {
               "kind": "Content",
-              "text": "<boolean>;\n                            length({ name }: {\n                                name: "
+              "text": "<boolean>;\nlength({ name }: {\nname: "
             },
             {
               "kind": "Reference",
@@ -6472,7 +6472,7 @@
             },
             {
               "kind": "Content",
-              "text": "<string>;\n                            }): "
+              "text": "<string>;\n}): "
             },
             {
               "kind": "Reference",
@@ -6481,7 +6481,7 @@
             },
             {
               "kind": "Content",
-              "text": "<boolean>;\n                        };\n                    };\n                    type: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        options: "
+              "text": "<boolean>;\n};\n};\ntype: {\ntype: \"string\";\nrequired: true;\ncollection: false;\noptions: "
             },
             {
               "kind": "Reference",
@@ -6490,7 +6490,7 @@
             },
             {
               "kind": "Content",
-              "text": "[];\n                    };\n                    collection: {\n                        type: \"boolean\";\n                        required: true;\n                        collection: false;\n                        defaultValue(): boolean;\n                    };\n                    args: {\n                        computedType: (values: {\n                            type: "
+              "text": "[];\n};\ncollection: {\ntype: \"boolean\";\nrequired: true;\ncollection: false;\ndefaultValue(): boolean;\n};\nargs: {\ncomputedType: (values: {\ntype: "
             },
             {
               "kind": "Reference",
@@ -6499,7 +6499,7 @@
             },
             {
               "kind": "Content",
-              "text": ";\n                        }) => string;\n                    };\n                    computedData: {\n                        collection: false;\n                        type: "
+              "text": ";\n}) => string;\n};\ncomputedData: {\ncollection: false;\ntype: "
             },
             {
               "kind": "Reference",
@@ -6508,7 +6508,7 @@
             },
             {
               "kind": "Content",
-              "text": "<any>[];\n                        required: false;\n                    };\n                    computed: {\n                        required: false;\n                        type: \"function\";\n                        collection: false;\n                    };\n                }>;\n                collection: true;\n                required: true;\n                constraints: {\n                    eachNameUnique({ properties }: any): "
+              "text": "<any>[];\nrequired: false;\n};\ncomputed: {\nrequired: false;\ntype: \"function\";\ncollection: false;\n};\n}>;\ncollection: true;\nrequired: true;\nconstraints: {\neachNameUnique({ properties }: any): "
             },
             {
               "kind": "Reference",
@@ -6517,7 +6517,7 @@
             },
             {
               "kind": "Content",
-              "text": "<boolean>;\n                };\n                defaultValue(): never[];\n            };\n            isRef: {\n                required: true;\n                collection: false;\n                type: \"boolean\";\n                defaultValue: () => boolean;\n            };\n        }> | "
+              "text": "<boolean>;\n};\ndefaultValue(): never[];\n};\nisRef: {\nrequired: true;\ncollection: false;\ntype: \"boolean\";\ndefaultValue: () => boolean;\n};\n}> | "
             },
             {
               "kind": "Reference",
@@ -6535,7 +6535,7 @@
             },
             {
               "kind": "Content",
-              "text": ">)[];\n        collection: false;\n        required: true;\n    };\n    match: {\n        type: \"function\";\n        collection: false;\n        required: true;\n    };\n    notEmpty: {\n        type: \"boolean\";\n        collection: false;\n        required: false;\n    };\n}>"
+              "text": ">)[];\ncollection: false;\nrequired: true;\n};\nmatch: {\ntype: \"function\";\ncollection: false;\nrequired: true;\n};\nnotEmpty: {\ntype: \"boolean\";\ncollection: false;\nrequired: false;\n};\n}>"
             }
           ],
           "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
@@ -8338,7 +8338,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n    items: {\n        type: "
+              "text": "<    {\nitems: {\ntype: "
             },
             {
               "kind": "Reference",
@@ -8347,7 +8347,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n            activity: {\n                type: "
+              "text": "<    {\nactivity: {\ntype: "
             },
             {
               "kind": "Reference",
@@ -8356,7 +8356,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                    name: {\n                        type: \"string\";\n                        collection: false;\n                        required: true;\n                    };\n                    interactions: {\n                        type: "
+              "text": "<    {\nname: {\ntype: \"string\";\ncollection: false;\nrequired: true;\n};\ninteractions: {\ntype: "
             },
             {
               "kind": "Reference",
@@ -8374,7 +8374,7 @@
             },
             {
               "kind": "Content",
-              "text": ">;\n                        collection: true;\n                        defaultValue: (...args: any[]) => ("
+              "text": ">;\ncollection: true;\ndefaultValue: (...args: any[]) => ("
             },
             {
               "kind": "Reference",
@@ -8410,7 +8410,7 @@
             },
             {
               "kind": "Content",
-              "text": ">)[];\n                    };\n                    transfers: {\n                        type: "
+              "text": ">)[];\n};\ntransfers: {\ntype: "
             },
             {
               "kind": "Reference",
@@ -8428,7 +8428,7 @@
             },
             {
               "kind": "Content",
-              "text": ">;\n                        collection: true;\n                        defaultValue: (...args: any[]) => ("
+              "text": ">;\ncollection: true;\ndefaultValue: (...args: any[]) => ("
             },
             {
               "kind": "Reference",
@@ -8464,7 +8464,7 @@
             },
             {
               "kind": "Content",
-              "text": ">)[];\n                    };\n                    groups: {\n                        type: "
+              "text": ">)[];\n};\ngroups: {\ntype: "
             },
             {
               "kind": "Reference",
@@ -8482,7 +8482,7 @@
             },
             {
               "kind": "Content",
-              "text": ">;\n                        collection: true;\n                        defaultValue: (...args: any[]) => ("
+              "text": ">;\ncollection: true;\ndefaultValue: (...args: any[]) => ("
             },
             {
               "kind": "Reference",
@@ -8518,7 +8518,7 @@
             },
             {
               "kind": "Content",
-              "text": ">)[];\n                    };\n                    gateways: {\n                        type: "
+              "text": ">)[];\n};\ngateways: {\ntype: "
             },
             {
               "kind": "Reference",
@@ -8536,7 +8536,7 @@
             },
             {
               "kind": "Content",
-              "text": ">;\n                        collection: true;\n                        defaultValue: (...args: any[]) => ("
+              "text": ">;\ncollection: true;\ndefaultValue: (...args: any[]) => ("
             },
             {
               "kind": "Reference",
@@ -8572,7 +8572,7 @@
             },
             {
               "kind": "Content",
-              "text": ">)[];\n                    };\n                    events: {\n                        type: "
+              "text": ">)[];\n};\nevents: {\ntype: "
             },
             {
               "kind": "Reference",
@@ -8581,7 +8581,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                            name: {\n                                type: \"string\";\n                                required: true;\n                            };\n                        }>;\n                        collection: true;\n                        defaultValue: (...args: any[]) => ("
+              "text": "<    {\nname: {\ntype: \"string\";\nrequired: true;\n};\n}>;\ncollection: true;\ndefaultValue: (...args: any[]) => ("
             },
             {
               "kind": "Reference",
@@ -8590,7 +8590,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n                        name: {\n                        type: \"string\";\n                        required: true;\n                        };\n                        }> | "
+              "text": "<    {\nname: {\ntype: \"string\";\nrequired: true;\n};\n}> | "
             },
             {
               "kind": "Reference",
@@ -8599,7 +8599,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n                        name: {\n                        type: \"string\";\n                        required: true;\n                        };\n                        }>)[];\n                    };\n                }>;\n                collection: false;\n                required: true;\n            };\n            triggerInteractions: {\n                type: "
+              "text": "<    {\nname: {\ntype: \"string\";\nrequired: true;\n};\n}>)[];\n};\n}>;\ncollection: false;\nrequired: true;\n};\ntriggerInteractions: {\ntype: "
             },
             {
               "kind": "Reference",
@@ -8617,7 +8617,7 @@
             },
             {
               "kind": "Content",
-              "text": ">;\n                collection: true;\n                required: false;\n            };\n            map: {\n                type: \"function\";\n                collection: false;\n                required: true;\n            };\n            computeTarget: {\n                type: \"function\";\n                collection: false;\n                required: false;\n            };\n        }>;\n        collection: true;\n        required: true;\n    };\n    defaultValue: {\n        type: \"string\";\n        collection: false;\n        required: false;\n    };\n}>"
+              "text": ">;\ncollection: true;\nrequired: false;\n};\nmap: {\ntype: \"function\";\ncollection: false;\nrequired: true;\n};\ncomputeTarget: {\ntype: \"function\";\ncollection: false;\nrequired: false;\n};\n}>;\ncollection: true;\nrequired: true;\n};\ndefaultValue: {\ntype: \"string\";\ncollection: false;\nrequired: false;\n};\n}>"
             }
           ],
           "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
@@ -8645,7 +8645,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n    activity: {\n        type: "
+              "text": "<    {\nactivity: {\ntype: "
             },
             {
               "kind": "Reference",
@@ -8654,7 +8654,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n            name: {\n                type: \"string\";\n                collection: false;\n                required: true;\n            };\n            interactions: {\n                type: "
+              "text": "<    {\nname: {\ntype: \"string\";\ncollection: false;\nrequired: true;\n};\ninteractions: {\ntype: "
             },
             {
               "kind": "Reference",
@@ -8672,7 +8672,7 @@
             },
             {
               "kind": "Content",
-              "text": ">;\n                collection: true;\n                defaultValue: (...args: any[]) => ("
+              "text": ">;\ncollection: true;\ndefaultValue: (...args: any[]) => ("
             },
             {
               "kind": "Reference",
@@ -8708,7 +8708,7 @@
             },
             {
               "kind": "Content",
-              "text": ">)[];\n            };\n            transfers: {\n                type: "
+              "text": ">)[];\n};\ntransfers: {\ntype: "
             },
             {
               "kind": "Reference",
@@ -8726,7 +8726,7 @@
             },
             {
               "kind": "Content",
-              "text": ">;\n                collection: true;\n                defaultValue: (...args: any[]) => ("
+              "text": ">;\ncollection: true;\ndefaultValue: (...args: any[]) => ("
             },
             {
               "kind": "Reference",
@@ -8762,7 +8762,7 @@
             },
             {
               "kind": "Content",
-              "text": ">)[];\n            };\n            groups: {\n                type: "
+              "text": ">)[];\n};\ngroups: {\ntype: "
             },
             {
               "kind": "Reference",
@@ -8780,7 +8780,7 @@
             },
             {
               "kind": "Content",
-              "text": ">;\n                collection: true;\n                defaultValue: (...args: any[]) => ("
+              "text": ">;\ncollection: true;\ndefaultValue: (...args: any[]) => ("
             },
             {
               "kind": "Reference",
@@ -8816,7 +8816,7 @@
             },
             {
               "kind": "Content",
-              "text": ">)[];\n            };\n            gateways: {\n                type: "
+              "text": ">)[];\n};\ngateways: {\ntype: "
             },
             {
               "kind": "Reference",
@@ -8834,7 +8834,7 @@
             },
             {
               "kind": "Content",
-              "text": ">;\n                collection: true;\n                defaultValue: (...args: any[]) => ("
+              "text": ">;\ncollection: true;\ndefaultValue: (...args: any[]) => ("
             },
             {
               "kind": "Reference",
@@ -8870,7 +8870,7 @@
             },
             {
               "kind": "Content",
-              "text": ">)[];\n            };\n            events: {\n                type: "
+              "text": ">)[];\n};\nevents: {\ntype: "
             },
             {
               "kind": "Reference",
@@ -8879,7 +8879,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                    name: {\n                        type: \"string\";\n                        required: true;\n                    };\n                }>;\n                collection: true;\n                defaultValue: (...args: any[]) => ("
+              "text": "<    {\nname: {\ntype: \"string\";\nrequired: true;\n};\n}>;\ncollection: true;\ndefaultValue: (...args: any[]) => ("
             },
             {
               "kind": "Reference",
@@ -8888,7 +8888,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n                name: {\n                type: \"string\";\n                required: true;\n                };\n                }> | "
+              "text": "<    {\nname: {\ntype: \"string\";\nrequired: true;\n};\n}> | "
             },
             {
               "kind": "Reference",
@@ -8897,7 +8897,7 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\n                name: {\n                type: \"string\";\n                required: true;\n                };\n                }>)[];\n            };\n        }>;\n        collection: false;\n        required: true;\n    };\n    triggerInteractions: {\n        type: "
+              "text": "<    {\nname: {\ntype: \"string\";\nrequired: true;\n};\n}>)[];\n};\n}>;\ncollection: false;\nrequired: true;\n};\ntriggerInteractions: {\ntype: "
             },
             {
               "kind": "Reference",
@@ -8915,7 +8915,7 @@
             },
             {
               "kind": "Content",
-              "text": ">;\n        collection: true;\n        required: false;\n    };\n    map: {\n        type: \"function\";\n        collection: false;\n        required: true;\n    };\n    computeTarget: {\n        type: \"function\";\n        collection: false;\n        required: false;\n    };\n}>"
+              "text": ">;\ncollection: true;\nrequired: false;\n};\nmap: {\ntype: \"function\";\ncollection: false;\nrequired: true;\n};\ncomputeTarget: {\ntype: \"function\";\ncollection: false;\nrequired: false;\n};\n}>"
             }
           ],
           "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
@@ -8943,7 +8943,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n    items: {\n        type: "
+              "text": "<    {\nitems: {\ntype: "
             },
             {
               "kind": "Reference",
@@ -8952,7 +8952,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n            interaction: {\n                type: "
+              "text": "<    {\ninteraction: {\ntype: "
             },
             {
               "kind": "Reference",
@@ -8970,7 +8970,7 @@
             },
             {
               "kind": "Content",
-              "text": ">;\n                collection: false;\n                required: true;\n            };\n            map: {\n                type: \"function\";\n                collection: false;\n                required: true;\n            };\n            computeTarget: {\n                type: \"function\";\n                collection: false;\n                required: false;\n            };\n        }>;\n        collection: true;\n        required: true;\n    };\n    defaultValue: {\n        type: \"string\";\n        collection: false;\n        required: false;\n    };\n}>"
+              "text": ">;\ncollection: false;\nrequired: true;\n};\nmap: {\ntype: \"function\";\ncollection: false;\nrequired: true;\n};\ncomputeTarget: {\ntype: \"function\";\ncollection: false;\nrequired: false;\n};\n}>;\ncollection: true;\nrequired: true;\n};\ndefaultValue: {\ntype: \"string\";\ncollection: false;\nrequired: false;\n};\n}>"
             }
           ],
           "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
@@ -8998,7 +8998,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n    interaction: {\n        type: "
+              "text": "<    {\ninteraction: {\ntype: "
             },
             {
               "kind": "Reference",
@@ -9016,7 +9016,7 @@
             },
             {
               "kind": "Content",
-              "text": ">;\n        collection: false;\n        required: true;\n    };\n    map: {\n        type: \"function\";\n        collection: false;\n        required: true;\n    };\n    computeTarget: {\n        type: \"function\";\n        collection: false;\n        required: false;\n    };\n}>"
+              "text": ">;\ncollection: false;\nrequired: true;\n};\nmap: {\ntype: \"function\";\ncollection: false;\nrequired: true;\n};\ncomputeTarget: {\ntype: \"function\";\ncollection: false;\nrequired: false;\n};\n}>"
             }
           ],
           "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
@@ -9044,7 +9044,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n    map: {\n        type: \"function\";\n        collection: false;\n        required: true;\n    };\n    computeTarget: {\n        type: \"function\";\n        collection: false;\n        required: false;\n    };\n}>"
+              "text": "<    {\nmap: {\ntype: \"function\";\ncollection: false;\nrequired: true;\n};\ncomputeTarget: {\ntype: \"function\";\ncollection: false;\nrequired: false;\n};\n}>"
             }
           ],
           "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
@@ -11067,7 +11067,25 @@
             },
             {
               "kind": "Content",
-              "text": "[T[Key]['type']]> : never));\n}>>"
+              "text": "[T[Key]['type']]> : T[Key]['type'] extends "
+            },
+            {
+              "kind": "Reference",
+              "text": "PrimitivePropType",
+              "canonicalReference": "@interaqt/runtime!PrimitivePropType:type"
+            },
+            {
+              "kind": "Content",
+              "text": "[] ? "
+            },
+            {
+              "kind": "Reference",
+              "text": "ExtractPrimitiveTypes",
+              "canonicalReference": "@interaqt/runtime!ExtractPrimitiveTypes:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<REACTIVE, T[Key][\"collection\"], T[Key]['type']> : never));\n}>>"
             },
             {
               "kind": "Content",
@@ -11114,7 +11132,7 @@
           ],
           "typeTokenRange": {
             "startIndex": 10,
-            "endIndex": 36
+            "endIndex": 40
           }
         },
         {
@@ -13747,7 +13765,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n    relation: {\n        type: "
+              "text": "<    {\nrelation: {\ntype: "
             },
             {
               "kind": "Reference",
@@ -13765,7 +13783,7 @@
             },
             {
               "kind": "Content",
-              "text": ">;\n        collection: false;\n        required: true;\n    };\n    relationDirection: {\n        type: \"string\";\n        collection: false;\n        required: true;\n        defaultValue: () => string;\n    };\n    match: {\n        type: \"function\";\n        collection: false;\n        required: true;\n    };\n}>"
+              "text": ">;\ncollection: false;\nrequired: true;\n};\nrelationDirection: {\ntype: \"string\";\ncollection: false;\nrequired: true;\ndefaultValue: () => string;\n};\nmatch: {\ntype: \"function\";\ncollection: false;\nrequired: true;\n};\n}>"
             }
           ],
           "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
@@ -13793,7 +13811,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n    relation: {\n        type: "
+              "text": "<    {\nrelation: {\ntype: "
             },
             {
               "kind": "Reference",
@@ -13811,7 +13829,7 @@
             },
             {
               "kind": "Content",
-              "text": ">;\n        collection: false;\n        required: true;\n    };\n    relationDirection: {\n        type: \"string\";\n        collection: false;\n        required: true;\n        defaultValue: () => string;\n    };\n    match: {\n        type: \"function\";\n        collection: false;\n        required: true;\n    };\n    notEmpty: {\n        type: \"boolean\";\n        collection: false;\n        required: false;\n    };\n}>"
+              "text": ">;\ncollection: false;\nrequired: true;\n};\nrelationDirection: {\ntype: \"string\";\ncollection: false;\nrequired: true;\ndefaultValue: () => string;\n};\nmatch: {\ntype: \"function\";\ncollection: false;\nrequired: true;\n};\nnotEmpty: {\ntype: \"boolean\";\ncollection: false;\nrequired: false;\n};\n}>"
             }
           ],
           "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
@@ -13839,7 +13857,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n    relations: {\n        type: "
+              "text": "<    {\nrelations: {\ntype: "
             },
             {
               "kind": "Reference",
@@ -13848,7 +13866,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n            relation: {\n                type: "
+              "text": "<    {\nrelation: {\ntype: "
             },
             {
               "kind": "Reference",
@@ -13866,7 +13884,7 @@
             },
             {
               "kind": "Content",
-              "text": ">;\n                collection: false;\n                required: true;\n            };\n            relationDirection: {\n                type: \"string\";\n                collection: false;\n                required: true;\n                defaultValue: () => string;\n            };\n        }>;\n        collection: true;\n        required: true;\n    };\n    matchRelationToWeight: {\n        type: \"function\";\n        collection: false;\n        required: true;\n    };\n}>"
+              "text": ">;\ncollection: false;\nrequired: true;\n};\nrelationDirection: {\ntype: \"string\";\ncollection: false;\nrequired: true;\ndefaultValue: () => string;\n};\n}>;\ncollection: true;\nrequired: true;\n};\nmatchRelationToWeight: {\ntype: \"function\";\ncollection: false;\nrequired: true;\n};\n}>"
             }
           ],
           "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
@@ -13894,7 +13912,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n    relation: {\n        type: "
+              "text": "<    {\nrelation: {\ntype: "
             },
             {
               "kind": "Reference",
@@ -13912,7 +13930,7 @@
             },
             {
               "kind": "Content",
-              "text": ">;\n        collection: false;\n        required: true;\n    };\n    relationDirection: {\n        type: \"string\";\n        collection: false;\n        required: true;\n        defaultValue: () => string;\n    };\n    match: {\n        type: \"function\";\n        collection: false;\n        required: true;\n    };\n}>"
+              "text": ">;\ncollection: false;\nrequired: true;\n};\nrelationDirection: {\ntype: \"string\";\ncollection: false;\nrequired: true;\ndefaultValue: () => string;\n};\nmatch: {\ntype: \"function\";\ncollection: false;\nrequired: true;\n};\n}>"
             }
           ],
           "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
@@ -14149,819 +14167,6 @@
           }
         },
         {
-          "kind": "Variable",
-          "canonicalReference": "@interaqt/runtime!RelationStateMachine:var",
-          "docComment": "",
-          "excerptTokens": [
-            {
-              "kind": "Content",
-              "text": "RelationStateMachine: "
-            },
-            {
-              "kind": "Reference",
-              "text": "Klass",
-              "canonicalReference": "@interaqt/runtime!Klass:type"
-            },
-            {
-              "kind": "Content",
-              "text": "<{\n    states: {\n        type: "
-            },
-            {
-              "kind": "Reference",
-              "text": "Klass",
-              "canonicalReference": "@interaqt/runtime!Klass:type"
-            },
-            {
-              "kind": "Content",
-              "text": "<{\n            hasRelation: {\n                type: \"boolean\";\n                required: true;\n                collection: false;\n            };\n            fixedProperties: {\n                type: "
-            },
-            {
-              "kind": "Reference",
-              "text": "Klass",
-              "canonicalReference": "@interaqt/runtime!Klass:type"
-            },
-            {
-              "kind": "Content",
-              "text": "<{\n                    name: {\n                        type: \"string\";\n                        collection: false;\n                        required: true;\n                    };\n                    value: {\n                        type: "
-            },
-            {
-              "kind": "Reference",
-              "text": "Klass",
-              "canonicalReference": "@interaqt/runtime!Klass:type"
-            },
-            {
-              "kind": "Content",
-              "text": "<any>[];\n                        collection: false;\n                        required: true;\n                    };\n                }>;\n                collection: true;\n                required: false;\n            };\n            propertyHandle: {\n                type: \"function\";\n                required: false;\n                collection: false;\n            };\n        }>;\n        collection: true;\n        required: true;\n    };\n    transfers: {\n        type: "
-            },
-            {
-              "kind": "Reference",
-              "text": "Klass",
-              "canonicalReference": "@interaqt/runtime!Klass:type"
-            },
-            {
-              "kind": "Content",
-              "text": "<{\n            sourceActivity: {\n                type: "
-            },
-            {
-              "kind": "Reference",
-              "text": "Klass",
-              "canonicalReference": "@interaqt/runtime!Klass:type"
-            },
-            {
-              "kind": "Content",
-              "text": "<{\n                    name: {\n                        type: \"string\";\n                        collection: false;\n                        required: true;\n                    };\n                    interactions: {\n                        type: "
-            },
-            {
-              "kind": "Reference",
-              "text": "Klass",
-              "canonicalReference": "@interaqt/runtime!Klass:type"
-            },
-            {
-              "kind": "Content",
-              "text": "<"
-            },
-            {
-              "kind": "Reference",
-              "text": "InteractionPublicType",
-              "canonicalReference": "@interaqt/runtime!InteractionPublicType:type"
-            },
-            {
-              "kind": "Content",
-              "text": ">;\n                        collection: true;\n                        defaultValue: (...args: any[]) => ("
-            },
-            {
-              "kind": "Reference",
-              "text": "InertKlassInstance",
-              "canonicalReference": "@interaqt/runtime!InertKlassInstance:type"
-            },
-            {
-              "kind": "Content",
-              "text": "<"
-            },
-            {
-              "kind": "Reference",
-              "text": "InteractionPublicType",
-              "canonicalReference": "@interaqt/runtime!InteractionPublicType:type"
-            },
-            {
-              "kind": "Content",
-              "text": "> | "
-            },
-            {
-              "kind": "Reference",
-              "text": "ReactiveKlassInstance",
-              "canonicalReference": "@interaqt/runtime!ReactiveKlassInstance:type"
-            },
-            {
-              "kind": "Content",
-              "text": "<"
-            },
-            {
-              "kind": "Reference",
-              "text": "InteractionPublicType",
-              "canonicalReference": "@interaqt/runtime!InteractionPublicType:type"
-            },
-            {
-              "kind": "Content",
-              "text": ">)[];\n                    };\n                    transfers: {\n                        type: "
-            },
-            {
-              "kind": "Reference",
-              "text": "Klass",
-              "canonicalReference": "@interaqt/runtime!Klass:type"
-            },
-            {
-              "kind": "Content",
-              "text": "<"
-            },
-            {
-              "kind": "Reference",
-              "text": "TransferPublicType",
-              "canonicalReference": "@interaqt/runtime!TransferPublicType:type"
-            },
-            {
-              "kind": "Content",
-              "text": ">;\n                        collection: true;\n                        defaultValue: (...args: any[]) => ("
-            },
-            {
-              "kind": "Reference",
-              "text": "ReactiveKlassInstance",
-              "canonicalReference": "@interaqt/runtime!ReactiveKlassInstance:type"
-            },
-            {
-              "kind": "Content",
-              "text": "<"
-            },
-            {
-              "kind": "Reference",
-              "text": "TransferPublicType",
-              "canonicalReference": "@interaqt/runtime!TransferPublicType:type"
-            },
-            {
-              "kind": "Content",
-              "text": "> | "
-            },
-            {
-              "kind": "Reference",
-              "text": "InertKlassInstance",
-              "canonicalReference": "@interaqt/runtime!InertKlassInstance:type"
-            },
-            {
-              "kind": "Content",
-              "text": "<"
-            },
-            {
-              "kind": "Reference",
-              "text": "TransferPublicType",
-              "canonicalReference": "@interaqt/runtime!TransferPublicType:type"
-            },
-            {
-              "kind": "Content",
-              "text": ">)[];\n                    };\n                    groups: {\n                        type: "
-            },
-            {
-              "kind": "Reference",
-              "text": "Klass",
-              "canonicalReference": "@interaqt/runtime!Klass:type"
-            },
-            {
-              "kind": "Content",
-              "text": "<"
-            },
-            {
-              "kind": "Reference",
-              "text": "ActivityGroupPublicType",
-              "canonicalReference": "@interaqt/runtime!ActivityGroupPublicType:type"
-            },
-            {
-              "kind": "Content",
-              "text": ">;\n                        collection: true;\n                        defaultValue: (...args: any[]) => ("
-            },
-            {
-              "kind": "Reference",
-              "text": "InertKlassInstance",
-              "canonicalReference": "@interaqt/runtime!InertKlassInstance:type"
-            },
-            {
-              "kind": "Content",
-              "text": "<"
-            },
-            {
-              "kind": "Reference",
-              "text": "ActivityGroupPublicType",
-              "canonicalReference": "@interaqt/runtime!ActivityGroupPublicType:type"
-            },
-            {
-              "kind": "Content",
-              "text": "> | "
-            },
-            {
-              "kind": "Reference",
-              "text": "ReactiveKlassInstance",
-              "canonicalReference": "@interaqt/runtime!ReactiveKlassInstance:type"
-            },
-            {
-              "kind": "Content",
-              "text": "<"
-            },
-            {
-              "kind": "Reference",
-              "text": "ActivityGroupPublicType",
-              "canonicalReference": "@interaqt/runtime!ActivityGroupPublicType:type"
-            },
-            {
-              "kind": "Content",
-              "text": ">)[];\n                    };\n                    gateways: {\n                        type: "
-            },
-            {
-              "kind": "Reference",
-              "text": "Klass",
-              "canonicalReference": "@interaqt/runtime!Klass:type"
-            },
-            {
-              "kind": "Content",
-              "text": "<"
-            },
-            {
-              "kind": "Reference",
-              "text": "GatewayPublicType",
-              "canonicalReference": "@interaqt/runtime!GatewayPublicType:type"
-            },
-            {
-              "kind": "Content",
-              "text": ">;\n                        collection: true;\n                        defaultValue: (...args: any[]) => ("
-            },
-            {
-              "kind": "Reference",
-              "text": "InertKlassInstance",
-              "canonicalReference": "@interaqt/runtime!InertKlassInstance:type"
-            },
-            {
-              "kind": "Content",
-              "text": "<"
-            },
-            {
-              "kind": "Reference",
-              "text": "GatewayPublicType",
-              "canonicalReference": "@interaqt/runtime!GatewayPublicType:type"
-            },
-            {
-              "kind": "Content",
-              "text": "> | "
-            },
-            {
-              "kind": "Reference",
-              "text": "ReactiveKlassInstance",
-              "canonicalReference": "@interaqt/runtime!ReactiveKlassInstance:type"
-            },
-            {
-              "kind": "Content",
-              "text": "<"
-            },
-            {
-              "kind": "Reference",
-              "text": "GatewayPublicType",
-              "canonicalReference": "@interaqt/runtime!GatewayPublicType:type"
-            },
-            {
-              "kind": "Content",
-              "text": ">)[];\n                    };\n                    events: {\n                        type: "
-            },
-            {
-              "kind": "Reference",
-              "text": "Klass",
-              "canonicalReference": "@interaqt/runtime!Klass:type"
-            },
-            {
-              "kind": "Content",
-              "text": "<{\n                            name: {\n                                type: \"string\";\n                                required: true;\n                            };\n                        }>;\n                        collection: true;\n                        defaultValue: (...args: any[]) => ("
-            },
-            {
-              "kind": "Reference",
-              "text": "ReactiveKlassInstance",
-              "canonicalReference": "@interaqt/runtime!ReactiveKlassInstance:type"
-            },
-            {
-              "kind": "Content",
-              "text": "<    {\n                        name: {\n                        type: \"string\";\n                        required: true;\n                        };\n                        }> | "
-            },
-            {
-              "kind": "Reference",
-              "text": "InertKlassInstance",
-              "canonicalReference": "@interaqt/runtime!InertKlassInstance:type"
-            },
-            {
-              "kind": "Content",
-              "text": "<    {\n                        name: {\n                        type: \"string\";\n                        required: true;\n                        };\n                        }>)[];\n                    };\n                }>;\n                collection: false;\n                required: false;\n            };\n            triggerInteraction: {\n                type: "
-            },
-            {
-              "kind": "Reference",
-              "text": "Klass",
-              "canonicalReference": "@interaqt/runtime!Klass:type"
-            },
-            {
-              "kind": "Content",
-              "text": "<"
-            },
-            {
-              "kind": "Reference",
-              "text": "InteractionPublicType",
-              "canonicalReference": "@interaqt/runtime!InteractionPublicType:type"
-            },
-            {
-              "kind": "Content",
-              "text": ">;\n                collection: false;\n                required: true;\n            };\n            fromState: {\n                type: "
-            },
-            {
-              "kind": "Reference",
-              "text": "Klass",
-              "canonicalReference": "@interaqt/runtime!Klass:type"
-            },
-            {
-              "kind": "Content",
-              "text": "<{\n                    hasRelation: {\n                        type: \"boolean\";\n                        required: true;\n                        collection: false;\n                    };\n                    fixedProperties: {\n                        type: "
-            },
-            {
-              "kind": "Reference",
-              "text": "Klass",
-              "canonicalReference": "@interaqt/runtime!Klass:type"
-            },
-            {
-              "kind": "Content",
-              "text": "<{\n                            name: {\n                                type: \"string\";\n                                collection: false;\n                                required: true;\n                            };\n                            value: {\n                                type: "
-            },
-            {
-              "kind": "Reference",
-              "text": "Klass",
-              "canonicalReference": "@interaqt/runtime!Klass:type"
-            },
-            {
-              "kind": "Content",
-              "text": "<any>[];\n                                collection: false;\n                                required: true;\n                            };\n                        }>;\n                        collection: true;\n                        required: false;\n                    };\n                    propertyHandle: {\n                        type: \"function\";\n                        required: false;\n                        collection: false;\n                    };\n                }>;\n                collection: false;\n                required: true;\n            };\n            toState: {\n                type: "
-            },
-            {
-              "kind": "Reference",
-              "text": "Klass",
-              "canonicalReference": "@interaqt/runtime!Klass:type"
-            },
-            {
-              "kind": "Content",
-              "text": "<{\n                    hasRelation: {\n                        type: \"boolean\";\n                        required: true;\n                        collection: false;\n                    };\n                    fixedProperties: {\n                        type: "
-            },
-            {
-              "kind": "Reference",
-              "text": "Klass",
-              "canonicalReference": "@interaqt/runtime!Klass:type"
-            },
-            {
-              "kind": "Content",
-              "text": "<{\n                            name: {\n                                type: \"string\";\n                                collection: false;\n                                required: true;\n                            };\n                            value: {\n                                type: "
-            },
-            {
-              "kind": "Reference",
-              "text": "Klass",
-              "canonicalReference": "@interaqt/runtime!Klass:type"
-            },
-            {
-              "kind": "Content",
-              "text": "<any>[];\n                                collection: false;\n                                required: true;\n                            };\n                        }>;\n                        collection: true;\n                        required: false;\n                    };\n                    propertyHandle: {\n                        type: \"function\";\n                        required: false;\n                        collection: false;\n                    };\n                }>;\n                collection: false;\n                required: true;\n            };\n            handleType: {\n                type: \"string\";\n            };\n            handle: {\n                type: \"function\";\n                collection: false;\n                required: true;\n            };\n        }>;\n        collection: true;\n        required: true;\n    };\n    defaultState: {\n        type: "
-            },
-            {
-              "kind": "Reference",
-              "text": "Klass",
-              "canonicalReference": "@interaqt/runtime!Klass:type"
-            },
-            {
-              "kind": "Content",
-              "text": "<{\n            hasRelation: {\n                type: \"boolean\";\n                required: true;\n                collection: false;\n            };\n            fixedProperties: {\n                type: "
-            },
-            {
-              "kind": "Reference",
-              "text": "Klass",
-              "canonicalReference": "@interaqt/runtime!Klass:type"
-            },
-            {
-              "kind": "Content",
-              "text": "<{\n                    name: {\n                        type: \"string\";\n                        collection: false;\n                        required: true;\n                    };\n                    value: {\n                        type: "
-            },
-            {
-              "kind": "Reference",
-              "text": "Klass",
-              "canonicalReference": "@interaqt/runtime!Klass:type"
-            },
-            {
-              "kind": "Content",
-              "text": "<any>[];\n                        collection: false;\n                        required: true;\n                    };\n                }>;\n                collection: true;\n                required: false;\n            };\n            propertyHandle: {\n                type: \"function\";\n                required: false;\n                collection: false;\n            };\n        }>;\n        collection: false;\n        required: true;\n    };\n}>"
-            }
-          ],
-          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
-          "isReadonly": true,
-          "releaseTag": "Public",
-          "name": "RelationStateMachine",
-          "variableTypeTokenRange": {
-            "startIndex": 1,
-            "endIndex": 89
-          }
-        },
-        {
-          "kind": "Variable",
-          "canonicalReference": "@interaqt/runtime!RelationStateNode:var",
-          "docComment": "",
-          "excerptTokens": [
-            {
-              "kind": "Content",
-              "text": "RelationStateNode: "
-            },
-            {
-              "kind": "Reference",
-              "text": "Klass",
-              "canonicalReference": "@interaqt/runtime!Klass:type"
-            },
-            {
-              "kind": "Content",
-              "text": "<{\n    hasRelation: {\n        type: \"boolean\";\n        required: true;\n        collection: false;\n    };\n    fixedProperties: {\n        type: "
-            },
-            {
-              "kind": "Reference",
-              "text": "Klass",
-              "canonicalReference": "@interaqt/runtime!Klass:type"
-            },
-            {
-              "kind": "Content",
-              "text": "<{\n            name: {\n                type: \"string\";\n                collection: false;\n                required: true;\n            };\n            value: {\n                type: "
-            },
-            {
-              "kind": "Reference",
-              "text": "Klass",
-              "canonicalReference": "@interaqt/runtime!Klass:type"
-            },
-            {
-              "kind": "Content",
-              "text": "<any>[];\n                collection: false;\n                required: true;\n            };\n        }>;\n        collection: true;\n        required: false;\n    };\n    propertyHandle: {\n        type: \"function\";\n        required: false;\n        collection: false;\n    };\n}>"
-            }
-          ],
-          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
-          "isReadonly": true,
-          "releaseTag": "Public",
-          "name": "RelationStateNode",
-          "variableTypeTokenRange": {
-            "startIndex": 1,
-            "endIndex": 7
-          }
-        },
-        {
-          "kind": "Variable",
-          "canonicalReference": "@interaqt/runtime!RelationStateTransfer:var",
-          "docComment": "",
-          "excerptTokens": [
-            {
-              "kind": "Content",
-              "text": "RelationStateTransfer: "
-            },
-            {
-              "kind": "Reference",
-              "text": "Klass",
-              "canonicalReference": "@interaqt/runtime!Klass:type"
-            },
-            {
-              "kind": "Content",
-              "text": "<{\n    sourceActivity: {\n        type: "
-            },
-            {
-              "kind": "Reference",
-              "text": "Klass",
-              "canonicalReference": "@interaqt/runtime!Klass:type"
-            },
-            {
-              "kind": "Content",
-              "text": "<{\n            name: {\n                type: \"string\";\n                collection: false;\n                required: true;\n            };\n            interactions: {\n                type: "
-            },
-            {
-              "kind": "Reference",
-              "text": "Klass",
-              "canonicalReference": "@interaqt/runtime!Klass:type"
-            },
-            {
-              "kind": "Content",
-              "text": "<"
-            },
-            {
-              "kind": "Reference",
-              "text": "InteractionPublicType",
-              "canonicalReference": "@interaqt/runtime!InteractionPublicType:type"
-            },
-            {
-              "kind": "Content",
-              "text": ">;\n                collection: true;\n                defaultValue: (...args: any[]) => ("
-            },
-            {
-              "kind": "Reference",
-              "text": "InertKlassInstance",
-              "canonicalReference": "@interaqt/runtime!InertKlassInstance:type"
-            },
-            {
-              "kind": "Content",
-              "text": "<"
-            },
-            {
-              "kind": "Reference",
-              "text": "InteractionPublicType",
-              "canonicalReference": "@interaqt/runtime!InteractionPublicType:type"
-            },
-            {
-              "kind": "Content",
-              "text": "> | "
-            },
-            {
-              "kind": "Reference",
-              "text": "ReactiveKlassInstance",
-              "canonicalReference": "@interaqt/runtime!ReactiveKlassInstance:type"
-            },
-            {
-              "kind": "Content",
-              "text": "<"
-            },
-            {
-              "kind": "Reference",
-              "text": "InteractionPublicType",
-              "canonicalReference": "@interaqt/runtime!InteractionPublicType:type"
-            },
-            {
-              "kind": "Content",
-              "text": ">)[];\n            };\n            transfers: {\n                type: "
-            },
-            {
-              "kind": "Reference",
-              "text": "Klass",
-              "canonicalReference": "@interaqt/runtime!Klass:type"
-            },
-            {
-              "kind": "Content",
-              "text": "<"
-            },
-            {
-              "kind": "Reference",
-              "text": "TransferPublicType",
-              "canonicalReference": "@interaqt/runtime!TransferPublicType:type"
-            },
-            {
-              "kind": "Content",
-              "text": ">;\n                collection: true;\n                defaultValue: (...args: any[]) => ("
-            },
-            {
-              "kind": "Reference",
-              "text": "ReactiveKlassInstance",
-              "canonicalReference": "@interaqt/runtime!ReactiveKlassInstance:type"
-            },
-            {
-              "kind": "Content",
-              "text": "<"
-            },
-            {
-              "kind": "Reference",
-              "text": "TransferPublicType",
-              "canonicalReference": "@interaqt/runtime!TransferPublicType:type"
-            },
-            {
-              "kind": "Content",
-              "text": "> | "
-            },
-            {
-              "kind": "Reference",
-              "text": "InertKlassInstance",
-              "canonicalReference": "@interaqt/runtime!InertKlassInstance:type"
-            },
-            {
-              "kind": "Content",
-              "text": "<"
-            },
-            {
-              "kind": "Reference",
-              "text": "TransferPublicType",
-              "canonicalReference": "@interaqt/runtime!TransferPublicType:type"
-            },
-            {
-              "kind": "Content",
-              "text": ">)[];\n            };\n            groups: {\n                type: "
-            },
-            {
-              "kind": "Reference",
-              "text": "Klass",
-              "canonicalReference": "@interaqt/runtime!Klass:type"
-            },
-            {
-              "kind": "Content",
-              "text": "<"
-            },
-            {
-              "kind": "Reference",
-              "text": "ActivityGroupPublicType",
-              "canonicalReference": "@interaqt/runtime!ActivityGroupPublicType:type"
-            },
-            {
-              "kind": "Content",
-              "text": ">;\n                collection: true;\n                defaultValue: (...args: any[]) => ("
-            },
-            {
-              "kind": "Reference",
-              "text": "InertKlassInstance",
-              "canonicalReference": "@interaqt/runtime!InertKlassInstance:type"
-            },
-            {
-              "kind": "Content",
-              "text": "<"
-            },
-            {
-              "kind": "Reference",
-              "text": "ActivityGroupPublicType",
-              "canonicalReference": "@interaqt/runtime!ActivityGroupPublicType:type"
-            },
-            {
-              "kind": "Content",
-              "text": "> | "
-            },
-            {
-              "kind": "Reference",
-              "text": "ReactiveKlassInstance",
-              "canonicalReference": "@interaqt/runtime!ReactiveKlassInstance:type"
-            },
-            {
-              "kind": "Content",
-              "text": "<"
-            },
-            {
-              "kind": "Reference",
-              "text": "ActivityGroupPublicType",
-              "canonicalReference": "@interaqt/runtime!ActivityGroupPublicType:type"
-            },
-            {
-              "kind": "Content",
-              "text": ">)[];\n            };\n            gateways: {\n                type: "
-            },
-            {
-              "kind": "Reference",
-              "text": "Klass",
-              "canonicalReference": "@interaqt/runtime!Klass:type"
-            },
-            {
-              "kind": "Content",
-              "text": "<"
-            },
-            {
-              "kind": "Reference",
-              "text": "GatewayPublicType",
-              "canonicalReference": "@interaqt/runtime!GatewayPublicType:type"
-            },
-            {
-              "kind": "Content",
-              "text": ">;\n                collection: true;\n                defaultValue: (...args: any[]) => ("
-            },
-            {
-              "kind": "Reference",
-              "text": "InertKlassInstance",
-              "canonicalReference": "@interaqt/runtime!InertKlassInstance:type"
-            },
-            {
-              "kind": "Content",
-              "text": "<"
-            },
-            {
-              "kind": "Reference",
-              "text": "GatewayPublicType",
-              "canonicalReference": "@interaqt/runtime!GatewayPublicType:type"
-            },
-            {
-              "kind": "Content",
-              "text": "> | "
-            },
-            {
-              "kind": "Reference",
-              "text": "ReactiveKlassInstance",
-              "canonicalReference": "@interaqt/runtime!ReactiveKlassInstance:type"
-            },
-            {
-              "kind": "Content",
-              "text": "<"
-            },
-            {
-              "kind": "Reference",
-              "text": "GatewayPublicType",
-              "canonicalReference": "@interaqt/runtime!GatewayPublicType:type"
-            },
-            {
-              "kind": "Content",
-              "text": ">)[];\n            };\n            events: {\n                type: "
-            },
-            {
-              "kind": "Reference",
-              "text": "Klass",
-              "canonicalReference": "@interaqt/runtime!Klass:type"
-            },
-            {
-              "kind": "Content",
-              "text": "<{\n                    name: {\n                        type: \"string\";\n                        required: true;\n                    };\n                }>;\n                collection: true;\n                defaultValue: (...args: any[]) => ("
-            },
-            {
-              "kind": "Reference",
-              "text": "ReactiveKlassInstance",
-              "canonicalReference": "@interaqt/runtime!ReactiveKlassInstance:type"
-            },
-            {
-              "kind": "Content",
-              "text": "<    {\n                name: {\n                type: \"string\";\n                required: true;\n                };\n                }> | "
-            },
-            {
-              "kind": "Reference",
-              "text": "InertKlassInstance",
-              "canonicalReference": "@interaqt/runtime!InertKlassInstance:type"
-            },
-            {
-              "kind": "Content",
-              "text": "<    {\n                name: {\n                type: \"string\";\n                required: true;\n                };\n                }>)[];\n            };\n        }>;\n        collection: false;\n        required: false;\n    };\n    triggerInteraction: {\n        type: "
-            },
-            {
-              "kind": "Reference",
-              "text": "Klass",
-              "canonicalReference": "@interaqt/runtime!Klass:type"
-            },
-            {
-              "kind": "Content",
-              "text": "<"
-            },
-            {
-              "kind": "Reference",
-              "text": "InteractionPublicType",
-              "canonicalReference": "@interaqt/runtime!InteractionPublicType:type"
-            },
-            {
-              "kind": "Content",
-              "text": ">;\n        collection: false;\n        required: true;\n    };\n    fromState: {\n        type: "
-            },
-            {
-              "kind": "Reference",
-              "text": "Klass",
-              "canonicalReference": "@interaqt/runtime!Klass:type"
-            },
-            {
-              "kind": "Content",
-              "text": "<{\n            hasRelation: {\n                type: \"boolean\";\n                required: true;\n                collection: false;\n            };\n            fixedProperties: {\n                type: "
-            },
-            {
-              "kind": "Reference",
-              "text": "Klass",
-              "canonicalReference": "@interaqt/runtime!Klass:type"
-            },
-            {
-              "kind": "Content",
-              "text": "<{\n                    name: {\n                        type: \"string\";\n                        collection: false;\n                        required: true;\n                    };\n                    value: {\n                        type: "
-            },
-            {
-              "kind": "Reference",
-              "text": "Klass",
-              "canonicalReference": "@interaqt/runtime!Klass:type"
-            },
-            {
-              "kind": "Content",
-              "text": "<any>[];\n                        collection: false;\n                        required: true;\n                    };\n                }>;\n                collection: true;\n                required: false;\n            };\n            propertyHandle: {\n                type: \"function\";\n                required: false;\n                collection: false;\n            };\n        }>;\n        collection: false;\n        required: true;\n    };\n    toState: {\n        type: "
-            },
-            {
-              "kind": "Reference",
-              "text": "Klass",
-              "canonicalReference": "@interaqt/runtime!Klass:type"
-            },
-            {
-              "kind": "Content",
-              "text": "<{\n            hasRelation: {\n                type: \"boolean\";\n                required: true;\n                collection: false;\n            };\n            fixedProperties: {\n                type: "
-            },
-            {
-              "kind": "Reference",
-              "text": "Klass",
-              "canonicalReference": "@interaqt/runtime!Klass:type"
-            },
-            {
-              "kind": "Content",
-              "text": "<{\n                    name: {\n                        type: \"string\";\n                        collection: false;\n                        required: true;\n                    };\n                    value: {\n                        type: "
-            },
-            {
-              "kind": "Reference",
-              "text": "Klass",
-              "canonicalReference": "@interaqt/runtime!Klass:type"
-            },
-            {
-              "kind": "Content",
-              "text": "<any>[];\n                        collection: false;\n                        required: true;\n                    };\n                }>;\n                collection: true;\n                required: false;\n            };\n            propertyHandle: {\n                type: \"function\";\n                required: false;\n                collection: false;\n            };\n        }>;\n        collection: false;\n        required: true;\n    };\n    handleType: {\n        type: \"string\";\n    };\n    handle: {\n        type: \"function\";\n        collection: false;\n        required: true;\n    };\n}>"
-            }
-          ],
-          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
-          "isReadonly": true,
-          "releaseTag": "Public",
-          "name": "RelationStateTransfer",
-          "variableTypeTokenRange": {
-            "startIndex": 1,
-            "endIndex": 75
-          }
-        },
-        {
           "kind": "Function",
           "canonicalReference": "@interaqt/runtime!removeAllInstance:function(1)",
           "docComment": "",
@@ -15142,7 +14347,25 @@
             },
             {
               "kind": "Content",
-              "text": "[T[Key]['type']]> : never)) : never;\n}>"
+              "text": "[T[Key]['type']]> : T[Key]['type'] extends "
+            },
+            {
+              "kind": "Reference",
+              "text": "PrimitivePropType",
+              "canonicalReference": "@interaqt/runtime!PrimitivePropType:type"
+            },
+            {
+              "kind": "Content",
+              "text": "[] ? "
+            },
+            {
+              "kind": "Reference",
+              "text": "ExtractPrimitiveTypes",
+              "canonicalReference": "@interaqt/runtime!ExtractPrimitiveTypes:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<REACTIVE, T[Key][\"collection\"], T[Key]['type']> : never)) : never;\n}>"
             },
             {
               "kind": "Content",
@@ -15189,7 +14412,7 @@
           ],
           "typeTokenRange": {
             "startIndex": 10,
-            "endIndex": 34
+            "endIndex": 38
           }
         },
         {
@@ -16648,6 +15871,189 @@
           "variableTypeTokenRange": {
             "startIndex": 1,
             "endIndex": 17
+          }
+        },
+        {
+          "kind": "Variable",
+          "canonicalReference": "@interaqt/runtime!StateMachine:var",
+          "docComment": "",
+          "excerptTokens": [
+            {
+              "kind": "Content",
+              "text": "StateMachine: "
+            },
+            {
+              "kind": "Reference",
+              "text": "Klass",
+              "canonicalReference": "@interaqt/runtime!Klass:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<    {\nstates: {\ntype: "
+            },
+            {
+              "kind": "Reference",
+              "text": "Klass",
+              "canonicalReference": "@interaqt/runtime!Klass:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<    {\nvalue: {\ntype: (\"string\" | \"number\" | \"boolean\" | \"object\" | \"null\")[];\ncollection: false;\nrequired: false;\n};\npropertyHandle: {\ntype: \"function\";\nrequired: false;\ncollection: false;\n};\n}>;\ncollection: true;\nrequired: true;\n};\ntransfers: {\ntype: "
+            },
+            {
+              "kind": "Reference",
+              "text": "Klass",
+              "canonicalReference": "@interaqt/runtime!Klass:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<    {\ntriggerInteraction: {\ntype: "
+            },
+            {
+              "kind": "Reference",
+              "text": "Klass",
+              "canonicalReference": "@interaqt/runtime!Klass:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<"
+            },
+            {
+              "kind": "Reference",
+              "text": "InteractionPublicType",
+              "canonicalReference": "@interaqt/runtime!InteractionPublicType:type"
+            },
+            {
+              "kind": "Content",
+              "text": ">;\ncollection: false;\nrequired: true;\n};\nfromState: {\ntype: "
+            },
+            {
+              "kind": "Reference",
+              "text": "Klass",
+              "canonicalReference": "@interaqt/runtime!Klass:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<    {\nvalue: {\ntype: (\"string\" | \"number\" | \"boolean\" | \"object\" | \"null\")[];\ncollection: false;\nrequired: false;\n};\npropertyHandle: {\ntype: \"function\";\nrequired: false;\ncollection: false;\n};\n}>;\ncollection: false;\nrequired: true;\n};\ntoState: {\ntype: "
+            },
+            {
+              "kind": "Reference",
+              "text": "Klass",
+              "canonicalReference": "@interaqt/runtime!Klass:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<    {\nvalue: {\ntype: (\"string\" | \"number\" | \"boolean\" | \"object\" | \"null\")[];\ncollection: false;\nrequired: false;\n};\npropertyHandle: {\ntype: \"function\";\nrequired: false;\ncollection: false;\n};\n}>;\ncollection: false;\nrequired: true;\n};\nhandleType: {\ntype: \"string\";\n};\nhandle: {\ntype: \"function\";\ncollection: false;\nrequired: true;\n};\n}>;\ncollection: true;\nrequired: true;\n};\ndefaultState: {\ntype: "
+            },
+            {
+              "kind": "Reference",
+              "text": "Klass",
+              "canonicalReference": "@interaqt/runtime!Klass:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<    {\nvalue: {\ntype: (\"string\" | \"number\" | \"boolean\" | \"object\" | \"null\")[];\ncollection: false;\nrequired: false;\n};\npropertyHandle: {\ntype: \"function\";\nrequired: false;\ncollection: false;\n};\n}>;\ncollection: false;\nrequired: true;\n};\n}>"
+            }
+          ],
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
+          "isReadonly": true,
+          "releaseTag": "Public",
+          "name": "StateMachine",
+          "variableTypeTokenRange": {
+            "startIndex": 1,
+            "endIndex": 17
+          }
+        },
+        {
+          "kind": "Variable",
+          "canonicalReference": "@interaqt/runtime!StateNode:var",
+          "docComment": "",
+          "excerptTokens": [
+            {
+              "kind": "Content",
+              "text": "StateNode: "
+            },
+            {
+              "kind": "Reference",
+              "text": "Klass",
+              "canonicalReference": "@interaqt/runtime!Klass:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<    {\nvalue: {\ntype: (\"string\" | \"number\" | \"boolean\" | \"object\" | \"null\")[];\ncollection: false;\nrequired: false;\n};\npropertyHandle: {\ntype: \"function\";\nrequired: false;\ncollection: false;\n};\n}>"
+            }
+          ],
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
+          "isReadonly": true,
+          "releaseTag": "Public",
+          "name": "StateNode",
+          "variableTypeTokenRange": {
+            "startIndex": 1,
+            "endIndex": 3
+          }
+        },
+        {
+          "kind": "Variable",
+          "canonicalReference": "@interaqt/runtime!StateTransfer:var",
+          "docComment": "",
+          "excerptTokens": [
+            {
+              "kind": "Content",
+              "text": "StateTransfer: "
+            },
+            {
+              "kind": "Reference",
+              "text": "Klass",
+              "canonicalReference": "@interaqt/runtime!Klass:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<    {\ntriggerInteraction: {\ntype: "
+            },
+            {
+              "kind": "Reference",
+              "text": "Klass",
+              "canonicalReference": "@interaqt/runtime!Klass:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<"
+            },
+            {
+              "kind": "Reference",
+              "text": "InteractionPublicType",
+              "canonicalReference": "@interaqt/runtime!InteractionPublicType:type"
+            },
+            {
+              "kind": "Content",
+              "text": ">;\ncollection: false;\nrequired: true;\n};\nfromState: {\ntype: "
+            },
+            {
+              "kind": "Reference",
+              "text": "Klass",
+              "canonicalReference": "@interaqt/runtime!Klass:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<    {\nvalue: {\ntype: (\"string\" | \"number\" | \"boolean\" | \"object\" | \"null\")[];\ncollection: false;\nrequired: false;\n};\npropertyHandle: {\ntype: \"function\";\nrequired: false;\ncollection: false;\n};\n}>;\ncollection: false;\nrequired: true;\n};\ntoState: {\ntype: "
+            },
+            {
+              "kind": "Reference",
+              "text": "Klass",
+              "canonicalReference": "@interaqt/runtime!Klass:type"
+            },
+            {
+              "kind": "Content",
+              "text": "<    {\nvalue: {\ntype: (\"string\" | \"number\" | \"boolean\" | \"object\" | \"null\")[];\ncollection: false;\nrequired: false;\n};\npropertyHandle: {\ntype: \"function\";\nrequired: false;\ncollection: false;\n};\n}>;\ncollection: false;\nrequired: true;\n};\nhandleType: {\ntype: \"string\";\n};\nhandle: {\ntype: \"function\";\ncollection: false;\nrequired: true;\n};\n}>"
+            }
+          ],
+          "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
+          "isReadonly": true,
+          "releaseTag": "Public",
+          "name": "StateTransfer",
+          "variableTypeTokenRange": {
+            "startIndex": 1,
+            "endIndex": 11
           }
         },
         {
@@ -18133,7 +17539,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n    records: {\n        type: ("
+              "text": "<    {\nrecords: {\ntype: ("
             },
             {
               "kind": "Reference",
@@ -18142,7 +17548,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n            name: {\n                type: \"string\";\n                collection: false;\n                required: true;\n                constraints: {\n                    nameFormat({ name }: {\n                        name: "
+              "text": "<    {\nname: {\ntype: \"string\";\ncollection: false;\nrequired: true;\nconstraints: {\nnameFormat({ name }: {\nname: "
             },
             {
               "kind": "Reference",
@@ -18151,7 +17557,7 @@
             },
             {
               "kind": "Content",
-              "text": "<string>;\n                    }): "
+              "text": "<string>;\n}): "
             },
             {
               "kind": "Reference",
@@ -18160,7 +17566,7 @@
             },
             {
               "kind": "Content",
-              "text": "<boolean>;\n                };\n            };\n            computedData: {\n                type: "
+              "text": "<boolean>;\n};\n};\ncomputedData: {\ntype: "
             },
             {
               "kind": "Reference",
@@ -18169,7 +17575,7 @@
             },
             {
               "kind": "Content",
-              "text": "<any>[];\n                collection: false;\n                required: false;\n            };\n            properties: {\n                type: "
+              "text": "<any>[];\ncollection: false;\nrequired: false;\n};\nproperties: {\ntype: "
             },
             {
               "kind": "Reference",
@@ -18178,7 +17584,7 @@
             },
             {
               "kind": "Content",
-              "text": "<{\n                    name: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        constraints: {\n                            format({ name }: {\n                                name: "
+              "text": "<    {\nname: {\ntype: \"string\";\nrequired: true;\ncollection: false;\nconstraints: {\nformat({ name }: {\nname: "
             },
             {
               "kind": "Reference",
@@ -18187,7 +17593,7 @@
             },
             {
               "kind": "Content",
-              "text": "<string>;\n                            }): "
+              "text": "<string>;\n}): "
             },
             {
               "kind": "Reference",
@@ -18196,7 +17602,7 @@
             },
             {
               "kind": "Content",
-              "text": "<boolean>;\n                            length({ name }: {\n                                name: "
+              "text": "<boolean>;\nlength({ name }: {\nname: "
             },
             {
               "kind": "Reference",
@@ -18205,7 +17611,7 @@
             },
             {
               "kind": "Content",
-              "text": "<string>;\n                            }): "
+              "text": "<string>;\n}): "
             },
             {
               "kind": "Reference",
@@ -18214,7 +17620,7 @@
             },
             {
               "kind": "Content",
-              "text": "<boolean>;\n                        };\n                    };\n                    type: {\n                        type: \"string\";\n                        required: true;\n                        collection: false;\n                        options: "
+              "text": "<boolean>;\n};\n};\ntype: {\ntype: \"string\";\nrequired: true;\ncollection: false;\noptions: "
             },
             {
               "kind": "Reference",
@@ -18223,7 +17629,7 @@
             },
             {
               "kind": "Content",
-              "text": "[];\n                    };\n                    collection: {\n                        type: \"boolean\";\n                        required: true;\n                        collection: false;\n                        defaultValue(): boolean;\n                    };\n                    args: {\n                        computedType: (values: {\n                            type: "
+              "text": "[];\n};\ncollection: {\ntype: \"boolean\";\nrequired: true;\ncollection: false;\ndefaultValue(): boolean;\n};\nargs: {\ncomputedType: (values: {\ntype: "
             },
             {
               "kind": "Reference",
@@ -18232,7 +17638,7 @@
             },
             {
               "kind": "Content",
-              "text": ";\n                        }) => string;\n                    };\n                    computedData: {\n                        collection: false;\n                        type: "
+              "text": ";\n}) => string;\n};\ncomputedData: {\ncollection: false;\ntype: "
             },
             {
               "kind": "Reference",
@@ -18241,7 +17647,7 @@
             },
             {
               "kind": "Content",
-              "text": "<any>[];\n                        required: false;\n                    };\n                    computed: {\n                        required: false;\n                        type: \"function\";\n                        collection: false;\n                    };\n                }>;\n                collection: true;\n                required: true;\n                constraints: {\n                    eachNameUnique({ properties }: any): "
+              "text": "<any>[];\nrequired: false;\n};\ncomputed: {\nrequired: false;\ntype: \"function\";\ncollection: false;\n};\n}>;\ncollection: true;\nrequired: true;\nconstraints: {\neachNameUnique({ properties }: any): "
             },
             {
               "kind": "Reference",
@@ -18250,7 +17656,7 @@
             },
             {
               "kind": "Content",
-              "text": "<boolean>;\n                };\n                defaultValue(): never[];\n            };\n            isRef: {\n                required: true;\n                collection: false;\n                type: \"boolean\";\n                defaultValue: () => boolean;\n            };\n        }> | "
+              "text": "<boolean>;\n};\ndefaultValue(): never[];\n};\nisRef: {\nrequired: true;\ncollection: false;\ntype: \"boolean\";\ndefaultValue: () => boolean;\n};\n}> | "
             },
             {
               "kind": "Reference",
@@ -18268,7 +17674,7 @@
             },
             {
               "kind": "Content",
-              "text": ">)[];\n        collection: true;\n        required: true;\n    };\n    matchRecordToWeight: {\n        type: \"function\";\n        collection: false;\n        required: true;\n    };\n}>"
+              "text": ">)[];\ncollection: true;\nrequired: true;\n};\nmatchRecordToWeight: {\ntype: \"function\";\ncollection: false;\nrequired: true;\n};\n}>"
             }
           ],
           "fileUrlPath": "node_modules/@interaqt/shared/dist/index.d.ts",
