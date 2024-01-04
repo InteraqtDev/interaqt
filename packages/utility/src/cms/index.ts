@@ -287,17 +287,3 @@ export const createUniqueContentAttributive = (entityName: string) => {
     })
 }
 
-
-
-
-type RelationDefinition = {
-    source: typeof Entity,
-    target: typeof Entity,
-    sourceProperty: string,
-    targetProperty: string,
-    relType: string,
-}
-
-export function createContentRelation(relation: RelationDefinition, properties: ContentProperty[], auth: EntityDefinition) {
-
-}
