@@ -2,7 +2,7 @@
     "name": "interaqt",
     "private": true,
     "version": "1.0.0",
-    "description": "The only right tool for AI generating code.",
+    "description": "Better application framework for LLM era.",
     "scripts": {
         "test": "pnpm --filter '@interaqt/*' test:run"
     },

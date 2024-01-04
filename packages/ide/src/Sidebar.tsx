@@ -8,18 +8,18 @@ import TeamIcon from "./assets/team";
 import ReportIcon from "./assets/report";
 import ModuleIcon from './assets/module';
 
-const useNavigate = () => () => {}
-const useMatch = () => false
+const useNavigate = () => (_: string) => { }
+const useMatch = (_: string) => false
 
 function Menu({
   menu,
   active,
   back,
 }: {
-  menu: any;
+  menu: { title: string, Icon: any }[];
   active?: number;
   back?: string;
-}, {createElement}) {
+}, { createElement }) {
   const navigate = useNavigate();
   return (
     <nav className="flex flex-1 flex-col">
@@ -45,7 +45,7 @@ function Menu({
                       : "text-gray-nor hover:text-gray-sel hover:bg-gray-50 group flex items-center gap-x-4 rounded-md p-2 text-sm leading-6"
                   }
                 >
-                  <Icon className="group-hover:text-gray-sel" stroke={active === index ? '#0E0E0E' : 'currentColor' } aria-hidden="true" />
+                  <Icon className="group-hover:text-gray-sel" stroke={active === index ? '#0E0E0E' : 'currentColor'} aria-hidden="true" />
                   {title}
                 </a>
               </li>
@@ -85,7 +85,7 @@ function Menu({
   );
 }
 
-export default function Sidebar({}, {createElement}) {
+export default function Sidebar({ }, { createElement }) {
   const navigate = useNavigate();
   const mainMenu = [
     {
