@@ -1,7 +1,7 @@
 import './MapInteraction.js'
 import './MapActivity.js'
 import './MapRecordMutation.js'
-import './RelationStateMachine.js'
+import './StateMachine.js'
 import './RelationBasedWeightedSummation.js'
 import './RelationCount.js'
 import './WeightedSummation.js'

@@ -34,11 +34,11 @@ import {
     RelationBasedAny,
     RelationBasedEvery,
     RelationCount,
-    RelationStateMachine,
-    RelationStateNode,
-    RelationStateTransfer,
     removeAllInstance,
     State,
+    StateMachine,
+    StateNode,
+    StateTransfer,
     stringifyAllInstances,
     Transfer,
     USER_ENTITY
@@ -196,18 +196,17 @@ export const deleteInteraction = Interaction.create({
     })
 })
 // friend 关系的状态机描述
-const notFriendState = RelationStateNode.create({
-    hasRelation: false
+const notFriendState = StateNode.create({
+    value: null
 })
-const isFriendState = RelationStateNode.create({
-    hasRelation: true
+const isFriendState = StateNode.create({
+    value: {}
 })
-const addFriendTransfer = RelationStateTransfer.create({
-    sourceActivity: createFriendRelationActivity,
+const addFriendTransfer = StateTransfer.create({
     triggerInteraction: approveInteraction,
     fromState: notFriendState,
     toState: isFriendState,
-    handleType: 'computeSource',
+    handleType: 'computeTarget',
     handle: async function (this: Controller, eventArgs, activityId) {
         const {BoolExp} = this.globals
         const match = BoolExp.atom({
@@ -226,12 +225,12 @@ const addFriendTransfer = RelationStateTransfer.create({
     }
 
 })
-const deleteFriendTransfer = RelationStateTransfer.create({
+const deleteFriendTransfer = StateTransfer.create({
     // sourceActivity: activity,
     triggerInteraction: deleteInteraction,
     fromState: isFriendState,
     toState: notFriendState,
-    handleType: 'computeSource',
+    handleType: 'computeTarget',
     handle: async function (eventArgs, activityId) {
         return {
             source: eventArgs.user,
@@ -240,7 +239,7 @@ const deleteFriendTransfer = RelationStateTransfer.create({
     }
 
 })
-const friendRelationSM = RelationStateMachine.create({
+const friendRelationSM = StateMachine.create({
     states: [notFriendState, isFriendState],
     transfers: [addFriendTransfer, deleteFriendTransfer],
     defaultState: notFriendState

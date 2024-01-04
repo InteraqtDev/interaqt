@@ -16,10 +16,10 @@ import {
     Relation,
     RelationBasedAny,
     RelationBasedEvery,
-    RelationStateMachine,
-    RelationStateNode,
-    RelationStateTransfer,
     removeAllInstance,
+    StateMachine,
+    StateNode,
+    StateTransfer,
     stringifyAllInstances,
     USER_ENTITY
 } from "@interaqt/runtime";
@@ -198,18 +198,18 @@ export const transferReviewersInteraction = Interaction.create({
 })
 
 // 是否是 reviewer 的状态机
-const notReviewerState = RelationStateNode.create({
-    hasRelation: false
+const notReviewerState = StateNode.create({
+    value: null
 })
-const isReviewerState = RelationStateNode.create({
-    hasRelation: true
+const isReviewerState = StateNode.create({
+    value: {}
 })
 
-const sendRequestTransfer = RelationStateTransfer.create({
+const sendRequestTransfer = StateTransfer.create({
     triggerInteraction: sendInteraction,
     fromState: notReviewerState,
     toState: isReviewerState,
-    handleType: 'computeSource',
+    handleType: 'computeTarget',
     handle: async function(eventArgs) {
         return {
             source: eventArgs.payload.request,
@@ -219,11 +219,11 @@ const sendRequestTransfer = RelationStateTransfer.create({
 
 })
 
-const addReviewerTransfer = RelationStateTransfer.create({
+const addReviewerTransfer = StateTransfer.create({
     triggerInteraction: addReviewersInteraction,
     fromState: isReviewerState,
     toState: notReviewerState,
-    handleType: 'computeSource',
+    handleType: 'computeTarget',
     handle: async function(eventArgs, activityId) {
         return eventArgs.payload.reviewer.map((reviewer: any) => {
             return {
@@ -235,11 +235,11 @@ const addReviewerTransfer = RelationStateTransfer.create({
 
 })
 
-const transferReviewerTransfer = RelationStateTransfer.create({
+const transferReviewerTransfer = StateTransfer.create({
     triggerInteraction: transferReviewersInteraction,
     fromState: isReviewerState,
     toState: notReviewerState,
-    handleType: 'computeSource',
+    handleType: 'computeTarget',
     handle: async function(eventArgs, activityId) {
         return {
             source: eventArgs.payload.request,
@@ -249,11 +249,11 @@ const transferReviewerTransfer = RelationStateTransfer.create({
 
 })
 
-const transferFromReviewerTransfer = RelationStateTransfer.create({
+const transferFromReviewerTransfer = StateTransfer.create({
     triggerInteraction: transferReviewersInteraction,
     fromState: notReviewerState,
     toState: isReviewerState,
-    handleType: 'computeSource',
+    handleType: 'computeTarget',
     handle: async function(eventArgs, activityId) {
         return {
             source: eventArgs.payload.request,
@@ -263,7 +263,7 @@ const transferFromReviewerTransfer = RelationStateTransfer.create({
 
 })
 
-const reviewerRelationSM = RelationStateMachine.create({
+const reviewerRelationSM = StateMachine.create({
     states: [notReviewerState, isReviewerState],
     transfers: [sendRequestTransfer, transferReviewerTransfer, addReviewerTransfer, transferFromReviewerTransfer],
     defaultState: notReviewerState

@@ -11,7 +11,7 @@ type RecordChangeEffect = {
 }
 
 export class WeightedSummationHandle extends IncrementalComputedDataHandle {
-    records: KlassInstance<typeof WeightedSummation, false>['records'] = []
+    records!: KlassInstance<typeof WeightedSummation, false>['records']
     mapRecordToWeight!: (record: KlassInstance<typeof Entity, false> | KlassInstance<typeof Relation, false>, info: KlassInstance<any, false>) => number
     // 单独抽出来让下面能覆写
     parseComputedData(){
@@ -22,8 +22,10 @@ export class WeightedSummationHandle extends IncrementalComputedDataHandle {
     getDefaultValue(newRecordId?: any): any {
         return 0
     }
-    async computeEffect(mutationEvent: RecordMutationEvent, mutationEvents: RecordMutationEvent[]): Promise<KlassInstance<any, false>|undefined> {
-        return this.records!.find((record) => {
+    computeEffect(mutationEvent: RecordMutationEvent, mutationEvents: RecordMutationEvent[]): KlassInstance<any, false>|undefined {
+        // FIXME type
+        // @ts-ignore
+        return this.records.find((record: any) => {
             return (record.name) === mutationEvent.recordName
         })
     }
