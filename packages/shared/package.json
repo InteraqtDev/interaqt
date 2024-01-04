@@ -2,7 +2,7 @@
   "name": "@interaqt/shared",
   "module": "index.ts",
   "type": "module",
-  "version": "1.0.22",
+  "version": "1.0.23",
   "devDependencies": {
     "@microsoft/api-extractor": "^7.38.5",
     "rimraf": "^5.0.5",
