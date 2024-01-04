@@ -1,6 +1,6 @@
 import {assertType, describe, test} from "vitest";
 import {Entity, Relation} from "../entity/Entity.js";
-import {InertKlassInstance, Klass, KlassInstance, KlassProp} from "../createClass.js";
+import {createClass, InertKlassInstance, Klass, KlassInstance, KlassProp} from "../createClass.js";
 import { BoolAtomData, BoolExpressionData } from "../BoolExp.js";
 import {
     ActivityGroup,
@@ -45,7 +45,26 @@ describe("createClass types", () => {
     test('attributive types', () => {
         assertType<KlassInstance<typeof BoolExpressionData, false>|KlassInstance<typeof BoolAtomData, false>>(({left: {}} as unknown as  KlassInstance<typeof BoolExpressionData, false>).left)
     })
+
+
+    test('entity and relation types', () => {
+        const WeightedSummation = createClass({
+            name: 'WeightedSummation',
+            public: {
+                records: {
+                    type: [Entity, Relation],
+                    collection: true,
+                    required: true,
+                },
+            }
+        })
+
+        assertType<(KlassInstance<typeof Entity, false>|KlassInstance<typeof Relation,false>)[]>({} as unknown as KlassInstance<typeof WeightedSummation, false>["records"])
+        assertType<KlassInstance<typeof WeightedSummation, false>["records"]>([] as unknown as KlassInstance<typeof Entity, false>[]|KlassInstance<typeof Relation,false>[])
+    })
 })
+
+
 
 
 

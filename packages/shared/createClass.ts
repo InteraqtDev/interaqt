@@ -1,13 +1,13 @@
 import {atom, Atom, computed, isAtom, isReactive, rawStructureClone, reactive, toRaw, UnwrapReactive} from "data0";
 import {assert, hasOwn, isObject, isPlainObject} from "./utils.js";
 
-type PrimitivePropType = 'string'|'number'|'boolean'| 'object'|'function'
+type PrimitivePropType = 'string'|'number'|'boolean'| 'object'|'function'|'null'
 type DefaultValueType = (...args: any[]) => any
 // FIXME return type 应该是个 Prop ?
 type ComputedValueType = (obj: KlassInstance<any, any>) => any
 
 type ClassPropType = {
-    type?: Klass<any>|Klass<any>[]|PrimitivePropType,
+    type?: Klass<any>|Klass<any>[]|PrimitivePropType|PrimitivePropType[],
     // 用来接触循环引用的
     instanceType?: Object,
     // FIXME 有用吗？
@@ -61,6 +61,7 @@ interface PrimitivePropertyMap {
     number: number
     boolean: boolean
     object: object
+    null: null
     function: (...arg: any[]) => any
 }
 
@@ -96,6 +97,11 @@ type ExtractKlassTypes<REACTIVE extends boolean, COLLECTION extends true|false|u
         SUB_KLASS extends Klass<any> ?
             KlassProp<REACTIVE, COLLECTION,InertKlassInstance<SUB_KLASS["public"]>> : never : never
 
+type ExtractPrimitiveTypes<REACTIVE extends boolean, COLLECTION extends true|false|undefined, T extends PrimitivePropType[] > =
+    T extends Array<infer SUB_KLASS> ?
+        SUB_KLASS extends PrimitivePropType ?
+            KlassProp<REACTIVE, COLLECTION, PrimitivePropertyMap[SUB_KLASS]> : never : never
+
 export type RequiredProps<T extends NonNullable<KlassMeta["public"]>, REACTIVE extends true|false, IS_ARG extends true|false> = OmitNever<{
     [Key in keyof T]:
         RequireWithoutDefaultAndComputed<T[Key], IS_ARG> extends true ?
@@ -110,7 +116,9 @@ export type RequiredProps<T extends NonNullable<KlassMeta["public"]>, REACTIVE e
                                 ExtractKlassTypes<REACTIVE, T[Key]["collection"], T[Key]['type']>:
                                 T[Key]['type'] extends PrimitivePropType ?
                                     KlassProp<REACTIVE, T[Key]["collection"],  PrimitivePropertyMap[T[Key]['type']]> :
-                                    never
+                                        T[Key]['type'] extends PrimitivePropType[] ?
+                                            ExtractPrimitiveTypes<REACTIVE, T[Key]["collection"],  T[Key]['type']> :
+                                            never
                     )
             ):
             never
@@ -132,7 +140,9 @@ export type OptionalProps<T extends NonNullable<KlassMeta["public"]>, REACTIVE e
                                 ExtractKlassTypes<REACTIVE, T[Key]["collection"], T[Key]['type']>:
                                 T[Key]['type'] extends PrimitivePropType ?
                                     KlassProp<REACTIVE, T[Key]["collection"],  PrimitivePropertyMap[T[Key]['type']]> :
-                                    never
+                                    T[Key]['type'] extends PrimitivePropType[] ?
+                                        ExtractPrimitiveTypes<REACTIVE, T[Key]["collection"],  T[Key]['type']> :
+                                        never
                     )
             )
 }>>

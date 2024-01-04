@@ -1,36 +1,15 @@
-import { createClass, Klass } from "./createClass.js";
+import { createClass } from "./createClass.js";
 import { Activity, Interaction } from "./activity/Activity.js";
 import { Entity, Property, Relation } from "./entity/Entity.js";
 import { State } from "./state/State.js";
 
-const FixedProperty = createClass({
-    name: 'RelationFixedProperty',
+export const StateNode = createClass({
+    name: 'StateNode',
     public: {
-        name: {
-            type: 'string',
-            collection: false,
-            required: true
-        },
-        value: {
-            type: [] as Klass<any>[], // 可以是任何
-            collection: false,
-            required: true,
-        }
-    }
-})
-
-export const RelationStateNode = createClass({
-    name: 'RelationStateNode',
-    public: {
-        hasRelation: {
-            type: 'boolean',
-            required: true,
-            collection: false
-        },
         // 用来标记一个 独特的 state。
-        fixedProperties: {
-            type: FixedProperty,
-            collection: true,
+        value: {
+            type: ['object', 'string', 'number', 'boolean', 'null'],
+            collection: false,
             required: false,
         },
         propertyHandle: {
@@ -41,31 +20,26 @@ export const RelationStateNode = createClass({
     }
 })
 
-export const RelationStateTransfer = createClass({
-    name: 'RelationStateTransfer',
+export const StateTransfer = createClass({
+    name: 'StateTransfer',
     public: {
-        sourceActivity: {
-            type: Activity,
-            collection: false,
-            required: false
-        },
         triggerInteraction: {
             type: Interaction,
             collection: false,
             required: true
         },
         fromState: {
-            type: RelationStateNode,
+            type: StateNode,
             collection: false,
             required: true
         },
         toState: {
-            type: RelationStateNode,
+            type: StateNode,
             collection: false,
             required: true
         },
         handleType: {
-            type: 'string',   // 支持 'enumeration' 和 'computeSource'
+            type: 'string',   // 支持 'enumeration' 和 'computeTarget'
         },
         handle: {
             type: 'function',
@@ -76,28 +50,32 @@ export const RelationStateTransfer = createClass({
 })
 
 
-export const RelationStateMachine = createClass({
-    name: 'RelationStateMachine',
+export const StateMachine = createClass({
+    name: 'StateMachine',
     public: {
         states: {
-            type: RelationStateNode,
+            type: StateNode,
             collection: true,
             required: true
         },
         transfers: {
-            type: RelationStateTransfer,
+            type: StateTransfer,
             collection: true,
             required: true
         },
         defaultState: {
-            type: RelationStateNode,
+            type: StateNode,
             collection: false,
             required: true
         }
     }
 })
 
-Relation.public.computedData.type.push(RelationStateMachine)
+
+Relation.public.computedData.type.push(StateMachine)
+Entity.public.computedData.type.push(StateMachine)
+Property.public.computedData.type.push(StateMachine)
+State.public.computedData.type.push(StateMachine)
 
 
 // ComputedData 的基础结构
