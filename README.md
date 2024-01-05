@@ -70,8 +70,8 @@ Interaqt's abstraction transcends specific programming languages. The NodeJS ite
 # 3. Components of Interaqt
 | Component                | Description                                                                   | Status                                                           |
 |--------------------------|-------------------------------------------------------------------------------|------------------------------------------------------------------|
+| Interaqt Runtime(NodeJS) | NodeJS runtime that automatically builds databases and generates usable APIs. | <img src="https://img.shields.io/npm/v/%40interaqt%2Fruntime" /> <img src="https://img.shields.io/npm/dt/%40interaqt/runtime" />|
 | Interaqt IDE             | Visual editor for processes, data, and more.                                  | 🚧Release on August 2024                                         | 
-| Interaqt Runtime(NodeJS) | NodeJS runtime that automatically builds databases and generates usable APIs. | <img src="https://img.shields.io/npm/v/%40interaqt%2Fruntime" /> |
 | Interaqt Runtime(Go)     | Go runtime.                                                                   | 🚧Release on August 2024                                         |
 | Interaqt Runtime(Java)   | Java runtime.                                                                 | 🚧Release on August 2024                                         |
 

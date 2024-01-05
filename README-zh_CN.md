@@ -18,8 +18,8 @@ Interaqt 期望通过这种方式，让任何个人或者团队不再被具体�
 # 项目组成
 | 名称                       | 描述                          | 状态                                                               |
 |--------------------------|-----------------------------|------------------------------------------------------------------|
+| Interaqt Runtime(NodeJS) | 自动建立数据库、生成可用 api 的NodeJS运行时 | <img src="https://img.shields.io/npm/v/%40interaqt%2Fruntime" /> <img src="https://img.shields.io/npm/dt/%40interaqt/runtime" />|
 | Interaqt IDE             | 可视化的流程、数据等编辑器               | 🚧Release on August 2024                                         | 
-| Interaqt Runtime(NodeJS) | 自动建立数据库、生成可用 api 的NodeJS运行时 | <img src="https://img.shields.io/npm/v/%40interaqt%2Fruntime" /> |
 | Interaqt Runtime(Go)     | 自动建立数据库、生成可用 api 的Go运行时     | 🚧Release on August 2024                                         |
 | Interaqt Runtime(Java)   | 自动建立数据库、生成可用 api 的Java运行时   | 🚧Release on August 2024                                         |
 
