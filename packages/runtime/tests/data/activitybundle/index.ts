@@ -219,7 +219,7 @@ const addFriendTransfer = StateTransfer.create({
 
         const sendEvent = (await this.system.getEvent(match))[0]
         return {
-            source: sendEvent.args.user,
+            source: sendEvent.user,
             target: eventArgs.user
         }
     }

@@ -1,13 +1,13 @@
-import {Entity, Interaction, KlassInstance, MapInteraction} from "@interaqt/shared";
+import {Entity, KlassInstance, MapInteraction} from "@interaqt/shared";
 import {InteractionEventArgs} from "../types/interaction.js";
 import {MatchExp} from '@interaqt/storage'
 import {ComputedDataHandle} from "./ComputedDataHandle.js";
-import {RecordMutationEvent} from "../System.js";
-import {InteractionCallResponse} from "../InteractionCall.js";
+import {EVENT_RECORD, RecordMutationEvent} from "../System.js";
+
 
 export class MapInteractionHandle extends ComputedDataHandle {
     data!: KlassInstance<typeof Entity, false>
-    mapItems!: Map<KlassInstance<typeof Interaction, false>, {
+    mapItems!: Map<string, {
         computeTarget: (data: InteractionEventArgs, activityId?: string) => any
         handle: (data: InteractionEventArgs, activityId?: string) => any
     }>
@@ -25,7 +25,7 @@ export class MapInteractionHandle extends ComputedDataHandle {
     parseComputedData() {
         const computedData = this.computedData as unknown as  KlassInstance<typeof MapInteraction, false>
         this.mapItems = new Map(computedData.items.map(({interaction, map, computeTarget}) => {
-            return [interaction, {
+            return [interaction.uuid, {
                 handle: map,
                 computeTarget: (computeTarget as (data: InteractionEventArgs, activityId?: string) => any)?.bind(this.controller)
             }]
@@ -36,81 +36,87 @@ export class MapInteractionHandle extends ComputedDataHandle {
     addEventListener() {
         super.addEventListener()
 
-        this.mapItems.forEach((_, interaction)=> {
-            this.controller.listen(interaction, this.onCallInteraction)
+        this.controller.system.storage.listen(async (mutationEvents) => {
+            const events: RecordMutationEvent[] = []
+            for(let mutationEvent of mutationEvents){
+
+                if (mutationEvent.type==='create'&& mutationEvent.recordName === EVENT_RECORD) {
+                    // 是不是监听的 interaction 的变化
+                    const item = this.mapItems.get(mutationEvent.record!.interactionId)
+                    if (item) {
+                        const {handle} = item
+                        const eventRecord = mutationEvent.record! as unknown as InteractionEventArgs
+                        const value = await handle.call(this.controller, eventRecord, mutationEvent.record!.activityId)
+
+                        let innerMutationEvents: RecordMutationEvent[]
+                        if (this.computedDataType === 'global') {
+                            innerMutationEvents = await this.updateGlobalState( value)
+                        } else if (this.computedDataType === 'property') {
+                            innerMutationEvents = await this.updateProperty(value, mutationEvent.record!.interactionId, eventRecord, mutationEvent.record!.activityId)
+                        } else if (this.computedDataType === 'entity' || this.computedDataType === 'relation') {
+                            innerMutationEvents = await this.createOrUpdateRecord(value)
+                        }
+                        events.push(...innerMutationEvents!)
+                    }
+                }
+            }
+
+            return { events }
         })
     }
-    onCallInteraction = async (interaction: KlassInstance<typeof Interaction, false>, interactionEventArgs: InteractionEventArgs, effects: InteractionCallResponse["effects"],activityId?: string) => {
-        const {handle} = this.mapItems.get(interaction)!
-        const value = await handle.call(this.controller, interactionEventArgs, activityId)
-
-        if (this.computedDataType === 'global') {
-            return this.updateState( value, effects)
-        } else if (this.computedDataType === 'property') {
-            return this.updateProperty(value, interaction, interactionEventArgs, activityId,  effects)
-        } else if (this.computedDataType === 'entity' || this.computedDataType === 'relation') {
-            return this.createOrUpdateRecord(value, effects)
-        }
-
-    }
-    async updateProperty(newValue: any, interaction: KlassInstance<typeof Interaction, false>,interactionEventArgs: InteractionEventArgs, activityId: string|undefined, effects: InteractionCallResponse["effects"]) {
-        const {computeTarget} = this.mapItems.get(interaction)!
+    async updateProperty(newValue: any, interactionUUID: string,interactionEventArgs: InteractionEventArgs, activityId: string|undefined) {
+        const events: RecordMutationEvent[] = []
+        const {computeTarget} = this.mapItems.get(interactionUUID)!
 
         const source = await computeTarget(interactionEventArgs, activityId)
         if (source) {
             const sources = Array.isArray(source) ? source : [source]
             for (const source of sources) {
                 const match = MatchExp.fromObject(source)
-                const result = await this.controller.system.storage.update(this.recordName!, match, {[this.propertyName!]: newValue})
-                effects!.push({
-                    type: 'update',
-                    recordName: this.recordName!,
-                    record: result
-                })
+                const innerEvents : RecordMutationEvent[] = []
+                await this.controller.system.storage.update(this.recordName!, match, {[this.propertyName!]: newValue}, innerEvents)
+                events.push(...innerEvents)
             }
         }
+
+        return events
     }
-    async createOrUpdateRecord(newMappedItemResult: any, effects: InteractionCallResponse["effects"]) {
+    async createOrUpdateRecord(newMappedItemResult: any) {
+        const events: RecordMutationEvent[] = []
+
         if (newMappedItemResult !== undefined) {
             const newMappedItems = Array.isArray(newMappedItemResult) ? newMappedItemResult : [newMappedItemResult]
             for(const newMappedItem of newMappedItems) {
                 // CAUTION 注意，这里的增量计算语义是 map one interaction to one relation。所以不会有更新的情况，因为 Interaction 不会更新。
                 //  如果有更复杂的 computed Relation 需求，应该用别的
-                let result
+                const innerEvents : RecordMutationEvent[] = []
+
                 if (this.computedDataType === 'entity') {
                     if(newMappedItem.id) {
                         const match = MatchExp.atom({key: 'id', value: ['=', newMappedItem.id]})
-                        result = await this.controller.system.storage.update( this.recordName!, match, newMappedItem)
+                        await this.controller.system.storage.update( this.recordName!, match, newMappedItem,  innerEvents)
                     } else {
-                        result = await this.controller.system.storage.create( this.recordName!, newMappedItem)
+                        await this.controller.system.storage.create( this.recordName!, newMappedItem,  innerEvents)
                     }
                 } else {
                     if (newMappedItem.id) {
                         const match = MatchExp.atom({key: 'id', value: ['=', newMappedItem.id]})
-                        result = await this.controller.system.storage.updateRelationByName( this.recordName!, match, newMappedItem)
+                        await this.controller.system.storage.updateRelationByName( this.recordName!, match, newMappedItem,  innerEvents)
                     } else {
-                        result = await this.controller.system.storage.addRelationByNameById( this.recordName!, newMappedItem.source.id, newMappedItem.target.id, newMappedItem)
+                        if (events.length === 2) debugger
+                        await this.controller.system.storage.addRelationByNameById( this.recordName!, newMappedItem.source.id, newMappedItem.target.id, newMappedItem,  innerEvents)
                     }
                 }
-
-
-                effects!.push({
-                    type: newMappedItem.id ? 'update' : 'create',
-                    recordName: this.recordName!,
-                    record: result
-                })
-
+                events.push(...innerEvents)
             }
-
         }
+
+        return events
     }
-    updateState(newValue: any, effects: InteractionCallResponse["effects"]) {
-        effects!.push({
-            type: 'update',
-            stateName: this.dataContext.id!,
-            value: newValue
-        })
-        return this.controller.system.storage.set('state', this.dataContext.id as string, newValue)
+    async updateGlobalState(newValue: any) {
+        const events: RecordMutationEvent[] = []
+        await this.controller.system.storage.set('state', this.dataContext.id as string, newValue, events)
+        return events
     }
 }
 

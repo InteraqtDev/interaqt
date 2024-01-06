@@ -15,6 +15,7 @@ import { ConnectionOptions } from 'mysql2/promise';
 import cors from 'cors';
 import { FastifyLoggerOptions } from 'fastify';
 import { MatchExpressionData } from '@interaqt/storage';
+import { MutationEvent as MutationEvent_2 } from '@interaqt/storage';
 import mysql from 'mysql2/promise';
 import { QueryResult } from 'pg';
 import SQLite from 'better-sqlite3';
@@ -980,7 +981,7 @@ export const constraints: {
 
 // @public (undocumented)
 export class Controller {
-    constructor(system: System, entities: KlassInstance<typeof Entity, false>[], relations: KlassInstance<typeof Relation, false>[], activities: KlassInstance<typeof Activity, false>[], interactions: KlassInstance<typeof Interaction, false>[], states?: KlassInstance<typeof Property, false>[]);
+    constructor(system: System, entities: KlassInstance<typeof Entity, false>[], relations: KlassInstance<typeof Relation, false>[], activities: KlassInstance<typeof Activity, false>[], interactions: KlassInstance<typeof Interaction, false>[], states?: KlassInstance<typeof Property, false>[], recordChangeSideEffects?: KlassInstance<typeof RecordChangeSideEffect, false>[]);
     // (undocumented)
     activities: KlassInstance<typeof Activity, false>[];
     // Warning: (ae-forgotten-export) The symbol "ActivityCall" needs to be exported by the entry point index.d.ts
@@ -1006,8 +1007,6 @@ export class Controller {
     // (undocumented)
     computedDataHandles: Set<ComputedDataHandle>;
     // (undocumented)
-    dispatch(event: any, ...args: any[]): Promise<void>;
-    // (undocumented)
     entities: KlassInstance<typeof Entity, false>[];
     // (undocumented)
     globals: {
@@ -1022,7 +1021,7 @@ export class Controller {
     // (undocumented)
     interactions: KlassInstance<typeof Interaction, false>[];
     // (undocumented)
-    listen(event: any, callback: SystemCallback): () => void;
+    recordChangeSideEffects: KlassInstance<typeof RecordChangeSideEffect, false>[];
     // (undocumented)
     relations: KlassInstance<typeof Relation, false>[];
     // (undocumented)
@@ -1428,6 +1427,14 @@ export type EntityIdRef = {
     [k: string]: any;
 };
 
+// Warning: (ae-forgotten-export) The symbol "EntityType" needs to be exported by the entry point index.d.ts
+// Warning: (ae-forgotten-export) The symbol "InferType" needs to be exported by the entry point index.d.ts
+//
+// @public (undocumented)
+export type EntityInstanceType<T extends EntityType> = {
+    [P in T['properties'][number] as P['name']]: P['collection'] extends true ? Array<InferType<P>> : InferType<P>;
+};
+
 // @public (undocumented)
 export type EvaluateError = {
     data: any;
@@ -1710,8 +1717,7 @@ export type InteractionEvent = {
     interactionId: string;
     interactionName: string;
     activityId?: string;
-    args: InteractionEventArgs;
-};
+} & InteractionEventArgs;
 
 // @public (undocumented)
 export type InteractionEventArgs = {
@@ -2060,7 +2066,7 @@ export class MonoSystem implements System {
     // (undocumented)
     logger: SystemLogger;
     // (undocumented)
-    saveEvent(event: InteractionEvent): Promise<any>;
+    saveEvent(event: InteractionEvent, mutationEvents?: RecordMutationEvent[]): Promise<any>;
     // (undocumented)
     setup(entities: KlassInstance<typeof Entity, false>[], relations: KlassInstance<typeof Relation, false>[], install?: boolean): any;
     // (undocumented)
@@ -2068,6 +2074,8 @@ export class MonoSystem implements System {
     // (undocumented)
     updateActivity(match: MatchExpressionData, activity: any): Promise<any>;
 }
+
+export { MutationEvent_2 as MutationEvent }
 
 // @public (undocumented)
 export class MysqlDB implements Database {
@@ -2926,17 +2934,110 @@ export type ReactiveKlassOptions = Omit<KlassOptions, 'isReactive'> & {
 };
 
 // @public (undocumented)
-export type RecordChangeListener = (mutationEvents: RecordMutationEvent[]) => any;
+export const RecordChangeSideEffect: Klass<{
+    name: {
+        type: "string";
+        collection: false;
+        required: true;
+    };
+    record: {
+        type: (Klass<{
+            name: {
+                type: "string";
+                collection: false;
+                required: true;
+                constraints: {
+                    nameFormat({ name }: {
+                        name: Atom<string>;
+                    }): Atom<boolean>;
+                };
+            };
+            computedData: {
+                type: Klass<any>[];
+                collection: false;
+                required: false;
+            };
+            properties: {
+                type: Klass<{
+                    name: {
+                        type: "string";
+                        required: true;
+                        collection: false;
+                        constraints: {
+                            format({ name }: {
+                                name: Atom<string>;
+                            }): Atom<boolean>;
+                            length({ name }: {
+                                name: Atom<string>;
+                            }): Atom<boolean>;
+                        };
+                    };
+                    type: {
+                        type: "string";
+                        required: true;
+                        collection: false;
+                        options: PropertyTypes[];
+                    };
+                    collection: {
+                        type: "boolean";
+                        required: true;
+                        collection: false;
+                        defaultValue(): boolean;
+                    };
+                    args: {
+                        computedType: (values: {
+                            type: PropertyTypes;
+                        }) => string;
+                    };
+                    computedData: {
+                        collection: false;
+                        type: Klass<any>[];
+                        required: false;
+                    };
+                    computed: {
+                        required: false;
+                        type: "function";
+                        collection: false;
+                    };
+                }>;
+                collection: true;
+                required: true;
+                constraints: {
+                    eachNameUnique({ properties }: any): Atom<boolean>;
+                };
+                defaultValue(): never[];
+            };
+            isRef: {
+                required: true;
+                collection: false;
+                type: "boolean";
+                defaultValue: () => boolean;
+            };
+        }> | Klass<RelationPublic>)[];
+        collection: false;
+        required: true;
+    };
+    sideEffect: {
+        type: "function";
+        collection: false;
+        required: true;
+    };
+}>;
+
+// @public (undocumented)
+export type RecordMutationCallback = (mutationEvents: RecordMutationEvent[]) => Promise<{
+    events?: RecordMutationEvent[];
+} | undefined | void>;
 
 // @public (undocumented)
 export type RecordMutationEvent = {
     recordName: string;
     type: 'create' | 'update' | 'delete';
     keys?: string[];
-    record?: {
+    record?: EntityIdRef & {
         [key: string]: any;
     };
-    oldRecord?: {
+    oldRecord?: EntityIdRef & {
         [key: string]: any;
     };
 };
@@ -3381,20 +3482,20 @@ type Storage_2 = {
     commitTransaction: (transactionName?: string) => Promise<any>;
     rollbackTransaction: (transactionName?: string) => Promise<any>;
     get: (itemName: string, id: string, initialValue?: any) => Promise<any>;
-    set: (itemName: string, id: string, value: any) => Promise<any>;
+    set: (itemName: string, id: string, value: any, events?: RecordMutationEvent[]) => Promise<any>;
     setup: (entities: KlassInstance<typeof Entity, false>[], relations: KlassInstance<typeof Relation, false>[], createTables?: boolean) => any;
     findOne: (entityName: string, ...arg: any[]) => Promise<any>;
     update: (entityName: string, ...arg: any[]) => Promise<any>;
     find: (entityName: string, ...arg: any[]) => Promise<any[]>;
-    create: (entityName: string, data: any) => Promise<any>;
-    delete: (entityName: string, data: any) => Promise<any>;
+    create: (entityName: string, data: any, events?: RecordMutationEvent[]) => Promise<any>;
+    delete: (entityName: string, data: any, events?: RecordMutationEvent[]) => Promise<any>;
     findOneRelationByName: (relationName: string, ...arg: any[]) => Promise<any>;
     findRelationByName: (relationName: string, ...arg: any[]) => Promise<any>;
-    updateRelationByName: (relationName: string, ...arg: any[]) => Promise<any>;
-    removeRelationByName: (relationName: string, ...arg: any[]) => Promise<any>;
-    addRelationByNameById: (relationName: string, ...arg: any[]) => Promise<any>;
+    updateRelationByName: (relationName: string, matchExpressionData: any, rawData: any, events?: RecordMutationEvent[]) => Promise<any>;
+    removeRelationByName: (relationName: string, matchExpressionData: any, events?: RecordMutationEvent[]) => Promise<any>;
+    addRelationByNameById: (relationName: string, sourceEntityId: string, targetEntityId: string, rawData: any, events?: RecordMutationEvent[]) => Promise<any>;
     getRelationName: (...arg: any[]) => string;
-    listen: (callback: RecordChangeListener) => any;
+    listen: (callback: RecordMutationCallback) => any;
 };
 export { Storage_2 as Storage }
 
@@ -3414,19 +3515,19 @@ export interface System {
     // (undocumented)
     createActivity: (activity: any) => Promise<any>;
     // (undocumented)
-    getActivity: (query?: MatchExpressionData) => Promise<any[]>;
+    getActivity: (query?: any) => Promise<any[]>;
     // (undocumented)
     getEvent: (query: any) => Promise<InteractionEvent[]>;
     // (undocumented)
     logger: SystemLogger;
     // (undocumented)
-    saveEvent: (interactionEvent: InteractionEvent) => Promise<any>;
+    saveEvent: (interactionEvent: InteractionEvent, mutationEvents: RecordMutationEvent[]) => Promise<any>;
     // (undocumented)
     setup: (entities: KlassInstance<typeof Entity, false>[], relations: KlassInstance<typeof Relation, false>[], install?: boolean) => Promise<any>;
     // (undocumented)
     storage: Storage_2;
     // (undocumented)
-    updateActivity: (match: MatchExpressionData, activity: any) => Promise<any>;
+    updateActivity: (match: any, activity: any) => Promise<any>;
 }
 
 // @public (undocumented)

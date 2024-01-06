@@ -27,5 +27,4 @@ export type InteractionEvent = {
     interactionId: string,
     interactionName: string,
     activityId?: string,
-    args: InteractionEventArgs
-}
+} & InteractionEventArgs

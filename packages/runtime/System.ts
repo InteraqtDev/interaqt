@@ -1,12 +1,8 @@
 import {createClass, Entity, KlassInstance, Property, Relation} from "@interaqt/shared";
 import {InteractionEvent} from './types/interaction.js'
-import {MatchExpressionData} from "@interaqt/storage";
-
 
 export type SystemCallback =  (...arg: any[]) => any
-
-
-export type RecordChangeListener = (mutationEvents:RecordMutationEvent[]) => any
+export type RecordMutationCallback = (mutationEvents:RecordMutationEvent[]) => Promise<{ events?: RecordMutationEvent[] } |undefined|void>
 
 export const SYSTEM_RECORD = '_System_'
 export const EVENT_RECORD = '_Event_'
@@ -22,34 +18,33 @@ export type Storage = {
 
     // kv 存储
     get: (itemName: string, id: string, initialValue?: any) => Promise<any>
-    set: (itemName: string, id: string, value: any) => Promise<any>,
+    set: (itemName: string, id: string, value: any, events?: RecordMutationEvent[]) => Promise<any>,
     // er存储
     setup: (entities: KlassInstance<typeof Entity, false>[], relations: KlassInstance<typeof Relation, false>[], createTables?: boolean) => any
     findOne: (entityName: string, ...arg: any[]) => Promise<any>,
     update: (entityName: string, ...arg: any[]) => Promise<any>,
     find: (entityName: string, ...arg: any[]) => Promise<any[]>,
-    create: (entityName: string, data:any) => Promise<any>
-    delete: (entityName: string, data:any) => Promise<any>
+    create: (entityName: string, data:any,  events?: RecordMutationEvent[]) => Promise<any>
+    delete: (entityName: string, data:any,  events?: RecordMutationEvent[]) => Promise<any>
     findOneRelationByName: (relationName: string, ...arg: any[]) => Promise<any>
     findRelationByName: (relationName: string, ...arg: any[]) => Promise<any>
-    updateRelationByName: (relationName: string, ...arg: any[]) => Promise<any>
-    removeRelationByName: (relationName: string, ...arg: any[]) => Promise<any>
-    // addRelation: (relationName: string, ...arg: any[]) => Promise<any>
-    addRelationByNameById: (relationName: string, ...arg: any[]) => Promise<any>
+    updateRelationByName: (relationName: string, matchExpressionData: any, rawData: any, events?: RecordMutationEvent[]) => Promise<any>
+    removeRelationByName: (relationName: string, matchExpressionData: any, events?: RecordMutationEvent[]) => Promise<any>
+    addRelationByNameById: (relationName: string, sourceEntityId: string, targetEntityId: string, rawData: any, events?: RecordMutationEvent[]) => Promise<any>
     getRelationName: (...arg: any[]) => string
-    listen: (callback: RecordChangeListener) => any
+    listen: (callback: RecordMutationCallback) => any
 }
 
 export type RecordMutationEvent = {
     recordName:  string,
     type: 'create' | 'update' | 'delete',
     keys?: string[],
-    record?: {
+    record?:EntityIdRef & {
         [key: string]: any
     },
-    oldRecord?: {
+    oldRecord?: EntityIdRef & {
         [key: string]: any
-    }
+    },
 }
 
 export type SystemLogger = {
@@ -67,10 +62,10 @@ export type SystemLogType = {
 
 export interface System {
     getEvent: (query: any) => Promise<InteractionEvent[]>
-    saveEvent: (interactionEvent: InteractionEvent) => Promise<any>
+    saveEvent: (interactionEvent: InteractionEvent, mutationEvents: RecordMutationEvent[]) => Promise<any>
     createActivity: (activity: any) => Promise<any>
-    updateActivity: (match: MatchExpressionData, activity: any) => Promise<any>
-    getActivity:(query?: MatchExpressionData) => Promise<any[]>
+    updateActivity: (match: any, activity: any) => Promise<any>
+    getActivity:(query?: any) => Promise<any[]>
     conceptClass: Map<string, ReturnType<typeof createClass>>
     storage: Storage
     logger: SystemLogger
@@ -128,6 +123,26 @@ export const systemEntity = Entity.create({
         })
     ]
 })
+
+type EntityType = {
+    name: string,
+    properties: {
+        name: string,
+        type: string,
+        collection: boolean,
+        required?: boolean
+    }[]
+}
+
+type InferType<T> = T extends { type: 'string' } ? string :
+    T extends { type: 'number' } ? number :
+        // 添加更多类型映射
+        unknown;
+
+export type EntityInstanceType<T extends EntityType> = {
+    [P in T['properties'][number] as P['name']]: P['collection'] extends true ? Array<InferType<P>> : InferType<P>;
+}
+
 // event 的实体化
 export const eventEntity = Entity.create({
     name: EVENT_RECORD,
@@ -148,12 +163,24 @@ export const eventEntity = Entity.create({
             collection: false,
         }),
         Property.create({
-            name: 'args',
-            type: 'string',
+            name: 'payload',
+            type: 'object',
             collection: false,
-        })
+        }),
+        Property.create({
+            name: 'user',
+            type: 'object',
+            collection: false,
+        }),
+        Property.create({
+            name: 'query',
+            type: 'object',
+            collection: false,
+        }),
     ]
 })
+
+
 export const activityEntity = Entity.create({
     name: ACTIVITY_RECORD,
     properties: [

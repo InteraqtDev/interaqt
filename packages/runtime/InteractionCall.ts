@@ -15,7 +15,7 @@ import {
     Klass,
     KlassInstance, DataAttributives, DataAttributive, Computation,
 } from "@interaqt/shared";
-import {System} from "./System.js";
+import {RecordMutationEvent, System} from "./System.js";
 import {EventUser, InteractionEvent, InteractionEventArgs} from "./types/interaction.js";
 import {assert, everyWithErrorAsync} from "./util.js";
 import {ActivityCall} from "./ActivityCall.js";
@@ -374,11 +374,11 @@ export class InteractionCall {
     isGetInteraction() {
         return this.interaction.action === GetAction
     }
-    async saveEvent(interactionEvent: InteractionEvent) {
+    async saveEvent(interactionEvent: InteractionEvent, effects: any[]) {
         // 为 payload 里面的新数据保存起来
-        return await this.system.saveEvent(interactionEvent)
+        return await this.system.saveEvent(interactionEvent, effects)
     }
-    async savePayload(payload: InteractionEventArgs["payload"]){
+    async savePayload(payload: InteractionEventArgs["payload"], effects: any[]){
         const payloadDefs = this.interaction.payload?.items || []
         const savedPayload: InteractionEventArgs["payload"] = {}
         for(let payloadDef of payloadDefs) {
@@ -388,13 +388,22 @@ export class InteractionCall {
                 if (payloadItem) {
                     const recordName = (payloadDef.base as KlassInstance<typeof Entity, false>).name
                     if (payloadDef.isCollection) {
-                        savedPayload[payloadDef.name!] = await Promise.all((payloadItem as any[]).map(item => this.system.storage.create(recordName, item)))
+                        savedPayload[payloadDef.name!] = await Promise.all((payloadItem as any[]).map(async (item) => {
+                            const events: RecordMutationEvent[] =[]
+                            const result = await this.system.storage.create(recordName, item, events)
+                            effects.push(...events)
+                            return result
+                        }))
                     } else {
-                        savedPayload[payloadDef.name!] = await this.system.storage.create(recordName, payloadItem)
+                        const events: RecordMutationEvent[] =[]
+                        savedPayload[payloadDef.name!] = await this.system.storage.create(recordName, payloadItem, events)
+                        effects.push(...events)
                     }
                 }
             }
         }
+
+
         return savedPayload
     }
     async retrieveData(interactionEvent: InteractionEventArgs) {
@@ -449,15 +458,23 @@ export class InteractionCall {
     async call(interactionEventArgs: InteractionEventArgs, activityId?: string, checkUserRef?: CheckUserRef, context?: InteractionContext): Promise<InteractionCallResponse> {
         const response: InteractionCallResponse = {
             sideEffects: {},
+            effects: []
         }
 
         response.error  = await this.check(interactionEventArgs, activityId, checkUserRef, context)
 
         if (!response.error) {
-            const savedPayload = await this.savePayload(interactionEventArgs.payload)
+            const savedPayload = await this.savePayload(interactionEventArgs.payload, response.effects!)
             const event = {
                 interactionName: this.interaction.name,
                 interactionId: this.interaction.uuid,
+                user: interactionEventArgs.user,
+                query: interactionEventArgs.query,
+                payload: {
+                    ...interactionEventArgs.payload,
+                    ...savedPayload
+                },
+
                 args: {
                     ...interactionEventArgs,
                     payload: {
@@ -467,7 +484,8 @@ export class InteractionCall {
                 },
                 activityId
             }
-            await this.saveEvent(event)
+
+            await this.saveEvent(event, response.effects!)
             response.event = event
             // effect
             await this.runEffects(interactionEventArgs, activityId, response)

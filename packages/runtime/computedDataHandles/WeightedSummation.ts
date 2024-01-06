@@ -1,4 +1,4 @@
-import {RecordMutationEvent} from "../System.js";
+import {EntityIdRef, RecordMutationEvent} from "../System.js";
 import {IncrementalComputedDataHandle, StatePatch} from "./IncrementalComputedDataHandle.js";
 import {Entity, KlassInstance, Relation, WeightedSummation} from "@interaqt/shared";
 import {MatchExp} from '@interaqt/storage'
@@ -10,13 +10,15 @@ type RecordChangeEffect = {
     info: KlassInstance<any, false>
 }
 
+type MapRecordToWeight = (record: EntityIdRef, info: KlassInstance<any, false>) => number
+
 export class WeightedSummationHandle extends IncrementalComputedDataHandle {
     records!: KlassInstance<typeof WeightedSummation, false>['records']
-    mapRecordToWeight!: (record: KlassInstance<typeof Entity, false> | KlassInstance<typeof Relation, false>, info: KlassInstance<any, false>) => number
+    mapRecordToWeight!: MapRecordToWeight
     // 单独抽出来让下面能覆写
     parseComputedData(){
         const computedData = this.computedData as unknown as KlassInstance<typeof WeightedSummation, false>
-        this.mapRecordToWeight = computedData.matchRecordToWeight!.bind(this.controller)
+        this.mapRecordToWeight = computedData.matchRecordToWeight!.bind(this.controller) as MapRecordToWeight
         this.records = computedData.records
     }
     getDefaultValue(newRecordId?: any): any {
@@ -63,7 +65,7 @@ export class WeightedSummationHandle extends IncrementalComputedDataHandle {
         }
 
         if (oldRecord) {
-            originWeight = this.mapRecordToWeight(oldRecord as KlassInstance<typeof Entity, false>, effect)
+            originWeight = this.mapRecordToWeight(oldRecord, effect)
         }
 
         if(currentWeight !== originWeight) {

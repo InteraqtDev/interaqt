@@ -2,7 +2,7 @@ import {ComputedData, KlassInstance, Relation, StateMachine, StateTransfer} from
 import {Controller} from "../Controller.js";
 import {InteractionEventArgs} from "../types/interaction.js";
 import {assert} from "../util.js";
-import {EntityIdRef, RecordMutationEvent} from '../System.js'
+import {EntityIdRef, EVENT_RECORD, RecordMutationEvent} from '../System.js'
 import {MatchAtom, MatchExp} from '@interaqt/storage'
 import {ComputedDataHandle, DataContext} from "./ComputedDataHandle.js";
 import {InteractionCallResponse} from "../InteractionCall.js";
@@ -19,6 +19,7 @@ export class StateMachineHandle extends ComputedDataHandle {
     transfers!: KlassInstance<typeof StateTransfer, false>[]
     transferHandleFn?: Map<KlassInstance<typeof StateTransfer, false>, TransferHandleFn>
     data?: KlassInstance<typeof Relation, false>
+    triggerInteractionToTransferMap: Map<string, Set<KlassInstance<typeof StateTransfer, false>>> = new Map()
     constructor(controller: Controller , computedData: KlassInstance<typeof ComputedData, false> , dataContext:  DataContext) {
         super(controller, computedData, dataContext)
         this.data = this.dataContext.id as KlassInstance<typeof Relation, false>
@@ -42,19 +43,41 @@ export class StateMachineHandle extends ComputedDataHandle {
         this.userFullCompute = () => {
             return this.defaultState
         }
+
+        this.transfers.forEach(transfer => {
+            let transfers = this.triggerInteractionToTransferMap!.get(transfer.triggerInteraction.uuid)
+            if (!transfers) {
+                this.triggerInteractionToTransferMap!.set(transfer.triggerInteraction.uuid, (transfers = new Set()))
+            }
+            transfers.add(transfer)
+        })
     }
 
     addEventListener() {
         super.addEventListener();
-        this.listenInteractions()
-    }
-    listenInteractions() {
-        // 遍历 transfer 来监听 interaction
-        this.transfers.forEach(transfer => {
-            // @ts-ignore
-            this.controller.listen(transfer.triggerInteraction, (interaction: any, ...args:any[]) => this.onCallInteraction(transfer, ...args))
+
+        this.controller.system.storage.listen(async (mutationEvents) => {
+            const events: RecordMutationEvent[] = []
+            for(let mutationEvent of mutationEvents){
+                if (mutationEvent.type==='create'&& mutationEvent.recordName === EVENT_RECORD) {
+                    // 是不是监听的 interaction 的变化
+                    const transfers = this.triggerInteractionToTransferMap.get(mutationEvent.record!.interactionId)
+                    if (transfers) {
+                        const eventRecord = mutationEvent.record! as unknown as InteractionEventArgs
+
+                        for(let transfer of transfers) {
+                            const newEvents = await this.onCallInteraction(transfer, eventRecord, mutationEvent.record!.activityId)
+                            events.push(...(newEvents||[]))
+                        }
+                    }
+                }
+
+            }
+
+            return { events }
         })
     }
+
 
     getRelationSourceTargetPairs(handleFnResult: ComputeSourceResult): SourceTargetPair {
         if (!handleFnResult) return []
@@ -79,29 +102,33 @@ export class StateMachineHandle extends ComputedDataHandle {
 
         return []
     }
-    onCallInteraction = async (transfer: KlassInstance<typeof StateTransfer, false>, interactionEventArgs: InteractionEventArgs, effects: InteractionCallResponse["effects"], activityId? :string) =>{
+    onCallInteraction = async (transfer: KlassInstance<typeof StateTransfer, false>, interactionEventArgs: InteractionEventArgs,  activityId? :string) =>{
         // CAUTION 不能房子啊 constructor 里面因为它实在 controller 里面调用的，controller 还没准备好。
         const handleFn = this.transferHandleFn!.get(transfer)!
         if (transfer.handleType === 'computeTarget') {
             // 1. 执行 handle 来计算  source 和 target
             const targets = await handleFn.call(this.controller, interactionEventArgs, activityId)
+
+            let events!: RecordMutationEvent[]
+
             if (this.computedDataType=== 'relation') {
-                await this.transferRelationState(targets as ComputeRelationTargetResult, transfer, effects)
+                events = await this.transferRelationState(targets as ComputeRelationTargetResult, transfer)
             } else  if (this.computedDataType === 'entity') {
-                await this.transferEntityState(targets as EntityTargetResult, transfer, effects)
+                events = await this.transferEntityState(targets as EntityTargetResult, transfer)
             } else if(this.computedDataType === 'global'){
-                await this.transferGlobalState(transfer, effects)
+                events = await this.transferGlobalState(transfer)
             } else if(this.computedDataType === 'property'){
-                await this.transferPropertyState(targets as EntityTargetResult, transfer, effects)
+                events = await this.transferPropertyState(targets as EntityTargetResult, transfer)
             }
 
-
+            return events
         } else {
             assert(false, 'not implemented yet')
         }
     }
-    async transferPropertyState(inputTargets: EntityTargetResult, transfer: KlassInstance<typeof StateTransfer, false>, effects?: InteractionCallResponse["effects"]) {
+    async transferPropertyState(inputTargets: EntityTargetResult, transfer: KlassInstance<typeof StateTransfer, false>, ) {
         const targets = inputTargets ? (Array.isArray(inputTargets) ? inputTargets : [inputTargets]) : []
+        const events: RecordMutationEvent[] = []
         for(let target of targets) {
             const currentState = transfer.fromState!
             const nextState = transfer.toState!
@@ -114,28 +141,27 @@ export class StateMachineHandle extends ComputedDataHandle {
             const matchedEntity = (await this.controller.system.storage.findOne(this.recordName!, match, undefined, ['*']))!
 
             if (matchedEntity[this.propertyName!] === currentState.value) {
-                const result = await this.controller.system.storage.update(this.recordName!, match, {[this.propertyName!]: nextState.value})
-                effects!.push({
-                    type: 'update',
-                    recordName: this.recordName!,
-                    record: result
-                })
+                const innerMutationEvents: RecordMutationEvent[] =[]
+
+                await this.controller.system.storage.update(this.recordName!, match, {[this.propertyName!]: nextState.value}, innerMutationEvents)
+                events.push(...innerMutationEvents)
             }
         }
+        return events
     }
-    async transferGlobalState( transfer: KlassInstance<typeof StateTransfer, false>, effects?: InteractionCallResponse["effects"]) {
+    async transferGlobalState( transfer: KlassInstance<typeof StateTransfer, false>) {
         const currentState = await this.controller.system.storage.get('state', this.dataContext.id as string)
+        const events: RecordMutationEvent[] = []
+
         if (currentState === transfer.fromState!.value) {
-            await this.controller.system.storage.set('state', this.dataContext.id as string, transfer.toState.value)
-            effects!.push({
-                type: 'update',
-                recordName: 'state',
-                record: { [this.dataContext.id as string]:transfer.toState.value }
-            })
+            await this.controller.system.storage.set('state', this.dataContext.id as string, transfer.toState.value, events)
         }
+        return events
     }
-    async transferEntityState(inputTargets: EntityTargetResult, transfer: KlassInstance<typeof StateTransfer, false>, effects?: InteractionCallResponse["effects"]) {
+    async transferEntityState(inputTargets: EntityTargetResult, transfer: KlassInstance<typeof StateTransfer, false>) {
         const targets = inputTargets ? (Array.isArray(inputTargets) ? inputTargets : [inputTargets]) : []
+        const events: RecordMutationEvent[] = []
+
         for(let target of targets) {
             const currentState = transfer.fromState!
             const nextState = transfer.toState!
@@ -146,6 +172,7 @@ export class StateMachineHandle extends ComputedDataHandle {
             })
 
             // 如果当前状态是有的情况，那么要准确的判断是不是和 currentState 完全 match，这里要用 fixedProperties 来 match.
+            const innerMutationEvents: RecordMutationEvent[] =[]
             if (currentState.value) {
                 let match = baseMatch
 
@@ -165,20 +192,13 @@ export class StateMachineHandle extends ComputedDataHandle {
 
                     if(!nextState.value) {
                         // 转移成删除
-                        const result = await this.controller.system.storage.delete(this.recordName!, MatchExp.atom(matchExp))
-                        effects!.push({
-                            type: 'delete',
-                            recordName: this.recordName!,
-                            record: result
-                        })
+
+                        await this.controller.system.storage.delete(this.recordName!, MatchExp.atom(matchExp), innerMutationEvents)
+
                     } else {
                         // TODO 除了 fixedProperties 还有 propertyHandle 来计算 动态的 property
-                        const result = await this.controller.system.storage.update(this.recordName!, MatchExp.atom(matchExp), nextState.value)
-                        effects!.push({
-                            type: 'update',
-                            recordName: this.recordName!,
-                            record: result
-                        })
+                        await this.controller.system.storage.update(this.recordName!, MatchExp.atom(matchExp), nextState.value, innerMutationEvents)
+
                     }
                 }
 
@@ -188,25 +208,26 @@ export class StateMachineHandle extends ComputedDataHandle {
                 if (!matchedEntity) {
                     // 没有数据才说明匹配
                     // 转移 变成有
-                    const result = await this.controller.system.storage.create(this.recordName!, nextState.value)
-                    effects!.push({
-                        type: 'create',
-                        recordName: this.recordName!,
-                        record: result
-                    })
+                    const result = await this.controller.system.storage.create(this.recordName!, nextState.value, innerMutationEvents)
+
                 }
             }
+            events.push(...innerMutationEvents)
+
         }
 
+        return events
     }
-    async transferRelationState(targets: ComputeRelationTargetResult, transfer: KlassInstance<typeof StateTransfer, false>, effects?: InteractionCallResponse["effects"]) {
+    async transferRelationState(targets: ComputeRelationTargetResult, transfer: KlassInstance<typeof StateTransfer, false>) {
         const sourceAndTargetPairs = this.getRelationSourceTargetPairs(targets)
         const relationName = this.recordName!
+        const events: RecordMutationEvent[] = []
 
         for(let sourceAndTargetPair of sourceAndTargetPairs) {
             const [sourceRef, targetRef] = sourceAndTargetPair
             const currentState = transfer.fromState!
             const nextState = transfer.toState!
+            const innerMutationEvents: RecordMutationEvent[] =[]
 
             const baseRelationMatch =  MatchExp.atom({
                 key: 'source.id',
@@ -237,20 +258,12 @@ export class StateMachineHandle extends ComputedDataHandle {
 
                     if(!nextState.value) {
                         // 转移成删除
-                        const result = await this.controller.system.storage.removeRelationByName(relationName, MatchExp.atom(matchExp))
-                        effects!.push({
-                            type: 'delete',
-                            recordName:relationName,
-                            record: result
-                        })
+                        const result = await this.controller.system.storage.removeRelationByName(relationName, MatchExp.atom(matchExp), innerMutationEvents)
+
                     } else {
                         // TODO 除了 fixedProperties 还有 propertyHandle 来计算 动态的 property
-                        const result = await this.controller.system.storage.updateRelationByName(relationName, MatchExp.atom(matchExp), nextState.value)
-                        effects!.push({
-                            type: 'update',
-                            recordName: relationName,
-                            record: result
-                        })
+                        const result = await this.controller.system.storage.updateRelationByName(relationName, MatchExp.atom(matchExp), nextState.value, innerMutationEvents)
+
                     }
                 }
 
@@ -260,15 +273,15 @@ export class StateMachineHandle extends ComputedDataHandle {
                 if (!matchedRelation) {
                     // 没有数据才说明匹配
                     // 转移 变成有
-                    const result = await this.controller.system.storage.addRelationByNameById(relationName, sourceRef.id, targetRef.id, nextState.value)
-                    effects!.push({
-                        type: 'create',
-                        recordName: relationName,
-                        record: result
-                    })
+                    const result = await this.controller.system.storage.addRelationByNameById(relationName, sourceRef.id, targetRef.id, nextState.value, innerMutationEvents)
+
                 }
             }
+
+            events.push(...innerMutationEvents)
         }
+
+        return events
     }
 }
 ComputedDataHandle.Handles.set(StateMachine, StateMachineHandle)

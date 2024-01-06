@@ -141,7 +141,6 @@ export class RelationBasedWeightedSummationHandle extends IncrementalComputedDat
 
         const { entityRelationAttribute, relatedEntityRelationAttribute, relationName, toCountAttributeName, toCountEntityName, isBidirectional } = effect.info
 
-        const a = await this.controller.system.storage.find('Request', undefined, undefined, ['*'])
         // 计算上面的四个值，构建成 isCurrentMatch/isOriginMatch 的计算参数
         // 先找 currentRelationRecord/oldRelationRecord
         if (mutationEvent.recordName === relationName ) {
@@ -157,9 +156,9 @@ export class RelationBasedWeightedSummationHandle extends IncrementalComputedDat
 
             // 针对 update 判断之前是否满足条件
             if (mutationEvent.type === 'update') {
-                oldRelationRecord =  mutationEvent.oldRecord as KlassInstance<typeof Relation, false>
+                oldRelationRecord =  mutationEvent.oldRecord as unknown as  KlassInstance<typeof Relation, false>
             } else if (mutationEvent.type === 'delete'){
-                oldRelationRecord = mutationEvent.record as KlassInstance<typeof Relation, false>
+                oldRelationRecord = mutationEvent.record as  unknown as  KlassInstance<typeof Relation, false>
             }
         } else if(mutationEvent.recordName === toCountEntityName && mutationEvent.type === 'update'){
             currentRelationRecord = (effect as RelatedRecordChangeEffect).relationRecord
@@ -198,7 +197,7 @@ export class RelationBasedWeightedSummationHandle extends IncrementalComputedDat
                 }
             } else {
                 if ( mutationEvent.type === 'update' ) {
-                    oldRecord = mutationEvent.oldRecord as KlassInstance<typeof Entity, false>
+                    oldRecord = mutationEvent.oldRecord as unknown as  KlassInstance<typeof Entity, false>
                 }
             }
         }

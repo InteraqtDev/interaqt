@@ -8,15 +8,16 @@ import {
     Klass,
     KlassInstance,
     Property,
+    RecordChangeSideEffect,
     Relation
 } from "@interaqt/shared";
 import './computedDataHandles/index.js'
 import {ActivityCall} from "./ActivityCall.js";
-import {InteractionCall, InteractionCallResponse} from "./InteractionCall.js";
+import {InteractionCall} from "./InteractionCall.js";
 import {InteractionEventArgs} from "./types/interaction.js";
 import {assert} from "./util.js";
 import {ComputedDataHandle, DataContext} from "./computedDataHandles/ComputedDataHandle.js";
-import { asyncInteractionContext} from "./asyncInteractionContext.js";
+import {asyncInteractionContext} from "./asyncInteractionContext.js";
 
 export const USER_ENTITY = 'User'
 
@@ -41,8 +42,9 @@ export class Controller {
         public relations: KlassInstance<typeof Relation, false>[],
         public activities: KlassInstance<typeof Activity, false>[],
         public interactions: KlassInstance<typeof Interaction, false>[],
-        public states: KlassInstance<typeof Property, false>[] = [])
-    {
+        public states: KlassInstance<typeof Property, false>[] = [],
+        public recordChangeSideEffects: KlassInstance<typeof RecordChangeSideEffect, false>[] = []
+    ) {
         // CAUTION 因为 public 里面的会在 constructor 后面才初始化，所以ActivityCall 里面读不到 this.system
         this.system = system
         activities.forEach(activity => {
@@ -91,12 +93,12 @@ export class Controller {
             })
         })
 
-        // 全局的
         states.forEach(state => {
             if (state.computedData) {
                 this.addComputedDataHandle(state.computedData as KlassInstance<typeof ComputedData, false>, undefined, state.name as string)
             }
         })
+
     }
     addComputedDataHandle(computedData: KlassInstance<any, false>, host:DataContext["host"], id: DataContext["id"]) {
         const dataContext: DataContext = {
@@ -127,30 +129,11 @@ export class Controller {
             await handle.setupStates()
             handle.addEventListener()
         }
+
         // TODO 如果是恢复模式，还要从 event stack 中开始恢复数据。
     }
     callbacks: Map<any, Set<SystemCallback>> = new Map()
-    listen(event:any, callback: SystemCallback) {
-        let callbacks = this.callbacks.get(event)!
-        if (!callbacks) {
-            this.callbacks.set(event, (callbacks = new Set()))
-        }
 
-        callbacks.add(callback)
-        return () => {
-            callbacks.delete(callback)
-        }
-    }
-
-    async dispatch(event: any, ...args: any[]) {
-        const callbacks = this.callbacks.get(event)
-
-        if (callbacks) {
-            for(const callback of callbacks) {
-                await callback(event, ...args)
-            }
-        }
-    }
     async callInteraction(interactionId:string, interactionEventArgs: InteractionEventArgs) {
         const context= asyncInteractionContext.getStore() as InteractionContext
         const logger = this.system.logger.child(context?.logContext || {})
@@ -161,25 +144,15 @@ export class Controller {
 
         logger.info({label: "interaction", message:interactionCall.interaction.name})
         await this.system.storage.beginTransaction(interactionCall.interaction.name)
-        const result = await interactionCall.call(interactionEventArgs )
-        if (!result.error) {
-            const effects: any[] = []
-            try {
-                logger.info({label: "effect", message:interactionCall.interaction.name})
-                await this.dispatch(interactionCall.interaction, result.event!.args, effects, undefined)
-                result.effects = effects
-            } catch (error) {
-                result.error = error
-                logger.error({label: "effect", message:interactionCall.interaction.name})
-            }
-        } else {
+        // CAUTION 虽然这这里就有开始有 _EVENT_ 的change event，但是我们现在并不允许在 computedData 里面监听这个。所以这个不算。
+        //  未来是否需要统一，还要再看。目前迁好像极少情况下会有这种需求，但现在还是能通过 MapInteraction 来模拟。
+        const result = await interactionCall.call(interactionEventArgs)
+        if (result.error) {
             logger.error({label: "interaction", message:interactionCall.interaction.name})
-        }
-
-        if (!result.error) {
-            await this.system.storage.commitTransaction(interactionCall.interaction.name)
-        } else{
             await this.system.storage.rollbackTransaction(interactionCall.interaction.name)
+        } else {
+            await this.system.storage.commitTransaction(interactionCall.interaction.name)
+            // TODO 执行 RecordChangeSideEffect
         }
 
         return result
@@ -199,24 +172,13 @@ export class Controller {
         await this.system.storage.beginTransaction(interactionNameWithActivityName)
 
         const result = await activityCall.callInteraction(activityId, interactionCallId, interactionEventArgs)
-        if (!result.error) {
-            const effects: any[] = []
-            try {
-                const maybeNewActivityId = activityId || result.context?.activityId
-                await this.dispatch(activityCall.uuidToInteractionCall.get(interactionCallId)!.interaction, interactionEventArgs, effects, maybeNewActivityId)
-                result.effects = effects
-            } catch(error) {
-                result.error = error
-                logger.error({label: "effect", message:interactionNameWithActivityName})
-            }
-        } else {
+        if (result.error) {
             logger.error({label: "activity", message:interactionNameWithActivityName})
-        }
-
-        if (!result.error) {
-            await this.system.storage.commitTransaction(interactionNameWithActivityName)
-        } else{
             await this.system.storage.rollbackTransaction(interactionNameWithActivityName)
+
+        } else {
+            await this.system.storage.commitTransaction(interactionNameWithActivityName)
+            // TODO 拿到 recordChangeEvents，然后执行 RecordChangeSideEffects
         }
 
         return result

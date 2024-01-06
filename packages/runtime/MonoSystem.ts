@@ -6,7 +6,7 @@ import {
     Database,
     EVENT_RECORD,
     eventEntity,
-    RecordChangeListener,
+    RecordMutationCallback,
     RecordMutationEvent,
     Storage,
     System,
@@ -42,7 +42,7 @@ class MonoStorage implements Storage{
     public queryHandle?: EntityQueryHandle
     constructor(public db: Database) {
     }
-    public callbacks: Set<RecordChangeListener> = new Set()
+    public callbacks: Set<RecordMutationCallback> = new Set()
     beginTransaction(name='') {
         return this.db.scheme('BEGIN', name)
     }
@@ -60,14 +60,13 @@ class MonoStorage implements Storage{
 
         return JSONParse(value)
     }
-    async set(concept: string, key: string, value:any) {
+    async set(concept: string, key: string, value:any, events?: MutationEvent[]) {
         const match = MatchExp.atom({key: 'key', value: ['=', key]}).and({  key: 'concept', value: ['=', concept] })
         const origin = await this.queryHandle!.findOne(SYSTEM_RECORD, match, undefined, ['value'])
         if (origin) {
-            // CAUtION 之类一定是用 this 上的方法才有事件
-            return this.update(SYSTEM_RECORD, match,{ concept, key: key.toString(), value: JSONStringify(value)})
+            return this.callWithEvents(this.queryHandle!.update.bind(this.queryHandle), [SYSTEM_RECORD, match, { concept, key: key.toString(), value: JSONStringify(value)}], events)
         } else {
-            return this.create(SYSTEM_RECORD, { concept, key: key.toString(), value: encodeURI(JSON.stringify(value))})
+            return this.callWithEvents(this.queryHandle!.create.bind(this.queryHandle), [SYSTEM_RECORD, { concept, key: key.toString(), value: encodeURI(JSON.stringify(value))}], events)
         }
     }
     async setup(entities: KlassInstance<typeof Entity, false>[], relations: KlassInstance<typeof Relation, false>[], createTables = false) {
@@ -84,23 +83,24 @@ class MonoStorage implements Storage{
     find(...arg:Parameters<EntityQueryHandle["find"]>) {
         return this.queryHandle!.find(...arg)
     }
-    create(entityName: string, rawData: RawEntityData) {
-        return this.callWithEvents(this.queryHandle!.create.bind(this.queryHandle), [entityName, rawData])
+    create(entityName: string, rawData: RawEntityData, events?: MutationEvent[]) {
+        return this.callWithEvents(this.queryHandle!.create.bind(this.queryHandle), [entityName, rawData], events)
     }
-    update(entity: string, matchExpressionData: MatchExpressionData, rawData: RawEntityData,) {
-        return this.callWithEvents(this.queryHandle!.update.bind(this.queryHandle), [entity, matchExpressionData, rawData])
+    update(entity: string, matchExpressionData: MatchExpressionData, rawData: RawEntityData, events?: MutationEvent[]) {
+        return this.callWithEvents(this.queryHandle!.update.bind(this.queryHandle), [entity, matchExpressionData, rawData], events)
     }
-    delete(entityName: string, matchExpressionData: MatchExpressionData,) {
-        return this.callWithEvents(this.queryHandle!.delete.bind(this.queryHandle), [entityName, matchExpressionData])
+    delete(entityName: string, matchExpressionData: MatchExpressionData, events?: MutationEvent[]) {
+        return this.callWithEvents(this.queryHandle!.delete.bind(this.queryHandle), [entityName, matchExpressionData], events)
     }
-    async callWithEvents<T extends any[]>(method: (...arg: [...T, MutationEvent[]]) => any, args: T) {
-        const events: MutationEvent[] = []
+    async callWithEvents<T extends any[]>(method: (...arg: [...T, MutationEvent[]]) => any, args: T, events: MutationEvent[] = []) {
         const result = await method(...args, events)
         // FIXME 还没有实现异步机制
         // nextJob(() => {
         //     this.dispatch(events)
         // })
-        await this.dispatch(events)
+        // CAUTION 特别注意这里会空充 events
+        const  newEvents = await this.dispatch(events)
+        events.push(...newEvents)
         return result
     }
     findRelationByName(...arg:Parameters<EntityQueryHandle["findRelationByName"]>) {
@@ -109,25 +109,31 @@ class MonoStorage implements Storage{
     findOneRelationByName(...arg: Parameters<EntityQueryHandle["findOneRelationByName"]>) {
         return this.queryHandle!.findOneRelationByName(...arg)
     }
-    updateRelationByName(relationName: string, matchExpressionData: MatchExpressionData, rawData: RawEntityData,  ) {
-        return this.callWithEvents(this.queryHandle!.updateRelationByName.bind(this.queryHandle), [relationName, matchExpressionData, rawData])
+    updateRelationByName(relationName: string, matchExpressionData: MatchExpressionData, rawData: RawEntityData, events?: MutationEvent[] ) {
+        return this.callWithEvents(this.queryHandle!.updateRelationByName.bind(this.queryHandle), [relationName, matchExpressionData, rawData], events)
     }
-    removeRelationByName(relationName: string, matchExpressionData: MatchExpressionData,) {
-        return this.callWithEvents(this.queryHandle!.removeRelationByName.bind(this.queryHandle), [relationName, matchExpressionData])
+    removeRelationByName(relationName: string, matchExpressionData: MatchExpressionData, events?: MutationEvent[]) {
+        return this.callWithEvents(this.queryHandle!.removeRelationByName.bind(this.queryHandle), [relationName, matchExpressionData], events)
     }
-    addRelationByNameById(relationName: string, sourceEntityId: string, targetEntityId: string, rawData: RawEntityData = {},) {
-        return this.callWithEvents(this.queryHandle!.addRelationByNameById.bind(this.queryHandle), [relationName, sourceEntityId, targetEntityId, rawData])
+    addRelationByNameById(relationName: string, sourceEntityId: string, targetEntityId: string, rawData: RawEntityData = {}, events?: MutationEvent[]) {
+        if (events?.length===2)debugger
+        return this.callWithEvents(this.queryHandle!.addRelationByNameById.bind(this.queryHandle), [relationName, sourceEntityId, targetEntityId, rawData], events)
     }
     getRelationName(...arg:Parameters<EntityQueryHandle["getRelationName"]>) {
         return this.queryHandle!.getRelationName(...arg)
     }
-    listen(callback: RecordChangeListener) {
+    listen(callback: RecordMutationCallback) {
         this.callbacks.add(callback)
     }
     async dispatch(events: RecordMutationEvent[]) {
+        const newEvents: MutationEvent[] = []
         for(let callback of this.callbacks) {
-            await callback(events)
+            const callbackResult = await callback(events)
+            if (callbackResult?.events) {
+                // newEvents.push(...callbackResult.events)
+            }
         }
+        return newEvents
     }
 }
 
@@ -141,13 +147,12 @@ export class MonoSystem implements System {
     constructor(db: Database = new SQLiteDB(), public logger: SystemLogger = defaultLogger) {
         this.storage = new MonoStorage(db)
     }
-    async saveEvent(event: InteractionEvent) {
-        return this.storage.create(EVENT_RECORD, {...event, args: JSONStringify(event.args||{})})
+    async saveEvent(event: InteractionEvent, mutationEvents: RecordMutationEvent[] = []): Promise<any> {
+        return this.storage.create(EVENT_RECORD, event, mutationEvents)
     }
     async getEvent(query?: MatchExpressionData ) {
         return (await this.storage.find(EVENT_RECORD, query, undefined, ['*'])).map(event => ({
             ...event,
-            args: JSONParse(event.args)
         })) as unknown as InteractionEvent[]
     }
     async createActivity(activity: any) {

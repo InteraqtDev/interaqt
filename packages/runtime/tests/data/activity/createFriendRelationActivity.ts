@@ -170,7 +170,7 @@ const addFriendTransfer = StateTransfer.create({
 
         const sendEvent = (await this.system.getEvent(match))[0]
         return {
-            source: sendEvent.args.user,
+            source: sendEvent.user,
             target: eventArgs.user
         }
     }
@@ -211,18 +211,18 @@ export const mapFriendActivityToRequest = MapActivity.create({
             activity: createFriendRelationActivity,
             triggerInteractions: [sendInteraction, approveInteraction, rejectInteraction],
             map: function (stack) {
-                const sendRequestEvent = stack.find((i: any) => i.interaction.name === 'sendRequest')
+                const sendRequestEvent = stack.find((i: any) => i.interactionName === 'sendRequest')
 
                 if (!sendRequestEvent) {
                     return undefined
                 }
 
-                const handled = !!stack.find((i: any) => i.interaction.name === 'approve' || i.interaction.name === 'reject')
+                const handled = !!stack.find((i: any) => i.interactionName === 'approve' || i.interactionName === 'reject')
 
                 return {
-                    from: sendRequestEvent.data.user,
-                    to: sendRequestEvent.data.payload.to,
-                    message: sendRequestEvent.data.payload.message,
+                    from: sendRequestEvent.user,
+                    to: sendRequestEvent.payload.to,
+                    message: sendRequestEvent.payload.message,
                     handled,
                 }
             }
