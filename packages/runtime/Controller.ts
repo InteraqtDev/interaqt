@@ -1,4 +1,4 @@
-import {System, SystemCallback} from "./System.js";
+import {RecordMutationEvent, System, SystemCallback, SystemLogger} from "./System.js";
 import {
     Activity,
     BoolExp,
@@ -8,12 +8,12 @@ import {
     Klass,
     KlassInstance,
     Property,
-    RecordChangeSideEffect,
+    RecordMutationSideEffect,
     Relation
 } from "@interaqt/shared";
 import './computedDataHandles/index.js'
 import {ActivityCall} from "./ActivityCall.js";
-import {InteractionCall} from "./InteractionCall.js";
+import {InteractionCall, InteractionCallResponse} from "./InteractionCall.js";
 import {InteractionEventArgs} from "./types/interaction.js";
 import {assert} from "./util.js";
 import {ComputedDataHandle, DataContext} from "./computedDataHandles/ComputedDataHandle.js";
@@ -33,6 +33,7 @@ export class Controller {
     public interactionCallsByName = new Map<string, InteractionCall>()
     public interactionCalls = new Map<string, InteractionCall>()
     // 因为很多 function 都会bind controller 作为 this，所以我们也把 controller 的 globals 作为注入全局工具的入口。
+    public recordNameToSideEffects = new Map<string, Set<KlassInstance<typeof RecordMutationSideEffect, false>>>()
     public globals = {
         BoolExp
     }
@@ -43,7 +44,7 @@ export class Controller {
         public activities: KlassInstance<typeof Activity, false>[],
         public interactions: KlassInstance<typeof Interaction, false>[],
         public states: KlassInstance<typeof Property, false>[] = [],
-        public recordChangeSideEffects: KlassInstance<typeof RecordChangeSideEffect, false>[] = []
+        public recordMutationSideEffects: KlassInstance<typeof RecordMutationSideEffect, false>[] = []
     ) {
         // CAUTION 因为 public 里面的会在 constructor 后面才初始化，所以ActivityCall 里面读不到 this.system
         this.system = system
@@ -99,6 +100,14 @@ export class Controller {
             }
         })
 
+        recordMutationSideEffects.forEach(sideEffect => {
+          let sideEffects = this.recordNameToSideEffects.get(sideEffect.record.name)
+          if (!sideEffects) {
+              this.recordNameToSideEffects.set(sideEffect.record.name, sideEffects = new Set())
+          }
+          sideEffects.add(sideEffect)
+        })
+
     }
     addComputedDataHandle(computedData: KlassInstance<any, false>, host:DataContext["host"], id: DataContext["id"]) {
         const dataContext: DataContext = {
@@ -152,10 +161,30 @@ export class Controller {
             await this.system.storage.rollbackTransaction(interactionCall.interaction.name)
         } else {
             await this.system.storage.commitTransaction(interactionCall.interaction.name)
-            // TODO 执行 RecordChangeSideEffect
+            await this.runRecordChangeSideEffects(result, logger)
         }
 
         return result
+    }
+    async runRecordChangeSideEffects(result: InteractionCallResponse,  logger: SystemLogger) {
+        const mutationEvents = result.effects as RecordMutationEvent[]
+        for(let event of mutationEvents || []) {
+            const sideEffects = this.recordNameToSideEffects.get(event.recordName)
+            if (sideEffects) {
+                for(let sideEffect of sideEffects) {
+                    try {
+                        result.sideEffects[sideEffect.name] = {
+                            result: await sideEffect.content(event),
+                        }
+                    } catch (e){
+                        logger.error({label: "recordMutationSideEffect", message:sideEffect.name})
+                        result.sideEffects[sideEffect.name] = {
+                            error: e
+                        }
+                    }
+                }
+            }
+        }
     }
     async callActivityInteraction(activityCallId:string, interactionCallId:string, activityId: string|undefined, interactionEventArgs: InteractionEventArgs) {
         const context= asyncInteractionContext.getStore() as InteractionContext
@@ -178,7 +207,7 @@ export class Controller {
 
         } else {
             await this.system.storage.commitTransaction(interactionNameWithActivityName)
-            // TODO 拿到 recordChangeEvents，然后执行 RecordChangeSideEffects
+            await this.runRecordChangeSideEffects(result, logger)
         }
 
         return result

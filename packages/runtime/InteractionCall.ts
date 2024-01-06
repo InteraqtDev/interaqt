@@ -52,8 +52,8 @@ export class ConditionError {
 }
 
 type SideEffectResult = {
-    result: any,
-    error: any
+    result?: any,
+    error?: any
 }
 
 export type InteractionCallResponse= {
@@ -63,7 +63,7 @@ export type InteractionCallResponse= {
     event?: InteractionEvent
     // interaction 中产生的 record create/update 等行为
     effects? : any[]
-    sideEffects?: {
+    sideEffects: {
         [k: string]: SideEffectResult
     }
     // interaction 附加产生的上下文，例如 activityId
