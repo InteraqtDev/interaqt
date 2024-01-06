@@ -325,8 +325,8 @@ export const Relation = createClass({
 // @ts-ignore
 Relation.public.source.type.push(Relation)
 
-export const RecordChangeSideEffect = createClass({
-    name: 'RecordChangeSideEffect',
+export const RecordMutationSideEffect = createClass({
+    name: 'RecordMutationSideEffect',
     public: {
         name: {
             type: 'string',
@@ -338,7 +338,7 @@ export const RecordChangeSideEffect = createClass({
             collection: false,
             required: true
         },
-        sideEffect: {
+        content: {
             type: 'function',
             collection: false,
             required: true
