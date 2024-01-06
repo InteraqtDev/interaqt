@@ -206,3 +206,5 @@ export const activityEntity = Entity.create({
         })
     ]
 })
+
+export type InteractionEventRecord = InteractionEvent & EntityIdRef

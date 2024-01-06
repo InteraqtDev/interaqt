@@ -2,7 +2,7 @@ import {Entity, KlassInstance, MapInteraction} from "@interaqt/shared";
 import {InteractionEventArgs} from "../types/interaction.js";
 import {MatchExp} from '@interaqt/storage'
 import {ComputedDataHandle} from "./ComputedDataHandle.js";
-import {EVENT_RECORD, RecordMutationEvent} from "../System.js";
+import {EVENT_RECORD, InteractionEventRecord, RecordMutationEvent} from "../System.js";
 
 
 export class MapInteractionHandle extends ComputedDataHandle {
@@ -45,7 +45,7 @@ export class MapInteractionHandle extends ComputedDataHandle {
                     const item = this.mapItems.get(mutationEvent.record!.interactionId)
                     if (item) {
                         const {handle} = item
-                        const eventRecord = mutationEvent.record! as unknown as InteractionEventArgs
+                        const eventRecord = mutationEvent.record! as InteractionEventRecord
                         const value = await handle.call(this.controller, eventRecord, mutationEvent.record!.activityId)
 
                         let innerMutationEvents: RecordMutationEvent[]

@@ -2,7 +2,7 @@ import {ComputedData, KlassInstance, Relation, StateMachine, StateTransfer} from
 import {Controller} from "../Controller.js";
 import {InteractionEventArgs} from "../types/interaction.js";
 import {assert} from "../util.js";
-import {EntityIdRef, EVENT_RECORD, RecordMutationEvent} from '../System.js'
+import {EntityIdRef, EVENT_RECORD, InteractionEventRecord, RecordMutationEvent} from '../System.js'
 import {MatchAtom, MatchExp} from '@interaqt/storage'
 import {ComputedDataHandle, DataContext} from "./ComputedDataHandle.js";
 import {InteractionCallResponse} from "../InteractionCall.js";
@@ -63,7 +63,7 @@ export class StateMachineHandle extends ComputedDataHandle {
                     // 是不是监听的 interaction 的变化
                     const transfers = this.triggerInteractionToTransferMap.get(mutationEvent.record!.interactionId)
                     if (transfers) {
-                        const eventRecord = mutationEvent.record! as unknown as InteractionEventArgs
+                        const eventRecord = mutationEvent.record! as InteractionEventRecord
 
                         for(let transfer of transfers) {
                             const newEvents = await this.onCallInteraction(transfer, eventRecord, mutationEvent.record!.activityId)

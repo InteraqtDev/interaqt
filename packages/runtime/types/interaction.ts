@@ -1,4 +1,5 @@
 
+
 export type EventUser = {
     [k: string]: any,
     id: string,
@@ -28,3 +29,4 @@ export type InteractionEvent = {
     interactionName: string,
     activityId?: string,
 } & InteractionEventArgs
+

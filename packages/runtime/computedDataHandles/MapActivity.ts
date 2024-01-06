@@ -2,7 +2,7 @@ import {Activity, Entity, getInteractions, Interaction, KlassInstance, MapActivi
 import {InteractionEvent, InteractionEventArgs} from "../types/interaction.js";
 import {MatchExp} from '@interaqt/storage'
 import {ComputedDataHandle} from "./ComputedDataHandle.js";
-import {activityEntity, EVENT_RECORD, RecordMutationEvent} from "../System.js";
+import {activityEntity, EVENT_RECORD, InteractionEventRecord, RecordMutationEvent} from "../System.js";
 import {assert} from "../util.js";
 
 
@@ -71,7 +71,7 @@ export class MapActivityHandle extends ComputedDataHandle {
                     const item = this.mapItems.get(mutationEvent.record!.interactionId)
                     if (item) {
                         const {interaction} = item
-                        const eventRecord = mutationEvent.record! as unknown as InteractionEventArgs
+                        const eventRecord = mutationEvent.record! as InteractionEventRecord
 
                         const newEvents = await this.onCallInteraction(interaction, eventRecord, mutationEvent.record!.activityId)
                         events.push(...(newEvents||[]))
