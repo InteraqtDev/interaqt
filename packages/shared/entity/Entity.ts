@@ -324,3 +324,24 @@ export const Relation = createClass({
 // FIXME type relation 和 entity 的 public type 最好都单独定义
 // @ts-ignore
 Relation.public.source.type.push(Relation)
+
+export const RecordChangeSideEffect = createClass({
+    name: 'RecordChangeSideEffect',
+    public: {
+        name: {
+            type: 'string',
+            collection: false,
+            required: true
+        },
+        record: {
+            type: [Entity, Relation],
+            collection: false,
+            required: true
+        },
+        sideEffect: {
+            type: 'function',
+            collection: false,
+            required: true
+        }
+    }
+})
