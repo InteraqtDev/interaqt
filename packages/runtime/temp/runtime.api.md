@@ -981,7 +981,7 @@ export const constraints: {
 
 // @public (undocumented)
 export class Controller {
-    constructor(system: System, entities: KlassInstance<typeof Entity, false>[], relations: KlassInstance<typeof Relation, false>[], activities: KlassInstance<typeof Activity, false>[], interactions: KlassInstance<typeof Interaction, false>[], states?: KlassInstance<typeof Property, false>[], recordChangeSideEffects?: KlassInstance<typeof RecordChangeSideEffect, false>[]);
+    constructor(system: System, entities: KlassInstance<typeof Entity, false>[], relations: KlassInstance<typeof Relation, false>[], activities: KlassInstance<typeof Activity, false>[], interactions: KlassInstance<typeof Interaction, false>[], states?: KlassInstance<typeof Property, false>[], recordMutationSideEffects?: KlassInstance<typeof RecordMutationSideEffect, false>[]);
     // (undocumented)
     activities: KlassInstance<typeof Activity, false>[];
     // Warning: (ae-forgotten-export) The symbol "ActivityCall" needs to be exported by the entry point index.d.ts
@@ -1021,9 +1021,101 @@ export class Controller {
     // (undocumented)
     interactions: KlassInstance<typeof Interaction, false>[];
     // (undocumented)
-    recordChangeSideEffects: KlassInstance<typeof RecordChangeSideEffect, false>[];
+    recordMutationSideEffects: KlassInstance<typeof RecordMutationSideEffect, false>[];
+    // (undocumented)
+    recordNameToSideEffects: Map<string, Set<InertKlassInstance<    {
+    name: {
+    type: "string";
+    collection: false;
+    required: true;
+    };
+    record: {
+    type: (Klass<RelationPublic> | Klass<{
+    name: {
+    type: "string";
+    collection: false;
+    required: true;
+    constraints: {
+    nameFormat({ name }: {
+    name: Atom<string>;
+    }): Atom<boolean>;
+    };
+    };
+    computedData: {
+    type: Klass<any>[];
+    collection: false;
+    required: false;
+    };
+    properties: {
+    type: Klass<{
+    name: {
+    type: "string";
+    required: true;
+    collection: false;
+    constraints: {
+    format({ name }: {
+    name: Atom<string>;
+    }): Atom<boolean>;
+    length({ name }: {
+    name: Atom<string>;
+    }): Atom<boolean>;
+    };
+    };
+    type: {
+    type: "string";
+    required: true;
+    collection: false;
+    options: PropertyTypes[];
+    };
+    collection: {
+    type: "boolean";
+    required: true;
+    collection: false;
+    defaultValue(): boolean;
+    };
+    args: {
+    computedType: (values: {
+    type: PropertyTypes;
+    }) => string;
+    };
+    computedData: {
+    collection: false;
+    type: Klass<any>[];
+    required: false;
+    };
+    computed: {
+    required: false;
+    type: "function";
+    collection: false;
+    };
+    }>;
+    collection: true;
+    required: true;
+    constraints: {
+    eachNameUnique({ properties }: any): Atom<boolean>;
+    };
+    defaultValue(): never[];
+    };
+    isRef: {
+    required: true;
+    collection: false;
+    type: "boolean";
+    defaultValue: () => boolean;
+    };
+    }>)[];
+    collection: false;
+    required: true;
+    };
+    content: {
+    type: "function";
+    collection: false;
+    required: true;
+    };
+    }>>>;
     // (undocumented)
     relations: KlassInstance<typeof Relation, false>[];
+    // (undocumented)
+    runRecordChangeSideEffects(result: InteractionCallResponse, logger: SystemLogger): Promise<void>;
     // (undocumented)
     setup(install?: boolean): Promise<void>;
     // (undocumented)
@@ -1725,6 +1817,9 @@ export type InteractionEventArgs = {
     payload?: EventPayload;
     query?: EventQuery;
 };
+
+// @public (undocumented)
+export type InteractionEventRecord = InteractionEvent & EntityIdRef;
 
 // @public (undocumented)
 export type InteractionInstanceType = KlassInstance<typeof Interaction, false>;
@@ -2934,7 +3029,25 @@ export type ReactiveKlassOptions = Omit<KlassOptions, 'isReactive'> & {
 };
 
 // @public (undocumented)
-export const RecordChangeSideEffect: Klass<{
+export type RecordMutationCallback = (mutationEvents: RecordMutationEvent[]) => Promise<{
+    events?: RecordMutationEvent[];
+} | undefined | void>;
+
+// @public (undocumented)
+export type RecordMutationEvent = {
+    recordName: string;
+    type: 'create' | 'update' | 'delete';
+    keys?: string[];
+    record?: EntityIdRef & {
+        [key: string]: any;
+    };
+    oldRecord?: EntityIdRef & {
+        [key: string]: any;
+    };
+};
+
+// @public (undocumented)
+export const RecordMutationSideEffect: Klass<{
     name: {
         type: "string";
         collection: false;
@@ -3017,30 +3130,12 @@ export const RecordChangeSideEffect: Klass<{
         collection: false;
         required: true;
     };
-    sideEffect: {
+    content: {
         type: "function";
         collection: false;
         required: true;
     };
 }>;
-
-// @public (undocumented)
-export type RecordMutationCallback = (mutationEvents: RecordMutationEvent[]) => Promise<{
-    events?: RecordMutationEvent[];
-} | undefined | void>;
-
-// @public (undocumented)
-export type RecordMutationEvent = {
-    recordName: string;
-    type: 'create' | 'update' | 'delete';
-    keys?: string[];
-    record?: EntityIdRef & {
-        [key: string]: any;
-    };
-    oldRecord?: EntityIdRef & {
-        [key: string]: any;
-    };
-};
 
 // @public (undocumented)
 export const Relation: Klass<RelationPublic>;

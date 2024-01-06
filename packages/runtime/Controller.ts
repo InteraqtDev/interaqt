@@ -173,12 +173,12 @@ export class Controller {
             if (sideEffects) {
                 for(let sideEffect of sideEffects) {
                     try {
-                        result.sideEffects[sideEffect.name] = {
+                        result.sideEffects![sideEffect.name] = {
                             result: await sideEffect.content(event),
                         }
                     } catch (e){
                         logger.error({label: "recordMutationSideEffect", message:sideEffect.name})
-                        result.sideEffects[sideEffect.name] = {
+                        result.sideEffects![sideEffect.name] = {
                             error: e
                         }
                     }
