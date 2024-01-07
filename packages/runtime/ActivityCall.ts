@@ -368,16 +368,16 @@ export class ActivityCall {
         const state = new ActivityState(await this.getState(activityId!), this)
         if(!state.isInteractionAvailable(uuid)) return { error: `interaction ${uuid} not available`}
 
-        const res = await interactionCall.call(interactionEventArgs, activityId!, this.checkUserRef)
-        if (res.error) {
-            return res
+        const result = await interactionCall.call(interactionEventArgs, activityId!, this.checkUserRef)
+        if (result.error) {
+            return result
         }
 
         // 如果有 ref，要保存下来，方便后面 interactionCall 的时候通过 checkUserRef 去取
         await this.saveUserRefs(activityId!, interactionCall, interactionEventArgs)
 
-        const result = state.completeInteraction(uuid)
-        assert(result, 'change activity state failed')
+        const stateCompleteResult = state.completeInteraction(uuid)
+        assert(stateCompleteResult, 'change activity state failed')
         // 完成了。存新的 state。
         const nextState = state.toJSON()
         // await this.system.storage.set('ActivityState', activityId, nextState)
@@ -385,6 +385,7 @@ export class ActivityCall {
 
 
         return {
+            ...result,
             context: {
                 activityId,
                 nextState
