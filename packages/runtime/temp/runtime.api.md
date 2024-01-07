@@ -1636,7 +1636,6 @@ export type EventQuery = {
 export type EventUser = {
     [k: string]: any;
     id: string;
-    roles: string[];
 };
 
 // @public (undocumented)

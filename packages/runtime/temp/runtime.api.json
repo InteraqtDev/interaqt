@@ -6643,7 +6643,7 @@
             },
             {
               "kind": "Content",
-              "text": "{\n    [k: string]: any;\n    id: string;\n    roles: string[];\n}"
+              "text": "{\n    [k: string]: any;\n    id: string;\n}"
             },
             {
               "kind": "Content",

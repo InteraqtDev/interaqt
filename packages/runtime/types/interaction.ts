@@ -3,7 +3,6 @@
 export type EventUser = {
     [k: string]: any,
     id: string,
-    roles: string[]
 }
 
 
