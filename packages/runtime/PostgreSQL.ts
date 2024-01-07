@@ -1,8 +1,10 @@
 import {Database, DatabaseLogger, EntityIdRef, ROW_ID_ATTR} from "./System.js";
-import {Client, type ClientConfig} from 'pg'
+import pg, { type ClientConfig} from 'pg'
 import {asyncInteractionContext} from "./asyncInteractionContext.js";
 import pino from "pino";
 import {InteractionContext} from "./Controller";
+
+const { Client} = pg
 
 class IDSystem {
     constructor(public db: Database) {}
@@ -27,7 +29,7 @@ export type PostgreSQLDBConfig = Omit<ClientConfig, 'database'> & { logger? :Dat
 export class PostgreSQLDB implements Database{
     idSystem!: IDSystem
     logger: DatabaseLogger
-    db: Client
+    db: InstanceType<typeof Client>
     constructor(public database:string, public options: PostgreSQLDBConfig = {}) {
         this.idSystem = new IDSystem(this)
         this.logger = this.options?.logger || pino()

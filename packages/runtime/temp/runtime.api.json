@@ -12512,8 +12512,21 @@
                 },
                 {
                   "kind": "Reference",
+                  "text": "InstanceType",
+                  "canonicalReference": "!InstanceType:type"
+                },
+                {
+                  "kind": "Content",
+                  "text": "<typeof "
+                },
+                {
+                  "kind": "Reference",
                   "text": "Client",
-                  "canonicalReference": "@types/pg!Client:class"
+                  "canonicalReference": "@interaqt/runtime!~Client:var"
+                },
+                {
+                  "kind": "Content",
+                  "text": ">"
                 },
                 {
                   "kind": "Content",
@@ -12526,7 +12539,7 @@
               "name": "db",
               "propertyTypeTokenRange": {
                 "startIndex": 1,
-                "endIndex": 2
+                "endIndex": 5
               },
               "isStatic": false,
               "isProtected": false,
@@ -13308,11 +13321,11 @@
                 },
                 {
                   "kind": "Content",
-                  "text": "<import(\"pg\")."
+                  "text": "<"
                 },
                 {
                   "kind": "Reference",
-                  "text": "QueryResult",
+                  "text": "pg.QueryResult",
                   "canonicalReference": "@types/pg!QueryResult:interface"
                 },
                 {

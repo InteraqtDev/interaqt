@@ -8,7 +8,6 @@
 
 import { AsyncLocalStorage } from 'async_hooks';
 import { Atom } from 'data0';
-import { Client } from 'pg';
 import { ClientConfig } from 'pg';
 import { Connection } from 'mysql2/promise';
 import { ConnectionOptions } from 'mysql2/promise';
@@ -17,7 +16,7 @@ import { FastifyLoggerOptions } from 'fastify';
 import { MatchExpressionData } from '@interaqt/storage';
 import { MutationEvent as MutationEvent_2 } from '@interaqt/storage';
 import mysql from 'mysql2/promise';
-import { QueryResult } from 'pg';
+import pg from 'pg';
 import SQLite from 'better-sqlite3';
 import { UnwrapReactive } from 'data0';
 
@@ -2881,8 +2880,10 @@ export class PostgreSQLDB implements Database {
     close(): Promise<void>;
     // (undocumented)
     database: string;
+    // Warning: (ae-forgotten-export) The symbol "Client" needs to be exported by the entry point index.d.ts
+    //
     // (undocumented)
-    db: Client;
+    db: InstanceType<typeof Client>;
     // (undocumented)
     delete<T extends any>(sql: string, where: any[], name?: string): Promise<T[]>;
     // (undocumented)
@@ -2911,7 +2912,7 @@ export class PostgreSQLDB implements Database {
     // (undocumented)
     query<T extends any>(sql: string, where?: any[], name?: string): Promise<T[]>;
     // (undocumented)
-    scheme(sql: string, name?: string): Promise<QueryResult<any>>;
+    scheme(sql: string, name?: string): Promise<pg.QueryResult<any>>;
     // (undocumented)
     update<T extends any>(sql: string, values: any[], idField?: string, name?: string): Promise<T[]>;
 }
