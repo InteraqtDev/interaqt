@@ -382,8 +382,7 @@ export class InteractionCall {
         const payloadDefs = this.interaction.payload?.items || []
         const savedPayload: InteractionEventArgs["payload"] = {}
         for(let payloadDef of payloadDefs) {
-            const isPayloadUser = payloadDef.base.name === USER_ENTITY
-            if (!payloadDef.isRef && !isPayloadUser) {
+            if (!payloadDef.isRef ) {
                 const payloadItem = payload![payloadDef.name!]
                 if (payloadItem) {
                     const recordName = (payloadDef.base as KlassInstance<typeof Entity, false>).name

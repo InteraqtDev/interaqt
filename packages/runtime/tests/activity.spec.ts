@@ -1,6 +1,18 @@
 import {beforeEach, describe, expect, test} from "vitest";
 import {MonoSystem} from "../MonoSystem.js";
-import {Activity, createInstances, getInstance, KlassByName, KlassInstance, removeAllInstance, Controller} from "@interaqt/runtime";
+import {
+    Activity,
+    Entity,
+    Relation,
+    State,
+    createInstances,
+    getInstance,
+    KlassByName,
+    KlassInstance,
+    removeAllInstance,
+    Controller,
+    Interaction, EntityIdRef
+} from "@interaqt/runtime";
 import {ActivityCall, ActivityGroupNode} from "../ActivityCall.js";
 
 describe("activity state", () => {
@@ -12,11 +24,10 @@ describe("activity state", () => {
     let rejectUUID:string
     let cancelUUID:string
 
-    const userA = { id: "1", roles: ['user']}
-    const userB = { id: "2", roles: ['user']}
+    let userA!: EntityIdRef
+    let userB!: EntityIdRef
     beforeEach(async () => {
         removeAllInstance()
-        // const { data }  = (await import('./data/simpleActivityWithER'))
         const { data }  = (await import('./data/activity'))
         /**
          * 当前的格式为:
@@ -28,23 +39,32 @@ describe("activity state", () => {
 
         createInstances(data, false)
         system = new MonoSystem()
-        await system.setup([], [], true)
         system.conceptClass = KlassByName
-        const mainActivity = (getInstance(Activity) as KlassInstance<typeof Activity, false>[]).find(a => a.name === 'createFriendRelation')!
+        const activities = [...getInstance(Activity) as KlassInstance<typeof Activity, false>[]]
+        const entities = [...getInstance(Entity)]
+        const relations = [...getInstance(Relation)]
+
         const controller = new Controller(
             system,
-            [],
-            [],
-            [],
-            [],
+            entities,
+            relations,
+            activities,
+            getInstance(Interaction),
+            getInstance(State),
         )
+        await controller.setup(true)
+
         // CAUTION 这里 controller 没什么用，只是作为 globals 注入的点。interaction  的各种 check 里面需要 controller 的 globals。
+        const mainActivity = activities.find(a => a.name === 'createFriendRelation')!
         createFriendRelationActivityCall = new ActivityCall(mainActivity, controller)
 
         sendRequestUUID = createFriendRelationActivityCall.graph.head.uuid
         approveUUID = (createFriendRelationActivityCall.graph.tail as ActivityGroupNode).childSeqs![0].head.uuid
         rejectUUID = (createFriendRelationActivityCall.graph.tail as ActivityGroupNode).childSeqs![1].head.uuid
         cancelUUID = (createFriendRelationActivityCall.graph.tail as ActivityGroupNode).childSeqs![2].head.uuid
+
+        userA = await controller.system.storage.create('User', { id: "1", roles: ['user']})
+        userB = await controller.system.storage.create('User', { id: "2", roles: ['user']})
     })
 
     test("call friend request activity with approve response", async () => {

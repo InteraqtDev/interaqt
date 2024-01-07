@@ -33,6 +33,7 @@ export const sendInteraction = Interaction.create({
             PayloadItem.create({
                 name: 'to',
                 attributives: boolExpToAttributives(BoolExp.atom(OtherAttr)),
+                isRef:true,
                 base: UserEntity,
                 itemRef: userRefB
             }),
