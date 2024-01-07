@@ -196,6 +196,7 @@ const friendRelationSM = StateMachine.create({
     transfers: [addFriendTransfer, deleteFriendTransfer],
     defaultState: notFriendState
 })
+
 export const friendRelation = Relation.create({
     source: UserEntity,
     sourceProperty: 'friends',

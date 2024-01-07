@@ -130,7 +130,7 @@ class MonoStorage implements Storage{
         for(let callback of this.callbacks) {
             const callbackResult = await callback(events)
             if (callbackResult?.events) {
-                // newEvents.push(...callbackResult.events)
+                newEvents.push(...callbackResult.events)
             }
         }
         return newEvents

@@ -192,13 +192,10 @@ export class StateMachineHandle extends ComputedDataHandle {
 
                     if(!nextState.value) {
                         // 转移成删除
-
                         await this.controller.system.storage.delete(this.recordName!, MatchExp.atom(matchExp), innerMutationEvents)
-
                     } else {
                         // TODO 除了 fixedProperties 还有 propertyHandle 来计算 动态的 property
                         await this.controller.system.storage.update(this.recordName!, MatchExp.atom(matchExp), nextState.value, innerMutationEvents)
-
                     }
                 }
 
@@ -208,8 +205,7 @@ export class StateMachineHandle extends ComputedDataHandle {
                 if (!matchedEntity) {
                     // 没有数据才说明匹配
                     // 转移 变成有
-                    const result = await this.controller.system.storage.create(this.recordName!, nextState.value, innerMutationEvents)
-
+                    await this.controller.system.storage.create(this.recordName!, nextState.value, innerMutationEvents)
                 }
             }
             events.push(...innerMutationEvents)
@@ -258,12 +254,10 @@ export class StateMachineHandle extends ComputedDataHandle {
 
                     if(!nextState.value) {
                         // 转移成删除
-                        const result = await this.controller.system.storage.removeRelationByName(relationName, MatchExp.atom(matchExp), innerMutationEvents)
-
+                        await this.controller.system.storage.removeRelationByName(relationName, MatchExp.atom(matchExp), innerMutationEvents)
                     } else {
                         // TODO 除了 fixedProperties 还有 propertyHandle 来计算 动态的 property
-                        const result = await this.controller.system.storage.updateRelationByName(relationName, MatchExp.atom(matchExp), nextState.value, innerMutationEvents)
-
+                        await this.controller.system.storage.updateRelationByName(relationName, MatchExp.atom(matchExp), nextState.value, innerMutationEvents)
                     }
                 }
 
@@ -273,8 +267,7 @@ export class StateMachineHandle extends ComputedDataHandle {
                 if (!matchedRelation) {
                     // 没有数据才说明匹配
                     // 转移 变成有
-                    const result = await this.controller.system.storage.addRelationByNameById(relationName, sourceRef.id, targetRef.id, nextState.value, innerMutationEvents)
-
+                    await this.controller.system.storage.addRelationByNameById(relationName, sourceRef.id, targetRef.id, nextState.value, innerMutationEvents)
                 }
             }
 
