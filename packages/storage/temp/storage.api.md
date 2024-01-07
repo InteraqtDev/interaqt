@@ -470,7 +470,7 @@ export class Modifier {
     get orderBy(): {
         attribute: string;
         recordName: string;
-        order: string;
+        order: "ASC" | "DESC";
     }[];
     // (undocumented)
     recordName: string;
@@ -479,7 +479,7 @@ export class Modifier {
 // @public (undocumented)
 export type ModifierData = {
     orderBy?: {
-        [k: string]: string;
+        [k: string]: 'ASC' | 'DESC';
     };
     limit?: number;
     offset?: number;

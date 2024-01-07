@@ -636,9 +636,12 @@ ${innerQuerySQL}
         if (!isUpdate && !newRawDataWithNewIds.id) {
             // 为自己分配 id，一定要在最前面，因为后面记录link 事件的地方一定要有 target/source 的 id
             newRawDataWithNewIds.id = await this.database.getAutoId(newEntityData.recordName)
+        } else if(isUpdate && !newRawDataWithNewIds.id) {
+            // 因为用户传进来的 update 字段里面可能没有 id 字段，所以这里要加上。
+            // newRawDataWithNewIds 用在了后面的 event 里面，保证有 id 才正确。外部可能会从 event 里面读。
+            newRawDataWithNewIds.id = oldRecord!.id
         }
 
-        // FIXME 应该先 有 create 再有  Link 事件
         if (!isUpdate) {
             events?.push({
                 type: 'create',
