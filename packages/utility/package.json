@@ -21,7 +21,9 @@
     "access": "public"
   },
   "exports": {
-    "./logto/*.js": "./logto/*.js"
+    "./logto/*.js": "./logto/*.js",
+    "./cms/*.js": "./cms/*.js",
+    "./pattern/*.js": "./pattern/*.js"
   },
   "devDependencies": {
     "@microsoft/api-extractor": "^7.39.0",
