@@ -1,6 +1,6 @@
 {
   "name": "@interaqt/utility",
-  "version": "0.8.6",
+  "version": "0.8.7",
   "description": "interaqt utility",
   "main": "index.js",
   "type": "module",
