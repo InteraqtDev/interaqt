@@ -9,6 +9,7 @@ import {asyncInteractionContext} from "./asyncInteractionContext.js";
 
 type ServerOptions = {
     port: number,
+    host?: string,
     parseUserId: (headers: any) => Promise<string | undefined>
     cors? : Parameters<typeof cors>[0]
     logger? : FastifyLoggerOptions
@@ -211,7 +212,7 @@ export async function startServer(controller: Controller, options: ServerOptions
         return { message: 'pong' }
     })
 
-    fastify.listen({ port: options.port }, (err, address) => {
+    fastify.listen({ port: options.port, host: options.host ?? 'localhost' }, (err, address) => {
         if (err) throw err
         // Server is now listening on ${address}
     })
