@@ -20,7 +20,7 @@
     "minor": "node scripts/release.js minor",
     "major": "node scripts/release.js major"
   },
-  "version": "0.8.33",
+  "version": "0.8.34",
   "main": "dist/index.js",
   "files": [
     "dist"
