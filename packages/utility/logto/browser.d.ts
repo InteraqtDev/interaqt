@@ -8,6 +8,6 @@ export declare class Client {
     interactionAddr: string;
     constructor(endpoint: string, appId: string, interaqtEndpoint: string);
     getToken(): Promise<void>;
-    post: (data: any) => Promise<any>;
+    post: (data: any, devUserId?: any) => Promise<any>;
 }
 //# sourceMappingURL=browser.d.ts.map

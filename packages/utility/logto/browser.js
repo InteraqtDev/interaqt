@@ -4,7 +4,17 @@ export class Client {
         this.endpoint = endpoint;
         this.appId = appId;
         this.interaqtEndpoint = interaqtEndpoint;
-        this.post = async (data) => {
+        this.post = async (data, devUserId) => {
+            if (devUserId !== undefined) {
+                return (await fetch(this.interactionAddr, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-user-id': devUserId
+                    },
+                    body: JSON.stringify(data)
+                })).json();
+            }
             if (!this.token)
                 await this.getToken();
             return (await fetch(this.interactionAddr, {
