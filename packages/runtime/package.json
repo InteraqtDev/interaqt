@@ -5,7 +5,7 @@
     "@types/pg": "^8.10.9",
     "pino-pretty": "^10.3.0",
     "rimraf": "^5.0.5",
-    "typescript": "^5.2.2",
+    "typescript": "^5.3.3",
     "vite-tsconfig-paths": "^4.2.1",
     "vitest": "^0.34.6"
   },
@@ -29,7 +29,7 @@
   "license": "MIT",
   "dependencies": {
     "@fastify/middie": "^8.3.0",
-    "@interaqt/shared": "^1.0.25",
+    "@interaqt/shared": "^1.0.26",
     "@interaqt/storage": "^1.0.7",
     "@types/better-sqlite3": "^7.6.8",
     "@types/connect": "^3.4.38",
