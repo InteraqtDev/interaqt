@@ -120,6 +120,10 @@ ${this.buildModifierClause(recordQuery.modifier, prefix)}
     buildModifierClause(modifier: Modifier, prefix?: string) {
         const {limit, offset, orderBy} = modifier
         const clauses = []
+        if (orderBy.length) {
+            clauses.push(`ORDER BY ${orderBy.map(({attribute, recordName, order}) => `"${this.withPrefix(prefix)}${recordName}.${attribute}" ${order}`).join(',')}`)
+        }
+
         if (limit) {
             clauses.push(`LIMIT ${limit}`)
         }
@@ -127,9 +131,7 @@ ${this.buildModifierClause(recordQuery.modifier, prefix)}
             clauses.push(`OFFSET ${offset}`)
         }
 
-        if (orderBy.length) {
-            clauses.push(`ORDER BY ${orderBy.map(({attribute, recordName, order}) => `"${this.withPrefix(prefix)}${recordName}.${attribute}" ${order}`).join(',')}`)
-        }
+
 
         return clauses.join('\n')
     }

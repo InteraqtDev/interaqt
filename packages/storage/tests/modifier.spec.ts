@@ -100,6 +100,25 @@ describe('modifier test', () => {
         ])
     })
 
+    test('test order by with limit', async () => {
+        const returnUser = await entityQueryHandle.create('User', {name: 'a', age: 17})
+        const returnUser2 = await entityQueryHandle.create('User', {name: 'b', age: 18})
+        const returnUser3 = await entityQueryHandle.create('User', {name: 'c', age: 19})
+        const returnUser4 = await entityQueryHandle.create('User', {name: 'd', age: 20})
+        const findUsers = await entityQueryHandle.find('User', undefined, { orderBy: {age: 'desc'}, limit: 2}, ['name', 'age'])
+        expect(findUsers.length).toBe(2)
+        expect(findUsers).toMatchObject([
+            {
+                name: 'd',
+                age: 20
+            },
+            {
+                name: 'c',
+                age: 19
+            },
+        ])
+    })
+
 
 })
 
