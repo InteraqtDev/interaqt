@@ -15,7 +15,18 @@ export class Client {
     async getToken() {
         this.token =  await this.client.getAccessToken(this.interactionAddr)
     }
-    post = async (data:any) => {
+    post = async (data:any, devUserId?: any) => {
+        if (devUserId !== undefined) {
+            return (await fetch(this.interactionAddr, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-user-id': devUserId
+                },
+                body: JSON.stringify(data)
+            })).json()
+        }
+
         if (!this.token) await this.getToken()
 
         return (await fetch(this.interactionAddr, {
