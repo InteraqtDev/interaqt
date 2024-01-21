@@ -12,9 +12,6 @@
   "files": [
     "dist"
   ],
-  "peerDependencies": {
-    "typescript": "^5.2.2"
-  },
   "scripts": {
     "build": "rimraf dist && tsc -p ./tsconfig.prod.json",
     "type": "api-extractor run",

@@ -20,13 +20,12 @@ type ClassPropType = {
     }
 }
 
-type OptionalRequiredType<T> = T&{required?:false} | T& { required: true}
-type OptionalDefaultValueType<T> = T&{defaultValue?: undefined} | T& { defaultValue: DefaultValueType}
-type OptionalComputedValueType<T> = T&{computed?: undefined} | T& { computed: ComputedValueType}
-type OptionalCollectionType<T> = T&{collection?: false} | T& { collection: true}
+// type OptionalRequiredType<T> = T&{required?:false} | T& { required: true}
+// type OptionalDefaultValueType<T> = T&{defaultValue?: undefined} | T& { defaultValue: DefaultValueType}
+// type OptionalComputedValueType<T> = T&{computed?: undefined} | T& { computed: ComputedValueType}
+// type OptionalCollectionType<T> = T&{collection?: false} | T& { collection: true}
 // arg 是有 required 并且一定没有 defaultValue并且一定没有 computed 才有
 // prop 是有 required 或者有 defaultValue 或者有 computed 就必有
-// FIXME 还要判断有没有 defaultValue 和 computed value
 
 export type RequireWithoutDefaultAndComputed<T extends ClassMetaPublicItem, IS_ARG extends true|false> =
     IS_ARG extends true ?
@@ -34,7 +33,13 @@ export type RequireWithoutDefaultAndComputed<T extends ClassMetaPublicItem, IS_A
         (T["defaultValue"] extends DefaultValueType? true:  T["computed"] extends ComputedValueType? true: T["required"] extends true  ? true : false)
 
 
-type ClassMetaPublicItem = OptionalComputedValueType<OptionalRequiredType<OptionalDefaultValueType<OptionalCollectionType<ClassPropType>>>>
+// type ClassMetaPublicItem = OptionalComputedValueType<OptionalRequiredType<OptionalDefaultValueType<OptionalCollectionType<ClassPropType>>>>
+type ClassMetaPublicItem = ClassPropType & {
+    collection?: true|false,
+    computed?: ComputedValueType,
+    defaultValue?:DefaultValueType,
+    required?: true|false,
+}
 
 export type KlassMeta = {
     name: string,
@@ -72,7 +77,6 @@ export type KlassInstancePrimitiveProps = {
 }
 
 
-export type KlassProp<REACTIVE extends boolean, COLLECTION extends true|false|undefined, T> = IfReactiveCollectionProp<REACTIVE, COLLECTION, T>
 
 type IfReactiveCollectionProp<REACTIVE extends boolean, COLLECTION extends true|false|undefined, T> = REACTIVE extends true ?
     (
@@ -92,10 +96,16 @@ export type UnwrapCollectionType<T extends Klass<any>[]> = {
     [Key in keyof T]: T[Key]["public"]
 }[keyof T][number]
 
-type ExtractKlassTypes<REACTIVE extends boolean, COLLECTION extends true|false|undefined, T extends Klass<any>[] > =
-    T extends Array<infer SUB_KLASS> ?
-        SUB_KLASS extends Klass<any> ?
-            KlassProp<REACTIVE, COLLECTION,InertKlassInstance<SUB_KLASS["public"]>> : never : never
+export type KlassProp<REACTIVE extends boolean, COLLECTION extends true|false|undefined, T> = IfReactiveCollectionProp<REACTIVE, COLLECTION, T>
+
+
+// type ExtractKlassTypes<REACTIVE extends boolean, COLLECTION extends true|false|undefined, T extends Klass<any>[] > =
+//     T extends Array<infer SUB_KLASS> ?
+//         SUB_KLASS extends Klass<any> ?
+//             KlassProp<REACTIVE, COLLECTION,InertKlassInstance<SUB_KLASS["public"]>> : never : never
+
+
+
 
 type ExtractPrimitiveTypes<REACTIVE extends boolean, COLLECTION extends true|false|undefined, T extends PrimitivePropType[] > =
     T extends Array<infer SUB_KLASS> ?
@@ -113,7 +123,8 @@ export type RequiredProps<T extends NonNullable<KlassMeta["public"]>, REACTIVE e
                         T[Key]['type'] extends Klass<any> ?
                             KlassProp<REACTIVE, T[Key]["collection"],  InertKlassInstance<T[Key]['type']['public']>> :
                             T[Key]['type'] extends Klass<any>[] ?
-                                ExtractKlassTypes<REACTIVE, T[Key]["collection"], T[Key]['type']>:
+                                KlassProp<REACTIVE, T[Key]["collection"], KlassInstance<Klass<any>, false> & UnknownInstance>:
+                                // ExtractKlassTypes<REACTIVE, T[Key]["collection"], T[Key]['type']>:
                                 T[Key]['type'] extends PrimitivePropType ?
                                     KlassProp<REACTIVE, T[Key]["collection"],  PrimitivePropertyMap[T[Key]['type']]> :
                                         T[Key]['type'] extends PrimitivePropType[] ?
@@ -124,6 +135,7 @@ export type RequiredProps<T extends NonNullable<KlassMeta["public"]>, REACTIVE e
             never
 }>
 
+type UnknownInstance ={ [key: string]: any}
 
 export type OptionalProps<T extends NonNullable<KlassMeta["public"]>, REACTIVE extends true|false, IS_ARG  extends true|false> = Partial<OmitNever<{
     [Key in keyof T]:
@@ -137,7 +149,7 @@ export type OptionalProps<T extends NonNullable<KlassMeta["public"]>, REACTIVE e
                         T[Key]['type'] extends Klass<any> ?
                             KlassProp<REACTIVE, T[Key]["collection"],  InertKlassInstance<T[Key]['type']['public']>> :
                             T[Key]['type'] extends Klass<any>[] ?
-                                ExtractKlassTypes<REACTIVE, T[Key]["collection"], T[Key]['type']>:
+                                KlassProp<REACTIVE, T[Key]["collection"], KlassInstance<Klass<any>, false> & UnknownInstance>:
                                 T[Key]['type'] extends PrimitivePropType ?
                                     KlassProp<REACTIVE, T[Key]["collection"],  PrimitivePropertyMap[T[Key]['type']]> :
                                     T[Key]['type'] extends PrimitivePropType[] ?
@@ -166,7 +178,7 @@ export type Klass<T extends NonNullable<KlassMeta["public"]>> = {
     isKlass: true,
     public: T,
     constraints: KlassMeta['constraints'],
-    instances: KlassInstance<Klass<T>, any>[],
+    instances: (KlassInstance<Klass<T>, false>|KlassInstance<Klass<T>, true>)[] ,
     display? : KlassMeta['display']
     stringify: (instance: InertKlassInstance<T>|ReactiveKlassInstance<T>) => string
     parse: () => InertKlassInstance<T>
@@ -489,7 +501,11 @@ export function deepClone<T>(obj: T, deepCloneKlass?: boolean): T{
     throw new Error(`unknown type`)
 }
 
-export type KlassInstance<T extends Klass<any>, U extends boolean> = U extends true ? ReactiveKlassInstance<T["public"]> : InertKlassInstance<T["public"]>
+type KlassLikeType = {
+    public: KlassMeta["public"]
+}
+
+export type KlassInstance<T extends KlassLikeType, U extends true|false> = U extends true ? ReactiveKlassInstance<T["public"]> : InertKlassInstance<T["public"]>
 
 export function removeAllInstance() {
     for( let [, Klass] of KlassByName ) {
