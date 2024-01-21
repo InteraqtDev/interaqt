@@ -1882,7 +1882,7 @@ export type Klass<T extends NonNullable<KlassMeta["public"]>> = {
     isKlass: true;
     public: T;
     constraints: KlassMeta['constraints'];
-    instances: KlassInstance<Klass<T>, any>[];
+    instances: (KlassInstance<Klass<T>, false> | KlassInstance<Klass<T>, true>)[];
     display?: KlassMeta['display'];
     stringify: (instance: InertKlassInstance<T> | ReactiveKlassInstance<T>) => string;
     parse: () => InertKlassInstance<T>;
@@ -1894,8 +1894,10 @@ export type Klass<T extends NonNullable<KlassMeta["public"]>> = {
 // @public (undocumented)
 export const KlassByName: Map<string, Klass<any>>;
 
+// Warning: (ae-forgotten-export) The symbol "KlassLikeType" needs to be exported by the entry point index.d.ts
+//
 // @public (undocumented)
-export type KlassInstance<T extends Klass<any>, U extends boolean> = U extends true ? ReactiveKlassInstance<T["public"]> : InertKlassInstance<T["public"]>;
+export type KlassInstance<T extends KlassLikeType, U extends true | false> = U extends true ? ReactiveKlassInstance<T["public"]> : InertKlassInstance<T["public"]>;
 
 // @public (undocumented)
 export type KlassInstanceArgs<T extends NonNullable<KlassMeta["public"]>> = OptionalProps<T, false, true> & RequiredProps<T, false, true>;
@@ -1955,12 +1957,12 @@ export const MapActivity: Klass<    {
                     groups: {
                         type: Klass<ActivityGroupPublicType>;
                         collection: true;
-                        defaultValue: (...args: any[]) => (InertKlassInstance<ActivityGroupPublicType> | ReactiveKlassInstance<ActivityGroupPublicType>)[];
+                        defaultValue: (...args: any[]) => (ReactiveKlassInstance<ActivityGroupPublicType> | InertKlassInstance<ActivityGroupPublicType>)[];
                     };
                     gateways: {
                         type: Klass<GatewayPublicType>;
                         collection: true;
-                        defaultValue: (...args: any[]) => (InertKlassInstance<GatewayPublicType> | ReactiveKlassInstance<GatewayPublicType>)[];
+                        defaultValue: (...args: any[]) => (ReactiveKlassInstance<GatewayPublicType> | InertKlassInstance<GatewayPublicType>)[];
                     };
                     events: {
                         type: Klass<    {
@@ -2034,12 +2036,12 @@ export const MapActivityItem: Klass<    {
             groups: {
                 type: Klass<ActivityGroupPublicType>;
                 collection: true;
-                defaultValue: (...args: any[]) => (InertKlassInstance<ActivityGroupPublicType> | ReactiveKlassInstance<ActivityGroupPublicType>)[];
+                defaultValue: (...args: any[]) => (ReactiveKlassInstance<ActivityGroupPublicType> | InertKlassInstance<ActivityGroupPublicType>)[];
             };
             gateways: {
                 type: Klass<GatewayPublicType>;
                 collection: true;
-                defaultValue: (...args: any[]) => (InertKlassInstance<GatewayPublicType> | ReactiveKlassInstance<GatewayPublicType>)[];
+                defaultValue: (...args: any[]) => (ReactiveKlassInstance<GatewayPublicType> | InertKlassInstance<GatewayPublicType>)[];
             };
             events: {
                 type: Klass<    {
@@ -2225,14 +2227,14 @@ export const OperatorNames: {
 };
 
 // Warning: (ae-forgotten-export) The symbol "OmitNever" needs to be exported by the entry point index.d.ts
-// Warning: (ae-forgotten-export) The symbol "ExtractKlassTypes" needs to be exported by the entry point index.d.ts
+// Warning: (ae-forgotten-export) The symbol "UnknownInstance" needs to be exported by the entry point index.d.ts
 // Warning: (ae-forgotten-export) The symbol "PrimitivePropType" needs to be exported by the entry point index.d.ts
 // Warning: (ae-forgotten-export) The symbol "PrimitivePropertyMap" needs to be exported by the entry point index.d.ts
 // Warning: (ae-forgotten-export) The symbol "ExtractPrimitiveTypes" needs to be exported by the entry point index.d.ts
 //
 // @public (undocumented)
 export type OptionalProps<T extends NonNullable<KlassMeta["public"]>, REACTIVE extends true | false, IS_ARG extends true | false> = Partial<OmitNever<{
-    [Key in keyof T]: RequireWithoutDefaultAndComputed<T[Key], IS_ARG> extends true ? never : (T[Key]["instanceType"] extends Object ? KlassProp<REACTIVE, T[Key]["collection"], T[Key]["instanceType"]> : (T[Key]['type'] extends Klass<any> ? KlassProp<REACTIVE, T[Key]["collection"], InertKlassInstance<T[Key]['type']['public']>> : T[Key]['type'] extends Klass<any>[] ? ExtractKlassTypes<REACTIVE, T[Key]["collection"], T[Key]['type']> : T[Key]['type'] extends PrimitivePropType ? KlassProp<REACTIVE, T[Key]["collection"], PrimitivePropertyMap[T[Key]['type']]> : T[Key]['type'] extends PrimitivePropType[] ? ExtractPrimitiveTypes<REACTIVE, T[Key]["collection"], T[Key]['type']> : never));
+    [Key in keyof T]: RequireWithoutDefaultAndComputed<T[Key], IS_ARG> extends true ? never : (T[Key]["instanceType"] extends Object ? KlassProp<REACTIVE, T[Key]["collection"], T[Key]["instanceType"]> : (T[Key]['type'] extends Klass<any> ? KlassProp<REACTIVE, T[Key]["collection"], InertKlassInstance<T[Key]['type']['public']>> : T[Key]['type'] extends Klass<any>[] ? KlassProp<REACTIVE, T[Key]["collection"], KlassInstance<Klass<any>, false> & UnknownInstance> : T[Key]['type'] extends PrimitivePropType ? KlassProp<REACTIVE, T[Key]["collection"], PrimitivePropertyMap[T[Key]['type']]> : T[Key]['type'] extends PrimitivePropType[] ? ExtractPrimitiveTypes<REACTIVE, T[Key]["collection"], T[Key]['type']> : never));
 }>>;
 
 // Warning: (ae-forgotten-export) The symbol "ParseAtomNameToObjectType" needs to be exported by the entry point index.d.ts
@@ -3301,7 +3303,7 @@ export function removeAllInstance(): void;
 
 // @public (undocumented)
 export type RequiredProps<T extends NonNullable<KlassMeta["public"]>, REACTIVE extends true | false, IS_ARG extends true | false> = OmitNever<{
-    [Key in keyof T]: RequireWithoutDefaultAndComputed<T[Key], IS_ARG> extends true ? (T[Key]["instanceType"] extends Object ? KlassProp<REACTIVE, T[Key]["collection"], T[Key]["instanceType"]> : (T[Key]['type'] extends Klass<any> ? KlassProp<REACTIVE, T[Key]["collection"], InertKlassInstance<T[Key]['type']['public']>> : T[Key]['type'] extends Klass<any>[] ? ExtractKlassTypes<REACTIVE, T[Key]["collection"], T[Key]['type']> : T[Key]['type'] extends PrimitivePropType ? KlassProp<REACTIVE, T[Key]["collection"], PrimitivePropertyMap[T[Key]['type']]> : T[Key]['type'] extends PrimitivePropType[] ? ExtractPrimitiveTypes<REACTIVE, T[Key]["collection"], T[Key]['type']> : never)) : never;
+    [Key in keyof T]: RequireWithoutDefaultAndComputed<T[Key], IS_ARG> extends true ? (T[Key]["instanceType"] extends Object ? KlassProp<REACTIVE, T[Key]["collection"], T[Key]["instanceType"]> : (T[Key]['type'] extends Klass<any> ? KlassProp<REACTIVE, T[Key]["collection"], InertKlassInstance<T[Key]['type']['public']>> : T[Key]['type'] extends Klass<any>[] ? KlassProp<REACTIVE, T[Key]["collection"], KlassInstance<Klass<any>, false> & UnknownInstance> : T[Key]['type'] extends PrimitivePropType ? KlassProp<REACTIVE, T[Key]["collection"], PrimitivePropertyMap[T[Key]['type']]> : T[Key]['type'] extends PrimitivePropType[] ? ExtractPrimitiveTypes<REACTIVE, T[Key]["collection"], T[Key]['type']> : never)) : never;
 }>;
 
 // Warning: (ae-forgotten-export) The symbol "DefaultValueType" needs to be exported by the entry point index.d.ts
@@ -3859,7 +3861,7 @@ export const WeightedSummation: Klass<    {
 //
 // node_modules/@interaqt/shared/dist/index.d.ts:24:9 - (ae-forgotten-export) The symbol "UnwrappedActivityInstanceType" needs to be exported by the entry point index.d.ts
 // node_modules/@interaqt/shared/dist/index.d.ts:287:9 - (ae-forgotten-export) The symbol "CommonAtomPublic" needs to be exported by the entry point index.d.ts
-// node_modules/@interaqt/shared/dist/index.d.ts:1433:9 - (ae-forgotten-export) The symbol "ClassMetaPublicItem" needs to be exported by the entry point index.d.ts
+// node_modules/@interaqt/shared/dist/index.d.ts:1440:9 - (ae-forgotten-export) The symbol "ClassMetaPublicItem" needs to be exported by the entry point index.d.ts
 
 // (No @packageDocumentation comment for this package)
 
