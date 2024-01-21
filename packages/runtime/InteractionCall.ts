@@ -425,7 +425,8 @@ export class InteractionCall {
         let data: any
         if (Entity.is(this.interaction.data) || Relation.is(this.interaction.data)) {
             const recordName = (this.interaction.data as KlassInstance<typeof Entity, false>).name
-            const {modifier: fixedModifier, attributeQuery: fixedAttributeQuery} = Object.fromEntries(this.interaction.query?.items?.map(item => [item.name, item.value as any]) || [])
+            const {modifier: fixedModifier, attributeQuery: fixedAttributeQuery} = Object.fromEntries(
+                this.interaction.query?.items?.map(item => [(item as any).name, (item as any).value as any]) || [])
             const modifier = {...(interactionEvent.query?.modifier||{}), ...(fixedModifier||{})}
             // TODO 怎么判断 attributeQuery 是在 fixed 的q范围里面？？？？
             const attributeQuery = interactionEvent.query?.attributeQuery || []
