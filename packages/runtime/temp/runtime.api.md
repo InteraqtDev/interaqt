@@ -2209,7 +2209,7 @@ export class MysqlDB implements Database {
     // (undocumented)
     query<T extends any>(sql: string, where?: any[], name?: string): Promise<T[]>;
     // (undocumented)
-    scheme(sql: string, name?: string): Promise<[mysql.OkPacket | mysql.RowDataPacket[] | mysql.RowDataPacket[][] | mysql.OkPacket[] | mysql.ProcedureCallPacket | mysql.ResultSetHeader[], mysql.FieldPacket[]]>;
+    scheme(sql: string, name?: string): Promise<[mysql.QueryResult, mysql.FieldPacket[]]>;
     // (undocumented)
     update<T extends any>(sql: string, values: any[], idField?: string, name?: string): Promise<T[]>;
 }

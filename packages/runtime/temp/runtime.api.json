@@ -10948,57 +10948,12 @@
                 },
                 {
                   "kind": "Reference",
-                  "text": "mysql.OkPacket",
-                  "canonicalReference": "mysql2!OkPacket:interface"
+                  "text": "mysql.QueryResult",
+                  "canonicalReference": "mysql2!QueryResult:type"
                 },
                 {
                   "kind": "Content",
-                  "text": " | "
-                },
-                {
-                  "kind": "Reference",
-                  "text": "mysql.RowDataPacket",
-                  "canonicalReference": "mysql2!RowDataPacket:interface"
-                },
-                {
-                  "kind": "Content",
-                  "text": "[] | "
-                },
-                {
-                  "kind": "Reference",
-                  "text": "mysql.RowDataPacket",
-                  "canonicalReference": "mysql2!RowDataPacket:interface"
-                },
-                {
-                  "kind": "Content",
-                  "text": "[][] | "
-                },
-                {
-                  "kind": "Reference",
-                  "text": "mysql.OkPacket",
-                  "canonicalReference": "mysql2!OkPacket:interface"
-                },
-                {
-                  "kind": "Content",
-                  "text": "[] | "
-                },
-                {
-                  "kind": "Reference",
-                  "text": "mysql.ProcedureCallPacket",
-                  "canonicalReference": "mysql2!ProcedureCallPacket:type"
-                },
-                {
-                  "kind": "Content",
-                  "text": " | "
-                },
-                {
-                  "kind": "Reference",
-                  "text": "mysql.ResultSetHeader",
-                  "canonicalReference": "mysql2!ResultSetHeader:interface"
-                },
-                {
-                  "kind": "Content",
-                  "text": "[], "
+                  "text": ", "
                 },
                 {
                   "kind": "Reference",
@@ -11017,7 +10972,7 @@
               "isStatic": false,
               "returnTypeTokenRange": {
                 "startIndex": 5,
-                "endIndex": 21
+                "endIndex": 11
               },
               "releaseTag": "Public",
               "isProtected": false,
