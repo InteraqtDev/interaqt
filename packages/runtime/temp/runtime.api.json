@@ -7460,15 +7460,6 @@
             },
             {
               "kind": "Content",
-              "text": "<    {\nname: {\ntype: \"string\";\nrequired: true;\n};\n}> | "
-            },
-            {
-              "kind": "Reference",
-              "text": "ReactiveKlassInstance",
-              "canonicalReference": "@interaqt/runtime!ReactiveKlassInstance:type"
-            },
-            {
-              "kind": "Content",
               "text": "<    {\nname: {\ntype: \"string\";\nrequired: true;\n};\n}>"
             }
           ],
@@ -7478,7 +7469,7 @@
           "name": "GetAction",
           "variableTypeTokenRange": {
             "startIndex": 1,
-            "endIndex": 5
+            "endIndex": 3
           }
         },
         {

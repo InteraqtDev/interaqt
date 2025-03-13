@@ -1767,11 +1767,6 @@ export const GetAction: InertKlassInstance<    {
         type: "string";
         required: true;
     };
-}> | ReactiveKlassInstance<    {
-    name: {
-        type: "string";
-        required: true;
-    };
 }>;
 
 // @public (undocumented)
@@ -3875,7 +3870,7 @@ export const WeightedSummation: Klass<    {
 //
 // node_modules/@interaqt/shared/dist/index.d.ts:24:9 - (ae-forgotten-export) The symbol "UnwrappedActivityInstanceType" needs to be exported by the entry point index.d.ts
 // node_modules/@interaqt/shared/dist/index.d.ts:287:9 - (ae-forgotten-export) The symbol "CommonAtomPublic" needs to be exported by the entry point index.d.ts
-// node_modules/@interaqt/shared/dist/index.d.ts:1440:9 - (ae-forgotten-export) The symbol "ClassMetaPublicItem" needs to be exported by the entry point index.d.ts
+// node_modules/@interaqt/shared/dist/index.d.ts:1435:9 - (ae-forgotten-export) The symbol "ClassMetaPublicItem" needs to be exported by the entry point index.d.ts
 
 // (No @packageDocumentation comment for this package)
 
