@@ -4,8 +4,6 @@
 
 ```ts
 
-/// <reference types="node" />
-
 import { AsyncLocalStorage } from 'async_hooks';
 import { Atom } from 'data0';
 import { ClientConfig } from 'pg';
@@ -14,7 +12,7 @@ import { ConnectionOptions } from 'mysql2/promise';
 import cors from 'cors';
 import { FastifyLoggerOptions } from 'fastify';
 import { MatchExpressionData } from '@interaqt/storage';
-import { MutationEvent as MutationEvent_2 } from '@interaqt/storage';
+import { MutationEvent } from '@interaqt/storage';
 import mysql from 'mysql2/promise';
 import pg from 'pg';
 import SQLite from 'better-sqlite3';
@@ -38,77 +36,77 @@ export const ACTIVITY_RECORD = "_Activity_";
 
 // @public (undocumented)
 export const activityEntity: InertKlassInstance<    {
-name: {
-type: "string";
-collection: false;
-required: true;
-constraints: {
-nameFormat({ name }: {
-name: Atom<string>;
-}): Atom<boolean>;
-};
-};
-computedData: {
-type: Klass<any>[];
-collection: false;
-required: false;
-};
-properties: {
-type: Klass<    {
-name: {
-type: "string";
-required: true;
-collection: false;
-constraints: {
-format({ name }: {
-name: Atom<string>;
-}): Atom<boolean>;
-length({ name }: {
-name: Atom<string>;
-}): Atom<boolean>;
-};
-};
-type: {
-type: "string";
-required: true;
-collection: false;
-options: PropertyTypes[];
-};
-collection: {
-type: "boolean";
-required: true;
-collection: false;
-defaultValue(): boolean;
-};
-args: {
-computedType: (values: {
-type: PropertyTypes;
-}) => string;
-};
-computedData: {
-collection: false;
-type: Klass<any>[];
-required: false;
-};
-computed: {
-required: false;
-type: "function";
-collection: false;
-};
-}>;
-collection: true;
-required: true;
-constraints: {
-eachNameUnique({ properties }: any): Atom<boolean>;
-};
-defaultValue(): never[];
-};
-isRef: {
-required: true;
-collection: false;
-type: "boolean";
-defaultValue: () => boolean;
-};
+    name: {
+        type: "string";
+        collection: false;
+        required: true;
+        constraints: {
+            nameFormat({ name }: {
+                name: Atom<string>;
+            }): Atom<boolean>;
+        };
+    };
+    computedData: {
+        type: Klass<any>[];
+        collection: false;
+        required: false;
+    };
+    properties: {
+        type: Klass<    {
+            name: {
+                type: "string";
+                required: true;
+                collection: false;
+                constraints: {
+                    format({ name }: {
+                        name: Atom<string>;
+                    }): Atom<boolean>;
+                    length({ name }: {
+                        name: Atom<string>;
+                    }): Atom<boolean>;
+                };
+            };
+            type: {
+                type: "string";
+                required: true;
+                collection: false;
+                options: PropertyTypes[];
+            };
+            collection: {
+                type: "boolean";
+                required: true;
+                collection: false;
+                defaultValue(): boolean;
+            };
+            args: {
+                computedType: (values: {
+                    type: PropertyTypes;
+                }) => string;
+            };
+            computedData: {
+                collection: false;
+                type: Klass<any>[];
+                required: false;
+            };
+            computed: {
+                required: false;
+                type: "function";
+                collection: false;
+            };
+        }>;
+        collection: true;
+        required: true;
+        constraints: {
+            eachNameUnique({ properties }: any): Atom<boolean>;
+        };
+        defaultValue(): never[];
+    };
+    isRef: {
+        required: true;
+        collection: false;
+        type: "boolean";
+        defaultValue: () => boolean;
+    };
 }>;
 
 // @public (undocumented)
@@ -229,6 +227,9 @@ export type APIBody = {
     payload?: EventPayload;
     query?: EventQuery;
 };
+
+// @public (undocumented)
+export function assert(condition: any, message: string): void;
 
 // @public (undocumented)
 export const asyncInteractionContext: AsyncLocalStorage<unknown>;
@@ -1023,93 +1024,93 @@ export class Controller {
     recordMutationSideEffects: KlassInstance<typeof RecordMutationSideEffect, false>[];
     // (undocumented)
     recordNameToSideEffects: Map<string, Set<InertKlassInstance<    {
-    name: {
-    type: "string";
-    collection: false;
-    required: true;
-    };
-    record: {
-    type: (Klass<RelationPublic> | Klass<{
-    name: {
-    type: "string";
-    collection: false;
-    required: true;
-    constraints: {
-    nameFormat({ name }: {
-    name: Atom<string>;
-    }): Atom<boolean>;
-    };
-    };
-    computedData: {
-    type: Klass<any>[];
-    collection: false;
-    required: false;
-    };
-    properties: {
-    type: Klass<{
-    name: {
-    type: "string";
-    required: true;
-    collection: false;
-    constraints: {
-    format({ name }: {
-    name: Atom<string>;
-    }): Atom<boolean>;
-    length({ name }: {
-    name: Atom<string>;
-    }): Atom<boolean>;
-    };
-    };
-    type: {
-    type: "string";
-    required: true;
-    collection: false;
-    options: PropertyTypes[];
-    };
-    collection: {
-    type: "boolean";
-    required: true;
-    collection: false;
-    defaultValue(): boolean;
-    };
-    args: {
-    computedType: (values: {
-    type: PropertyTypes;
-    }) => string;
-    };
-    computedData: {
-    collection: false;
-    type: Klass<any>[];
-    required: false;
-    };
-    computed: {
-    required: false;
-    type: "function";
-    collection: false;
-    };
-    }>;
-    collection: true;
-    required: true;
-    constraints: {
-    eachNameUnique({ properties }: any): Atom<boolean>;
-    };
-    defaultValue(): never[];
-    };
-    isRef: {
-    required: true;
-    collection: false;
-    type: "boolean";
-    defaultValue: () => boolean;
-    };
-    }>)[];
-    collection: false;
-    required: true;
-    };
-    content: {
-    type: "function";
-    collection: false;
-    required: true;
-    };
+        name: {
+            type: "string";
+            collection: false;
+            required: true;
+        };
+        record: {
+            type: (Klass<{
+                name: {
+                    type: "string";
+                    collection: false;
+                    required: true;
+                    constraints: {
+                        nameFormat({ name }: {
+                            name: Atom<string>;
+                        }): Atom<boolean>;
+                    };
+                };
+                computedData: {
+                    type: Klass<any>[];
+                    collection: false;
+                    required: false;
+                };
+                properties: {
+                    type: Klass<{
+                        name: {
+                            type: "string";
+                            required: true;
+                            collection: false;
+                            constraints: {
+                                format({ name }: {
+                                    name: Atom<string>;
+                                }): Atom<boolean>;
+                                length({ name }: {
+                                    name: Atom<string>;
+                                }): Atom<boolean>;
+                            };
+                        };
+                        type: {
+                            type: "string";
+                            required: true;
+                            collection: false;
+                            options: PropertyTypes[];
+                        };
+                        collection: {
+                            type: "boolean";
+                            required: true;
+                            collection: false;
+                            defaultValue(): boolean;
+                        };
+                        args: {
+                            computedType: (values: {
+                                type: PropertyTypes;
+                            }) => string;
+                        };
+                        computedData: {
+                            collection: false;
+                            type: Klass<any>[];
+                            required: false;
+                        };
+                        computed: {
+                            required: false;
+                            type: "function";
+                            collection: false;
+                        };
+                    }>;
+                    collection: true;
+                    required: true;
+                    constraints: {
+                        eachNameUnique({ properties }: any): Atom<boolean>;
+                    };
+                    defaultValue(): never[];
+                };
+                isRef: {
+                    required: true;
+                    collection: false;
+                    type: "boolean";
+                    defaultValue: () => boolean;
+                };
+            }> | Klass<RelationPublic>)[];
+            collection: false;
+            required: true;
+        };
+        content: {
+            type: "function";
+            collection: false;
+            required: true;
+        };
     }>>>;
     // (undocumented)
     relations: KlassInstance<typeof Relation, false>[];
@@ -1548,77 +1549,77 @@ export const EVENT_RECORD = "_Event_";
 
 // @public (undocumented)
 export const eventEntity: InertKlassInstance<    {
-name: {
-type: "string";
-collection: false;
-required: true;
-constraints: {
-nameFormat({ name }: {
-name: Atom<string>;
-}): Atom<boolean>;
-};
-};
-computedData: {
-type: Klass<any>[];
-collection: false;
-required: false;
-};
-properties: {
-type: Klass<    {
-name: {
-type: "string";
-required: true;
-collection: false;
-constraints: {
-format({ name }: {
-name: Atom<string>;
-}): Atom<boolean>;
-length({ name }: {
-name: Atom<string>;
-}): Atom<boolean>;
-};
-};
-type: {
-type: "string";
-required: true;
-collection: false;
-options: PropertyTypes[];
-};
-collection: {
-type: "boolean";
-required: true;
-collection: false;
-defaultValue(): boolean;
-};
-args: {
-computedType: (values: {
-type: PropertyTypes;
-}) => string;
-};
-computedData: {
-collection: false;
-type: Klass<any>[];
-required: false;
-};
-computed: {
-required: false;
-type: "function";
-collection: false;
-};
-}>;
-collection: true;
-required: true;
-constraints: {
-eachNameUnique({ properties }: any): Atom<boolean>;
-};
-defaultValue(): never[];
-};
-isRef: {
-required: true;
-collection: false;
-type: "boolean";
-defaultValue: () => boolean;
-};
+    name: {
+        type: "string";
+        collection: false;
+        required: true;
+        constraints: {
+            nameFormat({ name }: {
+                name: Atom<string>;
+            }): Atom<boolean>;
+        };
+    };
+    computedData: {
+        type: Klass<any>[];
+        collection: false;
+        required: false;
+    };
+    properties: {
+        type: Klass<    {
+            name: {
+                type: "string";
+                required: true;
+                collection: false;
+                constraints: {
+                    format({ name }: {
+                        name: Atom<string>;
+                    }): Atom<boolean>;
+                    length({ name }: {
+                        name: Atom<string>;
+                    }): Atom<boolean>;
+                };
+            };
+            type: {
+                type: "string";
+                required: true;
+                collection: false;
+                options: PropertyTypes[];
+            };
+            collection: {
+                type: "boolean";
+                required: true;
+                collection: false;
+                defaultValue(): boolean;
+            };
+            args: {
+                computedType: (values: {
+                    type: PropertyTypes;
+                }) => string;
+            };
+            computedData: {
+                collection: false;
+                type: Klass<any>[];
+                required: false;
+            };
+            computed: {
+                required: false;
+                type: "function";
+                collection: false;
+            };
+        }>;
+        collection: true;
+        required: true;
+        constraints: {
+            eachNameUnique({ properties }: any): Atom<boolean>;
+        };
+        defaultValue(): never[];
+    };
+    isRef: {
+        required: true;
+        collection: false;
+        type: "boolean";
+        defaultValue: () => boolean;
+    };
 }>;
 
 // @public (undocumented)
@@ -1729,7 +1730,16 @@ export const Every: Klass<    {
 }>;
 
 // @public (undocumented)
+export function everyAsync<T>(items: T[], check: (arg: T) => Promise<boolean>): Promise<boolean>;
+
+// @public (undocumented)
+export function everyWithErrorAsync<T, U>(items: T[], check: (arg: T) => Promise<true | U>): Promise<true | U>;
+
+// @public (undocumented)
 export type ExpressionData<T> = BoolExpressionRawData<T> | AtomData<T>;
+
+// @public (undocumented)
+export function filterMap(map: Map<any, any>, handle: (key: any, value: any) => boolean): Map<any, boolean>;
 
 // @public (undocumented)
 export function findRootActivity(interaction: InteractionInstanceType): ActivityInstanceType | null;
@@ -1786,6 +1796,9 @@ export type GroupNode = {
 
 // @public (undocumented)
 export const ID_ATTR = "id";
+
+// @public (undocumented)
+export function indexBy(arr: any[], key: string): any;
 
 // @public (undocumented)
 export type InertKlassInstance<T extends NonNullable<KlassMeta["public"]>> = InertKlassInstanceProps<T> & KlassInstancePrimitiveProps;
@@ -2134,6 +2147,11 @@ export const MapInteractionItem: Klass<    {
 }>;
 
 // @public (undocumented)
+export function mapObject(a: object, fn: (k: string, v: any) => any): {
+    [k: string]: any;
+};
+
+// @public (undocumented)
 export const MapRecordMutation: Klass<    {
     map: {
         type: "function";
@@ -2170,7 +2188,7 @@ export class MonoSystem implements System {
     updateActivity(match: MatchExpressionData, activity: any): Promise<any>;
 }
 
-export { MutationEvent_2 as MutationEvent }
+export { MutationEvent }
 
 // @public (undocumented)
 export class MysqlDB implements Database {
@@ -3331,9 +3349,7 @@ export const SideEffect: Klass<{
 
 // @public (undocumented)
 export class SQLiteDB implements Database {
-    constructor(file?: string, options?: (SQLite.Options & {
-        logger: DatabaseLogger;
-    }) | undefined);
+    constructor(file?: string, options?: SQLiteDBOptions | undefined);
     // (undocumented)
     close(): void;
     // (undocumented)
@@ -3357,9 +3373,7 @@ export class SQLiteDB implements Database {
     // (undocumented)
     open(): Promise<void>;
     // (undocumented)
-    options?: (SQLite.Options & {
-        logger: DatabaseLogger;
-    }) | undefined;
+    options?: SQLiteDBOptions | undefined;
     // (undocumented)
     parseMatchExpression(key: string, value: [string, string], fieldName: string, fieldType: string, isReferenceValue: boolean, getReferenceFieldValue: (v: string) => string, p: () => string): {
         fieldValue: string;
@@ -3635,77 +3649,77 @@ export type SystemCallback = (...arg: any[]) => any;
 
 // @public (undocumented)
 export const systemEntity: InertKlassInstance<    {
-name: {
-type: "string";
-collection: false;
-required: true;
-constraints: {
-nameFormat({ name }: {
-name: Atom<string>;
-}): Atom<boolean>;
-};
-};
-computedData: {
-type: Klass<any>[];
-collection: false;
-required: false;
-};
-properties: {
-type: Klass<    {
-name: {
-type: "string";
-required: true;
-collection: false;
-constraints: {
-format({ name }: {
-name: Atom<string>;
-}): Atom<boolean>;
-length({ name }: {
-name: Atom<string>;
-}): Atom<boolean>;
-};
-};
-type: {
-type: "string";
-required: true;
-collection: false;
-options: PropertyTypes[];
-};
-collection: {
-type: "boolean";
-required: true;
-collection: false;
-defaultValue(): boolean;
-};
-args: {
-computedType: (values: {
-type: PropertyTypes;
-}) => string;
-};
-computedData: {
-collection: false;
-type: Klass<any>[];
-required: false;
-};
-computed: {
-required: false;
-type: "function";
-collection: false;
-};
-}>;
-collection: true;
-required: true;
-constraints: {
-eachNameUnique({ properties }: any): Atom<boolean>;
-};
-defaultValue(): never[];
-};
-isRef: {
-required: true;
-collection: false;
-type: "boolean";
-defaultValue: () => boolean;
-};
+    name: {
+        type: "string";
+        collection: false;
+        required: true;
+        constraints: {
+            nameFormat({ name }: {
+                name: Atom<string>;
+            }): Atom<boolean>;
+        };
+    };
+    computedData: {
+        type: Klass<any>[];
+        collection: false;
+        required: false;
+    };
+    properties: {
+        type: Klass<    {
+            name: {
+                type: "string";
+                required: true;
+                collection: false;
+                constraints: {
+                    format({ name }: {
+                        name: Atom<string>;
+                    }): Atom<boolean>;
+                    length({ name }: {
+                        name: Atom<string>;
+                    }): Atom<boolean>;
+                };
+            };
+            type: {
+                type: "string";
+                required: true;
+                collection: false;
+                options: PropertyTypes[];
+            };
+            collection: {
+                type: "boolean";
+                required: true;
+                collection: false;
+                defaultValue(): boolean;
+            };
+            args: {
+                computedType: (values: {
+                    type: PropertyTypes;
+                }) => string;
+            };
+            computedData: {
+                collection: false;
+                type: Klass<any>[];
+                required: false;
+            };
+            computed: {
+                required: false;
+                type: "function";
+                collection: false;
+            };
+        }>;
+        collection: true;
+        required: true;
+        constraints: {
+            eachNameUnique({ properties }: any): Atom<boolean>;
+        };
+        defaultValue(): never[];
+    };
+    isRef: {
+        required: true;
+        collection: false;
+        type: "boolean";
+        defaultValue: () => boolean;
+    };
 }>;
 
 // @public (undocumented)
@@ -3859,9 +3873,9 @@ export const WeightedSummation: Klass<    {
 
 // Warnings were encountered during analysis:
 //
-// node_modules/@interaqt/shared/dist/index.d.ts:24:9 - (ae-forgotten-export) The symbol "UnwrappedActivityInstanceType" needs to be exported by the entry point index.d.ts
-// node_modules/@interaqt/shared/dist/index.d.ts:287:9 - (ae-forgotten-export) The symbol "CommonAtomPublic" needs to be exported by the entry point index.d.ts
-// node_modules/@interaqt/shared/dist/index.d.ts:1440:9 - (ae-forgotten-export) The symbol "ClassMetaPublicItem" needs to be exported by the entry point index.d.ts
+// index.ts:13:55 - (ae-forgotten-export) The symbol "UnwrappedActivityInstanceType" needs to be exported by the entry point index.d.ts
+// index.ts:13:55 - (ae-forgotten-export) The symbol "CommonAtomPublic" needs to be exported by the entry point index.d.ts
+// index.ts:13:55 - (ae-forgotten-export) The symbol "ClassMetaPublicItem" needs to be exported by the entry point index.d.ts
 
 // (No @packageDocumentation comment for this package)
 
