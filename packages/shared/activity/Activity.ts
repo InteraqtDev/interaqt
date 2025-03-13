@@ -19,7 +19,7 @@ export const Action = createClass({
 
 
 // CAUTION 全局唯一的 GET 交互。
-export const GetAction = new Action({ name: 'get'})
+export const GetAction = new Action({ name: 'get'}, {isReactive: false})
 
 
 export const PayloadItem = createClass({

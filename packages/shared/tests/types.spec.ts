@@ -14,7 +14,8 @@ import {
     InteractionPublicType,
     Transfer,
     TransferInstanceType,
-    TransferPublicType
+    TransferPublicType,
+    GetAction
 } from "../activity/Activity.js";
 
 
@@ -86,6 +87,10 @@ describe("createClass types", () => {
 
         assertType<any[]>(testEntity.properties)
         assertType<typeof testEntity.properties>([] as any[])
+    })
+
+    test('get action type', () => {
+        assertType<typeof GetAction>( {} as unknown as InertKlassInstance<{name: {type: 'string', required: true}}>)
     })
 })
 
