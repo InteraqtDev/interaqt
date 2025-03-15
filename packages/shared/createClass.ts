@@ -171,8 +171,10 @@ export type ReactiveKlassInstanceProps<T extends NonNullable<KlassMeta["public"]
 export type ReactiveKlassInstance<T extends NonNullable<KlassMeta["public"]>> = ReactiveKlassInstanceProps<T> &  KlassInstancePrimitiveProps
 
 export type Klass<T extends NonNullable<KlassMeta["public"]>> = {
-    new<U extends KlassOptions|ReactiveKlassOptions>(arg: object, options?: U) : U extends ReactiveKlassOptions ? ReactiveKlassInstance<T> : InertKlassInstance<T>,
-    create: (arg: KlassInstanceArgs<T>, options?: KlassOptions) => InertKlassInstance<T>,
+    new<O extends KlassOptions | ReactiveKlassOptions | undefined>(arg: object, options?: O): 
+        O extends { isReactive: true } ? ReactiveKlassInstance<T> : InertKlassInstance<T>,
+    create<O extends KlassOptions | ReactiveKlassOptions | undefined>(arg: KlassInstanceArgs<T>, options?: O): 
+        O extends { isReactive: true } ? ReactiveKlassInstance<T> : InertKlassInstance<T>,
     createReactive: (arg: KlassInstanceArgs<T>, options?: KlassOptions) => ReactiveKlassInstance<T>,
     displayName: string,
     isKlass: true,
@@ -348,8 +350,11 @@ export function createClass<T extends KlassMeta>(metadata: T) : Klass<T['public'
 
     if (KlassByName.get(metadata.name)) throw new Error(`Class name must be global unique. ${metadata.name}`)
 
-    function create(fieldValues: InertKlassInstance<T["public"]>, options?: KlassOptions): InertKlassInstance<typeof metadata.public> {
-        return new KlassClass(rawStructureClone(fieldValues), options) as unknown as InertKlassInstance<typeof metadata.public>
+    function create<O extends KlassOptions | ReactiveKlassOptions | undefined>(fieldValues: InertKlassInstance<T["public"]>, options?: O): O extends { isReactive: true } ? ReactiveKlassInstance<typeof metadata.public> : InertKlassInstance<typeof metadata.public> {
+        if (options?.isReactive === true) {
+            return new KlassClass(rawStructureClone(fieldValues), options) as any;
+        }
+        return new KlassClass(rawStructureClone(fieldValues), options) as unknown as InertKlassInstance<typeof metadata.public>;
     }
 
     function createReactive(fieldValues: InertKlassInstance<T["public"]>, options?: KlassOptions) : ReactiveKlassInstance<typeof metadata.public>{

@@ -1,6 +1,6 @@
 import {assertType, describe, test} from "vitest";
 import {Entity, Relation} from "../entity/Entity.js";
-import {createClass, InertKlassInstance, Klass, KlassInstance, KlassProp} from "../createClass.js";
+import {createClass, InertKlassInstance, Klass, KlassInstance, KlassProp, ReactiveKlassInstance} from "../createClass.js";
 import {BoolAtomData, BoolExpressionData} from "../BoolExp.js";
 import {
     ActivityGroup,
@@ -87,6 +87,23 @@ describe("createClass types", () => {
 
         assertType<any[]>(testEntity.properties)
         assertType<typeof testEntity.properties>([] as any[])
+    })
+
+    test('create ReactiveKlassInstance and InkertKlassType', () => {
+        const NewClassType = createClass({
+            name: 'NewClass',
+            public: {
+                name: {type: 'string', required: true},
+            }
+        })
+        
+        const i1 = NewClassType.create({name: 'get'}, {isReactive: true})
+        const i2 = NewClassType.create({name: 'get'}, {isReactive: false})
+        const i3 = NewClassType.create({name: 'get'})
+        
+        assertType<ReactiveKlassInstance<{name: {type: 'string', required: true}}>>(i1)
+        assertType<InertKlassInstance<{name: {type: 'string', required: true}}>>(i2)
+        assertType<InertKlassInstance<{name: {type: 'string', required: true}}>>(i3)
     })
 
     test('get action type', () => {
