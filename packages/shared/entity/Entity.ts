@@ -23,6 +23,10 @@ type PropertyPublic = {
         required: true,
         options: () => string[]
     },
+    collection: {
+        type: 'boolean',
+        required: false,
+    },
     defaultValue: {
         type: 'function',
         required: false,
