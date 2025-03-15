@@ -1,4 +1,3 @@
-import {computed} from 'data0'
 import {createClass, Klass} from "../createClass.js";
 import {PropertyTypes} from "../entity/Entity.js";
 const validNameFormatExp = /^[a-zA-Z0-9_]+$/
@@ -13,10 +12,10 @@ export const State = createClass({
             collection: false,
             constraints: {
                 format({name}: { name: any }) {
-                    return computed(() => validNameFormatExp.test(name))
+                    return validNameFormatExp.test(name)
                 },
                 length({name}: { name: any }) {
-                    return computed(() => name.length > 1 && name.length < 5)
+                    return name.length > 1 && name.length < 5
                 }
             }
         },
