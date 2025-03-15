@@ -88,6 +88,10 @@ export const Property: Klass<PropertyPublic> = createClass({
             required: true,
             options: () => Object.values(PropertyTypes)
         },
+        collection: {
+            type: 'boolean',
+            required: false,
+        },
         // 这个是 property 的值
         defaultValue: {
             type: 'function',
