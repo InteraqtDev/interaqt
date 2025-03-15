@@ -35,7 +35,79 @@ export const Activity: Klass<ActivityPublicType>;
 export const ACTIVITY_RECORD = "_Activity_";
 
 // @public (undocumented)
-export const activityEntity: InertKlassInstance<    {
+export const activityEntity: ReactiveKlassInstance<    {
+name: {
+type: "string";
+collection: false;
+required: true;
+constraints: {
+nameFormat({ name }: {
+name: Atom<string>;
+}): Atom<boolean>;
+};
+};
+computedData: {
+type: Klass<any>[];
+collection: false;
+required: false;
+};
+properties: {
+type: Klass<    {
+name: {
+type: "string";
+required: true;
+collection: false;
+constraints: {
+format({ name }: {
+name: Atom<string>;
+}): Atom<boolean>;
+length({ name }: {
+name: Atom<string>;
+}): Atom<boolean>;
+};
+};
+type: {
+type: "string";
+required: true;
+collection: false;
+options: PropertyTypes[];
+};
+collection: {
+type: "boolean";
+required: true;
+collection: false;
+defaultValue(): boolean;
+};
+args: {
+computedType: (values: {
+type: PropertyTypes;
+}) => string;
+};
+computedData: {
+collection: false;
+type: Klass<any>[];
+required: false;
+};
+computed: {
+required: false;
+type: "function";
+collection: false;
+};
+}>;
+collection: true;
+required: true;
+constraints: {
+eachNameUnique({ properties }: any): Atom<boolean>;
+};
+defaultValue(): never[];
+};
+isRef: {
+required: true;
+collection: false;
+type: "boolean";
+defaultValue: () => boolean;
+};
+}> | InertKlassInstance<    {
 name: {
 type: "string";
 collection: false;
@@ -599,6 +671,108 @@ export function boolExpToAttributives(obj: BoolExp<KlassInstance<typeof Attribut
         collection: false;
         required: false;
     };
+}> | ReactiveKlassInstance<    {
+    content: {
+        type: (Klass<    {
+            type: {
+                type: "string";
+                required: true;
+                collection: false;
+                defaultValue: () => string;
+            };
+            data: {
+                instanceType: ReactiveKlassInstance<    {
+                    content: {
+                        type: "function";
+                        required: true;
+                        collection: false;
+                    };
+                }> | InertKlassInstance<    {
+                    content: {
+                        type: "function";
+                        required: true;
+                        collection: false;
+                    };
+                }>;
+                required: true;
+                collection: false;
+            };
+        }> | Klass<    {
+            type: {
+                type: "string";
+                required: true;
+                collection: false;
+                defaultValue: () => string;
+            };
+            operator: {
+                type: "string";
+                required: true;
+                collection: false;
+                options: string[];
+                defaultValue: () => string;
+            };
+            left: {
+                instanceType: InertKlassInstance<    {
+                    type: {
+                        type: "string";
+                        required: true;
+                        collection: false;
+                        defaultValue: () => string;
+                    };
+                    data: {
+                        instanceType: ReactiveKlassInstance<    {
+                            content: {
+                                type: "function";
+                                required: true;
+                                collection: false;
+                            };
+                        }> | InertKlassInstance<    {
+                            content: {
+                                type: "function";
+                                required: true;
+                                collection: false;
+                            };
+                        }>;
+                        required: true;
+                        collection: false;
+                    };
+                }> | UnwrappedBoolExpressionInstanceType<any>;
+                required: true;
+                collection: false;
+            };
+            right: {
+                instanceType: InertKlassInstance<    {
+                    type: {
+                        type: "string";
+                        required: true;
+                        collection: false;
+                        defaultValue: () => string;
+                    };
+                    data: {
+                        instanceType: ReactiveKlassInstance<    {
+                            content: {
+                                type: "function";
+                                required: true;
+                                collection: false;
+                            };
+                        }> | InertKlassInstance<    {
+                            content: {
+                                type: "function";
+                                required: true;
+                                collection: false;
+                            };
+                        }>;
+                        required: true;
+                        collection: false;
+                    };
+                }> | UnwrappedBoolExpressionInstanceType<any>;
+                required: false;
+                collection: false;
+            };
+        }>)[];
+        collection: false;
+        required: false;
+    };
 }>;
 
 // @public (undocumented)
@@ -704,10 +878,214 @@ export function boolExpToConditions(obj: BoolExp<KlassInstance<typeof Condition,
         collection: false;
         required: false;
     };
+}> | ReactiveKlassInstance<    {
+    content: {
+        type: (Klass<    {
+            type: {
+                type: "string";
+                required: true;
+                collection: false;
+                defaultValue: () => string;
+            };
+            data: {
+                instanceType: ReactiveKlassInstance<    {
+                    content: {
+                        type: "function";
+                        required: true;
+                        collection: false;
+                    };
+                }> | InertKlassInstance<    {
+                    content: {
+                        type: "function";
+                        required: true;
+                        collection: false;
+                    };
+                }>;
+                required: true;
+                collection: false;
+            };
+        }> | Klass<    {
+            type: {
+                type: "string";
+                required: true;
+                collection: false;
+                defaultValue: () => string;
+            };
+            operator: {
+                type: "string";
+                required: true;
+                collection: false;
+                options: string[];
+                defaultValue: () => string;
+            };
+            left: {
+                instanceType: InertKlassInstance<    {
+                    type: {
+                        type: "string";
+                        required: true;
+                        collection: false;
+                        defaultValue: () => string;
+                    };
+                    data: {
+                        instanceType: ReactiveKlassInstance<    {
+                            content: {
+                                type: "function";
+                                required: true;
+                                collection: false;
+                            };
+                        }> | InertKlassInstance<    {
+                            content: {
+                                type: "function";
+                                required: true;
+                                collection: false;
+                            };
+                        }>;
+                        required: true;
+                        collection: false;
+                    };
+                }> | UnwrappedBoolExpressionInstanceType<any>;
+                required: true;
+                collection: false;
+            };
+            right: {
+                instanceType: InertKlassInstance<    {
+                    type: {
+                        type: "string";
+                        required: true;
+                        collection: false;
+                        defaultValue: () => string;
+                    };
+                    data: {
+                        instanceType: ReactiveKlassInstance<    {
+                            content: {
+                                type: "function";
+                                required: true;
+                                collection: false;
+                            };
+                        }> | InertKlassInstance<    {
+                            content: {
+                                type: "function";
+                                required: true;
+                                collection: false;
+                            };
+                        }>;
+                        required: true;
+                        collection: false;
+                    };
+                }> | UnwrappedBoolExpressionInstanceType<any>;
+                required: false;
+                collection: false;
+            };
+        }>)[];
+        collection: false;
+        required: false;
+    };
 }>;
 
 // @public (undocumented)
 export function boolExpToDataAttributives(obj: BoolExp<KlassInstance<typeof DataAttributive, false>>): InertKlassInstance<    {
+    content: {
+        type: (Klass<    {
+            type: {
+                type: "string";
+                required: true;
+                collection: false;
+                defaultValue: () => string;
+            };
+            data: {
+                instanceType: ReactiveKlassInstance<    {
+                    content: {
+                        type: "function";
+                        required: true;
+                        collection: false;
+                    };
+                }> | InertKlassInstance<    {
+                    content: {
+                        type: "function";
+                        required: true;
+                        collection: false;
+                    };
+                }>;
+                required: true;
+                collection: false;
+            };
+        }> | Klass<    {
+            type: {
+                type: "string";
+                required: true;
+                collection: false;
+                defaultValue: () => string;
+            };
+            operator: {
+                type: "string";
+                required: true;
+                collection: false;
+                options: string[];
+                defaultValue: () => string;
+            };
+            left: {
+                instanceType: InertKlassInstance<    {
+                    type: {
+                        type: "string";
+                        required: true;
+                        collection: false;
+                        defaultValue: () => string;
+                    };
+                    data: {
+                        instanceType: ReactiveKlassInstance<    {
+                            content: {
+                                type: "function";
+                                required: true;
+                                collection: false;
+                            };
+                        }> | InertKlassInstance<    {
+                            content: {
+                                type: "function";
+                                required: true;
+                                collection: false;
+                            };
+                        }>;
+                        required: true;
+                        collection: false;
+                    };
+                }> | UnwrappedBoolExpressionInstanceType<any>;
+                required: true;
+                collection: false;
+            };
+            right: {
+                instanceType: InertKlassInstance<    {
+                    type: {
+                        type: "string";
+                        required: true;
+                        collection: false;
+                        defaultValue: () => string;
+                    };
+                    data: {
+                        instanceType: ReactiveKlassInstance<    {
+                            content: {
+                                type: "function";
+                                required: true;
+                                collection: false;
+                            };
+                        }> | InertKlassInstance<    {
+                            content: {
+                                type: "function";
+                                required: true;
+                                collection: false;
+                            };
+                        }>;
+                        required: true;
+                        collection: false;
+                    };
+                }> | UnwrappedBoolExpressionInstanceType<any>;
+                required: false;
+                collection: false;
+            };
+        }>)[];
+        collection: false;
+        required: false;
+    };
+}> | ReactiveKlassInstance<    {
     content: {
         type: (Klass<    {
             type: {
@@ -1548,7 +1926,79 @@ export { Event_2 as Event }
 export const EVENT_RECORD = "_Event_";
 
 // @public (undocumented)
-export const eventEntity: InertKlassInstance<    {
+export const eventEntity: ReactiveKlassInstance<    {
+name: {
+type: "string";
+collection: false;
+required: true;
+constraints: {
+nameFormat({ name }: {
+name: Atom<string>;
+}): Atom<boolean>;
+};
+};
+computedData: {
+type: Klass<any>[];
+collection: false;
+required: false;
+};
+properties: {
+type: Klass<    {
+name: {
+type: "string";
+required: true;
+collection: false;
+constraints: {
+format({ name }: {
+name: Atom<string>;
+}): Atom<boolean>;
+length({ name }: {
+name: Atom<string>;
+}): Atom<boolean>;
+};
+};
+type: {
+type: "string";
+required: true;
+collection: false;
+options: PropertyTypes[];
+};
+collection: {
+type: "boolean";
+required: true;
+collection: false;
+defaultValue(): boolean;
+};
+args: {
+computedType: (values: {
+type: PropertyTypes;
+}) => string;
+};
+computedData: {
+collection: false;
+type: Klass<any>[];
+required: false;
+};
+computed: {
+required: false;
+type: "function";
+collection: false;
+};
+}>;
+collection: true;
+required: true;
+constraints: {
+eachNameUnique({ properties }: any): Atom<boolean>;
+};
+defaultValue(): never[];
+};
+isRef: {
+required: true;
+collection: false;
+type: "boolean";
+defaultValue: () => boolean;
+};
+}> | InertKlassInstance<    {
 name: {
 type: "string";
 collection: false;
@@ -1883,8 +2333,12 @@ export type InteractionPublicType = {
 
 // @public (undocumented)
 export type Klass<T extends NonNullable<KlassMeta["public"]>> = {
-    new <U extends KlassOptions | ReactiveKlassOptions>(arg: object, options?: U): U extends ReactiveKlassOptions ? ReactiveKlassInstance<T> : InertKlassInstance<T>;
-    create: (arg: KlassInstanceArgs<T>, options?: KlassOptions) => InertKlassInstance<T>;
+    new <O extends KlassOptions | ReactiveKlassOptions | undefined>(arg: object, options?: O): O extends {
+        isReactive: true;
+    } ? ReactiveKlassInstance<T> : InertKlassInstance<T>;
+    create<O extends KlassOptions | ReactiveKlassOptions | undefined>(arg: KlassInstanceArgs<T>, options?: O): O extends {
+        isReactive: true;
+    } ? ReactiveKlassInstance<T> : InertKlassInstance<T>;
     createReactive: (arg: KlassInstanceArgs<T>, options?: KlassOptions) => ReactiveKlassInstance<T>;
     displayName: string;
     isKlass: true;
@@ -3643,7 +4097,79 @@ export const SYSTEM_RECORD = "_System_";
 export type SystemCallback = (...arg: any[]) => any;
 
 // @public (undocumented)
-export const systemEntity: InertKlassInstance<    {
+export const systemEntity: ReactiveKlassInstance<    {
+name: {
+type: "string";
+collection: false;
+required: true;
+constraints: {
+nameFormat({ name }: {
+name: Atom<string>;
+}): Atom<boolean>;
+};
+};
+computedData: {
+type: Klass<any>[];
+collection: false;
+required: false;
+};
+properties: {
+type: Klass<    {
+name: {
+type: "string";
+required: true;
+collection: false;
+constraints: {
+format({ name }: {
+name: Atom<string>;
+}): Atom<boolean>;
+length({ name }: {
+name: Atom<string>;
+}): Atom<boolean>;
+};
+};
+type: {
+type: "string";
+required: true;
+collection: false;
+options: PropertyTypes[];
+};
+collection: {
+type: "boolean";
+required: true;
+collection: false;
+defaultValue(): boolean;
+};
+args: {
+computedType: (values: {
+type: PropertyTypes;
+}) => string;
+};
+computedData: {
+collection: false;
+type: Klass<any>[];
+required: false;
+};
+computed: {
+required: false;
+type: "function";
+collection: false;
+};
+}>;
+collection: true;
+required: true;
+constraints: {
+eachNameUnique({ properties }: any): Atom<boolean>;
+};
+defaultValue(): never[];
+};
+isRef: {
+required: true;
+collection: false;
+type: "boolean";
+defaultValue: () => boolean;
+};
+}> | InertKlassInstance<    {
 name: {
 type: "string";
 collection: false;
@@ -3870,7 +4396,7 @@ export const WeightedSummation: Klass<    {
 //
 // node_modules/@interaqt/shared/dist/index.d.ts:24:9 - (ae-forgotten-export) The symbol "UnwrappedActivityInstanceType" needs to be exported by the entry point index.d.ts
 // node_modules/@interaqt/shared/dist/index.d.ts:287:9 - (ae-forgotten-export) The symbol "CommonAtomPublic" needs to be exported by the entry point index.d.ts
-// node_modules/@interaqt/shared/dist/index.d.ts:1435:9 - (ae-forgotten-export) The symbol "ClassMetaPublicItem" needs to be exported by the entry point index.d.ts
+// node_modules/@interaqt/shared/dist/index.d.ts:1745:9 - (ae-forgotten-export) The symbol "ClassMetaPublicItem" needs to be exported by the entry point index.d.ts
 
 // (No @packageDocumentation comment for this package)
 
