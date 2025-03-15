@@ -1,21 +1,21 @@
-import {computed, Atom} from 'data0'
+import {computed} from 'data0'
 import {createClass, Klass} from "../createClass.js";
-import { PropertyTypeMap, PropertyTypes} from "../entity/Entity.js";
+import {PropertyTypes} from "../entity/Entity.js";
 const validNameFormatExp = /^[a-zA-Z0-9_]+$/
 
 export const State = createClass({
     name: 'State',
-    display: (obj) => obj.name,
+    display: (obj: any) => obj.name,
     public: {
         name: {
             type: 'string',
             required: true,
             collection: false,
             constraints: {
-                format({name}: { name: Atom<string> }) {
+                format({name}: { name: any }) {
                     return computed(() => validNameFormatExp.test(name))
                 },
-                length({name}: { name: Atom<string> }) {
+                length({name}: { name: any }) {
                     return computed(() => name.length > 1 && name.length < 5)
                 }
             }
@@ -38,7 +38,9 @@ export const State = createClass({
         },
         args: {
             // TODO 怎么表达 args？？需要根据不同的 type 类型构建。例如 string 长度，number 范围。
-            computedType: (values: { type: PropertyTypes }) => PropertyTypeMap[values.type],
+            type: 'object',
+            required: false,
+            collection: false,
         },
         computedData: {
             collection: false,

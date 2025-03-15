@@ -30,17 +30,17 @@ export const Conditions = createClass({
     }
 })
 
-function toConditions(obj?: BoolExp<KlassInstance<typeof Condition, false>>): KlassInstance<typeof BoolAtomData, false>|KlassInstance<typeof BoolExpressionData, false>|undefined {
+function toConditions(obj?: BoolExp<KlassInstance<typeof Condition>>): KlassInstance<typeof BoolAtomData>|KlassInstance<typeof BoolExpressionData>|undefined {
     if (!obj) return undefined
 
     if (obj.raw.type === 'atom') {
         return BoolAtomData.create({
             type: 'atom',
-            data: obj.raw.data!
+            data: obj.raw.data
         })
     }
 
-    const expData = obj.raw as BoolExpressionRawData<KlassInstance<typeof Condition, false>>
+    const expData = obj.raw as BoolExpressionRawData<KlassInstance<typeof Condition>>
     return BoolExpressionData.create({
         type: 'expression',
         operator: expData.operator,
@@ -50,8 +50,8 @@ function toConditions(obj?: BoolExp<KlassInstance<typeof Condition, false>>): Kl
 }
 
 
-export function boolExpToConditions(obj: BoolExp<KlassInstance<typeof Condition, false>>) {
+export function boolExpToConditions(obj: BoolExp<KlassInstance<typeof Condition>>) {
     return Conditions.create({
-        content: toConditions(obj) as KlassInstance<typeof BoolExpressionData, false>
+        content: toConditions(obj) as KlassInstance<typeof BoolExpressionData>
     })
 }

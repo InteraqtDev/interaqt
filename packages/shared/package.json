@@ -17,12 +17,10 @@
     "type": "api-extractor run",
     "release": "node scripts/release.js",
     "build-all": "npm run build && npm run type",
-    "test": "vitest",
-    "test:run": "vitest run"
+    "test": "vitest run"
   },
   "dependencies": {
-    "acorn": "^8.10.0",
-    "data0": "^1.0.0"
+    "acorn": "^8.10.0"
   },
   "types": "./dist/index.d.ts",
   "exports": {

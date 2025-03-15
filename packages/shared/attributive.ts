@@ -59,17 +59,17 @@ export const Attributives = createClass({
     }
 })
 
-function toAttributives(obj?: BoolExp<KlassInstance<typeof Attributive, false>>): KlassInstance<typeof BoolAtomData, false>|KlassInstance<typeof BoolExpressionData, false>|undefined {
+function toAttributives(obj?: BoolExp<KlassInstance<typeof Attributive>>): KlassInstance<typeof BoolAtomData>|KlassInstance<typeof BoolExpressionData>|undefined {
     if (!obj) return undefined
 
     if (obj.raw.type === 'atom') {
         return BoolAtomData.create({
             type: 'atom',
-            data: obj.raw.data!
+            data: obj.raw.data
         })
     }
 
-    const expData = obj.raw as BoolExpressionRawData<KlassInstance<typeof Attributive, false>>
+    const expData = obj.raw as BoolExpressionRawData<KlassInstance<typeof Attributive>>
     return BoolExpressionData.create({
         type: 'expression',
         operator: expData.operator,
@@ -79,9 +79,9 @@ function toAttributives(obj?: BoolExp<KlassInstance<typeof Attributive, false>>)
 }
 
 
-export function boolExpToAttributives(obj: BoolExp<KlassInstance<typeof Attributive, false>>) {
+export function boolExpToAttributives(obj: BoolExp<KlassInstance<typeof Attributive>>) {
     return Attributives.create({
-        content: toAttributives(obj) as KlassInstance<typeof BoolExpressionData, false>
+        content: toAttributives(obj) as KlassInstance<typeof BoolExpressionData>
     })
 }
 

@@ -50,7 +50,7 @@ export const Query = createClass({
     name: 'Query',
     public: {
         items: {
-            type: [QueryItem],
+            type: QueryItem,
             required: true,
             collection: true,
         }
@@ -73,7 +73,7 @@ export const Computation = createClass({
 })
 
 
-function toDataAttributives(obj?: BoolExp<KlassInstance<typeof DataAttributive, false>>): KlassInstance<typeof BoolAtomData, false>|KlassInstance<typeof BoolExpressionData, false>|undefined {
+function toDataAttributives(obj?: BoolExp<KlassInstance<typeof DataAttributive>>): KlassInstance<typeof BoolAtomData>|KlassInstance<typeof BoolExpressionData>|undefined {
     if (!obj) return undefined
 
     if (obj.raw.type === 'atom') {
@@ -83,7 +83,7 @@ function toDataAttributives(obj?: BoolExp<KlassInstance<typeof DataAttributive, 
         })
     }
 
-    const expData = obj.raw as BoolExpressionRawData<KlassInstance<typeof DataAttributive, false>>
+    const expData = obj.raw as BoolExpressionRawData<KlassInstance<typeof DataAttributive>>
     return BoolExpressionData.create({
         type: 'expression',
         operator: expData.operator,
@@ -93,9 +93,9 @@ function toDataAttributives(obj?: BoolExp<KlassInstance<typeof DataAttributive, 
 }
 
 
-export function boolExpToDataAttributives(obj: BoolExp<KlassInstance<typeof DataAttributive, false>>) {
+export function boolExpToDataAttributives(obj: BoolExp<KlassInstance<typeof DataAttributive>>) {
     return DataAttributives.create({
-        content: toDataAttributives(obj) as KlassInstance<typeof BoolExpressionData, false>
+        content: toDataAttributives(obj) as KlassInstance<typeof BoolExpressionData>
     })
 }
 

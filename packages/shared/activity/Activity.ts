@@ -19,7 +19,7 @@ export const Action = createClass({
 
 
 // CAUTION 全局唯一的 GET 交互。
-export const GetAction = new Action({ name: 'get'}, {isReactive: false})
+export const GetAction = new Action({ name: 'get'})
 
 
 export const PayloadItem = createClass({
@@ -130,8 +130,8 @@ export type InteractionPublicType = {
     // 副作用
     sideEffects: {
         type: typeof SideEffect,
-        collection: true
-        defaultValue: (...args: any[]) => KlassInstance<typeof SideEffect, any>[]
+        collection: true,
+        defaultValue: (...args: any[]) => KlassInstance<typeof SideEffect>[]
     },
     dataAttributives: {
       required: false,
@@ -152,7 +152,7 @@ export type InteractionPublicType = {
 
 export const Interaction: Klass<InteractionPublicType> = createClass({
     name:'Interaction',
-    display: (interaction: KlassInstance<Klass<InteractionPublicType>, false>) => `${interaction.action.name}`,
+    display: (interaction: KlassInstance<Klass<InteractionPublicType>>) => `${interaction.action.name}`,
     public: {
         name: {
             type: 'string',
@@ -249,28 +249,28 @@ type ActivityPublicType = {
     interactions: {
         type: Klass<InteractionPublicType>,
         collection :true,
-        defaultValue: (...args: any[]) => KlassInstance<Klass<InteractionPublicType>, any>[]
+        defaultValue: (...args: any[]) => KlassInstance<Klass<InteractionPublicType>>[]
     },
 
     transfers: {
         type: Klass<TransferPublicType>
         collection: true
-        defaultValue: (...args: any[]) => KlassInstance<Klass<TransferPublicType>, any>[]
+        defaultValue: (...args: any[]) => KlassInstance<Klass<TransferPublicType>>[]
     },
     groups: {
         type: Klass<ActivityGroupPublicType>,
         collection: true
-        defaultValue: (...args: any[]) => KlassInstance<Klass<ActivityGroupPublicType>, any>[]
+        defaultValue: (...args: any[]) => KlassInstance<Klass<ActivityGroupPublicType>>[]
     },
     gateways: {
         type: Klass<GatewayPublicType>
         collection: true
-        defaultValue: (...args: any[]) => KlassInstance<Klass<GatewayPublicType>, any>[]
+        defaultValue: (...args: any[]) => KlassInstance<Klass<GatewayPublicType>>[]
     },
     events: {
         type: typeof Event,
         collection: true
-        defaultValue: (...args: any[]) => KlassInstance<typeof Event, any>[]
+        defaultValue: (...args: any[]) => KlassInstance<typeof Event>[]
     }
 } 
 
@@ -283,11 +283,11 @@ type ActivityPublicType = {
 
 type UnwrappedActivityInstanceType = {
     name: string,
-    interactions: KlassInstance<Klass<InteractionPublicType>, any>[]
-    transfers: KlassInstance<Klass<TransferPublicType>, any>[]
-    groups: KlassInstance<Klass<ActivityGroupPublicType>, any>[]
-    gateways: KlassInstance<Klass<GatewayPublicType>, any>[]
-    events: KlassInstance<typeof Event, any>[]
+    interactions: KlassInstance<Klass<InteractionPublicType>>[]
+    transfers: KlassInstance<Klass<TransferPublicType>>[]
+    groups: KlassInstance<Klass<ActivityGroupPublicType>>[]
+    gateways: KlassInstance<Klass<GatewayPublicType>>[]
+    events: KlassInstance<typeof Event>[]
 } & KlassInstancePrimitiveProps
 
 export type ActivityGroupPublicType = {
@@ -420,11 +420,11 @@ Activity.public.transfers.type = Transfer
 Activity.public.groups.type = ActivityGroup
 
 
-export type ActivityInstanceType = KlassInstance<typeof Activity, false>
-export type ActivityGroupInstanceType = KlassInstance<Klass<ActivityGroupPublicType>, false>
-export type InteractionInstanceType = KlassInstance<typeof Interaction, false>
-export type GatewayInstanceType = KlassInstance<typeof Gateway, false>
-export type TransferInstanceType = KlassInstance<typeof Transfer, false>
+export type ActivityInstanceType = KlassInstance<typeof Activity>
+export type ActivityGroupInstanceType = KlassInstance<Klass<ActivityGroupPublicType>>
+export type InteractionInstanceType = KlassInstance<typeof Interaction>
+export type GatewayInstanceType = KlassInstance<typeof Gateway>
+export type TransferInstanceType = KlassInstance<typeof Transfer>
 
 
 export function forEachInteraction(activity: ActivityInstanceType, handle:(i:InteractionInstanceType, g?: ActivityGroupInstanceType) => any, parenGroup?: ActivityGroupInstanceType) {

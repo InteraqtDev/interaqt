@@ -1,6 +1,4 @@
-import {Atom, computed, incPick, incUnique} from 'data0'
-import {createClass, getInstance, Klass, KlassInstance} from "../createClass.js";
-
+import {createClass, getInstance, Klass} from "../createClass.js";
 
 export enum PropertyTypes {
     String = 'string',
@@ -8,179 +6,199 @@ export enum PropertyTypes {
     Boolean = 'boolean',
 }
 
-
 const validNameFormatExp = /^[a-zA-Z0-9_]+$/
 
+// Define types for Property, Entity, and Relation to avoid circular references
+type PropertyPublic = {
+    name: {
+        type: 'string',
+        required: true,
+        constraints: {
+            format: (arg: { name: string }) => boolean,
+            length: (arg: { name: string }) => boolean
+        }
+    },
+    type: {
+        type: 'string',
+        required: true,
+        options: () => string[]
+    },
+    defaultValue: {
+        type: 'function',
+        required: false,
+    },
+    computedType: {
+        type: 'function',
+        required: false,
+    },
+    computedData: {
+        type: Klass<any>[],
+        collection: false,
+        required: false,
+    }
+};
 
-export const Property = createClass({
+type EntityPublic = {
+    name: {
+        type: 'string',
+        required: true,
+        constraints: {
+            nameFormat: (arg: { name: string }) => boolean
+        }
+    },
+    properties: {
+        type: Klass<PropertyPublic>,
+        collection: true,
+        required: true,
+        constraints: {
+            eachNameUnique: (arg: { properties: any[] }) => boolean
+        },
+        defaultValue: () => any[]
+    },
+    computedData: {
+        type: Klass<any>[],
+        collection: false,
+        required: false,
+    }
+};
+
+export const Property: Klass<PropertyPublic> = createClass({
     name: 'Property',
     display: (obj: any) => obj.name,
     public: {
         name: {
             type: 'string',
             required: true,
-            collection: false,
             constraints: {
-                format({name}: { name: Atom<string> }) {
-                    return computed(() => validNameFormatExp.test(name))
+                format({name}: { name: string }) {
+                    return validNameFormatExp.test(name);
                 },
-                length({name}: { name: Atom<string> }) {
-                    return computed(() => name.length > 1 && name.length < 5)
+                length({name}: { name: string }) {
+                    return name.length > 1 && name.length < 5;
                 }
             }
         },
+        // 这个是 property 的类型
         type: {
             type: 'string',
             required: true,
-            collection: false,
-            // 有这个基本就不需要其他验证了
-            // TODO 怎么表示那种可以用 option，也可以自由创建的值？
-            options: Array.from(Object.values(PropertyTypes)),
+            options: () => Object.values(PropertyTypes)
         },
-        collection: {
-            type: 'boolean',
-            required: true,
-            collection: false,
-            defaultValue() {
-                return false
-            }
+        // 这个是 property 的值
+        defaultValue: {
+            type: 'function',
+            required: false,
         },
-        args: {
-            // TODO 怎么表达 args？？需要根据不同的 type 类型构建。例如 string 长度，number 范围。
-            computedType: (values: { type: PropertyTypes }) => PropertyTypeMap[values.type],
+        // 这个是 property 的值的类型
+        computedType: {
+            type: 'function',
+            required: false,
         },
         computedData: {
-            collection: false,
             // CAUTION 这里的具体类型等着外面注册 IncrementalComputationHandle 的时候修补
             type: [] as Klass<any>[],
-            required: false,
-        },
-        computed: {
-            required: false,
-            type: "function",
             collection: false,
+            required: false,
+        }
+    },
+    constraints: {
+        entityNameUnique(thisInstance: object, allInstances: object[]) {
+            const entities = allInstances as any[];
+            const uniqueNames = new Set(entities.map(e => e.name));
+            return uniqueNames.size === entities.length;
         }
     }
 })
 
-export const constraints = {
-    entityNameUnique({entities}: { entities: (typeof Entity)[] }) {
-        const uniqueNames = incUnique(incPick(entities, '$name'))
-        return computed(() => uniqueNames.size === entities.length)
-    }
-}
-
-export const Entity = createClass({
+// CAUTION 这里的 Entity 是 Concept 的一种
+export const Entity: Klass<EntityPublic> = createClass({
     name: 'Entity',
-    display: (instance: any) => instance.name,
+    display: (obj: any) => obj.name,
     public: {
         name: {
             type: 'string',
-            collection: false,
-            required:true,
+            required: true,
             constraints: {
-                nameFormat({name}: { name: Atom<string> }) {
-                    return computed(() => {
-                        return validNameFormatExp.test(name)
-                    })
+                nameFormat({name}: { name: string }) {
+                    return validNameFormatExp.test(name);
                 }
             }
-        },
-        computedData: {
-            // CAUTION 这里的具体类型等着外面注册 IncrementalComputationHandle 的时候修补
-            type: [] as Klass<any>[],
-            collection: false,
-            required: false,
         },
         properties: {
             type: Property,
             collection: true,
-            required:true,
+            required: true,
             constraints: {
-                // 默认第一参数是 property 本身，第二参数是 entity
                 eachNameUnique({properties}) {
-                    // CAUTION 这里取的是 leaf atom，不然到 incUnique 里面已经监听不到  name string 的变化了。
-                    // FIXME 实例化之后 property 不是个 Class 吗？它的 name 就是个 atom，也没有 $name 这个属性，如何统一？？？
-                    const uniqueNames = incUnique(incPick(properties, '$name'))
-                    return computed(() => {
-                        return uniqueNames.size === properties.length
-                    })
+                    const uniqueNames = new Set(properties.map((p: any) => p.name));
+                    return uniqueNames.size === properties.length;
                 }
             },
             defaultValue() {
                 return []
             }
         },
-        isRef: {
-            required: true,
+        computedData: {
+            // CAUTION 这里的具体类型等着外面注册 IncrementalComputationHandle 的时候修补
+            type: [] as Klass<any>[],
             collection: false,
-            type: 'boolean', // 可以在 payload 中作为 ref 被后续的 interaction 引用。
-            defaultValue: () => false
+            required: false,
         }
     }
 })
 
-export const PropertyTypeMap = {
-    [PropertyTypes.String]: 'string',
-    [PropertyTypes.Number]: 'number',
-    [PropertyTypes.Boolean]: 'boolean',
-}
-
-
+// Define a simplified RelationPublic type that matches the actual implementation
 export type RelationPublic = {
     name: {
-        // TODO 是自动根据 entity/attribute 生成的，应该怎么表示？
         type: 'string',
         required: false,
         collection: false,
-        // fixme type
-        computed: (relation: any) => any
+        computed: (relation: any) => string
     },
     source: {
-        // source 可以是 Entity 或者 relation
-        // CAUTION 理论上应该改成 Entity 和 Relation 的交集，这里先强行这样实现了
-        type: typeof Entity | Klass<RelationPublic>,
+        type: (typeof Entity | typeof Relation)[],
         required: true,
         collection: false,
-        options: () => (KlassInstance<typeof Entity, any>|KlassInstance<Klass<RelationPublic>, any>)[]
+        options: () => any[]
     },
     sourceProperty: {
         type: 'string',
         required: true,
         collection: false,
         constraints: {
-            [ruleName: string]: ((thisProp: any, thisEntity: object) => Atom<boolean> | boolean | any[]) | Function | string
+            nameNotSameWithProp: (thisInstance: any) => boolean,
+            nameUnique: (thisInstance: any) => boolean
         }
-    }
+    },
     target: {
-        type: typeof Entity,
+        type: (typeof Entity | typeof Relation)[],
         required: true,
         collection: false,
-        options: () => (KlassInstance<typeof Entity, any>|KlassInstance<Klass<RelationPublic>, any>)[]
+        options: () => any[]
     },
     targetProperty: {
         type: 'string',
         required: true,
         collection: false,
         constraints: {
-            [ruleName: string]: ((thisProp: any, thisEntity: object) => Atom<boolean> | boolean | any[]) | Function | string
-        },
-    }
+            nameNotSameWithProp: (thisInstance: any) => boolean,
+            nameUnique: (thisInstance: any) => boolean
+        }
+    },
     isTargetReliance: {
         type: 'boolean',
         required: true,
-        collection:false,
-        defaultValue:() => boolean
+        collection: false,
+        defaultValue: () => boolean
     },
     relType: {
         type: 'string',
         collection: false,
         required: true,
-        options: () => string[]
-        defaultValue: () => [string]
-    }
+        options: () => string[],
+        defaultValue: () => string
+    },
     computedData: {
-        // CAUTION 这里的具体类型等着外面注册 IncrementalComputationHandle 的时候修补
         type: Klass<any>[],
         collection: false,
         required: false,
@@ -190,103 +208,93 @@ export type RelationPublic = {
         collection: true,
         required: true,
         constraints: {
-            [ruleName: string]: ((thisProp: any, thisEntity: object) => Atom<boolean> | boolean | any[]) | Function | string
+            eachNameUnique: (thisInstance: any) => boolean
         },
         defaultValue: () => any[]
     }
-}
+};
 
-export const Relation = createClass({
+// Create a placeholder for Relation to avoid circular reference
+const RELATION_PLACEHOLDER = {} as unknown as Klass<any>;
+
+// Use type assertion to avoid circular reference issues
+export const Relation: Klass<any> = createClass({
     name: 'Relation',
-    display: (instance) => ``,
+    display: (obj: any) => obj.name || `${obj.source?.name || 'unknown'} -> ${obj.target?.name || 'unknown'}`,
     public: {
         name: {
-            // TODO 是自动根据 entity/attribute 生成的，应该怎么表示？
             type: 'string',
             required: false,
-            collection: false,
-            // fixme type
             computed: (relation: any) => {
-                return `${relation.source!.name}_${relation.sourceProperty}_${relation.targetProperty}_${relation.target!.name}`
+                if (relation.source && relation.target) {
+                    return `${relation.source.name}_${relation.target.name}`
+                }
+                return ''
             }
         },
         source: {
-            // source 可以是 Entity 或者 relation
-            // CAUTION 理论上应该改成 Entity 和 Relation 的交集，这里先强行这样实现了
-            type: [Entity] as unknown as typeof Entity,
+            type: [Entity, RELATION_PLACEHOLDER],
             required: true,
-            collection: false,
-            options() {
-                return getInstance(Entity)
+            options(): any[] {
+                return [...getInstance(Entity), ...getInstance(Relation)]
             }
         },
         sourceProperty: {
             type: 'string',
             required: true,
-            collection: false,
             constraints: {
-                nameNotSameWithProp(relation:KlassInstance<Klass<RelationPublic>, false>) {
-                    return computed(() => {
-                        const {source, sourceProperty} = relation
-                        return source?.properties?.every((p) => {
-                            return p.name !== sourceProperty
-                        })
-                    })
+                nameNotSameWithProp(thisInstance: any) {
+                    const relation = thisInstance as any;
+                    if (!relation.source) return false;
+                    return !relation.source.properties.some((p: any) => p.name === relation.sourceProperty);
                 },
-                nameUnique(relation:KlassInstance<Klass<RelationPublic>, false>) {
-                    return computed(() => {
-                        const {source, target, sourceProperty, targetProperty} = relation
-                        return !(source === target && sourceProperty === targetProperty)
-                    })
+                nameUnique(thisInstance: any): boolean {
+                    const relation = thisInstance as any;
+                    if (!relation.source) return false;
+                    const relations = getInstance(Relation).filter(r => (r as any).source === relation.source);
+                    return !relations.some(r => r !== relation && (r as any).sourceProperty === relation.sourceProperty);
                 }
             }
         },
         target: {
-            type: Entity,
+            type: [Entity, RELATION_PLACEHOLDER],
             required: true,
-            collection: false,
             options() {
-                return getInstance(Entity)
+                return [...getInstance(Entity), ...getInstance(Relation)]
             }
         },
         targetProperty: {
             type: 'string',
             required: true,
-            collection: false,
             constraints: {
-                nameNotSameWithProp(relation:KlassInstance<Klass<RelationPublic>, false>) {
-                    return computed(() => {
-                        const {target, targetProperty} = relation
-                        return target?.properties?.every((p) => {
-                            return p.name !== targetProperty
-                        })
-                    })
+                nameNotSameWithProp(thisInstance: any) {
+                    const relation = thisInstance as any;
+                    if (!relation.target) return false;
+                    return !relation.target.properties.some((p: any) => p.name === relation.targetProperty);
                 },
-                nameUnique(relation:KlassInstance<Klass<RelationPublic>, false>) {
-                    return computed(() => {
-                        const {source, target, sourceProperty, targetProperty} = relation
-                        return !(source === target && sourceProperty === targetProperty)
-                    })
+                nameUnique(thisInstance: any): boolean {
+                    const relation = thisInstance as any;
+                    if (!relation.target) return false;
+                    const relations = getInstance(Relation).filter(r => (r as any).target === relation.target);
+                    return !relations.some(r => r !== relation && (r as any).targetProperty === relation.targetProperty);
                 }
             }
         },
         isTargetReliance: {
             type: 'boolean',
             required: true,
-            collection:false,
             defaultValue() {
                 return false
             }
         },
         relType: {
             type: 'string',
-            collection: false,
             required: true,
             options() {
-                return ['1:1', '1:n', 'n:1', 'n:n']
+                return ['oneToOne', 'oneToMany', 'manyToOne', 'manyToMany']
             },
             defaultValue() {
-                return ['1:1']
+                return 'oneToOne'
             }
         },
         computedData: {
@@ -300,48 +308,26 @@ export const Relation = createClass({
             collection: true,
             required: true,
             constraints: {
-                // 这里是从上面复制下来的。
-                // 默认第一参数是 property 本身，第二参数是 relation
-                eachNameUnique(relation:KlassInstance<Klass<RelationPublic>, false>) {
-                    // CAUTION 这里取的是 leaf atom，不然到 incUnique 里面已经监听不到  name string 的变化了。
-                    // FIXME 实例化之后 property 不是个 Class 吗？它的 name 就是个 atom，也没有 $name 这个属性，如何统一？？？
-                    return computed(() => {
-                        const {properties} = relation
-                        const uniqueNames = incUnique(incPick(properties, '$name'))
-                        return computed(() => {
-                            return uniqueNames.size === properties.length
-                        })
-                    })
+                eachNameUnique(thisInstance: any) {
+                    const relation = thisInstance as any;
+                    const uniqueNames = new Set(relation.properties.map((p: any) => p.name));
+                    return uniqueNames.size === relation.properties.length;
                 }
             },
             defaultValue() {
                 return []
             }
-        },
-    } as RelationPublic
-})
-// CAUTION Relation 可以作为 source
-// FIXME type relation 和 entity 的 public type 最好都单独定义
-// @ts-ignore
-Relation.public.source.type.push(Relation)
-
-export const RecordMutationSideEffect = createClass({
-    name: 'RecordMutationSideEffect',
-    public: {
-        name: {
-            type: 'string',
-            collection: false,
-            required: true
-        },
-        record: {
-            type: [Entity, Relation],
-            collection: false,
-            required: true
-        },
-        content: {
-            type: 'function',
-            collection: false,
-            required: true
         }
     }
 })
+
+// Fix the source and target types to use the actual Relation class
+Relation.public.source.type = [Entity, Relation];
+Relation.public.target.type = [Entity, Relation];
+
+// 这个是 PropertyTypeMap
+export const PropertyTypeMap = {
+    [PropertyTypes.String]: 'string',
+    [PropertyTypes.Number]: 'number',
+    [PropertyTypes.Boolean]: 'boolean',
+}

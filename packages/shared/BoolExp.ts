@@ -267,7 +267,7 @@ export const  BoolAtomData = createClass({
             defaultValue: () => 'atom'
         },
         data: {
-            instanceType: {} as unknown as (KlassInstance<Klass<CommonAtomPublic>, any>),
+            instanceType: {} as unknown as KlassInstance<Klass<CommonAtomPublic>>,
             required: true,
             collection: false,
         }
@@ -277,11 +277,10 @@ export const  BoolAtomData = createClass({
 
 
 export type UnwrappedBoolExpressionInstanceType<T extends NonNullable<KlassMeta["public"]>>  = {
-// type UnwrappedBoolExpressionInstanceType<T extends NonNullable<KlassMeta["public"]>>  = {
     type: string,
     operator: string,
-    left: UnwrappedBoolExpressionInstanceType<T> | KlassInstance<typeof BoolAtomData, false>,
-    right?: UnwrappedBoolExpressionInstanceType<T> | KlassInstance<typeof BoolAtomData, false>,
+    left: UnwrappedBoolExpressionInstanceType<T> | KlassInstance<typeof BoolAtomData>,
+    right?: UnwrappedBoolExpressionInstanceType<T> | KlassInstance<typeof BoolAtomData>,
 } & KlassInstancePrimitiveProps
 
 export const BoolExpressionData = createClass({
@@ -301,12 +300,12 @@ export const BoolExpressionData = createClass({
             defaultValue: () => 'and'
         },
         left: {
-            instanceType: {} as unknown as (KlassInstance<typeof BoolAtomData, false> | UnwrappedBoolExpressionInstanceType<any>),
+            instanceType: {} as unknown as (KlassInstance<typeof BoolAtomData> | UnwrappedBoolExpressionInstanceType<any>),
             required: true,
             collection: false,
         },
         right: {
-            instanceType: {} as unknown as (KlassInstance<typeof BoolAtomData, false> | UnwrappedBoolExpressionInstanceType<any>),
+            instanceType: {} as unknown as (KlassInstance<typeof BoolAtomData> | UnwrappedBoolExpressionInstanceType<any>),
             required: false,
             collection: false,
         }
