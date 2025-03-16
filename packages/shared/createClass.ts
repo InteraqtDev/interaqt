@@ -314,7 +314,7 @@ export function createClass<T extends KlassMeta>(metadata: T) : Klass<T['public'
     if (KlassByName.get(metadata.name)) throw new Error(`Class name must be global unique. ${metadata.name}`)
 
     function create(fieldValues: InertKlassInstance<T["public"]>, options?: KlassOptions): InertKlassInstance<typeof metadata.public> {
-        return new KlassClass(fieldValues, options) as InertKlassInstance<typeof metadata.public>;
+        return new KlassClass(deepClone(fieldValues), options) as InertKlassInstance<typeof metadata.public>;
     }
 
     function stringify(obj: InertKlassInstance<(typeof metadata)['public']>) {
@@ -437,28 +437,6 @@ export function getDisplayValue(obj: InertKlassInstance<any>) {
     return (obj.constructor as Klass<any>).display?.(obj)
 }
 
-// Helper function to replace rawStructureClone from data0
-function structureClone<T>(obj: T, replacer?: (value: any) => any): T {
-    if (replacer) {
-        return JSON.parse(JSON.stringify(obj, (key, value) => {
-            return replacer(value);
-        }));
-    }
-    
-    // Use try-catch to safely check for structureClone
-    try {
-        // @ts-ignore - structureClone might not be recognized in all TS versions
-        if (typeof structureClone === 'function') {
-            // @ts-ignore
-            return structureClone(obj);
-        }
-    } catch (e) {
-        // Function not available, fall through to JSON method
-    }
-    
-    // Fallback to JSON serialization
-    return JSON.parse(JSON.stringify(obj));
-}
 
 export function deepClone<T>(obj: T, deepCloneKlass?: boolean): T{
     if (obj === undefined || obj === null || typeof obj !== 'object') return obj
