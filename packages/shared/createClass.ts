@@ -314,7 +314,7 @@ export function createClass<T extends KlassMeta>(metadata: T) : Klass<T['public'
     if (KlassByName.get(metadata.name)) throw new Error(`Class name must be global unique. ${metadata.name}`)
 
     function create(fieldValues: InertKlassInstance<T["public"]>, options?: KlassOptions): InertKlassInstance<typeof metadata.public> {
-        return new KlassClass(structureClone(fieldValues), options) as unknown as InertKlassInstance<typeof metadata.public>;
+        return new KlassClass(fieldValues, options) as InertKlassInstance<typeof metadata.public>;
     }
 
     function stringify(obj: InertKlassInstance<(typeof metadata)['public']>) {
@@ -396,8 +396,7 @@ export function createClass<T extends KlassMeta>(metadata: T) : Klass<T['public'
         public static instances: InertKlassInstance<typeof metadata.public>[] = []
         public uuid: string
         constructor(arg: KlassRawInstanceDataType["public"], options? :KlassOptions) {
-            const self = this as unknown as InertKlassInstance<typeof metadata.public>
-
+            const self = this 
             if (metadata.public) {
                 Object.entries(metadata.public).forEach(([ propName, propDef]: [string, ClassMetaPublicItem]) => {
                     const initialValue = hasOwn(arg, propName) ? arg[propName as unknown as keyof typeof arg] : propDef.defaultValue?.()
@@ -414,7 +413,7 @@ export function createClass<T extends KlassMeta>(metadata: T) : Klass<T['public'
             Object.entries(metadata.public).forEach(([ propName, propDef]: [string, ClassMetaPublicItem]) => {
                 if (propDef.computed) {
                     Object.defineProperty(self, propName, {
-                        get: () => propDef.computed!(self),
+                        get: () => propDef.computed!(self as InertKlassInstance<typeof metadata.public>),
                         enumerable: true,
                     })
                 }
@@ -422,12 +421,12 @@ export function createClass<T extends KlassMeta>(metadata: T) : Klass<T['public'
 
             this._options = options
             this.uuid = this._options?.uuid || crypto.randomUUID()
-            KlassClass.instances.push(self)
+            KlassClass.instances.push(self as InertKlassInstance<typeof metadata.public>)
         }
     }
 
-    KlassByName.set(metadata.name, KlassClass as unknown as Klass<typeof metadata.public>)
-    return KlassClass as unknown as Klass<typeof metadata.public>
+    KlassByName.set(metadata.name, KlassClass as  Klass<typeof metadata.public>)
+    return KlassClass as Klass<typeof metadata.public>
 }
 
 export function getUUID(obj: InertKlassInstance<any>): string {

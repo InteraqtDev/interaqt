@@ -235,7 +235,7 @@ export const Relation: Klass<any> = createClass({
             required: false,
             computed: (relation: any) => {
                 if (relation.source && relation.target) {
-                    return `${relation.source.name}_${relation.target.name}`
+                    return `${relation.source.name}_${relation.sourceProperty}_${relation.target.name}_${relation.targetProperty}`
                 }
                 return ''
             }
