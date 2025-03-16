@@ -180,7 +180,6 @@ describe("db setup", () => {
             targetProperty: 'file',
             mergedTo: 'source',
         })
-
         // 虚拟关系表
         expect(setup.map.links.File_owner_file_User_source).toMatchObject({
             relType: ['1', '1'],

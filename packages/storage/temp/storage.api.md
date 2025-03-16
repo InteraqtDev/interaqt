@@ -159,7 +159,7 @@ export type Database = {
 
 // @public (undocumented)
 export class DBSetup {
-    constructor(entities: KlassInstance<typeof Entity, false>[], relations: KlassInstance<typeof Relation, false>[], database?: Database | undefined, mergeLinks?: MergeLinks);
+    constructor(entities: KlassInstance<typeof Entity>[], relations: KlassInstance<typeof Relation>[], database?: Database | undefined, mergeLinks?: MergeLinks);
     // (undocumented)
     assignTableAndField(): void;
     // (undocumented)
@@ -169,11 +169,11 @@ export class DBSetup {
     // (undocumented)
     combineRecordTable(mergeTarget: string, toMerge: string, link: string): string[] | undefined;
     // (undocumented)
-    createLink(relationName: string, relation: KlassInstance<typeof Relation, false>): LinkMapItem;
+    createLink(relationName: string, relation: KlassInstance<typeof Relation>): LinkMapItem;
     // (undocumented)
-    createLinkOfRelationAndEntity(relationEntityName: string, relationName: string, relation: KlassInstance<typeof Relation, false>, isSource: boolean): LinkMapItem;
+    createLinkOfRelationAndEntity(relationEntityName: string, relationName: string, relation: KlassInstance<typeof Relation>, isSource: boolean): LinkMapItem;
     // (undocumented)
-    createRecord(entity: KlassInstance<typeof Entity, false> | KlassInstance<typeof Relation, false>, isRelation?: boolean): RecordMapItem;
+    createRecord(entity: KlassInstance<typeof Entity> | KlassInstance<typeof Relation>, isRelation?: boolean): RecordMapItem;
     // (undocumented)
     createRecordToTable(item: string, table: string): void;
     // (undocumented)
@@ -183,9 +183,9 @@ export class DBSetup {
     // (undocumented)
     database?: Database | undefined;
     // (undocumented)
-    entities: KlassInstance<typeof Entity, false>[];
+    entities: KlassInstance<typeof Entity>[];
     // (undocumented)
-    getRecordName(rawRecord: KlassInstance<typeof Entity, false> | KlassInstance<typeof Relation, false>): string;
+    getRecordName(rawRecord: KlassInstance<typeof Entity> | KlassInstance<typeof Relation>): string;
     // (undocumented)
     getRelationNameOfRelationAndEntity(relationName: string, isSource: boolean): string;
     // (undocumented)
@@ -201,7 +201,7 @@ export class DBSetup {
     // (undocumented)
     recordToTableMap: Map<string, string>;
     // (undocumented)
-    relations: KlassInstance<typeof Relation, false>[];
+    relations: KlassInstance<typeof Relation>[];
     // (undocumented)
     renameTableWithJoinedEntities(originTableName: string): void;
     // (undocumented)
@@ -871,7 +871,7 @@ export type ValueAttribute = {
 //
 // erstorage/EntityToTableMap.ts:78:5 - (ae-forgotten-export) The symbol "RecordMap" needs to be exported by the entry point index.d.ts
 // erstorage/EntityToTableMap.ts:79:5 - (ae-forgotten-export) The symbol "LinkMap" needs to be exported by the entry point index.d.ts
-// erstorage/Setup.ts:18:19 - (ae-forgotten-export) The symbol "ColumnData" needs to be exported by the entry point index.d.ts
+// erstorage/Setup.ts:45:19 - (ae-forgotten-export) The symbol "ColumnData" needs to be exported by the entry point index.d.ts
 
 // (No @packageDocumentation comment for this package)
 

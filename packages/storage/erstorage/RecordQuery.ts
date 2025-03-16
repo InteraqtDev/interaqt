@@ -164,10 +164,12 @@ export class RecordQueryTree {
     onlyIdField() {
         return this.fields.length === 1 && this.fields[0] === 'id'
     }
-    merge(otherTree:RecordQueryTree) : RecordQueryTree{
+    merge(otherTree: RecordQueryTree): RecordQueryTree {
+        // 合并两个 tree，返回一个新的 tree
         const fields = Array.from(new Set([...this.fields, ...otherTree.fields]))
-        const records: {[k:string]: RecordQueryTree} = {}
+        // 合并 records
         const keys = Array.from(new Set([...Object.keys(this.records), ...Object.keys(otherTree.records)]))
+        const records: Record<string, RecordQueryTree> = {}
 
         keys.forEach(key => {
             if (this.records[key] && otherTree.records[key]) {

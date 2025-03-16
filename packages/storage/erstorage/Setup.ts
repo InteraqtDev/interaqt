@@ -4,6 +4,33 @@ import {LinkMapItem, MapData, RecordAttribute, RecordMapItem, ValueAttribute} fr
 import {assert} from "../utils.js";
 import {Database, ID_ATTR, ROW_ID_ATTR} from "./EntityQueryHandle.js";
 
+// Define the types we need
+type EntityPublic = {
+    name: string;
+    properties: KlassInstance<typeof Property>[];
+    [key: string]: any;
+};
+
+type RelationPublic = {
+    name: string;
+    source: KlassInstance<typeof Entity>;
+    sourceProperty: string;
+    target: KlassInstance<typeof Entity>;
+    targetProperty: string;
+    relType: string;
+    isTargetReliance: boolean;
+    properties: KlassInstance<typeof Property>[];
+    [key: string]: any;
+};
+
+type PropertyPublic = {
+    name: string;
+    type: string;
+    collection?: boolean;
+    computed?: any;
+    [key: string]: any;
+};
+
 type ColumnData = {
     name:string,
     type:string,
@@ -30,8 +57,8 @@ export class DBSetup {
     public tables:TableData = {}
     public map: MapData = { links: {}, records: {}}
     constructor(
-        public entities: KlassInstance<typeof Entity, false>[],
-        public relations: KlassInstance<typeof Relation, false>[],
+        public entities: KlassInstance<typeof Entity>[],
+        public relations: KlassInstance<typeof Relation>[],
         public database?: Database,
         public mergeLinks: MergeLinks = []
     ) {
@@ -75,7 +102,7 @@ export class DBSetup {
         sameTableRecordsToMove.forEach(sameTableRecord => this.recordToTableMap.set(sameTableRecord, joinTargetTable))
 
         // 3. 新 table 合并数据
-        this.tableToRecordsMap.set(joinTargetTable, new Set([...joinTargetSameTableRecords, ...sameTableRecordsToMove]))
+        this.tableToRecordsMap.set(joinTargetTable, new Set(Array.from(joinTargetSameTableRecords).concat(Array.from(sameTableRecordsToMove))))
 
         // 4. 记录 log
         this.mergeLog.push({ joinTargetRecord, record, link })
@@ -107,15 +134,19 @@ export class DBSetup {
     }
 
 
-    createRecord(entity: KlassInstance<typeof Entity, false>|KlassInstance<typeof Relation, false>, isRelation? :boolean) {
-        const attributes: {[k:string]: Omit<ValueAttribute, 'field'>} = Object.fromEntries(entity.properties!.map((property: KlassInstance<typeof Property, false>) => [
-            property.name,
-            {
-                type: property.type,
-                computed: property.computed,
-                collection: property.collection,
-            }
-        ]))
+    createRecord(entity: KlassInstance<typeof Entity> | KlassInstance<typeof Relation>, isRelation? :boolean) {
+        const entityWithProps = entity as unknown as EntityPublic | RelationPublic;
+        const attributes: {[k:string]: Omit<ValueAttribute, 'field'>} = Object.fromEntries(entityWithProps.properties.map((property: KlassInstance<typeof Property>) => {
+            const prop = property as unknown as PropertyPublic;
+            return [
+                prop.name,
+                {
+                    type: prop.type,
+                    computed: prop.computed,
+                    collection: prop.collection,
+                }
+            ];
+        }));
 
         // 自动补充
         attributes[ID_ATTR] = {
@@ -127,46 +158,42 @@ export class DBSetup {
         }
 
         return {
-            table: entity.name,
+            table: entityWithProps.name,
             attributes,
             isRelation,
         } as RecordMapItem
     }
-    createLink(relationName: string, relation: KlassInstance<typeof Relation, false>) {
+    createLink(relationName: string, relation: KlassInstance<typeof Relation>) {
+        const relationWithProps = relation as unknown as RelationPublic;
         return {
             table: relationName,
-            relType: relation.relType!.split(':'),
-            sourceRecord: this.getRecordName(relation.source as KlassInstance<typeof Entity, false>),
-            sourceProperty: relation.sourceProperty,
-            targetRecord: this.getRecordName(relation.target!),
-            targetProperty: relation.targetProperty,
+            relType: relationWithProps.relType.split(':'),
+            sourceRecord: this.getRecordName(relationWithProps.source),
+            sourceProperty: relationWithProps.sourceProperty,
+            targetRecord: this.getRecordName(relationWithProps.target),
+            targetProperty: relationWithProps.targetProperty,
             recordName: relationName,
-            isTargetReliance: relation.isTargetReliance
+            isTargetReliance: relationWithProps.isTargetReliance
         } as LinkMapItem
     }
-    getRecordName(rawRecord:KlassInstance<typeof Entity, false>|KlassInstance<typeof Relation, false>): string {
-        return rawRecord.name!
+    getRecordName(rawRecord: KlassInstance<typeof Entity> | KlassInstance<typeof Relation>): string {
+        const record = rawRecord as unknown as EntityPublic | RelationPublic;
+        return record.name;
     }
     //虚拟 link
-    createLinkOfRelationAndEntity(relationEntityName: string, relationName: string, relation: KlassInstance<typeof Relation, false>, isSource: boolean) {
-        const relationRelType = relation.relType!.split(':')
+    createLinkOfRelationAndEntity(relationEntityName: string, relationName: string, relation: KlassInstance<typeof Relation>, isSource: boolean) {
+        const relationWithProps = relation as unknown as RelationPublic;
+        const [sourceRelType, targetRelType] = relationWithProps.relType.split(':');
         return {
             table: undefined, // 虚拟 link 没有表
             sourceRecord: relationEntityName,
             sourceProperty: isSource ? 'source' : 'target',
-            targetRecord: isSource ? this.getRecordName(relation.source as KlassInstance<typeof Entity, false>): this.getRecordName(relation.target!),
+            targetRecord: isSource ? this.getRecordName(relationWithProps.source): this.getRecordName(relationWithProps.target),
             // targetRecord: isSource ? relation.source.name: relation.target.name,
             targetProperty: undefined, // 不能从 entity 来获取关系表
-            // source 1:x1 -关联表- x2:1 target
-            // 如果是 1: n 关系，x1 是 n，x2 是 1
-            // 如果是 n: 1 关系，x1 是 1，x2 是 n
-            // 如果是 n: n 关系，x1 是 n，x2 是 n
-            // 如果是 1 : 1 关系，x1 是 1，x2 是 1
-            relType: [relationRelType[isSource? 1:0], '1'],
-            // 用来标记这是个虚拟 link 的
+            relType: [isSource ? targetRelType : sourceRelType,'1'],
             isSourceRelation: true,
-            // sourceField: 'source',
-            // targetField: undefined, // 虚拟表只往 relation 方向合并。
+            mergedTo: 'combined'
         } as LinkMapItem
     }
     getRelationNameOfRelationAndEntity(relationName: string, isSource: boolean) {
@@ -176,15 +203,17 @@ export class DBSetup {
     buildMap() {
         // 1. 按照范式生成基础 entity record
         this.entities.forEach(entity => {
-            assert(!this.map.records[entity.name!], `entity name ${entity.name} is duplicated`)
-            this.map.records[entity.name!] = this.createRecord(entity)
+            const entityWithProps = entity as unknown as EntityPublic;
+            assert(!this.map.records[entityWithProps.name], `entity name ${entityWithProps.name} is duplicated`)
+            this.map.records[entityWithProps.name] = this.createRecord(entity)
             // 记录一下 entity 和 表的关系。后面用于合并的时候做计算。
-            this.createRecordToTable(entity.name!, entity.name!)
+            this.createRecordToTable(entityWithProps.name, entityWithProps.name)
         })
 
         // 2. 生成 relation record 以及所有的 link
         this.relations.forEach(relation => {
-            const relationName = relation.name
+            const relationWithProps = relation as unknown as RelationPublic;
+            const relationName = relationWithProps.name
             assert(!this.map.records[relationName], `relation name ${relationName} is duplicated`)
             this.map.records[relationName] = this.createRecord(relation, true)
             this.createRecordToTable(relationName, relationName)
