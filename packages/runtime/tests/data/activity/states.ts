@@ -1,5 +1,5 @@
 import {friendRelation} from "./createFriendRelationActivity.js";
-import {Any, Count, Every, State} from "@interaqt/runtime";
+import {Any, Count, Every, State} from '@';
 import {requestEntity} from "./requestEntity.js";
 
 const totalFriendRelationState = State.create({

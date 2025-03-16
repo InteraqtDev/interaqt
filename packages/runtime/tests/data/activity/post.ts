@@ -12,7 +12,7 @@ import {
     PropertyTypes,
     RecordMutationEvent,
     Relation
-} from "@interaqt/runtime";
+} from '@';
 
 export const postEntity = Entity.create({ name: 'Post' })
 

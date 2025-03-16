@@ -1,7 +1,7 @@
 import {sendRequestRelation, userTotalUnhandledRequest} from "./requestEntity.js";
 import {friendRelation} from "./createFriendRelationActivity.js";
 import {UserEntity} from "./user.js";
-import {Property, RelationBasedAny, RelationBasedEvery, RelationCount} from "@interaqt/runtime";
+import {Property, RelationBasedAny, RelationBasedEvery, RelationCount} from '@';
 
 UserEntity.properties.push(Property.create({
     name: 'totalUnhandledRequest',

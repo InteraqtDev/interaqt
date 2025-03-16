@@ -40,13 +40,13 @@ type WeightedSummationRelation = {
 export class RelationBasedWeightedSummationHandle extends IncrementalComputedDataHandle {
     entityName!: string
     relationInfos!: WeightedSummationRelation[]
-    relations!: KlassInstance<typeof RelationBasedWeightedSummation, false>["relations"]
+    relations!: KlassInstance<typeof RelationBasedWeightedSummation>["relations"]
     mapRelationToWeight!: (record: EntityIdRef, relation: EntityIdRef) => number
     // 单独抽出来让下面能覆写
     parseComputedData(){
-        const computedData = this.computedData as unknown as KlassInstance<typeof RelationBasedWeightedSummation, false>
+        const computedData = this.computedData as unknown as KlassInstance<typeof RelationBasedWeightedSummation>
         this.mapRelationToWeight = computedData.matchRelationToWeight!.bind(this.controller)
-        this.entityName = this.dataContext.host!.name!
+        this.entityName = (this.dataContext.host as any).name
         this.relations = computedData.relations
     }
     getDefaultValue(newRecordId?: any): any {
@@ -54,13 +54,19 @@ export class RelationBasedWeightedSummationHandle extends IncrementalComputedDat
     }
     async setupStates(): Promise<void> {
         this.relationInfos = this.relations!.map(({relation, relationDirection}) => {
+            // @ts-ignore
             const toCountAttributeName = relation![relationDirection==='source' ? 'sourceProperty': 'targetProperty']!
             return {
                 relationName: this.controller.system.storage.getRelationName(this.entityName, toCountAttributeName),
+                // @ts-ignore
                 toCountAttributeName,
+                // @ts-ignore
                 toCountEntityName: relation![relationDirection==='source' ? 'target': 'source']!.name!,
+                // @ts-ignore
                 entityRelationAttribute : relationDirection! as 'source'|'target',
+                // @ts-ignore
                 relatedEntityRelationAttribute: relationDirection === 'source' ? 'target': 'source',
+                // @ts-ignore
                 isBidirectional : relation?.source === relation?.target && relation?.sourceProperty === relation?.targetProperty
             }
         })

@@ -1,4 +1,4 @@
-import {Entity, Property} from "@interaqt/runtime";
+import {Entity, Property} from '@';
 
 export const messageEntity = Entity.create({
     name: 'Message',

@@ -21,7 +21,7 @@ import {
     RelationBasedAny,
     RelationBasedEvery,
     RelationCount
-} from "@interaqt/runtime";
+} from '../../index.js';
 
 export const globalUserRole = createUserRoleAttributive({})
 
@@ -234,18 +234,20 @@ RequestEntity.properties.push(
 )
 
 // 我有多少未处理的
+// debugger
+const pendingRequestCount = RelationCount.create({
+    relation: reviewerRelation,
+    relationDirection: 'target',
+    match: function (request, relation) {
+        return request.result === 'pending'
+    }
+})
 UserEntity.properties.push(
     Property.create({
         name: 'pendingRequestCount',
         type: 'number',
         collection: false,
-        computedData: RelationCount.create({
-            relation: reviewerRelation,
-            relationDirection: 'target',
-            match: function (request, relation) {
-                return request.result === 'pending'
-            }
-        })
+        computedData: pendingRequestCount
     })
 )
 

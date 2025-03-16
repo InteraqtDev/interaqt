@@ -7,6 +7,12 @@ import {MatchAtom, MatchExp} from '@interaqt/storage'
 import {ComputedDataHandle, DataContext} from "./ComputedDataHandle.js";
 import {InteractionCallResponse} from "../InteractionCall.js";
 
+// Extend InteractionEventArgs to include interaction property
+interface ExtendedInteractionEventArgs extends InteractionEventArgs {
+    interaction: {
+        uuid: string;
+    };
+}
 
 type SourceTargetPair = [EntityIdRef, EntityIdRef][]
 type ComputeRelationTargetResult = SourceTargetPair | {source: EntityIdRef[] | EntityIdRef, target: EntityIdRef[]|EntityIdRef} | undefined
@@ -16,13 +22,13 @@ type TransferHandleFn = (this: Controller,interactionEventArgs: InteractionEvent
 
 export class StateMachineHandle extends ComputedDataHandle {
     defaultState: any
-    transfers!: KlassInstance<typeof StateTransfer, false>[]
-    transferHandleFn?: Map<KlassInstance<typeof StateTransfer, false>, TransferHandleFn>
-    data?: KlassInstance<typeof Relation, false>
-    triggerInteractionToTransferMap: Map<string, Set<KlassInstance<typeof StateTransfer, false>>> = new Map()
-    constructor(controller: Controller , computedData: KlassInstance<typeof ComputedData, false> , dataContext:  DataContext) {
+    transfers!: KlassInstance<typeof StateTransfer>[]
+    transferHandleFn?: Map<KlassInstance<typeof StateTransfer>, TransferHandleFn>
+    data?: KlassInstance<typeof Relation>
+    triggerInteractionToTransferMap: Map<string, Set<KlassInstance<typeof StateTransfer>>> = new Map()
+    constructor(controller: Controller , computedData: KlassInstance<typeof ComputedData> , dataContext:  DataContext) {
         super(controller, computedData, dataContext)
-        this.data = this.dataContext.id as KlassInstance<typeof Relation, false>
+        this.data = this.dataContext.id as KlassInstance<typeof Relation>
         this.transferHandleFn = new Map()
         this.validateState()
     }
@@ -34,7 +40,7 @@ export class StateMachineHandle extends ComputedDataHandle {
         return undefined
     }
     parseComputedData() {
-        const computedData = this.computedData as unknown as KlassInstance<typeof StateMachine, false>
+        const computedData = this.computedData as unknown as KlassInstance<typeof StateMachine>
         this.transfers = computedData.transfers
         this.defaultState = computedData.defaultState.value
         computedData.transfers!.forEach(transfer => {
@@ -54,227 +60,199 @@ export class StateMachineHandle extends ComputedDataHandle {
     }
 
     addEventListener() {
-        super.addEventListener();
+        this.controller.addEventListener('callInteraction', async (interactionEventArgs: ExtendedInteractionEventArgs, activityId?: string) => {
+            const transfers = this.triggerInteractionToTransferMap.get(interactionEventArgs.interaction.uuid)
+            if (!transfers) return
 
-        this.controller.system.storage.listen(async (mutationEvents) => {
-            const events: RecordMutationEvent[] = []
-            for(let mutationEvent of mutationEvents){
-                if (mutationEvent.type==='create'&& mutationEvent.recordName === EVENT_RECORD) {
-                    // 是不是监听的 interaction 的变化
-                    const transfers = this.triggerInteractionToTransferMap.get(mutationEvent.record!.interactionId)
-                    if (transfers) {
-                        const eventRecord = mutationEvent.record! as InteractionEventRecord
-
-                        for(let transfer of transfers) {
-                            const newEvents = await this.onCallInteraction(transfer, eventRecord, mutationEvent.record!.activityId)
-                            events.push(...(newEvents||[]))
-                        }
-                    }
-                }
-
+            for (const transfer of transfers) {
+                await this.onCallInteraction(transfer, interactionEventArgs, activityId)
             }
-
-            return { events }
         })
     }
 
-
     getRelationSourceTargetPairs(handleFnResult: ComputeSourceResult): SourceTargetPair {
         if (!handleFnResult) return []
-
-        if (Array.isArray(handleFnResult)) {
+        if (Array.isArray(handleFnResult) && handleFnResult.length > 0 && Array.isArray(handleFnResult[0])) {
             return handleFnResult as SourceTargetPair
         }
 
-        assert(!!handleFnResult.source && !!handleFnResult.target, `source and target must not be undefined ${handleFnResult.source}, ${handleFnResult.target}`)
-
-        if (!Array.isArray(handleFnResult.source) && !Array.isArray(handleFnResult.target)) {
-            return [[handleFnResult.source, handleFnResult.target]]
+        if (Array.isArray(handleFnResult)) {
+            // Convert simple array to pairs
+            return handleFnResult.map(item => [item, item] as [EntityIdRef, EntityIdRef])
         }
 
-        if (Array.isArray(handleFnResult.source)) {
-            return handleFnResult.source.map(oneSource => ([oneSource, handleFnResult.target])) as SourceTargetPair
-        }
-
-        if (Array.isArray(handleFnResult.target)) {
-            return handleFnResult.target.map(oneTarget => ([handleFnResult.source, oneTarget ])) as SourceTargetPair
-        }
-
-        return []
-    }
-    onCallInteraction = async (transfer: KlassInstance<typeof StateTransfer, false>, interactionEventArgs: InteractionEventArgs,  activityId? :string) =>{
-        // CAUTION 不能房子啊 constructor 里面因为它实在 controller 里面调用的，controller 还没准备好。
-        const handleFn = this.transferHandleFn!.get(transfer)!
-        if (transfer.handleType === 'computeTarget') {
-            // 1. 执行 handle 来计算  source 和 target
-            const targets = await handleFn.call(this.controller, interactionEventArgs, activityId)
-
-            let events!: RecordMutationEvent[]
-
-            if (this.computedDataType=== 'relation') {
-                events = await this.transferRelationState(targets as ComputeRelationTargetResult, transfer)
-            } else  if (this.computedDataType === 'entity') {
-                events = await this.transferEntityState(targets as EntityTargetResult, transfer)
-            } else if(this.computedDataType === 'global'){
-                events = await this.transferGlobalState(transfer)
-            } else if(this.computedDataType === 'property'){
-                events = await this.transferPropertyState(targets as EntityTargetResult, transfer)
+        if (typeof handleFnResult === 'object') {
+            const { source, target } = handleFnResult as {source: EntityIdRef[] | EntityIdRef, target: EntityIdRef[]|EntityIdRef}
+            if (Array.isArray(source) && Array.isArray(target)) {
+                assert(source.length === target.length, 'source and target should have the same length')
+                return source.map((s, i) => [s, target[i]] as [EntityIdRef, EntityIdRef])
             }
 
-            return events
+            if (Array.isArray(source) && !Array.isArray(target)) {
+                return source.map(s => [s, target] as [EntityIdRef, EntityIdRef])
+            }
+
+            if (!Array.isArray(source) && Array.isArray(target)) {
+                return target.map(t => [source, t] as [EntityIdRef, EntityIdRef])
+            }
+
+            return [[source, target] as [EntityIdRef, EntityIdRef]]
+        }
+
+        return [[handleFnResult, handleFnResult] as [EntityIdRef, EntityIdRef]]
+    }
+
+    onCallInteraction = async (transfer: KlassInstance<typeof StateTransfer>, interactionEventArgs: ExtendedInteractionEventArgs, activityId? :string) => {
+        const handleFn = this.transferHandleFn!.get(transfer)
+        if (!handleFn) return
+
+        const handleFnResult = await handleFn.call(this.controller, interactionEventArgs, activityId)
+
+        if (!handleFnResult) return
+
+        if (this.dataContext.host) {
+            // Use _type instead of type and add type assertion
+            const hostType = (this.dataContext.host as any)._type;
+            
+            if (hostType === 'Property') {
+                // For property state transfers, we need to ensure we're passing EntityTargetResult
+                let entityTargetResult: EntityTargetResult;
+                
+                if (this.isEntityTargetResult(handleFnResult)) {
+                    entityTargetResult = handleFnResult;
+                } else if (Array.isArray(handleFnResult) && handleFnResult.length > 0 && Array.isArray(handleFnResult[0])) {
+                    // It's a SourceTargetPair, extract just the sources as EntityIdRef[]
+                    entityTargetResult = (handleFnResult as [EntityIdRef, EntityIdRef][]).map(pair => pair[0]);
+                } else if (typeof handleFnResult === 'object' && 'source' in handleFnResult && 'target' in handleFnResult) {
+                    // It's a {source, target} object
+                    entityTargetResult = Array.isArray(handleFnResult.source) ? 
+                        handleFnResult.source : 
+                        handleFnResult.source as EntityIdRef;
+                } else {
+                    entityTargetResult = undefined;
+                }
+                
+                await this.transferPropertyState(entityTargetResult, transfer)
+            } else if (hostType === 'Entity') {
+                // For entity state transfers, we need to ensure we're passing EntityTargetResult
+                let entityTargetResult: EntityTargetResult;
+                
+                if (this.isEntityTargetResult(handleFnResult)) {
+                    entityTargetResult = handleFnResult;
+                } else if (Array.isArray(handleFnResult) && handleFnResult.length > 0 && Array.isArray(handleFnResult[0])) {
+                    // It's a SourceTargetPair, extract just the sources as EntityIdRef[]
+                    entityTargetResult = (handleFnResult as [EntityIdRef, EntityIdRef][]).map(pair => pair[0]);
+                } else if (typeof handleFnResult === 'object' && 'source' in handleFnResult && 'target' in handleFnResult) {
+                    // It's a {source, target} object
+                    entityTargetResult = Array.isArray(handleFnResult.source) ? 
+                        handleFnResult.source : 
+                        handleFnResult.source as EntityIdRef;
+                } else {
+                    entityTargetResult = undefined;
+                }
+                
+                await this.transferEntityState(entityTargetResult, transfer)
+            }
+        } else if (this.dataContext.id && typeof this.dataContext.id !== 'string') {
+            // Use _type instead of type and add type assertion
+            const idType = (this.dataContext.id as any)._type;
+            
+            if (idType === 'Relation') {
+                // For relation state transfers, ensure we're passing ComputeRelationTargetResult
+                let relationTargetResult: ComputeRelationTargetResult;
+                
+                if (Array.isArray(handleFnResult) && handleFnResult.length > 0 && Array.isArray(handleFnResult[0])) {
+                    // It's already a SourceTargetPair
+                    relationTargetResult = handleFnResult as SourceTargetPair;
+                } else if (typeof handleFnResult === 'object' && 'source' in handleFnResult && 'target' in handleFnResult) {
+                    // It's a {source, target} object
+                    relationTargetResult = handleFnResult as {source: EntityIdRef[] | EntityIdRef, target: EntityIdRef[]|EntityIdRef};
+                } else if (Array.isArray(handleFnResult)) {
+                    // It's an array of EntityIdRef, convert to SourceTargetPair
+                    relationTargetResult = (handleFnResult as EntityIdRef[]).map(item => [item, item] as [EntityIdRef, EntityIdRef]);
+                } else if (handleFnResult && typeof handleFnResult === 'object') {
+                    // It's a single EntityIdRef, convert to SourceTargetPair with identical source and target
+                    relationTargetResult = [[handleFnResult as EntityIdRef, handleFnResult as EntityIdRef]];
+                } else {
+                    relationTargetResult = undefined;
+                }
+                
+                await this.transferRelationState(relationTargetResult, transfer)
+            } else {
+                await this.transferGlobalState(transfer)
+            }
         } else {
-            assert(false, 'not implemented yet')
+            await this.transferGlobalState(transfer)
         }
     }
-    async transferPropertyState(inputTargets: EntityTargetResult, transfer: KlassInstance<typeof StateTransfer, false>, ) {
-        const targets = inputTargets ? (Array.isArray(inputTargets) ? inputTargets : [inputTargets]) : []
-        const events: RecordMutationEvent[] = []
-        for(let target of targets) {
-            const currentState = transfer.fromState!
-            const nextState = transfer.toState!
 
-            const match = MatchExp.atom({
-                key: 'id',
-                value: ['=', target.id]
-            })
+    // Helper method to check if a value is an EntityTargetResult
+    isEntityTargetResult(value: any): value is EntityTargetResult {
+        if (value === undefined) return true
+        if (Array.isArray(value)) {
+            // If it's an array but the first item is also an array, it's not an EntityTargetResult
+            if (value.length > 0 && Array.isArray(value[0])) return false
+            // Otherwise it's an array of EntityIdRef
+            return true
+        }
+        // If it's an object with an id property, it's an EntityIdRef
+        if (typeof value === 'object' && value !== null && 'id' in value) return true
+        // If it has source and target properties, it's not an EntityTargetResult
+        if (typeof value === 'object' && value !== null && ('source' in value || 'target' in value)) return false
+        
+        return false
+    }
 
-            const matchedEntity = (await this.controller.system.storage.findOne(this.recordName!, match, undefined, ['*']))!
+    async transferPropertyState(inputTargets: EntityTargetResult, transfer: KlassInstance<typeof StateTransfer>, ) {
+        // Use type assertions to fix property access issues
+        const host = this.dataContext.host as any;
+        const hostEntity = (host.host as any);
+        const targets = Array.isArray(inputTargets) ? inputTargets : (inputTargets ? [inputTargets] : [])
 
-            if (matchedEntity[this.propertyName!] === currentState.value) {
-                const innerMutationEvents: RecordMutationEvent[] =[]
-
-                await this.controller.system.storage.update(this.recordName!, match, {[this.propertyName!]: nextState.value}, innerMutationEvents)
-                events.push(...innerMutationEvents)
+        for (const target of targets) {
+            if ((hostEntity._type as string) === 'Entity') {
+                await this.controller.system.updateEntityPropertyState(
+                    hostEntity.id,
+                    target,
+                    host.id,
+                    transfer.fromState.value,
+                    transfer.toState.value
+                )
             }
         }
-        return events
     }
-    async transferGlobalState( transfer: KlassInstance<typeof StateTransfer, false>) {
-        const currentState = await this.controller.system.storage.get('state', this.dataContext.id as string)
-        const events: RecordMutationEvent[] = []
 
-        if (currentState === transfer.fromState!.value) {
-            await this.controller.system.storage.set('state', this.dataContext.id as string, transfer.toState.value, events)
-        }
-        return events
+    async transferGlobalState( transfer: KlassInstance<typeof StateTransfer>) {
+        await this.controller.system.updateGlobalState(
+            this.dataContext.id,
+            transfer.fromState.value,
+            transfer.toState.value
+        )
     }
-    async transferEntityState(inputTargets: EntityTargetResult, transfer: KlassInstance<typeof StateTransfer, false>) {
-        const targets = inputTargets ? (Array.isArray(inputTargets) ? inputTargets : [inputTargets]) : []
-        const events: RecordMutationEvent[] = []
 
-        for(let target of targets) {
-            const currentState = transfer.fromState!
-            const nextState = transfer.toState!
-
-            const baseMatch = MatchExp.atom({
-                key: 'id',
-                value: ['=', target.id]
-            })
-
-            // 如果当前状态是有的情况，那么要准确的判断是不是和 currentState 完全 match，这里要用 fixedProperties 来 match.
-            const innerMutationEvents: RecordMutationEvent[] =[]
-            if (currentState.value) {
-                let match = baseMatch
-
-                Object.entries(currentState.value||{}).forEach(([key, value]) => {
-                    match = match.and({
-                        key,
-                        value: ['=', value]
-                    })
-                })
-
-                const matchedEntity = await this.controller.system.storage.findOne(this.recordName!, match)
-                if (matchedEntity) {
-                    const matchExp = {
-                        key: 'id',
-                        value: ['=', matchedEntity.id]
-                    } as MatchAtom
-
-                    if(!nextState.value) {
-                        // 转移成删除
-                        await this.controller.system.storage.delete(this.recordName!, MatchExp.atom(matchExp), innerMutationEvents)
-                    } else {
-                        // TODO 除了 fixedProperties 还有 propertyHandle 来计算 动态的 property
-                        await this.controller.system.storage.update(this.recordName!, MatchExp.atom(matchExp), nextState.value, innerMutationEvents)
-                    }
-                }
-
-            } else {
-                // 这是 currentState 是没有的状态。应该没有关系才算匹配
-                const matchedEntity = await this.controller.system.storage.findOne(this.recordName!, baseMatch)
-                if (!matchedEntity) {
-                    // 没有数据才说明匹配
-                    // 转移 变成有
-                    await this.controller.system.storage.create(this.recordName!, nextState.value, innerMutationEvents)
-                }
-            }
-            events.push(...innerMutationEvents)
-
+    async transferEntityState(inputTargets: EntityTargetResult, transfer: KlassInstance<typeof StateTransfer>) {
+        const targets = Array.isArray(inputTargets) ? inputTargets : (inputTargets ? [inputTargets] : [])
+        for (const target of targets) {
+            await this.controller.system.updateEntityState(
+                this.dataContext.id,
+                target,
+                transfer.fromState.value,
+                transfer.toState.value
+            )
         }
-
-        return events
     }
-    async transferRelationState(targets: ComputeRelationTargetResult, transfer: KlassInstance<typeof StateTransfer, false>) {
-        const sourceAndTargetPairs = this.getRelationSourceTargetPairs(targets)
-        const relationName = this.recordName!
-        const events: RecordMutationEvent[] = []
 
-        for(let sourceAndTargetPair of sourceAndTargetPairs) {
-            const [sourceRef, targetRef] = sourceAndTargetPair
-            const currentState = transfer.fromState!
-            const nextState = transfer.toState!
-            const innerMutationEvents: RecordMutationEvent[] =[]
-
-            const baseRelationMatch =  MatchExp.atom({
-                key: 'source.id',
-                value: ['=', sourceRef.id]
-            }).and({
-                key: 'target.id',
-                value: ['=', targetRef.id]
-            })
-
-            // 如果当前状态是有的情况，那么要准确的判断是不是和 currentState 完全 match，这里要用 fixedProperties 来 match.
-            if (currentState.value) {
-                let relationMatch = baseRelationMatch
-
-                Object.entries(currentState.value).forEach(([key, value]) => {
-                    relationMatch = relationMatch.and({
-                        key,
-                        value: ['=', value]
-                    })
-                })
-
-
-                const matchedRelation = await this.controller.system.storage.findOneRelationByName(relationName, relationMatch)
-                if (matchedRelation) {
-                    const matchExp = {
-                        key: 'id',
-                        value: ['=', matchedRelation.id]
-                    } as MatchAtom
-
-                    if(!nextState.value) {
-                        // 转移成删除
-                        await this.controller.system.storage.removeRelationByName(relationName, MatchExp.atom(matchExp), innerMutationEvents)
-                    } else {
-                        // TODO 除了 fixedProperties 还有 propertyHandle 来计算 动态的 property
-                        await this.controller.system.storage.updateRelationByName(relationName, MatchExp.atom(matchExp), nextState.value, innerMutationEvents)
-                    }
-                }
-
-            } else {
-                // 这是 currentState 是没有的状态。应该没有关系才算匹配
-                const matchedRelation = await this.controller.system.storage.findOneRelationByName(relationName, baseRelationMatch)
-                if (!matchedRelation) {
-                    // 没有数据才说明匹配
-                    // 转移 变成有
-                    await this.controller.system.storage.addRelationByNameById(relationName, sourceRef.id, targetRef.id, nextState.value, innerMutationEvents)
-                }
-            }
-
-            events.push(...innerMutationEvents)
+    async transferRelationState(targets: ComputeRelationTargetResult, transfer: KlassInstance<typeof StateTransfer>) {
+        const pairs = this.getRelationSourceTargetPairs(targets)
+        for (const [source, target] of pairs) {
+            await this.controller.system.updateRelationState(
+                this.dataContext.id,
+                source,
+                target,
+                transfer.fromState.value,
+                transfer.toState.value
+            )
         }
-
-        return events
     }
 }
 ComputedDataHandle.Handles.set(StateMachine, StateMachineHandle)

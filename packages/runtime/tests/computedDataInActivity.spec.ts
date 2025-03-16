@@ -11,7 +11,7 @@ import {
     Relation,
     removeAllInstance,
     State
-} from "@interaqt/runtime";
+} from '@';
 import '../computedDataHandles/index.js'
 import {MatchExp} from '@interaqt/storage'
 
@@ -42,9 +42,9 @@ describe('computed data in activity', () => {
     beforeEach(async () => {
         removeAllInstance()
         const { data }  = (await import('./data/activity'))
-        createInstances(data, false)
+        createInstances(data)
 
-        // createInstances(data, false)
+        // createInstances(data)
         /**
          * 当前的格式为:
          * New && Other Admin as A
@@ -58,7 +58,7 @@ describe('computed data in activity', () => {
         system.conceptClass = KlassByName
         controller = new Controller(
             system,
-            [...Entity.instances].filter(e => !e.isRef),
+            [...Entity.instances].filter(e => (e as any).isRef === false),
             [...Relation.instances],
             [...Activity.instances],
             [...Interaction.instances],

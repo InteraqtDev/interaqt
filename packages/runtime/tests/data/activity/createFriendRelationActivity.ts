@@ -17,7 +17,7 @@ import {
     StateNode,
     StateTransfer,
     Transfer
-} from "@interaqt/runtime";
+} from '@';
 import {OtherAttr} from "./roles.js";
 import {UserEntity} from "./user.js";
 import {messageEntity} from "./messageEntity.js";

@@ -6,7 +6,7 @@ import "./roles.js";
 import "./states.js";
 import "./friend.js";
 import "./post.js"
-import {removeAllInstance, stringifyAllInstances} from "@interaqt/runtime";
+import {removeAllInstance, stringifyAllInstances} from '@';
 
 
 export const data = JSON.parse(stringifyAllInstances())

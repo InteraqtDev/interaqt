@@ -316,11 +316,7 @@ export class ActivityCall {
         return (await this.system.getActivity(match))[0]
     }
     async setActivity(activityId: string, value: any) {
-        const match = MatchExp.atom({
-            key: 'id',
-            value: ['=', activityId],
-        })
-        return await this.system.updateActivity(match, value)
+        await this.system.storage.set('Activity', activityId, value)
     }
     async setState(activityId: string, state: any) {
         const match = MatchExp.atom({
@@ -417,7 +413,7 @@ export class ActivityCall {
         await this.setActivity( activityId, {refs})
     }
 
-    checkUserRef = async (attributive: KlassInstance<typeof Attributive, false>, eventUser: EventUser, activityId: string): Promise<boolean> => {
+    checkUserRef = async (attributive: KlassInstance<typeof Attributive>, eventUser: EventUser, activityId: string): Promise<boolean> => {
         assert(attributive.isRef, 'attributive must be ref')
         const refs = (await this.getActivity(activityId))?.refs
         return refs[attributive.name!] === eventUser.id

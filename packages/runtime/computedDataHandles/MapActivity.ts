@@ -7,10 +7,10 @@ import {assert} from "../util.js";
 
 
 export class MapActivityHandle extends ComputedDataHandle {
-    data!: KlassInstance<typeof Entity, false>
+    data!: KlassInstance<typeof Entity>
     mapItems!: Map<string, {
-        activity: KlassInstance<typeof Activity, false>
-        interaction: KlassInstance<typeof Interaction, false>
+        activity: KlassInstance<typeof Activity>
+        interaction: KlassInstance<typeof Interaction>
         computeTarget: (data: InteractionEventArgs, activityId?: string) => any
         handle: (interactionEvents: InteractionEvent[], args: InteractionEventArgs, activityId?: string) => any
     }>
@@ -26,7 +26,7 @@ export class MapActivityHandle extends ComputedDataHandle {
         return undefined
     }
     parseComputedData() {
-        const computedData = this.computedData as unknown as  KlassInstance<typeof MapActivity, false>
+        const computedData = this.computedData as unknown as KlassInstance<typeof MapActivity>
         this.mapItems = new Map()
 
         computedData.items.forEach(({activity, map, computeTarget, triggerInteractions}) => {
@@ -47,7 +47,7 @@ export class MapActivityHandle extends ComputedDataHandle {
     setupSchema() {
         // 如果是 map to record，那么要记录一下关系，后面再触发的时候，自动判断是更新 record 还是
         if (this.computedDataType === 'entity' || this.computedDataType === 'relation') {
-            const thisEntity = (this.dataContext.id as KlassInstance<typeof Entity, false>)
+            const thisEntity = (this.dataContext.id as KlassInstance<typeof Entity>)
 
             this.controller.relations.push(Relation.create({
                 source: thisEntity,
@@ -55,7 +55,7 @@ export class MapActivityHandle extends ComputedDataHandle {
                 target: activityEntity,
                 relType: '1:1',
                 targetProperty: thisEntity.name.toLowerCase(),
-            }))
+            } as any))
         }
     }
     addEventListener() {
@@ -89,7 +89,7 @@ export class MapActivityHandle extends ComputedDataHandle {
         //     })
         // })
     }
-    onCallInteraction = async (interaction: KlassInstance<typeof Interaction, false>, interactionEventArgs: InteractionEventArgs, activityId?: string) => {
+    onCallInteraction = async (interaction: KlassInstance<typeof Interaction>, interactionEventArgs: InteractionEventArgs, activityId?: string) => {
         assert(activityId !== undefined, 'activityId should not be undefined')
 
         // 还没有数据，尝试执行 map 函数看能不能得到数据
@@ -121,7 +121,7 @@ export class MapActivityHandle extends ComputedDataHandle {
         return events
 
     }
-    async updateProperty(newValue: any, interaction: KlassInstance<typeof Interaction, false>,interactionEventArgs: InteractionEventArgs, activityId: string|undefined) {
+    async updateProperty(newValue: any, interaction: KlassInstance<typeof Interaction>,interactionEventArgs: InteractionEventArgs, activityId: string|undefined) {
         const {computeTarget} = this.mapItems.get(interaction.uuid)!
 
         const events: RecordMutationEvent[] = []

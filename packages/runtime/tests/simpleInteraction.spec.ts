@@ -1,7 +1,6 @@
 import {beforeEach, describe, expect, test} from "vitest";
-import {Controller} from "../Controller.js";
-import {MonoSystem} from "../MonoSystem.js";
-import {BoolExp, Interaction, KlassByName, removeAllInstance} from "@interaqt/runtime";
+import {Controller, MonoSystem, BoolExp, Interaction, KlassByName, removeAllInstance} from '../index.js';
+
 
 // 里面有所有必须的数据？
 type User = {
@@ -10,7 +9,7 @@ type User = {
     [k:string]: any
 }
 
-describe('map interaction', () => {
+describe('simple interaction', () => {
 
     let system: MonoSystem
     let createRequestUUID: string
@@ -24,7 +23,6 @@ describe('map interaction', () => {
     beforeEach(async () => {
         removeAllInstance()
         const { entities, relations, interactions} = (await import('./data/leaveRequestSimple.js'))
-
         system = new MonoSystem()
         system.conceptClass = KlassByName
         controller = new Controller(

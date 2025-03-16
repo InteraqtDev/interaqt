@@ -20,7 +20,7 @@ export type Storage = {
     get: (itemName: string, id: string, initialValue?: any) => Promise<any>
     set: (itemName: string, id: string, value: any, events?: RecordMutationEvent[]) => Promise<any>,
     // er存储
-    setup: (entities: KlassInstance<typeof Entity, false>[], relations: KlassInstance<typeof Relation, false>[], createTables?: boolean) => any
+    setup: (entities: KlassInstance<typeof Entity>[], relations: KlassInstance<typeof Relation>[], createTables?: boolean) => any
     findOne: (entityName: string, ...arg: any[]) => Promise<any>,
     update: (entityName: string, ...arg: any[]) => Promise<any>,
     find: (entityName: string, ...arg: any[]) => Promise<any[]>,
@@ -69,7 +69,13 @@ export interface System {
     conceptClass: Map<string, ReturnType<typeof createClass>>
     storage: Storage
     logger: SystemLogger
-    setup: (entities: KlassInstance<typeof Entity, false>[], relations: KlassInstance<typeof Relation, false>[], install?: boolean) => Promise<any>
+    setup: (entities: KlassInstance<typeof Entity>[], relations: KlassInstance<typeof Relation>[], install?: boolean) => Promise<any>
+    
+    // Add missing methods
+    updateEntityPropertyState: (entityId: any, target: any, propertyId: any, fromState: any, toState: any) => Promise<any>
+    updateGlobalState: (id: any, fromState: any, toState: any) => Promise<any>
+    updateEntityState: (entityId: any, target: any, fromState: any, toState: any) => Promise<any>
+    updateRelationState: (relationId: any, source: any, target: any, fromState: any, toState: any) => Promise<any>
 }
 
 export type EntityIdRef = {

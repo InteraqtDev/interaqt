@@ -1,7 +1,7 @@
 import {beforeEach, describe, expect, test} from "vitest";
 import {Controller} from "../Controller.js";
 import {MonoSystem} from "../MonoSystem.js";
-import {BoolExp} from "@interaqt/runtime";
+import {BoolExp} from '@';
 import {draftInteraction, publishInteraction, userEntity} from "./data/stateMachine.js";
 
 

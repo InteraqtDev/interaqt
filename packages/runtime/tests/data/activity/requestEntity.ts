@@ -10,7 +10,7 @@ import {
     RelationBasedAny,
     RelationBasedEvery,
     RelationCount
-} from "@interaqt/runtime";
+} from '@';
 import {messageEntity} from "./messageEntity.js";
 
 export const requestEntity = Entity.create({

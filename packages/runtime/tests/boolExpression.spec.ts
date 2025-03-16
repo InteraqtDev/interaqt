@@ -1,5 +1,5 @@
 import {describe, expect, test} from "vitest";
-import {EvaluateError, parse} from "@interaqt/runtime";
+import {EvaluateError, parse} from '@';
 
 const handle = (data: AtomType) => /^true/i.test(data.key)
 

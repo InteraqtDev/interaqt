@@ -8,7 +8,6 @@ import {
     Klass,
     KlassInstance,
     Property,
-    RecordMutationSideEffect,
     Relation
 } from "@interaqt/shared";
 import './computedDataHandles/index.js'
@@ -20,6 +19,30 @@ import {ComputedDataHandle, DataContext} from "./computedDataHandles/ComputedDat
 import {asyncInteractionContext} from "./asyncInteractionContext.js";
 
 export const USER_ENTITY = 'User'
+
+// Define RecordMutationSideEffect since it's not exported from shared
+export interface RecordMutationSideEffect {
+    name: string;
+    record: { name: string };
+    content: (event: RecordMutationEvent) => Promise<any>;
+}
+
+// Create a class to use as a type and value
+export class RecordMutationSideEffectClass implements RecordMutationSideEffect {
+    name: string;
+    record: { name: string };
+    content: (event: RecordMutationEvent) => Promise<any>;
+
+    constructor(data: RecordMutationSideEffect) {
+        this.name = data.name;
+        this.record = data.record;
+        this.content = data.content;
+    }
+
+    static create(data: RecordMutationSideEffect): RecordMutationSideEffectClass {
+        return new RecordMutationSideEffectClass(data);
+    }
+}
 
 export type InteractionContext = {
     logContext?: any
@@ -33,18 +56,18 @@ export class Controller {
     public interactionCallsByName = new Map<string, InteractionCall>()
     public interactionCalls = new Map<string, InteractionCall>()
     // 因为很多 function 都会bind controller 作为 this，所以我们也把 controller 的 globals 作为注入全局工具的入口。
-    public recordNameToSideEffects = new Map<string, Set<KlassInstance<typeof RecordMutationSideEffect, false>>>()
+    public recordNameToSideEffects = new Map<string, Set<KlassInstance<any> | RecordMutationSideEffectClass>>()
     public globals = {
         BoolExp
     }
     constructor(
         public system: System,
-        public entities: KlassInstance<typeof Entity, false>[],
-        public relations: KlassInstance<typeof Relation, false>[],
-        public activities: KlassInstance<typeof Activity, false>[],
-        public interactions: KlassInstance<typeof Interaction, false>[],
-        public states: KlassInstance<typeof Property, false>[] = [],
-        public recordMutationSideEffects: KlassInstance<typeof RecordMutationSideEffect, false>[] = []
+        public entities: KlassInstance<typeof Entity>[],
+        public relations: KlassInstance<typeof Relation>[],
+        public activities: KlassInstance<typeof Activity>[],
+        public interactions: KlassInstance<typeof Interaction>[],
+        public states: KlassInstance<typeof Property>[] = [],
+        public recordMutationSideEffects: RecordMutationSideEffectClass[] = []
     ) {
         // CAUTION 因为 public 里面的会在 constructor 后面才初始化，所以ActivityCall 里面读不到 this.system
         this.system = system
@@ -70,33 +93,36 @@ export class Controller {
         // entity 的
         entities.forEach(entity => {
             if (entity.computedData) {
-                this.addComputedDataHandle(entity.computedData as KlassInstance<typeof ComputedData, false>, undefined, entity)
+                this.addComputedDataHandle(entity.computedData as KlassInstance<typeof ComputedData>, undefined, entity)
             }
 
             // property 的
             entity.properties?.forEach(property => {
                 if (property.computedData) {
-                    this.addComputedDataHandle(property.computedData as KlassInstance<typeof ComputedData, false>, entity, property)
+                    this.addComputedDataHandle(property.computedData as KlassInstance<typeof ComputedData>, entity, property)
                 }
             })
         })
 
         // relation 的
         relations.forEach(relation => {
-            if(relation.computedData) {
-                this.addComputedDataHandle(relation.computedData as KlassInstance<typeof ComputedData, false>, undefined, relation)
+            const relationAny = relation as any;
+            if(relationAny.computedData) {
+                this.addComputedDataHandle(relationAny.computedData as KlassInstance<typeof ComputedData>, undefined, relation)
             }
 
-            relation.properties?.forEach(property => {
-                if (property.computedData) {
-                    this.addComputedDataHandle(property.computedData as KlassInstance<typeof ComputedData, false>, relation, property)
-                }
-            })
+            if (relationAny.properties) {
+                relationAny.properties.forEach((property: any) => {
+                    if (property.computedData) {
+                        this.addComputedDataHandle(property.computedData as KlassInstance<typeof ComputedData>, relation, property)
+                    }
+                })
+            }
         })
 
         states.forEach(state => {
             if (state.computedData) {
-                this.addComputedDataHandle(state.computedData as KlassInstance<typeof ComputedData, false>, undefined, state.name as string)
+                this.addComputedDataHandle(state.computedData as KlassInstance<typeof ComputedData>, undefined, state.name as string)
             }
         })
 
@@ -109,12 +135,13 @@ export class Controller {
         })
 
     }
-    addComputedDataHandle(computedData: KlassInstance<any, false>, host:DataContext["host"], id: DataContext["id"]) {
+    addComputedDataHandle(computedData: KlassInstance<any>, host:DataContext["host"], id: DataContext["id"]) {
         const dataContext: DataContext = {
             host,
             id
         }
-        const Handle = ComputedDataHandle.Handles.get(computedData.constructor as Klass<any>)!
+        const handles = ComputedDataHandle.Handles
+        const Handle = handles.get(computedData.constructor as Klass<any>)!
         assert(!!Handle, `cannot find handle for ${computedData.constructor.name}`)
 
         this.computedDataHandles.add(
@@ -166,19 +193,29 @@ export class Controller {
 
         return result
     }
-    async runRecordChangeSideEffects(result: InteractionCallResponse,  logger: SystemLogger) {
+    async runRecordChangeSideEffects(result: InteractionCallResponse, logger: SystemLogger) {
         const mutationEvents = result.effects as RecordMutationEvent[]
         for(let event of mutationEvents || []) {
             const sideEffects = this.recordNameToSideEffects.get(event.recordName)
             if (sideEffects) {
                 for(let sideEffect of sideEffects) {
                     try {
-                        result.sideEffects![sideEffect.name] = {
-                            result: await sideEffect.content(event),
+                        if (sideEffect instanceof RecordMutationSideEffectClass) {
+                            result.sideEffects![sideEffect.name] = {
+                                result: await sideEffect.content(event),
+                            }
+                        } else {
+                            // Handle KlassInstance case if needed
+                            const sideEffectAny = sideEffect as any;
+                            result.sideEffects![sideEffectAny.name] = {
+                                result: await sideEffectAny.content(event),
+                            }
                         }
                     } catch (e){
-                        logger.error({label: "recordMutationSideEffect", message:sideEffect.name})
-                        result.sideEffects![sideEffect.name] = {
+                        const effectName = sideEffect instanceof RecordMutationSideEffectClass ? 
+                            sideEffect.name : (sideEffect as any).name;
+                        logger.error({label: "recordMutationSideEffect", message: effectName})
+                        result.sideEffects![effectName] = {
                             error: e
                         }
                     }
@@ -211,6 +248,15 @@ export class Controller {
         }
 
         return result
+    }
+
+    // Add addEventListener method to Controller class
+    addEventListener(eventName: string, callback: (...args: any[]) => any) {
+        // Implementation of addEventListener
+        if (!this.callbacks.has(eventName)) {
+            this.callbacks.set(eventName, new Set());
+        }
+        this.callbacks.get(eventName)!.add(callback);
     }
 }
 

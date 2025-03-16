@@ -6,7 +6,7 @@ import {EVENT_RECORD, InteractionEventRecord, RecordMutationEvent} from "../Syst
 
 
 export class MapInteractionHandle extends ComputedDataHandle {
-    data!: KlassInstance<typeof Entity, false>
+    data!: KlassInstance<typeof Entity>
     mapItems!: Map<string, {
         computeTarget: (data: InteractionEventArgs, activityId?: string) => any
         handle: (data: InteractionEventArgs, activityId?: string) => any
@@ -23,7 +23,7 @@ export class MapInteractionHandle extends ComputedDataHandle {
         return undefined
     }
     parseComputedData() {
-        const computedData = this.computedData as unknown as  KlassInstance<typeof MapInteraction, false>
+        const computedData = this.computedData as unknown as KlassInstance<typeof MapInteraction>
         this.mapItems = new Map(computedData.items.map(({interaction, map, computeTarget}) => {
             return [interaction.uuid, {
                 handle: map,

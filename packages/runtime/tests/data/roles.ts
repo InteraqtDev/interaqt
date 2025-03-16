@@ -1,4 +1,4 @@
-import {createUserRoleAttributive, Attributive} from "@interaqt/runtime";
+import {createUserRoleAttributive, Attributive} from '@';
 
 export const NewAttr = Attributive.create({
     name: 'New',

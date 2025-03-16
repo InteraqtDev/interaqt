@@ -12,7 +12,7 @@ import {
     removeAllInstance,
     State,
     createDataAPI
-} from "@interaqt/runtime";
+} from '@';
 import {startServer} from "../server.js";
 import {MatchAtom} from "@interaqt/storage";
 
@@ -50,9 +50,9 @@ describe('server test', () => {
     beforeAll(async () => {
         removeAllInstance()
         const {data} = (await import('./data/activity'))
-        createInstances(data, false)
+        createInstances(data)
 
-        // createInstances(data, false)
+        // createInstances(data)
         /**
          * 当前的格式为:
          * New && Other Admin as A
@@ -65,7 +65,7 @@ describe('server test', () => {
         system.conceptClass = KlassByName
         controller = new Controller(
             system,
-            [...Entity.instances].filter(e => !e.isRef),
+            [...Entity.instances].filter(e => (e as any).isRef === false),
             [...Relation.instances],
             [...Activity.instances],
             [...Interaction.instances],

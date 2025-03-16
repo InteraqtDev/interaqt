@@ -9,7 +9,7 @@ import {
     StateNode,
     StateTransfer,
     StateMachine
-} from "@interaqt/runtime";
+} from '@';
 
 const statusProperty = Property.create({
     name: 'status',

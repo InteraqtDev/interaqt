@@ -22,15 +22,15 @@ import {
     StateTransfer,
     stringifyAllInstances,
     USER_ENTITY
-} from "@interaqt/runtime";
+} from '@';
 import {OtherAttr} from "./roles";
 
 const UserEntity = Entity.create({ name: USER_ENTITY })
 const nameProperty = Property.create({ name: 'name', type: PropertyTypes.String })
 UserEntity.properties.push(nameProperty)
 
-export const globalUserRole = createUserRoleAttributive({name: 'user'}, {isReactive: true})
-const userRefA = createUserRoleAttributive({name: 'A', isRef: true}, {isReactive: true})
+export const globalUserRole = createUserRoleAttributive({name: 'user'}  )
+const userRefA = createUserRoleAttributive({name: 'A', isRef: true})
 
 const RequestEntity= Entity.create({
     name: 'Request',
@@ -149,7 +149,7 @@ const rejectInteraction = Interaction.create({
 // 加签
 export const addReviewersInteraction = Interaction.create({
     name: 'addReviewers',
-    userRef: createUserRoleAttributive({name: '', isRef: true}, {isReactive: true}),
+    userRef: createUserRoleAttributive({name: '', isRef: true}),
     action: Action.create({name: 'addReviewers'}),
     payload: Payload.create({
         items: [
@@ -175,7 +175,7 @@ export const addReviewersInteraction = Interaction.create({
 // 转移
 export const transferReviewersInteraction = Interaction.create({
     name: 'transferReviewer',
-    userRef: createUserRoleAttributive({name: '', isRef: true}, {isReactive: true}),
+    userRef: createUserRoleAttributive({name: '', isRef: true}),
     action: Action.create({name: 'transferReviewer'}),
     payload: Payload.create({
         items: [

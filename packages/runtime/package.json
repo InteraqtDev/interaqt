@@ -14,8 +14,7 @@
     "vitest": "^3.0.8"
   },
   "scripts": {
-    "test": "vitest | pino-pretty",
-    "test:run": "vitest run | pino-pretty",
+    "test": "vitest run | pino-pretty",
     "build": "rimraf dist && tsc -p ./tsconfig.prod.json",
     "type": "api-extractor run",
     "build-all": "npm run build && npm run type",
@@ -33,7 +32,7 @@
   "license": "MIT",
   "dependencies": {
     "@fastify/middie": "^9.0.3",
-    "@interaqt/shared": "^1.0.29",
+    "@interaqt/shared": "^2.0.1",
     "@interaqt/storage": "^1.0.8",
     "acorn": "^8.14.1",
     "better-sqlite3": "^11.8.1",

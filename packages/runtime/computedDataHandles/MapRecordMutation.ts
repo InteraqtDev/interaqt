@@ -5,15 +5,15 @@ import {RecordMutationEvent} from "../System.js";
 import {IncrementalComputedDataHandle, StatePatch} from "./IncrementalComputedDataHandle.js";
 
 export class MapInteractionHandle extends IncrementalComputedDataHandle {
-    data!: KlassInstance<typeof Entity, false>
+    data!: KlassInstance<typeof Entity>
     mapItem!: (mutationEvent: RecordMutationEvent, mutationEvents: RecordMutationEvent[], lastValue: any) => any
     computeTarget?: (mutationEvent: RecordMutationEvent, mutationEvents: RecordMutationEvent[], lastValue: any) => any
-    constructor(controller: Controller , computedData: KlassInstance<typeof ComputedData, false> , dataContext:  DataContext) {
+    constructor(controller: Controller, computedData: KlassInstance<typeof ComputedData>, dataContext: DataContext) {
         super(controller, computedData, dataContext);
     }
     parseComputedData() {
-        const computedData = this.computedData as unknown as  KlassInstance<typeof MapRecordMutation, false>
-        this.data = this.dataContext.id as KlassInstance<typeof Entity, false>
+        const computedData = this.computedData as unknown as KlassInstance<typeof MapRecordMutation>
+        this.data = this.dataContext.id as KlassInstance<typeof Entity>
         this.mapItem = (computedData.map! as (mutationEvent: RecordMutationEvent, mutationEvents: RecordMutationEvent[]) => any ).bind(this.controller)
         this.computeTarget = computedData.computeTarget?.bind(this.controller)
     }

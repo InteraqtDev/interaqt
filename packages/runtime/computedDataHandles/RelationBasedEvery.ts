@@ -8,27 +8,31 @@ export class RelationBasedEveryHandle extends ComputedDataHandle {
     totalCountField: string= `${this.propertyName}_total_count`
     notEmpty? :boolean
     setupSchema() {
-        const computedData = this.computedData as unknown as KlassInstance<typeof RelationBasedEvery, false>
+        const computedData = this.computedData as KlassInstance<typeof RelationBasedEvery>
         const matchCountField = `${this.propertyName}_match_count`
         const totalCountField = `${this.propertyName}_total_count`
         // 新赠两个 count
         const matchCountProperty = Property.create({
             name: matchCountField,
             type: 'number',
-            collection: false,
             computedData: RelationCount.create({
                 relation: computedData.relation,
                 relationDirection: computedData.relationDirection,
                 match: computedData.match
             })
-        })
-        this.dataContext.host?.properties!.push(matchCountProperty)
-        this.controller.addComputedDataHandle(matchCountProperty.computedData!, this.dataContext.host, matchCountProperty)
+        } as any)
+        
+        // Use type assertion for host.properties
+        const host = this.dataContext.host as any;
+        if (host && host.properties) {
+            host.properties.push(matchCountProperty);
+        }
+        
+        this.controller.addComputedDataHandle(matchCountProperty.computedData as KlassInstance<any>, this.dataContext.host, matchCountProperty)
 
         const totalCountProperty = Property.create({
             name: totalCountField,
             type: 'number',
-            collection: false,
             computedData: RelationCount.create({
                 relation: computedData.relation,
                 relationDirection: computedData.relationDirection,
@@ -36,9 +40,13 @@ export class RelationBasedEveryHandle extends ComputedDataHandle {
                     return true
                 }
             })
-        })
-        this.dataContext.host?.properties!.push(totalCountProperty)
-        this.controller.addComputedDataHandle(totalCountProperty.computedData!, this.dataContext.host, totalCountProperty)
+        } as any)
+        
+        if (host && host.properties) {
+            host.properties.push(totalCountProperty);
+        }
+        
+        this.controller.addComputedDataHandle(totalCountProperty.computedData as KlassInstance<any>, this.dataContext.host, totalCountProperty)
     }
     parseComputedData(){
         // FIXME setupSchema 里面也想用怎么办？setupSchema 是在 super.constructor 里面调用的。在那个里面 注册的话又会被
@@ -48,7 +56,7 @@ export class RelationBasedEveryHandle extends ComputedDataHandle {
         this.userComputeEffect = this.computeEffect
         this.userFullCompute = this.isMatchCountEqualTotalCount
 
-        const computedData = this.computedData as unknown as KlassInstance<typeof RelationBasedEvery, false>
+        const computedData = this.computedData as KlassInstance<typeof RelationBasedEvery>
         this.notEmpty = computedData.notEmpty
     }
 

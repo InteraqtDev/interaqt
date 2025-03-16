@@ -42,7 +42,7 @@ import {
     stringifyAllInstances,
     Transfer,
     USER_ENTITY
-} from "@interaqt/runtime";
+} from '@';
 
 const userRefA = createUserRoleAttributive({name: 'A', isRef: true})
 

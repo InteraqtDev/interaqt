@@ -69,9 +69,13 @@ class MonoStorage implements Storage{
             return this.callWithEvents(this.queryHandle!.create.bind(this.queryHandle), [SYSTEM_RECORD, { concept, key: key.toString(), value: encodeURI(JSON.stringify(value))}], events)
         }
     }
-    async setup(entities: KlassInstance<typeof Entity, false>[], relations: KlassInstance<typeof Relation, false>[], createTables = false) {
+    async setup(entities: KlassInstance<typeof Entity>[], relations: KlassInstance<typeof Relation>[], createTables = false) {
         await this.db.open()
-        const dbSetup = new DBSetup(entities, relations, this.db)
+        const dbSetup = new DBSetup(
+            entities as any, 
+            relations as any, 
+            this.db
+        )
         if (createTables) await dbSetup.createTables()
         this.queryHandle = new EntityQueryHandle( new EntityToTableMap(dbSetup.map), this.db)
 
@@ -183,7 +187,119 @@ export class MonoSystem implements System {
             refs: JSONParse(activity.refs),
         }))
     }
-    setup(entities: KlassInstance<typeof Entity, false>[], relations: KlassInstance<typeof Relation, false>[], install = false){
-        return this.storage.setup([...entities, systemEntity, eventEntity, activityEntity], relations, install)
+    setup(entities: KlassInstance<typeof Entity>[], relations: KlassInstance<typeof Relation>[], install = false){
+        // Create a type that matches what DBSetup expects
+        type DBSetupEntityType = KlassInstance<typeof Entity> & { isRef?: boolean };
+        
+        // Function to ensure entities have the required properties
+        const prepareEntity = (entity: KlassInstance<typeof Entity>): DBSetupEntityType => {
+            const entityAny = entity as any;
+            if (entityAny.isRef === undefined) {
+                entityAny.isRef = false;
+            }
+            return entityAny as DBSetupEntityType;
+        };
+        
+        // Prepare all entities including system entities
+        const preparedEntities = [
+            ...entities.map(prepareEntity),
+            prepareEntity(systemEntity as KlassInstance<typeof Entity>),
+            prepareEntity(eventEntity as KlassInstance<typeof Entity>),
+            prepareEntity(activityEntity as KlassInstance<typeof Entity>)
+        ];
+        
+        // Pass the prepared entities to storage.setup
+        return this.storage.setup(
+            preparedEntities as any, 
+            relations, 
+            install
+        );
+    }
+
+    // Implement the missing methods
+    async updateEntityPropertyState(entityId: any, target: any, propertyId: any, fromState: any, toState: any): Promise<any> {
+        const match = MatchExp.atom({key: 'id', value: ['=', target.id]})
+        const entity = await this.storage.findOne(entityId, match)
+        if (entity && entity[propertyId] === fromState) {
+            return this.storage.update(entityId, match, {[propertyId]: toState})
+        }
+        return null
+    }
+
+    async updateGlobalState(id: any, fromState: any, toState: any): Promise<any> {
+        const currentState = await this.storage.get('state', id)
+        if (currentState === fromState) {
+            return this.storage.set('state', id, toState)
+        }
+        return null
+    }
+
+    async updateEntityState(entityId: any, target: any, fromState: any, toState: any): Promise<any> {
+        const baseMatch = MatchExp.atom({key: 'id', value: ['=', target.id]})
+        
+        if (fromState) {
+            let match = baseMatch
+            Object.entries(fromState || {}).forEach(([key, value]) => {
+                match = match.and({key, value: ['=', value]})
+            })
+            
+            const matchedEntity = await this.storage.findOne(entityId, match)
+            if (matchedEntity) {
+                if (!toState) {
+                    // Delete entity
+                    return this.storage.delete(entityId, MatchExp.atom({key: 'id', value: ['=', matchedEntity.id]}))
+                } else {
+                    // Update entity
+                    return this.storage.update(entityId, MatchExp.atom({key: 'id', value: ['=', matchedEntity.id]}), toState)
+                }
+            }
+        } else {
+            // Check if entity doesn't exist
+            const matchedEntity = await this.storage.findOne(entityId, baseMatch)
+            if (!matchedEntity && toState) {
+                // Create entity
+                return this.storage.create(entityId, toState)
+            }
+        }
+        return null
+    }
+
+    async updateRelationState(relationId: any, source: any, target: any, fromState: any, toState: any): Promise<any> {
+        const baseRelationMatch = MatchExp.atom({
+            key: 'source.id',
+            value: ['=', source.id]
+        }).and({
+            key: 'target.id',
+            value: ['=', target.id]
+        })
+        
+        if (fromState) {
+            let relationMatch = baseRelationMatch
+            Object.entries(fromState).forEach(([key, value]) => {
+                relationMatch = relationMatch.and({
+                    key,
+                    value: ['=', value]
+                })
+            })
+            
+            const matchedRelation = await this.storage.findOneRelationByName(relationId, relationMatch)
+            if (matchedRelation) {
+                if (!toState) {
+                    // Remove relation
+                    return this.storage.removeRelationByName(relationId, MatchExp.atom({key: 'id', value: ['=', matchedRelation.id]}))
+                } else {
+                    // Update relation
+                    return this.storage.updateRelationByName(relationId, MatchExp.atom({key: 'id', value: ['=', matchedRelation.id]}), toState)
+                }
+            }
+        } else {
+            // Check if relation doesn't exist
+            const matchedRelation = await this.storage.findOneRelationByName(relationId, baseRelationMatch)
+            if (!matchedRelation && toState) {
+                // Create relation
+                return this.storage.addRelationByNameById(relationId, source.id, target.id, toState)
+            }
+        }
+        return null
     }
 }

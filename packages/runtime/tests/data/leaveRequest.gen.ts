@@ -20,7 +20,7 @@ import {
     RelationBasedAny,
     RelationBasedEvery,
     RelationCount
-} from "@interaqt/runtime";
+} from '@';
 
 
 

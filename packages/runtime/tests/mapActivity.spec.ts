@@ -12,7 +12,7 @@ import {
     removeAllInstance,
     State,
     BoolExp
-} from "@interaqt/runtime";
+} from '@';
 
 // 里面有所有必须的数据？
 type User = {
@@ -39,9 +39,9 @@ describe('map activity', () => {
     beforeEach(async () => {
         removeAllInstance()
         const { data }  = (await import('./data/activity/index.js'))
-        createInstances(data, false)
+        createInstances(data)
 
-        // createInstances(data, false)
+        // createInstances(data)
         /**
          * 当前的格式为:
          * New && Other Admin as A
@@ -55,7 +55,7 @@ describe('map activity', () => {
         system.conceptClass = KlassByName
         controller = new Controller(
             system,
-            [...Entity.instances].filter(e => !e.isRef),
+            [...Entity.instances].filter(e => (e as any).isRef === false),
             [...Relation.instances],
             [...Activity.instances],
             [...Interaction.instances],

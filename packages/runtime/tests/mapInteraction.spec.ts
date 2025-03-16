@@ -11,7 +11,7 @@ import {
     Relation,
     removeAllInstance,
     State
-} from "@interaqt/runtime";
+} from '@';
 import {AttributeError} from "../InteractionCall.js";
 
 // 里面有所有必须的数据？
@@ -34,9 +34,9 @@ describe('map interaction', () => {
     beforeEach(async () => {
         removeAllInstance()
         const {data} = (await import('./data/leaveRequest'))
-        createInstances(data, false)
+        createInstances(data)
 
-        // createInstances(data, false)
+        // createInstances(data)
         /**
          * 当前的格式为:
          * New && Other Admin as A
@@ -50,7 +50,7 @@ describe('map interaction', () => {
         system.conceptClass = KlassByName
         controller = new Controller(
             system,
-            [...Entity.instances].filter(e => !e.isRef),
+            [...Entity.instances].filter(e => (e as any).isRef === false),
             [...Relation.instances],
             [...Activity.instances],
             [...Interaction.instances],

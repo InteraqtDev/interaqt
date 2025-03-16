@@ -18,7 +18,7 @@
     "lib": ["esnext", "dom"],
     "types": ["node"],
     "paths": {
-        "@interaqt/runtime": ["index.ts"]
+        "@": ["index.ts"]
     }
   },
   "include": [

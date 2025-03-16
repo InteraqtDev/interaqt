@@ -7,8 +7,8 @@ import {MatchExp} from '@interaqt/storage'
 
 
 export type DataContext = {
-    host?: KlassInstance<typeof Entity, false>| KlassInstance<typeof Relation, false>
-    id: KlassInstance<typeof Entity, false>| KlassInstance<typeof Relation, false>| KlassInstance<typeof Property, false>|string
+    host?: KlassInstance<typeof Entity> | KlassInstance<typeof Relation>
+    id: KlassInstance<typeof Entity> | KlassInstance<typeof Relation> | KlassInstance<typeof Property> | string
 }
 
 export type ComputedEffect = any
@@ -23,7 +23,7 @@ export class ComputedDataHandle {
     public recordName?: string
     public propertyName?: string
     public stateName?: string
-    constructor(public controller: Controller , public computedData: KlassInstance<any, false> , public dataContext:  DataContext) {
+    constructor(public controller: Controller, public computedData: KlassInstance<any>, public dataContext: DataContext) {
         this.computedDataType = (!dataContext.host && typeof dataContext.id === 'string' )?
             'global' :
             dataContext.id instanceof Entity ?
@@ -33,12 +33,12 @@ export class ComputedDataHandle {
                     'property'
 
         if (this.computedDataType === 'property') {
-            this.recordName = (this.dataContext.host as KlassInstance<typeof Entity, false>).name
-            this.propertyName = (this.dataContext.id as KlassInstance<typeof Property, false>).name
+            this.recordName = (this.dataContext.host as KlassInstance<typeof Entity>).name
+            this.propertyName = (this.dataContext.id as KlassInstance<typeof Property>).name
         } else if (this.computedDataType === 'global') {
             this.stateName = this.dataContext.id as string
         } else if (this.computedDataType === 'entity'|| this.computedDataType === 'relation') {
-            this.recordName = (this.dataContext.id as KlassInstance<typeof Entity, false>).name
+            this.recordName = (this.dataContext.id as KlassInstance<typeof Entity>).name
         }
 
         this.setupSchema()
@@ -60,7 +60,8 @@ export class ComputedDataHandle {
         this.controller.system.storage.listen(async (mutationEvents) => {
             for(let mutationEvent of mutationEvents){
                 // 如果数据是 property，那么创建  host record 的时候要剔重初始数据
-                if (this.computedDataType === 'property' && mutationEvent.type === 'create' && mutationEvent.recordName === this.dataContext.host!.name ) {
+                if (this.computedDataType === 'property' && mutationEvent.type === 'create' && 
+                    mutationEvent.recordName === (this.dataContext.host as any).name ) {
                     await this.insertDefaultPropertyValue(mutationEvent.record)
                 }
 
@@ -80,7 +81,7 @@ export class ComputedDataHandle {
     }
     // parse 用户的 function 等。
     parseComputedData(){
-        const computedData = this.computedData as KlassInstance<typeof ComputedData, false>
+        const computedData = this.computedData as KlassInstance<typeof ComputedData>
         this.userComputeEffect = this.parseComputeEffectFunction(computedData.computeEffect!).bind(this.controller)
         this.userFullCompute = this.parseFullComputeFunction(computedData.computation!).bind(this.controller)
     }

@@ -5,19 +5,24 @@ import {RecordMutationEvent, SYSTEM_RECORD} from "../System.js";
 export class RelationBasedAnyHandle extends ComputedDataHandle {
     matchCountField: string = `${this.stateName}_match_count`
     setupSchema() {
-        const computedData = this.computedData as KlassInstance<typeof Any, false>
+        const computedData = this.computedData as KlassInstance<typeof Any>
         const matchCountField = `${this.stateName}_match_count`
         const matchCountState = State.create({
             name: matchCountField,
             type: 'number',
-            collection: false,
             computedData: Count.create({
                 record: computedData.record,
                 match: computedData.match
             })
-        })
-        this.controller.states.push(matchCountState)
-        this.controller.addComputedDataHandle(matchCountState.computedData!, undefined, matchCountField)
+        } as any)
+        
+        // Use type assertion for controller.states
+        const controller = this.controller as any;
+        if (controller.states) {
+            controller.states.push(matchCountState);
+        }
+        
+        this.controller.addComputedDataHandle(matchCountState.computedData as KlassInstance<any>, undefined, matchCountField)
     }
     parseComputedData(){
         // FIXME setupSchema 里面也想用怎么办？setupSchema 是在 super.constructor 里面调用的。在那个里面 注册的话又会被

@@ -6,33 +6,41 @@ export class EveryHandle extends ComputedDataHandle {
     matchCountField: string = `${this.propertyName}_match_count`
     totalCountField: string= `${this.propertyName}_total_count`
     setupSchema() {
-        const computedData = this.computedData as KlassInstance<typeof Every, false>
+        const computedData = this.computedData as KlassInstance<typeof Every>
         const matchCountField = `${this.stateName}_match_count`
         const totalCountField = `${this.stateName}_total_count`
         // 新赠两个 count
         const matchCountState = State.create({
             name: matchCountField,
             type: 'number',
-            collection: false,
             computedData: Count.create({
                 record: computedData.record,
                 match: computedData.match
             })
-        })
-        this.controller.states.push(matchCountState)
-        this.controller.addComputedDataHandle(matchCountState.computedData!, undefined, matchCountField)
+        } as any)
+        
+        // Use type assertion for controller.states
+        const controller = this.controller as any;
+        if (controller.states) {
+            controller.states.push(matchCountState);
+        }
+        
+        this.controller.addComputedDataHandle(matchCountState.computedData as KlassInstance<any>, undefined, matchCountField)
 
         const totalCountState = State.create({
             name: totalCountField,
             type: 'number',
-            collection: false,
             computedData: Count.create({
                 record: computedData.record,
                 match: ()=>true
             })
-        })
-        this.controller.states.push(totalCountState)
-        this.controller.addComputedDataHandle(totalCountState.computedData!, undefined, totalCountField)
+        } as any)
+        
+        if (controller.states) {
+            controller.states.push(totalCountState);
+        }
+        
+        this.controller.addComputedDataHandle(totalCountState.computedData as KlassInstance<any>, undefined, totalCountField)
     }
     parseComputedData(){
         // FIXME setupSchema 里面也想用怎么办？setupSchema 是在 super.constructor 里面调用的。在那个里面 注册的话又会被
@@ -53,7 +61,7 @@ export class EveryHandle extends ComputedDataHandle {
             mutationEvent.recordName === SYSTEM_RECORD
             && mutationEvent.type === 'update'
             && mutationEvent.record!.concept === 'state'
-            && mutationEvent.record!.key === this.totalCountField || mutationEvent.record!.key ===this.matchCountField
+            && (mutationEvent.record!.key === this.totalCountField || mutationEvent.record!.key === this.matchCountField)
         ) {
             return true
         }

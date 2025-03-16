@@ -12,7 +12,7 @@ import {
     removeAllInstance,
     Controller,
     Interaction, EntityIdRef, RecordMutationSideEffect, RecordMutationEvent
-} from "@interaqt/runtime";
+} from '@';
 import {ActivityCall, ActivityGroupNode} from "../ActivityCall.js";
 
 describe("activity state", () => {
@@ -43,19 +43,20 @@ describe("activity state", () => {
          * message: Message
          */
 
-        createInstances(data, false)
+        createInstances(data)
         system = new MonoSystem()
         system.conceptClass = KlassByName
-        const activities = [...getInstance(Activity) as KlassInstance<typeof Activity, false>[]]
+        const activities = [...getInstance(Activity) as KlassInstance<typeof Activity>[]]
         const entities = [...getInstance(Entity)]
         const relations = [...getInstance(Relation)]
         const interactions = [...getInstance(Interaction)]
 
-        const friendRelation = relations.find(r => r.name === 'User_friends_friends_User')!
+        const friendRelation = relations.find(r => (r as any).name === 'User_friends_friends_User')!
 
         relationCreateEvent = undefined
         relationDeleteEvent = undefined
-        const syncRelationSideEffect = RecordMutationSideEffect.create({
+        const syncRelationSideEffect = // @ts-ignore
+RecordMutationSideEffect.create({
             name: 'syncFriendRelation',
             record: friendRelation,
             content: async function(this: Controller, mutationEvent: RecordMutationEvent) {

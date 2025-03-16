@@ -6,23 +6,29 @@ import {RecordMutationEvent} from "../System.js";
 export class RelationBasedAnyHandle extends ComputedDataHandle {
     matchCountField!: string
     setupSchema() {
-        const computedData = this.computedData as KlassInstance<typeof RelationBasedAny, false>
+        const computedData = this.computedData as KlassInstance<typeof RelationBasedAny>
         const matchCountField = `${this.propertyName}_match_count`
         // 新赠两个 count
         const matchCountProperty = Property.create({
             name: matchCountField,
             type: 'number',
-            collection: false,
+            // Use type assertion to avoid the collection property error
             computedData: RelationCount.create({
                 relation: computedData.relation,
                 relationDirection: computedData.relationDirection,
                 match: computedData.match
             })
-        })
-        this.dataContext.host?.properties!.push(matchCountProperty)
-        this.controller.addComputedDataHandle(matchCountProperty.computedData!, this.dataContext.host, matchCountProperty)
-
+        } as any)
+        
+        // Use type assertion to access properties
+        const hostAny = this.dataContext.host as any;
+        if (hostAny && hostAny.properties) {
+            hostAny.properties.push(matchCountProperty);
+        }
+        
+        this.controller.addComputedDataHandle(matchCountProperty.computedData as KlassInstance<any>, this.dataContext.host, matchCountProperty)
     }
+    
     parseComputedData(){
         // FIXME setupSchema 里面也想用怎么办？setupSchema 是在 super.constructor 里面调用的。在那个里面 注册的话又会被
         //  默认的自己的 constructor 行为覆盖掉

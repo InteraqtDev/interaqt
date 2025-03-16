@@ -73,14 +73,14 @@ export type InteractionCallResponse= {
 }
 
 
-type HandleAttributive = (attributive: KlassInstance<typeof Attributive, false>) => Promise<boolean>
+type HandleAttributive = (attributive: KlassInstance<typeof Attributive>) => Promise<boolean>
 
 type Attributive = {
     content: (...args: any[]) => any
     name: string
 }
 
-type CheckUserRef = (attributive: KlassInstance<typeof Attributive, false>, eventUser: EventUser, activityId: string) => Promise<boolean>
+type CheckUserRef = (attributive: KlassInstance<typeof Attributive>, eventUser: EventUser, activityId: string) => Promise<boolean>
 
 export class InteractionCall {
     system: System
@@ -112,12 +112,12 @@ export class InteractionCall {
         }
         return true
     }
-    async checkMixedAttributive(attributiveData: KlassInstance<typeof Attributive, false>, instance: ConceptInstance) {
+    async checkMixedAttributive(attributiveData: KlassInstance<typeof Attributive>, instance: ConceptInstance) {
         // const attributiveByName = indexBy((UserAttributive.instances as any[]).concat(Entity.instances), 'name')
         return Promise.resolve(true)
     }
     createHandleAttributive(AttributiveClass: typeof Attributive| typeof Attributive, interactionEvent: InteractionEventArgs, target: any) {
-        return (attributive: KlassInstance<typeof Attributive, false>) => {
+        return (attributive: KlassInstance<typeof Attributive>) => {
             return this.checkAttributive(attributive, interactionEvent, target)
         }
     }
@@ -127,14 +127,14 @@ export class InteractionCall {
 
         const userAttributiveCombined =
             Attributives.is(this.interaction.userAttributives) ?
-                BoolExp.fromValue<KlassInstance<typeof Attributive, false>>(
-                    this.interaction.userAttributives!.content! as ExpressionData<KlassInstance<typeof Attributive, false>>
+                BoolExp.fromValue<KlassInstance<typeof Attributive>>(
+                    this.interaction.userAttributives!.content! as ExpressionData<KlassInstance<typeof Attributive>>
                 ) :
-                BoolExp.atom<KlassInstance<typeof Attributive, false>>(
-                    this.interaction.userAttributives as KlassInstance<typeof Attributive, false>
+                BoolExp.atom<KlassInstance<typeof Attributive>>(
+                    this.interaction.userAttributives as KlassInstance<typeof Attributive>
                 )
 
-        const checkHandle = (attributive: KlassInstance<typeof Attributive, false>) => {
+        const checkHandle = (attributive: KlassInstance<typeof Attributive>) => {
             if (attributive.isRef) {
                 return checkUserRef!(attributive, interactionEvent.user, activityId!)
             } else {
@@ -148,15 +148,15 @@ export class InteractionCall {
         throw new AttributeError('check user failed', res)
     }
     // 用来check attributive 形容的后面的  target 到底是不是那个概念的实例。
-    async checkConcept(instance: ConceptInstance, concept: Concept, attributives?: BoolExpressionRawData<KlassInstance<typeof Attributive, false>>, stack: ConceptCheckStack[] = []): Promise<ConceptCheckResponse> {
+    async checkConcept(instance: ConceptInstance, concept: Concept, attributives?: BoolExpressionRawData<KlassInstance<typeof Attributive>>, stack: ConceptCheckStack[] = []): Promise<ConceptCheckResponse> {
         const currentStack = stack.concat({type: 'concept', values: {attributives, concept}})
 
         const conceptRes = await this.isConcept(instance, concept, currentStack)
         if (conceptRes !== true) return conceptRes
 
         if (attributives) {
-            const handleAttributives = (attributive: KlassInstance<typeof Attributive, false>) => this.checkMixedAttributive(attributive, instance)
-            const attrMatchRes = await this.checkAttributives(new BoolExp<KlassInstance<typeof Attributive, false>>(attributives), handleAttributives , currentStack)
+            const handleAttributives = (attributive: KlassInstance<typeof Attributive>) => this.checkMixedAttributive(attributive, instance)
+            const attrMatchRes = await this.checkAttributives(new BoolExp<KlassInstance<typeof Attributive>>(attributives), handleAttributives , currentStack)
             if (attrMatchRes !== true) return attrMatchRes
         }
 
@@ -217,7 +217,7 @@ export class InteractionCall {
         return !!(concept as ConceptAlias).for
     }
 
-    async checkAttributives(attributives: BoolExp<KlassInstance<typeof Attributive, false>>, handleAttributive: HandleAttributive, stack: ConceptCheckStack[] = []) : Promise<ConceptCheckResponse>{
+    async checkAttributives(attributives: BoolExp<KlassInstance<typeof Attributive>>, handleAttributive: HandleAttributive, stack: ConceptCheckStack[] = []) : Promise<ConceptCheckResponse>{
         const result =  await attributives.evaluateAsync(handleAttributive)
         return result === true ? true : {name: '', type: 'matchAttributives', stack, error: result}
     }
@@ -249,12 +249,12 @@ export class InteractionCall {
 
 
             if (payloadDef.isCollection) {
-                const result = await everyWithErrorAsync(payloadItem,(item => this.checkConcept(item, payloadDef.base as KlassInstance<typeof Entity, false>)))
+                const result = await everyWithErrorAsync(payloadItem,(item => this.checkConcept(item, payloadDef.base as KlassInstance<typeof Entity>)))
                 if (result! == true) {
                     throw new AttributeError(`${payloadDef.name} check concept failed`, result)
                 }
             } else {
-                const result = await this.checkConcept(payloadItem, payloadDef.base as KlassInstance<typeof Entity, false>)
+                const result = await this.checkConcept(payloadItem, payloadDef.base as KlassInstance<typeof Entity>)
                 if (result !== true) {
                     throw new AttributeError(`${payloadDef.name} check concept failed`, result)
                 }
@@ -279,8 +279,8 @@ export class InteractionCall {
 
             if (payloadDef.attributives) {
                 const attributives =  Attributives.is(payloadDef.attributives) ?
-                    new BoolExp<KlassInstance<typeof Attributive, false>>(payloadDef.attributives.content as BoolExpressionRawData<KlassInstance<typeof Attributive, false>>) :
-                    BoolExp.atom<KlassInstance<typeof Attributive, false>>(payloadDef.attributives as KlassInstance<typeof Attributive, false>)
+                    new BoolExp<KlassInstance<typeof Attributive>>(payloadDef.attributives.content as BoolExpressionRawData<KlassInstance<typeof Attributive>>) :
+                    BoolExp.atom<KlassInstance<typeof Attributive>>(payloadDef.attributives as KlassInstance<typeof Attributive>)
 
                 // 作为整体是否合法应该放到 condition 里面做
                 if (payloadDef.isCollection) {
@@ -315,11 +315,11 @@ export class InteractionCall {
     async checkCondition(interactionEvent: InteractionEventArgs) {
         if (this.interaction.conditions ) {
             const conditions =  Conditions.is(this.interaction.conditions) ?
-                new BoolExp<KlassInstance<typeof Condition, false>>(this.interaction.conditions.content as BoolExpressionRawData<KlassInstance<typeof Condition, false>>) :
-                BoolExp.atom<KlassInstance<typeof Condition, false>>(this.interaction.conditions as KlassInstance<typeof Condition, false>)
+                new BoolExp<KlassInstance<typeof Condition>>(this.interaction.conditions.content as BoolExpressionRawData<KlassInstance<typeof Condition>>) :
+                BoolExp.atom<KlassInstance<typeof Condition>>(this.interaction.conditions as KlassInstance<typeof Condition>)
 
 
-            const handleAttribute = async (condition: KlassInstance<typeof Condition, false>) => {
+            const handleAttribute = async (condition: KlassInstance<typeof Condition>) => {
                 if (!condition) return true
 
                 if (condition.content) {
@@ -385,7 +385,7 @@ export class InteractionCall {
             if (!payloadDef.isRef ) {
                 const payloadItem = payload![payloadDef.name!]
                 if (payloadItem) {
-                    const recordName = (payloadDef.base as KlassInstance<typeof Entity, false>).name
+                    const recordName = (payloadDef.base as KlassInstance<typeof Entity>).name
                     if (payloadDef.isCollection) {
                         savedPayload[payloadDef.name!] = await Promise.all((payloadItem as any[]).map(async (item) => {
                             const events: RecordMutationEvent[] =[]
@@ -408,11 +408,11 @@ export class InteractionCall {
     async retrieveData(interactionEvent: InteractionEventArgs) {
         const matchFn = this.interaction.dataAttributives ?
             (DataAttributives.is(this.interaction.dataAttributives) ?
-                BoolExp.fromValue<KlassInstance<typeof DataAttributive, false>>(
-                    this.interaction.dataAttributives!.content! as ExpressionData<KlassInstance<typeof DataAttributive, false>>
+                BoolExp.fromValue<KlassInstance<typeof DataAttributive>>(
+                    this.interaction.dataAttributives!.content! as ExpressionData<KlassInstance<typeof DataAttributive>>
                 ) :
-                BoolExp.atom<KlassInstance<typeof DataAttributive, false>>(
-                    this.interaction.dataAttributives as KlassInstance<typeof DataAttributive, false>
+                BoolExp.atom<KlassInstance<typeof DataAttributive>>(
+                    this.interaction.dataAttributives as KlassInstance<typeof DataAttributive>
                 )
             ) :
             undefined
@@ -424,7 +424,7 @@ export class InteractionCall {
 
         let data: any
         if (Entity.is(this.interaction.data) || Relation.is(this.interaction.data)) {
-            const recordName = (this.interaction.data as KlassInstance<typeof Entity, false>).name
+            const recordName = (this.interaction.data as KlassInstance<typeof Entity>).name
             const {modifier: fixedModifier, attributeQuery: fixedAttributeQuery} = Object.fromEntries(
                 this.interaction.query?.items?.map(item => [(item as any).name, (item as any).value as any]) || [])
             const modifier = {...(interactionEvent.query?.modifier||{}), ...(fixedModifier||{})}
@@ -435,7 +435,7 @@ export class InteractionCall {
             data = await this.system.storage.find(recordName, finalMatch, modifier, attributeQuery)
         } else if (Computation.is(this.interaction.data)){
             // computation
-            const { content: computation } = this.interaction.data as KlassInstance<typeof Computation, false>
+            const { content: computation } = this.interaction.data as KlassInstance<typeof Computation>
             data= await computation.call(this.controller, match, interactionEvent.query, interactionEvent )
         } else {
             assert(false,`unknown data type ${this.interaction.data}`)
