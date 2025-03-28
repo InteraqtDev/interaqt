@@ -49,7 +49,7 @@ describe('map interaction', () => {
         system.conceptClass = KlassByName
         controller = new Controller(
             system,
-            [...Entity.instances].filter(e => (e as any).isRef === false),
+            [...Entity.instances].filter(e => !(e as any).isRef),
             [...Relation.instances],
             [...Activity.instances],
             [...Interaction.instances],

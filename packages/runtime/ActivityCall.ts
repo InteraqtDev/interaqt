@@ -316,7 +316,11 @@ export class ActivityCall {
         return (await this.system.getActivity(match))[0]
     }
     async setActivity(activityId: string, value: any) {
-        await this.system.storage.set('Activity', activityId, value)
+        const match = MatchExp.atom({
+            key: 'id',
+            value: ['=', activityId],
+        })
+        return await this.system.updateActivity(match, value)
     }
     async setState(activityId: string, state: any) {
         const match = MatchExp.atom({

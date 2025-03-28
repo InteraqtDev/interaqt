@@ -11,7 +11,9 @@ import {
     KlassInstance,
     removeAllInstance,
     Controller,
-    Interaction, EntityIdRef, RecordMutationSideEffect, RecordMutationEvent
+    Interaction, EntityIdRef,
+    RecordMutationSideEffect,
+    RecordMutationEvent
 } from '@';
 import {ActivityCall, ActivityGroupNode} from "../ActivityCall.js";
 
@@ -55,8 +57,7 @@ describe("activity state", () => {
 
         relationCreateEvent = undefined
         relationDeleteEvent = undefined
-        const syncRelationSideEffect = // @ts-ignore
-RecordMutationSideEffect.create({
+        const syncRelationSideEffect = RecordMutationSideEffect.create({
             name: 'syncFriendRelation',
             record: friendRelation,
             content: async function(this: Controller, mutationEvent: RecordMutationEvent) {

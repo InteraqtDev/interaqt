@@ -9,7 +9,7 @@ import {
     Interaction,
     KlassByName,
     Relation,
-    removeAllInstance,
+    removeAllInstance, SQLiteDB,
     State
 } from '@';
 import {AttributeError} from "../InteractionCall.js";
@@ -45,12 +45,14 @@ describe('map interaction', () => {
          * message: Message
          */
 
-
-        system = new MonoSystem()
+        // const db = new SQLiteDB('test.db')
+        const db = new SQLiteDB(':memory:')
+        system = new MonoSystem(db)
         system.conceptClass = KlassByName
+
         controller = new Controller(
             system,
-            [...Entity.instances].filter(e => (e as any).isRef === false),
+            [...Entity.instances].filter(e => !(e as any).isRef),
             [...Relation.instances],
             [...Activity.instances],
             [...Interaction.instances],
@@ -108,6 +110,7 @@ describe('map interaction', () => {
 
         const requests1 = await controller.system.storage.find('Request', undefined, undefined, ['*', ['from', {attributeQuery: ["*"]}], ['to', {attributeQuery: ["*"]}]])
         expect(requests1.length).toBe(1)
+        debugger
         expect(requests1[0].to.id).toBe(userBId)
         expect(requests1[0].from.id).toBe(userAId)
         expect(requests1[0].approved_match_count).toBe(0)

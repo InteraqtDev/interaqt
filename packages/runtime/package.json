@@ -33,7 +33,7 @@
   "dependencies": {
     "@fastify/middie": "^9.0.3",
     "@interaqt/shared": "^2.0.1",
-    "@interaqt/storage": "^1.0.8",
+    "@interaqt/storage": "^2.0.0",
     "acorn": "^8.14.1",
     "better-sqlite3": "^11.8.1",
     "chalk": "^5.4.1",

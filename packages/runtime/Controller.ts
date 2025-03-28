@@ -21,26 +21,26 @@ import {asyncInteractionContext} from "./asyncInteractionContext.js";
 export const USER_ENTITY = 'User'
 
 // Define RecordMutationSideEffect since it's not exported from shared
-export interface RecordMutationSideEffect {
+export interface IRecordMutationSideEffect {
     name: string;
     record: { name: string };
     content: (event: RecordMutationEvent) => Promise<any>;
 }
 
 // Create a class to use as a type and value
-export class RecordMutationSideEffectClass implements RecordMutationSideEffect {
+export class RecordMutationSideEffect implements IRecordMutationSideEffect {
     name: string;
     record: { name: string };
     content: (event: RecordMutationEvent) => Promise<any>;
 
-    constructor(data: RecordMutationSideEffect) {
+    constructor(data: IRecordMutationSideEffect) {
         this.name = data.name;
         this.record = data.record;
         this.content = data.content;
     }
 
-    static create(data: RecordMutationSideEffect): RecordMutationSideEffectClass {
-        return new RecordMutationSideEffectClass(data);
+    static create(data: IRecordMutationSideEffect): RecordMutationSideEffect {
+        return new RecordMutationSideEffect(data);
     }
 }
 
@@ -56,7 +56,7 @@ export class Controller {
     public interactionCallsByName = new Map<string, InteractionCall>()
     public interactionCalls = new Map<string, InteractionCall>()
     // 因为很多 function 都会bind controller 作为 this，所以我们也把 controller 的 globals 作为注入全局工具的入口。
-    public recordNameToSideEffects = new Map<string, Set<KlassInstance<any> | RecordMutationSideEffectClass>>()
+    public recordNameToSideEffects = new Map<string, Set<KlassInstance<any> | RecordMutationSideEffect>>()
     public globals = {
         BoolExp
     }
@@ -67,7 +67,7 @@ export class Controller {
         public activities: KlassInstance<typeof Activity>[],
         public interactions: KlassInstance<typeof Interaction>[],
         public states: KlassInstance<typeof Property>[] = [],
-        public recordMutationSideEffects: RecordMutationSideEffectClass[] = []
+        public recordMutationSideEffects: RecordMutationSideEffect[] = []
     ) {
         // CAUTION 因为 public 里面的会在 constructor 后面才初始化，所以ActivityCall 里面读不到 this.system
         this.system = system
@@ -200,7 +200,7 @@ export class Controller {
             if (sideEffects) {
                 for(let sideEffect of sideEffects) {
                     try {
-                        if (sideEffect instanceof RecordMutationSideEffectClass) {
+                        if (sideEffect instanceof RecordMutationSideEffect) {
                             result.sideEffects![sideEffect.name] = {
                                 result: await sideEffect.content(event),
                             }
@@ -212,7 +212,7 @@ export class Controller {
                             }
                         }
                     } catch (e){
-                        const effectName = sideEffect instanceof RecordMutationSideEffectClass ? 
+                        const effectName = sideEffect instanceof RecordMutationSideEffect ?
                             sideEffect.name : (sideEffect as any).name;
                         logger.error({label: "recordMutationSideEffect", message: effectName})
                         result.sideEffects![effectName] = {
