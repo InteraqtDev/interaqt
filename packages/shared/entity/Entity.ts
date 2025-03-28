@@ -31,7 +31,7 @@ type PropertyPublic = {
         type: 'function',
         required: false,
     },
-    computedType: {
+    computed: {
         type: 'function',
         required: false,
     },
@@ -98,7 +98,7 @@ export const Property: Klass<PropertyPublic> = createClass({
             required: false,
         },
         // 这个是 property 的值的类型
-        computedType: {
+        computed: {
             type: 'function',
             required: false,
         },
@@ -235,7 +235,7 @@ export const Relation: Klass<any> = createClass({
             required: false,
             computed: (relation: any) => {
                 if (relation.source && relation.target) {
-                    return `${relation.source.name}_${relation.sourceProperty}_${relation.target.name}_${relation.targetProperty}`
+                    return `${relation.source.name}_${relation.sourceProperty}_${relation.targetProperty}_${relation.target.name}`
                 }
                 return ''
             }

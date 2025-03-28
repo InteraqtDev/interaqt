@@ -7,7 +7,7 @@
     "@microsoft/api-extractor": "^7.38.5",
     "rimraf": "^5.0.5",
     "typescript": "^5.3.3",
-    "vitest": "^0.34.6"
+    "vitest": "^3.0.8"
   },
   "files": [
     "dist"

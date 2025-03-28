@@ -229,6 +229,7 @@ export class DBSetup {
         // 3. 根据 Link 补充 record attribute 到 record 里面。方便之后的查询。
         Object.entries(this.map.links).forEach(([relation, relationData]) => {
             assert(!relationData.isSourceRelation || (relationData.sourceProperty === 'source' || relationData.sourceProperty === 'target'), 'virtual relation sourceProperty should only be source/target')
+            if (!this.map.records[relationData.sourceRecord]) debugger
             this.map.records[relationData.sourceRecord].attributes[relationData.sourceProperty] = {
                 type: 'id',
                 isRecord:true,

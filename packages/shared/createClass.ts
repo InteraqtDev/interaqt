@@ -283,7 +283,6 @@ export function createInstances(objects: KlassRawInstanceDataType[]) {
             }
         })
     }
-
     return uuidToInstance
 }
 
@@ -310,6 +309,25 @@ export function stringifyAttribute(obj: any) {
     }
 }
 
+export function rawStructureClone(obj: any, modifier?: (res: any) => any ): typeof obj{
+    let result
+    if (Array.isArray(obj)) {
+      result = obj.map((i: any) => rawStructureClone(i, modifier))
+    } else  if (obj instanceof Map) {
+      result = new Map(Array.from(obj.entries(), ([key, value]: [string, any]) => [key, rawStructureClone(value, modifier)]))
+    } else  if (obj instanceof Set) {
+      result = new Set(Array.from(obj.values(), (x: any) => rawStructureClone(x, modifier)))
+    } else if (isPlainObject(obj)) {
+      result = Object.fromEntries(Object.entries(obj).map(([k,v]: [k: string, v: any]) => [k, rawStructureClone(v, modifier)]))
+    } else {
+      result = obj
+    }
+  
+    // if (Array.isArray(result)) debugger
+    return modifier? modifier(result) : result
+  }
+
+
 export function createClass<T extends KlassMeta>(metadata: T) : Klass<T['public']>{
     if (KlassByName.get(metadata.name)) throw new Error(`Class name must be global unique. ${metadata.name}`)
 
@@ -318,50 +336,16 @@ export function createClass<T extends KlassMeta>(metadata: T) : Klass<T['public'
     }
 
     function stringify(obj: InertKlassInstance<(typeof metadata)['public']>) {
-        try {
-            const publicProps: Record<string, any> = {};
-            
-            // Process each property separately to handle functions correctly
-            for (const [key, propDef] of Object.entries(metadata.public)) {
-                try {
-                    const propValue = obj[key as keyof typeof obj];
-                    
-                    // Special handling for functions
-                    if (typeof propValue === 'function' && propDef.type === 'function') {
-                        publicProps[key] = `func::${propValue.toString()}`;
-                    } else if (isObject(propValue) && !isPlainObject(propValue) && propValue !== null) {
-                        // Handle reference to another instance
-                        try {
-                            publicProps[key] = `uuid::${(propValue as InertKlassInstance<any>).uuid}`;
-                        } catch (e) {
-                            console.error(`Error getting UUID for property ${key}:`, e);
-                            publicProps[key] = null;
-                        }
-                    } else {
-                        // Handle regular values
-                        publicProps[key] = propValue;
-                    }
-                } catch (e) {
-                    console.error(`Error stringifying property ${key}:`, e);
-                    publicProps[key] = null;
-                }
-            }
-            
-            return JSON.stringify({
-                type: metadata.name,
-                options: obj._options,
-                uuid: obj.uuid,
-                public: publicProps
-            } as KlassRawInstanceDataType);
-        } catch (e) {
-            console.error("Error in stringify:", e);
-            return JSON.stringify({
-                type: metadata.name,
-                options: obj._options,
-                uuid: obj.uuid,
-                public: {}
-            });
-        }
+        return JSON.stringify({
+            type: metadata.name,
+            options: obj._options,
+            uuid: obj.uuid,
+            public: Object.fromEntries(Object.entries(metadata.public).map(([key, propDef]) => {
+
+                // CAUTION 任何 Klass 叶子结点都会被替换成 uuid
+                return [key, rawStructureClone(obj[key as keyof typeof obj], stringifyAttribute)]
+            })),
+        } as KlassRawInstanceDataType)
     }
 
     function clone(obj: InertKlassInstance<T['public']>, deepCloneKlass: boolean){
@@ -420,8 +404,10 @@ export function createClass<T extends KlassMeta>(metadata: T) : Klass<T['public'
             })
 
             this._options = options
-            this.uuid = this._options?.uuid || crypto.randomUUID()
-            KlassClass.instances.push(self as InertKlassInstance<typeof metadata.public>)
+            const uuid = this._options?.uuid || crypto.randomUUID()
+            assert(!KlassClass.instances.find(i => i.uuid === uuid), `duplicate uuid in options ${this._options?.uuid}, ${metadata.name}`)
+            this.uuid = uuid
+            KlassClass.instances.push(this as InertKlassInstance<typeof metadata.public>)
         }
     }
 
