@@ -1,202 +1,201 @@
-import {Entity, Property, PropertyTypes, Relation} from "@interaqt/shared";
-import {KlassInstance, removeAllInstance} from "@interaqt/shared";
+import { Entity, Property, Relation, RelationType } from "../../types";
 
 // @ts-ignore
-export function createCommonData(): { entities: KlassInstance<typeof Entity, false>[], relations: KlassInstance<typeof Relation, false>[] } {
+export function createCommonData(): { entities: Entity[], relations: Relation[] } {
 
-    const userEntity = Entity.create({
+    const userEntity: Entity = {
         name: 'User',
         properties: [
-            Property.create({ name: 'name', type: PropertyTypes.String }),
-            Property.create({ name: 'age', type: PropertyTypes.Number })
+            { name: 'name', type: 'String' },
+            { name: 'age', type: 'Number' }
         ]
-    })
+    };
 
-
-    const profileEntity = Entity.create({
+    const profileEntity: Entity = {
         name: 'Profile',
-        properties: [Property.create({ name: 'title', type: PropertyTypes.String })]
-    })
+        properties: [{ name: 'title', type: 'String' }]
+    };
 
-    const fileEntity = Entity.create({
+    const fileEntity: Entity = {
         name: 'File',
-        properties: [Property.create({ name: 'fileName', type: PropertyTypes.String })]
-    })
+        properties: [{ name: 'fileName', type: 'String' }]
+    };
 
-
-    Relation.create({
+    const fileOwnerRelation: Relation = {
         source: fileEntity,
         sourceProperty: 'owner',
         target: userEntity,
         targetProperty: 'file',
-        relType: 'n:1',
+        type: RelationType.ManyToOne,
         properties: [
-            Property.create({ name: 'viewed', type: PropertyTypes.Number })
+            { name: 'viewed', type: 'Number' }
         ]
-    })
+    };
 
-    Relation.create({
+    const profileOwnerRelation: Relation = {
         source: profileEntity,
         sourceProperty: 'owner',
         target: userEntity,
         targetProperty: 'profile',
-        relType: '1:1',
+        type: RelationType.OneToOne,
         properties: [
-            Property.create({ name: 'viewed', type: PropertyTypes.Number })
+            { name: 'viewed', type: 'Number' }
         ]
-    })
+    };
 
-
-    Relation.create({
+    const leaderMemberRelation: Relation = {
         source: userEntity,
         sourceProperty: 'leader',
         target: userEntity,
         targetProperty: 'member',
-        relType: 'n:1'
-    })
+        type: RelationType.ManyToOne,
+        properties: []
+    };
 
-
-
-
-    const friendRelation = Relation.create({
+    const friendRelation: Relation = {
         source: userEntity,
         sourceProperty: 'friends',
         target: userEntity,
         targetProperty: 'friends',
-        relType: 'n:n',
+        type: RelationType.ManyToMany,
         properties: [
-            Property.create({ name: 'level', type: PropertyTypes.Number })
+            { name: 'level', type: 'Number' }
         ]
-    })
+    };
 
-
-
-    const itemEntity = Entity.create({
+    const itemEntity: Entity = {
         name: 'Item',
-        properties: [Property.create({ name: 'itemName', type: PropertyTypes.String })]
-    })
+        properties: [{ name: 'itemName', type: 'String' }]
+    };
 
-    Relation.create({
+    const itemOwnerRelation: Relation = {
         source: userEntity,
         sourceProperty: 'item',
         target: itemEntity,
         targetProperty: 'owner',
-        relType: '1:1',
-        isTargetReliance: true
-    })
+        type: RelationType.OneToOne,
+        isTargetReliance: true,
+        properties: []
+    };
 
-    const teamEntity = Entity.create({
+    const teamEntity: Entity = {
         name: 'Team',
-        properties: [Property.create({ name: 'teamName', type: PropertyTypes.String })]
-    })
+        properties: [{ name: 'teamName', type: 'String' }]
+    };
 
-
-    const locEntity = Entity.create({
+    const locEntity: Entity = {
         name: 'Location',
         properties: [
-            Property.create({ name: 'name', type: PropertyTypes.String })
+            { name: 'name', type: 'String' }
         ]
-    })
+    };
 
-    const matchEntity = Entity.create({
+    const matchEntity: Entity = {
         name: 'Match',
         properties: [
-            Property.create({ name: 'name', type: PropertyTypes.String })
+            { name: 'name', type: 'String' }
         ]
-    })
+    };
 
-    const teamRelation = Relation.create({
+    const teamRelation: Relation = {
         source: userEntity,
         sourceProperty: 'teams',
         target: teamEntity,
         targetProperty: 'members',
-        relType: 'n:n',
+        type: RelationType.ManyToMany,
         properties: [
-            Property.create({ name: 'role', type: PropertyTypes.String}),
+            { name: 'role', type: 'String' }
         ]
-    })
+    };
 
-    Relation.create({
+    const teamBaseRelation: Relation = {
         source: teamRelation,
         sourceProperty: 'base',
         target: locEntity,
         targetProperty: 'belong',
-        relType: '1:1',
-    })
+        type: RelationType.OneToOne,
+        properties: []
+    };
 
-    Relation.create({
+    const teamMatchHostRelation: Relation = {
         source: teamRelation,
         sourceProperty: 'matches',
         target: matchEntity,
         targetProperty: 'host',
-        relType: '1:n',
-    })
+        type: RelationType.OneToMany,
+        properties: []
+    };
 
-    Relation.create({
+    const teamMatchParticipantRelation: Relation = {
         source: teamRelation,
         sourceProperty: 'participates',
         target: matchEntity,
         targetProperty: 'participants',
-        relType: 'n:n',
-    })
+        type: RelationType.ManyToMany,
+        properties: []
+    };
 
-
-    const powerEntity = Entity.create({
+    const powerEntity: Entity = {
         name: 'Power',
         properties: [
-            Property.create({ name: 'powerName', type: PropertyTypes.String })
+            { name: 'powerName', type: 'String' }
         ]
-    })
+    };
 
-    Relation.create({
+    const powerOwnerRelation: Relation = {
         source: userEntity,
         sourceProperty: 'powers',
         target: powerEntity,
         targetProperty: 'owner',
-        relType: '1:n',
-        isTargetReliance: true
-    })
+        type: RelationType.OneToMany,
+        isTargetReliance: true,
+        properties: []
+    };
 
-
-    //  FIXME Group 这个名字不行？？？
-    // department
-    const departmentEntity = Entity.create({
+    const departmentEntity: Entity = {
         name: 'Department',
         properties: [
-            Property.create({ name: 'name', type: PropertyTypes.String })
+            { name: 'name', type: 'String' }
         ]
-    })
+    };
 
-    // group and group relation
-    Relation.create({
+    const departmentHierarchyRelation: Relation = {
         source: departmentEntity,
         sourceProperty: 'parent',
         target: departmentEntity,
         targetProperty: 'children',
-        relType: 'n:1',
-    })
+        type: RelationType.ManyToOne,
+        properties: []
+    };
 
-    // // group and user relation
-    // Relation.create({
-    //     source: groupEntity,
-    //     sourceProperty: 'members',
-    //     target: userEntity,
-    //     targetProperty: 'groups',
-    //     relType: 'n:n',
-    //     properties: [
-    //         Property.create({ name: 'role', type: PropertyTypes.String })
-    //     ]
-    // })
-
-
-    const entities = [...Entity.instances] as KlassInstance<typeof Entity, false>[]
-    const relations = [...Relation.instances] as KlassInstance<typeof Relation, false>[]
-
-    removeAllInstance()
+    const entities: Entity[] = [
+        userEntity,
+        profileEntity,
+        fileEntity,
+        itemEntity,
+        teamEntity,
+        locEntity,
+        matchEntity,
+        powerEntity,
+        departmentEntity
+    ];
+    
+    const relations: Relation[] = [
+        fileOwnerRelation,
+        profileOwnerRelation,
+        leaderMemberRelation,
+        friendRelation,
+        itemOwnerRelation,
+        teamRelation,
+        teamBaseRelation,
+        teamMatchHostRelation,
+        teamMatchParticipantRelation,
+        powerOwnerRelation,
+        departmentHierarchyRelation
+    ];
 
     return {
         entities,
         relations
-    }
-
+    };
 }

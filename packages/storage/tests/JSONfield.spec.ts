@@ -5,8 +5,8 @@ import {SQLiteDB} from '../../runtime/SQLite.js'
 import {EntityToTableMap} from "../erstorage/EntityToTableMap.js";
 import {MatchExp} from "../erstorage/MatchExp.js";
 import {EntityQueryHandle} from "../erstorage/EntityQueryHandle.js";
-import {Entity, Property} from "@interaqt/shared";
 import TestLogger from "./testLogger.js";
+import { Entity, Property } from "../types/entity.js";
 
 describe('json field test', () => {
     let db: SQLiteDB
@@ -15,25 +15,25 @@ describe('json field test', () => {
     let logger
 
     beforeEach(async () => {
-        const userEntity = Entity.create({
+        const userEntity: Entity = {
             name: 'User',
             properties: [
-                Property.create({
+                {
                     name: 'name',
                     type: 'string',
-                }),
-                Property.create( {
+                },
+                {
                     name: 'roles',
                     type: 'string',
-                    collection: true
-                }),
-                Property.create( {
+                    isCollection: true
+                },
+                {
                     name: 'scores',
                     type: 'number',
-                    collection: true
-                })
+                    isCollection: true
+                }
             ]
-        })
+        }
         logger = new TestLogger('', true)
         // @ts-ignore
         db = new SQLiteDB(':memory:', {logger})

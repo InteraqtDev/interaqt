@@ -49,3 +49,8 @@ export function deepMerge(a: ObjectContainer, b: ObjectContainer) {
     })
     return result
 }
+
+
+export function indexBy(arr: any[], key: string) {
+return Object.fromEntries(arr.map(o => [o[key], o]))
+}

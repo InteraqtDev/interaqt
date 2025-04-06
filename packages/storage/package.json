@@ -30,5 +30,8 @@
     ".": {
       "import": "./dist/index.js"
     }
+  },
+  "dependencies": {
+    "acorn": "^8.14.1"
   }
 }
