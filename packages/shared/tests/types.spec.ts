@@ -34,6 +34,7 @@ describe("createClass types", () => {
         const relation = Relation.create({
             source: Entity.create({name: 'test'}),
             target: Entity.create({name: 'test2'}),
+            type: '1:1',
             sourceProperty: 'to2',
             targetProperty: 'to1',
         })

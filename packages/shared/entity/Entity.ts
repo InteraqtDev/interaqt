@@ -206,6 +206,11 @@ export type RelationPublic = {
         options: () => string[],
         defaultValue: () => string
     },
+    type: {
+        type: 'string',
+        collection: false,
+        required: true,
+    },
     computedData: {
         type: Klass<any>[],
         collection: false,
@@ -223,16 +228,17 @@ export type RelationPublic = {
 };
 
 // Create a placeholder for Relation to avoid circular reference
-const RELATION_PLACEHOLDER = {} as unknown as Klass<any>;
+const RELATION_PLACEHOLDER = {} as unknown as Klass<RelationPublic>;
 
 // Use type assertion to avoid circular reference issues
-export const Relation: Klass<any> = createClass({
+export const Relation: Klass<RelationPublic> = createClass({
     name: 'Relation',
     display: (obj: any) => obj.name || `${obj.source?.name || 'unknown'} -> ${obj.target?.name || 'unknown'}`,
     public: {
         name: {
             type: 'string',
             required: false,
+            collection: false,
             computed: (relation: any) => {
                 if (relation.source && relation.target) {
                     return `${relation.source.name}_${relation.sourceProperty}_${relation.targetProperty}_${relation.target.name}`
@@ -243,6 +249,7 @@ export const Relation: Klass<any> = createClass({
         source: {
             type: [Entity, RELATION_PLACEHOLDER],
             required: true,
+            collection: false,
             options(): any[] {
                 return [...getInstance(Entity), ...getInstance(Relation)]
             }
@@ -250,6 +257,7 @@ export const Relation: Klass<any> = createClass({
         sourceProperty: {
             type: 'string',
             required: true,
+            collection: false,
             constraints: {
                 nameNotSameWithProp(thisInstance: any) {
                     const relation = thisInstance as any;
@@ -267,6 +275,7 @@ export const Relation: Klass<any> = createClass({
         target: {
             type: [Entity, RELATION_PLACEHOLDER],
             required: true,
+            collection: false,
             options() {
                 return [...getInstance(Entity), ...getInstance(Relation)]
             }
@@ -274,6 +283,7 @@ export const Relation: Klass<any> = createClass({
         targetProperty: {
             type: 'string',
             required: true,
+            collection: false,
             constraints: {
                 nameNotSameWithProp(thisInstance: any) {
                     const relation = thisInstance as any;
@@ -291,6 +301,7 @@ export const Relation: Klass<any> = createClass({
         isTargetReliance: {
             type: 'boolean',
             required: true,
+            collection: false,
             defaultValue() {
                 return false
             }
@@ -298,12 +309,18 @@ export const Relation: Klass<any> = createClass({
         relType: {
             type: 'string',
             required: true,
+            collection: false,
             options() {
                 return ['oneToOne', 'oneToMany', 'manyToOne', 'manyToMany']
             },
             defaultValue() {
                 return 'oneToOne'
             }
+        },
+        type: {
+            type: 'string',
+            required: true,
+            collection: false,
         },
         computedData: {
             // CAUTION 这里的具体类型等着外面注册 IncrementalComputationHandle 的时候修补
