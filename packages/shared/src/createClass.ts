@@ -2,7 +2,7 @@ import {assert, hasOwn, isObject, isPlainObject} from "./utils.js";
 
 type PrimitivePropType = 'string'|'number'|'boolean'| 'object'|'function'|'null'
 type DefaultValueType = (...args: any[]) => any
-type ComputedValueType = (obj: KlassInstance<any>) => any
+type ComputedValueType = (obj: KlassInstanceOfPublic<any>) => any
 
 type ClassPropType = {
     type?: Klass<any>|Klass<any>[]|PrimitivePropType|PrimitivePropType[],
@@ -41,8 +41,8 @@ export type KlassMeta = {
     // TODO 完成 Private 等等其他
 }
 
-export function getInstance<T extends Klass<any>>(Type: T): KlassInstance<T>[]{
-    return Type.instances as KlassInstance<T>[]
+export function getInstance<T extends Klass<any>>(Type: T): KlassInstanceOfPublic<T["public"]>[]{
+    return Type.instances as KlassInstanceOfPublic<T["public"]>[]
 }
 
 interface PrimitivePropertyMap {
@@ -83,9 +83,9 @@ export type RequiredProps<T extends NonNullable<KlassMeta["public"]>, IS_ARG ext
                     KlassProp<T[Key]["collection"],  T[Key]["instanceType"]>:
                     (
                         T[Key]['type'] extends Klass<any> ?
-                            KlassProp<T[Key]["collection"],  InertKlassInstance<T[Key]['type']['public']>> :
+                            KlassProp<T[Key]["collection"],  KlassInstanceOfPublic<T[Key]['type']['public']>> :
                             T[Key]['type'] extends Klass<any>[] ?
-                                KlassProp<T[Key]["collection"], KlassInstance<Klass<any>> & UnknownInstance>:
+                                KlassProp<T[Key]["collection"], KlassInstanceOfPublic<T[Key]['type'][number]["public"]> & UnknownInstance>:
                                 T[Key]['type'] extends PrimitivePropType ?
                                     KlassProp<T[Key]["collection"],  PrimitivePropertyMap[T[Key]['type']]> :
                                         T[Key]['type'] extends PrimitivePropType[] ?
@@ -108,9 +108,9 @@ export type OptionalProps<T extends NonNullable<KlassMeta["public"]>, IS_ARG  ex
                     KlassProp<T[Key]["collection"],  T[Key]["instanceType"]>:
                     (
                         T[Key]['type'] extends Klass<any> ?
-                            KlassProp<T[Key]["collection"],  InertKlassInstance<T[Key]['type']['public']>> :
+                            KlassProp<T[Key]["collection"],  KlassInstanceOfPublic<T[Key]['type']['public']>> :
                             T[Key]['type'] extends Klass<any>[] ?
-                                KlassProp<T[Key]["collection"], KlassInstance<Klass<any>> & UnknownInstance>:
+                                KlassProp<T[Key]["collection"], KlassInstanceOfPublic<T[Key]['type'][number]["public"]> & UnknownInstance>:
                                 T[Key]['type'] extends PrimitivePropType ?
                                     KlassProp<T[Key]["collection"],  PrimitivePropertyMap[T[Key]['type']]> :
                                     T[Key]['type'] extends PrimitivePropType[] ?
@@ -124,22 +124,22 @@ export type OptionalProps<T extends NonNullable<KlassMeta["public"]>, IS_ARG  ex
 //  参数是有 required 但是没有 defaultValue 的就必填
 //  返回值是有 required 或者有 defaultValue 的就必有
 export type KlassInstanceArgs<T extends NonNullable<KlassMeta["public"]>> = OptionalProps<T, true> & RequiredProps<T, true>
-export type InertKlassInstanceProps<T extends NonNullable<KlassMeta["public"]>> = OptionalProps<T, false> & RequiredProps<T, false>
-export type InertKlassInstance<T extends NonNullable<KlassMeta["public"]>> = InertKlassInstanceProps<T> & KlassInstancePrimitiveProps
+export type KlassInstanceProps<T extends NonNullable<KlassMeta["public"]>> = OptionalProps<T, false> & RequiredProps<T, false>
+export type KlassInstanceOfPublic<T extends NonNullable<KlassMeta["public"]>> = KlassInstanceProps<T> & KlassInstancePrimitiveProps
 
-export type KlassInstance<T extends Klass<any>> = InertKlassInstance<T["public"]>
+export type KlassInstance<T extends Klass<any>> = KlassInstanceOfPublic<T["public"]>
 
 export type Klass<T extends NonNullable<KlassMeta["public"]>> = {
-    new(arg: object, options?: KlassOptions): InertKlassInstance<T>,
-    create(arg: KlassInstanceArgs<T>, options?: KlassOptions): InertKlassInstance<T>,
+    new(arg: object, options?: KlassOptions): KlassInstanceOfPublic<T>,
+    create(arg: KlassInstanceArgs<T>, options?: KlassOptions): KlassInstanceOfPublic<T>,
     displayName: string,
     isKlass: true,
     public: T,
     constraints: KlassMeta['constraints'],
-    instances: KlassInstance<Klass<T>>[],
+    instances: KlassInstanceOfPublic<T>[],
     display? : KlassMeta['display']
-    stringify: (instance: InertKlassInstance<T>) => string
-    parse: () => InertKlassInstance<T>
+    stringify: (instance: KlassInstanceOfPublic<T>) => string
+    parse: () => KlassInstanceOfPublic<T>
     check: (data: object) => boolean
     is: (arg: any) => boolean
     clone: <V>(obj: V, deep: boolean) => V
@@ -185,8 +185,8 @@ function parseInstanceProp(propValue: string, propType: string, propName: string
 }
 
 export function createInstances(objects: KlassRawInstanceDataType[]) {
-    const uuidToInstance = new Map<string, InertKlassInstance<any>>()
-    const unsatisfiedInstances = new Map<InertKlassInstance<any>, object>()
+    const uuidToInstance = new Map<string, KlassInstanceOfPublic<any>>()
+    const unsatisfiedInstances = new Map<KlassInstanceOfPublic<any>, object>()
     objects.forEach(({ type, options = {}, uuid, public: rawProps } :KlassRawInstanceDataType) => {
         assert(!uuidToInstance.get(uuid), `duplicate uuid ${uuid}, ${type}, ${JSON.stringify(rawProps)}`)
         const Klass = KlassByName.get(type)!
@@ -266,8 +266,9 @@ export function createInstances(objects: KlassRawInstanceDataType[]) {
     })
 
     for(let [instance, unsatisfiedProps] of unsatisfiedInstances) {
+        const Klass = instance.constructor as Klass<any>
+
         Object.entries(unsatisfiedProps).forEach(([rawPropName, uuid]) => {
-            const Klass = instance.constructor as Klass<any>
             const [propNameStr, indexStr] = rawPropName.split('.')
             const propName = propNameStr as keyof typeof instance
             const isCollection = Klass.public[propName].collection
@@ -294,7 +295,7 @@ export function stringifyAllInstances() {
     return `[${result.join(',')}]`
 }
 
-export function stringifyInstance(obj: InertKlassInstance<any>) {
+export function stringifyInstance(obj: KlassInstanceOfPublic<any>) {
     const Klass = KlassByName.get(obj._type) as Klass<any>
     return Klass.stringify(obj)
 }
@@ -303,7 +304,7 @@ export function stringifyAttribute(obj: any) {
     if (typeof obj === 'function') {
         return `func::${obj.toString()}`
     } else if((isObject(obj) && !isPlainObject(obj))) {
-        return `uuid::${(obj as InertKlassInstance<any>).uuid}`
+        return `uuid::${(obj as KlassInstanceOfPublic<any>).uuid}`
     } else {
         return obj
     }
@@ -331,11 +332,11 @@ export function rawStructureClone(obj: any, modifier?: (res: any) => any ): type
 export function createClass<T extends KlassMeta>(metadata: T) : Klass<T['public']>{
     if (KlassByName.get(metadata.name)) throw new Error(`Class name must be global unique. ${metadata.name}`)
 
-    function create(fieldValues: InertKlassInstance<T["public"]>, options?: KlassOptions): InertKlassInstance<typeof metadata.public> {
-        return new KlassClass(deepClone(fieldValues), options) as InertKlassInstance<typeof metadata.public>;
+    function create(fieldValues: KlassInstanceOfPublic<T["public"]>, options?: KlassOptions): KlassInstanceOfPublic<typeof metadata.public> {
+        return new KlassClass(deepClone(fieldValues), options) as KlassInstanceOfPublic<typeof metadata.public>;
     }
 
-    function stringify(obj: InertKlassInstance<(typeof metadata)['public']>) {
+    function stringify(obj: KlassInstanceOfPublic<(typeof metadata)['public']>) {
         return JSON.stringify({
             type: metadata.name,
             options: obj._options,
@@ -348,8 +349,8 @@ export function createClass<T extends KlassMeta>(metadata: T) : Klass<T['public'
         } as KlassRawInstanceDataType)
     }
 
-    function clone(obj: InertKlassInstance<T['public']>, deepCloneKlass: boolean){
-        const arg = Object.fromEntries(Object.keys(metadata.public).map(k => [k, deepClone(obj[k as keyof typeof obj], deepCloneKlass)])) as InertKlassInstance<T['public']>
+    function clone(obj: KlassInstanceOfPublic<T['public']>, deepCloneKlass: boolean){
+        const arg = Object.fromEntries(Object.keys(metadata.public).map(k => [k, deepClone(obj[k as keyof typeof obj], deepCloneKlass)])) as KlassInstanceOfPublic<T['public']>
         return KlassClass.create(arg)
     }
 
@@ -357,7 +358,7 @@ export function createClass<T extends KlassMeta>(metadata: T) : Klass<T['public'
         return obj instanceof KlassClass
     }
 
-    function check(data: InertKlassInstance<any>) {
+    function check(data: KlassInstanceOfPublic<any>) {
         // TODO 要check 到底有没有
         if (data.uuid) return true
         // TODO check data is valid or not
@@ -377,17 +378,16 @@ export function createClass<T extends KlassMeta>(metadata: T) : Klass<T['public'
         public static public = metadata.public
         public static constraints = metadata.constraints
         public static display = metadata.display
-        public static instances: InertKlassInstance<typeof metadata.public>[] = []
+        public static instances: KlassInstanceOfPublic<T["public"]>[] = []
         public uuid: string
         constructor(arg: KlassRawInstanceDataType["public"], options? :KlassOptions) {
-            const self = this 
+            const self = this as KlassInstanceOfPublic<T["public"]>
             if (metadata.public) {
-                Object.entries(metadata.public).forEach(([ propName, propDef]: [string, ClassMetaPublicItem]) => {
+                Object.entries(metadata.public as T["public"]).forEach(([ propName, propDef]) => {
                     const initialValue = hasOwn(arg, propName) ? arg[propName as unknown as keyof typeof arg] : propDef.defaultValue?.()
                     
                     if (initialValue!==undefined) {
-                        // @ts-ignore
-                        self[propName] = initialValue
+                        self[propName as keyof typeof self] = initialValue
                     }
                     // TODO 要不要再这里就验证？？？
                 })
@@ -397,17 +397,17 @@ export function createClass<T extends KlassMeta>(metadata: T) : Klass<T['public'
             Object.entries(metadata.public).forEach(([ propName, propDef]: [string, ClassMetaPublicItem]) => {
                 if (propDef.computed) {
                     Object.defineProperty(self, propName, {
-                        get: () => propDef.computed!(self as InertKlassInstance<typeof metadata.public>),
+                        get: () => propDef.computed!(self as KlassInstanceOfPublic<typeof metadata.public>),
                         enumerable: true,
                     })
                 }
             })
 
-            this._options = options
+            this._options = options || {}
             const uuid = this._options?.uuid || crypto.randomUUID()
             assert(!KlassClass.instances.find(i => i.uuid === uuid), `duplicate uuid in options ${this._options?.uuid}, ${metadata.name}`)
             this.uuid = uuid
-            KlassClass.instances.push(this as InertKlassInstance<typeof metadata.public>)
+            KlassClass.instances.push(self)
         }
     }
 
@@ -415,11 +415,11 @@ export function createClass<T extends KlassMeta>(metadata: T) : Klass<T['public'
     return KlassClass as Klass<typeof metadata.public>
 }
 
-export function getUUID(obj: InertKlassInstance<any>): string {
+export function getUUID(obj: KlassInstanceOfPublic<any>): string {
     return obj.uuid || ''
 }
 
-export function getDisplayValue(obj: InertKlassInstance<any>) {
+export function getDisplayValue(obj: KlassInstanceOfPublic<any>) {
     return (obj.constructor as Klass<any>).display?.(obj)
 }
 
@@ -439,8 +439,7 @@ export function deepClone<T>(obj: T, deepCloneKlass?: boolean): T{
         return new Map(Array.from((obj as Map<any, any>).entries()).map(([k, v]) => [k, deepClone(v)])) as T
     }
 
-    // @ts-ignore
-    if (typeof obj?.constructor?.isKlass) return deepCloneKlass ? ((obj as InertKlassInstance<any>)?.constructor as Klass<any>)?.clone(obj as InertKlassInstance<any>, deepCloneKlass) as T: obj
+    if (typeof ((obj as any)?.constructor as Klass<any>)?.isKlass) return deepCloneKlass ? ((obj as KlassInstanceOfPublic<any>)?.constructor as Klass<any>)?.clone(obj as KlassInstanceOfPublic<any>, deepCloneKlass) as T: obj
 
     // TODO 支持其他类型，例如 Date/RegExp/Error
     throw new Error(`unknown type`)

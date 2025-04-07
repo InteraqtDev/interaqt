@@ -16,12 +16,11 @@
     "esModuleInterop": true,
     "removeComments": false,
     "lib": ["esnext", "dom"],
-    "types": [ "node", "acorn"],
+    "types": ["acorn"],
     "rootDir": "."
   },
   "include": [
-    "./",
-    "global.d.ts",
+    "src",
     "tests"
   ]
 }

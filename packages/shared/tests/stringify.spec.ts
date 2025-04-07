@@ -1,5 +1,5 @@
 import {describe, expect, test} from "vitest";
-import {createClass, createInstances, removeAllInstance, stringifyAllInstances} from "../createClass";
+import {createClass, createInstances, removeAllInstance, stringifyAllInstances} from "../src/createClass";
 
 
 const Ref = createClass({

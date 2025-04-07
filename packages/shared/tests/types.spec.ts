@@ -1,7 +1,7 @@
 import {assertType, describe, test} from "vitest";
-import {Entity, Property, PropertyTypes, Relation} from "../entity/Entity.js";
-import {createClass, InertKlassInstance, Klass, KlassInstance, KlassProp} from "../createClass.js";
-import {BoolAtomData, BoolExpressionData} from "../BoolExp.js";
+import {Entity, Property, PropertyTypes, Relation} from "../src/entity/Entity.js";
+import {createClass, Klass, KlassInstance, KlassInstanceOfPublic, KlassProp} from "../src/createClass.js";
+import {BoolAtomData, BoolExpressionData} from "../src/BoolExp.js";
 import {
     ActivityGroup,
     ActivityGroupInstanceType,
@@ -16,7 +16,7 @@ import {
     TransferInstanceType,
     TransferPublicType,
     GetAction
-} from "../activity/Activity.js";
+} from "../src/activity/Activity.js";
 
 
 assertType<(Klass<InteractionPublicType> | Klass<ActivityGroupPublicType> | Klass<GatewayPublicType>)[]>(
@@ -24,7 +24,7 @@ assertType<(Klass<InteractionPublicType> | Klass<ActivityGroupPublicType> | Klas
 )
 
 type MapSource = TransferPublicType['source']['type'] extends Klass<infer SUB_T>[] ?
-    KlassProp<TransferPublicType['source']["collection"], InertKlassInstance<SUB_T>> : number
+    KlassProp<TransferPublicType['source']["collection"], KlassInstanceOfPublic<SUB_T>> : number
 
 
 
@@ -47,7 +47,7 @@ describe("createClass types", () => {
         assertType<keyof (typeof Transfer)["public"]>({} as 'source'|'target'|'name')
         assertType<keyof TransferInstanceType>({} as  'source'|'target'|'name')
         assertType<TransferInstanceType["source"]>({} as InteractionInstanceType|ActivityInstanceType|ActivityGroupInstanceType)
-        assertType<KlassInstance<Klass<TransferPublicType>>["source"]>({} as InteractionInstanceType)
+        assertType<KlassInstanceOfPublic<TransferPublicType>["source"]>({} as InteractionInstanceType)
     })
 
 
@@ -117,13 +117,13 @@ describe("createClass types", () => {
         const i2 = NewClassType.create({name: 'get'})
         const i3 = NewClassType.create({name: 'get'})
         
-        assertType<InertKlassInstance<{name: {type: 'string', required: true}}>>(i1)
-        assertType<InertKlassInstance<{name: {type: 'string', required: true}}>>(i2)
-        assertType<InertKlassInstance<{name: {type: 'string', required: true}}>>(i3)
+        assertType<KlassInstanceOfPublic<{name: {type: 'string', required: true}}>>(i1)
+        assertType<KlassInstanceOfPublic<{name: {type: 'string', required: true}}>>(i2)
+        assertType<KlassInstanceOfPublic<{name: {type: 'string', required: true}}>>(i3)
 
 
         const p1 = Property.create({name: 'role', type: PropertyTypes.String});
-        assertType<InertKlassInstance<{name: {type: 'string', required: true}}>>(p1)
+        assertType<KlassInstanceOfPublic<{name: {type: 'string', required: true}}>>(p1)
         const UserEntity = Entity.create({
             name: 'User',
             properties: [p1],
@@ -131,7 +131,7 @@ describe("createClass types", () => {
     })
 
     test('get action type', () => {
-        assertType<typeof GetAction>( {} as unknown as InertKlassInstance<{name: {type: 'string', required: true}}>)
+        assertType<typeof GetAction>( {} as unknown as KlassInstanceOfPublic<{name: {type: 'string', required: true}}>)
     })
 })
 
