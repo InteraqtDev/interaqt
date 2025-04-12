@@ -53,7 +53,7 @@ export class MapActivityHandle extends ComputedDataHandle {
                 source: thisEntity,
                 sourceProperty: 'activity',
                 target: activityEntity,
-                relType: '1:1',
+                type: '1:1',
                 targetProperty: thisEntity.name.toLowerCase(),
             } as any))
         }

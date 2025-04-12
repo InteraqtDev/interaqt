@@ -10,7 +10,7 @@ export default defineConfig({
     ],
     resolve: {
         alias: {
-            '@interaqt/shared': path.resolve(__dirname, '../shared/index.ts')
+            // '@interaqt/shared': path.resolve(__dirname, '../shared/index.ts')
         }
     }
 })

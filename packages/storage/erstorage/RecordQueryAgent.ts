@@ -1,6 +1,6 @@
+import {BoolExp} from "@interaqt/shared";
 import {EntityToTableMap} from "./EntityToTableMap.js";
 import {assert, setByPath} from "../utils.js";
-import {BoolExp} from './BoolExp.js'
 import {Database, EntityIdRef} from './EntityQueryHandle.js'
 import {FieldMatchAtom, MatchAtom, MatchExp, MatchExpressionData} from "./MatchExp.js";
 import {AttributeQuery, AttributeQueryData, AttributeQueryDataRecordItem} from "./AttributeQuery.js";

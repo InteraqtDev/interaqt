@@ -92,7 +92,7 @@ describe('server test', () => {
         }, {allowAnonymous:true, useNamedParams: true})
 
         startServer(controller,  {
-            port: 8082,
+            port: 8083,
             parseUserId: async (headers) => {
                 // TODO: 从 headers 中获取 userId
                 return headers.userid
@@ -105,19 +105,19 @@ describe('server test', () => {
 
     test('use friend activity to test server', async () => {
 
-        const response = await fetch('http://localhost:8082/ping')
+        const response = await fetch('http://localhost:8083/ping')
         expect(response.status).toBe(200)
         expect(await response.json()).toMatchObject({ message: 'pong' })
 
         // 1. 创建用户 a
-        const resp1 = await post('http://localhost:8082/api/syncUser', {
+        const resp1 = await post('http://localhost:8083/api/syncUser', {
             userId: userAId
         })
         expect(resp1.status).toBe(200)
 
 
         // 2. 创建用户 b
-        await post('http://localhost:8082/api/syncUser', {
+        await post('http://localhost:8083/api/syncUser', {
             userId: userBId
         })
 
@@ -146,7 +146,7 @@ describe('server test', () => {
             }
         }
 
-        const resp2 = await post('http://localhost:8082/interaction', {
+        const resp2 = await post('http://localhost:8083/interaction', {
             activity: 'createFriendRelation',
             interaction: 'sendRequest',
             payload
@@ -167,7 +167,7 @@ describe('server test', () => {
         // // 4. b 接受
         const payload2 = {}
 
-        const resp3 = await post('http://localhost:8082/interaction', {
+        const resp3 = await post('http://localhost:8083/interaction', {
             activity: 'createFriendRelation',
             activityId,
             interaction: 'approve',
@@ -200,7 +200,7 @@ describe('server test', () => {
                 value: ['=', userBId]
             }).toValue()
         ]
-        const resp4 = await post('http://localhost:8082/api/getRequests', params, {
+        const resp4 = await post('http://localhost:8083/api/getRequests', params, {
             "userid": userBId,
         })
         expect(resp4.status).toBe(200)

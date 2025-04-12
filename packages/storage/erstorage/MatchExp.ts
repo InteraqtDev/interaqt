@@ -1,4 +1,4 @@
-import {BoolExp} from "./BoolExp.js";
+import {BoolExp} from "@interaqt/shared";
 import {EntityToTableMap} from "./EntityToTableMap.js";
 import {assert} from "../utils.js";
 import {RecordQueryTree} from "./RecordQuery.js";

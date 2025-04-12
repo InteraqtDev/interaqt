@@ -15,7 +15,7 @@
     "dist"
   ],
   "peerDependencies": {
-    "@interaqt/shared": "^2.0.2"
+    "@interaqt/shared": "^2.1.0"
   },
   "scripts": {
     "test": "vitest run",
@@ -30,8 +30,5 @@
     ".": {
       "import": "./dist/index.js"
     }
-  },
-  "dependencies": {
-    "acorn": "^8.14.1"
   }
 }

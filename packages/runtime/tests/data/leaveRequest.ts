@@ -69,7 +69,7 @@ const sendRequestRelation = Relation.create({
     sourceProperty: 'from',
     target: UserEntity,
     targetProperty: 'request',
-    relType: 'n:1',
+    type: 'n:1',
     computedData:  MapInteraction.create({
         items: [
             MapInteractionItem.create({
@@ -276,7 +276,7 @@ const reviewerRelation = Relation.create({
     sourceProperty: 'to',
     target: UserEntity,
     targetProperty: 'request',
-    relType: 'n:1',
+    type: 'n:1',
     computedData:  reviewerRelationSM,
     properties: [Property.create({
         name: 'result',

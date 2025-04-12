@@ -56,7 +56,7 @@ const supervisorRelation = Relation.create({
     sourceProperty: 'supervisor',
     target: UserEntity,
     targetProperty: 'subordinate',
-    relType: 'n:1',
+    type: 'n:1',
 })
 
 const requestReasonProp = Property.create({
@@ -102,7 +102,7 @@ const sendRequestRelation = Relation.create({
     sourceProperty: 'from',
     target: UserEntity,
     targetProperty: 'request',
-    relType: 'n:1',
+    type: 'n:1',
 })
 
 
@@ -126,7 +126,7 @@ const reviewerRelation = Relation.create({
     sourceProperty: 'reviewer',
     target: UserEntity,
     targetProperty: 'request',
-    relType: 'n:n',
+    type: 'n:n',
 
     properties: [
         isSecondProp,

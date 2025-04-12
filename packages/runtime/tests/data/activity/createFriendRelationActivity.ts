@@ -202,7 +202,7 @@ export const friendRelation = Relation.create({
     sourceProperty: 'friends',
     target: UserEntity,
     targetProperty: 'friends',
-    relType: 'n:n',
+    type: 'n:n',
     computedData: friendRelationSM
 })
 

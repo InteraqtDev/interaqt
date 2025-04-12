@@ -4,13 +4,11 @@ import {
     BoolExp,
     boolExpToAttributives,
     boolExpToDataAttributives,
-    Controller,
     createUserRoleAttributive,
     DataAttributive,
     Entity,
     GetAction,
     Interaction,
-    InteractionEventArgs,
     MapInteraction,
     MapInteractionItem,
     Payload,
@@ -21,7 +19,8 @@ import {
     RelationBasedAny,
     RelationBasedEvery,
     RelationCount
-} from '../../index.js';
+} from '@interaqt/shared';
+import {Controller,InteractionEventArgs,} from '../../index.js'
 
 export const globalUserRole = createUserRoleAttributive({})
 
@@ -38,7 +37,7 @@ const supervisorRelation = Relation.create({
     sourceProperty: 'supervisor',
     target: UserEntity,
     targetProperty: 'subordinate',
-    relType: 'n:1',
+    type: 'n:1',
 })
 
 
@@ -109,7 +108,7 @@ const sendRequestRelation = Relation.create({
     sourceProperty: 'from',
     target: UserEntity,
     targetProperty: 'request',
-    relType: 'n:1',
+    type: 'n:1',
     computedData: MapInteraction.create({
         items: [
             MapInteractionItem.create({
@@ -125,13 +124,15 @@ const sendRequestRelation = Relation.create({
     }),
 })
 
+
 // 主管和 request 的 relation
 const reviewerRelation = Relation.create({
     source: RequestEntity,
     sourceProperty: 'reviewer',
     target: UserEntity,
     targetProperty: 'request',
-    relType: 'n:n',
+    type: 'n:n',
+    // TODO 改 interaction，没有 mapInteractionItem 了
     computedData: MapInteraction.create({
         items: [
             MapInteractionItem.create({
@@ -175,6 +176,7 @@ const reviewerRelation = Relation.create({
             name: 'result',
             type: 'string',
             collection: false,
+            // TODO 改 statemachine
             computedData: MapInteraction.create({
                 items: [
                     MapInteractionItem.create({

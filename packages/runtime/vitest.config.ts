@@ -13,7 +13,7 @@ export default defineConfig({
     resolve: {
         alias: {
             '@': path.resolve(__dirname, './index.ts'),
-            '@interaqt/shared': path.resolve(__dirname, '../shared/index.ts'),
+            '@interaqt/shared': path.resolve(__dirname, '../shared/src/index.ts'),
             '@interaqt/storage': path.resolve(__dirname, '../storage/index.ts')
         }
     }

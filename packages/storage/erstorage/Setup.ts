@@ -140,6 +140,7 @@ export class DBSetup {
     }
     createLink(relationName: string, relation: Relation) {
         const relationWithProps = relation
+        if (!relationWithProps.type) debugger
         return {
             table: relationName,
             relType: relationWithProps.type.split(':'),

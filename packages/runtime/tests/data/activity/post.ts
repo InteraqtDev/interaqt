@@ -91,5 +91,5 @@ export const postRevisionRelation = Relation.create({
     sourceProperty: 'revisions',
     target: postRevisionEntity,
     targetProperty: 'current',
-    relType: '1:n',
+    type: '1:n',
 })
