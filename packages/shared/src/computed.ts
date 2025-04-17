@@ -1,7 +1,7 @@
 import { createClass } from "./createClass.js";
 import { Activity, Interaction } from "./activity/Activity.js";
 import { Entity, Property, Relation } from "./entity/Entity.js";
-import { State } from "./state/State.js";
+import { Dictionary } from "./dictionary/Dictionary.js";
 
 export const StateNode = createClass({
     name: 'StateNode',
@@ -75,7 +75,7 @@ export const StateMachine = createClass({
 Relation.public.computedData.type.push(StateMachine)
 Entity.public.computedData.type.push(StateMachine)
 Property.public.computedData.type.push(StateMachine)
-State.public.computedData.type.push(StateMachine)
+Dictionary.public.computedData.type.push(StateMachine)
 
 
 // ComputedData 的基础结构
@@ -193,7 +193,7 @@ export const Count = createClass({
     }
 })
 
-State.public.computedData.type.push(WeightedSummation, Count)
+Dictionary.public.computedData.type.push(WeightedSummation, Count)
 
 
 // every
@@ -408,7 +408,7 @@ Property.public.computedData.type.push(
     MapRecordMutation as unknown as typeof ComputedData,
 )
 
-State.public.computedData.type.push(
+Dictionary.public.computedData.type.push(
     MapInteraction as unknown as typeof ComputedData,
     MapActivity as unknown as typeof ComputedData,
     MapRecordMutation as unknown as typeof ComputedData,

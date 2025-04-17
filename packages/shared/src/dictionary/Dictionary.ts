@@ -2,8 +2,8 @@ import {createClass, Klass} from "../createClass.js";
 import {PropertyTypes} from "../entity/Entity.js";
 const validNameFormatExp = /^[a-zA-Z0-9_]+$/
 
-export const State = createClass({
-    name: 'State',
+export const Dictionary = createClass({
+    name: 'Dictionary',
     display: (obj: any) => obj.name,
     public: {
         name: {
