@@ -20,4 +20,9 @@ export class RelationCountHandle extends RelationBasedWeightedSummationHandle {
     }
 }
 
-ComputedDataHandle.Handles.set(RelationCount, RelationCountHandle)
+ComputedDataHandle.Handles.set(RelationCount, {
+    global: RelationCountHandle,
+    entity: RelationCountHandle,
+    relation: RelationCountHandle,
+    property: RelationCountHandle
+})

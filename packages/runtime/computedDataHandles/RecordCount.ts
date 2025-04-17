@@ -18,4 +18,9 @@ export class RecordCountHandle extends WeightedSummationHandle {
     }
 }
 
-ComputedDataHandle.Handles.set(Count, RecordCountHandle)
+ComputedDataHandle.Handles.set(Count, {
+    global: RecordCountHandle,
+    entity: RecordCountHandle,
+    relation: RecordCountHandle,
+    property: RecordCountHandle
+})

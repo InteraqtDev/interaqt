@@ -277,4 +277,9 @@ export class StateMachineHandle extends ComputedDataHandle {
         return events
     }
 }
-ComputedDataHandle.Handles.set(StateMachine, StateMachineHandle)
+ComputedDataHandle.Handles.set(StateMachine, {
+    global: StateMachineHandle,
+    entity: StateMachineHandle,
+    relation: StateMachineHandle,
+    property: StateMachineHandle
+})

@@ -25,7 +25,7 @@ export class EveryHandle extends ComputedDataHandle {
             controller.states.push(matchCountState);
         }
         
-        this.controller.addComputedDataHandle(matchCountState.computedData as KlassInstance<any>, undefined, matchCountField)
+        this.controller.addComputedDataHandle('global', matchCountState.computedData as KlassInstance<any>, undefined, matchCountField)
 
         const totalCountState = State.create({
             name: totalCountField,
@@ -40,7 +40,7 @@ export class EveryHandle extends ComputedDataHandle {
             controller.states.push(totalCountState);
         }
         
-        this.controller.addComputedDataHandle(totalCountState.computedData as KlassInstance<any>, undefined, totalCountField)
+        this.controller.addComputedDataHandle('global', totalCountState.computedData as KlassInstance<any>, undefined, totalCountField)
     }
     parseComputedData(){
         // FIXME setupSchema 里面也想用怎么办？setupSchema 是在 super.constructor 里面调用的。在那个里面 注册的话又会被
@@ -74,4 +74,9 @@ export class EveryHandle extends ComputedDataHandle {
     }
 }
 
-ComputedDataHandle.Handles.set(Every, EveryHandle)
+ComputedDataHandle.Handles.set(Every, {
+    global: EveryHandle,
+    entity: EveryHandle,
+    relation: EveryHandle,
+    property: EveryHandle
+})

@@ -22,7 +22,7 @@ export class RelationBasedAnyHandle extends ComputedDataHandle {
             controller.states.push(matchCountState);
         }
         
-        this.controller.addComputedDataHandle(matchCountState.computedData as KlassInstance<any>, undefined, matchCountField)
+        this.controller.addComputedDataHandle('global', matchCountState.computedData as KlassInstance<any>, undefined, matchCountField)
     }
     parseComputedData(){
         // FIXME setupSchema 里面也想用怎么办？setupSchema 是在 super.constructor 里面调用的。在那个里面 注册的话又会被
@@ -54,4 +54,9 @@ export class RelationBasedAnyHandle extends ComputedDataHandle {
     }
 }
 
-ComputedDataHandle.Handles.set(Any, RelationBasedAnyHandle)
+ComputedDataHandle.Handles.set(Any, {
+    global: RelationBasedAnyHandle,
+    entity: RelationBasedAnyHandle,
+    relation: RelationBasedAnyHandle,
+    property: RelationBasedAnyHandle
+})

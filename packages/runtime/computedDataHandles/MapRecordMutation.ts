@@ -51,4 +51,9 @@ export class MapInteractionHandle extends IncrementalComputedDataHandle {
     }
 }
 
-ComputedDataHandle.Handles.set(MapRecordMutation, MapInteractionHandle)
+ComputedDataHandle.Handles.set(MapRecordMutation, {
+    global: MapInteractionHandle,
+    entity: MapInteractionHandle,
+    relation: MapInteractionHandle,
+    property: MapInteractionHandle
+})

@@ -187,4 +187,9 @@ export class MapActivityHandle extends ComputedDataHandle {
     }
 }
 
-ComputedDataHandle.Handles.set(MapActivity, MapActivityHandle)
+ComputedDataHandle.Handles.set(MapActivity, {
+    global: MapActivityHandle,
+    entity: MapActivityHandle,
+    relation: MapActivityHandle,
+    property: MapActivityHandle
+})

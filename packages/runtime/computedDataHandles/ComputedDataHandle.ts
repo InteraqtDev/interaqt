@@ -15,8 +15,16 @@ export type ComputedEffect = any
 
 export type ComputeEffectResult= ComputedEffect|ComputedEffect[]|undefined
 
+
+type HandlesForType = {
+    global?: typeof ComputedDataHandle,
+    entity?: typeof ComputedDataHandle,
+    relation?: typeof ComputedDataHandle,
+    property?: typeof ComputedDataHandle,
+}
+
 export class ComputedDataHandle {
-    public static  Handles: Map<Klass<any>,  typeof ComputedDataHandle> = new Map()
+    public static  Handles: Map<Klass<any>,  HandlesForType> = new Map()
     computedDataType: 'global' | 'entity' | 'relation' | 'property'
     userComputeEffect!: (mutationEvent: any, mutationEvents: any) => Promise<ComputeEffectResult>|ComputeEffectResult
     userFullCompute!: (...args: any[]) => Promise<any>
@@ -145,4 +153,9 @@ export class ComputedDataHandle {
     }
 }
 
-ComputedDataHandle.Handles.set(ComputedData, ComputedDataHandle)
+ComputedDataHandle.Handles.set(ComputedData, { 
+    global: ComputedDataHandle,
+    entity: ComputedDataHandle,
+    relation: ComputedDataHandle,
+    property: ComputedDataHandle
+})

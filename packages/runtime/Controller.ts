@@ -49,6 +49,8 @@ export type InteractionContext = {
     [k: string]: any
 }
 
+export type ComputedDataType = 'global' | 'entity' | 'relation' | 'property'
+
 export class Controller {
     public computedDataHandles = new Set<ComputedDataHandle>()
     public activityCalls = new Map<string, ActivityCall>()
@@ -93,13 +95,13 @@ export class Controller {
         // entity 的
         entities.forEach(entity => {
             if (entity.computedData) {
-                this.addComputedDataHandle(entity.computedData as KlassInstance<typeof ComputedData>, undefined, entity)
+                this.addComputedDataHandle('entity', entity.computedData as KlassInstance<typeof ComputedData>, undefined, entity)
             }
 
             // property 的
             entity.properties?.forEach(property => {
                 if (property.computedData) {
-                    this.addComputedDataHandle(property.computedData as KlassInstance<typeof ComputedData>, entity, property)
+                    this.addComputedDataHandle('property', property.computedData as KlassInstance<typeof ComputedData>, entity, property)
                 }
             })
         })
@@ -108,13 +110,13 @@ export class Controller {
         relations.forEach(relation => {
             const relationAny = relation as any;
             if(relationAny.computedData) {
-                this.addComputedDataHandle(relationAny.computedData as KlassInstance<typeof ComputedData>, undefined, relation)
+                this.addComputedDataHandle('relation', relationAny.computedData as KlassInstance<typeof ComputedData>, undefined, relation)
             }
 
             if (relationAny.properties) {
                 relationAny.properties.forEach((property: any) => {
                     if (property.computedData) {
-                        this.addComputedDataHandle(property.computedData as KlassInstance<typeof ComputedData>, relation, property)
+                        this.addComputedDataHandle('property', property.computedData as KlassInstance<typeof ComputedData>, relation, property)
                     }
                 })
             }
@@ -122,7 +124,7 @@ export class Controller {
 
         states.forEach(state => {
             if (state.computedData) {
-                this.addComputedDataHandle(state.computedData as KlassInstance<typeof ComputedData>, undefined, state.name as string)
+                this.addComputedDataHandle('global', state.computedData as KlassInstance<typeof ComputedData>, undefined, state.name as string)
             }
         })
 
@@ -135,13 +137,13 @@ export class Controller {
         })
 
     }
-    addComputedDataHandle(computedData: KlassInstance<any>, host:DataContext["host"], id: DataContext["id"]) {
+    addComputedDataHandle(computedDataType: ComputedDataType,computedData: KlassInstance<any>, host:DataContext["host"], id: DataContext["id"]) {
         const dataContext: DataContext = {
             host,
             id
         }
         const handles = ComputedDataHandle.Handles
-        const Handle = handles.get(computedData.constructor as Klass<any>)!
+        const Handle = handles.get(computedData.constructor as Klass<any>)![computedDataType]!
         assert(!!Handle, `cannot find handle for ${computedData.constructor.name}`)
 
         this.computedDataHandles.add(

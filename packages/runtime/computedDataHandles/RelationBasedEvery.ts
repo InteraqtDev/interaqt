@@ -28,7 +28,7 @@ export class RelationBasedEveryHandle extends ComputedDataHandle {
             host.properties.push(matchCountProperty);
         }
         
-        this.controller.addComputedDataHandle(matchCountProperty.computedData as KlassInstance<any>, this.dataContext.host, matchCountProperty)
+        this.controller.addComputedDataHandle('property', matchCountProperty.computedData as KlassInstance<any>, this.dataContext.host, matchCountProperty)
 
         const totalCountProperty = Property.create({
             name: totalCountField,
@@ -46,7 +46,7 @@ export class RelationBasedEveryHandle extends ComputedDataHandle {
             host.properties.push(totalCountProperty);
         }
         
-        this.controller.addComputedDataHandle(totalCountProperty.computedData as KlassInstance<any>, this.dataContext.host, totalCountProperty)
+        this.controller.addComputedDataHandle('property', totalCountProperty.computedData as KlassInstance<any>, this.dataContext.host, totalCountProperty)
     }
     parseComputedData(){
         // FIXME setupSchema 里面也想用怎么办？setupSchema 是在 super.constructor 里面调用的。在那个里面 注册的话又会被
@@ -81,4 +81,9 @@ export class RelationBasedEveryHandle extends ComputedDataHandle {
     }
 }
 
-ComputedDataHandle.Handles.set(RelationBasedEvery, RelationBasedEveryHandle)
+ComputedDataHandle.Handles.set(RelationBasedEvery, {
+    global: RelationBasedEveryHandle,
+    entity: RelationBasedEveryHandle,
+    relation: RelationBasedEveryHandle,
+    property: RelationBasedEveryHandle
+})

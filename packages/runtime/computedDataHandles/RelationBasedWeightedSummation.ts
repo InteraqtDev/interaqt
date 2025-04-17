@@ -228,4 +228,9 @@ export class RelationBasedWeightedSummationHandle extends IncrementalComputedDat
     }
 }
 
-ComputedDataHandle.Handles.set(RelationBasedWeightedSummation, RelationBasedWeightedSummationHandle)
+ComputedDataHandle.Handles.set(RelationBasedWeightedSummation, {
+    global: RelationBasedWeightedSummationHandle,
+    entity: RelationBasedWeightedSummationHandle,
+    relation: RelationBasedWeightedSummationHandle,
+    property: RelationBasedWeightedSummationHandle
+})

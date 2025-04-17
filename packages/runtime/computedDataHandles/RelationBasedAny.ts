@@ -26,7 +26,7 @@ export class RelationBasedAnyHandle extends ComputedDataHandle {
             hostAny.properties.push(matchCountProperty);
         }
         
-        this.controller.addComputedDataHandle(matchCountProperty.computedData as KlassInstance<any>, this.dataContext.host, matchCountProperty)
+        this.controller.addComputedDataHandle('property', matchCountProperty.computedData as KlassInstance<any>, this.dataContext.host, matchCountProperty)
     }
     
     parseComputedData(){
@@ -59,4 +59,9 @@ export class RelationBasedAnyHandle extends ComputedDataHandle {
     }
 }
 
-ComputedDataHandle.Handles.set(RelationBasedAny, RelationBasedAnyHandle)
+ComputedDataHandle.Handles.set(RelationBasedAny, {
+    global: RelationBasedAnyHandle,
+    entity: RelationBasedAnyHandle,
+    relation: RelationBasedAnyHandle,
+    property: RelationBasedAnyHandle
+})

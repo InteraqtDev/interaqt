@@ -79,4 +79,9 @@ export class WeightedSummationHandle extends IncrementalComputedDataHandle {
     }
 }
 
-ComputedDataHandle.Handles.set(WeightedSummation, WeightedSummationHandle)
+ComputedDataHandle.Handles.set(WeightedSummation, {
+    global: WeightedSummationHandle,
+    entity: WeightedSummationHandle,
+    relation: WeightedSummationHandle,
+    property: WeightedSummationHandle
+})

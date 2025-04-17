@@ -120,4 +120,9 @@ export class MapInteractionHandle extends ComputedDataHandle {
     }
 }
 
-ComputedDataHandle.Handles.set(MapInteraction, MapInteractionHandle)
+ComputedDataHandle.Handles.set(MapInteraction, {
+    global: MapInteractionHandle,
+    entity: MapInteractionHandle,
+    relation: MapInteractionHandle,
+    property: MapInteractionHandle
+})
