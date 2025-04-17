@@ -4,7 +4,7 @@ import {
     Activity,
     Entity,
     Relation,
-    State,
+    Dictionary,
     createInstances,
     getInstance,
     KlassByName,
@@ -76,7 +76,7 @@ describe("activity state", () => {
             relations,
             activities,
             interactions,
-            getInstance(State),
+            getInstance(Dictionary),
             [syncRelationSideEffect]
         )
         await controller.setup(true)

@@ -10,7 +10,7 @@ import {
     KlassByName,
     Relation,
     removeAllInstance, SQLiteDB,
-    State
+    Dictionary
 } from '@';
 import {AttributeError} from "../InteractionCall.js";
 
@@ -56,7 +56,7 @@ describe('map interaction', () => {
             [...Relation.instances],
             [...Activity.instances],
             [...Interaction.instances],
-            [...State.instances]
+            [...Dictionary.instances]
         )
         await controller.setup(true)
         sendRequestUUID = Interaction.instances!.find(i => i.name === 'sendRequest')!.uuid

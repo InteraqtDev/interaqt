@@ -1,5 +1,5 @@
 import {ComputedDataHandle} from "./ComputedDataHandle.js";
-import {Any, Count, KlassInstance, State} from "@interaqt/shared";
+import {Any, Count, Dictionary, KlassInstance} from "@interaqt/shared";
 import {RecordMutationEvent, SYSTEM_RECORD} from "../System.js";
 
 export class RelationBasedAnyHandle extends ComputedDataHandle {
@@ -7,7 +7,7 @@ export class RelationBasedAnyHandle extends ComputedDataHandle {
     setupSchema() {
         const computedData = this.computedData as KlassInstance<typeof Any>
         const matchCountField = `${this.stateName}_match_count`
-        const matchCountState = State.create({
+        const matchCountState = Dictionary.create({
             name: matchCountField,
             type: 'number',
             computedData: Count.create({

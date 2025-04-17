@@ -10,7 +10,7 @@ import {
     KlassByName,
     Relation,
     removeAllInstance,
-    State
+    Dictionary
 } from '@';
 
 // 里面有所有必须的数据？
@@ -53,7 +53,7 @@ describe('map interaction', () => {
             [...Relation.instances],
             [...Activity.instances],
             [...Interaction.instances],
-            [...State.instances]
+            [...Dictionary.instances]
         )
         await controller.setup(true)
         createPostUUID = Interaction.instances!.find(i => i.name === 'createPost')!.uuid

@@ -1,8 +1,8 @@
 import {friendRelation} from "./createFriendRelationActivity.js";
-import {Any, Count, Every, State} from '@';
+import {Any, Count, Every, Dictionary} from '@';
 import {requestEntity} from "./requestEntity.js";
 
-const totalFriendRelationState = State.create({
+const totalFriendRelationState = Dictionary.create({
     name: 'totalFriendRelation',
     type: 'number',
     collection: false,
@@ -11,7 +11,7 @@ const totalFriendRelationState = State.create({
         match: () => true
     })
 })
-const everyRequestHandledState = State.create({
+const everyRequestHandledState = Dictionary.create({
     name: 'everyRequestHandled',
     type: 'boolean',
     collection: false,
@@ -22,7 +22,7 @@ const everyRequestHandledState = State.create({
         }
     })
 })
-const anyRequestHandledState = State.create({
+const anyRequestHandledState = Dictionary.create({
     name: 'anyRequestHandled',
     type: 'boolean',
     collection: false,
@@ -33,7 +33,7 @@ const anyRequestHandledState = State.create({
         }
     })
 })
-export const states = [
+export const dictionary = [
     totalFriendRelationState,
     everyRequestHandledState,
     anyRequestHandledState,

@@ -1,5 +1,5 @@
 import {ComputedDataHandle} from "./ComputedDataHandle.js";
-import {Count, Every, KlassInstance, State} from "@interaqt/shared";
+import {Count, Every, KlassInstance, Dictionary} from "@interaqt/shared";
 import {RecordMutationEvent, SYSTEM_RECORD} from "../System.js";
 
 export class EveryHandle extends ComputedDataHandle {
@@ -10,7 +10,7 @@ export class EveryHandle extends ComputedDataHandle {
         const matchCountField = `${this.stateName}_match_count`
         const totalCountField = `${this.stateName}_total_count`
         // 新赠两个 count
-        const matchCountState = State.create({
+        const matchCountState = Dictionary.create({
             name: matchCountField,
             type: 'number',
             computedData: Count.create({
@@ -27,7 +27,7 @@ export class EveryHandle extends ComputedDataHandle {
         
         this.controller.addComputedDataHandle('global', matchCountState.computedData as KlassInstance<any>, undefined, matchCountField)
 
-        const totalCountState = State.create({
+        const totalCountState = Dictionary.create({
             name: totalCountField,
             type: 'number',
             computedData: Count.create({

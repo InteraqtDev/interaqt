@@ -10,7 +10,7 @@ import {
     KlassByName,
     Relation,
     removeAllInstance,
-    State,
+    Dictionary,
     createDataAPI
 } from '@';
 import {startServer} from "../server.js";
@@ -69,7 +69,7 @@ describe('server test', () => {
             [...Relation.instances],
             [...Activity.instances],
             [...Interaction.instances],
-            [...State.instances]
+            [...Dictionary.instances]
         )
         await controller.setup(true)
         sendRequestUUID = Interaction.instances!.find(i => i.name === 'sendRequest')!.uuid

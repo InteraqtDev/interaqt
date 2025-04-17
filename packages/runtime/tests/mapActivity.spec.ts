@@ -10,7 +10,7 @@ import {
     KlassByName,
     Relation,
     removeAllInstance,
-    State,
+    Dictionary,
     BoolExp
 } from '@';
 
@@ -59,7 +59,7 @@ describe('map activity', () => {
             [...Relation.instances],
             [...Activity.instances],
             [...Interaction.instances],
-            [...State.instances]
+            [...Dictionary.instances]
         )
         await controller.setup(true)
 

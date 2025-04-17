@@ -10,7 +10,7 @@ import {
     KlassByName,
     Relation,
     removeAllInstance,
-    State
+    Dictionary
 } from '@';
 import '../computedDataHandles/index.js'
 import {MatchExp} from '@interaqt/storage'
@@ -62,7 +62,7 @@ describe('computed data in activity', () => {
             [...Relation.instances],
             [...Activity.instances],
             [...Interaction.instances],
-            [...State.instances]
+            [...Dictionary.instances]
         )
         await controller.setup(true)
 
