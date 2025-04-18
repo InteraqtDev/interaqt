@@ -260,7 +260,7 @@ export const Every = createClass({
             collection: false,
             required: true
         },
-        match: {
+        callback: {
             type: 'function',
             collection: false,
             required: true
