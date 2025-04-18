@@ -2,7 +2,7 @@
   "name": "@interaqt/shared",
   "module": "src/index.ts",
   "type": "module",
-  "version": "2.3.0",
+  "version": "2.4.0",
   "devDependencies": {
     "@microsoft/api-extractor": "^7.38.5",
     "@release-it/conventional-changelog": "^10.0.0",
