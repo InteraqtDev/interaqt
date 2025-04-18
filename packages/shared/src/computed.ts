@@ -185,11 +185,16 @@ export const Count = createClass({
             collection: false,
             required: true
         },
-        match: {
+        callback: {
             type: 'function',
             collection: false,
             required: true
-        }
+        },
+        attributes: {
+            type: 'string',
+            collection: true,
+            required: false
+        },
     }
 })
 
@@ -265,6 +270,11 @@ export const Every = createClass({
             collection: false,
             required: true
         },
+        attributes: {
+            type: 'string',
+            collection: true,
+            required: false
+        },
         notEmpty: {
             type: 'boolean',
             collection: false,
@@ -281,11 +291,16 @@ export const Any = createClass({
             collection: false,
             required: true
         },
-        match: {
+        callback: {
             type: 'function',
             collection: false,
             required: true
-        }
+        },
+        attributes: {
+            type: 'string',
+            collection: true,
+            required: false
+        },
     }
 })
 
