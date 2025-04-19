@@ -10,7 +10,7 @@ export class RecordCountHandle extends WeightedSummationHandle {
     matchExpression!: (record: EntityIdRef, info: KlassInstance<any>) => boolean
     parseComputedData(){
         const computedData = this.computedData as KlassInstance<typeof Count>
-        this.matchExpression = (computedData.match!).bind(this.controller)
+        this.matchExpression = (computedData.callback!).bind(this.controller)
         this.mapRecordToWeight = (record: EntityIdRef, info: KlassInstance<any>): number=>{
             return this.matchExpression(record, info) ? 1 : 0
         }

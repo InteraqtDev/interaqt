@@ -175,6 +175,7 @@ describe('computed data in activity', () => {
         expect(everyRequestHandled1).toBeFalsy()
 
         // 6. 正确 b approve
+        debugger
         const res5 = await controller.callActivityInteraction(makeFriendActivityUUID, approveUUID, activityId, {user: userB})
         expect(res5.error).toBeUndefined()
 

@@ -8,7 +8,7 @@ const totalFriendRelationState = Dictionary.create({
     collection: false,
     computedData: Count.create({
         record: friendRelation,
-        match: () => true
+        callback: () => true
     })
 })
 const everyRequestHandledState = Dictionary.create({
@@ -17,9 +17,10 @@ const everyRequestHandledState = Dictionary.create({
     collection: false,
     computedData: Every.create({
         record: requestEntity,
-        match: (request) => {
+        callback: (request) => {
             return request.handled
-        }
+        },
+        attributes: ['handled']
     })
 })
 const anyRequestHandledState = Dictionary.create({
@@ -28,9 +29,10 @@ const anyRequestHandledState = Dictionary.create({
     collection: false,
     computedData: Any.create({
         record: requestEntity,
-        match: (request) => {
+        callback: (request) => {
             return request.handled
-        }
+        },
+        attributes: ['handled']
     })
 })
 export const dictionary = [

@@ -49,7 +49,7 @@ describe('server test', () => {
 
     beforeAll(async () => {
         removeAllInstance()
-        const {data} = (await import('./data/activity'))
+        const {data} = (await import('./data/activity/index.js'))
         createInstances(data)
 
         // createInstances(data)

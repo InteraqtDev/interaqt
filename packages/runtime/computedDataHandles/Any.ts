@@ -1,6 +1,71 @@
 import {ComputedDataHandle} from "./ComputedDataHandle.js";
 import {Any, Count, Dictionary, KlassInstance} from "@interaqt/shared";
 import {RecordMutationEvent, SYSTEM_RECORD} from "../System.js";
+import { Controller } from "../Controller.js";
+import { DateDep, GlobalBoundState } from "./Computation.js";
+import { DataBasedComputation } from "./Computation.js";
+
+
+export class GlobalAnyHandle implements DataBasedComputation {
+    callback: (this: Controller, item: any) => boolean
+    state!: ReturnType<typeof this.createState>
+    useLastValue: boolean = true
+    dataDeps: {[key: string]: DateDep} = {}
+    constructor(public controller: Controller,  args: KlassInstance<typeof Any>,  public dataContext: DataContext, ) {
+        this.callback = args.callback.bind(this)
+        this.dataDeps = {
+            main: {
+                type: 'record',
+                name:args.record.name,
+                attributes: args.attributes
+            }
+        }
+    }
+
+    createState() {
+        return {
+            matchCount: new GlobalBoundState(0),
+            totalCount: new GlobalBoundState(0),
+        }
+    }
+    
+    getDefaultValue() {
+        return false
+    }
+
+    async compute({main: records}: {main: any[]}): Promise<boolean> {
+        // TODO deps
+        const matchCount = await this.state.matchCount.set(records.filter(this.callback).length)
+
+        return matchCount>0
+    }
+
+    async incrementalCompute(lastValue: boolean, mutationEvent: RecordMutationEvent): Promise<boolean> {
+        let matchCount = await this.state!.matchCount.get()
+        if (mutationEvent.type === 'create') {
+            const newItemMatch = !!this.callback.call(this.controller, mutationEvent.record) 
+            if (newItemMatch === true) {
+                matchCount = await this.state!.matchCount.set(matchCount + 1)
+            }
+        } else if (mutationEvent.type === 'delete') {
+            const oldItemMatch = !!this.callback.call(this.controller, mutationEvent.oldRecord) 
+            if (oldItemMatch === true) {
+                matchCount = await this.state!.matchCount.set(matchCount - 1)
+            }
+        } else if (mutationEvent.type === 'update') {
+            const oldItemMatch = !!this.callback.call(this.controller, mutationEvent.oldRecord) 
+            const newItemMatch = !!this.callback.call(this.controller, mutationEvent.record) 
+            if (oldItemMatch === true && newItemMatch === false) {
+                matchCount = await this.state!.matchCount.set(matchCount - 1)
+            } else if (oldItemMatch === false && newItemMatch === true) {
+                matchCount = await this.state!.matchCount.set(matchCount + 1)
+            }
+        }
+
+        return matchCount>0
+    }
+}
+
 
 export class RelationBasedAnyHandle extends ComputedDataHandle {
     matchCountField: string = `${this.stateName}_match_count`
@@ -12,7 +77,7 @@ export class RelationBasedAnyHandle extends ComputedDataHandle {
             type: 'number',
             computedData: Count.create({
                 record: computedData.record,
-                match: computedData.match
+                callback: computedData.callback
             })
         } as any)
         
@@ -55,8 +120,6 @@ export class RelationBasedAnyHandle extends ComputedDataHandle {
 }
 
 ComputedDataHandle.Handles.set(Any, {
-    global: RelationBasedAnyHandle,
-    entity: RelationBasedAnyHandle,
-    relation: RelationBasedAnyHandle,
+    global: GlobalAnyHandle,
     property: RelationBasedAnyHandle
 })

@@ -9,15 +9,17 @@ export class GlobalEveryHandle implements DataBasedComputation {
     state!: ReturnType<typeof this.createState>
     useLastValue: boolean = true
     dataDeps: {[key: string]: DateDep} = {}
-    constructor(public controller: Controller,  computedData: KlassInstance<typeof Every>,  public dataContext: DataContext, ) {
-        this.callback = computedData.callback.bind(this)
+    defaultValue: boolean
+    constructor(public controller: Controller,  args: KlassInstance<typeof Every>,  public dataContext: DataContext, ) {
+        this.callback = args.callback.bind(this)
         this.dataDeps = {
             main: {
                 type: 'record',
-                name:computedData.record.name,
-                attributes: computedData.attributes
+                name:args.record.name,
+                attributes: args.attributes
             }
         }
+        this.defaultValue = !args.notEmpty
     }
 
     createState() {
@@ -28,11 +30,10 @@ export class GlobalEveryHandle implements DataBasedComputation {
     }
     
     getDefaultValue() {
-        return true
+        return this.defaultValue
     }
 
     async compute({main: records}: {main: any[]}): Promise<boolean> {
-        const recordName = this.dataContext.host!.name
         // TODO deps
 
         const totalCount = await this.state.totalCount.set(records.length)
@@ -83,7 +84,7 @@ export class PropertyEveryHandle extends ComputedDataHandle {
             type: 'number',
             computedData: Count.create({
                 record: computedData.record,
-                match: computedData.match
+                callback: computedData.callback
             })
         } as any)
         
@@ -100,7 +101,7 @@ export class PropertyEveryHandle extends ComputedDataHandle {
             type: 'number',
             computedData: Count.create({
                 record: computedData.record,
-                match: ()=>true
+                callback: ()=>true
             })
         } as any)
         

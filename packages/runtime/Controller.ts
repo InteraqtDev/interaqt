@@ -198,6 +198,7 @@ export class Controller {
                     }
                 }
 
+                // FIXME 这里 createState 要放到 setup 前面，因为可能会修改 entity、relation ???
                 // 1. 创建计算所需要的 state
                 if (computationHandle.createState) {
                     computationHandle.state = await computationHandle.createState()
@@ -226,29 +227,33 @@ export class Controller {
                         if (dep.type === 'record') {
                             this.system.storage.listen(async (mutationEvents) => {
                                 for(let mutationEvent of mutationEvents){
-                                    if (mutationEvent.recordName === dep.name) {
-                                        if (dataBasedComputation.incrementalCompute) {
-                                            let lastValue = undefined
-                                            if (dataBasedComputation.useLastValue) {
-                                                lastValue = await this.retrieveLastValue(dataBasedComputation.dataContext)
-                                            }
-                                            const result = await dataBasedComputation.incrementalCompute(lastValue, mutationEvent)
-                                            // TODO 应用 result
-                                            await this.applyResult(dataBasedComputation.dataContext, result)
+                                    if (mutationEvent.recordName !== dep.name) continue
+                                    // TODO 考虑 * 的情况
+                                    if (mutationEvent.type === 'update' && dep.attributes?.every(attr => mutationEvent.record?.[attr] === undefined)) {
+                                        continue
+                                    }
 
-
-                                        } else if(dataBasedComputation.incrementalPatchCompute){
-                                            const patch = await dataBasedComputation.incrementalPatchCompute(mutationEvent)
-                                            // TODO 应用 patch
-                                            await this.applyResultPatch(dataBasedComputation.dataContext, patch)
-
-
-                                        } else {
-                                            // TODO 需要注入 dataDeps
-                                            const result = await dataBasedComputation.compute()
-                                            // TODO 应用 result
-                                            await this.applyResult(dataBasedComputation.dataContext, result)
+                                    if (dataBasedComputation.incrementalCompute) {
+                                        let lastValue = undefined
+                                        if (dataBasedComputation.useLastValue) {
+                                            lastValue = await this.retrieveLastValue(dataBasedComputation.dataContext)
                                         }
+                                        const result = await dataBasedComputation.incrementalCompute(lastValue, mutationEvent)
+                                        // TODO 应用 result
+                                        await this.applyResult(dataBasedComputation.dataContext, result)
+
+
+                                    } else if(dataBasedComputation.incrementalPatchCompute){
+                                        const patch = await dataBasedComputation.incrementalPatchCompute(mutationEvent)
+                                        // TODO 应用 patch
+                                        await this.applyResultPatch(dataBasedComputation.dataContext, patch)
+
+
+                                    } else {
+                                        // TODO 需要注入 dataDeps
+                                        const result = await dataBasedComputation.compute()
+                                        // TODO 应用 result
+                                        await this.applyResult(dataBasedComputation.dataContext, result)
                                     }
                                 }
                             })
