@@ -17,6 +17,7 @@ import {InteractionEventArgs} from "./types/interaction.js";
 import {assert} from "./util.js";
 import {ComputedDataHandle, DataContext} from "./computedDataHandles/ComputedDataHandle.js";
 import {asyncInteractionContext} from "./asyncInteractionContext.js";
+import { Computation, DataBasedComputation, DateDep, GlobalBoundState, RecordBoundState } from "./computedDataHandles/Computation.js";
 
 export const USER_ENTITY = 'User'
 
@@ -52,7 +53,7 @@ export type InteractionContext = {
 export type ComputedDataType = 'global' | 'entity' | 'relation' | 'property'
 
 export class Controller {
-    public computedDataHandles = new Set<ComputedDataHandle>()
+    public computedDataHandles = new Set<ComputedDataHandle|Computation>()
     public activityCalls = new Map<string, ActivityCall>()
     public activityCallsByName = new Map<string, ActivityCall>()
     public interactionCallsByName = new Map<string, InteractionCall>()
@@ -139,6 +140,13 @@ export class Controller {
     }
     addComputedDataHandle(computedDataType: ComputedDataType,computedData: KlassInstance<any>, host:DataContext["host"], id: DataContext["id"]) {
         const dataContext: DataContext = {
+            type: (!host && typeof id === 'string' )?
+                'global' :
+                id instanceof Entity ?
+                    'entity' :
+                    id instanceof Relation ?
+                        'relation' :
+                        'property',
             host,
             id
         }
@@ -151,24 +159,140 @@ export class Controller {
         )
     }
     async setup(install?: boolean) {
+
         // 1. setup 数据库
         for(const handle of this.computedDataHandles) {
-            handle.parseComputedData()
+            if (handle instanceof ComputedDataHandle) {
+                handle.parseComputedData()
+            }
         }
         // CAUTION 注意这里的 entities/relations 可能被 IncrementalComputationHandle 修改过了
         await this.system.setup(this.entities, this.relations, install)
 
         // 2. 增量计算的字段设置初始值
         for(const handle of this.computedDataHandles) {
-            await handle.setupInitialValue()
+            if (handle instanceof ComputedDataHandle) {
+                await handle.setupInitialValue()
+            }
         }
 
         for(const handle of this.computedDataHandles) {
-            await handle.setupStates()
-            handle.addEventListener()
+            if (handle instanceof ComputedDataHandle) {
+                await handle.setupStates()
+                handle.addEventListener()
+            }
+        }
+       
+
+
+        for(const handle of this.computedDataHandles) {
+            if (!(handle instanceof ComputedDataHandle)) {
+                const computationHandle = handle as Computation
+                // 0. 创建 defaultValue
+                if (computationHandle.getDefaultValue) {
+                    const defaultValue = computationHandle.getDefaultValue()
+                    if (computationHandle.dataContext.type === 'global') {
+                        await this.applyResult(computationHandle.dataContext, defaultValue)
+                    } else {
+                        // TODO ER property 等 defalutValue 的设置
+                    }
+                }
+
+                // 1. 创建计算所需要的 state
+                if (computationHandle.createState) {
+                    computationHandle.state = await computationHandle.createState()
+
+                    for(const [key, state] of Object.entries(computationHandle.state)) {
+                        if (state instanceof GlobalBoundState) {
+                            state.controller = this
+
+                            const globalKey = `${computationHandle.dataContext!.id!}_${key}`
+                            state.globalKey = globalKey
+
+                            if (typeof state.defaultValue !== undefined) {
+                                await this.system.storage.set('state',globalKey, state.defaultValue)
+                            }
+                        } else if (state instanceof RecordBoundState) {
+                            // TODO 需要附加到 ER 上面去。
+                        }
+                    }
+
+                }
+
+                // 2. 根据 data deps 计算出 mutation events
+                if( (computationHandle as DataBasedComputation).compute) {
+                    const dataBasedComputation = computationHandle as DataBasedComputation
+                    Object.entries(dataBasedComputation.dataDeps||{} as {[key: string]: DateDep}).forEach(([key, dep]: [string, DateDep]) => {
+                        if (dep.type === 'record') {
+                            this.system.storage.listen(async (mutationEvents) => {
+                                for(let mutationEvent of mutationEvents){
+                                    if (mutationEvent.recordName === dep.name) {
+                                        if (dataBasedComputation.incrementalCompute) {
+                                            let lastValue = undefined
+                                            if (dataBasedComputation.useLastValue) {
+                                                lastValue = await this.retrieveLastValue(dataBasedComputation.dataContext)
+                                            }
+                                            const result = await dataBasedComputation.incrementalCompute(lastValue, mutationEvent)
+                                            // TODO 应用 result
+                                            await this.applyResult(dataBasedComputation.dataContext, result)
+
+
+                                        } else if(dataBasedComputation.incrementalPatchCompute){
+                                            const patch = await dataBasedComputation.incrementalPatchCompute(mutationEvent)
+                                            // TODO 应用 patch
+                                            await this.applyResultPatch(dataBasedComputation.dataContext, patch)
+
+
+                                        } else {
+                                            // TODO 需要注入 dataDeps
+                                            const result = await dataBasedComputation.compute()
+                                            // TODO 应用 result
+                                            await this.applyResult(dataBasedComputation.dataContext, result)
+                                        }
+                                    }
+                                }
+                            })
+                        } else {
+                            // TODO 别的依赖
+                        }
+                    })
+
+                    
+                    
+                }
+                
+            }
         }
 
         // TODO 如果是恢复模式，还要从 event stack 中开始恢复数据。
+    }
+    async applyResult(dataContext: DataContext, result: any) {
+        if (dataContext.type === 'global') {
+            // TODO 
+            return this.system.storage.set('state', dataContext.id! as string, result)
+        } else if (dataContext.type === 'entity') {
+            // TODO
+        } else if (dataContext.type === 'relation') {
+            // TODO
+        }
+    }
+    async retrieveLastValue(dataContext: DataContext) {
+        if (dataContext.type === 'global') {
+            return this.system.storage.get('state', dataContext.id! as string)
+        } else if (dataContext.type === 'entity') {
+            // TODO
+        } else if (dataContext.type === 'relation') {
+            // TODO
+        }
+    }
+    async applyResultPatch(dataContext: DataContext, patch: any) {
+        if (dataContext.type === 'global') {
+            // TODO
+        } else if (dataContext.type === 'entity') {
+            // TODO
+        } else if (dataContext.type === 'relation') {
+            // TODO
+        }
     }
     callbacks: Map<any, Set<SystemCallback>> = new Map()
 

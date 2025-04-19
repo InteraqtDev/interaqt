@@ -4,9 +4,11 @@ import {Entity, Property, Relation} from "@interaqt/shared";
 import {RecordMutationEvent} from "../System.js";
 import {ComputedData} from "@interaqt/shared";
 import {MatchExp} from '@interaqt/storage'
+import { Computation } from "./Computation.js";
 
 
 export type DataContext = {
+    type: 'global' | 'entity' | 'relation' | 'property'
     host?: KlassInstance<typeof Entity> | KlassInstance<typeof Relation>
     id: KlassInstance<typeof Entity> | KlassInstance<typeof Relation> | KlassInstance<typeof Property> | string
 }
@@ -17,10 +19,10 @@ export type ComputeEffectResult= ComputedEffect|ComputedEffect[]|undefined
 
 
 type HandlesForType = {
-    global?: typeof ComputedDataHandle,
-    entity?: typeof ComputedDataHandle,
-    relation?: typeof ComputedDataHandle,
-    property?: typeof ComputedDataHandle,
+    global?: typeof ComputedDataHandle | { new(...args: any[]): Computation },
+    entity?: typeof ComputedDataHandle | { new(...args: any[]): Computation },
+    relation?: typeof ComputedDataHandle | { new(...args: any[]): Computation },
+    property?: typeof ComputedDataHandle | { new(...args: any[]): Computation },
 }
 
 export class ComputedDataHandle {

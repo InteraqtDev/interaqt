@@ -29,7 +29,7 @@ describe('Every computed handle', () => {
                 collection: false,
                 computedData: Every.create({
                     record: requestEntity,
-                    match: (request:any) => {
+                    callback: (request:any) => {
                         return request.handled
                     }
                 })

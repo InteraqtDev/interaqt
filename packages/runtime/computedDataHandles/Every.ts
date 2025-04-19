@@ -1,8 +1,76 @@
 import {ComputedDataHandle} from "./ComputedDataHandle.js";
 import {Count, Every, KlassInstance, Dictionary} from "@interaqt/shared";
 import {RecordMutationEvent, SYSTEM_RECORD} from "../System.js";
+import { DataBasedComputation, DateDep, GlobalBoundState, RecordBoundState } from "./Computation.js";
+import { Controller } from "../Controller.js";
+import { DataContext } from "./ComputedDataHandle.js";
+export class GlobalEveryHandle implements DataBasedComputation {
+    callback: (this: Controller, item: any) => boolean
+    state!: ReturnType<typeof this.createState>
+    useLastValue: boolean = true
+    dataDeps: {[key: string]: DateDep} = {}
+    constructor(public controller: Controller,  computedData: KlassInstance<typeof Every>,  public dataContext: DataContext, ) {
+        this.callback = computedData.callback.bind(this)
+        this.dataDeps = {
+            main: {
+                type: 'record',
+                name:computedData.record.name,
+                attributes: computedData.attributes
+            }
+        }
+    }
 
-export class EveryHandle extends ComputedDataHandle {
+    createState() {
+        return {
+            matchCount: new GlobalBoundState(0),
+            totalCount: new GlobalBoundState(0),
+        }
+    }
+    
+    getDefaultValue() {
+        return true
+    }
+
+    async compute({main: records}: {main: any[]}): Promise<boolean> {
+        const recordName = this.dataContext.host!.name
+        // TODO deps
+
+        const totalCount = await this.state.totalCount.set(records.length)
+        const matchCount = await this.state.matchCount.set(records.filter(this.callback).length)
+
+        return matchCount === totalCount
+    }
+
+    async incrementalCompute(lastValue: boolean, mutationEvent: RecordMutationEvent): Promise<boolean> {
+        let totalCount = await this.state!.totalCount.get()
+        let matchCount = await this.state!.matchCount.get()
+        if (mutationEvent.type === 'create') {
+            totalCount = await this.state!.totalCount.set(totalCount + 1)
+            const newItemMatch = !!this.callback.call(this.controller, mutationEvent.record) 
+            if (newItemMatch === true) {
+                matchCount = await this.state!.matchCount.set(matchCount + 1)
+            }
+        } else if (mutationEvent.type === 'delete') {
+            totalCount = await this.state!.totalCount.set(totalCount - 1)
+            const oldItemMatch = !!this.callback.call(this.controller, mutationEvent.oldRecord) 
+            if (oldItemMatch === true) {
+                matchCount = await this.state!.matchCount.set(matchCount - 1)
+            }
+        } else if (mutationEvent.type === 'update') {
+            const oldItemMatch = !!this.callback.call(this.controller, mutationEvent.oldRecord) 
+            const newItemMatch = !!this.callback.call(this.controller, mutationEvent.record) 
+            if (oldItemMatch === true && newItemMatch === false) {
+                matchCount = await this.state!.matchCount.set(matchCount - 1)
+            } else if (oldItemMatch === false && newItemMatch === true) {
+                matchCount = await this.state!.matchCount.set(matchCount + 1)
+            }
+        }
+
+        return matchCount === totalCount
+    }
+}
+
+export class PropertyEveryHandle extends ComputedDataHandle {
     matchCountField: string = `${this.propertyName}_match_count`
     totalCountField: string= `${this.propertyName}_total_count`
     setupSchema() {
@@ -74,9 +142,12 @@ export class EveryHandle extends ComputedDataHandle {
     }
 }
 
+
+
+
+
+
 ComputedDataHandle.Handles.set(Every, {
-    global: EveryHandle,
-    entity: EveryHandle,
-    relation: EveryHandle,
-    property: EveryHandle
+    global: GlobalEveryHandle,
+    property: PropertyEveryHandle
 })
