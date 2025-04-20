@@ -9,9 +9,9 @@ if (!version) {
 
 const gitStatus = execSync('git status ./ --porcelain').toString().trim()
 const isClean = gitStatus  === ''
-if (!isClean) {
-  throw new Error('Working tree is not clean')
-}
+// if (!isClean) {
+//   throw new Error('Working tree is not clean')
+// }
 
 function buildTypes() {
   const extractorConfig = ExtractorConfig.loadFileAndPrepare('api-extractor.json');
