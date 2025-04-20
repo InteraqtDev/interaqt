@@ -877,13 +877,14 @@ export type ValueAttribute = {
     field: string;
     fieldType?: string;
     computed?: (record: any) => any;
+    defaultValue?: () => any;
 };
 
 // Warnings were encountered during analysis:
 //
-// erstorage/EntityToTableMap.ts:78:5 - (ae-forgotten-export) The symbol "RecordMap" needs to be exported by the entry point index.d.ts
-// erstorage/EntityToTableMap.ts:79:5 - (ae-forgotten-export) The symbol "LinkMap" needs to be exported by the entry point index.d.ts
-// erstorage/Setup.ts:20:19 - (ae-forgotten-export) The symbol "ColumnData" needs to be exported by the entry point index.d.ts
+// erstorage/EntityToTableMap.ts:79:5 - (ae-forgotten-export) The symbol "RecordMap" needs to be exported by the entry point index.d.ts
+// erstorage/EntityToTableMap.ts:80:5 - (ae-forgotten-export) The symbol "LinkMap" needs to be exported by the entry point index.d.ts
+// erstorage/Setup.ts:21:19 - (ae-forgotten-export) The symbol "ColumnData" needs to be exported by the entry point index.d.ts
 
 // (No @packageDocumentation comment for this package)
 

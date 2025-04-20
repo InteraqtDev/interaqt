@@ -16802,7 +16802,7 @@
             },
             {
               "kind": "Content",
-              "text": "{\n    type: string;\n    collection?: boolean;\n    table?: string;\n    field: string;\n    fieldType?: string;\n    computed?: (record: any) => any;\n}"
+              "text": "{\n    type: string;\n    collection?: boolean;\n    table?: string;\n    field: string;\n    fieldType?: string;\n    computed?: (record: any) => any;\n    defaultValue?: () => any;\n}"
             },
             {
               "kind": "Content",
