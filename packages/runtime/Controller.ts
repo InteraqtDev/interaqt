@@ -18,6 +18,7 @@ import {assert} from "./util.js";
 import {ComputedDataHandle, DataContext} from "./computedDataHandles/ComputedDataHandle.js";
 import {asyncInteractionContext} from "./asyncInteractionContext.js";
 import { Computation, DataBasedComputation, DateDep, GlobalBoundState, RecordBoundState } from "./computedDataHandles/Computation.js";
+import { Scheduler } from "./Scheduler.js";
 
 export const USER_ENTITY = 'User'
 
@@ -53,7 +54,6 @@ export type InteractionContext = {
 export type ComputedDataType = 'global' | 'entity' | 'relation' | 'property'
 
 export class Controller {
-    public computedDataHandles = new Set<ComputedDataHandle|Computation>()
     public activityCalls = new Map<string, ActivityCall>()
     public activityCallsByName = new Map<string, ActivityCall>()
     public interactionCallsByName = new Map<string, InteractionCall>()
@@ -63,17 +63,19 @@ export class Controller {
     public globals = {
         BoolExp
     }
+    public scheduler: Scheduler
     constructor(
         public system: System,
         public entities: KlassInstance<typeof Entity>[],
         public relations: KlassInstance<typeof Relation>[],
         public activities: KlassInstance<typeof Activity>[],
         public interactions: KlassInstance<typeof Interaction>[],
-        public states: KlassInstance<typeof Property>[] = [],
+        public dict: KlassInstance<typeof Property>[] = [],
         public recordMutationSideEffects: RecordMutationSideEffect[] = []
     ) {
         // CAUTION 因为 public 里面的会在 constructor 后面才初始化，所以ActivityCall 里面读不到 this.system
         this.system = system
+
         activities.forEach(activity => {
             const activityCall = new ActivityCall(activity, this)
             this.activityCalls.set(activity.uuid, activityCall)
@@ -92,42 +94,7 @@ export class Controller {
             }
         })
 
-        // 初始化 各种 computed。
-        // entity 的
-        entities.forEach(entity => {
-            if (entity.computedData) {
-                this.addComputedDataHandle('entity', entity.computedData as KlassInstance<typeof ComputedData>, undefined, entity)
-            }
-
-            // property 的
-            entity.properties?.forEach(property => {
-                if (property.computedData) {
-                    this.addComputedDataHandle('property', property.computedData as KlassInstance<typeof ComputedData>, entity, property)
-                }
-            })
-        })
-
-        // relation 的
-        relations.forEach(relation => {
-            const relationAny = relation as any;
-            if(relationAny.computedData) {
-                this.addComputedDataHandle('relation', relationAny.computedData as KlassInstance<typeof ComputedData>, undefined, relation)
-            }
-
-            if (relationAny.properties) {
-                relationAny.properties.forEach((property: any) => {
-                    if (property.computedData) {
-                        this.addComputedDataHandle('property', property.computedData as KlassInstance<typeof ComputedData>, relation, property)
-                    }
-                })
-            }
-        })
-
-        states.forEach(state => {
-            if (state.computedData) {
-                this.addComputedDataHandle('global', state.computedData as KlassInstance<typeof ComputedData>, undefined, state.name as string)
-            }
-        })
+        this.scheduler = new Scheduler(this, this.entities, this.relations, this.dict)
 
         recordMutationSideEffects.forEach(sideEffect => {
           let sideEffects = this.recordNameToSideEffects.get(sideEffect.record.name)
@@ -138,136 +105,11 @@ export class Controller {
         })
 
     }
-    addComputedDataHandle(computedDataType: ComputedDataType,computedData: KlassInstance<any>, host:DataContext["host"], id: DataContext["id"]) {
-        const dataContext: DataContext = {
-            type: (!host && typeof id === 'string' )?
-                'global' :
-                id instanceof Entity ?
-                    'entity' :
-                    id instanceof Relation ?
-                        'relation' :
-                        'property',
-            host,
-            id
-        }
-        const handles = ComputedDataHandle.Handles
-        const Handle = handles.get(computedData.constructor as Klass<any>)![computedDataType]!
-        assert(!!Handle, `cannot find handle for ${computedData.constructor.name}`)
-
-        this.computedDataHandles.add(
-            new Handle(this, computedData, dataContext)
-        )
-    }
+    
     async setup(install?: boolean) {
-
-        // 1. setup 数据库
-        for(const handle of this.computedDataHandles) {
-            if (handle instanceof ComputedDataHandle) {
-                handle.parseComputedData()
-            }
-        }
-        // CAUTION 注意这里的 entities/relations 可能被 IncrementalComputationHandle 修改过了
-        await this.system.setup(this.entities, this.relations, install)
-
-        // 2. 增量计算的字段设置初始值
-        for(const handle of this.computedDataHandles) {
-            if (handle instanceof ComputedDataHandle) {
-                await handle.setupInitialValue()
-            }
-        }
-
-        for(const handle of this.computedDataHandles) {
-            if (handle instanceof ComputedDataHandle) {
-                await handle.setupStates()
-                handle.addEventListener()
-            }
-        }
-       
-
-
-        for(const handle of this.computedDataHandles) {
-            if (!(handle instanceof ComputedDataHandle)) {
-                const computationHandle = handle as Computation
-                // 0. 创建 defaultValue
-                if (computationHandle.getDefaultValue) {
-                    const defaultValue = computationHandle.getDefaultValue()
-                    if (computationHandle.dataContext.type === 'global') {
-                        await this.applyResult(computationHandle.dataContext, defaultValue)
-                    } else {
-                        // TODO ER property 等 defalutValue 的设置
-                    }
-                }
-
-                // FIXME 这里 createState 要放到 setup 前面，因为可能会修改 entity、relation ???
-                // 1. 创建计算所需要的 state
-                if (computationHandle.createState) {
-                    computationHandle.state = await computationHandle.createState()
-
-                    for(const [key, state] of Object.entries(computationHandle.state)) {
-                        if (state instanceof GlobalBoundState) {
-                            state.controller = this
-
-                            const globalKey = `${computationHandle.dataContext!.id!}_${key}`
-                            state.globalKey = globalKey
-
-                            if (typeof state.defaultValue !== undefined) {
-                                await this.system.storage.set('state',globalKey, state.defaultValue)
-                            }
-                        } else if (state instanceof RecordBoundState) {
-                            // TODO 需要附加到 ER 上面去。
-                        }
-                    }
-
-                }
-
-                // 2. 根据 data deps 计算出 mutation events
-                if( (computationHandle as DataBasedComputation).compute) {
-                    const dataBasedComputation = computationHandle as DataBasedComputation
-                    Object.entries(dataBasedComputation.dataDeps||{} as {[key: string]: DateDep}).forEach(([key, dep]: [string, DateDep]) => {
-                        if (dep.type === 'record') {
-                            this.system.storage.listen(async (mutationEvents) => {
-                                for(let mutationEvent of mutationEvents){
-                                    if (mutationEvent.recordName !== dep.name) continue
-                                    // TODO 考虑 * 的情况
-                                    if (mutationEvent.type === 'update' && dep.attributes?.every(attr => mutationEvent.record?.[attr] === undefined)) {
-                                        continue
-                                    }
-
-                                    if (dataBasedComputation.incrementalCompute) {
-                                        let lastValue = undefined
-                                        if (dataBasedComputation.useLastValue) {
-                                            lastValue = await this.retrieveLastValue(dataBasedComputation.dataContext)
-                                        }
-                                        const result = await dataBasedComputation.incrementalCompute(lastValue, mutationEvent)
-                                        // TODO 应用 result
-                                        await this.applyResult(dataBasedComputation.dataContext, result)
-
-
-                                    } else if(dataBasedComputation.incrementalPatchCompute){
-                                        const patch = await dataBasedComputation.incrementalPatchCompute(mutationEvent)
-                                        // TODO 应用 patch
-                                        await this.applyResultPatch(dataBasedComputation.dataContext, patch)
-
-
-                                    } else {
-                                        // TODO 需要注入 dataDeps
-                                        const result = await dataBasedComputation.compute()
-                                        // TODO 应用 result
-                                        await this.applyResult(dataBasedComputation.dataContext, result)
-                                    }
-                                }
-                            })
-                        } else {
-                            // TODO 别的依赖
-                        }
-                    })
-
-                    
-                    
-                }
-                
-            }
-        }
+        const states = this.scheduler.createStates()
+        await this.system.setup(this.entities, this.relations, states, install)
+        await this.scheduler.setup()
 
         // TODO 如果是恢复模式，还要从 event stack 中开始恢复数据。
     }

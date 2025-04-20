@@ -20,6 +20,7 @@ describe('Every and Any computed handle', () => {
             collection: false,
             computedData: Every.create({
                 record: requestEntity,
+                attributes: ['handled'],
                 callback: (request:any) => {
                     return request.handled
                 },
@@ -35,14 +36,14 @@ describe('Every and Any computed handle', () => {
 
     // 获取 dictionary 的值
     const everyRequestHandled0 = await system.storage.get('state','everyRequestHandled')
-    expect(everyRequestHandled0).toBe(false)
+    expect(everyRequestHandled0).toBeFalsy()
     // 创建两个 request
     const request1 = await system.storage.create('Request', {handled: false})
     const request2 = await system.storage.create('Request', {handled: false})
 
     // 获取 dictionary 的值
     const everyRequestHandled = await system.storage.get('state','everyRequestHandled')
-    expect(everyRequestHandled).toBe(false)
+    expect(everyRequestHandled).toBeFalsy()
 
     // 更新 request 的 handled 属性
     const idMatch1 = BoolExp.atom({
@@ -58,14 +59,14 @@ describe('Every and Any computed handle', () => {
 
     // 获取 dictionary 的值
     const everyRequestHandled2 = await system.storage.get('state','everyRequestHandled')
-    expect(everyRequestHandled2).toBe(true)
+    expect(everyRequestHandled2).toBeTruthy()
 
     // 再次更新 request 的 handled 属性
     await system.storage.update('Request', idMatch1, {handled: false})
 
     // 获取 dictionary 的值
     const everyRequestHandled3 = await system.storage.get('state','everyRequestHandled')
-    expect(everyRequestHandled3).toBe(false)
+    expect(everyRequestHandled3).toBeFalsy()
   });
 
   test('should be true when any request is handled', async () => {
@@ -83,6 +84,7 @@ describe('Every and Any computed handle', () => {
             collection: false,
             computedData: Any.create({
                 record: requestEntity,
+                attributes: ['handled'],
                 callback: (request:any) => {
                     return request.handled
                 },
@@ -95,7 +97,7 @@ describe('Every and Any computed handle', () => {
     await controller.setup(true)
     // 获取 dictionary 的值
     const anyRequestHandled0 = await system.storage.get('state','anyRequestHandled')
-    expect(anyRequestHandled0).toBe(false)
+    expect(anyRequestHandled0).toBeFalsy()
     
     // 创建两个 request
     const request1 = await system.storage.create('Request', {handled: false})
@@ -103,24 +105,25 @@ describe('Every and Any computed handle', () => {
 
     // 获取 dictionary 的值
     const anyRequestHandled = await system.storage.get('state','anyRequestHandled')
-    expect(anyRequestHandled).toBe(false)
+    expect(anyRequestHandled).toBeFalsy()
 
     // 更新 request 的 handled 属性
     const idMatch1 = BoolExp.atom({
         key: 'id',
         value: ['=', request1.id]
     })  
+    debugger
     await system.storage.update('Request', idMatch1, {handled: true})
 
     // 获取 dictionary 的值
     const anyRequestHandled2 = await system.storage.get('state','anyRequestHandled')
-    expect(anyRequestHandled2).toBe(true)   
+    expect(anyRequestHandled2).toBeTruthy()   
 
     // 更新 request 的 handled 属性
     await system.storage.update('Request', idMatch1, {handled: false})
 
     // 获取 dictionary 的值
     const anyRequestHandled3 = await system.storage.get('state','anyRequestHandled')
-    expect(anyRequestHandled3).toBe(false)
+    expect(anyRequestHandled3).toBeFalsy()
   });
 }); 

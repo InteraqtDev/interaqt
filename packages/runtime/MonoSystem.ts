@@ -3,6 +3,7 @@
 import {
     ACTIVITY_RECORD,
     activityEntity,
+    ComputationStates,
     Database,
     EVENT_RECORD,
     eventEntity,
@@ -126,6 +127,9 @@ class MonoStorage implements Storage{
     getRelationName(...arg:Parameters<EntityQueryHandle["getRelationName"]>) {
         return this.queryHandle!.getRelationName(...arg)
     }
+    getEntityName(...arg:Parameters<EntityQueryHandle["getEntityName"]>) {
+        return this.queryHandle!.getEntityName(...arg)
+    }
     listen(callback: RecordMutationCallback) {
         this.callbacks.add(callback)
     }
@@ -187,7 +191,7 @@ export class MonoSystem implements System {
             refs: JSONParse(activity.refs),
         }))
     }
-    setup(entities: KlassInstance<typeof Entity>[], relations: KlassInstance<typeof Relation>[], install = false){
+    setup(entities: KlassInstance<typeof Entity>[], relations: KlassInstance<typeof Relation>[], states: ComputationStates, install = false){
         // Create a type that matches what DBSetup expects
         type DBSetupEntityType = KlassInstance<typeof Entity> & { isRef?: boolean };
         

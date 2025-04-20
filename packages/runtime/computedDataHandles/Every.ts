@@ -4,6 +4,7 @@ import {RecordMutationEvent, SYSTEM_RECORD} from "../System.js";
 import { DataBasedComputation, DateDep, GlobalBoundState, RecordBoundState } from "./Computation.js";
 import { Controller } from "../Controller.js";
 import { DataContext } from "./ComputedDataHandle.js";
+import { ERRecordMutationEvent } from "../Scheduler.js";
 export class GlobalEveryHandle implements DataBasedComputation {
     callback: (this: Controller, item: any) => boolean
     state!: ReturnType<typeof this.createState>
@@ -14,7 +15,7 @@ export class GlobalEveryHandle implements DataBasedComputation {
         this.callback = args.callback.bind(this)
         this.dataDeps = {
             main: {
-                type: 'record',
+                type: 'records',
                 name:args.record.name,
                 attributes: args.attributes
             }
@@ -42,7 +43,7 @@ export class GlobalEveryHandle implements DataBasedComputation {
         return matchCount === totalCount
     }
 
-    async incrementalCompute(lastValue: boolean, mutationEvent: RecordMutationEvent): Promise<boolean> {
+    async incrementalCompute(lastValue: boolean, mutationEvent: ERRecordMutationEvent): Promise<boolean> {
         let totalCount = await this.state!.totalCount.get()
         let matchCount = await this.state!.matchCount.get()
         if (mutationEvent.type === 'create') {

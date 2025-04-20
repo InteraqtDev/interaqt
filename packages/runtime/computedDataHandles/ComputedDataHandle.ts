@@ -6,12 +6,32 @@ import {ComputedData} from "@interaqt/shared";
 import {MatchExp} from '@interaqt/storage'
 import { Computation } from "./Computation.js";
 
-
-export type DataContext = {
-    type: 'global' | 'entity' | 'relation' | 'property'
-    host?: KlassInstance<typeof Entity> | KlassInstance<typeof Relation>
-    id: KlassInstance<typeof Entity> | KlassInstance<typeof Relation> | KlassInstance<typeof Property> | string
+export type GlobalDataContext = {
+    type: 'global',
+    id: string
 }
+
+export type EntityDataContext = {
+    type: 'entity',
+    id: KlassInstance<typeof Entity>
+}
+
+export type RelationDataContext = {
+    type: 'relation',
+    id: KlassInstance<typeof Relation>
+}
+
+export type PropertyDataContext = {
+    type: 'property',
+    host: KlassInstance<typeof Entity> | KlassInstance<typeof Relation>,
+    id: string
+}
+
+
+
+
+
+export type DataContext = GlobalDataContext|EntityDataContext|RelationDataContext|PropertyDataContext
 
 export type ComputedEffect = any
 

@@ -1,5 +1,8 @@
 import {createClass, Entity, KlassInstance, Property, Relation} from "@interaqt/shared";
 import {InteractionEvent} from './types/interaction.js'
+import { GlobalBoundState } from "./computedDataHandles/Computation.js";
+import { RecordBoundState } from "./computedDataHandles/Computation.js";
+import { DataContext } from "./computedDataHandles/ComputedDataHandle.js";
 
 export type SystemCallback =  (...arg: any[]) => any
 export type RecordMutationCallback = (mutationEvents:RecordMutationEvent[]) => Promise<{ events?: RecordMutationEvent[] } |undefined|void>
@@ -32,6 +35,7 @@ export type Storage = {
     removeRelationByName: (relationName: string, matchExpressionData: any, events?: RecordMutationEvent[]) => Promise<any>
     addRelationByNameById: (relationName: string, sourceEntityId: string, targetEntityId: string, rawData: any, events?: RecordMutationEvent[]) => Promise<any>
     getRelationName: (...arg: any[]) => string
+    getEntityName: (...arg: any[]) => string
     listen: (callback: RecordMutationCallback) => any
 }
 
@@ -60,6 +64,8 @@ export type SystemLogType = {
     [k: string]: any
 }
 
+export type ComputationStates = {dataContext: DataContext, state: {[key: string]: RecordBoundState<any>|GlobalBoundState<any>}}[]
+
 export interface System {
     getEvent: (query: any) => Promise<InteractionEvent[]>
     saveEvent: (interactionEvent: InteractionEvent, mutationEvents: RecordMutationEvent[]) => Promise<any>
@@ -69,7 +75,7 @@ export interface System {
     conceptClass: Map<string, ReturnType<typeof createClass>>
     storage: Storage
     logger: SystemLogger
-    setup: (entities: KlassInstance<typeof Entity>[], relations: KlassInstance<typeof Relation>[], install?: boolean) => Promise<any>
+    setup: (entities: KlassInstance<typeof Entity>[], relations: KlassInstance<typeof Relation>[], states: ComputationStates, install?: boolean) => Promise<any>
     
     // Add missing methods
     updateEntityPropertyState: (entityId: any, target: any, propertyId: any, fromState: any, toState: any) => Promise<any>
