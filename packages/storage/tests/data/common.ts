@@ -7,7 +7,8 @@ export function createCommonData(): { entities: Entity[], relations: Relation[] 
         name: 'User',
         properties: [
             { name: 'name', type: 'String' },
-            { name: 'age', type: 'Number' }
+            { name: 'age', type: 'Number' },
+            {name:'gender', type:'string', defaultValue: () => 'male'}
         ]
     };
 

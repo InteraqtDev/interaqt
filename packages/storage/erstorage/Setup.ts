@@ -12,6 +12,7 @@ type ColumnData = {
     fieldType?:string,
     collection?:boolean,
     notNull?: boolean,
+    defaultValue?: () =>any
 }
 
 
@@ -118,7 +119,8 @@ export class DBSetup {
                 {
                     type: prop.type,
                     computed: prop.computed,
-                    collection: prop.isCollection
+                    collection: prop.isCollection,
+                    defaultValue: prop.defaultValue
                 }
             ];
         }));
@@ -439,6 +441,7 @@ export class DBSetup {
                     name: (attribute as ValueAttribute).field,
                     type: (attribute as ValueAttribute).type,
                     fieldType: (attribute as ValueAttribute).fieldType,
+                    defaultValue: (attribute as ValueAttribute).defaultValue
                 }
             })
         })
@@ -449,7 +452,7 @@ export class DBSetup {
             `
 CREATE TABLE "${tableName}" (
 ${Object.values(this.tables[tableName].columns).map(column => (`
-    "${column.name}" ${column.fieldType}`)).join(',')}
+    "${column.name}" ${column.fieldType} ${column.defaultValue ? `DEFAULT ${column.defaultValue()}` : ''}`)).join(',')}
 )
 `
         ))

@@ -35,10 +35,11 @@ describe('create data', () => {
     test('create and query with only value attribute', async () => {
         const returnUser = await entityQueryHandle.create('User', {name: 'aaa', age: 17})
         expect(returnUser).toMatchObject({id: 1})
-        const findUser = await entityQueryHandle.findOne('User', MatchExp.atom({key:'name', value: ['=', 'aaa']}), {}, ['name', 'age'])
+        const findUser = await entityQueryHandle.findOne('User', MatchExp.atom({key:'name', value: ['=', 'aaa']}), {}, ['name', 'age', 'gender'])
         expect(findUser).toMatchObject({
             name: 'aaa',
-            age: 17
+            age: 17,
+            gender: 'male'
         })
     })
 
