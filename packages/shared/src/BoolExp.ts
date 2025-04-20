@@ -257,7 +257,18 @@ type CommonAtomPublic = {
     }
 }
 
-export const  BoolAtomData = createClass({
+export type BoolAtomPublic = {
+    type: {
+        type: 'string',
+        required: true,
+    },
+    data: {
+        type: Klass<CommonAtomPublic>,
+        required: true,
+    }
+}
+
+export const  BoolAtomData: Klass<BoolAtomPublic> = createClass({
     name: 'BoolAtomData',
     public: {
         type: {
@@ -267,6 +278,7 @@ export const  BoolAtomData = createClass({
             defaultValue: () => 'atom'
         },
         data: {
+            type: {} as unknown as Klass<CommonAtomPublic>,
             instanceType: {} as unknown as KlassInstance<Klass<CommonAtomPublic>>,
             required: true,
             collection: false,
@@ -300,12 +312,12 @@ export const BoolExpressionData = createClass({
             defaultValue: () => 'and'
         },
         left: {
-            instanceType: {} as unknown as (KlassInstance<typeof BoolAtomData> | UnwrappedBoolExpressionInstanceType<any>),
+            instanceType: {} as unknown as (KlassInstance<Klass<BoolAtomPublic>> | UnwrappedBoolExpressionInstanceType<any>),
             required: true,
             collection: false,
         },
         right: {
-            instanceType: {} as unknown as (KlassInstance<typeof BoolAtomData> | UnwrappedBoolExpressionInstanceType<any>),
+            instanceType: {} as unknown as (KlassInstance<Klass<BoolAtomPublic>> | UnwrappedBoolExpressionInstanceType<any>),
             required: false,
             collection: false,
         }

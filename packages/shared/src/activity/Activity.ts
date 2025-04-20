@@ -225,9 +225,15 @@ export const Gateway: Klass<GatewayPublicType> = createClass({
     }
 })
 
+export type EventPublicType = {
+    name: {
+        type: 'string',
+        required: true
+    }
+}
 
 // 用户可以定义事件
-export const Event = createClass({
+export const Event: Klass<EventPublicType> = createClass({
     name: 'Event',
     public: {
         name: {
@@ -268,9 +274,9 @@ type ActivityPublicType = {
         defaultValue: (...args: any[]) => KlassInstance<Klass<GatewayPublicType>>[]
     },
     events: {
-        type: typeof Event,
+        type: Klass<EventPublicType>,
         collection: true
-        defaultValue: (...args: any[]) => KlassInstance<typeof Event>[]
+        defaultValue: (...args: any[]) => KlassInstance<Klass<EventPublicType>>[]
     }
 } 
 
@@ -287,7 +293,7 @@ type UnwrappedActivityInstanceType = {
     transfers: KlassInstance<Klass<TransferPublicType>>[]
     groups: KlassInstance<Klass<ActivityGroupPublicType>>[]
     gateways: KlassInstance<Klass<GatewayPublicType>>[]
-    events: KlassInstance<typeof Event>[]
+    events: KlassInstance<Klass<EventPublicType>>[]
 } & KlassInstancePrimitiveProps
 
 export type ActivityGroupPublicType = {
