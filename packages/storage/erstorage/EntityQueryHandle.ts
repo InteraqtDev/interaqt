@@ -116,4 +116,8 @@ export class EntityQueryHandle {
     getRelationName(entity: string, attribute: string): string {
         return this.map.getInfo(entity, attribute).linkName
     }
+    getEntityName(entity: string, attribute: string): string {
+        const info = this.map.getInfo(entity, attribute)
+        return info.recordName
+    }
 }
