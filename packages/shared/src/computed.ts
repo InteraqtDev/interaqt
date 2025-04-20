@@ -216,7 +216,7 @@ export const Count = createClass({
         },
         attributeQuery: {
             instanceType: {} as unknown as AttributeQueryData,
-            collection: true,
+            collection: false,
             required: false
         },
     }
@@ -296,7 +296,7 @@ export const Every = createClass({
         },
         attributeQuery: {
             instanceType: {} as unknown as AttributeQueryData,
-            collection: true,
+            collection: false,
             required: false
         },
         notEmpty: {
@@ -322,7 +322,7 @@ export const Any = createClass({
         },
         attributeQuery: {
             instanceType: {} as unknown as AttributeQueryData,
-            collection: true,
+            collection: false,
             required: false
         },
     }
