@@ -5,12 +5,12 @@
 ```ts
 
 import { BoolExp } from '@interaqt/shared';
-import { Entity } from '@interaqt/shared';
-import { KlassInstance } from '@interaqt/shared';
-import { Relation } from '@interaqt/shared';
 
 // @public (undocumented)
 export const ALL_ATTR_SYMBOL = "*";
+
+// @public (undocumented)
+export function assert(condition: any, message: string): void;
 
 // @public (undocumented)
 export class AttributeInfo {
@@ -159,7 +159,7 @@ export type Database = {
 
 // @public (undocumented)
 export class DBSetup {
-    constructor(entities: KlassInstance<typeof Entity>[], relations: KlassInstance<typeof Relation>[], database?: Database | undefined, mergeLinks?: MergeLinks);
+    constructor(entities: Entity[], relations: Relation[], database?: Database | undefined, mergeLinks?: MergeLinks);
     // (undocumented)
     assignTableAndField(): void;
     // (undocumented)
@@ -169,11 +169,11 @@ export class DBSetup {
     // (undocumented)
     combineRecordTable(mergeTarget: string, toMerge: string, link: string): string[] | undefined;
     // (undocumented)
-    createLink(relationName: string, relation: KlassInstance<typeof Relation>): LinkMapItem;
+    createLink(relationName: string, relation: Relation): LinkMapItem;
     // (undocumented)
-    createLinkOfRelationAndEntity(relationEntityName: string, relationName: string, relation: KlassInstance<typeof Relation>, isSource: boolean): LinkMapItem;
+    createLinkOfRelationAndEntity(relationEntityName: string, relationName: string, relation: Relation, isSource: boolean): LinkMapItem;
     // (undocumented)
-    createRecord(entity: KlassInstance<typeof Entity> | KlassInstance<typeof Relation>, isRelation?: boolean): RecordMapItem;
+    createRecord(entity: Entity | Relation, isRelation?: boolean): RecordMapItem;
     // (undocumented)
     createRecordToTable(item: string, table: string): void;
     // (undocumented)
@@ -182,10 +182,12 @@ export class DBSetup {
     createTableSQL(): string[];
     // (undocumented)
     database?: Database | undefined;
+    // Warning: (ae-forgotten-export) The symbol "Entity" needs to be exported by the entry point index.d.ts
+    //
     // (undocumented)
-    entities: KlassInstance<typeof Entity>[];
+    entities: Entity[];
     // (undocumented)
-    getRecordName(rawRecord: KlassInstance<typeof Entity> | KlassInstance<typeof Relation>): string;
+    getRecordName(rawRecord: Entity | Relation): string;
     // (undocumented)
     getRelationNameOfRelationAndEntity(relationName: string, isSource: boolean): string;
     // (undocumented)
@@ -200,8 +202,10 @@ export class DBSetup {
     mergeRecords(): void;
     // (undocumented)
     recordToTableMap: Map<string, string>;
+    // Warning: (ae-forgotten-export) The symbol "Relation" needs to be exported by the entry point index.d.ts
+    //
     // (undocumented)
-    relations: KlassInstance<typeof Relation>[];
+    relations: Relation[];
     // (undocumented)
     renameTableWithJoinedEntities(originTableName: string): void;
     // (undocumented)
@@ -244,6 +248,8 @@ export class EntityQueryHandle {
     findPath(entity: string, attribute: string, entityId: string, ancestorId: string): Promise<Record_2[] | undefined>;
     // (undocumented)
     findRelationByName(relationName: string, matchExpressionData?: MatchExpressionData, modifierData?: ModifierData, attributeQueryData?: AttributeQueryData): Promise<Record_2[]>;
+    // (undocumented)
+    getEntityName(entity: string, attribute: string): string;
     // (undocumented)
     getRelationName(entity: string, attribute: string): string;
     // (undocumented)
@@ -310,6 +316,12 @@ export function flatten<T>(arr: (T | T[])[]): T[];
 
 // @public (undocumented)
 export const ID_ATTR = "id";
+
+// @public (undocumented)
+export function indexBy(arr: any[], key: string): any;
+
+// @public (undocumented)
+export function isRelation(relation: any): boolean;
 
 // @public (undocumented)
 export type JoinTables = {
@@ -871,7 +883,7 @@ export type ValueAttribute = {
 //
 // erstorage/EntityToTableMap.ts:78:5 - (ae-forgotten-export) The symbol "RecordMap" needs to be exported by the entry point index.d.ts
 // erstorage/EntityToTableMap.ts:79:5 - (ae-forgotten-export) The symbol "LinkMap" needs to be exported by the entry point index.d.ts
-// erstorage/Setup.ts:45:19 - (ae-forgotten-export) The symbol "ColumnData" needs to be exported by the entry point index.d.ts
+// erstorage/Setup.ts:20:19 - (ae-forgotten-export) The symbol "ColumnData" needs to be exported by the entry point index.d.ts
 
 // (No @packageDocumentation comment for this package)
 
