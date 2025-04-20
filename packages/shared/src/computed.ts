@@ -2,6 +2,7 @@ import { createClass } from "./createClass.js";
 import { Activity, Interaction } from "./activity/Activity.js";
 import { Entity, Property, Relation } from "./entity/Entity.js";
 import { Dictionary } from "./dictionary/Dictionary.js";
+import { BoolExp } from "./BoolExp.js";
 
 export const StateNode = createClass({
     name: 'StateNode',
@@ -177,6 +178,29 @@ export const WeightedSummation = createClass({
     }
 })
 
+type MatchExpressionData = BoolExp<any>;
+type ModifierData = {
+    orderBy?: {
+        [k: string]: 'ASC' | 'DESC';
+    };
+    limit?: number;
+    offset?: number;
+};
+type RecordQueryData = {
+    matchExpression?: MatchExpressionData;
+    attributeQuery?: AttributeQueryData;
+    modifier?: ModifierData;
+    label?: string;
+    goto?: string;
+    exit?: (data: any) => Promise<any>;
+};
+
+type AttributeQueryData = AttributeQueryDataItem[];
+
+type AttributeQueryDataItem = string | AttributeQueryDataRecordItem;
+
+type AttributeQueryDataRecordItem = [string, RecordQueryData, boolean?];
+
 export const Count = createClass({
     name: 'Count',
     public: {
@@ -190,8 +214,8 @@ export const Count = createClass({
             collection: false,
             required: true
         },
-        attributes: {
-            type: 'string',
+        attributeQuery: {
+            instanceType: {} as unknown as AttributeQueryData,
             collection: true,
             required: false
         },
@@ -270,8 +294,8 @@ export const Every = createClass({
             collection: false,
             required: true
         },
-        attributes: {
-            type: 'string',
+        attributeQuery: {
+            instanceType: {} as unknown as AttributeQueryData,
             collection: true,
             required: false
         },
@@ -296,8 +320,8 @@ export const Any = createClass({
             collection: false,
             required: true
         },
-        attributes: {
-            type: 'string',
+        attributeQuery: {
+            instanceType: {} as unknown as AttributeQueryData,
             collection: true,
             required: false
         },
