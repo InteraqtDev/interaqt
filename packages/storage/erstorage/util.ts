@@ -1,4 +1,3 @@
-import { Relation } from "../types/relation"
 
 export function flatten<T>(arr: (T|T[])[]) {
     const result: T[] = []

@@ -15,7 +15,7 @@
     "dist"
   ],
   "peerDependencies": {
-    "@interaqt/shared": "^2.4.0"
+    "@interaqt/shared": "^2.4.1"
   },
   "scripts": {
     "test": "vitest run",
