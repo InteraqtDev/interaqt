@@ -1,87 +1,165 @@
-import {EntityIdRef, RecordMutationEvent} from "../System.js";
-import {IncrementalComputedDataHandle, StatePatch} from "./IncrementalComputedDataHandle.js";
-import {Entity, KlassInstance, Relation, WeightedSummation} from "@interaqt/shared";
-import {MatchExp} from '@interaqt/storage'
-import {ComputedDataHandle} from "./ComputedDataHandle.js";
+import { ComputedDataHandle, DataContext, PropertyDataContext } from "./ComputedDataHandle.js";
+import { WeightedSummation, KlassInstance, Relation, Entity } from "@interaqt/shared";
+import { Controller } from "../Controller.js";
+import { DataDep, GlobalBoundState, RecordBoundState } from "./Computation.js";
+import { DataBasedComputation } from "./Computation.js";
+import { ERRecordMutationEvent } from "../Scheduler.js";
+import { MatchExp } from "@interaqt/storage";
 
-type RecordChangeEffect = {
-    affectedId: string,
-    recordName: string
-    info: KlassInstance<any>
-}
+export class GlobalWeightedSummationHandle implements DataBasedComputation {
+    matchRecordToWeight: (this: Controller, item: any) => { weight: number; value: number }
+    state: ReturnType<any>
+    useLastValue: boolean = true
+    dataDeps: {[key: string]: DataDep} = {}
+    record: KlassInstance<typeof Entity|typeof Relation>
 
-type MapRecordToWeight = (record: EntityIdRef, info: KlassInstance<any>) => number
-
-export class WeightedSummationHandle extends IncrementalComputedDataHandle {
-    records!: KlassInstance<typeof WeightedSummation>['records']
-    mapRecordToWeight!: MapRecordToWeight
-    // 单独抽出来让下面能覆写
-    parseComputedData(){
-        const computedData = this.computedData as unknown as KlassInstance<typeof WeightedSummation>
-        this.mapRecordToWeight = computedData.matchRecordToWeight!.bind(this.controller) as MapRecordToWeight
-        this.records = computedData.records
-    }
-    getDefaultValue(newRecordId?: any): any {
-        return 0
-    }
-    computeEffect(mutationEvent: RecordMutationEvent, mutationEvents: RecordMutationEvent[]): KlassInstance<any>|undefined {
-        // FIXME type
-        // @ts-ignore
-        return this.records.find((record: any) => {
-            return (record.name) === mutationEvent.recordName
-        })
-    }
-    async getLastValue(effect: RecordChangeEffect, mutationEvent: RecordMutationEvent, mutationEvents: RecordMutationEvent[]) {
-        return this.controller.system.storage.get('state', this.stateName!)
-    }
-    async computePatch(effect: KlassInstance<any>, lastSummation: number, mutationEvent: RecordMutationEvent, mutationEvents: RecordMutationEvent[]): Promise<StatePatch|StatePatch[]|undefined> {
-        let currentWeight = 0
-        let originWeight = 0
-
-        let currentRecord
-        let oldRecord
-
-
-        const isRelation = effect instanceof Relation
-        const affectedId = mutationEvent.record?.id ?? mutationEvent.oldRecord?.id
-        const recordName = mutationEvent.recordName
-
-        if (mutationEvent.type === 'create' || mutationEvent.type === 'update') {
-            const match = MatchExp.atom({key: 'id', value: ['=', affectedId]})
-            currentRecord = isRelation ? await this.controller.system.storage.findOneRelationByName(recordName!, match, undefined, ['*'])
-                : await this.controller.system.storage.findOne(recordName!, match, undefined, ['*'])
-        }
-
-        if (mutationEvent.type === 'update') {
-            oldRecord = mutationEvent.oldRecord!
-        }
-
-        if (mutationEvent.type === 'delete') {
-            oldRecord = mutationEvent.record!
-        }
-
-        if (currentRecord) {
-            currentWeight = this.mapRecordToWeight(currentRecord, effect )
-        }
-
-        if (oldRecord) {
-            originWeight = this.mapRecordToWeight(oldRecord, effect)
-        }
-
-        if(currentWeight !== originWeight) {
-            // FIXME 改成引用的形式, 例如 “+1” 这样就不用获取上一次的值了 ？storage 要支持，现在好像不支持？？？
-            return {
-                type: 'update',
-                affectedId,
-                value: lastSummation + (currentWeight - originWeight)
+    constructor(public controller: Controller, args: KlassInstance<typeof WeightedSummation>, public dataContext: DataContext) {
+        this.matchRecordToWeight = args.callback.bind(this)
+        this.record = args.record
+        
+        
+        this.dataDeps = {
+            main: {
+                type: 'records',
+                source: this.record,
+                attributeQuery: args.attributeQuery
             }
         }
+    }
+
+    
+    getDefaultValue() {
+        return 0
+    }
+
+    async compute({main: records}: {main: any[]}): Promise<number> {
+        let summation = 0;
+        
+        for (const record of records) {
+            const result = this.matchRecordToWeight.call(this.controller, record);
+            summation += result.weight * result.value;
+        }
+
+        await this.state.summation.set(summation);
+        return summation;
+    }
+
+    async incrementalCompute(lastValue: number, mutationEvent: ERRecordMutationEvent): Promise<number> {
+        let summation = lastValue
+        if (mutationEvent.type === 'create') {
+            const newItem = mutationEvent.record;
+            const result = this.matchRecordToWeight.call(this.controller, newItem);
+            summation = lastValue + (result.weight * result.value);
+        } else if (mutationEvent.type === 'delete') {
+            const oldItem = mutationEvent.record;
+            const result = this.matchRecordToWeight.call(this.controller, oldItem);
+            summation = lastValue - (result.weight * result.value);
+        } else if (mutationEvent.type === 'update') {
+            const oldItem = mutationEvent.oldRecord;
+            const newItem = { ...mutationEvent.oldRecord, ...mutationEvent.record};
+            
+            const oldResult = this.matchRecordToWeight.call(this.controller, oldItem);
+            const newResult = this.matchRecordToWeight.call(this.controller, newItem);
+            
+            const oldValue = oldResult.weight * oldResult.value;
+            const newValue = newResult.weight * newResult.value;
+            
+            summation = lastValue - oldValue + newValue;
+        }
+
+        return summation;
+    }
+}
+
+export class PropertyWeightedSummationHandle implements DataBasedComputation {
+    matchRecordToWeight: (this: Controller, item: any) => { weight: number; value: number }
+    state!: ReturnType<typeof this.createState>
+    useLastValue: boolean = true
+    dataDeps: {[key: string]: DataDep} = {}
+    relationAttr: string
+    relatedRecordName: string
+    isSource: boolean
+    relation: KlassInstance<typeof Relation>
+
+    constructor(public controller: Controller, public args: KlassInstance<typeof WeightedSummation>, public dataContext: PropertyDataContext) {
+        this.matchRecordToWeight = args.callback.bind(this)
+
+        // 我们假设在PropertyWeightedSummationHandle中，records数组的第一个元素是一个Relation
+        this.relation = args.record as KlassInstance<typeof Relation>
+        this.relationAttr = this.relation.source.name === dataContext.host.name ? this.relation.sourceProperty : this.relation.targetProperty
+        this.isSource = this.relation.source.name === dataContext.host.name
+        this.relatedRecordName = this.isSource ? this.relation.target.name : this.relation.source.name
+        
+        this.dataDeps = {
+            _current: {
+                type: 'property',
+                attributeQuery: [[this.relationAttr, {attributeQuery: args.attributeQuery}]]
+            }
+        }
+    }
+
+    createState() {
+        return {
+            summation: new RecordBoundState<number>(0)
+        }   
+    }
+    
+    getDefaultValue() {
+        return 0
+    }
+
+    async compute({_current}: {_current: any}): Promise<number> {
+        let summation = 0;
+        
+        for (const record of _current[this.relationAttr]) {
+            const result = this.matchRecordToWeight.call(this.controller, record);
+            summation += result.weight * result.value;
+        }
+        
+        await this.state.summation.set(_current, summation);
+        return summation;
+    }
+
+    async incrementalCompute(lastValue: number, mutationEvent: ERRecordMutationEvent): Promise<number> {
+        let summation = await this.state!.summation.get(mutationEvent.record);
+        const relatedMutationEvent = mutationEvent.relatedMutationEvent!;
+
+        if (relatedMutationEvent.type === 'create') {
+            // 关联关系的新建
+            const newItem = await this.controller.system.storage.findOne(this.relatedRecordName, MatchExp.atom({
+                key: 'id',
+                value: ['=', relatedMutationEvent.record![this.isSource ? 'target' : 'source']!.id]
+            }), undefined, ['*']);
+
+            const result = this.matchRecordToWeight.call(this.controller, newItem);
+            summation = await this.state!.summation.set(mutationEvent.record, summation + (result.weight * result.value));
+        } else if (relatedMutationEvent.type === 'delete') {
+            // 关联关系的删除
+            const oldItem = await this.controller.system.storage.findOne(this.relatedRecordName, MatchExp.atom({
+                key: 'id',
+                value: ['=', relatedMutationEvent.record![this.isSource ? 'target' : 'source']!.id]
+            }), undefined, ['*']);
+
+            const result = this.matchRecordToWeight.call(this.controller, oldItem);
+            summation = await this.state!.summation.set(mutationEvent.record, summation - (result.weight * result.value));
+        } else if (relatedMutationEvent.type === 'update') {
+            const oldRecord = relatedMutationEvent.oldRecord
+            const newRecord = { ...relatedMutationEvent.oldRecord, ...relatedMutationEvent.record}
+            // 关联实体的更新
+            const oldResult = this.matchRecordToWeight.call(this.controller, oldRecord);
+            const newResult = this.matchRecordToWeight.call(this.controller, newRecord);
+            
+            const oldValue = oldResult.weight * oldResult.value;
+            const newValue = newResult.weight * newResult.value;
+            
+            summation = await this.state!.summation.set(mutationEvent.record, summation - oldValue + newValue);
+        }
+
+        return summation;
     }
 }
 
 ComputedDataHandle.Handles.set(WeightedSummation, {
-    global: WeightedSummationHandle,
-    entity: WeightedSummationHandle,
-    relation: WeightedSummationHandle,
-    property: WeightedSummationHandle
-})
+    global: GlobalWeightedSummationHandle,
+    property: PropertyWeightedSummationHandle
+});

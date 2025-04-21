@@ -227,7 +227,7 @@ export class Scheduler {
             } else {
                 dataDepRecords = await this.controller.system.storage.find(source.sourceRecordName, MatchExp.atom({
                     key: source.targetPath!.slice(0, -1).concat('id').join('.'),
-                    value: ['=', mutationEvent.oldRecord![isSource ? 'source' : 'target']!.id]
+                    value: ['=', mutationEvent.record![isSource ? 'source' : 'target']!.id]
                 }), undefined, dataDep.attributeQuery)
             }
         }

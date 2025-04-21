@@ -48,7 +48,7 @@ export class GlobalAnyHandle implements DataBasedComputation {
                 matchCount = await this.state!.matchCount.set(matchCount + 1)
             }
         } else if (mutationEvent.type === 'delete') {
-            const oldItemMatch = !!this.callback.call(this.controller, mutationEvent.oldRecord) 
+            const oldItemMatch = !!this.callback.call(this.controller, mutationEvent.record) 
             if (oldItemMatch === true) {
                 matchCount = await this.state!.matchCount.set(matchCount - 1)
             }
@@ -128,7 +128,7 @@ export class PropertyAnyHandle implements DataBasedComputation {
             // TODO 有没有可能关联实体也被删除了！！！！，所以查不到了！！！！是有可能的，所以只能软删除？
             const oldItem = await this.controller.system.storage.findOne(this.relatedRecordName, MatchExp.atom({
                 key: 'id',
-                value: ['=', relatedMutationEvent.oldRecord![this.isSource ? 'target' : 'source']!.id]
+                value: ['=', relatedMutationEvent.record![this.isSource ? 'target' : 'source']!.id]
             }), undefined, ['*'])
 
             const oldItemMatch = !!this.callback.call(this.controller, oldItem) 
