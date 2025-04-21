@@ -978,7 +978,12 @@ WHERE "${entityInfo.idField}" = (${p()})
         
 
         // 跟自己合表实体的必须先断开关联，也就是移走。不然下面 updateRecordData 的时候就会把数据删除。
-        const sameRowEntityNullOrRefOrNewData = newEntityDataWithDep.combinedRecordIdRefs.concat(newEntityDataWithDep.combinedNewRecords, newEntityDataWithDep.combinedNullRecords, newEntityDataWithDep.mergedLinkTargetNullRecords)
+        const sameRowEntityNullOrRefOrNewData = newEntityDataWithDep.combinedRecordIdRefs.concat(
+            newEntityDataWithDep.combinedNewRecords, 
+            newEntityDataWithDep.combinedNullRecords, 
+            newEntityDataWithDep.mergedLinkTargetNullRecords,
+            newEntityDataWithDep.mergedLinkTargetRecordIdRefs,
+        )
         // 1. 删除旧的关系。出现null 或者新的管理数据，说明是建立新的关系，也要先删除关系。
         for (let newRelatedEntityData of sameRowEntityNullOrRefOrNewData) {
             const linkInfo = newRelatedEntityData.info!.getLinkInfo()
@@ -1019,30 +1024,15 @@ WHERE "${entityInfo.idField}" = (${p()})
 
     async handleUpdateReliance(entityName: string, matchedEntity: EntityIdRef, newEntityData: NewRecordData, events?: MutationEvent[]) {
 
-        // 0. 通过 null 来删除的关系
-        const nullRecords = newEntityData.isolatedNullRecords.concat(newEntityData.differentTableMergedLinkNullRecords)
-        for (let nullRecord of nullRecords) {
-            const linkInfo = nullRecord.info!.getLinkInfo()
-
-            const updatedEntityLinkAttr = linkInfo.isRelationSource(entityName, nullRecord.info!.attributeName) ? 'source' : 'target'
-            await this.unlink(
-                linkInfo.name,
-                MatchExp.atom({
-                    key: `${updatedEntityLinkAttr}.id`,
-                    value: ['=', matchedEntity.id],
-                }),
-                !linkInfo.isRelationSource(entityName, nullRecord.info!.attributeName),
-                'unlink old reliance for update',
-                events,
-            )
-        }
 
         // CAUTION update 里面的表达关联实体的语义统统认为是 replace。如果用户想要表达 xToMany 的情况下新增关系，应该自己拆成两步进行。既先更新数据，再用 addLink 去增加关系。
         // 1. 断开自己和原来关联实体的关系。这里只要处理依赖我的，或者关系独立的，因为我依赖的在应该在 updateSameRowData 里面处理了。
         const otherTableEntitiesData = newEntityData.differentTableMergedLinkRecordIdRefs.concat(
             newEntityData.differentTableMergedLinkNewRecords,
+            newEntityData.differentTableMergedLinkNullRecords,
             newEntityData.isolatedRecordIdRefs,
             newEntityData.isolatedNewRecords,
+            newEntityData.isolatedNullRecords
         )
 
 

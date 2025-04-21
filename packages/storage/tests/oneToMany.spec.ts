@@ -565,11 +565,42 @@ describe('one to many', () => {
                     age: 14,
                     id: updatedUser.leader.id
                 }
-            }, {
+            }, 
+            {
+                "record":  {
+                  "id": 1,
+                  "target":  {
+                    "id": 2,
+                  },
+                },
+                "recordName": "User_leader_member_User",
+                "type": "delete",
+              },
+              {
                 type: "create",
                 recordName: "User_leader_member_User",
                 record: {
                     id: updatedUser.leader[LINK_SYMBOL].id,
+                    "source":  {
+                        "id": 1,
+                        "leader":  {
+                        "&":  {
+                            "id": 2,
+                        },
+                        "age": 14,
+                        "changes": 1,
+                        "id": 3,
+                        "lastInsertRowid": 3,
+                        "name": "m2",
+                        },
+                    },
+                    "target":  {
+                        "age": 14,
+                        "changes": 1,
+                        "id": 3,
+                        "lastInsertRowid": 3,
+                        "name": "m2",
+                    },
                 }
             }
         ])
@@ -720,6 +751,13 @@ describe('one to many', () => {
         })
 
         expect(events2).toMatchObject([
+            {
+                type: "delete",
+                recordName: "User_leader_member_User",
+                record: {
+                    id: updatedUserA.leader[LINK_SYMBOL].id,
+                }
+            },
             {
                 type: "create",
                 recordName: "User_leader_member_User",
