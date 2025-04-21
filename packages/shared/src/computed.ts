@@ -174,7 +174,12 @@ export const WeightedSummation = createClass({
             type: 'function',
             collection: false,
             required: true
-        }
+        },
+        attributeQuery: {
+            instanceType: {} as unknown as AttributeQueryData,
+            collection: false,
+            required: false
+        },
     }
 })
 
