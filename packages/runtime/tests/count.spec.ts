@@ -193,6 +193,7 @@ describe('Count computed handle', () => {
       Property.create({
         name: 'taskCount',
         type: 'number',
+        defaultValue: () => 0,
         computedData: Count.create({
           record: ownsTaskRelation
         })

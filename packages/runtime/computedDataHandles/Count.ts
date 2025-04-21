@@ -37,7 +37,7 @@ export class GlobalCountHandle implements DataBasedComputation {
     }
 
     async incrementalCompute(lastValue: number, mutationEvent: ERRecordMutationEvent): Promise<number> {
-        let count = lastValue;
+        let count = lastValue || 0;
         
         if (mutationEvent.type === 'create') {
             count = lastValue + 1;
@@ -88,7 +88,7 @@ export class PropertyCountHandle implements DataBasedComputation {
     }
 
     async incrementalCompute(lastValue: number, mutationEvent: ERRecordMutationEvent): Promise<number> {
-        let count = lastValue;
+        let count = lastValue || 0;
         const relatedMutationEvent = mutationEvent.relatedMutationEvent!;
 
         if (relatedMutationEvent.type === 'create') {
