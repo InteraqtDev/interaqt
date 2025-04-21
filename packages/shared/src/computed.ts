@@ -170,7 +170,7 @@ export const WeightedSummation = createClass({
             collection: false,
             required: true
         },
-        matchRecordToWeight: {
+        callback: {
             type: 'function',
             collection: false,
             required: true
