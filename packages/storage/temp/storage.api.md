@@ -514,9 +514,13 @@ export class NewRecordData {
     // (undocumented)
     combinedNewRecords: NewRecordData[];
     // (undocumented)
+    combinedNullRecords: NewRecordData[];
+    // (undocumented)
     combinedRecordIdRefs: NewRecordData[];
     // (undocumented)
     differentTableMergedLinkNewRecords: NewRecordData[];
+    // (undocumented)
+    differentTableMergedLinkNullRecords: NewRecordData[];
     // (undocumented)
     differentTableMergedLinkRecordIdRefs: NewRecordData[];
     // (undocumented)
@@ -539,6 +543,8 @@ export class NewRecordData {
     // (undocumented)
     isolatedNewRecords: NewRecordData[];
     // (undocumented)
+    isolatedNullRecords: NewRecordData[];
+    // (undocumented)
     isolatedRecordIdRefs: NewRecordData[];
     // (undocumented)
     isRef(): boolean;
@@ -550,6 +556,8 @@ export class NewRecordData {
     merge(partialNewRawData: RawEntityData): NewRecordData;
     // (undocumented)
     mergedLinkTargetNewRecords: NewRecordData[];
+    // (undocumented)
+    mergedLinkTargetNullRecords: NewRecordData[];
     // (undocumented)
     mergedLinkTargetRecordIdRefs: NewRecordData[];
     // (undocumented)

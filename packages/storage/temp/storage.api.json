@@ -9374,6 +9374,41 @@
             },
             {
               "kind": "Property",
+              "canonicalReference": "@interaqt/storage!NewRecordData#combinedNullRecords:member",
+              "docComment": "",
+              "excerptTokens": [
+                {
+                  "kind": "Content",
+                  "text": "combinedNullRecords: "
+                },
+                {
+                  "kind": "Reference",
+                  "text": "NewRecordData",
+                  "canonicalReference": "@interaqt/storage!NewRecordData:class"
+                },
+                {
+                  "kind": "Content",
+                  "text": "[]"
+                },
+                {
+                  "kind": "Content",
+                  "text": ";"
+                }
+              ],
+              "isReadonly": false,
+              "isOptional": false,
+              "releaseTag": "Public",
+              "name": "combinedNullRecords",
+              "propertyTypeTokenRange": {
+                "startIndex": 1,
+                "endIndex": 3
+              },
+              "isStatic": false,
+              "isProtected": false,
+              "isAbstract": false
+            },
+            {
+              "kind": "Property",
               "canonicalReference": "@interaqt/storage!NewRecordData#combinedRecordIdRefs:member",
               "docComment": "",
               "excerptTokens": [
@@ -9434,6 +9469,41 @@
               "isOptional": false,
               "releaseTag": "Public",
               "name": "differentTableMergedLinkNewRecords",
+              "propertyTypeTokenRange": {
+                "startIndex": 1,
+                "endIndex": 3
+              },
+              "isStatic": false,
+              "isProtected": false,
+              "isAbstract": false
+            },
+            {
+              "kind": "Property",
+              "canonicalReference": "@interaqt/storage!NewRecordData#differentTableMergedLinkNullRecords:member",
+              "docComment": "",
+              "excerptTokens": [
+                {
+                  "kind": "Content",
+                  "text": "differentTableMergedLinkNullRecords: "
+                },
+                {
+                  "kind": "Reference",
+                  "text": "NewRecordData",
+                  "canonicalReference": "@interaqt/storage!NewRecordData:class"
+                },
+                {
+                  "kind": "Content",
+                  "text": "[]"
+                },
+                {
+                  "kind": "Content",
+                  "text": ";"
+                }
+              ],
+              "isReadonly": false,
+              "isOptional": false,
+              "releaseTag": "Public",
+              "name": "differentTableMergedLinkNullRecords",
               "propertyTypeTokenRange": {
                 "startIndex": 1,
                 "endIndex": 3
@@ -9740,6 +9810,41 @@
             },
             {
               "kind": "Property",
+              "canonicalReference": "@interaqt/storage!NewRecordData#isolatedNullRecords:member",
+              "docComment": "",
+              "excerptTokens": [
+                {
+                  "kind": "Content",
+                  "text": "isolatedNullRecords: "
+                },
+                {
+                  "kind": "Reference",
+                  "text": "NewRecordData",
+                  "canonicalReference": "@interaqt/storage!NewRecordData:class"
+                },
+                {
+                  "kind": "Content",
+                  "text": "[]"
+                },
+                {
+                  "kind": "Content",
+                  "text": ";"
+                }
+              ],
+              "isReadonly": false,
+              "isOptional": false,
+              "releaseTag": "Public",
+              "name": "isolatedNullRecords",
+              "propertyTypeTokenRange": {
+                "startIndex": 1,
+                "endIndex": 3
+              },
+              "isStatic": false,
+              "isProtected": false,
+              "isAbstract": false
+            },
+            {
+              "kind": "Property",
               "canonicalReference": "@interaqt/storage!NewRecordData#isolatedRecordIdRefs:member",
               "docComment": "",
               "excerptTokens": [
@@ -9943,6 +10048,41 @@
               "isOptional": false,
               "releaseTag": "Public",
               "name": "mergedLinkTargetNewRecords",
+              "propertyTypeTokenRange": {
+                "startIndex": 1,
+                "endIndex": 3
+              },
+              "isStatic": false,
+              "isProtected": false,
+              "isAbstract": false
+            },
+            {
+              "kind": "Property",
+              "canonicalReference": "@interaqt/storage!NewRecordData#mergedLinkTargetNullRecords:member",
+              "docComment": "",
+              "excerptTokens": [
+                {
+                  "kind": "Content",
+                  "text": "mergedLinkTargetNullRecords: "
+                },
+                {
+                  "kind": "Reference",
+                  "text": "NewRecordData",
+                  "canonicalReference": "@interaqt/storage!NewRecordData:class"
+                },
+                {
+                  "kind": "Content",
+                  "text": "[]"
+                },
+                {
+                  "kind": "Content",
+                  "text": ";"
+                }
+              ],
+              "isReadonly": false,
+              "isOptional": false,
+              "releaseTag": "Public",
+              "name": "mergedLinkTargetNullRecords",
               "propertyTypeTokenRange": {
                 "startIndex": 1,
                 "endIndex": 3
