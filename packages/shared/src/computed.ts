@@ -214,16 +214,6 @@ export const Count = createClass({
             collection: false,
             required: true
         },
-        callback: {
-            type: 'function',
-            collection: false,
-            required: true
-        },
-        attributeQuery: {
-            instanceType: {} as unknown as AttributeQueryData,
-            collection: false,
-            required: false
-        },
     }
 })
 
