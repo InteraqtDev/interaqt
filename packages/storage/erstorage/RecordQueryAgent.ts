@@ -975,57 +975,29 @@ WHERE "${entityInfo.idField}" = (${p()})
     }
 
     async updateSameRowData(entityName: string, matchedEntity: Record, newEntityDataWithDep: NewRecordData, events?: MutationEvent[]) {
+        
+
         // 跟自己合表实体的必须先断开关联，也就是移走。不然下面 updateRecordData 的时候就会把数据删除。
-        const sameRowEntityRefOrNewData = newEntityDataWithDep.combinedRecordIdRefs.concat(newEntityDataWithDep.combinedNewRecords)
-        
-        // 1. 处理显式设置为 null 的关系字段
-        for (const attributeName in newEntityDataWithDep.rawData) {
-            if (newEntityDataWithDep.rawData[attributeName] === null) {
-                try {
-                    const attributeInfo = this.map.getInfo(entityName, attributeName);
-                    
-                    // 确保是关系字段且关系存在
-                    if (attributeInfo && attributeInfo.isRecord && matchedEntity[attributeName]?.id) {
-                        const linkInfo = attributeInfo.getLinkInfo();
-                        
-                        // 使用关系名称直接解除关系，这样能确保双向都解除
-                        await this.unlink(
-                            linkInfo.name,
-                            MatchExp.atom({
-                                key: 'source.id',
-                                value: ['=', linkInfo.isRelationSource(entityName, attributeName) ? matchedEntity.id : matchedEntity[attributeName].id]
-                            }).and({
-                                key: 'target.id',
-                                value: ['=', linkInfo.isRelationSource(entityName, attributeName) ? matchedEntity[attributeName].id : matchedEntity.id]
-                            }),
-                            false,
-                            `unlink ${attributeName} because value explicitly set to null`,
-                            events
-                        );
-                    }
-                } catch (error) {
-                    // 属性可能不是关系字段，继续处理其他字段
-                    continue;
-                }
-            }
-        }
-        
-        // 2. 删除旧的关系
-        for (let newRelatedEntityData of sameRowEntityRefOrNewData) {
+        const sameRowEntityNullOrRefOrNewData = newEntityDataWithDep.combinedRecordIdRefs.concat(newEntityDataWithDep.combinedNewRecords, newEntityDataWithDep.combinedNullRecords, newEntityDataWithDep.mergedLinkTargetNullRecords)
+        // 1. 删除旧的关系。出现null 或者新的管理数据，说明是建立新的关系，也要先删除关系。
+        for (let newRelatedEntityData of sameRowEntityNullOrRefOrNewData) {
             const linkInfo = newRelatedEntityData.info!.getLinkInfo()
             const updatedEntityLinkAttr = linkInfo.isRelationSource(entityName, newRelatedEntityData.info!.attributeName) ? 'source' : 'target'
-            if (!newRelatedEntityData.isRef() || matchedEntity[newRelatedEntityData.info?.attributeName!]?.id !== newRelatedEntityData.getData().id) {
-                await this.unlink(
-                    linkInfo.name,
-                    MatchExp.atom({
-                        key: `${updatedEntityLinkAttr}.id`,
-                        value: ['=', matchedEntity.id],
-                    }),
-                    !linkInfo.isRelationSource(entityName, newRelatedEntityData.info!.attributeName),
-                    `unlink ${newRelatedEntityData.info?.parentEntityName} ${newRelatedEntityData.info?.attributeName} for update ${entityName}`,
-                    events
-                )
+            if ((newRelatedEntityData.isRef() && matchedEntity[newRelatedEntityData.info?.attributeName!]?.id === newRelatedEntityData.getData().id)) {
+                // 放过原来就是同样 related entity 的场景。可能是编程中为了方便没做检查，把原本的写了进来。
+                continue
             }
+
+            await this.unlink(
+                linkInfo.name,
+                MatchExp.atom({
+                    key: `${updatedEntityLinkAttr}.id`,
+                    value: ['=', matchedEntity.id],
+                }),
+                !linkInfo.isRelationSource(entityName, newRelatedEntityData.info!.attributeName),
+                `unlink ${newRelatedEntityData.info?.parentEntityName} ${newRelatedEntityData.info?.attributeName} for update ${entityName}`,
+                events
+            )
         }
 
         // 2. 分配 id,处理需要 flash out 的数据等，事件也是这里面记录的。这里面会有抢夺关系，所以也可能会有删除事件。
@@ -1046,7 +1018,25 @@ WHERE "${entityInfo.idField}" = (${p()})
     }
 
     async handleUpdateReliance(entityName: string, matchedEntity: EntityIdRef, newEntityData: NewRecordData, events?: MutationEvent[]) {
-        // 这里面都是依赖我的，或者关系数据完全独立的。
+
+        // 0. 通过 null 来删除的关系
+        const nullRecords = newEntityData.isolatedNullRecords.concat(newEntityData.differentTableMergedLinkNullRecords)
+        for (let nullRecord of nullRecords) {
+            const linkInfo = nullRecord.info!.getLinkInfo()
+
+            const updatedEntityLinkAttr = linkInfo.isRelationSource(entityName, nullRecord.info!.attributeName) ? 'source' : 'target'
+            await this.unlink(
+                linkInfo.name,
+                MatchExp.atom({
+                    key: `${updatedEntityLinkAttr}.id`,
+                    value: ['=', matchedEntity.id],
+                }),
+                !linkInfo.isRelationSource(entityName, nullRecord.info!.attributeName),
+                'unlink old reliance for update',
+                events,
+            )
+        }
+
         // CAUTION update 里面的表达关联实体的语义统统认为是 replace。如果用户想要表达 xToMany 的情况下新增关系，应该自己拆成两步进行。既先更新数据，再用 addLink 去增加关系。
         // 1. 断开自己和原来关联实体的关系。这里只要处理依赖我的，或者关系独立的，因为我依赖的在应该在 updateSameRowData 里面处理了。
         const otherTableEntitiesData = newEntityData.differentTableMergedLinkRecordIdRefs.concat(
@@ -1055,36 +1045,6 @@ WHERE "${entityInfo.idField}" = (${p()})
             newEntityData.isolatedNewRecords,
         )
 
-        // 处理 x:n 类型关系的 null 值
-        for (const attributeName in newEntityData.rawData) {
-            if (newEntityData.rawData[attributeName] === null) {
-                try {
-                    const attributeInfo = this.map.getInfo(entityName, attributeName);
-                    
-                    // 确保是关系字段且是 x:n 类型
-                    if (attributeInfo && attributeInfo.isRecord && attributeInfo.isXToMany) {
-                        const linkInfo = attributeInfo.getLinkInfo();
-                        
-                        // 通过LinkName直接清除关联，确保双向都清除
-                        const updatedEntityLinkAttr = linkInfo.isRelationSource(entityName, attributeName) ? 'source' : 'target';
-                        
-                        await this.unlink(
-                            linkInfo.name,
-                            MatchExp.atom({
-                                key: `${updatedEntityLinkAttr}.id`,
-                                value: ['=', matchedEntity.id],
-                            }),
-                            !linkInfo.isRelationSource(entityName, attributeName),
-                            `unlink all ${attributeName} because value explicitly set to null`,
-                            events
-                        );
-                    }
-                } catch (error) {
-                    // 属性可能不是关系字段，继续处理其他字段
-                    continue;
-                }
-            }
-        }
 
         // CAUTION 由于 xToMany 的数组情况会平铺处理，所以这里可能出现两次，所以这里记录一下排重
         const removedLinkName = new Set()
@@ -1162,7 +1122,7 @@ WHERE "${entityInfo.idField}" = (${p()})
         for (let matchedEntity of matchedEntities) {
             // 1. 创建我依赖的
             const newEntityDataWithDep = await this.createRecordDependency(newEntityData, events)
-            // 2. 把同表的实体移出去，为新同表建立 id；可能有要删除的 reliance
+            // 2. 把同表的实体移出去，为新同表 Record 建立 id；可能有要删除的 reliance
             const newEntityDataWithIdsWithFlashOutRecords = await this.updateSameRowData(entityName, matchedEntity, newEntityDataWithDep, events)
             // 3. 更新依赖我的和关系表独立的
             const relianceUpdatedResult = await this.handleUpdateReliance(entityName, matchedEntity, newEntityData, events)
@@ -1229,16 +1189,16 @@ WHERE "${entityInfo.idField}" = (${p()})
                     await this.database.update(`
 UPDATE "${recordInfo.table}"
 SET ${fields.map(field => `"${field}" = ${p()}`).join(',')}
-WHERE "${recordInfo.idField}" IN (${records.map(({id}) => p()).join(',')})
-`, [...fields.map(field => null), ...records.map(({id}) => id)], recordInfo.idField, `use update to delete ${recordName} because of sameRowData`)
+WHERE "${recordInfo.idField}" = ${p()}
+`, [...fields.map(field => null), record.id], recordInfo.idField, `use update to delete ${recordName} because of sameRowData`)
 
                 } else {
                     // 不存在同行数据 record ，可以 delete row
                     const p = this.getPlaceholder()
                     await this.database.delete(`
 DELETE FROM "${recordInfo.table}"
-WHERE "${recordInfo.idField}" IN (${records.map(({id}) => p()).join(',')})
-`, [...records.map(({id}) => id)], `delete record ${recordInfo.name} as row`)
+WHERE "${recordInfo.idField}" = ${p()}
+`, [record.id], `delete record ${recordInfo.name} as row`)
                 }
             }
             events?.push({

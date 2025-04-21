@@ -339,6 +339,8 @@ describe('relation attributes', () => {
         expect(foundUser.profile).toBeTruthy();
         expect(foundUser.profile.title).toBe('User Profile');
         
+        
+
         // Verify the file has an owner
         let foundFile = await handle.findOne(
             'File',
@@ -346,6 +348,8 @@ describe('relation attributes', () => {
             undefined,
             ['fileName', ['owner', { attributeQuery: ['name', 'age'] }]]
         );
+
+        
         
         expect(foundFile.owner).toBeTruthy();
         expect(foundFile.owner.name).toBe('fileOwner');
@@ -369,6 +373,13 @@ describe('relation attributes', () => {
         );
         
         expect(foundUser.profile).toBeUndefined();
+
+        // delete many to one relation using null
+        await handle.update(
+            'File',
+            MatchExp.atom({ key: 'id', value: ['=', file.id] }),
+            { owner: null }
+        );
         
         // Verify owner relationship is removed
         foundFile = await handle.findOne(
@@ -378,11 +389,10 @@ describe('relation attributes', () => {
             ['fileName', ['owner', { attributeQuery: ['name'] }]]
         );
         
-        expect(foundFile.owner).toBeNull();
+        expect(foundFile.owner).toBeUndefined();
     });
 
-    // TODO 更多关系上的测试
-    test('delete relation by setting relation field to null', async () => {
+    test('delete relation by setting n:n relation field to null', async () => {
         // Create a user with teams
         const user = await handle.create('User', {
             name: 'testUser',

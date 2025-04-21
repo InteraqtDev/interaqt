@@ -11,18 +11,24 @@ export class NewRecordData {
     public mergedLinkTargetNewRecords: NewRecordData[] = []
     // 关系往自身合并的异表老 record
     public mergedLinkTargetRecordIdRefs: NewRecordData[] = []
+    // 关系往自身合并的异表 null 值
+    public mergedLinkTargetNullRecords: NewRecordData[] = []
     // 自己跟父亲之间的 relation 的数据
     public linkRecordData?: NewRecordData
     // 三表合一的 record
     public combinedNewRecords : NewRecordData[] = []
     // 三表合一的老 record
     public combinedRecordIdRefs : NewRecordData[] = []
+    // 三表合一的 null 值
+    public combinedNullRecords: NewRecordData[] = []
     // 往属性方向合并的异表 record
     public differentTableMergedLinkNewRecords: NewRecordData[] = []
     public differentTableMergedLinkRecordIdRefs: NewRecordData[] = []
+    public differentTableMergedLinkNullRecords: NewRecordData[] = []
     // 完全关系独立的数据
     public isolatedNewRecords: NewRecordData[] = []
     public isolatedRecordIdRefs: NewRecordData[] = []
+    public isolatedNullRecords: NewRecordData[] = []
     // 当时 linkRecord 的时候，source/target 就可能出现在下面
     public entityIdAttributes: AttributeInfo[] = []
     // 不包括虚拟 link
@@ -48,7 +54,9 @@ export class NewRecordData {
             // CAUTION 三表合一的情况（需要排除掉关系的 source、target 是同一实体的情况，这种情况下不算合表）
             if (newRelatedEntityData.info!.isMergedWithParent()) {
                 // 三表合一的情况。记录合表的数据到底是有 id ，还是新的。如果是有 id ，说明是要  update 某一行。
-                if (newRelatedEntityData.isRef()) {
+                if (newRelatedEntityData.isNull()) {
+                    this.combinedNullRecords.push(newRelatedEntityData)
+                } else if (newRelatedEntityData.isRef()) {
                     this.combinedRecordIdRefs.push(newRelatedEntityData)
                 } else {
                     // 全新的同表的数据
@@ -60,7 +68,9 @@ export class NewRecordData {
                 // FIXME relatedEntitiesData 是不是要限制下，只允许那些自己能管的。
                 //  因为 source/target 这样的合并之后就不规自己管了。这里也不应该处理。
                 if (newRelatedEntityData.info!.isLinkMergedWithParent()) {
-                    if (newRelatedEntityData.isRef()) {
+                    if (newRelatedEntityData.isNull()) {
+                        this.mergedLinkTargetNullRecords.push(newRelatedEntityData)
+                    } else if (newRelatedEntityData.isRef()) {
                         this.mergedLinkTargetRecordIdRefs.push(newRelatedEntityData)
                     } else {
                         this.mergedLinkTargetNewRecords.push(newRelatedEntityData)
@@ -68,14 +78,18 @@ export class NewRecordData {
 
                 } else if(newRelatedEntityData.info!.isLinkMergedWithAttribute()) {
                     // 关系往属性方向合并的
-                    if( newRelatedEntityData.isRef()) {
+                    if( newRelatedEntityData.isNull()) {
+                        this.differentTableMergedLinkNullRecords.push(newRelatedEntityData)
+                    } else if (newRelatedEntityData.isRef()) {
                         this.differentTableMergedLinkRecordIdRefs.push(newRelatedEntityData)
                     } else {
                         this.differentTableMergedLinkNewRecords.push(newRelatedEntityData)
                     }
                 } else {
                     // 关系完全独立的
-                    if (newRelatedEntityData.isRef()) {
+                    if (newRelatedEntityData.isNull()) {
+                        this.isolatedNullRecords.push(newRelatedEntityData)
+                    } else if (newRelatedEntityData.isRef()) {
                         this.isolatedRecordIdRefs.push(newRelatedEntityData)
                     } else {
                         this.isolatedNewRecords.push(newRelatedEntityData)
