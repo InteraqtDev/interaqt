@@ -127,13 +127,19 @@ export class Controller {
             await this.system.storage.update(propertyDataContext.host.name, BoolExp.atom({key: 'id', value: ['=', record.id]}), {[propertyDataContext.id]: result})
         }   
     }
-    async retrieveLastValue(dataContext: DataContext) {
+    async retrieveLastValue(dataContext: DataContext, record?: any) {
         if (dataContext.type === 'global') {
             return this.system.storage.get('state', dataContext.id! as string)
         } else if (dataContext.type === 'entity') {
             // TODO
         } else if (dataContext.type === 'relation') {
             // TODO
+        } else {
+            const propertyDataContext = dataContext as PropertyDataContext
+            if (record[propertyDataContext.id]) return record[propertyDataContext.id]
+
+            const item = await this.system.storage.findOne(propertyDataContext.host.name, BoolExp.atom({key: 'id', value: ['=', record!.id]}), undefined, ['*'])
+            return item[propertyDataContext.id]
         }
     }
     async applyResultPatch(dataContext: DataContext, patch: any, record?: any) {

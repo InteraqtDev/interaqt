@@ -251,7 +251,7 @@ export class Scheduler {
             if (dataBasedComputation.incrementalCompute) {
                 let lastValue = undefined
                 if (dataBasedComputation.useLastValue) {
-                    lastValue = await this.controller.retrieveLastValue(dataBasedComputation.dataContext)
+                    lastValue = await this.controller.retrieveLastValue(dataBasedComputation.dataContext, erRecordMutationEvent.record)
                 }
                 const result = await dataBasedComputation.incrementalCompute(lastValue, erRecordMutationEvent)
                 // TODO 应用 result
