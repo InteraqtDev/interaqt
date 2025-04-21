@@ -15,9 +15,9 @@ import {ActivityCall} from "./ActivityCall.js";
 import {InteractionCall, InteractionCallResponse} from "./InteractionCall.js";
 import {InteractionEventArgs} from "./types/interaction.js";
 import {assert} from "./util.js";
-import {ComputedDataHandle, DataContext} from "./computedDataHandles/ComputedDataHandle.js";
+import {ComputedDataHandle, DataContext, PropertyDataContext} from "./computedDataHandles/ComputedDataHandle.js";
 import {asyncInteractionContext} from "./asyncInteractionContext.js";
-import { Computation, DataBasedComputation, DateDep, GlobalBoundState, RecordBoundState } from "./computedDataHandles/Computation.js";
+import { Computation, DataBasedComputation, DataDep, GlobalBoundState, RecordBoundState } from "./computedDataHandles/Computation.js";
 import { Scheduler } from "./Scheduler.js";
 
 export const USER_ENTITY = 'User'
@@ -113,7 +113,7 @@ export class Controller {
 
         // TODO 如果是恢复模式，还要从 event stack 中开始恢复数据。
     }
-    async applyResult(dataContext: DataContext, result: any) {
+    async applyResult(dataContext: DataContext, result: any, record?: any) {
         if (dataContext.type === 'global') {
             // TODO 
             return this.system.storage.set('state', dataContext.id! as string, result)
@@ -121,7 +121,11 @@ export class Controller {
             // TODO
         } else if (dataContext.type === 'relation') {
             // TODO
-        }
+        } else {
+            // TODO
+            const propertyDataContext = dataContext as PropertyDataContext
+            await this.system.storage.update(propertyDataContext.host.name, BoolExp.atom({key: 'id', value: ['=', record.id]}), {[propertyDataContext.id]: result})
+        }   
     }
     async retrieveLastValue(dataContext: DataContext) {
         if (dataContext.type === 'global') {
@@ -132,12 +136,14 @@ export class Controller {
             // TODO
         }
     }
-    async applyResultPatch(dataContext: DataContext, patch: any) {
+    async applyResultPatch(dataContext: DataContext, patch: any, record?: any) {
         if (dataContext.type === 'global') {
             // TODO
         } else if (dataContext.type === 'entity') {
             // TODO
         } else if (dataContext.type === 'relation') {
+            // TODO
+        } else {
             // TODO
         }
     }

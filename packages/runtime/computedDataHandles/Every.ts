@@ -1,7 +1,7 @@
 import {ComputedDataHandle} from "./ComputedDataHandle.js";
 import {Count, Every, KlassInstance, Dictionary} from "@interaqt/shared";
 import {RecordMutationEvent, SYSTEM_RECORD} from "../System.js";
-import { DataBasedComputation, DateDep, GlobalBoundState, RecordBoundState } from "./Computation.js";
+import { DataBasedComputation, DataDep, GlobalBoundState, RecordBoundState } from "./Computation.js";
 import { Controller } from "../Controller.js";
 import { DataContext } from "./ComputedDataHandle.js";
 import { ERRecordMutationEvent } from "../Scheduler.js";
@@ -9,15 +9,15 @@ export class GlobalEveryHandle implements DataBasedComputation {
     callback: (this: Controller, item: any) => boolean
     state!: ReturnType<typeof this.createState>
     useLastValue: boolean = true
-    dataDeps: {[key: string]: DateDep} = {}
+    dataDeps: {[key: string]: DataDep} = {}
     defaultValue: boolean
     constructor(public controller: Controller,  args: KlassInstance<typeof Every>,  public dataContext: DataContext, ) {
         this.callback = args.callback.bind(this)
         this.dataDeps = {
             main: {
                 type: 'records',
-                name:args.record.name,
-                attributes: args.attributes
+                source: args.record,
+                attributeQuery: args.attributeQuery
             }
         }
         this.defaultValue = !args.notEmpty

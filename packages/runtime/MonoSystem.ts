@@ -3,7 +3,7 @@
 import {
     ACTIVITY_RECORD,
     activityEntity,
-    ComputationStates,
+    ComputationState,
     Database,
     EVENT_RECORD,
     eventEntity,
@@ -16,7 +16,7 @@ import {
     SystemLogger
 } from "./System.js";
 import {InteractionEvent} from './types/interaction.js'
-import {createClass, Entity, KlassInstance, Relation} from "@interaqt/shared";
+import {createClass, Entity, KlassInstance, Property, Relation} from "@interaqt/shared";
 import {
     DBSetup,
     EntityQueryHandle,
@@ -28,6 +28,8 @@ import {
 } from '@interaqt/storage'
 import {SQLiteDB} from "./SQLite.js";
 import pino from "pino";
+import { RecordBoundState } from "./computedDataHandles/Computation.js";
+import { EntityDataContext, PropertyDataContext } from "./computedDataHandles/ComputedDataHandle.js";
 
 function JSONStringify(value:any) {
     return encodeURI(JSON.stringify(value))
@@ -191,7 +193,7 @@ export class MonoSystem implements System {
             refs: JSONParse(activity.refs),
         }))
     }
-    setup(entities: KlassInstance<typeof Entity>[], relations: KlassInstance<typeof Relation>[], states: ComputationStates, install = false){
+    setup(entities: KlassInstance<typeof Entity>[], relations: KlassInstance<typeof Relation>[], states: ComputationState[], install = false){
         // Create a type that matches what DBSetup expects
         type DBSetupEntityType = KlassInstance<typeof Entity> & { isRef?: boolean };
         
@@ -211,6 +213,26 @@ export class MonoSystem implements System {
             prepareEntity(eventEntity as KlassInstance<typeof Entity>),
             prepareEntity(activityEntity as KlassInstance<typeof Entity>)
         ];
+
+        states.forEach(({dataContext, state}) => {
+            Object.entries(state).forEach(([stateName, stateItem]) => {
+                if (stateItem instanceof RecordBoundState) { 
+                    const propertyDataContext = dataContext as PropertyDataContext
+                    const entity = propertyDataContext.host 
+                    const propertyName = propertyDataContext.id as string
+                    const boundStateName = `_boundState_${propertyName}_${stateName}`
+                    stateItem.key = boundStateName
+                    // TODO 也要允许 computed 
+                    entity.properties.push(Property.create({
+                        name: boundStateName,
+                        type: typeof stateItem.defaultValue,
+                        // 应该系统定义
+                        collection: Array.isArray(stateItem.defaultValue),
+                        defaultValue: () => stateItem.defaultValue
+                    }))
+                }
+            })
+        })
         
         // Pass the prepared entities to storage.setup
         return this.storage.setup(

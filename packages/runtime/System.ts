@@ -64,7 +64,7 @@ export type SystemLogType = {
     [k: string]: any
 }
 
-export type ComputationStates = {dataContext: DataContext, state: {[key: string]: RecordBoundState<any>|GlobalBoundState<any>}}[]
+export type ComputationState = {dataContext: DataContext, state: {[key: string]: RecordBoundState<any>|GlobalBoundState<any>}}
 
 export interface System {
     getEvent: (query: any) => Promise<InteractionEvent[]>
@@ -75,7 +75,7 @@ export interface System {
     conceptClass: Map<string, ReturnType<typeof createClass>>
     storage: Storage
     logger: SystemLogger
-    setup: (entities: KlassInstance<typeof Entity>[], relations: KlassInstance<typeof Relation>[], states: ComputationStates, install?: boolean) => Promise<any>
+    setup: (entities: KlassInstance<typeof Entity>[], relations: KlassInstance<typeof Relation>[], states: ComputationState[], install?: boolean) => Promise<any>
     
     // Add missing methods
     updateEntityPropertyState: (entityId: any, target: any, propertyId: any, fromState: any, toState: any) => Promise<any>

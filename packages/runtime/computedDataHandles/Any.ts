@@ -2,24 +2,26 @@ import {ComputedDataHandle, DataContext, PropertyDataContext} from "./ComputedDa
 import {Any, Count, Dictionary, KlassInstance, Relation} from "@interaqt/shared";
 import {RecordMutationEvent, SYSTEM_RECORD} from "../System.js";
 import { Controller } from "../Controller.js";
-import { DateDep, GlobalBoundState, RecordBoundState } from "./Computation.js";
+import { DataDep, GlobalBoundState, RecordBoundState } from "./Computation.js";
 import { DataBasedComputation } from "./Computation.js";
 import { data } from "../tests/data/leaveRequest.js";
 import { ERRecordMutationEvent } from "../Scheduler.js";
+import { assert } from "console";
+import { MatchExp } from "@interaqt/storage";
 
 
 export class GlobalAnyHandle implements DataBasedComputation {
     callback: (this: Controller, item: any) => boolean
     state!: ReturnType<typeof this.createState>
     useLastValue: boolean = true
-    dataDeps: {[key: string]: DateDep} = {}
+    dataDeps: {[key: string]: DataDep} = {}
     constructor(public controller: Controller,  args: KlassInstance<typeof Any>,  public dataContext: DataContext, ) {
         this.callback = args.callback.bind(this)
         this.dataDeps = {
             main: {
                 type: 'records',
-                name:args.record.name,
-                attributes: args.attributes
+                source:args.record,
+                attributeQuery: args.attributeQuery
             }
         }
     }
@@ -72,19 +74,22 @@ export class RelationBasedPropertyAnyHandle implements DataBasedComputation {
     callback: (this: Controller, item: any) => boolean
     state!: ReturnType<typeof this.createState>
     useLastValue: boolean = true
-    dataDeps: {[key: string]: DateDep} = {}
+    dataDeps: {[key: string]: DataDep} = {}
     relationAttr: string
+    relatedRecordName: string
+    isSource: boolean
     constructor(public controller: Controller,  args: KlassInstance<typeof Any>,  public dataContext: PropertyDataContext ) {
         this.callback = args.callback.bind(this)
 
         const relation = args.record as KlassInstance<typeof Relation>
         this.relationAttr = relation.source.name === dataContext.host.name ? relation.sourceProperty : relation.targetProperty
-        
+        this.isSource = relation.source.name === dataContext.host.name
+        this.relatedRecordName = this.isSource ? relation.target.name : relation.source.name
+        // TODO 用户会不会还有其他依赖？理论上我们应该给所有的计算都提供 dataDeps 定义，最后一起 Merge。
         this.dataDeps = {
-            current: {
-                type: '$record',
-                name:args.record.name,
-                attributes: [this.relationAttr].concat(args.attributes||[])
+            _current: {
+                type: 'property',
+                attributeQuery: [[this.relationAttr, {attributeQuery: args.attributeQuery||[]}]]
             }
         }
     }
@@ -99,32 +104,48 @@ export class RelationBasedPropertyAnyHandle implements DataBasedComputation {
         return false
     }
 
-    async compute({current}: {current: any}): Promise<boolean> {
-        // TODO deps
-        const matchCount = await this.state.matchCount.set(current, current[this.relationAttr].filter(this.callback).length)
-
+    async compute({_current}: {_current: any}): Promise<boolean> {
+        const matchCount = await this.state.matchCount.set(_current, _current[this.relationAttr].filter(this.callback).length)
         return matchCount>0
     }
 
     async incrementalCompute(lastValue: boolean, mutationEvent: ERRecordMutationEvent): Promise<boolean> {
-        let matchCount = await this.state!.matchCount.get()
-        if (mutationEvent.type === 'create') {
-            const newItemMatch = !!this.callback.call(this.controller, mutationEvent.record) 
+        // TODO 如果未来支持用户可以自定义 dataDeps，那么这里也要支持如果发现是其他 dataDeps 变化，这里要直接返回重算的信号。
+        let matchCount = await this.state!.matchCount.get(mutationEvent.record)
+        const relatedMutationEvent = mutationEvent.relatedMutationEvent!
+
+        if (relatedMutationEvent.type === 'create') {
+            // 关联关系的新建
+            // TODO 有没有可能关联实体也被删除了！！！！，所以查不到了！！！！是有可能的，所以只能软删除？
+            const newItem = await this.controller.system.storage.findOne(this.relatedRecordName, MatchExp.atom({
+                key: 'id',
+                value: ['=', relatedMutationEvent.record![this.isSource ? 'target' : 'source']!.id]
+            }), undefined, ['*'])
+
+            const newItemMatch = !!this.callback.call(this.controller, newItem) 
             if (newItemMatch === true) {
-                matchCount = await this.state!.matchCount.set(matchCount + 1)
+                matchCount = await this.state!.matchCount.set(relatedMutationEvent.record, matchCount + 1)
             }
-        } else if (mutationEvent.type === 'delete') {
-            const oldItemMatch = !!this.callback.call(this.controller, mutationEvent.oldRecord) 
+        } else if (relatedMutationEvent.type === 'delete') {
+            // 关联关系的删除
+            // TODO 有没有可能关联实体也被删除了！！！！，所以查不到了！！！！是有可能的，所以只能软删除？
+            const oldItem = await this.controller.system.storage.findOne(this.relatedRecordName, MatchExp.atom({
+                key: 'id',
+                value: ['=', relatedMutationEvent.oldRecord![this.isSource ? 'target' : 'source']!.id]
+            }), undefined, ['*'])
+
+            const oldItemMatch = !!this.callback.call(this.controller, oldItem) 
             if (oldItemMatch === true) {
-                matchCount = await this.state!.matchCount.set(matchCount - 1)
+                matchCount = await this.state!.matchCount.set(relatedMutationEvent.record, matchCount - 1)
             }
-        } else if (mutationEvent.type === 'update') {
-            const oldItemMatch = !!this.callback.call(this.controller, mutationEvent.oldRecord) 
-            const newItemMatch = !!this.callback.call(this.controller, mutationEvent.record) 
+        } else if (relatedMutationEvent.type === 'update') {
+            // 关联实体的更新
+            const oldItemMatch = !!this.callback.call(this.controller, relatedMutationEvent.oldRecord) 
+            const newItemMatch = !!this.callback.call(this.controller, relatedMutationEvent.record) 
             if (oldItemMatch === true && newItemMatch === false) {
-                matchCount = await this.state!.matchCount.set(matchCount - 1)
+                matchCount = await this.state!.matchCount.set(relatedMutationEvent.record, matchCount - 1)
             } else if (oldItemMatch === false && newItemMatch === true) {
-                matchCount = await this.state!.matchCount.set(matchCount + 1)
+                matchCount = await this.state!.matchCount.set(relatedMutationEvent.record, matchCount + 1)
             }
         }
 

@@ -1,6 +1,5 @@
-
 import {beforeEach, describe, expect, test} from "vitest";
-import {Controller, MonoSystem, Property, Entity, Every,Dictionary,BoolExp, Interaction, KlassByName, removeAllInstance, Any} from '../index.js';
+import {Controller, MonoSystem, Property, Entity, Every,Dictionary,BoolExp, Interaction, KlassByName, removeAllInstance, Any, Relation} from '../index.js';
 
 // 创建简单测试环境，直接测试 EveryHandle 的具体方法
 describe('Every and Any computed handle', () => {
@@ -20,7 +19,7 @@ describe('Every and Any computed handle', () => {
             collection: false,
             computedData: Every.create({
                 record: requestEntity,
-                attributes: ['handled'],
+                attributeQuery: ['handled'],
                 callback: (request:any) => {
                     return request.handled
                 },
@@ -84,7 +83,7 @@ describe('Every and Any computed handle', () => {
             collection: false,
             computedData: Any.create({
                 record: requestEntity,
-                attributes: ['handled'],
+                attributeQuery: ['handled'],
                 callback: (request:any) => {
                     return request.handled
                 },
@@ -112,7 +111,6 @@ describe('Every and Any computed handle', () => {
         key: 'id',
         value: ['=', request1.id]
     })  
-    debugger
     await system.storage.update('Request', idMatch1, {handled: true})
 
     // 获取 dictionary 的值
@@ -125,5 +123,77 @@ describe('Every and Any computed handle', () => {
     // 获取 dictionary 的值
     const anyRequestHandled3 = await system.storage.get('state','anyRequestHandled')
     expect(anyRequestHandled3).toBeFalsy()
+  });
+
+
+  test('should be true when any request of a user is handled', async () => {
+    const userEntity = Entity.create({
+        name: 'User',
+        properties: [
+            Property.create({
+                name:'name',
+                type:'string',
+                defaultValue: () => 'user1'
+            })
+        ]
+    })
+    const requestEntity = Entity.create({
+        name: 'Request',
+        properties: [
+            Property.create({name: 'handled', type: 'boolean'})
+        ]
+    })
+    const entities = [userEntity, requestEntity]
+    // 创建一个 user 和 request 的关系
+    const requestRelation = Relation.create({
+        source: userEntity,
+        sourceProperty: 'requests',
+        target: requestEntity,
+        targetProperty: 'owner',
+        name: 'requests',
+        type: 'n:n'
+    })
+    const relations = [requestRelation]
+
+    userEntity.properties.push(Property.create({
+        name: 'anyRequestHandled', 
+        type: 'boolean',
+        computedData: Any.create({
+            record: requestRelation,
+            attributeQuery: ['handled'],
+            callback: (request:any) => {
+                return request.handled
+            },
+        })
+    }))
+
+    const system = new MonoSystem()
+    system.conceptClass = KlassByName
+    const controller = new Controller(system,entities,relations,[],[],[],[])
+    await controller.setup(true)
+
+    // 创建 1 个 user 和 2 个 request
+    const user = await system.storage.create('User', {anyRequestHandled: false})
+    const request1 = await system.storage.create('Request', {handled: false, owner: user})
+    const request2 = await system.storage.create('Request', {handled: false, owner: user})
+
+    // 重新获取用户数据，查看 anyRequestHandled 的值
+    const user2 = await system.storage.findOne('User', BoolExp.atom({key: 'id', value: ['=', user.id]}), undefined, ['*'])
+    expect(user2.anyRequestHandled).toBeFalsy()
+
+    // 更新 request 的 handled 属性
+    await system.storage.update('Request', BoolExp.atom({key: 'id', value: ['=', request1.id]}), {handled: true})
+
+    // 重新获取用户数据，查看 anyRequestHandled 的值
+    const user3 = await system.storage.findOne('User', BoolExp.atom({key: 'id', value: ['=', user.id]}), undefined, ['*'])
+    expect(user3.anyRequestHandled).toBeTruthy()
+
+    // 更新 request 的 handled 属性
+    await system.storage.update('Request', BoolExp.atom({key: 'id', value: ['=', request1.id]}), {handled: false})
+
+    // 重新获取用户数据，查看 anyRequestHandled 的值
+    const user4 = await system.storage.findOne('User', BoolExp.atom({key: 'id', value: ['=', user.id]}), undefined, ['*'])
+    expect(user4.anyRequestHandled).toBeFalsy()
+
   });
 }); 
