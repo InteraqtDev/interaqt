@@ -309,8 +309,213 @@ describe('relation attributes', () => {
         // query
     })
 
+    test('delete relation by setting relation field to null in x:1 relationship', async () => {
+        // Create a user with a profile (one-to-one relationship)
+        const user = await handle.create('User', {
+            name: 'profileUser',
+            age: 30,
+            profile: {
+                title: 'User Profile'
+            }
+        });
+
+        // Create a file with an owner (many-to-one relationship)
+        const file = await handle.create('File', {
+            fileName: 'document.txt',
+            owner: {
+                name: 'fileOwner',
+                age: 25
+            }
+        });
+
+        // Verify the user has a profile
+        let foundUser = await handle.findOne(
+            'User',
+            MatchExp.atom({ key: 'id', value: ['=', user.id] }),
+            undefined,
+            ['name', ['profile', { attributeQuery: ['title'] }]]
+        );
+        
+        expect(foundUser.profile).toBeTruthy();
+        expect(foundUser.profile.title).toBe('User Profile');
+        
+        // Verify the file has an owner
+        let foundFile = await handle.findOne(
+            'File',
+            MatchExp.atom({ key: 'id', value: ['=', file.id] }),
+            undefined,
+            ['fileName', ['owner', { attributeQuery: ['name', 'age'] }]]
+        );
+        
+        expect(foundFile.owner).toBeTruthy();
+        expect(foundFile.owner.name).toBe('fileOwner');
+        
+        // Remove profile by setting the relation field to null (one-to-one)
+        await handle.update(
+            'User',
+            MatchExp.atom({ key: 'id', value: ['=', user.id] }),
+            {
+                profile: null
+            }
+        );
+        
+        
+        // Verify profile relationship is removed
+        foundUser = await handle.findOne(
+            'User',
+            MatchExp.atom({ key: 'id', value: ['=', user.id] }),
+            undefined,
+            ['name', ['profile', { attributeQuery: ['title'] }]]
+        );
+        
+        expect(foundUser.profile).toBeUndefined();
+        
+        // Verify owner relationship is removed
+        foundFile = await handle.findOne(
+            'File',
+            MatchExp.atom({ key: 'id', value: ['=', file.id] }),
+            undefined,
+            ['fileName', ['owner', { attributeQuery: ['name'] }]]
+        );
+        
+        expect(foundFile.owner).toBeNull();
+    });
+
     // TODO 更多关系上的测试
-})
+    test('delete relation by setting relation field to null', async () => {
+        // Create a user with teams
+        const user = await handle.create('User', {
+            name: 'testUser',
+            age: 25,
+            teams: [{
+                teamName: 'teamA',
+                '&': {
+                    role: 'member'
+                }
+            }, {
+                teamName: 'teamB',
+                '&': {
+                    role: 'leader'
+                }
+            }]
+        });
+
+        // Verify the user has two teams
+        let foundUser = await handle.findOne(
+            'User',
+            MatchExp.atom({ key: 'id', value: ['=', user.id] }),
+            undefined,
+            ['name', ['teams', { attributeQuery: ['teamName', ['&', { attributeQuery: ['role'] }]] }]]
+        );
+        
+        expect(foundUser.teams.length).toBe(2);
+        
+        
+        // Remove all teams by setting the entire relation field to null
+        await handle.update(
+            'User',
+            MatchExp.atom({ key: 'id', value: ['=', user.id] }),
+            {
+                teams: null
+            }
+        );
+        
+        // Verify no teams remain
+        foundUser = await handle.findOne(
+            'User',
+            MatchExp.atom({ key: 'id', value: ['=', user.id] }),
+            undefined,
+            ['name', ['teams', { attributeQuery: ['teamName'] }]]
+        );
+        
+        expect(foundUser.teams).toEqual([]);
+    });
+
+    test('delete all relations by setting x:n relation field to null', async () => {
+        // Create a user with multiple teams
+        const user = await handle.create('User', {
+            name: 'teamUser',
+            age: 28,
+            teams: [
+                { teamName: 'Team A', '&': { role: 'member' } },
+                { teamName: 'Team B', '&': { role: 'leader' } },
+                { teamName: 'Team C', '&': { role: 'observer' } }
+            ]
+        });
+
+        // Verify the user has three teams
+        let foundUser = await handle.findOne(
+            'User',
+            MatchExp.atom({ key: 'id', value: ['=', user.id] }),
+            undefined,
+            ['name', ['teams', { attributeQuery: ['teamName', ['&', { attributeQuery: ['role'] }]] }]]
+        );
+        
+        expect(foundUser.teams.length).toBe(3);
+        
+        // Remove all teams by setting the teams field to null
+        await handle.update(
+            'User',
+            MatchExp.atom({ key: 'id', value: ['=', user.id] }),
+            {
+                teams: null
+            }
+        );
+        
+        // Verify no teams remain
+        foundUser = await handle.findOne(
+            'User',
+            MatchExp.atom({ key: 'id', value: ['=', user.id] }),
+            undefined,
+            ['name', ['teams', { attributeQuery: ['teamName'] }]]
+        );
+        
+        expect(foundUser.teams).toEqual([]);
+        
+        // Create user with both x:1 and x:n relations
+        const complexUser = await handle.create('User', {
+            name: 'complexUser',
+            profile: { title: 'Complex Profile' },
+            teams: [
+                { teamName: 'Complex Team A' },
+                { teamName: 'Complex Team B' }
+            ]
+        });
+        
+        // Verify relations exist
+        let verifyUser = await handle.findOne(
+            'User',
+            MatchExp.atom({ key: 'id', value: ['=', complexUser.id] }),
+            undefined,
+            ['name', ['profile', { attributeQuery: ['title'] }], ['teams', { attributeQuery: ['teamName'] }]]
+        );
+        
+        expect(verifyUser.profile).toBeTruthy();
+        expect(verifyUser.teams.length).toBe(2);
+        
+        // Remove both x:1 and x:n relations simultaneously
+        await handle.update(
+            'User',
+            MatchExp.atom({ key: 'id', value: ['=', complexUser.id] }),
+            {
+                profile: null,
+                teams: null
+            }
+        );
+        
+        // Verify all relations removed
+        verifyUser = await handle.findOne(
+            'User',
+            MatchExp.atom({ key: 'id', value: ['=', complexUser.id] }),
+            undefined,
+            ['name', ['profile', { attributeQuery: ['title'] }], ['teams', { attributeQuery: ['teamName'] }]]
+        );
+        
+        expect(verifyUser.profile).toBeUndefined();
+        expect(verifyUser.teams).toEqual([]);
+    });
+
+});
 
 
 

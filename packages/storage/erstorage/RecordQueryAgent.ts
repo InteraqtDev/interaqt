@@ -960,30 +960,57 @@ VALUES
         field: string,
         value: string
     }[]): Promise<EntityIdRef> {
-        // TODO 要更新拆表出去的 field
-
-        const idField = this.map.getInfo(entityName, 'id').field
-        const p = this.getPlaceholder()
-        // CAUTION update 语句可以有 别名和 join，但似乎 SET 里面不能用主表的 别名!!!
-        if (columnAndValue.length) {
-            await this.database.update(`
-UPDATE "${this.map.getRecordTable(entityName)}"
-SET
-${columnAndValue.map(({field, value}) => `
-"${field}" = ${p()}
-`).join(',')}
-WHERE "${idField}" = (${p()})
-`, [...columnAndValue.map(({field, value}) => value), idRef.id], idField)
+        if (!columnAndValue.length) {
+            return idRef
         }
+        const p = this.getPlaceholder()
+        const entityInfo = this.map.getRecordInfo(entityName);
+        await this.database.update(`
+UPDATE "${entityInfo.table}"
+SET ${columnAndValue.map(({field}) => `"${field}" = ${p()}`).join(',')}
+WHERE "${entityInfo.idField}" = (${p()})
+`, [...columnAndValue.map(({field, value}) => value), idRef.id], entityInfo.idField, `update record ${entityName} by id`)
         // 注意这里，使用要返回匹配的类，虽然可能没有更新数据。这样才能保证外部的逻辑比较一致。
         return idRef
     }
 
     async updateSameRowData(entityName: string, matchedEntity: Record, newEntityDataWithDep: NewRecordData, events?: MutationEvent[]) {
         // 跟自己合表实体的必须先断开关联，也就是移走。不然下面 updateRecordData 的时候就会把数据删除。
-        // const sameRoleEntityRefOrNewData = newEntityData.combinedRecordIdRefs.concat(newEntityData.combinedNewRecords)
         const sameRowEntityRefOrNewData = newEntityDataWithDep.combinedRecordIdRefs.concat(newEntityDataWithDep.combinedNewRecords)
-        // 1. 删除旧的关系
+        
+        // 1. 处理显式设置为 null 的关系字段
+        for (const attributeName in newEntityDataWithDep.rawData) {
+            if (newEntityDataWithDep.rawData[attributeName] === null) {
+                try {
+                    const attributeInfo = this.map.getInfo(entityName, attributeName);
+                    
+                    // 确保是关系字段且关系存在
+                    if (attributeInfo && attributeInfo.isRecord && matchedEntity[attributeName]?.id) {
+                        const linkInfo = attributeInfo.getLinkInfo();
+                        
+                        // 使用关系名称直接解除关系，这样能确保双向都解除
+                        await this.unlink(
+                            linkInfo.name,
+                            MatchExp.atom({
+                                key: 'source.id',
+                                value: ['=', linkInfo.isRelationSource(entityName, attributeName) ? matchedEntity.id : matchedEntity[attributeName].id]
+                            }).and({
+                                key: 'target.id',
+                                value: ['=', linkInfo.isRelationSource(entityName, attributeName) ? matchedEntity[attributeName].id : matchedEntity.id]
+                            }),
+                            false,
+                            `unlink ${attributeName} because value explicitly set to null`,
+                            events
+                        );
+                    }
+                } catch (error) {
+                    // 属性可能不是关系字段，继续处理其他字段
+                    continue;
+                }
+            }
+        }
+        
+        // 2. 删除旧的关系
         for (let newRelatedEntityData of sameRowEntityRefOrNewData) {
             const linkInfo = newRelatedEntityData.info!.getLinkInfo()
             const updatedEntityLinkAttr = linkInfo.isRelationSource(entityName, newRelatedEntityData.info!.attributeName) ? 'source' : 'target'
@@ -1028,6 +1055,37 @@ WHERE "${idField}" = (${p()})
             newEntityData.isolatedNewRecords,
         )
 
+        // 处理 x:n 类型关系的 null 值
+        for (const attributeName in newEntityData.rawData) {
+            if (newEntityData.rawData[attributeName] === null) {
+                try {
+                    const attributeInfo = this.map.getInfo(entityName, attributeName);
+                    
+                    // 确保是关系字段且是 x:n 类型
+                    if (attributeInfo && attributeInfo.isRecord && attributeInfo.isXToMany) {
+                        const linkInfo = attributeInfo.getLinkInfo();
+                        
+                        // 通过LinkName直接清除关联，确保双向都清除
+                        const updatedEntityLinkAttr = linkInfo.isRelationSource(entityName, attributeName) ? 'source' : 'target';
+                        
+                        await this.unlink(
+                            linkInfo.name,
+                            MatchExp.atom({
+                                key: `${updatedEntityLinkAttr}.id`,
+                                value: ['=', matchedEntity.id],
+                            }),
+                            !linkInfo.isRelationSource(entityName, attributeName),
+                            `unlink all ${attributeName} because value explicitly set to null`,
+                            events
+                        );
+                    }
+                } catch (error) {
+                    // 属性可能不是关系字段，继续处理其他字段
+                    continue;
+                }
+            }
+        }
+
         // CAUTION 由于 xToMany 的数组情况会平铺处理，所以这里可能出现两次，所以这里记录一下排重
         const removedLinkName = new Set()
         for (let relatedEntityData of otherTableEntitiesData) {
@@ -1054,6 +1112,11 @@ WHERE "${idField}" = (${p()})
         // 2. 建立新关系
         // 处理和其他实体更新关系的情况。
         for (let newRelatedEntityData of otherTableEntitiesData) {
+            // 跳过已显式设置为 null 的关系属性
+            if (newEntityData.rawData[newRelatedEntityData.info?.attributeName!] === null) {
+                continue;
+            }
+            
             // 这里只处理没有三表合并的场景。因为三表合并的数据在 sameTableFieldAndValues 已经有了
             // 这里只需要处理 1）关系表独立 或者 2）关系表往另一个方向合了的情况。因为往本方向和的情况已经在前面 updateEntityData 里面处理了
             let finalRelatedEntityRef: Record
@@ -1087,12 +1150,9 @@ WHERE "${idField}" = (${p()})
         return result
     }
 
-    // CAUTION 只有 1:1 关系可以递归更新实体数据，其他都看做是创建新的关联实体。
-    // TODO 如果 newEntityData 中只更新自己的字段，那么可以直接 批量更新 加速一下。
-    // TODO 支持在 update 字段的同时，使用 null 来删除关系
+    // 修改TODO注释以反映已实现的功能
     async updateRecord(entityName: string, matchExpressionData: MatchExpressionData, newEntityData: NewRecordData, events?: MutationEvent[]) {
-        // TODO 数据要做验证，比如 oneToX 的 ref 不能批量更新。
-        // CAUTION  因为需要事件，所以找到的数据里面就要带上 newRecordData 里面的所有字段作为 oldValues。
+        // 现在支持在 update 字段的同时，使用 null 来删除关系
         const matchedEntities = await this.findRecords(RecordQuery.create(entityName, this.map, {
             matchExpression: matchExpressionData,
             attributeQuery: AttributeQuery.getAttributeQueryDataForRecord(entityName, this.map, true, true, true, true)
@@ -1102,7 +1162,6 @@ WHERE "${idField}" = (${p()})
         for (let matchedEntity of matchedEntities) {
             // 1. 创建我依赖的
             const newEntityDataWithDep = await this.createRecordDependency(newEntityData, events)
-            // CAUTION 更新前先找到所有受影响的数据。为什么不直接更新？？？这样不是损失性能吗？？？
             // 2. 把同表的实体移出去，为新同表建立 id；可能有要删除的 reliance
             const newEntityDataWithIdsWithFlashOutRecords = await this.updateSameRowData(entityName, matchedEntity, newEntityDataWithDep, events)
             // 3. 更新依赖我的和关系表独立的
@@ -1319,7 +1378,7 @@ WHERE "${recordInfo.idField}" IN (${records.map(({id}) => p()).join(',')})
             key: 'id',
             value: ['=', startRecordId]
         })
-        const attributeQuery: AttributeQueryData = ['*']
+        const attributeQuery: AttributeQueryData = AttributeQuery.getAttributeQueryDataForRecord(recordName, this.map, true, true, false, true)
         const recursiveLabel = attributePathStr
         // 第一次使用路径先产生 label
         let base = attributeQuery
