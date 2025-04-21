@@ -165,9 +165,9 @@ Property.public.computedData.type.push(RelationCount, RelationBasedWeightedSumma
 export const WeightedSummation = createClass({
     name: 'WeightedSummation',
     public: {
-        records: {
+        record: {
             type: [Entity, Relation],
-            collection: true,
+            collection: false,
             required: true
         },
         matchRecordToWeight: {
