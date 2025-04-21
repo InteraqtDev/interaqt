@@ -1,12 +1,9 @@
-import {ComputedDataHandle, DataContext, PropertyDataContext} from "./ComputedDataHandle.js";
-import {Any, Count, Dictionary, KlassInstance, Relation} from "@interaqt/shared";
-import {RecordMutationEvent, SYSTEM_RECORD} from "../System.js";
+import { ComputedDataHandle, DataContext, PropertyDataContext } from "./ComputedDataHandle.js";
+import { Any, KlassInstance, Relation } from "@interaqt/shared";
 import { Controller } from "../Controller.js";
 import { DataDep, GlobalBoundState, RecordBoundState } from "./Computation.js";
 import { DataBasedComputation } from "./Computation.js";
-import { data } from "../tests/data/leaveRequest.js";
 import { ERRecordMutationEvent } from "../Scheduler.js";
-import { assert } from "console";
 import { MatchExp } from "@interaqt/storage";
 
 
@@ -28,7 +25,7 @@ export class GlobalAnyHandle implements DataBasedComputation {
 
     createState() {
         return {
-            matchCount: new GlobalBoundState(0),
+            matchCount: new GlobalBoundState<number>(0),
         }
     }
     
@@ -70,7 +67,7 @@ export class GlobalAnyHandle implements DataBasedComputation {
 }
 
 
-export class RelationBasedPropertyAnyHandle implements DataBasedComputation {
+export class PropertyAnyHandle implements DataBasedComputation {
     callback: (this: Controller, item: any) => boolean
     state!: ReturnType<typeof this.createState>
     useLastValue: boolean = true
@@ -96,8 +93,8 @@ export class RelationBasedPropertyAnyHandle implements DataBasedComputation {
 
     createState() {
         return {
-            matchCount: new RecordBoundState(0),
-        }
+            matchCount: new RecordBoundState<number>(0),
+        }   
     }
     
     getDefaultValue() {
@@ -124,7 +121,7 @@ export class RelationBasedPropertyAnyHandle implements DataBasedComputation {
 
             const newItemMatch = !!this.callback.call(this.controller, newItem) 
             if (newItemMatch === true) {
-                matchCount = await this.state!.matchCount.set(relatedMutationEvent.record, matchCount + 1)
+                matchCount = await this.state!.matchCount.set(mutationEvent.record, matchCount + 1)
             }
         } else if (relatedMutationEvent.type === 'delete') {
             // 关联关系的删除
@@ -136,16 +133,16 @@ export class RelationBasedPropertyAnyHandle implements DataBasedComputation {
 
             const oldItemMatch = !!this.callback.call(this.controller, oldItem) 
             if (oldItemMatch === true) {
-                matchCount = await this.state!.matchCount.set(relatedMutationEvent.record, matchCount - 1)
+                matchCount = await this.state!.matchCount.set(mutationEvent.record, matchCount - 1)
             }
         } else if (relatedMutationEvent.type === 'update') {
             // 关联实体的更新
             const oldItemMatch = !!this.callback.call(this.controller, relatedMutationEvent.oldRecord) 
             const newItemMatch = !!this.callback.call(this.controller, relatedMutationEvent.record) 
             if (oldItemMatch === true && newItemMatch === false) {
-                matchCount = await this.state!.matchCount.set(relatedMutationEvent.record, matchCount - 1)
+                matchCount = await this.state!.matchCount.set(mutationEvent.record, matchCount - 1)
             } else if (oldItemMatch === false && newItemMatch === true) {
-                matchCount = await this.state!.matchCount.set(relatedMutationEvent.record, matchCount + 1)
+                matchCount = await this.state!.matchCount.set(mutationEvent.record, matchCount + 1)
             }
         }
 
@@ -154,59 +151,7 @@ export class RelationBasedPropertyAnyHandle implements DataBasedComputation {
 }
 
 
-// export class RelationBasedAnyHandle extends ComputedDataHandle {
-//     matchCountField: string = `${this.stateName}_match_count`
-//     setupSchema() {
-//         const computedData = this.computedData as KlassInstance<typeof Any>
-//         const matchCountField = `${this.stateName}_match_count`
-//         const matchCountState = Dictionary.create({
-//             name: matchCountField,
-//             type: 'number',
-//             computedData: Count.create({
-//                 record: computedData.record,
-//                 callback: computedData.callback
-//             })
-//         } as any)
-        
-//         // Use type assertion for controller.states
-//         const controller = this.controller as any;
-//         if (controller.states) {
-//             controller.states.push(matchCountState);
-//         }
-        
-//         this.controller.addComputedDataHandle('global', matchCountState.computedData as KlassInstance<any>, undefined, matchCountField)
-//     }
-//     parseComputedData(){
-//         // FIXME setupSchema 里面也想用怎么办？setupSchema 是在 super.constructor 里面调用的。在那个里面 注册的话又会被
-//         //  默认的自己的 constructor 行为覆盖掉
-//         this.matchCountField = `${this.stateName}_match_count`
-//         this.userComputeEffect = this.computeEffect
-//         this.userFullCompute = this.isMatchCountMoreThan1
-//     }
-
-//     getDefaultValue() {
-//         return false
-//     }
-
-//     computeEffect(mutationEvent: RecordMutationEvent, mutationEvents: RecordMutationEvent[]): any {
-//         // 如果是自己的 record 的上面两个字段更新，那么才要重算
-//         if (
-//             mutationEvent.recordName === SYSTEM_RECORD
-//             && mutationEvent.type === 'update'
-//             && mutationEvent.record!.concept === 'state'
-//             && mutationEvent.record!.key === this.matchCountField
-//         ) {
-//             return mutationEvent.oldRecord!.id
-//         }
-//     }
-
-//     async isMatchCountMoreThan1(recordId: string) {
-//         const matchCountFieldCount = await this.controller.system.storage.get('state',this.matchCountField)
-//         return matchCountFieldCount > 0
-//     }
-// }
-
 ComputedDataHandle.Handles.set(Any, {
     global: GlobalAnyHandle,
-    property: RelationBasedPropertyAnyHandle
+    property: PropertyAnyHandle
 })

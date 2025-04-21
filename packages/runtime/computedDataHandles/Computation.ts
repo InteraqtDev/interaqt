@@ -18,7 +18,7 @@ export class RecordBoundState<T> {
     record!: string
     key!: string
     controller!: Controller
-    constructor(public defaultValue:T) { 
+    constructor(public defaultValue:any) { 
 
     }
     async set(record:any, value: any): Promise<T> {
@@ -38,7 +38,7 @@ export class RecordBoundState<T> {
 export class GlobalBoundState<T> {
     key!:string
     controller!: Controller
-    constructor(public defaultValue?: T) {
+    constructor(public defaultValue?: any) {
 
     }
     async set(value: any):Promise<T> {

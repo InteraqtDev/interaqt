@@ -1,10 +1,10 @@
-import {ComputedDataHandle} from "./ComputedDataHandle.js";
-import {Count, Every, KlassInstance, Dictionary} from "@interaqt/shared";
-import {RecordMutationEvent, SYSTEM_RECORD} from "../System.js";
+import { ComputedDataHandle, PropertyDataContext } from "./ComputedDataHandle.js";
+import { Every, KlassInstance, Property, Relation } from "@interaqt/shared";
 import { DataBasedComputation, DataDep, GlobalBoundState, RecordBoundState } from "./Computation.js";
 import { Controller } from "../Controller.js";
 import { DataContext } from "./ComputedDataHandle.js";
 import { ERRecordMutationEvent } from "../Scheduler.js";
+import { MatchExp } from "@interaqt/storage";
 export class GlobalEveryHandle implements DataBasedComputation {
     callback: (this: Controller, item: any) => boolean
     state!: ReturnType<typeof this.createState>
@@ -25,8 +25,8 @@ export class GlobalEveryHandle implements DataBasedComputation {
 
     createState() {
         return {
-            matchCount: new GlobalBoundState(0),
-            totalCount: new GlobalBoundState(0),
+            matchCount: new GlobalBoundState<number>(0),
+            totalCount: new GlobalBoundState<number>(0),
         }
     }
     
@@ -72,75 +72,98 @@ export class GlobalEveryHandle implements DataBasedComputation {
     }
 }
 
-export class PropertyEveryHandle extends ComputedDataHandle {
-    matchCountField: string = `${this.propertyName}_match_count`
-    totalCountField: string= `${this.propertyName}_total_count`
-    setupSchema() {
-        const computedData = this.computedData as KlassInstance<typeof Every>
-        const matchCountField = `${this.stateName}_match_count`
-        const totalCountField = `${this.stateName}_total_count`
-        // 新赠两个 count
-        const matchCountState = Dictionary.create({
-            name: matchCountField,
-            type: 'number',
-            computedData: Count.create({
-                record: computedData.record,
-                callback: computedData.callback
-            })
-        } as any)
-        
-        // Use type assertion for controller.states
-        const controller = this.controller as any;
-        if (controller.states) {
-            controller.states.push(matchCountState);
-        }
-        
-        this.controller.addComputedDataHandle('global', matchCountState.computedData as KlassInstance<any>, undefined, matchCountField)
 
-        const totalCountState = Dictionary.create({
-            name: totalCountField,
-            type: 'number',
-            computedData: Count.create({
-                record: computedData.record,
-                callback: ()=>true
-            })
-        } as any)
-        
-        if (controller.states) {
-            controller.states.push(totalCountState);
+
+
+export class PropertyEveryHandle implements DataBasedComputation {
+    callback: (this: Controller, item: any) => boolean
+    state!: ReturnType<typeof this.createState>
+    useLastValue: boolean = true
+    dataDeps: {[key: string]: DataDep} = {}
+    relationAttr: string
+    relatedRecordName: string
+    isSource: boolean
+    constructor(public controller: Controller,  public args: KlassInstance<typeof Every>,  public dataContext: PropertyDataContext ) {
+        this.callback = args.callback.bind(this)
+
+        const relation = args.record as KlassInstance<typeof Relation>
+        this.relationAttr = relation.source.name === dataContext.host.name ? relation.sourceProperty : relation.targetProperty
+        this.isSource = relation.source.name === dataContext.host.name
+        this.relatedRecordName = this.isSource ? relation.target.name : relation.source.name
+        // TODO 用户会不会还有其他依赖？理论上我们应该给所有的计算都提供 dataDeps 定义，最后一起 Merge。
+        this.dataDeps = {
+            _current: {
+                type: 'property',
+                attributeQuery: [[this.relationAttr, {attributeQuery: args.attributeQuery||[]}]]
+            }
         }
-        
-        this.controller.addComputedDataHandle('global', totalCountState.computedData as KlassInstance<any>, undefined, totalCountField)
-    }
-    parseComputedData(){
-        // FIXME setupSchema 里面也想用怎么办？setupSchema 是在 super.constructor 里面调用的。在那个里面 注册的话又会被
-        //  默认的自己的 constructor 行为覆盖掉
-        this.matchCountField = `${this.stateName}_match_count`
-        this.totalCountField = `${this.stateName}_total_count`
-        this.userComputeEffect = this.computeEffect
-        this.userFullCompute = this.isMatchCountEqualTotalCount
     }
 
+    createState() {
+        return {
+            matchCount: new RecordBoundState<number>(0),
+            totalCount: new RecordBoundState<number>(0),
+        }
+    }
+    
     getDefaultValue() {
-        return true
+        return !this.args.notEmpty
     }
 
-    computeEffect(mutationEvent: RecordMutationEvent, mutationEvents: RecordMutationEvent[]): any {
-        // 如果是自己的 record 的上面两个字段更新，那么才要重算
-        if (
-            mutationEvent.recordName === SYSTEM_RECORD
-            && mutationEvent.type === 'update'
-            && mutationEvent.record!.concept === 'state'
-            && (mutationEvent.record!.key === this.totalCountField || mutationEvent.record!.key === this.matchCountField)
-        ) {
-            return true
+    async compute({_current}: {_current: any}): Promise<boolean> {
+        const totalCount = await this.state.totalCount.set(_current,_current[this.relationAttr].length)
+        const matchCount = await this.state.matchCount.set(_current, _current[this.relationAttr].filter(this.callback).length)
+        return matchCount === totalCount
+    }
+
+    async incrementalCompute(lastValue: boolean, mutationEvent: ERRecordMutationEvent): Promise<boolean> {
+        // TODO 如果未来支持用户可以自定义 dataDeps，那么这里也要支持如果发现是其他 dataDeps 变化，这里要直接返回重算的信号。
+        let matchCount = await this.state!.matchCount.get(mutationEvent.record)
+        let totalCount = await this.state!.totalCount.get(mutationEvent.record)
+        const relatedMutationEvent = mutationEvent.relatedMutationEvent!
+
+        if (relatedMutationEvent.type === 'create') {
+            // 关联关系的新建
+            // TODO 有没有可能关联实体也被删除了！！！！，所以查不到了！！！！是有可能的，所以只能软删除？
+            const newItem = await this.controller.system.storage.findOne(this.relatedRecordName, MatchExp.atom({
+                key: 'id',
+                value: ['=', relatedMutationEvent.record![this.isSource ? 'target' : 'source']!.id]
+            }), undefined, ['*'])
+
+            const newItemMatch = !!this.callback.call(this.controller, newItem) 
+            if (newItemMatch === true) {
+                matchCount = await this.state!.matchCount.set(mutationEvent.record, matchCount + 1)
+            }
+
+            totalCount = await this.state!.totalCount.set(mutationEvent.record, totalCount + 1)
+        } else if (relatedMutationEvent.type === 'delete') {
+            // 关联关系的删除
+            // TODO 有没有可能关联实体也被删除了！！！！，所以查不到了！！！！是有可能的，所以只能软删除？
+            const oldItem = await this.controller.system.storage.findOne(this.relatedRecordName, MatchExp.atom({
+                key: 'id',
+                value: ['=', relatedMutationEvent.oldRecord![this.isSource ? 'target' : 'source']!.id]
+            }), undefined, ['*'])
+
+            const oldItemMatch = !!this.callback.call(this.controller, oldItem) 
+            if (oldItemMatch === true) {
+                matchCount = await this.state!.matchCount.set(mutationEvent.record, matchCount - 1)
+            }
+
+            totalCount = await this.state!.totalCount.set(mutationEvent.record, totalCount - 1)
+        } else if (relatedMutationEvent.type === 'update') {
+            // 关联实体的更新
+            const oldItemMatch = !!this.callback.call(this.controller, relatedMutationEvent.oldRecord) 
+            const newItemMatch = !!this.callback.call(this.controller, relatedMutationEvent.record) 
+            if (oldItemMatch === true && newItemMatch === false) {
+                matchCount = await this.state!.matchCount.set(mutationEvent.record, matchCount - 1)
+            } else if (oldItemMatch === false && newItemMatch === true) {
+                matchCount = await this.state!.matchCount.set(mutationEvent.record, matchCount + 1)
+            }
+
+            totalCount = await this.state!.totalCount.set(mutationEvent.record, totalCount)
         }
-    }
 
-    async isMatchCountEqualTotalCount(effect: string) {
-        const matchCountFieldCount = await this.controller.system.storage.get('state',this.matchCountField)
-        const totalCountFieldCount = await this.controller.system.storage.get('state',this.totalCountField)
-        return matchCountFieldCount === totalCountFieldCount
+        return matchCount === totalCount
     }
 }
 

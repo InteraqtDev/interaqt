@@ -196,4 +196,82 @@ describe('Every and Any computed handle', () => {
     expect(user4.anyRequestHandled).toBeFalsy()
 
   });
+
+  test('should be true when every request of a user is handled', async () => {
+    const userEntity = Entity.create({
+        name: 'User',
+        properties: [
+            Property.create({
+                name:'name',
+                type:'string',
+                defaultValue: () => 'user1'
+            })
+        ]
+    })
+    const requestEntity = Entity.create({
+        name: 'Request',
+        properties: [
+            Property.create({name: 'handled', type: 'boolean'})
+        ]
+    })
+    const entities = [userEntity, requestEntity]
+    // 创建一个 user 和 request 的关系
+    const requestRelation = Relation.create({
+        source: userEntity,
+        sourceProperty: 'requests',
+        target: requestEntity,
+        targetProperty: 'owner',
+        name: 'requests',
+        type: 'n:n'
+    })
+    const relations = [requestRelation]
+
+    userEntity.properties.push(Property.create({
+        name: 'everyRequestHandled',
+        type: 'boolean',
+        computedData: Every.create({
+            record: requestRelation,
+            attributeQuery: ['handled'],
+            notEmpty: true,
+            callback: (request:any) => {
+                return !!request.handled
+            },
+        })
+    }))
+
+    const system = new MonoSystem() 
+    system.conceptClass = KlassByName
+    const controller = new Controller(system,entities,relations,[],[],[],[])
+    await controller.setup(true)
+
+    // 创建 1 个 user 和 2 个 request
+    const user = await system.storage.create('User', {everyRequestHandled: false})  
+    const request1 = await system.storage.create('Request', {handled: false, owner: user})      
+    const request2 = await system.storage.create('Request', {handled: false, owner: user})
+
+    // 重新获取用户数据，查看 everyRequestHandled 的值
+    const user2 = await system.storage.findOne('User', BoolExp.atom({key: 'id', value: ['=', user.id]}), undefined, ['*'])
+    expect(user2.everyRequestHandled).toBeFalsy()       
+
+    // 更新 request 的 handled 属性
+    await system.storage.update('Request', BoolExp.atom({key: 'id', value: ['=', request1.id]}), {handled: true})
+
+    // 重新获取用户数据，查看 everyRequestHandled 的值
+    const user3 = await system.storage.findOne('User', BoolExp.atom({key: 'id', value: ['=', user.id]}), undefined, ['*'])
+    expect(user3.everyRequestHandled).toBeFalsy()       
+
+    // 更新 request2 的 handled 属性
+    await system.storage.update('Request', BoolExp.atom({key: 'id', value: ['=', request2.id]}), {handled: true})
+
+    // 重新获取用户数据，查看 everyRequestHandled 的值
+    const user4 = await system.storage.findOne('User', BoolExp.atom({key: 'id', value: ['=', user.id]}), undefined, ['*'])
+    expect(user4.everyRequestHandled).toBeTruthy()   
+
+    // 更新 request2 的 handled 属性
+    await system.storage.update('Request', BoolExp.atom({key: 'id', value: ['=', request2.id]}), {handled: false})
+
+    // 重新获取用户数据，查看 everyRequestHandled 的值
+    const user5 = await system.storage.findOne('User', BoolExp.atom({key: 'id', value: ['=', user.id]}), undefined, ['*'])
+    expect(user5.everyRequestHandled).toBeFalsy()
+  });
 }); 

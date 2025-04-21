@@ -222,14 +222,21 @@ export class MonoSystem implements System {
                     const propertyName = propertyDataContext.id as string
                     const boundStateName = `_boundState_${propertyName}_${stateName}`
                     stateItem.key = boundStateName
-                    // TODO 也要允许 computed 
-                    entity.properties.push(Property.create({
-                        name: boundStateName,
-                        type: typeof stateItem.defaultValue,
-                        // 应该系统定义
-                        collection: Array.isArray(stateItem.defaultValue),
-                        defaultValue: () => stateItem.defaultValue
-                    }))
+
+                    if (stateItem.defaultValue instanceof Property) {
+                        // TODO 特别注意这里改了 name
+                        stateItem.defaultValue.name = boundStateName
+                        entity.properties.push(stateItem.defaultValue)
+                    } else {
+                        const defaultValuetype = typeof stateItem.defaultValue
+                        entity.properties.push(Property.create({
+                            name: boundStateName,
+                            type: defaultValuetype,
+                            // 应该系统定义
+                            collection: Array.isArray(stateItem.defaultValue),
+                            defaultValue: () => stateItem.defaultValue
+                        }))
+                    }
                 }
             })
         })
