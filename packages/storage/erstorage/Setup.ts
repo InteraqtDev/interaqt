@@ -452,7 +452,7 @@ export class DBSetup {
             `
 CREATE TABLE "${tableName}" (
 ${Object.values(this.tables[tableName].columns).map(column => (`
-    "${column.name}" ${column.fieldType} ${column.defaultValue ? `DEFAULT ${column.defaultValue()}` : ''}`)).join(',')}
+    "${column.name}" ${column.fieldType} ${column.defaultValue ? `DEFAULT ${JSON.stringify(column.defaultValue())}` : ''}`)).join(',')}
 )
 `
         ))
