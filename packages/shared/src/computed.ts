@@ -422,6 +422,23 @@ export const MapRecordMutation = createClass({
 })
 
 
+export const Transform = createClass({
+    name: 'Transform',
+    public: {
+        record: {
+            // TODO MutationEvent 等等
+            type: [Entity, Relation, Activity, Interaction],
+            collection: false,
+            required: true
+        },
+        callback: {
+            type: 'function',
+            collection: false,
+            required: true
+        }
+    }
+})
+
 
 // CAUTION 修补 Entity computedData 里面的类型
 Entity.public.computedData.type.push(
