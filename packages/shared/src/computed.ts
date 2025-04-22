@@ -431,6 +431,11 @@ export const Transform = createClass({
             collection: false,
             required: true
         },
+        attributeQuery: {
+            instanceType: {} as unknown as AttributeQueryData,
+            collection: false,
+            required: false
+        },
         callback: {
             type: 'function',
             collection: false,
