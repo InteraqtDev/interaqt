@@ -1,54 +1,98 @@
-import {Entity, KlassInstance, MapInteraction, Relation, Transform} from "@interaqt/shared";
-import {InteractionEventArgs} from "../types/interaction.js";
-import {MatchExp} from '@interaqt/storage'
-import {ComputedDataHandle} from "./ComputedDataHandle.js";
-import {EVENT_RECORD, InteractionEventRecord, RecordMutationEvent} from "../System.js";
-import { IncrementalComputedDataHandle, StatePatch } from "./IncrementalComputedDataHandle.js";
+import { ComputedDataHandle, DataContext, EntityDataContext, PropertyDataContext } from "./ComputedDataHandle.js";
+import { Transform, KlassInstance, Relation, Entity, Activity, Interaction, BoolExp } from "@interaqt/shared";
+import { Controller } from "../Controller.js";
+import { ComputeResultPatch, DataDep, GlobalBoundState, RecordBoundState, RecordsDataDep } from "./Computation.js";
+import { DataBasedComputation } from "./Computation.js";
+import { ERRecordMutationEvent } from "../Scheduler.js";
+import { MatchExp } from "@interaqt/storage";
+import { Klass } from "@interaqt/shared";
+import { assert } from "console";
 
-type TransformCallback = (event: any) => any
-
-
-export class TransformHandle extends IncrementalComputedDataHandle {
-    transform!: TransformCallback
-    // 单独抽出来让下面能覆写
-    parseComputedData(){
-        const computedData = this.computedData as unknown as KlassInstance<typeof Transform>
-        this.transform = computedData.callback!.bind(this.controller) as TransformCallback
-    }
-    getDefaultValue(newRecordId?: any): any {
-        return []
-    }
-    computeEffect(mutationEvent: RecordMutationEvent, mutationEvents: RecordMutationEvent[]): KlassInstance<any>|undefined {
-        return undefined
-    }
-    async getLastValue(effect: any, mutationEvent: RecordMutationEvent, mutationEvents: RecordMutationEvent[]) {
-    }
-    async computePatch(effect: KlassInstance<any>, lastValue: any, mutationEvent: RecordMutationEvent, mutationEvents: RecordMutationEvent[]): Promise<StatePatch|StatePatch[]|undefined> {
-        if (mutationEvent.type === 'create') {
-            const newValue= this.transform(mutationEvent.record)
-            return {
-                type: 'create',
-                value: newValue
-            }
-        } else if (mutationEvent.type === 'update') {
-            const newValue= this.transform(mutationEvent.record)
-            return {
-                type: 'update',
-                value: newValue,
-                affectedId: mutationEvent.record!.id
-            }
-        } else if (mutationEvent.type === 'delete') {
-            return {
-                type: 'delete',
-                affectedId: mutationEvent.record!.id
+export class RecordsTransformHandle implements DataBasedComputation {
+    transformCallback: (this: Controller, item: any) => any
+    state!: ReturnType<typeof this.createState>
+    useLastValue: boolean = true
+    dataDeps: {[key: string]: DataDep} = {}
+    
+    constructor(public controller: Controller, args: KlassInstance<typeof Transform>, public dataContext: DataContext) {
+        this.transformCallback = args.callback.bind(this)
+        
+        this.dataDeps = {
+            main: {
+                type: 'records',
+                source: args.record as KlassInstance<typeof Entity>|KlassInstance<typeof Relation>|KlassInstance<typeof Activity>|KlassInstance<typeof Interaction>,
+                attributeQuery: args.attributeQuery || ['*']
             }
         }
     }
+    
+    createState() {
+        return {
+            sourceRecordId: new RecordBoundState<any>(''),
+        }
+    }
+    
+    getDefaultValue() {
+        return []
+    }
+
+    async compute({main: records}: {main: any[]}): Promise<any[]> {
+        const transformedRecords = [];
+        
+        // FIXME transfrom 出来结果还没有 id，怎么通过 state 去存 sourceRecordId 呢？？？？
+        return records.map((record) => {
+            return {
+                ...this.transformCallback.call(this.controller, record),
+                [this.state.sourceRecordId.key]: record.id
+            }
+        });
+    }
+
+    async incrementalPatchCompute(lastValue: any[], mutationEvent: ERRecordMutationEvent): Promise<ComputeResultPatch | ComputeResultPatch[]|undefined> {
+        const dataContext = this.dataContext as EntityDataContext
+        
+        if (mutationEvent.type === 'create') {
+            const matchSourceRecord = BoolExp.atom({key: 'id', value: ['=', mutationEvent.record.id]})
+            const souceDataDep = this.dataDeps.main as RecordsDataDep
+            const sourceRecord = await this.controller.system.storage.findOne(souceDataDep.source.name, matchSourceRecord, undefined, souceDataDep.attributeQuery)
+            const transformedRecord = {
+                ...this.transformCallback.call(this.controller, sourceRecord),
+                [this.state.sourceRecordId.key]: mutationEvent.record.id
+            }
+            return {
+                type:'insert',
+                data: transformedRecord
+            }
+        } else if (mutationEvent.type === 'update'||mutationEvent.type === 'delete') {
+            const sourceRecordId = mutationEvent.oldRecord?.id ?? mutationEvent.record!.id
+            const match = BoolExp.atom({key: this.state.sourceRecordId.key, value: ['=', sourceRecordId]})
+            const mappedRecord = await this.controller.system.storage.findOne(dataContext.id.name, match, undefined, ['*'])
+            if (mutationEvent.type === 'delete') {
+                return {
+                    type:'delete',
+                    affectedId: mappedRecord.id
+                }
+            } else {
+                const matchSourceRecord = BoolExp.atom({key: 'id', value: ['=', sourceRecordId]})
+                const sourceRecord = await this.controller.system.storage.findOne((this.dataDeps.main as RecordsDataDep).source.name, matchSourceRecord, undefined, (this.dataDeps.main as RecordsDataDep).attributeQuery)
+                const transformedRecord = {
+                    ...this.transformCallback.call(this.controller, sourceRecord),
+                    [this.state.sourceRecordId.key]: sourceRecord.id
+                }
+                return {
+                    type:'update',
+                    data: transformedRecord,
+                    affectedId: mappedRecord.id
+                }
+            }
+        }
+        
+    }
 }
 
+
+// Register the Transform with ComputedDataHandle
 ComputedDataHandle.Handles.set(Transform, {
-    global: TransformHandle,
-    entity: TransformHandle,
-    relation: TransformHandle,
-    property: TransformHandle
-})
+    entity: RecordsTransformHandle,
+    relation: RecordsTransformHandle
+});

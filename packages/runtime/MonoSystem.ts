@@ -217,10 +217,19 @@ export class MonoSystem implements System {
         states.forEach(({dataContext, state}) => {
             Object.entries(state).forEach(([stateName, stateItem]) => {
                 if (stateItem instanceof RecordBoundState) { 
-                    const propertyDataContext = dataContext as PropertyDataContext
-                    const entity = propertyDataContext.host 
-                    const propertyName = propertyDataContext.id as string
-                    const boundStateName = `_boundState_${propertyName}_${stateName}`
+                    let boundStateName = ''
+                    let entity!: KlassInstance<typeof Entity> 
+                    if (dataContext.type === 'property') {
+                        const propertyDataContext = dataContext as PropertyDataContext
+                        entity = propertyDataContext.host 
+                        const propertyName = propertyDataContext.id as string
+                        boundStateName = `_property_boundState_${entity.name}_${propertyName}_${stateName}`
+                    } else if(dataContext.type === 'entity'||dataContext.type === 'relation') {
+                        entity = dataContext.id as KlassInstance<typeof Entity>
+                        boundStateName = `_${dataContext.type}_boundState_${dataContext.id.name}_${stateName}`
+                    } else {
+                        throw new Error(`Unsupported data context type: ${dataContext.type}`)
+                    }
                     stateItem.key = boundStateName
 
                     if (stateItem.defaultValue instanceof Property) {

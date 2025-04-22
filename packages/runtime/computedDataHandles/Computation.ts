@@ -1,4 +1,4 @@
-import { Relation } from "@interaqt/shared"
+import { Activity, Interaction, Relation } from "@interaqt/shared"
 import { KlassInstance } from "@interaqt/shared"
 import { Entity } from "@interaqt/shared"
 import { BoolExp } from "@interaqt/shared"
@@ -11,7 +11,8 @@ export type ComputeResult = any
 
 export type ComputeResultPatch = {
     type: 'insert' | 'update' | 'delete'
-    data: any
+    data?: any
+    affectedId?: any
 }
 
 export class RecordBoundState<T> {
@@ -54,7 +55,7 @@ export class GlobalBoundState<T> {
 
 export type RecordsDataDep = {
     type: 'records',
-    source: KlassInstance<typeof Entity>|KlassInstance<typeof Relation>,
+    source: KlassInstance<typeof Entity>|KlassInstance<typeof Relation>|KlassInstance<typeof Activity>|KlassInstance<typeof Interaction>,
     match?: MatchExpressionData,
     modifier?: ModifierData,
     attributeQuery?: AttributeQueryData
@@ -89,9 +90,9 @@ export interface DataBasedComputation {
     // 全量计算
     compute: (...args: any[]) => ComputeResult
     // 增量计算
-    incrementalCompute?: (...args: any[]) => ComputeResult
+    incrementalCompute?: (...args: any[]) => Promise<ComputeResult>
     // 增量计算，返回的是基于上一次结果的寄过增量
-    incrementalPatchCompute?: (...args: any[]) => ComputeResultPatch|ComputeResultPatch[]|undefined
+    incrementalPatchCompute?: (...args: any[]) => Promise<ComputeResultPatch|ComputeResultPatch[]|undefined>
     createState?: (...args: any[]) => {[key: string]: RecordBoundState<any>|GlobalBoundState<any>}
     dataDeps?: {[key: string]: any}
     getDefaultValue?: (...args: any[]) => any
@@ -102,8 +103,8 @@ export interface DataBasedComputation {
 export interface EventBasedComputation {
     dataContext: DataContext
     state: {[key: string]: RecordBoundState<any>|GlobalBoundState<any>}
-    incrementalCompute?: (...args: any[]) => ComputeResult
-    incrementalPatchCompute?: (...args: any[]) => ComputeResultPatch|ComputeResultPatch[]|undefined
+    incrementalCompute?: (...args: any[]) => Promise<ComputeResult>
+    incrementalPatchCompute?: (...args: any[]) => Promise<ComputeResultPatch|ComputeResultPatch[]|undefined>
     createState?: (...args: any[]) => {[key: string]: RecordBoundState<any>|GlobalBoundState<any>}
     eventDeps?: {[key: string]: any}
     useLastValue?: boolean

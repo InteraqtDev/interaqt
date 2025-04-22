@@ -11,3 +11,6 @@ export * from './types/interaction.js'
 export * from './types/boolExpression.js'
 export * from './util.js'
 export { type MutationEvent } from '@interaqt/storage'
+
+// Make sure Transform is exported
+import './computedDataHandles/Transform.js'

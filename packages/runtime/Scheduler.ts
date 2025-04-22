@@ -146,7 +146,11 @@ export class Scheduler {
                     } else if (state instanceof RecordBoundState) {
                         // TODO 这里的初始化在 monosystem 里面做了。理论上上面的 GlobalBoundState 也应该丢到里面去。
                         state.controller = this.controller
-                        state.record = (computationHandle.dataContext as PropertyDataContext)!.host.name!
+                        if (computationHandle.dataContext.type === 'property') {
+                            state.record = (computationHandle.dataContext as PropertyDataContext)!.host.name!
+                        } else {
+                            state.record = (computationHandle.dataContext as EntityDataContext)!.id.name!
+                        }
                     }
                 }
             }
@@ -259,9 +263,14 @@ export class Scheduler {
     
     
             } else if(dataBasedComputation.incrementalPatchCompute){
-                const patch = await dataBasedComputation.incrementalPatchCompute(erRecordMutationEvent)
-                // TODO 应用 patch
-                await this.controller.applyResultPatch(dataBasedComputation.dataContext, patch, erRecordMutationEvent.record)
+                let lastValue = undefined
+                if (dataBasedComputation.useLastValue) {
+                    lastValue = await this.controller.retrieveLastValue(dataBasedComputation.dataContext, erRecordMutationEvent.record)
+                }
+                const patch = await dataBasedComputation.incrementalPatchCompute(lastValue, erRecordMutationEvent)
+                if (patch) {
+                    await this.controller.applyResultPatch(dataBasedComputation.dataContext, patch, erRecordMutationEvent.record)
+                }
     
     
             } else {

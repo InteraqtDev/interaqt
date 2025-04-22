@@ -15,10 +15,11 @@ import {ActivityCall} from "./ActivityCall.js";
 import {InteractionCall, InteractionCallResponse} from "./InteractionCall.js";
 import {InteractionEventArgs} from "./types/interaction.js";
 import {assert} from "./util.js";
-import {ComputedDataHandle, DataContext, PropertyDataContext} from "./computedDataHandles/ComputedDataHandle.js";
+import {ComputedDataHandle, DataContext, EntityDataContext, PropertyDataContext, RelationDataContext} from "./computedDataHandles/ComputedDataHandle.js";
 import {asyncInteractionContext} from "./asyncInteractionContext.js";
-import { Computation, DataBasedComputation, DataDep, GlobalBoundState, RecordBoundState } from "./computedDataHandles/Computation.js";
+import { Computation, ComputeResultPatch, DataBasedComputation, DataDep, GlobalBoundState, RecordBoundState } from "./computedDataHandles/Computation.js";
 import { Scheduler } from "./Scheduler.js";
+import { MatchExp } from "@interaqt/storage";
 
 export const USER_ENTITY = 'User'
 
@@ -142,15 +143,33 @@ export class Controller {
             return item[propertyDataContext.id]
         }
     }
-    async applyResultPatch(dataContext: DataContext, patch: any, record?: any) {
-        if (dataContext.type === 'global') {
-            // TODO
-        } else if (dataContext.type === 'entity') {
-            // TODO
-        } else if (dataContext.type === 'relation') {
-            // TODO
-        } else {
-            // TODO
+    async applyResultPatch(dataContext: DataContext, patch: ComputeResultPatch|ComputeResultPatch[], record?: any) {
+        const patches = Array.isArray(patch) ? patch : [patch]
+        for(const patch of patches) {
+                if (dataContext.type === 'global') {
+                    // TODO
+                    return this.system.storage.set('state', dataContext.id! as string, patch)
+            } else if (dataContext.type === 'entity'||dataContext.type === 'relation') {
+                const erDataContext = dataContext as EntityDataContext|RelationDataContext
+                if (patch.type === 'insert') {  
+                    await this.system.storage.create(erDataContext.id.name, patch.data)
+                } else if (patch.type === 'update') {
+                    const match = MatchExp.atom({key: 'id', value: ['=', patch.affectedId]})
+                    await this.system.storage.update(erDataContext.id.name, match, patch.data)
+                } else if (patch.type === 'delete') {
+                    const match = MatchExp.atom({key: 'id', value: ['=', patch.affectedId]})
+                    await this.system.storage.delete(erDataContext.id.name, match)
+                }
+            } else {
+                const propertyDataContext = dataContext as PropertyDataContext
+                if (patch.type === 'insert') {
+                    await this.system.storage.update(propertyDataContext.host.name, BoolExp.atom({key: 'id', value: ['=', record.id]}), {[propertyDataContext.id]: patch.data})
+                } else if (patch.type === 'update') {
+                    await this.system.storage.update(propertyDataContext.host.name, BoolExp.atom({key: 'id', value: ['=', record.id]}), {[propertyDataContext.id]: patch.data})
+                } else if (patch.type === 'delete') {
+                    await this.system.storage.update(propertyDataContext.host.name, BoolExp.atom({key: 'id', value: ['=', record.id]}), {[propertyDataContext.id]: null})
+                }
+            }
         }
     }
     callbacks: Map<any, Set<SystemCallback>> = new Map()
