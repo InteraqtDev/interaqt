@@ -1,24 +1,20 @@
-import {RecordMutationEvent, System, SystemCallback, SystemLogger} from "./System.js";
+import { RecordMutationEvent, System, SystemCallback, SystemLogger } from "./System.js";
 import {
     Activity,
-    BoolExp,
-    ComputedData,
-    Entity,
-    Interaction,
-    Klass,
-    KlassInstance,
+    BoolExp, Entity,
+    Interaction, KlassInstance,
     Property,
     Relation
 } from "@interaqt/shared";
-import './computedDataHandles/index.js'
-import {ActivityCall} from "./ActivityCall.js";
-import {InteractionCall, InteractionCallResponse} from "./InteractionCall.js";
-import {InteractionEventArgs} from "./types/interaction.js";
-import {assert} from "./util.js";
-import {ComputedDataHandle, DataContext, EntityDataContext, PropertyDataContext, RelationDataContext} from "./computedDataHandles/ComputedDataHandle.js";
-import {asyncInteractionContext} from "./asyncInteractionContext.js";
-import { Computation, ComputeResultPatch, DataBasedComputation, DataDep, GlobalBoundState, RecordBoundState } from "./computedDataHandles/Computation.js";
-import { Scheduler } from "./Scheduler.js";
+import './computedDataHandles/index.js';
+import { ActivityCall } from "./ActivityCall.js";
+import { InteractionCall, InteractionCallResponse } from "./InteractionCall.js";
+import { InteractionEventArgs } from "./types/interaction.js";
+import { assert } from "./util.js";
+import { DataContext, EntityDataContext, PropertyDataContext, RelationDataContext } from "./computedDataHandles/ComputedDataHandle.js";
+import { asyncInteractionContext } from "./asyncInteractionContext.js";
+import { ComputeResultPatch } from "./computedDataHandles/Computation.js";
+import { Scheduler, SKIP_RESULT } from "./Scheduler.js";
 import { MatchExp } from "@interaqt/storage";
 
 export const USER_ENTITY = 'User'
@@ -115,6 +111,8 @@ export class Controller {
         // TODO 如果是恢复模式，还要从 event stack 中开始恢复数据。
     }
     async applyResult(dataContext: DataContext, result: any, record?: any) {
+        if (result ===SKIP_RESULT) return
+
         if (dataContext.type === 'global') {
             // TODO 
             return this.system.storage.set('state', dataContext.id! as string, result)
@@ -123,7 +121,6 @@ export class Controller {
         } else if (dataContext.type === 'relation') {
             // TODO
         } else {
-            // TODO
             const propertyDataContext = dataContext as PropertyDataContext
             await this.system.storage.update(propertyDataContext.host.name, BoolExp.atom({key: 'id', value: ['=', record.id]}), {[propertyDataContext.id]: result})
         }   
@@ -131,10 +128,10 @@ export class Controller {
     async retrieveLastValue(dataContext: DataContext, record?: any) {
         if (dataContext.type === 'global') {
             return this.system.storage.get('state', dataContext.id! as string)
-        } else if (dataContext.type === 'entity') {
-            // TODO
-        } else if (dataContext.type === 'relation') {
-            // TODO
+        } else if (dataContext.type === 'entity'||dataContext.type === 'relation') {
+            
+            return this.system.storage.find(dataContext.id.name, undefined, undefined, ['*'])
+      
         } else {
             const propertyDataContext = dataContext as PropertyDataContext
             if (record[propertyDataContext.id]) return record[propertyDataContext.id]
@@ -143,7 +140,9 @@ export class Controller {
             return item[propertyDataContext.id]
         }
     }
-    async applyResultPatch(dataContext: DataContext, patch: ComputeResultPatch|ComputeResultPatch[], record?: any) {
+    async applyResultPatch(dataContext: DataContext, patch: typeof SKIP_RESULT|ComputeResultPatch|ComputeResultPatch[], record?: any) {
+        if (patch === SKIP_RESULT) return
+
         const patches = Array.isArray(patch) ? patch : [patch]
         for(const patch of patches) {
                 if (dataContext.type === 'global') {

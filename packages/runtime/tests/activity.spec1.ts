@@ -36,7 +36,7 @@ describe("activity state", () => {
 
     beforeEach(async () => {
         removeAllInstance()
-        const { data }  = (await import('./data/activity'))
+        const { data }  = (await import('./data/activity/index.js'))
         /**
          * 当前的格式为:
          * New && Other Admin as A

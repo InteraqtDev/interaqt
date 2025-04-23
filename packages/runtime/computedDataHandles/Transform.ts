@@ -1,12 +1,9 @@
-import { ComputedDataHandle, DataContext, EntityDataContext, PropertyDataContext } from "./ComputedDataHandle.js";
+import { ComputedDataHandle, DataContext, EntityDataContext } from "./ComputedDataHandle.js";
 import { Transform, KlassInstance, Relation, Entity, Activity, Interaction, BoolExp } from "@interaqt/shared";
 import { Controller } from "../Controller.js";
-import { ComputeResultPatch, DataDep, GlobalBoundState, RecordBoundState, RecordsDataDep } from "./Computation.js";
+import { ComputeResultPatch, DataDep, RecordBoundState, RecordsDataDep } from "./Computation.js";
 import { DataBasedComputation } from "./Computation.js";
 import { ERRecordMutationEvent } from "../Scheduler.js";
-import { MatchExp } from "@interaqt/storage";
-import { Klass } from "@interaqt/shared";
-import { assert } from "console";
 
 export class RecordsTransformHandle implements DataBasedComputation {
     transformCallback: (this: Controller, item: any) => any
@@ -39,7 +36,6 @@ export class RecordsTransformHandle implements DataBasedComputation {
     async compute({main: records}: {main: any[]}): Promise<any[]> {
         const transformedRecords = [];
         
-        // FIXME transfrom 出来结果还没有 id，怎么通过 state 去存 sourceRecordId 呢？？？？
         return records.map((record) => {
             return {
                 ...this.transformCallback.call(this.controller, record),

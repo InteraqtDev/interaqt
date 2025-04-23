@@ -1,10 +1,10 @@
 import { Controller } from "./Controller.js";
 import { DataContext, ComputedDataHandle, PropertyDataContext, EntityDataContext } from "./computedDataHandles/ComputedDataHandle.js";
 
-import { Entity, Klass, KlassInstance, Property, Relation } from "@interaqt/shared";
+import { Entity, Interaction, Klass, KlassInstance, Property, Relation } from "@interaqt/shared";
 import { assert } from "./util.js";
-import { Computation, ComputationClass, DataBasedComputation, DataDep, GlobalBoundState, RecordBoundState, RecordsDataDep } from "./computedDataHandles/Computation.js";
-import { RecordMutationEvent } from "./System.js";
+import { Computation, ComputationClass, DataBasedComputation, DataDep, DataMutationEventDep, EventBasedComputation, EventDep, GlobalBoundState, RecordBoundState, RecordsDataDep } from "./computedDataHandles/Computation.js";
+import { EVENT_RECORD, eventEntity, RecordMutationEvent } from "./System.js";
 import { AttributeQueryData, MatchExp, RecordQueryData } from "@interaqt/storage";
 
 type ERCreateMutationEventsSourceMap = {
@@ -38,7 +38,14 @@ type ERUpdateMutationEventsSourceMap = {
     isRelation?: boolean
 }
 
-type ERMutationEventsSourceMap = ERCreateMutationEventsSourceMap | ERDeleteMutationEventsSourceMap | ERUpdateMutationEventsSourceMap
+type ERMutationEventSourceMap = ERCreateMutationEventsSourceMap | ERDeleteMutationEventsSourceMap | ERUpdateMutationEventsSourceMap
+
+type InteractionEventSourceMap = {
+    eventDep: EventDep
+    intraction: KlassInstance<typeof Interaction>
+    computation: EventBasedComputation,
+}
+
 
 export type ERRecordMutationEvent = {
     dataDep:DataDep,
@@ -52,6 +59,8 @@ export type ERRecordMutationEvent = {
     isRelation?: boolean
 }
 
+
+export const SKIP_RESULT = Symbol('skip_result')
 
 export class Scheduler {
     computations = new Set<Computation>()
@@ -156,47 +165,88 @@ export class Scheduler {
             }
         }
     }
+    erMutationEventSources: ERMutationEventSourceMap[] = []
+    dataSourceMapTree: {[key: string]: {[key: string]: ERMutationEventSourceMap[]}} = {}
+    interactionEventSources: InteractionEventSourceMap[] = []
+    eventSourceMapTree: {[intreactionName: string]: InteractionEventSourceMap[]} = {}
     async setupMutationListeners() {
 
-        const ERMutationEventsSource: ERMutationEventsSourceMap[]= []
+        const ERMutationEventSources: ERMutationEventSourceMap[]= []
 
         for(const computation of this.computations) {
-            const computationHandle = computation as Computation
-            // TODO 这里 createState 要放到 setup 前面，因为可能会修改 entity、relation ???
-            // 2. 根据 data deps 计算出 mutation events
-            if( (computationHandle as DataBasedComputation).compute) {
-                const dataBasedComputation = computationHandle as DataBasedComputation
+            // 1. 根据 data deps 计算出 mutation events
+            if( (computation as DataBasedComputation).compute) {
+                const dataBasedComputation = computation as DataBasedComputation
                 if (dataBasedComputation.dataDeps) {
-                    ERMutationEventsSource.push(
-                        ...this.convertDataDepsToERMutationEventsSourceMap(dataBasedComputation.dataDeps, computationHandle)
+                    ERMutationEventSources.push(
+                        ...Object.entries(dataBasedComputation.dataDeps).map(([dataDepName, dataDep]) => this.convertDataDepToERMutationEventsSourceMap(dataDepName, dataDep, computation)).flat()
                     )
+                }
+            } else {
+                // 2. EventBasedComputation
+                const eventBasedComputation = computation as EventBasedComputation
+                if (eventBasedComputation.eventDeps) {
+                    Object.entries(eventBasedComputation.eventDeps!).forEach(([eventDepName, eventDep]) => {
+                        if (eventDep.type === 'interaction') {
+                            const interaction = eventDep.interaction
+                            this.interactionEventSources.push({
+                                eventDep,
+                                intraction: interaction,
+                                computation: eventBasedComputation
+                            })
+
+                        } else if (eventDep.type === 'data') {
+                            // 复用 dataDep 的能力
+                            const dataDep = eventDep.dataDep
+                            ERMutationEventSources.push(
+                                ...this.convertDataDepToERMutationEventsSourceMap(eventDepName, dataDep, computation, eventDep.eventType)
+                            )
+                        }
+                    })
                 }
             }
         }
 
+        this.eventSourceMapTree = this.buildEventSourceMapTree(this.interactionEventSources)
         // 根据 sourcemap 来执行真正的监听
-        const sourceMapTree = this.buildSourceMapTree(ERMutationEventsSource)
+        this.erMutationEventSources = ERMutationEventSources
+        this.dataSourceMapTree = this.buildDataSourceMapTree(this.erMutationEventSources)
+
+
         this.controller.system.storage.listen(async (mutationEvents) => {
             for(let mutationEvent of mutationEvents){
-                const sources = sourceMapTree[mutationEvent.recordName]?.[mutationEvent.type]
-                if (sources) {
-                    for(const source of sources) {
-                        if(source.type === 'update') {
-                            if(source.attributes!.every(attr => mutationEvent.record![attr]===mutationEvent.oldRecord![attr])) {
-                                continue
-                            }   
+                if(mutationEvent.recordName === EVENT_RECORD) {
+                    // TODO 未来考虑是不是不应该从 storage 来触发？但似乎从 stroge 出发也合理。
+                    //  storage 代表的是系统的全部状态，不是传统意义上的只管存储
+                    const event = mutationEvent.record!
+                    const interactionEventSources = this.eventSourceMapTree[mutationEvent.record![event.interactionName]]
+                    if (interactionEventSources) {
+                        for(const interactionEventSource of interactionEventSources) {
+                            await this.runEventBasedComputation(interactionEventSource, mutationEvent)
                         }
-                        await this.runComputation(source, mutationEvent)
+                    }
+
+                } else {
+                    const sources = this.dataSourceMapTree[mutationEvent.recordName]?.[mutationEvent.type]
+                    if (sources) {
+                        for(const source of sources) {
+                            if(source.type === 'update') {
+                                if(source.attributes!.every(attr => mutationEvent.record![attr]===mutationEvent.oldRecord![attr])) {
+                                    continue
+                                }   
+                            }
+                            await this.runDataBasedComputation(source, mutationEvent)
+                        }
                     }
                 }
+
+                
             }
         })
-        this.ERMutationEventsSource = ERMutationEventsSource
-        this.sourceMapTree = sourceMapTree
+        
     }
-    ERMutationEventsSource: ERMutationEventsSourceMap[] = []
-    sourceMapTree: {[key: string]: {[key: string]: ERMutationEventsSourceMap[]}} = {}
-    async computeERRecordMutationEvents(source: ERMutationEventsSourceMap, mutationEvent: RecordMutationEvent): Promise<ERRecordMutationEvent[]> {
+    
+    async computeERRecordMutationEvents(source: ERMutationEventSourceMap, mutationEvent: RecordMutationEvent): Promise<ERRecordMutationEvent[]> {
         // 1. 直接就是当前 dataDep的增删改，复用信息就够了
         if(!source.targetPath?.length) {
             return [{
@@ -247,7 +297,63 @@ export class Scheduler {
         }))
         
     }
-    async runComputation(source: ERMutationEventsSourceMap, mutationEvent: RecordMutationEvent) {
+    async runEventBasedComputation(source: InteractionEventSourceMap, mutationEvent: RecordMutationEvent) {
+        // TODO 
+        const eventBasedComputation = source.computation as EventBasedComputation
+        if(eventBasedComputation.dataContext.type === 'property') {
+            let dirtyRecords:any[]|undefined = undefined
+            if (eventBasedComputation.computeDirtyRecords) {
+                dirtyRecords = await eventBasedComputation.computeDirtyRecords()
+            } else {
+                dirtyRecords = await this.controller.system.storage.find(eventBasedComputation.dataContext.host.name, undefined, undefined, ['*'])
+            }
+            if (dirtyRecords) {
+                for(const record of dirtyRecords) {
+                    if (eventBasedComputation.incrementalCompute) {
+                        let lastValue = undefined
+                        if (eventBasedComputation.useLastValue) {
+                            lastValue = await this.controller.retrieveLastValue(eventBasedComputation.dataContext, record)
+                        }
+                        const result = await eventBasedComputation.incrementalCompute(lastValue, mutationEvent, record)
+                        await this.controller.applyResult(eventBasedComputation.dataContext, result, record)
+                    } else if(eventBasedComputation.incrementalPatchCompute){
+                        let lastValue = undefined
+                        if (eventBasedComputation.useLastValue) {
+                            lastValue = await this.controller.retrieveLastValue(eventBasedComputation.dataContext, record)
+                        }
+                        const patch = await eventBasedComputation.incrementalPatchCompute(lastValue, mutationEvent, record)
+                        if (patch) {
+                            await this.controller.applyResultPatch(eventBasedComputation.dataContext, patch, record)
+                        }
+                    }
+                }
+            }
+            
+        } else {
+            if (eventBasedComputation.incrementalCompute) {
+                let lastValue = undefined
+                if (eventBasedComputation.useLastValue) {
+                    lastValue = await this.controller.retrieveLastValue(eventBasedComputation.dataContext)
+                }
+                const result = await eventBasedComputation.incrementalCompute(lastValue, eventBasedComputation)
+                await this.controller.applyResult(eventBasedComputation.dataContext, result)
+            } else if(eventBasedComputation.incrementalPatchCompute){
+                let lastValue = undefined
+                if (eventBasedComputation.useLastValue) {
+                    lastValue = await this.controller.retrieveLastValue(eventBasedComputation.dataContext)
+                }
+                const patch = await eventBasedComputation.incrementalPatchCompute(lastValue)
+                if (patch) {
+                    await this.controller.applyResultPatch(eventBasedComputation.dataContext, patch)
+                }
+            }
+        }
+        
+    }
+    async runDataBasedComputation(source: ERMutationEventSourceMap, mutationEvent: RecordMutationEvent) {
+        // 根据 recordMutationEvent 计算出来哪些数据需要重新计算
+        //  1. 如果是 global/entity/relation，那么全都是要全部重算的。
+        //  2. 如果是 property，只要反向匹配出来哪些 records 收到了影响，重算就行了。
         const erRecordMutationEvents = await this.computeERRecordMutationEvents(source, mutationEvent)
         const dataBasedComputation = source.computation as DataBasedComputation
 
@@ -283,10 +389,20 @@ export class Scheduler {
 
         
     }
-    buildSourceMapTree(sourceMap: ERMutationEventsSourceMap[]) {
+    buildEventSourceMapTree(sourceMaps: InteractionEventSourceMap[]) {
+        const sourceMapTree: {[interactionName:string]: InteractionEventSourceMap[]} = {}
+        sourceMaps.forEach(sourceMap => {
+            if (!sourceMapTree[sourceMap.intraction.name]) {
+                sourceMapTree[sourceMap.intraction.name] = []
+            }
+            sourceMapTree[sourceMap.intraction.name].push(sourceMap)
+        })
+        return sourceMapTree
+    }
+    buildDataSourceMapTree(sourceMaps: ERMutationEventSourceMap[]) {
         // 两层结构，第一层是 recordName，第二层是 type
-        const sourceMapTree: {[key: string]: {[key: string]: ERMutationEventsSourceMap[]}   } = {}
-        sourceMap.forEach(source => {
+        const sourceMapTree: {[key: string]: {[key: string]: ERMutationEventSourceMap[]}   } = {}
+        sourceMaps.forEach(source => {
             if (!sourceMapTree[source.recordName]) {
                 sourceMapTree[source.recordName] = {}
             }
@@ -297,45 +413,53 @@ export class Scheduler {
         })
         return sourceMapTree
     }
-    convertDataDepsToERMutationEventsSourceMap(dataDeps: {[key: string]: DataDep}, computation: Computation) {
-        const ERMutationEventsSource: ERMutationEventsSourceMap[]= []
-        Object.entries(dataDeps).forEach(([depName, dep]: [string, DataDep]) => {
-            if (dep.type === 'records') {
+    convertDataDepToERMutationEventsSourceMap(dataDepName:string, dataDep: DataDep, computation: Computation, eventType?: 'create'|'delete'|'update'): ERMutationEventSourceMap[] {
+        const ERMutationEventsSource: ERMutationEventSourceMap[]= []
+        if (dataDep.type === 'records') {
+            if (!eventType || eventType === 'create') {
                 ERMutationEventsSource.push({
-                    dataDep: dep,
+                    dataDep: dataDep,
                     type: 'create',
-                    recordName: dep.source.name,
-                    sourceRecordName: dep.source.name,
-                    computation
-                }, {    
-                    dataDep: dep,
-                    type: 'delete',
-                    recordName: dep.source.name,
-                    sourceRecordName: dep.source.name,
+                    recordName: dataDep.source.name,
+                    sourceRecordName: dataDep.source.name,
                     computation
                 })
-
-                if (dep.attributeQuery) {
-                    ERMutationEventsSource.push(...this.convertAttrsToERMutationEventsSourceMap(dep, dep.source.name, dep.attributeQuery, [], computation))
-                }
-            } else if (dep.type==='property') {
-                const dataContext = computation.dataContext as PropertyDataContext
-
-                if (dep.attributeQuery) {
-                    // 注意这里的 recordName 应该是当前数据 entity 的 name，因为依赖的是 property 所在的自身 entity
-                    ERMutationEventsSource.push(...this.convertAttrsToERMutationEventsSourceMap(dep, dataContext.host.name, dep.attributeQuery, [], computation))
-                }
-            } else if (dep.type ==='global') {
-                // TODO global 怎么监听啊
             }
-        })
+            if (!eventType || eventType === 'delete') {
+                ERMutationEventsSource.push({    
+                    dataDep: dataDep,
+                    type: 'delete',
+                    recordName: dataDep.source.name,
+                    sourceRecordName: dataDep.source.name,
+                    computation
+                })
+            }
+            
+            if (!eventType || eventType === 'update') {
+                // 监听 update
+                if (dataDep.attributeQuery) {
+                    ERMutationEventsSource.push(...this.convertAttrsToERMutationEventsSourceMap(dataDep, dataDep.source.name, dataDep.attributeQuery, [], computation))
+                }
+            }
+            
+        } else if (dataDep.type==='property') {
+            // 只能监听 update eventType。
+            const dataContext = computation.dataContext as PropertyDataContext
+
+            if (dataDep.attributeQuery) {
+                // 注意这里的 recordName 应该是当前数据 entity 的 name，因为依赖的是 property 所在的自身 entity
+                ERMutationEventsSource.push(...this.convertAttrsToERMutationEventsSourceMap(dataDep, dataContext.host.name, dataDep.attributeQuery, [], computation))
+            }
+        } else if (dataDep.type ==='global') {
+            // TODO global 怎么监听啊
+            // 只能监听 update eventType
+        }
 
         return ERMutationEventsSource
     }
+    
     convertAttrsToERMutationEventsSourceMap(dataDep: DataDep, baseRecordName: string, attributes: AttributeQueryData, context: string[], computation: Computation) {
-        const dataContext = computation.dataContext as EntityDataContext
-
-        const ERMutationEventsSource: ERMutationEventsSourceMap[] = []
+        const ERMutationEventsSource: ERMutationEventSourceMap[] = []
         const primitiveAttr: string[] = []
         const relationQueryAttr: [string, RecordQueryData][] = []
         
@@ -351,7 +475,7 @@ export class Scheduler {
                 throw new Error(`unknown attribute type: ${attr}`)
             }
         })
-
+        // 自身的 attribute update
         if (primitiveAttr.length > 0) {
             const recordName = context.length > 0 ? this.controller.system.storage.getEntityName(baseRecordName, context.join('.')) : baseRecordName
             ERMutationEventsSource.push({
@@ -365,6 +489,7 @@ export class Scheduler {
             })
         }
 
+        // 关联 record 字段的更新
         relationQueryAttr.forEach(([attrName, subQuery]) => {
             ERMutationEventsSource.push(...this.convertRelationAttrToERMutationEventsSourceMap(dataDep, baseRecordName, subQuery.attributeQuery!, context.concat(attrName), computation))
         })
@@ -372,7 +497,7 @@ export class Scheduler {
     }
 
     convertRelationAttrToERMutationEventsSourceMap(dataDep: DataDep, baseRecordName: string, subAttrs: AttributeQueryData, context: string[], computation: Computation) {
-        const ERMutationEventsSource: ERMutationEventsSourceMap[] = []
+        const ERMutationEventsSource: ERMutationEventSourceMap[] = []
         // TODO 转化成对关联实体的监听
         // 1. 先监听"关联实体关系"的 create/delete
         const relatedRecordName = this.controller.system.storage.getRelationName(baseRecordName, context.join('.'))

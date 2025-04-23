@@ -5,6 +5,7 @@ import {
     activityEntity,
     ComputationState,
     Database,
+    DatabaseLogger,
     EVENT_RECORD,
     eventEntity,
     RecordMutationCallback,
@@ -149,12 +150,20 @@ class MonoStorage implements Storage{
 
 
 
-const defaultLogger = pino()
+export const defaultLogger = pino()
+export class ConsoleLogger implements DatabaseLogger{
+    info({type, name, sql, params}: Parameters<DatabaseLogger["info"]>[0]) {
+        console.log({type, name, sql, params})
+    }
+    child() {
+        return new ConsoleLogger()
+    }
+}
 
 export class MonoSystem implements System {
     conceptClass: Map<string, ReturnType<typeof createClass>> = new Map()
     storage: Storage
-    constructor(db: Database = new SQLiteDB(), public logger: SystemLogger = defaultLogger) {
+    constructor(db: Database = new SQLiteDB(undefined, {logger: new ConsoleLogger()}), public logger: SystemLogger = defaultLogger) {
         this.storage = new MonoStorage(db)
     }
     async saveEvent(event: InteractionEvent, mutationEvents: RecordMutationEvent[] = []): Promise<any> {

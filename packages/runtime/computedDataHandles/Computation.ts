@@ -100,15 +100,29 @@ export interface DataBasedComputation {
 }
 
 
+export type InteractionEventDep = {
+    type: 'interaction',
+    interaction: KlassInstance<typeof Interaction>
+}
+
+export type DataEventDep = {
+    type: 'data',
+    eventType?: 'create'|'delete'|'update',
+    dataDep: DataDep
+}
+
+export type EventDep = InteractionEventDep|DataEventDep
+
 export interface EventBasedComputation {
     dataContext: DataContext
     state: {[key: string]: RecordBoundState<any>|GlobalBoundState<any>}
     incrementalCompute?: (...args: any[]) => Promise<ComputeResult>
     incrementalPatchCompute?: (...args: any[]) => Promise<ComputeResultPatch|ComputeResultPatch[]|undefined>
     createState?: (...args: any[]) => {[key: string]: RecordBoundState<any>|GlobalBoundState<any>}
-    eventDeps?: {[key: string]: any}
+    eventDeps?: {[key: string]: EventDep}
     useLastValue?: boolean
     getDefaultValue?: (...args: any[]) => any
+    computeDirtyRecords?: (...args: any[]) => Promise<string[]>
 }
 
 export type Computation = DataBasedComputation|EventBasedComputation
