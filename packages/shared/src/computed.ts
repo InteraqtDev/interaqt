@@ -11,7 +11,7 @@ export const StateNode = createClass({
         name: {
             type: 'string',
             collection: false,
-            required: false,
+            required: true,
         },
         computeValue: {
             type: 'function',
