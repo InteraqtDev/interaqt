@@ -8,12 +8,12 @@ export const StateNode = createClass({
     name: 'StateNode',
     public: {
         // 用来标记一个 独特的 state。
-        value: {
-            type: ['object', 'string', 'number', 'boolean', 'null'],
+        name: {
+            type: ['string'],
             collection: false,
             required: false,
         },
-        propertyHandle: {
+        computeValue: {
             type: 'function',
             required: false,
             collection: false
@@ -24,28 +24,25 @@ export const StateNode = createClass({
 export const StateTransfer = createClass({
     name: 'StateTransfer',
     public: {
-        triggerInteraction: {
-            type: Interaction,
+        trigger: {
+            instanceType: {} as unknown as {[key:string]:any},
             collection: false,
             required: true
         },
-        fromState: {
+        current: {
             type: StateNode,
             collection: false,
             required: true
         },
-        toState: {
+        next: {
             type: StateNode,
             collection: false,
             required: true
         },
-        handleType: {
-            type: 'string',   // 支持 'enumeration' 和 'computeTarget'
-        },
-        handle: {
+        computeTarget: {
             type: 'function',
             collection: false,
-            required: true
+            required: false
         }
     }
 })
