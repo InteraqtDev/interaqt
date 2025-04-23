@@ -9,7 +9,7 @@ export const StateNode = createClass({
     public: {
         // 用来标记一个 独特的 state。
         name: {
-            type: ['string'],
+            type: 'string',
             collection: false,
             required: false,
         },
