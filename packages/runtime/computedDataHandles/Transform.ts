@@ -3,7 +3,7 @@ import { Transform, KlassInstance, Relation, Entity, Activity, Interaction, Bool
 import { Controller } from "../Controller.js";
 import { ComputeResultPatch, DataDep, RecordBoundState, RecordsDataDep } from "./Computation.js";
 import { DataBasedComputation } from "./Computation.js";
-import { ERRecordMutationEvent } from "../Scheduler.js";
+import { EtityMutationEvent } from "../Scheduler.js";
 
 export class RecordsTransformHandle implements DataBasedComputation {
     transformCallback: (this: Controller, item: any) => any
@@ -44,7 +44,7 @@ export class RecordsTransformHandle implements DataBasedComputation {
         });
     }
 
-    async incrementalPatchCompute(lastValue: any[], mutationEvent: ERRecordMutationEvent): Promise<ComputeResultPatch | ComputeResultPatch[]|undefined> {
+    async incrementalPatchCompute(lastValue: any[], mutationEvent: EtityMutationEvent): Promise<ComputeResultPatch | ComputeResultPatch[]|undefined> {
         const dataContext = this.dataContext as EntityDataContext
         
         if (mutationEvent.type === 'create') {

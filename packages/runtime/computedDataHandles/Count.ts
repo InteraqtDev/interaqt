@@ -3,7 +3,7 @@ import { Count, KlassInstance, Relation, Entity } from "@interaqt/shared";
 import { Controller } from "../Controller.js";
 import { DataDep, GlobalBoundState, RecordBoundState } from "./Computation.js";
 import { DataBasedComputation } from "./Computation.js";
-import { ERRecordMutationEvent } from "../Scheduler.js";
+import { EtityMutationEvent } from "../Scheduler.js";
 import { MatchExp } from "@interaqt/storage";
 
 export class GlobalCountHandle implements DataBasedComputation {
@@ -36,7 +36,7 @@ export class GlobalCountHandle implements DataBasedComputation {
         return records.length;
     }
 
-    async incrementalCompute(lastValue: number, mutationEvent: ERRecordMutationEvent): Promise<number> {
+    async incrementalCompute(lastValue: number, mutationEvent: EtityMutationEvent): Promise<number> {
         let count = lastValue || 0;
         
         if (mutationEvent.type === 'create') {
@@ -87,7 +87,7 @@ export class PropertyCountHandle implements DataBasedComputation {
         return count;
     }
 
-    async incrementalCompute(lastValue: number, mutationEvent: ERRecordMutationEvent): Promise<number> {
+    async incrementalCompute(lastValue: number, mutationEvent: EtityMutationEvent): Promise<number> {
         let count = lastValue || 0;
         const relatedMutationEvent = mutationEvent.relatedMutationEvent!;
 

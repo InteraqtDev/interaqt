@@ -3,7 +3,7 @@ import { Every, KlassInstance, Property, Relation } from "@interaqt/shared";
 import { DataBasedComputation, DataDep, GlobalBoundState, RecordBoundState } from "./Computation.js";
 import { Controller } from "../Controller.js";
 import { DataContext } from "./ComputedDataHandle.js";
-import { ERRecordMutationEvent } from "../Scheduler.js";
+import { EtityMutationEvent } from "../Scheduler.js";
 import { MatchExp } from "@interaqt/storage";
 export class GlobalEveryHandle implements DataBasedComputation {
     callback: (this: Controller, item: any) => boolean
@@ -43,7 +43,7 @@ export class GlobalEveryHandle implements DataBasedComputation {
         return matchCount === totalCount
     }
 
-    async incrementalCompute(lastValue: boolean, mutationEvent: ERRecordMutationEvent): Promise<boolean> {
+    async incrementalCompute(lastValue: boolean, mutationEvent: EtityMutationEvent): Promise<boolean> {
         let totalCount = await this.state!.totalCount.get()
         let matchCount = await this.state!.matchCount.get()
         if (mutationEvent.type === 'create') {
@@ -116,7 +116,7 @@ export class PropertyEveryHandle implements DataBasedComputation {
         return matchCount === totalCount
     }
 
-    async incrementalCompute(lastValue: boolean, mutationEvent: ERRecordMutationEvent): Promise<boolean> {
+    async incrementalCompute(lastValue: boolean, mutationEvent: EtityMutationEvent): Promise<boolean> {
         // TODO 如果未来支持用户可以自定义 dataDeps，那么这里也要支持如果发现是其他 dataDeps 变化，这里要直接返回重算的信号。
         let matchCount = await this.state!.matchCount.get(mutationEvent.record)
         let totalCount = await this.state!.totalCount.get(mutationEvent.record)

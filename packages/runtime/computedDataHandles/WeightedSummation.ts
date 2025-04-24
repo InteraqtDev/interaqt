@@ -3,7 +3,7 @@ import { WeightedSummation, KlassInstance, Relation, Entity } from "@interaqt/sh
 import { Controller } from "../Controller.js";
 import { DataDep, GlobalBoundState, RecordBoundState } from "./Computation.js";
 import { DataBasedComputation } from "./Computation.js";
-import { ERRecordMutationEvent } from "../Scheduler.js";
+import { EtityMutationEvent } from "../Scheduler.js";
 import { MatchExp } from "@interaqt/storage";
 
 export class GlobalWeightedSummationHandle implements DataBasedComputation {
@@ -44,7 +44,7 @@ export class GlobalWeightedSummationHandle implements DataBasedComputation {
         return summation;
     }
 
-    async incrementalCompute(lastValue: number, mutationEvent: ERRecordMutationEvent): Promise<number> {
+    async incrementalCompute(lastValue: number, mutationEvent: EtityMutationEvent): Promise<number> {
         let summation = lastValue
         if (mutationEvent.type === 'create') {
             const newItem = mutationEvent.record;
@@ -120,7 +120,7 @@ export class PropertyWeightedSummationHandle implements DataBasedComputation {
         return summation;
     }
 
-    async incrementalCompute(lastValue: number, mutationEvent: ERRecordMutationEvent): Promise<number> {
+    async incrementalCompute(lastValue: number, mutationEvent: EtityMutationEvent): Promise<number> {
         let summation = await this.state!.summation.get(mutationEvent.record);
         const relatedMutationEvent = mutationEvent.relatedMutationEvent!;
 

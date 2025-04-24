@@ -1,10 +1,10 @@
 import { Interaction, KlassInstance, StateMachine, StateNode } from "@interaqt/shared";
 import { Controller } from "../Controller.js";
 import { InteractionEventArgs } from "../types/interaction.js";
-import { EntityIdRef, EVENT_RECORD } from '../System.js';
+import { EntityIdRef, EVENT_RECORD, RecordMutationEvent } from '../System.js';
 import { ComputedDataHandle, DataContext } from "./ComputedDataHandle.js";
 import { DataEventDep, EventBasedComputation, EventDep, GlobalBoundState, RecordBoundState } from "./Computation.js";
-import { ERRecordMutationEvent, SKIP_RESULT } from "../Scheduler.js";
+import { EtityMutationEvent, SKIP_RESULT } from "../Scheduler.js";
 import { TransitionFinder } from "./TransitionFinder.js";
 
 type SourceTargetPair = [EntityIdRef, EntityIdRef][]
@@ -19,18 +19,9 @@ export class GlobalStateMachineHandle implements EventBasedComputation {
     useLastValue: boolean = true
     eventDeps: {[key: string]: EventDep} = {}
     defaultState: KlassInstance<typeof StateNode>
-    constructor(public controller: Controller, args: KlassInstance<typeof StateMachine>, public dataContext: DataContext) {
+    constructor(public controller: Controller, public args: KlassInstance<typeof StateMachine>, public dataContext: DataContext) {
         this.transitionFinder = new TransitionFinder(args)
         this.defaultState = args.defaultState
-        // 订阅所有事件
-        args.transfers.forEach(transfer => {
-            this.eventDeps[transfer.trigger.name] = transfer.trigger instanceof Interaction ? 
-                {
-                    type: 'interaction',
-                    interaction: transfer.trigger
-                } : 
-                transfer.trigger as DataEventDep
-        })
     }
     createState() {
         return {
@@ -41,20 +32,19 @@ export class GlobalStateMachineHandle implements EventBasedComputation {
     getDefaultValue() {
         return this.defaultState.computeValue ? this.defaultState.computeValue.call(this) : this.defaultState.name
     }
-    mutationEventToTrigger(mutationEvent: ERRecordMutationEvent) {
+    mutationEventToTrigger(mutationEvent: RecordMutationEvent) {
         if (mutationEvent.recordName === EVENT_RECORD) {
-            const interactionName = mutationEvent.record.interactionName!
+            const interactionName = mutationEvent.record!.interactionName!
             const interaction = this.controller.interactions.find(i => i.name === interactionName)
             return interaction
         } else {
             return {
                 type: 'data',
                 eventType: mutationEvent.type,
-                dataDep: mutationEvent.dataDep
             }
         }
     }
-    async incrementalCompute(lastValue: string, mutationEvent: ERRecordMutationEvent, dirtyRecord: any) {
+    async incrementalCompute(lastValue: string, mutationEvent: EtityMutationEvent, dirtyRecord: any) {
         const currentStateName = await this.state.currentState.get()
         const trigger = this.mutationEventToTrigger(mutationEvent)
         const nextState = this.transitionFinder?.findNextState(currentStateName, trigger)
@@ -98,31 +88,28 @@ export class PropertyStateMachineHandle implements EventBasedComputation {
     getDefaultValue() {
         return this.defaultState.computeValue ? this.defaultState.computeValue.call(this) : this.defaultState.name
     }
-    mutationEventToTrigger(mutationEvent: ERRecordMutationEvent) {
+    mutationEventToTrigger(mutationEvent: RecordMutationEvent) {
+        // FIXME 支持 data mutation
         if (mutationEvent.recordName === EVENT_RECORD) {
-            const interactionName = mutationEvent.record.interactionName!
+            const interactionName = mutationEvent.record!.interactionName!
             const interaction = this.controller.interactions.find(i => i.name === interactionName)
             return interaction
-        } else {
-            return {
-                type: 'data',
-                eventType: mutationEvent.type,
-                dataDep: mutationEvent.dataDep
-            }
         }
     }
-    computeDirtyRecords(mutationEvent: ERRecordMutationEvent) {
+    computeDirtyRecords(mutationEvent: RecordMutationEvent) {
         // 这里 trigger 要么是 DataEventDep，要么是 Interaqtion。
         // TODO 未来还会有 Action 之类的？？？
         const trigger = this.mutationEventToTrigger(mutationEvent)
-        const transfer = this.transitionFinder.findTransfer(trigger)
-        if (transfer?.computeTarget) {
-            const event = mutationEvent.recordName === EVENT_RECORD ? mutationEvent.record : mutationEvent
-            return transfer.computeTarget(event)
+        if (trigger) {
+            const transfer = this.transitionFinder.findTransfer(trigger)
+            if (transfer?.computeTarget) {
+                const event = mutationEvent.recordName === EVENT_RECORD ? mutationEvent.record : mutationEvent
+                return transfer.computeTarget(event)
+            }
         }
     }
     
-    async incrementalCompute(lastValue: string, mutationEvent: ERRecordMutationEvent, dirtyRecord: any) {
+    async incrementalCompute(lastValue: string, mutationEvent: RecordMutationEvent, dirtyRecord: any) {
         const currentStateName = await this.state.currentState.get(dirtyRecord)
         const trigger = this.mutationEventToTrigger(mutationEvent)
         const nextState = this.transitionFinder?.findNextState(currentStateName, trigger)
