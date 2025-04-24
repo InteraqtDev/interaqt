@@ -22,6 +22,15 @@ export class GlobalStateMachineHandle implements EventBasedComputation {
     constructor(public controller: Controller, args: KlassInstance<typeof StateMachine>, public dataContext: DataContext) {
         this.transitionFinder = new TransitionFinder(args)
         this.defaultState = args.defaultState
+        // 订阅所有事件
+        args.transfers.forEach(transfer => {
+            this.eventDeps[transfer.trigger.name] = transfer.trigger instanceof Interaction ? 
+                {
+                    type: 'interaction',
+                    interaction: transfer.trigger
+                } : 
+                transfer.trigger as DataEventDep
+        })
     }
     createState() {
         return {
