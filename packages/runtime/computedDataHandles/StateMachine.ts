@@ -1,7 +1,7 @@
 import { Interaction, KlassInstance, StateMachine, StateNode } from "@interaqt/shared";
 import { Controller } from "../Controller.js";
 import { InteractionEventArgs } from "../types/interaction.js";
-import { EntityIdRef, EVENT_RECORD, SYSTEM_RECORD } from '../System.js';
+import { EntityIdRef, EVENT_RECORD } from '../System.js';
 import { ComputedDataHandle, DataContext } from "./ComputedDataHandle.js";
 import { DataEventDep, EventBasedComputation, EventDep, GlobalBoundState, RecordBoundState } from "./Computation.js";
 import { ERRecordMutationEvent, SKIP_RESULT } from "../Scheduler.js";
@@ -18,18 +18,37 @@ export class GlobalStateMachineHandle implements EventBasedComputation {
     state!: {[key: string]: GlobalBoundState<any>}
     useLastValue: boolean = true
     eventDeps: {[key: string]: EventDep} = {}
+    defaultState: KlassInstance<typeof StateNode>
     constructor(public controller: Controller, args: KlassInstance<typeof StateMachine>, public dataContext: DataContext) {
         this.transitionFinder = new TransitionFinder(args)
+        this.defaultState = args.defaultState
     }
     createState() {
         return {
-            currentState: new GlobalBoundState<string>(''),
+            currentState: new GlobalBoundState<string>(this.defaultState.name),
         }
     }
-    
+    // 这里的 defaultValue 不能是 async 的模式。因为是直接创建时填入的。
+    getDefaultValue() {
+        return this.defaultState.computeValue ? this.defaultState.computeValue.call(this) : this.defaultState.name
+    }
+    mutationEventToTrigger(mutationEvent: ERRecordMutationEvent) {
+        if (mutationEvent.recordName === EVENT_RECORD) {
+            const interactionName = mutationEvent.record.interactionName!
+            const interaction = this.controller.interactions.find(i => i.name === interactionName)
+            return interaction
+        } else {
+            return {
+                type: 'data',
+                eventType: mutationEvent.type,
+                dataDep: mutationEvent.dataDep
+            }
+        }
+    }
     async incrementalCompute(lastValue: string, mutationEvent: ERRecordMutationEvent, dirtyRecord: any) {
         const currentStateName = await this.state.currentState.get()
-        const nextState = this.transitionFinder?.findNextState(currentStateName, mutationEvent)
+        const trigger = this.mutationEventToTrigger(mutationEvent)
+        const nextState = this.transitionFinder?.findNextState(currentStateName, trigger)
         if (!nextState) return SKIP_RESULT
 
         await this.state.currentState.set(nextState.name)

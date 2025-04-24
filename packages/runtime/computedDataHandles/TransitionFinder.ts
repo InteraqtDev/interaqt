@@ -1,4 +1,3 @@
-import { Controller } from "../Controller.js";
 import { KlassInstance } from "@interaqt/shared";
 import { StateMachine } from "@interaqt/shared";
 

@@ -27,7 +27,7 @@ describe('StateMachineRunner', () => {
         await controller.setup(true);
     });
 
-    test('global state machine', async () => {
+    test('property state machine', async () => {
         const user1 = await controller.system.storage.create('User', {
             name: 'user1',
         })
