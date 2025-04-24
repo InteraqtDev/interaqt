@@ -33,7 +33,7 @@ describe('map interaction', () => {
     let userCId: string
     beforeEach(async () => {
         removeAllInstance()
-        const {data} = (await import('./data/leaveRequest'))
+        const {data} = (await import('./data/leaveRequest.js'))
         createInstances(data)
 
         // createInstances(data)

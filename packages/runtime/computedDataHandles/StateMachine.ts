@@ -1,9 +1,9 @@
-import { KlassInstance, StateMachine } from "@interaqt/shared";
+import { Interaction, KlassInstance, StateMachine, StateNode } from "@interaqt/shared";
 import { Controller } from "../Controller.js";
 import { InteractionEventArgs } from "../types/interaction.js";
-import { EntityIdRef } from '../System.js';
+import { EntityIdRef, EVENT_RECORD, SYSTEM_RECORD } from '../System.js';
 import { ComputedDataHandle, DataContext } from "./ComputedDataHandle.js";
-import { ComputeResult, EventBasedComputation, EventDep, GlobalBoundState, RecordBoundState } from "./Computation.js";
+import { DataEventDep, EventBasedComputation, EventDep, GlobalBoundState, RecordBoundState } from "./Computation.js";
 import { ERRecordMutationEvent, SKIP_RESULT } from "../Scheduler.js";
 import { TransitionFinder } from "./TransitionFinder.js";
 
@@ -46,24 +46,58 @@ export class PropertyStateMachineHandle implements EventBasedComputation {
     state!: {[key: string]: RecordBoundState<any>|GlobalBoundState<any>}
     useLastValue: boolean = true
     eventDeps: {[key: string]: EventDep} = {}
+    defaultState: KlassInstance<typeof StateNode>
     constructor(public controller: Controller, args: KlassInstance<typeof StateMachine>, public dataContext: DataContext) {
         this.transitionFinder = new TransitionFinder(args)
+        this.defaultState = args.defaultState
+
+        // 订阅所有事件
+        args.transfers.forEach(transfer => {
+            this.eventDeps[transfer.trigger.name] = transfer.trigger instanceof Interaction ? 
+                {
+                    type: 'interaction',
+                    interaction: transfer.trigger
+                } : 
+                transfer.trigger as DataEventDep
+        })
     }
     createState() {
         return {
-            currentState: new RecordBoundState<string>(''),
+            currentState: new RecordBoundState<string>(this.defaultState.name),
+        }
+    }
+    // 这里的 defaultValue 不能是 async 的模式。因为是直接创建时填入的。
+    getDefaultValue() {
+        return this.defaultState.computeValue ? this.defaultState.computeValue.call(this) : this.defaultState.name
+    }
+    mutationEventToTrigger(mutationEvent: ERRecordMutationEvent) {
+        if (mutationEvent.recordName === EVENT_RECORD) {
+            const interactionName = mutationEvent.record.interactionName!
+            const interaction = this.controller.interactions.find(i => i.name === interactionName)
+            return interaction
+        } else {
+            return {
+                type: 'data',
+                eventType: mutationEvent.type,
+                dataDep: mutationEvent.dataDep
+            }
         }
     }
     computeDirtyRecords(mutationEvent: ERRecordMutationEvent) {
-        const transfer = this.transitionFinder.findTransfer(mutationEvent)
+        // 这里 trigger 要么是 DataEventDep，要么是 Interaqtion。
+        // TODO 未来还会有 Action 之类的？？？
+        const trigger = this.mutationEventToTrigger(mutationEvent)
+        const transfer = this.transitionFinder.findTransfer(trigger)
         if (transfer?.computeTarget) {
-            return transfer.computeTarget(mutationEvent)
+            const event = mutationEvent.recordName === EVENT_RECORD ? mutationEvent.record : mutationEvent
+            return transfer.computeTarget(event)
         }
     }
     
     async incrementalCompute(lastValue: string, mutationEvent: ERRecordMutationEvent, dirtyRecord: any) {
         const currentStateName = await this.state.currentState.get(dirtyRecord)
-        const nextState = this.transitionFinder?.findNextState(currentStateName, mutationEvent)
+        const trigger = this.mutationEventToTrigger(mutationEvent)
+        const nextState = this.transitionFinder?.findNextState(currentStateName, trigger)
         if (!nextState) return SKIP_RESULT
 
         await this.state.currentState.set(dirtyRecord, nextState.name)

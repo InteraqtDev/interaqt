@@ -130,9 +130,18 @@ export class Scheduler {
             const computationHandle = computation as Computation
             // 0. 创建 defaultValue
             // property 的默认值在 setup 的时候已经创建了。
-            if (computationHandle.dataContext.type!=='property' && computationHandle.getDefaultValue) {
-                const defaultValue = computationHandle.getDefaultValue()
-                await this.controller.applyResult(computationHandle.dataContext, defaultValue)
+            if(computationHandle.getDefaultValue) {
+                if (computationHandle.dataContext.type!=='property') {
+                    const defaultValue = await computationHandle.getDefaultValue()
+                    await this.controller.applyResult(computationHandle.dataContext, defaultValue)
+                } else {
+                    // property computation 也能提供 defaultValue 的能力？
+                    const property = computationHandle.dataContext.host.properties?.find(property => property.name === computationHandle.dataContext.id)!
+                    if (!property.defaultValue) {
+                        // FIXME 这里没有支持 getDefaultValue 的 async 模式。会不会有问题？？？
+                        property.defaultValue = computationHandle.getDefaultValue()
+                    }
+                }
             }
         }
     }
@@ -219,7 +228,7 @@ export class Scheduler {
                     // TODO 未来考虑是不是不应该从 storage 来触发？但似乎从 stroge 出发也合理。
                     //  storage 代表的是系统的全部状态，不是传统意义上的只管存储
                     const event = mutationEvent.record!
-                    const interactionEventSources = this.eventSourceMapTree[mutationEvent.record![event.interactionName]]
+                    const interactionEventSources = this.eventSourceMapTree[event.interactionName]
                     if (interactionEventSources) {
                         for(const interactionEventSource of interactionEventSources) {
                             await this.runEventBasedComputation(interactionEventSource, mutationEvent)
@@ -303,12 +312,14 @@ export class Scheduler {
         if(eventBasedComputation.dataContext.type === 'property') {
             let dirtyRecords:any[]|undefined = undefined
             if (eventBasedComputation.computeDirtyRecords) {
-                dirtyRecords = await eventBasedComputation.computeDirtyRecords()
+                dirtyRecords = await eventBasedComputation.computeDirtyRecords(mutationEvent)
             } else {
                 dirtyRecords = await this.controller.system.storage.find(eventBasedComputation.dataContext.host.name, undefined, undefined, ['*'])
             }
+
             if (dirtyRecords) {
-                for(const record of dirtyRecords) {
+                const records = Array.isArray(dirtyRecords) ? dirtyRecords : [dirtyRecords]
+                for(const record of records) {
                     if (eventBasedComputation.incrementalCompute) {
                         let lastValue = undefined
                         if (eventBasedComputation.useLastValue) {

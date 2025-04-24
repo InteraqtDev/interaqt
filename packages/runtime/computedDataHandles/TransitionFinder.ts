@@ -3,6 +3,8 @@ import { KlassInstance } from "@interaqt/shared";
 import { StateMachine } from "@interaqt/shared";
 
 function shallowEqual(a: {[key:string]:any}, b: {[key:string]:any}) {
+    if (a===b) return true
+    
     for (const key in b) {
         if (a[key] !== b[key]) {
             return false

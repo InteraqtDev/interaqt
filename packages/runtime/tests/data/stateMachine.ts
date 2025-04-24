@@ -11,145 +11,156 @@ import {
     StateMachine
 } from '@';
 
-const statusProperty = Property.create({
-    name: 'status',
-    type: 'string',
-})
 
-export const postEntity = Entity.create({
-    name: 'Post',
-    properties: [
-        statusProperty
-    ]
-})
+export function createData() {
 
-export const userEntity = Entity.create({
-    name: 'User',
-    properties: [
-        Property.create({
-            name: 'name',
-            type: 'string',
-            collection: false,
+    const statusProperty = Property.create({
+        name: 'status',
+        type: 'string',
+    })
+
+     const postEntity = Entity.create({
+        name: 'Post',
+        properties: [
+            statusProperty,
+            Property.create({
+                name: 'title',
+                type: 'string',
+                collection: false,
+            })
+        ]
+    })
+
+     const userEntity = Entity.create({
+        name: 'User',
+        properties: [
+            Property.create({
+                name: 'name',
+                type: 'string',
+                collection: false,
+            })
+        ]
+    })
+
+     const draftInteraction = Interaction.create({
+        name: 'draft',
+        action: Action.create({name: 'draft'}),
+        payload: Payload.create({
+            items: [
+                PayloadItem.create({
+                    name: 'content',
+                    isRef:true,
+                    base: postEntity
+                })
+            ]
         })
-    ]
-})
-
-export const draftInteraction = Interaction.create({
-    name: 'draft',
-    action: Action.create({name: 'draft'}),
-    payload: Payload.create({
-        items: [
-            PayloadItem.create({
-                name: 'content',
-                isRef:true,
-                base: postEntity
-            })
-        ]
     })
-})
 
-export const finalizeInteraction = Interaction.create({
-    name: 'finalize',
-    action: Action.create({name: 'finalize'}),
-    payload: Payload.create({
-        items: [
-            PayloadItem.create({
-                name: 'content',
-                isRef:true,
-                base: postEntity
-            })
-        ]
+     const finalizeInteraction = Interaction.create({
+        name: 'finalize',
+        action: Action.create({name: 'finalize'}),
+        payload: Payload.create({
+            items: [
+                PayloadItem.create({
+                    name: 'content',
+                    isRef:true,
+                    base: postEntity
+                })
+            ]
+        })
     })
-})
 
 
 
-export const publishInteraction = Interaction.create({
-    name: 'publish',
-    action: Action.create({name: 'publish'}),
-    payload: Payload.create({
-        items: [
-            PayloadItem.create({
-                name: 'content',
-                isRef:true,
-                base: postEntity
-            })
-        ]
+     const publishInteraction = Interaction.create({
+        name: 'publish',
+        action: Action.create({name: 'publish'}),
+        payload: Payload.create({
+            items: [
+                PayloadItem.create({
+                    name: 'content',
+                    isRef:true,
+                    base: postEntity
+                })
+            ]
+        })
     })
-})
 
-export const withdrawInteraction = Interaction.create({
-    name: 'withdraw',
-    action: Action.create({name: 'withdraw'}),
-    payload: Payload.create({
-        items: [
-            PayloadItem.create({
-                name: 'content',
-                isRef:true,
-                base: postEntity
-            })
-        ]
+     const withdrawInteraction = Interaction.create({
+        name: 'withdraw',
+        action: Action.create({name: 'withdraw'}),
+        payload: Payload.create({
+            items: [
+                PayloadItem.create({
+                    name: 'content',
+                    isRef:true,
+                    base: postEntity
+                })
+            ]
+        })
     })
-})
 
-const draftState = StateNode.create({
-    value: 'draft',
-})
+    const draftState = StateNode.create({
+        name: 'draft',
+    })
 
-const normalState = StateNode.create({
-    value: 'normal',
-})
+    const normalState = StateNode.create({
+        name: 'normal',
+    })
 
 
-const publishedState = StateNode.create({
-    value: 'published',
-})
+    const publishedState = StateNode.create({
+        name: 'published',
+    })
 
-const draftToNormalTransfer = StateTransfer.create({
-    triggerInteraction: finalizeInteraction,
-    fromState: draftState,
-    toState: normalState,
-    handleType: 'computeTarget',
-    handle: (event: InteractionEventArgs) => {
-        return {id: event.payload!.content.id}
+    const draftToNormalTransfer = StateTransfer.create({
+        trigger: finalizeInteraction,
+        current: draftState,
+        next: normalState,
+        computeTarget: (event: InteractionEventArgs) => {
+            return {id: event.payload!.content.id}
+        }
+    })
+
+    const normalToDraftTransfer = StateTransfer.create({
+        trigger: draftInteraction,
+        current: normalState,
+        next: draftState,
+        computeTarget: (event: InteractionEventArgs) => {
+            return {id: event.payload!.content.id}
+        }
+    })
+
+    const normalToPublishedTransfer = StateTransfer.create({
+        trigger: publishInteraction,
+        current: normalState,
+        next: publishedState,
+        computeTarget: (event: InteractionEventArgs) => {
+            return {id: event.payload!.content.id}
+        }
+    })
+
+    const publishedToNormalTransfer = StateTransfer.create({
+        trigger: withdrawInteraction,
+        current: publishedState,
+        next: normalState,
+        computeTarget: (event: InteractionEventArgs) => {
+            return {id: event.payload!.content.id}
+        }
+    })
+
+    const stateMachine = StateMachine.create({
+        states: [draftState, normalState, publishedState],
+        transfers: [draftToNormalTransfer, normalToDraftTransfer, normalToPublishedTransfer, publishedToNormalTransfer],
+        defaultState: normalState
+    })
+
+    statusProperty.computedData = stateMachine
+    statusProperty.defaultValue = () =>stateMachine.defaultState.name
+
+    return {
+        entities: [postEntity, userEntity],
+        relations: [],
+        interactions: {draftInteraction, finalizeInteraction, publishInteraction, withdrawInteraction},
     }
-})
-
-const normalToDraftTransfer = StateTransfer.create({
-    triggerInteraction: draftInteraction,
-    fromState: normalState,
-    toState: draftState,
-    handleType: 'computeTarget',
-    handle: (event: InteractionEventArgs) => {
-        return {id: event.payload!.content.id}
-    }
-})
-
-const normalToPublishedTransfer = StateTransfer.create({
-    triggerInteraction: publishInteraction,
-    fromState: normalState,
-    toState: publishedState,
-    handleType: 'computeTarget',
-    handle: (event: InteractionEventArgs) => {
-        return {id: event.payload!.content.id}
-    }
-})
-
-const publishedToNormalTransfer = StateTransfer.create({
-    triggerInteraction: withdrawInteraction,
-    fromState: publishedState,
-    toState: normalState,
-    handleType: 'computeTarget',
-    handle: (event: InteractionEventArgs) => {
-        return {id: event.payload!.content.id}
-    }
-})
-
-const stateMachine = StateMachine.create({
-    states: [draftState, normalState, publishedState],
-    transfers: [draftToNormalTransfer, normalToDraftTransfer, normalToPublishedTransfer, publishedToNormalTransfer],
-    defaultState: normalState
-})
-
-statusProperty.computedData = stateMachine
-
+}

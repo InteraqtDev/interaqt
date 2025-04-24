@@ -41,7 +41,7 @@ describe('computed data in activity', () => {
     let userDId: string
     beforeEach(async () => {
         removeAllInstance()
-        const { data }  = (await import('./data/activity'))
+        const { data }  = (await import('./data/activity/index.js'))
         createInstances(data)
 
         // createInstances(data)
