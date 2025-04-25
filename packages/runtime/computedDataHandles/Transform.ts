@@ -48,37 +48,59 @@ export class RecordsTransformHandle implements DataBasedComputation {
         const dataContext = this.dataContext as EntityDataContext
         
         if (mutationEvent.type === 'create') {
-            const matchSourceRecord = BoolExp.atom({key: 'id', value: ['=', mutationEvent.record.id]})
+            const matchSourceRecord = BoolExp.atom({key: 'id', value: ['=', mutationEvent.record!.id]})
             const souceDataDep = this.dataDeps.main as RecordsDataDep
             const sourceRecord = await this.controller.system.storage.findOne(souceDataDep.source.name, matchSourceRecord, undefined, souceDataDep.attributeQuery)
-            const transformedRecord = {
-                ...this.transformCallback.call(this.controller, sourceRecord),
-                [this.state.sourceRecordId.key]: mutationEvent.record.id
-            }
-            return {
-                type:'insert',
-                data: transformedRecord
+            const transformedRecord = this.transformCallback.call(this.controller, sourceRecord)
+            // 允许返回 Null，表示不插入
+            if(transformedRecord) {
+                return {
+                    type:'insert',
+                    data: {
+                        ...transformedRecord,
+                        [this.state.sourceRecordId.key]: mutationEvent.record!.id
+                    }
+                }
             }
         } else if (mutationEvent.type === 'update'||mutationEvent.type === 'delete') {
             const sourceRecordId = mutationEvent.oldRecord?.id ?? mutationEvent.record!.id
             const match = BoolExp.atom({key: this.state.sourceRecordId.key, value: ['=', sourceRecordId]})
             const mappedRecord = await this.controller.system.storage.findOne(dataContext.id.name, match, undefined, ['*'])
             if (mutationEvent.type === 'delete') {
-                return {
-                    type:'delete',
-                    affectedId: mappedRecord.id
+                if (mappedRecord) {
+                    return {
+                        type:'delete',
+                        affectedId: mappedRecord.id
+                    }
                 }
             } else {
                 const matchSourceRecord = BoolExp.atom({key: 'id', value: ['=', sourceRecordId]})
                 const sourceRecord = await this.controller.system.storage.findOne((this.dataDeps.main as RecordsDataDep).source.name, matchSourceRecord, undefined, (this.dataDeps.main as RecordsDataDep).attributeQuery)
-                const transformedRecord = {
-                    ...this.transformCallback.call(this.controller, sourceRecord),
-                    [this.state.sourceRecordId.key]: sourceRecord.id
-                }
-                return {
-                    type:'update',
-                    data: transformedRecord,
-                    affectedId: mappedRecord.id
+                const transformedRecord = this.transformCallback.call(this.controller, sourceRecord)
+                if (transformedRecord) {
+                    const data = {
+                        ...transformedRecord,
+                        [this.state.sourceRecordId.key]: sourceRecordId
+                    }
+                    if (mappedRecord) {
+                        return {
+                            type:'update',
+                            data,
+                            affectedId: mappedRecord.id     
+                        }
+                    } else {
+                        return {
+                            type:'insert',
+                            data,
+                        }
+                    }
+                } else {
+                    if( mappedRecord) {
+                        return {
+                            type:'delete',
+                            affectedId: mappedRecord.id
+                        }
+                    }
                 }
             }
         }

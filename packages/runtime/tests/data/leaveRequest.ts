@@ -1,11 +1,13 @@
 import {
     Action,
+    Any,
     Attributive,
     Attributives,
     BoolAtomData,
     Controller,
     createUserRoleAttributive,
     Entity,
+    Every,
     Interaction,
     MapInteraction,
     MapInteractionItem,
@@ -21,6 +23,7 @@ import {
     StateNode,
     StateTransfer,
     stringifyAllInstances,
+    Transform,
     USER_ENTITY
 } from '@';
 import {OtherAttr} from "./roles";
@@ -50,7 +53,7 @@ export const sendInteraction = Interaction.create({
             PayloadItem.create({
                 name: 'to',
                 attributives: Attributives.create({
-                    content: BoolAtomData.create({data: OtherAttr})
+                    content: BoolAtomData.create({data: OtherAttr, type: 'boolean'})
                 }),
                 base: UserEntity,
                 isRef: true,
@@ -70,26 +73,16 @@ const sendRequestRelation = Relation.create({
     target: UserEntity,
     targetProperty: 'request',
     type: 'n:1',
-    computedData:  MapInteraction.create({
-        items: [
-            MapInteractionItem.create({
-                interaction: sendInteraction,
-                map:function map(event: any){
-                    return {
-                        source: event.payload.request,
-                        target: event.user,
-                    }
-                }
-
-            })
-        ],
-        // sourceInteraction: sendInteraction,
-        // handle:function map(event: any){
-        //     return {
-        //         source: event.payload.request,
-        //         target: event.user,
-        //     }
-        // }
+    computedData:  
+    Transform.create({
+        callback: function map(event: any){
+            return {
+                source: event.payload.request,
+                target: event.user,
+            }
+        },
+        record: RequestEntity,
+        attributeQuery: ['*']
     }),
 })
 
@@ -120,7 +113,7 @@ export const approveInteraction = Interaction.create({
                 name: 'request',
                 // FIXME 增加定语： 我的、未完成的
                 attributives: Attributives.create({
-                    content: BoolAtomData.create({data: MyAttr})
+                    content: BoolAtomData.create({data: MyAttr, type: 'boolean'})
                 }),
                 base: RequestEntity,
                 isRef: true
@@ -156,7 +149,7 @@ export const addReviewersInteraction = Interaction.create({
             PayloadItem.create({
                 name: 'reviewers',
                 attributives: Attributives.create({
-                    content: BoolAtomData.create({data: OtherAttr})
+                    content: BoolAtomData.create({data: OtherAttr, type: 'boolean'})
                 }),
                 isCollection: true,
                 base: UserEntity,
@@ -182,7 +175,7 @@ export const transferReviewersInteraction = Interaction.create({
             PayloadItem.create({
                 name: 'reviewer',
                 attributives: Attributives.create({
-                    content: BoolAtomData.create({data: OtherAttr})
+                    content: BoolAtomData.create({data: OtherAttr, type: 'boolean'})
                 }),
                 base: UserEntity,
                 isRef: true
@@ -199,32 +192,29 @@ export const transferReviewersInteraction = Interaction.create({
 
 // 是否是 reviewer 的状态机
 const notReviewerState = StateNode.create({
-    value: null
+    name: 'notReviewer'
 })
 const isReviewerState = StateNode.create({
-    value: {}
+    name: 'isReviewer'
 })
 
 const sendRequestTransfer = StateTransfer.create({
-    triggerInteraction: sendInteraction,
-    fromState: notReviewerState,
-    toState: isReviewerState,
-    handleType: 'computeTarget',
-    handle: async function(eventArgs) {
+    trigger: sendInteraction,
+    current: notReviewerState,
+    next: isReviewerState,
+    computeTarget: async function(eventArgs) {
         return {
             source: eventArgs.payload.request,
             target: eventArgs.payload.to
         }
     }
-
 })
 
 const addReviewerTransfer = StateTransfer.create({
-    triggerInteraction: addReviewersInteraction,
-    fromState: isReviewerState,
-    toState: notReviewerState,
-    handleType: 'computeTarget',
-    handle: async function(eventArgs, activityId) {
+    trigger: addReviewersInteraction,
+    current: isReviewerState,
+    next: notReviewerState,
+    computeTarget: async function(eventArgs) {
         return eventArgs.payload.reviewer.map((reviewer: any) => {
             return {
                 source: eventArgs.payload.request,
@@ -232,15 +222,13 @@ const addReviewerTransfer = StateTransfer.create({
             }
         })
     }
-
 })
 
 const transferReviewerTransfer = StateTransfer.create({
-    triggerInteraction: transferReviewersInteraction,
-    fromState: isReviewerState,
-    toState: notReviewerState,
-    handleType: 'computeTarget',
-    handle: async function(eventArgs, activityId) {
+    trigger: transferReviewersInteraction,
+    current: isReviewerState,
+    next: notReviewerState,
+    computeTarget: async function(eventArgs) {
         return {
             source: eventArgs.payload.request,
             target: eventArgs.payload.reviewer
@@ -250,17 +238,15 @@ const transferReviewerTransfer = StateTransfer.create({
 })
 
 const transferFromReviewerTransfer = StateTransfer.create({
-    triggerInteraction: transferReviewersInteraction,
-    fromState: notReviewerState,
-    toState: isReviewerState,
-    handleType: 'computeTarget',
-    handle: async function(eventArgs, activityId) {
+    trigger: transferReviewersInteraction,
+    current: notReviewerState,
+    next: isReviewerState,
+    computeTarget: async function(eventArgs) {
         return {
             source: eventArgs.payload.request,
             target: eventArgs.user
         }
     }
-
 })
 
 const reviewerRelationSM = StateMachine.create({
@@ -314,63 +300,26 @@ RequestEntity.properties.push(
         name: 'approved',
         type: 'boolean',
         collection: false,
-        computedData: RelationBasedEvery.create({
-            relation: reviewerRelation,
-            relationDirection: 'source',
+        computedData: Every.create({
+            record: reviewerRelation,
             notEmpty: true,
-            match:
-            (_, relation) => {
+            callback:(relation) => {
                 return relation.result === 'approved'
             }
-
         })
     }),
     Property.create({
         name: 'rejected',
         type: 'boolean',
         collection: false,
-        computedData: RelationBasedAny.create({
-            relation: reviewerRelation,
-            relationDirection: 'source',
-            match:
-            (_, relation) => {
+        computedData: Any.create({
+            record: reviewerRelation,
+            callback:(relation) => {
                 return relation.result === 'rejected'
             }
 
         })
     }),
-    // Property.create({
-    //         name: 'result',
-    //         type: 'string',
-    //         collection: false,
-    //         computedData: ComputedData.create({
-    //             computeEffect: `
-    //         (mutationEvent) => {
-    //             if(
-    //                 mutationEvent.type === 'update'
-    //                 &&
-    //                 mutationEvent.recordName === 'Request' &&
-    //                 (mutationEvent.record.approved !== undefined || mutationEvent.record.rejected !== undefined)
-    //             ){
-    //                 return mutationEvent.oldRecord.id
-    //             }
-    //
-    //         }
-    //         `,
-    //             computation:`
-    //         async (requestId) => {
-    //             const match = this.system.storage.queryHandle.createMatchFromAtom({
-    //                 key: 'id',
-    //                 value: ['=', requestId]
-    //             })
-    //
-    //             const request = await this.system.storage.findOne('Request', match, undefined, ['approved', 'rejected'])
-    //             return request.approved ? 'approved' : (request.rejected ? 'rejected' : 'pending')
-    //         }
-    // `
-    //     })
-    // }),
-    // 上面和下面两种写法都可以，机制不同。下面的是在 insert/update 的时候就直接计算了
     Property.create({
         name: 'result',
         type: 'string',
