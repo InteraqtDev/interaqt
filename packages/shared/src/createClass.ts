@@ -192,6 +192,8 @@ export function createInstances(objects: KlassRawInstanceDataType[]) {
         const Klass = KlassByName.get(type)!
         const optionsWithUUID: KlassOptions = {...options, uuid}
         
+        
+        
         // 根据
         const publicProps:{[k:string]: any} = {}
         const unsatisfiedProps: {[k:string]: any} = {}
@@ -216,12 +218,13 @@ export function createInstances(objects: KlassRawInstanceDataType[]) {
                 return;
             }
 
+            // CAUTION 注意这里是不是 Collection 不能使用 Array.isArray(propValue) 判断，因为值可能就是一种数组数据结构。
             const hasStringValue = typeof propValue === 'string' || 
-                (Array.isArray(propValue) && (propValue as any[]).some(i => typeof i === 'string'))
+                (propDef.collection && (propValue as any[]).some(i => typeof i === 'string'))
                 
             // 不应该是 string 类型，但是却是 string 类型的情况，说名是被序列化了。
             if (propType !== 'string' && hasStringValue) {
-                if(Array.isArray(propValue)) {
+                if(propDef.collection) {
                     publicProps[propName] = [] as any[]
 
                     (propValue as any[]).forEach((propValueItem, index) => {
@@ -274,7 +277,7 @@ export function createInstances(objects: KlassRawInstanceDataType[]) {
             const isCollection = Klass.public[propName].collection
 
             const ref = uuidToInstance.get(uuid)!
-            assert(!!ref, `can not find instance ${uuid} for ${instance.constructor.name}.${propName as string}`)
+            assert(!!ref, `can not find instance ${uuid} for ${(instance.constructor as Klass<any>).displayName||(instance.constructor as Klass<any>).name}.${propName as string}`)
 
             if (isCollection) {
                 (instance[propName]! as any[])[parseInt(indexStr, 10)] = ref
@@ -342,7 +345,6 @@ export function createClass<T extends KlassMeta>(metadata: T) : Klass<T['public'
             options: obj._options,
             uuid: obj.uuid,
             public: Object.fromEntries(Object.entries(metadata.public).map(([key, propDef]) => {
-
                 // CAUTION 任何 Klass 叶子结点都会被替换成 uuid
                 return [key, rawStructureClone(obj[key as keyof typeof obj], stringifyAttribute)]
             })),
