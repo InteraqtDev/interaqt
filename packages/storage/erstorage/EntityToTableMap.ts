@@ -109,7 +109,7 @@ export class EntityToTableMap {
         return new RecordInfo(recordName, this)
     }
     getInfo(entityName: string, attribute: string) : AttributeInfo{
-        const result = this.getInfoByPath([entityName, attribute])
+        const result = this.getInfoByPath([entityName, ...(attribute.split('.'))])
 
         assert(!!result,
             `cannot find attribute "${attribute}" in "${entityName}". attributes: ${this.data.records[entityName] && Object.keys(this.data.records[entityName]?.attributes)}`
@@ -155,6 +155,7 @@ export class EntityToTableMap {
             } else {
                 const data = this.data.records[currentEntity]
                 attributeData = data!.attributes[currentAttribute!] as RecordAttribute
+                if (!attributeData) debugger
                 assert(!!attributeData, `attribute ${currentAttribute} not found in ${currentEntity}. namePath: ${namePath.join('.')}`)
                 parentEntity = currentEntity
                 currentEntity = (attributeData as RecordAttribute).isRecord ? (attributeData as RecordAttribute).recordName : ''
