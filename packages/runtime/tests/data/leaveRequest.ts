@@ -9,8 +9,7 @@ import {
     Entity,
     Every,
     Interaction,
-    MapInteraction,
-    MapInteractionItem,
+    InteractionEventEntity,
     Payload,
     PayloadItem,
     Property,
@@ -25,11 +24,12 @@ import {
 } from '@';
 import { OtherAttr } from "./roles";
 
-const UserEntity = Entity.create({ name: USER_ENTITY })
+export function createData() {
+    const UserEntity = Entity.create({ name: USER_ENTITY })
 const nameProperty = Property.create({ name: 'name', type: PropertyTypes.String })
 UserEntity.properties.push(nameProperty)
 
-export const globalUserRole = createUserRoleAttributive({name: 'user'}  )
+ const globalUserRole = createUserRoleAttributive({name: 'user'}  )
 const userRefA = createUserRoleAttributive({name: 'A', isRef: true})
 
 const RequestEntity= Entity.create({
@@ -42,7 +42,7 @@ const RequestEntity= Entity.create({
 })
 
 
-export const sendInteraction = Interaction.create({
+ const sendInteraction = Interaction.create({
     name: 'sendRequest',
     action: Action.create({name: 'sendRequest'}),
     payload: Payload.create({
@@ -50,7 +50,7 @@ export const sendInteraction = Interaction.create({
             PayloadItem.create({
                 name: 'to',
                 attributives: Attributives.create({
-                    content: BoolAtomData.create({data: OtherAttr, type: 'boolean'})
+                    content: BoolAtomData.create({data: OtherAttr, type: 'atom'})
                 }),
                 base: UserEntity,
                 isRef: true,
@@ -73,15 +73,21 @@ const sendRequestRelation = Relation.create({
     computedData:  
     Transform.create({
         callback: function map(event: any){
-            return {
-                source: event.payload.request,
-                target: event.user,
+            if (event.interactionName === sendInteraction.name) {
+                return {
+                    source: event.payload.request,
+                    target: event.user,
+                }
+            } else {
+                return null
             }
         },
-        record: RequestEntity,
+        record: InteractionEventEntity,
         attributeQuery: ['*']
     }),
 })
+
+
 
 const MyAttr = Attributive.create({
     name: 'Mine',
@@ -101,7 +107,7 @@ const MyAttr = Attributive.create({
 
 
 // 同意
-export const approveInteraction = Interaction.create({
+ const approveInteraction = Interaction.create({
     name: 'approve',
     action: Action.create({name: 'approve'}),
     payload: Payload.create({
@@ -110,7 +116,7 @@ export const approveInteraction = Interaction.create({
                 name: 'request',
                 // FIXME 增加定语： 我的、未完成的
                 attributives: Attributives.create({
-                    content: BoolAtomData.create({data: MyAttr, type: 'boolean'})
+                    content: BoolAtomData.create({data: MyAttr, type: 'atom'})
                 }),
                 base: RequestEntity,
                 isRef: true
@@ -137,7 +143,7 @@ const rejectInteraction = Interaction.create({
 })
 
 // 加签
-export const addReviewersInteraction = Interaction.create({
+ const addReviewersInteraction = Interaction.create({
     name: 'addReviewers',
     userRef: createUserRoleAttributive({name: '', isRef: true}),
     action: Action.create({name: 'addReviewers'}),
@@ -146,7 +152,7 @@ export const addReviewersInteraction = Interaction.create({
             PayloadItem.create({
                 name: 'reviewers',
                 attributives: Attributives.create({
-                    content: BoolAtomData.create({data: OtherAttr, type: 'boolean'})
+                    content: BoolAtomData.create({data: OtherAttr, type: 'atom'})
                 }),
                 isCollection: true,
                 base: UserEntity,
@@ -163,7 +169,7 @@ export const addReviewersInteraction = Interaction.create({
 })
 
 // 转移
-export const transferReviewersInteraction = Interaction.create({
+ const transferReviewersInteraction = Interaction.create({
     name: 'transferReviewer',
     userRef: createUserRoleAttributive({name: '', isRef: true}),
     action: Action.create({name: 'transferReviewer'}),
@@ -172,7 +178,7 @@ export const transferReviewersInteraction = Interaction.create({
             PayloadItem.create({
                 name: 'reviewer',
                 attributives: Attributives.create({
-                    content: BoolAtomData.create({data: OtherAttr, type: 'boolean'})
+                    content: BoolAtomData.create({data: OtherAttr, type: 'atom'})
                 }),
                 base: UserEntity,
                 isRef: true
@@ -190,11 +196,11 @@ export const transferReviewersInteraction = Interaction.create({
 // 是否是 reviewer 的状态机
 const notReviewerState = StateNode.create({
     name: 'notReviewer',
-    computeValue:() => ({})
+    computeValue:() => null
 })
 const isReviewerState = StateNode.create({
     name: 'isReviewer',
-    computeValue: ()=> null
+    computeValue: ()=> ({})
 })
 
 const sendRequestTransfer = StateTransfer.create({
@@ -202,6 +208,7 @@ const sendRequestTransfer = StateTransfer.create({
     current: notReviewerState,
     next: isReviewerState,
     computeTarget: async function(eventArgs) {
+        
         return {
             source: eventArgs.payload.request,
             target: eventArgs.payload.to
@@ -254,6 +261,47 @@ const reviewerRelationSM = StateMachine.create({
     defaultState: notReviewerState
 })
 
+const pendingStateNode = StateNode.create({
+    name: 'pending'
+})
+
+const approvedStateNode = StateNode.create({
+    name: 'approved'
+})
+
+const rejectedStateNode = StateNode.create({
+    name: 'rejected'
+})
+
+const pendingToApprovedTransfer = StateTransfer.create({
+    trigger: approveInteraction,
+    current: pendingStateNode,
+    next: approvedStateNode,
+    computeTarget: async function(eventArgs) {
+        return {
+            id: eventArgs.payload.request.id,
+        }
+    }
+})
+
+const pendingToRejectedTransfer = StateTransfer.create({
+    trigger: rejectInteraction,
+    current: pendingStateNode,
+    next: rejectedStateNode,
+    computeTarget: async function(eventArgs) {
+        return {
+            id: eventArgs.payload.request.id,
+        }
+    }
+})
+
+const resultSM = StateMachine.create({
+    states: [pendingStateNode, approvedStateNode, rejectedStateNode],
+    transfers: [pendingToApprovedTransfer, pendingToRejectedTransfer],
+    defaultState: pendingStateNode
+})
+
+
 
 // 是否是 reviewer
 const reviewerRelation = Relation.create({
@@ -267,30 +315,7 @@ const reviewerRelation = Relation.create({
         name: 'result',
         type: 'string',
         collection: false,
-        computedData: MapInteraction.create({
-            items: [
-                MapInteractionItem.create({
-                    interaction: approveInteraction,
-                    map: () => 'approved',
-                    computeTarget: function(event) {
-                        return {
-                            "source.id": event.payload.request.id,
-                            "target.id": event.user.id
-                        }
-                    }
-                }),
-                MapInteractionItem.create({
-                    interaction: rejectInteraction,
-                    map: () => 'rejected',
-                    computeTarget: function(event)  {
-                        return {
-                            "source.id": event.payload.request.id,
-                            "target.id": event.user.id
-                        }
-                    }
-                })
-            ],
-        })
+        computedData: resultSM
     })]
 })
 
@@ -301,8 +326,10 @@ RequestEntity.properties.push(
         collection: false,
         computedData: Every.create({
             record: reviewerRelation,
+            attributeQuery: [['&', {attributeQuery: ['result']}]],
             notEmpty: true,
             callback:(relation) => {
+                debugger
                 return relation.result === 'approved'
             }
         })
@@ -313,7 +340,9 @@ RequestEntity.properties.push(
         collection: false,
         computedData: Any.create({
             record: reviewerRelation,
+            attributeQuery: [['&', {attributeQuery: ['result']}]],
             callback:(relation) => {
+                debugger
                 return relation.result === 'rejected'
             }
 
@@ -329,6 +358,9 @@ RequestEntity.properties.push(
     }),
 )
 
-
-export const data = JSON.parse(stringifyAllInstances())
-removeAllInstance()
+    return {
+        entities: [UserEntity, RequestEntity],
+        interactions: [sendInteraction, approveInteraction, rejectInteraction, addReviewersInteraction, transferReviewersInteraction],
+        relations: [sendRequestRelation, reviewerRelation]
+    }
+}

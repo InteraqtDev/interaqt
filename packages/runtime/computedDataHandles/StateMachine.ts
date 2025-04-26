@@ -1,9 +1,9 @@
-import { Interaction, KlassInstance, StateMachine, StateNode } from "@interaqt/shared";
+import { KlassInstance, StateMachine, StateNode } from "@interaqt/shared";
 import { Controller } from "../Controller.js";
 import { InteractionEventArgs } from "../types/interaction.js";
 import { EntityIdRef, EVENT_RECORD, RecordMutationEvent } from '../System.js';
 import { ComputedDataHandle, DataContext, EntityDataContext } from "./ComputedDataHandle.js";
-import { ComputeResultPatch, DataEventDep, EventBasedComputation, EventDep, GlobalBoundState, RecordBoundState } from "./Computation.js";
+import { ComputeResultPatch, EventBasedComputation, EventDep, GlobalBoundState, RecordBoundState } from "./Computation.js";
 import { EtityMutationEvent, SKIP_RESULT } from "../Scheduler.js";
 import { TransitionFinder } from "./TransitionFinder.js";
 
@@ -206,5 +206,4 @@ ComputedDataHandle.Handles.set(StateMachine, {
     global: GlobalStateMachineHandle,
     property: PropertyStateMachineHandle,
     relation: RecordStateMachineHandle,
-    entity: RecordStateMachineHandle,
 })

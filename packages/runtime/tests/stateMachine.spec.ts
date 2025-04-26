@@ -1,8 +1,6 @@
-import { describe, expect, test, beforeEach } from "vitest";
-import { KlassInstance } from "@interaqt/shared";
+import { describe, expect, test } from "vitest";
 import { Controller } from "../Controller.js";
 import { MonoSystem } from "../MonoSystem.js";
-import { Interaction } from "@interaqt/shared";
 import { createData as createPropertyStateMachineData } from "./data/propertyStateMachine.js";
 import { createData as createGlobalStateMachineData } from "./data/globalStateMachine.js";
 import { createData as createRelationStateMachineData } from "./data/relationStateMachine.js";

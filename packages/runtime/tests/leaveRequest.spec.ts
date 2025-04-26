@@ -13,6 +13,7 @@ import {
     Dictionary
 } from '@';
 import {AttributeError} from "../InteractionCall.js";
+import {createData} from './data/leaveRequest.js'
 
 // 里面有所有必须的数据？
 type User = {
@@ -32,9 +33,7 @@ describe('map interaction', () => {
     let userBId: string
     let userCId: string
     beforeEach(async () => {
-        removeAllInstance()
-        const {data} = (await import('./data/leaveRequest.js'))
-        createInstances(data)
+        const {entities, interactions, relations} = createData()
 
         // createInstances(data)
         /**
@@ -52,11 +51,11 @@ describe('map interaction', () => {
 
         controller = new Controller(
             system,
-            [...Entity.instances].filter(e => !(e as any).isRef),
-            [...Relation.instances],
-            [...Activity.instances],
-            [...Interaction.instances],
-            [...Dictionary.instances]
+            entities,
+            relations,
+            [],
+            interactions,
+            []
         )
         await controller.setup(true)
         sendRequestUUID = Interaction.instances!.find(i => i.name === 'sendRequest')!.uuid
@@ -110,11 +109,9 @@ describe('map interaction', () => {
 
         const requests1 = await controller.system.storage.find('Request', undefined, undefined, ['*', ['from', {attributeQuery: ["*"]}], ['to', {attributeQuery: ["*"]}]])
         expect(requests1.length).toBe(1)
-        debugger
+        
         expect(requests1[0].to.id).toBe(userBId)
         expect(requests1[0].from.id).toBe(userAId)
-        expect(requests1[0].approved_match_count).toBe(0)
-        expect(requests1[0].approved_total_count).toBe(1)
         expect(requests1[0].approved).toBeFalsy()
         expect(requests1[0].rejected).toBeFalsy()
         expect(requests1[0].result).toBe('pending')

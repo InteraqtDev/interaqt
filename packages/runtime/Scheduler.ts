@@ -98,7 +98,7 @@ export class Scheduler {
             const args = computation.args
             const handles = ComputedDataHandle.Handles
             const ComputationCtor = handles.get(args.constructor as Klass<any>)![dataContext.type]! as ComputationClass
-            assert(!!ComputationCtor, `cannot find Computation handle for ${args.constructor.name}`)
+            assert(!!ComputationCtor, `cannot find Computation handle for ${(args.constructor as any).displayName || (args.constructor as any).name}`)
 
             this.computations.add(new ComputationCtor(this.controller, args, dataContext))
         }
@@ -450,7 +450,14 @@ export class Scheduler {
         })
         // 自身的 attribute update
         if (primitiveAttr.length > 0) {
-            const recordName = context.length > 0 ? this.controller.system.storage.getEntityName(baseRecordName, context.join('.')) : baseRecordName
+            let recordName = baseRecordName
+            if (context.length>0) {
+                if (context.at(-1) === '&') {
+                    recordName = this.controller.system.storage.getRelationName(baseRecordName, context.slice(0, -1).join('.'))
+                } else {
+                    recordName = this.controller.system.storage.getEntityName(baseRecordName, context.join('.'))
+                }
+            }
             ERMutationEventsSource.push({
                 dataDep,
                 type: 'update',
@@ -471,33 +478,36 @@ export class Scheduler {
 
     convertRelationAttrToERMutationEventsSourceMap(dataDep: DataDep, baseRecordName: string, subAttrs: AttributeQueryData, context: string[], computation: Computation) {
         const ERMutationEventsSource: EntityEventSourceMap[] = []
-        // TODO 转化成对关联实体的监听
-        // 1. 先监听"关联实体关系"的 create/delete
-        const relatedRecordName = this.controller.system.storage.getRelationName(baseRecordName, context.join('.'))
-        ERMutationEventsSource.push({
-            dataDep,
-            type: 'create',
-            recordName: relatedRecordName,
-            sourceRecordName: baseRecordName,
-            isRelation: true,
-            targetPath: context,
-            computation
-        }, {
-            dataDep,
-            type: 'delete',
-            recordName: relatedRecordName,
-            sourceRecordName: baseRecordName,
-            isRelation: true,
-            targetPath: context,
-            computation
-        })
 
+        if (context.at(-1) !== '&') {
+            // 1. 先监听"关联实体关系"的 create/delete
+            const realtionRecordName = this.controller.system.storage.getRelationName(baseRecordName, context.join('.'))
+            ERMutationEventsSource.push({
+                dataDep,
+                type: 'create',
+                recordName: realtionRecordName,
+                sourceRecordName: baseRecordName,
+                isRelation: true,
+                targetPath: context,
+                computation
+            }, {
+                dataDep,
+                type: 'delete',
+                recordName: realtionRecordName,
+                sourceRecordName: baseRecordName,
+                isRelation: true,
+                targetPath: context,
+                computation
+            })
+        }
         // 2. 监听关联实体的属性 update
         if (subAttrs.length > 0) {
             ERMutationEventsSource.push(...this.convertAttrsToERMutationEventsSourceMap(dataDep, baseRecordName, subAttrs, context, computation))
         }
-        
+            
         return ERMutationEventsSource
+
+        
     }
     async setup() {
         await this.setupDefaultValues()
