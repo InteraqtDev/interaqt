@@ -43,13 +43,13 @@ function Other(targetUser, { user }){
 
 export const User = createUserRoleAttributive( {
     name: 'User'
-}, { isReactive: true })
+})
 
 export const Admin = createUserRoleAttributive( {
     name: 'Admin'
-}, { isReactive: true })
+})
 
 export const Anonymous = createUserRoleAttributive( {
     name: 'Anonymous'
-}, { isReactive: true })
+})
 

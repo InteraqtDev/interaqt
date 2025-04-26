@@ -4,7 +4,7 @@ import { DataContext, ComputedDataHandle, PropertyDataContext, EntityDataContext
 import { Entity, Interaction, Klass, KlassInstance, Property, Relation } from "@interaqt/shared";
 import { assert } from "./util.js";
 import { Computation, ComputationClass, DataBasedComputation, DataDep, EventBasedComputation, EventDep, GlobalBoundState, RecordBoundState, RecordsDataDep } from "./computedDataHandles/Computation.js";
-import { eventEntity, RecordMutationEvent } from "./System.js";
+import { InteractionEventEntity, RecordMutationEvent } from "./System.js";
 import { AttributeQueryData, MatchExp, RecordQueryData } from "@interaqt/storage";
 
 type EntityCreateEventsSourceMap = {
@@ -190,12 +190,12 @@ export class Scheduler {
                 ERMutationEventSources.push({
                     dataDep: {
                         type: 'records',
-                        source: eventEntity,
+                        source: InteractionEventEntity,
                         attributeQuery: ['*']
                     },
                     type: 'create',
-                    recordName: eventEntity.name,
-                    sourceRecordName: eventEntity.name,
+                    recordName: InteractionEventEntity.name,
+                    sourceRecordName: InteractionEventEntity.name,
                     computation
                 })
             }
@@ -313,8 +313,9 @@ export class Scheduler {
         return dirtyRecordsAndEvents
     }
     async computeEventBasedDirtyRecordsAndEvents(source: EntityEventSourceMap, mutationEvent: RecordMutationEvent) {
-        if (source.computation.dataContext.type === 'property') {
-            let dirtyRecords = (await (source.computation as EventBasedComputation).computeDirtyRecords!(mutationEvent)) || []
+        const eventBasedComputation = source.computation as EventBasedComputation
+        if (eventBasedComputation.computeDirtyRecords) {
+            let dirtyRecords = (await eventBasedComputation.computeDirtyRecords!(mutationEvent)) || []
             dirtyRecords = Array.isArray(dirtyRecords) ? dirtyRecords : [dirtyRecords]
             return dirtyRecords.map(record => [record, {
                 dataDep: source.dataDep,

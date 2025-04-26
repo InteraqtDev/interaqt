@@ -8,7 +8,8 @@ import {
     Property,
     StateNode,
     StateTransfer,
-    StateMachine
+    StateMachine,
+    Dictionary
 } from '@';
 
 

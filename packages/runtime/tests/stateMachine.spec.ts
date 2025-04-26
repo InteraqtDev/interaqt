@@ -1,33 +1,23 @@
-import { describe, expect, test, beforeEach, vi } from "vitest";
+import { describe, expect, test, beforeEach } from "vitest";
 import { KlassInstance } from "@interaqt/shared";
 import { Controller } from "../Controller.js";
 import { MonoSystem } from "../MonoSystem.js";
-import { StateNode, StateTransfer, StateMachine, Interaction, Action, Payload, PayloadItem } from "@interaqt/shared";
-import { createData } from "./data/stateMachine.js";
-
+import { Interaction } from "@interaqt/shared";
+import { createData as createPropertyStateMachineData } from "./data/propertyStateMachine.js";
+import { createData as createGlobalStateMachineData } from "./data/globalStateMachine.js";
+import { createData as createRelationStateMachineData } from "./data/relationStateMachine.js";
 describe('StateMachineRunner', () => {
-    let controller: Controller;
-    let draftState: KlassInstance<typeof StateNode>;
-    let normalState: KlassInstance<typeof StateNode>;
-    let publishedState: KlassInstance<typeof StateNode>;
-    let finalizeInteraction: KlassInstance<typeof Interaction>;
-    let draftInteraction: KlassInstance<typeof Interaction>;
-    let publishInteraction: KlassInstance<typeof Interaction>;
-    let withdrawInteraction: KlassInstance<typeof Interaction>;
-    let stateMachine: KlassInstance<typeof StateMachine>;
-
-    beforeEach(async () => {
-        const {entities, interactions} = createData()
-        draftInteraction = interactions.draftInteraction
-        finalizeInteraction = interactions.finalizeInteraction
-        publishInteraction = interactions.publishInteraction
-        withdrawInteraction = interactions.withdrawInteraction
-        const system = new MonoSystem();
-        controller = new Controller(system, entities, [], [], Object.values(interactions), [], []);
-        await controller.setup(true);
-    });
 
     test('property state machine', async () => {
+        const {entities, interactions} = createPropertyStateMachineData()
+        const draftInteraction = interactions.draftInteraction
+        const finalizeInteraction = interactions.finalizeInteraction
+        const publishInteraction = interactions.publishInteraction
+        const withdrawInteraction = interactions.withdrawInteraction
+        
+        const system = new MonoSystem();
+        const controller = new Controller(system, entities, [], [], Object.values(interactions), [], []);
+        await controller.setup(true);
         const user1 = await controller.system.storage.create('User', {
             name: 'user1',
         })
@@ -96,4 +86,84 @@ describe('StateMachineRunner', () => {
         expect(post5[1].status).toBe('normal')
         
     });
-}); 
+
+    test('global state machine', async () => {
+        const {entities, interactions, dicts} = createGlobalStateMachineData()
+        const enableInteraction = interactions.enableInteraction
+        const disableInteraction = interactions.disableInteraction
+
+        const system = new MonoSystem();
+        const controller = new Controller(system, entities, [], [], Object.values(interactions), dicts, []);
+        await controller.setup(true);
+
+        const user1 = await controller.system.storage.create('User', {
+            name: 'user1',
+        })
+        
+        const globalState = await controller.system.storage.get('state', 'globalState')
+        expect(globalState).toBe('enabled')
+
+        await controller.callInteraction(disableInteraction.uuid, {
+            user: user1,
+        })
+        const globalState2 = await controller.system.storage.get('state', 'globalState')
+        expect(globalState2).toBe('disabled')
+
+        await controller.callInteraction(enableInteraction.uuid, {
+            user: user1,
+        })
+        const globalState3 = await controller.system.storage.get('state', 'globalState')
+        expect(globalState3).toBe('enabled')
+    })
+
+
+    test('relation state machine', async () => {
+        const {entities, relations, interactions} = createRelationStateMachineData()
+        const sendInteraction = interactions.sendInteraction
+        const transferReviewersInteraction = interactions.transferReviewersInteraction
+        
+        const system = new MonoSystem();
+        const controller = new Controller(system, entities, relations, [], Object.values(interactions), [], []);
+        await controller.setup(true);
+
+        const user1 = await controller.system.storage.create('User', {
+            name: 'user1',
+        })
+        const user2 = await controller.system.storage.create('User', {
+            name: 'user2',
+        })
+        const user3 = await controller.system.storage.create('User', {
+            name: 'user3',
+        })
+
+        const {error} =await controller.callInteraction(sendInteraction.uuid, {
+            user: user1,
+            payload: {
+                to: user2,
+                request: {
+                    title: 'request1',
+                }
+            }
+        })
+
+        const request = await controller.system.storage.find('Request', undefined, undefined, ['title', ['to', {attributeQuery:['*']}]])
+        expect(request[0].title).toBe('request1')
+        expect(request[0].to.id).toBe(user2.id)
+
+        await controller.callInteraction(transferReviewersInteraction.uuid, {
+            user: user1,
+            payload: {
+                reviewer: user3,
+                request: {
+                    id: request[0].id,
+                }
+            }
+        })
+
+        const request2 = await controller.system.storage.find('Request', undefined, undefined, ['*', ['to', {attributeQuery:['*']}]])
+        expect(request2[0].title).toBe('request1')
+        expect(request2[0].to.id).toBe(user3.id)
+        
+        
+    })
+});     

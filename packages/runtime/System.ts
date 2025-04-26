@@ -115,7 +115,7 @@ export type Database = {
 } // activity 数据
 // state 等系统配置数据的实体化
 // FIXME 应该独立到外部
-export const systemEntity = Entity.create({
+export const SystemEntity = Entity.create({
     name: SYSTEM_RECORD,
     properties: [
         Property.create({
@@ -156,7 +156,7 @@ export type EntityInstanceType<T extends EntityType> = {
 }
 
 // event 的实体化
-export const eventEntity = Entity.create({
+export const InteractionEventEntity = Entity.create({
     name: EVENT_RECORD,
     properties: [
         Property.create({
@@ -193,7 +193,7 @@ export const eventEntity = Entity.create({
 })
 
 
-export const activityEntity = Entity.create({
+export const ActivityStateEntity = Entity.create({
     name: ACTIVITY_RECORD,
     properties: [
         Property.create({

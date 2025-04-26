@@ -6,6 +6,7 @@ import { Controller } from "../Controller"
 import { DataContext } from "./ComputedDataHandle"
 import { AttributeQueryData, MatchExpressionData, ModifierData } from "@interaqt/storage"
 import { Dictionary } from "@interaqt/shared"
+import { SKIP_RESULT } from "../Scheduler"
 
 export type ComputeResult = any
 
@@ -90,9 +91,9 @@ export interface DataBasedComputation {
     // 全量计算
     compute: (...args: any[]) => ComputeResult
     // 增量计算
-    incrementalCompute?: (...args: any[]) => Promise<ComputeResult>
+    incrementalCompute?: (...args: any[]) => Promise<ComputeResult|typeof SKIP_RESULT>
     // 增量计算，返回的是基于上一次结果的寄过增量
-    incrementalPatchCompute?: (...args: any[]) => Promise<ComputeResultPatch|ComputeResultPatch[]|undefined>
+    incrementalPatchCompute?: (...args: any[]) => Promise<ComputeResultPatch|ComputeResultPatch[]|undefined|typeof SKIP_RESULT>
     createState?: (...args: any[]) => {[key: string]: RecordBoundState<any>|GlobalBoundState<any>}
     dataDeps?: {[key: string]: any}
     getDefaultValue?: (...args: any[]) => any
@@ -116,13 +117,13 @@ export type EventDep = InteractionEventDep|DataEventDep
 export interface EventBasedComputation {
     dataContext: DataContext
     state: {[key: string]: RecordBoundState<any>|GlobalBoundState<any>}
-    incrementalCompute?: (...args: any[]) => Promise<ComputeResult>
-    incrementalPatchCompute?: (...args: any[]) => Promise<ComputeResultPatch|ComputeResultPatch[]|undefined>
+    incrementalCompute?: (...args: any[]) => Promise<ComputeResult|typeof SKIP_RESULT>
+    incrementalPatchCompute?: (...args: any[]) => Promise<ComputeResultPatch|ComputeResultPatch[]|undefined|typeof SKIP_RESULT>
     createState?: (...args: any[]) => {[key: string]: RecordBoundState<any>|GlobalBoundState<any>}
     eventDeps?: {[key: string]: EventDep}
     useLastValue?: boolean
     getDefaultValue?: (...args: any[]) => any
-    computeDirtyRecords?: (...args: any[]) => Promise<string[]>
+    computeDirtyRecords?: (...args: any[]) => Promise<any[]|undefined>
 }
 
 export type Computation = DataBasedComputation|EventBasedComputation

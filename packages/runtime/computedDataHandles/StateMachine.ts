@@ -2,8 +2,8 @@ import { Interaction, KlassInstance, StateMachine, StateNode } from "@interaqt/s
 import { Controller } from "../Controller.js";
 import { InteractionEventArgs } from "../types/interaction.js";
 import { EntityIdRef, EVENT_RECORD, RecordMutationEvent } from '../System.js';
-import { ComputedDataHandle, DataContext } from "./ComputedDataHandle.js";
-import { DataEventDep, EventBasedComputation, EventDep, GlobalBoundState, RecordBoundState } from "./Computation.js";
+import { ComputedDataHandle, DataContext, EntityDataContext } from "./ComputedDataHandle.js";
+import { ComputeResultPatch, DataEventDep, EventBasedComputation, EventDep, GlobalBoundState, RecordBoundState } from "./Computation.js";
 import { EtityMutationEvent, SKIP_RESULT } from "../Scheduler.js";
 import { TransitionFinder } from "./TransitionFinder.js";
 
@@ -69,15 +69,7 @@ export class PropertyStateMachineHandle implements EventBasedComputation {
         this.transitionFinder = new TransitionFinder(args)
         this.defaultState = args.defaultState
 
-        // 订阅所有事件
-        args.transfers.forEach(transfer => {
-            this.eventDeps[transfer.trigger.name] = transfer.trigger instanceof Interaction ? 
-                {
-                    type: 'interaction',
-                    interaction: transfer.trigger
-                } : 
-                transfer.trigger as DataEventDep
-        })
+        
     }
     createState() {
         return {
@@ -96,16 +88,17 @@ export class PropertyStateMachineHandle implements EventBasedComputation {
             return interaction
         }
     }
-    computeDirtyRecords(mutationEvent: RecordMutationEvent) {
+    async computeDirtyRecords(mutationEvent: RecordMutationEvent) {
         // 这里 trigger 要么是 DataEventDep，要么是 Interaqtion。
         // TODO 未来还会有 Action 之类的？？？
         const trigger = this.mutationEventToTrigger(mutationEvent)
         if (trigger) {
-            const transfer = this.transitionFinder.findTransfer(trigger)
-            if (transfer?.computeTarget) {
+            const transfers = this.transitionFinder.findTransfers(trigger)
+            
+            return Promise.all(transfers.map(transfer => {
                 const event = mutationEvent.recordName === EVENT_RECORD ? mutationEvent.record : mutationEvent
-                return transfer.computeTarget(event)
-            }
+                return transfer.computeTarget!.call(this, event)
+            }))
         }
     }
     
@@ -119,12 +112,99 @@ export class PropertyStateMachineHandle implements EventBasedComputation {
 
         return nextState.computeValue? (await nextState.computeValue.call(this, lastValue)) : nextState.name
     }
-
-    
 }
+
+
+
+export class RecordStateMachineHandle implements EventBasedComputation {
+    transitionFinder: TransitionFinder
+    state!: {[key: string]: RecordBoundState<any>|GlobalBoundState<any>}
+    useLastValue: boolean = false
+    eventDeps: {[key: string]: EventDep} = {}
+    defaultState: KlassInstance<typeof StateNode>
+    dataContext: EntityDataContext
+    constructor(public controller: Controller, args: KlassInstance<typeof StateMachine>, dataContext: DataContext) {
+        this.transitionFinder = new TransitionFinder(args)
+        this.defaultState = args.defaultState
+        this.dataContext = dataContext as EntityDataContext
+    }
+    createState() {
+        return {
+            currentState: new RecordBoundState<string>(this.defaultState.name),
+        }
+    }
+    // 这里的 defaultValue 不能是 async 的模式。因为是直接创建时填入的。
+    getDefaultValue() {
+        return this.defaultState.computeValue ? this.defaultState.computeValue.call(this) : this.defaultState.name
+    }
+    mutationEventToTrigger(mutationEvent: RecordMutationEvent) {
+        // FIXME 支持 data mutation
+        if (mutationEvent.recordName === EVENT_RECORD) {
+            const interactionName = mutationEvent.record!.interactionName!
+            const interaction = this.controller.interactions.find(i => i.name === interactionName)
+            return interaction
+        }
+    }
+    async computeDirtyRecords(mutationEvent: RecordMutationEvent) {
+        // 这里 trigger 要么是 DataEventDep，要么是 Interaqtion。
+        // TODO 未来还会有 Action 之类的？？？
+        const trigger = this.mutationEventToTrigger(mutationEvent)
+        if (trigger) {
+            const transfers = this.transitionFinder.findTransfers(trigger)
+            
+            return Promise.all(transfers.map(transfer => {
+                const event = mutationEvent.recordName === EVENT_RECORD ? mutationEvent.record : mutationEvent
+                return transfer.computeTarget!.call(this, event)
+            }))
+        }
+    }
+    
+    async incrementalPatchCompute(lastValue: string, mutationEvent: RecordMutationEvent, dirtyRecord: any): Promise<ComputeResultPatch|undefined|typeof SKIP_RESULT> {
+        const currentStateName = dirtyRecord.id ? (await this.state.currentState.get(dirtyRecord)) : this.defaultState.name
+        const trigger = this.mutationEventToTrigger(mutationEvent)
+        const nextState = this.transitionFinder?.findNextState(currentStateName, trigger)
+        if (!nextState) return SKIP_RESULT
+
+        
+
+        const nextValue = nextState.computeValue? (await nextState.computeValue.call(this, lastValue)) : nextState.name
+        if (dirtyRecord.id) {
+            if (nextValue === null) {
+                return {
+                    type:'delete',
+                    affectedId: [dirtyRecord.id],
+                }
+            }else {
+                // await this.state.currentState.set(dirtyRecord, nextState.name)
+                return {
+                    type:'update',
+                    affectedId: [dirtyRecord.id],
+                    data: {
+                        ...nextState,
+                        [this.state.currentState.key]: nextState.name
+                    }
+                }
+            }
+        } else {
+            if (nextValue) {
+                return {
+                    type: 'insert',
+                    data: {
+                        ...dirtyRecord,
+                        ...nextState,
+                        [this.state.currentState.key]: nextState.name
+                    }
+                }
+            }
+        }
+    }
+}
+
 
     
 ComputedDataHandle.Handles.set(StateMachine, {
     global: GlobalStateMachineHandle,
-    property: PropertyStateMachineHandle
+    property: PropertyStateMachineHandle,
+    relation: RecordStateMachineHandle,
+    entity: RecordStateMachineHandle,
 })

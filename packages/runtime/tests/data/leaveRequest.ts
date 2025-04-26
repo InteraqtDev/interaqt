@@ -15,10 +15,7 @@ import {
     PayloadItem,
     Property,
     PropertyTypes,
-    Relation,
-    RelationBasedAny,
-    RelationBasedEvery,
-    removeAllInstance,
+    Relation, removeAllInstance,
     StateMachine,
     StateNode,
     StateTransfer,
@@ -26,7 +23,7 @@ import {
     Transform,
     USER_ENTITY
 } from '@';
-import {OtherAttr} from "./roles";
+import { OtherAttr } from "./roles";
 
 const UserEntity = Entity.create({ name: USER_ENTITY })
 const nameProperty = Property.create({ name: 'name', type: PropertyTypes.String })
@@ -192,10 +189,12 @@ export const transferReviewersInteraction = Interaction.create({
 
 // 是否是 reviewer 的状态机
 const notReviewerState = StateNode.create({
-    name: 'notReviewer'
+    name: 'notReviewer',
+    computeValue:() => ({})
 })
 const isReviewerState = StateNode.create({
-    name: 'isReviewer'
+    name: 'isReviewer',
+    computeValue: ()=> null
 })
 
 const sendRequestTransfer = StateTransfer.create({

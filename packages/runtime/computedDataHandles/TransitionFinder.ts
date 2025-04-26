@@ -39,7 +39,7 @@ export class TransitionFinder {
         return null
     }
 
-    findTransfer(trigger:any) {
-        return this.data.transfers.find(transfer => shallowEqual(transfer.trigger, trigger))
+    findTransfers(trigger:any) {
+        return this.data.transfers.filter(transfer => shallowEqual(transfer.trigger, trigger))
     }
 }

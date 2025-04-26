@@ -3,17 +3,19 @@
 import {
     ACTIVITY_RECORD,
     activityEntity,
+    ActivityStateEntity,
     ComputationState,
     Database,
     DatabaseLogger,
     EVENT_RECORD,
     eventEntity,
+    InteractionEventEntity,
     RecordMutationCallback,
     RecordMutationEvent,
     Storage,
     System,
     SYSTEM_RECORD,
-    systemEntity,
+    SystemEntity,
     SystemLogger
 } from "./System.js";
 import {InteractionEvent} from './types/interaction.js'
@@ -163,7 +165,7 @@ export class ConsoleLogger implements DatabaseLogger{
 export class MonoSystem implements System {
     conceptClass: Map<string, ReturnType<typeof createClass>> = new Map()
     storage: Storage
-    constructor(db: Database = new SQLiteDB(undefined, {logger: new ConsoleLogger()}), public logger: SystemLogger = defaultLogger) {
+    constructor(db: Database = new SQLiteDB(undefined,{logger: new ConsoleLogger()}), public logger: SystemLogger = defaultLogger) {
         this.storage = new MonoStorage(db)
     }
     async saveEvent(event: InteractionEvent, mutationEvents: RecordMutationEvent[] = []): Promise<any> {
@@ -218,9 +220,9 @@ export class MonoSystem implements System {
         // Prepare all entities including system entities
         const preparedEntities = [
             ...entities.map(prepareEntity),
-            prepareEntity(systemEntity as KlassInstance<typeof Entity>),
-            prepareEntity(eventEntity as KlassInstance<typeof Entity>),
-            prepareEntity(activityEntity as KlassInstance<typeof Entity>)
+            prepareEntity(SystemEntity as KlassInstance<typeof Entity>),
+            prepareEntity(InteractionEventEntity as KlassInstance<typeof Entity>),
+            prepareEntity(ActivityStateEntity as KlassInstance<typeof Entity>)
         ];
 
         states.forEach(({dataContext, state}) => {

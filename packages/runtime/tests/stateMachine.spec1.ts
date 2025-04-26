@@ -2,7 +2,7 @@ import {beforeEach, describe, expect, test} from "vitest";
 import {Controller} from "../Controller.js";
 import {MonoSystem} from "../MonoSystem.js";
 import {BoolExp} from '@';
-import {draftInteraction, publishInteraction, userEntity} from "./data/stateMachine.js";
+import {draftInteraction, publishInteraction, userEntity} from "./data/propertyStateMachine.js";
 
 
 describe('map interaction', async () => {
@@ -17,7 +17,7 @@ describe('map interaction', async () => {
         finalizeInteraction,
         withdrawInteraction,
         publishInteraction,
-    } = (await import('./data/stateMachine.js'))
+    } = (await import('./data/propertyStateMachine.js'))
 
     beforeEach(async () => {
 
