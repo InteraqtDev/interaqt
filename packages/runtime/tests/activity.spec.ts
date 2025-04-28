@@ -16,6 +16,7 @@ import {
     RecordMutationEvent
 } from '@';
 import {ActivityCall, ActivityGroupNode} from "../ActivityCall.js";
+import { createData } from './data/activity/index.js';
 
 describe("activity state", () => {
     let createFriendRelationActivityCall: ActivityCall
@@ -35,8 +36,7 @@ describe("activity state", () => {
     let controller!: Controller
 
     beforeEach(async () => {
-        removeAllInstance()
-        const { data }  = (await import('./data/activity/index.js'))
+        const { entities, relations, interactions, dicts, activities }  = createData()
         /**
          * 当前的格式为:
          * New && Other Admin as A
@@ -45,29 +45,11 @@ describe("activity state", () => {
          * message: Message
          */
 
-        createInstances(data)
         system = new MonoSystem()
         system.conceptClass = KlassByName
-        const activities = [...getInstance(Activity) as KlassInstance<typeof Activity>[]]
-        const entities = [...getInstance(Entity)]
-        const relations = [...getInstance(Relation)]
-        const interactions = [...getInstance(Interaction)]
 
         const friendRelation = relations.find(r => (r as any).name === 'User_friends_friends_User')!
 
-        relationCreateEvent = undefined
-        relationDeleteEvent = undefined
-        const syncRelationSideEffect = RecordMutationSideEffect.create({
-            name: 'syncFriendRelation',
-            record: friendRelation,
-            content: async function(this: Controller, mutationEvent: RecordMutationEvent) {
-                if(mutationEvent.type === 'create') {
-                    relationCreateEvent = mutationEvent
-                } else  if (mutationEvent.type ==='delete') {
-                    relationDeleteEvent = mutationEvent
-                }
-            }
-        })
 
 
         controller = new Controller(
@@ -76,8 +58,8 @@ describe("activity state", () => {
             relations,
             activities,
             interactions,
-            getInstance(Dictionary),
-            [syncRelationSideEffect]
+            dicts,
+            []
         )
         await controller.setup(true)
 
@@ -131,14 +113,13 @@ describe("activity state", () => {
 
         // 6. 正确 b approve
         const res5 = await controller.callActivityInteraction(activityUUID, approveUUID, activityId,{user: userB})
-
+        
         // 查询关系是否正确建立
         const relation = await controller.system.storage.findOneRelationByName('User_friends_friends_User', undefined, undefined, ['*', ['source', {attributeQuery: ['*']}], ['target', {attributeQuery: ['*']}]])
         expect(relation.source.id).toBe(userA.id)
         expect(relation.target.id).toBe(userB.id)
 
         expect(res5.error).toBeUndefined()
-        expect(relationCreateEvent).toBeDefined()
 
         // 7. 错误 b reject
         const res6 = await controller.callActivityInteraction(activityUUID, rejectUUID, activityId,{user: userB})

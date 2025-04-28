@@ -211,7 +211,8 @@ export class Scheduler {
                 if (sources) {
                     for(const source of sources) {
                         if(source.type === 'update') {
-                            if(source.attributes!.every(attr => mutationEvent.record![attr]===mutationEvent.oldRecord![attr])) {
+                            const propAttrs = source.attributes!.filter(attr => attr!=='id')
+                            if(propAttrs.every(attr => mutationEvent.record![attr]===mutationEvent.oldRecord![attr])) {
                                 continue
                             }   
                         }
@@ -237,7 +238,7 @@ export class Scheduler {
             // 2.3. 关联关系的 create/delete 事件，计算出关联关系的增删改最终影响了哪些当前 dataDep
             assert(source.type === 'create' || source.type === 'delete', 'only support create/delete event for relation')
             const relation = this.controller.relations.find(relation => relation.name === source.recordName)
-            // TODO  FIXME 没考虑 bidirectional 的情况!!!???
+            // FIXME 没考虑 bidirectional 的情况，双向关系死循环了
             const isSource = relation?.sourceProperty === source.targetPath!.at(-1)
             const dataDep = source.dataDep as RecordsDataDep
             if (source.type === 'create') {

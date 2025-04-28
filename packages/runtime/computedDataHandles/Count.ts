@@ -37,6 +37,7 @@ export class GlobalCountHandle implements DataBasedComputation {
     }
 
     async incrementalCompute(lastValue: number, mutationEvent: EtityMutationEvent): Promise<number> {
+        debugger
         let count = lastValue || 0;
         
         if (mutationEvent.type === 'create') {
