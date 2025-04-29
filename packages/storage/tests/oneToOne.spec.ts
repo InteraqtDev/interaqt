@@ -224,14 +224,6 @@ describe('one to one', () => {
         expect(events).toMatchObject([
             {
                 type: "delete",
-                recordName: "User",
-                record: {
-                    name: "a1",
-                    age: 12,
-                    id: userA.id,
-                }
-            }, {
-                type: "delete",
                 recordName: "User_item_owner_Item",
                 record: {
                     id: userA.item[LINK_SYMBOL].id
@@ -242,6 +234,14 @@ describe('one to one', () => {
                 record: {
                     itemName: "item1",
                     id: userA.item.id,
+                }
+            }, {
+                type: "delete",
+                recordName: "User",
+                record: {
+                    name: "a1",
+                    age: 12,
+                    id: userA.id,
                 }
             }
         ])

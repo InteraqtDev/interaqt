@@ -1136,13 +1136,22 @@ WHERE "${entityInfo.idField}" = (${p()})
         })
         const records = await this.findRecords(deleteQuery, `find record for deleting ${recordName}`, undefined)
 
+        // CAUTION 我们应该先删除关系，再删除关联实体。按照下面的顺序就能保证事件顺序的正确。
         if (records.length) {
-            // 删除独立表或者关系在另一边的关系数据
+            // 删除关系数据（独立表或者关系在另一边的关系数据）
             await this.deleteNotReliantSeparateLinkRecords(recordName, records, events)
-            // 删除依赖我的实体
-            await this.deleteDifferentTableReliance(recordName, records, events)
-            // 删除自身以及有生命周期依赖的合表 record
-            await this.deleteRecordSameRowData(recordName, records, events, inSameRowDataOp)
+            // 删除依赖我的实体（其他表中的）。注意, reliance 只可能是 1:x，不可能多个 n 个 record 被1个 reliace 依赖。
+            //  为什么这里要单独计算 events, 是因为 1:1 并且刚好关系数据分配到了当前 record 上 时，关系事件顺序会不正确了。
+            const relianceEvents: MutationEvent[] = []
+            await this.deleteDifferentTableReliance(recordName, records, relianceEvents)
+            // 删除自身、有生命周期依赖的合表 record、合表到当前 record 的关系数据。
+            const recordEvents: MutationEvent[] = []
+            await this.deleteRecordSameRowData(recordName, records, recordEvents, inSameRowDataOp)
+
+            // 1. recordEvents 除了最后一个外全都是关系删除事件。
+            // 2. relianceEvents 中都是 reliance 删除事件，可能包含关系删除事件。
+            // 3. 最后一个 recordEvents 是 record 删除事件。
+            events?.push(...recordEvents.slice(0, -1), ...relianceEvents, recordEvents.at(-1)!)
         }
 
         return records
@@ -1191,12 +1200,23 @@ WHERE "${recordInfo.idField}" = ${p()}
 `, [record.id], `delete record ${recordInfo.name} as row`)
                 }
             }
-            events?.push({
-                type: 'delete',
-                recordName: recordName,
-                record,
-            })
+            
+            // 1. 一定先删除递归处理同表的 reliance tree
+            for (let relianceInfo of recordInfo.sameTableReliance) {
+                // 只要真正存在这个数据才要删除
+                if (record[relianceInfo.attributeName]?.id) {
+                    // 和 reliance 的 link record 的事件
+                    events?.push({
+                        type: 'delete',
+                        recordName: relianceInfo.linkName,
+                        record: record[relianceInfo.attributeName][LINK_SYMBOL],
+                    })
 
+                    await this.handleDeletedRecordReliance(relianceInfo.recordName, record[relianceInfo.attributeName]!, events)
+                }
+            }
+
+            // 2. 接着先记录关系删除事件，再记录 record 删除事件。
             recordInfo.mergedRecordAttributes.forEach(attributeInfo => {
                 if (record[attributeInfo.attributeName]?.id) {
                     // 记录和自己合并的 link 事件
@@ -1208,19 +1228,10 @@ WHERE "${recordInfo.idField}" = ${p()}
                 }
             })
 
-            // 递归处理同表的 reliance tree
-            recordInfo.sameTableReliance.forEach(relianceInfo => {
-                // 只要真正存在这个数据才要删除
-                if (record[relianceInfo.attributeName]?.id) {
-                    // 和 reliance 的 link record 的事件
-                    events?.push({
-                        type: 'delete',
-                        recordName: relianceInfo.linkName,
-                        record: record[relianceInfo.attributeName][LINK_SYMBOL],
-                    })
-
-                    this.handleDeletedRecordReliance(relianceInfo.recordName, record[relianceInfo.attributeName]!, events)
-                }
+            events?.push({
+                type: 'delete',
+                recordName: recordName,
+                record,
             })
         }
     }

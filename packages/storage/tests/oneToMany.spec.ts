@@ -287,6 +287,12 @@ describe('one to many', () => {
         expect(events).toMatchObject([
             {
                 type: "delete",
+                recordName: "User_leader_member_User",
+                record: {
+                    id: userA.leader[LINK_SYMBOL].id
+                }
+            }, {
+                type: "delete",
                 recordName: "User",
                 record: {
                     name: "a1",
@@ -295,12 +301,6 @@ describe('one to many', () => {
                     leader: {
                         id: userA.leader.id
                     }
-                }
-            }, {
-                type: "delete",
-                recordName: "User_leader_member_User",
-                record: {
-                    id: userA.leader[LINK_SYMBOL].id
                 }
             }
         ])
