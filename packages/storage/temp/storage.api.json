@@ -13271,7 +13271,7 @@
                 },
                 {
                   "kind": "Content",
-                  "text": ", record: "
+                  "text": ", records: "
                 },
                 {
                   "kind": "Reference",
@@ -13331,7 +13331,7 @@
                   "isOptional": false
                 },
                 {
-                  "parameterName": "record",
+                  "parameterName": "records",
                   "parameterTypeTokenRange": {
                     "startIndex": 3,
                     "endIndex": 5

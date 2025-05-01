@@ -722,7 +722,7 @@ export class RecordQueryAgent {
     // (undocumented)
     deleteDifferentTableReliance(recordName: string, records: EntityIdRef[], events?: MutationEvent_2[]): Promise<void>;
     // (undocumented)
-    deleteNotReliantSeparateLinkRecords(recordName: string, record: EntityIdRef[], events?: MutationEvent_2[]): Promise<void>;
+    deleteNotReliantSeparateLinkRecords(recordName: string, records: EntityIdRef[], events?: MutationEvent_2[]): Promise<void>;
     // (undocumented)
     deleteRecord(recordName: string, matchExp: MatchExpressionData, events?: MutationEvent_2[], inSameRowDataOp?: boolean): Promise<Record_2[]>;
     // (undocumented)
