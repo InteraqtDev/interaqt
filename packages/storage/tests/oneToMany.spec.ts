@@ -797,8 +797,36 @@ describe('one to many', () => {
         // 应该没有事件
         expect(events3).toMatchObject([])
     })
+
+    test('find one to many data:find with new related as source', async () => {
+        const userA = await entityQueryHandle.create('User', {name:'a1', age:12, powers: [{powerName: 'p1'}, {powerName: 'p2'}]})
+
+        const findUser = await entityQueryHandle.findOne('User',
+            MatchExp.atom({ key: 'id', value: ['=', userA.id]}),
+            {},
+            ['name', 'age', ['powers', { attributeQuery: ['id','powerName']}]])
+
+        expect(findUser).toMatchObject({
+            name: 'a1',
+            age: 12,
+            powers: [{powerName: 'p1'}, {powerName: 'p2'}]
+        })
+
+        const firstPower = findUser.powers[0]
+
+        const findPower = await entityQueryHandle.findOne('Power',
+            MatchExp.atom({ key: 'id', value: ['=', firstPower.id]}),
+            {},
+            ['powerName', ['owner', {attributeQuery: ['name', ['&', {attributeQuery: ['id']}]]}]]
+        )
+
+        expect(findPower).toMatchObject({
+            powerName: 'p1',
+            owner: {
+                name: 'a1'
+            }
+        })
+    })
 })
-
-
 
 
