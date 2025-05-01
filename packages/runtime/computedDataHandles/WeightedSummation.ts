@@ -121,6 +121,9 @@ export class PropertyWeightedSummationHandle implements DataBasedComputation {
     }
 
     async incrementalCompute(lastValue: number, mutationEvent: EtityMutationEvent): Promise<number> {
+        // FIXME 应该用 RelationBoundState 记录
+
+        
         let summation = await this.state!.summation.get(mutationEvent.record);
         const relatedMutationEvent = mutationEvent.relatedMutationEvent!;
 
@@ -142,6 +145,7 @@ export class PropertyWeightedSummationHandle implements DataBasedComputation {
 
             const result = this.matchRecordToWeight.call(this.controller, oldItem);
             summation = await this.state!.summation.set(mutationEvent.record, summation - (result.weight * result.value));
+
         } else if (relatedMutationEvent.type === 'update') {
             const oldRecord = relatedMutationEvent.oldRecord
             const newRecord = { ...relatedMutationEvent.oldRecord, ...relatedMutationEvent.record}

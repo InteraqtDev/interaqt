@@ -206,8 +206,8 @@ export function createData() {
                 key: 'activityId',
                 value: ['=', eventArgs.activityId]
             })
-    
-            const sendEvent = (await this.controller.system.getEvent(match))[0]
+            // FIXME 这里是不是应该直接能从 eventArgs 获取？？？
+            const sendEvent = await this.controller.system.storage.findOne(InteractionEventEntity.name, match, undefined, ['*'])
             return {
                 source: sendEvent.user,
                 target: sendEvent.payload!.to
