@@ -103,6 +103,11 @@ export const WeightedSummation = createClass({
             collection: false,
             required: true
         },
+        direction: {
+            type: 'string',
+            collection: false,
+            required: false
+        },
         callback: {
             type: 'function',
             collection: false,
