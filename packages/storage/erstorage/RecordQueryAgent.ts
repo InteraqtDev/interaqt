@@ -1145,13 +1145,15 @@ WHERE "${entityInfo.idField}" = (${p()})
             const relianceEvents: MutationEvent[] = []
             await this.deleteDifferentTableReliance(recordName, records, relianceEvents)
             // 删除自身、有生命周期依赖的合表 record、合表到当前 record 的关系数据。
-            const recordEvents: MutationEvent[] = []
-            await this.deleteRecordSameRowData(recordName, records, recordEvents, inSameRowDataOp)
+            const sameRowRecordEvents: MutationEvent[] = []
+            await this.deleteRecordSameRowData(recordName, records, sameRowRecordEvents, inSameRowDataOp)
 
             // 1. recordEvents 除了最后一个外全都是关系删除事件。
             // 2. relianceEvents 中都是 reliance 删除事件，可能包含关系删除事件。
-            // 3. 最后一个 recordEvents 是 record 删除事件。
-            events?.push(...recordEvents.slice(0, -1), ...relianceEvents, recordEvents.at(-1)!)
+            // 3. 最后 recordEvents 是 record 删除事件。
+            const relationEvents = sameRowRecordEvents.slice(0, sameRowRecordEvents.length - records.length)
+            const recordEvents = sameRowRecordEvents.slice(sameRowRecordEvents.length - records.length)
+            events?.push(...relationEvents, ...relianceEvents, ...recordEvents)
         }
 
         return records
@@ -1209,7 +1211,10 @@ WHERE "${recordInfo.idField}" = ${p()}
                     events?.push({
                         type: 'delete',
                         recordName: relianceInfo.linkName,
-                        record: record[relianceInfo.attributeName][LINK_SYMBOL],
+                        record: {
+                            ...record[relianceInfo.attributeName][LINK_SYMBOL],
+                            [relianceInfo.isRecordSource() ? 'source' : 'target']: record[relianceInfo.attributeName]
+                        },
                     })
 
                     await this.handleDeletedRecordReliance(relianceInfo.recordName, record[relianceInfo.attributeName]!, events)
@@ -1223,17 +1228,20 @@ WHERE "${recordInfo.idField}" = ${p()}
                     events?.push({
                         type: 'delete',
                         recordName: attributeInfo.linkName,
-                        record: record[attributeInfo.attributeName][LINK_SYMBOL],
+                        // CAUTION 注意这里一定要增加 link 上对于原始 record 的引用。外部计算的时候可能需要，那时可能 record 也删了查询不到了。
+                        record: {
+                            ...record[attributeInfo.attributeName][LINK_SYMBOL],
+                            [attributeInfo.isRecordSource() ? 'source' : 'target']: record
+                        },
                     })
                 }
             })
-
-            events?.push({
-                type: 'delete',
-                recordName: recordName,
-                record,
-            })
         }
+        events?.push(...records.map(record => ({
+            type: 'delete',
+            recordName: recordName,
+            record,
+        }) as MutationEvent))
     }
 
     async handleDeletedRecordReliance(recordName: string, record: EntityIdRef, events?: MutationEvent[]) {
@@ -1247,28 +1255,51 @@ WHERE "${recordInfo.idField}" = ${p()}
         return record
     }
 
-    async deleteNotReliantSeparateLinkRecords(recordName: string, record: EntityIdRef[], events?: MutationEvent[]) {
+    async deleteNotReliantSeparateLinkRecords(recordName: string, records: EntityIdRef[], events?: MutationEvent[]) {
         const recordInfo = this.map.getRecordInfo(recordName)
         for (let info of recordInfo.differentTableRecordAttributes) {
             if (!info.isReliance) {
                 const key = info.isRecordSource() ? 'source.id' : 'target.id'
                 const newMatch = MatchExp.atom({
                     key,
-                    value: ['in', record.map(r => r.id)]
+                    value: ['in', records.map(r => r.id)]
                 })
-                await this.deleteRecord(info.linkName, newMatch, events)
+                // 关系事件上全部都要增加原始 record 的引用。注意不能给所有 events 都去加，因为删除 link 时也可能有关联实体被删除事件。
+                //  只有最后哪些 events 是删除 link 的事件。
+                const deletedLinkRecords =await this.deleteRecord(info.linkName, newMatch, events)
+                if (events) {
+                    const recordsById = new Map(deletedLinkRecords.map(r => [r.id, r]))
+                    const deletedLinkRecordEvents = events.slice(events.length - deletedLinkRecords.length)
+                    deletedLinkRecordEvents.forEach(event => {
+                        event.record![info.isRecordSource() ? 'source' : 'target'] = recordsById.get(event.record![info.isRecordSource() ? 'source' : 'target'].id)
+                    })
+                }
             }
         }
     }
 
     async deleteDifferentTableReliance(recordName: string, records: EntityIdRef[], events?: MutationEvent[]) {
         const recordInfo = this.map.getRecordInfo(recordName)
+        const recordsById = events ? new Map(records.map(r => [r.id, r])) : undefined
+
         for (let info of recordInfo.differentTableReliance) {
             const matchInIds = MatchExp.atom({
                 key: `${info.getReverseInfo()?.attributeName!}.id`,
                 value: ['in', records.map(r => r.id)]
             })
             await this.deleteRecord(info.recordName, matchInIds, events)
+            if (events) {
+                // 删除关系时，要增加上当前 record 的引用。
+                // TODO 这里需要更加高效的方法
+                events.forEach(event => {
+                    if (event.recordName === info.linkName) {
+                        const record = recordsById!.get(event.record![info.isRecordSource() ? 'source' : 'target'].id)
+                        if (record) {
+                            event.record![info.isRecordSource() ? 'source' : 'target'] = record
+                        }
+                    }
+                })
+            }
         }
     }
 

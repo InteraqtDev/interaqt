@@ -289,7 +289,12 @@ describe('one to many', () => {
                 type: "delete",
                 recordName: "User_leader_member_User",
                 record: {
-                    id: userA.leader[LINK_SYMBOL].id
+                    id: userA.leader[LINK_SYMBOL].id,
+                    source: {
+                        name: "a1",
+                        age: 11,
+                        id: 2,
+                    },
                 }
             }, {
                 type: "delete",

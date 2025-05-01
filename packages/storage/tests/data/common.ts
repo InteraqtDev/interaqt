@@ -178,7 +178,7 @@ export function createCommonData(): { entities: Entity[], relations: Relation[] 
         locEntity,
         matchEntity,
         powerEntity,
-        departmentEntity
+        departmentEntity,
     ];
     
     const relations: Relation[] = [
@@ -192,7 +192,7 @@ export function createCommonData(): { entities: Entity[], relations: Relation[] 
         teamMatchHostRelation,
         teamMatchParticipantRelation,
         powerOwnerRelation,
-        departmentHierarchyRelation
+        departmentHierarchyRelation,
     ];
 
     return {
