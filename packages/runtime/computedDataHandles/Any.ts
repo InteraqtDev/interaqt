@@ -4,7 +4,7 @@ import { Controller } from "../Controller.js";
 import { DataDep, GlobalBoundState, RecordBoundState, RelationBoundState } from "./Computation.js";
 import { DataBasedComputation } from "./Computation.js";
 import { EtityMutationEvent } from "../Scheduler.js";
-import { MatchExp } from "@interaqt/storage";
+import { MatchExp, AttributeQueryData } from "@interaqt/storage";
 
 
 export class GlobalAnyHandle implements DataBasedComputation {
@@ -76,19 +76,20 @@ export class PropertyAnyHandle implements DataBasedComputation {
     relatedRecordName: string
     isSource: boolean
     relation: KlassInstance<typeof Relation>
+    relationAttributeQuery: AttributeQueryData
     constructor(public controller: Controller,  args: KlassInstance<typeof Any>,  public dataContext: PropertyDataContext ) {
         this.callback = args.callback.bind(this)
 
         const relation = args.record as KlassInstance<typeof Relation>
         this.relation = relation
-        this.relationAttr = relation.source.name === dataContext.host.name ? relation.sourceProperty : relation.targetProperty
-        this.isSource = relation.source.name === dataContext.host.name
+        this.isSource = args.direction ? args.direction === 'source' :relation.source.name === dataContext.host.name
+        this.relationAttr = this.isSource ? relation.sourceProperty : relation.targetProperty
         this.relatedRecordName = this.isSource ? relation.target.name : relation.source.name
-        // TODO 用户会不会还有其他依赖？理论上我们应该给所有的计算都提供 dataDeps 定义，最后一起 Merge。
+        this.relationAttributeQuery = args.attributeQuery || []
         this.dataDeps = {
             _current: {
                 type: 'property',
-                attributeQuery: [[this.relationAttr, {attributeQuery: args.attributeQuery||[]}]]
+                attributeQuery: [[this.relationAttr, {attributeQuery: [['&', {attributeQuery: this.relationAttributeQuery}]]}]]
             }
         }
     }
@@ -118,12 +119,12 @@ export class PropertyAnyHandle implements DataBasedComputation {
         if (relatedMutationEvent.type === 'create') {
             // 关联关系的新建
             const relationRecord = relatedMutationEvent.record!
-            const newItem = await this.controller.system.storage.findOne(this.relatedRecordName, MatchExp.atom({
+            const newRelationWithEntity = await this.controller.system.storage.findOne(this.relation.name, MatchExp.atom({
                 key: 'id',
-                value: ['=', relatedMutationEvent.record![this.isSource ? 'target' : 'source']!.id]
-            }), undefined, ['*'])
+                value: ['=', relationRecord.id]
+            }), undefined, this.relationAttributeQuery)
 
-            const newItemMatch = !!this.callback.call(this.controller, newItem) 
+            const newItemMatch = !!this.callback.call(this.controller, newRelationWithEntity) 
             if (newItemMatch === true) {
                 matchCount = await this.state!.matchCount.set(mutationEvent.record, matchCount + 1)
                 await this.state!.isItemMatch.set(relationRecord, true)
@@ -137,22 +138,28 @@ export class PropertyAnyHandle implements DataBasedComputation {
                 matchCount = await this.state!.matchCount.set(mutationEvent.record, matchCount - 1)
             }
         } else if (relatedMutationEvent.type === 'update') {
-            // 关联实体的更新
+            // 关联实体或者关联关系上的字段的更新
             const currentRecord = mutationEvent.oldRecord!
-            const relatedEntityRecord = relatedMutationEvent.oldRecord!
+            const isRelationUpdate = mutationEvent.relatedMutationEvent?.recordName === this.relation.name
 
-            const relationRecord = await this.controller.system.storage.findOne(this.relation.name, MatchExp.atom({
-                key: 'source.id',
-                value: ['=', this.isSource ?  currentRecord.id: relatedEntityRecord.id]
-            }).and({
-                key: 'target.id',
-                value: ['=', this.isSource ? relatedEntityRecord.id : currentRecord.id]
-            }), undefined, ['*', [this.isSource ? 'target' : 'source', {attributeQuery: ['*']}]])
+            const relationMatch = isRelationUpdate ? 
+                MatchExp.atom({
+                    key: 'id',
+                    value: ['=', mutationEvent.relatedMutationEvent!.oldRecord!.id]
+                }) : 
+                MatchExp.atom({
+                    key: 'source.id',
+                    value: ['=', this.isSource ?  currentRecord.id: mutationEvent.relatedMutationEvent!.oldRecord!.id]
+                }).and({
+                    key: 'target.id',
+                    value: ['=', this.isSource ? mutationEvent.relatedMutationEvent!.oldRecord!.id : currentRecord.id]
+                })
 
-            const newRelatedEntityRecord = relationRecord[this.isSource ? 'target' : 'source']
+
+            const relationRecord = await this.controller.system.storage.findOne(this.relation.name, relationMatch, undefined, this.relationAttributeQuery)
 
             const oldItemMatch = !!await this.state!.isItemMatch.get(relationRecord)
-            const newItemMatch = !!this.callback.call(this.controller, newRelatedEntityRecord) 
+            const newItemMatch = !!this.callback.call(this.controller, relationRecord) 
             if (oldItemMatch === true && newItemMatch === false) {
                 matchCount = await this.state!.matchCount.set(currentRecord, matchCount - 1)
             } else if (oldItemMatch === false && newItemMatch === true) {

@@ -390,7 +390,8 @@ export function createData() {
         collection: false,
         computedData: Every.create({
             record: sendRequestRelation,
-            callback: (request) => request.result !== 'pending'
+            attributeQuery: [['source', {attributeQuery: ['result']}]],
+            callback: (relation) => relation.source.result !== 'pending'
         })
     }))
     
@@ -400,7 +401,8 @@ export function createData() {
         collection: false,
         computedData: Any.create({
             record: sendRequestRelation,
-            callback: (request) => request.result !== 'pending'
+            attributeQuery: [['source', {attributeQuery: ['result']}]],
+            callback: (relation) => relation.source.result !== 'pending'
         })
     }))
     

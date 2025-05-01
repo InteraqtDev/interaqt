@@ -9,18 +9,19 @@ import {
     Entity,
     GetAction,
     Interaction,
-    MapInteraction,
-    MapInteractionItem,
     Payload,
     PayloadItem,
     Property,
     PropertyTypes,
     Relation,
-    RelationBasedAny,
-    RelationBasedEvery,
-    RelationCount
+    Any,
+    Every,
+    WeightedSummation,
+    RelationCount,
+    Transform
 } from '@interaqt/shared';
-import {Controller,InteractionEventArgs,} from '../../index.js'
+import {Controller,InteractionEventArgs, InteractionEventEntity,} from '../../index.js'
+import { InteractionCall } from '../../InteractionCall.js';
 
 export const globalUserRole = createUserRoleAttributive({})
 
@@ -109,18 +110,17 @@ const sendRequestRelation = Relation.create({
     target: UserEntity,
     targetProperty: 'request',
     type: 'n:1',
-    computedData: MapInteraction.create({
-        items: [
-            MapInteractionItem.create({
-                interaction: createInteraction,
-                map: function map(event: any) {
-                    return {
-                        source: event.payload.request,
-                        target: event.user,
-                    }
+    computedData: Transform.create({
+        record: InteractionEventEntity,
+        callback: function map(event: any) {
+            if (event.interactionName === createInteraction.name) {
+                return {
+                    source: event.payload.request,
+                    target: event.user,
                 }
-            }),
-        ]
+            }
+            return null
+        }
     }),
 })
 
@@ -133,38 +133,34 @@ const reviewerRelation = Relation.create({
     targetProperty: 'request',
     type: 'n:n',
     // TODO 改 interaction，没有 mapInteractionItem 了
-    computedData: MapInteraction.create({
-        items: [
-            MapInteractionItem.create({
-                interaction: createInteraction,
-                map: async function map(this: Controller, event: any) {
-                    const {BoolExp} = this.globals
+    computedData: Transform.create({
+        record: createInteraction,
+        callback: async function map(this: Controller, event: any) {
+            const {BoolExp} = this.globals
 
-                    const match = BoolExp.atom({
-                        key: 'id',
-                        value: ['=', event.user.id]
-                    })
+            const match = BoolExp.atom({
+                key: 'id',
+                value: ['=', event.user.id]
+            })
 
-                    const {supervisor} = await this.system.storage.findOne(
-                        'User',
-                        match,
-                        undefined,
-                        [
-                            ['supervisor', {attributeQuery: [['supervisor', {attributeQuery: ['*']}]]}],
-                        ]
-                    )
+            const {supervisor} = await this.system.storage.findOne(
+                'User',
+                match,
+                undefined,
+                [
+                    ['supervisor', {attributeQuery: [['supervisor', {attributeQuery: ['*']}]]}],
+                ]
+            )
 
-                    return [{
-                        source: event.payload.request,
-                        target: supervisor,
-                    }, {
-                        source: event.payload.request,
-                        isSecond: true,
-                        target: supervisor.supervisor,
-                    }]
-                }
-            }),
-        ],
+            return [{
+                source: event.payload.request,
+                target: supervisor,
+            }, {
+                source: event.payload.request,
+                isSecond: true,
+                target: supervisor.supervisor,
+            }]
+        }
     }),
     properties: [
         Property.create({
@@ -177,20 +173,17 @@ const reviewerRelation = Relation.create({
             type: 'string',
             collection: false,
             // TODO 改 statemachine
-            computedData: MapInteraction.create({
-                items: [
-                    MapInteractionItem.create({
-                        interaction: approveInteraction,
-                        map: () => 'approved',
-                        computeTarget: async function (this: Controller, event) {
+            computedData: Transform.create({
+                // FIXME
+                record: approveInteraction,
+                map: () => 'approved',
+                computeTarget: async function (this: Controller, event) {
 
-                            return {
-                                "source.id": event.payload.request.id,
-                                "target.id": event.user.id
-                            }
-                        }
-                    }),
-                ],
+                    return {
+                        "source.id": event.payload.request.id,
+                        "target.id": event.user.id
+                    }
+                }
             })
         })
     ]
@@ -202,27 +195,23 @@ RequestEntity.properties.push(
         name: 'approved',
         type: 'boolean',
         collection: false,
-        computedData: RelationBasedEvery.create({
-            relation: reviewerRelation,
-            relationDirection: 'source',
+        computedData: Every.create({
+            record: reviewerRelation,
             notEmpty: true,
-            match:
-                (_, relation) => {
-                    return relation.result === 'approved'
-                }
+            callback:(relation) => {
+                return relation.result === 'approved'
+            }
         })
     }),
     Property.create({
         name: 'rejected',
         type: 'boolean',
         collection: false,
-        computedData: RelationBasedAny.create({
-            relation: reviewerRelation,
-            relationDirection: 'source',
-            match:
-                (_, relation) => {
-                    return relation.result === 'rejected'
-                }
+        computedData: Any.create({
+            record: reviewerRelation,
+            callback: (relation) => {
+                return relation.result === 'rejected'
+            }
         })
     }),
     Property.create({
@@ -237,11 +226,13 @@ RequestEntity.properties.push(
 
 // 我有多少未处理的
 // debugger
-const pendingRequestCount = RelationCount.create({
-    relation: reviewerRelation,
-    relationDirection: 'target',
-    match: function (request, relation) {
-        return request.result === 'pending'
+const pendingRequestCount = WeightedSummation.create({
+    record: reviewerRelation,
+    callback: function (relation) {
+        return {
+            weight: 1,
+            value: relation.result === 'pending' ? 0 : 1
+        }
     }
 })
 UserEntity.properties.push(

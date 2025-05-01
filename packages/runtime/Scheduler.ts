@@ -217,7 +217,7 @@ export class Scheduler {
                     for(const source of sources) {
                         if(source.type === 'update') {
                             const propAttrs = source.attributes!.filter(attr => attr!=='id')
-                            if(propAttrs.every(attr => mutationEvent.record![attr]===mutationEvent.oldRecord![attr])) {
+                            if(propAttrs.every(attr => !mutationEvent.record!.hasOwnProperty(attr) || (mutationEvent.record![attr]===mutationEvent.oldRecord![attr])) ){
                                 continue
                             }   
                         }

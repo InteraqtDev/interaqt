@@ -326,10 +326,9 @@ RequestEntity.properties.push(
         collection: false,
         computedData: Every.create({
             record: reviewerRelation,
-            attributeQuery: [['&', {attributeQuery: ['result']}]],
+            attributeQuery: ['result'],
             notEmpty: true,
             callback:(relation) => {
-                debugger
                 return relation.result === 'approved'
             }
         })
@@ -340,9 +339,8 @@ RequestEntity.properties.push(
         collection: false,
         computedData: Any.create({
             record: reviewerRelation,
-            attributeQuery: [['&', {attributeQuery: ['result']}]],
+            attributeQuery: ['result'],
             callback:(relation) => {
-                debugger
                 return relation.result === 'rejected'
             }
 

@@ -160,9 +160,9 @@ describe('Every and Any computed handle', () => {
         type: 'boolean',
         computedData: Any.create({
             record: requestRelation,
-            attributeQuery: ['handled'],
-            callback: (request:any) => {
-                return request.handled
+            attributeQuery: [['target', {attributeQuery: ['handled']}]],
+            callback: (relation:any) => {
+                return relation.target.handled
             },
         })
     }))
@@ -246,10 +246,10 @@ describe('Every and Any computed handle', () => {
         type: 'boolean',
         computedData: Every.create({
             record: requestRelation,
-            attributeQuery: ['handled'],
+            attributeQuery: [['target', {attributeQuery: ['handled']}]],
             notEmpty: true,
-            callback: (request:any) => {
-                return !!request.handled
+            callback: (relation:any) => {
+                return !!relation.target.handled
             },
         })
     }))

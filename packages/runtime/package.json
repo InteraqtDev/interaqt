@@ -32,8 +32,8 @@
   "license": "MIT",
   "dependencies": {
     "@fastify/middie": "^9.0.3",
-    "@interaqt/shared": "^2.9.3",
-    "@interaqt/storage": "^2.1.3",
+    "@interaqt/shared": "^3.0.1",
+    "@interaqt/storage": "^2.3.0",
     "acorn": "^8.14.1",
     "better-sqlite3": "^11.8.1",
     "chalk": "^5.4.1",

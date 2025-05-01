@@ -1,10 +1,11 @@
 import { ComputedDataHandle, PropertyDataContext } from "./ComputedDataHandle.js";
-import { Every, KlassInstance, Property, Relation } from "@interaqt/shared";
+import { Every, KlassInstance, Relation } from "@interaqt/shared";
 import { DataBasedComputation, DataDep, GlobalBoundState, RecordBoundState, RelationBoundState } from "./Computation.js";
 import { Controller } from "../Controller.js";
 import { DataContext } from "./ComputedDataHandle.js";
 import { EtityMutationEvent } from "../Scheduler.js";
-import { AttributeQuery, MatchExp } from "@interaqt/storage";
+import { AttributeQuery, AttributeQueryData, MatchExp } from "@interaqt/storage";
+import { assert } from "../util.js";
 export class GlobalEveryHandle implements DataBasedComputation {
     callback: (this: Controller, item: any) => boolean
     state!: ReturnType<typeof this.createState>
@@ -83,21 +84,25 @@ export class PropertyEveryHandle implements DataBasedComputation {
     relationAttr: string
     relation: KlassInstance<typeof Relation>
     relatedRecordName: string
-    isSource: boolean
+    isSource: boolean   
+    relationAttributeQuery: AttributeQueryData
     constructor(public controller: Controller,  public args: KlassInstance<typeof Every>,  public dataContext: PropertyDataContext ) {
         this.callback = args.callback.bind(this)
 
         const relation = args.record as KlassInstance<typeof Relation>
+        assert(relation.source.name === dataContext.host.name || relation.target.name === dataContext.host.name, 'relation source or target must be the same as the host')
         this.relation = relation
-        // FIXME 应该用参数来指定，因为可能 relation 
-        this.relationAttr = relation.source.name === dataContext.host.name ? relation.sourceProperty : relation.targetProperty
-        this.isSource = relation.source.name === dataContext.host.name
+        this.isSource = args.direction ? args.direction === 'source' :relation.source.name === dataContext.host.name
+        this.relationAttr = this.isSource ? relation.sourceProperty : relation.targetProperty
         this.relatedRecordName = this.isSource ? relation.target.name : relation.source.name
-        // TODO 用户会不会还有其他依赖？理论上我们应该给所有的计算都提供 dataDeps 定义，最后一起 Merge。
+
+        this.relationAttributeQuery = args.attributeQuery || []
+
         this.dataDeps = {
             _current: {
                 type: 'property',
-                attributeQuery: [[this.relationAttr, {attributeQuery: args.attributeQuery||[]}]]
+                // CAUTION 这里注册的依赖是从当前的 record 出发的。
+                attributeQuery: [[this.relationAttr, {attributeQuery: [['&', {attributeQuery: this.relationAttributeQuery}]]}]]
             }
         }
     }
@@ -115,6 +120,7 @@ export class PropertyEveryHandle implements DataBasedComputation {
     }
 
     async compute({_current}: {_current: any}): Promise<boolean> {
+        // FIXME 这里的代码是未经过验证的，目前都是走的增量
         const totalCount = await this.state.totalCount.set(_current,_current[this.relationAttr].length)
         let matchCount = 0
         for(const item of _current[this.relationAttr]) {
@@ -140,15 +146,15 @@ export class PropertyEveryHandle implements DataBasedComputation {
         if (relatedMutationEvent.type === 'create') {
             // 关联关系的新建
             const relationRecord = relatedMutationEvent.record!
-            const newItem = await this.controller.system.storage.findOne(this.relatedRecordName, MatchExp.atom({
+            const newRelationWithEntity = await this.controller.system.storage.findOne(this.relation.name, MatchExp.atom({
                 key: 'id',
-                value: ['=', relationRecord[this.isSource ? 'target' : 'source']!.id]
-            }), undefined, ['*'])
+                value: ['=', relationRecord.id]
+            }), undefined, this.relationAttributeQuery)
 
-            const newItemMatch = !!this.callback.call(this.controller, newItem) 
+            const newItemMatch = !!this.callback.call(this.controller, newRelationWithEntity) 
             if (newItemMatch === true) {
                 matchCount = await this.state!.matchCount.set(mutationEvent.record, matchCount + 1)
-                await this.state!.isItemMatch.set(relationRecord, true)
+                await this.state!.isItemMatch.set(newRelationWithEntity, true)
             }
 
             totalCount = await this.state!.totalCount.set(mutationEvent.record, totalCount + 1)
@@ -162,22 +168,28 @@ export class PropertyEveryHandle implements DataBasedComputation {
 
             totalCount = await this.state!.totalCount.set(mutationEvent.record, totalCount - 1)
         } else if (relatedMutationEvent.type === 'update') {
-            // 关联实体的更新
+            // 关联实体或者关联关系上的字段的更新
             const currentRecord = mutationEvent.oldRecord!
-            const relatedEntityRecord = relatedMutationEvent.oldRecord!
+            const isRelationUpdate = mutationEvent.relatedMutationEvent?.recordName === this.relation.name
 
-            const relationRecord = await this.controller.system.storage.findOne(this.relation.name, MatchExp.atom({
-                key: 'source.id',
-                value: ['=', this.isSource ?  currentRecord.id: relatedEntityRecord.id]
-            }).and({
-                key: 'target.id',
-                value: ['=', this.isSource ? relatedEntityRecord.id : currentRecord.id]
-            }), undefined, ['*', [this.isSource ? 'target' : 'source', {attributeQuery: ['*']}]])
+            const relationMatch = isRelationUpdate ? 
+                MatchExp.atom({
+                    key: 'id',
+                    value: ['=', mutationEvent.relatedMutationEvent!.oldRecord!.id]
+                }) : 
+                MatchExp.atom({
+                    key: 'source.id',
+                    value: ['=', this.isSource ?  currentRecord.id: mutationEvent.relatedMutationEvent!.oldRecord!.id]
+                }).and({
+                    key: 'target.id',
+                    value: ['=', this.isSource ? mutationEvent.relatedMutationEvent!.oldRecord!.id : currentRecord.id]
+                })
 
-            const newRelatedEntityRecord = relationRecord[this.isSource ? 'target' : 'source']
+
+            const relationRecord = await this.controller.system.storage.findOne(this.relation.name, relationMatch, undefined, this.relationAttributeQuery)
 
             const oldItemMatch = !!await this.state!.isItemMatch.get(relationRecord)
-            const newItemMatch = !!this.callback.call(this.controller, newRelatedEntityRecord) 
+            const newItemMatch = !!this.callback.call(this.controller, relationRecord) 
             if (oldItemMatch === true && newItemMatch === false) {
                 matchCount = await this.state!.matchCount.set(currentRecord, matchCount - 1)
             } else if (oldItemMatch === false && newItemMatch === true) {
