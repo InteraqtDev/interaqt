@@ -1,9 +1,9 @@
 import { Controller } from "./Controller.js";
-import { DataContext, ComputedDataHandle, PropertyDataContext, EntityDataContext } from "./computedDataHandles/ComputedDataHandle.js";
+import { DataContext, ComputedDataHandle, PropertyDataContext, EntityDataContext, RelationDataContext } from "./computedDataHandles/ComputedDataHandle.js";
 
 import { Entity, Interaction, Klass, KlassInstance, Property, Relation } from "@interaqt/shared";
 import { assert } from "./util.js";
-import { Computation, ComputationClass, DataBasedComputation, DataDep, EventBasedComputation, EventDep, GlobalBoundState, RecordBoundState, RecordsDataDep } from "./computedDataHandles/Computation.js";
+import { Computation, ComputationClass, DataBasedComputation, DataDep, EventBasedComputation, EventDep, GlobalBoundState, RecordBoundState, RecordsDataDep, RelationBoundState } from "./computedDataHandles/Computation.js";
 import { InteractionEventEntity, RecordMutationEvent } from "./System.js";
 import { AttributeQueryData, MatchExp, RecordQueryData } from "@interaqt/storage";
 
@@ -104,13 +104,26 @@ export class Scheduler {
         }
     }
     createStates() {
-        const states: {dataContext: DataContext, state: {[key: string]: RecordBoundState<any>|GlobalBoundState<any>}}[] = []
+        const states: {dataContext: DataContext, state: {[key: string]: RecordBoundState<any>|GlobalBoundState<any>|RelationBoundState<any>}}[] = []
         for(const computation of this.computations) {
             const computationHandle = computation as Computation
             if (computationHandle.createState) {
                 const state = computationHandle.createState()
                 states.push({dataContext: computationHandle.dataContext, state})
                 computationHandle.state = state
+
+
+                for(let stateItem of Object.values(state)) {
+                    stateItem.controller = this.controller
+                    stateItem.controller = this.controller
+                    if (stateItem instanceof RecordBoundState) {
+                        if (computationHandle.dataContext.type === 'property') {
+                            stateItem.record = (computationHandle.dataContext as PropertyDataContext)!.host.name!
+                        } else {
+                            stateItem.record = (computationHandle.dataContext as EntityDataContext)!.id.name!
+                        }
+                    }
+                }
             }   
         }
         return states
@@ -152,15 +165,7 @@ export class Scheduler {
                             await this.controller.system.storage.set('state', state.key , state.defaultValue)
                         }
 
-                    } else if (state instanceof RecordBoundState) {
-                        // TODO 这里的初始化在 monosystem 里面做了。理论上上面的 GlobalBoundState 也应该丢到里面去。
-                        state.controller = this.controller
-                        if (computationHandle.dataContext.type === 'property') {
-                            state.record = (computationHandle.dataContext as PropertyDataContext)!.host.name!
-                        } else {
-                            state.record = (computationHandle.dataContext as EntityDataContext)!.id.name!
-                        }
-                    }
+                    } 
                 }
             }
         }

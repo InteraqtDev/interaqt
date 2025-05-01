@@ -367,7 +367,7 @@ export function createData() {
         callback: (relation) => {
             return {
                 weight: 1,
-                value: relation.result === 'pending' ? 0 : 1
+                value: relation.result === 'pending' ? 0 : 1,
             }
         }
     })

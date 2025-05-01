@@ -195,6 +195,21 @@ describe('Every and Any computed handle', () => {
     const user4 = await system.storage.findOne('User', BoolExp.atom({key: 'id', value: ['=', user.id]}), undefined, ['*'])
     expect(user4.anyRequestHandled).toBeFalsy()
 
+
+    // 更新 request 为 true
+    await system.storage.update('Request', BoolExp.atom({key: 'id', value: ['=', request1.id]}), {handled: true})
+    // 重新获取用户数据，查看 anyRequestHandled 的值
+    const user5 = await system.storage.findOne('User', BoolExp.atom({key: 'id', value: ['=', user.id]}), undefined, ['*'])
+    expect(user5.anyRequestHandled).toBeTruthy()
+
+    // 删除 request
+    await system.storage.delete('Request', BoolExp.atom({key: 'id', value: ['=', request1.id]}))
+
+    // 重新获取用户数据，查看 anyRequestHandled 的值
+    const user6 = await system.storage.findOne('User', BoolExp.atom({key: 'id', value: ['=', user.id]}), undefined, ['*'])
+    expect(user6.anyRequestHandled).toBeFalsy()
+
+    
   });
 
   test('should be true when every request of a user is handled', async () => {
@@ -267,11 +282,19 @@ describe('Every and Any computed handle', () => {
     const user4 = await system.storage.findOne('User', BoolExp.atom({key: 'id', value: ['=', user.id]}), undefined, ['*'])
     expect(user4.everyRequestHandled).toBeTruthy()   
 
-    // 更新 request2 的 handled 属性
+    // 更新 request2 的 handled 属性为 false
     await system.storage.update('Request', BoolExp.atom({key: 'id', value: ['=', request2.id]}), {handled: false})
 
     // 重新获取用户数据，查看 everyRequestHandled 的值
     const user5 = await system.storage.findOne('User', BoolExp.atom({key: 'id', value: ['=', user.id]}), undefined, ['*'])
     expect(user5.everyRequestHandled).toBeFalsy()
+
+    // 删除 request2
+    await system.storage.delete('Request', BoolExp.atom({key: 'id', value: ['=', request2.id]}))
+
+    // 重新获取用户数据，查看 everyRequestHandled 的值
+    const user6 = await system.storage.findOne('User', BoolExp.atom({key: 'id', value: ['=', user.id]}), undefined, ['*'])
+    expect(user6.everyRequestHandled).toBeTruthy()
+    
   });
 }); 

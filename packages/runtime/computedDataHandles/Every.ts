@@ -1,10 +1,10 @@
 import { ComputedDataHandle, PropertyDataContext } from "./ComputedDataHandle.js";
 import { Every, KlassInstance, Property, Relation } from "@interaqt/shared";
-import { DataBasedComputation, DataDep, GlobalBoundState, RecordBoundState } from "./Computation.js";
+import { DataBasedComputation, DataDep, GlobalBoundState, RecordBoundState, RelationBoundState } from "./Computation.js";
 import { Controller } from "../Controller.js";
 import { DataContext } from "./ComputedDataHandle.js";
 import { EtityMutationEvent } from "../Scheduler.js";
-import { MatchExp } from "@interaqt/storage";
+import { AttributeQuery, MatchExp } from "@interaqt/storage";
 export class GlobalEveryHandle implements DataBasedComputation {
     callback: (this: Controller, item: any) => boolean
     state!: ReturnType<typeof this.createState>
@@ -81,12 +81,15 @@ export class PropertyEveryHandle implements DataBasedComputation {
     useLastValue: boolean = true
     dataDeps: {[key: string]: DataDep} = {}
     relationAttr: string
+    relation: KlassInstance<typeof Relation>
     relatedRecordName: string
     isSource: boolean
     constructor(public controller: Controller,  public args: KlassInstance<typeof Every>,  public dataContext: PropertyDataContext ) {
         this.callback = args.callback.bind(this)
 
         const relation = args.record as KlassInstance<typeof Relation>
+        this.relation = relation
+        // FIXME 应该用参数来指定，因为可能 relation 
         this.relationAttr = relation.source.name === dataContext.host.name ? relation.sourceProperty : relation.targetProperty
         this.isSource = relation.source.name === dataContext.host.name
         this.relatedRecordName = this.isSource ? relation.target.name : relation.source.name
@@ -103,6 +106,7 @@ export class PropertyEveryHandle implements DataBasedComputation {
         return {
             matchCount: new RecordBoundState<number>(0),
             totalCount: new RecordBoundState<number>(0),
+            isItemMatch: new RelationBoundState<boolean>(false, this.relation.name)
         }
     }
     
@@ -112,7 +116,16 @@ export class PropertyEveryHandle implements DataBasedComputation {
 
     async compute({_current}: {_current: any}): Promise<boolean> {
         const totalCount = await this.state.totalCount.set(_current,_current[this.relationAttr].length)
-        const matchCount = await this.state.matchCount.set(_current, _current[this.relationAttr].filter(this.callback).length)
+        let matchCount = 0
+        for(const item of _current[this.relationAttr]) {
+            if (this.callback.call(this.controller, item)) {
+                matchCount++
+                // CAUTION 这里是记录在关系上，而不是在关联实体上
+                // FIXME 这里能获取到关系记录吗？
+                await this.state!.isItemMatch.set(item['&'], true)
+            }
+        }
+
         return matchCount === totalCount
     }
 
@@ -122,29 +135,27 @@ export class PropertyEveryHandle implements DataBasedComputation {
         let totalCount = await this.state!.totalCount.get(mutationEvent.record)
         const relatedMutationEvent = mutationEvent.relatedMutationEvent!
 
+        // property 类型收到的事件都是 update，需要通过 relatedMutationEvent 来判断到底是关系的新增和删除还是关联实体的更新 。
+
         if (relatedMutationEvent.type === 'create') {
             // 关联关系的新建
-            // TODO 有没有可能关联实体也被删除了！！！！，所以查不到了！！！！是有可能的，所以只能软删除？
+            const relationRecord = relatedMutationEvent.record!
             const newItem = await this.controller.system.storage.findOne(this.relatedRecordName, MatchExp.atom({
                 key: 'id',
-                value: ['=', relatedMutationEvent.record![this.isSource ? 'target' : 'source']!.id]
+                value: ['=', relationRecord[this.isSource ? 'target' : 'source']!.id]
             }), undefined, ['*'])
 
             const newItemMatch = !!this.callback.call(this.controller, newItem) 
             if (newItemMatch === true) {
                 matchCount = await this.state!.matchCount.set(mutationEvent.record, matchCount + 1)
+                await this.state!.isItemMatch.set(relationRecord, true)
             }
 
             totalCount = await this.state!.totalCount.set(mutationEvent.record, totalCount + 1)
         } else if (relatedMutationEvent.type === 'delete') {
             // 关联关系的删除
-            // TODO 有没有可能关联实体也被删除了！！！！，所以查不到了！！！！是有可能的，所以只能软删除？
-            const oldItem = await this.controller.system.storage.findOne(this.relatedRecordName, MatchExp.atom({
-                key: 'id',
-                value: ['=', relatedMutationEvent.oldRecord![this.isSource ? 'target' : 'source']!.id]
-            }), undefined, ['*'])
-
-            const oldItemMatch = !!this.callback.call(this.controller, oldItem) 
+            const relationRecord = relatedMutationEvent.record!
+            const oldItemMatch = !!await this.state!.isItemMatch.get(relationRecord)
             if (oldItemMatch === true) {
                 matchCount = await this.state!.matchCount.set(mutationEvent.record, matchCount - 1)
             }
@@ -152,15 +163,29 @@ export class PropertyEveryHandle implements DataBasedComputation {
             totalCount = await this.state!.totalCount.set(mutationEvent.record, totalCount - 1)
         } else if (relatedMutationEvent.type === 'update') {
             // 关联实体的更新
-            const oldItemMatch = !!this.callback.call(this.controller, relatedMutationEvent.oldRecord) 
-            const newItemMatch = !!this.callback.call(this.controller, relatedMutationEvent.record) 
-            if (oldItemMatch === true && newItemMatch === false) {
-                matchCount = await this.state!.matchCount.set(mutationEvent.record, matchCount - 1)
-            } else if (oldItemMatch === false && newItemMatch === true) {
-                matchCount = await this.state!.matchCount.set(mutationEvent.record, matchCount + 1)
-            }
+            const currentRecord = mutationEvent.oldRecord!
+            const relatedEntityRecord = relatedMutationEvent.oldRecord!
 
-            totalCount = await this.state!.totalCount.set(mutationEvent.record, totalCount)
+            const relationRecord = await this.controller.system.storage.findOne(this.relation.name, MatchExp.atom({
+                key: 'source.id',
+                value: ['=', this.isSource ?  currentRecord.id: relatedEntityRecord.id]
+            }).and({
+                key: 'target.id',
+                value: ['=', this.isSource ? relatedEntityRecord.id : currentRecord.id]
+            }), undefined, ['*', [this.isSource ? 'target' : 'source', {attributeQuery: ['*']}]])
+
+            const newRelatedEntityRecord = relationRecord[this.isSource ? 'target' : 'source']
+
+            const oldItemMatch = !!await this.state!.isItemMatch.get(relationRecord)
+            const newItemMatch = !!this.callback.call(this.controller, newRelatedEntityRecord) 
+            if (oldItemMatch === true && newItemMatch === false) {
+                matchCount = await this.state!.matchCount.set(currentRecord, matchCount - 1)
+            } else if (oldItemMatch === false && newItemMatch === true) {
+                matchCount = await this.state!.matchCount.set(currentRecord, matchCount + 1)
+            }
+            await this.state!.isItemMatch.set(relationRecord, newItemMatch)
+          
+            totalCount = await this.state!.totalCount.set(currentRecord, totalCount)
         }
 
         return matchCount === totalCount
