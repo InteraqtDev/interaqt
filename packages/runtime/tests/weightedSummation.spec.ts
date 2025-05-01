@@ -128,11 +128,11 @@ describe('WeightedSummation computed handle', () => {
         type: 'number',
         computedData: WeightedSummation.create({
           record: purchaseRelation,
-          attributeQuery: ['quantity', 'price'],
-          callback: (product: any) => {
+          attributeQuery: [['target', {attributeQuery: ['quantity', 'price']}]],
+          callback: (relation: any) => {
             return {
-              weight: product.quantity || 0,
-              value: product.price || 0
+              weight: relation.target.quantity || 0,
+              value: relation.target.price || 0
             };
           }
         })

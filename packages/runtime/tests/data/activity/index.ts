@@ -363,11 +363,11 @@ export function createData() {
     // 计算 unhandled request 的总数
      const userTotalUnhandledRequest = WeightedSummation.create({
         record: receivedRequestRelation,
-        attributeQuery: ['result'],
+        attributeQuery: [['source', {attributeQuery: ['result']}]],
         callback: (relation) => {
             return {
                 weight: 1,
-                value: relation.result === 'pending' ? 0 : 1,
+                value: relation.source.result === 'pending' ? 0 : 1,
             }
         }
     })

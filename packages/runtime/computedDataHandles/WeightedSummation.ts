@@ -1,10 +1,10 @@
 import { ComputedDataHandle, DataContext, PropertyDataContext } from "./ComputedDataHandle.js";
 import { WeightedSummation, KlassInstance, Relation, Entity } from "@interaqt/shared";
 import { Controller } from "../Controller.js";
-import { DataDep, GlobalBoundState, RecordBoundState } from "./Computation.js";
+import { DataDep, GlobalBoundState, RecordBoundState, RelationBoundState } from "./Computation.js";
 import { DataBasedComputation } from "./Computation.js";
 import { EtityMutationEvent } from "../Scheduler.js";
-import { MatchExp } from "@interaqt/storage";
+import { AttributeQueryData, MatchExp } from "@interaqt/storage";
 
 export class GlobalWeightedSummationHandle implements DataBasedComputation {
     matchRecordToWeight: (this: Controller, item: any) => { weight: number; value: number }
@@ -80,6 +80,7 @@ export class PropertyWeightedSummationHandle implements DataBasedComputation {
     relatedRecordName: string
     isSource: boolean
     relation: KlassInstance<typeof Relation>
+    relationAttributeQuery: AttributeQueryData
 
     constructor(public controller: Controller, public args: KlassInstance<typeof WeightedSummation>, public dataContext: PropertyDataContext) {
         this.matchRecordToWeight = args.callback.bind(this)
@@ -89,18 +90,20 @@ export class PropertyWeightedSummationHandle implements DataBasedComputation {
         this.relationAttr = this.relation.source.name === dataContext.host.name ? this.relation.sourceProperty : this.relation.targetProperty
         this.isSource = this.relation.source.name === dataContext.host.name
         this.relatedRecordName = this.isSource ? this.relation.target.name : this.relation.source.name
+        this.relationAttributeQuery = args.attributeQuery || []
         
         this.dataDeps = {
             _current: {
                 type: 'property',
-                attributeQuery: [[this.relationAttr, {attributeQuery: args.attributeQuery}]]
+                attributeQuery: [[this.relationAttr, {attributeQuery: [['&', {attributeQuery: this.relationAttributeQuery}]]}]]
             }
         }
     }
 
     createState() {
         return {
-            summation: new RecordBoundState<number>(0)
+            summation: new RecordBoundState<number>(0),
+            itemResult: new RelationBoundState<number>(0, this.relation.name)
         }   
     }
     
@@ -109,11 +112,15 @@ export class PropertyWeightedSummationHandle implements DataBasedComputation {
     }
 
     async compute({_current}: {_current: any}): Promise<number> {
+        // FIXME 没有验证过
         let summation = 0;
         
         for (const record of _current[this.relationAttr]) {
-            const result = this.matchRecordToWeight.call(this.controller, record);
-            summation += result.weight * result.value;
+            const relationRecord = record['&']
+            const valueAndWeight = this.matchRecordToWeight.call(this.controller, relationRecord);
+            const result = valueAndWeight.weight * valueAndWeight.value;
+            await this.state.itemResult.set(relationRecord, result);
+            summation += result;
         }
         
         await this.state.summation.set(_current, summation);
@@ -122,41 +129,48 @@ export class PropertyWeightedSummationHandle implements DataBasedComputation {
 
     async incrementalCompute(lastValue: number, mutationEvent: EtityMutationEvent): Promise<number> {
         // FIXME 应该用 RelationBoundState 记录
-
-        
         let summation = await this.state!.summation.get(mutationEvent.record);
         const relatedMutationEvent = mutationEvent.relatedMutationEvent!;
 
         if (relatedMutationEvent.type === 'create') {
             // 关联关系的新建
-            const newItem = await this.controller.system.storage.findOne(this.relatedRecordName, MatchExp.atom({
+            const newRelationRecord = await this.controller.system.storage.findOne(this.relation.name, MatchExp.atom({
                 key: 'id',
-                value: ['=', relatedMutationEvent.record![this.isSource ? 'target' : 'source']!.id]
-            }), undefined, ['*']);
+                value: ['=', relatedMutationEvent.record!.id]
+            }), undefined, this.relationAttributeQuery);
 
-            const result = this.matchRecordToWeight.call(this.controller, newItem);
-            summation = await this.state!.summation.set(mutationEvent.record, summation + (result.weight * result.value));
+            const valueAndWeight = this.matchRecordToWeight.call(this.controller, newRelationRecord);
+            const result = valueAndWeight.weight * valueAndWeight.value;
+            await this.state!.itemResult.set(newRelationRecord, result);
+            summation = await this.state!.summation.set(mutationEvent.record, summation + result);
         } else if (relatedMutationEvent.type === 'delete') {
             // 关联关系的删除
-            const oldItem = await this.controller.system.storage.findOne(this.relatedRecordName, MatchExp.atom({
-                key: 'id',
-                value: ['=', relatedMutationEvent.record![this.isSource ? 'target' : 'source']!.id]
-            }), undefined, ['*']);
-
-            const result = this.matchRecordToWeight.call(this.controller, oldItem);
-            summation = await this.state!.summation.set(mutationEvent.record, summation - (result.weight * result.value));
+            const oldResult = await this.state!.itemResult.get(relatedMutationEvent.record);
+            summation = await this.state!.summation.set(mutationEvent.record, summation - oldResult);
 
         } else if (relatedMutationEvent.type === 'update') {
-            const oldRecord = relatedMutationEvent.oldRecord
-            const newRecord = { ...relatedMutationEvent.oldRecord, ...relatedMutationEvent.record}
-            // 关联实体的更新
-            const oldResult = this.matchRecordToWeight.call(this.controller, oldRecord);
-            const newResult = this.matchRecordToWeight.call(this.controller, newRecord);
-            
-            const oldValue = oldResult.weight * oldResult.value;
-            const newValue = newResult.weight * newResult.value;
-            
-            summation = await this.state!.summation.set(mutationEvent.record, summation - oldValue + newValue);
+
+            const relationMatch = relatedMutationEvent?.recordName === this.relation.name ? 
+                MatchExp.atom({
+                    key: 'id',
+                    value: ['=', relatedMutationEvent!.oldRecord!.id]
+                }) : 
+                MatchExp.atom({
+                    key: 'source.id',
+                    value: ['=', this.isSource ? mutationEvent.oldRecord!.id : relatedMutationEvent.oldRecord!.id]
+                }).and({
+                    key: 'target.id',
+                    value: ['=', this.isSource ? relatedMutationEvent.oldRecord!.id : mutationEvent.oldRecord!.id]
+                })  
+
+
+            const newRelationRecord = await this.controller.system.storage.findOne(this.relation.name, relationMatch, undefined, this.relationAttributeQuery);
+
+            const oldResult = await this.state!.itemResult.get(relatedMutationEvent.oldRecord);
+            const newValueAndWeight = this.matchRecordToWeight.call(this.controller, newRelationRecord);
+            const newResult = newValueAndWeight.weight * newValueAndWeight.value;
+                
+            summation = await this.state!.summation.set(mutationEvent.record, summation - oldResult + newResult);
         }
 
         return summation;
