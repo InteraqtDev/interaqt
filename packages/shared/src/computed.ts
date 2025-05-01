@@ -153,37 +153,6 @@ export const Count = createClass({
 Dictionary.public.computedData.type.push(WeightedSummation, Count)
 
 
-// every
-export const RelationBasedEvery = createClass({
-    name: 'RelationBasedEvery',
-    public: {
-        relation: {
-            type: Relation,
-            collection: false,
-            required: true
-        },
-        // 因为 relation 可能 source/target 实体相同，所以还有增加方向信息
-        relationDirection: {
-            type: 'string',
-            collection: false,
-            required: true,
-            defaultValue: () => 'source'
-        },
-        // 创建初始值的时候用于计算哪些 relation 是要  count 的
-        // 这里 match 的是 relatedEntity
-        match: {
-            type: 'function',
-            collection: false,
-            required: true
-        },
-        notEmpty: {
-            type: 'boolean',
-            collection: false,
-            required: false
-        }
-    }
-})
-
 
 export const Every = createClass({
     name: 'Every',
@@ -197,7 +166,6 @@ export const Every = createClass({
             type: 'string',
             collection: false,
             required: false,
-            defaultValue: () => 'source'
         },
         callback: {
             type: 'function',
@@ -229,7 +197,6 @@ export const Any = createClass({
             type: 'string',
             collection: false,
             required: false,
-            defaultValue: () => 'source'
         },
         callback: {
             type: 'function',
