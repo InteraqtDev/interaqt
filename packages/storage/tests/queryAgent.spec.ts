@@ -1,11 +1,11 @@
 import {describe, expect, test} from "vitest";
-import {RecordQueryAgent} from "../erstorage/RecordQueryAgent.js";
-import {SQLiteDB} from '../../runtime/SQLite'
-import {EntityToTableMap} from "../erstorage/EntityToTableMap.js";
+import {RecordQueryAgent} from "../src/erstorage/RecordQueryAgent.js";
+import {SQLiteDB} from '../../runtime/src/SQLite'
+import {EntityToTableMap} from "../src/erstorage/EntityToTableMap.js";
 import {entityToTableMapData} from "./data/mapData";
-import {MatchExp, MatchExpressionData} from "../erstorage/MatchExp.js";
-import {AttributeQuery, AttributeQueryData} from "../erstorage/AttributeQuery.js";
-import {RecordQuery, RecordQueryData} from "../erstorage/RecordQuery.js";
+import {MatchExp, MatchExpressionData} from "../src/erstorage/MatchExp.js";
+import {AttributeQuery, AttributeQueryData} from "../src/erstorage/AttributeQuery.js";
+import {RecordQuery, RecordQueryData} from "../src/erstorage/RecordQuery.js";
 
 
 const database = new SQLiteDB()

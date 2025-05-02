@@ -22,8 +22,6 @@
     "rootDir": "."
   },
   "include": [
-    "./erstorage",
-    "./index.ts",
-    "./utils.ts"
+    "./src/**/*"
   ]
 }

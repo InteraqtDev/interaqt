@@ -1,4 +1,6 @@
-import {Entity, Property, Relation} from "../types/index.js";
+// import {Entity, Property, Relation} from "../types/index.js";
+import {Entity, KlassInstance, Property, Relation} from '@interaqt/shared'
+import {KlassByName} from '@interaqt/shared'
 import {LinkMapItem, MapData, RecordAttribute, RecordMapItem, ValueAttribute} from "./EntityToTableMap.js";
 import {assert} from "../utils.js";
 import {Database, ID_ATTR, ROW_ID_ATTR} from "./EntityQueryHandle.js";
@@ -33,8 +35,8 @@ export class DBSetup {
     public tables:TableData = {}
     public map: MapData = { links: {}, records: {}}
     constructor(
-        public entities: Entity[],
-        public relations: Relation[],
+        public entities: KlassInstance<typeof Entity>[],
+        public relations: KlassInstance<typeof Relation>[],
         public database?: Database,
         public mergeLinks: MergeLinks = []
     ) {
@@ -110,16 +112,16 @@ export class DBSetup {
     }
 
 
-    createRecord(entity: Entity | Relation, isRelation? :boolean) {
+    createRecord(entity: KlassInstance<typeof Entity> | KlassInstance<typeof Relation>, isRelation? :boolean) {
         const entityWithProps = entity
-        const attributes: {[k:string]: Omit<ValueAttribute, 'field'>} = Object.fromEntries(entityWithProps.properties.map((property:Property) => {
+        const attributes: {[k:string]: Omit<ValueAttribute, 'field'>} = Object.fromEntries(entityWithProps.properties.map((property:KlassInstance<typeof Property>) => {
             const prop = property
             return [
                 prop.name,
                 {
                     type: prop.type,
                     computed: prop.computed,
-                    collection: prop.isCollection,
+                    collection: prop.collection,
                     defaultValue: prop.defaultValue
                 }
             ];
@@ -140,7 +142,7 @@ export class DBSetup {
             isRelation,
         } as RecordMapItem
     }
-    createLink(relationName: string, relation: Relation) {
+    createLink(relationName: string, relation: KlassInstance<typeof Relation>) {
         const relationWithProps = relation
         if (!relationWithProps.type) debugger
         return {
@@ -154,17 +156,17 @@ export class DBSetup {
             isTargetReliance: relationWithProps.isTargetReliance
         } as LinkMapItem
     }
-    getRecordName(rawRecord: Entity | Relation): string {
+    getRecordName(rawRecord: KlassInstance<typeof Entity> | KlassInstance<typeof Relation>): string {
         if (isRelation(rawRecord)) {
-            const record = rawRecord as Relation
+            const record = rawRecord as KlassInstance<typeof Relation>
             return `${record.source.name}_${record.sourceProperty}_${record.targetProperty}_${record.target.name}`
         } else {
-            const record = rawRecord as Entity
+            const record = rawRecord as KlassInstance<typeof Entity>
             return record.name
         }
     }
     //虚拟 link
-    createLinkOfRelationAndEntity(relationEntityName: string, relationName: string, relation: Relation, isSource: boolean) {
+    createLinkOfRelationAndEntity(relationEntityName: string, relationName: string, relation: KlassInstance<typeof Relation>, isSource: boolean) {
         const relationWithProps = relation 
         const [sourceRelType, targetRelType] = relationWithProps.type.split(':');
         return {

@@ -1,8 +1,8 @@
 import {describe, expect, test} from "vitest";
-import {EntityToTableMap} from "../erstorage/EntityToTableMap.js";
+import {EntityToTableMap} from "../src/erstorage/EntityToTableMap.js";
 import {entityToTableMapData} from './data/mapData'
-import {AttributeQuery, AttributeQueryData} from "../erstorage/AttributeQuery.js";
-import {RecordQueryTree} from "../erstorage/RecordQuery.js";
+import {AttributeQuery, AttributeQueryData} from "../src/erstorage/AttributeQuery.js";
+import {RecordQueryTree} from "../src/erstorage/RecordQuery.js";
 
 
 const entityToTableMap = new EntityToTableMap(entityToTableMapData)

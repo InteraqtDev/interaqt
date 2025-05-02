@@ -18,8 +18,7 @@
     "types": ["node"]
   },
   "include": [
-    "./erstorage",
-    "./",
-    "./test"
+    "./src/**/*",
+    "./tests"
   ]
 }

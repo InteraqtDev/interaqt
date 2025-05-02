@@ -1,9 +1,9 @@
 import {expect, test, describe, afterEach, beforeAll, beforeEach} from "vitest";
 import { createCommonData} from "./data/common";
-import {DBSetup} from "../erstorage/Setup.js";
-import { SQLiteDB } from '../../runtime/SQLite'
-import {EntityToTableMap} from "../erstorage/EntityToTableMap.js";
-import {EntityQueryHandle} from "../erstorage/EntityQueryHandle.js";
+import {DBSetup} from "../src/erstorage/Setup.js";
+import { SQLiteDB } from '../../runtime/src/SQLite'
+import {EntityToTableMap} from "../src/erstorage/EntityToTableMap.js";
+import {EntityQueryHandle} from "../src/erstorage/EntityQueryHandle.js";
 import TestLogger from "./testLogger.js";
 
 

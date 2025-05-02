@@ -1,13 +1,12 @@
-import {afterEach, beforeEach, describe, expect, test} from "vitest";
-import {DBSetup} from "../erstorage/Setup.js";
+import { afterEach, beforeEach, describe, expect, test } from "vitest";
+import { DBSetup } from "../src/erstorage/Setup.js";
 // @ts-ignore
-import {SQLiteDB} from '../../runtime/SQLite.js'
-import {EntityToTableMap} from "../erstorage/EntityToTableMap.js";
-import {MatchExp} from "../erstorage/MatchExp.js";
-import {EntityQueryHandle} from "../erstorage/EntityQueryHandle.js";
+import { SQLiteDB } from '../../runtime/src/SQLite.js';
+import { EntityToTableMap } from "../src/erstorage/EntityToTableMap.js";
+import { MatchExp } from "../src/erstorage/MatchExp.js";
+import { EntityQueryHandle } from "../src/erstorage/EntityQueryHandle.js";
 import TestLogger from "./testLogger.js";
-import { Entity, Property } from "../types/entity.js";
-
+import { Entity, KlassInstance, Property } from '@interaqt/shared';
 describe('json field test', () => {
     let db: SQLiteDB
     let setup
@@ -15,25 +14,25 @@ describe('json field test', () => {
     let logger
 
     beforeEach(async () => {
-        const userEntity: Entity = {
+        const userEntity: KlassInstance<typeof Entity> = Entity.create({
             name: 'User',
             properties: [
-                {
+                Property.create({
                     name: 'name',
                     type: 'string',
-                },
-                {
+                }),
+                Property.create({
                     name: 'roles',
                     type: 'string',
-                    isCollection: true
-                },
-                {
+                    collection: true
+                }),
+                Property.create({
                     name: 'scores',
                     type: 'number',
-                    isCollection: true
-                }
+                    collection: true
+                })
             ]
-        }
+        })
         logger = new TestLogger('', true)
         // @ts-ignore
         db = new SQLiteDB(':memory:', {logger})
