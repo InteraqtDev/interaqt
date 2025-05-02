@@ -6,7 +6,7 @@ import {
     StateTransfer,
     StateMachine,
     Dictionary
-} from 'src/runtime';
+} from '@';
 
 
 export function createData() {

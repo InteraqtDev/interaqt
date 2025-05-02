@@ -8,7 +8,7 @@ import {
   Property,
   Relation,
   Transform
-} from 'src/runtime';
+} from '@';
 
 describe('Transform computed handle', () => {
   

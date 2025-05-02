@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, test } from "vitest";
-import { Controller, MonoSystem } from 'src/runtime/index.js';
 import {
+    Controller, MonoSystem,
     BoolExp, Interaction,
     KlassByName, SQLiteDB, AttributeError
-} from 'src/runtime/index.js';
+} from '@';
 import { createData } from './data/leaveRequest.js';
 
 // 里面有所有必须的数据？

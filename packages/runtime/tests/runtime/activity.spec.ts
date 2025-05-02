@@ -3,7 +3,7 @@ import {
     KlassByName, Controller, EntityIdRef, RecordMutationEvent,
     ActivityCall, ActivityGroupNode,
     MonoSystem
-} from 'src/runtime/index.js';
+} from '@';
 import { createData } from './data/activity/index.js';
 
 describe("activity state", () => {

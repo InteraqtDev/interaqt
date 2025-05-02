@@ -5,29 +5,8 @@ import {AttributeQueryData} from "./AttributeQuery.js";
 import {assert} from "../utils.js";
 import {RecordQuery} from "./RecordQuery.js";
 import {NewRecordData, RawEntityData} from "./NewRecordData.js";
-import {MutationEvent, RecordQueryAgent} from "./RecordQueryAgent.js";
-
-
-export const ROW_ID_ATTR = '_rowId'
-export const ID_ATTR = 'id'
-
-export type EntityIdRef = {
-    id: string,
-    [ROW_ID_ATTR]? : string,
-    [k:string]: any
-}
-
-export type Database = {
-    scheme: (sql:string, name?:string) => Promise<any>
-    query: <T extends any>(sql: string,values: any[], name?:string) => Promise<T[]>
-    delete: <T extends any>(sql: string, where: any[],name?:string) => Promise<T[]>
-    insert: (sql: string, values: any[], name?:string) => Promise<EntityIdRef>
-    update: (sql: string, values: any[], idField?: string, name?:string) => Promise<EntityIdRef[]>
-    getAutoId: (recordName: string) => Promise<string>
-    parseMatchExpression?: (key: string, value: [string, any], fieldName: string, fieldType: string, isReferenceValue: boolean, getReferenceFieldValue:(v: string) => string, genPlaceholder: (name?: string) => string) => any
-    getPlaceholder?: () => (name?:string) => string,
-    mapToDBFieldType: (type: string, collection?: boolean) => string
-}
+import {RecordQueryAgent} from "./RecordQueryAgent.js";
+import {EntityIdRef, Database, MutationEvent} from "@runtime";
 
 export class EntityQueryHandle {
     agent: RecordQueryAgent

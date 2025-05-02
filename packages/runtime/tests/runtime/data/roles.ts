@@ -1,4 +1,4 @@
-import {createUserRoleAttributive, Attributive} from 'src/runtime';
+import {createUserRoleAttributive, Attributive} from '@';
 
 export const NewAttr = Attributive.create({
     name: 'New',

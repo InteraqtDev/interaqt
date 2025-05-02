@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { Controller, MonoSystem, Property, Entity, Every, Dictionary, BoolExp, Any, Relation } from 'src/runtime';
+import { Controller, MonoSystem, Property, Entity, Every, Dictionary, BoolExp, Any, Relation } from '@';
 
 // 创建简单测试环境，直接测试 EveryHandle 的具体方法
 describe('Every and Any computed handle', () => {

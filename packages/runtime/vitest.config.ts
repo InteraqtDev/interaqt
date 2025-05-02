@@ -16,8 +16,6 @@ export default defineConfig({
             '@runtime': path.resolve(__dirname, './src/runtime/index.ts'),
             '@shared': path.resolve(__dirname, './src/shared/index.ts'),
             '@storage': path.resolve(__dirname, './src/storage/index.ts'),
-            '@interaqt/shared': path.resolve(__dirname, './src/shared/index.ts'),
-            '@interaqt/storage': path.resolve(__dirname, './src/storage/index.ts'),
             '@': path.resolve(__dirname, './src'),
         }
     }

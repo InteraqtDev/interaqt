@@ -18,7 +18,7 @@ import {
     StateNode,
     StateTransfer, Transform,
     USER_ENTITY
-} from 'src/runtime';
+} from '@';
 import { OtherAttr } from "./roles";
 
 export function createData() {

@@ -9,7 +9,7 @@ import {
     StateNode,
     StateTransfer,
     StateMachine
-} from 'src/runtime';
+} from '@';
 
 
 export function createData() {

@@ -2,7 +2,7 @@ import {BoolExp} from "@shared";
 import {EntityToTableMap} from "./EntityToTableMap.js";
 import {assert} from "../utils.js";
 import {RecordQueryTree} from "./RecordQuery.js";
-import {Database} from "./EntityQueryHandle.js";
+import {Database} from "@runtime";
 import {PlaceholderGen} from "./RecordQueryAgent.js";
 
 export type MatchAtom = { key: string, value: [string, any], isReferenceValue?: boolean }

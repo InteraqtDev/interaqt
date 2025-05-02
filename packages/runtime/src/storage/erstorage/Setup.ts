@@ -1,10 +1,8 @@
-// import {Entity, Property, Relation} from "../types/index.js";
-import {Entity, KlassInstance, Property, Relation} from '@shared'
-import {KlassByName} from '@shared'
-import {LinkMapItem, MapData, RecordAttribute, RecordMapItem, ValueAttribute} from "./EntityToTableMap.js";
-import {assert} from "../utils.js";
-import {Database, ID_ATTR, ROW_ID_ATTR} from "./EntityQueryHandle.js";
+import { Entity, KlassInstance, Property, Relation } from '@shared';
+import { LinkMapItem, MapData, RecordAttribute, RecordMapItem, ValueAttribute } from "./EntityToTableMap.js";
+import { assert } from "../utils.js";
 import { isRelation } from "./util.js";
+import { ID_ATTR, ROW_ID_ATTR,Database } from "@runtime";
 
 // Define the types we need
 

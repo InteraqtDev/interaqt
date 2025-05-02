@@ -15,12 +15,33 @@ import {
     Klass,
     KlassInstance, DataAttributives, DataAttributive, Computation,
 } from "@shared";
-import {RecordMutationEvent, System} from "./System.js";
-import {EventUser, InteractionEvent, InteractionEventArgs} from "./types/interaction.js";
-import {assert, everyWithErrorAsync} from "./util.js";
-import {ActivityCall} from "./ActivityCall.js";
-import {someAsync} from "@storage";
-import {Controller, InteractionContext, USER_ENTITY} from "./Controller.js";
+import { RecordMutationEvent, System } from "./System.js";
+import { assert, everyWithErrorAsync } from "./util.js";
+import { ActivityCall } from "./ActivityCall.js";
+import { someAsync } from "./util.js";
+import { Controller, InteractionContext } from "./Controller.js";
+
+
+export type InteractionEvent  = {
+    interactionName: string,
+    interactionId: string,
+    user: EventUser,
+    query: any,
+    payload: any,
+    activityId?: string,
+}
+
+export type InteractionEventArgs = {
+    user: EventUser,
+    query: any,
+    payload: any,
+    activityId?: string,
+}
+
+export type EventUser = {
+    id: string,
+}
+
 
 type ConceptCheckStack = {
     type: string,

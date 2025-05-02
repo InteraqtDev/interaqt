@@ -1,22 +1,14 @@
+import {EntityIdRef,Database, MutationEvent} from "@runtime";
 import {BoolExp} from "@shared";
 import {EntityToTableMap} from "./EntityToTableMap.js";
 import {assert, setByPath} from "../utils.js";
-import {Database, EntityIdRef} from './EntityQueryHandle.js'
+import {} from './EntityQueryHandle.js'
 import {FieldMatchAtom, MatchAtom, MatchExp, MatchExpressionData} from "./MatchExp.js";
 import {AttributeQuery, AttributeQueryData, AttributeQueryDataRecordItem} from "./AttributeQuery.js";
 import {LINK_SYMBOL, RecordQuery, RecordQueryTree} from "./RecordQuery.js";
 import {NewRecordData, RawEntityData} from "./NewRecordData.js";
 import {Modifier} from "./Modifier.js";
 
-
-export type MutationEvent = {
-    type: "create" | 'update' | 'delete',
-    recordName: string,
-    id?: string,
-    keys?: string[],
-    record?: Record
-    oldRecord?: Record
-}
 
 export type JoinTables = {
     for: any

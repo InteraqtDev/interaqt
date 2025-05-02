@@ -9,7 +9,7 @@ import {
   Property,
   Relation,
   Count
-} from 'src/runtime';
+} from '@';
 
 describe('Count computed handle', () => {
   

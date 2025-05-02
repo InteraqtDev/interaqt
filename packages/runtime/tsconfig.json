@@ -19,7 +19,10 @@
     "types": ["node"],
     "paths": {
         "@": ["src"],
-        "@/SQLite": ["src/runtime/SQLite.ts"]
+        "@/SQLite": ["src/runtime/SQLite.ts"],
+        "@runtime": ["src/runtime/index.ts"],
+        "@shared": ["src/shared/index.ts"],
+        "@storage": ["src/storage/index.ts"]
     }
   },
   "include": [

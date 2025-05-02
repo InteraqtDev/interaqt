@@ -17,9 +17,11 @@ import {
     Any,
     Every,
     WeightedSummation,
-    Transform
-} from '@interaqt/shared';
-import { Controller, InteractionEventArgs, InteractionEventEntity, } from 'src/runtime';
+    Transform,
+    Controller, 
+    InteractionEventArgs, 
+    InteractionEventEntity 
+} from '@';
 
 export const globalUserRole = createUserRoleAttributive({})
 

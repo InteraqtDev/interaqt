@@ -1,12 +1,11 @@
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
-import { DBSetup } from "@interaqt/storage";
-// @ts-ignore
-import { SQLiteDB } from '@/SQLite.js';
-import { EntityToTableMap } from "@interaqt/storage";
-import { MatchExp } from "@interaqt/storage";
-import { EntityQueryHandle } from "@interaqt/storage";
+import { DBSetup } from "@storage";
+import { SQLiteDB } from '@runtime';
+import { EntityToTableMap } from "@storage";
+import { MatchExp } from "@storage";
+import { EntityQueryHandle } from "@storage";
 import TestLogger from "./testLogger.js";
-import { Entity, KlassInstance, Property } from '@interaqt/shared';
+import { Entity, KlassInstance, Property } from '@shared';
 describe('json field test', () => {
     let db: SQLiteDB
     let setup
