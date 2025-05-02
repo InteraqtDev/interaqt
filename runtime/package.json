@@ -28,7 +28,7 @@
     "minor": "node scripts/release.js minor",
     "major": "node scripts/release.js major"
   },
-  "version": "0.0.1",
+  "version": "0.1.0",
   "main": "dist/index.js",
   "files": [
     "dist"
