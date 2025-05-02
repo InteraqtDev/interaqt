@@ -1,6 +1,5 @@
-import {beforeEach, describe, expect, test} from "vitest";
-import {Controller} from "../Controller.js";
-import {MonoSystem} from "../MonoSystem.js";
+import { beforeEach, describe, expect, test } from "vitest";
+import { Controller, MonoSystem } from '@';
 import {
     Activity,
     BoolExp,

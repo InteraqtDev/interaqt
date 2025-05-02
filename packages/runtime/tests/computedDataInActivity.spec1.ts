@@ -1,7 +1,5 @@
 import {beforeEach, describe, expect, test} from "vitest";
-import {Controller} from "../Controller.js";
-import {ActivityCall, ActivityGroupNode} from "../ActivityCall.js";
-import {MonoSystem} from "../MonoSystem.js";
+import {Controller, ActivityCall, ActivityGroupNode, MonoSystem} from "@";
 import {
     Activity,
     createInstances,

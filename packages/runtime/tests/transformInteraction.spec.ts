@@ -1,19 +1,10 @@
-import {beforeEach, describe, expect, test} from "vitest";
-import {Controller} from "../src/Controller.js";
-import {MonoSystem} from "../src/MonoSystem.js";
+import { beforeEach, describe, expect, test } from "vitest";
+import { Controller, MonoSystem } from '@';
 import {
-    Activity,
-    BoolExp,
-    createInstances,
-    Entity,
-    Interaction,
-    KlassByName,
-    Relation,
-    removeAllInstance, SQLiteDB,
-    Dictionary
+    BoolExp, Interaction,
+    KlassByName, SQLiteDB, AttributeError
 } from '@';
-import {AttributeError} from "../src/InteractionCall.js";
-import {createData} from './data/leaveRequest.js'
+import { createData } from './data/leaveRequest.js';
 
 // 里面有所有必须的数据？
 type User = {

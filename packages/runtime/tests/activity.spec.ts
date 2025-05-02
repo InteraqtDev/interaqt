@@ -1,21 +1,9 @@
-import {beforeEach, describe, expect, test} from "vitest";
-import {MonoSystem} from "../src/MonoSystem.js";
+import { beforeEach, describe, expect, test } from "vitest";
 import {
-    Activity,
-    Entity,
-    Relation,
-    Dictionary,
-    createInstances,
-    getInstance,
-    KlassByName,
-    KlassInstance,
-    removeAllInstance,
-    Controller,
-    Interaction, EntityIdRef,
-    RecordMutationSideEffect,
-    RecordMutationEvent
+    KlassByName, Controller, EntityIdRef, RecordMutationEvent,
+    ActivityCall, ActivityGroupNode,
+    MonoSystem
 } from '@';
-import {ActivityCall, ActivityGroupNode} from "../src/ActivityCall.js";
 import { createData } from './data/activity/index.js';
 
 describe("activity state", () => {

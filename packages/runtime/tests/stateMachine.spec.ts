@@ -1,6 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { Controller } from "../src/Controller.js";
-import { MonoSystem } from "../src/MonoSystem.js";
+import { Controller, MonoSystem } from '@';
 import { createData as createPropertyStateMachineData } from "./data/propertyStateMachine.js";
 import { createData as createGlobalStateMachineData } from "./data/globalStateMachine.js";
 import { createData as createRelationStateMachineData } from "./data/relationStateMachine.js";

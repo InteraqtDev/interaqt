@@ -1,7 +1,6 @@
-import { Action, Attributives, BoolAtomData, BoolExp, createUserRoleAttributive, Interaction, Payload, PayloadItem, Property, Relation, StateMachine, StateNode, StateTransfer } from "@interaqt/shared";
-import { Entity } from "@interaqt/shared";
+import { Entity, Action, Attributives, BoolAtomData, createUserRoleAttributive, Interaction, Payload, PayloadItem, Property, Relation, StateMachine, StateNode, StateTransfer } from "@interaqt/shared";
 import { OtherAttr } from "./roles";
-import { RecordStateMachineHandle } from "../../computedDataHandles/StateMachine";
+import { RecordStateMachineHandle } from "@";
 import { MatchExp } from "@interaqt/storage";
 
 export function createData() {

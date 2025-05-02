@@ -17,11 +17,9 @@ import {
     Any,
     Every,
     WeightedSummation,
-    RelationCount,
     Transform
 } from '@interaqt/shared';
-import {Controller,InteractionEventArgs, InteractionEventEntity,} from '../../index.js'
-import { InteractionCall } from '../../InteractionCall.js';
+import { Controller, InteractionEventArgs, InteractionEventEntity, } from '@';
 
 export const globalUserRole = createUserRoleAttributive({})
 
@@ -250,7 +248,7 @@ UserEntity.properties.push(
         name: 'pendingSubRequestCount',
         type: 'number',
         collection: false,
-        computedData: RelationCount.create({
+        computedData: Count.create({
             relation: reviewerRelation,
             relationDirection: 'target',
             match: function (request, relation) {

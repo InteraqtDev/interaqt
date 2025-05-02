@@ -13,9 +13,9 @@ import {
     BoolExp,
     Controller,
     Action, Activity, Interaction, Payload, PayloadItem, USER_ENTITY,
+    PropertyStateMachineHandle, RecordStateMachineHandle, 
     ActivityGroup
 } from '@';
-import { PropertyStateMachineHandle, RecordStateMachineHandle } from "../../../src/computedDataHandles/StateMachine.js";
 import { MatchExp } from "@interaqt/storage";
 
 
