@@ -1,11 +1,7 @@
 import {afterEach, beforeEach, describe, expect, test} from "vitest";
 import {createCommonData} from "./data/common";
-import {DBSetup} from "../src/erstorage/Setup.js";
 import {SQLiteDB} from '../../runtime/src/SQLite'
-import {EntityToTableMap} from "../src/erstorage/EntityToTableMap.js";
-import {MatchExp} from "../src/erstorage/MatchExp.js";
-import {EntityQueryHandle} from "../src/erstorage/EntityQueryHandle.js";
-import {RecursiveContext} from "../src/erstorage/RecordQueryAgent.js";
+import {EntityToTableMap,MatchExp,EntityQueryHandle,RecursiveContext,DBSetup} from "@";
 import TestLogger from "./testLogger.js";
 
 describe('group tree', () => {

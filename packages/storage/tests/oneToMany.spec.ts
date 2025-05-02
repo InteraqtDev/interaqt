@@ -1,12 +1,7 @@
 import {afterEach, beforeEach, describe, expect, test} from "vitest";
 import {createCommonData} from "./data/common";
-import {DBSetup} from "../src/erstorage/Setup.js";
+import {DBSetup,EntityToTableMap,MatchExp,EntityQueryHandle,MutationEvent,LINK_SYMBOL} from "@";
 import {SQLiteDB} from '../../runtime/src/SQLite'
-import {EntityToTableMap} from "../src/erstorage/EntityToTableMap.js";
-import {MatchExp} from "../src/erstorage/MatchExp.js";
-import {EntityQueryHandle} from "../src/erstorage/EntityQueryHandle.js";
-import {MutationEvent} from "../src/erstorage/RecordQueryAgent.js";
-import {LINK_SYMBOL} from "../src/erstorage/RecordQuery.js";
 import TestLogger from "./testLogger.js";
 
 describe('one to many', () => {

@@ -1,5 +1,6 @@
 {
   "compilerOptions": {
+    "baseUrl": ".",
     "lib": ["ESNext"],
     "module": "esnext",
     "target": "esnext",
@@ -15,7 +16,10 @@
     "allowSyntheticDefaultImports": true,
     "forceConsistentCasingInFileNames": true,
     "allowJs": true,
-    "types": ["node"]
+    "types": ["node"],
+    "paths": {
+        "@": ["src/index.ts"]
+    }
   },
   "include": [
     "./src/**/*",

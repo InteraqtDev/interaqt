@@ -1,11 +1,8 @@
 import {afterEach, beforeEach, describe, expect, test} from "vitest";
 import {createCommonData} from "./data/common";
-import {DBSetup} from "../src/erstorage/Setup.js";
+import {DBSetup,EntityToTableMap,MatchExp,EntityQueryHandle} from "@";
 import {SQLiteDB} from '../../runtime/src/SQLite'
-import {EntityToTableMap} from "../src/erstorage/EntityToTableMap.js";
 import {removeAllInstance} from '@interaqt/shared'
-import {MatchExp} from "../src/erstorage/MatchExp.js";
-import {EntityQueryHandle} from "../src/erstorage/EntityQueryHandle.js";
 import TestLogger from "./testLogger.js";
 
 
