@@ -1,11 +1,11 @@
 import { Controller } from "./Controller.js";
 import { DataContext, ComputedDataHandle, PropertyDataContext, EntityDataContext, RelationDataContext } from "./computedDataHandles/ComputedDataHandle.js";
 
-import { Entity, Interaction, Klass, KlassInstance, Property, Relation } from "@interaqt/shared";
+import { Entity, Interaction, Klass, KlassInstance, Property, Relation } from "@shared";
 import { assert } from "./util.js";
 import { Computation, ComputationClass, DataBasedComputation, DataDep, EventBasedComputation, EventDep, GlobalBoundState, RecordBoundState, RecordsDataDep, RelationBoundState } from "./computedDataHandles/Computation.js";
 import { InteractionEventEntity, RecordMutationEvent } from "./System.js";
-import { AttributeQueryData, MatchExp, RecordQueryData } from "@interaqt/storage";
+import { AttributeQueryData, MatchExp, RecordQueryData } from "@storage";
 
 type EntityCreateEventsSourceMap = {
     dataDep: DataDep,

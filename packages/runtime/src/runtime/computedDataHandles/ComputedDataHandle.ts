@@ -1,5 +1,5 @@
-import { KlassInstance, Klass } from "@interaqt/shared";
-import { Entity, Relation } from "@interaqt/shared";
+import { KlassInstance, Klass } from "@shared";
+import { Entity, Relation } from "@shared";
 import { Computation } from "./Computation.js";
 
 export type GlobalDataContext = {

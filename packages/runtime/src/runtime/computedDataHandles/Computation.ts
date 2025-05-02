@@ -1,11 +1,11 @@
-import { Activity, Interaction, Relation } from "@interaqt/shared"
-import { KlassInstance } from "@interaqt/shared"
-import { Entity } from "@interaqt/shared"
-import { BoolExp } from "@interaqt/shared"
+import { Activity, Interaction, Relation } from "@shared"
+import { KlassInstance } from "@shared"
+import { Entity } from "@shared"
+import { BoolExp } from "@shared"
 import { Controller } from "../Controller"
 import { DataContext } from "./ComputedDataHandle"
-import { AttributeQueryData, MatchExpressionData, ModifierData } from "@interaqt/storage"
-import { Dictionary } from "@interaqt/shared"
+import { AttributeQueryData, MatchExpressionData, ModifierData } from "@storage"
+import { Dictionary } from "@shared"
 import { SKIP_RESULT } from "../Scheduler"
 
 export type ComputeResult = any

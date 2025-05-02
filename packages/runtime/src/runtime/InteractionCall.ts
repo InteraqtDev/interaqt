@@ -14,12 +14,12 @@ import {
     InteractionInstanceType,
     Klass,
     KlassInstance, DataAttributives, DataAttributive, Computation,
-} from "@interaqt/shared";
+} from "@shared";
 import {RecordMutationEvent, System} from "./System.js";
 import {EventUser, InteractionEvent, InteractionEventArgs} from "./types/interaction.js";
 import {assert, everyWithErrorAsync} from "./util.js";
 import {ActivityCall} from "./ActivityCall.js";
-import {someAsync} from "@interaqt/storage";
+import {someAsync} from "@storage";
 import {Controller, InteractionContext, USER_ENTITY} from "./Controller.js";
 
 type ConceptCheckStack = {

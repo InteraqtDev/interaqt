@@ -1,5 +1,5 @@
-export * from '@interaqt/shared'
-export * from '@interaqt/storage'
+export * from '@shared'
+export * from '@storage'
 export * from './Controller.js'
 export * from './MonoSystem.js'
 export * from './System.js'

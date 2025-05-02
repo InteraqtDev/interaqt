@@ -1,4 +1,4 @@
-import {BoolExp} from "@interaqt/shared";
+import {BoolExp} from "@shared";
 import {EntityToTableMap} from "./EntityToTableMap.js";
 import {assert, setByPath} from "../utils.js";
 import {Database, EntityIdRef} from './EntityQueryHandle.js'

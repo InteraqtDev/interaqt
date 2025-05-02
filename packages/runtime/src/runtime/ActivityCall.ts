@@ -8,12 +8,12 @@ import {
     InteractionInstanceType,
     KlassInstance,
     TransferInstanceType,
-} from "@interaqt/shared";
+} from "@shared";
 import {assert} from "./util.js";
 import {System} from "./System.js";
 import {InteractionCall, InteractionCallResponse} from "./InteractionCall.js";
 import {EventUser, InteractionEventArgs} from "./types/interaction.js";
-import {MatchExp} from "@interaqt/storage";
+import {MatchExp} from "@storage";
 import {Controller} from "./Controller.js";
 
 

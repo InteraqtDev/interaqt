@@ -5,7 +5,7 @@ import {
     Interaction, KlassInstance,
     Property,
     Relation
-} from "@interaqt/shared";
+} from "@shared";
 import './computedDataHandles/index.js';
 import { ActivityCall } from "./ActivityCall.js";
 import { InteractionCall, InteractionCallResponse } from "./InteractionCall.js";
@@ -15,7 +15,7 @@ import { DataContext, EntityDataContext, PropertyDataContext, RelationDataContex
 import { asyncInteractionContext } from "./asyncInteractionContext.js";
 import { ComputeResultPatch } from "./computedDataHandles/Computation.js";
 import { Scheduler, SKIP_RESULT } from "./Scheduler.js";
-import { MatchExp } from "@interaqt/storage";
+import { MatchExp } from "@storage";
 
 export const USER_ENTITY = 'User'
 

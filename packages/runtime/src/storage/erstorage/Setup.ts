@@ -1,6 +1,6 @@
 // import {Entity, Property, Relation} from "../types/index.js";
-import {Entity, KlassInstance, Property, Relation} from '@interaqt/shared'
-import {KlassByName} from '@interaqt/shared'
+import {Entity, KlassInstance, Property, Relation} from '@shared'
+import {KlassByName} from '@shared'
 import {LinkMapItem, MapData, RecordAttribute, RecordMapItem, ValueAttribute} from "./EntityToTableMap.js";
 import {assert} from "../utils.js";
 import {Database, ID_ATTR, ROW_ID_ATTR} from "./EntityQueryHandle.js";

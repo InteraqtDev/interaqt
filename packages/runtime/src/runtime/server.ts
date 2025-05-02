@@ -1,7 +1,7 @@
 import Fastify, {FastifyLoggerOptions, FastifyReply, FastifyRequest} from 'fastify'
 import {Controller, USER_ENTITY} from "./Controller.js";
 import {EventPayload, EventQuery, EventUser, InteractionEventArgs} from "./types/interaction.js";
-import {MatchExp} from "@interaqt/storage";
+import {MatchExp} from "@storage";
 import cors from 'cors'
 import middie from '@fastify/middie'
 import {assert} from "./util.js";

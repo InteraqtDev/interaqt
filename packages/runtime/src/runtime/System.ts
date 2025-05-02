@@ -1,4 +1,4 @@
-import {createClass, Entity, KlassInstance, Property, Relation} from "@interaqt/shared";
+import {createClass, Entity, KlassInstance, Property, Relation} from "@shared";
 import {InteractionEvent} from './types/interaction.js'
 import { GlobalBoundState } from "./computedDataHandles/Computation.js";
 import { RecordBoundState } from "./computedDataHandles/Computation.js";

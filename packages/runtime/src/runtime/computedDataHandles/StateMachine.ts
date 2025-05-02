@@ -1,4 +1,4 @@
-import { KlassInstance, StateMachine, StateNode } from "@interaqt/shared";
+import { KlassInstance, StateMachine, StateNode } from "@shared";
 import { Controller } from "../Controller.js";
 import { InteractionEventArgs } from "../types/interaction.js";
 import { EntityIdRef, EVENT_RECORD, RecordMutationEvent } from '../System.js';

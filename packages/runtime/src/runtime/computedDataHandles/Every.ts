@@ -1,10 +1,10 @@
 import { ComputedDataHandle, PropertyDataContext } from "./ComputedDataHandle.js";
-import { Every, KlassInstance, Relation } from "@interaqt/shared";
+import { Every, KlassInstance, Relation } from "@shared";
 import { DataBasedComputation, DataDep, GlobalBoundState, RecordBoundState, RelationBoundState } from "./Computation.js";
 import { Controller } from "../Controller.js";
 import { DataContext } from "./ComputedDataHandle.js";
 import { EtityMutationEvent } from "../Scheduler.js";
-import { AttributeQuery, AttributeQueryData, MatchExp } from "@interaqt/storage";
+import { AttributeQuery, AttributeQueryData, MatchExp } from "@storage";
 import { assert } from "../util.js";
 export class GlobalEveryHandle implements DataBasedComputation {
     callback: (this: Controller, item: any) => boolean

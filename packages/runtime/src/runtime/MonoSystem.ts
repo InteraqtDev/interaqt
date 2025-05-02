@@ -19,7 +19,7 @@ import {
     SystemLogger
 } from "./System.js";
 import {InteractionEvent} from './types/interaction.js'
-import {createClass, Entity, KlassInstance, Property, Relation} from "@interaqt/shared";
+import {createClass, Entity, KlassInstance, Property, Relation} from "@shared";
 import {
     DBSetup,
     EntityQueryHandle,
@@ -28,7 +28,7 @@ import {
     MatchExpressionData,
     MutationEvent,
     RawEntityData
-} from '@interaqt/storage'
+} from '@storage'
 import {SQLiteDB} from "./SQLite.js";
 import pino from "pino";
 import { RecordBoundState, RelationBoundState } from "./computedDataHandles/Computation.js";

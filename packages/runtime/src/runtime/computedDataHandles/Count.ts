@@ -1,10 +1,10 @@
 import { ComputedDataHandle, DataContext, PropertyDataContext } from "./ComputedDataHandle.js";
-import { Count, KlassInstance, Relation, Entity } from "@interaqt/shared";
+import { Count, KlassInstance, Relation, Entity } from "@shared";
 import { Controller } from "../Controller.js";
 import { DataDep, GlobalBoundState, RecordBoundState } from "./Computation.js";
 import { DataBasedComputation } from "./Computation.js";
 import { EtityMutationEvent } from "../Scheduler.js";
-import { MatchExp } from "@interaqt/storage";
+import { MatchExp } from "@storage";
 
 export class GlobalCountHandle implements DataBasedComputation {
     state!: ReturnType<typeof this.createState>

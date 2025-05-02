@@ -38,7 +38,7 @@ The `@interaqt/storage` package is built around a few key concepts:
 First, you need to define your data model using entities and relations:
 
 ```typescript
-import { Entity, Property, Relation, RelationType } from "@interaqt/storage";
+import { Entity, Property, Relation, RelationType } from "@storage";
 
 // Define an entity
 const userEntity: Entity = {
@@ -80,7 +80,7 @@ const relations = [profileRelation];
 After defining your data model, you need to set up the storage with a database:
 
 ```typescript
-import { DBSetup, EntityToTableMap, EntityQueryHandle } from "@interaqt/storage";
+import { DBSetup, EntityToTableMap, EntityQueryHandle } from "@storage";
 import { SQLiteDB } from "your-database-adapter"; // Example database adapter
 
 // Create and open the database connection

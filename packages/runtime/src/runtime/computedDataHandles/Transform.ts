@@ -1,5 +1,5 @@
 import { ComputedDataHandle, DataContext, EntityDataContext } from "./ComputedDataHandle.js";
-import { Transform, KlassInstance, Relation, Entity, Activity, Interaction, BoolExp } from "@interaqt/shared";
+import { Transform, KlassInstance, Relation, Entity, Activity, Interaction, BoolExp } from "@shared";
 import { Controller } from "../Controller.js";
 import { ComputeResultPatch, DataDep, RecordBoundState, RecordsDataDep } from "./Computation.js";
 import { DataBasedComputation } from "./Computation.js";

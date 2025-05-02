@@ -1,5 +1,5 @@
-import { KlassInstance } from "@interaqt/shared";
-import { StateMachine } from "@interaqt/shared";
+import { KlassInstance } from "@shared";
+import { StateMachine } from "@shared";
 
 function shallowEqual(a: {[key:string]:any}, b: {[key:string]:any}) {
     if (a===b) return true
