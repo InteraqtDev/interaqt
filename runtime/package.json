@@ -2,6 +2,7 @@
   "name": "interaqt",
   "devDependencies": {
     "@microsoft/api-extractor": "^7.52.1",
+    "@types/acorn": "^6.0.4",
     "@types/better-sqlite3": "^7.6.12",
     "@types/connect": "^3.4.38",
     "@types/cors": "^2.8.17",
