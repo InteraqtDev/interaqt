@@ -1,6 +1,6 @@
 import {beforeEach, describe, expect, test} from "vitest";
-import {Controller} from "../Controller.js";
-import {MonoSystem} from "../MonoSystem.js";
+import {Controller} from "../src/Controller.js";
+import {MonoSystem} from "../src/MonoSystem.js";
 import {
     Activity,
     BoolExp,
@@ -12,7 +12,7 @@ import {
     removeAllInstance, SQLiteDB,
     Dictionary
 } from '@';
-import {AttributeError} from "../InteractionCall.js";
+import {AttributeError} from "../src/InteractionCall.js";
 import {createData} from './data/leaveRequest.js'
 
 // 里面有所有必须的数据？

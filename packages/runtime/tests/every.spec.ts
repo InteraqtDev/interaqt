@@ -1,5 +1,5 @@
 import {beforeEach, describe, expect, test} from "vitest";
-import {Controller, MonoSystem, Property, Entity, Every,Dictionary,BoolExp, Interaction, KlassByName, removeAllInstance, Any, Relation} from '../index.js';
+import {Controller, MonoSystem, Property, Entity, Every,Dictionary,BoolExp, Interaction, KlassByName, removeAllInstance, Any, Relation} from '../src/index.js';
 
 // 创建简单测试环境，直接测试 EveryHandle 的具体方法
 describe('Every and Any computed handle', () => {

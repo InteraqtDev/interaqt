@@ -9,7 +9,7 @@ import {
   Property,
   Relation,
   Count
-} from '../index.js';
+} from '../src/index.js';
 
 describe('Count computed handle', () => {
   

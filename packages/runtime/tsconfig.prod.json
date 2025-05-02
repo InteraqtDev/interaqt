@@ -21,17 +21,6 @@
     "types": ["node"],
   },
   "include": [
-    "./computedDataHandles/**/*",
-    "./ActivityCall.ts",
-    "./boolExpression.ts",
-    "./index.ts",
-    "./Controller.ts",
-    "./InteractionCall.ts",
-    "./MonoSystem.ts",
-    "./System.ts",
-    "./SQLite.ts",
-    "./util.ts",
-    "./server.ts",
-    "./asyncInteractionContext.ts",
+    "src/**/*"
   ]
 }

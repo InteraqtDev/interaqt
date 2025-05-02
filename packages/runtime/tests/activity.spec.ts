@@ -1,5 +1,5 @@
 import {beforeEach, describe, expect, test} from "vitest";
-import {MonoSystem} from "../MonoSystem.js";
+import {MonoSystem} from "../src/MonoSystem.js";
 import {
     Activity,
     Entity,
@@ -15,7 +15,7 @@ import {
     RecordMutationSideEffect,
     RecordMutationEvent
 } from '@';
-import {ActivityCall, ActivityGroupNode} from "../ActivityCall.js";
+import {ActivityCall, ActivityGroupNode} from "../src/ActivityCall.js";
 import { createData } from './data/activity/index.js';
 
 describe("activity state", () => {

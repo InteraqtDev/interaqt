@@ -18,12 +18,10 @@
     "lib": ["esnext", "dom"],
     "types": ["node"],
     "paths": {
-        "@": ["index.ts"]
+        "@": ["src/index.ts"]
     }
   },
   "include": [
-    "./",
-    "./types",
-    "./tests"
+    "src/**/*"
   ]
 }

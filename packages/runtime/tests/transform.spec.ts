@@ -8,7 +8,7 @@ import {
   Property,
   Relation,
   Transform
-} from '../index.js';
+} from '../src/index.js';
 
 describe('Transform computed handle', () => {
   
