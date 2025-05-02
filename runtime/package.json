@@ -11,7 +11,7 @@
     "pino-pretty": "^13.0.0",
     "release-it": "^19.0.1",
     "rimraf": "^6.0.1",
-    "typescript": "^5.8.2",
+    "typescript": "^5.8.3",
     "vite": "^6.3.4",
     "vite-plugin-dts": "^4.5.3",
     "vite-tsconfig-paths": "^5.1.4",
@@ -23,7 +23,7 @@
     "test-storage": "vitest run tests/storage",
     "test-shared": "vitest run tests/shared",
     "build": "rimraf dist && tsc -p tsconfig.prod.json",
-    "release": "node scripts/release.js",
+    "release": "release-it",
     "patch": "node scripts/release.js patch",
     "minor": "node scripts/release.js minor",
     "major": "node scripts/release.js major"
