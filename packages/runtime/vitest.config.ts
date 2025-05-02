@@ -12,9 +12,13 @@ export default defineConfig({
     ],
     resolve: {
         alias: {
-            '@': path.resolve(__dirname, './src/index.ts'),
-            '@interaqt/shared': path.resolve(__dirname, '../shared/src/index.ts'),
-            '@interaqt/storage': path.resolve(__dirname, '../storage/index.ts')
+            '@/SQLite.js': path.resolve(__dirname, './src/runtime/SQLite.ts'),
+            '@runtime': path.resolve(__dirname, './src/runtime/index.ts'),
+            '@shared': path.resolve(__dirname, './src/shared/index.ts'),
+            '@storage': path.resolve(__dirname, './src/storage/index.ts'),
+            '@interaqt/shared': path.resolve(__dirname, './src/shared/index.ts'),
+            '@interaqt/storage': path.resolve(__dirname, './src/storage/index.ts'),
+            '@': path.resolve(__dirname, './src'),
         }
     }
 })

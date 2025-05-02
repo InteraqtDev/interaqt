@@ -18,7 +18,8 @@
     "lib": ["esnext", "dom"],
     "types": ["node"],
     "paths": {
-        "@": ["src/index.ts"]
+        "@": ["src"],
+        "@/SQLite": ["src/runtime/SQLite.ts"]
     }
   },
   "include": [

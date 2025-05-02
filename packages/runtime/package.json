@@ -15,6 +15,9 @@
   },
   "scripts": {
     "test": "vitest run",
+    "test-runtime": "vitest run tests/runtime",
+    "test-storage": "vitest run tests/storage",
+    "test-shared": "vitest run tests/shared",
     "build": "rimraf dist && tsc -p ./tsconfig.prod.json",
     "type": "api-extractor run",
     "build-all": "npm run build && npm run type",
