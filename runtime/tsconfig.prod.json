@@ -1,0 +1,31 @@
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "outDir": "dist",
+    "sourceMap": true,
+    "target": "esnext",
+    "newLine": "LF",
+    "useDefineForClassFields": false,
+    "declaration": true,
+    "declarationMap": true,
+    "module": "esnext",
+    "moduleResolution": "node",
+    "allowJs": false,
+    "strict": true,
+    "noUnusedLocals": false,
+    "experimentalDecorators": true,
+    "resolveJsonModule": true,
+    "esModuleInterop": true,
+    "removeComments": false,
+    "lib": ["esnext", "dom"],
+    "types": ["node"],
+    "paths": {
+        "@runtime": ["src/runtime/index.ts"],
+        "@shared": ["src/shared/index.ts"],
+        "@storage": ["src/storage/index.ts"]
+    }
+  },
+  "include": [
+    "src/**/*"
+  ]
+}
