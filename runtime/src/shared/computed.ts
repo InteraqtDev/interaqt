@@ -1,8 +1,9 @@
+import { AttributeQueryData } from '@storage';
 import { createClass } from "./createClass.js";
 import { Activity, Interaction } from "./activity/Activity.js";
 import { Entity, Property, Relation } from "./entity/Entity.js";
 import { Dictionary } from "./dictionary/Dictionary.js";
-import { BoolExp } from "./BoolExp.js";
+
 
 export const StateNode = createClass({
     name: 'StateNode',
@@ -70,10 +71,7 @@ export const StateMachine = createClass({
 })
 
 
-Relation.public.computedData.type.push(StateMachine)
-Entity.public.computedData.type.push(StateMachine)
-Property.public.computedData.type.push(StateMachine)
-Dictionary.public.computedData.type.push(StateMachine)
+
 
 
 // ComputedData 的基础结构
@@ -121,29 +119,6 @@ export const WeightedSummation = createClass({
     }
 })
 
-type MatchExpressionData = BoolExp<any>;
-type ModifierData = {
-    orderBy?: {
-        [k: string]: 'ASC' | 'DESC';
-    };
-    limit?: number;
-    offset?: number;
-};
-type RecordQueryData = {
-    matchExpression?: MatchExpressionData;
-    attributeQuery?: AttributeQueryData;
-    modifier?: ModifierData;
-    label?: string;
-    goto?: string;
-    exit?: (data: any) => Promise<any>;
-};
-
-type AttributeQueryData = AttributeQueryDataItem[];
-
-type AttributeQueryDataItem = string | AttributeQueryDataRecordItem;
-
-type AttributeQueryDataRecordItem = [string, RecordQueryData, boolean?];
-
 export const Count = createClass({
     name: 'Count',
     public: {
@@ -154,9 +129,6 @@ export const Count = createClass({
         },
     }
 })
-
-Dictionary.public.computedData.type.push(WeightedSummation, Count)
-
 
 
 export const Every = createClass({
@@ -241,9 +213,8 @@ export const Transform = createClass({
 })
 
 
-// CAUTION 修补 Entity computedData 里面的类型
-
-// TODO Property 支持的 只增不减的 max/min/topN/
-//  TODO 支持 filter？就是 关系上 comptedData
-
-
+// 修补 Entity computedData 里面的类型
+Relation.public.computedData.type.push(StateMachine, WeightedSummation, Count, Every, Any, Transform)
+Entity.public.computedData.type.push(StateMachine, WeightedSummation, Count, Every, Any, Transform)
+Property.public.computedData.type.push(StateMachine, WeightedSummation, Count, Every, Any, Transform)
+Dictionary.public.computedData.type.push(StateMachine, WeightedSummation, Count, Every, Any, Transform)
