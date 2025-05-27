@@ -142,6 +142,9 @@ class MonoStorage implements Storage{
         }
         return newEvents
     }
+    destroy() {
+        return this.db.close()
+    }
 }
 
 
@@ -369,5 +372,8 @@ export class MonoSystem implements System {
             }
         }
         return null
+    }
+    destroy() {
+        this.storage.destroy()
     }
 }

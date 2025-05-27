@@ -146,6 +146,21 @@ export interface EventBasedComputation {
     computeDirtyRecords?: (...args: any[]) => Promise<any[]|undefined>
 }
 
-export type Computation = DataBasedComputation|EventBasedComputation
+export type Computation = DataBasedComputation|EventBasedComputation|AsyncDataBasedComputation
 
 export type ComputationClass = new(...args: any[]) => Computation
+
+
+export interface AsyncDataBasedComputation {
+    dataContext: DataContext
+    createState?: (...args: any[]) => {[key: string]: RecordBoundState<any>|GlobalBoundState<any>}
+    state: {[key: string]: RecordBoundState<any>|GlobalBoundState<any>|RelationBoundState<any>}
+    getDefaultValue?: (...args: any[]) => any
+    useLastValue?: boolean
+    compute: (...args: any[]) => Promise<ComputeResult>
+    incrementalCompute?: (...args: any[]) => Promise<any>
+    incrementalPatchCompute?: (...args: any[]) => Promise<any>
+
+    asyncReturnResult?: (...args: any[]) => Promise<ComputeResult|typeof SKIP_RESULT>
+    asyncReturnResultPatch?: (...args: any[]) => Promise<ComputeResultPatch|ComputeResultPatch[]|undefined|typeof SKIP_RESULT>
+}

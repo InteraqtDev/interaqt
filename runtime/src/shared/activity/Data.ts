@@ -58,21 +58,6 @@ export const Query = createClass({
 })
 
 
-export const Computation = createClass({
-    name: 'Computation',
-    public: {
-        content: {
-            type: 'function',
-            required: true,
-            collection: false
-        },
-        name: {
-            type: 'string'
-        },
-    }
-})
-
-
 function toDataAttributives(obj?: BoolExp<KlassInstance<typeof DataAttributive>>): KlassInstance<typeof BoolAtomData>|KlassInstance<typeof BoolExpressionData>|undefined {
     if (!obj) return undefined
 

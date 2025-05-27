@@ -140,8 +140,8 @@ export class Controller {
             return item[propertyDataContext.id]
         }
     }
-    async applyResultPatch(dataContext: DataContext, patch: typeof SKIP_RESULT|ComputeResultPatch|ComputeResultPatch[], record?: any) {
-        if (patch === SKIP_RESULT) return
+    async applyResultPatch(dataContext: DataContext, patch: typeof SKIP_RESULT|ComputeResultPatch|ComputeResultPatch[]|undefined, record?: any) {
+        if (patch === SKIP_RESULT||patch === undefined) return
 
         const patches = Array.isArray(patch) ? patch : [patch]
         for(const patch of patches) {

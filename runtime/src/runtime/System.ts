@@ -36,6 +36,7 @@ export type Storage = {
     getRelationName: (...arg: any[]) => string
     getEntityName: (...arg: any[]) => string
     listen: (callback: RecordMutationCallback) => any
+    destroy: () => Promise<any>
 }
 
 export type RecordMutationEvent = {
@@ -110,7 +111,7 @@ export type Database = {
     parseMatchExpression?: (key: string, value: [string, any], fieldName: string, fieldType: string, isReferenceValue: boolean, getReferenceFieldValue:(v: string) => string, genPlaceholder: (name?: string) => string) => any
     getPlaceholder?: () => (name?:string) => string,
     mapToDBFieldType: (type: string, collection?: boolean) => string
-
+    close: () => Promise<any>
 } // activity 数据
 // state 等系统配置数据的实体化
 // FIXME 应该独立到外部
