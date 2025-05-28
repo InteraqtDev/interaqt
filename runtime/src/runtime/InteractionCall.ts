@@ -13,7 +13,7 @@ import {
     GetAction,
     InteractionInstanceType,
     Klass,
-    KlassInstance, DataAttributives, DataAttributive, Computation,
+    KlassInstance, DataAttributives, DataAttributive,
 } from "@shared";
 import { RecordMutationEvent, System } from "./System.js";
 import { assert, everyWithErrorAsync,someAsync } from "./util.js";
@@ -463,10 +463,10 @@ export class InteractionCall {
             const matchInQuery = interactionEvent.query?.match ? BoolExp.fromValue(interactionEvent.query?.match) : undefined
             const finalMatch = (matchInQuery && match) ? match.and(matchInQuery) : (match || matchInQuery)
             data = await this.system.storage.find(recordName, finalMatch, modifier, attributeQuery)
-        } else if (Computation.is(this.interaction.data)){
-            // computation
-            const { content: computation } = this.interaction.data as KlassInstance<typeof Computation>
-            data= await computation.call(this.controller, match, interactionEvent.query, interactionEvent )
+        // } else if (Computation.is(this.interaction.data)){
+        //     // computation
+        //     const { content: computation } = this.interaction.data as KlassInstance<typeof Computation>
+        //     data= await computation.call(this.controller, match, interactionEvent.query, interactionEvent )
         } else {
             assert(false,`unknown data type ${this.interaction.data}`)
         }

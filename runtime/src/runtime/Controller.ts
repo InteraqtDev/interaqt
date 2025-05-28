@@ -13,8 +13,8 @@ import { InteractionEventArgs } from "./InteractionCall.js";
 import { assert } from "./util.js";
 import { DataContext, EntityDataContext, PropertyDataContext, RelationDataContext } from "./computedDataHandles/ComputedDataHandle.js";
 import { asyncInteractionContext } from "./asyncInteractionContext.js";
-import { ComputeResultPatch } from "./computedDataHandles/Computation.js";
-import { Scheduler, SKIP_RESULT } from "./Scheduler.js";
+import { ComputationResult, ComputationResultSkip, ComputationResultPatch } from "./computedDataHandles/Computation.js";
+import { Scheduler} from "./Scheduler.js";
 import { MatchExp } from "@storage";
 
 export const USER_ENTITY = 'User'
@@ -111,7 +111,7 @@ export class Controller {
         // TODO 如果是恢复模式，还要从 event stack 中开始恢复数据。
     }
     async applyResult(dataContext: DataContext, result: any, record?: any) {
-        if (result ===SKIP_RESULT) return
+        if (result instanceof ComputationResultSkip) return
 
         if (dataContext.type === 'global') {
             // TODO 
@@ -140,8 +140,8 @@ export class Controller {
             return item[propertyDataContext.id]
         }
     }
-    async applyResultPatch(dataContext: DataContext, patch: typeof SKIP_RESULT|ComputeResultPatch|ComputeResultPatch[]|undefined, record?: any) {
-        if (patch === SKIP_RESULT||patch === undefined) return
+    async applyResultPatch(dataContext: DataContext, patch: ComputationResult|ComputationResultPatch|ComputationResultPatch[]|undefined, record?: any) {
+        if (patch instanceof ComputationResultSkip||patch === undefined) return
 
         const patches = Array.isArray(patch) ? patch : [patch]
         for(const patch of patches) {

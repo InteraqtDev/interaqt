@@ -3,7 +3,7 @@ import { DataContext, ComputedDataHandle, PropertyDataContext, EntityDataContext
 
 import { Entity, Klass, KlassInstance, Property, Relation } from "@shared";
 import { assert } from "./util.js";
-import { AsyncDataBasedComputation, Computation, ComputationClass, DataBasedComputation, DataDep, EventBasedComputation, GlobalBoundState, RecordBoundState, RecordsDataDep, RelationBoundState } from "./computedDataHandles/Computation.js";
+import { Computation, ComputationClass, DataBasedComputation, DataDep, EventBasedComputation, GlobalBoundState, RecordBoundState, RecordsDataDep, RelationBoundState } from "./computedDataHandles/Computation.js";
 import { InteractionEventEntity, RecordMutationEvent } from "./System.js";
 import { AttributeQueryData, MatchExp, RecordQueryData } from "@storage";
 
@@ -51,7 +51,6 @@ export type EtityMutationEvent = RecordMutationEvent & {
 }
 
 
-export const SKIP_RESULT = Symbol('skip_result')
 export const ASYNC_TASK_RECORD = '_ASYNC_TASK_'
 
 export class Scheduler {
@@ -403,22 +402,22 @@ export class Scheduler {
         }
     }
 
-    async handleAsyncReturn(computation: AsyncDataBasedComputation, taskRecordIdRef: {id: string}) {
+    async handleAsyncReturn(computation: DataBasedComputation, taskRecordIdRef: {id: string}) {
         const taskRecord = await this.controller.system.storage.findOne(this.getAsyncTaskRecordKey(computation), MatchExp.atom({key: 'id', value: ['=', taskRecordIdRef.id]}), {}, ['*', ['record', {attributeQuery: ['id']}]])
         // 1. 检查 task 是否仍然是 dataContext 当前最新的，如果不是，说明 task 已经过期，返回值不用管了。
         if (taskRecord.status === 'success') {
-            if (computation.asyncReturnResult) {
-                const result = await computation.asyncReturnResult(taskRecord.result, taskRecord.args)
-                await this.controller.applyResult(computation.dataContext, result, taskRecord.record)
-            } else if (computation.asyncReturnResultPatch) {
-                const patch = await computation.asyncReturnResultPatch(taskRecord.result, taskRecord.args)
-                await this.controller.applyResultPatch(computation.dataContext, patch, taskRecord.record)
+
+            const resultOrPatch = await computation.asyncReturn!(taskRecord.result, taskRecord.args)
+            if (computation.incrementalPatchCompute) {
+                await this.controller.applyResultPatch(computation.dataContext, resultOrPatch, taskRecord.record)
+            } else {
+                await this.controller.applyResult(computation.dataContext, resultOrPatch, taskRecord.record)
             }
         }
     }
 
     isAsyncComputation(computation: Computation) {
-        return (computation as AsyncDataBasedComputation).asyncReturnResult !== undefined || (computation as AsyncDataBasedComputation).asyncReturnResultPatch !== undefined
+        return (computation as DataBasedComputation).asyncReturn !== undefined
     }
 
     async runComputation(computation: Computation, erRecordMutationEvent: RecordMutationEvent, record?: any) {

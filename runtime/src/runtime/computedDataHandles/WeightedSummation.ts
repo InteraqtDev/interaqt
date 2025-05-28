@@ -1,7 +1,7 @@
 import { ComputedDataHandle, DataContext, PropertyDataContext } from "./ComputedDataHandle.js";
 import { WeightedSummation, KlassInstance, Relation, Entity } from "@shared";
 import { Controller } from "../Controller.js";
-import { DataDep, GlobalBoundState, RecordBoundState, RelationBoundState } from "./Computation.js";
+import { DataDep, RecordBoundState, RelationBoundState } from "./Computation.js";
 import { DataBasedComputation } from "./Computation.js";
 import { EtityMutationEvent } from "../Scheduler.js";
 import { AttributeQueryData, MatchExp } from "@storage";

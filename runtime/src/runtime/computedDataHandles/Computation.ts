@@ -6,15 +6,31 @@ import { Controller } from "../Controller"
 import { DataContext } from "./ComputedDataHandle"
 import { AttributeQueryData, MatchExpressionData, ModifierData } from "@storage"
 import { Dictionary } from "@shared"
-import { SKIP_RESULT } from "../Scheduler"
 
-export type ComputeResult = any
 
-export type ComputeResultPatch = {
+export type ComputationResultPatch = {
     type: 'insert' | 'update' | 'delete'
     data?: any
     affectedId?: any
 }
+
+
+
+export class ComputationResult{
+    static skip = () => new ComputationResultSkip()
+    static resolve = (result: any, args?:any) => new ComputationResultResolve(result, args)
+}
+
+export class ComputationResultSkip extends ComputationResult{
+
+}
+
+export class ComputationResultResolve extends ComputationResult{
+    constructor(public result: any, public args?:any) {
+        super()
+    }
+}
+
 
 export class RecordBoundState<T> {
     record!: string
@@ -109,15 +125,17 @@ export interface DataBasedComputation {
     dataContext: DataContext
     state: {[key: string]: RecordBoundState<any>|GlobalBoundState<any>|RelationBoundState<any>}
     // 全量计算
-    compute: (...args: any[]) => ComputeResult
+    compute: (...args: any[]) => Promise<ComputationResult|any>
     // 增量计算
-    incrementalCompute?: (...args: any[]) => Promise<ComputeResult|typeof SKIP_RESULT>
+    incrementalCompute?: (...args: any[]) => Promise<ComputationResult|any>
     // 增量计算，返回的是基于上一次结果的寄过增量
-    incrementalPatchCompute?: (...args: any[]) => Promise<ComputeResultPatch|ComputeResultPatch[]|undefined|typeof SKIP_RESULT>
+    incrementalPatchCompute?: (...args: any[]) => Promise<ComputationResult|ComputationResultPatch|ComputationResultPatch[]|undefined>
     createState?: (...args: any[]) => {[key: string]: RecordBoundState<any>|GlobalBoundState<any>}
     dataDeps?: {[key: string]: any}
     getDefaultValue?: (...args: any[]) => any
     useLastValue?: boolean
+    // 异步计算，就会声明这个函数
+    asyncReturn?: (...args: any[]) => Promise<ComputationResultSkip|any>
 }
 
 
@@ -137,30 +155,16 @@ export type EventDep = InteractionEventDep|DataEventDep
 export interface EventBasedComputation {
     dataContext: DataContext
     state: {[key: string]: RecordBoundState<any>|GlobalBoundState<any>|RelationBoundState<any>}
-    incrementalCompute?: (...args: any[]) => Promise<ComputeResult|typeof SKIP_RESULT>
-    incrementalPatchCompute?: (...args: any[]) => Promise<ComputeResultPatch|ComputeResultPatch[]|undefined|typeof SKIP_RESULT>
+    incrementalCompute?: (...args: any[]) => Promise<ComputationResult|any>
+    incrementalPatchCompute?: (...args: any[]) => Promise<ComputationResult|ComputationResultPatch|ComputationResultPatch[]|undefined>
     createState?: (...args: any[]) => {[key: string]: RecordBoundState<any>|GlobalBoundState<any>}
     eventDeps?: {[key: string]: EventDep}
     useLastValue?: boolean
     getDefaultValue?: (...args: any[]) => any
     computeDirtyRecords?: (...args: any[]) => Promise<any[]|undefined>
+    asyncReturn?: (...args: any[]) => Promise<ComputationResultSkip|any>
 }
 
-export type Computation = DataBasedComputation|EventBasedComputation|AsyncDataBasedComputation
+export type Computation = DataBasedComputation|EventBasedComputation
 
 export type ComputationClass = new(...args: any[]) => Computation
-
-
-export interface AsyncDataBasedComputation {
-    dataContext: DataContext
-    createState?: (...args: any[]) => {[key: string]: RecordBoundState<any>|GlobalBoundState<any>}
-    state: {[key: string]: RecordBoundState<any>|GlobalBoundState<any>|RelationBoundState<any>}
-    getDefaultValue?: (...args: any[]) => any
-    useLastValue?: boolean
-    compute: (...args: any[]) => Promise<ComputeResult>
-    incrementalCompute?: (...args: any[]) => Promise<any>
-    incrementalPatchCompute?: (...args: any[]) => Promise<any>
-
-    asyncReturnResult?: (...args: any[]) => Promise<ComputeResult|typeof SKIP_RESULT>
-    asyncReturnResultPatch?: (...args: any[]) => Promise<ComputeResultPatch|ComputeResultPatch[]|undefined|typeof SKIP_RESULT>
-}

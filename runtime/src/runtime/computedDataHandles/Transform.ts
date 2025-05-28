@@ -1,7 +1,7 @@
 import { ComputedDataHandle, DataContext, EntityDataContext } from "./ComputedDataHandle.js";
 import { Transform, KlassInstance, Relation, Entity, Activity, Interaction, BoolExp } from "@shared";
 import { Controller } from "../Controller.js";
-import { ComputeResultPatch, DataDep, RecordBoundState, RecordsDataDep } from "./Computation.js";
+import { ComputationResultPatch, DataDep, RecordBoundState, RecordsDataDep } from "./Computation.js";
 import { DataBasedComputation } from "./Computation.js";
 import { EtityMutationEvent } from "../Scheduler.js";
 
@@ -44,7 +44,7 @@ export class RecordsTransformHandle implements DataBasedComputation {
         });
     }
 
-    async incrementalPatchCompute(lastValue: any[], mutationEvent: EtityMutationEvent): Promise<ComputeResultPatch | ComputeResultPatch[]|undefined> {
+    async incrementalPatchCompute(lastValue: any[], mutationEvent: EtityMutationEvent): Promise<ComputationResultPatch | ComputationResultPatch[]|undefined> {
         const dataContext = this.dataContext as EntityDataContext
         
         if (mutationEvent.type === 'create') {

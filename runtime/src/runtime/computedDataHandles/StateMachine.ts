@@ -3,8 +3,8 @@ import { Controller } from "../Controller.js";
 import { InteractionEventArgs } from "../InteractionCall.js";
 import { EntityIdRef, EVENT_RECORD, RecordMutationEvent } from '../System.js';
 import { ComputedDataHandle, DataContext, EntityDataContext } from "./ComputedDataHandle.js";
-import { ComputeResultPatch, EventBasedComputation, EventDep, GlobalBoundState, RecordBoundState } from "./Computation.js";
-import { EtityMutationEvent, SKIP_RESULT } from "../Scheduler.js";
+import { ComputationResult, ComputationResultPatch, EventBasedComputation, EventDep, GlobalBoundState, RecordBoundState } from "./Computation.js";
+import { EtityMutationEvent } from "../Scheduler.js";
 import { TransitionFinder } from "./TransitionFinder.js";
 
 type SourceTargetPair = [EntityIdRef, EntityIdRef][]
@@ -48,7 +48,7 @@ export class GlobalStateMachineHandle implements EventBasedComputation {
         const currentStateName = await this.state.currentState.get()
         const trigger = this.mutationEventToTrigger(mutationEvent)
         const nextState = this.transitionFinder?.findNextState(currentStateName, trigger)
-        if (!nextState) return SKIP_RESULT
+        if (!nextState) return ComputationResult.skip()
 
         await this.state.currentState.set(nextState.name)
 
@@ -106,7 +106,7 @@ export class PropertyStateMachineHandle implements EventBasedComputation {
         const currentStateName = await this.state.currentState.get(dirtyRecord)
         const trigger = this.mutationEventToTrigger(mutationEvent)
         const nextState = this.transitionFinder?.findNextState(currentStateName, trigger)
-        if (!nextState) return SKIP_RESULT
+        if (!nextState) return ComputationResult.skip()
 
         await this.state.currentState.set(dirtyRecord, nextState.name)
 
@@ -159,11 +159,11 @@ export class RecordStateMachineHandle implements EventBasedComputation {
         }
     }
     
-    async incrementalPatchCompute(lastValue: string, mutationEvent: RecordMutationEvent, dirtyRecord: any): Promise<ComputeResultPatch|undefined|typeof SKIP_RESULT> {
+    async incrementalPatchCompute(lastValue: string, mutationEvent: RecordMutationEvent, dirtyRecord: any): Promise<ComputationResult|ComputationResultPatch|undefined> {
         const currentStateName = dirtyRecord.id ? (await this.state.currentState.get(dirtyRecord)) : this.defaultState.name
         const trigger = this.mutationEventToTrigger(mutationEvent)
         const nextState = this.transitionFinder?.findNextState(currentStateName, trigger)
-        if (!nextState) return SKIP_RESULT
+        if (!nextState) return ComputationResult.skip()
 
         
 

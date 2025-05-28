@@ -1,4 +1,4 @@
-import { Controller, Entity, MonoSystem, Property, ComputedDataHandle, createClass, AsyncDataBasedComputation, MatchExp, DataDep, PropertyDataContext, KlassInstance , PGLiteDB} from "@";
+import { Controller, Entity, MonoSystem, Property, ComputedDataHandle, createClass, MatchExp, DataDep, PropertyDataContext, KlassInstance, PGLiteDB, DataBasedComputation } from "@";
 import { expect, test, describe } from "vitest";
 
 const TestCrawlerComputed = createClass({
@@ -11,7 +11,7 @@ const TestCrawlerComputed = createClass({
     }
 })
 
-class TestCrawlerComputation implements AsyncDataBasedComputation {
+class TestCrawlerComputation implements DataBasedComputation {
     state = {}
     dataDeps: {[key: string]: DataDep} = {}
     constructor(public controller: Controller, public args: KlassInstance<typeof TestCrawlerComputed>, public dataContext: PropertyDataContext) {
@@ -23,11 +23,11 @@ class TestCrawlerComputation implements AsyncDataBasedComputation {
             }
         }
     }
-    compute(...args: any[]) {
-        return Promise.resolve({name:'John'})
+    async compute(...args: any[]) {
+        return {name:'John'}
     }
-    asyncReturnResult(result:any, args:any) {
-        return Promise.resolve(`${result}_crawled_by_${args.name}`)
+    async asyncReturn(result:any, args:any) {
+        return `${result}_crawled_by_${args.name}`
     }
 }
 
@@ -39,7 +39,7 @@ ComputedDataHandle.Handles.set(TestCrawlerComputed, {
 
 
 describe('async computed', () => {
-    test('test', async () => {
+    test('test basic async computed', async () => {
         
         const URLEntity = Entity.create({
             name: 'URL',
@@ -58,7 +58,7 @@ describe('async computed', () => {
         await controller.setup(true)
         const crawlerComputation = Array.from(controller.scheduler.computations.values()).find(
             computation => computation.dataContext.type === 'property' && computation.dataContext.host === URLEntity && computation.dataContext.id === 'content'
-        )! as AsyncDataBasedComputation
+        )! as DataBasedComputation
         const crawlerTaskRecordName = controller.scheduler.getAsyncTaskRecordKey(crawlerComputation)
 
 
