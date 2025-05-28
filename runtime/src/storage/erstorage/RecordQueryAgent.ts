@@ -814,13 +814,15 @@ INSERT INTO "${this.map.getRecordTable(newEntityData.recordName)}"
 (${sameRowNewFieldAndValue.map(f => `"${f.field}"`).join(',')})
 VALUES
 (${sameRowNewFieldAndValue.map(f => p()).join(',')}) 
-`, sameRowNewFieldAndValue.map(f => this.prepareFieldValue(f.value)), queryName) as EntityIdRef
+`, sameRowNewFieldAndValue.map(f => this.prepareFieldValue(f.value, f.fieldType!)), queryName) as EntityIdRef
 
         return Object.assign(result, newEntityDataWithIdsWithFlashOutRecords.getData())
     }
 
-    prepareFieldValue(value: any) {
-        // return value === undefined ? 'null' : JSON.stringify(value)
+    prepareFieldValue(value: any, fieldType?: string) {
+        if (fieldType?.toLowerCase() === 'json') {
+            return JSON.stringify(value)
+        }
         return value
     }
 

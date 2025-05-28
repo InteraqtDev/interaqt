@@ -125,7 +125,7 @@ export class SQLiteDB implements Database{
             return 'INTEGER PRIMARY KEY'
         } else if (type === 'id') {
             return 'INT'
-        } else if (collection || type === 'object') {
+        } else if (collection || type === 'object'||type==='json') {
             return 'JSON'
         } else if (type === 'string') {
             return 'TEXT'

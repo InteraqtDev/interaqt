@@ -396,7 +396,7 @@ export class Scheduler {
                 status: result === undefined ? 'pending' : 'success',
                 args,
                 record,
-                result: result ? JSON.stringify(result) : null
+                result
             })
         } else {
             // global/entity 的情况

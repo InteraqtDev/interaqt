@@ -120,14 +120,16 @@ export class DBSetup {
                     type: prop.type,
                     computed: prop.computed,
                     collection: prop.collection,
-                    defaultValue: prop.defaultValue
+                    defaultValue: prop.defaultValue,
+                    fieldType: this.database!.mapToDBFieldType(prop.type, prop.collection)
                 }
             ];
         }));
 
         // 自动补充
         attributes[ID_ATTR] = {
-            type: 'id'
+            type: 'id',
+            fieldType: this.database!.mapToDBFieldType('pk')
         }
 
         if (isRelation) {

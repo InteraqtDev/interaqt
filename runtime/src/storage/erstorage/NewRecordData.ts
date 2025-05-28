@@ -6,6 +6,12 @@ import {LINK_SYMBOL} from "./RecordQuery.js";
 
 export type RawEntityData = { [k: string]: any }
 
+export type FieldAndValue = {
+    field: string,
+    value: any,
+    fieldType?: string
+}
+
 export class NewRecordData {
     // 关系往自身合并的异表新 record
     public mergedLinkTargetNewRecords: NewRecordData[] = []
@@ -134,15 +140,16 @@ export class NewRecordData {
         return {...this.rawData} as Record
     }
 
-    getSameRowFieldAndValue(oldRecord: Omit<Record, 'id'> = {}) : {field:string, value:any}[]{
+    getSameRowFieldAndValue(oldRecord: Omit<Record, 'id'> = {}) : FieldAndValue[]{
 
         const newRecord = {...oldRecord, ...this.rawData}
 
-        const result: {field:string, value:any}[] = this.valueAttributes.map((info) => {
+        const result: FieldAndValue[] = this.valueAttributes.map((info) => {
             const value = info.isComputed ? info.computed!({...this.rawData, ...oldRecord}) : this.rawData[info.attributeName]
             return {
                 field: info.field!,
-                value
+                value,
+                fieldType: info.fieldType!
             }
         })
 
@@ -155,7 +162,8 @@ export class NewRecordData {
                 if (newValue !== oldRecord[info.attributeName]) {
                     result.push({
                         field: info.field!,
-                        value: newValue
+                        value: newValue,
+                        fieldType: info.fieldType!
                     })
                 }
             }
@@ -165,7 +173,7 @@ export class NewRecordData {
         this.entityIdAttributes.forEach(info => {
             result.push({
                 field:info.linkField!,
-                value: this.rawData[info.attributeName].id
+                value: this.rawData[info.attributeName].id,
             })
         })
 
@@ -173,7 +181,7 @@ export class NewRecordData {
         this.mergedLinkTargetRecordIdRefs.forEach(recordData => {
             result.push({
                 field: recordData.info?.linkField!,
-                value: recordData.getRef().id
+                value: recordData.getRef().id,
             })
 
             if (recordData.linkRecordData) {
