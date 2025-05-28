@@ -18,14 +18,14 @@ export type ComputationResultPatch = {
 
 export class ComputationResult{
     static skip = () => new ComputationResultSkip()
-    static resolve = (result: any, args?:any) => new ComputationResultResolve(result, args)
+    static resolved = (result: any, args?:any) => new ComputationResultResolved(result, args)
 }
 
 export class ComputationResultSkip extends ComputationResult{
 
 }
 
-export class ComputationResultResolve extends ComputationResult{
+export class ComputationResultResolved extends ComputationResult{
     constructor(public result: any, public args?:any) {
         super()
     }

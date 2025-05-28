@@ -4,7 +4,7 @@ import { DataBasedComputation, DataDep, GlobalBoundState, RecordBoundState, Rela
 import { Controller } from "../Controller.js";
 import { DataContext } from "./ComputedDataHandle.js";
 import { EtityMutationEvent } from "../Scheduler.js";
-import { AttributeQuery, AttributeQueryData, MatchExp } from "@storage";
+import { AttributeQueryData, MatchExp } from "@storage";
 import { assert } from "../util.js";
 export class GlobalEveryHandle implements DataBasedComputation {
     callback: (this: Controller, item: any) => boolean

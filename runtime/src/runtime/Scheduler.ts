@@ -3,7 +3,7 @@ import { DataContext, ComputedDataHandle, PropertyDataContext, EntityDataContext
 
 import { Entity, Klass, KlassInstance, Property, Relation } from "@shared";
 import { assert } from "./util.js";
-import { Computation, ComputationClass, DataBasedComputation, DataDep, EventBasedComputation, GlobalBoundState, RecordBoundState, RecordsDataDep, RelationBoundState } from "./computedDataHandles/Computation.js";
+import { Computation, ComputationClass, ComputationResult, ComputationResultResolved, ComputationResultSkip, DataBasedComputation, DataDep, EventBasedComputation, GlobalBoundState, RecordBoundState, RecordsDataDep, RelationBoundState } from "./computedDataHandles/Computation.js";
 import { InteractionEventEntity, RecordMutationEvent } from "./System.js";
 import { AttributeQueryData, MatchExp, RecordQueryData } from "@storage";
 
@@ -246,7 +246,6 @@ export class Scheduler {
         this.erMutationEventSources = ERMutationEventSources
         this.dataSourceMapTree = this.buildDataSourceMapTree(this.erMutationEventSources)
 
-        const root = this
         this.controller.system.storage.listen(async (mutationEvents) => {
             for(let mutationEvent of mutationEvents){
                 const sources = this.dataSourceMapTree[mutationEvent.recordName]?.[mutationEvent.type]
@@ -389,13 +388,15 @@ export class Scheduler {
     getAsyncTaskRecordKey(computation: Computation) {
         return `${ASYNC_TASK_RECORD}_${(computation.dataContext as PropertyDataContext).host?.name ?  `${(computation.dataContext as PropertyDataContext).host?.name}_` : ''}${(computation.dataContext as PropertyDataContext).id}`
     }
-    async createAsyncTask(computation: Computation, args: any, record?: any) {
+    async createAsyncTask(computation: Computation, args: any, record?: any, result?: any) {
         // TODO 创建异步任务
         // TODO 要根据不同 dataContext 来创建不同的 task。
         if (computation.dataContext.type === 'property') {
             return this.controller.system.storage.create(this.getAsyncTaskRecordKey(computation), {
+                status: result === undefined ? 'pending' : 'success',
                 args,
-                record
+                record,
+                result: result ? JSON.stringify(result) : null
             })
         } else {
             // global/entity 的情况
@@ -452,14 +453,34 @@ export class Scheduler {
             // 3. 全量计算
             const databasedComputation = computation as DataBasedComputation
             // FIXME 需要注入 dataDeps
-            const argsOrResult = await databasedComputation.compute()
+            const argsOrResult = await databasedComputation.compute(await this.resolveDataDeps(databasedComputation, record), record)
             if (this.isAsyncComputation(computation)) {
-                // 应用 result
-                await this.createAsyncTask(computation, argsOrResult, record)
+                if (argsOrResult instanceof ComputationResultSkip) {
+                    // do nothing
+                } else if (argsOrResult instanceof ComputationResultResolved) {
+                    await this.createAsyncTask(computation, argsOrResult.args, record, argsOrResult.result)
+                } else {
+                    await this.createAsyncTask(computation, argsOrResult, record, argsOrResult.result)
+                }
             } else {
                 // 应用 resultPatch
                 await this.controller.applyResultPatch(databasedComputation.dataContext, argsOrResult, record)
             }
+        }
+    }
+    async resolveDataDeps(computation: DataBasedComputation, record?: any) {
+        if (computation.dataDeps) {
+
+            const values: any[] = await Promise.all(Object.values(computation.dataDeps).map(async dataDep => {
+                if (dataDep.type === 'records') {
+                    return await this.controller.system.storage.find(dataDep.source.name, undefined, {}, dataDep.attributeQuery)
+                } else if (dataDep.type === 'property') {
+                    return this.controller.system.storage.findOne((computation.dataContext as PropertyDataContext).host.name, MatchExp.atom({key: 'id', value: ['=', record.id]}), {}, dataDep.attributeQuery)
+                }
+            }))
+            return Object.fromEntries(Object.entries(computation.dataDeps).map(([dataDepName, dataDep], index) => [dataDepName, values[index]]))
+        } else {
+            return {}
         }
     }
     buildDataSourceMapTree(sourceMaps: EntityEventSourceMap[]) {

@@ -1,4 +1,4 @@
-import { Controller, Entity, MonoSystem, Property, ComputedDataHandle, createClass, MatchExp, DataDep, PropertyDataContext, KlassInstance, PGLiteDB, DataBasedComputation } from "@";
+import { Controller, Entity, MonoSystem, Property, ComputedDataHandle, createClass, MatchExp, DataDep, PropertyDataContext, KlassInstance, PGLiteDB, DataBasedComputation, ComputationResult } from "@";
 import { expect, test, describe } from "vitest";
 
 const TestCrawlerComputed = createClass({
@@ -23,11 +23,14 @@ class TestCrawlerComputation implements DataBasedComputation {
             }
         }
     }
-    async compute(...args: any[]) {
-        return {name:'John'}
+    async compute({_current}: {_current:any}) {
+        if (_current.url === 'https://www.interaqt.dev') {
+            return ComputationResult.resolved('reactive backend framwork', {type: 'preset'})
+        }
+        return {type: 'random'}
     }
     async asyncReturn(result:any, args:any) {
-        return `${result}_crawled_by_${args.name}`
+        return `${result}_crawled_by_${args.type}`
     }
 }
 
@@ -63,7 +66,7 @@ describe('async computed', () => {
 
 
         // 1. 创建了异步任务 
-        const url = await system.storage.create('URL', {url: 'https://www.interaqt.dev'})
+        const url = await system.storage.create('URL', {url: 'https://not.exist.com'})
 
         const crawlerTaskRecords = await system.storage.find(crawlerTaskRecordName)
         expect(crawlerTaskRecords.length).toBe(1)
@@ -79,7 +82,16 @@ describe('async computed', () => {
         
         // 4. 检查 content 属性是否被更新
         const entity = await system.storage.findOne(URLEntity.name, MatchExp.atom({key: 'id', value: ['=', crawlerTaskRecords[0].id]}), {}, ['*'])
-        expect(entity.content).toBe(`${randomResult}_crawled_by_John`)
+        expect(entity.content).toBe(`${randomResult}_crawled_by_random`)
+
+
+        // test async computed with resolved return
+        const url2 = await system.storage.create('URL', {url: 'https://www.interaqt.dev'})
+        const updatedCrawlerTaskRecord2 = await system.storage.findOne(crawlerTaskRecordName, MatchExp.atom({key: 'record.id', value: ['=', url2.id]}), {}, ['*'])
+        await controller.scheduler.handleAsyncReturn(crawlerComputation, updatedCrawlerTaskRecord2)
+
+        const entity2 = await system.storage.findOne(URLEntity.name, MatchExp.atom({key: 'id', value: ['=', url2.id]}), {}, ['*'])
+        expect(entity2.content).toBe('reactive backend framwork_crawled_by_preset')
 
         await system.destroy()
     })
