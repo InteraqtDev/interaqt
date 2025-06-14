@@ -3,7 +3,7 @@ import { Any, KlassInstance, Relation } from "@shared";
 import { Controller } from "../Controller.js";
 import { DataDep, GlobalBoundState, RecordBoundState, RelationBoundState } from "./Computation.js";
 import { DataBasedComputation } from "./Computation.js";
-import { EtityMutationEvent } from "../Scheduler.js";
+import { EtityMutationEvent } from "../ComputationSourceMap.js";
 import { MatchExp, AttributeQueryData } from "@storage";
 
 

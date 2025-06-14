@@ -3,7 +3,7 @@ import { Transform, KlassInstance, Relation, Entity, Activity, Interaction, Bool
 import { Controller } from "../Controller.js";
 import { ComputationResultPatch, DataDep, RecordBoundState, RecordsDataDep } from "./Computation.js";
 import { DataBasedComputation } from "./Computation.js";
-import { EtityMutationEvent } from "../Scheduler.js";
+import { EtityMutationEvent } from "../ComputationSourceMap.js";
 
 export class RecordsTransformHandle implements DataBasedComputation {
     transformCallback: (this: Controller, item: any) => any
