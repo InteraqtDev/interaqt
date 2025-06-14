@@ -1,7 +1,7 @@
 import { KlassInstance, StateMachine, StateNode } from "@shared";
 import { Controller } from "../Controller.js";
 import { InteractionEventArgs } from "../InteractionCall.js";
-import { EntityIdRef, EVENT_RECORD, RecordMutationEvent } from '../System.js';
+import { EntityIdRef, INTERACTION_RECORD, RecordMutationEvent } from '../System.js';
 import { ComputedDataHandle, DataContext, EntityDataContext } from "./ComputedDataHandle.js";
 import { ComputationResult, ComputationResultPatch, EventBasedComputation, EventDep, GlobalBoundState, RecordBoundState } from "./Computation.js";
 import { EtityMutationEvent } from "../Scheduler.js";
@@ -33,7 +33,7 @@ export class GlobalStateMachineHandle implements EventBasedComputation {
         return this.defaultState.computeValue ? this.defaultState.computeValue.call(this) : this.defaultState.name
     }
     mutationEventToTrigger(mutationEvent: RecordMutationEvent) {
-        if (mutationEvent.recordName === EVENT_RECORD) {
+        if (mutationEvent.recordName === INTERACTION_RECORD) {
             const interactionName = mutationEvent.record!.interactionName!
             const interaction = this.controller.interactions.find(i => i.name === interactionName)
             return interaction
@@ -82,7 +82,7 @@ export class PropertyStateMachineHandle implements EventBasedComputation {
     }
     mutationEventToTrigger(mutationEvent: RecordMutationEvent) {
         // FIXME 支持 data mutation
-        if (mutationEvent.recordName === EVENT_RECORD) {
+        if (mutationEvent.recordName === INTERACTION_RECORD) {
             const interactionName = mutationEvent.record!.interactionName!
             const interaction = this.controller.interactions.find(i => i.name === interactionName)
             return interaction
@@ -96,7 +96,7 @@ export class PropertyStateMachineHandle implements EventBasedComputation {
             const transfers = this.transitionFinder.findTransfers(trigger)
             
             return Promise.all(transfers.map(transfer => {
-                const event = mutationEvent.recordName === EVENT_RECORD ? mutationEvent.record : mutationEvent
+                const event = mutationEvent.recordName === INTERACTION_RECORD ? mutationEvent.record : mutationEvent
                 return transfer.computeTarget!.call(this, event)
             }))
         }
@@ -139,7 +139,7 @@ export class RecordStateMachineHandle implements EventBasedComputation {
     }
     mutationEventToTrigger(mutationEvent: RecordMutationEvent) {
         // FIXME 支持 data mutation
-        if (mutationEvent.recordName === EVENT_RECORD) {
+        if (mutationEvent.recordName === INTERACTION_RECORD) {
             const interactionName = mutationEvent.record!.interactionName!
             const interaction = this.controller.interactions.find(i => i.name === interactionName)
             return interaction
@@ -153,7 +153,7 @@ export class RecordStateMachineHandle implements EventBasedComputation {
             const transfers = this.transitionFinder.findTransfers(trigger)
             
             return Promise.all(transfers.map(transfer => {
-                const event = mutationEvent.recordName === EVENT_RECORD ? mutationEvent.record : mutationEvent
+                const event = mutationEvent.recordName === INTERACTION_RECORD ? mutationEvent.record : mutationEvent
                 return transfer.computeTarget!.call(this, event)
             }))
         }

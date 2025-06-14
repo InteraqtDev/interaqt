@@ -3,7 +3,7 @@ import {
     ComputationState,
     Database,
     DatabaseLogger,
-    EVENT_RECORD, InteractionEventEntity,
+    INTERACTION_RECORD, InteractionEventEntity,
     RecordMutationCallback,
     RecordMutationEvent,
     Storage,
@@ -165,10 +165,10 @@ export class MonoSystem implements System {
         this.storage = new MonoStorage(db)
     }
     async saveEvent(event: InteractionEvent, mutationEvents: RecordMutationEvent[] = []): Promise<any> {
-        return this.storage.create(EVENT_RECORD, event, mutationEvents)
+        return this.storage.create(INTERACTION_RECORD, event, mutationEvents)
     }
     async getEvent(query?: MatchExpressionData ) {
-        return (await this.storage.find(EVENT_RECORD, query, undefined, ['*'])).map(event => ({
+        return (await this.storage.find(INTERACTION_RECORD, query, undefined, ['*'])).map(event => ({
             ...event,
         })) as unknown as InteractionEvent[]
     }

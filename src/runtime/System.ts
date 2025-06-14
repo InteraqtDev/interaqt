@@ -7,7 +7,7 @@ export type SystemCallback =  (...arg: any[]) => any
 export type RecordMutationCallback = (mutationEvents:RecordMutationEvent[]) => Promise<{ events?: RecordMutationEvent[] } |undefined|void>
 
 export const SYSTEM_RECORD = '_System_'
-export const EVENT_RECORD = '_Event_'
+export const INTERACTION_RECORD = '_Interaction_'
 export const ACTIVITY_RECORD = '_Activity_'
 
 export type Storage = {
@@ -151,7 +151,7 @@ export type EntityInstanceType<T extends EntityType> = {
 
 // event 的实体化
 export const InteractionEventEntity = Entity.create({
-    name: EVENT_RECORD,
+    name: INTERACTION_RECORD,
     properties: [
         Property.create({
             name: 'interactionId',
