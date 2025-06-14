@@ -197,12 +197,12 @@ export const ActivityStateEntity = Entity.create({
         }),
         Property.create({
             name: 'state',
-            type: 'string',
+            type: 'object',
             collection: false,
         }),
         Property.create({
             name: 'refs',
-            type: 'string',
+            type: 'object',
             collection: false,
         })
     ]

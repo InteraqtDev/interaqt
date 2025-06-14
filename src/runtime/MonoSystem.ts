@@ -175,8 +175,8 @@ export class MonoSystem implements System {
     async createActivity(activity: any) {
         return this.storage.create(ACTIVITY_RECORD, {
             ...activity,
-            state: JSONStringify(activity.state),
-            refs: JSONStringify(activity.refs),
+            state: activity.state,
+            refs: activity.refs,
         })
     }
     async updateActivity(match: MatchExpressionData, activity: any) {
@@ -186,18 +186,18 @@ export class MonoSystem implements System {
         delete data.state
         delete data.refs
         if (activity.state) {
-            data.state = JSONStringify(activity.state)
+            data.state = activity.state
         }
         if (activity.refs) {
-            data.refs = JSONStringify(activity.refs)
+            data.refs = activity.refs
         }
         return this.storage.update(ACTIVITY_RECORD, match, data)
     }
     async getActivity(query?: MatchExpressionData) {
         return (await this.storage.find(ACTIVITY_RECORD, query, undefined, ['*'])).map(activity => ({
             ...activity,
-            state: JSONParse(activity.state),
-            refs: JSONParse(activity.refs),
+            state: activity.state,
+            refs: activity.refs,
         }))
     }
     setup(entities: KlassInstance<typeof Entity>[], relations: KlassInstance<typeof Relation>[], states: ComputationState[], install = false){

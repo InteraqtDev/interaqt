@@ -11,7 +11,6 @@ type SourceTargetPair = [EntityIdRef, EntityIdRef][]
 type ComputeRelationTargetResult = SourceTargetPair | {source: EntityIdRef[] | EntityIdRef, target: EntityIdRef[]|EntityIdRef} | undefined
 type EntityTargetResult = EntityIdRef|EntityIdRef[]|undefined
 type ComputeSourceResult = ComputeRelationTargetResult| EntityTargetResult
-type TransferHandleFn = (this: Controller,interactionEventArgs: InteractionEventArgs, activityId?:string ) =>  Promise<ComputeSourceResult>
 
 export class GlobalStateMachineHandle implements EventBasedComputation {
     transitionFinder: TransitionFinder
