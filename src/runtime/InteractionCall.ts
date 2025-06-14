@@ -42,8 +42,8 @@ export type InteractionEvent  = {
 
 export type InteractionEventArgs = {
     user: EventUser,
-    query: any,
-    payload: any,
+    query?: any,
+    payload?: any,
     activityId?: string,
 }
 
@@ -512,7 +512,9 @@ export class InteractionCall {
                         ...savedPayload
                     },
                 },
-                activityId
+                activity: {
+                    id: activityId,
+                }
             }
 
             await this.saveEvent(event, response.effects!)

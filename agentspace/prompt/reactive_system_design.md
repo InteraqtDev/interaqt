@@ -1,6 +1,6 @@
 # Reactive System Design
 
-## Prompt
+## 1. Prompt
 这个项目的响应式具体指的是：用户只要描述系统中数据的定义，数据的具体变化过程是响应式的。
 例如：有一个内容系统，其中一个实体概念是帖子，帖子有一个点赞总数。用户将"点赞总数"描述成"用户和帖子间的点赞关系的总和"，框架会根据这个定义自动知道但出现新的点赞关系时，总数应该加一，这是由"总和"这个概念的定义决定的。总和这个数据在数据库中的变化是由框架自动操作完成的。
 
@@ -15,11 +15,11 @@
 
 我现在要重做这一部分的实现设计，我下面有一些问题，你来回答我。回答的内容，写在每个问题后面"回答"的章节中。
 
-## 问题
+## 2. 问题
 
-### 问题1 Entity/Relation/Event/Collection/Value 等概念的 梳理
+### 2.1. 问题 Entity/Relation/Event/Collection/Value 等概念的 梳理
 
-#### 描述
+#### 2.1.1. 描述
 
 我系统中有这些概念：
 - Entity/Relation 既是提供给用户用来描述业务中的实体关系的，也是真实创建数据库表结构时需要的。
@@ -29,5 +29,34 @@
 
 这些概念直接应该是个什么关系？应该怎么用类、类型、接口等具体表示？
 
-#### 回答
+#### 2.1.2. 回答
 
+- Entity/Relation 都是 Entity. Event 不是.
+- 系统会为 Entity 创建 Entity Collection，因此会有 EntityCollectionMutationEvent.
+- 所有的 Entity Collection 都可以被监听，并且能有统一的 Computation 表达。
+
+MutationEvents 是一种描述当前系统中的所有实体“变化”的数据。它和其他实体不是同一个维度的事情，不应该因为表现出一样的性质就做同样的抽象。
+如果真的有开发者需求，希望能复用 computation 的能力，也应该通过的别的方式来桥接。
+如果有来自用户的观测/管理系统的需求，应该基于 Interaction 去构建。虽然会比较难。
+
+
+## 3. 设计
+
+### 3.1. Entity & Property & Relation
+
+Property<Type>:
+- name: string
+- type: TypeString<Type>
+- collection: boolean
+- getDefaultValue: () => Type. 可以根据其他初始字段计算初始值
+- getValue: () => Type. 基于当前记录其他字段的计算表达，同样会写入数据库。但是是在增删时直接计算。
+- computed: Computation. 响应式表达
+
+Entity:
+- properties: Property<any>[]
+
+Relation extends Entity:
+- source: Enity
+- sourceProperty: string
+- target: Entity
+- targetProperty: string

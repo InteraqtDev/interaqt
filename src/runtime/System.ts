@@ -164,11 +164,6 @@ export const InteractionEventEntity = Entity.create({
             collection: false,
         }),
         Property.create({
-            name: 'activityId',
-            type: 'string',
-            collection: false,
-        }),
-        Property.create({
             name: 'payload',
             type: 'object',
             collection: false,
@@ -211,6 +206,15 @@ export const ActivityStateEntity = Entity.create({
             collection: false,
         })
     ]
+})
+
+export const ActivityInteractionRelation = Relation.create({
+    name: 'activityInteraction',
+    source: ActivityStateEntity,
+    sourceProperty: 'interaction',
+    target: InteractionEventEntity,
+    targetProperty: 'activity',
+    type: '1:n',
 })
 
 export type InteractionEventRecord = InteractionEvent & EntityIdRef

@@ -203,8 +203,8 @@ export function createData() {
                 key: 'interactionName',
                 value: ['=', sendInteraction.name]
             }).and({
-                key: 'activityId',
-                value: ['=', eventArgs.activityId]
+                key: 'activity.id',
+                value: ['=', eventArgs.activity.id]
             })
             // FIXME 这里是不是应该直接能从 eventArgs 获取？？？
             const sendEvent = await this.controller.system.storage.findOne(InteractionEventEntity.name, match, undefined, ['*'])
@@ -270,10 +270,11 @@ export function createData() {
         current: resultPendingState,
         next: resultApprovedState,
         computeTarget: async function (this: PropertyStateMachineHandle, eventArgs) {
-            return this.controller.system.storage.findOne('Request', MatchExp.atom({
+            const request= await this.controller.system.storage.findOne('Request', MatchExp.atom({
                 key: 'activityId',
-                value: ['=', eventArgs.activityId]
+                value: ['=', eventArgs.activity.id]
             }))
+            return request
         }
     })
     const pendingToRejectedTransfer = StateTransfer.create({
@@ -283,7 +284,7 @@ export function createData() {
         computeTarget: async function (this: PropertyStateMachineHandle, eventArgs) {
             return this.controller.system.storage.findOne('Request', MatchExp.atom({
                 key: 'activityId',
-                value: ['=', eventArgs.activityId]
+                value: ['=', eventArgs.activity.id]
             }))
         }
     })
@@ -298,14 +299,14 @@ export function createData() {
         name: 'Request',
         computedData: Transform.create({
             record: InteractionEventEntity,
-            attributeQuery: ['*'],
+            attributeQuery: ['*', ['activity', {attributeQuery:['id']}]],
             callback: (interactionEvent) => {
                 if (interactionEvent.interactionName === sendInteraction.name) {
                     return {
                         from: interactionEvent.user,
                         to: interactionEvent.payload.to,
                         message: interactionEvent.payload.menssage,
-                        activityId: interactionEvent.activityId
+                        activityId: interactionEvent.activity.id
                     }
                 }
             }

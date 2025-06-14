@@ -1,5 +1,5 @@
 import {
-    ACTIVITY_RECORD, ActivityStateEntity,
+    ACTIVITY_RECORD, ActivityInteractionRelation, ActivityStateEntity,
     ComputationState,
     Database,
     DatabaseLogger,
@@ -120,7 +120,6 @@ class MonoStorage implements Storage{
         return this.callWithEvents(this.queryHandle!.removeRelationByName.bind(this.queryHandle), [relationName, matchExpressionData], events)
     }
     addRelationByNameById(relationName: string, sourceEntityId: string, targetEntityId: string, rawData: RawEntityData = {}, events?: RecordMutationEvent[]) {
-        if (events?.length===2)debugger
         return this.callWithEvents(this.queryHandle!.addRelationByNameById.bind(this.queryHandle), [relationName, sourceEntityId, targetEntityId, rawData], events)
     }
     getRelationName(...arg:Parameters<EntityQueryHandle["getRelationName"]>) {
@@ -219,7 +218,7 @@ export class MonoSystem implements System {
             ...entities.map(prepareEntity),
             prepareEntity(SystemEntity as KlassInstance<typeof Entity>),
             prepareEntity(InteractionEventEntity as KlassInstance<typeof Entity>),
-            prepareEntity(ActivityStateEntity as KlassInstance<typeof Entity>)
+            prepareEntity(ActivityStateEntity as KlassInstance<typeof Entity>),
         ];
 
         states.forEach(({dataContext, state}) => {
@@ -282,7 +281,7 @@ export class MonoSystem implements System {
         // Pass the prepared entities to storage.setup
         return this.storage.setup(
             preparedEntities as any, 
-            relations, 
+            [...relations, ActivityInteractionRelation],
             install
         );
     }

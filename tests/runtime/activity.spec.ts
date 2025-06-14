@@ -97,11 +97,8 @@ describe("activity state", () => {
         // 5. 角色错误 a approve
         const res4 = await controller.callActivityInteraction(activityUUID,  approveUUID, activityId,{user: userA})
         expect(res4.error).toBeDefined()
-
-
         // 6. 正确 b approve
         const res5 = await controller.callActivityInteraction(activityUUID, approveUUID, activityId,{user: userB})
-        
         // 查询关系是否正确建立
         const relation = await controller.system.storage.findOneRelationByName('User_friends_friends_User', undefined, undefined, ['*', ['source', {attributeQuery: ['*']}], ['target', {attributeQuery: ['*']}]])
         expect(relation.source.id).toBe(userA.id)

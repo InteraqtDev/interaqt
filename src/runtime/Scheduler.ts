@@ -408,3 +408,6 @@ export class Scheduler {
         await this.setupMutationListeners()
     }
 }
+
+export { EtityMutationEvent };
+
