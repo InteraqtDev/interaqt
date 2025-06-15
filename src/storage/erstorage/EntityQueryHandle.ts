@@ -7,6 +7,7 @@ import {RecordQuery} from "./RecordQuery.js";
 import {NewRecordData, RawEntityData} from "./NewRecordData.js";
 import {RecordQueryAgent} from "./RecordQueryAgent.js";
 import {EntityIdRef, Database, RecordMutationEvent} from "@runtime";
+import {getInstance, Entity} from "@shared";
 
 export class EntityQueryHandle {
     agent: RecordQueryAgent
@@ -98,5 +99,80 @@ export class EntityQueryHandle {
     getEntityName(entity: string, attribute: string): string {
         const info = this.map.getInfo(entity, attribute)
         return info.recordName
+    }
+
+    // === Filtered Entity 相关方法 ===
+
+    /**
+     * 检查给定的 entity 是否是 filtered entity
+     */
+    isFilteredEntity(entityName: string): boolean {
+        const entities = getInstance(Entity);
+        const entity = entities.find((e: any) => e.name === entityName);
+        return !!(entity?.sourceEntity && entity?.filterCondition);
+    }
+
+    /**
+     * 获取 filtered entity 的配置
+     */
+    getFilteredEntityConfig(entityName: string): { sourceEntity: string, filterCondition: any } | null {
+        const entities = getInstance(Entity);
+        const entity = entities.find((e: any) => e.name === entityName);
+        if (entity?.sourceEntity && entity?.filterCondition) {
+            return {
+                sourceEntity: entity.sourceEntity,
+                filterCondition: entity.filterCondition
+            };
+        }
+        return null;
+    }
+
+    /**
+     * 获取基于指定源实体的所有 filtered entities
+     */
+    getFilteredEntitiesForSource(sourceEntityName: string): Array<{ name: string, filterCondition: any }> {
+        const entities = getInstance(Entity);
+        const filteredEntities: Array<{ name: string, filterCondition: any }> = [];
+        const seenNames = new Set<string>();
+        
+        for (const entity of entities) {
+            // 确保实体有 sourceEntity 和 filterCondition，且 sourceEntity 匹配
+            if ((entity as any).sourceEntity === sourceEntityName && 
+                (entity as any).filterCondition && 
+                (entity as any).sourceEntity && 
+                (entity as any).name !== sourceEntityName &&
+                !seenNames.has((entity as any).name)) {
+                
+                seenNames.add((entity as any).name);
+                filteredEntities.push({
+                    name: (entity as any).name,
+                    filterCondition: (entity as any).filterCondition
+                });
+            }
+        }
+        
+        return filteredEntities;
+    }
+
+    /**
+     * 处理 filtered entity 的查询，重定向到源实体并添加过滤条件
+     */
+    async findForFilteredEntity(filteredEntityName: string, matchExpressionData?: MatchExpressionData, modifierData?: ModifierData, attributeQueryData: AttributeQueryData = []) {
+        const config = this.getFilteredEntityConfig(filteredEntityName);
+        if (!config) {
+            throw new Error(`${filteredEntityName} is not a filtered entity`);
+        }
+
+        // 构造查询条件：过滤条件 + 额外的匹配条件（如果有）
+        let combinedMatch = config.filterCondition;
+        
+        if (matchExpressionData) {
+            combinedMatch = new MatchExp(config.sourceEntity, this.map, combinedMatch)
+                .and(new MatchExp(config.sourceEntity, this.map, matchExpressionData))
+                .data;
+        }
+
+        // 直接在源实体上查询，使用过滤条件
+        return this.find(config.sourceEntity, combinedMatch, modifierData, attributeQueryData);
     }
 }

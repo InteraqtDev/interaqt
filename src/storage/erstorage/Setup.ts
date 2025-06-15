@@ -132,6 +132,22 @@ export class DBSetup {
             fieldType: this.database!.mapToDBFieldType('pk')
         }
 
+        // 如果不是关系且有其他实体以此为源实体，添加 __filtered_entities 字段
+        if (!isRelation) {
+            const entityName = entityWithProps.name;
+            const hasFilteredEntities = this.entities.some(e => 
+                (e as any).sourceEntity === entityName
+            );
+            
+            if (hasFilteredEntities) {
+                attributes['__filtered_entities'] = {
+                    type: 'json',
+                    fieldType: this.database!.mapToDBFieldType('json') || 'JSON',
+                    defaultValue: () => '{}'
+                };
+            }
+        }
+
         if (isRelation) {
             assert(!attributes.source && !attributes.target, 'source and target is reserved name for relation attributes')
         }
@@ -447,6 +463,29 @@ export class DBSetup {
                 }
             })
         })
+
+        // 为源实体表添加 __filtered_entities 字段
+        this.entities.forEach(entity => {
+            const entityName = entity.name;
+            // 检查是否有其他实体以此实体为 sourceEntity
+            const hasFilteredEntities = this.entities.some(e => 
+                (e as any).sourceEntity === entityName
+            );
+            
+            if (hasFilteredEntities) {
+                const record = this.map.records[entityName];
+                if (record && record.table) {
+                    const filteredEntitiesFieldName = '__filtered_entities';
+                    if (!this.tables[record.table].columns[filteredEntitiesFieldName]) {
+                        this.tables[record.table].columns[filteredEntitiesFieldName] = {
+                            name: filteredEntitiesFieldName,
+                            type: 'json',
+                            fieldType: this.database!.mapToDBFieldType('json') || 'JSON',
+                        };
+                    }
+                }
+            }
+        });
     }
 
     createTableSQL() {

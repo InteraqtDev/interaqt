@@ -14,3 +14,4 @@
 - [x] 理解其中是如何通过一个类似 sourcemap 的数据结构来从 data mutation event 中找到对应要触发的 computation 的，将 computation sourcemap 相关的代码和类型定义都从 Scheduler 中抽出来重构到一个新的独立文件中，并保证`npm test`能成功通过。
 - [x] 继续重构 Scheduler 和 ComputationSourceMap，让 ComputationSourceMap 来持有数据，并提供查询的接口，而不只是工厂方法。
 - [x] 继续遵照 `agentspace/prompt/activity.md` 中的指示完成任务。
+- [x] 遵照 `agentspace/prompt/filtered_entity.md` 实现 Filtered Entity。

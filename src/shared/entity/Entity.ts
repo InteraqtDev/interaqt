@@ -63,6 +63,18 @@ type EntityPublic = {
         type: Klass<any>[],
         collection: false,
         required: false,
+    },
+    // Filtered Entity 字段 - 从哪个 entity 过滤
+    sourceEntity: {
+        type: 'string',
+        collection: false,
+        required: false,
+    },
+    // Filtered Entity 字段 - 过滤条件（使用 MatchExp 格式）
+    filterCondition: {
+        type: 'object',
+        collection: false,
+        required: false,
     }
 };
 
@@ -149,6 +161,18 @@ export const Entity: Klass<EntityPublic> = createClass({
         computedData: {
             // CAUTION 这里的具体类型等着外面注册 IncrementalComputationHandle 的时候修补
             type: [] as Klass<any>[],
+            collection: false,
+            required: false,
+        },
+        // Filtered Entity 字段 - 从哪个 entity 过滤
+        sourceEntity: {
+            type: 'string',
+            collection: false,
+            required: false,
+        },
+        // Filtered Entity 字段 - 过滤条件（使用 MatchExp 格式）
+        filterCondition: {
+            type: 'object',
             collection: false,
             required: false,
         }
