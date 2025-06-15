@@ -196,7 +196,7 @@ export const Interaction: Klass<InteractionPublicType> = createClass({
             collection: false,
         },
         data: {
-            type: [Entity, Relation, Computation],
+            type: [Entity, Relation],
             required: false,
             collection: false
         },
