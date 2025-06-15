@@ -50,11 +50,10 @@ export class PGLiteDB implements Database{
         await this.idSystem.setup()
 
     }
-    async query<T extends any>(sql:string, where: any[] =[], name= '')  {
+    async query<T extends any>(sql:string, params: any[] =[], name= '')  {
         const context= asyncInteractionContext.getStore() as InteractionContext
         const logger = this.logger.child(context?.logContext || {})
 
-        const params = where.map(x => x===false ? 0 : x===true ? 1 : x)
         logger.info({
             type:'query',
             name,
@@ -68,7 +67,7 @@ export class PGLiteDB implements Database{
         const logger = this.logger.child(context?.logContext || {})
         const finalSQL = `${sql} ${idField ? `RETURNING "${idField}" AS id`: ''}`
         const params = values.map(x => {
-            return (typeof x === 'object' && x !==null) ? JSON.stringify(x) : x===false ? 0 : x===true ? 1 : x
+            return (typeof x === 'object' && x !==null) ? JSON.stringify(x) : x
         })
         logger.info({
             type:'update',
@@ -82,7 +81,7 @@ export class PGLiteDB implements Database{
         const context= asyncInteractionContext.getStore() as InteractionContext
         const logger = this.logger.child(context?.logContext || {})
         const params = values.map(x => {
-            return (typeof x === 'object' && x !==null) ? JSON.stringify(x) : x===false ? 0 : x===true ? 1 : x
+            return (typeof x === 'object' && x !==null) ? JSON.stringify(x) :  x
         })
         logger.info({
             type:'insert',
@@ -94,10 +93,9 @@ export class PGLiteDB implements Database{
         const finalSQL = `${sql} RETURNING "${ROW_ID_ATTR}"`
         return (await this.db.query(finalSQL, params)).rows[0] as EntityIdRef
     }
-    async delete<T extends any> (sql:string, where: any[], name='') {
+    async delete<T extends any> (sql:string, params: any[], name='') {
         const context= asyncInteractionContext.getStore() as InteractionContext
         const logger = this.logger.child(context?.logContext || {})
-        const params = where.map(x => x===false ? 0 : x===true ? 1 : x)
         logger.info({
             type:'delete',
             name,
@@ -151,7 +149,7 @@ export class PGLiteDB implements Database{
         } else if (type === 'string') {
             return 'TEXT'
         } else if (type === 'boolean') {
-            return 'INT(2)'
+            return 'BOOL'
         } else if(type === 'number'){
             return "INT"
         }else if(type === 'timestamp'){

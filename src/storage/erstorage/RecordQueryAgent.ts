@@ -618,8 +618,12 @@ ${innerQuerySQL}
 
         const relianceResult = await this.handleCreationReliance(newEntityDataWithDep.merge(newRecordIdRef), events)
 
+        // 合并所有数据以获得完整的记录
+        const fullRecord = Object.assign({}, newEntityData.getData(), newRecordIdRef, relianceResult);
+
         // 处理 filtered entity - 检查新创建的记录是否属于任何 filtered entity
-        await this.updateFilteredEntityFlags(newEntityData.recordName, newRecordIdRef.id, events)
+        // 传递 isCreation = true 表示这是创建操作，只生成事件但不持久化 __filtered_entities
+        await this.updateFilteredEntityFlags(newEntityData.recordName, newRecordIdRef.id, events, fullRecord, true)
 
         // 更新 relianceResult 的信息到
         return Object.assign(newRecordIdRef, relianceResult)
@@ -1115,6 +1119,10 @@ WHERE "${entityInfo.idField}" = (${p()})
             // 3. 更新依赖我的和关系表独立的
             const relianceUpdatedResult = await this.handleUpdateReliance(entityName, matchedEntity, newEntityData, events)
 
+            // 处理 filtered entity - 检查更新后的记录是否属于任何 filtered entity
+            // 传递原始的 matchedEntity，它包含更新前的 __filtered_entities 状态
+            await this.updateFilteredEntityFlags(entityName, matchedEntity.id, events, matchedEntity)
+
             result.push({...newEntityData.getData(), ...newEntityDataWithIdsWithFlashOutRecords.getData(), ...relianceUpdatedResult})
         }
 
@@ -1235,6 +1243,28 @@ WHERE "${recordInfo.idField}" = ${p()}
                 }
             })
         }
+        
+        // 处理 filtered entity 的删除事件
+        for (let record of records) {
+            const filteredEntities = this.getFilteredEntitiesForSource(recordName);
+            if (filteredEntities.length > 0 && record.__filtered_entities) {
+                // __filtered_entities 可能已经被解析为对象
+                const currentFlags = typeof record.__filtered_entities === 'string' 
+                    ? JSON.parse(record.__filtered_entities) 
+                    : record.__filtered_entities;
+                for (const filteredEntity of filteredEntities) {
+                    if (currentFlags[filteredEntity.name] === true) {
+                        // 记录属于这个 filtered entity，生成删除事件
+                        events?.push({
+                            type: 'delete',
+                            recordName: filteredEntity.name,
+                            record: { ...record }
+                        });
+                    }
+                }
+            }
+        }
+        
         events?.push(...records.map(record => ({
             type: 'delete',
             recordName: recordName,
@@ -1436,61 +1466,89 @@ WHERE "${recordInfo.idField}" = ${p()}
     /**
      * 更新记录的 filtered entity 标记
      */
-    async updateFilteredEntityFlags(entityName: string, recordId: string, events?: RecordMutationEvent[]) {
+    async updateFilteredEntityFlags(entityName: string, recordId: string, events?: RecordMutationEvent[], originalRecord?: Record, isCreation?: boolean) {
         const filteredEntities = this.getFilteredEntitiesForSource(entityName);
         
         if (filteredEntities.length === 0) return;
 
-        // 获取当前记录
+        // 获取原始记录的 __filtered_entities 状态
+        const originalFlags = originalRecord?.__filtered_entities 
+            ? (typeof originalRecord.__filtered_entities === 'string' 
+                ? JSON.parse(originalRecord.__filtered_entities) 
+                : originalRecord.__filtered_entities)
+            : {};
+
+        // 获取更新后的记录以检查当前过滤条件
         const idMatch = MatchExp.atom({ key: 'id', value: ['=', recordId] });
-        const records = await this.findRecords(
-            RecordQuery.create(entityName, this.map, { matchExpression: idMatch }),
-            `find record for filtered entity check ${entityName}:${recordId}`
+        const updatedRecords = await this.findRecords(
+            RecordQuery.create(entityName, this.map, { matchExpression: idMatch, attributeQuery: ['*'] }),
+            `find updated record for filtered entity check ${entityName}:${recordId}`
         );
         
-        if (records.length === 0) return;
-        const record = records[0];
+        if (updatedRecords.length === 0) return;
+        const updatedRecord = updatedRecords[0];
 
         // 检查每个 filtered entity 条件
-        const currentFlags = record.__filtered_entities ? JSON.parse(record.__filtered_entities) : {};
-        const newFlags = { ...currentFlags };
+        const isNewRecord = !originalRecord?.__filtered_entities;
+        const newFlags = { ...originalFlags };
         
         for (const filteredEntity of filteredEntities) {
             // 检查记录是否满足过滤条件 - 直接使用过滤条件查询
             const matchingRecords = await this.findRecords(
-                RecordQuery.create(entityName, this.map, { matchExpression: filteredEntity.filterCondition }),
+                RecordQuery.create(entityName, this.map, { matchExpression: filteredEntity.filterCondition.and({
+                    key: 'id',
+                    value: ['=', recordId]
+                }),
+                modifier: {
+                    limit: 1
+                }
+            }),
                 `check filtered entity condition ${filteredEntity.name} for ${entityName}`
             );
             
             // 检查当前记录是否在匹配的记录中
-            const belongsToFilteredEntity = matchingRecords.some(r => r.id === recordId);
-            const previouslyBelonged = currentFlags[filteredEntity.name] === true;
+            const belongsToFilteredEntity = matchingRecords.length > 0;
+            const previouslyBelonged = originalFlags[filteredEntity.name] === true;
             
             newFlags[filteredEntity.name] = belongsToFilteredEntity;
             
             // 生成相应的事件
-            if (belongsToFilteredEntity && !previouslyBelonged) {
+            // 对于新创建的记录，如果满足条件就生成 create 事件
+            // 对于已存在的记录，只在状态变化时生成事件
+            if (belongsToFilteredEntity && (isNewRecord || !previouslyBelonged)) {
                 // 记录现在属于这个 filtered entity
                 events?.push({
                     type: 'create',
                     recordName: filteredEntity.name,
-                    record: { ...record, id: recordId }
+                    record: { ...updatedRecord }
                 });
-            } else if (!belongsToFilteredEntity && previouslyBelonged) {
+            } else if (!belongsToFilteredEntity && previouslyBelonged && !isNewRecord) {
                 // 记录不再属于这个 filtered entity
                 events?.push({
                     type: 'delete',
                     recordName: filteredEntity.name,
-                    record: { ...record, id: recordId }
+                    record: { ...updatedRecord }
                 });
             }
         }
 
         // 更新 __filtered_entities 字段（这是内部操作，不生成事件）
-        if (JSON.stringify(currentFlags) !== JSON.stringify(newFlags)) {
-            await this.updateRecordDataById(entityName, { id: recordId }, [
-                { field: '__filtered_entities', value: JSON.stringify(newFlags) }
-            ]);
+        if (JSON.stringify(originalFlags) !== JSON.stringify(newFlags)) {
+            // 获取 __filtered_entities 字段的实际数据库字段名
+            const recordInfo = this.map.getRecordInfo(entityName);
+            const filteredEntitiesAttribute = recordInfo.data.attributes['__filtered_entities'];
+            
+            if (filteredEntitiesAttribute && (filteredEntitiesAttribute as any).field) {
+                const fieldName = (filteredEntitiesAttribute as any).field;
+                const fieldType = (filteredEntitiesAttribute as any).fieldType;
+                
+                await this.updateRecordDataById(entityName, { id: recordId }, [
+                    { 
+                        field: fieldName, 
+                        value: this.prepareFieldValue(newFlags, fieldType) 
+                    }
+                ]);
+            }
         }
     }
 

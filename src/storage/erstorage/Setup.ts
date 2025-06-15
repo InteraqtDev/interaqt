@@ -142,8 +142,7 @@ export class DBSetup {
             if (hasFilteredEntities) {
                 attributes['__filtered_entities'] = {
                     type: 'json',
-                    fieldType: this.database!.mapToDBFieldType('json') || 'JSON',
-                    defaultValue: () => '{}'
+                    fieldType: this.database!.mapToDBFieldType('json') || 'JSON'
                 };
             }
         }
