@@ -290,7 +290,7 @@ export class ActivityCall {
     async create() {
         const initialStateData = ActivityState.createInitialState(this.graph.head)
 
-        const activity = await this.system.createActivity({
+        const activity = await this.controller.activityManager.createActivity({
             name: this.activity.name,
             uuid: this.activity.uuid,
             state: initialStateData,
@@ -313,21 +313,21 @@ export class ActivityCall {
             key: 'id',
             value: ['=', activityId],
         })
-        return (await this.system.getActivity(match))[0]
+        return (await this.controller.activityManager.getActivity(match))[0]
     }
     async setActivity(activityId: string, value: any) {
         const match = MatchExp.atom({
             key: 'id',
             value: ['=', activityId],
         })
-        return await this.system.updateActivity(match, value)
+        return await this.controller.activityManager.updateActivity(match, value)
     }
     async setState(activityId: string, state: any) {
         const match = MatchExp.atom({
             key: 'id',
             value: ['=', activityId],
         })
-        return await this.system.updateActivity(match, {state: state})
+        return await this.controller.activityManager.updateActivity(match, {state: state})
     }
     isStartNode(uuid: string) {
         const node = this.uuidToNode.get(uuid) as InteractionLikeNodeBase

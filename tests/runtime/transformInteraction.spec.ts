@@ -100,7 +100,7 @@ describe('map interaction', () => {
 
         const requests1 = await controller.system.storage.find('Request', undefined, undefined, ['*', ['from', {attributeQuery: ["*"]}], ['to', {attributeQuery: ["*"]}]])
         expect(requests1.length).toBe(1)
-        
+        debugger
         expect(requests1[0].to.id).toBe(userBId)
         expect(requests1[0].from.id).toBe(userAId)
         expect(requests1[0].approved).toBeFalsy()

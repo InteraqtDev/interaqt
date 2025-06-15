@@ -2,7 +2,8 @@ import { AttributeQueryData, RecordQueryData } from "../storage/index.js";
 import { DataDep, Computation, DataBasedComputation } from "./computedDataHandles/Computation.js";
 import { PropertyDataContext } from "./computedDataHandles/ComputedDataHandle.js";
 import { Controller } from "./Controller.js";
-import { InteractionEventEntity, RecordMutationEvent  } from "./System.js";
+import { InteractionEventEntity  } from "./ActivityManager.js";
+import { RecordMutationEvent } from "./System.js";
 
 // SourceMap 类型定义
 export type EntityCreateEventsSourceMap = {
@@ -80,11 +81,9 @@ export class ComputationSourceMapManager {
                 }
             } else {
                 // 2. EventBasedComputation 等同于监听 
-                // - EventEntity 的 create 事件
-                // - erMutationEvent 的 create 事件
-                // - Action 的 create 事件
-                // - Activity 的 create 事件
-                // FIXME 增加 ERMutationEvents 的 create 事件
+                // - Interaction 的 create 事件
+                // - TODO Action 的 create 事件
+                // - TODO Activity 的 create 事件
                 ERMutationEventSources.push({
                     dataDep: {
                         type: 'records',

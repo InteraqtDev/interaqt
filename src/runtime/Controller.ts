@@ -7,15 +7,13 @@ import {
     Relation
 } from "@shared";
 import './computedDataHandles/index.js';
-import { ActivityCall } from "./ActivityCall.js";
-import { InteractionCall, InteractionCallResponse } from "./InteractionCall.js";
+import { InteractionCallResponse } from "./InteractionCall.js";
 import { InteractionEventArgs } from "./InteractionCall.js";
-import { assert } from "./util.js";
 import { DataContext, EntityDataContext, PropertyDataContext, RelationDataContext } from "./computedDataHandles/ComputedDataHandle.js";
-import { asyncInteractionContext } from "./asyncInteractionContext.js";
 import { ComputationResult, ComputationResultSkip, ComputationResultPatch } from "./computedDataHandles/Computation.js";
-import { Scheduler} from "./Scheduler.js";
+import { Scheduler } from "./Scheduler.js";
 import { MatchExp } from "@storage";
+import { ActivityManager } from "./ActivityManager.js";
 
 export const USER_ENTITY = 'User'
 
@@ -51,16 +49,13 @@ export type InteractionContext = {
 export type ComputedDataType = 'global' | 'entity' | 'relation' | 'property'
 
 export class Controller {
-    public activityCalls = new Map<string, ActivityCall>()
-    public activityCallsByName = new Map<string, ActivityCall>()
-    public interactionCallsByName = new Map<string, InteractionCall>()
-    public interactionCalls = new Map<string, InteractionCall>()
     // 因为很多 function 都会bind controller 作为 this，所以我们也把 controller 的 globals 作为注入全局工具的入口。
     public recordNameToSideEffects = new Map<string, Set<KlassInstance<any> | RecordMutationSideEffect>>()
     public globals = {
         BoolExp
     }
     public scheduler: Scheduler
+    public activityManager: ActivityManager
     constructor(
         public system: System,
         public entities: KlassInstance<typeof Entity>[],
@@ -73,23 +68,8 @@ export class Controller {
         // CAUTION 因为 public 里面的会在 constructor 后面才初始化，所以ActivityCall 里面读不到 this.system
         this.system = system
 
-        activities.forEach(activity => {
-            const activityCall = new ActivityCall(activity, this)
-            this.activityCalls.set(activity.uuid, activityCall)
-            if (activity.name) {
-                assert(!this.activityCallsByName.has(activity.name), `activity name ${activity.name} is duplicated`)
-                this.activityCallsByName.set(activity.name, activityCall)
-            }
-        })
-
-        interactions.forEach(interaction => {
-            const interactionCall = new InteractionCall(interaction, this)
-            this.interactionCalls.set(interaction.uuid, interactionCall)
-            if (interaction.name) {
-                assert(!this.interactionCallsByName.has(interaction.name), `interaction name ${interaction.name} is duplicated`)
-                this.interactionCallsByName.set(interaction.name, interactionCall)
-            }
-        })
+        // Initialize ActivityManager
+        this.activityManager = new ActivityManager(this, this.system, activities, interactions)
 
         this.scheduler = new Scheduler(this, this.entities, this.relations, this.dict)
 
@@ -175,27 +155,10 @@ export class Controller {
     callbacks: Map<any, Set<SystemCallback>> = new Map()
 
     async callInteraction(interactionId:string, interactionEventArgs: InteractionEventArgs) {
-        const context= asyncInteractionContext.getStore() as InteractionContext
-        const logger = this.system.logger.child(context?.logContext || {})
-
-        const interactionCall = this.interactionCalls.get(interactionId)!
-        assert(!!interactionCall,`cannot find interaction for ${interactionId}`)
-
-
-        logger.info({label: "interaction", message:interactionCall.interaction.name})
-        await this.system.storage.beginTransaction(interactionCall.interaction.name)
-        // CAUTION 虽然这这里就有开始有 _EVENT_ 的change event，但是我们现在并不允许在 computedData 里面监听这个。所以这个不算。
-        //  未来是否需要统一，还要再看。目前迁好像极少情况下会有这种需求，但现在还是能通过 MapInteraction 来模拟。
-        const result = await interactionCall.call(interactionEventArgs)
-        if (result.error) {
-            logger.error({label: "interaction", message:interactionCall.interaction.name})
-            await this.system.storage.rollbackTransaction(interactionCall.interaction.name)
-        } else {
-            await this.system.storage.commitTransaction(interactionCall.interaction.name)
-            await this.runRecordChangeSideEffects(result, logger)
-        }
-
-        return result
+        return this.activityManager.callInteraction(interactionId, interactionEventArgs)
+    }
+    async callActivityInteraction(activityCallId:string, interactionCallId:string, activityId: string|undefined, interactionEventArgs: InteractionEventArgs) {
+        return this.activityManager.callActivityInteraction(activityCallId, interactionCallId, activityId, interactionEventArgs)
     }
     async runRecordChangeSideEffects(result: InteractionCallResponse, logger: SystemLogger) {
         const mutationEvents = result.effects as RecordMutationEvent[]
@@ -227,32 +190,7 @@ export class Controller {
             }
         }
     }
-    async callActivityInteraction(activityCallId:string, interactionCallId:string, activityId: string|undefined, interactionEventArgs: InteractionEventArgs) {
-        const context= asyncInteractionContext.getStore() as InteractionContext
-        const logger = this.system.logger.child(context?.logContext || {})
-
-        const activityCall = this.activityCalls.get(activityCallId)!
-        assert(!!activityCall,`cannot find interaction for ${activityCallId}`)
-        const interactionCall = activityCall.uuidToInteractionCall.get(interactionCallId)
-        assert(!!interactionCall,`cannot find interaction for ${interactionCallId}`)
-
-        const interactionNameWithActivityName = `${activityCall.activity.name}:${interactionCall!.interaction.name}`
-        logger.info({label: "activity", message:`${activityCall.activity.name}:${interactionCall!.interaction.name}`})
-
-        await this.system.storage.beginTransaction(interactionNameWithActivityName)
-
-        const result = await activityCall.callInteraction(activityId, interactionCallId, interactionEventArgs)
-        if (result.error) {
-            logger.error({label: "activity", message:interactionNameWithActivityName})
-            await this.system.storage.rollbackTransaction(interactionNameWithActivityName)
-
-        } else {
-            await this.system.storage.commitTransaction(interactionNameWithActivityName)
-            await this.runRecordChangeSideEffects(result, logger)
-        }
-
-        return result
-    }
+    
 
     // Add addEventListener method to Controller class
     addEventListener(eventName: string, callback: (...args: any[]) => any) {

@@ -185,6 +185,7 @@ export class Scheduler {
                 }
             }
         })
+        // TODO 未来也许要监听 MutationEvent，让开发者能观测系统的变化。
     }
     async computeDirtyRecords(source: EntityEventSourceMap, mutationEvent: RecordMutationEvent) {
         if(!source.targetPath?.length) {

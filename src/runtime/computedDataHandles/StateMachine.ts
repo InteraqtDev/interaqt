@@ -1,7 +1,7 @@
 import { KlassInstance, StateMachine, StateNode } from "@shared";
 import { Controller } from "../Controller.js";
-import { InteractionEventArgs } from "../InteractionCall.js";
-import { EntityIdRef, INTERACTION_RECORD, RecordMutationEvent } from '../System.js';
+import { EntityIdRef, RecordMutationEvent } from '../System.js';
+import {INTERACTION_RECORD} from "../ActivityManager";
 import { ComputedDataHandle, DataContext, EntityDataContext } from "./ComputedDataHandle.js";
 import { ComputationResult, ComputationResultPatch, EventBasedComputation, EventDep, GlobalBoundState, RecordBoundState } from "./Computation.js";
 import { EtityMutationEvent } from "../Scheduler.js";

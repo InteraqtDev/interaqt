@@ -1,9 +1,7 @@
 import {
-    ACTIVITY_RECORD, ActivityInteractionRelation, ActivityStateEntity,
     ComputationState,
     Database,
     DatabaseLogger,
-    INTERACTION_RECORD, InteractionEventEntity,
     RecordMutationCallback,
     RecordMutationEvent,
     Storage,
@@ -12,6 +10,7 @@ import {
     SystemEntity,
     SystemLogger
 } from "./System.js";
+import { INTERACTION_RECORD} from "./ActivityManager.js";
 import { InteractionEvent } from './InteractionCall.js';
 import { createClass, Entity, KlassInstance, Property, Relation } from "@shared";
 import {
@@ -172,34 +171,7 @@ export class MonoSystem implements System {
             ...event,
         })) as unknown as InteractionEvent[]
     }
-    async createActivity(activity: any) {
-        return this.storage.create(ACTIVITY_RECORD, {
-            ...activity,
-            state: activity.state,
-            refs: activity.refs,
-        })
-    }
-    async updateActivity(match: MatchExpressionData, activity: any) {
-        const data = {
-            ...activity
-        }
-        delete data.state
-        delete data.refs
-        if (activity.state) {
-            data.state = activity.state
-        }
-        if (activity.refs) {
-            data.refs = activity.refs
-        }
-        return this.storage.update(ACTIVITY_RECORD, match, data)
-    }
-    async getActivity(query?: MatchExpressionData) {
-        return (await this.storage.find(ACTIVITY_RECORD, query, undefined, ['*'])).map(activity => ({
-            ...activity,
-            state: activity.state,
-            refs: activity.refs,
-        }))
-    }
+    
     setup(entities: KlassInstance<typeof Entity>[], relations: KlassInstance<typeof Relation>[], states: ComputationState[], install = false){
         // Create a type that matches what DBSetup expects
         type DBSetupEntityType = KlassInstance<typeof Entity> & { isRef?: boolean };
@@ -217,8 +189,6 @@ export class MonoSystem implements System {
         const preparedEntities = [
             ...entities.map(prepareEntity),
             prepareEntity(SystemEntity as KlassInstance<typeof Entity>),
-            prepareEntity(InteractionEventEntity as KlassInstance<typeof Entity>),
-            prepareEntity(ActivityStateEntity as KlassInstance<typeof Entity>),
         ];
 
         states.forEach(({dataContext, state}) => {
@@ -281,7 +251,7 @@ export class MonoSystem implements System {
         // Pass the prepared entities to storage.setup
         return this.storage.setup(
             preparedEntities as any, 
-            [...relations, ActivityInteractionRelation],
+            relations,
             install
         );
     }

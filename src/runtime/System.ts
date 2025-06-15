@@ -5,11 +5,7 @@ import { DataContext } from "./computedDataHandles/ComputedDataHandle.js";
 import { InteractionEvent } from "./InteractionCall.js";
 export type SystemCallback =  (...arg: any[]) => any
 export type RecordMutationCallback = (mutationEvents:RecordMutationEvent[]) => Promise<{ events?: RecordMutationEvent[] } |undefined|void>
-
 export const SYSTEM_RECORD = '_System_'
-export const INTERACTION_RECORD = '_Interaction_'
-export const ACTIVITY_RECORD = '_Activity_'
-
 export type Storage = {
     // 将 entity 映射到表结构的 map
     map: any
@@ -69,9 +65,6 @@ export type ComputationState = {dataContext: DataContext, state: {[key: string]:
 export interface System {
     getEvent: (query: any) => Promise<InteractionEvent[]>
     saveEvent: (interactionEvent: InteractionEvent, mutationEvents: RecordMutationEvent[]) => Promise<any>
-    createActivity: (activity: any) => Promise<any>
-    updateActivity: (match: any, activity: any) => Promise<any>
-    getActivity:(query?: any) => Promise<any[]>
     conceptClass: Map<string, ReturnType<typeof createClass>>
     storage: Storage
     logger: SystemLogger
@@ -149,72 +142,5 @@ export type EntityInstanceType<T extends EntityType> = {
     [P in T['properties'][number] as P['name']]: P['collection'] extends true ? Array<InferType<P>> : InferType<P>;
 }
 
-// event 的实体化
-export const InteractionEventEntity = Entity.create({
-    name: INTERACTION_RECORD,
-    properties: [
-        Property.create({
-            name: 'interactionId',
-            type: 'string',
-            collection: false,
-        }),
-        Property.create({
-            name: 'interactionName',
-            type: 'string',
-            collection: false,
-        }),
-        Property.create({
-            name: 'payload',
-            type: 'object',
-            collection: false,
-        }),
-        Property.create({
-            name: 'user',
-            type: 'object',
-            collection: false,
-        }),
-        Property.create({
-            name: 'query',
-            type: 'object',
-            collection: false,
-        }),
-    ]
-})
-
-
-export const ActivityStateEntity = Entity.create({
-    name: ACTIVITY_RECORD,
-    properties: [
-        Property.create({
-            name: 'name',
-            type: 'string',
-            collection: false,
-        }),
-        Property.create({
-            name: 'uuid',
-            type: 'string',
-            collection: false,
-        }),
-        Property.create({
-            name: 'state',
-            type: 'object',
-            collection: false,
-        }),
-        Property.create({
-            name: 'refs',
-            type: 'object',
-            collection: false,
-        })
-    ]
-})
-
-export const ActivityInteractionRelation = Relation.create({
-    name: 'activityInteraction',
-    source: ActivityStateEntity,
-    sourceProperty: 'interaction',
-    target: InteractionEventEntity,
-    targetProperty: 'activity',
-    type: '1:n',
-})
 
 export type InteractionEventRecord = InteractionEvent & EntityIdRef

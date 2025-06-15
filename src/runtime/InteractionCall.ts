@@ -464,7 +464,6 @@ export class InteractionCall {
             const finalMatch = (matchInQuery && match) ? match.and(matchInQuery) : (match || matchInQuery)
             data = await this.system.storage.find(recordName, finalMatch, modifier, attributeQuery)
         // } else if (Computation.is(this.interaction.data)){
-        //     // computation
         //     const { content: computation } = this.interaction.data as KlassInstance<typeof Computation>
         //     data= await computation.call(this.controller, match, interactionEvent.query, interactionEvent )
         } else {
