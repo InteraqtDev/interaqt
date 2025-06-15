@@ -7,7 +7,7 @@ import {
     Relation,
 } from "@shared";
 import { ActivityCall } from "./ActivityCall.js";
-import { InteractionCall, InteractionCallResponse } from "./InteractionCall.js";
+import { InteractionCall, InteractionCallResponse, InteractionEvent } from "./InteractionCall.js";
 import { InteractionEventArgs } from "./InteractionCall.js";
 import { assert } from "./util.js";
 import { asyncInteractionContext } from "./asyncInteractionContext.js";
@@ -95,7 +95,6 @@ export class ActivityManager {
 
     constructor(
         private controller: Controller,
-        private system: System,
         activities: KlassInstance<typeof Activity>[],
         interactions: KlassInstance<typeof Interaction>[]
     ) {
@@ -126,20 +125,20 @@ export class ActivityManager {
 
     async callInteraction(interactionId: string, interactionEventArgs: InteractionEventArgs): Promise<InteractionCallResponse> {
         const context = asyncInteractionContext.getStore() as InteractionContext
-        const logger = this.system.logger.child(context?.logContext || {})
+        const logger = this.controller.system.logger.child(context?.logContext || {})
 
         const interactionCall = this.interactionCalls.get(interactionId)!
         assert(!!interactionCall, `cannot find interaction for ${interactionId}`)
 
         logger.info({label: "interaction", message: interactionCall.interaction.name})
-        await this.system.storage.beginTransaction(interactionCall.interaction.name)
+        await this.controller.system.storage.beginTransaction(interactionCall.interaction.name)
         
         const result = await interactionCall.call(interactionEventArgs)
         if (result.error) {
             logger.error({label: "interaction", message: interactionCall.interaction.name})
-            await this.system.storage.rollbackTransaction(interactionCall.interaction.name)
+            await this.controller.system.storage.rollbackTransaction(interactionCall.interaction.name)
         } else {
-            await this.system.storage.commitTransaction(interactionCall.interaction.name)
+            await this.controller.system.storage.commitTransaction(interactionCall.interaction.name)
             await this.runRecordChangeSideEffects(result, logger)
         }
 
@@ -148,20 +147,20 @@ export class ActivityManager {
 
     async callActivityInteraction(activityCallId: string, interactionCallId: string, activityId: string | undefined, interactionEventArgs: InteractionEventArgs): Promise<InteractionCallResponse> {
         const context = asyncInteractionContext.getStore() as InteractionContext
-        const logger = this.system.logger.child(context?.logContext || {})
+        const logger = this.controller.system.logger.child(context?.logContext || {})
 
         const activityCall = this.activityCalls.get(activityCallId)!
         assert(!!activityCall, `cannot find activity for ${activityCallId}`)
 
         logger.info({label: "activity", message: activityCall.activity.name})
-        await this.system.storage.beginTransaction(activityCall.activity.name)
+        await this.controller.system.storage.beginTransaction(activityCall.activity.name)
         
         const result = await activityCall.callInteraction(activityId, interactionCallId, interactionEventArgs)
         if (result.error) {
             logger.error({label: "activity", message: activityCall.activity.name})
-            await this.system.storage.rollbackTransaction(activityCall.activity.name)
+            await this.controller.system.storage.rollbackTransaction(activityCall.activity.name)
         } else {
-            await this.system.storage.commitTransaction(activityCall.activity.name)
+            await this.controller.system.storage.commitTransaction(activityCall.activity.name)
             await this.runRecordChangeSideEffects(result, logger)
         }
 
@@ -202,7 +201,7 @@ export class ActivityManager {
         }
     }
     async createActivity(activity: any) {
-        return this.system.storage.create(ACTIVITY_RECORD, {
+        return this.controller.system.storage.create(ACTIVITY_RECORD, {
             ...activity,
             state: activity.state,
             refs: activity.refs,
@@ -220,14 +219,22 @@ export class ActivityManager {
         if (activity.refs) {
             data.refs = activity.refs
         }
-        return this.system.storage.update(ACTIVITY_RECORD, match, data)
+        return this.controller.system.storage.update(ACTIVITY_RECORD, match, data)
     }
     async getActivity(query?: MatchExpressionData) {
-        return (await this.system.storage.find(ACTIVITY_RECORD, query, undefined, ['*'])).map(activity => ({
+        return (await this.controller.system.storage.find(ACTIVITY_RECORD, query, undefined, ['*'])).map(activity => ({
             ...activity,
             state: activity.state,
             refs: activity.refs,
         }))
+    }
+    async saveEvent(event: InteractionEvent, mutationEvents: RecordMutationEvent[] = []): Promise<any> {
+        return this.controller.system.storage.create(INTERACTION_RECORD, event, mutationEvents)
+    }
+    async getEvent(query?: MatchExpressionData ) {
+        return (await this.controller.system.storage.find(INTERACTION_RECORD, query, undefined, ['*'])).map(event => ({
+            ...event,
+        })) as unknown as InteractionEvent[]
     }
     getActivityCall(activityId: string): ActivityCall | undefined {
         return this.activityCalls.get(activityId)

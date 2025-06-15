@@ -69,7 +69,7 @@ export class Controller {
         this.system = system
 
         // Initialize ActivityManager
-        this.activityManager = new ActivityManager(this, this.system, activities, interactions)
+        this.activityManager = new ActivityManager(this, activities, interactions)
 
         this.scheduler = new Scheduler(this, this.entities, this.relations, this.dict)
 

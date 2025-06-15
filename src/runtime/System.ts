@@ -1,4 +1,4 @@
-import {createClass, Entity, KlassInstance, Property, Relation} from "@shared";
+import { createClass, Entity, KlassInstance, Property, Relation } from "@shared";
 import { GlobalBoundState } from "./computedDataHandles/Computation.js";
 import { RecordBoundState } from "./computedDataHandles/Computation.js";
 import { DataContext } from "./computedDataHandles/ComputedDataHandle.js";
@@ -63,8 +63,6 @@ export type SystemLogType = {
 export type ComputationState = {dataContext: DataContext, state: {[key: string]: RecordBoundState<any>|GlobalBoundState<any>}}
 
 export interface System {
-    getEvent: (query: any) => Promise<InteractionEvent[]>
-    saveEvent: (interactionEvent: InteractionEvent, mutationEvents: RecordMutationEvent[]) => Promise<any>
     conceptClass: Map<string, ReturnType<typeof createClass>>
     storage: Storage
     logger: SystemLogger

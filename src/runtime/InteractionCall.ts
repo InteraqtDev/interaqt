@@ -16,7 +16,7 @@ import {
     KlassInstance, DataAttributives, DataAttributive,
 } from "@shared";
 import { RecordMutationEvent, System } from "./System.js";
-import { assert, everyWithErrorAsync,someAsync } from "./util.js";
+import { assert, everyWithErrorAsync, someAsync } from "./util.js";
 import { ActivityCall } from "./ActivityCall.js";
 import { Controller, InteractionContext } from "./Controller.js";
 
@@ -406,7 +406,7 @@ export class InteractionCall {
     }
     async saveEvent(interactionEvent: InteractionEvent, effects: any[]) {
         // 为 payload 里面的新数据保存起来
-        return await this.system.saveEvent(interactionEvent, effects)
+        return await this.controller.activityManager.saveEvent(interactionEvent, effects)
     }
     async savePayload(payload: InteractionEventArgs["payload"], effects: any[]){
         const payloadDefs = this.interaction.payload?.items || []

@@ -9,12 +9,12 @@ import {
     KlassInstance,
     TransferInstanceType,
 } from "@shared";
-import {assert} from "./util.js";
-import {System} from "./System.js";
-import {InteractionCall, InteractionCallResponse} from "./InteractionCall.js";
-import {EventUser, InteractionEventArgs} from "./InteractionCall.js";
-import {MatchExp} from "@storage";
-import {Controller} from "./Controller.js";
+import { assert } from "./util.js";
+import { System } from "./System.js";
+import { InteractionCall, InteractionCallResponse } from "./InteractionCall.js";
+import { EventUser, InteractionEventArgs } from "./InteractionCall.js";
+import { MatchExp } from "@storage";
+import { Controller } from "./Controller.js";
 
 
 export type Seq = {
