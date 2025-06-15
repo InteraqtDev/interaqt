@@ -8,6 +8,7 @@ import {NewRecordData, RawEntityData} from "./NewRecordData.js";
 import {RecordQueryAgent} from "./RecordQueryAgent.js";
 import {EntityIdRef, Database, RecordMutationEvent} from "@runtime";
 import {getInstance, Entity} from "@shared";
+import {Record} from "./RecordQueryAgent.js";
 
 export class EntityQueryHandle {
     agent: RecordQueryAgent
@@ -25,7 +26,27 @@ export class EntityQueryHandle {
         return (await this.find(entityName, matchExpression, limitedModifier, attributeQuery))[0]
     }
 
-    async find(entityName: string, matchExpressionData?: MatchExpressionData, modifierData?: ModifierData, attributeQueryData: AttributeQueryData = []) {
+    async find(entityName: string, matchExpressionData?: MatchExpressionData, modifierData?: ModifierData, attributeQueryData: AttributeQueryData = []): Promise<Record[]> {
+        // 检查是否是 filtered entity
+        if (this.isFilteredEntity(entityName)) {
+            const config = this.getFilteredEntityConfig(entityName);
+            if (!config) {
+                throw new Error(`${entityName} is not a filtered entity`);
+            }
+
+            // 构造查询条件：过滤条件 + 额外的匹配条件（如果有）
+            let combinedMatch = config.filterCondition;
+            
+            if (matchExpressionData) {
+                combinedMatch = new MatchExp(config.sourceEntity, this.map, combinedMatch)
+                    .and(new MatchExp(config.sourceEntity, this.map, matchExpressionData))
+                    .data;
+            }
+
+            // 直接在源实体上查询，使用过滤条件
+            return this.find(config.sourceEntity, combinedMatch, modifierData, attributeQueryData);
+        }
+
         assert(this.map.getRecord(entityName), `cannot find entity ${entityName}`)
         const entityQuery = RecordQuery.create(
             entityName,
@@ -47,11 +68,51 @@ export class EntityQueryHandle {
 
     // CAUTION 不能递归更新 relate entity 的 value，如果传入了 related entity 的值，说明是建立新的联系。
     async update(entity: string, matchExpressionData: MatchExpressionData, rawData: RawEntityData, events?: RecordMutationEvent[]) {
+        // 检查是否是 filtered entity
+        if (this.isFilteredEntity(entity)) {
+            const config = this.getFilteredEntityConfig(entity);
+            if (!config) {
+                throw new Error(`${entity} is not a filtered entity`);
+            }
+
+            // 构造查询条件：过滤条件 + 原有的匹配条件
+            let combinedMatch = config.filterCondition;
+            if (matchExpressionData) {
+                combinedMatch = new MatchExp(config.sourceEntity, this.map, config.filterCondition)
+                    .and(new MatchExp(config.sourceEntity, this.map, matchExpressionData))
+                    .data;
+            }
+
+            // 在源实体上执行更新操作
+            const newEntityData = new NewRecordData(this.map, config.sourceEntity, rawData)
+            return this.agent.updateRecord(config.sourceEntity, combinedMatch, newEntityData, events)
+        }
+
         const newEntityData = new NewRecordData(this.map, entity, rawData)
         return this.agent.updateRecord(entity, matchExpressionData, newEntityData, events)
     }
 
     async delete(entityName: string, matchExpressionData: MatchExpressionData,events?: RecordMutationEvent[]) {
+        // 检查是否是 filtered entity
+        if (this.isFilteredEntity(entityName)) {
+            const config = this.getFilteredEntityConfig(entityName);
+            if (!config) {
+                throw new Error(`${entityName} is not a filtered entity`);
+            }
+
+            // 构造查询条件：过滤条件 + 原有的匹配条件
+            const combinedMatchExp = new MatchExp(config.sourceEntity, this.map, config.filterCondition)
+                .and(new MatchExp(config.sourceEntity, this.map, matchExpressionData));
+            
+            // 确保 combinedMatch 有值
+            if (!combinedMatchExp.data) {
+                throw new Error('Failed to construct combined match expression');
+            }
+
+            // 在源实体上执行删除操作
+            return this.agent.deleteRecord(config.sourceEntity, combinedMatchExp.data, events)
+        }
+
         return this.agent.deleteRecord(entityName, matchExpressionData, events)
     }
 
@@ -154,25 +215,5 @@ export class EntityQueryHandle {
         return filteredEntities;
     }
 
-    /**
-     * 处理 filtered entity 的查询，重定向到源实体并添加过滤条件
-     */
-    async findForFilteredEntity(filteredEntityName: string, matchExpressionData?: MatchExpressionData, modifierData?: ModifierData, attributeQueryData: AttributeQueryData = []) {
-        const config = this.getFilteredEntityConfig(filteredEntityName);
-        if (!config) {
-            throw new Error(`${filteredEntityName} is not a filtered entity`);
-        }
 
-        // 构造查询条件：过滤条件 + 额外的匹配条件（如果有）
-        let combinedMatch = config.filterCondition;
-        
-        if (matchExpressionData) {
-            combinedMatch = new MatchExp(config.sourceEntity, this.map, combinedMatch)
-                .and(new MatchExp(config.sourceEntity, this.map, matchExpressionData))
-                .data;
-        }
-
-        // 直接在源实体上查询，使用过滤条件
-        return this.find(config.sourceEntity, combinedMatch, modifierData, attributeQueryData);
-    }
 }

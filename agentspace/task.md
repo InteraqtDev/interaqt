@@ -15,3 +15,6 @@
 - [x] 继续重构 Scheduler 和 ComputationSourceMap，让 ComputationSourceMap 来持有数据，并提供查询的接口，而不只是工厂方法。
 - [x] 继续遵照 `agentspace/prompt/activity.md` 中的指示完成任务。
 - [x] 遵照 `agentspace/prompt/filtered_entity.md` 实现 Filtered Entity。
+  - [x] 统一 find 接口，在接口中判断是否为 filtered entity，移除单独的 findForFilteredEntity 方法
+  - [x] 支持直接在 filtered entity 上执行 update 和 delete 操作
+  - [x] 添加了 filtered entity 事件抛出的测试用例
