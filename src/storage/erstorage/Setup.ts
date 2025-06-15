@@ -165,14 +165,15 @@ export class DBSetup {
             };
         }
 
-
+        const { sourceEntity, filterCondition } = (entityWithProps as any) || {}
+        // CAUTION 暂时不支持跨 record 的 Filter。如果要支持，需要有类似 runtime computation 中的级联计算法
 
         return {
             table: entityWithProps.name,
             attributes,
             isRelation,
-            sourceRecordName: (entityWithProps as any).sourceEntity?.name,
-            filterCondition: (entityWithProps as any).filterCondition,
+            sourceRecordName: sourceEntity?.name,
+            filterCondition: filterCondition,
             filteredBy: filteredBy.length ? filteredBy.map(e => e.name) : undefined,
         } as RecordMapItem
     }
