@@ -148,11 +148,11 @@ export async function startServer(controller: Controller, options: ServerOptions
             let result: any
             if (activityName) {
                 // 还需要区分 create 和 call
-                const activityCallId = controller.activityCallsByName.get(activityName)?.activity.uuid
-                const interactionId = controller.activityCallsByName.get(activityName)!.interactionCallByName.get(interactionName!)?.interaction.uuid
+                const activityCallId = controller.activityManager.activityCallsByName.get(activityName)?.activity.uuid
+                const interactionId = controller.activityManager.activityCallsByName.get(activityName)!.interactionCallByName.get(interactionName!)?.interaction.uuid
                 result = await controller.callActivityInteraction(activityCallId!, interactionId!, activityId, eventArgs)
             } else {
-                const interactionId = controller.interactionCallsByName.get(interactionName!)?.interaction.uuid
+                const interactionId = controller.activityManager.interactionCallsByName.get(interactionName!)?.interaction.uuid
                 result = await controller.callInteraction(interactionId!, eventArgs)
             }
 
