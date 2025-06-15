@@ -163,24 +163,6 @@ export class MonoSystem implements System {
     }
     
     setup(entities: KlassInstance<typeof Entity>[], relations: KlassInstance<typeof Relation>[], states: ComputationState[], install = false){
-        // Create a type that matches what DBSetup expects
-        type DBSetupEntityType = KlassInstance<typeof Entity> & { isRef?: boolean };
-        
-        // Function to ensure entities have the required properties
-        const prepareEntity = (entity: KlassInstance<typeof Entity>): DBSetupEntityType => {
-            const entityAny = entity as any;
-            if (entityAny.isRef === undefined) {
-                entityAny.isRef = false;
-            }
-            return entityAny as DBSetupEntityType;
-        };
-        
-        // Prepare all entities including system entities
-        const preparedEntities = [
-            ...entities.map(prepareEntity),
-            prepareEntity(SystemEntity as KlassInstance<typeof Entity>),
-        ];
-
         states.forEach(({dataContext, state}) => {
             Object.entries(state).forEach(([stateName, stateItem]) => {
                 if (stateItem instanceof RecordBoundState) { 
@@ -240,10 +222,10 @@ export class MonoSystem implements System {
         
         // Pass the prepared entities to storage.setup
         return this.storage.setup(
-            preparedEntities as any, 
+            [...entities, SystemEntity], 
             relations,
             install
-        );
+        )
     }
     destroy() {
         this.storage.destroy()
