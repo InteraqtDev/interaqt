@@ -18,3 +18,4 @@
   - [x] 统一 find 接口，在接口中判断是否为 filtered entity，移除单独的 findForFilteredEntity 方法
   - [x] 支持直接在 filtered entity 上执行 update 和 delete 操作
   - [x] 添加了 filtered entity 事件抛出的测试用例
+- [x] 遵照 `agentspace/prompt/scheduler.md` 中的指示梳理 scheduler 并修复 bug。

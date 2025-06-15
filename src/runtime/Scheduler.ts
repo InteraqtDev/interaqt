@@ -138,8 +138,7 @@ export class Scheduler {
                     // property computation 也能提供 defaultValue 的能力？
                     const property = computation.dataContext.host.properties?.find(property => property.name === computation.dataContext.id)!
                     if (!property.defaultValue) {
-                        // FIXME 这里没有支持 getDefaultValue 的 async 模式。会不会有问题？？？
-                        property.defaultValue = computation.getDefaultValue()
+                        property.defaultValue = await computation.getDefaultValue()
                     }
                 }
             }
@@ -231,7 +230,8 @@ export class Scheduler {
         let pointer = result
         // 一路浅拷贝
         for(const attr of path) {
-            // fIXME Computation 不能跨越 x:n 的集合，所以路径上应该都是对象。
+            // CAUTION Computation 不能跨越 x:n 的集合，所以路径上应该都是对象。
+            assert(typeof pointer[attr] === 'object', `cannot compute old record for ${sourceMap.recordName} because ${attr} is not an object`)
             pointer[attr] = {...pointer[attr]}
             pointer = pointer[attr]
         }

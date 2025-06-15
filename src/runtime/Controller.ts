@@ -114,7 +114,6 @@ export class Controller {
       
         } else {
             const propertyDataContext = dataContext as PropertyDataContext
-            if (!record) debugger
             if (record[propertyDataContext.id]) return record[propertyDataContext.id]
 
             const item = await this.system.storage.findOne(propertyDataContext.host.name, BoolExp.atom({key: 'id', value: ['=', record!.id]}), undefined, ['*'])
