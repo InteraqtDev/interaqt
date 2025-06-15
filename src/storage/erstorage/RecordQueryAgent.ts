@@ -1,14 +1,13 @@
-import {EntityIdRef,Database, RecordMutationEvent} from "@runtime";
-import {BoolExp} from "@shared";
-import {EntityToTableMap} from "./EntityToTableMap.js";
-import {assert, setByPath} from "../utils.js";
-import {} from './EntityQueryHandle.js'
-import {FieldMatchAtom, MatchAtom, MatchExp, MatchExpressionData} from "./MatchExp.js";
-import {AttributeQuery, AttributeQueryData, AttributeQueryDataRecordItem} from "./AttributeQuery.js";
-import {LINK_SYMBOL, RecordQuery, RecordQueryTree} from "./RecordQuery.js";
-import {NewRecordData, RawEntityData} from "./NewRecordData.js";
-import {Modifier} from "./Modifier.js";
-import {getInstance, Entity} from "@shared";
+import { EntityIdRef, Database, RecordMutationEvent } from "@runtime";
+import { BoolExp } from "@shared";
+import { EntityToTableMap } from "./EntityToTableMap.js";
+import { assert, setByPath } from "../utils.js";
+import { } from './EntityQueryHandle.js';
+import { FieldMatchAtom, MatchAtom, MatchExp, MatchExpressionData } from "./MatchExp.js";
+import { AttributeQuery, AttributeQueryData, AttributeQueryDataRecordItem } from "./AttributeQuery.js";
+import { LINK_SYMBOL, RecordQuery, RecordQueryTree } from "./RecordQuery.js";
+import { NewRecordData, RawEntityData } from "./NewRecordData.js";
+import { Modifier } from "./Modifier.js";
 
 
 export type JoinTables = {
@@ -1440,27 +1439,10 @@ WHERE "${recordInfo.idField}" = ${p()}
      * 获取基于指定源实体的所有 filtered entities
      */
     getFilteredEntitiesForSource(sourceEntityName: string): Array<{ name: string, filterCondition: any }> {
-        const entities = getInstance(Entity);
-        const filteredEntities: Array<{ name: string, filterCondition: any }> = [];
-        const seenNames = new Set<string>();
-        
-        for (const entity of entities) {
-            // 确保实体有 sourceEntity 和 filterCondition，且 sourceEntity 匹配
-            if ((entity as any).sourceEntity === sourceEntityName && 
-                (entity as any).filterCondition && 
-                (entity as any).sourceEntity && 
-                (entity as any).name !== sourceEntityName &&
-                !seenNames.has((entity as any).name)) {
-                
-                seenNames.add((entity as any).name);
-                filteredEntities.push({
-                    name: (entity as any).name,
-                    filterCondition: (entity as any).filterCondition
-                });
-            }
-        }
-        
-        return filteredEntities;
+        return this.map.getRecordInfo(sourceEntityName).filteredBy?.map(recordInfo => ({
+            name: recordInfo.name,
+            filterCondition: recordInfo.filterCondition
+        })) || []
     }
 
     /**
@@ -1472,11 +1454,7 @@ WHERE "${recordInfo.idField}" = ${p()}
         if (filteredEntities.length === 0) return;
 
         // 获取原始记录的 __filtered_entities 状态
-        const originalFlags = originalRecord?.__filtered_entities 
-            ? (typeof originalRecord.__filtered_entities === 'string' 
-                ? JSON.parse(originalRecord.__filtered_entities) 
-                : originalRecord.__filtered_entities)
-            : {};
+        const originalFlags = originalRecord?.__filtered_entities || {};
 
         // 获取更新后的记录以检查当前过滤条件
         const idMatch = MatchExp.atom({ key: 'id', value: ['=', recordId] });

@@ -66,7 +66,7 @@ type EntityPublic = {
     },
     // Filtered Entity 字段 - 从哪个 entity 过滤
     sourceEntity: {
-        type: 'string',
+        type: (Klass<EntityPublic>|Klass<RelationPublic>)[],
         collection: false,
         required: false,
     },
@@ -130,6 +130,9 @@ export const Property: Klass<PropertyPublic> = createClass({
     }
 })
 
+const ENTITY_PLACEHOLDER = {} as unknown as Klass<EntityPublic>
+// Create a placeholder for Relation to avoid circular reference
+const RELATION_PLACEHOLDER = {} as unknown as Klass<RelationPublic>;
 // CAUTION 这里的 Entity 是 Concept 的一种
 export const Entity: Klass<EntityPublic> = createClass({
     name: 'Entity',
@@ -166,7 +169,7 @@ export const Entity: Klass<EntityPublic> = createClass({
         },
         // Filtered Entity 字段 - 从哪个 entity 过滤
         sourceEntity: {
-            type: 'string',
+            type: [ENTITY_PLACEHOLDER, ENTITY_PLACEHOLDER],
             collection: false,
             required: false,
         },
@@ -251,8 +254,6 @@ export type RelationPublic = {
     }
 };
 
-// Create a placeholder for Relation to avoid circular reference
-const RELATION_PLACEHOLDER = {} as unknown as Klass<RelationPublic>;
 
 // Use type assertion to avoid circular reference issues
 export const Relation: Klass<RelationPublic> = createClass({

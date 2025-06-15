@@ -3,6 +3,7 @@ import {AttributeInfo} from "./AttributeInfo.js";
 import {RecordInfo} from "./RecordInfo.js";
 import {LinkInfo} from "./LinkInfo.js";
 import {LINK_SYMBOL} from "./RecordQuery.js";
+import { MatchExp } from "./MatchExp.js";
 
 
 export type ValueAttribute = {
@@ -43,7 +44,12 @@ export type RecordMapItem = {
     attributes: {
         [k:string]: ValueAttribute|RecordAttribute
     }
-    isRelation? :boolean
+    isRelation? :boolean,
+    sourceRecordName? : string,
+    filterCondition?: MatchExp,
+    resolvedSourceRecordName?: string,
+    resolvedFilterCondition?: MatchExp,
+    filteredBy? : string[],
 }
 
 type RecordMap = {

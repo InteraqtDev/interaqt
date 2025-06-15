@@ -12,6 +12,18 @@ export class RecordInfo {
         return this.data.isRelation
     }
 
+    get sourceRecordName() {
+        return this.data.sourceRecordName
+    }
+
+    get filterCondition() {
+        return this.data.filterCondition
+    }
+
+    get filteredBy() {
+        return this.data.filteredBy?.map(name => new RecordInfo(name, this.map))
+    }
+
     get combinedRecords() {
         return this.strictRecordAttributes.filter(info => {
             return info.isMergedWithParent()

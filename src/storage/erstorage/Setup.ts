@@ -110,7 +110,23 @@ export class DBSetup {
     }
 
 
+    resolveBaseSourceEntityAndFilter(entity: KlassInstance<typeof Entity>) {
+        const entityWithProps = entity
+        let sourceEntity = (entityWithProps as any).sourceEntity
+        let filterCondition = (entityWithProps as any).filterCondition
+        assert((sourceEntity && filterCondition) || (!sourceEntity && !filterCondition), `filterCondition is required for ${entityWithProps.name}`)
+        if (!(sourceEntity && filterCondition)) return
+
+        while(sourceEntity.sourceEntity) {
+            sourceEntity = sourceEntity.sourceEntity
+            filterCondition = filterCondition.and(sourceEntity.filter)
+        }
+
+        return { sourceEntity, filterCondition }
+    }
+
     createRecord(entity: KlassInstance<typeof Entity> | KlassInstance<typeof Relation>, isRelation? :boolean) {
+        
         const entityWithProps = entity
         const attributes: {[k:string]: Omit<ValueAttribute, 'field'>} = Object.fromEntries(entityWithProps.properties.map((property:KlassInstance<typeof Property>) => {
             const prop = property
@@ -126,35 +142,38 @@ export class DBSetup {
             ];
         }));
 
+
+        if (isRelation) {
+            assert(!attributes.source && !attributes.target, 'source and target is reserved name for relation attributes')
+        }
+
         // 自动补充
         attributes[ID_ATTR] = {
             type: 'id',
             fieldType: this.database!.mapToDBFieldType('pk')
         }
 
-        // 如果不是关系且有其他实体以此为源实体，添加 __filtered_entities 字段
-        if (!isRelation) {
-            const entityName = entityWithProps.name;
-            const hasFilteredEntities = this.entities.some(e => 
-                (e as any).sourceEntity === entityName
-            );
-            
-            if (hasFilteredEntities) {
-                attributes['__filtered_entities'] = {
-                    type: 'json',
-                    fieldType: this.database!.mapToDBFieldType('json') || 'JSON'
-                };
-            }
+        // 添加 __filtered_entities 字段到需要的实体或关系
+        const filteredBy = this.entities.filter(e => 
+            (e as any).sourceEntity === entityWithProps
+        );
+        
+        if (filteredBy.length) {
+            attributes['__filtered_entities'] = {
+                type: 'json',
+                fieldType: this.database!.mapToDBFieldType('json') || 'JSON'
+            };
         }
 
-        if (isRelation) {
-            assert(!attributes.source && !attributes.target, 'source and target is reserved name for relation attributes')
-        }
+
 
         return {
             table: entityWithProps.name,
             attributes,
             isRelation,
+            sourceRecordName: (entityWithProps as any).sourceEntity?.name,
+            filterCondition: (entityWithProps as any).filterCondition,
+            filteredBy: filteredBy.length ? filteredBy.map(e => e.name) : undefined,
         } as RecordMapItem
     }
     createLink(relationName: string, relation: KlassInstance<typeof Relation>) {
@@ -463,28 +482,6 @@ export class DBSetup {
             })
         })
 
-        // 为源实体表添加 __filtered_entities 字段
-        this.entities.forEach(entity => {
-            const entityName = entity.name;
-            // 检查是否有其他实体以此实体为 sourceEntity
-            const hasFilteredEntities = this.entities.some(e => 
-                (e as any).sourceEntity === entityName
-            );
-            
-            if (hasFilteredEntities) {
-                const record = this.map.records[entityName];
-                if (record && record.table) {
-                    const filteredEntitiesFieldName = '__filtered_entities';
-                    if (!this.tables[record.table].columns[filteredEntitiesFieldName]) {
-                        this.tables[record.table].columns[filteredEntitiesFieldName] = {
-                            name: filteredEntitiesFieldName,
-                            type: 'json',
-                            fieldType: this.database!.mapToDBFieldType('json') || 'JSON',
-                        };
-                    }
-                }
-            }
-        });
     }
 
     createTableSQL() {

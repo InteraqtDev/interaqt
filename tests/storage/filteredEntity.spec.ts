@@ -1,8 +1,8 @@
-import {afterEach, beforeEach, describe, expect, test} from "vitest";
-import {DBSetup, EntityToTableMap, MatchExp, EntityQueryHandle} from "@storage";
-import {Entity, Property, BoolExp} from '@shared';
+import { afterEach, beforeEach, describe, expect, test } from "vitest";
+import { DBSetup, EntityToTableMap, MatchExp, EntityQueryHandle } from "@storage";
+import { Entity, Property } from '@shared';
 import TestLogger from "./testLogger.js";
-import {PGLiteDB} from '@runtime';
+import { PGLiteDB } from '@runtime';
 
 describe('filtered entity test', () => {
     let db: PGLiteDB;
@@ -25,8 +25,8 @@ describe('filtered entity test', () => {
         // 创建 filtered entity - ActiveUsers
         const activeUsersEntity = Entity.create({
             name: 'ActiveUsers',
-            sourceEntity: 'User',
-            filterCondition: BoolExp.atom({
+            sourceEntity: userEntity,
+            filterCondition: MatchExp.atom({
                 key: 'isActive',
                 value: ['=', true]
             })
@@ -35,8 +35,8 @@ describe('filtered entity test', () => {
         // 创建 filtered entity - YoungUsers  
         const youngUsersEntity = Entity.create({
             name: 'YoungUsers',
-            sourceEntity: 'User',
-            filterCondition: BoolExp.atom({
+            sourceEntity: userEntity,
+            filterCondition: MatchExp.atom({
                 key: 'age',
                 value: ['<', 25]
             })
@@ -45,8 +45,8 @@ describe('filtered entity test', () => {
         // 创建 filtered entity - TechYoungUsers (复杂条件)
         const techYoungUsersEntity = Entity.create({
             name: 'TechYoungUsers',
-            sourceEntity: 'User',
-            filterCondition: BoolExp.atom({
+            sourceEntity: userEntity,
+            filterCondition: MatchExp.atom({
                 key: 'age',
                 value: ['<', 30]
             }).and({
@@ -82,10 +82,8 @@ describe('filtered entity test', () => {
 
     test('should get filtered entity config correctly', () => {
         const activeUsersConfig = entityQueryHandle.getFilteredEntityConfig('ActiveUsers');
-        expect(activeUsersConfig).toMatchObject({
-            sourceEntity: 'User',
-            filterCondition: expect.any(Object)
-        });
+        expect(activeUsersConfig?.sourceRecordName).toBe('User');
+        expect(activeUsersConfig?.filterCondition).toBeDefined();
 
         const userConfig = entityQueryHandle.getFilteredEntityConfig('User');
         expect(userConfig).toBe(null);
