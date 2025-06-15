@@ -10,8 +10,6 @@ import {
     SystemEntity,
     SystemLogger
 } from "./System.js";
-import { INTERACTION_RECORD} from "./ActivityManager.js";
-import { InteractionEvent } from './InteractionCall.js';
 import { createClass, Entity, KlassInstance, Property, Relation } from "@shared";
 import {
     DBSetup,
@@ -162,14 +160,6 @@ export class MonoSystem implements System {
     storage: Storage
     constructor(db: Database = new SQLiteDB(undefined,{logger: new ConsoleLogger()}), public logger: SystemLogger = defaultLogger) {
         this.storage = new MonoStorage(db)
-    }
-    async saveEvent(event: InteractionEvent, mutationEvents: RecordMutationEvent[] = []): Promise<any> {
-        return this.storage.create(INTERACTION_RECORD, event, mutationEvents)
-    }
-    async getEvent(query?: MatchExpressionData ) {
-        return (await this.storage.find(INTERACTION_RECORD, query, undefined, ['*'])).map(event => ({
-            ...event,
-        })) as unknown as InteractionEvent[]
     }
     
     setup(entities: KlassInstance<typeof Entity>[], relations: KlassInstance<typeof Relation>[], states: ComputationState[], install = false){
