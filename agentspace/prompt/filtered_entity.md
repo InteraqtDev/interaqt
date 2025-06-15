@@ -13,7 +13,7 @@
 6. [x] 在 tests/storage 下新增一个文件，写出完整的测试用例，并保证 `npm test` 全部通过。
 7. [x] 修改 tests/storage 下 filtered entity 的测试用例，使用 PGLite。
 8. [x] 增加 tests/storage 下 filtered entity 的测试用例，要明确检查抛出的事件中是否包含了正确的 filtered entity 的事件。例如当新增一个 entity时，如果它也是 filtered entity，那么抛出的事件中只是有 source entity 的一条事件，也还要有一条新的 filtered entity 的事件。增删改的事件都应该如此。因为已经有一个字段用来标记某个 entity 记录是否也是 filtered entity 了，那么只要在更新标记的时候做一下判断，就应该能得到相应的 filtered entity 事件。删除的时候也只要根据这个标记同时抛出相应的删除事件就行了。
-9. [] 在当前的系统里，relation 也被看作时一种 entity，应该也能作为 Filtered Entity 的 sourceEntity。你先写一写测试用例来测试一下当前的代码是否支持，如果不支持的话，继续修改改代码变得支持。
+9. [x] 在当前的系统里，relation 也被看作时一种 entity，应该也能作为 Filtered Entity 的 sourceEntity。你先写一写测试用例来测试一下当前的代码是否支持，如果不支持的话，继续修改改代码变得支持。
 
 ## document
 
