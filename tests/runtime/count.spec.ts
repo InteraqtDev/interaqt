@@ -233,4 +233,207 @@ describe('Count computed handle', () => {
     expect(finalUser1.taskCount).toBe(1);
     expect(finalUser2.taskCount).toBe(2);
   });
+
+
+  test('should only count self relation twice on n:n relation', async () => {
+    // Create User entity with computed property
+    const userEntity = Entity.create({
+      name: 'User',
+      properties: [
+        Property.create({
+          name: 'username',
+          type: 'string'
+        })
+      ]
+    });
+    
+    // Create Group entity with computed property
+    const groupEntity = Entity.create({
+      name: 'Group',
+      properties: [
+        Property.create({
+          name: 'groupName',
+          type: 'string'
+        })
+      ]
+    });
+    
+    const entities = [userEntity, groupEntity];
+    
+    // Create bidirectional relationship
+    const userGroupRelation = Relation.create({
+      source: userEntity,
+      sourceProperty: 'groups',
+      target: groupEntity,
+      targetProperty: 'members',
+      name: 'userGroup',
+      type: 'n:n'
+    });
+    
+    const relations = [userGroupRelation];
+    
+    // Add computed property to User to count groups
+    userEntity.properties.push(
+      Property.create({
+        name: 'groupCount',
+        type: 'number',
+        defaultValue: () => 0,
+        computedData: Count.create({
+          record: userGroupRelation
+        })
+      })
+    );
+    
+    // Add computed property to Group to count members
+    groupEntity.properties.push(
+      Property.create({
+        name: 'memberCount',
+        type: 'number',
+        defaultValue: () => 0,
+        computedData: Count.create({
+          record: userGroupRelation
+        })
+      })
+    );
+    
+    // Setup system and controller
+    const system = new MonoSystem();
+    system.conceptClass = KlassByName;
+    const controller = new Controller(system, entities, relations, [], [], [], []);
+    await controller.setup(true);
+    
+    // Create users and groups
+    const user1 = await system.storage.create('User', {username: 'user1'});
+    const user2 = await system.storage.create('User', {username: 'user2'});
+    const group1 = await system.storage.create('Group', {groupName: 'group1'});
+    const group2 = await system.storage.create('Group', {groupName: 'group2'});
+    
+    // Initial counts should be 0
+    const initialUser1 = await system.storage.findOne('User', BoolExp.atom({key: 'id', value: ['=', user1.id]}), undefined, ['*']);
+    const initialGroup1 = await system.storage.findOne('Group', BoolExp.atom({key: 'id', value: ['=', group1.id]}), undefined, ['*']);
+    expect(initialUser1.groupCount).toBe(0);
+    expect(initialGroup1.memberCount).toBe(0);
+    
+    // Create relationship between user1 and group1
+    // This should trigger computation on both sides
+    await system.storage.addRelationByNameById('User_groups_members_Group', user1.id, group1.id, {});
+    
+    // Check if counts are updated correctly
+    const updatedUser1 = await system.storage.findOne('User', BoolExp.atom({key: 'id', value: ['=', user1.id]}), undefined, ['*']);
+    const updatedGroup1 = await system.storage.findOne('Group', BoolExp.atom({key: 'id', value: ['=', group1.id]}), undefined, ['*']);
+    
+    expect(updatedUser1.groupCount).toBe(1);
+    expect(updatedGroup1.memberCount).toBe(1);
+    
+    // Add more relationships
+    await system.storage.addRelationByNameById('User_groups_members_Group', user1.id, group2.id, {});
+    await system.storage.addRelationByNameById('User_groups_members_Group', user2.id, group1.id, {});
+    
+    // Check final counts
+    const finalUser1 = await system.storage.findOne('User', BoolExp.atom({key: 'id', value: ['=', user1.id]}), undefined, ['*']);
+    const finalUser2 = await system.storage.findOne('User', BoolExp.atom({key: 'id', value: ['=', user2.id]}), undefined, ['*']);
+    const finalGroup1 = await system.storage.findOne('Group', BoolExp.atom({key: 'id', value: ['=', group1.id]}), undefined, ['*']);
+    const finalGroup2 = await system.storage.findOne('Group', BoolExp.atom({key: 'id', value: ['=', group2.id]}), undefined, ['*']);
+    
+    expect(finalUser1.groupCount).toBe(2);
+    expect(finalUser2.groupCount).toBe(1);
+    expect(finalGroup1.memberCount).toBe(2);
+    expect(finalGroup2.memberCount).toBe(1);
+  });
+
+
+
+  test('should handle deletion in bidirectional relation', async () => {
+    // Create entities
+    const authorEntity = Entity.create({
+      name: 'Author',
+      properties: [
+        Property.create({
+          name: 'name',
+          type: 'string'
+        })
+      ]
+    });
+    
+    const bookEntity = Entity.create({
+      name: 'Book',
+      properties: [
+        Property.create({
+          name: 'title',
+          type: 'string'
+        })
+      ]
+    });
+    
+    const entities = [authorEntity, bookEntity];
+    
+    // Create bidirectional relationship
+    const authorBookRelation = Relation.create({
+      source: authorEntity,
+      sourceProperty: 'books',
+      target: bookEntity,
+      targetProperty: 'authors',
+      name: 'authorBook',
+      type: 'n:n'
+    });
+    
+    const relations = [authorBookRelation];
+    
+    // Add computed properties
+    authorEntity.properties.push(
+      Property.create({
+        name: 'bookCount',
+        type: 'number',
+        defaultValue: () => 0,
+        computedData: Count.create({
+          record: authorBookRelation
+        })
+      })
+    );
+    
+    bookEntity.properties.push(
+      Property.create({
+        name: 'authorCount',
+        type: 'number',
+        defaultValue: () => 0,
+        computedData: Count.create({
+          record: authorBookRelation
+        })
+      })
+    );
+    
+    // Setup system and controller
+    const system = new MonoSystem();
+    system.conceptClass = KlassByName;
+    const controller = new Controller(system, entities, relations, [], [], [], []);
+    await controller.setup(true);
+    
+    // Create data
+    const author1 = await system.storage.create('Author', {name: 'Author 1'});
+    const author2 = await system.storage.create('Author', {name: 'Author 2'});
+    const book1 = await system.storage.create('Book', {title: 'Book 1'});
+    const book2 = await system.storage.create('Book', {title: 'Book 2'});
+    
+    // Create relationships
+    const rel1 = await system.storage.addRelationByNameById('Author_books_authors_Book', author1.id, book1.id, {});
+    const rel2 = await system.storage.addRelationByNameById('Author_books_authors_Book', author1.id, book2.id, {});
+    const rel3 = await system.storage.addRelationByNameById('Author_books_authors_Book', author2.id, book1.id, {});
+    
+    // Check counts before deletion
+    const beforeAuthor1 = await system.storage.findOne('Author', BoolExp.atom({key: 'id', value: ['=', author1.id]}), undefined, ['*']);
+    const beforeBook1 = await system.storage.findOne('Book', BoolExp.atom({key: 'id', value: ['=', book1.id]}), undefined, ['*']);
+    
+    expect(beforeAuthor1.bookCount).toBe(2);
+    expect(beforeBook1.authorCount).toBe(2);
+    
+    // Delete a relationship
+    await system.storage.removeRelationByName('Author_books_authors_Book', BoolExp.atom({key: 'id', value: ['=', rel1.id]}));
+    
+    // Check counts after deletion
+    const afterAuthor1 = await system.storage.findOne('Author', BoolExp.atom({key: 'id', value: ['=', author1.id]}), undefined, ['*']);
+    const afterBook1 = await system.storage.findOne('Book', BoolExp.atom({key: 'id', value: ['=', book1.id]}), undefined, ['*']);
+    
+    expect(afterAuthor1.bookCount).toBe(1);
+    expect(afterBook1.authorCount).toBe(1);
+  });
 }); 

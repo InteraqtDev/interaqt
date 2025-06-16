@@ -19,3 +19,6 @@
   - [x] 支持直接在 filtered entity 上执行 update 和 delete 操作
   - [x] 添加了 filtered entity 事件抛出的测试用例
 - [x] 遵照 `agentspace/prompt/scheduler.md` 中的指示梳理 scheduler 并修复 bug。
+- [ ] 修复双向关系的循环计算问题
+  - [x] 构造了能重现问题的测试用例 `tests/runtime/bidirectionalRelation.spec.ts`
+  - [ ] 分析问题根源并实现修复方案

@@ -86,7 +86,7 @@ export class PropertyCountHandle implements DataBasedComputation {
         return count;
     }
 
-    async incrementalCompute(lastValue: number, mutationEvent: EtityMutationEvent): Promise<number> {
+    async incrementalCompute(lastValue: number, mutationEvent: EtityMutationEvent, record: any): Promise<number> {
         let count = lastValue || 0;
         const relatedMutationEvent = mutationEvent.relatedMutationEvent!;
 

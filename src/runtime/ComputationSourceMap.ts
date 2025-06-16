@@ -10,8 +10,11 @@ export type EntityCreateEventsSourceMap = {
     dataDep: DataDep,
     type: 'create',
     recordName: string,
+    // dataDep 的 source 实体
     sourceRecordName: string,
+    // 监听变化的属性相对于 dataDep 实体对象的路径。路径是从当前实体出发的。
     targetPath?: string[],
+    // 当前实体是否是 relation 类型
     isRelation?: boolean,
     computation: Computation
 }

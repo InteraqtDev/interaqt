@@ -186,39 +186,43 @@ export class Scheduler {
         })
         // TODO 未来也许要监听 MutationEvent，让开发者能观测系统的变化。
     }
-    async computeDirtyRecords(source: EntityEventSourceMap, mutationEvent: RecordMutationEvent) {
+    async computeDirtyDataDepRecords(source: EntityEventSourceMap, mutationEvent: RecordMutationEvent): Promise<any[]> {
+        // 1. 就是自身的变化
         if(!source.targetPath?.length) {
             return [mutationEvent.oldRecord ?? mutationEvent.record]
         }
 
-        let dataDepRecords: any[] = []
+        // 2. 关联关系、关联实体的变化
+        let dirtyDataDepRecords: any[] = []
         if (!source.isRelation) { 
+            // 2.1. 关联实体的 update 事件，create/delete 不用管，因为那些会先有关系的 create/delete 事件。
             assert(source.type === 'update', 'only support update event for entity')
-            dataDepRecords = await this.controller.system.storage.find(source.sourceRecordName, MatchExp.atom({
+            dirtyDataDepRecords = await this.controller.system.storage.find(source.sourceRecordName, MatchExp.atom({
                 key: source.targetPath!.concat('id').join('.'),
-                value: ['=', mutationEvent.oldRecord?.id??mutationEvent.record?.id]
+                value: ['=', mutationEvent.oldRecord!.id]
             }))
         } else {
-            // 2.3. 关联关系的 create/delete 事件，计算出关联关系的增删改最终影响了哪些当前 dataDep
+            // 2.2. 关联关系的 create/delete 事件，计算出关联关系的增删改最终影响了哪些当前 dataDep
             assert(source.type === 'create' || source.type === 'delete', 'only support create/delete event for relation')
             const relation = this.controller.relations.find(relation => relation.name === source.recordName)
-            // FIXME 没考虑 bidirectional 的情况，双向关系死循环了
+            // FIXME 没考虑 semmetric relation 的情况，对称关系死循环了
             const isSource = relation?.sourceProperty === source.targetPath!.at(-1)
             const dataDep = source.dataDep as RecordsDataDep
             if (source.type === 'create') {
-                dataDepRecords = await this.controller.system.storage.find(source.sourceRecordName, MatchExp.atom({
-                    key: source.targetPath!.concat('id').join('.'),
-                    value: ['=', mutationEvent.record![isSource ? 'target' : 'source']!.id]
+                dirtyDataDepRecords = await this.controller.system.storage.find(source.sourceRecordName, MatchExp.atom({
+                    key: source.targetPath!.concat(['&','id']).join('.'),
+                    value: ['=', mutationEvent.record!.id]
                 }), undefined, dataDep.attributeQuery)
             } else {
-                dataDepRecords = await this.controller.system.storage.find(source.sourceRecordName, MatchExp.atom({
+                dirtyDataDepRecords = await this.controller.system.storage.find(source.sourceRecordName, MatchExp.atom({
+                    // 因为关系已经删掉了，所以必须用倒数第二个节点的信息来判断影响了谁。
                     key: source.targetPath!.slice(0, -1).concat('id').join('.'),
                     value: ['=', mutationEvent.record![isSource ? 'source' : 'target']!.id]
                 }), undefined, dataDep.attributeQuery)
             }
         }
 
-        return dataDepRecords
+        return dirtyDataDepRecords
     }
     computeOldRecord(newRecord: any, sourceMap: EntityEventSourceMap, mutationEvent: RecordMutationEvent) {
         if (!sourceMap.targetPath?.length) {
@@ -231,7 +235,7 @@ export class Scheduler {
         // 一路浅拷贝
         for(const attr of path) {
             // CAUTION Computation 不能跨越 x:n 的集合，所以路径上应该都是对象。
-            assert(typeof pointer[attr] === 'object', `cannot compute old record for ${sourceMap.recordName} because ${attr} is not an object`)
+            // FIXME assert(typeof pointer[attr] === 'object', `cannot compute old record for ${sourceMap.recordName} because ${attr} is not an object`)
             pointer[attr] = {...pointer[attr]}
             pointer = pointer[attr]
         }
@@ -265,7 +269,7 @@ export class Scheduler {
                 ...mutationEvent
             }]]
         } else {
-            const dataDepRecords = await this.computeDirtyRecords(source, mutationEvent)
+            const dataDepRecords = await this.computeDirtyDataDepRecords(source, mutationEvent)
             dirtyRecordsAndEvents = dataDepRecords.map(record => [record, {
                 dataDep: source.dataDep,
                 type: 'update',

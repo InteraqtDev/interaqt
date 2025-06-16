@@ -135,14 +135,14 @@ export class PropertyEveryHandle implements DataBasedComputation {
         return matchCount === totalCount
     }
 
-    async incrementalCompute(lastValue: boolean, mutationEvent: EtityMutationEvent): Promise<boolean> {
+    async incrementalCompute(lastValue: boolean, mutationEvent: EtityMutationEvent, record: any): Promise<boolean> {
         // TODO 如果未来支持用户可以自定义 dataDeps，那么这里也要支持如果发现是其他 dataDeps 变化，这里要直接返回重算的信号。
         let matchCount = await this.state!.matchCount.get(mutationEvent.record)
         let totalCount = await this.state!.totalCount.get(mutationEvent.record)
         const relatedMutationEvent = mutationEvent.relatedMutationEvent!
 
-        // property 类型收到的事件都是 update，需要通过 relatedMutationEvent 来判断到底是关系的新增和删除还是关联实体的更新 。
-
+        // 关联实体只有更新才会触发到这里来，这是监听时就决定了的。
+        // 关联关系的增删改都会到这里来。
         if (relatedMutationEvent.type === 'create') {
             // 关联关系的新建
             const relationRecord = relatedMutationEvent.record!
@@ -196,10 +196,9 @@ export class PropertyEveryHandle implements DataBasedComputation {
                 matchCount = await this.state!.matchCount.set(currentRecord, matchCount + 1)
             }
             await this.state!.isItemMatch.set(relationRecord, newItemMatch)
-          
+        
             totalCount = await this.state!.totalCount.set(currentRecord, totalCount)
         }
-
         return matchCount === totalCount
     }
 }

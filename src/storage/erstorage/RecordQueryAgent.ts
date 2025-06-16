@@ -655,7 +655,7 @@ ${innerQuerySQL}
                 events?.push({
                     type: 'update',
                     recordName: newEntityData.recordName,
-                    record: newEntityData.getData()!,
+                    record: {...newEntityData.getData()!, id: oldRecord!.id},
                     oldRecord: oldRecord
                 })
             }
