@@ -204,9 +204,7 @@ export class Scheduler {
         } else {
             // 2.2. 关联关系的 create/delete 事件，计算出关联关系的增删改最终影响了哪些当前 dataDep
             assert(source.type === 'create' || source.type === 'delete', 'only support create/delete event for relation')
-            const relation = this.controller.relations.find(relation => relation.name === source.recordName)
-            // FIXME 没考虑 semmetric relation 的情况，对称关系死循环了
-            const isSource = relation?.sourceProperty === source.targetPath!.at(-1)
+            
             const dataDep = source.dataDep as RecordsDataDep
             if (source.type === 'create') {
                 dirtyDataDepRecords = await this.controller.system.storage.find(source.sourceRecordName, MatchExp.atom({
@@ -214,11 +212,25 @@ export class Scheduler {
                     value: ['=', mutationEvent.record!.id]
                 }), undefined, dataDep.attributeQuery)
             } else {
-                dirtyDataDepRecords = await this.controller.system.storage.find(source.sourceRecordName, MatchExp.atom({
-                    // 因为关系已经删掉了，所以必须用倒数第二个节点的信息来判断影响了谁。
-                    key: source.targetPath!.slice(0, -1).concat('id').join('.'),
-                    value: ['=', mutationEvent.record![isSource ? 'source' : 'target']!.id]
-                }), undefined, dataDep.attributeQuery)
+                // TODO 需要确定一下，是不是没考虑 targetPath 中间 semmetric relation 的情况
+                const relation = this.controller.relations.find(relation => relation.name === source.recordName)!
+                const isSemmetricRelation = relation.sourceProperty === relation.targetProperty && relation.source === relation.target
+
+                if (isSemmetricRelation) {
+                    dirtyDataDepRecords = await this.controller.system.storage.find(source.sourceRecordName, MatchExp.atom({
+                        // 因为关系已经删掉了，所以必须用倒数第二个节点的信息来判断影响了谁。
+                        key: source.targetPath!.slice(0, -1).concat('id').join('.'),
+                        value: ['in', [mutationEvent.record!.source.id, mutationEvent.record!.target.id]]
+                    }), undefined, dataDep.attributeQuery)
+                } else {
+                    const isSource = relation?.sourceProperty === source.targetPath!.at(-1)
+                    dirtyDataDepRecords = await this.controller.system.storage.find(source.sourceRecordName, MatchExp.atom({
+                        // 因为关系已经删掉了，所以必须用倒数第二个节点的信息来判断影响了谁。
+                        key: source.targetPath!.slice(0, -1).concat('id').join('.'),
+                        value: ['=', mutationEvent.record![isSource ? 'source' : 'target']!.id]
+                    }), undefined, dataDep.attributeQuery)
+                }
+                
             }
         }
 

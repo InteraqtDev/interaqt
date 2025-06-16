@@ -19,6 +19,7 @@
   - [x] 支持直接在 filtered entity 上执行 update 和 delete 操作
   - [x] 添加了 filtered entity 事件抛出的测试用例
 - [x] 遵照 `agentspace/prompt/scheduler.md` 中的指示梳理 scheduler 并修复 bug。
-- [ ] 修复双向关系的循环计算问题
-  - [x] 构造了能重现问题的测试用例 `tests/runtime/bidirectionalRelation.spec.ts`
+- [ ] 修复对称关系(symmetric relation)的循环计算问题
+  - [x] 构造了能重现问题的测试用例 `tests/runtime/symmetricRelation.spec.ts`
+  - [x] 确认了问题：删除对称关系时，只有 source 端的计数被更新，target 端的计数没有被更新
   - [ ] 分析问题根源并实现修复方案
