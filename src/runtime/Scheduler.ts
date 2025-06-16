@@ -237,6 +237,7 @@ export class Scheduler {
         return dirtyDataDepRecords
     }
     computeOldRecord(newRecord: any, sourceMap: EntityEventSourceMap, mutationEvent: RecordMutationEvent) {
+        // 因为 RecordMutationEvent 可能是关联的实体等数据更新，所以要从 RecordMutationEvent 中构造出当前 record 的 oldRecord
         if (!sourceMap.targetPath?.length) {
             return mutationEvent.oldRecord
         }
@@ -247,8 +248,15 @@ export class Scheduler {
         // 一路浅拷贝
         for(const attr of path) {
             // CAUTION Computation 不能跨越 x:n 的集合，所以路径上应该都是对象。
-            // FIXME assert(typeof pointer[attr] === 'object', `cannot compute old record for ${sourceMap.recordName} because ${attr} is not an object`)
-            pointer[attr] = {...pointer[attr]}
+            if (typeof pointer[attr] === 'object') {
+                pointer[attr] = {...pointer[attr]}
+            } else if( pointer[attr] === undefined){
+                // undefined
+                pointer[attr] = {}
+            } else {
+                throw new Error(`cannot compute old record for ${sourceMap.recordName} because ${attr} is not an object`)
+            }
+            
             pointer = pointer[attr]
         }
         if(Array.isArray(pointer[lastAttr])) {
