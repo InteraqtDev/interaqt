@@ -96,8 +96,32 @@ export class Scheduler {
                     })
                     entities.push(AsyncTaskEntity)
                     relations.push(AsyncTaskRelation)
+                } else if (newComputation.dataContext.type === 'global') {
+                    // Global 类型的异步任务表
+                    const AsyncTaskEntity = Entity.create({
+                        name: this.getAsyncTaskRecordKey(newComputation),
+                        properties: [
+                            Property.create({
+                                name: 'status',
+                                type: 'string',
+                            }),
+                            Property.create({
+                                name: 'args',
+                                type: 'json',
+                            }),
+                            Property.create({
+                                name: 'result',
+                                type: 'json',
+                            }),
+                            Property.create({
+                                name: 'globalKey',
+                                type: 'string',
+                            })
+                        ]
+                    })
+                    entities.push(AsyncTaskEntity)
                 }
-                // TODO global 的情况
+                // TODO entity 的情况
             }
         }
     }
@@ -334,11 +358,18 @@ export class Scheduler {
         }
     }
     getAsyncTaskRecordKey(computation: Computation) {
-        return `${ASYNC_TASK_RECORD}_${(computation.dataContext as PropertyDataContext).host?.name ?  `${(computation.dataContext as PropertyDataContext).host?.name}_` : ''}${(computation.dataContext as PropertyDataContext).id}`
+        if (computation.dataContext.type === 'property') {
+            const propertyContext = computation.dataContext as PropertyDataContext
+            return `${ASYNC_TASK_RECORD}_${propertyContext.host.name}_${propertyContext.id}`
+        } else if (computation.dataContext.type === 'global') {
+            return `${ASYNC_TASK_RECORD}_${computation.dataContext.id}`
+        } else {
+            // entity 或其他类型
+            return `${ASYNC_TASK_RECORD}_${computation.dataContext.type}_${(computation.dataContext as any).id?.name || computation.dataContext.id}`
+        }
     }
     async createAsyncTask(computation: Computation, args: any, record?: any, result?: any) {
-        // TODO 创建异步任务
-        // TODO 要根据不同 dataContext 来创建不同的 task。
+        // 根据不同 dataContext 来创建不同的 task
         if (computation.dataContext.type === 'property') {
             return this.controller.system.storage.create(this.getAsyncTaskRecordKey(computation), {
                 status: result === undefined ? 'pending' : 'success',
@@ -346,22 +377,46 @@ export class Scheduler {
                 record,
                 result
             })
+        } else if (computation.dataContext.type === 'global') {
+            return this.controller.system.storage.create(this.getAsyncTaskRecordKey(computation), {
+                status: result === undefined ? 'pending' : 'success',
+                args,
+                globalKey: computation.dataContext.id,
+                result
+            })
         } else {
-            // global/entity 的情况
+            // entity 的情况
+            throw new Error(`Async computation for ${computation.dataContext.type} is not implemented yet`)
         }
     }
 
     async handleAsyncReturn(computation: DataBasedComputation, taskRecordIdRef: {id: string}) {
-        const taskRecord = await this.controller.system.storage.findOne(this.getAsyncTaskRecordKey(computation), MatchExp.atom({key: 'id', value: ['=', taskRecordIdRef.id]}), {}, ['*', ['record', {attributeQuery: ['id']}]])
-        // 1. 检查 task 是否仍然是 dataContext 当前最新的，如果不是，说明 task 已经过期，返回值不用管了。
+        const attributeQuery = computation.dataContext.type === 'property' ? ['*', ['record', {attributeQuery: ['id']}]] : ['*']
+        const taskRecord = await this.controller.system.storage.findOne(this.getAsyncTaskRecordKey(computation), MatchExp.atom({key: 'id', value: ['=', taskRecordIdRef.id]}), {}, attributeQuery)
+        
+        // 检查 task 是否仍然是 dataContext 当前最新的，如果不是，说明 task 已经过期，返回值不用管了。
         if (taskRecord.status === 'success') {
-
             const resultOrPatch = await computation.asyncReturn!(taskRecord.result, taskRecord.args)
-            if (computation.incrementalPatchCompute) {
-                await this.controller.applyResultPatch(computation.dataContext, resultOrPatch, taskRecord.record)
+            
+            if (computation.dataContext.type === 'global') {
+                // Global 类型不需要 record 参数
+                if (computation.incrementalPatchCompute) {
+                    await this.controller.applyResultPatch(computation.dataContext, resultOrPatch)
+                } else {
+                    await this.controller.applyResult(computation.dataContext, resultOrPatch)
+                }
+            } else if (computation.dataContext.type === 'property') {
+                // Property 和其他类型需要 record 参数
+                if (computation.incrementalPatchCompute) {
+                    await this.controller.applyResultPatch(computation.dataContext, resultOrPatch, taskRecord.record)
+                } else {
+                    await this.controller.applyResult(computation.dataContext, resultOrPatch, taskRecord.record)
+                }
             } else {
-                await this.controller.applyResult(computation.dataContext, resultOrPatch, taskRecord.record)
+                // TODO entity 处理
             }
+        } else {
+            // TODO error 处理
         }
     }
 

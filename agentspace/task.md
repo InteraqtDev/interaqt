@@ -23,3 +23,9 @@
   - [x] 构造了能重现问题的测试用例 `tests/runtime/symmetricRelation.spec.ts`
   - [x] 确认了问题：删除对称关系时，只有 source 端的计数被更新，target 端的计数没有被更新
   - [ ] 分析问题根源并实现修复方案
+- [x] 实现 Global 类型的异步计算支持
+  - [x] 修改 Scheduler 支持创建 Global 类型的异步任务表
+  - [x] 实现 createAsyncTask 和 handleAsyncReturn 对 Global 类型的支持
+  - [x] 修改 getAsyncTaskRecordKey 方法支持不同类型的计算
+  - [x] 创建测试用例 `tests/runtime/globalAsyncComputed.spec.ts`
+  - [x] 测试通过，功能正常工作

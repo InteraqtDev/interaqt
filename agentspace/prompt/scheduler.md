@@ -14,6 +14,8 @@ Scheduler 是负责调度本项目中响应式计算的。项目中的 Computati
 - [x] 深入阅读 src/runtime 下的 Scheduler 相关的代码，包括相关的 Controller 等。对设计理念、具体实现都写到下面的章节中。
 - [x] 修复对称关系(symmetric relation)的循环计算问题。在本项目中，relation 有一种特殊情况 symmetric relation，它指的是在 source entity 和 target entity 中使用的 property 都是一样。在业务中，"friend" 就是一个常见的例子。不管关系是由哪边建立的，都叫"friend"。在查询的也是也是只通过 friend 这个名字就都能查出来了。二在一般关系中 source 和 target 的 property 不一样，我们通过 property 查询某个 entity 相应的 relation 的时候，只能查出 property 严格对应的那一边的记录。
 - [ ] 实现 Global 和 Entity 类型的异步计算支持
+  - [x] 实现 Global 类型的异步计算支持
+  - [ ] 实现 Entity 类型的异步计算支持
 - [ ] 完成 Entity 和 Relation 级别的计算结果应用逻辑
 - [ ] 实现事件恢复模式，支持从 event stack 恢复数据
 - [ ] 添加 Activity 的事件监听支持
