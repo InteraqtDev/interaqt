@@ -13,13 +13,14 @@ Scheduler 是负责调度本项目中响应式计算的。项目中的 Computati
 现在你的任务：
 - [x] 深入阅读 src/runtime 下的 Scheduler 相关的代码，包括相关的 Controller 等。对设计理念、具体实现都写到下面的章节中。
 - [x] 修复对称关系(symmetric relation)的循环计算问题。在本项目中，relation 有一种特殊情况 symmetric relation，它指的是在 source entity 和 target entity 中使用的 property 都是一样。在业务中，"friend" 就是一个常见的例子。不管关系是由哪边建立的，都叫"friend"。在查询的也是也是只通过 friend 这个名字就都能查出来了。二在一般关系中 source 和 target 的 property 不一样，我们通过 property 查询某个 entity 相应的 relation 的时候，只能查出 property 严格对应的那一边的记录。
-- [ ] 实现 Global 和 Entity 类型的异步计算支持
+- [x] 实现 Global、Entity 和 Relation 类型的异步计算支持
   - [x] 实现 Global 类型的异步计算支持
-  - [ ] 实现 Entity 类型的异步计算支持
-- [ ] 完成 Entity 和 Relation 级别的计算结果应用逻辑
+  - [x] 实现 Entity 类型的异步计算支持
+  - [x] 实现 Relation 类型的异步计算支持
+- [x] 完成 Entity 和 Relation 级别的计算结果应用逻辑
+- [ ] 实现 Global 数据依赖的变化监听机制
 - [ ] 实现事件恢复模式，支持从 event stack 恢复数据
 - [ ] 添加 Activity 的事件监听支持
-- [ ] 实现 Global 数据依赖的变化监听机制
 - [ ] 支持属性查询中的通配符展开
 - [ ] 添加 MutationEvent 的对外暴露接口
 
@@ -88,17 +89,6 @@ Scheduler 是整个响应式系统的核心调度器，负责：
 ### 未实现和有问题的部分
 
 #### 未实现功能：
-1. **Global 类型的异步计算支持**（第99、324行）
-   - 目前只实现了 property 类型的异步计算
-   - Global 和 Entity 类型的异步计算任务表创建未实现
-
-2. **Entity 和 Relation 级别的计算结果应用**（Controller 96-101行）
-   - applyResult() 方法中 entity 和 relation 类型的处理逻辑为空
-   - 需要实现如何将计算结果应用到实体或关系级别
-
-3. **Global 类型的增量补丁计算**（Controller 129行）
-   - applyResultPatch() 方法中 global 类型的处理逻辑未完成
-
 4. **事件恢复模式**（Controller 90行）
    - 从 event stack 恢复数据的功能未实现
    - 这是实现事件溯源的关键功能

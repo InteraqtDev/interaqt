@@ -19,13 +19,21 @@
   - [x] 支持直接在 filtered entity 上执行 update 和 delete 操作
   - [x] 添加了 filtered entity 事件抛出的测试用例
 - [x] 遵照 `agentspace/prompt/scheduler.md` 中的指示梳理 scheduler 并修复 bug。
-- [ ] 修复对称关系(symmetric relation)的循环计算问题
+- [x] 修复对称关系(symmetric relation)的循环计算问题
   - [x] 构造了能重现问题的测试用例 `tests/runtime/symmetricRelation.spec.ts`
   - [x] 确认了问题：删除对称关系时，只有 source 端的计数被更新，target 端的计数没有被更新
-  - [ ] 分析问题根源并实现修复方案
+  - [x] 分析问题根源并实现修复方案
 - [x] 实现 Global 类型的异步计算支持
   - [x] 修改 Scheduler 支持创建 Global 类型的异步任务表
   - [x] 实现 createAsyncTask 和 handleAsyncReturn 对 Global 类型的支持
   - [x] 修改 getAsyncTaskRecordKey 方法支持不同类型的计算
   - [x] 创建测试用例 `tests/runtime/globalAsyncComputed.spec.ts`
   - [x] 测试通过，功能正常工作
+- [x] 实现 Entity 和 Relation 类型的异步计算支持
+  - [x] 修改 Scheduler 支持创建 Entity 和 Relation 类型的异步任务表
+  - [x] 实现 createAsyncTask 对 Entity 和 Relation 类型的支持
+  - [x] 实现 handleAsyncReturn 对 Entity 和 Relation 类型的支持
+  - [x] 修改 Controller 的 applyResult 方法支持 Entity 和 Relation 类型
+  - [x] 创建测试用例 `tests/runtime/entityAsyncComputed.spec.ts`
+  - [x] 创建测试用例 `tests/runtime/relationAsyncComputed.spec.ts`
+  - [x] 所有测试通过，功能正常工作

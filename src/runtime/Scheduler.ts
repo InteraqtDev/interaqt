@@ -1,5 +1,5 @@
 import { Controller } from "./Controller.js";
-import { DataContext, ComputedDataHandle, PropertyDataContext, EntityDataContext } from "./computedDataHandles/ComputedDataHandle.js";
+import { DataContext, ComputedDataHandle, PropertyDataContext, EntityDataContext, RelationDataContext } from "./computedDataHandles/ComputedDataHandle.js";
 
 import { Entity, Klass, KlassInstance, Property, Relation } from "@shared";
 import { assert } from "./util.js";
@@ -120,8 +120,57 @@ export class Scheduler {
                         ]
                     })
                     entities.push(AsyncTaskEntity)
+                } else if (newComputation.dataContext.type === 'entity') {
+                    // Entity 类型的异步任务表
+                    const entityContext = newComputation.dataContext as EntityDataContext
+                    const AsyncTaskEntity = Entity.create({
+                        name: this.getAsyncTaskRecordKey(newComputation),
+                        properties: [
+                            Property.create({
+                                name: 'status',
+                                type: 'string',
+                            }),
+                            Property.create({
+                                name: 'args',
+                                type: 'json',
+                            }),
+                            Property.create({
+                                name: 'result',
+                                type: 'json',
+                            }),
+                            Property.create({
+                                name: 'entityName',
+                                type: 'string',
+                            })
+                        ]
+                    })
+                    entities.push(AsyncTaskEntity)
+                } else if (newComputation.dataContext.type === 'relation') {
+                    // Relation 类型的异步任务表
+                    const relationContext = newComputation.dataContext as RelationDataContext
+                    const AsyncTaskEntity = Entity.create({
+                        name: this.getAsyncTaskRecordKey(newComputation),
+                        properties: [
+                            Property.create({
+                                name: 'status',
+                                type: 'string',
+                            }),
+                            Property.create({
+                                name: 'args',
+                                type: 'json',
+                            }),
+                            Property.create({
+                                name: 'result',
+                                type: 'json',
+                            }),
+                            Property.create({
+                                name: 'relationName',
+                                type: 'string',
+                            })
+                        ]
+                    })
+                    entities.push(AsyncTaskEntity)
                 }
-                // TODO entity 的情况
             }
         }
     }
@@ -384,9 +433,24 @@ export class Scheduler {
                 globalKey: computation.dataContext.id,
                 result
             })
+        } else if (computation.dataContext.type === 'entity') {
+            const entityContext = computation.dataContext as EntityDataContext
+            return this.controller.system.storage.create(this.getAsyncTaskRecordKey(computation), {
+                status: result === undefined ? 'pending' : 'success',
+                args,
+                entityName: entityContext.id.name,
+                result
+            })
+        } else if (computation.dataContext.type === 'relation') {
+            const relationContext = computation.dataContext as RelationDataContext
+            return this.controller.system.storage.create(this.getAsyncTaskRecordKey(computation), {
+                status: result === undefined ? 'pending' : 'success',
+                args,
+                relationName: relationContext.id.name,
+                result
+            })
         } else {
-            // entity 的情况
-            throw new Error(`Async computation for ${computation.dataContext.type} is not implemented yet`)
+            throw new Error(`Async computation for ${(computation.dataContext as any).type} is not implemented yet`)
         }
     }
 
@@ -412,8 +476,13 @@ export class Scheduler {
                 } else {
                     await this.controller.applyResult(computation.dataContext, resultOrPatch, taskRecord.record)
                 }
-            } else {
-                // TODO entity 处理
+            } else if (computation.dataContext.type === 'entity' || computation.dataContext.type === 'relation') {
+                // Entity 和 Relation 类型不需要 record 参数
+                if (computation.incrementalPatchCompute) {
+                    await this.controller.applyResultPatch(computation.dataContext, resultOrPatch)
+                } else {
+                    await this.controller.applyResult(computation.dataContext, resultOrPatch)
+                }
             }
         } else {
             // TODO error 处理

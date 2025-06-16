@@ -2,7 +2,9 @@ import { beforeEach, describe, expect, test } from "vitest";
 import {
     KlassByName, Controller, EntityIdRef, RecordMutationEvent,
     ActivityCall, ActivityGroupNode,
-    MonoSystem
+    MonoSystem,
+    KlassInstance,
+    Relation
 } from '@';
 import { createData } from './data/activity/index.js';
 
@@ -22,6 +24,7 @@ describe("activity state", () => {
     let relationCreateEvent: RecordMutationEvent|undefined
     let relationDeleteEvent: RecordMutationEvent|undefined
     let controller!: Controller
+    let friendRelation!: KlassInstance<typeof Relation>
 
     beforeEach(async () => {
         const { entities, relations, interactions, dicts, activities }  = createData()
@@ -36,7 +39,7 @@ describe("activity state", () => {
         system = new MonoSystem()
         system.conceptClass = KlassByName
 
-        const friendRelation = relations.find(r => (r as any).name === 'User_friends_friends_User')!
+        friendRelation = relations.find(r => (r as any).name === 'User_friends_friends_User')!
 
 
 
@@ -100,9 +103,10 @@ describe("activity state", () => {
         // 6. 正确 b approve
         const res5 = await controller.callActivityInteraction(activityUUID, approveUUID, activityId,{user: userB})
         // 查询关系是否正确建立
-        const relation = await controller.system.storage.findOneRelationByName('User_friends_friends_User', undefined, undefined, ['*', ['source', {attributeQuery: ['*']}], ['target', {attributeQuery: ['*']}]])
-        expect(relation.source.id).toBe(userA.id)
-        expect(relation.target.id).toBe(userB.id)
+        const relations = await controller.system.storage.findRelationByName(friendRelation.name, undefined, undefined, ['*', ['source', {attributeQuery: ['*']}], ['target', {attributeQuery: ['*']}]])
+        expect(relations.length).toBe(1)
+        expect(relations[0].source.id).toBe(userA.id)
+        expect(relations[0].target.id).toBe(userB.id)
 
         expect(res5.error).toBeUndefined()
 

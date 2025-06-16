@@ -226,13 +226,6 @@ export type RelationPublic = {
         collection: false,
         defaultValue: () => boolean
     },
-    relType: {
-        type: 'string',
-        collection: false,
-        required: true,
-        options: () => string[],
-        defaultValue: () => string
-    },
     type: {
         type: 'string',
         collection: false,
@@ -329,17 +322,6 @@ export const Relation: Klass<RelationPublic> = createClass({
             collection: false,
             defaultValue() {
                 return false
-            }
-        },
-        relType: {
-            type: 'string',
-            required: true,
-            collection: false,
-            options() {
-                return ['oneToOne', 'oneToMany', 'manyToOne', 'manyToMany']
-            },
-            defaultValue() {
-                return 'oneToOne'
             }
         },
         type: {

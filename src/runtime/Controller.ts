@@ -14,6 +14,7 @@ import { ComputationResult, ComputationResultSkip, ComputationResultPatch } from
 import { Scheduler } from "./Scheduler.js";
 import { MatchExp } from "@storage";
 import { ActivityManager } from "./ActivityManager.js";
+import { assert } from "./util.js";
 
 export const USER_ENTITY = 'User'
 
@@ -94,12 +95,29 @@ export class Controller {
         if (result instanceof ComputationResultSkip) return
 
         if (dataContext.type === 'global') {
-            // TODO 
             return this.system.storage.set('state', dataContext.id! as string, result)
         } else if (dataContext.type === 'entity') {
-            // TODO
+            if (result === undefined || result === null) return
+            // Entity 级别的计算结果完全替换实体表中的所有记录
+            const entityContext = dataContext as EntityDataContext
+            // 先删除所有记录
+            await this.system.storage.delete(entityContext.id.name, BoolExp.atom({key: 'id', value: ['not', null]}))
+            // 然后插入新记录，result 必须是数组
+            const items = Array.isArray(result) ? result : [result]
+            for (const item of items) {
+                await this.system.storage.create(entityContext.id.name, item)
+            }
         } else if (dataContext.type === 'relation') {
-            // TODO
+            if (result === undefined || result === null) return
+            // Relation 级别的计算结果完全替换关系表中的所有记录
+            const relationContext = dataContext as RelationDataContext
+            // 先删除所有记录
+            await this.system.storage.delete(relationContext.id.name, BoolExp.atom({key: 'id', value: ['not', null]}))
+            // 然后插入新记录，result 必须是数组
+            const items = Array.isArray(result) ? result : [result]
+            for (const item of items) {
+                await this.system.storage.create(relationContext.id.name, item)
+            }
         } else {
             const propertyDataContext = dataContext as PropertyDataContext
             await this.system.storage.update(propertyDataContext.host.name, BoolExp.atom({key: 'id', value: ['=', record.id]}), {[propertyDataContext.id]: result})
@@ -109,9 +127,7 @@ export class Controller {
         if (dataContext.type === 'global') {
             return this.system.storage.get('state', dataContext.id! as string)
         } else if (dataContext.type === 'entity'||dataContext.type === 'relation') {
-            
             return this.system.storage.find(dataContext.id.name, undefined, undefined, ['*'])
-      
         } else {
             const propertyDataContext = dataContext as PropertyDataContext
             if (record[propertyDataContext.id]) return record[propertyDataContext.id]
@@ -126,7 +142,6 @@ export class Controller {
         const patches = Array.isArray(patch) ? patch : [patch]
         for(const patch of patches) {
                 if (dataContext.type === 'global') {
-                    // TODO
                     return this.system.storage.set('state', dataContext.id! as string, patch)
             } else if (dataContext.type === 'entity'||dataContext.type === 'relation') {
                 const erDataContext = dataContext as EntityDataContext|RelationDataContext
