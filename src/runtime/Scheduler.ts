@@ -3,14 +3,15 @@ import { DataContext, ComputedDataHandle, PropertyDataContext, EntityDataContext
 
 import { Entity, Klass, KlassInstance, Property, Relation } from "@shared";
 import { assert } from "./util.js";
-import { Computation, ComputationClass, ComputationResult, ComputationResultAsync, ComputationResultResolved, ComputationResultSkip, DataBasedComputation, EventBasedComputation, GlobalBoundState, RecordBoundState, RecordsDataDep, RelationBoundState } from "./computedDataHandles/Computation.js";
-import { RecordMutationEvent } from "./System.js";
+import { Computation, ComputationClass, ComputationResult, ComputationResultAsync, ComputationResultFullRecompute, ComputationResultResolved, ComputationResultSkip, DataBasedComputation, EventBasedComputation, GlobalBoundState, RecordBoundState, RecordsDataDep, RelationBoundState } from "./computedDataHandles/Computation.js";
+import { RecordMutationEvent, SYSTEM_RECORD } from "./System.js";
 import { MatchExp } from "@storage";
 import {
     EntityEventSourceMap,
     EtityMutationEvent,
     DataSourceMapTree,
-    ComputationSourceMapManager
+    ComputationSourceMapManager,
+    EntityCreateEventsSourceMap
 } from "./ComputationSourceMap.js";
 
 export const ASYNC_TASK_RECORD = '_ASYNC_TASK_'
@@ -57,21 +58,21 @@ export class Scheduler {
         })
 
 
-        for(const computation of computationInputs) {
-            const dataContext = computation.dataContext
-            const args = computation.args
+        for(const computationInput of computationInputs) {
+            const dataContext = computationInput.dataContext
+            const args = computationInput.args
             const handles = ComputedDataHandle.Handles
             const ComputationCtor = handles.get(args.constructor as Klass<any>)![dataContext.type]! as ComputationClass
             assert(!!ComputationCtor, `cannot find Computation handle for ${(args.constructor as any).displayName || (args.constructor as any).name}`)
-            const newComputation = new ComputationCtor(this.controller, args, dataContext)
-            this.computations.add(newComputation)
+            const computation = new ComputationCtor(this.controller, args, dataContext)
+            this.computations.add(computation)
 
 
-            // TODO 建立自己所需要的 task 任务表。应该每一个 asyncComputation 都有一张独立的表。global state 总共一张。
-            if(this.isAsyncComputation(newComputation)) {
-                if (newComputation.dataContext.type === 'property') {
+            // 为每一个 async computation 建立自己所需要的 task 任务表。应该每一个 asyncComputation 都有一张独立的表。global state 总共一张。
+            if(this.isAsyncComputation(computation)) {
+                if (computation.dataContext.type === 'property') {
                     const AsyncTaskEntity = Entity.create({
-                        name: this.getAsyncTaskRecordKey(newComputation),
+                        name: this.getAsyncTaskRecordKey(computation),
                         properties: [
                         Property.create({
                             name: 'status',
@@ -87,19 +88,19 @@ export class Scheduler {
                         })
                     ]})
                     const AsyncTaskRelation = Relation.create({
-                        name: `${AsyncTaskEntity.name}_${newComputation.dataContext.host.name}_${newComputation.dataContext.id}`,
+                        name: `${AsyncTaskEntity.name}_${computation.dataContext.host.name}_${computation.dataContext.id}`,
                         source: AsyncTaskEntity,
-                        target: newComputation.dataContext.host,
+                        target: computation.dataContext.host,
                         sourceProperty: 'record',
-                        targetProperty: `_${newComputation.dataContext.id}_task`,
+                        targetProperty: `_${computation.dataContext.id}_task`,
                         type: '1:1'
                     })
                     entities.push(AsyncTaskEntity)
                     relations.push(AsyncTaskRelation)
-                } else if (newComputation.dataContext.type === 'global') {
+                } else if (computation.dataContext.type === 'global') {
                     // Global 类型的异步任务表
                     const AsyncTaskEntity = Entity.create({
-                        name: this.getAsyncTaskRecordKey(newComputation),
+                        name: this.getAsyncTaskRecordKey(computation),
                         properties: [
                             Property.create({
                                 name: 'status',
@@ -120,11 +121,11 @@ export class Scheduler {
                         ]
                     })
                     entities.push(AsyncTaskEntity)
-                } else if (newComputation.dataContext.type === 'entity') {
+                } else if (computation.dataContext.type === 'entity') {
                     // Entity 类型的异步任务表
-                    const entityContext = newComputation.dataContext as EntityDataContext
+                    const entityContext = computation.dataContext as EntityDataContext
                     const AsyncTaskEntity = Entity.create({
-                        name: this.getAsyncTaskRecordKey(newComputation),
+                        name: this.getAsyncTaskRecordKey(computation),
                         properties: [
                             Property.create({
                                 name: 'status',
@@ -145,11 +146,11 @@ export class Scheduler {
                         ]
                     })
                     entities.push(AsyncTaskEntity)
-                } else if (newComputation.dataContext.type === 'relation') {
+                } else if (computation.dataContext.type === 'relation') {
                     // Relation 类型的异步任务表
-                    const relationContext = newComputation.dataContext as RelationDataContext
+                    const relationContext = computation.dataContext as RelationDataContext
                     const AsyncTaskEntity = Entity.create({
-                        name: this.getAsyncTaskRecordKey(newComputation),
+                        name: this.getAsyncTaskRecordKey(computation),
                         properties: [
                             Property.create({
                                 name: 'status',
@@ -226,13 +227,8 @@ export class Scheduler {
                 for(const [stateName, state] of Object.entries(computationHandle.state)) {
                     if (state instanceof GlobalBoundState) {
                         state.controller = this.controller
-
                         state.key = `${computationHandle.dataContext!.id!}_${stateName}`
-
-                        if (typeof state.defaultValue !== undefined) {
-                            await this.controller.system.storage.set('state', state.key , state.defaultValue)
-                        }
-
+                        await this.controller.system.storage.set('state', state.key , state.defaultValue ?? null)
                     } 
                 }
             }
@@ -257,6 +253,8 @@ export class Scheduler {
                 }
             }
         })
+
+        // TODO dataContext 为 property 的还要监听自身 record 的创建事件，创建的时候就要跑一边 computation 来设置初始值啊。
         // TODO 未来也许要监听 MutationEvent，让开发者能观测系统的变化。
     }
     async computeDirtyDataDepRecords(source: EntityEventSourceMap, mutationEvent: RecordMutationEvent): Promise<any[]> {
@@ -356,7 +354,33 @@ export class Scheduler {
     async computeDataBasedDirtyRecordsAndEvents(source: EntityEventSourceMap, mutationEvent: RecordMutationEvent) {
         let dirtyRecordsAndEvents: [any, EtityMutationEvent][] = []
 
-        if(!source.targetPath?.length) {
+        // 特殊处理 Global 类型的数据依赖
+        if (source.dataDep.type === 'global' && mutationEvent.recordName === '_System_') {
+            // 对于 Global 类型，需要找到所有依赖这个 global 值的记录
+            // 如果是 property 级别的计算，需要找到所有实体记录
+            if (source.computation.dataContext.type === 'property') {
+                const propertyContext = source.computation.dataContext as PropertyDataContext
+                const allRecords = await this.controller.system.storage.find(propertyContext.host.name, undefined, {}, ['*'])
+                dirtyRecordsAndEvents = allRecords.map(record => [record, {
+                    dataDep: source.dataDep,
+                    type: 'update',
+                    recordName: propertyContext.host.name,
+                    record: record,
+                    oldRecord: record,
+                    relatedMutationEvent: mutationEvent
+                }])
+                // FIXME 
+                if (source.sourceRecordName !== propertyContext.host.name) {
+                    debugger
+                }
+            } else if (source.computation.dataContext.type === 'global') {
+                // 对于 global 级别的计算，不需要具体的记录
+                dirtyRecordsAndEvents = [[null, {
+                    dataDep: source.dataDep,
+                    ...mutationEvent
+                }]]
+            }
+        } else if(!source.targetPath?.length) {
             dirtyRecordsAndEvents = [[mutationEvent.record, {
                 dataDep: source.dataDep,
                 ...mutationEvent
@@ -366,12 +390,13 @@ export class Scheduler {
             dirtyRecordsAndEvents = dataDepRecords.map(record => [record, {
                 dataDep: source.dataDep,
                 type: 'update',
-                recordName: record.name,
+                recordName: source.sourceRecordName,
                 record: record,
                 oldRecord: this.computeOldRecord(record, source, mutationEvent),
                 relatedAttribute: source.targetPath,
                 relatedMutationEvent: mutationEvent
             }])
+            
         }
         return dirtyRecordsAndEvents
     }
@@ -395,15 +420,19 @@ export class Scheduler {
         return (computation as DataBasedComputation).compute !== undefined
     }
     async runDirtyRecordsComputation(source: EntityEventSourceMap, mutationEvent: RecordMutationEvent) {
-        let dirtyRecordsAndEvents: [any, EtityMutationEvent][] = []
-        if (this.isDataBasedComputation(source.computation)) {
-            dirtyRecordsAndEvents = await this.computeDataBasedDirtyRecordsAndEvents(source, mutationEvent)
+        if ((source as EntityCreateEventsSourceMap).isInitial) {
+            await this.runComputation(source.computation, mutationEvent, mutationEvent.record, true)
         } else {
-            dirtyRecordsAndEvents = await this.computeEventBasedDirtyRecordsAndEvents(source, mutationEvent)
-        }
-
-        for(const [record, erRecordMutationEvent] of dirtyRecordsAndEvents) {
-            await this.runComputation(source.computation, erRecordMutationEvent, record)
+            let dirtyRecordsAndEvents: [any, EtityMutationEvent][] = []
+            if (this.isDataBasedComputation(source.computation)) {
+                dirtyRecordsAndEvents = await this.computeDataBasedDirtyRecordsAndEvents(source, mutationEvent)
+            } else {
+                dirtyRecordsAndEvents = await this.computeEventBasedDirtyRecordsAndEvents(source, mutationEvent)
+            }
+    
+            for(const [record, erRecordMutationEvent] of dirtyRecordsAndEvents) {
+                await this.runComputation(source.computation, erRecordMutationEvent, record)
+            }
         }
     }
     getAsyncTaskRecordKey(computation: Computation) {
@@ -493,29 +522,43 @@ export class Scheduler {
         return (computation as DataBasedComputation).asyncReturn !== undefined
     }
 
-    async runComputation(computation: Computation, erRecordMutationEvent: RecordMutationEvent, record?: any) {
+    async runComputation(computation: Computation, erRecordMutationEvent: RecordMutationEvent, record?: any, forceFullCompute: boolean = false) {
         let computationResult: ComputationResult|any
-        if (computation.incrementalCompute) {
-            // 1.增量计算，返回全量结果
-            let lastValue = undefined
-            if (computation.useLastValue) {
-                lastValue = await this.controller.retrieveLastValue(computation.dataContext, record)
-            }
-            
-            computationResult = await computation.incrementalCompute(lastValue, erRecordMutationEvent, record)
-            
-        } else if(computation.incrementalPatchCompute){
-            // 2.增量计算，返回增量结果
-            let lastValue = undefined
-            if (computation.useLastValue) {
-                lastValue = await this.controller.retrieveLastValue(computation.dataContext, record)
+
+        const dataDeps = (computation as DataBasedComputation).dataDeps ? await this.resolveDataDeps(computation as DataBasedComputation, record) : {}
+
+        if (forceFullCompute || (!computation.incrementalCompute && !computation.incrementalPatchCompute)) {
+            // 全量计算。forceFullCompute 用在了初始化时，或者要修正数据时。
+            const databasedComputation = computation as DataBasedComputation
+            computationResult = await databasedComputation.compute(dataDeps, record)
+        } else {
+            if (computation.incrementalCompute) {
+                // 1.增量计算，返回全量结果
+                let lastValue = undefined
+                if (computation.useLastValue) {
+                    lastValue = await this.controller.retrieveLastValue(computation.dataContext, record)
+                }
+                
+                computationResult = await computation.incrementalCompute(lastValue, erRecordMutationEvent, record, dataDeps)
+                
+            } else if(computation.incrementalPatchCompute){
+                // 2.增量计算，返回增量结果
+                let lastValue = undefined
+                if (computation.useLastValue) {
+                    lastValue = await this.controller.retrieveLastValue(computation.dataContext, record)
+                }
+    
+                computationResult = await computation.incrementalPatchCompute(lastValue, erRecordMutationEvent, record, dataDeps)
+            } else {
+                throw new Error(`Unknown computation type: ${computation.constructor.name}`)
             }
 
-            computationResult = await computation.incrementalPatchCompute(lastValue, erRecordMutationEvent, record)
-        } else {
-            // 3. 全量计算
-            const databasedComputation = computation as DataBasedComputation
-            computationResult = await databasedComputation.compute(await this.resolveDataDeps(databasedComputation, record), record)
+            if (computationResult instanceof ComputationResultFullRecompute) {
+                // 如果计算结果为 false ，说明不能增量计算，要全量计算。
+                const databasedComputation = computation as DataBasedComputation
+                assert(databasedComputation.compute !== undefined, 'compute must be defined for computation incrementalCompute returns false')
+                computationResult = await databasedComputation.compute(dataDeps, record)
+            }   
         }
 
         if (computationResult instanceof ComputationResultSkip) {
@@ -542,6 +585,8 @@ export class Scheduler {
                     return await this.controller.system.storage.find(dataDep.source.name, undefined, {}, dataDep.attributeQuery)
                 } else if (dataDep.type === 'property') {
                     return this.controller.system.storage.findOne((computation.dataContext as PropertyDataContext).host.name, MatchExp.atom({key: 'id', value: ['=', record.id]}), {}, dataDep.attributeQuery)
+                } else if (dataDep.type === 'global') {
+                    return this.controller.system.storage.get('state', dataDep.source.name)
                 }
             }))
             return Object.fromEntries(Object.entries(computation.dataDeps).map(([dataDepName, dataDep], index) => [dataDepName, values[index]]))
@@ -552,9 +597,16 @@ export class Scheduler {
     
     
     async setup() {
+        // entity/relation/dict 是 computation 时的 defaultValue.
         await this.setupDefaultValues()
+        // entity/relation/dict 中的 computation 内部的 state 的 default value.
         await this.setupStateDefaultValues()
+        // 设置 computation 对 mutation 事件 的监听
         await this.setupMutationListeners()
+        // 可能需要的 computation 初始化行为。
+        // 1. 如果 global dict 里面有值，并且 entity/relation 有 computation 是直接依赖于 global dict 的，那么就要 run 一遍。
+        //  这里可以直接触发一次所有 global dict 的 create 事件。
+        // 2. record 创建时，computation 字段时需要直接计算一次，因为它可能直接依赖了的是已有的 global dict。
     }
 }
 

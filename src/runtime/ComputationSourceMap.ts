@@ -1,22 +1,25 @@
 import { AttributeQueryData, RecordQueryData } from "../storage/index.js";
-import { DataDep, Computation, DataBasedComputation } from "./computedDataHandles/Computation.js";
+import { DataDep, Computation, DataBasedComputation, RecordsDataDep } from "./computedDataHandles/Computation.js";
 import { PropertyDataContext } from "./computedDataHandles/ComputedDataHandle.js";
 import { Controller } from "./Controller.js";
 import { InteractionEventEntity  } from "./ActivityManager.js";
-import { RecordMutationEvent } from "./System.js";
+import { RecordMutationEvent, SYSTEM_RECORD } from "./System.js";
 
 // SourceMap 类型定义
 export type EntityCreateEventsSourceMap = {
     dataDep: DataDep,
     type: 'create',
+    // 当前事件所属的 entity 的 name，当前的 entity 不一定就是 dataDep 的 source 实体。可能是 dataDep source 的关联实体。
     recordName: string,
+    // 当前实体是否是 relation 类型
+    isRelation?: boolean,
     // dataDep 的 source 实体
     sourceRecordName: string,
     // 监听变化的属性相对于 dataDep 实体对象的路径。路径是从当前实体出发的。
     targetPath?: string[],
-    // 当前实体是否是 relation 类型
-    isRelation?: boolean,
-    computation: Computation
+    // 当前要记录的事件是不是为了 record 初始化时就进行计算而用的。
+    isInitial?: boolean
+    computation: Computation,
 }
 
 export type EntityDeleteEventsSourceMap = {
@@ -76,28 +79,29 @@ export class ComputationSourceMapManager {
         for(const computation of computations) {
             // 1. 根据 data deps 计算出 mutation events
             if( this.isDataBasedComputation(computation)) {
-                const dataBasedComputation = computation as DataBasedComputation
-                if (dataBasedComputation.dataDeps) {
-                    ERMutationEventSources.push(
-                        ...Object.entries(dataBasedComputation.dataDeps).map(([dataDepName, dataDep]) => this.convertDataDepToERMutationEventsSourceMap(dataDepName, dataDep, computation)).flat()
-                    )
+                ERMutationEventSources.push(
+                    ...Object.entries(computation.dataDeps).map(([dataDepName, dataDep]) => this.convertDataDepToERMutationEventsSourceMap(dataDepName, dataDep, computation)).flat()
+                )
+
+                // 2. 监听自身 record 的 create 事件，可能一开始创建就要执行一遍 computation. 如果依赖了已有的 global dict。
+                if (computation.dataContext.type === 'property' && Object.values(computation.dataDeps).some(dataDep => dataDep.type === 'global')) {
+                    const selfDataDep: RecordsDataDep = {
+                        type: 'records',
+                        source: computation.dataContext.host,
+                    }
+                    ERMutationEventSources.push(...this.convertDataDepToERMutationEventsSourceMap('_self', selfDataDep, computation, 'create'))
                 }
             } else {
+                // TODO 是不是可以和 DataBasedComputation 统一处理？因为监听的 Interaction 也是一种 entity。
                 // 2. EventBasedComputation 等同于监听 
                 // - Interaction 的 create 事件
-                // - TODO Action 的 create 事件
-                // - TODO Activity 的 create 事件
-                ERMutationEventSources.push({
-                    dataDep: {
-                        type: 'records',
-                        source: InteractionEventEntity,
-                        attributeQuery: ['*']
-                    },
-                    type: 'create',
-                    recordName: InteractionEventEntity.name,
-                    sourceRecordName: InteractionEventEntity.name,
-                    computation
-                })
+                // - TODO Activity 的 create 事件？确定需要吗？
+                const recordDataDep: RecordsDataDep = {
+                    type: 'records',
+                    source: InteractionEventEntity,
+                    attributeQuery: ['*']
+                }
+                ERMutationEventSources.push(...this.convertDataDepToERMutationEventsSourceMap('record', recordDataDep, computation, 'create'))
             }
         }
 
@@ -105,7 +109,7 @@ export class ComputationSourceMapManager {
         this.sourceMaps = [...ERMutationEventSources]
         this.sourceMapTree = this.buildDataSourceMapTree(this.sourceMaps)
     }
-    isDataBasedComputation(computation: Computation) {
+    isDataBasedComputation(computation: Computation): computation is DataBasedComputation {
         return (computation as DataBasedComputation).compute !== undefined
     }
     /**
@@ -146,23 +150,34 @@ export class ComputationSourceMapManager {
             return true
         }
         
-        const propAttrs = source.attributes!.filter(attr => attr !== 'id')
-        return !propAttrs.every(attr => 
-            !mutationEvent.record!.hasOwnProperty(attr) || 
-            (mutationEvent.record![attr] === mutationEvent.oldRecord![attr])
-        )
+        // 特殊处理 Global 类型的数据依赖
+        if (source.dataDep.type === 'global' && mutationEvent.recordName === '_System_') {
+            // 检查是否是 state 类型的记录，并且 key 匹配
+            return mutationEvent.record?.concept === 'state' && 
+                   mutationEvent.record?.key === source.dataDep.source.name
+        } else {
+            // 如果是更新，检查是否是依赖的属性有变化。
+            const propAttrs = source.attributes!.filter(attr => attr !== 'id')
+            return !propAttrs.every(attr => 
+                !mutationEvent.record!.hasOwnProperty(attr) || 
+                (mutationEvent.record![attr] === mutationEvent.oldRecord![attr])
+            )
+        }
     }
 
-    convertDataDepToERMutationEventsSourceMap(dataDepName:string, dataDep: DataDep, computation: Computation, eventType?: 'create'|'delete'|'update'): EntityEventSourceMap[] {
+    convertDataDepToERMutationEventsSourceMap(dataDepName:string, dataDep: DataDep, computation: Computation, eventType?: 'create'|'delete'|'update', isInitial: boolean = false): EntityEventSourceMap[] {
         const ERMutationEventsSource: EntityEventSourceMap[]= []
         if (dataDep.type === 'records') {
+            // 监听的是某个 records 集合。例如全局的 Count 就需要。
+            // 没有指定 eventType 就说明全都要监听
             if (!eventType || eventType === 'create') {
                 ERMutationEventsSource.push({
                     dataDep: dataDep,
                     type: 'create',
                     recordName: dataDep.source.name,
                     sourceRecordName: dataDep.source.name,
-                    computation
+                    computation,
+                    isInitial,
                 })
             }
             if (!eventType || eventType === 'delete') {
@@ -183,6 +198,7 @@ export class ComputationSourceMapManager {
             }
             
         } else if (dataDep.type==='property') {
+            // 依赖的是单个记录的某个 property 属性，或者关联实体、关联关系。例如自定义的计算中就常见。
             // 只能监听 update eventType。
             const dataContext = computation.dataContext as PropertyDataContext
 
@@ -191,8 +207,29 @@ export class ComputationSourceMapManager {
                 ERMutationEventsSource.push(...this.convertAttrsToERMutationEventsSourceMap(dataDep, dataContext.host.name, dataDep.attributeQuery, [], computation, true))
             }
         } else if (dataDep.type ==='global') {
-            // TODO global 怎么监听啊
-            // 只能监听 update eventType
+            // 依赖的是全局的一个 Dict 值。注意这里理论上只有 create 和 update，初始化的时候会得到创建的事件。全局的值是不会删除的。
+            // Global 数据存储在 _System_ 表中，监听 state 类型的记录更新
+            if (!eventType || eventType === 'update') {
+                ERMutationEventsSource.push({
+                    dataDep: dataDep,
+                    type: 'update',
+                    recordName: SYSTEM_RECORD,
+                    sourceRecordName: SYSTEM_RECORD,
+                    attributes: ['value'],
+                    computation
+                })
+            }
+
+            // create 也需要监听，因为可能依赖了已有的 global dict。
+            if (!eventType || eventType === 'create'){
+                ERMutationEventsSource.push({
+                    dataDep: dataDep,
+                    type: 'create',
+                    recordName: SYSTEM_RECORD,
+                    sourceRecordName: SYSTEM_RECORD,
+                    computation
+                })
+            }
         }
 
         return ERMutationEventsSource

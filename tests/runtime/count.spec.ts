@@ -209,6 +209,11 @@ describe('Count computed handle', () => {
     // Create users
     const user1 = await system.storage.create('User', {username: 'user1'});
     const user2 = await system.storage.create('User', {username: 'user2'});
+
+    const initialUser1 = await system.storage.findOne('User', BoolExp.atom({key: 'id', value: ['=', user1.id]}), undefined, ['*']);
+    const initialUser2 = await system.storage.findOne('User', BoolExp.atom({key: 'id', value: ['=', user2.id]}), undefined, ['*']);
+    expect(initialUser1.taskCount).toBe(0);
+    expect(initialUser2.taskCount).toBe(0);
     
     // Create tasks for each user
     await system.storage.create('Task', {title: 'User1 Task 1', owner: user1});

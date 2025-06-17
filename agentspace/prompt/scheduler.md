@@ -18,7 +18,12 @@ Scheduler 是负责调度本项目中响应式计算的。项目中的 Computati
   - [x] 实现 Entity 类型的异步计算支持
   - [x] 实现 Relation 类型的异步计算支持
 - [x] 完成 Entity 和 Relation 级别的计算结果应用逻辑
-- [ ] 实现 Global 数据依赖的变化监听机制
+- [x] 实现 Global 数据依赖的变化监听机制
+  - 修改了 `Scheduler.ts` 的 `resolveDataDeps` 方法，添加了对 global 类型的处理
+  - 修改了 `Scheduler.ts` 的 `computeDataBasedDirtyRecordsAndEvents` 方法，处理 Global 类型的特殊情况
+  - 修改了 `ComputationSourceMap.ts` 的 `convertDataDepToERMutationEventsSourceMap` 方法，添加了对 global 类型的监听
+  - 修改了 `ComputationSourceMap.ts` 的 `shouldTriggerUpdateComputation` 方法，处理 Global 类型的特殊过滤逻辑
+  - 创建了测试用例 `tests/runtime/globalDataDependency.spec.ts`，验证功能正常工作
 - [ ] 实现事件恢复模式，支持从 event stack 恢复数据
 - [ ] 添加 Activity 的事件监听支持
 - [ ] 支持属性查询中的通配符展开
@@ -89,20 +94,16 @@ Scheduler 是整个响应式系统的核心调度器，负责：
 ### 未实现和有问题的部分
 
 #### 未实现功能：
+6. **Global 数据依赖的监听**（ComputationSourceMap 190行）
+   - Global 类型的 DataDep 如何转换为事件监听未实现
 4. **事件恢复模式**（Controller 90行）
    - 从 event stack 恢复数据的功能未实现
    - 这是实现事件溯源的关键功能
-
 5. **Activity 的事件监听**（ComputationSourceMap 84-85行）
    - 目前只监听了 Interaction 的创建事件
    - Activity 的事件监听未实现
-
-6. **Global 数据依赖的监听**（ComputationSourceMap 190行）
-   - Global 类型的 DataDep 如何转换为事件监听未实现
-
 7. **通配符属性查询**（ComputationSourceMap 207行）
    - attributeQuery 中的 '*' 需要读取实体定义来展开
-
 8. **MutationEvent 对外暴露**（Scheduler 187行）
    - 让开发者能观测系统变化的功能未实现
 

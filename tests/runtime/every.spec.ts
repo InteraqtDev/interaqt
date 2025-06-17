@@ -293,4 +293,141 @@ describe('Every and Any computed handle', () => {
     expect(user6.everyRequestHandled).toBeTruthy()
     
   });
+
+  test('check entities should work with extra data deps', async () => {
+    const userEntity = Entity.create({
+        name: 'User',
+        properties: [
+            Property.create({name: 'name', type: 'string'}),
+            Property.create({name: 'age', type: 'number'})
+        ]
+    })
+
+    const ageLimit = Dictionary.create({
+        name: 'ageLimit',
+        type: 'number',
+        collection: false,
+    })
+
+    const ageLimitComputed = Dictionary.create({
+        name: 'isEveryUserAgeGreaterThanAgeLimit',
+        type: 'boolean',
+        collection: false,
+        computedData: Every.create({
+            record: userEntity,
+            attributeQuery: ['age'],
+            dataDeps: {
+                ageLimit: {
+                    type: 'global',
+                    source: ageLimit,
+                }
+            },
+            callback: (user:any, dataDeps:any) => {
+                return user.age > dataDeps.ageLimit
+            },
+        })
+    })
+
+
+    const entities = [userEntity]
+    const system = new MonoSystem()
+    const controller = new Controller(system,entities,[],[],[],[ageLimit, ageLimitComputed],[])
+    await controller.setup(true)
+
+    // set ageLimit to 19
+    await system.storage.set('state', 'ageLimit', 19)
+
+    const user1 = await system.storage.create('User', {name: 'user1', age: 18})
+    const user2 = await system.storage.create('User', {name: 'user2', age: 20})
+
+    const isEveryUserAgeGreaterThanAgeLimit = await system.storage.get('state', 'isEveryUserAgeGreaterThanAgeLimit')
+    expect(isEveryUserAgeGreaterThanAgeLimit).toBeFalsy()
+
+    // 把 user1 的 age 改为 20
+    await system.storage.update('User', BoolExp.atom({key: 'id', value: ['=', user1.id]}), {age: 20})
+
+    const isEveryUserAgeGreaterThanAgeLimit2 = await system.storage.get('state', 'isEveryUserAgeGreaterThanAgeLimit')
+    expect(isEveryUserAgeGreaterThanAgeLimit2).toBeTruthy()
+
+    // 把 ageLimit 改为 21
+    await system.storage.set('state', 'ageLimit', 21)
+
+    const isEveryUserAgeGreaterThanAgeLimit3 = await system.storage.get('state', 'isEveryUserAgeGreaterThanAgeLimit')
+    expect(isEveryUserAgeGreaterThanAgeLimit3).toBeFalsy()
+  })
+
+
+  test('check entities should work with extra data deps for Any', async () => {
+    const userEntity = Entity.create({
+        name: 'User',
+        properties: [
+            Property.create({name: 'name', type: 'string'}),
+            Property.create({name: 'age', type: 'number'})
+        ]
+    })
+
+    const ageLimit = Dictionary.create({
+        name: 'ageLimit',
+        type: 'number',
+        collection: false,
+    })
+
+    const ageLimitComputed = Dictionary.create({
+        name: 'isAnyUserAgeGreaterThanAgeLimit',
+        type: 'boolean',
+        collection: false,
+        computedData: Any.create({
+            record: userEntity,
+            attributeQuery: ['age'],
+            dataDeps: {
+                ageLimit: {
+                    type: 'global',
+                    source: ageLimit,
+                }
+            },
+            callback: (user:any, dataDeps:any) => {
+                return user.age > dataDeps.ageLimit
+            },
+        })
+    })
+
+    const entities = [userEntity]
+    const system = new MonoSystem()
+    const controller = new Controller(system,entities,[],[],[],[ageLimit, ageLimitComputed],[])
+    await controller.setup(true)
+
+    // set ageLimit to 19   
+    await system.storage.set('state', 'ageLimit', 19)
+
+    const user1 = await system.storage.create('User', {name: 'user1', age: 18})
+    const user2 = await system.storage.create('User', {name: 'user2', age: 20})
+
+    const isAnyUserAgeGreaterThanAgeLimit = await system.storage.get('state', 'isAnyUserAgeGreaterThanAgeLimit')
+    expect(isAnyUserAgeGreaterThanAgeLimit).toBeTruthy()
+
+    // set ageLimit to 21
+    await system.storage.set('state', 'ageLimit', 21)
+
+    const isAnyUserAgeGreaterThanAgeLimit2 = await system.storage.get('state', 'isAnyUserAgeGreaterThanAgeLimit')
+    expect(isAnyUserAgeGreaterThanAgeLimit2).toBeFalsy()
+
+    // set ageLimit to 19
+    await system.storage.set('state', 'ageLimit', 19)
+
+    const isAnyUserAgeGreaterThanAgeLimit3 = await system.storage.get('state', 'isAnyUserAgeGreaterThanAgeLimit')
+    expect(isAnyUserAgeGreaterThanAgeLimit3).toBeTruthy()
+
+    // delete user1 
+    await system.storage.delete('User', BoolExp.atom({key: 'id', value: ['=', user1.id]}))
+
+    const isAnyUserAgeGreaterThanAgeLimit4 = await system.storage.get('state', 'isAnyUserAgeGreaterThanAgeLimit')
+    expect(isAnyUserAgeGreaterThanAgeLimit4).toBeTruthy()
+    
+    // delete user2
+    await system.storage.delete('User', BoolExp.atom({key: 'id', value: ['=', user2.id]}))
+
+    const isAnyUserAgeGreaterThanAgeLimit5 = await system.storage.get('state', 'isAnyUserAgeGreaterThanAgeLimit')
+    expect(isAnyUserAgeGreaterThanAgeLimit5).toBeFalsy()
+
+  })
 }); 

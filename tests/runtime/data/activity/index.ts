@@ -425,9 +425,9 @@ export function createData() {
         computedData: Every.create({
             record: requestEntity,
             callback: (request) => {
-                return request.handled
+                return request.result !== 'pending'
             },
-            attributeQuery: ['handled']
+            attributeQuery: ['result']
         })
     })
     const anyRequestHandledState = Dictionary.create({
@@ -437,9 +437,9 @@ export function createData() {
         computedData: Any.create({
             record: requestEntity,
             callback: (request) => {
-                return request.handled
+                return request.result !== 'pending'
             },
-            attributeQuery: ['handled']
+            attributeQuery: ['result']
         })
     })
      

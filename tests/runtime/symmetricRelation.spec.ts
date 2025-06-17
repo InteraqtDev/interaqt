@@ -11,9 +11,9 @@ import {
   MatchExp
 } from '@';
 
-describe('Symmetric relation computation cycle bug', () => {
+describe('Symmetric relation computation', () => {
   
-  test('should demonstrate symmetric relation count bug on deletion', async () => {
+  test('should support symmetric relation on deletion', async () => {
     // Create User entity
     const userEntity = Entity.create({
       name: 'User',

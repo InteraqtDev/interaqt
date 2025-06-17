@@ -1,14 +1,14 @@
 import { ComputedDataHandle, DataContext, PropertyDataContext } from "./ComputedDataHandle.js";
 import { Any, KlassInstance, Relation } from "@shared";
 import { Controller } from "../Controller.js";
-import { DataDep, GlobalBoundState, RecordBoundState, RelationBoundState } from "./Computation.js";
+import { ComputationResult, DataDep, GlobalBoundState, RecordBoundState, RecordsDataDep, RelationBoundState } from "./Computation.js";
 import { DataBasedComputation } from "./Computation.js";
 import { EtityMutationEvent } from "../ComputationSourceMap.js";
 import { MatchExp, AttributeQueryData } from "@storage";
 
 
 export class GlobalAnyHandle implements DataBasedComputation {
-    callback: (this: Controller, item: any) => boolean
+    callback: (this: Controller, item: any, dataDeps?: {[key: string]: any}) => boolean
     state!: ReturnType<typeof this.createState>
     useLastValue: boolean = true
     dataDeps: {[key: string]: DataDep} = {}
@@ -19,7 +19,8 @@ export class GlobalAnyHandle implements DataBasedComputation {
                 type: 'records',
                 source:args.record,
                 attributeQuery: args.attributeQuery
-            }
+            },
+            ...(args.dataDeps || {})
         }
     }
 
@@ -33,28 +34,32 @@ export class GlobalAnyHandle implements DataBasedComputation {
         return false
     }
 
-    async compute({main: records}: {main: any[]}): Promise<boolean> {
+    async compute({main: records, ...dataDeps}: {main: any[], [key: string]: any}): Promise<boolean> {
         // TODO deps
-        const matchCount = await this.state.matchCount.set(records.filter(this.callback).length)
+        const matchCount = await this.state.matchCount.set(records.filter(item => this.callback.call(this.controller, item, dataDeps)).length)
 
         return matchCount>0
     }
 
-    async incrementalCompute(lastValue: boolean, mutationEvent: EtityMutationEvent): Promise<boolean> {
+    async incrementalCompute(lastValue: boolean, mutationEvent: EtityMutationEvent, record: any, dataDeps: {[key: string]: any}): Promise<boolean|ComputationResult> {
+        if (mutationEvent.recordName !== (this.dataDeps.main as RecordsDataDep).source!.name) {
+            return ComputationResult.fullRecompute('mutationEvent.recordName not match')
+        }
+
         let matchCount = await this.state!.matchCount.get()
         if (mutationEvent.type === 'create') {
-            const newItemMatch = !!this.callback.call(this.controller, mutationEvent.record) 
+            const newItemMatch = !!this.callback.call(this.controller, mutationEvent.record, dataDeps) 
             if (newItemMatch === true) {
                 matchCount = await this.state!.matchCount.set(matchCount + 1)
             }
         } else if (mutationEvent.type === 'delete') {
-            const oldItemMatch = !!this.callback.call(this.controller, mutationEvent.record) 
+            const oldItemMatch = !!this.callback.call(this.controller, mutationEvent.record, dataDeps) 
             if (oldItemMatch === true) {
                 matchCount = await this.state!.matchCount.set(matchCount - 1)
             }
         } else if (mutationEvent.type === 'update') {
-            const oldItemMatch = !!this.callback.call(this.controller, mutationEvent.oldRecord) 
-            const newItemMatch = !!this.callback.call(this.controller, mutationEvent.record) 
+            const oldItemMatch = !!this.callback.call(this.controller, mutationEvent.oldRecord, dataDeps) 
+            const newItemMatch = !!this.callback.call(this.controller, mutationEvent.record, dataDeps) 
             if (oldItemMatch === true && newItemMatch === false) {
                 matchCount = await this.state!.matchCount.set(matchCount - 1)
             } else if (oldItemMatch === false && newItemMatch === true) {
@@ -68,7 +73,7 @@ export class GlobalAnyHandle implements DataBasedComputation {
 
 
 export class PropertyAnyHandle implements DataBasedComputation {
-    callback: (this: Controller, item: any) => boolean
+    callback: (this: Controller, item: any, dataDeps?: {[key: string]: any}) => boolean
     state!: ReturnType<typeof this.createState>
     useLastValue: boolean = true
     dataDeps: {[key: string]: DataDep} = {}
@@ -90,7 +95,8 @@ export class PropertyAnyHandle implements DataBasedComputation {
             _current: {
                 type: 'property',
                 attributeQuery: [[this.relationAttr, {attributeQuery: [['&', {attributeQuery: this.relationAttributeQuery}]]}]]
-            }
+            },
+            ...(args.dataDeps || {})
         }
     }
 
@@ -106,12 +112,16 @@ export class PropertyAnyHandle implements DataBasedComputation {
         return false
     }
 
-    async compute({_current}: {_current: any}): Promise<boolean> {
-        const matchCount = await this.state.matchCount.set(_current, _current[this.relationAttr].filter(this.callback).length)
+    async compute({_current, ...dataDeps}: {_current: any, [key: string]: any}): Promise<boolean> {
+        const matchCount = await this.state.matchCount.set(_current, _current[this.relationAttr].filter((item: any) => this.callback.call(this.controller, item, dataDeps)).length)
         return matchCount>0
     }
 
-    async incrementalCompute(lastValue: boolean, mutationEvent: EtityMutationEvent): Promise<boolean> {
+    async incrementalCompute(lastValue: boolean, mutationEvent: EtityMutationEvent, record: any, dataDeps: {[key: string]: any}): Promise<boolean|ComputationResult> {
+        if (mutationEvent.recordName !== this.dataContext.host.name) {
+            return ComputationResult.fullRecompute('mutationEvent.recordName not match')
+        }
+
         // TODO 如果未来支持用户可以自定义 dataDeps，那么这里也要支持如果发现是其他 dataDeps 变化，这里要直接返回重算的信号。
         let matchCount = await this.state!.matchCount.get(mutationEvent.record)
         const relatedMutationEvent = mutationEvent.relatedMutationEvent!
@@ -124,7 +134,7 @@ export class PropertyAnyHandle implements DataBasedComputation {
                 value: ['=', relationRecord.id]
             }), undefined, this.relationAttributeQuery)
 
-            const newItemMatch = !!this.callback.call(this.controller, newRelationWithEntity) 
+            const newItemMatch = !!this.callback.call(this.controller, newRelationWithEntity, dataDeps) 
             if (newItemMatch === true) {
                 matchCount = await this.state!.matchCount.set(mutationEvent.record, matchCount + 1)
                 await this.state!.isItemMatch.set(relationRecord, true)
@@ -159,7 +169,7 @@ export class PropertyAnyHandle implements DataBasedComputation {
             const relationRecord = await this.controller.system.storage.findOne(this.relation.name, relationMatch, undefined, this.relationAttributeQuery)
 
             const oldItemMatch = !!await this.state!.isItemMatch.get(relationRecord)
-            const newItemMatch = !!this.callback.call(this.controller, relationRecord) 
+            const newItemMatch = !!this.callback.call(this.controller, relationRecord, dataDeps) 
             if (oldItemMatch === true && newItemMatch === false) {
                 matchCount = await this.state!.matchCount.set(currentRecord, matchCount - 1)
             } else if (oldItemMatch === false && newItemMatch === true) {

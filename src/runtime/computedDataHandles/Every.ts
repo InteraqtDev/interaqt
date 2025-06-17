@@ -1,25 +1,28 @@
 import { ComputedDataHandle, PropertyDataContext } from "./ComputedDataHandle.js";
 import { Every, KlassInstance, Relation } from "@shared";
-import { DataBasedComputation, DataDep, GlobalBoundState, RecordBoundState, RelationBoundState } from "./Computation.js";
+import { ComputationResult, DataBasedComputation, DataDep, GlobalBoundState, RecordBoundState, RecordsDataDep, RelationBoundState } from "./Computation.js";
 import { Controller } from "../Controller.js";
 import { DataContext } from "./ComputedDataHandle.js";
 import { EtityMutationEvent } from "../Scheduler.js";
 import { AttributeQueryData, MatchExp } from "@storage";
 import { assert } from "../util.js";
+
+
 export class GlobalEveryHandle implements DataBasedComputation {
-    callback: (this: Controller, item: any) => boolean
+    callback: (this: Controller, item: any, dataDeps?: {[key: string]: any}) => boolean
     state!: ReturnType<typeof this.createState>
     useLastValue: boolean = true
     dataDeps: {[key: string]: DataDep} = {}
     defaultValue: boolean
-    constructor(public controller: Controller,  args: KlassInstance<typeof Every>,  public dataContext: DataContext, ) {
+    constructor(public controller: Controller,  public args: KlassInstance<typeof Every>,  public dataContext: DataContext, ) {
         this.callback = args.callback.bind(this)
         this.dataDeps = {
             main: {
                 type: 'records',
                 source: args.record,
                 attributeQuery: args.attributeQuery
-            }
+            },
+            ...(args.dataDeps || {})
         }
         this.defaultValue = !args.notEmpty
     }
@@ -35,33 +38,35 @@ export class GlobalEveryHandle implements DataBasedComputation {
         return this.defaultValue
     }
 
-    async compute({main: records}: {main: any[]}): Promise<boolean> {
-        // TODO deps
-
+    async compute({main: records, ...dataDeps}: {main: any[], [key: string]: any}): Promise<boolean> {
         const totalCount = await this.state.totalCount.set(records.length)
-        const matchCount = await this.state.matchCount.set(records.filter(this.callback).length)
+        const matchCount = await this.state.matchCount.set(records.filter(item => this.callback.call(this.controller, item, dataDeps)).length)
 
         return matchCount === totalCount
     }
 
-    async incrementalCompute(lastValue: boolean, mutationEvent: EtityMutationEvent): Promise<boolean> {
+    async incrementalCompute(lastValue: boolean, mutationEvent: EtityMutationEvent, record: any, dataDeps: {[key: string]: any}): Promise<boolean|ComputationResult> {
+        if (mutationEvent.recordName !== (this.dataDeps.main as RecordsDataDep).source!.name) {
+            return ComputationResult.fullRecompute('mutationEvent.recordName not match')
+        }
+
         let totalCount = await this.state!.totalCount.get()
         let matchCount = await this.state!.matchCount.get()
         if (mutationEvent.type === 'create') {
             totalCount = await this.state!.totalCount.set(totalCount + 1)
-            const newItemMatch = !!this.callback.call(this.controller, mutationEvent.record) 
+            const newItemMatch = !!this.callback.call(this.controller, mutationEvent.record, dataDeps) 
             if (newItemMatch === true) {
                 matchCount = await this.state!.matchCount.set(matchCount + 1)
             }
         } else if (mutationEvent.type === 'delete') {
             totalCount = await this.state!.totalCount.set(totalCount - 1)
-            const oldItemMatch = !!this.callback.call(this.controller, mutationEvent.oldRecord) 
+            const oldItemMatch = !!this.callback.call(this.controller, mutationEvent.oldRecord, dataDeps) 
             if (oldItemMatch === true) {
                 matchCount = await this.state!.matchCount.set(matchCount - 1)
             }
         } else if (mutationEvent.type === 'update') {
-            const oldItemMatch = !!this.callback.call(this.controller, mutationEvent.oldRecord) 
-            const newItemMatch = !!this.callback.call(this.controller, mutationEvent.record) 
+            const oldItemMatch = !!this.callback.call(this.controller, mutationEvent.oldRecord, dataDeps) 
+            const newItemMatch = !!this.callback.call(this.controller, mutationEvent.record, dataDeps) 
             if (oldItemMatch === true && newItemMatch === false) {
                 matchCount = await this.state!.matchCount.set(matchCount - 1)
             } else if (oldItemMatch === false && newItemMatch === true) {
@@ -77,7 +82,7 @@ export class GlobalEveryHandle implements DataBasedComputation {
 
 
 export class PropertyEveryHandle implements DataBasedComputation {
-    callback: (this: Controller, item: any) => boolean
+    callback: (this: Controller, item: any, dataDeps?: {[key: string]: any}) => boolean
     state!: ReturnType<typeof this.createState>
     useLastValue: boolean = true
     dataDeps: {[key: string]: DataDep} = {}
@@ -103,7 +108,8 @@ export class PropertyEveryHandle implements DataBasedComputation {
                 type: 'property',
                 // CAUTION 这里注册的依赖是从当前的 record 出发的。
                 attributeQuery: [[this.relationAttr, {attributeQuery: [['&', {attributeQuery: this.relationAttributeQuery}]]}]]
-            }
+            },
+            ...(args.dataDeps || {})
         }
     }
 
@@ -119,12 +125,12 @@ export class PropertyEveryHandle implements DataBasedComputation {
         return !this.args.notEmpty
     }
 
-    async compute({_current}: {_current: any}): Promise<boolean> {
+    async compute({_current, ...dataDeps}: {_current: any, [key: string]: any}): Promise<boolean> {
         // FIXME 这里的代码是未经过验证的，目前都是走的增量
         const totalCount = await this.state.totalCount.set(_current,_current[this.relationAttr].length)
         let matchCount = 0
         for(const item of _current[this.relationAttr]) {
-            if (this.callback.call(this.controller, item)) {
+            if (this.callback.call(this.controller, item, dataDeps)) {
                 matchCount++
                 // CAUTION 这里是记录在关系上，而不是在关联实体上
                 // FIXME 这里能获取到关系记录吗？
@@ -135,7 +141,11 @@ export class PropertyEveryHandle implements DataBasedComputation {
         return matchCount === totalCount
     }
 
-    async incrementalCompute(lastValue: boolean, mutationEvent: EtityMutationEvent, record: any): Promise<boolean> {
+    async incrementalCompute(lastValue: boolean, mutationEvent: EtityMutationEvent, record: any, dataDeps: {[key: string]: any}): Promise<boolean|ComputationResult> {
+        if (mutationEvent.recordName !== this.dataContext.host.name) {
+            return ComputationResult.fullRecompute('mutationEvent.recordName not match')
+        }
+
         // TODO 如果未来支持用户可以自定义 dataDeps，那么这里也要支持如果发现是其他 dataDeps 变化，这里要直接返回重算的信号。
         let matchCount = await this.state!.matchCount.get(mutationEvent.record)
         let totalCount = await this.state!.totalCount.get(mutationEvent.record)
@@ -151,7 +161,7 @@ export class PropertyEveryHandle implements DataBasedComputation {
                 value: ['=', relationRecord.id]
             }), undefined, this.relationAttributeQuery)
 
-            const newItemMatch = !!this.callback.call(this.controller, newRelationWithEntity) 
+            const newItemMatch = !!this.callback.call(this.controller, newRelationWithEntity, dataDeps) 
             if (newItemMatch === true) {
                 matchCount = await this.state!.matchCount.set(mutationEvent.record, matchCount + 1)
                 await this.state!.isItemMatch.set(newRelationWithEntity, true)
@@ -189,7 +199,7 @@ export class PropertyEveryHandle implements DataBasedComputation {
             const relationRecord = await this.controller.system.storage.findOne(this.relation.name, relationMatch, undefined, this.relationAttributeQuery)
 
             const oldItemMatch = !!await this.state!.isItemMatch.get(relationRecord)
-            const newItemMatch = !!this.callback.call(this.controller, relationRecord) 
+            const newItemMatch = !!this.callback.call(this.controller, relationRecord, dataDeps) 
             if (oldItemMatch === true && newItemMatch === false) {
                 matchCount = await this.state!.matchCount.set(currentRecord, matchCount - 1)
             } else if (oldItemMatch === false && newItemMatch === true) {

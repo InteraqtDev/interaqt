@@ -204,8 +204,6 @@ export class Controller {
             }
         }
     }
-    
-
     // Add addEventListener method to Controller class
     addEventListener(eventName: string, callback: (...args: any[]) => any) {
         // Implementation of addEventListener

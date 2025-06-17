@@ -154,6 +154,12 @@ export const Every = createClass({
             collection: false,
             required: false
         },
+        dataDeps: {
+            // FIXME 类型定义
+            instanceType: {} as unknown as {[key: string]: any},
+            collection: false,
+            required: false
+        },
         notEmpty: {
             type: 'boolean',
             collection: false,
@@ -182,6 +188,12 @@ export const Any = createClass({
         },
         attributeQuery: {
             instanceType: {} as unknown as AttributeQueryData,
+            collection: false,
+            required: false
+        },
+        dataDeps: {
+            // FIXME 类型定义
+            instanceType: {} as unknown as {[key: string]: any},
             collection: false,
             required: false
         },

@@ -20,10 +20,17 @@ export class ComputationResult{
     static skip = () => new ComputationResultSkip()
     static resolved = (result: any, args?:any) => new ComputationResultResolved(result, args)
     static async = (args?:any) => new ComputationResultAsync(args)
+    static fullRecompute = (reason?:any) => new ComputationResultFullRecompute(reason)
 }
 
 export class ComputationResultSkip extends ComputationResult{
 
+}
+
+export class ComputationResultFullRecompute extends ComputationResult{
+    constructor(public reason?:any) {
+        super()
+    }
 }
 
 export class ComputationResultAsync extends ComputationResult{
@@ -138,7 +145,7 @@ export interface DataBasedComputation {
     // 增量计算，返回的是基于上一次结果的寄过增量
     incrementalPatchCompute?: (...args: any[]) => Promise<ComputationResult|ComputationResultPatch|ComputationResultPatch[]|undefined>
     createState?: (...args: any[]) => {[key: string]: RecordBoundState<any>|GlobalBoundState<any>}
-    dataDeps?: {[key: string]: any}
+    dataDeps: {[key: string]: any}
     getDefaultValue?: (...args: any[]) => any
     useLastValue?: boolean
     // 异步计算，就会声明这个函数
