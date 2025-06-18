@@ -37,3 +37,4 @@
   - [x] 创建测试用例 `tests/runtime/entityAsyncComputed.spec.ts`
   - [x] 创建测试用例 `tests/runtime/relationAsyncComputed.spec.ts`
   - [x] 所有测试通过，功能正常工作
+- [] 实现 ExternalSynchronizer
