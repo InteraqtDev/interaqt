@@ -37,4 +37,8 @@
   - [x] 创建测试用例 `tests/runtime/entityAsyncComputed.spec.ts`
   - [x] 创建测试用例 `tests/runtime/relationAsyncComputed.spec.ts`
   - [x] 所有测试通过，功能正常工作
+- [x] 按照 `agentspace/prompt/document.md` 中的要求完成文档工作。
+  - [x] 阅读 `src` 下所有目录和子目录中已有的文档，了解基本情况
+  - [x] 阅读 `agentspace` 下目录和子目录中的所有文档，了解之前的任务需要的知识和做了的具体工作
+  - [x] 制定写使用文档和开发文档的计划和大纲，写到 `agentspace/knowledge/outline.md` 中
 - [] 实现 ExternalSynchronizer
