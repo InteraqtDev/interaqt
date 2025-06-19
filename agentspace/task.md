@@ -41,4 +41,13 @@
   - [x] 阅读 `src` 下所有目录和子目录中已有的文档，了解基本情况
   - [x] 阅读 `agentspace` 下目录和子目录中的所有文档，了解之前的任务需要的知识和做了的具体工作
   - [x] 制定写使用文档和开发文档的计划和大纲，写到 `agentspace/knowledge/outline.md` 中
+- [x] 按照 `agentspace/prompt/examples.md` 中的要求实现 example.
+  - [x] 实现 Example 1: 社交+内容网络 (Social Content Network)
+  - [x] 包含用户系统、好友关系、关注关系、内容发布、点赞、浏览等功能
+  - [x] 实现完整的实体定义 (User, Post, Tag, Category)
+  - [x] 实现完整的关系定义 (Friendship, Follow, Like, View, etc.)
+  - [x] 实现响应式计算属性 (friendCount, likeCount, engagementScore, etc.)
+  - [x] 实现所有交互定义 (RegisterUser, CreatePost, LikePost, etc.)
+  - [x] 创建完整的测试套件覆盖所有功能
+  - [x] 修复所有核心功能问题，实体和关系正常工作
 - [] 实现 ExternalSynchronizer
