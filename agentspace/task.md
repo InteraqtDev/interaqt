@@ -50,4 +50,6 @@
   - [x] 实现所有交互定义 (RegisterUser, CreatePost, LikePost, etc.)
   - [x] 创建完整的测试套件覆盖所有功能
   - [x] 修复所有核心功能问题，实体和关系正常工作
+- [x] 根据 `agentspace/prompt/llm_output_improve.md` 中的指示来排查 LLM agent 生成示例失败的问题。
+- [x] 完善文档，添加实体增删改的响应式模式章节
 - [] 实现 ExternalSynchronizer

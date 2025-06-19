@@ -2,6 +2,25 @@
 
 交互（Interaction）是 @interaqt/runtime 中用户与系统交互的唯一方式，也是系统中所有数据变化的来源。通过定义交互，你可以描述用户可以执行的操作以及这些操作如何影响系统中的数据。
 
+## 重要说明：关于用户身份
+
+**@interaqt/runtime 专注于业务逻辑的响应式处理，不包含用户认证相关功能。**
+
+在使用本框架时，请注意：
+- 系统假定用户身份已经通过其他方式（如 JWT、Session 等）完成认证
+- 所有交互都从"已有用户身份"的状态开始
+- 不需要定义用户注册、登录、注销等认证相关的交互
+- 用户上下文（user context）应该由外部系统提供给框架
+
+例如，在执行交互时，用户信息是作为参数传入的：
+```javascript
+// 用户身份由外部系统提供
+const result = await controller.callInteraction('CreatePost', {
+  user: { id: 'user123', name: 'John', role: 'author' },  // 已认证的用户
+  payload: { /* ... */ }
+});
+```
+
 ## 交互的基本概念
 
 ### 什么是交互
@@ -50,19 +69,8 @@ app.post('/api/posts', async (req, res) => {
 const CreatePost = Interaction.create({
   name: 'CreatePost',
   action: Action.create({
-    name: 'createPost',
-    // 声明式数据操作
-    operation: [
-      {
-        type: 'create',
-        entity: 'Post',
-        payload: {
-          title: '$.title',
-          content: '$.content',
-          author: '$.authorId'
-        }
-      }
-    ]
+    name: 'createPost'
+    // Action 只包含名称，不包含操作逻辑
   }),
   payload: Payload.create({
     items: [
@@ -71,7 +79,7 @@ const CreatePost = Interaction.create({
       PayloadItem.create({ name: 'authorId', type: 'string', isRef: true, refEntity: 'User' })
     ]
   })
-  // 权限和计算更新都是自动的
+  // 数据变化通过 Relation 或 Property 的 computedData 来声明式定义
 });
 ```
 
@@ -85,67 +93,78 @@ import { Interaction, Action, Payload, PayloadItem } from '@interaqt/runtime';
 const SayHello = Interaction.create({
   name: 'SayHello',
   action: Action.create({
-    name: 'sayHello',
-    operation: []  // 无操作，只是一个示例
+    name: 'sayHello'
+    // Action 只是标识，不包含具体操作
   })
 });
 ```
 
 ### 创建实体的交互
 
+在 @interaqt/runtime 中，交互本身不直接操作数据。数据的创建、更新、删除都是通过响应式计算来实现的。
+
 ```javascript
-const CreateUser = Interaction.create({
-  name: 'CreateUser',
+// 1. 定义交互
+const CreateArticle = Interaction.create({
+  name: 'CreateArticle',
   action: Action.create({
-    name: 'createUser',
-    operation: [
-      {
-        type: 'create',
-        entity: 'User',
-        payload: {
-          name: '$.name',
-          email: '$.email',
-          status: 'active'  // 固定值
-        }
-      }
-    ]
+    name: 'createArticle'
   }),
   payload: Payload.create({
     items: [
       PayloadItem.create({ 
-        name: 'name', 
+        name: 'title', 
         type: 'string', 
         required: true 
       }),
       PayloadItem.create({ 
-        name: 'email', 
+        name: 'content', 
         type: 'string', 
         required: true 
+      }),
+      PayloadItem.create({ 
+        name: 'categoryId', 
+        type: 'string',
+        isRef: true,
+        refEntity: 'Category' 
       })
     ]
   })
 });
+
+// 2. 使用 Transform 监听交互事件并创建实体
+import { Transform, InteractionEventEntity } from '@interaqt/runtime';
+
+// 在定义 Article 实体的关系时，可以添加响应式的创建逻辑
+const ArticleCreation = Transform.create({
+  record: InteractionEventEntity,
+  callback: function(event) {
+    if (event.interactionName === 'CreateArticle') {
+      // 返回要创建的 Article 数据
+      return {
+        title: event.payload.title,
+        content: event.payload.content,
+        categoryId: event.payload.categoryId,
+        status: 'draft',
+        createdAt: new Date().toISOString()
+      };
+    }
+    return null;
+  }
+});
+
+// 将这个 Transform 附加到 Article 实体的某个属性或关系上
 ```
 
 ### 更新实体的交互
 
 ```javascript
+// 1. 定义更新交互
+// 注意：这是已登录用户更新自己资料的交互，用户身份通过 context 传入
 const UpdateUserProfile = Interaction.create({
   name: 'UpdateUserProfile',
   action: Action.create({
-    name: 'updateProfile',
-    operation: [
-      {
-        type: 'update',
-        entity: 'User',
-        where: { id: '$.userId' },
-        payload: {
-          name: '$.name',
-          bio: '$.bio',
-          avatar: '$.avatar'
-        }
-      }
-    ]
+    name: 'updateProfile'
   }),
   payload: Payload.create({
     items: [
@@ -162,6 +181,9 @@ const UpdateUserProfile = Interaction.create({
     ]
   })
 });
+
+// 2. 使用 Transform 或 StateMachine 来响应交互并更新数据
+// 这通常会在 Property 的 computedData 中定义
 ```
 
 ## 定义交互参数（Payload）
@@ -245,18 +267,31 @@ const CreateComment = Interaction.create({
     ]
   }),
   action: Action.create({
-    name: 'createComment',
-    operation: [
-      {
-        type: 'create',
-        entity: 'Comment',
-        payload: {
-          content: '$.content',
-          post: '$.postId',
-          author: '$.authorId'
-        }
+    name: 'createComment'
+  })
+});
+
+// 评论的创建通过 Relation 的 computedData 来实现
+const CommentRelation = Relation.create({
+  source: Comment,
+  sourceProperty: 'author',
+  target: User,
+  targetProperty: 'comments',
+  type: 'n:1',
+  computedData: Transform.create({
+    record: InteractionEventEntity,
+    callback: function(event) {
+      if (event.interactionName === 'CreateComment') {
+        return {
+          source: {
+            content: event.payload.content,
+            createdAt: new Date().toISOString()
+          },
+          target: event.payload.authorId
+        };
       }
-    ]
+      return null;
+    }
   })
 });
 ```
@@ -335,27 +370,20 @@ const CreateOrder = Interaction.create({
 
 ## 实现数据变更逻辑
 
-### 创建实体
+在 @interaqt/runtime 中，所有的数据变更都是通过响应式计算来实现的。交互（Interaction）只是触发事件，真正的数据变化通过以下方式声明：
+
+1. **使用 Transform 监听交互事件**：在 Relation 或 Property 的 computedData 中定义
+2. **使用 StateMachine**：根据交互改变状态
+3. **使用计算属性**：如 Count、Every、Any 等
+
+### 创建实体 - 响应式方式
 
 ```javascript
+// 1. 定义创建博客的交互
 const CreateBlogPost = Interaction.create({
   name: 'CreateBlogPost',
   action: Action.create({
-    name: 'createBlogPost',
-    operation: [
-      {
-        type: 'create',
-        entity: 'Post',
-        payload: {
-          title: '$.title',
-          content: '$.content',
-          author: '$.authorId',
-          status: 'draft',
-          createdAt: () => new Date().toISOString(),
-          slug: (payload) => payload.title.toLowerCase().replace(/\s+/g, '-')
-        }
-      }
-    ]
+    name: 'createBlogPost'
   }),
   payload: Payload.create({
     items: [
@@ -365,26 +393,59 @@ const CreateBlogPost = Interaction.create({
     ]
   })
 });
+
+// 2. 通过 Relation 的 computedData 来创建博客文章
+const UserPostRelation = Relation.create({
+  source: Post,
+  sourceProperty: 'author',
+  target: User,
+  targetProperty: 'posts',
+  type: 'n:1',
+  computedData: Transform.create({
+    record: InteractionEventEntity,
+    callback: function(event) {
+      if (event.interactionName === 'CreateBlogPost') {
+        // 返回要创建的关系，同时会创建 Post 实体
+        return {
+          source: {
+            title: event.payload.title,
+            content: event.payload.content,
+            status: 'draft',
+            createdAt: new Date().toISOString(),
+            slug: event.payload.title.toLowerCase().replace(/\s+/g, '-')
+          },
+          target: event.payload.authorId
+        };
+      }
+      return null;
+    }
+  })
+});
+
+// 3. User 的 postCount 属性会自动更新
+const User = Entity.create({
+  name: 'User',
+  properties: [
+    Property.create({
+      name: 'postCount',
+      type: 'number',
+      computedData: Count.create({
+        relation: UserPostRelation,
+        relationDirection: 'target'
+      })
+    })
+  ]
+});
 ```
 
-### 更新实体
+### 更新实体状态 - 使用 StateMachine
 
 ```javascript
+// 1. 定义发布文章的交互
 const PublishPost = Interaction.create({
   name: 'PublishPost',
   action: Action.create({
-    name: 'publishPost',
-    operation: [
-      {
-        type: 'update',
-        entity: 'Post',
-        where: { id: '$.postId' },
-        payload: {
-          status: 'published',
-          publishedAt: () => new Date().toISOString()
-        }
-      }
-    ]
+    name: 'publishPost'
   }),
   payload: Payload.create({
     items: [
@@ -397,30 +458,58 @@ const PublishPost = Interaction.create({
       })
     ]
   })
+});
+
+// 2. 使用 StateMachine 管理文章状态
+import { StateMachine, StateNode } from '@interaqt/runtime';
+
+const DraftState = StateNode.create({ name: 'draft' });
+const PublishedState = StateNode.create({ name: 'published' });
+
+const PostStateMachine = StateMachine.create({
+  name: 'PostStatus',
+  states: [DraftState, PublishedState],
+  defaultState: DraftState,
+  transitions: [
+    {
+      from: DraftState,
+      to: PublishedState,
+      on: PublishPost
+    }
+  ]
+});
+
+// 3. 在 Post 实体中使用状态机
+const Post = Entity.create({
+  name: 'Post',
+  properties: [
+    Property.create({
+      name: 'status',
+      type: 'string',
+      computedData: PostStateMachine
+    }),
+    Property.create({
+      name: 'publishedAt',
+      type: 'string',
+      computed: function(post) {
+        // 当状态变为 published 时，记录发布时间
+        return post.status === 'published' ? new Date().toISOString() : null;
+      }
+    })
+  ]
 });
 ```
 
-### 删除实体
+### 删除实体 - 通过条件计算
+
+在响应式系统中，"删除"通常是通过标记或过滤来实现的：
 
 ```javascript
+// 1. 定义删除交互
 const DeletePost = Interaction.create({
   name: 'DeletePost',
   action: Action.create({
-    name: 'deletePost',
-    operation: [
-      // 先删除相关的评论
-      {
-        type: 'delete',
-        entity: 'Comment',
-        where: { post: '$.postId' }
-      },
-      // 再删除帖子本身
-      {
-        type: 'delete',
-        entity: 'Post',
-        where: { id: '$.postId' }
-      }
-    ]
+    name: 'deletePost'
   }),
   payload: Payload.create({
     items: [
@@ -434,26 +523,56 @@ const DeletePost = Interaction.create({
     ]
   })
 });
+
+// 2. 使用 Transform 记录删除事件
+const PostDeletionRelation = Relation.create({
+  source: Post,
+  sourceProperty: 'deletedBy',
+  target: User,
+  targetProperty: 'deletedPosts',
+  type: 'n:1',
+  computedData: Transform.create({
+    record: InteractionEventEntity,
+    callback: function(event) {
+      if (event.interactionName === 'DeletePost') {
+        return {
+          source: event.payload.postId,
+          target: event.user.id,
+          deletedAt: new Date().toISOString()
+        };
+      }
+      return null;
+    }
+  })
+});
+
+// 3. 在 Post 实体中添加删除标记
+const Post = Entity.create({
+  name: 'Post',
+  properties: [
+    Property.create({
+      name: 'isDeleted',
+      type: 'boolean',
+      computedData: Any.create({
+        record: PostDeletionRelation,
+        relationDirection: 'source'
+      })
+    })
+  ]
+});
+
+// 4. 创建过滤后的实体视图
+const ActivePost = Post.filter(post => !post.isDeleted);
 ```
 
 ### 建立关系
 
 ```javascript
+// 1. 定义关注用户的交互
 const FollowUser = Interaction.create({
   name: 'FollowUser',
   action: Action.create({
-    name: 'followUser',
-    operation: [
-      {
-        type: 'createRelation',
-        relation: 'Follow',
-        source: '$.followerId',
-        target: '$.followeeId',
-        properties: {
-          followedAt: () => new Date().toISOString()
-        }
-      }
-    ]
+    name: 'followUser'
   }),
   payload: Payload.create({
     items: [
@@ -474,61 +593,67 @@ const FollowUser = Interaction.create({
     ]
   })
 });
+
+// 2. 使用 Transform 创建关注关系
+const FollowRelation = Relation.create({
+  source: User,
+  sourceProperty: 'following',
+  target: User,
+  targetProperty: 'followers',
+  type: 'n:n',
+  properties: [
+    Property.create({
+      name: 'followedAt',
+      type: 'string'
+    })
+  ],
+  computedData: Transform.create({
+    record: InteractionEventEntity,
+    callback: function(event) {
+      if (event.interactionName === 'FollowUser') {
+        return {
+          source: event.payload.followerId,
+          target: event.payload.followeeId,
+          followedAt: new Date().toISOString()
+        };
+      }
+      return null;
+    }
+  })
+});
+
+// 3. 用户的关注者数量会自动计算
+const User = Entity.create({
+  name: 'User',
+  properties: [
+    Property.create({
+      name: 'followerCount',
+      type: 'number',
+      computedData: Count.create({
+        relation: FollowRelation,
+        relationDirection: 'target'
+      })
+    }),
+    Property.create({
+      name: 'followingCount',
+      type: 'number',
+      computedData: Count.create({
+        relation: FollowRelation,
+        relationDirection: 'source'
+      })
+    })
+  ]
+});
 ```
 
-### 复杂的多步操作
+### 复杂的业务逻辑 - 订单处理示例
 
 ```javascript
+// 1. 定义下单交互
 const PlaceOrder = Interaction.create({
   name: 'PlaceOrder',
   action: Action.create({
-    name: 'placeOrder',
-    operation: [
-      // 1. 创建订单
-      {
-        type: 'create',
-        entity: 'Order',
-        payload: {
-          userId: '$.userId',
-          status: 'pending',
-          totalAmount: '$.totalAmount',
-          shippingAddress: '$.shippingAddress'
-        },
-        resultKey: 'order'  // 保存结果以供后续操作使用
-      },
-      // 2. 创建订单项
-      {
-        type: 'createMultiple',
-        entity: 'OrderItem',
-        payload: (payload, results) => {
-          return payload.items.map(item => ({
-            orderId: results.order.id,
-            productId: item.productId,
-            quantity: item.quantity,
-            price: item.price
-          }));
-        }
-      },
-      // 3. 更新库存
-      {
-        type: 'updateMultiple',
-        entity: 'Product',
-        operations: (payload) => {
-          return payload.items.map(item => ({
-            where: { id: item.productId },
-            payload: {
-              stock: { $inc: -item.quantity }
-            }
-          }));
-        }
-      },
-      // 4. 清空购物车
-      {
-        type: 'delete',
-        entity: 'CartItem',
-        where: { userId: '$.userId' }
-      }
-    ]
+    name: 'placeOrder'
   }),
   payload: Payload.create({
     items: [
@@ -539,20 +664,68 @@ const PlaceOrder = Interaction.create({
     ]
   })
 });
+
+// 2. 创建订单关系
+const UserOrderRelation = Relation.create({
+  source: Order,
+  sourceProperty: 'user',
+  target: User,
+  targetProperty: 'orders',
+  type: 'n:1',
+  computedData: Transform.create({
+    record: InteractionEventEntity,
+    callback: function(event) {
+      if (event.interactionName === 'PlaceOrder') {
+        return {
+          source: {
+            status: 'pending',
+            totalAmount: event.payload.totalAmount,
+            shippingAddress: event.payload.shippingAddress,
+            items: event.payload.items,
+            createdAt: new Date().toISOString()
+          },
+          target: event.payload.userId
+        };
+      }
+      return null;
+    }
+  })
+});
+
+// 3. 库存自动扣减
+const Product = Entity.create({
+  name: 'Product',
+  properties: [
+    Property.create({
+      name: 'stock',
+      type: 'number',
+      // 使用 WeightedSummation 计算剩余库存
+      computedData: WeightedSummation.create({
+        record: OrderItemRelation,
+        relationDirection: 'target',
+        callback: function(orderItem) {
+          return {
+            weight: -orderItem.quantity,  // 负数表示扣减
+            value: 1
+          };
+        }
+      })
+    })
+  ]
+});
 ```
 
-## 使用 Transform 来创建关系
+## 使用 Transform 来监听交互并创建数据
 
-Transform 计算不仅可以用于属性计算，还可以用于自动创建关系。
+Transform 是 @interaqt/runtime 中的核心概念，用于监听系统中的事件（如交互事件）并响应式地创建或更新数据。
 
-### 将交互映射为关系
+### 监听交互事件创建关系
 
 ```javascript
-import { MapInteractionToRecord } from '@interaqt/runtime';
-
-// 定义点赞交互
+// 1. 定义点赞交互
 const LikePost = Interaction.create({
   name: 'LikePost',
+  action: Action.create({ name: 'likePost' }),
   payload: Payload.create({
     items: [
       PayloadItem.create({ name: 'userId', type: 'string', isRef: true, refEntity: 'User' }),
@@ -561,25 +734,57 @@ const LikePost = Interaction.create({
   })
 });
 
-// 使用 MapInteractionToRecord 自动创建点赞关系
-const LikeMapping = MapInteractionToRecord.create({
-  interaction: LikePost,
-  map: {
-    source: '$.userId',
-    target: '$.postId',
-    entity: 'Like',
-    properties: {
-      likedAt: () => new Date().toISOString()
+// 2. 定义点赞关系，使用 Transform 监听交互事件
+const LikeRelation = Relation.create({
+  source: User,
+  sourceProperty: 'likedPosts',
+  target: Post,
+  targetProperty: 'likedBy',
+  type: 'n:n',
+  properties: [
+    Property.create({
+      name: 'likedAt',
+      type: 'string'
+    })
+  ],
+  computedData: Transform.create({
+    record: InteractionEventEntity,
+    callback: function(event) {
+      if (event.interactionName === 'LikePost') {
+        return {
+          source: event.payload.userId,
+          target: event.payload.postId,
+          likedAt: new Date().toISOString()
+        };
+      }
+      return null;
     }
-  }
+  })
+});
+
+// 3. Post 的点赞数会自动计算
+const Post = Entity.create({
+  name: 'Post',
+  properties: [
+    Property.create({
+      name: 'likeCount',
+      type: 'number',
+      computedData: Count.create({
+        relation: LikeRelation,
+        relationDirection: 'target'
+      })
+    })
+  ]
 });
 ```
 
-### 条件映射
+### 条件创建关系
 
 ```javascript
+// 1. 定义投票交互
 const VotePost = Interaction.create({
   name: 'VotePost',
+  action: Action.create({ name: 'votePost' }),
   payload: Payload.create({
     items: [
       PayloadItem.create({ name: 'userId', type: 'string', isRef: true, refEntity: 'User' }),
@@ -589,92 +794,136 @@ const VotePost = Interaction.create({
   })
 });
 
-// 根据投票类型创建不同的关系
-const VoteMapping = MapInteractionToRecord.create({
-  interaction: VotePost,
-  map: [
-    {
-      condition: (payload) => payload.voteType === 'up',
-      source: '$.userId',
-      target: '$.postId',
-      entity: 'Upvote',
-      properties: {
-        votedAt: () => new Date().toISOString()
+// 2. 根据投票类型创建不同的关系
+const UpvoteRelation = Relation.create({
+  source: User,
+  sourceProperty: 'upvotedPosts',
+  target: Post,
+  targetProperty: 'upvotedBy',
+  type: 'n:n',
+  properties: [
+    Property.create({ name: 'votedAt', type: 'string' })
+  ],
+  computedData: Transform.create({
+    record: InteractionEventEntity,
+    callback: function(event) {
+      if (event.interactionName === 'VotePost' && event.payload.voteType === 'up') {
+        return {
+          source: event.payload.userId,
+          target: event.payload.postId,
+          votedAt: new Date().toISOString()
+        };
       }
-    },
-    {
-      condition: (payload) => payload.voteType === 'down',
-      source: '$.userId',
-      target: '$.postId',
-      entity: 'Downvote',
-      properties: {
-        votedAt: () => new Date().toISOString()
-      }
+      return null;
     }
-  ]
+  })
+});
+
+const DownvoteRelation = Relation.create({
+  source: User,
+  sourceProperty: 'downvotedPosts',
+  target: Post,
+  targetProperty: 'downvotedBy',
+  type: 'n:n',
+  properties: [
+    Property.create({ name: 'votedAt', type: 'string' })
+  ],
+  computedData: Transform.create({
+    record: InteractionEventEntity,
+    callback: function(event) {
+      if (event.interactionName === 'VotePost' && event.payload.voteType === 'down') {
+        return {
+          source: event.payload.userId,
+          target: event.payload.postId,
+          votedAt: new Date().toISOString()
+        };
+      }
+      return null;
+    }
+  })
 });
 ```
 
-### 自动创建关联
+### 创建多个关系的例子
 
 ```javascript
+// 1. 定义创建帖子并添加标签的交互
 const CreatePostWithTags = Interaction.create({
   name: 'CreatePostWithTags',
+  action: Action.create({ name: 'createPostWithTags' }),
   payload: Payload.create({
     items: [
       PayloadItem.create({ name: 'title', type: 'string', required: true }),
       PayloadItem.create({ name: 'content', type: 'string', required: true }),
       PayloadItem.create({ name: 'authorId', type: 'string', isRef: true, refEntity: 'User' }),
-      PayloadItem.create({ name: 'tagNames', type: 'string', collection: true })
+      PayloadItem.create({ name: 'tagIds', type: 'string', collection: true, isRef: true, refEntity: 'Tag' })
     ]
   })
 });
 
-// 自动创建帖子和标签的关系
-const PostTagMapping = MapInteractionToRecord.create({
-  interaction: CreatePostWithTags,
-  map: async (payload, context) => {
-    // 首先创建帖子
-    const post = await context.create('Post', {
-      title: payload.title,
-      content: payload.content,
-      author: payload.authorId
-    });
-    
-    // 为每个标签创建关系
-    const relations = [];
-    for (const tagName of payload.tagNames) {
-      // 查找或创建标签
-      let tag = await context.findOne('Tag', { name: tagName });
-      if (!tag) {
-        tag = await context.create('Tag', { name: tagName });
+// 2. 创建帖子关系
+const UserPostRelation = Relation.create({
+  source: Post,
+  sourceProperty: 'author',
+  target: User,
+  targetProperty: 'posts',
+  type: 'n:1',
+  computedData: Transform.create({
+    record: InteractionEventEntity,
+    callback: function(event) {
+      if (event.interactionName === 'CreatePostWithTags') {
+        return {
+          source: {
+            title: event.payload.title,
+            content: event.payload.content,
+            createdAt: new Date().toISOString()
+          },
+          target: event.payload.authorId,
+          _postId: event.id // 保存帖子ID供标签关系使用
+        };
       }
-      
-      // 创建帖子-标签关系
-      relations.push({
-        source: post.id,
-        target: tag.id,
-        entity: 'PostTag'
-      });
+      return null;
     }
-    
-    return relations;
-  }
+  })
+});
+
+// 3. 创建帖子-标签关系
+const PostTagRelation = Relation.create({
+  source: Post,
+  sourceProperty: 'tags',
+  target: Tag,
+  targetProperty: 'posts',
+  type: 'n:n',
+  computedData: Transform.create({
+    record: InteractionEventEntity,
+    callback: function(event) {
+      if (event.interactionName === 'CreatePostWithTags' && event.payload.tagIds) {
+        // 为每个标签创建一个关系
+        return event.payload.tagIds.map(tagId => ({
+          source: event._postId, // 使用之前保存的帖子ID
+          target: tagId,
+          addedAt: new Date().toISOString()
+        }));
+      }
+      return null;
+    }
+  })
 });
 ```
 
-## 使用 StateMachine
+## 使用 StateMachine 管理状态
 
-StateMachine 不仅可以用于属性计算，还可以用于将交互映射为属性值的变化。
+StateMachine 用于管理实体的状态变化，可以根据交互事件自动转换状态。
 
-### 将交互映射为属性值
+### 基本状态机示例
 
 ```javascript
-import { MapInteractionToProperty } from '@interaqt/runtime';
+import { StateMachine, StateNode } from '@interaqt/runtime';
 
-// 定义订单状态相关的交互
+// 1. 定义状态相关的交互
 const PayOrder = Interaction.create({
   name: 'PayOrder',
+  action: Action.create({ name: 'payOrder' }),
   payload: Payload.create({
     items: [
       PayloadItem.create({ name: 'orderId', type: 'string', isRef: true, refEntity: 'Order' }),
@@ -686,6 +935,7 @@ const PayOrder = Interaction.create({
 
 const ShipOrder = Interaction.create({
   name: 'ShipOrder',
+  action: Action.create({ name: 'shipOrder' }),
   payload: Payload.create({
     items: [
       PayloadItem.create({ name: 'orderId', type: 'string', isRef: true, refEntity: 'Order' }),
@@ -694,34 +944,88 @@ const ShipOrder = Interaction.create({
   })
 });
 
-// 使用 MapInteractionToProperty 更新订单状态
-const OrderStatusMapping = MapInteractionToProperty.create([
-  {
-    interaction: PayOrder,
-    map: {
-      entity: 'Order',
-      where: { id: '$.orderId' },
-      property: 'status',
-      value: 'paid'
+// 2. 定义状态节点
+const PendingState = StateNode.create({ name: 'pending' });
+const PaidState = StateNode.create({ name: 'paid' });
+const ShippedState = StateNode.create({ name: 'shipped' });
+const DeliveredState = StateNode.create({ name: 'delivered' });
+
+// 3. 创建订单状态机
+const OrderStateMachine = StateMachine.create({
+  name: 'OrderStatus',
+  states: [PendingState, PaidState, ShippedState, DeliveredState],
+  defaultState: PendingState,
+  transitions: [
+    {
+      from: PendingState,
+      to: PaidState,
+      on: PayOrder
+    },
+    {
+      from: PaidState,
+      to: ShippedState,
+      on: ShipOrder
     }
-  },
-  {
-    interaction: ShipOrder,
-    map: {
-      entity: 'Order',
-      where: { id: '$.orderId' },
-      property: 'status',
-      value: 'shipped'
-    }
-  }
-]);
+  ]
+});
+
+// 4. 在订单实体中使用状态机
+const Order = Entity.create({
+  name: 'Order',
+  properties: [
+    Property.create({
+      name: 'status',
+      type: 'string',
+      computedData: OrderStateMachine
+    }),
+    // 根据状态计算其他属性
+    Property.create({
+      name: 'canCancel',
+      type: 'boolean',
+      computed: function(order) {
+        return order.status === 'pending' || order.status === 'paid';
+      }
+    }),
+    Property.create({
+      name: 'paymentInfo',
+      type: 'object',
+      computedData: Transform.create({
+        record: InteractionEventEntity,
+        callback: function(event) {
+          if (event.interactionName === 'PayOrder' && event.payload.orderId === this.id) {
+            return {
+              method: event.payload.paymentMethod,
+              amount: event.payload.amount,
+              paidAt: new Date().toISOString()
+            };
+          }
+          return null;
+        }
+      })
+    })
+  ]
+});
 ```
 
-### 状态更新
+### 复杂的工作流状态机
 
 ```javascript
+// 请假申请的状态机示例
+const SubmitLeaveRequest = Interaction.create({
+  name: 'SubmitLeaveRequest',
+  action: Action.create({ name: 'submitLeaveRequest' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({ name: 'reason', type: 'string' }),
+      PayloadItem.create({ name: 'startDate', type: 'string' }),
+      PayloadItem.create({ name: 'endDate', type: 'string' })
+    ]
+  })
+});
+
 const ApproveLeaveRequest = Interaction.create({
   name: 'ApproveLeaveRequest',
+  action: Action.create({ name: 'approveLeaveRequest' }),
   payload: Payload.create({
     items: [
       PayloadItem.create({ name: 'requestId', type: 'string', isRef: true, refEntity: 'LeaveRequest' }),
@@ -731,95 +1035,79 @@ const ApproveLeaveRequest = Interaction.create({
   })
 });
 
-const LeaveRequestStatusMapping = MapInteractionToProperty.create({
-  interaction: ApproveLeaveRequest,
-  map: [
+const RejectLeaveRequest = Interaction.create({
+  name: 'RejectLeaveRequest',
+  action: Action.create({ name: 'rejectLeaveRequest' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({ name: 'requestId', type: 'string', isRef: true, refEntity: 'LeaveRequest' }),
+      PayloadItem.create({ name: 'rejectedBy', type: 'string', isRef: true, refEntity: 'User' }),
+      PayloadItem.create({ name: 'reason', type: 'string' })
+    ]
+  })
+});
+
+// 定义请假申请的状态
+const DraftState = StateNode.create({ name: 'draft' });
+const SubmittedState = StateNode.create({ name: 'submitted' });
+const ApprovedState = StateNode.create({ name: 'approved' });
+const RejectedState = StateNode.create({ name: 'rejected' });
+
+const LeaveRequestStateMachine = StateMachine.create({
+  name: 'LeaveRequestStatus',
+  states: [DraftState, SubmittedState, ApprovedState, RejectedState],
+  defaultState: DraftState,
+  transitions: [
     {
-      entity: 'LeaveRequest',
-      where: { id: '$.requestId' },
-      property: 'status',
-      value: 'approved'
+      from: DraftState,
+      to: SubmittedState,
+      on: SubmitLeaveRequest
     },
     {
-      entity: 'LeaveRequest',
-      where: { id: '$.requestId' },
-      property: 'approvedBy',
-      value: '$.approverId'
+      from: SubmittedState,
+      to: ApprovedState,
+      on: ApproveLeaveRequest
     },
     {
-      entity: 'LeaveRequest',
-      where: { id: '$.requestId' },
-      property: 'approvedAt',
-      value: () => new Date().toISOString()
-    },
-    {
-      entity: 'LeaveRequest',
-      where: { id: '$.requestId' },
-      property: 'approvalComments',
-      value: '$.comments'
+      from: SubmittedState,
+      to: RejectedState,
+      on: RejectLeaveRequest
     }
   ]
 });
-```
 
-### 多交互映射
-
-```javascript
-// 定义多个相关交互
-const SubmitLeaveRequest = Interaction.create({
-  name: 'SubmitLeaveRequest',
-  // ... payload 定义
+// 在请假申请实体中使用
+const LeaveRequest = Entity.create({
+  name: 'LeaveRequest',
+  properties: [
+    Property.create({
+      name: 'status',
+      type: 'string',
+      computedData: LeaveRequestStateMachine
+    }),
+    Property.create({
+      name: 'approvalHistory',
+      type: 'object',
+      collection: true,
+      computedData: Transform.create({
+        record: InteractionEventEntity,
+        callback: function(event) {
+          if ((event.interactionName === 'ApproveLeaveRequest' || 
+               event.interactionName === 'RejectLeaveRequest') &&
+              event.payload.requestId === this.id) {
+            return {
+              action: event.interactionName,
+              userId: event.payload.approverId || event.payload.rejectedBy,
+              comments: event.payload.comments || event.payload.reason,
+              timestamp: new Date().toISOString()
+            };
+          }
+          return null;
+        }
+      })
+    })
+  ]
 });
-
-const RejectLeaveRequest = Interaction.create({
-  name: 'RejectLeaveRequest',
-  // ... payload 定义
-});
-
-const CancelLeaveRequest = Interaction.create({
-  name: 'CancelLeaveRequest',
-  // ... payload 定义
-});
-
-// 统一的状态映射
-const LeaveRequestWorkflow = MapInteractionToProperty.create([
-  {
-    interaction: SubmitLeaveRequest,
-    map: {
-      entity: 'LeaveRequest',
-      where: { id: '$.requestId' },
-      property: 'status',
-      value: 'submitted'
-    }
-  },
-  {
-    interaction: ApproveLeaveRequest,
-    map: {
-      entity: 'LeaveRequest',
-      where: { id: '$.requestId' },
-      property: 'status',
-      value: 'approved'
-    }
-  },
-  {
-    interaction: RejectLeaveRequest,
-    map: {
-      entity: 'LeaveRequest',
-      where: { id: '$.requestId' },
-      property: 'status',
-      value: 'rejected'
-    }
-  },
-  {
-    interaction: CancelLeaveRequest,
-    map: {
-      entity: 'LeaveRequest',
-      where: { id: '$.requestId' },
-      property: 'status',
-      value: 'cancelled'
-    }
-  }
-]);
 ```
 
 ## 执行交互
@@ -827,66 +1115,78 @@ const LeaveRequestWorkflow = MapInteractionToProperty.create([
 ### 基本执行
 
 ```javascript
-// 在控制器中执行交互
-const result = await controller.executeInteraction('CreatePost', {
-  title: 'My First Post',
-  content: 'This is the content of my first post.',
-  authorId: 'user123'
-});
-
-console.log('Created post:', result);
-```
-
-### 带上下文执行
-
-```javascript
-// 传递用户上下文
-const result = await controller.executeInteraction('CreatePost', {
-  title: 'My First Post',
-  content: 'This is the content of my first post.',
-  authorId: 'user123'
-}, {
-  user: { id: 'user123', role: 'author' },
-  timestamp: new Date().toISOString()
-});
-```
-
-### 批量执行
-
-```javascript
-// 批量执行多个交互
-const results = await controller.executeInteractions([
-  {
-    name: 'CreatePost',
-    payload: { title: 'Post 1', content: 'Content 1', authorId: 'user123' }
-  },
-  {
-    name: 'CreatePost',
-    payload: { title: 'Post 2', content: 'Content 2', authorId: 'user123' }
-  }
-]);
-```
-
-### 事务执行
-
-```javascript
-// 在事务中执行交互
-await controller.transaction(async (trx) => {
-  const post = await trx.executeInteraction('CreatePost', {
-    title: 'My Post',
-    content: 'Content',
+// 使用 controller.callInteraction 执行交互
+const result = await controller.callInteraction('CreatePost', {
+  user: { id: 'user123', name: 'John' },  // 用户上下文
+  payload: {
+    title: 'My First Post',
+    content: 'This is the content of my first post.',
     authorId: 'user123'
+  }
+});
+
+console.log('Interaction result:', result);
+```
+
+### 查找交互并执行
+
+```javascript
+// 通过名称查找交互
+const createPostInteraction = Interaction.instances.find(i => i.name === 'CreatePost');
+
+if (createPostInteraction) {
+  const result = await controller.callInteraction(createPostInteraction.uuid, {
+    user: { id: 'user123' },
+    payload: {
+      title: 'Another Post',
+      content: 'More content',
+      authorId: 'user123'
+    }
   });
-  
-  await trx.executeInteraction('AddTagToPost', {
-    postId: post.id,
-    tagName: 'javascript'
-  });
-  
-  await trx.executeInteraction('NotifyFollowers', {
-    userId: 'user123',
-    postId: post.id
-  });
+}
+```
+
+### 在活动中执行交互
+
+```javascript
+// 作为活动的一部分执行交互
+const result = await controller.callActivityInteraction(
+  'activity-id',
+  'interaction-id', 
+  'activity-instance-id',
+  {
+    user: { id: 'user123' },
+    payload: { /* ... */ }
+  }
+);
+```
+
+### 权限控制
+
+```javascript
+// 使用 Attributive 进行权限控制
+const DeletePost = Interaction.create({
+  name: 'DeletePost',
+  action: Action.create({ name: 'deletePost' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({
+        name: 'postId',
+        type: 'string',
+        isRef: true,
+        refEntity: 'Post',
+        required: true,
+        // 添加权限验证
+        attributives: Attributive.create({
+          name: 'IsAuthor',
+          content: async function(post, { user }) {
+            // 检查用户是否是帖子作者
+            return post.author.id === user.id;
+          }
+        })
+      })
+    ]
+  })
 });
 ```
 
@@ -895,56 +1195,59 @@ await controller.transaction(async (trx) => {
 ### 参数验证错误
 
 ```javascript
-try {
-  await controller.executeInteraction('CreatePost', {
-    title: '',  // 空标题
+const result = await controller.callInteraction('CreatePost', {
+  user: { id: 'user123' },
+  payload: {
+    title: '',  // 空标题会触发验证错误
     // content 缺失
     authorId: 'invalid-user-id'
-  });
-} catch (error) {
-  if (error.type === 'ValidationError') {
-    console.log('Validation errors:', error.details);
-    // {
-    //   title: 'Title is required',
-    //   content: 'Content is required',
-    //   authorId: 'Referenced user does not exist'
-    // }
   }
+});
+
+if (result.error) {
+  console.log('Error type:', result.error.type);
+  console.log('Error message:', result.error.message);
 }
 ```
 
 ### 权限错误
 
 ```javascript
-try {
-  await controller.executeInteraction('DeletePost', {
+const result = await controller.callInteraction('DeletePost', {
+  user: { id: 'user456' },  // 非作者
+  payload: {
     postId: 'post123'
-  }, {
-    user: { id: 'user456', role: 'user' }  // 非作者尝试删除
-  });
-} catch (error) {
-  if (error.type === 'PermissionError') {
-    console.log('Permission denied:', error.message);
   }
+});
+
+if (result.error) {
+  console.log('Permission denied:', result.error);
 }
 ```
 
 ### 业务逻辑错误
 
+在响应式系统中，业务逻辑错误通常通过计算属性和条件来预防：
+
 ```javascript
-try {
-  await controller.executeInteraction('PlaceOrder', {
-    userId: 'user123',
-    items: [
-      { productId: 'product1', quantity: 100 }  // 库存不足
-    ]
-  });
-} catch (error) {
-  if (error.type === 'BusinessLogicError') {
-    console.log('Business logic error:', error.message);
-    console.log('Error details:', error.details);
-  }
-}
+// 使用 Every 确保库存充足
+const Order = Entity.create({
+  name: 'Order',
+  properties: [
+    Property.create({
+      name: 'isValid',
+      type: 'boolean',
+      computedData: Every.create({
+        record: OrderItemRelation,
+        relationDirection: 'source',
+        callback: function(orderItem) {
+          // 检查每个订单项的产品库存是否充足
+          return orderItem.product.stock >= orderItem.quantity;
+        }
+      })
+    })
+  ]
+});
 ```
 
 ## 交互的最佳实践
@@ -955,21 +1258,36 @@ try {
 // ✅ 好的设计：原子性操作
 const LikePost = Interaction.create({
   name: 'LikePost',
-  // 单一职责：只处理点赞
+  action: Action.create({ name: 'likePost' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({ name: 'userId', type: 'string', isRef: true, refEntity: 'User' }),
+      PayloadItem.create({ name: 'postId', type: 'string', isRef: true, refEntity: 'Post' })
+    ]
+  })
 });
 
 const UnlikePost = Interaction.create({
   name: 'UnlikePost',
-  // 单一职责：只处理取消点赞
+  action: Action.create({ name: 'unlikePost' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({ name: 'userId', type: 'string', isRef: true, refEntity: 'User' }),
+      PayloadItem.create({ name: 'postId', type: 'string', isRef: true, refEntity: 'Post' })
+    ]
+  })
 });
 
 // ❌ 避免的设计：过于复杂的交互
 const ManagePostLike = Interaction.create({
   name: 'ManagePostLike',
+  action: Action.create({ name: 'managePostLike' }),
   payload: Payload.create({
     items: [
-      PayloadItem.create({ name: 'action', type: 'string', enum: ['like', 'unlike', 'toggle'] })
+      PayloadItem.create({ name: 'action', type: 'string', enum: ['like', 'unlike', 'toggle'] }),
       // 一个交互处理多种操作，增加复杂性
+      PayloadItem.create({ name: 'userId', type: 'string', isRef: true, refEntity: 'User' }),
+      PayloadItem.create({ name: 'postId', type: 'string', isRef: true, refEntity: 'Post' })
     ]
   })
 });
@@ -979,14 +1297,32 @@ const ManagePostLike = Interaction.create({
 
 ```javascript
 // ✅ 清晰的命名
-const SubmitLeaveRequest = Interaction.create({ name: 'SubmitLeaveRequest' });
-const ApproveLeaveRequest = Interaction.create({ name: 'ApproveLeaveRequest' });
-const PublishBlogPost = Interaction.create({ name: 'PublishBlogPost' });
+const SubmitLeaveRequest = Interaction.create({ 
+  name: 'SubmitLeaveRequest',
+  action: Action.create({ name: 'submitLeaveRequest' })
+});
+const ApproveLeaveRequest = Interaction.create({ 
+  name: 'ApproveLeaveRequest',
+  action: Action.create({ name: 'approveLeaveRequest' })
+});
+const PublishBlogPost = Interaction.create({ 
+  name: 'PublishBlogPost',
+  action: Action.create({ name: 'publishBlogPost' })
+});
 
 // ❌ 模糊的命名
-const DoAction = Interaction.create({ name: 'DoAction' });
-const ProcessData = Interaction.create({ name: 'ProcessData' });
-const HandleRequest = Interaction.create({ name: 'HandleRequest' });
+const DoAction = Interaction.create({ 
+  name: 'DoAction',
+  action: Action.create({ name: 'doAction' })
+});
+const ProcessData = Interaction.create({ 
+  name: 'ProcessData',
+  action: Action.create({ name: 'processData' })
+});
+const HandleRequest = Interaction.create({ 
+  name: 'HandleRequest',
+  action: Action.create({ name: 'handleRequest' })
+});
 ```
 
 ### 3. 合理使用参数验证
@@ -994,6 +1330,8 @@ const HandleRequest = Interaction.create({ name: 'HandleRequest' });
 ```javascript
 // ✅ 适当的验证
 const CreateProduct = Interaction.create({
+  name: 'CreateProduct',
+  action: Action.create({ name: 'createProduct' }),
   payload: Payload.create({
     items: [
       PayloadItem.create({ 
@@ -1008,13 +1346,22 @@ const CreateProduct = Interaction.create({
         type: 'number', 
         required: true,
         min: 0
+      }),
+      PayloadItem.create({ 
+        name: 'categoryId', 
+        type: 'string',
+        isRef: true,
+        refEntity: 'Category',
+        required: true
       })
     ]
   })
 });
 
-// ❌ 过度验证
+// ❌ 过度验证（应该在其他层面处理）
 const CreateProduct = Interaction.create({
+  name: 'CreateProduct',
+  action: Action.create({ name: 'createProduct' }),
   payload: Payload.create({
     items: [
       PayloadItem.create({ 
@@ -1025,7 +1372,7 @@ const CreateProduct = Interaction.create({
         maxLength: 50,
         pattern: '^[A-Za-z0-9\\s\\-]+$',
         validate: async (value) => {
-          // 过于复杂的自定义验证
+          // 过于复杂的自定义验证应该通过 Attributive 或计算属性处理
           const exists = await checkNameExists(value);
           const isValid = await validateWithExternalAPI(value);
           return !exists && isValid;
@@ -1036,35 +1383,72 @@ const CreateProduct = Interaction.create({
 });
 ```
 
-### 4. 考虑性能影响
+### 4. 利用响应式特性
 
 ```javascript
-// ✅ 高效的操作
-const BatchCreatePosts = Interaction.create({
-  action: Action.create({
-    operation: [
-      {
-        type: 'createMultiple',  // 批量创建
-        entity: 'Post',
-        payload: '$.posts'
-      }
+// ✅ 充分利用响应式计算
+// 定义简单的交互
+const CreatePost = Interaction.create({
+  name: 'CreatePost',
+  action: Action.create({ name: 'createPost' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({ name: 'title', type: 'string', required: true }),
+      PayloadItem.create({ name: 'content', type: 'string', required: true }),
+      PayloadItem.create({ name: 'authorId', type: 'string', isRef: true, refEntity: 'User' })
     ]
   })
 });
 
-// ❌ 低效的操作
-const CreateManyPosts = Interaction.create({
-  action: Action.create({
-    operation: (payload) => {
-      // 为每个帖子创建单独的操作
-      return payload.posts.map(post => ({
-        type: 'create',
-        entity: 'Post',
-        payload: post
-      }));
+// 数据变化通过响应式定义自动处理
+const UserPostRelation = Relation.create({
+  // ... 关系定义
+  computedData: Transform.create({
+    record: InteractionEventEntity,
+    callback: function(event) {
+      if (event.interactionName === 'CreatePost') {
+        // 自动创建关系和实体
+        return { /* ... */ };
+      }
     }
   })
 });
+
+// User 的 postCount 自动更新
+const User = Entity.create({
+  name: 'User',
+  properties: [
+    Property.create({
+      name: 'postCount',
+      type: 'number',
+      computedData: Count.create({
+        relation: UserPostRelation,
+        relationDirection: 'target'
+      })
+    })
+  ]
+});
 ```
 
-交互是 @interaqt/runtime 中连接用户操作和数据变化的桥梁。通过合理设计交互，可以创建出既易于理解又高效执行的业务逻辑系统。 
+### 5. 适当使用活动（Activity）
+
+对于复杂的多步骤流程，使用 Activity 来组织相关的交互：
+
+```javascript
+// 订单处理活动
+const OrderProcessActivity = Activity.create({
+  name: 'OrderProcess',
+  interactions: [
+    CreateOrderInteraction,
+    ValidateInventoryInteraction,
+    ProcessPaymentInteraction,
+    UpdateInventoryInteraction,
+    SendConfirmationInteraction
+  ],
+  transfers: [
+    // 定义交互之间的流转逻辑
+  ]
+});
+```
+
+交互是 @interaqt/runtime 中连接用户操作和数据变化的桥梁。通过合理设计交互，结合框架的响应式特性，可以创建出既易于理解又高效执行的业务逻辑系统。记住：交互只定义"做什么"，而具体的"怎么做"通过响应式计算来实现。 
