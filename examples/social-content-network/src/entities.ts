@@ -1,188 +1,163 @@
-import { Property, Count, WeightedSummation } from '@/index.js'
-import { User as UserBase, Post as PostBase, Tag as TagBase, Category as CategoryBase } from './entities-base.js'
-import { 
-  Friendship, 
-  Follow, 
-  UserPost, 
-  Like, 
-  View, 
-  PostTag, 
-  PostCategory 
-} from './relations.js'
+import { Property, PropertyTypes, Count } from '@';
+import { User, Post, Comment, FriendRequest, Tag } from './entities-base.js';
+import {
+  UserPost,
+  PostComment,
+  UserComment, Friendship, Like
+} from './relations.js';
 
-// 为用户实体添加响应式计算属性
-UserBase.properties.push(
+// 为 User 实体添加响应式计算属性 - 暂时移除所有computedData以调试Activity重复问题
+User.properties.push(
+  // 好友数量
   Property.create({
     name: 'friendCount',
-    type: 'number',
+    type: PropertyTypes.Number,
     defaultValue: () => 0,
     computedData: Count.create({
-      record: Friendship,
-      attributeQuery: ['status'],
-      callback: (relation: any) => relation.status === 'accepted'
+      record: Friendship
     })
   }),
   
-  Property.create({
-    name: 'followerCount',
-    type: 'number',
-    defaultValue: () => 0,
-    computedData: Count.create({
-      record: Follow,
-      where: (relation: any) => relation.target.id === 'current_user_id'
-    })
-  }),
-  
-  Property.create({
-    name: 'followingCount',
-    type: 'number',
-    defaultValue: () => 0,
-    computedData: Count.create({
-      record: Follow,
-      where: (relation: any) => relation.source.id === 'current_user_id'
-    })
-  }),
-  
+  // 发布的内容数量
   Property.create({
     name: 'postCount',
-    type: 'number',
+    type: PropertyTypes.Number,
     defaultValue: () => 0,
     computedData: Count.create({
-      record: UserPost,
-      attributeQuery: [['target', { attributeQuery: ['status'] }]],
-      callback: (relation: any) => relation.target.status === 'published'
+      record: UserPost
     })
   }),
-
-  // 活跃度分数的复合计算 - 使用 WeightedSummation 替代 Transform
+  
+  // 评论数量
+  Property.create({
+    name: 'commentCount',
+    type: PropertyTypes.Number,
+    defaultValue: () => 0,
+    computedData: Count.create({
+      record: UserComment
+    })
+  }),
+  
+  // 活跃度分数 (简化版本)
   Property.create({
     name: 'activityScore',
-    type: 'number',
+    type: PropertyTypes.Number,
     defaultValue: () => 0,
-    computedData: WeightedSummation.create({
-      record: UserPost,
-      attributeQuery: [['target', { attributeQuery: ['status'] }]],
-      callback: (relation: any) => {
-        // 基于发布帖子计算活跃度分数
-        return {
-          weight: 1,
-          value: relation.target.status === 'published' ? 10 : 0
-        }
-      }
-    })
+    computed: (user) => {
+      const postScore = (user.postCount || 0) * 2;
+      const commentScore = (user.commentCount || 0) * 1;
+      return postScore + commentScore;
+    }
   })
-)
+);
 
-// 为帖子实体添加响应式计算属性
-PostBase.properties.push(
-
-  // 响应式计算属性
+// 为 Post 实体添加响应式计算属性 - 暂时移除所有computedData以调试Activity重复问题
+Post.properties.push(
+  // 点赞数量
   Property.create({
     name: 'likeCount',
-    type: 'number',
+    type: PropertyTypes.Number,
     defaultValue: () => 0,
     computedData: Count.create({
       record: Like
     })
   }),
-
+  
+  // 评论数量
   Property.create({
-    name: 'viewCount',
-    type: 'number',
+    name: 'commentCount',
+    type: PropertyTypes.Number,
     defaultValue: () => 0,
     computedData: Count.create({
-      record: View
+      record: PostComment
     })
   }),
-
-  // 互动分数（加权计算）
+  
+  // 热度分数 (简化版本)
   Property.create({
-    name: 'engagementScore',
-    type: 'number',
+    name: 'hotScore',
+    type: PropertyTypes.Number,
     defaultValue: () => 0,
-    computedData: WeightedSummation.create({
-      record: Like,
-      attributeQuery: ['type'],
-      callback: (like: any) => {
-        const weights: Record<string, number> = {
-          'like': 1,
-          'love': 2,
-          'laugh': 1.5,
-          'wow': 1.5,
-          'sad': 1,
-          'angry': 0.5
-        }
-        return {
-          weight: 1,
-          value: weights[like.type] || 1
-        }
-      }
-    })
+    computed: (post) => {
+      const likeScore = (post.likeCount || 0) * 2;
+      const commentScore = (post.commentCount || 0) * 3;
+      const viewScore = (post.viewCount || 0) * 0.1;
+      return Math.floor(likeScore + commentScore + viewScore);
+    }
   }),
-
-)
-
-// 为标签实体添加响应式计算属性
-TagBase.properties.push(
-  // 使用该标签的帖子数量
+  
+  // 是否已发布
   Property.create({
-    name: 'postCount',
-    type: 'number',
-    defaultValue: () => 0,
-    computedData: Count.create({
-      record: PostTag
-    })
+    name: 'isPublished',
+    type: PropertyTypes.Boolean,
+    computed: (post) => post.status === 'published'
   }),
-
-  // 受欢迎程度（基于使用该标签的帖子的互动数据）
+  
+  // 是否已删除
   Property.create({
-    name: 'popularityScore',
-    type: 'number',
-    defaultValue: () => 0,
-    computedData: WeightedSummation.create({
-      record: PostTag,
-      attributeQuery: [['source', { attributeQuery: ['likeCount', 'viewCount'] }]],
-      callback: (relation: any) => {
-        const post = relation.source
-        return {
-          weight: 1,
-          value: (post.likeCount || 0) * 2 + (post.viewCount || 0) * 0.1
-        }
-      }
-    })
+    name: 'isDeleted',
+    type: PropertyTypes.Boolean,
+    computed: (post) => post.status === 'deleted'
+  }),
+  
+  // 是否可编辑 (草稿或已发布状态)
+  Property.create({
+    name: 'isEditable',
+    type: PropertyTypes.Boolean,
+    computed: (post) => post.status === 'draft' || post.status === 'published'
   })
-)
+);
 
-// 为分类实体添加响应式计算属性
-CategoryBase.properties.push(
-  // 该分类下的帖子数量
-  Property.create({
-    name: 'postCount',
-    type: 'number',
-    defaultValue: () => 0,
-    computedData: Count.create({
-      record: PostCategory
-    })
-  }),
+// 为 Comment 实体添加响应式计算属性 - 暂时简化以避免Activity重复
+// Comment.properties.push(
+//   // 回复数量
+//   Property.create({
+//     name: 'replyCount',
+//     type: 'number',
+//     computedData: Count.create({
+//       record: CommentReply
+//     })
+//   }),
+//   
+//   // 点赞数量
+//   Property.create({
+//     name: 'likeCount',
+//     type: 'number',
+//     computedData: Count.create({
+//       record: CommentLike
+//     })
+//   }),
+//   
+//   // 是否有回复
+//   Property.create({
+//     name: 'hasReplies',
+//     type: 'boolean',
+//     computedData: Any.create({
+//       record: CommentReply,
+//       callback: () => true
+//     })
+//   })
+// );
 
-  // 已发布的帖子数量
-  Property.create({
-    name: 'activePostCount',
-    type: 'number',
-    defaultValue: () => 0,
-    computedData: Count.create({
-      record: PostCategory,
-      attributeQuery: [['source', { attributeQuery: ['status'] }]],
-      callback: (relation: any) => relation.source.status === 'published'
-    })
-  })
-)
+// 为 Tag 实体添加响应式计算属性 - 暂时简化以避免Activity重复
+// Tag.properties.push(
+//   // 使用该标签的内容数量
+//   Property.create({
+//     name: 'postCount',
+//     type: 'number',
+//     computedData: Count.create({
+//       record: PostTag
+//     })
+//   }),
+//   
+//   // 热门程度 (使用次数)
+//   Property.create({
+//     name: 'popularity',
+//     type: 'number',
+//     defaultValue: () => 0,
+//     computed: (tag) => tag.postCount || 0
+//   })
+// );
 
-// 导出增强后的实体
-export const User = UserBase
-export const Post = PostBase  
-export const Tag = TagBase
-export const Category = CategoryBase
-
-// 导出所有实体
-export const entities = [User, Post, Tag, Category]
+// 导出所有实体 (移除过滤实体以避免 Activity 重复问题)
+export const entities = [User, Post, Comment, FriendRequest, Tag];

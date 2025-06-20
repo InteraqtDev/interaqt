@@ -1,92 +1,172 @@
-# Example 1: 社交+内容网络
+# 社交+内容网络示例
 
-这个示例展示了如何使用 @interaqt/runtime 构建一个基本的社交内容网络系统，包含以下核心功能：
+本示例展示了如何使用 @interaqt/runtime 构建一个社交内容网络，包含好友关系、内容发布、草稿管理、点赞功能等核心特性。
 
 ## 功能特性
 
-### 1. 好友关系实现
-- 用户注册和档案管理
-- 发送/接受/拒绝好友请求
-- 对称的好友关系管理
-- 好友列表查询
+### 1. 用户管理
+- 用户基本信息管理
+- 用户个人资料
+- 用户统计信息（粉丝数、关注数、发布内容数等）
 
-### 2. 内容发布功能  
-- 创建和编辑文章/帖子
-- 发布状态管理（草稿/已发布）
-- 内容分类和标签
-- 内容浏览和搜索
+### 2. 好友关系系统
+- 发送好友请求
+- 接受/拒绝好友请求
+- 查看好友列表
+- 取消好友关系
+- 关注/取消关注功能
 
-### 3. 点赞功能的实现
-- 对内容进行点赞/取消点赞
-- 响应式点赞计数
-- 点赞历史记录
-- 用户点赞活动统计
+### 3. 内容发布系统
+- 创建内容草稿
+- 发布内容（从草稿到公开）
+- 编辑已发布内容
+- 删除内容
+- 内容状态管理（草稿、已发布、已删除）
+- 内容统计（阅读量、点赞数、评论数）
 
-## 响应式特性展示
+### 4. 点赞系统
+- 对内容点赞/取消点赞
+- 实时更新点赞计数
+- 查看点赞用户列表
+- 防止重复点赞
 
-该示例充分展示了框架的响应式特性：
+### 5. 评论系统
+- 发表评论
+- 回复评论（嵌套评论）
+- 删除评论
+- 评论点赞
+- 评论计数
 
-- **自动计数更新**：当用户点赞时，帖子的点赞数自动更新
-- **关系统计**：用户的好友数量、发帖数量等自动维护
-- **活跃度计算**：基于用户行为自动计算用户活跃度
-- **内容推荐**：基于用户关系和互动自动计算推荐内容
+### 6. 动态时间线
+- 个人动态（自己发布的内容）
+- 好友动态（好友发布的内容）
+- 推荐内容
 
-## 技术要点
+## 技术实现亮点
 
-1. **实体设计**：User、Post、Like、Friendship 等核心实体
-2. **关系设计**：一对多、多对多、对称关系的应用
-3. **计算属性**：Count、Transform 等响应式计算的使用
-4. **交互设计**：用户操作的标准化处理
-5. **权限控制**：基于角色和所有权的访问控制
+### 响应式计算
+- **好友计数**：使用 Count 计算好友数量，自动响应好友关系的增删
+- **内容统计**：使用 Count 计算点赞数、评论数，实时更新
+- **用户活跃度**：使用 WeightedSummation 计算用户活跃度分数
+- **内容推荐**：使用 Transform 生成个性化推荐列表
+
+### 权限控制
+- **内容编辑权限**：只有作者可以编辑自己的内容
+- **好友请求权限**：不能向已经是好友的用户发送请求
+- **评论权限**：只有好友可以评论内容（可配置）
+
+### 状态管理
+- **内容状态机**：草稿 → 已发布 → 已删除
+- **好友请求状态机**：待处理 → 已接受/已拒绝
+
+### 过滤实体
+- **公开内容**：过滤出已发布且未删除的内容
+- **好友内容**：过滤出好友发布的内容
+- **热门内容**：过滤出点赞数和评论数较高的内容
 
 ## 目录结构
 
 ```
 social-content-network/
 ├── README.md                 # 本文档
-├── requirements.md           # 详细需求规格
+├── requirements.md           # 详细需求说明
 ├── src/
-│   ├── entities.ts          # 实体定义
-│   ├── relations.ts         # 关系定义  
+│   ├── index.ts             # 主入口文件
+│   ├── entities-base.ts     # 基础实体定义
+│   ├── entities.ts          # 完整实体和关系定义
 │   ├── interactions.ts      # 交互定义
-│   ├── computations.ts      # 响应式计算
-│   └── index.ts             # 系统入口
+│   └── relations.ts         # 关系定义
 ├── tests/
-│   ├── entities.test.ts     # 实体测试
-│   ├── relations.test.ts    # 关系测试
+│   ├── setup.ts            # 测试环境设置
+│   ├── entities.test.ts    # 实体测试
 │   ├── interactions.test.ts # 交互测试
-│   ├── computations.test.ts # 计算测试
-│   └── integration.test.ts  # 集成测试
+│   ├── computations.test.ts # 响应式计算测试
+│   ├── integration.test.ts # 集成测试
+│   └── minimal.test.ts     # 最小功能测试
 └── docs/
-    ├── api.md               # API 文档
-    └── usage.md             # 使用指南
+    ├── usage.md            # 使用说明
+    └── api.md              # API 文档
 ```
 
 ## 快速开始
 
-1. 安装依赖
 ```bash
+# 安装依赖
 npm install
-```
 
-2. 运行测试
-```bash
+# 运行测试
 npm run test:social-network
+
+# 运行示例
+npm run example:social-network
 ```
 
-3. 启动示例
-```bash
-npm run start:social-network
+## 示例用法
+
+```typescript
+import { createSocialNetwork } from './src/index.js';
+
+const { controller, entities, relations } = await createSocialNetwork();
+
+// 创建用户
+const user1 = await controller.callInteraction('CreateUser', {
+  payload: { username: 'alice', displayName: 'Alice Wang' }
+});
+
+const user2 = await controller.callInteraction('CreateUser', {
+  payload: { username: 'bob', displayName: 'Bob Li' }
+});
+
+// 发送好友请求
+await controller.callInteraction('SendFriendRequest', {
+  user: user1.data,
+  payload: { targetUserId: user2.data.id }
+});
+
+// 接受好友请求
+await controller.callInteraction('AcceptFriendRequest', {
+  user: user2.data,
+  payload: { requesterId: user1.data.id }
+});
+
+// 创建内容
+await controller.callInteraction('CreatePost', {
+  user: user1.data,
+  payload: { 
+    title: 'Hello World', 
+    content: 'This is my first post!',
+    tags: ['hello', 'world']
+  }
+});
+
+// 发布内容
+await controller.callInteraction('PublishPost', {
+  user: user1.data,
+  payload: { postId: post.data.id }
+});
+
+// 点赞内容
+await controller.callInteraction('LikePost', {
+  user: user2.data,
+  payload: { postId: post.data.id }
+});
 ```
 
-## 学习重点
+## 核心概念演示
 
-通过这个示例，您将学会：
+本示例重点演示了以下 @interaqt/runtime 的核心概念：
 
-1. 如何设计响应式的数据模型
-2. 如何处理复杂的关系逻辑
-3. 如何实现自动化的数据同步
-4. 如何编写高质量的测试用例
-5. 如何优化响应式计算的性能
+1. **响应式计算**：自动维护统计数据，无需手动更新
+2. **权限控制**：基于 Attributive 的细粒度权限管理
+3. **状态机**：内容和请求的状态转换
+4. **过滤实体**：动态数据视图
+5. **复杂关系**：多对多、一对多关系的组合使用
+6. **事件驱动**：基于交互的数据变更
 
-这个示例是理解 @interaqt/runtime 框架核心概念的最佳起点。
+## 学习建议
+
+1. 先阅读 `requirements.md` 了解详细需求
+2. 查看 `src/entities.ts` 了解实体和关系设计
+3. 学习 `src/interactions.ts` 了解业务逻辑实现
+4. 运行测试用例理解各功能的使用方法
+5. 尝试修改和扩展功能

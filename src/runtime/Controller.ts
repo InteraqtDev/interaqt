@@ -56,15 +56,28 @@ export class Controller {
     }
     public scheduler: Scheduler
     public activityManager: ActivityManager
+    public entities: KlassInstance<typeof Entity>[]
+    public relations: KlassInstance<typeof Relation>[]
+    public activities: KlassInstance<typeof Activity>[]
+    public interactions: KlassInstance<typeof Interaction>[]
+    public dict: KlassInstance<typeof Property>[] = []
+    public recordMutationSideEffects: RecordMutationSideEffect[] = []
     constructor(
         public system: System,
-        public entities: KlassInstance<typeof Entity>[],
-        public relations: KlassInstance<typeof Relation>[],
-        public activities: KlassInstance<typeof Activity>[],
-        public interactions: KlassInstance<typeof Interaction>[],
-        public dict: KlassInstance<typeof Property>[] = [],
-        public recordMutationSideEffects: RecordMutationSideEffect[] = []
+        entities: KlassInstance<typeof Entity>[],
+        relations: KlassInstance<typeof Relation>[],
+        activities: KlassInstance<typeof Activity>[],
+        interactions: KlassInstance<typeof Interaction>[],
+        dict: KlassInstance<typeof Property>[] = [],
+        recordMutationSideEffects: RecordMutationSideEffect[] = []
     ) {
+        // 因为我们会对 entities 数组进行补充。如果外部复用了传入的数组对象，就会发生混乱，例如在测试用例中复用。
+        this.entities = [...entities]
+        this.relations = [...relations]
+        this.activities = [...activities]
+        this.interactions = [...interactions]
+        this.dict = [...dict]
+        this.recordMutationSideEffects = [...recordMutationSideEffects]
         // CAUTION 因为 public 里面的会在 constructor 后面才初始化，所以ActivityCall 里面读不到 this.system
         this.system = system
 

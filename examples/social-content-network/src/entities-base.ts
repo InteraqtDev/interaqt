@@ -1,165 +1,191 @@
-import { Entity, Property } from '@/index.js'
+import { Entity, Property, PropertyTypes } from '@';
 
-// 不包含响应式计算的基础实体定义
-
-// 用户实体（基础版本）
+/**
+ * 用户实体
+ */
 export const User = Entity.create({
   name: 'User',
   properties: [
     // 基本信息
-    Property.create({ 
-      name: 'username', 
-      type: 'string', 
-      required: true,
-      unique: true,
-      minLength: 3,
-      maxLength: 30
+    Property.create({
+      name: 'username',
+      type: PropertyTypes.String,
+      required: true
     }),
-    Property.create({ 
-      name: 'email', 
-      type: 'string', 
-      required: true,
-      unique: true
+    Property.create({
+      name: 'displayName',
+      type: PropertyTypes.String,
+      required: true
     }),
-    Property.create({ 
-      name: 'displayName', 
-      type: 'string', 
-      required: true,
-      maxLength: 50
+    Property.create({
+      name: 'avatar',
+      type: PropertyTypes.String,
+      required: false
     }),
-    Property.create({ 
-      name: 'bio', 
-      type: 'string',
-      maxLength: 500
+    Property.create({
+      name: 'bio',
+      type: PropertyTypes.String,
+      required: false
     }),
-    Property.create({ 
-      name: 'avatar', 
-      type: 'string'
+    Property.create({
+      name: 'email',
+      type: PropertyTypes.String,
+      required: false
     }),
-    Property.create({ 
-      name: 'createdAt', 
-      type: 'string', 
-      defaultValue: () => new Date().toISOString(),
-      index: true
+    Property.create({
+      name: 'createdAt',
+      type: PropertyTypes.String,
+      defaultValue: () => new Date().toISOString()
     }),
-    Property.create({ 
-      name: 'lastActiveAt', 
-      type: 'string', 
-      defaultValue: () => new Date().toISOString(),
-      index: true
-    }),
-    Property.create({ 
-      name: 'isActive', 
-      type: 'boolean', 
-      defaultValue: () => true,
-      index: true
+    Property.create({
+      name: 'lastActiveAt',
+      type: PropertyTypes.String,
+      defaultValue: () => new Date().toISOString()
     })
   ]
-})
+});
 
-// 帖子实体（基础版本）
+/**
+ * 内容/帖子实体
+ */
 export const Post = Entity.create({
   name: 'Post',
   properties: [
     // 基本信息
-    Property.create({ 
-      name: 'title', 
-      type: 'string', 
-      required: true,
-      maxLength: 200
-    }),
-    Property.create({ 
-      name: 'content', 
-      type: 'string', 
+    Property.create({
+      name: 'title',
+      type: PropertyTypes.String,
       required: true
     }),
     Property.create({
-      name: 'status',
-      type: 'string',
-      defaultValue: () => 'draft',
-      index: true
+      name: 'content',
+      type: PropertyTypes.String,
+      required: true
     }),
-    Property.create({ 
-      name: 'createdAt', 
-      type: 'string', 
-      defaultValue: () => new Date().toISOString(),
-      index: true
+    Property.create({
+      name: 'tags',
+      type: PropertyTypes.String,
+      collection: true
     }),
-    Property.create({ 
-      name: 'publishedAt', 
-      type: 'string',
-      index: true
+    Property.create({
+      name: 'mediaUrls',
+      type: PropertyTypes.String,
+      collection: true
     }),
-    Property.create({ 
-      name: 'updatedAt', 
-      type: 'string', 
+    
+    // 时间信息
+    Property.create({
+      name: 'createdAt',
+      type: PropertyTypes.String,
       defaultValue: () => new Date().toISOString()
+    }),
+    Property.create({
+      name: 'updatedAt',
+      type: PropertyTypes.String,
+      defaultValue: () => new Date().toISOString()
+    }),
+    Property.create({
+      name: 'publishedAt',
+      type: PropertyTypes.String,
+      required: false
+    }),
+    
+    // 状态信息
+    Property.create({
+      name: 'status',
+      type: PropertyTypes.String,
+      defaultValue: () => 'draft' // draft, published, deleted
+    }),
+    Property.create({
+      name: 'visibility',
+      type: PropertyTypes.String,
+      defaultValue: () => 'public' // public, friends, private
+    }),
+    
+    // 统计信息 - 这些将通过响应式计算自动维护
+    Property.create({
+      name: 'viewCount',
+      type: PropertyTypes.Number,
+      defaultValue: () => 0
     })
   ]
-})
+});
 
-// 标签实体（基础版本）
+/**
+ * 评论实体
+ */
+export const Comment = Entity.create({
+  name: 'Comment',
+  properties: [
+    Property.create({
+      name: 'content',
+      type: PropertyTypes.String,
+      required: true
+    }),
+    Property.create({
+      name: 'createdAt',
+      type: PropertyTypes.String,
+      defaultValue: () => new Date().toISOString()
+    }),
+    Property.create({
+      name: 'updatedAt',
+      type: PropertyTypes.String,
+      defaultValue: () => new Date().toISOString()
+    }),
+    Property.create({
+      name: 'isDeleted',
+      type: PropertyTypes.Boolean,
+      defaultValue: () => false
+    })
+  ]
+});
+
+/**
+ * 好友请求实体
+ */
+export const FriendRequest = Entity.create({
+  name: 'FriendRequest',
+  properties: [
+    Property.create({
+      name: 'message',
+      type: PropertyTypes.String,
+      required: false
+    }),
+    Property.create({
+      name: 'status',
+      type: PropertyTypes.String,
+      defaultValue: () => 'pending' // pending, accepted, rejected
+    }),
+    Property.create({
+      name: 'createdAt',
+      type: PropertyTypes.String,
+      defaultValue: () => new Date().toISOString()
+    }),
+    Property.create({
+      name: 'respondedAt',
+      type: PropertyTypes.String,
+      required: false
+    })
+  ]
+});
+
+/**
+ * 标签实体
+ */
 export const Tag = Entity.create({
   name: 'Tag',
   properties: [
-    Property.create({ 
-      name: 'name', 
-      type: 'string', 
-      required: true,
-      unique: true,
-      maxLength: 50
+    Property.create({
+      name: 'name',
+      type: PropertyTypes.String,
+      required: true
     }),
-    Property.create({ 
-      name: 'description', 
-      type: 'string',
-      maxLength: 200
-    }),
-    Property.create({ 
-      name: 'color', 
-      type: 'string', 
-      defaultValue: () => '#666666'
-    }),
-    Property.create({ 
-      name: 'createdAt', 
-      type: 'string', 
+    Property.create({
+      name: 'createdAt',
+      type: PropertyTypes.String,
       defaultValue: () => new Date().toISOString()
     })
   ]
-})
+});
 
-// 分类实体（基础版本）
-export const Category = Entity.create({
-  name: 'Category',
-  properties: [
-    Property.create({ 
-      name: 'name', 
-      type: 'string', 
-      required: true,
-      unique: true,
-      maxLength: 100
-    }),
-    Property.create({ 
-      name: 'description', 
-      type: 'string',
-      maxLength: 500
-    }),
-    Property.create({ 
-      name: 'parentId', 
-      type: 'string',
-      isRef: true,
-      refEntity: 'Category'
-    }),
-    Property.create({ 
-      name: 'order', 
-      type: 'number', 
-      defaultValue: () => 0,
-      index: true
-    }),
-    Property.create({ 
-      name: 'isActive', 
-      type: 'boolean', 
-      defaultValue: () => true,
-      index: true
-    })
-  ]
-})
+export const entities = [User, Post, Comment, FriendRequest, Tag];
