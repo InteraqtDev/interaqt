@@ -280,7 +280,7 @@ export class InteractionCall {
 
             if (payloadDef.isCollection) {
                 const result = await everyWithErrorAsync(payloadItem,(item => this.checkConcept(item, payloadDef.base as KlassInstance<typeof Entity>)))
-                if (result! == true) {
+                if (result !== true) {
                     throw new AttributeError(`${payloadDef.name} check concept failed`, result)
                 }
             } else {

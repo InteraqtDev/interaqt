@@ -13,6 +13,23 @@
 - "**管理员**可以删除任何评论" - "管理员" 是一个定语
 - "**好友**可以查看私人资料" - "好友" 是一个定语
 
+### Attributive 的核心结构
+
+```javascript
+const MyAttributive = Attributive.create({
+  name: 'MyAttributive',  // 定语的名称
+  content: function(targetUser, eventArgs) {
+    // targetUser: 第一个参数，在 userAttributives 中通常是当前用户
+    //            在 payload attributives 中是 payload item 的值
+    // eventArgs: 包含 user、payload、query 等交互事件信息
+    // this: 绑定到 Controller 实例，可以访问 system、globals 等
+    
+    // 返回 true 表示权限通过，false 表示拒绝
+    return true;
+  }
+});
+```
+
 ### 定语的作用
 
 定语系统提供了以下功能：
@@ -48,42 +65,18 @@ app.put('/api/posts/:id', async (req, res) => {
 const UpdatePost = Interaction.create({
   name: 'UpdatePost',
   action: Action.create({
-    name: 'updatePost',
-    operation: [
-      {
-        type: 'update',
-        entity: 'Post',
-        where: { id: '$.postId' },
-        payload: {
-          title: '$.title',
-          content: '$.content'
-        }
-      }
-    ]
+    name: 'updatePost'
   }),
   payload: Payload.create({
     items: [
-      PayloadItem.create({ name: 'postId', type: 'string', isRef: true, refEntity: 'Post' }),
+      PayloadItem.create({ name: 'postId', type: 'string', isRef: true, base: Post }),
       PayloadItem.create({ name: 'title', type: 'string' }),
       PayloadItem.create({ name: 'content', type: 'string' })
     ]
   }),
-  // 声明式权限控制
-  attributives: [
-    Attributive.create({
-      name: 'PostAuthor',
-      description: '帖子作者',
-      condition: (context) => {
-        const post = context.getEntity('Post', context.payload.postId);
-        return post.author === context.user.id;
-      }
-    }),
-    Attributive.create({
-      name: 'Admin',
-      description: '管理员',
-      condition: (context) => context.user.role === 'admin'
-    })
-  ]
+  // 声明式权限控制 - 作者或管理员可以更新
+  userAttributives: BoolExp.atom(PostAuthorAttributive)
+    .or(BoolExp.atom(AdminAttributive))
 });
 ```
 
@@ -92,20 +85,21 @@ const UpdatePost = Interaction.create({
 ### 基于角色的权限
 
 ```javascript
-import { Attributive } from '@interaqt/runtime';
+import { Attributive, BoolExp } from '@interaqt/runtime';
 
 // 定义角色定语
 const AdminAttributive = Attributive.create({
   name: 'Admin',
-  content: function Admin(target, { user }) {
-    return user.role === 'admin';
+  content: function Admin(targetUser, eventArgs) {
+    // this 绑定到 controller，可以访问 system 和其他工具
+    return eventArgs.user.role === 'admin';
   }
 });
 
 const ModeratorAttributive = Attributive.create({
   name: 'Moderator',
-  content: function Moderator(target, { user }) {
-    return ['admin', 'moderator'].includes(user.role);
+  content: function Moderator(targetUser, eventArgs) {
+    return ['admin', 'moderator'].includes(eventArgs.user.role);
   }
 });
 
@@ -113,27 +107,20 @@ const ModeratorAttributive = Attributive.create({
 const DeleteUser = Interaction.create({
   name: 'DeleteUser',
   action: Action.create({
-    name: 'deleteUser',
-    operation: [
-      {
-        type: 'delete',
-        entity: 'User',
-        where: { id: '$.userId' }
-      }
-    ]
+    name: 'deleteUser'
   }),
   payload: Payload.create({
     items: [
-      PayloadItem.create({ name: 'userId', type: 'string', isRef: true, refEntity: 'User' })
+      PayloadItem.create({ name: 'userId', type: 'string', isRef: true, base: User })
     ]
   }),
-  attributives: [AdminAttributive]
+  userAttributives: AdminAttributive
 });
 
 // 版主和管理员可以删除评论
 const DeleteComment = Interaction.create({
   name: 'DeleteComment',
-  attributives: [ModeratorAttributive]
+  userAttributives: ModeratorAttributive,
   // ... 其他配置
 });
 ```
@@ -144,41 +131,48 @@ const DeleteComment = Interaction.create({
 // 定义关系定语
 const PostAuthorAttributive = Attributive.create({
   name: 'PostAuthor',
-  content: async function PostAuthor(this: Controller, post, { user }) {
+  content: async function PostAuthor(targetUser, eventArgs) {
+    // this 是 controller 实例
     const { BoolExp } = this.globals;
+    const postId = eventArgs.payload.postId;
+    
     const match = BoolExp.atom({
       key: 'id',
-      value: ['=', post.id]
+      value: ['=', postId]
     });
+    
     const postData = await this.system.storage.findOne('Post', match, undefined, [['author', { attributeQuery: ['id'] }]]);
-    return postData && postData.author.id === user.id;
+    return postData && postData.author.id === eventArgs.user.id;
   }
 });
 
 const CommentAuthorAttributive = Attributive.create({
   name: 'CommentAuthor',
-  content: async function CommentAuthor(this: Controller, comment, { user }) {
+  content: async function CommentAuthor(targetUser, eventArgs) {
     const { BoolExp } = this.globals;
+    const commentId = eventArgs.payload.commentId;
+    
     const match = BoolExp.atom({
       key: 'id',
-      value: ['=', comment.id]
+      value: ['=', commentId]
     });
+    
     const commentData = await this.system.storage.findOne('Comment', match, undefined, [['author', { attributeQuery: ['id'] }]]);
-    return commentData && commentData.author.id === user.id;
+    return commentData && commentData.author.id === eventArgs.user.id;
   }
 });
 
 // 只有帖子作者可以编辑帖子
 const EditPost = Interaction.create({
   name: 'EditPost',
-  attributives: [PostAuthorAttributive],
+  userAttributives: PostAuthorAttributive,
   // ... 其他配置
 });
 
 // 评论作者可以编辑自己的评论
 const EditComment = Interaction.create({
   name: 'EditComment',
-  attributives: [CommentAuthorAttributive],
+  userAttributives: CommentAuthorAttributive,
   // ... 其他配置
 });
 ```
@@ -189,13 +183,14 @@ const EditComment = Interaction.create({
 // 好友关系定语
 const FriendAttributive = Attributive.create({
   name: 'Friend',
-  content: async function Friend(this: Controller, targetUser, { user }) {
+  content: async function Friend(targetUser, eventArgs) {
     const { BoolExp } = this.globals;
+    const targetUserId = eventArgs.payload.targetUserId;
     
     // 检查是否为好友关系
     const friendship = await this.system.storage.findOne('Friendship', 
-      BoolExp.atom({ key: 'source', value: ['=', user.id] })
-        .and({ key: 'target', value: ['=', targetUser.id] })
+      BoolExp.atom({ key: 'source', value: ['=', eventArgs.user.id] })
+        .and({ key: 'target', value: ['=', targetUserId] })
         .and({ key: 'status', value: ['=', 'accepted'] })
     );
     
@@ -206,16 +201,16 @@ const FriendAttributive = Attributive.create({
 // 项目成员定语
 const ProjectMemberAttributive = Attributive.create({
   name: 'ProjectMember',
-  description: '项目成员',
-  condition: async (context) => {
-    const projectId = context.payload.projectId;
-    const userId = context.user.id;
+  content: async function ProjectMember(targetUser, eventArgs) {
+    const projectId = eventArgs.payload.projectId;
+    const userId = eventArgs.user.id;
+    const { BoolExp } = this.globals;
     
-    const membership = await context.findOne('ProjectMembership', {
-      project: projectId,
-      user: userId,
-      status: 'active'
-    });
+    const membership = await this.system.storage.findOne('ProjectMembership',
+      BoolExp.atom({ key: 'project', value: ['=', projectId] })
+        .and({ key: 'user', value: ['=', userId] })
+        .and({ key: 'status', value: ['=', 'active'] })
+    );
     
     return !!membership;
   }
@@ -224,14 +219,14 @@ const ProjectMemberAttributive = Attributive.create({
 // 只有好友可以查看私人资料
 const ViewPrivateProfile = Interaction.create({
   name: 'ViewPrivateProfile',
-  attributives: [FriendAttributive],
+  userAttributives: FriendAttributive,
   // ... 其他配置
 });
 
 // 只有项目成员可以创建任务
 const CreateTask = Interaction.create({
   name: 'CreateTask',
-  attributives: [ProjectMemberAttributive],
+  userAttributives: ProjectMemberAttributive,
   // ... 其他配置
 });
 ```
@@ -242,8 +237,7 @@ const CreateTask = Interaction.create({
 // 基于时间的权限
 const BusinessHoursAttributive = Attributive.create({
   name: 'BusinessHours',
-  description: '工作时间',
-  condition: (context) => {
+  content: function BusinessHours(targetUser, eventArgs) {
     const now = new Date();
     const hour = now.getHours();
     const day = now.getDay();
@@ -256,9 +250,11 @@ const BusinessHoursAttributive = Attributive.create({
 // 基于数据状态的权限
 const DraftPostAttributive = Attributive.create({
   name: 'DraftPost',
-  description: '草稿状态的帖子',
-  condition: async (context) => {
-    const post = await context.findOne('Post', { id: context.payload.postId });
+  content: async function DraftPost(targetUser, eventArgs) {
+    const { BoolExp } = this.globals;
+    const post = await this.system.storage.findOne('Post', 
+      BoolExp.atom({ key: 'id', value: ['=', eventArgs.payload.postId] })
+    );
     return post && post.status === 'draft';
   }
 });
@@ -266,92 +262,190 @@ const DraftPostAttributive = Attributive.create({
 // 基于用户状态的权限
 const VerifiedUserAttributive = Attributive.create({
   name: 'VerifiedUser',
-  description: '已验证用户',
-  condition: (context) => {
-    return context.user.isVerified === true;
+  content: function VerifiedUser(targetUser, eventArgs) {
+    return eventArgs.user.isVerified === true;
   }
 });
 
 // 只有在工作时间内才能提交请假申请
 const SubmitLeaveRequest = Interaction.create({
   name: 'SubmitLeaveRequest',
-  attributives: [BusinessHoursAttributive],
+  userAttributives: BusinessHoursAttributive,
   // ... 其他配置
 });
 
 // 只有已验证用户可以发布帖子
 const PublishPost = Interaction.create({
   name: 'PublishPost',
-  attributives: [VerifiedUserAttributive],
+  userAttributives: VerifiedUserAttributive,
   // ... 其他配置
 });
 ```
 
-## 为实体添加定语
+## 为 Payload 添加定语限制
+
+除了限制谁可以执行交互，你还可以限制交互的具体参数必须满足的条件：
+
+```javascript
+// 定义一个限制：只能编辑自己创建的内容
+const OwnContentAttributive = Attributive.create({
+  name: 'OwnContent',
+  content: async function OwnContent(content, eventArgs) {
+    // content 是 payload item 的值
+    return content.author === eventArgs.user.id;
+  }
+});
+
+// 定义一个限制：内容必须是草稿状态
+const DraftContentAttributive = Attributive.create({
+  name: 'DraftContent',
+  content: async function DraftContent(content, eventArgs) {
+    return content.status === 'draft';
+  }
+});
+
+// 在交互中使用 payload 定语
+const EditDraft = Interaction.create({
+  name: 'EditDraft',
+  action: Action.create({ name: 'editDraft' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({ 
+        name: 'content',
+        type: 'string',
+        isRef: true,
+        base: Post,
+        // 限制只能编辑自己的草稿内容
+        attributives: BoolExp.atom(OwnContentAttributive)
+          .and(BoolExp.atom(DraftContentAttributive))
+      }),
+      PayloadItem.create({ name: 'title', type: 'string' }),
+      PayloadItem.create({ name: 'body', type: 'string' })
+    ]
+  })
+});
+```
+
+## 通过交互控制实体操作权限
+
+在 @interaqt/runtime 中，实体级别的权限控制是通过交互（Interaction）来实现的，而不是直接在实体定义上。以下是如何限制实体的创建、查询和更新：
 
 ### 限制实体的创建
 
 ```javascript
-const Post = Entity.create({
-  name: 'Post',
-  properties: [
-    Property.create({ name: 'title', type: 'string' }),
-    Property.create({ name: 'content', type: 'string' }),
-    Property.create({ name: 'status', type: 'string', defaultValue: 'draft' })
-  ],
-  // 只有已验证用户可以创建帖子
-  createAttributives: [VerifiedUserAttributive]
+// 定义只有已验证用户可以创建帖子
+const CreatePost = Interaction.create({
+  name: 'CreatePost',
+  action: Action.create({ name: 'createPost' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({ name: 'title', type: 'string', required: true }),
+      PayloadItem.create({ name: 'content', type: 'string', required: true }),
+      PayloadItem.create({ name: 'authorId', type: 'string', isRef: true, base: User })
+    ]
+  }),
+  // 只有已验证用户可以执行
+  userAttributives: VerifiedUserAttributive
+});
+
+// 通过 Relation 的 computedData 创建实体
+const UserPostRelation = Relation.create({
+  source: Post,
+  sourceProperty: 'author',
+  target: User,
+  targetProperty: 'posts',
+  type: 'n:1',
+  computedData: Transform.create({
+    record: InteractionEventEntity,
+    callback: function(event) {
+      if (event.interactionName === 'CreatePost') {
+        return {
+          source: {
+            title: event.payload.title,
+            content: event.payload.content,
+            status: 'draft'
+          },
+          target: event.payload.authorId
+        };
+      }
+      return null;
+    }
+  })
 });
 ```
 
 ### 限制实体的查询
 
 ```javascript
-const PrivateMessage = Entity.create({
-  name: 'PrivateMessage',
-  properties: [
-    Property.create({ name: 'content', type: 'string' }),
-    Property.create({ name: 'sender', type: 'string', isRef: true, refEntity: 'User' }),
-    Property.create({ name: 'receiver', type: 'string', isRef: true, refEntity: 'User' })
-  ],
-  // 只有消息的发送者或接收者可以查看
-  readAttributives: [
-    Attributive.create({
-      name: 'MessageParticipant',
-      description: '消息参与者',
-      condition: async (context, record) => {
-        const userId = context.user.id;
-        return record.sender === userId || record.receiver === userId;
-      }
-    })
-  ]
+// 定义消息参与者权限
+const MessageParticipantAttributive = Attributive.create({
+  name: 'MessageParticipant',
+  content: async function MessageParticipant(targetUser, eventArgs) {
+    const messageId = eventArgs.query?.match?.id || eventArgs.payload?.messageId;
+    const { BoolExp } = this.globals;
+    
+    const message = await this.system.storage.findOne('PrivateMessage',
+      BoolExp.atom({ key: 'id', value: ['=', messageId] })
+    );
+    
+    const userId = eventArgs.user.id;
+    return message && (message.sender === userId || message.receiver === userId);
+  }
+});
+
+// 查询私人消息的交互
+const ViewPrivateMessages = Interaction.create({
+  name: 'ViewPrivateMessages',
+  action: GetAction, // 使用内置的查询 Action
+  data: PrivateMessage,
+  // 只有消息参与者可以查看
+  userAttributives: MessageParticipantAttributive
 });
 ```
 
 ### 限制实体的更新
 
 ```javascript
-const UserProfile = Entity.create({
-  name: 'UserProfile',
-  properties: [
-    Property.create({ name: 'bio', type: 'string' }),
-    Property.create({ name: 'avatar', type: 'string' }),
-    Property.create({ name: 'isPublic', type: 'boolean', defaultValue: true })
-  ],
-  // 只有用户本人可以更新自己的资料
-  updateAttributives: [
-    Attributive.create({
-      name: 'ProfileOwner',
-      description: '资料拥有者',
-      condition: async (context, record) => {
-        return record.user === context.user.id;
-      }
-    })
-  ]
+// 定义资料拥有者权限
+const ProfileOwnerAttributive = Attributive.create({
+  name: 'ProfileOwner',
+  content: async function ProfileOwner(targetUser, eventArgs) {
+    const profileId = eventArgs.payload.profileId;
+    const { BoolExp } = this.globals;
+    
+    const profile = await this.system.storage.findOne('UserProfile',
+      BoolExp.atom({ key: 'id', value: ['=', profileId] })
+    );
+    
+    return profile && profile.userId === eventArgs.user.id;
+  }
+});
+
+// 更新用户资料的交互
+const UpdateUserProfile = Interaction.create({
+  name: 'UpdateUserProfile',
+  action: Action.create({ name: 'updateProfile' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({ 
+        name: 'profileId', 
+        type: 'string', 
+        isRef: true, 
+        base: UserProfile,
+        required: true
+      }),
+      PayloadItem.create({ name: 'bio', type: 'string' }),
+      PayloadItem.create({ name: 'avatar', type: 'string' })
+    ]
+  }),
+  // 只有资料拥有者可以更新
+  userAttributives: ProfileOwnerAttributive
 });
 ```
 
 ## 组合多个定语
+
+@interaqt/runtime 的一个强大特性是能够在 Interaction 定义中直接使用 BoolExp 来组合多个原子 Attributive。Controller 会自动识别和处理这些组合，按照布尔逻辑执行权限检查。
 
 ### AND 逻辑组合
 
@@ -359,11 +453,8 @@ const UserProfile = Entity.create({
 // 需要同时满足多个条件
 const AdminAndBusinessHours = Interaction.create({
   name: 'SystemMaintenance',
-  attributives: [
-    AdminAttributive,
-    BusinessHoursAttributive
-  ],  // 默认是 AND 逻辑：必须既是管理员又在工作时间
-  // ... 其他配置
+  userAttributives: BoolExp.atom(AdminAttributive)
+    .and(BoolExp.atom(BusinessHoursAttributive))
 });
 ```
 
@@ -373,18 +464,28 @@ const AdminAndBusinessHours = Interaction.create({
 // 满足任一条件即可
 const EditPostAttributive = Attributive.create({
   name: 'CanEditPost',
-  description: '可以编辑帖子',
-  condition: async (context) => {
-    const post = await context.findOne('Post', { id: context.payload.postId });
+  content: async function CanEditPost(targetUser, eventArgs) {
+    const { BoolExp } = this.globals;
+    const post = await this.system.storage.findOne('Post',
+      BoolExp.atom({ key: 'id', value: ['=', eventArgs.payload.postId] })
+    );
     
     // 是作者 OR 是管理员
-    return post.author === context.user.id || context.user.role === 'admin';
+    return post && (post.author === eventArgs.user.id || eventArgs.user.role === 'admin');
   }
 });
 
 const EditPost = Interaction.create({
   name: 'EditPost',
-  attributives: [EditPostAttributive],
+  userAttributives: EditPostAttributive,
+  // ... 其他配置
+});
+
+// 或者使用 BoolExp 组合多个 Attributive
+const EditPostV2 = Interaction.create({
+  name: 'EditPostV2',
+  userAttributives: BoolExp.atom(PostAuthorAttributive)
+    .or(BoolExp.atom(AdminAttributive)),
   // ... 其他配置
 });
 ```
@@ -395,10 +496,10 @@ const EditPost = Interaction.create({
 // 复杂的权限组合
 const ComplexPermissionAttributive = Attributive.create({
   name: 'ComplexPermission',
-  description: '复杂权限',
-  condition: async (context) => {
-    const user = context.user;
-    const payload = context.payload;
+  content: async function ComplexPermission(targetUser, eventArgs) {
+    const user = eventArgs.user;
+    const payload = eventArgs.payload;
+    const { BoolExp } = this.globals;
     
     // 管理员可以执行任何操作
     if (user.role === 'admin') {
@@ -414,12 +515,462 @@ const ComplexPermissionAttributive = Attributive.create({
     
     // 普通用户只能操作自己的数据
     if (user.role === 'user') {
-      const resource = await context.findOne('Resource', { id: payload.resourceId });
+      const resource = await this.system.storage.findOne('Resource',
+        BoolExp.atom({ key: 'id', value: ['=', payload.resourceId] })
+      );
       return resource && resource.owner === user.id;
     }
     
     return false;
   }
+});
+```
+
+## 使用 BoolExp 构建复杂权限条件
+
+在 @interaqt/runtime 中，`userAttributives` 和 PayloadItem 的 `attributives` 都支持直接使用 BoolExp 来组合多个原子 Attributive。Controller 会自动识别并处理这些 BoolExp 表达式，让你能够灵活地构建复杂的权限规则。
+
+### BoolExp 组合 Attributive 的核心概念
+
+```javascript
+import { BoolExp, Attributive, Attributives } from '@interaqt/runtime';
+
+// 1. 定义原子 Attributive（每个只负责一个简单的权限检查）
+const AdminAttributive = Attributive.create({
+  name: 'Admin',
+  content: function(targetUser, eventArgs) {
+    return eventArgs.user.role === 'admin';
+  }
+});
+
+const OwnerAttributive = Attributive.create({
+  name: 'Owner',
+  content: async function(targetUser, eventArgs) {
+    const resourceId = eventArgs.payload.resourceId;
+    const resource = await this.system.storage.findOne('Resource', 
+      BoolExp.atom({ key: 'id', value: ['=', resourceId] })
+    );
+    return resource && resource.ownerId === eventArgs.user.id;
+  }
+});
+
+const ActiveUserAttributive = Attributive.create({
+  name: 'ActiveUser',
+  content: function(targetUser, eventArgs) {
+    return eventArgs.user.status === 'active';
+  }
+});
+
+// 2. 在 Interaction 中使用 BoolExp 组合这些原子 Attributive
+const UpdateResource = Interaction.create({
+  name: 'UpdateResource',
+  action: Action.create({ name: 'updateResource' }),
+  // 必须是活跃用户 AND (管理员 OR 资源拥有者)
+  userAttributives: BoolExp.atom(ActiveUserAttributive)
+    .and(
+      BoolExp.atom(AdminAttributive)
+        .or(BoolExp.atom(OwnerAttributive))
+    ),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({ 
+        name: 'resourceId', 
+        type: 'string', 
+        isRef: true, 
+        base: Resource 
+      })
+    ]
+  })
+});
+```
+
+### 在 userAttributives 中使用 BoolExp
+
+Controller 会自动解析 userAttributives 中的 BoolExp 表达式，按照布尔逻辑执行每个原子 Attributive 的检查：
+
+```javascript
+// 示例1：简单的 OR 逻辑
+const DeleteComment = Interaction.create({
+  name: 'DeleteComment',
+  // 管理员或评论作者可以删除
+  userAttributives: BoolExp.atom(AdminAttributive)
+    .or(BoolExp.atom(CommentAuthorAttributive)),
+  // ... 其他配置
+});
+
+// 示例2：复杂的嵌套逻辑
+// (管理员) OR (版主 AND 工作时间) AND (不是黑名单用户)
+const ModerateContent = Interaction.create({
+  name: 'ModerateContent',
+  userAttributives: BoolExp.atom(AdminAttributive)
+    .or(
+      BoolExp.atom(ModeratorAttributive)
+        .and(BoolExp.atom(BusinessHoursAttributive))
+    )
+    .and(BoolExp.atom(NotBlacklistedAttributive)),
+  // ... 其他配置
+});
+
+// 各个原子 Attributive 的定义
+const NotBlacklistedAttributive = Attributive.create({
+  name: 'NotBlacklisted',
+  content: async function NotBlacklisted(targetUser, eventArgs) {
+    const { BoolExp } = this.globals;
+    const blacklistEntry = await this.system.storage.findOne('Blacklist',
+      BoolExp.atom({ key: 'userId', value: ['=', eventArgs.user.id] })
+        .and({ key: 'status', value: ['=', 'active'] })
+    );
+    return !blacklistEntry;
+  }
+});
+
+const BusinessHoursAttributive = Attributive.create({
+  name: 'BusinessHours',
+  content: function(targetUser, eventArgs) {
+    const hour = new Date().getHours();
+    return hour >= 9 && hour < 18;
+  }
+});
+```
+
+### 在 PayloadItem 的 attributives 中使用 BoolExp
+
+同样的，PayloadItem 的 attributives 也支持 BoolExp 组合：
+
+```javascript
+const PublishArticle = Interaction.create({
+  name: 'PublishArticle',
+  action: Action.create({ name: 'publishArticle' }),
+  userAttributives: EditorAttributive, // 只有编辑可以发布
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({ 
+        name: 'article',
+        type: 'object',
+        isRef: true,
+        base: Article,
+        // 文章必须满足：(自己创建的 OR 被授权编辑的) AND 处于草稿状态
+        attributives: BoolExp.atom(OwnArticleAttributive)
+          .or(BoolExp.atom(AuthorizedToEditAttributive))
+          .and(BoolExp.atom(DraftStatusAttributive))
+      })
+    ]
+  })
+});
+
+// 原子 Attributive 定义
+const OwnArticleAttributive = Attributive.create({
+  name: 'OwnArticle',
+  content: function(article, eventArgs) {
+    return article.authorId === eventArgs.user.id;
+  }
+});
+
+const AuthorizedToEditAttributive = Attributive.create({
+  name: 'AuthorizedToEdit',
+  content: async function(article, eventArgs) {
+    const { BoolExp } = this.globals;
+    const permission = await this.system.storage.findOne('ArticleEditPermission',
+      BoolExp.atom({ key: 'articleId', value: ['=', article.id] })
+        .and({ key: 'userId', value: ['=', eventArgs.user.id] })
+        .and({ key: 'expiresAt', value: ['>', new Date().toISOString()] })
+    );
+    return !!permission;
+  }
+});
+
+const DraftStatusAttributive = Attributive.create({
+  name: 'DraftStatus',
+  content: function(article, eventArgs) {
+    return article.status === 'draft';
+  }
+});
+```
+
+### 原子性设计的重要性
+
+使用 BoolExp 组合 Attributive 的关键是保持每个 Attributive 的原子性——每个 Attributive 只负责一个具体的权限检查：
+
+```javascript
+// ✅ 好的设计：原子性 Attributive
+const IsManagerAttributive = Attributive.create({
+  name: 'IsManager',
+  content: function(targetUser, eventArgs) {
+    return eventArgs.user.role === 'manager';
+  }
+});
+
+const InDepartmentAttributive = Attributive.create({
+  name: 'InDepartment',
+  content: function(targetUser, eventArgs) {
+    const departmentId = eventArgs.payload.departmentId;
+    return eventArgs.user.departmentId === departmentId;
+  }
+});
+
+const HasBudgetApprovalAttributive = Attributive.create({
+  name: 'HasBudgetApproval',
+  content: async function(targetUser, eventArgs) {
+    const { BoolExp } = this.globals;
+    const approval = await this.system.storage.findOne('BudgetApproval',
+      BoolExp.atom({ key: 'userId', value: ['=', eventArgs.user.id] })
+        .and({ key: 'status', value: ['=', 'active'] })
+    );
+    return !!approval;
+  }
+});
+
+// 然后在 Interaction 中组合使用
+const ApproveDepartmentBudget = Interaction.create({
+  name: 'ApproveDepartmentBudget',
+  // 必须是经理 AND 在对应部门 AND 有预算审批权限
+  userAttributives: BoolExp.atom(IsManagerAttributive)
+    .and(BoolExp.atom(InDepartmentAttributive))
+    .and(BoolExp.atom(HasBudgetApprovalAttributive)),
+  // ... 其他配置
+});
+
+// ❌ 不好的设计：在单个 Attributive 中混合多个逻辑
+const ComplexManagerAttributive = Attributive.create({
+  name: 'ComplexManager',
+  content: async function(targetUser, eventArgs) {
+    // 不要这样做！应该拆分成多个原子 Attributive
+    if (eventArgs.user.role !== 'manager') return false;
+    if (eventArgs.user.departmentId !== eventArgs.payload.departmentId) return false;
+    const approval = await this.system.storage.findOne('BudgetApproval', /*...*/);
+    return !!approval;
+  }
+});
+```
+
+### 复杂权限表达式的最佳实践
+
+对于复杂的权限逻辑，可以预先定义好组合，提高可读性和复用性：
+
+```javascript
+// 1. 定义基础的原子 Attributive
+const AdminAttributive = Attributive.create({
+  name: 'Admin',
+  content: (targetUser, eventArgs) => eventArgs.user.role === 'admin'
+});
+
+const ModeratorAttributive = Attributive.create({
+  name: 'Moderator',
+  content: (targetUser, eventArgs) => eventArgs.user.role === 'moderator'
+});
+
+const VerifiedUserAttributive = Attributive.create({
+  name: 'VerifiedUser',
+  content: (targetUser, eventArgs) => eventArgs.user.isVerified === true
+});
+
+const AccountActiveAttributive = Attributive.create({
+  name: 'AccountActive',
+  content: (targetUser, eventArgs) => eventArgs.user.status === 'active'
+});
+
+// 2. 创建可复用的权限组合
+const contentModeratorPermission = BoolExp.atom(ModeratorAttributive)
+  .and(BoolExp.atom(VerifiedUserAttributive))
+  .and(BoolExp.atom(AccountActiveAttributive));
+
+const adminOrModeratorPermission = BoolExp.atom(AdminAttributive)
+  .or(contentModeratorPermission);
+
+// 3. 在多个 Interaction 中复用
+const DeleteContent = Interaction.create({
+  name: 'DeleteContent',
+  userAttributives: adminOrModeratorPermission,
+  // ... 其他配置
+});
+
+const BanUser = Interaction.create({
+  name: 'BanUser',
+  userAttributives: adminOrModeratorPermission,
+  // ... 其他配置
+});
+
+// 4. 使用 Attributives 包装（当需要时）
+const ComplexPermissionSet = Attributives.create({
+  content: adminOrModeratorPermission
+    .or(
+      BoolExp.atom(ResourceOwnerAttributive)
+        .and(BoolExp.atom(VerifiedUserAttributive))
+    )
+});
+```
+
+### 动态构建权限组合
+
+有时需要根据配置或运行时条件动态构建权限组合：
+
+```javascript
+// 动态构建权限表达式的工厂函数
+function buildResourcePermission(resourceType) {
+  // 基础权限：必须是已认证用户
+  let basePermission = BoolExp.atom(AuthenticatedAttributive);
+  
+  switch (resourceType) {
+    case 'public':
+      // 公开资源：只需要认证
+      return basePermission;
+      
+    case 'protected':
+      // 受保护资源：成员或管理员
+      return basePermission
+        .and(
+          BoolExp.atom(MemberAttributive)
+            .or(BoolExp.atom(AdminAttributive))
+        );
+        
+    case 'restricted':
+      // 限制资源：管理员且在工作时间
+      return basePermission
+        .and(BoolExp.atom(AdminAttributive))
+        .and(BoolExp.atom(BusinessHoursAttributive));
+        
+    default:
+      // 默认拒绝访问
+      return BoolExp.atom(Attributive.create({
+        name: 'AlwaysDeny',
+        content: () => false
+      }));
+  }
+}
+
+// 使用动态权限
+const AccessResource = Interaction.create({
+  name: 'AccessResource',
+  action: Action.create({ name: 'accessResource' }),
+  // 根据资源类型动态设置权限
+  userAttributives: buildResourcePermission('protected'),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({ 
+        name: 'resourceId', 
+        type: 'string',
+        isRef: true,
+        base: Resource
+      })
+    ]
+  })
+});
+```
+
+### 权限继承和组合
+
+通过 BoolExp 可以轻松实现权限的继承和组合关系：
+
+```javascript
+// 定义基础权限原子
+const BaseEmployeeAttributive = Attributive.create({
+  name: 'BaseEmployee',
+  content: function(targetUser, eventArgs) {
+    return eventArgs.user.employeeId && eventArgs.user.status === 'active';
+  }
+});
+
+const IsDepartmentManagerAttributive = Attributive.create({
+  name: 'IsDepartmentManager',
+  content: async function(targetUser, eventArgs) {
+    const { BoolExp } = this.globals;
+    const dept = await this.system.storage.findOne('Department',
+      BoolExp.atom({ key: 'managerId', value: ['=', eventArgs.user.id] })
+    );
+    return !!dept;
+  }
+});
+
+const IsFinanceTeamAttributive = Attributive.create({
+  name: 'IsFinanceTeam',
+  content: function(targetUser, eventArgs) {
+    return eventArgs.user.department === 'finance';
+  }
+});
+
+const IsExecutiveAttributive = Attributive.create({
+  name: 'IsExecutive',
+  content: function(targetUser, eventArgs) {
+    return ['ceo', 'cfo', 'cto'].includes(eventArgs.user.role);
+  }
+});
+
+// 使用 BoolExp 组合实现权限继承
+// 部门经理权限 = 基础员工权限 + 是部门经理
+const departmentManagerPermission = BoolExp.atom(BaseEmployeeAttributive)
+  .and(BoolExp.atom(IsDepartmentManagerAttributive));
+
+// 审批预算的交互
+const ApproveBudget = Interaction.create({
+  name: 'ApproveBudget',
+  // 部门经理 OR 财务团队 OR 高管 都可以审批
+  userAttributives: departmentManagerPermission
+    .or(
+      BoolExp.atom(BaseEmployeeAttributive)
+        .and(BoolExp.atom(IsFinanceTeamAttributive))
+    )
+    .or(BoolExp.atom(IsExecutiveAttributive)),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({
+        name: 'budget',
+        type: 'object',
+        base: Budget,
+        // 预算金额限制
+        attributives: BoolExp.atom(BudgetAmountLimitAttributive)
+      })
+    ]
+  })
+});
+
+// 为 payload 定义独立的 Attributive
+const BudgetAmountLimitAttributive = Attributive.create({
+  name: 'BudgetAmountLimit',
+  content: function(budget, eventArgs) {
+    // 不同角色有不同的审批额度
+    if (eventArgs.user.role === 'ceo') return true;
+    if (eventArgs.user.role === 'cfo') return budget.amount <= 1000000;
+    if (eventArgs.user.role === 'manager') return budget.amount <= 50000;
+    if (eventArgs.user.department === 'finance') return budget.amount <= 100000;
+    return false;
+  }
+});
+```
+
+### BoolExp 与 Attributive 的设计原则
+
+1. **保持 Attributive 的原子性**
+   - 每个 Attributive 只负责一个具体的权限检查
+   - 避免在单个 Attributive 中混合多个权限逻辑
+   - 使用 BoolExp 在 Interaction 层面组合这些原子检查
+
+2. **在正确的层面使用 BoolExp**
+   - 在 `userAttributives` 和 `attributives` 中使用 BoolExp 组合
+   - 不要在 Attributive 的 content 函数内部构建复杂的条件逻辑
+   - Controller 会自动处理 BoolExp 表达式的解析和执行
+
+3. **提高可读性和可维护性**
+   - 为常用的权限组合创建变量，便于复用
+   - 使用描述性的 Attributive 名称
+   - 添加注释说明复杂的权限逻辑
+
+4. **性能优化考虑**
+   - 将简单检查（如角色判断）放在前面，复杂查询放在后面
+   - 利用 BoolExp 的短路求值特性（AND 遇到 false 即停止，OR 遇到 true 即停止）
+   - 对于频繁使用的权限检查，考虑缓存结果
+
+示例：优化的权限检查顺序
+```javascript
+// 先检查简单条件，再检查需要数据库查询的条件
+const OptimizedPermission = Interaction.create({
+  name: 'OptimizedPermission',
+  userAttributives: BoolExp.atom(AdminAttributive) // 简单的角色检查
+    .or(
+      BoolExp.atom(ActiveUserAttributive) // 简单的状态检查
+        .and(BoolExp.atom(HasPermissionAttributive)) // 需要数据库查询
+        .and(BoolExp.atom(InTimeWindowAttributive)) // 需要计算
+    ),
+  // ... 其他配置
 });
 ```
 
@@ -430,10 +981,9 @@ const ComplexPermissionAttributive = Attributive.create({
 ```javascript
 const ConditionalAttributive = Attributive.create({
   name: 'ConditionalAccess',
-  description: '条件访问',
-  condition: async (context) => {
-    const user = context.user;
-    const payload = context.payload;
+  content: async function ConditionalAccess(targetUser, eventArgs) {
+    const user = eventArgs.user;
+    const payload = eventArgs.payload;
     
     // 基于用户等级的权限
     if (user.level >= 5) {
@@ -462,10 +1012,13 @@ const ConditionalAttributive = Attributive.create({
 ```javascript
 const EntityStateAttributive = Attributive.create({
   name: 'EntityState',
-  description: '基于实体状态的权限',
-  condition: async (context) => {
-    const entityId = context.payload.entityId;
-    const entity = await context.findOne('SomeEntity', { id: entityId });
+  content: async function EntityState(targetUser, eventArgs) {
+    const entityId = eventArgs.payload.entityId;
+    const { BoolExp } = this.globals;
+    
+    const entity = await this.system.storage.findOne('SomeEntity',
+      BoolExp.atom({ key: 'id', value: ['=', entityId] })
+    );
     
     if (!entity) {
       return false;
@@ -474,11 +1027,11 @@ const EntityStateAttributive = Attributive.create({
     // 基于实体的状态和用户的关系
     switch (entity.status) {
       case 'draft':
-        return entity.author === context.user.id;
+        return entity.author === eventArgs.user.id;
       case 'published':
         return true;  // 所有人都可以访问已发布的内容
       case 'archived':
-        return context.user.role === 'admin';
+        return eventArgs.user.role === 'admin';
       default:
         return false;
     }
@@ -491,9 +1044,8 @@ const EntityStateAttributive = Attributive.create({
 ```javascript
 const TimeWindowAttributive = Attributive.create({
   name: 'TimeWindow',
-  description: '时间窗口权限',
-  condition: async (context) => {
-    const user = context.user;
+  content: async function TimeWindow(targetUser, eventArgs) {
+    const user = eventArgs.user;
     const now = new Date();
     
     // 检查用户的访问时间窗口
@@ -512,32 +1064,170 @@ const TimeWindowAttributive = Attributive.create({
 });
 ```
 
+## BoolExp 在查询条件中的应用
+
+除了用于权限控制，BoolExp 还是构建查询条件的核心工具。理解它在查询中的用法有助于更好地在权限检查中使用它。
+
+### 查询条件的基本构建
+
+```javascript
+// 构建简单查询条件
+const { BoolExp } = this.globals;
+
+// 1. 单个条件
+const byId = BoolExp.atom({ key: 'id', value: ['=', userId] });
+
+// 2. AND 条件组合
+const activeUsers = BoolExp.atom({ key: 'status', value: ['=', 'active'] })
+  .and({ key: 'verified', value: ['=', true] });
+
+// 3. OR 条件组合
+const adminOrModerator = BoolExp.atom({ key: 'role', value: ['=', 'admin'] })
+  .or({ key: 'role', value: ['=', 'moderator'] });
+
+// 4. 复杂嵌套条件
+const complexQuery = BoolExp.atom({ key: 'age', value: ['>', 18] })
+  .and(
+    BoolExp.atom({ key: 'status', value: ['=', 'active'] })
+      .or({ key: 'role', value: ['=', 'premium'] })
+  );
+```
+
+### 在权限检查中使用查询
+
+```javascript
+const ResourceAccessAttributive = Attributive.create({
+  name: 'ResourceAccess',
+  content: async function ResourceAccess(targetUser, eventArgs) {
+    const { BoolExp } = this.globals;
+    const resourceId = eventArgs.payload.resourceId;
+    
+    // 构建复杂查询条件
+    const accessQuery = BoolExp.atom({ key: 'resourceId', value: ['=', resourceId] })
+      .and(
+        BoolExp.atom({ key: 'userId', value: ['=', eventArgs.user.id] })
+          .or({ key: 'groupId', value: ['in', eventArgs.user.groups || []] })
+      )
+      .and({ key: 'expiresAt', value: ['>', new Date().toISOString()] })
+      .and({ key: 'status', value: ['=', 'active'] });
+    
+    // 执行查询
+    const accessRecord = await this.system.storage.findOne('ResourceAccess', accessQuery);
+    
+    return !!accessRecord;
+  }
+});
+```
+
+### 查询操作符参考
+
+```javascript
+// BoolExp 支持的查询操作符
+const queryExamples = {
+  // 相等
+  equals: BoolExp.atom({ key: 'status', value: ['=', 'active'] }),
+  
+  // 不等
+  notEquals: BoolExp.atom({ key: 'status', value: ['!=', 'deleted'] }),
+  
+  // 大于/小于
+  greaterThan: BoolExp.atom({ key: 'age', value: ['>', 18] }),
+  lessThan: BoolExp.atom({ key: 'price', value: ['<', 100] }),
+  greaterOrEqual: BoolExp.atom({ key: 'score', value: ['>=', 60] }),
+  lessOrEqual: BoolExp.atom({ key: 'quantity', value: ['<=', 10] }),
+  
+  // 包含（用于数组字段）
+  contains: BoolExp.atom({ key: 'tags', value: ['contains', 'javascript'] }),
+  
+  // IN 操作（检查值是否在给定数组中）
+  inArray: BoolExp.atom({ key: 'role', value: ['in', ['admin', 'moderator']] }),
+  
+  // NULL 检查
+  isNull: BoolExp.atom({ key: 'deletedAt', value: ['=', null] }),
+  isNotNull: BoolExp.atom({ key: 'userId', value: ['!=', null] }),
+  
+  // 模糊匹配（如果数据库支持）
+  like: BoolExp.atom({ key: 'name', value: ['like', '%john%'] })
+};
+```
+
+### 权限与查询的结合示例
+
+```javascript
+// 创建一个根据用户权限动态调整查询条件的交互
+const ListResourcesWithPermission = Interaction.create({
+  name: 'ListResources',
+  action: GetAction,
+  data: Resource,
+  // 确保用户已认证
+  userAttributives: AuthenticatedAttributive,
+  // 使用 dataAttributives 来动态调整查询条件
+  dataAttributives: DataAttributive.create({
+    name: 'ResourceQueryFilter',
+    content: function(eventArgs) {
+      const { BoolExp } = this.globals;
+      let baseQuery = BoolExp.atom({ key: 'status', value: ['!=', 'deleted'] });
+      
+      // 根据用户角色添加不同的过滤条件
+      if (eventArgs.user.role === 'admin') {
+        // 管理员可以看到所有资源
+        return baseQuery;
+      } else if (eventArgs.user.role === 'manager') {
+        // 经理只能看到自己部门的资源
+        return baseQuery.and({ key: 'departmentId', value: ['=', eventArgs.user.departmentId] });
+      } else {
+        // 普通用户只能看到自己的资源或公开资源
+        return baseQuery.and(
+          BoolExp.atom({ key: 'ownerId', value: ['=', eventArgs.user.id] })
+            .or({ key: 'isPublic', value: ['=', true] })
+        );
+      }
+    }
+  })
+});
+```
+
 ## 权限缓存和性能优化
 
 ### 权限结果缓存
 
+如果需要缓存权限检查结果，你需要自己实现缓存机制：
+
 ```javascript
+// 使用外部缓存系统（如 Redis）
+const cache = new Map(); // 实际应用中使用 Redis 等
+
 const CachedAttributive = Attributive.create({
   name: 'CachedPermission',
-  description: '缓存权限',
-  condition: async (context) => {
-    const cacheKey = `permission:${context.user.id}:${context.interaction.name}`;
+  content: async function CachedPermission(targetUser, eventArgs) {
+    const cacheKey = `permission:${eventArgs.user.id}:${this.interaction.name}`;
     
     // 检查缓存
-    const cached = await context.cache.get(cacheKey);
-    if (cached !== null) {
-      return cached;
+    const cached = cache.get(cacheKey);
+    if (cached !== undefined && cached.expiry > Date.now()) {
+      return cached.value;
     }
     
-    // 执行权限检查
-    const hasPermission = await performExpensivePermissionCheck(context);
+    // 执行权限检查（这里调用实际的权限检查逻辑）
+    const hasPermission = await this.performExpensivePermissionCheck(eventArgs);
     
     // 缓存结果（5分钟）
-    await context.cache.set(cacheKey, hasPermission, 300);
+    cache.set(cacheKey, {
+      value: hasPermission,
+      expiry: Date.now() + 5 * 60 * 1000
+    });
     
     return hasPermission;
   }
 });
+
+// 在 Controller 上扩展权限检查方法
+Controller.prototype.performExpensivePermissionCheck = async function(eventArgs) {
+  // 执行复杂的权限检查逻辑
+  const { BoolExp } = this.globals;
+  // ... 复杂查询
+  return true;
+};
 ```
 
 ### 批量权限检查
@@ -545,17 +1235,17 @@ const CachedAttributive = Attributive.create({
 ```javascript
 const BatchPermissionAttributive = Attributive.create({
   name: 'BatchPermission',
-  description: '批量权限检查',
-  condition: async (context) => {
-    const userId = context.user.id;
-    const resourceIds = context.payload.resourceIds;
+  content: async function BatchPermission(targetUser, eventArgs) {
+    const userId = eventArgs.user.id;
+    const resourceIds = eventArgs.payload.resourceIds;
+    const { BoolExp } = this.globals;
     
     // 批量查询用户对这些资源的权限
-    const permissions = await context.find('Permission', {
-      user: userId,
-      resource: { $in: resourceIds },
-      status: 'active'
-    });
+    const permissions = await this.system.storage.find('Permission',
+      BoolExp.atom({ key: 'user', value: ['=', userId] })
+        .and({ key: 'resource', value: ['in', resourceIds] })
+        .and({ key: 'status', value: ['=', 'active'] })
+    );
     
     // 检查是否对所有资源都有权限
     return permissions.length === resourceIds.length;
@@ -570,11 +1260,10 @@ const BatchPermissionAttributive = Attributive.create({
 ```javascript
 const SafeAttributive = Attributive.create({
   name: 'SafePermission',
-  description: '安全权限检查',
-  condition: async (context) => {
+  content: async function SafePermission(targetUser, eventArgs) {
     try {
       // 执行权限检查逻辑
-      const hasPermission = await checkComplexPermission(context);
+      const hasPermission = await this.checkComplexPermission(eventArgs);
       return hasPermission;
     } catch (error) {
       // 记录错误但不阻止执行
@@ -585,6 +1274,12 @@ const SafeAttributive = Attributive.create({
     }
   }
 });
+
+// 扩展 Controller 以添加权限检查方法
+Controller.prototype.checkComplexPermission = async function(eventArgs) {
+  // 复杂的权限检查逻辑
+  return true;
+};
 ```
 
 ### 权限调试
@@ -592,19 +1287,18 @@ const SafeAttributive = Attributive.create({
 ```javascript
 const DebuggableAttributive = Attributive.create({
   name: 'DebuggablePermission',
-  description: '可调试权限',
-  condition: async (context) => {
-    const user = context.user;
-    const payload = context.payload;
+  content: async function DebuggablePermission(targetUser, eventArgs) {
+    const user = eventArgs.user;
+    const payload = eventArgs.payload;
     
     console.log('权限检查开始:', {
       user: user.id,
       role: user.role,
-      interaction: context.interaction.name,
+      interaction: this.interaction?.name,
       payload: payload
     });
     
-    const hasPermission = await performPermissionCheck(context);
+    const hasPermission = await this.performPermissionCheck(eventArgs);
     
     console.log('权限检查结果:', {
       userId: user.id,
@@ -615,6 +1309,11 @@ const DebuggableAttributive = Attributive.create({
     return hasPermission;
   }
 });
+
+Controller.prototype.performPermissionCheck = async function(eventArgs) {
+  // 实际的权限检查逻辑
+  return true;
+};
 ```
 
 ## 最佳实践

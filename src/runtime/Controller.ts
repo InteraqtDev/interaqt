@@ -14,7 +14,6 @@ import { ComputationResult, ComputationResultSkip, ComputationResultPatch } from
 import { Scheduler } from "./Scheduler.js";
 import { MatchExp } from "@storage";
 import { ActivityManager } from "./ActivityManager.js";
-import { assert } from "./util.js";
 
 export const USER_ENTITY = 'User'
 
