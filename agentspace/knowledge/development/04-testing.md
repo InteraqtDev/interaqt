@@ -212,8 +212,7 @@ test('should calculate property count correctly', async () => {
         sourceProperty: 'tasks',
         target: taskEntity,
         targetProperty: 'owner',
-        name: 'ownsTask',
-        type: '1:n'
+        type: 'n:1'
     });
     
     // 2. 添加计算属性
@@ -237,14 +236,14 @@ test('should calculate property count correctly', async () => {
     const user = await system.storage.create('User', {username: 'testuser'});
     
     // 初始任务数为0
-    const user1 = await system.storage.findOne('User', MatchExp.atom({key: 'id', value: ['=', user.id]}), undefined, ['*']);
+    const user1 = await system.storage.findOne('User', MatchExp.atom({key: 'id', value: ['=', user.id]}), {}, ['*']);
     expect(user1.taskCount).toBe(0);
     
     // 创建任务后计数增加
     await system.storage.create('Task', {title: 'Task 1', owner: user});
     await system.storage.create('Task', {title: 'Task 2', owner: user});
     
-    const user2 = await system.storage.findOne('User', MatchExp.atom({key: 'id', value: ['=', user.id]}), undefined, ['*']);
+    const user2 = await system.storage.findOne('User', MatchExp.atom({key: 'id', value: ['=', user.id]}), {}, ['*']);
     expect(user2.taskCount).toBe(2);
 });
 ```
@@ -273,8 +272,7 @@ class TestCrawlerComputation implements DataBasedComputation {
     constructor(public controller: Controller, public args: KlassInstance<typeof TestCrawlerComputed>, public dataContext: PropertyDataContext) {
         this.dataDeps = {
             _current: {
-                type: 'property',
-                attributeQuery: [this.args.source]
+                type: 'property'
             }
         }
     }
@@ -486,7 +484,7 @@ describe('relation operations', () => {
         // 验证关系查询
         const userWithPosts = await system.storage.findOne('User', 
             MatchExp.atom({key: 'id', value: ['=', user.id]}), 
-            undefined, 
+            {}, 
             ['*', ['posts', {attributeQuery: ['*']}]]
         );
         
@@ -611,7 +609,7 @@ describe('boundary conditions', () => {
         const user = await system.storage.create('User', {name: 'test'});
         const userWithTasks = await system.storage.findOne('User', 
             MatchExp.atom({key: 'id', value: ['=', user.id]}), 
-            undefined, 
+            {}, 
             ['*']
         );
         expect(userWithTasks.taskCount).toBe(0);

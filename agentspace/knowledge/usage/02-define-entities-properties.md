@@ -300,9 +300,9 @@ const User = Entity.create({
 });
 ```
 
-### 唯一约束
+### 约束和验证
 
-设置字段为唯一：
+框架本身不提供字段级别的唯一约束和索引配置。这些应该在数据库层面或通过业务逻辑来实现：
 
 ```javascript
 const User = Entity.create({
@@ -310,38 +310,29 @@ const User = Entity.create({
   properties: [
     Property.create({ 
       name: 'email', 
-      type: 'string',
-      unique: true  // 唯一约束
+      type: 'string'
+      // 唯一性通过业务逻辑或数据库约束保证
     }),
     Property.create({ 
       name: 'username', 
-      type: 'string',
-      unique: true
+      type: 'string'
+      // 同上
     })
   ]
 });
 ```
 
-### 索引
-
-为字段添加索引以提高查询性能：
+如果需要在应用层面进行唯一性检查，可以通过 Attributive 系统来实现：
 
 ```javascript
-const Post = Entity.create({
-  name: 'Post',
-  properties: [
-    Property.create({ name: 'title', type: 'string' }),
-    Property.create({ 
-      name: 'status', 
-      type: 'string',
-      index: true  // 添加索引
-    }),
-    Property.create({ 
-      name: 'createdAt', 
-      type: 'string',
-      index: true
-    })
-  ]
+const UniqueEmailAttributive = Attributive.create({
+  name: 'UniqueEmail',
+  content: async function(user, { system }) {
+    const existingUser = await system.storage.findOne('User', 
+      MatchExp.atom({ key: 'email', value: ['=', user.email] })
+    );
+    return !existingUser || existingUser.id === user.id;
+  }
 });
 ```
 
@@ -359,8 +350,7 @@ const User = Entity.create({
     Property.create({ 
       name: 'email', 
       type: 'string',
-      required: true,
-      unique: true
+      required: true
     }),
     Property.create({ 
       name: 'firstName', 
@@ -384,14 +374,12 @@ const User = Entity.create({
     Property.create({ 
       name: 'status', 
       type: 'string',
-      defaultValue: 'active',
-      index: true
+      defaultValue: 'active'
     }),
     Property.create({ 
       name: 'createdAt', 
       type: 'string',
-      defaultValue: () => new Date().toISOString(),
-      index: true
+      defaultValue: () => new Date().toISOString()
     }),
     
     // JSON 字段

@@ -110,7 +110,7 @@ const UserPosts = Relation.create({
   sourceProperty: 'posts',
   target: Post,
   targetProperty: 'author',
-  type: '1:n'
+  type: 'n:1'
 });
 ```
 
@@ -249,7 +249,7 @@ const Like = Relation.create({
     Property.create({ 
       name: 'type', 
       type: 'string', 
-      defaultValue: 'like'  // 可以是 'like', 'love', 'laugh' 等
+      defaultValue: () => 'like'  // 可以是 'like', 'love', 'laugh' 等
     })
   ]
 });
@@ -457,13 +457,14 @@ const Membership = Relation.create({
 ### 4. 考虑性能影响
 
 ```javascript
-// 为经常查询的关系字段添加索引
+// 关系定义示例（索引应该在数据库层面配置）
 const UserPosts = Relation.create({
   source: User,
+  sourceProperty: 'posts',
   target: Post,
-  type: '1:n',
   targetProperty: 'author',
-  indexes: ['author']  // 为作者字段添加索引
+  type: 'n:1'
+  // 索引配置应该在数据库层面进行
 });
 ```
 
@@ -514,7 +515,7 @@ const UserPosts = Relation.create({
   sourceProperty: 'posts',
   target: Post,
   targetProperty: 'author',
-  type: '1:n'
+  type: 'n:1'
 });
 
 const PostComments = Relation.create({
@@ -522,7 +523,7 @@ const PostComments = Relation.create({
   sourceProperty: 'comments',
   target: Comment,
   targetProperty: 'post',
-  type: '1:n'
+  type: 'n:1'
 });
 
 const UserComments = Relation.create({
@@ -530,7 +531,7 @@ const UserComments = Relation.create({
   sourceProperty: 'comments',
   target: Comment,
   targetProperty: 'author',
-  type: '1:n'
+  type: 'n:1'
 });
 
 const PostTags = Relation.create({

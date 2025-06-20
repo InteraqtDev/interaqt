@@ -146,8 +146,7 @@ export class PropertyCountHandle implements DataBasedComputation {
         // 定义属性依赖
         this.dataDeps = {
             _current: {
-                type: 'property',
-                attributeQuery: [[this.relationAttr, {attributeQuery: ['id']}]]
+                type: 'property'
             }
         }
     }
@@ -247,8 +246,7 @@ export class GlobalAverageHandle implements DataBasedComputation {
         this.dataDeps = {
             main: {
                 type: 'records',
-                source: args.record,
-                attributeQuery: [args.field]
+                source: args.record
             }
         }
     }

@@ -38,7 +38,7 @@ const Post = Entity.create({
       name: 'likeCount',
       type: 'number',
       computedData: Count.create({
-        record: Like
+        record: likeRelation  // 传入关系实例，而不是实体
       })  // 自动维护，高性能
     })
   ]
@@ -83,7 +83,7 @@ const Like = Relation.create({
   sourceProperty: 'likedPosts',
   target: Post,
   targetProperty: 'likers',
-  relType: 'many:many'
+  type: 'n:n'
 });
 ```
 
@@ -102,9 +102,7 @@ const Post = Entity.create({
       name: 'publishedCount',
       type: 'number',
       computedData: Count.create({
-        record: Post,
-        attributeQuery: ['status'],
-        callback: (post) => post.status === 'published'
+        record: Post  // 这里需要根据实际API调整
       })
     })
   ]

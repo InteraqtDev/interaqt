@@ -298,46 +298,49 @@ const CommentRelation = Relation.create({
 
 ### 参数验证
 
+框架的 PayloadItem 支持基本的 required 字段验证，但不支持复杂的验证规则如长度限制、正则表达式等。这些验证应该在业务逻辑中实现：
+
 ```javascript
 const CreateProduct = Interaction.create({
   name: 'CreateProduct',
+  action: Action.create({ name: 'createProduct' }),
   payload: Payload.create({
     items: [
       PayloadItem.create({ 
         name: 'name', 
         type: 'string', 
-        required: true,
-        minLength: 3,
-        maxLength: 100
+        required: true
+        // 复杂验证逻辑应该在交互处理中实现
       }),
       PayloadItem.create({ 
         name: 'price', 
         type: 'number', 
-        required: true,
-        min: 0,
-        max: 999999
+        required: true
+        // 价格范围验证应该在业务逻辑中处理
       }),
       PayloadItem.create({ 
         name: 'email', 
-        type: 'string',
-        pattern: '^[^@]+@[^@]+\.[^@]+$'  // 邮箱格式验证
+        type: 'string'
+        // 邮箱格式验证应该在业务逻辑中处理
       }),
       PayloadItem.create({ 
         name: 'category', 
-        type: 'string',
-        enum: ['electronics', 'clothing', 'books', 'home']
+        type: 'string'
+        // 枚举验证应该在业务逻辑中处理
       })
     ]
   })
-  // ... action 定义
 });
 ```
 
 ### 条件参数
 
+框架本身不支持动态的 required 条件和复杂的验证函数。这些逻辑应该在交互处理中实现：
+
 ```javascript
 const CreateOrder = Interaction.create({
   name: 'CreateOrder',
+  action: Action.create({ name: 'createOrder' }),
   payload: Payload.create({
     items: [
       PayloadItem.create({ 
@@ -348,23 +351,31 @@ const CreateOrder = Interaction.create({
       }),
       PayloadItem.create({ 
         name: 'shippingAddress', 
-        type: 'object',
-        // 当订单金额小于免邮门槛时必填
-        required: (payload) => payload.totalAmount < 100
+        type: 'object'
+        // 条件必填逻辑应该在交互处理中检查
       }),
       PayloadItem.create({ 
         name: 'couponCode', 
-        type: 'string',
-        // 优惠券代码的验证逻辑
-        validate: async (value) => {
-          if (!value) return true;
-          const coupon = await controller.findOne('Coupon', { code: value });
-          return coupon && coupon.isValid && new Date(coupon.expiresAt) > new Date();
-        }
+        type: 'string'
+        // 优惠券验证应该在业务逻辑中实现
       })
     ]
   })
-  // ... action 定义
+});
+
+// 验证逻辑应该在 Transform 或 Attributive 中实现
+const orderValidation = Transform.create({
+  record: InteractionEvent,
+  callback: function(event) {
+    if (event.interactionName === 'CreateOrder') {
+      // 在这里实现复杂的验证逻辑
+      const { payload } = event;
+      if (payload.totalAmount < 100 && !payload.shippingAddress) {
+        throw new Error('Shipping address is required for orders under $100');
+      }
+      // 优惠券验证等
+    }
+  }
 });
 ```
 
@@ -1176,14 +1187,8 @@ const DeletePost = Interaction.create({
         isRef: true,
         refEntity: 'Post',
         required: true,
-        // 添加权限验证
-        attributives: Attributive.create({
-          name: 'IsAuthor',
-          content: async function(post, { user }) {
-            // 检查用户是否是帖子作者
-            return post.author.id === user.id;
-          }
-        })
+        // 权限验证应该通过 userAttributives 实现
+        // 详见 attributive-permissions.md 文档
       })
     ]
   })
@@ -1367,16 +1372,9 @@ const CreateProduct = Interaction.create({
       PayloadItem.create({ 
         name: 'name',
         type: 'string',
-        required: true,
-        minLength: 3,
-        maxLength: 50,
-        pattern: '^[A-Za-z0-9\\s\\-]+$',
-        validate: async (value) => {
-          // 过于复杂的自定义验证应该通过 Attributive 或计算属性处理
-          const exists = await checkNameExists(value);
-          const isValid = await validateWithExternalAPI(value);
-          return !exists && isValid;
-        }
+        required: true
+        // 复杂验证如长度限制、正则表达式、异步验证等
+        // 应该通过 Attributive 系统或业务逻辑层处理
       })
     ]
   })

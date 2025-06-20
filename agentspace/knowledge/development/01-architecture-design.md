@@ -494,7 +494,7 @@ const Relation = createClass({
         sourceProperty: { type: 'string', required: true },
         target: { type: [Entity, Relation], required: true },
         targetProperty: { type: 'string', required: true },
-        type: { type: 'string', required: true }, // '1:1', '1:n', 'n:1', 'n:n'
+        type: { type: 'string', required: true }, // '1:1', 'n:1', 'n:n'
         symmetric: { type: 'boolean', required: false },
         properties: { type: Property, collection: true, required: true }
     }
