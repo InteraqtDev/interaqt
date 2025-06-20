@@ -133,10 +133,10 @@ const PostAuthorAttributive = Attributive.create({
   name: 'PostAuthor',
   content: async function PostAuthor(targetUser, eventArgs) {
     // this 是 controller 实例
-    const { BoolExp } = this.globals;
+    const { MatchExp } = this.globals;
     const postId = eventArgs.payload.postId;
     
-    const match = BoolExp.atom({
+    const match = MatchExp.atom({
       key: 'id',
       value: ['=', postId]
     });
@@ -149,10 +149,10 @@ const PostAuthorAttributive = Attributive.create({
 const CommentAuthorAttributive = Attributive.create({
   name: 'CommentAuthor',
   content: async function CommentAuthor(targetUser, eventArgs) {
-    const { BoolExp } = this.globals;
+    const { MatchExp } = this.globals;
     const commentId = eventArgs.payload.commentId;
     
-    const match = BoolExp.atom({
+    const match = MatchExp.atom({
       key: 'id',
       value: ['=', commentId]
     });
@@ -184,12 +184,12 @@ const EditComment = Interaction.create({
 const FriendAttributive = Attributive.create({
   name: 'Friend',
   content: async function Friend(targetUser, eventArgs) {
-    const { BoolExp } = this.globals;
+    const { MatchExp } = this.globals;
     const targetUserId = eventArgs.payload.targetUserId;
     
     // 检查是否为好友关系
     const friendship = await this.system.storage.findOne('Friendship', 
-      BoolExp.atom({ key: 'source', value: ['=', eventArgs.user.id] })
+      MatchExp.atom({ key: 'source', value: ['=', eventArgs.user.id] })
         .and({ key: 'target', value: ['=', targetUserId] })
         .and({ key: 'status', value: ['=', 'accepted'] })
     );
@@ -204,10 +204,10 @@ const ProjectMemberAttributive = Attributive.create({
   content: async function ProjectMember(targetUser, eventArgs) {
     const projectId = eventArgs.payload.projectId;
     const userId = eventArgs.user.id;
-    const { BoolExp } = this.globals;
+    const { MatchExp } = this.globals;
     
     const membership = await this.system.storage.findOne('ProjectMembership',
-      BoolExp.atom({ key: 'project', value: ['=', projectId] })
+      MatchExp.atom({ key: 'project', value: ['=', projectId] })
         .and({ key: 'user', value: ['=', userId] })
         .and({ key: 'status', value: ['=', 'active'] })
     );
@@ -251,9 +251,9 @@ const BusinessHoursAttributive = Attributive.create({
 const DraftPostAttributive = Attributive.create({
   name: 'DraftPost',
   content: async function DraftPost(targetUser, eventArgs) {
-    const { BoolExp } = this.globals;
+    const { MatchExp } = this.globals;
     const post = await this.system.storage.findOne('Post', 
-      BoolExp.atom({ key: 'id', value: ['=', eventArgs.payload.postId] })
+      MatchExp.atom({ key: 'id', value: ['=', eventArgs.payload.postId] })
     );
     return post && post.status === 'draft';
   }
@@ -382,10 +382,10 @@ const MessageParticipantAttributive = Attributive.create({
   name: 'MessageParticipant',
   content: async function MessageParticipant(targetUser, eventArgs) {
     const messageId = eventArgs.query?.match?.id || eventArgs.payload?.messageId;
-    const { BoolExp } = this.globals;
+    const { MatchExp } = this.globals;
     
     const message = await this.system.storage.findOne('PrivateMessage',
-      BoolExp.atom({ key: 'id', value: ['=', messageId] })
+      MatchExp.atom({ key: 'id', value: ['=', messageId] })
     );
     
     const userId = eventArgs.user.id;
@@ -411,10 +411,10 @@ const ProfileOwnerAttributive = Attributive.create({
   name: 'ProfileOwner',
   content: async function ProfileOwner(targetUser, eventArgs) {
     const profileId = eventArgs.payload.profileId;
-    const { BoolExp } = this.globals;
+    const { MatchExp } = this.globals;
     
     const profile = await this.system.storage.findOne('UserProfile',
-      BoolExp.atom({ key: 'id', value: ['=', profileId] })
+      MatchExp.atom({ key: 'id', value: ['=', profileId] })
     );
     
     return profile && profile.userId === eventArgs.user.id;
@@ -465,9 +465,9 @@ const AdminAndBusinessHours = Interaction.create({
 const EditPostAttributive = Attributive.create({
   name: 'CanEditPost',
   content: async function CanEditPost(targetUser, eventArgs) {
-    const { BoolExp } = this.globals;
+    const { MatchExp } = this.globals;
     const post = await this.system.storage.findOne('Post',
-      BoolExp.atom({ key: 'id', value: ['=', eventArgs.payload.postId] })
+      MatchExp.atom({ key: 'id', value: ['=', eventArgs.payload.postId] })
     );
     
     // 是作者 OR 是管理员
@@ -499,7 +499,6 @@ const ComplexPermissionAttributive = Attributive.create({
   content: async function ComplexPermission(targetUser, eventArgs) {
     const user = eventArgs.user;
     const payload = eventArgs.payload;
-    const { BoolExp } = this.globals;
     
     // 管理员可以执行任何操作
     if (user.role === 'admin') {
@@ -516,7 +515,7 @@ const ComplexPermissionAttributive = Attributive.create({
     // 普通用户只能操作自己的数据
     if (user.role === 'user') {
       const resource = await this.system.storage.findOne('Resource',
-        BoolExp.atom({ key: 'id', value: ['=', payload.resourceId] })
+        MatchExp.atom({ key: 'id', value: ['=', payload.resourceId] })
       );
       return resource && resource.owner === user.id;
     }
@@ -548,7 +547,7 @@ const OwnerAttributive = Attributive.create({
   content: async function(targetUser, eventArgs) {
     const resourceId = eventArgs.payload.resourceId;
     const resource = await this.system.storage.findOne('Resource', 
-      BoolExp.atom({ key: 'id', value: ['=', resourceId] })
+      MatchExp.atom({ key: 'id', value: ['=', resourceId] })
     );
     return resource && resource.ownerId === eventArgs.user.id;
   }
@@ -615,9 +614,9 @@ const ModerateContent = Interaction.create({
 const NotBlacklistedAttributive = Attributive.create({
   name: 'NotBlacklisted',
   content: async function NotBlacklisted(targetUser, eventArgs) {
-    const { BoolExp } = this.globals;
+    const { MatchExp } = this.globals;
     const blacklistEntry = await this.system.storage.findOne('Blacklist',
-      BoolExp.atom({ key: 'userId', value: ['=', eventArgs.user.id] })
+      MatchExp.atom({ key: 'userId', value: ['=', eventArgs.user.id] })
         .and({ key: 'status', value: ['=', 'active'] })
     );
     return !blacklistEntry;
@@ -669,9 +668,9 @@ const OwnArticleAttributive = Attributive.create({
 const AuthorizedToEditAttributive = Attributive.create({
   name: 'AuthorizedToEdit',
   content: async function(article, eventArgs) {
-    const { BoolExp } = this.globals;
+    const { MatchExp } = this.globals;
     const permission = await this.system.storage.findOne('ArticleEditPermission',
-      BoolExp.atom({ key: 'articleId', value: ['=', article.id] })
+      MatchExp.atom({ key: 'articleId', value: ['=', article.id] })
         .and({ key: 'userId', value: ['=', eventArgs.user.id] })
         .and({ key: 'expiresAt', value: ['>', new Date().toISOString()] })
     );
@@ -711,9 +710,9 @@ const InDepartmentAttributive = Attributive.create({
 const HasBudgetApprovalAttributive = Attributive.create({
   name: 'HasBudgetApproval',
   content: async function(targetUser, eventArgs) {
-    const { BoolExp } = this.globals;
+    const { MatchExp } = this.globals;
     const approval = await this.system.storage.findOne('BudgetApproval',
-      BoolExp.atom({ key: 'userId', value: ['=', eventArgs.user.id] })
+      MatchExp.atom({ key: 'userId', value: ['=', eventArgs.user.id] })
         .and({ key: 'status', value: ['=', 'active'] })
     );
     return !!approval;
@@ -873,9 +872,9 @@ const BaseEmployeeAttributive = Attributive.create({
 const IsDepartmentManagerAttributive = Attributive.create({
   name: 'IsDepartmentManager',
   content: async function(targetUser, eventArgs) {
-    const { BoolExp } = this.globals;
+    const { MatchExp } = this.globals;
     const dept = await this.system.storage.findOne('Department',
-      BoolExp.atom({ key: 'managerId', value: ['=', eventArgs.user.id] })
+      MatchExp.atom({ key: 'managerId', value: ['=', eventArgs.user.id] })
     );
     return !!dept;
   }
@@ -1014,10 +1013,10 @@ const EntityStateAttributive = Attributive.create({
   name: 'EntityState',
   content: async function EntityState(targetUser, eventArgs) {
     const entityId = eventArgs.payload.entityId;
-    const { BoolExp } = this.globals;
+    const { MatchExp } = this.globals;
     
     const entity = await this.system.storage.findOne('SomeEntity',
-      BoolExp.atom({ key: 'id', value: ['=', entityId] })
+      MatchExp.atom({ key: 'id', value: ['=', entityId] })
     );
     
     if (!entity) {
@@ -1064,31 +1063,31 @@ const TimeWindowAttributive = Attributive.create({
 });
 ```
 
-## BoolExp 在查询条件中的应用
+## MatchExp 在查询条件中的应用
 
-除了用于权限控制，BoolExp 还是构建查询条件的核心工具。理解它在查询中的用法有助于更好地在权限检查中使用它。
+**重要提醒：在 Attributive 的 content 函数中进行数据库查询时，应该使用 MatchExp 而不是 BoolExp。BoolExp 仅用于组合 Attributive，而 MatchExp 用于构建数据库查询条件。**
 
 ### 查询条件的基本构建
 
 ```javascript
 // 构建简单查询条件
-const { BoolExp } = this.globals;
+const { MatchExp } = this.globals;
 
 // 1. 单个条件
-const byId = BoolExp.atom({ key: 'id', value: ['=', userId] });
+const byId = MatchExp.atom({ key: 'id', value: ['=', userId] });
 
 // 2. AND 条件组合
-const activeUsers = BoolExp.atom({ key: 'status', value: ['=', 'active'] })
+const activeUsers = MatchExp.atom({ key: 'status', value: ['=', 'active'] })
   .and({ key: 'verified', value: ['=', true] });
 
 // 3. OR 条件组合
-const adminOrModerator = BoolExp.atom({ key: 'role', value: ['=', 'admin'] })
+const adminOrModerator = MatchExp.atom({ key: 'role', value: ['=', 'admin'] })
   .or({ key: 'role', value: ['=', 'moderator'] });
 
 // 4. 复杂嵌套条件
-const complexQuery = BoolExp.atom({ key: 'age', value: ['>', 18] })
+const complexQuery = MatchExp.atom({ key: 'age', value: ['>', 18] })
   .and(
-    BoolExp.atom({ key: 'status', value: ['=', 'active'] })
+    MatchExp.atom({ key: 'status', value: ['=', 'active'] })
       .or({ key: 'role', value: ['=', 'premium'] })
   );
 ```
@@ -1099,13 +1098,13 @@ const complexQuery = BoolExp.atom({ key: 'age', value: ['>', 18] })
 const ResourceAccessAttributive = Attributive.create({
   name: 'ResourceAccess',
   content: async function ResourceAccess(targetUser, eventArgs) {
-    const { BoolExp } = this.globals;
+    const { MatchExp } = this.globals;
     const resourceId = eventArgs.payload.resourceId;
     
     // 构建复杂查询条件
-    const accessQuery = BoolExp.atom({ key: 'resourceId', value: ['=', resourceId] })
+    const accessQuery = MatchExp.atom({ key: 'resourceId', value: ['=', resourceId] })
       .and(
-        BoolExp.atom({ key: 'userId', value: ['=', eventArgs.user.id] })
+        MatchExp.atom({ key: 'userId', value: ['=', eventArgs.user.id] })
           .or({ key: 'groupId', value: ['in', eventArgs.user.groups || []] })
       )
       .and({ key: 'expiresAt', value: ['>', new Date().toISOString()] })
@@ -1122,32 +1121,32 @@ const ResourceAccessAttributive = Attributive.create({
 ### 查询操作符参考
 
 ```javascript
-// BoolExp 支持的查询操作符
+// MatchExp 支持的查询操作符
 const queryExamples = {
   // 相等
-  equals: BoolExp.atom({ key: 'status', value: ['=', 'active'] }),
+  equals: MatchExp.atom({ key: 'status', value: ['=', 'active'] }),
   
   // 不等
-  notEquals: BoolExp.atom({ key: 'status', value: ['!=', 'deleted'] }),
+  notEquals: MatchExp.atom({ key: 'status', value: ['!=', 'deleted'] }),
   
   // 大于/小于
-  greaterThan: BoolExp.atom({ key: 'age', value: ['>', 18] }),
-  lessThan: BoolExp.atom({ key: 'price', value: ['<', 100] }),
-  greaterOrEqual: BoolExp.atom({ key: 'score', value: ['>=', 60] }),
-  lessOrEqual: BoolExp.atom({ key: 'quantity', value: ['<=', 10] }),
+  greaterThan: MatchExp.atom({ key: 'age', value: ['>', 18] }),
+  lessThan: MatchExp.atom({ key: 'price', value: ['<', 100] }),
+  greaterOrEqual: MatchExp.atom({ key: 'score', value: ['>=', 60] }),
+  lessOrEqual: MatchExp.atom({ key: 'quantity', value: ['<=', 10] }),
   
   // 包含（用于数组字段）
-  contains: BoolExp.atom({ key: 'tags', value: ['contains', 'javascript'] }),
+  contains: MatchExp.atom({ key: 'tags', value: ['contains', 'javascript'] }),
   
   // IN 操作（检查值是否在给定数组中）
-  inArray: BoolExp.atom({ key: 'role', value: ['in', ['admin', 'moderator']] }),
+  inArray: MatchExp.atom({ key: 'role', value: ['in', ['admin', 'moderator']] }),
   
   // NULL 检查
-  isNull: BoolExp.atom({ key: 'deletedAt', value: ['=', null] }),
-  isNotNull: BoolExp.atom({ key: 'userId', value: ['!=', null] }),
+  isNull: MatchExp.atom({ key: 'deletedAt', value: ['=', null] }),
+  isNotNull: MatchExp.atom({ key: 'userId', value: ['!=', null] }),
   
   // 模糊匹配（如果数据库支持）
-  like: BoolExp.atom({ key: 'name', value: ['like', '%john%'] })
+  like: MatchExp.atom({ key: 'name', value: ['like', '%john%'] })
 };
 ```
 
@@ -1165,8 +1164,8 @@ const ListResourcesWithPermission = Interaction.create({
   dataAttributives: DataAttributive.create({
     name: 'ResourceQueryFilter',
     content: function(eventArgs) {
-      const { BoolExp } = this.globals;
-      let baseQuery = BoolExp.atom({ key: 'status', value: ['!=', 'deleted'] });
+      const { MatchExp } = this.globals;
+      let baseQuery = MatchExp.atom({ key: 'status', value: ['!=', 'deleted'] });
       
       // 根据用户角色添加不同的过滤条件
       if (eventArgs.user.role === 'admin') {
@@ -1178,7 +1177,7 @@ const ListResourcesWithPermission = Interaction.create({
       } else {
         // 普通用户只能看到自己的资源或公开资源
         return baseQuery.and(
-          BoolExp.atom({ key: 'ownerId', value: ['=', eventArgs.user.id] })
+          MatchExp.atom({ key: 'ownerId', value: ['=', eventArgs.user.id] })
             .or({ key: 'isPublic', value: ['=', true] })
         );
       }
@@ -1224,7 +1223,7 @@ const CachedAttributive = Attributive.create({
 // 在 Controller 上扩展权限检查方法
 Controller.prototype.performExpensivePermissionCheck = async function(eventArgs) {
   // 执行复杂的权限检查逻辑
-  const { BoolExp } = this.globals;
+  const { MatchExp } = this.globals;
   // ... 复杂查询
   return true;
 };
@@ -1238,11 +1237,11 @@ const BatchPermissionAttributive = Attributive.create({
   content: async function BatchPermission(targetUser, eventArgs) {
     const userId = eventArgs.user.id;
     const resourceIds = eventArgs.payload.resourceIds;
-    const { BoolExp } = this.globals;
+    const { MatchExp } = this.globals;
     
     // 批量查询用户对这些资源的权限
     const permissions = await this.system.storage.find('Permission',
-      BoolExp.atom({ key: 'user', value: ['=', userId] })
+      MatchExp.atom({ key: 'user', value: ['=', userId] })
         .and({ key: 'resource', value: ['in', resourceIds] })
         .and({ key: 'status', value: ['=', 'active'] })
     );
