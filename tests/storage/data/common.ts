@@ -81,7 +81,7 @@ export function createCommonData(): { entities: KlassInstance<typeof Entity>[], 
 
     const teamEntity: KlassInstance<typeof Entity> = Entity.create({
         name: 'Team',
-        properties: [Property.create({ name: 'teamName', type: 'String' })]
+        properties: [Property.create({ name: 'name', type: 'String' })]
     });
 
     const locEntity: KlassInstance<typeof Entity> = Entity.create({
@@ -119,7 +119,7 @@ export function createCommonData(): { entities: KlassInstance<typeof Entity>[], 
     });
 
     const teamMatchHostRelation: KlassInstance<typeof Relation> = Relation.create({
-        source: teamRelation,
+        source: teamEntity,
         sourceProperty: 'matches',
         target: matchEntity,
         targetProperty: 'host',
@@ -128,7 +128,7 @@ export function createCommonData(): { entities: KlassInstance<typeof Entity>[], 
     });
 
     const teamMatchParticipantRelation: KlassInstance<typeof Relation> = Relation.create({
-        source: teamRelation,
+        source: teamEntity ,
         sourceProperty: 'participates',
         target: matchEntity,
         targetProperty: 'participants',

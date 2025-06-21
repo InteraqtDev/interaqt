@@ -13,7 +13,7 @@ describe('many to many', () => {
 
     beforeEach(async () => {
         const { entities, relations } = createCommonData()
-        logger = new TestLogger('', true)
+        logger = new TestLogger('', false)
 
         // @ts-ignore
         db = new SQLiteDB(':memory:', {logger})
@@ -35,15 +35,15 @@ describe('many to many', () => {
     test('create many to many data:create self', async () => {
         const events: RecordMutationEvent[] = []
         const userA = await handle.create('User', {name: 'aaa', age: 17}, events)
-        const teamA = await handle.create('Team', {teamName: 'teamA'})
+        const teamA = await handle.create('Team', {name: 'teamA'})
 
         const findUser = await handle.findOne('User', MatchExp.atom({ key: 'id', value: ['=', userA.id]}), {}, ['name', 'age'] )
         expect(findUser).toMatchObject({
             name:'aaa',
         })
-        const findTeam = await handle.findOne('Team', MatchExp.atom({ key: 'teamName', value: ['=', 'teamA']}), {}, ['teamName'] )
+        const findTeam = await handle.findOne('Team', MatchExp.atom({ key: 'name', value: ['=', 'teamA']}), {}, ['name'] )
         expect(findTeam).toMatchObject({
-            teamName:'teamA',
+            name:'teamA',
         })
 
         expect(events.length).toBe(1)
@@ -63,9 +63,9 @@ describe('many to many', () => {
             name: 'aaa',
             age: 17,
             teams: [{
-                teamName: 't1'
+                name: 't1'
             }, {
-                teamName: 't2'
+                name: 't2'
             }]
         }
         const userA = await handle.create('User', rawData, events)
@@ -73,11 +73,11 @@ describe('many to many', () => {
         const findUser = await handle.findOne(
             'User',
             MatchExp.atom({ key: 'id', value: ['=', userA.id]}), {},
-            ['name', 'age', ['teams', { attributeQuery: ['teamName']}]]
+            ['name', 'age', ['teams', { attributeQuery: ['name']}]]
         )
 
         // 查出来可能序不对
-        findUser.teams = findUser.teams.sort((a:any, b:any) => a.teamName > b.teamName ? 1 : -1)
+        findUser.teams = findUser.teams.sort((a:any, b:any) => a.name > b.name ? 1 : -1)
         expect(findUser).toMatchObject(rawData)
 
         expect(events.length).toBe(5)
@@ -90,9 +90,9 @@ describe('many to many', () => {
                     age: 17,
                     teams: [
                         {
-                            teamName: "t1"
+                            name: "t1"
                         }, {
-                            teamName: "t2"
+                            name: "t2"
                         }
                     ],
                     id: userA.id
@@ -119,7 +119,7 @@ describe('many to many', () => {
                 type: "create",
                 recordName: "Team",
                 record: {
-                    teamName: "t2",
+                    name: "t2",
                     id: 2
                 }
             }, {
@@ -140,25 +140,25 @@ describe('many to many', () => {
 
 
     test('create many to many data:create with existing related', async () => {
-        const teamA = await handle.create('Team', {teamName: 't1'})
-        const teamB = await handle.create('Team', {teamName: 't2'})
+        const teamA = await handle.create('Team', {name: 't1'})
+        const teamB = await handle.create('Team', {name: 't2'})
 
         const events:RecordMutationEvent[] = []
         const userA = await handle.create('User', {name: 'aaa', age: 17, teams: [teamA, teamB]}, events)
         const findUser = await handle.findOne(
             'User',
             MatchExp.atom({ key: 'id', value: ['=', userA.id]}), {},
-            ['name', 'age', ['teams', { attributeQuery: ['teamName']}]]
+            ['name', 'age', ['teams', { attributeQuery: ['name']}]]
         )
 
-        findUser.teams = findUser.teams.sort((a:any, b:any) => a.teamName > b.teamName ? 1 : -1)
+        findUser.teams = findUser.teams.sort((a:any, b:any) => a.name > b.name ? 1 : -1)
         expect(findUser).toMatchObject({
             name: 'aaa',
             age: 17,
             teams: [{
-                teamName: 't1'
+                name: 't1'
             }, {
-                teamName: 't2'
+                name: 't2'
             }]
         })
 
@@ -172,10 +172,10 @@ describe('many to many', () => {
                     age: 17,
                     teams: [
                         {
-                            teamName: "t1",
+                            name: "t1",
                             id: teamA.id
                         }, {
-                            teamName: "t2",
+                            name: "t2",
                             id: teamB.id
                         }
                     ],
@@ -216,9 +216,9 @@ describe('many to many', () => {
             name: 'aaa',
             age: 17,
             teams: [{
-                teamName: 't1'
+                name: 't1'
             }, {
-                teamName: 't2'
+                name: 't2'
             }]
         }
 
@@ -272,9 +272,9 @@ describe('many to many', () => {
             name: 'aaa',
             age: 17,
             teams: [{
-                teamName: 't1'
+                name: 't1'
             }, {
-                teamName: 't2'
+                name: 't2'
             }]
         }
 
@@ -310,27 +310,27 @@ describe('many to many', () => {
         {
             name: 'bbb',
             teams: [{
-                teamName: 't1'
+                name: 't1'
             }, {
-                teamName: 't2'
+                name: 't2'
             }]
         }, events)
 
         const findUser = await handle.findOne(
             'User',
             MatchExp.atom({ key: 'id', value: ['=', userA.id]}), {},
-            ['name', 'age', ['teams', { attributeQuery: ['teamName']}]]
+            ['name', 'age', ['teams', { attributeQuery: ['name']}]]
         )
 
-        findUser.teams = findUser.teams.sort((a:any, b:any) => a.teamName > b.teamName ? 1 : -1)
+        findUser.teams = findUser.teams.sort((a:any, b:any) => a.name > b.name ? 1 : -1)
 
         expect(findUser).toMatchObject({
             name: 'bbb',
             age: 17,
             teams: [{
-                teamName: 't1'
+                name: 't1'
             }, {
-                teamName: 't2'
+                name: 't2'
             }]
         })
 
@@ -342,10 +342,10 @@ describe('many to many', () => {
                     "name": "bbb",
                     "teams": [
                         {
-                            "teamName": "t1"
+                            "name": "t1"
                         },
                         {
-                            "teamName": "t2"
+                            "name": "t2"
                         }
                     ]
                 },
@@ -359,7 +359,7 @@ describe('many to many', () => {
                 "type": "create",
                 "recordName": "Team",
                 "record": {
-                    "teamName": "t1",
+                    "name": "t1",
                     "id": updatedUsers[0].teams[0].id
                 }
             },
@@ -380,7 +380,7 @@ describe('many to many', () => {
                 "type": "create",
                 "recordName": "Team",
                 "record": {
-                    "teamName": "t2",
+                    "name": "t2",
                     "id": updatedUsers[0].teams[1].id
                 }
             },
@@ -402,8 +402,8 @@ describe('many to many', () => {
 
 
     test('update many to many data:update with existing related', async () => {
-        const teamA = await handle.create('Team', {teamName: 't1'})
-        const teamB = await handle.create('Team', {teamName: 't2'})
+        const teamA = await handle.create('Team', {name: 't1'})
+        const teamB = await handle.create('Team', {name: 't2'})
         const userA = await handle.create('User', {name: 'aaa', age: 17, teams: [teamA, teamB]})
         const  events:RecordMutationEvent[] = []
         const updatedUsers = await handle.update('User', MatchExp.atom({
@@ -418,17 +418,17 @@ describe('many to many', () => {
         const findUser = await handle.findOne(
             'User',
             MatchExp.atom({ key: 'id', value: ['=', userA.id]}), {},
-            ['name', 'age', ['teams', { attributeQuery: ['teamName']}]]
+            ['name', 'age', ['teams', { attributeQuery: ['name']}]]
         )
 
-        findUser.teams = findUser.teams.sort((a:any, b:any) => a.teamName > b.teamName ? 1 : -1)
+        findUser.teams = findUser.teams.sort((a:any, b:any) => a.name > b.name ? 1 : -1)
         expect(findUser).toMatchObject({
             name: 'bbb',
             age: 17,
             teams: [{
-                teamName: 't1'
+                name: 't1'
             }, {
-                teamName: 't2'
+                name: 't2'
             }]
         })
 
@@ -491,8 +491,8 @@ describe('many to many', () => {
 
 
     test('query many to many data: with match expression', async () => {
-        const teamA = await handle.create('Team', {teamName: 't1'})
-        const teamB = await handle.create('Team', {teamName: 't2'})
+        const teamA = await handle.create('Team', {name: 't1'})
+        const teamB = await handle.create('Team', {name: 't2'})
         const userA = await handle.create('User', {name: 'aaa', age: 17, teams: [teamA, teamB]})
         const foundUser = await handle.findOne(
             'User',
@@ -502,9 +502,9 @@ describe('many to many', () => {
                 'age', [
                     'teams',
                     {
-                        attributeQuery: ['teamName'],
+                        attributeQuery: ['name'],
                         matchExpression: MatchExp.atom({
-                            key: 'teamName',
+                            key: 'name',
                             value: ['=', 't2']
                         })
                     }
@@ -518,7 +518,7 @@ describe('many to many', () => {
             age:17,
             teams: [{
                 id: teamB.id,
-                teamName:'t2'
+                name:'t2'
             }]
         })
     })
@@ -604,7 +604,22 @@ describe('many to many', () => {
                 }
             }
         ])
+    })
 
+    test('using n:n target attribute to query n:n source', async () => {
+        const user1 = await handle.create('User', {name: 'aaa', age: 17 })
+        const user2 = await handle.create('User', {name: 'bbb', age: 18})
+
+        const team1 = await handle.create('Team', {name: 't1'})
+        const team2 = await handle.create('Team', {name: 't2', members: [user1, user2]})
+
+        const match1 = await handle.create('Match', {name: 'm1', participants: [team2]})
+        const match2 = await handle.create('Match', {name: 'm2', participants: [team1]})
+
+        const foundUser = await handle.find('User', MatchExp.atom({ key: 'teams.participates.id', value: ['=', match1.id]}), {}, ['id', 'name', ['teams', {attributeQuery: ['name',['participates', {attributeQuery: ['name']}]]}]])
+        // const foundUser2 = await handle.find('User', undefined, {}, ['id', 'name', ['teams', {attributeQuery: ['name',['participates', {attributeQuery: ['name']}]]}]])
+        
+        expect(foundUser.length).toBe(2)
     })
 })
 

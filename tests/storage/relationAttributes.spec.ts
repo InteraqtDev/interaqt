@@ -28,7 +28,7 @@ describe('relation attributes', () => {
             name: 'aaa',
             age: 17,
             teams: [{
-                teamName: 'teamA',
+                name: 'teamA',
                 '&': {
                     role: 'leader'
                 }
@@ -42,7 +42,7 @@ describe('relation attributes', () => {
             relationName,
             match,
             {},
-            ['role', ['source', {attributeQuery: ['name', 'age']}], ['target', {attributeQuery: ['teamName']}]]
+            ['role', ['source', {attributeQuery: ['name', 'age']}], ['target', {attributeQuery: ['name']}]]
         )
 
         expect(findTeamRelation).toMatchObject({
@@ -52,7 +52,7 @@ describe('relation attributes', () => {
                 age:17
             },
             target: {
-                teamName: 'teamA'
+                name: 'teamA'
             }
         })
 
@@ -61,7 +61,7 @@ describe('relation attributes', () => {
             relationName,
             match,
             {},
-            ['role', ['source', {attributeQuery: ['name', 'age']}], ['target', {attributeQuery: ['teamName']}]]
+            ['role', ['source', {attributeQuery: ['name', 'age']}], ['target', {attributeQuery: ['name']}]]
         )
         expect(findTeamRelation2).toMatchObject({
             role: 'member',
@@ -70,7 +70,7 @@ describe('relation attributes', () => {
                 age:17
             },
             target: {
-                teamName: 'teamA'
+                name: 'teamA'
             }
         })
     })
@@ -215,22 +215,12 @@ describe('relation attributes', () => {
             name: 'aaa',
             age: 17,
             teams: [{
-                teamName: 'teamA',
+                name: 'teamA',
                 '&': {
                     role: 'leader',
                     base: {
                         name: 'zhuzhou'
                     },
-                    matches: [{
-                        name: 'm1'
-                    }, {
-                        name: 'm2'
-                    }],
-                    participates:[{
-                        name: 'm3'
-                    }, {
-                        name: 'm4'
-                    }]
                 }
             }]
         }
@@ -243,10 +233,8 @@ describe('relation attributes', () => {
             {},
             [
                 ['base', {attributeQuery: ['name']}],
-                ['matches', {attributeQuery: ['name']}],
-                ['participates', {attributeQuery: ['name']}],
                 ['source', {attributeQuery: ['name', 'age']}],
-                ['target', {attributeQuery: ['teamName']}]
+                ['target', {attributeQuery: ['name']}]
             ]
         )
 
@@ -254,22 +242,12 @@ describe('relation attributes', () => {
             base: {
                 name: 'zhuzhou'
             },
-            matches: [{
-                name: 'm1',
-            }, {
-                name: 'm2',
-            }],
-            participates: [{
-                name: 'm3',
-            },{
-                name: 'm4',
-            }],
             source:{
                 name: 'aaa',
                 age:17
             },
             target: {
-                teamName: 'teamA'
+                name: 'teamA'
             },
         })
 
@@ -288,12 +266,10 @@ describe('relation attributes', () => {
                     'teams',
                     {
                         attributeQuery: [
-                            'teamName',
+                            'name',
                             ['&', {attributeQuery: [
                                 'role',
                                 ['base', { attributeQuery: ['name']}],
-                                ['matches', { attributeQuery: ['name']}],
-                                ['participates', { attributeQuery: ['name']}],
                             ]}]
                         ]
                     }
@@ -395,12 +371,12 @@ describe('relation attributes', () => {
             name: 'testUser',
             age: 25,
             teams: [{
-                teamName: 'teamA',
+                name: 'teamA',
                 '&': {
                     role: 'member'
                 }
             }, {
-                teamName: 'teamB',
+                name: 'teamB',
                 '&': {
                     role: 'leader'
                 }
@@ -412,7 +388,7 @@ describe('relation attributes', () => {
             'User',
             MatchExp.atom({ key: 'id', value: ['=', user.id] }),
             undefined,
-            ['name', ['teams', { attributeQuery: ['teamName', ['&', { attributeQuery: ['role'] }]] }]]
+            ['name', ['teams', { attributeQuery: ['name', ['&', { attributeQuery: ['role'] }]] }]]
         );
         
         expect(foundUser.teams.length).toBe(2);
@@ -432,7 +408,7 @@ describe('relation attributes', () => {
             'User',
             MatchExp.atom({ key: 'id', value: ['=', user.id] }),
             undefined,
-            ['name', ['teams', { attributeQuery: ['teamName'] }]]
+            ['name', ['teams', { attributeQuery: ['name'] }]]
         );
         
         expect(foundUser.teams).toEqual([]);
@@ -444,9 +420,9 @@ describe('relation attributes', () => {
             name: 'teamUser',
             age: 28,
             teams: [
-                { teamName: 'Team A', '&': { role: 'member' } },
-                { teamName: 'Team B', '&': { role: 'leader' } },
-                { teamName: 'Team C', '&': { role: 'observer' } }
+                { name: 'Team A', '&': { role: 'member' } },
+                { name: 'Team B', '&': { role: 'leader' } },
+                { name: 'Team C', '&': { role: 'observer' } }
             ]
         });
 
@@ -455,7 +431,7 @@ describe('relation attributes', () => {
             'User',
             MatchExp.atom({ key: 'id', value: ['=', user.id] }),
             undefined,
-            ['name', ['teams', { attributeQuery: ['teamName', ['&', { attributeQuery: ['role'] }]] }]]
+            ['name', ['teams', { attributeQuery: ['name', ['&', { attributeQuery: ['role'] }]] }]]
         );
         
         expect(foundUser.teams.length).toBe(3);
@@ -474,7 +450,7 @@ describe('relation attributes', () => {
             'User',
             MatchExp.atom({ key: 'id', value: ['=', user.id] }),
             undefined,
-            ['name', ['teams', { attributeQuery: ['teamName'] }]]
+            ['name', ['teams', { attributeQuery: ['name'] }]]
         );
         
         expect(foundUser.teams).toEqual([]);
@@ -484,8 +460,8 @@ describe('relation attributes', () => {
             name: 'complexUser',
             profile: { title: 'Complex Profile' },
             teams: [
-                { teamName: 'Complex Team A' },
-                { teamName: 'Complex Team B' }
+                { name: 'Complex Team A' },
+                { name: 'Complex Team B' }
             ]
         });
         
@@ -494,7 +470,7 @@ describe('relation attributes', () => {
             'User',
             MatchExp.atom({ key: 'id', value: ['=', complexUser.id] }),
             undefined,
-            ['name', ['profile', { attributeQuery: ['title'] }], ['teams', { attributeQuery: ['teamName'] }]]
+            ['name', ['profile', { attributeQuery: ['title'] }], ['teams', { attributeQuery: ['name'] }]]
         );
         
         expect(verifyUser.profile).toBeTruthy();
@@ -515,7 +491,7 @@ describe('relation attributes', () => {
             'User',
             MatchExp.atom({ key: 'id', value: ['=', complexUser.id] }),
             undefined,
-            ['name', ['profile', { attributeQuery: ['title'] }], ['teams', { attributeQuery: ['teamName'] }]]
+            ['name', ['profile', { attributeQuery: ['title'] }], ['teams', { attributeQuery: ['name'] }]]
         );
         
         expect(verifyUser.profile).toBeUndefined();
