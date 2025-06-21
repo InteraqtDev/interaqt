@@ -261,35 +261,35 @@ describe('Every and Any computed handle', () => {
     const request2 = await system.storage.create('Request', {handled: false, owner: user})
 
     // 重新获取用户数据，查看 everyRequestHandled 的值
-    const user2 = await system.storage.findOne('User', BoolExp.atom({key: 'id', value: ['=', user.id]}), undefined, ['*'])
+    const user2 = await system.storage.findOne('User', MatchExp.atom({key: 'id', value: ['=', user.id]}), undefined, ['*'])
     expect(user2.everyRequestHandled).toBeFalsy()       
 
     // 更新 request 的 handled 属性
-    await system.storage.update('Request', BoolExp.atom({key: 'id', value: ['=', request1.id]}), {handled: true})
+    await system.storage.update('Request', MatchExp.atom({key: 'id', value: ['=', request1.id]}), {handled: true})
 
     // 重新获取用户数据，查看 everyRequestHandled 的值
-    const user3 = await system.storage.findOne('User', BoolExp.atom({key: 'id', value: ['=', user.id]}), undefined, ['*'])
+    const user3 = await system.storage.findOne('User', MatchExp.atom({key: 'id', value: ['=', user.id]}), undefined, ['*'])
     expect(user3.everyRequestHandled).toBeFalsy()       
 
     // 更新 request2 的 handled 属性
-    await system.storage.update('Request', BoolExp.atom({key: 'id', value: ['=', request2.id]}), {handled: true})
+    await system.storage.update('Request', MatchExp.atom({key: 'id', value: ['=', request2.id]}), {handled: true})
 
     // 重新获取用户数据，查看 everyRequestHandled 的值
-    const user4 = await system.storage.findOne('User', BoolExp.atom({key: 'id', value: ['=', user.id]}), undefined, ['*'])
+    const user4 = await system.storage.findOne('User', MatchExp.atom({key: 'id', value: ['=', user.id]}), undefined, ['*'])
     expect(user4.everyRequestHandled).toBeTruthy()   
 
     // 更新 request2 的 handled 属性为 false
-    await system.storage.update('Request', BoolExp.atom({key: 'id', value: ['=', request2.id]}), {handled: false})
+    await system.storage.update('Request', MatchExp.atom({key: 'id', value: ['=', request2.id]}), {handled: false})
 
     // 重新获取用户数据，查看 everyRequestHandled 的值
-    const user5 = await system.storage.findOne('User', BoolExp.atom({key: 'id', value: ['=', user.id]}), undefined, ['*'])
+    const user5 = await system.storage.findOne('User', MatchExp.atom({key: 'id', value: ['=', user.id]}), undefined, ['*'])
     expect(user5.everyRequestHandled).toBeFalsy()
 
     // 删除 request2
-    await system.storage.delete('Request', BoolExp.atom({key: 'id', value: ['=', request2.id]}))
+    await system.storage.delete('Request', MatchExp.atom({key: 'id', value: ['=', request2.id]}))
 
     // 重新获取用户数据，查看 everyRequestHandled 的值
-    const user6 = await system.storage.findOne('User', BoolExp.atom({key: 'id', value: ['=', user.id]}), undefined, ['*'])
+    const user6 = await system.storage.findOne('User', MatchExp.atom({key: 'id', value: ['=', user.id]}), undefined, ['*'])
     expect(user6.everyRequestHandled).toBeTruthy()
     
   });
@@ -364,19 +364,6 @@ describe('Every and Any computed handle', () => {
     expect(user2.everyRequestHasTwoItems).toBeFalsy()
 
     const item1 = await system.storage.create('Items', {name: 'item1', request: request1})
-    const user11 = await system.storage.findOne('User', 
-        MatchExp.atom({key: 'requests.&.target.items.&.id', value: ['=', 1]}), undefined, 
-        ['*', 
-            ['requests', {
-                attributeQuery: [
-                    ['&', {
-                        attributeQuery: [['target', {attributeQuery: [['items', {attributeQuery: ['name']}]]}]]
-                    }],
-                    ['items', {attributeQuery: ['name']}]
-                ]
-            }]
-        ]
-    )
 
     const item2 = await system.storage.create('Items', {name: 'item2', request: request1})
 

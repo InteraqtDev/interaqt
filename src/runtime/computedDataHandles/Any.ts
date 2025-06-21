@@ -122,11 +122,10 @@ export class PropertyAnyHandle implements DataBasedComputation {
             return ComputationResult.fullRecompute('mutationEvent.recordName not match')
         }
 
-        // TODO 如果未来支持用户可以自定义 dataDeps，那么这里也要支持如果发现是其他 dataDeps 变化，这里要直接返回重算的信号。
         let matchCount = await this.state!.matchCount.get(mutationEvent.record)
         const relatedMutationEvent = mutationEvent.relatedMutationEvent!
 
-        if (relatedMutationEvent.type === 'create') {
+        if (relatedMutationEvent.type === 'create'&&relatedMutationEvent.recordName === this.relation.name) {
             // 关联关系的新建
             const relationRecord = relatedMutationEvent.record!
             const newRelationWithEntity = await this.controller.system.storage.findOne(this.relation.name, MatchExp.atom({
@@ -140,14 +139,14 @@ export class PropertyAnyHandle implements DataBasedComputation {
                 await this.state!.isItemMatch.set(relationRecord, true)
 
             }
-        } else if (relatedMutationEvent.type === 'delete') {
+        } else if (relatedMutationEvent.type === 'delete'&&relatedMutationEvent.recordName === this.relation.name) {
             // 关联关系的删除
             const relationRecord = relatedMutationEvent.record!
             const oldItemMatch = !!await this.state!.isItemMatch.get(relationRecord)
             if (oldItemMatch === true) {
                 matchCount = await this.state!.matchCount.set(mutationEvent.record, matchCount - 1)
             }
-        } else if (relatedMutationEvent.type === 'update') {
+        } else if (relatedMutationEvent.type === 'update'&&(relatedMutationEvent.recordName === this.relation.name||relatedMutationEvent.recordName === this.relatedRecordName)) {
             // 关联实体或者关联关系上的字段的更新
             const currentRecord = mutationEvent.oldRecord!
             const isRelationUpdate = mutationEvent.relatedMutationEvent?.recordName === this.relation.name
@@ -176,6 +175,8 @@ export class PropertyAnyHandle implements DataBasedComputation {
                 matchCount = await this.state!.matchCount.set(currentRecord, matchCount + 1)
             }
             await this.state!.isItemMatch.set(relationRecord, newItemMatch)
+        } else {
+            return ComputationResult.fullRecompute('mutation is not caused by relation.')
         }
 
         return matchCount>0

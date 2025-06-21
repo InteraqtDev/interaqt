@@ -278,6 +278,7 @@ export class Scheduler {
             
             const dataDep = source.dataDep as RecordsDataDep
             if (source.type === 'create') {
+                // FIXME 这里的查询，中间能不能有 n:n 关系？storage 现在是否支持？
                 dirtyDataDepRecords = await this.controller.system.storage.find(source.sourceRecordName, MatchExp.atom({
                     key: source.targetPath!.concat(['&','id']).join('.'),
                     value: ['=', mutationEvent.record!.id]
@@ -369,10 +370,6 @@ export class Scheduler {
                     oldRecord: record,
                     relatedMutationEvent: mutationEvent
                 }])
-                // FIXME 
-                if (source.sourceRecordName !== propertyContext.host.name) {
-                    debugger
-                }
             } else if (source.computation.dataContext.type === 'global') {
                 // 对于 global 级别的计算，不需要具体的记录
                 dirtyRecordsAndEvents = [[null, {
@@ -396,7 +393,6 @@ export class Scheduler {
                 relatedAttribute: source.targetPath,
                 relatedMutationEvent: mutationEvent
             }])
-            
         }
         return dirtyRecordsAndEvents
     }

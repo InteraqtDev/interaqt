@@ -54,7 +54,7 @@ export const Attributives = createClass({
         content: {
             type: [BoolExpressionData, BoolAtomData],
             collection: false,
-            required: true
+            required: false
         },
     }
 })
