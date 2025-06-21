@@ -27,7 +27,6 @@ export class RecursiveContext {
     constructor(public label: string, public parent?: RecursiveContext, public stack: any[] = []) {
 
     }
-
     concat(value: any) {
         return new RecursiveContext(this.label, this.parent, [...this.stack, value])
     }
@@ -183,14 +182,20 @@ ${this.buildModifierClause(recordQuery.modifier, prefix)}
         }
 
         // findRecords 的一个 join 语句里面只能一次性搞定 x:1 的关联实体，以及关系上的 x:1 关联实体。
-        // 1. 这里只通过合表或者 join  处理了 x:1 的关联查询。x:n 的查询是通过二次查询获取的。
+        // 0. 这里只通过合表或者 join  处理了 x:1 的关联查询，包括了 parentLinkRecordQuery 上字段的查询，以及从 parentLink 发出可以看做是 x:1 的关联字段查询。
+        //  这个 x:1 是递归的，把一次性能通过 join 查到的都查了。
+        // x:n 的查询是通过二次查询获取的。
         const [querySQL, params] = this.buildXToOneFindQuery(entityQuery, '')
         const records = this.structureRawReturns(await this.database.query(querySQL, params, queryName), this.map.getRecordInfo(entityQuery.recordName).JSONFields) as any[]
-
 
         // 如果当前的 query 有 label，那么下面任何遍历 record 的地方都要 Push stack。
         const nextRecursiveContext = (entityQuery.label && entityQuery.label !== context.label) ? context.spawn(entityQuery.label) : context
 
+        // 第一步的 x:1 的递归形式的查询，相当与一个递归的减掉了所有 x:n 枝干的查询，我们也得递归的把所有 x:n 枝干补出来才行，不只是 parentLink 上的。
+        // 1. 补全所有 x:1 查询主干上的 x:n 关联实体及关系查询
+        this.completeXToOneLeftoverRecords(entityQuery, records, recordQueryRef, nextRecursiveContext)
+
+        
 
         // x:1 关系上的递归 字段查询。因为是递归所以可能不会 join，不会在 buildXToOneFindQuery 里。所以单独查询。
         for (let subEntityQuery of entityQuery.attributeQuery.xToOneRecords) {
@@ -270,6 +275,54 @@ ${this.buildModifierClause(recordQuery.modifier, prefix)}
             }
         }
         return records
+    }
+    async completeXToOneLeftoverRecords(entityQuery: RecordQuery, records: Record[], recordQueryRef: RecordQueryRef, context: RecursiveContext) {
+        // 1. 补全 parentLinkRecordQuery 上的 x:1 关联实体上剩下的 x:n 关联实体的查询
+        if (entityQuery.attributeQuery.parentLinkRecordQuery) {
+            const info = this.map.getInfo(entityQuery.parentRecord!, entityQuery.attributeName!)
+            const reverseAttributeName = info.getReverseInfo()?.attributeName!
+
+            for(let xToOneSubQuery of entityQuery.attributeQuery.parentLinkRecordQuery.attributeQuery.xToOneRecords) {
+                for(let xToManySubSubQuery of xToOneSubQuery.attributeQuery.xToManyRecords) {
+                    for(let record of records) {
+                        const nextContext = entityQuery.label ? context.concat(record) : context
+                        record[reverseAttributeName][LINK_SYMBOL][xToOneSubQuery.attributeName!][xToManySubSubQuery.attributeName!] = await this.findXToManyRelatedRecords(
+                            xToManySubSubQuery.parentRecord!,
+                            xToManySubSubQuery.attributeName!,
+                            record[reverseAttributeName][LINK_SYMBOL][xToOneSubQuery.attributeName!].id,
+                            xToManySubSubQuery,
+                            recordQueryRef,
+                            nextContext
+                        )
+                    }
+                }
+            }
+        }
+
+        // 2. 补全 x:1 的关联实体上的 x:n 关联查询
+        for(let xToOneSubQuery of entityQuery.attributeQuery.xToOneRecords) {
+            for (let xToManySubSubQuery of xToOneSubQuery.attributeQuery.xToManyRecords) {
+                for(let record of records) {
+                    const nextContext = entityQuery.label ? context.concat(record) : context
+                    record[xToOneSubQuery.attributeName!][xToManySubSubQuery.attributeName!] = await this.findXToManyRelatedRecords(
+                        xToManySubSubQuery.parentRecord!,
+                        xToManySubSubQuery.attributeName!,
+                        record[xToOneSubQuery.attributeName!].id,
+                        xToManySubSubQuery,
+                        recordQueryRef,
+                        nextContext
+                    )
+                }
+            }
+
+            // 3. 继续递归 complete x:1 关联实体上的 x:1 关联查询
+            for(let xToOneSubSubQuery of xToOneSubQuery.attributeQuery.xToOneRecords) {
+                for(let record of records) {
+                    const nextContext = entityQuery.label ? context.concat(record) : context
+                    await this.completeXToOneLeftoverRecords(xToOneSubSubQuery, [].concat(record[xToOneSubQuery.attributeName!]), recordQueryRef, nextContext)
+                }
+            }
+        }
     }
 
     // CAUTION 任何两个具体的实体之间只能有一条关系，但是可以在关系上有多条数据。1:n 的数据
