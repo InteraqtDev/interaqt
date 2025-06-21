@@ -138,4 +138,68 @@ describe('update data', () => {
     })
 })
 
+describe('query data', () => {
+    let db: SQLiteDB
+    let setup
+    let entityQueryHandle : EntityQueryHandle
+
+    beforeEach(async () => {
+        const { entities, relations } = createCommonData()
+        // @ts-ignore
+        db = new SQLiteDB()
+        await db.open()
+        setup = new DBSetup(entities, relations, db)
+        await setup.createTables()
+        entityQueryHandle = new EntityQueryHandle(new EntityToTableMap(setup.map), db)
+    })
+
+    afterEach(async () => {
+        // CAUTION 因为是 memory, 所以会清空数据。如果之后测试改成实体数据库，那么要主动清空数据
+        await db.close()
+    })
+
+    test('query n:1:n data', async () => {
+
+        const user1 = await entityQueryHandle.create('User', {
+            name: 'leader1', 
+            age: 17,
+            teams: [{
+                name: 'team1',
+            }, {
+                name: 'team2',
+            }]
+        })
+
+        const user2 = await entityQueryHandle.create('User', {
+            name: 'member1', 
+            age: 18,
+            leader: user1
+        })
+
+        const foundUser = await entityQueryHandle.findOne('User', 
+            MatchExp.atom({key: 'id', value: ['=', user2.id]}), {}, 
+            [
+                'name', 
+                [
+                    'leader', {attributeQuery: [
+                        'name',
+                        ['teams', {attributeQuery: ['name']}]
+                    ]}
+                ]
+            ]
+        )
+        expect(foundUser).toMatchObject({
+            name: 'member1',
+            leader: {
+                name: 'leader1',
+                teams: [{name: 'team1'}, {name: 'team2'}]
+            }
+        })
+        
+        
+    })
+
+    
+})
+
 

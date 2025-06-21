@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { Controller, MonoSystem, Property, Entity, Every, Dictionary, BoolExp, Any, Relation } from '@';
+import { Controller, MonoSystem, Property, Entity, Every, Dictionary, BoolExp, Any, Relation, MatchExp } from '@';
 
 // 创建简单测试环境，直接测试 EveryHandle 的具体方法
 describe('Every and Any computed handle', () => {
@@ -291,6 +291,106 @@ describe('Every and Any computed handle', () => {
     // 重新获取用户数据，查看 everyRequestHandled 的值
     const user6 = await system.storage.findOne('User', BoolExp.atom({key: 'id', value: ['=', user.id]}), undefined, ['*'])
     expect(user6.everyRequestHandled).toBeTruthy()
+    
+  });
+
+  test('should be true when every request with n:n items of a user is handled', async () => {
+    const userEntity = Entity.create({
+        name: 'User',
+        properties: [
+            Property.create({
+                name:'name',
+                type:'string',
+            })
+        ]
+    })
+    const requestEntity = Entity.create({
+        name: 'Request',
+        properties: [
+            Property.create({name: 'handled', type: 'boolean'})
+        ]
+    })
+    const itemsEntity = Entity.create({
+        name: 'Items',
+        properties: [
+            Property.create({name: 'name', type: 'string'})
+        ]
+    })
+
+
+    const entities = [userEntity, requestEntity, itemsEntity]
+    // 创建一个 user 和 request 的关系
+    const requestRelation = Relation.create({
+        source: userEntity,
+        sourceProperty: 'requests',
+        target: requestEntity,
+        targetProperty: 'owner',
+        name: 'requests',
+        type: 'n:n'
+    })
+    const itemsRelation = Relation.create({
+        source: requestEntity,
+        sourceProperty: 'items',
+        target: itemsEntity,
+        targetProperty: 'request',
+        name: 'items',
+        type: 'n:n'
+    })  
+    const relations = [requestRelation, itemsRelation]
+
+    userEntity.properties.push(Property.create({
+        name: 'everyRequestHasTwoItems',
+        type: 'boolean',
+        computedData: Every.create({
+            record: requestRelation,
+            attributeQuery: [['target', {attributeQuery: [['items', {attributeQuery: ['name']}]]}]],
+            notEmpty: true,
+            callback: (relation:any) => {
+                if (!relation.target) debugger
+                return relation.target.items?.length === 2
+            },
+        })
+    }))
+
+    const system = new MonoSystem() 
+    const controller = new Controller(system,entities,relations,[],[],[],[])
+    await controller.setup(true)
+
+    // 创建 1 个 user 和 2 个 request
+    const user = await system.storage.create('User', {everyRequestHandled: false})  
+    const request1 = await system.storage.create('Request', {handled: false, owner: user})      
+
+    const user2 = await system.storage.findOne('User', MatchExp.atom({key: 'id', value: ['=', user.id]}), undefined, ['*'])
+    expect(user2.everyRequestHasTwoItems).toBeFalsy()
+
+    const item1 = await system.storage.create('Items', {name: 'item1', request: request1})
+    const user11 = await system.storage.findOne('User', 
+        MatchExp.atom({key: 'requests.&.target.items.&.id', value: ['=', 1]}), undefined, 
+        ['*', 
+            ['requests', {
+                attributeQuery: [
+                    ['&', {
+                        attributeQuery: [['target', {attributeQuery: [['items', {attributeQuery: ['name']}]]}]]
+                    }],
+                    ['items', {attributeQuery: ['name']}]
+                ]
+            }]
+        ]
+    )
+
+    const item2 = await system.storage.create('Items', {name: 'item2', request: request1})
+
+    const user3 = await system.storage.findOne('User', MatchExp.atom({key: 'id', value: ['=', user.id]}), undefined, ['*', ['requests', {attributeQuery: [['items', {attributeQuery: ['name']}]]}]])
+    expect(user3.everyRequestHasTwoItems).toBeTruthy()
+
+    const item3 = await system.storage.create('Items', {name: 'item3', request: request1})
+    const user4 = await system.storage.findOne('User', MatchExp.atom({key: 'id', value: ['=', user.id]}), undefined, ['*'])
+    expect(user4.everyRequestHasTwoItems).toBeFalsy()
+
+    await system.storage.delete('Items', MatchExp.atom({key: 'id', value: ['=', item1.id]}))
+    const user5 = await system.storage.findOne('User', MatchExp.atom({key: 'id', value: ['=', user.id]}), undefined, ['*'])
+    expect(user5.everyRequestHasTwoItems).toBeTruthy()
+
     
   });
 

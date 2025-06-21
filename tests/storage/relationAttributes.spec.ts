@@ -498,6 +498,46 @@ describe('relation attributes', () => {
         expect(verifyUser.teams).toEqual([]);
     });
 
+
+    test('query related entity with relation symbol', async () => {
+        const user = await handle.create('User', {
+            name: 'aaa',
+            age: 17,
+            teams: [{
+                name: 'teamA',
+                '&': {
+                    role: 'leader'
+                },
+                matches: [{
+                    name: 'm1',
+                }, {
+                    name: 'm2',
+                }]
+            }]
+        })
+
+        // 经过 &.target 路径实际上仍然指向 user.teams
+        const foundUser = await handle.findOne(
+            'User',
+            MatchExp.atom({key: 'id', value: ['=', user.id]}),
+            undefined,
+            [   
+                'name', 
+                ['teams', {
+                    attributeQuery: [
+                        ['&', {attributeQuery: [
+                            ['target', {attributeQuery: [
+                                'name',
+                                ['matches', {attributeQuery: ['name']}]
+                            ]}]]
+                        }],
+                    ]
+                }]
+            ]
+        )
+
+        expect(foundUser.teams[0]['&']['target']['matches'][0].name).toBe('m1')
+    })
 });
 
 

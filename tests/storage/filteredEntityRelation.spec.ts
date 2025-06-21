@@ -41,8 +41,7 @@ describe('Filtered Entity with Relation as Source', () => {
         sourceProperty: 'teams',
         target: Team,
         targetProperty: 'members',
-        relType: 'n:n',
-        type: 'relation',
+        type: 'n:n',
         properties: [
             Property.create({ name: 'role', type: 'string' }),
             Property.create({ name: 'joinedAt', type: 'string' })
@@ -54,8 +53,7 @@ describe('Filtered Entity with Relation as Source', () => {
         sourceProperty: 'projects',
         target: Project,
         targetProperty: 'users',
-        relType: 'n:n',
-        type: 'relation',
+        type: 'n:n',
         properties: [
             Property.create({ name: 'role', type: 'string' }),
             Property.create({ name: 'assignedAt', type: 'string' })
