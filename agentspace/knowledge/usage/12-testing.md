@@ -222,6 +222,7 @@ describe('Count Computation', () => {
       name: 'totalUsers',
       type: 'number',
       collection: false,
+      defaultValue: () => 0,
       computedData: Count.create({
         record: userEntity
       })
@@ -231,10 +232,9 @@ describe('Count Computation', () => {
       name: 'activeUsers',
       type: 'number',
       collection: false,
+      defaultValue: () => 0,
       computedData: Count.create({
-        record: userEntity,
-        attributeQuery: ['isActive'],
-        callback: (user: any) => user.isActive === true
+        record: userEntity
       })
     });
     
@@ -303,6 +303,7 @@ describe('Transform Computation', () => {
       name: 'userStats',
       type: 'object',
       collection: false,
+      defaultValue: () => ({}),
       computedData: Transform.create({
         record: userEntity,
         attributeQuery: ['age', 'score'],

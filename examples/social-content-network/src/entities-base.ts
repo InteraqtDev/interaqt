@@ -1,4 +1,4 @@
-import { Entity, Property, PropertyTypes } from '@';
+import { Entity, Property } from '@';
 
 /**
  * 用户实体
@@ -9,37 +9,32 @@ export const User = Entity.create({
     // 基本信息
     Property.create({
       name: 'username',
-      type: PropertyTypes.String,
-      required: true
+      type: 'string',
     }),
     Property.create({
       name: 'displayName',
-      type: PropertyTypes.String,
-      required: true
+      type: 'string',
     }),
     Property.create({
       name: 'avatar',
-      type: PropertyTypes.String,
-      required: false
+      type: 'string',
     }),
     Property.create({
       name: 'bio',
-      type: PropertyTypes.String,
-      required: false
+      type: 'string',
     }),
     Property.create({
       name: 'email',
-      type: PropertyTypes.String,
-      required: false
+      type: 'string',
     }),
     Property.create({
       name: 'createdAt',
-      type: PropertyTypes.String,
+      type: 'string',
       defaultValue: () => new Date().toISOString()
     }),
     Property.create({
       name: 'lastActiveAt',
-      type: PropertyTypes.String,
+      type: 'string',
       defaultValue: () => new Date().toISOString()
     })
   ]
@@ -54,58 +49,55 @@ export const Post = Entity.create({
     // 基本信息
     Property.create({
       name: 'title',
-      type: PropertyTypes.String,
-      required: true
+      type: 'string',
     }),
     Property.create({
       name: 'content',
-      type: PropertyTypes.String,
-      required: true
+      type: 'string',
     }),
     Property.create({
       name: 'tags',
-      type: PropertyTypes.String,
+      type: 'string',
       collection: true
     }),
     Property.create({
       name: 'mediaUrls',
-      type: PropertyTypes.String,
+      type: 'string',
       collection: true
     }),
     
     // 时间信息
     Property.create({
       name: 'createdAt',
-      type: PropertyTypes.String,
+      type: 'string',
       defaultValue: () => new Date().toISOString()
     }),
     Property.create({
       name: 'updatedAt',
-      type: PropertyTypes.String,
+      type: 'string',
       defaultValue: () => new Date().toISOString()
     }),
     Property.create({
       name: 'publishedAt',
-      type: PropertyTypes.String,
-      required: false
+      type: 'string',
     }),
     
     // 状态信息
     Property.create({
       name: 'status',
-      type: PropertyTypes.String,
+      type: 'string',
       defaultValue: () => 'draft' // draft, published, deleted
     }),
     Property.create({
       name: 'visibility',
-      type: PropertyTypes.String,
+      type: 'string',
       defaultValue: () => 'public' // public, friends, private
     }),
     
     // 统计信息 - 这些将通过响应式计算自动维护
     Property.create({
       name: 'viewCount',
-      type: PropertyTypes.Number,
+      type: 'number',
       defaultValue: () => 0
     })
   ]
@@ -119,22 +111,21 @@ export const Comment = Entity.create({
   properties: [
     Property.create({
       name: 'content',
-      type: PropertyTypes.String,
-      required: true
+      type: 'string',
     }),
     Property.create({
       name: 'createdAt',
-      type: PropertyTypes.String,
+      type: 'string',
       defaultValue: () => new Date().toISOString()
     }),
     Property.create({
       name: 'updatedAt',
-      type: PropertyTypes.String,
+      type: 'string',
       defaultValue: () => new Date().toISOString()
     }),
     Property.create({
       name: 'isDeleted',
-      type: PropertyTypes.Boolean,
+      type: 'boolean',
       defaultValue: () => false
     })
   ]
@@ -148,23 +139,21 @@ export const FriendRequest = Entity.create({
   properties: [
     Property.create({
       name: 'message',
-      type: PropertyTypes.String,
-      required: false
+      type: 'string',
     }),
     Property.create({
       name: 'status',
-      type: PropertyTypes.String,
+      type: 'string',
       defaultValue: () => 'pending' // pending, accepted, rejected
     }),
     Property.create({
       name: 'createdAt',
-      type: PropertyTypes.String,
+      type: 'string',
       defaultValue: () => new Date().toISOString()
     }),
     Property.create({
       name: 'respondedAt',
-      type: PropertyTypes.String,
-      required: false
+      type: 'string',
     })
   ]
 });
@@ -177,12 +166,11 @@ export const Tag = Entity.create({
   properties: [
     Property.create({
       name: 'name',
-      type: PropertyTypes.String,
-      required: true
+      type: 'string',
     }),
     Property.create({
       name: 'createdAt',
-      type: PropertyTypes.String,
+      type: 'string',
       defaultValue: () => new Date().toISOString()
     })
   ]

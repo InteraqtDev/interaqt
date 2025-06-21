@@ -52,7 +52,8 @@ export class Controller {
     // 因为很多 function 都会bind controller 作为 this，所以我们也把 controller 的 globals 作为注入全局工具的入口。
     public recordNameToSideEffects = new Map<string, Set<KlassInstance<any> | RecordMutationSideEffect>>()
     public globals = {
-        BoolExp
+        BoolExp,
+        MatchExp
     }
     public scheduler: Scheduler
     public activityManager: ActivityManager

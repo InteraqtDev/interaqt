@@ -1,4 +1,4 @@
-import {createClass, KlassInstance} from "./createClass.js";
+import {createClass, Klass, KlassInstance} from "./createClass.js";
 import {BoolExp, BoolExpressionRawData, BoolExpressionData, BoolAtomData} from "./BoolExp.js";
 // import {BoolExp, BoolExpressionRawData} from "./BoolExp.js";
 
@@ -54,7 +54,7 @@ export const Attributives = createClass({
         content: {
             type: [BoolExpressionData, BoolAtomData],
             collection: false,
-            required: false
+            required: true
         },
     }
 })

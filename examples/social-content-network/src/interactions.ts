@@ -6,7 +6,8 @@ import {
   Attributive,
   BoolExp,
   GetAction,
-  Controller
+  Controller,
+  boolExpToAttributives
 } from '@';
 import { User, Post, Comment, FriendRequest } from './entities-base.js';
 
@@ -107,27 +108,22 @@ export const CreateUser = Interaction.create({
     items: [
       PayloadItem.create({
         name: 'username',
-        base: 'string',
         required: true
       }),
       PayloadItem.create({
         name: 'displayName',
-        base: 'string',
         required: true
       }),
       PayloadItem.create({
         name: 'email',
-        base: 'string',
         required: false
       }),
       PayloadItem.create({
         name: 'avatar',
-        base: 'string',
         required: false
       }),
       PayloadItem.create({
         name: 'bio',
-        base: 'string',
         required: false
       })
     ]
@@ -144,26 +140,23 @@ export const UpdateUserProfile = Interaction.create({
         base: User,
         isRef: true,
         required: true,
-        attributives: BoolExp.atom(Attributive.create({
-          name: 'IsSelf',
-          content: function(user, { user: currentUser }) {
-            return user.id === currentUser.id;
-          }
-        }))
+        attributives: Attributive.create({
+            name: 'IsSelf',
+            content: function(user, { user: currentUser }) {
+              return user.id === currentUser.id;
+            }
+          })
       }),
       PayloadItem.create({
         name: 'displayName',
-        base: 'string',
         required: false
       }),
       PayloadItem.create({
         name: 'avatar',
-        base: 'string',
         required: false
       }),
       PayloadItem.create({
         name: 'bio',
-        base: 'string',
         required: false
       })
     ]
@@ -188,11 +181,10 @@ export const SendFriendRequest = Interaction.create({
         base: User,
         isRef: true,
         required: true,
-        attributives: BoolExp.atom(NotSelfAttributive).and(BoolExp.atom(NotFriendAttributive))
+        attributives: boolExpToAttributives(BoolExp.atom(NotSelfAttributive).and(BoolExp.atom(NotFriendAttributive)))
       }),
       PayloadItem.create({
         name: 'message',
-        base: 'string',
         required: false
       })
     ]
@@ -209,12 +201,12 @@ export const AcceptFriendRequest = Interaction.create({
         base: FriendRequest,
         isRef: true,
         required: true,
-        attributives: BoolExp.atom(Attributive.create({
+        attributives: boolExpToAttributives(BoolExp.atom(Attributive.create({
           name: 'RequestReceiver',
           content: async function(this: Controller, request, { user }) {
             return request.receiver && request.receiver.id === user.id && request.status === 'pending';
           }
-        }))
+        })))
       })
     ]
   })
@@ -230,12 +222,12 @@ export const RejectFriendRequest = Interaction.create({
         base: FriendRequest,
         isRef: true,
         required: true,
-        attributives: BoolExp.atom(Attributive.create({
+        attributives: boolExpToAttributives(BoolExp.atom(Attributive.create({
           name: 'RequestReceiver',
           content: async function(this: Controller, request, { user }) {
             return request.receiver && request.receiver.id === user.id && request.status === 'pending';
           }
-        }))
+        })))
       })
     ]
   })
@@ -251,7 +243,7 @@ export const RemoveFriend = Interaction.create({
         base: User,
         isRef: true,
         required: true,
-        attributives: BoolExp.atom(NotSelfAttributive).and(BoolExp.atom(FriendAttributive))
+        attributives: boolExpToAttributives(BoolExp.atom(NotSelfAttributive).and(BoolExp.atom(FriendAttributive)))
       })
     ]
   })
@@ -267,7 +259,7 @@ export const FollowUser = Interaction.create({
         base: User,
         isRef: true,
         required: true,
-        attributives: BoolExp.atom(NotSelfAttributive)
+        attributives: boolExpToAttributives(BoolExp.atom(NotSelfAttributive))
       })
     ]
   })
@@ -283,7 +275,7 @@ export const UnfollowUser = Interaction.create({
         base: User,
         isRef: true,
         required: true,
-        attributives: BoolExp.atom(NotSelfAttributive)
+        attributives: boolExpToAttributives(BoolExp.atom(NotSelfAttributive))
       })
     ]
   })
@@ -298,29 +290,24 @@ export const CreatePost = Interaction.create({
     items: [
       PayloadItem.create({
         name: 'title',
-        base: 'string',
         required: true
       }),
       PayloadItem.create({
         name: 'content',
-        base: 'string',
         required: true
       }),
       PayloadItem.create({
         name: 'tags',
-        base: 'string',
         isCollection: true,
         required: false
       }),
       PayloadItem.create({
         name: 'mediaUrls',
-        base: 'string',
         isCollection: true,
         required: false
       }),
       PayloadItem.create({
         name: 'visibility',
-        base: 'string',
         required: false
       })
     ]
@@ -337,27 +324,23 @@ export const UpdatePost = Interaction.create({
         base: Post,
         isRef: true,
         required: true,
-        attributives: BoolExp.atom(PostAuthorAttributive)
+        attributives: boolExpToAttributives(BoolExp.atom(PostAuthorAttributive))
       }),
       PayloadItem.create({
         name: 'title',
-        base: 'string',
         required: false
       }),
       PayloadItem.create({
         name: 'content',
-        base: 'string',
         required: false
       }),
       PayloadItem.create({
         name: 'tags',
-        base: 'string',
         isCollection: true,
         required: false
       }),
       PayloadItem.create({
         name: 'visibility',
-        base: 'string',
         required: false
       })
     ]
@@ -374,12 +357,12 @@ export const PublishPost = Interaction.create({
         base: Post,
         isRef: true,
         required: true,
-        attributives: BoolExp.atom(PostAuthorAttributive).and(BoolExp.atom(Attributive.create({
+        attributives: boolExpToAttributives(BoolExp.atom(PostAuthorAttributive).and(BoolExp.atom(Attributive.create({
           name: 'IsDraft',
           content: function(post) {
             return post.status === 'draft';
           }
-        })))
+        }))))
       })
     ]
   })
@@ -395,7 +378,7 @@ export const UnpublishPost = Interaction.create({
         base: Post,
         isRef: true,
         required: true,
-        attributives: BoolExp.atom(PostAuthorAttributive).and(BoolExp.atom(PublishedPostAttributive))
+        attributives: boolExpToAttributives(BoolExp.atom(PostAuthorAttributive).and(BoolExp.atom(PublishedPostAttributive)))
       })
     ]
   })
@@ -411,7 +394,7 @@ export const DeletePost = Interaction.create({
         base: Post,
         isRef: true,
         required: true,
-        attributives: BoolExp.atom(PostAuthorAttributive)
+        attributives: boolExpToAttributives(BoolExp.atom(PostAuthorAttributive))
       })
     ]
   })
@@ -427,7 +410,7 @@ export const ViewPost = Interaction.create({
         base: Post,
         isRef: true,
         required: true,
-        attributives: BoolExp.atom(VisiblePostAttributive)
+        attributives: boolExpToAttributives(BoolExp.atom(VisiblePostAttributive))
       })
     ]
   })
@@ -470,7 +453,7 @@ export const LikePost = Interaction.create({
         base: Post,
         isRef: true,
         required: true,
-        attributives: BoolExp.atom(VisiblePostAttributive).and(BoolExp.atom(PublishedPostAttributive))
+        attributives: boolExpToAttributives(BoolExp.atom(VisiblePostAttributive).and(BoolExp.atom(PublishedPostAttributive)))
       })
     ]
   })
@@ -503,11 +486,10 @@ export const CreateComment = Interaction.create({
         base: Post,
         isRef: true,
         required: true,
-        attributives: BoolExp.atom(VisiblePostAttributive).and(BoolExp.atom(PublishedPostAttributive))
+        attributives: boolExpToAttributives(BoolExp.atom(VisiblePostAttributive).and(BoolExp.atom(PublishedPostAttributive)))
       }),
       PayloadItem.create({
         name: 'content',
-        base: 'string',
         required: true
       }),
       PayloadItem.create({
@@ -530,11 +512,10 @@ export const UpdateComment = Interaction.create({
         base: Comment,
         isRef: true,
         required: true,
-        attributives: BoolExp.atom(CommentAuthorAttributive)
+        attributives: boolExpToAttributives(BoolExp.atom(CommentAuthorAttributive))
       }),
       PayloadItem.create({
         name: 'content',
-        base: 'string',
         required: true
       })
     ]
@@ -551,7 +532,7 @@ export const DeleteComment = Interaction.create({
         base: Comment,
         isRef: true,
         required: true,
-        attributives: BoolExp.atom(CommentAuthorAttributive)
+        attributives: boolExpToAttributives(BoolExp.atom(CommentAuthorAttributive)) 
       })
     ]
   })

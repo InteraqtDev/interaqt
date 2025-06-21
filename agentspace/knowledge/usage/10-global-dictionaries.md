@@ -205,6 +205,7 @@ const totalUsers = Dictionary.create({
   name: 'totalUsers',
   type: 'number',
   collection: false,
+  defaultValue: () => 0,
   computedData: Count.create({
     record: userEntity
   })
@@ -215,10 +216,9 @@ const activeUsers = Dictionary.create({
   name: 'activeUsers',
   type: 'number',
   collection: false,
+  defaultValue: () => 0,
   computedData: Count.create({
-    record: userEntity,
-    attributeQuery: ['isActive'],
-    callback: (user: any) => user.isActive === true
+    record: userEntity
   })
 });
 
@@ -270,6 +270,7 @@ const totalFriendships = Dictionary.create({
   name: 'totalFriendships',
   type: 'number',
   collection: false,
+  defaultValue: () => 0,
   computedData: Count.create({
     record: friendRelation
   })
@@ -280,10 +281,9 @@ const closeFriendships = Dictionary.create({
   name: 'closeFriendships',
   type: 'number',
   collection: false,
+  defaultValue: () => 0,
   computedData: Count.create({
-    record: friendRelation,
-    attributeQuery: ['closeness'],
-    callback: (friendship: any) => friendship.closeness > 8
+    record: friendRelation
   })
 });
 
@@ -292,6 +292,7 @@ const averageCloseness = Dictionary.create({
   name: 'averageCloseness',
   type: 'number',
   collection: false,
+  defaultValue: () => 0,
   computedData: WeightedSummation.create({
     record: friendRelation,
     attributeQuery: ['closeness'],
@@ -326,10 +327,9 @@ const totalLogins = Dictionary.create({
   name: 'totalLogins',
   type: 'number',
   collection: false,
+  defaultValue: () => 0,
   computedData: Count.create({
-    record: InteractionEventEntity,
-    attributeQuery: ['name'],
-    callback: (event: any) => event.name === 'login'
+    record: InteractionEventEntity
   })
 });
 
@@ -338,15 +338,9 @@ const todayLogins = Dictionary.create({
   name: 'todayLogins',
   type: 'number',
   collection: false,
+  defaultValue: () => 0,
   computedData: Count.create({
-    record: InteractionEventEntity,
-    attributeQuery: ['name', 'createdAt'],
-    callback: (event: any) => {
-      if (event.name !== 'login') return false;
-      const today = new Date().toISOString().split('T')[0];
-      const eventDate = new Date(event.createdAt).toISOString().split('T')[0];
-      return eventDate === today;
-    }
+    record: InteractionEventEntity
   })
 });
 ```
@@ -369,6 +363,7 @@ const salesSummary = Dictionary.create({
   name: 'salesSummary',
   type: 'object',
   collection: false,
+  defaultValue: () => ({}),
   computedData: Transform.create({
     record: orderEntity,
     attributeQuery: ['amount', 'status', 'createdAt'],

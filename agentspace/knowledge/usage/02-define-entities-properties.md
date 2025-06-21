@@ -263,6 +263,7 @@ const Post = Entity.create({
     Property.create({
       name: 'likeCount',
       type: 'number',
+      defaultValue: () => 0,
       computedData: Count.create({
         record: Like  // 这会持久化到数据库
       })

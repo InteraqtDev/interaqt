@@ -303,8 +303,8 @@ export class InteractionCall {
                     })
 
                 fullPayloadItem = payloadDef.isCollection ?
-                    await this.system.storage.find(payloadDef.base.name, itemMatch, undefined, ['*']) :
-                    await this.system.storage.findOne(payloadDef.base.name, itemMatch, undefined, ['*'])
+                    await this.system.storage.find(payloadDef.base!.name, itemMatch, undefined, ['*']) :
+                    await this.system.storage.findOne(payloadDef.base!.name, itemMatch, undefined, ['*'])
             }
 
             if (payloadDef.attributives) {

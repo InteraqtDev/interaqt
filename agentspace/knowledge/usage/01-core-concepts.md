@@ -26,10 +26,9 @@ const Post = Entity.create({
     Property.create({
       name: 'likeCount',
       type: 'number',
+      defaultValue: () => 0,
       computedData: Count.create({
-        record: Like,
-        attributeQuery: [['post', { attributeQuery: ['id'] }]],
-        callback: (like) => like.post.id === 'current_post_id'
+        record: Like
       })  // 自动计算点赞数
     })
   ]

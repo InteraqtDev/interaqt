@@ -87,6 +87,7 @@ const fullName = Property.create({
 const postCount = Property.create({
     name: 'postCount',
     type: 'number',
+    defaultValue: () => 0,  // 必须提供默认值
     computedData: Count.create({
         record: UserPostRelation
     })
@@ -181,6 +182,7 @@ const totalUsers = Count.create({
 const userPostCount = Property.create({
     name: 'postCount',
     type: 'number',
+    defaultValue: () => 0,  // 必须提供默认值
     computedData: Count.create({
         record: UserPostRelation
     })
@@ -207,6 +209,7 @@ WeightedSummation.create(config: WeightedSummationConfig): KlassInstance<typeof 
 const userTotalScore = Property.create({
     name: 'totalScore',
     type: 'number',
+    defaultValue: () => 0,  // 必须提供默认值
     computedData: WeightedSummation.create({
         record: UserScoreRelation,
         callback: function(scoreRecord) {
@@ -251,6 +254,7 @@ Every.create(config: EveryConfig): KlassInstance<typeof Every>
 const completedAllRequired = Property.create({
     name: 'completedAllRequired',
     type: 'boolean',
+    defaultValue: () => false,  // 必须提供默认值
     computedData: Every.create({
         record: UserCourseRelation,
         callback: function(courseRelation) {
@@ -281,6 +285,7 @@ Any.create(config: AnyConfig): KlassInstance<typeof Any>
 const hasPendingTasks = Property.create({
     name: 'hasPendingTasks',
     type: 'boolean',
+    defaultValue: () => false,  // 必须提供默认值
     computedData: Any.create({
         record: UserTaskRelation,
         callback: function(taskRelation) {
@@ -310,6 +315,7 @@ Transform.create(config: TransformConfig): KlassInstance<typeof Transform>
 const userSummary = Property.create({
     name: 'summary',
     type: 'string',
+    defaultValue: () => '',  // 必须提供默认值
     computedData: Transform.create({
         record: User,
         callback: function(user) {

@@ -1,4 +1,4 @@
-import { Relation } from '@';
+import { Relation, Property } from '@';
 import { User, Post, Comment, FriendRequest, Tag } from './entities-base.js';
 
 /**
@@ -55,11 +55,11 @@ export const Friendship = Relation.create({
   targetProperty: 'friends',
   type: 'n:n',
   properties: [
-    {
+    Property.create({
       name: 'createdAt',
       type: 'string',
       defaultValue: () => new Date().toISOString()
-    }
+    })
   ]
 });
 
@@ -73,11 +73,11 @@ export const Follow = Relation.create({
   targetProperty: 'followers',
   type: 'n:n',
   properties: [
-    {
+    Property.create({
       name: 'createdAt',
       type: 'string',
       defaultValue: () => new Date().toISOString()
-    }
+    })
   ]
 });
 
@@ -110,11 +110,11 @@ export const Like = Relation.create({
   targetProperty: 'likedBy',
   type: 'n:n',
   properties: [
-    {
+    Property.create({
       name: 'createdAt',
       type: 'string',
       defaultValue: () => new Date().toISOString()
-    }
+    })
   ]
 });
 
@@ -128,11 +128,11 @@ export const CommentLike = Relation.create({
   targetProperty: 'likedBy',
   type: 'n:n',
   properties: [
-    {
+    Property.create({
       name: 'createdAt',
       type: 'string',
       defaultValue: () => new Date().toISOString()
-    }
+    })
   ]
 });
 
@@ -146,11 +146,11 @@ export const PostTag = Relation.create({
   targetProperty: 'posts',
   type: 'n:n',
   properties: [
-    {
+    Property.create({
       name: 'createdAt',
       type: 'string',
       defaultValue: () => new Date().toISOString()
-    }
+    })
   ]
 });
 

@@ -47,6 +47,9 @@ export class BoolExp<T> {
     isAtom() {
         return this.raw.type === 'atom'
     }
+    get type() {
+        return this.raw.type
+    }
     get left() {
         return new BoolExp<T>((this.raw as BoolExpressionRawData<T>).left)
     }
@@ -300,7 +303,7 @@ export const BoolExpressionData = createClass({
     public: {
         type: {
             type: 'string',
-            required: true,
+            required: false,
             collection: false,
             defaultValue: () => 'expression'
         },

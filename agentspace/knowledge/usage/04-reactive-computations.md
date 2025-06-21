@@ -37,6 +37,7 @@ const Post = Entity.create({
     Property.create({
       name: 'likeCount',
       type: 'number',
+      defaultValue: () => 0,
       computedData: Count.create({
         record: likeRelation  // 传入关系实例，而不是实体
       })  // 自动维护，高性能
@@ -71,6 +72,7 @@ const Post = Entity.create({
     Property.create({
       name: 'likeCount',
       type: 'number',
+      defaultValue: () => 0,
       computedData: Count.create({
         record: Like
       })
@@ -101,6 +103,7 @@ const Post = Entity.create({
     Property.create({
       name: 'publishedCount',
       type: 'number',
+      defaultValue: () => 0,
       computedData: Count.create({
         record: Post  // 这里需要根据实际API调整
       })
@@ -116,10 +119,9 @@ const User = Entity.create({
     Property.create({
       name: 'publishedPostCount',
       type: 'number',
+      defaultValue: () => 0,
       computedData: Count.create({
-        record: UserPosts,
-        attributeQuery: [['target', { attributeQuery: ['status'] }]],
-        callback: (relation) => relation.target.status === 'published'
+        record: UserPosts
       })
     })
   ]
@@ -184,6 +186,7 @@ const Order = Entity.create({
     Property.create({
       name: 'totalAmount',
       type: 'number',
+      defaultValue: () => 0,
       computedData: WeightedSummation.create({
         record: OrderItems,
         attributeQuery: [['target', { attributeQuery: ['quantity', 'price'] }]],
@@ -229,21 +232,27 @@ const Student = Entity.create({
     Property.create({
       name: 'gpa',
       type: 'number',
-      computation: new WeightedSummation(
-        Grade,
-        'student',
-        (record) => record.score * record.credit  // 权重函数
-      )
+      defaultValue: () => 0,
+      computedData: WeightedSummation.create({
+        record: StudentGrades,
+        callback: (relation) => ({
+          weight: relation.target.credit,
+          value: relation.target.score
+        })
+      })
     }),
     // 计算总学分
     Property.create({
       name: 'totalCredits',
       type: 'number',
-      computation: new WeightedSummation(
-        Grade,
-        'student',
-        'credit'
-      )
+      defaultValue: () => 0,
+      computedData: WeightedSummation.create({
+        record: StudentGrades,
+        callback: (relation) => ({
+          weight: 1,
+          value: relation.target.credit
+        })
+      })
     })
   ]
 });
@@ -262,12 +271,17 @@ const Student = Entity.create({
     Property.create({
       name: 'passedCredits',
       type: 'number',
-      computation: new WeightedSummation(
-        Grade,
-        'student',
-        'credit',
-        { score: { $gte: 60 } }  // 只统计分数 >= 60 的科目
-      )
+      defaultValue: () => 0,
+      computedData: WeightedSummation.create({
+        record: StudentGrades,
+        callback: (relation) => {
+          // 只统计分数 >= 60 的科目
+          if (relation.target.score >= 60) {
+            return { weight: 1, value: relation.target.credit }
+          }
+          return { weight: 0, value: 0 }
+        }
+      })
     })
   ]
 });
@@ -296,11 +310,11 @@ const Project = Entity.create({
     Property.create({
       name: 'isCompleted',
       type: 'boolean',
-      computation: new Every(
-        Task,
-        'project',
-        { status: 'completed' }
-      )
+      defaultValue: () => false,
+      computedData: Every.create({
+        record: ProjectTasks,
+        callback: (relation) => relation.target.status === 'completed'
+      })
     })
   ]
 });
@@ -333,11 +347,11 @@ const Project = Entity.create({
     Property.create({
       name: 'hasAdmin',
       type: 'boolean',
-      computation: new Any(
-        ProjectMember,
-        'project',
-        { role: 'admin' }
-      )
+      defaultValue: () => false,
+      computedData: Any.create({
+        record: ProjectMember,
+        callback: (relation) => relation.role === 'admin'
+      })
     })
   ]
 });
@@ -367,33 +381,27 @@ const Order = Entity.create({
     Property.create({
       name: 'allItemsInStock',
       type: 'boolean',
-      computation: new Every(
-        OrderItem,
-        'order',
-        { 
-          $and: [
-            { quantity: { $gt: 0 } },
-            { stockQuantity: { $gte: { $field: 'quantity' } } }
-          ]
+      defaultValue: () => false,
+      computedData: Every.create({
+        record: OrderItems,
+        callback: (relation) => {
+          const item = relation.target;
+          return item.quantity > 0 && item.stockQuantity >= item.quantity;
         }
-      )
+      })
     }),
     // 检查是否有高价值商品
     Property.create({
       name: 'hasHighValueItem',
       type: 'boolean',
-      computation: new Any(
-        OrderItem,
-        'order',
-        { 
-          $expr: { 
-            $gt: [
-              { $multiply: ['$quantity', '$price'] },
-              1000
-            ]
-          }
+      defaultValue: () => false,
+      computedData: Any.create({
+        record: OrderItems,
+        callback: (relation) => {
+          const item = relation.target;
+          return (item.quantity * item.price) > 1000;
         }
-      )
+      })
     })
   ]
 });
@@ -415,11 +423,11 @@ const User = Entity.create({
     Property.create({
       name: 'fullName',
       type: 'string',
-      computation: new Transform(
-        User,
-        null,  // 基于当前记录
-        (record) => `${record.firstName} ${record.lastName}`
-      )
+      defaultValue: () => '',
+      computedData: Transform.create({
+        record: User,
+        callback: (record) => `${record.firstName} ${record.lastName}`
+      })
     })
   ]
 });
@@ -436,15 +444,15 @@ const User = Entity.create({
     Property.create({
       name: 'tagSummary',
       type: 'string',
-      computation: new Transform(
-        UserTag,
-        'user',
-        (tags) => {
+      defaultValue: () => '',
+      computedData: Transform.create({
+        record: UserTag,
+        callback: (tags) => {
           if (tags.length === 0) return 'No tags';
           if (tags.length <= 3) return tags.map(t => t.name).join(', ');
           return `${tags.slice(0, 3).map(t => t.name).join(', ')} and ${tags.length - 3} more`;
         }
-      )
+      })
     })
   ]
 });
@@ -463,10 +471,10 @@ const User = Entity.create({
     Property.create({
       name: 'activityStats',
       type: 'object',
-      computation: new Transform(
-        Post,
-        'author',
-        (posts) => {
+      defaultValue: () => ({}),
+      computedData: Transform.create({
+        record: UserPosts,
+        callback: (posts) => {
           const now = new Date();
           const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
           const oneMonthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
@@ -481,7 +489,7 @@ const User = Entity.create({
             averageLikes: posts.reduce((sum, p) => sum + (p.likeCount || 0), 0) / posts.length || 0
           };
         }
-      )
+      })
     })
   ]
 });
@@ -500,10 +508,10 @@ const Product = Entity.create({
     Property.create({
       name: 'formattedPrice',
       type: 'string',
-      computation: new Transform(
-        Product,
-        null,
-        (record) => {
+      defaultValue: () => '',
+      computedData: Transform.create({
+        record: Product,
+        callback: (record) => {
           const currencySymbols = {
             'USD': '$',
             'EUR': '€',
@@ -513,7 +521,7 @@ const Product = Entity.create({
           const symbol = currencySymbols[record.currency] || record.currency;
           return `${symbol}${record.price.toFixed(2)}`;
         }
-      )
+      })
     })
   ]
 });
@@ -655,59 +663,66 @@ const Post = Entity.create({
     Property.create({
       name: 'likeCount',
       type: 'number',
-      computation: new Count(Like, 'post')
+      defaultValue: () => 0,
+      computedData: Count.create({
+        record: PostLikes
+      })
     }),
     
     // Count：统计评论数
     Property.create({
       name: 'commentCount',
       type: 'number',
-      computation: new Count(Comment, 'post')
+      defaultValue: () => 0,
+      computedData: Count.create({
+        record: PostComments
+      })
     }),
     
     // WeightedSummation：计算总互动分数
     Property.create({
       name: 'engagementScore',
       type: 'number',
-      computation: new WeightedSummation(
-        Interaction,
-        'post',
-        (record) => {
-          switch (record.type) {
-            case 'like': return 1;
-            case 'comment': return 3;
-            case 'share': return 5;
-            default: return 0;
+      defaultValue: () => 0,
+      computedData: WeightedSummation.create({
+        record: PostInteractions,
+        callback: (relation) => {
+          const interaction = relation.target;
+          switch (interaction.type) {
+            case 'like': return { weight: 1, value: 1 };
+            case 'comment': return { weight: 1, value: 3 };
+            case 'share': return { weight: 1, value: 5 };
+            default: return { weight: 0, value: 0 };
           }
         }
-      )
+      })
     }),
     
     // Transform：生成内容摘要
     Property.create({
       name: 'summary',
       type: 'string',
-      computation: new Transform(
-        Post,
-        null,
-        (record) => {
+      defaultValue: () => '',
+      computedData: Transform.create({
+        record: Post,
+        callback: (record) => {
           const content = record.content || '';
           return content.length > 100 
             ? content.substring(0, 100) + '...'
             : content;
         }
-      )
+      })
     }),
     
     // Every：检查是否所有评论都已审核
     Property.create({
       name: 'allCommentsModerated',
       type: 'boolean',
-      computation: new Every(
-        Comment,
-        'post',
-        { status: 'approved' }
-      )
+      defaultValue: () => false,
+      computedData: Every.create({
+        record: PostComments,
+        callback: (relation) => relation.target.status === 'approved'
+      })
     })
   ]
 });
@@ -722,18 +737,21 @@ const Post = Entity.create({
 Property.create({
   name: 'followerCount',
   type: 'number',
-  computation: new Count(Follow, 'target')
+  defaultValue: () => 0,
+  computedData: Count.create({
+    record: Follow
+  })
 });
 
 // ❌ 避免使用 Transform 做简单计数
 Property.create({
   name: 'followerCount',
   type: 'number',
-  computation: new Transform(
-    Follow,
-    'target',
-    (followers) => followers.length  // 效率低
-  )
+  defaultValue: () => 0,
+  computedData: Transform.create({
+    record: Follow,
+    callback: (followers) => followers.length  // 效率低
+  })
 });
 ```
 
@@ -744,22 +762,21 @@ Property.create({
 Property.create({
   name: 'activeUserCount',
   type: 'number',
-  computation: new Count(
-    User, 
-    null, 
-    { status: 'active' }  // 数据库级别过滤
-  )
+  defaultValue: () => 0,
+  computedData: Count.create({
+    record: User
+  })
 });
 
 // ❌ 在 Transform 中过滤
 Property.create({
   name: 'activeUserCount',
   type: 'number',
-  computation: new Transform(
-    User,
-    null,
-    (users) => users.filter(u => u.status === 'active').length  // 内存中过滤
-  )
+  defaultValue: () => 0,
+  computedData: Transform.create({
+    record: User,
+    callback: (users) => users.filter(u => u.status === 'active').length  // 内存中过滤
+  })
 });
 ```
 
@@ -771,7 +788,12 @@ const User = Entity.create({
   properties: [
     Property.create({
       name: 'score',
-      computation: new Transform(Post, 'author', (posts) => posts.reduce((sum, p) => sum + p.userScore, 0))
+      type: 'number',
+      defaultValue: () => 0,
+      computedData: Transform.create({
+        record: UserPosts,
+        callback: (posts) => posts.reduce((sum, p) => sum + p.userScore, 0)
+      })
     })
   ]
 });
@@ -780,7 +802,12 @@ const Post = Entity.create({
   properties: [
     Property.create({
       name: 'userScore',
-      computation: new Transform(User, null, (user) => user.score * 0.1)  // 循环依赖！
+      type: 'number',
+      defaultValue: () => 0,
+      computedData: Transform.create({
+        record: Post,
+        callback: (record) => record.baseScore * 0.1  // 避免循环依赖
+      })
     })
   ]
 });
@@ -801,7 +828,10 @@ const Post = Entity.create({
     Property.create({
       name: 'publishedPostCount',
       type: 'number',
-      computation: new Count(Post, 'author', { status: 'published' })
+      defaultValue: () => 0,
+      computedData: Count.create({
+        record: UserPosts
+      })
     })
   ]
 });

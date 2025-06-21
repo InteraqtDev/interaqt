@@ -49,6 +49,7 @@ const GlobalStats = Entity.create({
     Property.create({
       name: 'publishedPostCount',
       type: 'number',
+      defaultValue: () => 0,
       computedData: Count.create({
         record: PublishedPost
       })  // 自动更新
@@ -349,10 +350,9 @@ const User = Entity.create({
     Property.create({
       name: 'publishedPostCount',
       type: 'number',
+      defaultValue: () => 0,
       computedData: Count.create({
-        record: PublishedPost,
-        attributeQuery: [['author', { attributeQuery: ['id'] }]],
-        callback: (post) => post.author.id === 'current_user_id'
+        record: UserPublishedPosts
       })
     }),
     
@@ -360,10 +360,9 @@ const User = Entity.create({
     Property.create({
       name: 'popularPostCount',
       type: 'number',
+      defaultValue: () => 0,
       computedData: Count.create({
-        record: PopularPost,
-        attributeQuery: [['author', { attributeQuery: ['id'] }]],
-        callback: (post) => post.author.id === 'current_user_id'
+        record: UserPopularPosts
       })
     }),
     
@@ -371,12 +370,12 @@ const User = Entity.create({
     Property.create({
       name: 'totalViews',
       type: 'number',
+      defaultValue: () => 0,
       computedData: WeightedSummation.create({
-        record: PublishedPost,
-        attributeQuery: [['author', { attributeQuery: ['id'] }], ['viewCount']],
-        callback: (post) => ({
-          weight: post.author.id === 'current_user_id' ? 1 : 0,
-          value: post.viewCount
+        record: UserPublishedPosts,
+        callback: (relation) => ({
+          weight: 1,
+          value: relation.target.viewCount
         })
       })
     }),
@@ -385,11 +384,11 @@ const User = Entity.create({
     Property.create({
       name: 'isActiveAuthor',
       type: 'boolean',
-      computation: new Transform(
-        RecentPost,
-        'author',
-        (recentPosts) => recentPosts.length >= 3  // 最近有3篇以上帖子
-      )
+      defaultValue: () => false,
+      computedData: Transform.create({
+        record: UserRecentPosts,
+        callback: (recentPosts) => recentPosts.length >= 3  // 最近有3篇以上帖子
+      })
     })
   ]
 });
@@ -405,47 +404,62 @@ const GlobalStats = Entity.create({
     Property.create({
       name: 'totalPublishedPosts',
       type: 'number',
-      computation: new Count(PublishedPost)
+      defaultValue: () => 0,
+      computedData: Count.create({
+        record: PublishedPost
+      })
     }),
     
     Property.create({
       name: 'totalPopularPosts',
       type: 'number',
-      computation: new Count(PopularPost)
+      defaultValue: () => 0,
+      computedData: Count.create({
+        record: PopularPost
+      })
     }),
     
     Property.create({
       name: 'totalTechPosts',
       type: 'number',
-      computation: new Count(TechPost)
+      defaultValue: () => 0,
+      computedData: Count.create({
+        record: TechPost
+      })
     }),
     
     // 用户统计
     Property.create({
       name: 'activeUserCount',
       type: 'number',
-      computation: new Count(ActiveUser)
+      defaultValue: () => 0,
+      computedData: Count.create({
+        record: ActiveUser
+      })
     }),
     
     Property.create({
       name: 'authorCount',
       type: 'number',
-      computation: new Count(AuthorUser)
+      defaultValue: () => 0,
+      computedData: Count.create({
+        record: AuthorUser
+      })
     }),
     
     // 复合统计
     Property.create({
       name: 'averageViewsPerPost',
       type: 'number',
-      computation: new Transform(
-        [PublishedPost],
-        null,
-        (posts) => {
+      defaultValue: () => 0,
+      computedData: Transform.create({
+        record: PublishedPost,
+        callback: (posts) => {
           if (posts.length === 0) return 0;
           const totalViews = posts.reduce((sum, post) => sum + post.viewCount, 0);
           return totalViews / posts.length;
         }
-      )
+      })
     }),
     
     // 检查是否所有热门帖子都有标签

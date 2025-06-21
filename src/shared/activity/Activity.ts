@@ -34,10 +34,10 @@ export const PayloadItem = createClass({
             type: [Attributives, Attributive],
             collection: false,
         },
-        // 当前 Item 的具体概念类型
+        // 当前 Item 的具体概念类型。如果不是实体可以不填。
         base: {
             type: Entity,
-            required: true,
+            required: false,
             collection: false,
         },
         // isRef 表示这个 payload 是不是一个有 id ，系统中已经存在的。
