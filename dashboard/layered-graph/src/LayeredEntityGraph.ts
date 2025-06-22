@@ -67,7 +67,7 @@ export class LayeredEntityGraph {
 
       // 保存创建computed的回调，稍后批量执行
       this.pendingComputedCreation.push(() => {
-        const y = computed(() => {
+        const y = computed<number>(() => {
           try {
             const fullNode = this.nodes.get(id);
             if (!fullNode) {
@@ -198,9 +198,9 @@ export class LayeredEntityGraph {
         if (childrenInfo.length === 0) return 0;
         
         const minY = Math.min(...childrenInfo.map(info => info.y));
-        const maxY = Math.max(...childrenInfo.map(info => info.y + info.height));
+        const maxY = Math.max(...childrenInfo.map(info => info.y + info.height!));
         
-        return minY + (maxY - minY) / 2 - node.height() / 2;
+        return minY + (maxY - minY) / 2 - node.height()! / 2;
       }
       
       return 0;
@@ -222,7 +222,7 @@ export class LayeredEntityGraph {
     
     let accumulatedY = 0;
     for (let i = 0; i < nodeIndex; i++) {
-      accumulatedY += leafNodes[i].height() + VERTICAL_SPACING;
+      accumulatedY += leafNodes[i].height()! + VERTICAL_SPACING;
     }
     
     return accumulatedY;
@@ -277,7 +277,7 @@ export class LayeredEntityGraph {
     const minX = Math.min(...positions.map(p => p.x));
     const maxX = Math.max(...positions.map(p => p.x + p.width));
     const minY = Math.min(...positions.map(p => p.y));
-    const maxY = Math.max(...positions.map(p => p.y + p.height));
+    const maxY = Math.max(...positions.map(p => p.y + p.height!));
 
     return {
       width: maxX - minX,

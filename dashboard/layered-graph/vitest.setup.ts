@@ -7,7 +7,12 @@ global.ResizeObserver = class ResizeObserver {
 
 // Mock other DOM APIs that might be needed
 global.IntersectionObserver = class IntersectionObserver {
+  root = null;
+  rootMargin = '0px';
+  thresholds = [0];
+  
   observe() {}
   unobserve() {}
   disconnect() {}
-};
+  takeRecords() { return []; }
+} as any;
