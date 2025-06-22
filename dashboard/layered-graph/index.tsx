@@ -1,6 +1,4 @@
 import {createRoot, createElement} from "axii";
 import { App } from './src/App'
-import { install} from "axii-ui-theme-inc";
-install()
-
-createRoot(document.getElementById('root')!).render(<App/>)
+import { entities, relations } from '@social-content-network';
+createRoot(document.getElementById('root')!).render(<App entities={entities} relations={relations}/>)

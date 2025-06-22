@@ -8,7 +8,7 @@ import { RecordMutationEvent, SYSTEM_RECORD } from "./System.js";
 import { MatchExp } from "@storage";
 import {
     EntityEventSourceMap,
-    EtityMutationEvent,
+    type EtityMutationEvent,
     DataSourceMapTree,
     ComputationSourceMapManager,
     EntityCreateEventsSourceMap

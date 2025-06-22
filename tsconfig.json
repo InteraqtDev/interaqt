@@ -22,12 +22,17 @@
         "@/SQLite": ["src/runtime/SQLite.ts"],
         "@runtime": ["src/runtime/index.ts"],
         "@shared": ["src/shared/index.ts"],
-        "@storage": ["src/storage/index.ts"]
-    }
+        "@storage": ["src/storage/index.ts"],
+        "@social-content-network": ["examples/social-content-network/src/index.ts"]
+    },
+    "jsx": "react",
+    "jsxFactory": "createElement",
+    "jsxFragmentFactory": "Fragment",
   },
   "include": [
     "examples/**/*",
     "src/**/*",
-    "tests/**/*"
+    "tests/**/*",
+    "dashboard/**/*"
   ]
 }
