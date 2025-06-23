@@ -44,9 +44,9 @@ const CreateArticle = Interaction.create({
   action: Action.create({ name: 'createArticle' }),
   payload: Payload.create({
     items: [
-      PayloadItem.create({ name: 'title', type: 'string', required: true }),
-      PayloadItem.create({ name: 'content', type: 'string', required: true }),
-      PayloadItem.create({ name: 'authorId', type: 'string', isRef: true, refEntity: 'User', required: true })
+      PayloadItem.create({ name: 'title', required: true }),
+      PayloadItem.create({ name: 'content', required: true }),
+      PayloadItem.create({ name: 'authorId', base: User, isRef: true, required: true })
     ]
   })
 });
@@ -91,10 +91,10 @@ const CreateArticleWithTags = Interaction.create({
   action: Action.create({ name: 'createArticleWithTags' }),
   payload: Payload.create({
     items: [
-      PayloadItem.create({ name: 'title', type: 'string', required: true }),
-      PayloadItem.create({ name: 'content', type: 'string', required: true }),
-      PayloadItem.create({ name: 'authorId', type: 'string', isRef: true, refEntity: 'User' }),
-      PayloadItem.create({ name: 'tagIds', type: 'string', collection: true, isRef: true, refEntity: 'Tag' })
+      PayloadItem.create({ name: 'title', required: true }),
+      PayloadItem.create({ name: 'content', required: true }),
+      PayloadItem.create({ name: 'authorId', base: User, isRef: true }),
+      PayloadItem.create({ name: 'tagIds', base: Tag, isCollection: true, isRef: true })
     ]
   })
 });
@@ -146,9 +146,8 @@ const DeleteArticle = Interaction.create({
     items: [
       PayloadItem.create({ 
         name: 'articleId', 
-        type: 'string', 
+        base: Article,
         isRef: true, 
-        refEntity: 'Article',
         required: true 
       })
     ]
@@ -162,9 +161,8 @@ const RestoreArticle = Interaction.create({
     items: [
       PayloadItem.create({ 
         name: 'articleId', 
-        type: 'string', 
+        base: Article,
         isRef: true, 
-        refEntity: 'Article',
         required: true 
       })
     ]
@@ -324,7 +322,7 @@ const PublishArticle = Interaction.create({
   action: Action.create({ name: 'publishArticle' }),
   payload: Payload.create({
     items: [
-      PayloadItem.create({ name: 'articleId', type: 'string', isRef: true, refEntity: 'Article' })
+      PayloadItem.create({ name: 'articleId', base: Article, isRef: true })
     ]
   })
 });
@@ -334,7 +332,7 @@ const UnpublishArticle = Interaction.create({
   action: Action.create({ name: 'unpublishArticle' }),
   payload: Payload.create({
     items: [
-      PayloadItem.create({ name: 'articleId', type: 'string', isRef: true, refEntity: 'Article' })
+      PayloadItem.create({ name: 'articleId', base: Article, isRef: true })
     ]
   })
 });
@@ -372,9 +370,9 @@ const UpdateArticle = Interaction.create({
   action: Action.create({ name: 'updateArticle' }),
   payload: Payload.create({
     items: [
-      PayloadItem.create({ name: 'articleId', type: 'string', isRef: true, refEntity: 'Article' }),
-      PayloadItem.create({ name: 'title', type: 'string' }),
-      PayloadItem.create({ name: 'content', type: 'string' })
+      PayloadItem.create({ name: 'articleId', base: Article, isRef: true }),
+      PayloadItem.create({ name: 'title' }),
+      PayloadItem.create({ name: 'content' })
     ]
   })
 });
@@ -498,9 +496,9 @@ const CreateArticle = Interaction.create({
   action: Action.create({ name: 'createArticle' }),
   payload: Payload.create({
     items: [
-      PayloadItem.create({ name: 'title', type: 'string', required: true }),
-      PayloadItem.create({ name: 'content', type: 'string', required: true }),
-      PayloadItem.create({ name: 'authorId', type: 'string', isRef: true, refEntity: 'User' })
+      PayloadItem.create({ name: 'title', required: true }),
+      PayloadItem.create({ name: 'content', required: true }),
+      PayloadItem.create({ name: 'authorId', base: User, isRef: true })
     ]
   })
 });
@@ -510,7 +508,7 @@ const PublishArticle = Interaction.create({
   action: Action.create({ name: 'publishArticle' }),
   payload: Payload.create({
     items: [
-      PayloadItem.create({ name: 'articleId', type: 'string', isRef: true, refEntity: 'Article' })
+      PayloadItem.create({ name: 'articleId', base: Article, isRef: true })
     ]
   })
 });
@@ -520,7 +518,7 @@ const DeleteArticle = Interaction.create({
   action: Action.create({ name: 'deleteArticle' }),
   payload: Payload.create({
     items: [
-      PayloadItem.create({ name: 'articleId', type: 'string', isRef: true, refEntity: 'Article' })
+      PayloadItem.create({ name: 'articleId', base: Article, isRef: true })
     ]
   })
 });

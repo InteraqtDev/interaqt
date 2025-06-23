@@ -74,9 +74,9 @@ const CreatePost = Interaction.create({
   }),
   payload: Payload.create({
     items: [
-      PayloadItem.create({ name: 'title', type: 'string', required: true }),
-      PayloadItem.create({ name: 'content', type: 'string', required: true }),
-      PayloadItem.create({ name: 'authorId', type: 'string', isRef: true, refEntity: 'User' })
+      PayloadItem.create({ name: 'title', required: true }),
+      PayloadItem.create({ name: 'content', required: true }),
+      PayloadItem.create({ name: 'authorId', base: User, isRef: true })
     ]
   })
   // 数据变化通过 Relation 或 Property 的 computedData 来声明式定义
@@ -114,19 +114,16 @@ const CreateArticle = Interaction.create({
     items: [
       PayloadItem.create({ 
         name: 'title', 
-        type: 'string', 
         required: true 
       }),
       PayloadItem.create({ 
         name: 'content', 
-        type: 'string', 
         required: true 
       }),
       PayloadItem.create({ 
         name: 'categoryId', 
-        type: 'string',
-        isRef: true,
-        refEntity: 'Category' 
+        base: Category,
+        isRef: true
       })
     ]
   })
@@ -170,14 +167,13 @@ const UpdateUserProfile = Interaction.create({
     items: [
       PayloadItem.create({ 
         name: 'userId', 
-        type: 'string', 
-        isRef: true, 
-        refEntity: 'User',
+        base: User,
+        isRef: true,
         required: true 
       }),
-      PayloadItem.create({ name: 'name', type: 'string' }),
-      PayloadItem.create({ name: 'bio', type: 'string' }),
-      PayloadItem.create({ name: 'avatar', type: 'string' })
+      PayloadItem.create({ name: 'name' }),
+      PayloadItem.create({ name: 'bio' }),
+      PayloadItem.create({ name: 'avatar' })
     ]
   })
 });
@@ -198,37 +194,29 @@ const CreatePost = Interaction.create({
       // 字符串参数
       PayloadItem.create({ 
         name: 'title', 
-        type: 'string', 
         required: true 
       }),
       
       // 数字参数
       PayloadItem.create({ 
-        name: 'priority', 
-        type: 'number', 
-        defaultValue: 1 
+        name: 'priority'
       }),
       
       // 布尔参数
       PayloadItem.create({ 
-        name: 'isDraft', 
-        type: 'boolean', 
-        defaultValue: false 
+        name: 'isDraft'
       }),
       
       // 对象参数
       PayloadItem.create({ 
-        name: 'metadata', 
-        type: 'object',
+        name: 'metadata',
         required: false
       }),
       
       // 数组参数
       PayloadItem.create({ 
         name: 'tags', 
-        type: 'string',
-        collection: true,
-        defaultValue: []
+        isCollection: true
       })
     ]
   })
@@ -245,23 +233,20 @@ const CreateComment = Interaction.create({
     items: [
       PayloadItem.create({ 
         name: 'content', 
-        type: 'string', 
         required: true 
       }),
       // 引用帖子实体
       PayloadItem.create({ 
         name: 'postId', 
-        type: 'string', 
+        base: Post,
         isRef: true,
-        refEntity: 'Post',
         required: true 
       }),
       // 引用用户实体
       PayloadItem.create({ 
         name: 'authorId', 
-        type: 'string', 
+        base: User,
         isRef: true,
-        refEntity: 'User',
         required: true 
       })
     ]
@@ -314,19 +299,17 @@ const CreateProduct = Interaction.create({
       }),
       PayloadItem.create({ 
         name: 'price', 
-        type: 'number', 
+        , 
         required: true
         // 价格范围验证应该在业务逻辑中处理
       }),
       PayloadItem.create({ 
-        name: 'email', 
-        type: 'string'
-        // 邮箱格式验证应该在业务逻辑中处理
+        name: 'email'
+                // 邮箱格式验证应该在业务逻辑中处理
       }),
       PayloadItem.create({ 
-        name: 'category', 
-        type: 'string'
-        // 枚举验证应该在业务逻辑中处理
+        name: 'category'
+                // 枚举验证应该在业务逻辑中处理
       })
     ]
   })
@@ -345,19 +328,16 @@ const CreateOrder = Interaction.create({
     items: [
       PayloadItem.create({ 
         name: 'items', 
-        type: 'object',
-        collection: true,
+        isCollection: true,
         required: true 
       }),
       PayloadItem.create({ 
         name: 'shippingAddress', 
-        type: 'object'
-        // 条件必填逻辑应该在交互处理中检查
+                // 条件必填逻辑应该在交互处理中检查
       }),
       PayloadItem.create({ 
         name: 'couponCode', 
-        type: 'string'
-        // 优惠券验证应该在业务逻辑中实现
+                // 优惠券验证应该在业务逻辑中实现
       })
     ]
   })
@@ -398,9 +378,9 @@ const CreateBlogPost = Interaction.create({
   }),
   payload: Payload.create({
     items: [
-      PayloadItem.create({ name: 'title', type: 'string', required: true }),
-      PayloadItem.create({ name: 'content', type: 'string', required: true }),
-      PayloadItem.create({ name: 'authorId', type: 'string', isRef: true, refEntity: 'User' })
+      PayloadItem.create({ name: 'title', required: true }),
+      PayloadItem.create({ name: 'content', required: true }),
+      PayloadItem.create({ name: 'authorId', base: User, isRef: true })
     ]
   })
 });
@@ -439,7 +419,7 @@ const User = Entity.create({
   properties: [
     Property.create({
       name: 'postCount',
-      type: 'number',
+      ,
       computedData: Count.create({
         relation: UserPostRelation,
         relationDirection: 'target'
@@ -464,7 +444,7 @@ const PublishPost = Interaction.create({
         name: 'postId', 
         type: 'string', 
         isRef: true, 
-        refEntity: 'Post',
+        base: Post,
         required: true 
       })
     ]
@@ -528,7 +508,7 @@ const DeletePost = Interaction.create({
         name: 'postId', 
         type: 'string', 
         isRef: true, 
-        refEntity: 'Post',
+        base: Post,
         required: true 
       })
     ]
@@ -591,14 +571,14 @@ const FollowUser = Interaction.create({
         name: 'followerId', 
         type: 'string', 
         isRef: true, 
-        refEntity: 'User',
+        base: User,
         required: true 
       }),
       PayloadItem.create({ 
         name: 'followeeId', 
         type: 'string', 
         isRef: true, 
-        refEntity: 'User',
+        base: User,
         required: true 
       })
     ]
@@ -615,8 +595,7 @@ const FollowRelation = Relation.create({
   properties: [
     Property.create({
       name: 'followedAt',
-      type: 'string'
-    })
+          })
   ],
   computedData: Transform.create({
     record: InteractionEventEntity,
@@ -639,7 +618,7 @@ const User = Entity.create({
   properties: [
     Property.create({
       name: 'followerCount',
-      type: 'number',
+      ,
       computedData: Count.create({
         relation: FollowRelation,
         relationDirection: 'target'
@@ -647,7 +626,7 @@ const User = Entity.create({
     }),
     Property.create({
       name: 'followingCount',
-      type: 'number',
+      ,
       computedData: Count.create({
         relation: FollowRelation,
         relationDirection: 'source'
@@ -668,10 +647,10 @@ const PlaceOrder = Interaction.create({
   }),
   payload: Payload.create({
     items: [
-      PayloadItem.create({ name: 'userId', type: 'string', isRef: true, refEntity: 'User' }),
-      PayloadItem.create({ name: 'items', type: 'object', collection: true }),
-      PayloadItem.create({ name: 'totalAmount', type: 'number' }),
-      PayloadItem.create({ name: 'shippingAddress', type: 'object' })
+      PayloadItem.create({ name: 'userId', base: User, isRef: true }),
+      PayloadItem.create({ name: 'items', isCollection: true }),
+      PayloadItem.create({ name: 'totalAmount' }),
+      PayloadItem.create({ name: 'shippingAddress' })
     ]
   })
 });
@@ -709,7 +688,7 @@ const Product = Entity.create({
   properties: [
     Property.create({
       name: 'stock',
-      type: 'number',
+      ,
       // 使用 WeightedSummation 计算剩余库存
       computedData: WeightedSummation.create({
         record: OrderItemRelation,
@@ -739,8 +718,8 @@ const LikePost = Interaction.create({
   action: Action.create({ name: 'likePost' }),
   payload: Payload.create({
     items: [
-      PayloadItem.create({ name: 'userId', type: 'string', isRef: true, refEntity: 'User' }),
-      PayloadItem.create({ name: 'postId', type: 'string', isRef: true, refEntity: 'Post' })
+      PayloadItem.create({ name: 'userId', base: User, isRef: true }),
+      PayloadItem.create({ name: 'postId', base: Post, isRef: true })
     ]
   })
 });
@@ -755,8 +734,7 @@ const LikeRelation = Relation.create({
   properties: [
     Property.create({
       name: 'likedAt',
-      type: 'string'
-    })
+          })
   ],
   computedData: Transform.create({
     record: InteractionEventEntity,
@@ -779,7 +757,7 @@ const Post = Entity.create({
   properties: [
     Property.create({
       name: 'likeCount',
-      type: 'number',
+      ,
       computedData: Count.create({
         relation: LikeRelation,
         relationDirection: 'target'
@@ -798,9 +776,9 @@ const VotePost = Interaction.create({
   action: Action.create({ name: 'votePost' }),
   payload: Payload.create({
     items: [
-      PayloadItem.create({ name: 'userId', type: 'string', isRef: true, refEntity: 'User' }),
-      PayloadItem.create({ name: 'postId', type: 'string', isRef: true, refEntity: 'Post' }),
-      PayloadItem.create({ name: 'voteType', type: 'string', enum: ['up', 'down'] })
+      PayloadItem.create({ name: 'userId', base: User, isRef: true }),
+      PayloadItem.create({ name: 'postId', base: Post, isRef: true }),
+      PayloadItem.create({ name: 'voteType' })
     ]
   })
 });
@@ -864,10 +842,10 @@ const CreatePostWithTags = Interaction.create({
   action: Action.create({ name: 'createPostWithTags' }),
   payload: Payload.create({
     items: [
-      PayloadItem.create({ name: 'title', type: 'string', required: true }),
-      PayloadItem.create({ name: 'content', type: 'string', required: true }),
-      PayloadItem.create({ name: 'authorId', type: 'string', isRef: true, refEntity: 'User' }),
-      PayloadItem.create({ name: 'tagIds', type: 'string', collection: true, isRef: true, refEntity: 'Tag' })
+      PayloadItem.create({ name: 'title', required: true }),
+      PayloadItem.create({ name: 'content', required: true }),
+      PayloadItem.create({ name: 'authorId', base: User, isRef: true }),
+      PayloadItem.create({ name: 'tagIds', isCollection: true, isRef: true, base: Tag })
     ]
   })
 });
@@ -937,9 +915,9 @@ const PayOrder = Interaction.create({
   action: Action.create({ name: 'payOrder' }),
   payload: Payload.create({
     items: [
-      PayloadItem.create({ name: 'orderId', type: 'string', isRef: true, refEntity: 'Order' }),
+      PayloadItem.create({ name: 'orderId', type: 'string', isRef: true, base: Order }),
       PayloadItem.create({ name: 'paymentMethod', type: 'string' }),
-      PayloadItem.create({ name: 'amount', type: 'number' })
+      PayloadItem.create({ name: 'amount',  })
     ]
   })
 });
@@ -949,7 +927,7 @@ const ShipOrder = Interaction.create({
   action: Action.create({ name: 'shipOrder' }),
   payload: Payload.create({
     items: [
-      PayloadItem.create({ name: 'orderId', type: 'string', isRef: true, refEntity: 'Order' }),
+      PayloadItem.create({ name: 'orderId', type: 'string', isRef: true, base: Order }),
       PayloadItem.create({ name: 'trackingNumber', type: 'string' })
     ]
   })
@@ -1039,8 +1017,8 @@ const ApproveLeaveRequest = Interaction.create({
   action: Action.create({ name: 'approveLeaveRequest' }),
   payload: Payload.create({
     items: [
-      PayloadItem.create({ name: 'requestId', type: 'string', isRef: true, refEntity: 'LeaveRequest' }),
-      PayloadItem.create({ name: 'approverId', type: 'string', isRef: true, refEntity: 'User' }),
+      PayloadItem.create({ name: 'requestId', type: 'string', isRef: true, base: LeaveRequest }),
+      PayloadItem.create({ name: 'approverId', type: 'string', isRef: true, base: User }),
       PayloadItem.create({ name: 'comments', type: 'string' })
     ]
   })
@@ -1051,8 +1029,8 @@ const RejectLeaveRequest = Interaction.create({
   action: Action.create({ name: 'rejectLeaveRequest' }),
   payload: Payload.create({
     items: [
-      PayloadItem.create({ name: 'requestId', type: 'string', isRef: true, refEntity: 'LeaveRequest' }),
-      PayloadItem.create({ name: 'rejectedBy', type: 'string', isRef: true, refEntity: 'User' }),
+      PayloadItem.create({ name: 'requestId', type: 'string', isRef: true, base: LeaveRequest }),
+      PayloadItem.create({ name: 'rejectedBy', type: 'string', isRef: true, base: User }),
       PayloadItem.create({ name: 'reason', type: 'string' })
     ]
   })
@@ -1099,7 +1077,7 @@ const LeaveRequest = Entity.create({
     Property.create({
       name: 'approvalHistory',
       type: 'object',
-      collection: true,
+      isCollection: true,
       computedData: Transform.create({
         record: InteractionEventEntity,
         callback: function(event) {
@@ -1185,7 +1163,7 @@ const DeletePost = Interaction.create({
         name: 'postId',
         type: 'string',
         isRef: true,
-        refEntity: 'Post',
+        base: Post,
         required: true,
         // 权限验证应该通过 userAttributives 实现
         // 详见 attributive-permissions.md 文档
@@ -1266,8 +1244,8 @@ const LikePost = Interaction.create({
   action: Action.create({ name: 'likePost' }),
   payload: Payload.create({
     items: [
-      PayloadItem.create({ name: 'userId', type: 'string', isRef: true, refEntity: 'User' }),
-      PayloadItem.create({ name: 'postId', type: 'string', isRef: true, refEntity: 'Post' })
+      PayloadItem.create({ name: 'userId', base: User, isRef: true }),
+      PayloadItem.create({ name: 'postId', base: Post, isRef: true })
     ]
   })
 });
@@ -1277,8 +1255,8 @@ const UnlikePost = Interaction.create({
   action: Action.create({ name: 'unlikePost' }),
   payload: Payload.create({
     items: [
-      PayloadItem.create({ name: 'userId', type: 'string', isRef: true, refEntity: 'User' }),
-      PayloadItem.create({ name: 'postId', type: 'string', isRef: true, refEntity: 'Post' })
+      PayloadItem.create({ name: 'userId', base: User, isRef: true }),
+      PayloadItem.create({ name: 'postId', base: Post, isRef: true })
     ]
   })
 });
@@ -1289,10 +1267,10 @@ const ManagePostLike = Interaction.create({
   action: Action.create({ name: 'managePostLike' }),
   payload: Payload.create({
     items: [
-      PayloadItem.create({ name: 'action', type: 'string', enum: ['like', 'unlike', 'toggle'] }),
+      PayloadItem.create({ name: 'action' }),
       // 一个交互处理多种操作，增加复杂性
-      PayloadItem.create({ name: 'userId', type: 'string', isRef: true, refEntity: 'User' }),
-      PayloadItem.create({ name: 'postId', type: 'string', isRef: true, refEntity: 'Post' })
+      PayloadItem.create({ name: 'userId', base: User, isRef: true }),
+      PayloadItem.create({ name: 'postId', base: Post, isRef: true })
     ]
   })
 });
@@ -1341,22 +1319,16 @@ const CreateProduct = Interaction.create({
     items: [
       PayloadItem.create({ 
         name: 'name', 
-        type: 'string', 
-        required: true,
-        minLength: 1,
-        maxLength: 200
+        required: true
       }),
       PayloadItem.create({ 
         name: 'price', 
-        type: 'number', 
-        required: true,
-        min: 0
+        required: true
       }),
       PayloadItem.create({ 
         name: 'categoryId', 
-        type: 'string',
+        base: Category,
         isRef: true,
-        refEntity: 'Category',
         required: true
       })
     ]
@@ -1391,9 +1363,9 @@ const CreatePost = Interaction.create({
   action: Action.create({ name: 'createPost' }),
   payload: Payload.create({
     items: [
-      PayloadItem.create({ name: 'title', type: 'string', required: true }),
-      PayloadItem.create({ name: 'content', type: 'string', required: true }),
-      PayloadItem.create({ name: 'authorId', type: 'string', isRef: true, refEntity: 'User' })
+      PayloadItem.create({ name: 'title', required: true }),
+      PayloadItem.create({ name: 'content', required: true }),
+      PayloadItem.create({ name: 'authorId', base: User, isRef: true })
     ]
   })
 });
@@ -1418,7 +1390,7 @@ const User = Entity.create({
   properties: [
     Property.create({
       name: 'postCount',
-      type: 'number',
+      ,
       computedData: Count.create({
         relation: UserPostRelation,
         relationDirection: 'target'

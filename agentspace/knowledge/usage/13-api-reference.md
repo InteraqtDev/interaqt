@@ -543,11 +543,12 @@ PayloadItem.create(config: PayloadItemConfig): KlassInstance<typeof PayloadItem>
 
 **参数**
 - `config.name` (string, required): 参数名称
-- `config.base` (Entity, required): 参数的实体类型
+- `config.base` (Entity, optional): 参数的实体类型，仅在 isRef 为 true 时需要
 - `config.isRef` (boolean, optional): 是否为引用类型，默认 false
 - `config.required` (boolean, optional): 是否必需，默认 false
 - `config.isCollection` (boolean, optional): 是否为集合类型，默认 false
 - `config.attributives` (Attributive|Attributives, optional): 参数权限定语
+- `config.itemRef` (Attributive|Entity, optional): 用于在 Activity 中引用其他交互中定义的实体
 
 **示例**
 ```typescript
@@ -570,6 +571,26 @@ const postData = PayloadItem.create({
             return post.title && post.content
         }
     })
+})
+
+// 集合类型的引用
+const reviewersItem = PayloadItem.create({
+    name: 'reviewers',
+    base: User,
+    isRef: true,
+    isCollection: true,
+    attributives: Attributives.create({
+        content: BoolAtomData.create({data: ReviewerAttr, type: 'atom'})
+    })
+})
+
+// Activity 中的项目引用
+const activityItem = PayloadItem.create({
+    name: 'to',
+    base: User,
+    isRef: true,
+    attributives: boolExpToAttributives(BoolExp.atom(OtherAttr)),
+    itemRef: userRefB
 })
 ```
 

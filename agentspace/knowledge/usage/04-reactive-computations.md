@@ -691,9 +691,9 @@ const PaymentReceived = Interaction.create({
     name: 'recordPayment',
     payload: Payload.create({
       items: [
-        PayloadItem.create({ name: 'orderId', type: 'string', isRef: true, refEntity: 'Order' }),
-        PayloadItem.create({ name: 'amount', type: 'number' }),
-        PayloadItem.create({ name: 'paymentMethod', type: 'string' })
+        PayloadItem.create({ name: 'orderId', base: Order, isRef: true }),
+        PayloadItem.create({ name: 'amount' }),
+        PayloadItem.create({ name: 'paymentMethod' })
       ]
     })
   })

@@ -58,8 +58,8 @@ const CreatePost = Interaction.create({
   name: 'CreatePost',
   payload: Payload.create({
     items: [
-      PayloadItem.create({ name: 'title', type: 'string' }),
-      PayloadItem.create({ name: 'content', type: 'string' })
+      PayloadItem.create({ name: 'title' }),
+      PayloadItem.create({ name: 'content' })
     ]
   })
 });
@@ -68,7 +68,7 @@ const SubmitForReview = Interaction.create({
   name: 'SubmitForReview',
   payload: Payload.create({
     items: [
-      PayloadItem.create({ name: 'postId', type: 'string', isRef: true, refEntity: 'Post' })
+      PayloadItem.create({ name: 'postId', base: Post, isRef: true })
     ]
   })
 });
@@ -77,8 +77,8 @@ const ApprovePost = Interaction.create({
   name: 'ApprovePost',
   payload: Payload.create({
     items: [
-      PayloadItem.create({ name: 'postId', type: 'string', isRef: true, refEntity: 'Post' }),
-      PayloadItem.create({ name: 'reviewerId', type: 'string', isRef: true, refEntity: 'User' })
+      PayloadItem.create({ name: 'postId', base: Post, isRef: true }),
+      PayloadItem.create({ name: 'reviewerId', base: User, isRef: true })
     ]
   })
 });
@@ -87,7 +87,7 @@ const PublishPost = Interaction.create({
   name: 'PublishPost',
   payload: Payload.create({
     items: [
-      PayloadItem.create({ name: 'postId', type: 'string', isRef: true, refEntity: 'Post' })
+      PayloadItem.create({ name: 'postId', base: Post, isRef: true })
     ]
   })
 });
