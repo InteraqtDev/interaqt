@@ -170,21 +170,99 @@ Count.create(config: CountConfig): KlassInstance<typeof Count>
 
 **参数**
 - `config.record` (Entity|Relation, required): 要计数的实体或关系
+- `config.direction` (string, optional): 关系方向，可选值：'source' | 'target'，仅适用于关系计数
+- `config.callback` (function, optional): 过滤回调函数，返回布尔值决定是否计入计数
+- `config.attributeQuery` (AttributeQueryData, optional): 属性查询配置，优化数据获取
+- `config.dataDeps` (object, optional): 数据依赖配置，格式为 `{[key: string]: DataDep}`
 
 **示例**
 ```typescript
-// 全局计数
+// 基本全局计数
 const totalUsers = Count.create({
     record: User
 })
 
-// 属性计数（用户的帖子数量）
+// 基本属性计数（用户的帖子数量）
 const userPostCount = Property.create({
     name: 'postCount',
     type: 'number',
     defaultValue: () => 0,  // 必须提供默认值
     computedData: Count.create({
         record: UserPostRelation
+    })
+})
+
+// 带过滤条件的计数（只计算已发布的帖子）
+const publishedPostCount = Property.create({
+    name: 'publishedPostCount',
+    type: 'number',
+    defaultValue: () => 0,
+    computedData: Count.create({
+        record: UserPostRelation,
+        attributeQuery: [['target', {attributeQuery: ['status']}]],
+        callback: function(relation) {
+            return relation.target.status === 'published'
+        }
+    })
+})
+
+// 带数据依赖的计数（基于全局设置的最小分数过滤）
+const highScorePostCount = Property.create({
+    name: 'highScorePostCount',
+    type: 'number',
+    defaultValue: () => 0,
+    computedData: Count.create({
+        record: UserPostRelation,
+        attributeQuery: [['target', {attributeQuery: ['score']}]],
+        dataDeps: {
+            minScore: {
+                type: 'global',
+                source: Dictionary.create({
+                    name: 'minScoreThreshold',
+                    type: 'number',
+                    collection: false
+                })
+            }
+        },
+        callback: function(relation, dataDeps) {
+            return relation.target.score >= dataDeps.minScore
+        }
+    })
+})
+
+// 全局计数，带过滤和数据依赖
+const activeUsersCount = Dictionary.create({
+    name: 'activeUsersCount',
+    type: 'number',
+    collection: false,
+    computedData: Count.create({
+        record: User,
+        attributeQuery: ['lastLoginDate'],
+        dataDeps: {
+            activeDays: {
+                type: 'global',
+                source: Dictionary.create({
+                    name: 'userActiveDays',
+                    type: 'number',
+                    collection: false
+                })
+            }
+        },
+        callback: function(user, dataDeps) {
+            const daysSinceLogin = (Date.now() - new Date(user.lastLoginDate).getTime()) / (1000 * 60 * 60 * 24)
+            return daysSinceLogin <= dataDeps.activeDays
+        }
+    })
+})
+
+// 关系计数带方向参数
+const authorPostCount = Property.create({
+    name: 'authoredPostCount',
+    type: 'number',
+    defaultValue: () => 0,
+    computedData: Count.create({
+        record: UserPostRelation,
+        direction: 'target'  // 从用户角度计数关联的帖子
     })
 })
 ```

@@ -89,25 +89,16 @@ const Like = Relation.create({
 });
 ```
 
-### 条件计数
+### 带过滤条件的计数
 
-可以添加条件来统计满足特定条件的记录：
+Count 支持使用 callback 回调函数对记录进行过滤：
 
 ```javascript
 const Post = Entity.create({
   name: 'Post',
   properties: [
     Property.create({ name: 'title', type: 'string' }),
-    Property.create({ name: 'status', type: 'string' }),
-    // 统计已发布的帖子数量
-    Property.create({
-      name: 'publishedCount',
-      type: 'number',
-      defaultValue: () => 0,
-      computedData: Count.create({
-        record: Post  // 这里需要根据实际API调整
-      })
-    })
+    Property.create({ name: 'status', type: 'string' })
   ]
 });
 
@@ -121,7 +112,138 @@ const User = Entity.create({
       type: 'number',
       defaultValue: () => 0,
       computedData: Count.create({
-        record: UserPosts
+        record: UserPostRelation,
+        attributeQuery: [['target', {attributeQuery: ['status']}]],
+        callback: function(relation) {
+          return relation.target.status === 'published'
+        }
+      })
+    })
+  ]
+});
+
+const UserPostRelation = Relation.create({
+  source: User,
+  sourceProperty: 'posts',
+  target: Post,
+  targetProperty: 'author',
+  type: '1:n'
+});
+```
+
+### 基于数据依赖的动态过滤
+
+Count 支持 dataDeps 参数，允许基于全局数据或其他数据源进行动态过滤：
+
+```javascript
+// 基于全局评分阈值统计高分帖子数量
+const User = Entity.create({
+  name: 'User',
+  properties: [
+    Property.create({ name: 'name', type: 'string' }),
+    Property.create({
+      name: 'highScorePostCount',
+      type: 'number',
+      defaultValue: () => 0,
+      computedData: Count.create({
+        record: UserPostRelation,
+        attributeQuery: [['target', {attributeQuery: ['score']}]],
+        dataDeps: {
+          scoreThreshold: {
+            type: 'global',
+            source: Dictionary.create({
+              name: 'highScoreThreshold',
+              type: 'number',
+              collection: false
+            })
+          }
+        },
+        callback: function(relation, dataDeps) {
+          return relation.target.score >= dataDeps.scoreThreshold
+        }
+      })
+    })
+  ]
+});
+
+// 全局活跃用户计数，基于全局活跃天数设置
+const activeUsersCount = Dictionary.create({
+  name: 'activeUsersCount',
+  type: 'number',
+  collection: false,
+  computedData: Count.create({
+    record: User,
+    attributeQuery: ['lastLoginDate'],
+    dataDeps: {
+      activeDays: {
+        type: 'global',
+        source: Dictionary.create({
+          name: 'userActiveDays',
+          type: 'number',
+          collection: false
+        })
+      }
+    },
+    callback: function(user, dataDeps) {
+      const daysSinceLogin = (Date.now() - new Date(user.lastLoginDate).getTime()) / (1000 * 60 * 60 * 24)
+      return daysSinceLogin <= dataDeps.activeDays
+    }
+  })
+});
+```
+
+### 关系方向控制
+
+对于关系计数，可以使用 direction 参数指定计数方向：
+
+```javascript
+const User = Entity.create({
+  name: 'User',
+  properties: [
+    Property.create({ name: 'name', type: 'string' }),
+    // 统计作为作者的帖子数量
+    Property.create({
+      name: 'authoredPostCount',
+      type: 'number',
+      defaultValue: () => 0,
+      computedData: Count.create({
+        record: UserPostRelation,
+        direction: 'target'  // 从用户角度看向帖子
+      })
+    }),
+    // 统计作为关注者的关系数量
+    Property.create({
+      name: 'followingCount',
+      type: 'number',
+      defaultValue: () => 0,
+      computedData: Count.create({
+        record: FollowRelation,
+        direction: 'target'  // 从用户角度看向被关注者
+      })
+    })
+  ]
+});
+```
+
+### 属性查询优化
+
+使用 attributeQuery 参数可以优化数据获取，只查询计算所需的属性：
+
+```javascript
+const User = Entity.create({
+  name: 'User',
+  properties: [
+    Property.create({
+      name: 'completedTaskCount',
+      type: 'number',
+      defaultValue: () => 0,
+      computedData: Count.create({
+        record: UserTaskRelation,
+        attributeQuery: [['target', {attributeQuery: ['status', 'completedAt']}]],
+        callback: function(relation) {
+          const task = relation.target
+          return task.status === 'completed' && task.completedAt !== null
+        }
       })
     })
   ]
