@@ -33,9 +33,30 @@ const result = await controller.callInteraction('CreatePost', {
 
 每个交互都包含：
 - **名称**：交互的标识符
-- **动作（Action）**：具体的操作逻辑
+- **动作（Action）**：交互类型的标识符（⚠️ 注意：Action 只是标识符，不包含任何操作逻辑）
 - **载荷（Payload）**：交互需要的参数
 - **权限控制**：谁可以执行这个交互
+
+## ⚠️ 重要概念澄清：Action 不是"操作"
+
+很多开发者会误解 Action 的概念。**Action 只是给交互类型起的一个名字，就像事件的类型标签，它不包含任何操作逻辑。**
+
+```javascript
+// ❌ 错误理解：以为 Action 包含操作逻辑
+const CreatePost = Action.create({
+  name: 'createPost',
+  execute: async (payload) => {  // ❌ Action 没有 execute 方法！
+    // 试图在这里写操作逻辑...
+  }
+});
+
+// ✅ 正确理解：Action 只是一个标识符
+const CreatePost = Action.create({
+  name: 'createPost'  // 仅此而已！就像给事件起个名字
+});
+```
+
+**所有的数据变化逻辑都通过响应式计算（Transform、Count、Every、Any 等）来实现，而不是在 Action 中。**
 
 ### 交互 vs 传统 API
 
@@ -361,11 +382,85 @@ const orderValidation = Transform.create({
 
 ## 实现数据变更逻辑
 
-在 interaqt 中，所有的数据变更都是通过响应式计算来实现的。交互（Interaction）只是触发事件，真正的数据变化通过以下方式声明：
+⚠️ **重要：在 interaqt 中，绝对不要试图在交互中"操作"数据！**
 
-1. **使用 Transform 监听交互事件**：在 Relation 或 Property 的 computedData 中定义
-2. **使用 StateMachine**：根据交互改变状态
-3. **使用计算属性**：如 Count、Every、Any 等
+交互（Interaction）只是声明"用户可以做什么"，它不包含任何数据操作逻辑。所有的数据变化都是数据的**固有属性**，通过响应式计算自动维护。
+
+### 思维转换：从"操作数据"到"声明数据的本质"
+
+❌ **错误思维：试图在交互中操作数据**
+```javascript
+// 错误：以为要在某个地方写"创建帖子"的逻辑
+const CreatePost = Interaction.create({
+  name: 'CreatePost',
+  action: Action.create({
+    name: 'createPost',
+    // ❌ 错误：试图在这里写创建逻辑
+    handler: async (payload) => {
+      const post = await db.create('Post', payload);
+      await updateUserPostCount(payload.authorId);
+      return post;
+    }
+  })
+});
+```
+
+✅ **正确思维：声明数据是什么**
+```javascript
+// 1. 交互只是声明用户可以创建帖子
+const CreatePost = Interaction.create({
+  name: 'CreatePost',
+  action: Action.create({ name: 'createPost' }),  // 只是标识符
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({ name: 'title', required: true }),
+      PayloadItem.create({ name: 'content', required: true })
+    ]
+  })
+});
+
+// 2. 帖子的存在"是"对创建帖子交互的响应
+const UserPostRelation = Relation.create({
+  source: User,
+  target: Post,
+  computedData: Transform.create({
+    record: InteractionEvent,  // 监听所有交互事件
+    callback: (event) => {
+      if (event.interactionName === 'CreatePost') {
+        // 返回应该存在的帖子数据
+        return {
+          source: event.user.id,
+          target: {
+            title: event.payload.title,
+            content: event.payload.content,
+            createdAt: new Date().toISOString()
+          }
+        };
+      }
+    }
+  })
+});
+
+// 3. 用户帖子数"是"用户帖子关系的数量
+const User = Entity.create({
+  properties: [
+    Property.create({
+      name: 'postCount',
+      computedData: Count.create({
+        record: UserPostRelation
+      })
+    })
+  ]
+});
+```
+
+### 数据变化的正确方式
+
+数据变化通过以下方式**声明**（不是操作）：
+
+1. **Transform**：声明"当某个事件发生时，某个数据应该存在"
+2. **Count/Every/Any**：声明"某个数据是其他数据的计算结果"
+3. **StateMachine**：声明"状态根据事件如何转换"
 
 ### 创建实体 - 响应式方式
 

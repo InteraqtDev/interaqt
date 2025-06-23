@@ -485,7 +485,11 @@ const CreatePostInteraction = Interaction.create({
 
 ### Action.create()
 
-创建交互动作。
+创建交互动作标识符。
+
+⚠️ **重要：Action 不是"操作"，而是标识符**
+
+Action 只是给交互类型起的一个名字，就像事件的类型标签。它不包含任何操作逻辑或执行代码。
 
 **语法**
 ```typescript
@@ -493,13 +497,60 @@ Action.create(config: ActionConfig): KlassInstance<typeof Action>
 ```
 
 **参数**
-- `config.name` (string, required): 动作名称
+- `config.name` (string, required): 动作类型的标识符名称
 
 **示例**
 ```typescript
+// 这些只是标识符，不包含任何操作逻辑
 const CreateAction = Action.create({ name: 'create' })
 const UpdateAction = Action.create({ name: 'update' })
 const DeleteAction = Action.create({ name: 'delete' })
+const LikeAction = Action.create({ name: 'like' })
+
+// ❌ 错误理解：以为 Action 包含操作逻辑
+const WrongAction = Action.create({ 
+  name: 'create',
+  execute: () => { /* ... */ }  // ❌ Action 没有 execute 方法！
+})
+
+// ✅ 正确理解：Action 只是标识符
+const CorrectAction = Action.create({ 
+  name: 'create'  // 仅此而已！
+})
+```
+
+**操作逻辑在哪里？**
+
+所有的操作逻辑都通过响应式计算（Transform、Count 等）实现：
+
+```typescript
+// 交互只是声明用户可以创建帖子
+const CreatePost = Interaction.create({
+  name: 'CreatePost',
+  action: Action.create({ name: 'create' }),  // 只是标识符
+  payload: Payload.create({ /* ... */ })
+});
+
+// 真正的"创建"逻辑在 Transform 中
+const UserPostRelation = Relation.create({
+  source: User,
+  target: Post,
+  computedData: Transform.create({
+    record: InteractionEvent,
+    callback: (event) => {
+      if (event.interactionName === 'CreatePost') {
+        // 这里才是真正的创建逻辑
+        return {
+          source: event.user.id,
+          target: {
+            title: event.payload.title,
+            content: event.payload.content
+          }
+        };
+      }
+    }
+  })
+});
 ```
 
 ### Payload.create()
