@@ -13,6 +13,7 @@ export default defineConfig({
     resolve: {
         alias: {
             '@social-content-network': path.resolve(__dirname, '../../examples/social-content-network/src'),
+            '@dormitory-management': path.resolve(__dirname, '../../examples/dormitory-management/src'),
             '@runtime': path.resolve(__dirname, '../../src/runtime'),
             '@shared': path.resolve(__dirname, '../../src/shared'),
             '@storage': path.resolve(__dirname, '../../src/storage'),

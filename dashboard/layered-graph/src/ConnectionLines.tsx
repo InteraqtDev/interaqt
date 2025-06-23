@@ -34,8 +34,6 @@ export function ConnectionLines({
   entityRects,
   containerRect
 }: ConnectionLinesProps, { createSVGElement:createElement, useLayoutEffect }: RenderContext) {
-  // 等待 DOM 渲染完成的状态
-  const isReady = atom(false);
 
   // 获取属性元素的位置信息
   const getPropertyRect = (entityName: string, propertyName: string): DOMRect | null => {
@@ -166,25 +164,18 @@ export function ConnectionLines({
     // }
   };
 
-  // DOM 渲染完成后更新状态
-  setTimeout(() => {
-    if (!isReady()) {
-      isReady(true);
-    }
-  }, 200); // 增加等待时间确保 RxDOMRect 就绪
-
 
   return (
     <svg
-      style={{
+      style={() => ({
         position: 'absolute',
         top: 0,
         left: 0,
-        width: `${containerWidth}px`,
-        height: `${containerHeight}px`,
+        width: `${containerRect.value()?.width||0}px`,
+        height: `${containerRect.value()?.height||0}px`,
         pointerEvents: 'none',
         zIndex: 2
-      }}
+      })}
     >
       {calculateConnectionLines.map(computedLine => {
         if (!computedLine()) {

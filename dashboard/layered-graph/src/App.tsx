@@ -22,6 +22,7 @@ export function App({entities, relations}: AppProps, {createElement}: RenderCont
             <Graph
                 entities={new RxList(entities)}
                 relations={new RxList(relations)}
+                entityWidth={300}
             />
         </div>
     )

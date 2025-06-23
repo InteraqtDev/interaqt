@@ -70,19 +70,75 @@ export function Entity({
     textTransform: 'uppercase' as const
   };
 
+  // 获取 computedData 的类型名字
+  const getComputedDataTypeName = (computedData: any): string => {
+    if (!computedData) return '';
+    
+    console.log(computedData)
+
+    // 如果有 type 属性
+    if (computedData._type) {
+      return computedData._type;
+    }
+    
+    // 如果是字符串，直接返回
+    if (typeof computedData === 'string') {
+      return computedData;
+    }
+    
+    // 默认返回 'Computed'
+    return 'Computed';
+  };
+
   // 渲染属性列表
   const renderProperties = (properties: any[], isRelationProperty = false) => {
-    return properties.map((prop, index) => (
-      <div 
-        key={`${prop.name}-${index}`}
-        style={propertyStyle}
-        data-property={prop.name}
-        data-entity={id}
-      >
-        <strong>{prop.name}:</strong> {prop.type}
-        {prop.collection && '[]'}
-      </div>
-    ));
+    return properties.map((prop, index) => {
+      const hasComputedData = prop.computedData;
+      const hasComputed = prop.computed && typeof prop.computed === 'function';
+      const computedDataType = hasComputedData ? getComputedDataTypeName(prop.computedData) : '';
+      
+      return (
+        <div 
+          key={`${prop.name}-${index}`}
+          style={propertyStyle}
+          data-property={prop.name}
+          data-entity={id}
+        >
+          <strong>{prop.name}:</strong> {prop.type}
+          {prop.collection && '[]'}
+          
+          {/* computedData 标记 */}
+          {hasComputedData && (
+            <span style={{
+              marginLeft: '8px',
+              fontSize: '10px',
+              color: '#2563eb',
+              backgroundColor: '#dbeafe',
+              padding: '2px 6px',
+              borderRadius: '3px',
+              fontWeight: 'bold'
+            }}>
+              {computedDataType}
+            </span>
+          )}
+          
+          {/* computed 函数标记 */}
+          {hasComputed && (
+            <span style={{
+              marginLeft: '8px',
+              fontSize: '10px',
+              color: '#059669',
+              backgroundColor: '#ecfdf5',
+              padding: '2px 6px',
+              borderRadius: '3px',
+              fontWeight: 'bold'
+            }}>
+              computed
+            </span>
+          )}
+        </div>
+      );
+    });
   };
 
   const renderConnections = (connections: Connection[]) => {

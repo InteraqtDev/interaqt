@@ -27,13 +27,15 @@ interface TreeNode {
 export interface EntityGraphProps {
   entities: RxList<KlassInstance<typeof EntityType>>;
   relations: RxList<KlassInstance<typeof RelationType>>;
+  entityWidth?: number;
 }
 
 export function Graph(props: EntityGraphProps, { createElement, useLayoutEffect }: RenderContext) {
 
   const containerRect = new RxDOMRect(atom(null), {type: 'interval', duration:500})
+  const {entityWidth = 200, entities, relations} = props
   // 使用新的数据转换器
-  const { entityManager, connectionManager } = convertEntitiesToGraphData(props.entities, props.relations, 'User');
+  const { entityManager, connectionManager } = convertEntitiesToGraphData(entities, relations, 'User');
   // 存储所有 Entity 的位置信息
   const entityRects = new Map<string, RxDOMRect>();
   
@@ -61,7 +63,7 @@ export function Graph(props: EntityGraphProps, { createElement, useLayoutEffect 
         <Entity
           id={node.id}
           entityNode={node.entityNode}
-          width={200}
+          width={entityWidth}
           connections={node.connections}
         />
       );
@@ -80,7 +82,7 @@ export function Graph(props: EntityGraphProps, { createElement, useLayoutEffect 
         <Entity
           id={node.id}
           entityNode={node.entityNode}
-          width={200}
+          width={entityWidth}
           connections={node.connections}
         />
         
