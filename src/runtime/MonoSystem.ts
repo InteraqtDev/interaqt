@@ -171,7 +171,7 @@ export class MonoSystem implements System {
                     if (dataContext.type === 'property') {
                         const propertyDataContext = dataContext as PropertyDataContext
                         entity = propertyDataContext.host 
-                        const propertyName = propertyDataContext.id as string
+                        const propertyName = propertyDataContext.id.name
                         boundStateName = `_property_boundState_${entity.name}_${propertyName}_${stateName}`
                     } else if(dataContext.type === 'entity'||dataContext.type === 'relation') {
                         entity = dataContext.id as KlassInstance<typeof Entity>

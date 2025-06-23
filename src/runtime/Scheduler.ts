@@ -30,7 +30,7 @@ export class Scheduler {
             // property 的
             entity.properties?.forEach(property => {
                 if (property.computedData) {
-                    computationInputs.push({dataContext: {type: 'property',host: entity,id: property.name},args: property.computedData})
+                    computationInputs.push({dataContext: {type: 'property',host: entity,id: property},args: property.computedData})
                 }
             })
         })
@@ -45,7 +45,7 @@ export class Scheduler {
             if (relationAny.properties) {
                 relationAny.properties.forEach((property: any) => {
                     if (property.computedData) {
-                        computationInputs.push({dataContext: {type: 'property',host: relation,id: property.name},args: property.computedData})
+                        computationInputs.push({dataContext: {type: 'property',host: relation,id: property},args: property.computedData})
                     }
                 })
             }
@@ -88,11 +88,11 @@ export class Scheduler {
                         })
                     ]})
                     const AsyncTaskRelation = Relation.create({
-                        name: `${AsyncTaskEntity.name}_${computation.dataContext.host.name}_${computation.dataContext.id}`,
+                        name: `${AsyncTaskEntity.name}_${computation.dataContext.host.name}_${computation.dataContext.id.name}`,
                         source: AsyncTaskEntity,
                         target: computation.dataContext.host,
                         sourceProperty: 'record',
-                        targetProperty: `_${computation.dataContext.id}_task`,
+                        targetProperty: `_${computation.dataContext.id.name}_task`,
                         type: '1:1'
                     })
                     entities.push(AsyncTaskEntity)
@@ -210,7 +210,7 @@ export class Scheduler {
                     await this.controller.applyResult(computation.dataContext, defaultValue)
                 } else {
                     // property computation 也能提供 defaultValue 的能力？
-                    const property = computation.dataContext.host.properties?.find(property => property.name === computation.dataContext.id)!
+                    const property = computation.dataContext.id
                     if (!property.defaultValue) {
                         property.defaultValue = await computation.getDefaultValue()
                     }
@@ -227,7 +227,7 @@ export class Scheduler {
                 for(const [stateName, state] of Object.entries(computationHandle.state)) {
                     if (state instanceof GlobalBoundState) {
                         state.controller = this.controller
-                        state.key = `${computationHandle.dataContext!.id!}_${stateName}`
+                        state.key = `${(computationHandle.dataContext!.id! as any).name || computationHandle.dataContext!.id!}_${stateName}`
                         await this.controller.system.storage.set(DICTIONARY_RECORD, state.key , state.defaultValue ?? null)
                     } 
                 }
@@ -434,7 +434,7 @@ export class Scheduler {
     getAsyncTaskRecordKey(computation: Computation) {
         if (computation.dataContext.type === 'property') {
             const propertyContext = computation.dataContext as PropertyDataContext
-            return `${ASYNC_TASK_RECORD}_${propertyContext.host.name}_${propertyContext.id}`
+            return `${ASYNC_TASK_RECORD}_${propertyContext.host.name}_${propertyContext.id.name}`
         } else if (computation.dataContext.type === 'global') {
             return `${ASYNC_TASK_RECORD}_${computation.dataContext.id}`
         } else {

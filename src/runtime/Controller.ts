@@ -133,7 +133,7 @@ export class Controller {
             }
         } else {
             const propertyDataContext = dataContext as PropertyDataContext
-            await this.system.storage.update(propertyDataContext.host.name, BoolExp.atom({key: 'id', value: ['=', record.id]}), {[propertyDataContext.id]: result})
+            await this.system.storage.update(propertyDataContext.host.name, BoolExp.atom({key: 'id', value: ['=', record.id]}), {[propertyDataContext.id.name]: result})
         }   
     }
     async retrieveLastValue(dataContext: DataContext, record?: any) {
@@ -143,10 +143,10 @@ export class Controller {
             return this.system.storage.find(dataContext.id.name, undefined, undefined, ['*'])
         } else {
             const propertyDataContext = dataContext as PropertyDataContext
-            if (record[propertyDataContext.id]) return record[propertyDataContext.id]
+            if (record[propertyDataContext.id.name]) return record[propertyDataContext.id.name]
 
             const item = await this.system.storage.findOne(propertyDataContext.host.name, BoolExp.atom({key: 'id', value: ['=', record!.id]}), undefined, ['*'])
-            return item[propertyDataContext.id]
+            return item[propertyDataContext.id.name]
         }
     }
     async applyResultPatch(dataContext: DataContext, patch: ComputationResult|ComputationResultPatch|ComputationResultPatch[]|undefined, record?: any) {
@@ -170,11 +170,11 @@ export class Controller {
             } else {
                 const propertyDataContext = dataContext as PropertyDataContext
                 if (patch.type === 'insert') {
-                    await this.system.storage.update(propertyDataContext.host.name, BoolExp.atom({key: 'id', value: ['=', record.id]}), {[propertyDataContext.id]: patch.data})
+                    await this.system.storage.update(propertyDataContext.host.name, BoolExp.atom({key: 'id', value: ['=', record.id]}), {[propertyDataContext.id.name]: patch.data})
                 } else if (patch.type === 'update') {
-                    await this.system.storage.update(propertyDataContext.host.name, BoolExp.atom({key: 'id', value: ['=', record.id]}), {[propertyDataContext.id]: patch.data})
+                    await this.system.storage.update(propertyDataContext.host.name, BoolExp.atom({key: 'id', value: ['=', record.id]}), {[propertyDataContext.id.name]: patch.data})
                 } else if (patch.type === 'delete') {
-                    await this.system.storage.update(propertyDataContext.host.name, BoolExp.atom({key: 'id', value: ['=', record.id]}), {[propertyDataContext.id]: null})
+                    await this.system.storage.update(propertyDataContext.host.name, BoolExp.atom({key: 'id', value: ['=', record.id]}), {[propertyDataContext.id.name]: null})
                 }
             }
         }

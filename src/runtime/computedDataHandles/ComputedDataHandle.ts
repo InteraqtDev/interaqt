@@ -1,5 +1,5 @@
 import { KlassInstance, Klass } from "@shared";
-import { Entity, Relation } from "@shared";
+import { Entity, Relation, Property } from "@shared";
 import { Computation } from "./Computation.js";
 
 export type GlobalDataContext = {
@@ -20,7 +20,7 @@ export type RelationDataContext = {
 export type PropertyDataContext = {
     type: 'property',
     host: KlassInstance<typeof Entity> | KlassInstance<typeof Relation>,
-    id: string
+    id: KlassInstance<typeof Property>
 }
 
 
