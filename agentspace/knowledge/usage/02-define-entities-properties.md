@@ -5,7 +5,7 @@
 实体（Entity）是系统中数据的基本单位。使用 `Entity.create()` 方法创建实体：
 
 ```javascript
-import { Entity, Property } from '@interaqt/runtime';
+import { Entity, Property } from 'interaqt';
 
 const User = Entity.create({
   name: 'User',
@@ -253,7 +253,7 @@ const Product = Entity.create({
 默认情况下，计算属性不会存储在数据库中，而是在查询时动态计算。如果需要持久化计算结果（例如为了性能优化），可以使用响应式计算：
 
 ```javascript
-import { Count } from '@interaqt/runtime';
+import { Count } from 'interaqt';
 
 const Post = Entity.create({
   name: 'Post',
@@ -285,17 +285,14 @@ const User = Entity.create({
     Property.create({ 
       name: 'email', 
       type: 'string',
-      required: true  // 必填字段
     }),
     Property.create({ 
       name: 'name', 
       type: 'string',
-      required: true
     }),
     Property.create({ 
       name: 'bio', 
       type: 'string',
-      required: false  // 可选字段（默认）
     })
   ]
 });
@@ -342,7 +339,7 @@ const UniqueEmailAttributive = Attributive.create({
 以下是一个完整的用户实体定义示例：
 
 ```javascript
-import { Entity, Property } from '@interaqt/runtime';
+import { Entity, Property } from 'interaqt';
 
 const User = Entity.create({
   name: 'User',
@@ -351,17 +348,14 @@ const User = Entity.create({
     Property.create({ 
       name: 'email', 
       type: 'string',
-      required: true
     }),
     Property.create({ 
       name: 'firstName', 
       type: 'string',
-      required: true
     }),
     Property.create({ 
       name: 'lastName', 
       type: 'string',
-      required: true
     }),
     
     // 计算属性
@@ -401,12 +395,10 @@ const User = Entity.create({
     Property.create({ 
       name: 'bio', 
       type: 'string',
-      required: false
     }),
     Property.create({ 
       name: 'avatar', 
       type: 'string',
-      required: false
     })
   ]
 });

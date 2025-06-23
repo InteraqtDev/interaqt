@@ -1,12 +1,12 @@
 # 如何使用定语（Attributive）控制权限
 
-定语（Attributive）是 @interaqt/runtime 中用于权限控制的核心机制。它允许你以声明式的方式定义谁可以执行特定的操作，基于用户的角色、关系或其他动态条件来控制访问权限。
+定语（Attributive）是 interaqt 中用于权限控制的核心机制。它允许你以声明式的方式定义谁可以执行特定的操作，基于用户的角色、关系或其他动态条件来控制访问权限。
 
 ## 理解 Attributive 概念
 
 ### 什么是定语
 
-定语是一种描述性的约束条件，用于限制谁可以执行某个操作。在自然语言中，定语用来修饰名词；在 @interaqt/runtime 中，定语用来修饰交互和实体，定义访问规则。
+定语是一种描述性的约束条件，用于限制谁可以执行某个操作。在自然语言中，定语用来修饰名词；在 interaqt 中，定语用来修饰交互和实体，定义访问规则。
 
 例如：
 - "**作者**可以编辑帖子" - "作者" 就是一个定语
@@ -61,7 +61,7 @@ app.put('/api/posts/:id', async (req, res) => {
   res.json(updatedPost);
 });
 
-// @interaqt/runtime 定语方式
+// interaqt 定语方式
 const UpdatePost = Interaction.create({
   name: 'UpdatePost',
   action: Action.create({
@@ -85,7 +85,7 @@ const UpdatePost = Interaction.create({
 ### 基于角色的权限
 
 ```javascript
-import { Attributive, BoolExp } from '@interaqt/runtime';
+import { Attributive, BoolExp } from 'interaqt';
 
 // 定义角色定语
 const AdminAttributive = Attributive.create({
@@ -328,7 +328,7 @@ const EditDraft = Interaction.create({
 
 ## 通过交互控制实体操作权限
 
-在 @interaqt/runtime 中，实体级别的权限控制是通过交互（Interaction）来实现的，而不是直接在实体定义上。以下是如何限制实体的创建、查询和更新：
+在 interaqt 中，实体级别的权限控制是通过交互（Interaction）来实现的，而不是直接在实体定义上。以下是如何限制实体的创建、查询和更新：
 
 ### 限制实体的创建
 
@@ -445,7 +445,7 @@ const UpdateUserProfile = Interaction.create({
 
 ## 组合多个定语
 
-@interaqt/runtime 的一个强大特性是能够在 Interaction 定义中直接使用 BoolExp 来组合多个原子 Attributive。Controller 会自动识别和处理这些组合，按照布尔逻辑执行权限检查。
+interaqt 的一个强大特性是能够在 Interaction 定义中直接使用 BoolExp 来组合多个原子 Attributive。Controller 会自动识别和处理这些组合，按照布尔逻辑执行权限检查。
 
 ### AND 逻辑组合
 
@@ -527,12 +527,12 @@ const ComplexPermissionAttributive = Attributive.create({
 
 ## 使用 BoolExp 构建复杂权限条件
 
-在 @interaqt/runtime 中，`userAttributives` 和 PayloadItem 的 `attributives` 都支持直接使用 BoolExp 来组合多个原子 Attributive。Controller 会自动识别并处理这些 BoolExp 表达式，让你能够灵活地构建复杂的权限规则。
+在 interaqt 中，`userAttributives` 和 PayloadItem 的 `attributives` 都支持直接使用 BoolExp 来组合多个原子 Attributive。Controller 会自动识别并处理这些 BoolExp 表达式，让你能够灵活地构建复杂的权限规则。
 
 ### BoolExp 组合 Attributive 的核心概念
 
 ```javascript
-import { BoolExp, Attributive, Attributives } from '@interaqt/runtime';
+import { BoolExp, Attributive, Attributives } from 'interaqt';
 
 // 1. 定义原子 Attributive（每个只负责一个简单的权限检查）
 const AdminAttributive = Attributive.create({
@@ -1399,4 +1399,4 @@ const RobustAttributive = Attributive.create({
 });
 ```
 
-定语系统为 @interaqt/runtime 提供了强大而灵活的权限控制机制。通过合理设计和使用定语，可以实现复杂的权限控制逻辑，同时保持代码的清晰和可维护性。 
+定语系统为 interaqt 提供了强大而灵活的权限控制机制。通过合理设计和使用定语，可以实现复杂的权限控制逻辑，同时保持代码的清晰和可维护性。 

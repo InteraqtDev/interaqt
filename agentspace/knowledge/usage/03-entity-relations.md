@@ -1,6 +1,6 @@
 # 如何建立实体关系
 
-关系（Relation）是连接不同实体的桥梁，它定义了实体之间的关联方式。@interaqt/runtime 支持多种类型的关系，包括一对一、一对多、多对多和对称关系。
+关系（Relation）是连接不同实体的桥梁，它定义了实体之间的关联方式。interaqt 支持多种类型的关系，包括一对一、一对多、多对多和对称关系。
 
 ## 创建一对一关系
 
@@ -9,7 +9,7 @@
 ### 基本一对一关系
 
 ```javascript
-import { Entity, Property, Relation } from '@interaqt/runtime';
+import { Entity, Property, Relation } from 'interaqt';
 
 // 定义用户实体
 const User = Entity.create({
@@ -471,7 +471,7 @@ const UserPosts = Relation.create({
 ## 完整示例：博客系统的关系设计
 
 ```javascript
-import { Entity, Property, Relation } from '@interaqt/runtime';
+import { Entity, Property, Relation } from 'interaqt';
 
 // 实体定义
 const User = Entity.create({

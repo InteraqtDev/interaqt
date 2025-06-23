@@ -1,10 +1,10 @@
 # 如何定义和执行交互
 
-交互（Interaction）是 @interaqt/runtime 中用户与系统交互的唯一方式，也是系统中所有数据变化的来源。通过定义交互，你可以描述用户可以执行的操作以及这些操作如何影响系统中的数据。
+交互（Interaction）是 interaqt 中用户与系统交互的唯一方式，也是系统中所有数据变化的来源。通过定义交互，你可以描述用户可以执行的操作以及这些操作如何影响系统中的数据。
 
 ## 重要说明：关于用户身份
 
-**@interaqt/runtime 专注于业务逻辑的响应式处理，不包含用户认证相关功能。**
+**interaqt 专注于业务逻辑的响应式处理，不包含用户认证相关功能。**
 
 在使用本框架时，请注意：
 - 系统假定用户身份已经通过其他方式（如 JWT、Session 等）完成认证
@@ -65,7 +65,7 @@ app.post('/api/posts', async (req, res) => {
   res.json(post);
 });
 
-// @interaqt/runtime 交互方式
+// interaqt 交互方式
 const CreatePost = Interaction.create({
   name: 'CreatePost',
   action: Action.create({
@@ -88,7 +88,7 @@ const CreatePost = Interaction.create({
 ### 最简单的交互
 
 ```javascript
-import { Interaction, Action, Payload, PayloadItem } from '@interaqt/runtime';
+import { Interaction, Action, Payload, PayloadItem } from 'interaqt';
 
 const SayHello = Interaction.create({
   name: 'SayHello',
@@ -101,7 +101,7 @@ const SayHello = Interaction.create({
 
 ### 创建实体的交互
 
-在 @interaqt/runtime 中，交互本身不直接操作数据。数据的创建、更新、删除都是通过响应式计算来实现的。
+在 interaqt 中，交互本身不直接操作数据。数据的创建、更新、删除都是通过响应式计算来实现的。
 
 ```javascript
 // 1. 定义交互
@@ -133,7 +133,7 @@ const CreateArticle = Interaction.create({
 });
 
 // 2. 使用 Transform 监听交互事件并创建实体
-import { Transform, InteractionEventEntity } from '@interaqt/runtime';
+import { Transform, InteractionEventEntity } from 'interaqt';
 
 // 在定义 Article 实体的关系时，可以添加响应式的创建逻辑
 const ArticleCreation = Transform.create({
@@ -381,7 +381,7 @@ const orderValidation = Transform.create({
 
 ## 实现数据变更逻辑
 
-在 @interaqt/runtime 中，所有的数据变更都是通过响应式计算来实现的。交互（Interaction）只是触发事件，真正的数据变化通过以下方式声明：
+在 interaqt 中，所有的数据变更都是通过响应式计算来实现的。交互（Interaction）只是触发事件，真正的数据变化通过以下方式声明：
 
 1. **使用 Transform 监听交互事件**：在 Relation 或 Property 的 computedData 中定义
 2. **使用 StateMachine**：根据交互改变状态
@@ -472,7 +472,7 @@ const PublishPost = Interaction.create({
 });
 
 // 2. 使用 StateMachine 管理文章状态
-import { StateMachine, StateNode } from '@interaqt/runtime';
+import { StateMachine, StateNode } from 'interaqt';
 
 const DraftState = StateNode.create({ name: 'draft' });
 const PublishedState = StateNode.create({ name: 'published' });
@@ -728,7 +728,7 @@ const Product = Entity.create({
 
 ## 使用 Transform 来监听交互并创建数据
 
-Transform 是 @interaqt/runtime 中的核心概念，用于监听系统中的事件（如交互事件）并响应式地创建或更新数据。
+Transform 是 interaqt 中的核心概念，用于监听系统中的事件（如交互事件）并响应式地创建或更新数据。
 
 ### 监听交互事件创建关系
 
@@ -929,7 +929,7 @@ StateMachine 用于管理实体的状态变化，可以根据交互事件自动�
 ### 基本状态机示例
 
 ```javascript
-import { StateMachine, StateNode } from '@interaqt/runtime';
+import { StateMachine, StateNode } from 'interaqt';
 
 // 1. 定义状态相关的交互
 const PayOrder = Interaction.create({
@@ -1449,4 +1449,4 @@ const OrderProcessActivity = Activity.create({
 });
 ```
 
-交互是 @interaqt/runtime 中连接用户操作和数据变化的桥梁。通过合理设计交互，结合框架的响应式特性，可以创建出既易于理解又高效执行的业务逻辑系统。记住：交互只定义"做什么"，而具体的"怎么做"通过响应式计算来实现。 
+交互是 interaqt 中连接用户操作和数据变化的桥梁。通过合理设计交互，结合框架的响应式特性，可以创建出既易于理解又高效执行的业务逻辑系统。记住：交互只定义"做什么"，而具体的"怎么做"通过响应式计算来实现。 

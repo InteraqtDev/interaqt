@@ -1,6 +1,6 @@
 # 第13章：API 参考（API Reference）
 
-本章提供 @interaqt/runtime 框架所有核心 API 的详细参考文档，包括完整的参数说明、类型定义和使用示例。
+本章提供 interaqt 框架所有核心 API 的详细参考文档，包括完整的参数说明、类型定义和使用示例。
 
 ## 13.1 实体相关 API
 
@@ -201,7 +201,7 @@ WeightedSummation.create(config: WeightedSummationConfig): KlassInstance<typeof 
 **参数**
 - `config.record` (Entity|Relation, required): 要计算的实体或关系
 - `config.callback` (function, required): 计算权重和值的回调函数，返回 `{weight: number, value: number}`
-- `config.attributeQuery` (AttributeQueryData, optional): 属性查询配置
+- `config.attributeQuery` (AttributeQueryData, required): 属性查询配置
 
 **示例**
 ```typescript
@@ -245,7 +245,7 @@ Every.create(config: EveryConfig): KlassInstance<typeof Every>
 **参数**
 - `config.record` (Entity|Relation, required): 要检查的实体或关系
 - `config.callback` (function, required): 条件检查函数，返回布尔值
-- `config.attributeQuery` (AttributeQueryData, optional): 属性查询配置
+- `config.attributeQuery` (AttributeQueryData, required): 属性查询配置
 - `config.notEmpty` (boolean, optional): 当集合为空时的返回值
 
 **示例**
@@ -277,7 +277,7 @@ Any.create(config: AnyConfig): KlassInstance<typeof Any>
 **参数**
 - `config.record` (Entity|Relation, required): 要检查的实体或关系
 - `config.callback` (function, required): 条件检查函数，返回布尔值
-- `config.attributeQuery` (AttributeQueryData, optional): 属性查询配置
+- `config.attributeQuery` (AttributeQueryData, required): 属性查询配置
 
 **示例**
 ```typescript
@@ -307,7 +307,7 @@ Transform.create(config: TransformConfig): KlassInstance<typeof Transform>
 **参数**
 - `config.record` (Entity|Relation, required): 要转换的实体或关系
 - `config.callback` (function, required): 转换函数
-- `config.attributeQuery` (AttributeQueryData, optional): 属性查询配置
+- `config.attributeQuery` (AttributeQueryData, required): 属性查询配置
 
 **示例**
 ```typescript
@@ -883,7 +883,7 @@ type ComputationResultPatch = {
 ### 完整的博客系统示例
 
 ```typescript
-import { Entity, Property, Relation, Interaction, Activity, Controller } from '@interaqt/runtime'
+import { Entity, Property, Relation, Interaction, Activity, Controller } from 'interaqt'
 
 // 1. 定义实体
 const User = Entity.create({
@@ -997,4 +997,4 @@ await controller.callInteraction('likePost', {
 })
 ```
 
-这个 API 参考文档涵盖了 @interaqt/runtime 框架的所有核心 API，提供了完整的参数说明和实际使用示例。开发者可以根据这个文档快速上手并深入使用框架的各种功能。 
+这个 API 参考文档涵盖了 interaqt 框架的所有核心 API，提供了完整的参数说明和实际使用示例。开发者可以根据这个文档快速上手并深入使用框架的各种功能。 

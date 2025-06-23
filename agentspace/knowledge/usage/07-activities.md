@@ -1,6 +1,6 @@
 # 如何使用活动（Activity）管理流程
 
-活动（Activity）是 @interaqt/runtime 中用于管理复杂业务流程的核心机制。它允许你定义多步骤、多角色的业务流程，通过状态机模型来控制流程的执行顺序和条件。
+活动（Activity）是 interaqt 中用于管理复杂业务流程的核心机制。它允许你定义多步骤、多角色的业务流程，通过状态机模型来控制流程的执行顺序和条件。
 
 ## 理解活动概念
 
@@ -51,7 +51,7 @@ const OrderProcessActivity = Activity.create({
 ### 基本活动结构
 
 ```javascript
-import { Activity, Transfer, Condition, Interaction } from '@interaqt/runtime';
+import { Activity, Transfer, Condition, Interaction } from 'interaqt';
 
 // 定义相关的交互
 const CreatePost = Interaction.create({
@@ -860,4 +860,4 @@ const EfficientCondition = Condition.create({
 });
 ```
 
-活动系统为 @interaqt/runtime 提供了强大的流程管理能力，通过合理设计活动、状态和转移，可以实现复杂的业务流程控制，同时保持代码的清晰和可维护性。 
+活动系统为 interaqt 提供了强大的流程管理能力，通过合理设计活动、状态和转移，可以实现复杂的业务流程控制，同时保持代码的清晰和可维护性。 

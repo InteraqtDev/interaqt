@@ -1,6 +1,6 @@
 # 实体增删改的响应式模式
 
-在 @interaqt/runtime 中，所有的数据操作都遵循响应式的设计理念。本章将详细介绍如何正确处理实体的创建、更新和删除操作。
+在 interaqt 中，所有的数据操作都遵循响应式的设计理念。本章将详细介绍如何正确处理实体的创建、更新和删除操作。
 
 ## 核心原则
 
@@ -16,7 +16,7 @@
 通过在 Relation 的 `computedData` 中使用 Transform，可以监听交互事件并创建实体：
 
 ```javascript
-import { Entity, Property, Relation, Transform, InteractionEventEntity, Interaction, Action, Payload, PayloadItem } from '@interaqt/runtime';
+import { Entity, Property, Relation, Transform, InteractionEventEntity, Interaction, Action, Payload, PayloadItem } from 'interaqt';
 
 // 1. 定义实体
 const Article = Entity.create({
@@ -136,7 +136,7 @@ const ArticleTagRelation = Relation.create({
 在响应式系统中，推荐使用软删除而非物理删除：
 
 ```javascript
-import { StateMachine, StateNode, StateTransfer } from '@interaqt/runtime';
+import { StateMachine, StateNode, StateTransfer } from 'interaqt';
 
 // 1. 定义删除相关的交互
 const DeleteArticle = Interaction.create({
@@ -431,7 +431,7 @@ import {
   Entity, Property, Relation, Interaction, Action, Payload, PayloadItem,
   Transform, StateMachine, StateNode, StateTransfer, Count, MatchExp,
   InteractionEventEntity
-} from '@interaqt/runtime';
+} from 'interaqt';
 
 // === 实体定义 ===
 const User = Entity.create({

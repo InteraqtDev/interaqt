@@ -1,6 +1,6 @@
 # 9. 如何使用异步计算
 
-异步计算是 @interaqt/runtime 框架的高级特性，允许在响应式计算过程中调用外部 API、执行耗时操作或进行复杂的数据处理。本章将详细介绍如何在不同层次上实现和使用异步计算。
+异步计算是 interaqt 框架的高级特性，允许在响应式计算过程中调用外部 API、执行耗时操作或进行复杂的数据处理。本章将详细介绍如何在不同层次上实现和使用异步计算。
 
 ## 9.1 理解异步计算场景
 
@@ -59,7 +59,7 @@ class AsyncComputation {
 ### 9.2.2 创建全局异步计算类
 
 ```typescript
-import { createClass, ComputationResult } from '@interaqt/runtime';
+import { createClass, ComputationResult } from 'interaqt';
 
 // 定义全局天气计算类
 const GlobalWeatherComputed = createClass({
@@ -124,7 +124,7 @@ class GlobalWeatherComputation implements DataBasedComputation {
 ### 9.2.3 注册计算处理器
 
 ```typescript
-import { ComputedDataHandle } from '@interaqt/runtime';
+import { ComputedDataHandle } from 'interaqt';
 
 // 注册全局计算处理器
 ComputedDataHandle.Handles.set(GlobalWeatherComputed, {
@@ -917,4 +917,4 @@ setInterval(() => {
 }, 5000); // 每5秒处理一次异步任务
 ```
 
-异步计算为 @interaqt/runtime 框架提供了强大的扩展能力，使得系统能够处理复杂的业务逻辑和外部集成需求。通过合理使用异步计算，可以构建出功能丰富、性能优异的响应式应用系统。
+异步计算为 interaqt 框架提供了强大的扩展能力，使得系统能够处理复杂的业务逻辑和外部集成需求。通过合理使用异步计算，可以构建出功能丰富、性能优异的响应式应用系统。

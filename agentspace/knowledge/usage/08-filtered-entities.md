@@ -1,6 +1,6 @@
 # 如何使用过滤实体（Filtered Entity）
 
-过滤实体（Filtered Entity）是 @interaqt/runtime 中的一个高级特性，它允许你创建基于特定条件的实体视图。过滤实体就像是原始实体的一个子集，只包含满足特定条件的记录，同时支持在这个子集上进行响应式计算。
+过滤实体（Filtered Entity）是 interaqt 中的一个高级特性，它允许你创建基于特定条件的实体视图。过滤实体就像是原始实体的一个子集，只包含满足特定条件的记录，同时支持在这个子集上进行响应式计算。
 
 ## 理解过滤实体
 
@@ -63,7 +63,7 @@ const GlobalStats = Entity.create({
 ### 基于属性过滤
 
 ```javascript
-import { FilteredEntity, Entity, Property } from '@interaqt/runtime';
+import { FilteredEntity, Entity, Property } from 'interaqt';
 
 // 原始实体
 const Post = Entity.create({
@@ -795,4 +795,4 @@ monitorFilteredEntity('PublishedPost');
 monitorFilteredEntity('ActiveUser');
 ```
 
-过滤实体为 @interaqt/runtime 提供了强大的数据视图和计算能力。通过合理使用过滤实体，可以创建高效、实时更新的数据统计和分析系统，同时保持代码的清晰和可维护性。 
+过滤实体为 interaqt 提供了强大的数据视图和计算能力。通过合理使用过滤实体，可以创建高效、实时更新的数据统计和分析系统，同时保持代码的清晰和可维护性。 

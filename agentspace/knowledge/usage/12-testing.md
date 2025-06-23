@@ -1,6 +1,6 @@
 # 12. 如何进行测试
 
-测试是确保 @interaqt/runtime 应用质量的重要环节。框架提供了完整的测试支持，包括单元测试、集成测试和端到端测试。本章将详细介绍如何为响应式应用编写有效的测试。
+测试是确保 interaqt 应用质量的重要环节。框架提供了完整的测试支持，包括单元测试、集成测试和端到端测试。本章将详细介绍如何为响应式应用编写有效的测试。
 
 ## 12.1 搭建测试环境
 
@@ -21,7 +21,7 @@ export default defineConfig({
 
 // tests/setup.ts
 import { beforeEach, afterEach } from 'vitest';
-import { MonoSystem, PGLiteDB } from '@interaqt/runtime';
+import { MonoSystem, PGLiteDB } from 'interaqt';
 
 let testSystem: MonoSystem;
 
@@ -44,7 +44,7 @@ export { testSystem };
 
 ```typescript
 // tests/testDatabase.ts
-import { MonoSystem, PGLiteDB, MemoryDB } from '@interaqt/runtime';
+import { MonoSystem, PGLiteDB, MemoryDB } from 'interaqt';
 
 export function createTestSystem() {
   // 使用内存数据库进行快速测试
@@ -90,7 +90,7 @@ export class TestDataFactory {
 ```typescript
 // tests/entities/user.spec.ts
 import { describe, test, expect } from 'vitest';
-import { Entity, Property, Controller } from '@interaqt/runtime';
+import { Entity, Property, Controller } from 'interaqt';
 import { createTestSystem, TestDataFactory } from '../testDatabase';
 
 describe('User Entity', () => {
@@ -818,4 +818,4 @@ class TestScenarios {
 }
 ```
 
-通过系统化的测试方法，可以确保 @interaqt/runtime 应用的稳定性和可靠性。测试不仅能够验证功能的正确性，还能帮助发现性能问题和边界情况，为应用的长期维护提供保障。 
+通过系统化的测试方法，可以确保 interaqt 应用的稳定性和可靠性。测试不仅能够验证功能的正确性，还能帮助发现性能问题和边界情况，为应用的长期维护提供保障。 

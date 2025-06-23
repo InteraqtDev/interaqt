@@ -2,7 +2,7 @@
 
 ## 框架的核心理念
 
-@interaqt/runtime 是一个响应式的后端框架，其核心理念是：**用户只需要描述系统中数据的定义，数据的具体变化过程是响应式的**。
+interaqt 是一个响应式的后端框架，其核心理念是：**用户只需要描述系统中数据的定义，数据的具体变化过程是响应式的**。
 
 ### 基本范式：data = computation(events)
 
@@ -16,7 +16,7 @@ async function likePost(userId, postId) {
 }
 ```
 
-而在 @interaqt/runtime 中，你只需要声明数据的定义：
+而在 interaqt 中，你只需要声明数据的定义：
 ```javascript
 // 响应式方式：声明点赞数的计算方式
 const Post = Entity.create({

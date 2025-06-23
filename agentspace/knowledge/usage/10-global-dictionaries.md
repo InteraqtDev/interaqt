@@ -1,6 +1,6 @@
 # 10. 如何使用全局字典（Dictionary）
 
-全局字典是 @interaqt/runtime 框架中用于管理全局状态和配置的重要机制。它提供了一种声明式的方式来定义和维护系统级别的数据，这些数据可以被整个应用中的其他组件引用和响应。
+全局字典是 interaqt 框架中用于管理全局状态和配置的重要机制。它提供了一种声明式的方式来定义和维护系统级别的数据，这些数据可以被整个应用中的其他组件引用和响应。
 
 ## 10.1 理解字典概念
 
@@ -83,7 +83,7 @@ const userEntity = Entity.create({
 ### 10.2.1 基本字典定义
 
 ```typescript
-import { Dictionary } from '@interaqt/runtime';
+import { Dictionary } from 'interaqt';
 
 // 定义系统配置字典
 const systemConfig = Dictionary.create({
@@ -939,4 +939,4 @@ await batch.setMultiple({
 });
 ```
 
-全局字典为 @interaqt/runtime 框架提供了强大的全局状态管理能力。通过合理使用字典，可以实现系统配置管理、实时统计、缓存机制等功能，为构建复杂的响应式应用提供了坚实的基础。
+全局字典为 interaqt 框架提供了强大的全局状态管理能力。通过合理使用字典，可以实现系统配置管理、实时统计、缓存机制等功能，为构建复杂的响应式应用提供了坚实的基础。
