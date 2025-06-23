@@ -19,6 +19,7 @@
     "types": ["node"],
     "paths": {
         "@": ["src"],
+        "interaqt": ["src"],
         "@/SQLite": ["src/runtime/SQLite.ts"],
         "@runtime": ["src/runtime/index.ts"],
         "@shared": ["src/shared/index.ts"],
