@@ -1,8 +1,8 @@
-import { RenderContext, RxDOMRect } from 'axii';
+import { atom, RenderContext, RxDOMRect, RxList } from 'axii';
 import { Entity } from './Entity';
-import { Connection, ConnectionManager, EntityManager, EntityTreeNode, getRelationName, RelationConnection } from './DataProcessor';
+import { Connection, ConnectionManager, convertEntitiesToGraphData, EntityManager, EntityTreeNode, getRelationName, RelationConnection } from './DataProcessor';
 import { ConnectionLines } from './ConnectionLines';
-
+import { Entity as EntityType, Relation as RelationType, KlassInstance} from '@shared'
 // Graph组件的节点数据接口（保持向后兼容）
 export interface GraphNodeData {
   id: string;
@@ -11,12 +11,6 @@ export interface GraphNodeData {
   initialHeight?: number;
 }
 
-// 新的基于 EntityTreeNode 的 props 接口
-export interface EntityGraphProps {
-  entityManager: EntityManager;
-  connectionManager: ConnectionManager;
-  onLayoutComplete?: () => void;
-}
 
 
 
@@ -29,9 +23,17 @@ interface TreeNode {
   connections: Connection[]
 }
 
+// 新的基于 EntityTreeNode 的 props 接口
+export interface EntityGraphProps {
+  entities: RxList<KlassInstance<typeof EntityType>>;
+  relations: RxList<KlassInstance<typeof RelationType>>;
+}
 
 export function Graph(props: EntityGraphProps, { createElement, useLayoutEffect }: RenderContext) {
-  const { connectionManager, onLayoutComplete, entityManager } = props;
+
+  const containerRect = new RxDOMRect(atom(null), {type: 'interval', duration:500})
+  // 使用新的数据转换器
+  const { entityManager, connectionManager } = convertEntitiesToGraphData(props.entities, props.relations, 'User');
   // 存储所有 Entity 的位置信息
   const entityRects = new Map<string, RxDOMRect>();
   
@@ -97,9 +99,6 @@ export function Graph(props: EntityGraphProps, { createElement, useLayoutEffect 
   // 构建树结构
   const tree = entityManager.treeNodes.map(entityNode => convertEntityNodeToTreeNode(entityNode));
 
-  if (onLayoutComplete) {
-    setTimeout(onLayoutComplete, 0);
-  }
   
   useLayoutEffect(() => {
     connectionManager.connections.forEach(connection => {
@@ -110,6 +109,7 @@ export function Graph(props: EntityGraphProps, { createElement, useLayoutEffect 
 
   return (
     <div 
+      ref={containerRect.ref}
       style={{
         width: `100%`,
         height: `100%`,
@@ -122,13 +122,12 @@ export function Graph(props: EntityGraphProps, { createElement, useLayoutEffect 
       }}
       data-testid="layered-graph"
     >
-      
-      
       {/* 实体节点层 */}
       <div style={{ position: 'relative', zIndex: 2 }}>
         {tree.map(rootNode => renderNode(rootNode))}
       </div>
       <ConnectionLines
+        containerRect={containerRect}
         connections={connectionManager.connections}
         containerWidth={1400}
         containerHeight={800}

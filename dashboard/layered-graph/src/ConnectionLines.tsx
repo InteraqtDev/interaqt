@@ -7,6 +7,7 @@ export interface ConnectionLinesProps {
   containerWidth: number;
   containerHeight: number;
   entityRects?: Map<string, RxDOMRect>; // 新增：实体位置信息
+  containerRect: RxDOMRect;
 }
 
 // 连线点坐标接口
@@ -30,9 +31,9 @@ export function ConnectionLines({
   connections, 
   containerWidth, 
   containerHeight,
-  entityRects
+  entityRects,
+  containerRect
 }: ConnectionLinesProps, { createSVGElement:createElement, useLayoutEffect }: RenderContext) {
-
   // 等待 DOM 渲染完成的状态
   const isReady = atom(false);
 
@@ -64,11 +65,14 @@ export function ConnectionLines({
   // 计算连线路径
   const calculateConnectionLines = connections.map(connection => computed<ConnectionLine>(() => {
 
-    if(!connection.sourceRect.value() || !connection.targetRect.value()) {
+    if(!connection.sourceRect.value() || !connection.targetRect.value()||!containerRect.value()) {
       return null;
     }
 
     const isLeftToRight = Math.abs(connection.sourceEntityNode.level - connection.targetEntityNode.level) === 1;
+    const containerLeft = containerRect.value.raw!.left
+    const containerTop = containerRect.value.raw!.top
+
 
     if (isLeftToRight) {
 
@@ -79,13 +83,13 @@ export function ConnectionLines({
   
 
       const leftPoint: LinePoint = {
-        x: leftRect.right + LINE_ENDPOINT_GAP, // 右边
-        y: leftRect.top + leftRect.height / 2 // 中心
+        x: leftRect.right + LINE_ENDPOINT_GAP - containerLeft, // 右边
+        y: leftRect.top + leftRect.height / 2 - containerTop // 中心
       };
 
       const rightPoint: LinePoint = {
-        x: rightRect.left - LINE_ENDPOINT_GAP, // 左边
-        y: rightRect.top + rightRect.height / 2 // 中心
+        x: rightRect.left - LINE_ENDPOINT_GAP - containerLeft, // 左边
+        y: rightRect.top + rightRect.height / 2 - containerTop // 中心
       };
 
       // 创建折线路径（从右边到左边）
@@ -114,13 +118,13 @@ export function ConnectionLines({
       const rightRect = isLeftSource ? connection.targetRect.value()! : connection.sourceRect.value()!;
 
       const leftPoint: LinePoint = {
-        x: leftRect.right + LINE_ENDPOINT_GAP,
-        y: leftRect.top + leftRect.height / 2
+        x: leftRect.right + LINE_ENDPOINT_GAP - containerLeft,
+        y: leftRect.top + leftRect.height / 2 - containerTop
       };
 
       const rightPoint: LinePoint = {
-        x: rightRect.left - LINE_ENDPOINT_GAP,
-        y: rightRect.top + rightRect.height / 2
+        x: rightRect.left - LINE_ENDPOINT_GAP - containerLeft,
+        y: rightRect.top + rightRect.height / 2 - containerTop
       };
 
       const points: LinePoint[] = [leftPoint, rightPoint];
