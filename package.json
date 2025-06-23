@@ -24,7 +24,7 @@
     "test:storage": "vitest run tests/storage",
     "test:shared": "vitest run tests/shared",
     "test:social-network": "vitest run examples/social-content-network/tests",
-    "start:social-network": "node examples/social-content-network/demo.js",
+    "test:dormitory-management": "vitest run examples/dormitory-management/tests",
     "build": "rimraf dist && tsc -p tsconfig.prod.json",
     "release": "release-it",
     "patch": "node scripts/release.js patch",
