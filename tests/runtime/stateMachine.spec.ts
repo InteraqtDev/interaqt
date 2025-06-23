@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { Controller, MonoSystem } from '@runtime';
+import { Controller, MonoSystem, DICTIONARY_RECORD } from '@runtime';
 import { createData as createPropertyStateMachineData } from "./data/propertyStateMachine.js";
 import { createData as createGlobalStateMachineData } from "./data/globalStateMachine.js";
 import { createData as createRelationStateMachineData } from "./data/relationStateMachine.js";
@@ -97,19 +97,19 @@ describe('StateMachineRunner', () => {
             name: 'user1',
         })
         
-        const globalState = await controller.system.storage.get('state', 'globalState')
+        const globalState = await controller.system.storage.get(DICTIONARY_RECORD, 'globalState')
         expect(globalState).toBe('enabled')
 
         await controller.callInteraction(disableInteraction.uuid, {
             user: user1,
         })
-        const globalState2 = await controller.system.storage.get('state', 'globalState')
+        const globalState2 = await controller.system.storage.get(DICTIONARY_RECORD, 'globalState')
         expect(globalState2).toBe('disabled')
 
         await controller.callInteraction(enableInteraction.uuid, {
             user: user1,
         })
-        const globalState3 = await controller.system.storage.get('state', 'globalState')
+        const globalState3 = await controller.system.storage.get(DICTIONARY_RECORD, 'globalState')
         expect(globalState3).toBe('enabled')
     })
 

@@ -8,7 +8,8 @@ import {
   MonoSystem,
   Property,
   Relation,
-  WeightedSummation
+  WeightedSummation,
+  DICTIONARY_RECORD
 } from '@';
 
 // 创建简单测试环境，直接测试 WeightedSummationHandle 的具体方法
@@ -52,7 +53,7 @@ describe('WeightedSummation computed handle', () => {
     await controller.setup(true);
     
     // 初始值应为 0
-    const initialTotalValue = await system.storage.get('state', 'totalValue');
+    const initialTotalValue = await system.storage.get(DICTIONARY_RECORD, 'totalValue');
     expect(initialTotalValue).toBe(0);
     
     // 创建几个产品
@@ -60,7 +61,7 @@ describe('WeightedSummation computed handle', () => {
     const product2 = await system.storage.create('Product', {price: 20, quantity: 3});
     
     // 检查总值应为 (10*2) + (20*3) = 20 + 60 = 80
-    const totalValue1 = await system.storage.get('state', 'totalValue');
+    const totalValue1 = await system.storage.get(DICTIONARY_RECORD, 'totalValue');
     expect(totalValue1).toBe(80);
     
     // 更新产品数量
@@ -71,7 +72,7 @@ describe('WeightedSummation computed handle', () => {
     await system.storage.update('Product', idMatch1, {quantity: 5});
     
     // 检查更新后的总值应为 (10*5) + (20*3) = 50 + 60 = 110
-    const totalValue2 = await system.storage.get('state', 'totalValue');
+    const totalValue2 = await system.storage.get(DICTIONARY_RECORD, 'totalValue');
     expect(totalValue2).toBe(110);
     
     // 删除一个产品
@@ -82,7 +83,7 @@ describe('WeightedSummation computed handle', () => {
     await system.storage.delete('Product', idMatch2);
     
     // 检查删除后的总值应为 10*5 = 50
-    const totalValue3 = await system.storage.get('state', 'totalValue');
+    const totalValue3 = await system.storage.get(DICTIONARY_RECORD, 'totalValue');
     expect(totalValue3).toBe(50);
   });
   
@@ -213,14 +214,14 @@ describe('WeightedSummation computed handle', () => {
     await system.storage.create('Product', {price: 0, quantity: 5});
     
     // 总值应为 0*5 = 0
-    const totalValue1 = await system.storage.get('state', 'totalValue');
+    const totalValue1 = await system.storage.get(DICTIONARY_RECORD, 'totalValue');
     expect(totalValue1).toBe(0);
     
     // 创建数量为0的产品
     await system.storage.create('Product', {price: 20, quantity: 0});
     
     // 总值仍为 0*5 + 20*0 = 0
-    const totalValue2 = await system.storage.get('state', 'totalValue');
+    const totalValue2 = await system.storage.get(DICTIONARY_RECORD, 'totalValue');
     expect(totalValue2).toBe(0);
   });
   
@@ -265,7 +266,7 @@ describe('WeightedSummation computed handle', () => {
     await system.storage.create('Account', {amount: 50, factor: -1});  // 负债务
     
     // 净余额应为 (100*1) + (50*-1) = 100 - 50 = 50
-    const netBalance = await system.storage.get('state', 'netBalance');
+    const netBalance = await system.storage.get(DICTIONARY_RECORD, 'netBalance');
     expect(netBalance).toBe(50);
   });
 }); 

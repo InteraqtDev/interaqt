@@ -13,7 +13,8 @@ import {
   PGLiteDB,
   DataBasedComputation,
   ComputationResult,
-  Dictionary
+  Dictionary,
+  DICTIONARY_RECORD
 } from "@";
 
 // 创建一个全局异步计算的类
@@ -186,7 +187,7 @@ describe('Global async computed', () => {
     await controller.scheduler.handleAsyncReturn(statsComputation, {id: task1.id});
     
     // 检查全局统计状态
-    let productStats = await system.storage.get('state', 'productStats');
+    let productStats = await system.storage.get(DICTIONARY_RECORD, 'productStats');
     expect(productStats).toMatchObject({
       totalCount: 1,
       totalPrice: 100,
@@ -216,7 +217,7 @@ describe('Global async computed', () => {
     await controller.scheduler.handleAsyncReturn(statsComputation, {id: task2.id});
     
     // 检查更新后的全局统计状态
-    productStats = await system.storage.get('state', 'productStats');
+    productStats = await system.storage.get(DICTIONARY_RECORD, 'productStats');
     expect(productStats).toMatchObject({
       totalCount: 2,
       totalPrice: 300,

@@ -3,7 +3,7 @@ import { DataDep, Computation, DataBasedComputation, RecordsDataDep } from "./co
 import { PropertyDataContext } from "./computedDataHandles/ComputedDataHandle.js";
 import { Controller } from "./Controller.js";
 import { InteractionEventEntity  } from "./ActivityManager.js";
-import { RecordMutationEvent, SYSTEM_RECORD } from "./System.js";
+import { DICTIONARY_RECORD, RecordMutationEvent, SYSTEM_RECORD } from "./System.js";
 
 // SourceMap 类型定义
 export type EntityCreateEventsSourceMap = {
@@ -151,9 +151,9 @@ export class ComputationSourceMapManager {
         }
         
         // 特殊处理 Global 类型的数据依赖
-        if (source.dataDep.type === 'global' && mutationEvent.recordName === '_System_') {
+        if (source.dataDep.type === 'global' && mutationEvent.recordName === SYSTEM_RECORD) {
             // 检查是否是 state 类型的记录，并且 key 匹配
-            return mutationEvent.record?.concept === 'state' && 
+            return mutationEvent.record?.concept === DICTIONARY_RECORD && 
                    mutationEvent.record?.key === source.dataDep.source.name
         } else {
             // 如果是更新，检查是否是依赖的属性有变化。

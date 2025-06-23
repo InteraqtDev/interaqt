@@ -6,6 +6,7 @@ import { Controller } from "../Controller"
 import { DataContext } from "./ComputedDataHandle"
 import { AttributeQueryData, MatchExpressionData, ModifierData } from "@storage"
 import { Dictionary } from "@shared"
+import { DICTIONARY_RECORD } from "../System"
 
 
 export type ComputationResultPatch = {
@@ -94,11 +95,11 @@ export class GlobalBoundState<T> {
 
     }
     async set(value: any):Promise<T> {
-        await this.controller.system.storage.set('state', this.key, value)
+        await this.controller.system.storage.set(DICTIONARY_RECORD, this.key, value)
         return value
     }
     async get():Promise<T> {
-        return await this.controller.system.storage.get('state', this.key)
+        return await this.controller.system.storage.get(DICTIONARY_RECORD, this.key)
     }
 }
 

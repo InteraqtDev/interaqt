@@ -1,7 +1,7 @@
-import { RecordMutationEvent, System, SystemCallback, SystemLogger } from "./System.js";
+import { DICTIONARY_RECORD, RecordMutationEvent, System, SystemCallback, SystemLogger } from "./System.js";
 import {
     Activity,
-    BoolExp, Entity,
+    BoolExp, Dictionary, Entity,
     Interaction, KlassInstance,
     Property,
     Relation
@@ -61,7 +61,7 @@ export class Controller {
     public relations: KlassInstance<typeof Relation>[]
     public activities: KlassInstance<typeof Activity>[]
     public interactions: KlassInstance<typeof Interaction>[]
-    public dict: KlassInstance<typeof Property>[] = []
+    public dict: KlassInstance<typeof Dictionary>[] = []
     public recordMutationSideEffects: RecordMutationSideEffect[] = []
     constructor(
         public system: System,
@@ -69,7 +69,7 @@ export class Controller {
         relations: KlassInstance<typeof Relation>[],
         activities: KlassInstance<typeof Activity>[],
         interactions: KlassInstance<typeof Interaction>[],
-        dict: KlassInstance<typeof Property>[] = [],
+        dict: KlassInstance<typeof Dictionary>[] = [],
         recordMutationSideEffects: RecordMutationSideEffect[] = []
     ) {
         // 因为我们会对 entities 数组进行补充。如果外部复用了传入的数组对象，就会发生混乱，例如在测试用例中复用。
@@ -108,7 +108,7 @@ export class Controller {
         if (result instanceof ComputationResultSkip) return
 
         if (dataContext.type === 'global') {
-            return this.system.storage.set('state', dataContext.id! as string, result)
+            return this.system.storage.set(DICTIONARY_RECORD, dataContext.id! as string, result)
         } else if (dataContext.type === 'entity') {
             if (result === undefined || result === null) return
             // Entity 级别的计算结果完全替换实体表中的所有记录
@@ -138,7 +138,7 @@ export class Controller {
     }
     async retrieveLastValue(dataContext: DataContext, record?: any) {
         if (dataContext.type === 'global') {
-            return this.system.storage.get('state', dataContext.id! as string)
+            return this.system.storage.get(DICTIONARY_RECORD, dataContext.id! as string)
         } else if (dataContext.type === 'entity'||dataContext.type === 'relation') {
             return this.system.storage.find(dataContext.id.name, undefined, undefined, ['*'])
         } else {
@@ -155,7 +155,7 @@ export class Controller {
         const patches = Array.isArray(patch) ? patch : [patch]
         for(const patch of patches) {
                 if (dataContext.type === 'global') {
-                    return this.system.storage.set('state', dataContext.id! as string, patch)
+                    return this.system.storage.set(DICTIONARY_RECORD, dataContext.id! as string, patch)
             } else if (dataContext.type === 'entity'||dataContext.type === 'relation') {
                 const erDataContext = dataContext as EntityDataContext|RelationDataContext
                 if (patch.type === 'insert') {  

@@ -41,6 +41,11 @@ export const Dictionary = createClass({
             required: false,
             collection: false,
         },
+        defaultValue: {
+            type: 'function',
+            required: false,
+            collection: false,
+        },
         computedData: {
             collection: false,
             // CAUTION 这里的具体类型等着外面注册 IncrementalComputationHandle 的时候修补

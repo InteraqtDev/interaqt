@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { Controller, MonoSystem, Property, Entity, Every, Dictionary, BoolExp, Any, Relation, MatchExp } from '@';
+import { Controller, MonoSystem, Property, Entity, Every, Dictionary, BoolExp, Any, Relation, MatchExp, DICTIONARY_RECORD } from '@';
 
 // 创建简单测试环境，直接测试 EveryHandle 的具体方法
 describe('Every and Any computed handle', () => {
@@ -33,14 +33,14 @@ describe('Every and Any computed handle', () => {
 
 
     // 获取 dictionary 的值
-    const everyRequestHandled0 = await system.storage.get('state','everyRequestHandled')
+    const everyRequestHandled0 = await system.storage.get(DICTIONARY_RECORD,'everyRequestHandled')
     expect(everyRequestHandled0).toBeFalsy()
     // 创建两个 request
     const request1 = await system.storage.create('Request', {handled: false})
     const request2 = await system.storage.create('Request', {handled: false})
 
     // 获取 dictionary 的值
-    const everyRequestHandled = await system.storage.get('state','everyRequestHandled')
+    const everyRequestHandled = await system.storage.get(DICTIONARY_RECORD,'everyRequestHandled')
     expect(everyRequestHandled).toBeFalsy()
 
     // 更新 request 的 handled 属性
@@ -56,14 +56,14 @@ describe('Every and Any computed handle', () => {
     await system.storage.update('Request', idMatch2, {handled: true})
 
     // 获取 dictionary 的值
-    const everyRequestHandled2 = await system.storage.get('state','everyRequestHandled')
+    const everyRequestHandled2 = await system.storage.get(DICTIONARY_RECORD,'everyRequestHandled')
     expect(everyRequestHandled2).toBeTruthy()
 
     // 再次更新 request 的 handled 属性
     await system.storage.update('Request', idMatch1, {handled: false})
 
     // 获取 dictionary 的值
-    const everyRequestHandled3 = await system.storage.get('state','everyRequestHandled')
+    const everyRequestHandled3 = await system.storage.get(DICTIONARY_RECORD,'everyRequestHandled')
     expect(everyRequestHandled3).toBeFalsy()
   });
 
@@ -93,7 +93,7 @@ describe('Every and Any computed handle', () => {
     const controller = new Controller(system,entities,[],[],[],dictionary,[])
     await controller.setup(true)
     // 获取 dictionary 的值
-    const anyRequestHandled0 = await system.storage.get('state','anyRequestHandled')
+    const anyRequestHandled0 = await system.storage.get(DICTIONARY_RECORD,'anyRequestHandled')
     expect(anyRequestHandled0).toBeFalsy()
     
     // 创建两个 request
@@ -101,7 +101,7 @@ describe('Every and Any computed handle', () => {
     const request2 = await system.storage.create('Request', {handled: false})
 
     // 获取 dictionary 的值
-    const anyRequestHandled = await system.storage.get('state','anyRequestHandled')
+    const anyRequestHandled = await system.storage.get(DICTIONARY_RECORD,'anyRequestHandled')
     expect(anyRequestHandled).toBeFalsy()
 
     // 更新 request 的 handled 属性
@@ -112,14 +112,14 @@ describe('Every and Any computed handle', () => {
     await system.storage.update('Request', idMatch1, {handled: true})
 
     // 获取 dictionary 的值
-    const anyRequestHandled2 = await system.storage.get('state','anyRequestHandled')
+    const anyRequestHandled2 = await system.storage.get(DICTIONARY_RECORD,'anyRequestHandled')
     expect(anyRequestHandled2).toBeTruthy()   
 
     // 更新 request 的 handled 属性
     await system.storage.update('Request', idMatch1, {handled: false})
 
     // 获取 dictionary 的值
-    const anyRequestHandled3 = await system.storage.get('state','anyRequestHandled')
+    const anyRequestHandled3 = await system.storage.get(DICTIONARY_RECORD,'anyRequestHandled')
     expect(anyRequestHandled3).toBeFalsy()
   });
 
@@ -422,24 +422,24 @@ describe('Every and Any computed handle', () => {
     await controller.setup(true)
 
     // set ageLimit to 19
-    await system.storage.set('state', 'ageLimit', 19)
+    await system.storage.set(DICTIONARY_RECORD, 'ageLimit', 19)
 
     const user1 = await system.storage.create('User', {name: 'user1', age: 18})
     const user2 = await system.storage.create('User', {name: 'user2', age: 20})
 
-    const isEveryUserAgeGreaterThanAgeLimit = await system.storage.get('state', 'isEveryUserAgeGreaterThanAgeLimit')
+    const isEveryUserAgeGreaterThanAgeLimit = await system.storage.get(DICTIONARY_RECORD, 'isEveryUserAgeGreaterThanAgeLimit')
     expect(isEveryUserAgeGreaterThanAgeLimit).toBeFalsy()
 
     // 把 user1 的 age 改为 20
     await system.storage.update('User', BoolExp.atom({key: 'id', value: ['=', user1.id]}), {age: 20})
 
-    const isEveryUserAgeGreaterThanAgeLimit2 = await system.storage.get('state', 'isEveryUserAgeGreaterThanAgeLimit')
+    const isEveryUserAgeGreaterThanAgeLimit2 = await system.storage.get(DICTIONARY_RECORD, 'isEveryUserAgeGreaterThanAgeLimit')
     expect(isEveryUserAgeGreaterThanAgeLimit2).toBeTruthy()
 
     // 把 ageLimit 改为 21
-    await system.storage.set('state', 'ageLimit', 21)
+    await system.storage.set(DICTIONARY_RECORD, 'ageLimit', 21)
 
-    const isEveryUserAgeGreaterThanAgeLimit3 = await system.storage.get('state', 'isEveryUserAgeGreaterThanAgeLimit')
+    const isEveryUserAgeGreaterThanAgeLimit3 = await system.storage.get(DICTIONARY_RECORD, 'isEveryUserAgeGreaterThanAgeLimit')
     expect(isEveryUserAgeGreaterThanAgeLimit3).toBeFalsy()
   })
 
@@ -484,36 +484,36 @@ describe('Every and Any computed handle', () => {
     await controller.setup(true)
 
     // set ageLimit to 19   
-    await system.storage.set('state', 'ageLimit', 19)
+    await system.storage.set(DICTIONARY_RECORD, 'ageLimit', 19)
 
     const user1 = await system.storage.create('User', {name: 'user1', age: 18})
     const user2 = await system.storage.create('User', {name: 'user2', age: 20})
 
-    const isAnyUserAgeGreaterThanAgeLimit = await system.storage.get('state', 'isAnyUserAgeGreaterThanAgeLimit')
+    const isAnyUserAgeGreaterThanAgeLimit = await system.storage.get(DICTIONARY_RECORD, 'isAnyUserAgeGreaterThanAgeLimit')
     expect(isAnyUserAgeGreaterThanAgeLimit).toBeTruthy()
 
     // set ageLimit to 21
-    await system.storage.set('state', 'ageLimit', 21)
+    await system.storage.set(DICTIONARY_RECORD, 'ageLimit', 21)
 
-    const isAnyUserAgeGreaterThanAgeLimit2 = await system.storage.get('state', 'isAnyUserAgeGreaterThanAgeLimit')
+    const isAnyUserAgeGreaterThanAgeLimit2 = await system.storage.get(DICTIONARY_RECORD, 'isAnyUserAgeGreaterThanAgeLimit')
     expect(isAnyUserAgeGreaterThanAgeLimit2).toBeFalsy()
 
     // set ageLimit to 19
-    await system.storage.set('state', 'ageLimit', 19)
+    await system.storage.set(DICTIONARY_RECORD, 'ageLimit', 19)
 
-    const isAnyUserAgeGreaterThanAgeLimit3 = await system.storage.get('state', 'isAnyUserAgeGreaterThanAgeLimit')
+    const isAnyUserAgeGreaterThanAgeLimit3 = await system.storage.get(DICTIONARY_RECORD, 'isAnyUserAgeGreaterThanAgeLimit')
     expect(isAnyUserAgeGreaterThanAgeLimit3).toBeTruthy()
 
     // delete user1 
     await system.storage.delete('User', BoolExp.atom({key: 'id', value: ['=', user1.id]}))
 
-    const isAnyUserAgeGreaterThanAgeLimit4 = await system.storage.get('state', 'isAnyUserAgeGreaterThanAgeLimit')
+    const isAnyUserAgeGreaterThanAgeLimit4 = await system.storage.get(DICTIONARY_RECORD, 'isAnyUserAgeGreaterThanAgeLimit')
     expect(isAnyUserAgeGreaterThanAgeLimit4).toBeTruthy()
     
     // delete user2
     await system.storage.delete('User', BoolExp.atom({key: 'id', value: ['=', user2.id]}))
 
-    const isAnyUserAgeGreaterThanAgeLimit5 = await system.storage.get('state', 'isAnyUserAgeGreaterThanAgeLimit')
+    const isAnyUserAgeGreaterThanAgeLimit5 = await system.storage.get(DICTIONARY_RECORD, 'isAnyUserAgeGreaterThanAgeLimit')
     expect(isAnyUserAgeGreaterThanAgeLimit5).toBeFalsy()
 
   })

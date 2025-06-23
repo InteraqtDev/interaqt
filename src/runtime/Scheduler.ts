@@ -4,7 +4,7 @@ import { DataContext, ComputedDataHandle, PropertyDataContext, EntityDataContext
 import { Entity, Klass, KlassInstance, Property, Relation } from "@shared";
 import { assert } from "./util.js";
 import { Computation, ComputationClass, ComputationResult, ComputationResultAsync, ComputationResultFullRecompute, ComputationResultResolved, ComputationResultSkip, DataBasedComputation, EventBasedComputation, GlobalBoundState, RecordBoundState, RecordsDataDep, RelationBoundState } from "./computedDataHandles/Computation.js";
-import { RecordMutationEvent, SYSTEM_RECORD } from "./System.js";
+import { DICTIONARY_RECORD, RecordMutationEvent, SYSTEM_RECORD } from "./System.js";
 import { MatchExp } from "@storage";
 import {
     EntityEventSourceMap,
@@ -228,7 +228,7 @@ export class Scheduler {
                     if (state instanceof GlobalBoundState) {
                         state.controller = this.controller
                         state.key = `${computationHandle.dataContext!.id!}_${stateName}`
-                        await this.controller.system.storage.set('state', state.key , state.defaultValue ?? null)
+                        await this.controller.system.storage.set(DICTIONARY_RECORD, state.key , state.defaultValue ?? null)
                     } 
                 }
             }
@@ -582,7 +582,7 @@ export class Scheduler {
                 } else if (dataDep.type === 'property') {
                     return this.controller.system.storage.findOne((computation.dataContext as PropertyDataContext).host.name, MatchExp.atom({key: 'id', value: ['=', record.id]}), {}, dataDep.attributeQuery)
                 } else if (dataDep.type === 'global') {
-                    return this.controller.system.storage.get('state', dataDep.source.name)
+                    return await this.controller.system.storage.get(DICTIONARY_RECORD, dataDep.source.name)
                 }
             }))
             return Object.fromEntries(Object.entries(computation.dataDeps).map(([dataDepName, dataDep], index) => [dataDepName, values[index]]))
@@ -590,7 +590,12 @@ export class Scheduler {
             return {}
         }
     }
-    
+    async setupGlobalDict() {
+        const globalDict = this.controller.dict.filter(dict => dict.defaultValue !== undefined)
+        for (const dict of globalDict) {
+            await this.controller.system.storage.set(DICTIONARY_RECORD, dict.name, dict.defaultValue!())
+        }
+    }
     
     async setup() {
         // entity/relation/dict 是 computation 时的 defaultValue.
@@ -600,9 +605,8 @@ export class Scheduler {
         // 设置 computation 对 mutation 事件 的监听
         await this.setupMutationListeners()
         // 可能需要的 computation 初始化行为。
-        // 1. 如果 global dict 里面有值，并且 entity/relation 有 computation 是直接依赖于 global dict 的，那么就要 run 一遍。
-        //  这里可以直接触发一次所有 global dict 的 create 事件。
-        // 2. record 创建时，computation 字段时需要直接计算一次，因为它可能直接依赖了的是已有的 global dict。
+        // 为什么放在这里，因为 global dict 的赋值行为可能触发初始化的其他 computation.
+        await this.setupGlobalDict()
     }
 }
 

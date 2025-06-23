@@ -8,7 +8,9 @@ import {
   MonoSystem,
   Property,
   Relation,
-  Count
+  Count,
+  MatchExp,
+  DICTIONARY_RECORD
 } from '@';
 
 describe('Count computed handle', () => {
@@ -44,7 +46,7 @@ describe('Count computed handle', () => {
     await controller.setup(true);
     
     // Initial count should be 0
-    const initialCount = await system.storage.get('state', 'productCount');
+    const initialCount = await system.storage.get(DICTIONARY_RECORD, 'productCount');
     expect(initialCount).toBe(0);
     
     // Create products
@@ -52,14 +54,14 @@ describe('Count computed handle', () => {
     await system.storage.create('Product', {name: 'Product 2', price: 20});
     
     // Count should be 2
-    const count1 = await system.storage.get('state', 'productCount');
+    const count1 = await system.storage.get(DICTIONARY_RECORD, 'productCount');
     expect(count1).toBe(2);
     
     // Create another product
     await system.storage.create('Product', {name: 'Product 3', price: 30});
     
     // Count should be 3
-    const count2 = await system.storage.get('state', 'productCount');
+    const count2 = await system.storage.get(DICTIONARY_RECORD, 'productCount');
     expect(count2).toBe(3);
     
     // Delete a product
@@ -71,7 +73,7 @@ describe('Count computed handle', () => {
     await system.storage.delete('Product', idMatch);
     
     // Count should be 2
-    const count3 = await system.storage.get('state', 'productCount');
+    const count3 = await system.storage.get(DICTIONARY_RECORD, 'productCount');
     expect(count3).toBe(2);
   });
   
@@ -440,5 +442,403 @@ describe('Count computed handle', () => {
     
     expect(afterAuthor1.bookCount).toBe(1);
     expect(afterBook1.authorCount).toBe(1);
+  });
+
+  test('should count with callback filter on global Count', async () => {
+    // Create entity with status field
+    const orderEntity = Entity.create({
+      name: 'Order',
+      properties: [
+        Property.create({name: 'customerName', type: 'string'}),
+        Property.create({name: 'status', type: 'string'}),
+        Property.create({name: 'amount', type: 'number'})
+      ]
+    });
+    
+    const entities = [orderEntity];
+    
+    // Create dictionary item to store count of completed orders
+    const dictionary = [
+      Dictionary.create({
+        name: 'completedOrderCount',
+        type: 'number',
+        collection: false,
+        computedData: Count.create({
+          record: orderEntity,
+          attributeQuery: ['status'],
+          callback: function(order) {
+            return order.status === 'completed';
+          }
+        })
+      })
+    ];
+    
+    // Setup system and controller
+    const system = new MonoSystem();
+    system.conceptClass = KlassByName;
+    const controller = new Controller(system, entities, [], [], [], dictionary, []);
+    await controller.setup(true);
+    
+    // Initial count should be 0
+    const initialCount = await system.storage.get(DICTIONARY_RECORD, 'completedOrderCount');
+    expect(initialCount).toBe(0);
+    
+    // Create orders with different statuses
+    await system.storage.create('Order', {customerName: 'Customer 1', status: 'pending', amount: 100});
+    await system.storage.create('Order', {customerName: 'Customer 2', status: 'completed', amount: 200});
+    await system.storage.create('Order', {customerName: 'Customer 3', status: 'processing', amount: 150});
+    
+    // Only 1 completed order should be counted
+    const count1 = await system.storage.get(DICTIONARY_RECORD, 'completedOrderCount');
+    expect(count1).toBe(1);
+    
+    // Create another completed order
+    await system.storage.create('Order', {customerName: 'Customer 4', status: 'completed', amount: 300});
+    
+    // Should count 2 completed orders
+    const count2 = await system.storage.get(DICTIONARY_RECORD, 'completedOrderCount');
+    expect(count2).toBe(2);
+    
+    // Update an order status to completed
+    const orders = await system.storage.find('Order', BoolExp.atom({key: 'status', value: ['=', 'pending']}));
+    if (orders.length > 0) {
+      await system.storage.update('Order', BoolExp.atom({key: 'id', value: ['=', orders[0].id]}), {status: 'completed'});
+    }
+    
+    // Should count 3 completed orders now
+    const count3 = await system.storage.get(DICTIONARY_RECORD, 'completedOrderCount');
+    expect(count3).toBe(3);
+    
+    // Update a completed order to cancelled
+    const completedOrders = await system.storage.find('Order', BoolExp.atom({key: 'status', value: ['=', 'completed']}));
+    await system.storage.update('Order', BoolExp.atom({key: 'id', value: ['=', completedOrders[0].id]}), {status: 'cancelled'});
+    
+    // Should count 2 completed orders
+    const count4 = await system.storage.get(DICTIONARY_RECORD, 'completedOrderCount');
+    expect(count4).toBe(2);
+  });
+
+  test('should count with callback filter on property Count', async () => {
+    // Create entities
+    const projectEntity = Entity.create({
+      name: 'Project',
+      properties: [
+        Property.create({name: 'name', type: 'string'})
+      ]
+    });
+    
+    const issueEntity = Entity.create({
+      name: 'Issue',
+      properties: [
+        Property.create({name: 'title', type: 'string'}),
+        Property.create({name: 'priority', type: 'string'}),
+        Property.create({name: 'status', type: 'string', defaultValue: () => 'open'})
+      ]
+    });
+    
+    const entities = [projectEntity, issueEntity];
+    
+    // Create relationship
+    const projectIssueRelation = Relation.create({
+      source: projectEntity,
+      sourceProperty: 'issues',
+      target: issueEntity,
+      targetProperty: 'project',
+      name: 'projectIssue',
+      type: '1:n'
+    });
+    
+    const relations = [projectIssueRelation];
+    
+    // Add property to count high priority issues
+    projectEntity.properties.push(
+      Property.create({
+        name: 'highPriorityIssueCount',
+        type: 'number',
+        defaultValue: () => 0,
+        computedData: Count.create({
+          record: projectIssueRelation,
+          attributeQuery: [['target', {attributeQuery: ['priority']}]],
+          callback: function(relation) {
+            return relation.target.priority === 'high';
+          }
+        })
+      })
+    );
+    
+    // Setup system and controller
+    const system = new MonoSystem();
+    system.conceptClass = KlassByName;
+    const controller = new Controller(system, entities, relations, [], [], [], []);
+    await controller.setup(true);
+    
+    // Create project
+    const project = await system.storage.create('Project', {name: 'Test Project'});
+    
+    // Check initial count
+    const project1 = await system.storage.findOne('Project', BoolExp.atom({key: 'id', value: ['=', project.id]}), undefined, ['*']);
+    expect(project1.highPriorityIssueCount).toBe(0);
+    
+    // Create issues with different priorities
+    await system.storage.create('Issue', {title: 'Issue 1', priority: 'low', project: project});
+    await system.storage.create('Issue', {title: 'Issue 2', priority: 'high', project: project});
+    await system.storage.create('Issue', {title: 'Issue 3', priority: 'medium', project: project});
+    await system.storage.create('Issue', {title: 'Issue 4', priority: 'high', project: project});
+    
+    // Should count 2 high priority issues
+    const project2 = await system.storage.findOne('Project', BoolExp.atom({key: 'id', value: ['=', project.id]}), undefined, ['*']);
+    expect(project2.highPriorityIssueCount).toBe(2);
+    
+    // Update an issue priority to high
+    const issues = await system.storage.find('Issue', BoolExp.atom({key: 'priority', value: ['=', 'medium']}));
+    await system.storage.update('Issue', BoolExp.atom({key: 'id', value: ['=', issues[0].id]}), {priority: 'high'});
+    
+    // Should count 3 high priority issues
+    const project3 = await system.storage.findOne('Project', BoolExp.atom({key: 'id', value: ['=', project.id]}), undefined, ['*']);
+    expect(project3.highPriorityIssueCount).toBe(3);
+  });
+
+  test('should count with dataDeps in callback', async () => {
+    // Create entities
+    const customerEntity = Entity.create({
+      name: 'Customer',
+      properties: [
+        Property.create({name: 'name', type: 'string'}),
+        Property.create({name: 'vipStatus', type: 'boolean', defaultValue: () => false})
+      ]
+    });
+    
+    const purchaseEntity = Entity.create({
+      name: 'Purchase',
+      properties: [
+        Property.create({name: 'amount', type: 'number'}),
+        Property.create({name: 'date', type: 'string'})
+      ]
+    });
+    
+    const entities = [customerEntity, purchaseEntity];
+    
+    // Create relationship
+    const customerPurchaseRelation = Relation.create({
+      source: customerEntity,
+      sourceProperty: 'purchases',
+      target: purchaseEntity,
+      targetProperty: 'customer',
+      name: 'customerPurchase',
+      type: '1:n'
+    });
+    
+    const relations = [customerPurchaseRelation];
+    
+    // Create dictionary for minimum VIP amount
+    const vipMinAmount = Dictionary.create({
+      name: 'vipMinAmount',
+      type: 'number',
+      collection: false,
+      defaultValue: () => 1000
+    });
+    const dictionary = [vipMinAmount];
+    
+    // Add property to count purchases above VIP threshold
+    customerEntity.properties.push(
+      Property.create({
+        name: 'vipPurchaseCount',
+        type: 'number',
+        defaultValue: () => 0,
+        computedData: Count.create({
+          record: customerPurchaseRelation,
+          attributeQuery: [['target', {attributeQuery: ['amount']}]],
+          callback: function(relation, dataDeps) {
+            debugger
+            return relation.target.amount >= dataDeps.minAmount;
+          },
+          dataDeps: {
+            minAmount: {
+              type: 'global',
+              source: vipMinAmount,
+            }
+          }
+        })
+      })
+    );
+    
+    // Setup system and controller
+    const system = new MonoSystem();
+    system.conceptClass = KlassByName;
+    const controller = new Controller(system, entities, relations, [], [], dictionary, []);
+    await controller.setup(true);
+    
+    // Create customer
+    const customer = await system.storage.create('Customer', {name: 'John Doe'});
+    
+    // Create purchases with different amounts
+    await system.storage.create('Purchase', {amount: 500, date: '2024-01-01', customer: customer});
+    await system.storage.create('Purchase', {amount: 1200, date: '2024-01-02', customer: customer});
+    await system.storage.create('Purchase', {amount: 800, date: '2024-01-03', customer: customer});
+    await system.storage.create('Purchase', {amount: 1500, date: '2024-01-04', customer: customer});
+    
+    // Should count 2 VIP purchases (>= 1000)
+    const customer1 = await system.storage.findOne('Customer', MatchExp.atom({key: 'id', value: ['=', customer.id]}), undefined, ['*']);
+    expect(customer1.vipPurchaseCount).toBe(2);
+    
+    // Update VIP minimum amount
+    await system.storage.set(DICTIONARY_RECORD, 'vipMinAmount', 600);
+    
+    
+    // Should count 3 VIP purchases now (>= 600)
+    const customer2 = await system.storage.findOne('Customer', MatchExp.atom({key: 'id', value: ['=', customer.id]}), undefined, ['*']);
+    expect(customer2.vipPurchaseCount).toBe(3);
+  });
+
+  test('should count with attributeQuery optimization', async () => {
+    // Create entity with status field
+    const itemEntity = Entity.create({
+      name: 'Item',
+      properties: [
+        Property.create({name: 'name', type: 'string'}),
+        Property.create({name: 'status', type: 'string'}),
+        Property.create({name: 'description', type: 'string'}) // Not needed for count
+      ]
+    });
+    
+    const entities = [itemEntity];
+    
+    // Create dictionary to count items with specific status, using attributeQuery optimization
+    const dictionary = [
+      Dictionary.create({
+        name: 'activeItemCount',
+        type: 'number',
+        collection: false,
+        computedData: Count.create({
+          record: itemEntity,
+          callback: function(item) {
+            return item.status === 'active';
+          },
+          attributeQuery: ['name', 'status'] // Only fetch needed fields, not description
+        })
+      })
+    ];
+    
+    // Setup system and controller
+    const system = new MonoSystem();
+    system.conceptClass = KlassByName;
+    const controller = new Controller(system, entities, [], [], [], dictionary, []);
+    await controller.setup(true);
+    
+    // Create items
+    await system.storage.create('Item', {
+      name: 'Item1', 
+      status: 'active', 
+      description: 'Long description that is not needed for count'
+    });
+    await system.storage.create('Item', {
+      name: 'Item2', 
+      status: 'inactive', 
+      description: 'Another long description'
+    });
+    await system.storage.create('Item', {
+      name: 'Item3', 
+      status: 'active', 
+      description: 'Yet another description'
+    });
+    
+    // Should count 2 active items
+    const count1 = await system.storage.get(DICTIONARY_RECORD, 'activeItemCount');
+    expect(count1).toBe(2);
+    
+    // Update item status
+    const items = await system.storage.find('Item', BoolExp.atom({key: 'name', value: ['=', 'Item2']}));
+    await system.storage.update('Item', BoolExp.atom({key: 'id', value: ['=', items[0].id]}), {status: 'active'});
+    
+    // Should count 3 active items
+    const count2 = await system.storage.get(DICTIONARY_RECORD, 'activeItemCount');
+    expect(count2).toBe(3);
+  });
+
+  test('should count with direction parameter on relation', async () => {
+    // Create entities for user-to-user following relationship
+    const userEntity = Entity.create({
+      name: 'User',
+      properties: [
+        Property.create({name: 'username', type: 'string'})
+      ]
+    });
+    
+    const entities = [userEntity];
+    
+    // Create self-referencing relationship
+    const followRelation = Relation.create({
+      source: userEntity,
+      sourceProperty: 'following',
+      target: userEntity,
+      targetProperty: 'followers',
+      name: 'follows',
+      type: 'n:n'
+    });
+    
+    const relations = [followRelation];
+    
+    // Add properties to count followers and following separately
+    userEntity.properties.push(
+      Property.create({
+        name: 'followerCount',
+        type: 'number',
+        defaultValue: () => 0,
+        computedData: Count.create({
+          record: followRelation,
+          direction: 'target' // Count as target (being followed)
+        })
+      }),
+      Property.create({
+        name: 'followingCount',
+        type: 'number',
+        defaultValue: () => 0,
+        computedData: Count.create({
+          record: followRelation,
+          direction: 'source' // Count as source (following others)
+        })
+      })
+    );
+    
+    // Setup system and controller
+    const system = new MonoSystem();
+    system.conceptClass = KlassByName;
+    const controller = new Controller(system, entities, relations, [], [], [], []);
+    await controller.setup(true);
+    
+    // Create users
+    const user1 = await system.storage.create('User', {username: 'user1'});
+    const user2 = await system.storage.create('User', {username: 'user2'});
+    const user3 = await system.storage.create('User', {username: 'user3'});
+    
+    // Initial counts should be 0
+    const initialUser1 = await system.storage.findOne('User', BoolExp.atom({key: 'id', value: ['=', user1.id]}), undefined, ['*']);
+    expect(initialUser1.followerCount).toBe(0);
+    expect(initialUser1.followingCount).toBe(0);
+    
+    // User1 follows User2
+    await system.storage.addRelationByNameById('User_following_followers_User', user1.id, user2.id, {});
+    
+    // User1 should have 1 following, User2 should have 1 follower
+    const updatedUser1 = await system.storage.findOne('User', BoolExp.atom({key: 'id', value: ['=', user1.id]}), undefined, ['*']);
+    const updatedUser2 = await system.storage.findOne('User', BoolExp.atom({key: 'id', value: ['=', user2.id]}), undefined, ['*']);
+    
+    expect(updatedUser1.followingCount).toBe(1);
+    expect(updatedUser1.followerCount).toBe(0);
+    expect(updatedUser2.followingCount).toBe(0);
+    expect(updatedUser2.followerCount).toBe(1);
+    
+    // User3 follows User1, User1 follows User3 (mutual)
+    await system.storage.addRelationByNameById('User_following_followers_User', user3.id, user1.id, {});
+    await system.storage.addRelationByNameById('User_following_followers_User', user1.id, user3.id, {});
+    
+    // Check final counts
+    const finalUser1 = await system.storage.findOne('User', BoolExp.atom({key: 'id', value: ['=', user1.id]}), undefined, ['*']);
+    const finalUser3 = await system.storage.findOne('User', BoolExp.atom({key: 'id', value: ['=', user3.id]}), undefined, ['*']);
+    
+    expect(finalUser1.followingCount).toBe(2); // Following user2 and user3
+    expect(finalUser1.followerCount).toBe(1); // Followed by user3
+    expect(finalUser3.followingCount).toBe(1); // Following user1
+    expect(finalUser3.followerCount).toBe(1); // Followed by user1
   });
 }); 

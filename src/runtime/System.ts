@@ -6,6 +6,7 @@ import { InteractionEvent } from "./InteractionCall.js";
 export type SystemCallback =  (...arg: any[]) => any
 export type RecordMutationCallback = (mutationEvents:RecordMutationEvent[]) => Promise<{ events?: RecordMutationEvent[] } |undefined|void>
 export const SYSTEM_RECORD = '_System_'
+export const DICTIONARY_RECORD = '_Dictionary_'
 export type Storage = {
     // 将 entity 映射到表结构的 map
     map: any
