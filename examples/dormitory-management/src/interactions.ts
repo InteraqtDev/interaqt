@@ -106,24 +106,19 @@ export const CreateDormitory = Interaction.create({
   payload: Payload.create({
     items: [
       PayloadItem.create({
-        name: 'name',
-        type: 'string'
+        name: 'name'
       }),
       PayloadItem.create({
-        name: 'building',
-        type: 'string'
+        name: 'building'
       }),
       PayloadItem.create({
-        name: 'roomNumber',
-        type: 'string'
+        name: 'roomNumber'
       }),
       PayloadItem.create({
-        name: 'capacity',
-        type: 'number'
+        name: 'capacity'
       }),
       PayloadItem.create({
-        name: 'description',
-        type: 'string'
+        name: 'description'
       })
     ]
   }),
@@ -169,8 +164,7 @@ export const AssignMemberToDormitory = Interaction.create({
         isRef: true
       }),
       PayloadItem.create({
-        name: 'bedNumber',
-        type: 'number'
+        name: 'bedNumber'
       })
     ]
   }),
@@ -189,8 +183,7 @@ export const ApproveKickRequest = Interaction.create({
         isRef: true
       }),
       PayloadItem.create({
-        name: 'adminComment',
-        type: 'string'
+        name: 'adminComment'
       })
     ]
   }),
@@ -209,8 +202,7 @@ export const RejectKickRequest = Interaction.create({
         isRef: true
       }),
       PayloadItem.create({
-        name: 'adminComment',
-        type: 'string'
+        name: 'adminComment'
       })
     ]
   }),
@@ -231,8 +223,7 @@ export const LeaderApproveApplication = Interaction.create({
         isRef: true
       }),
       PayloadItem.create({
-        name: 'leaderComment',
-        type: 'string'
+        name: 'leaderComment'
       })
     ]
   }),
@@ -251,8 +242,7 @@ export const LeaderRejectApplication = Interaction.create({
         isRef: true
       }),
       PayloadItem.create({
-        name: 'leaderComment',
-        type: 'string'
+        name: 'leaderComment'
       })
     ]
   }),
@@ -271,16 +261,13 @@ export const RecordScore = Interaction.create({
         isRef: true
       }),
       PayloadItem.create({
-        name: 'points',
-        type: 'number'
+        name: 'points'
       }),
       PayloadItem.create({
-        name: 'reason',
-        type: 'string'
+        name: 'reason'
       }),
       PayloadItem.create({
-        name: 'category',
-        type: 'string'
+        name: 'category'
       })
     ]
   }),
@@ -299,8 +286,7 @@ export const RequestKickMember = Interaction.create({
         isRef: true
       }),
       PayloadItem.create({
-        name: 'reason',
-        type: 'string'
+        name: 'reason'
       })
     ]
   }),
@@ -322,8 +308,7 @@ export const ApplyForDormitory = Interaction.create({
         attributives: DormitoryNotFullAttributive
       }),
       PayloadItem.create({
-        name: 'message',
-        type: 'string'
+        name: 'message'
       })
     ]
   }),
@@ -406,12 +391,10 @@ export const AdminApproveApplication = Interaction.create({
         isRef: true
       }),
       PayloadItem.create({
-        name: 'adminComment',
-        type: 'string'
+        name: 'adminComment'
       }),
       PayloadItem.create({
-        name: 'bedNumber',
-        type: 'number'
+        name: 'bedNumber'
       })
     ]
   }),
@@ -430,8 +413,7 @@ export const AdminRejectApplication = Interaction.create({
         isRef: true
       }),
       PayloadItem.create({
-        name: 'adminComment',
-        type: 'string'
+        name: 'adminComment'
       })
     ]
   }),
