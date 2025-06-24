@@ -244,9 +244,35 @@ export const Transform = createClass({
     }
 })
 
+export const RealTime = createClass({
+    name: 'RealTimeValue',
+    public: {
+        attributeQuery: {
+            instanceType: {} as unknown as AttributeQueryData,
+            collection: false,
+            required: false
+        },
+        dataDeps: {
+            // FIXME 类型定义
+            instanceType: {} as unknown as {[key: string]: any},
+            collection: false,
+            required: false
+        },
+        nextRecomputeTime: {
+            type: 'function',
+            collection: false,
+            required: false
+        },
+        callback: {
+            type: 'function',
+            collection: false,
+            required: true
+        },
+    }
+})
 
 // 修补 Entity computedData 里面的类型
-Relation.public.computedData.type.push(StateMachine, WeightedSummation, Count, Every, Any, Transform)
-Entity.public.computedData.type.push(StateMachine, WeightedSummation, Count, Every, Any, Transform)
-Property.public.computedData.type.push(StateMachine, WeightedSummation, Count, Every, Any, Transform)
-Dictionary.public.computedData.type.push(StateMachine, WeightedSummation, Count, Every, Any, Transform)
+Relation.public.computedData.type.push(StateMachine, WeightedSummation, Count, Every, Any, Transform, RealTime)
+Entity.public.computedData.type.push(StateMachine, WeightedSummation, Count, Every, Any, Transform, RealTime)
+Property.public.computedData.type.push(StateMachine, WeightedSummation, Count, Every, Any, Transform, RealTime)
+Dictionary.public.computedData.type.push(StateMachine, WeightedSummation, Count, Every, Any, Transform, RealTime)

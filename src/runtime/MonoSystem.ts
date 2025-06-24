@@ -22,7 +22,7 @@ import {
 import { SQLiteDB } from "./SQLite.js";
 import pino from "pino";
 import { RecordBoundState, RelationBoundState } from "./computedDataHandles/Computation.js";
-import { PropertyDataContext } from "./computedDataHandles/ComputedDataHandle.js";
+import { DataContext, PropertyDataContext } from "./computedDataHandles/ComputedDataHandle.js";
 import { assert } from "./util.js";
 
 function JSONStringify(value:any) {
@@ -166,50 +166,42 @@ export class MonoSystem implements System {
         states.forEach(({dataContext, state}) => {
             Object.entries(state).forEach(([stateName, stateItem]) => {
                 if (stateItem instanceof RecordBoundState) { 
-                    let boundStateName = ''
                     let entity!: KlassInstance<typeof Entity> 
                     if (dataContext.type === 'property') {
                         const propertyDataContext = dataContext as PropertyDataContext
                         entity = propertyDataContext.host 
-                        const propertyName = propertyDataContext.id.name
-                        boundStateName = `_property_boundState_${entity.name}_${propertyName}_${stateName}`
                     } else if(dataContext.type === 'entity'||dataContext.type === 'relation') {
                         entity = dataContext.id as KlassInstance<typeof Entity>
-                        boundStateName = `_${dataContext.type}_boundState_${dataContext.id.name}_${stateName}`
                     } else {
                         throw new Error(`Unsupported data context type: ${dataContext.type}`)
                     }
-                    stateItem.key = boundStateName
 
                     if (stateItem.defaultValue instanceof Property) {
                         // TODO 特别注意这里改了 name
-                        stateItem.defaultValue.name = boundStateName
+                        stateItem.defaultValue.name = stateItem.key
                         entity.properties.push(stateItem.defaultValue)
                     } else {
                         const defaultValuetype = typeof stateItem.defaultValue
                         entity.properties.push(Property.create({
-                            name: boundStateName,
+                            name: stateItem.key,
                             type: defaultValuetype,
                             // 应该系统定义
                             collection: Array.isArray(stateItem.defaultValue),
                             defaultValue: () => stateItem.defaultValue
                         }))
                     }
-                } else if (stateItem instanceof RelationBoundState) {
-                    const propertyDataContext = dataContext as PropertyDataContext
-                    const boundStateName = `_relation_boundState_${propertyDataContext.host.name}_${propertyDataContext.id}_${stateName}`
-                    stateItem.key = boundStateName
+                } else if (stateItem instanceof RelationBoundState) {   
                     const relationName = stateItem.record
                     const relation = relations.find(relation => relation.name === relationName)!
                     assert(relation, `relation ${relationName} not found`)
                     if (stateItem.defaultValue instanceof Property) {
                         // TODO 特别注意这里改了 name
-                        stateItem.defaultValue.name = boundStateName
+                        stateItem.defaultValue.name = stateItem.key
                         relation.properties.push(stateItem.defaultValue)
                     } else {
                         const defaultValuetype = typeof stateItem.defaultValue
                         relation.properties.push(Property.create({
-                            name: boundStateName,
+                            name: stateItem.key,
                             type: defaultValuetype,
                             // 应该系统定义
                             collection: Array.isArray(stateItem.defaultValue),

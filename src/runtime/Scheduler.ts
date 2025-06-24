@@ -175,6 +175,16 @@ export class Scheduler {
             }
         }
     }
+    getBoundStateName(dataContext: DataContext, stateName: string, stateItem: RecordBoundState<any>|GlobalBoundState<any>|RelationBoundState<any>) {
+
+        const stateTypePrefix = stateItem instanceof RelationBoundState ? 'relation' : stateItem instanceof RecordBoundState ? 'record' : 'global'
+
+        const stateDataContextKey = dataContext.type === 'property' ? 
+            `${dataContext.host.name}_${dataContext.id.name}` : 
+            dataContext.id
+
+        return `_${stateTypePrefix}_boundState_${stateDataContextKey}_${stateName}`
+    }
     createStates() {
         const states: {dataContext: DataContext, state: {[key: string]: RecordBoundState<any>|GlobalBoundState<any>|RelationBoundState<any>}}[] = []
         for(const computation of this.computations) {
@@ -184,9 +194,9 @@ export class Scheduler {
                 computation.state = state
 
 
-                for(let stateItem of Object.values(state)) {
+                for(let [stateName, stateItem] of Object.entries(state)) {
                     stateItem.controller = this.controller
-                    stateItem.controller = this.controller
+                    stateItem.key = this.getBoundStateName(computation.dataContext, stateName, stateItem)
                     if (stateItem instanceof RecordBoundState) {
                         if (computation.dataContext.type === 'property') {
                             stateItem.record = (computation.dataContext as PropertyDataContext)!.host.name!
@@ -224,10 +234,9 @@ export class Scheduler {
             // TODO 这里 createState 要放到 setup 前面，因为可能会修改 entity、relation ???
             // 1. 创建计算所需要的 state
             if (computationHandle.state) {
-                for(const [stateName, state] of Object.entries(computationHandle.state)) {
+                for(const state of Object.values(computationHandle.state)) {
                     if (state instanceof GlobalBoundState) {
                         state.controller = this.controller
-                        state.key = `${(computationHandle.dataContext!.id! as any).name || computationHandle.dataContext!.id!}_${stateName}`
                         await this.controller.system.storage.set(DICTIONARY_RECORD, state.key , state.defaultValue ?? null)
                     } 
                 }
