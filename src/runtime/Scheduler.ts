@@ -322,48 +322,11 @@ export class Scheduler {
         return dirtyDataDepRecords
     }
     computeOldRecord(newRecord: any, sourceMap: EntityEventSourceMap, mutationEvent: RecordMutationEvent) {
-        // 因为 RecordMutationEvent 可能是关联的实体等数据更新，所以要从 RecordMutationEvent 中构造出当前 record 的 oldRecord
-        if (!sourceMap.targetPath?.length) {
+        // FIXME 理论上我们现在不需要 computeOldRecord 了。
+        if(!sourceMap.targetPath?.length) {
             return mutationEvent.oldRecord
         }
-        const result = {...newRecord}
-        const path = [...sourceMap.targetPath]
-        const lastAttr = path.pop()!
-        let pointer = result
-        // 一路浅拷贝
-        for(const attr of path) {
-            // CAUTION Computation 不能跨越 x:n 的集合，所以路径上应该都是对象。
-            if (typeof pointer[attr] === 'object') {
-                pointer[attr] = {...pointer[attr]}
-            } else if( pointer[attr] === undefined){
-                // undefined
-                pointer[attr] = {}
-            } else {
-                throw new Error(`cannot compute old record for ${sourceMap.recordName} because ${attr} is not an object`)
-            }
-            
-            pointer = pointer[attr]
-        }
-        if(Array.isArray(pointer[lastAttr])) {
-            // 集合
-            if (mutationEvent.type === 'delete') {
-                pointer[lastAttr] = pointer[lastAttr].concat(mutationEvent.record)
-            } else if (mutationEvent.type === 'create') {
-                pointer[lastAttr] = pointer[lastAttr].filter(item => item.id !== mutationEvent.record!.id)
-            } else if (mutationEvent.type === 'update') {
-                pointer[lastAttr] = pointer[lastAttr].map(item => item.id === mutationEvent.oldRecord!.id ? {...item, ...mutationEvent.oldRecord} : item)
-            }
-        } else {
-            if (mutationEvent.type === 'delete') {
-                pointer[lastAttr] = mutationEvent.record
-            } else if (mutationEvent.type === 'create') {
-                pointer[lastAttr] = undefined
-            } else if (mutationEvent.type === 'update') {
-                pointer[lastAttr] = {...pointer[lastAttr], ...mutationEvent.oldRecord}
-            }
-        }
-        
-        return result
+        return {...newRecord}
     }
     async computeDataBasedDirtyRecordsAndEvents(source: EntityEventSourceMap, mutationEvent: RecordMutationEvent) {
         let dirtyRecordsAndEvents: [any, EtityMutationEvent][] = []

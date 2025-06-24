@@ -3,26 +3,36 @@ import { Sum, KlassInstance, Relation, Entity } from "@shared";
 import { Controller } from "../Controller.js";
 import { ComputationResult, DataBasedComputation, DataDep, RecordBoundState, RecordsDataDep } from "./Computation.js";
 import { EtityMutationEvent } from "../Scheduler.js";
-import { MatchExp } from "@storage";
+import { MatchExp, AttributeQueryData } from "@storage";
+import { assert } from "../util.js";
 
 export class GlobalSumHandle implements DataBasedComputation {
-    callback: (this: Controller, item: any, dataDeps?: {[key: string]: any}) => number
     state!: ReturnType<typeof this.createState>
     useLastValue: boolean = true
     dataDeps: {[key: string]: DataDep} = {}
     record: KlassInstance<typeof Entity|typeof Relation>
-
-    constructor(public controller: Controller, args: KlassInstance<typeof Sum>, public dataContext: DataContext) {
+    sumFieldPath: string[]
+    constructor(public controller: Controller, public args: KlassInstance<typeof Sum>, public dataContext: DataContext) {
         this.record = args.record
-        this.callback = args.callback?.bind(this)
         
+        // 获取 attributeQuery 的第一个字段作为求和字段
+        if (!args.attributeQuery || args.attributeQuery.length === 0) {
+            throw new Error('Sum computation requires attributeQuery with at least one field')
+        }
+
+        this.sumFieldPath = []
+        let attrPointer:any = this.args.attributeQuery
+        while(attrPointer) {
+            this.sumFieldPath.push(Array.isArray(attrPointer[0]) ? attrPointer[0][0]: attrPointer[0])
+            attrPointer = Array.isArray(attrPointer[0]) ? attrPointer[0][1].attributeQuery : null
+        }
+
         this.dataDeps = {
             main: {
                 type: 'records',
                 source: this.record,
-                attributeQuery: args.attributeQuery
-            },
-            ...(args.dataDeps || {})
+                attributeQuery:args.attributeQuery
+            }
         }
     }
     
@@ -35,14 +45,20 @@ export class GlobalSumHandle implements DataBasedComputation {
         return 0
     }
 
-    async compute({main: records, ...dataDeps}: {main: any[], [key: string]: any}): Promise<number> {
+    resolveSumField(record:any, sumFieldPath = this.sumFieldPath) {
+        let base:any = record
+        for(let attr of sumFieldPath) {
+            base = base[attr]
+            if (base === undefined||base === null||Number.isNaN(base)||!Number.isFinite(base)) return 0
+        }
+        return base
+    }
+    async compute({main: records}: {main: any[]}): Promise<number> {
         let sum = 0;
         
         for (const record of records) {
-            const value = this.callback.call(this.controller, record, dataDeps);
-            if (typeof value === 'number' && !isNaN(value) && isFinite(value)) {
-                sum += value;
-            }
+            const value = this.resolveSumField(record) || 0;
+            sum += value;
         }
         
         return sum;
@@ -57,43 +73,20 @@ export class GlobalSumHandle implements DataBasedComputation {
         let sum = lastValue || 0;
         
         if (mutationEvent.type === 'create') {
-            if (!mutationEvent.record) {
-                return ComputationResult.fullRecompute('No record in create event');
-            }
-            const value = this.callback.call(this.controller, mutationEvent.record, dataDeps);
-            if (typeof value === 'number' && !isNaN(value) && isFinite(value)) {
-                sum += value;
-            }
+            const newRecord = await this.controller.system.storage.findOne(this.record.name, MatchExp.atom({key:'id', value:['=', mutationEvent.record!.id]}), undefined, this.args.attributeQuery)
+            const value = this.resolveSumField(newRecord);
+            sum += value;
         } else if (mutationEvent.type === 'delete') {
-            if (!mutationEvent.oldRecord) {
-                return ComputationResult.fullRecompute('No oldRecord in delete event');
-            }
-            // For delete events, use oldRecord which contains the full record before deletion
-            const value = this.callback.call(this.controller, mutationEvent.oldRecord, dataDeps);
-            if (typeof value === 'number' && !isNaN(value) && isFinite(value)) {
-                sum -= value;
-            }
+            // FIXME 必须同时知道删掉的关联关系，才能支持 attributeQuery 跨关系的 oldValue
+            return ComputationResult.fullRecompute('No oldRecord in delete event');
         } else if (mutationEvent.type === 'update') {
-            // If attributeQuery is specified, we might not have all required fields
-            // in the mutation event, so trigger a full recompute to be safe
-            const hasAttributeQuery = (this.dataDeps.main as RecordsDataDep).attributeQuery && 
-                                      (this.dataDeps.main as RecordsDataDep).attributeQuery!.length > 0;
+            const newRecord = await this.controller.system.storage.findOne(this.record.name, MatchExp.atom({key:'id', value:['=', mutationEvent.record!.id]}), undefined, this.args.attributeQuery)
+            const newValue = this.resolveSumField(newRecord);
             
-            if (hasAttributeQuery) {
-                return ComputationResult.fullRecompute('Update with attributeQuery requires full recompute');
-            }
-            
-            const oldValue = this.callback.call(this.controller, mutationEvent.oldRecord, dataDeps);
-            // For update events, merge oldRecord with the updated fields to get the complete new record
-            const newRecord = { ...mutationEvent.oldRecord, ...mutationEvent.record };
-            const newValue = this.callback.call(this.controller, newRecord, dataDeps);
-            
-            if (typeof oldValue === 'number' && !isNaN(oldValue) && isFinite(oldValue)) {
-                sum -= oldValue;
-            }
-            if (typeof newValue === 'number' && !isNaN(newValue) && isFinite(newValue)) {
-                sum += newValue;
-            }
+            assert(!mutationEvent.relatedAttribute || mutationEvent.relatedAttribute.every((r, index) => r===this.sumFieldPath[index]), 'related update event should not trigger this sum.')
+            const oldRecord = mutationEvent.relatedAttribute ? mutationEvent.relatedMutationEvent!.oldRecord : mutationEvent.oldRecord!
+            const oldValue = this.resolveSumField(oldRecord, this.sumFieldPath.slice(mutationEvent.relatedAttribute?.length||0, Infinity));
+            sum += newValue-oldValue 
         }
         
         return sum;
@@ -101,7 +94,6 @@ export class GlobalSumHandle implements DataBasedComputation {
 }
 
 export class PropertySumHandle implements DataBasedComputation {
-    callback: (this: Controller, item: any, dataDeps?: {[key: string]: any}) => number
     state!: ReturnType<typeof this.createState>
     useLastValue: boolean = true
     dataDeps: {[key: string]: DataDep} = {}
@@ -109,11 +101,10 @@ export class PropertySumHandle implements DataBasedComputation {
     relatedRecordName: string
     isSource: boolean
     relation: KlassInstance<typeof Relation>
-    relationAttributeQuery: any
+    relationAttributeQuery: AttributeQueryData
+    sumFieldPath: string[]
 
     constructor(public controller: Controller, public args: KlassInstance<typeof Sum>, public dataContext: PropertyDataContext) {
-        this.callback = args.callback?.bind(this)
-        
         // We assume in PropertySumHandle, the records array's first element is a Relation
         this.relation = args.record as KlassInstance<typeof Relation>
         this.isSource = args.direction ? args.direction === 'source' : this.relation.source.name === dataContext.host.name
@@ -122,37 +113,53 @@ export class PropertySumHandle implements DataBasedComputation {
         
         this.relationAttributeQuery = args.attributeQuery || []
         
+        // 解析 attributeQuery 获取求和字段
+        if (!args.attributeQuery || args.attributeQuery.length === 0) {
+            throw new Error('Sum computation requires attributeQuery with at least one field')
+        }
+        
+        this.sumFieldPath = []
+        let attrPointer:any = this.args.attributeQuery
+        while(attrPointer) {
+            this.sumFieldPath.push(Array.isArray(attrPointer[0]) ? attrPointer[0][0]: attrPointer[0])
+            attrPointer = Array.isArray(attrPointer[0]) ? attrPointer[0][1].attributeQuery : null
+        }
+        
         this.dataDeps = {
             _current: {
                 type: 'property',
-                attributeQuery: [[this.relationAttr, {attributeQuery: [['&', {attributeQuery: this.relationAttributeQuery}]]}]]
-            },
-            ...(args.dataDeps || {})
+                attributeQuery: [[this.relationAttr, {attributeQuery: this.relationAttributeQuery}]]
+            }
         }
     }
 
     createState() {
         return {
-            sum: new RecordBoundState<number>(0)
         }   
     }
     
     getDefaultValue() {
         return 0
     }
+    resolveSumField(record:any, sumFieldPath = this.sumFieldPath) {
+        let base:any = record
+        for(let attr of sumFieldPath) {
+            base = base[attr]
+            if (base === undefined||base === null||Number.isNaN(base)||!Number.isFinite(base)) return 0
+        }
+        return base
+    }
 
-    async compute({_current, ...dataDeps}: {_current: any, [key: string]: any}): Promise<number> {
+    async compute({_current}: {_current: any}): Promise<number> {
         const relations = _current[this.relationAttr] || [];
         let sum = 0;
         
         for (const relationItem of relations) {
-            const value = this.callback.call(this.controller, relationItem['&'], dataDeps);
-            if (typeof value === 'number' && !isNaN(value)) {
-                sum += value;
-            }
+            // 根据 attributeQuery 的结构获取值
+            let value = this.resolveSumField(relationItem, this.sumFieldPath)
+            sum += value;
         }
         
-        await this.state.sum.set(_current, sum);
         return sum;
     }
 
@@ -175,7 +182,7 @@ export class PropertySumHandle implements DataBasedComputation {
             return ComputationResult.fullRecompute('No related mutation event')
         }
         
-        let sum = await this.state.sum.get(mutationEvent.record) || lastValue || 0;
+        let sum = lastValue || 0;
 
         if (relatedMutationEvent.type === 'create' && relatedMutationEvent.recordName === this.relation.name) {
             // 关联关系的新建
@@ -184,22 +191,31 @@ export class PropertySumHandle implements DataBasedComputation {
                 this.relation.name, 
                 MatchExp.atom({key: 'id', value: ['=', relationRecord.id]}), 
                 undefined, 
-                this.relationAttributeQuery
+                this.relationAttributeQuery || []
             );
             
-            const value = this.callback.call(this.controller, newRelationWithEntity, dataDeps);
-            if (typeof value === 'number' && !isNaN(value)) {
-                sum += value;
-            }
+            // 获取字段值
+            const value = this.resolveSumField(newRelationWithEntity, this.sumFieldPath)
+            sum += value;
         } else if (relatedMutationEvent.type === 'delete' && relatedMutationEvent.recordName === this.relation.name) {
-            // 关联关系的删除 - 需要触发全量重计算，因为我们无法获取被删除关系的详细信息
+            // FIXME 关联关系的删除 - 无法知道原本的字段值
             return ComputationResult.fullRecompute('Cannot determine sum value for deleted relation')
         } else if (relatedMutationEvent.type === 'update') {
-            // 关联实体或关系的更新 - 触发全量重计算以确保正确性
-            return ComputationResult.fullRecompute('Complex update requires full recompute for sum calculation')
+            // 可能是关系更新也可能是关联实体更新
+            const newRelationWithEntity = await this.controller.system.storage.findOne(
+                this.relation.name, 
+                MatchExp.atom({key: mutationEvent.relatedAttribute.slice(2).concat('id').join('.'), value: ['=', relatedMutationEvent.oldRecord!.id]}), 
+                undefined, 
+                this.relationAttributeQuery
+            );
+            const newValue = this.resolveSumField(newRelationWithEntity)
+
+            assert(!mutationEvent.relatedAttribute || mutationEvent.relatedAttribute.every((r, index) => r===this.sumFieldPath[index]), 'related update event should not trigger this sum.')
+            const oldRecord = mutationEvent.relatedMutationEvent!.oldRecord 
+            const oldValue = this.resolveSumField(oldRecord, this.sumFieldPath.slice(mutationEvent.relatedAttribute!.length, Infinity));
+            sum += newValue-oldValue 
         }
 
-        await this.state.sum.set(mutationEvent.record, sum);
         return sum;
     }
 }

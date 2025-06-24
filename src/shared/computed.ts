@@ -168,20 +168,10 @@ export const Sum = createClass({
             collection: false,
             required: false,
         },
-        callback: {
-            type: 'function',
-            collection: false,
-            required: true
-        },
         attributeQuery: {
             instanceType: {} as unknown as AttributeQueryData,
             collection: false,
-            required: false
-        },
-        dataDeps: {
-            instanceType: {} as unknown as {[key: string]: any},
-            collection: false,
-            required: false
+            required: true
         },
     }
 })
