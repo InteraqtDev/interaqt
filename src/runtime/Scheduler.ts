@@ -5,7 +5,7 @@ import { Entity, Klass, KlassInstance, Property, Relation } from "@shared";
 import { assert } from "./util.js";
 import { Computation, ComputationClass, ComputationResult, ComputationResultAsync, ComputationResultFullRecompute, ComputationResultResolved, ComputationResultSkip, DataBasedComputation, EventBasedComputation, GlobalBoundState, RecordBoundState, RecordsDataDep, RelationBoundState } from "./computedDataHandles/Computation.js";
 import { DICTIONARY_RECORD, RecordMutationEvent, SYSTEM_RECORD } from "./System.js";
-import { MatchExp } from "@storage";
+import { AttributeQueryData, MatchExp } from "@storage";
 import {
     EntityEventSourceMap,
     type EtityMutationEvent,
@@ -177,13 +177,11 @@ export class Scheduler {
     }
     getBoundStateName(dataContext: DataContext, stateName: string, stateItem: RecordBoundState<any>|GlobalBoundState<any>|RelationBoundState<any>) {
 
-        const stateTypePrefix = stateItem instanceof RelationBoundState ? 'relation' : stateItem instanceof RecordBoundState ? 'record' : 'global'
-
         const stateDataContextKey = dataContext.type === 'property' ? 
             `${dataContext.host.name}_${dataContext.id.name}` : 
-            dataContext.id
+            (dataContext.type === 'entity' || dataContext.type === 'relation') ? dataContext.id.name : dataContext.id
 
-        return `_${stateTypePrefix}_boundState_${stateDataContextKey}_${stateName}`
+        return `_${stateDataContextKey}_bound_${stateName}`
     }
     createStates() {
         const states: {dataContext: DataContext, state: {[key: string]: RecordBoundState<any>|GlobalBoundState<any>|RelationBoundState<any>}}[] = []
@@ -198,10 +196,16 @@ export class Scheduler {
                     stateItem.controller = this.controller
                     stateItem.key = this.getBoundStateName(computation.dataContext, stateName, stateItem)
                     if (stateItem instanceof RecordBoundState) {
-                        if (computation.dataContext.type === 'property') {
-                            stateItem.record = (computation.dataContext as PropertyDataContext)!.host.name!
-                        } else {
-                            stateItem.record = (computation.dataContext as EntityDataContext)!.id.name!
+                        if (!stateItem.record) {
+                            if (computation.dataContext.type === 'property') {
+                                stateItem.record = (computation.dataContext as PropertyDataContext)!.host.name!
+                            } else if (computation.dataContext.type === 'entity') {
+                                stateItem.record = (computation.dataContext as EntityDataContext)!.id.name!
+                            } else if (computation.dataContext.type === 'relation') {
+                                stateItem.record = (computation.dataContext as RelationDataContext)!.id.name!
+                            } else {
+                                throw new Error(`global data context ${computation.dataContext.id} must specify record name for RecordBoundState`)
+                            }
                         }
                     }
                 }
@@ -280,19 +284,19 @@ export class Scheduler {
             dirtyDataDepRecords = await this.controller.system.storage.find(source.sourceRecordName, MatchExp.atom({
                 key: source.targetPath!.concat('id').join('.'),
                 value: ['=', mutationEvent.oldRecord!.id]
-            }))
+            }), undefined)
         } else {
-            // 2.2. 关联关系的 create/delete 事件，计算出关联关系的增删改最终影响了哪些当前 dataDep
+            // 2.2. 关联关系的 create/delete 事件(不一定是直接的关联关系)，计算出关联关系的增删改最终影响了哪些当前 dataDep
             assert(source.type === 'create' || source.type === 'delete', 'only support create/delete event for relation')
             
             const dataDep = source.dataDep as RecordsDataDep
             if (source.type === 'create') {
-                // FIXME 这里的查询，中间能不能有 n:n 关系？storage 现在是否支持？
                 dirtyDataDepRecords = await this.controller.system.storage.find(source.sourceRecordName, MatchExp.atom({
                     key: source.targetPath!.concat(['&','id']).join('.'),
                     value: ['=', mutationEvent.record!.id]
-                }), undefined, dataDep.attributeQuery)
+                }), undefined)
             } else {
+                // 关系的删除
                 // TODO 需要确定一下，是不是没考虑 targetPath 中间 semmetric relation 的情况
                 const relation = this.controller.relations.find(relation => relation.name === source.recordName)!
                 const isSemmetricRelation = relation.sourceProperty === relation.targetProperty && relation.source === relation.target
@@ -302,14 +306,14 @@ export class Scheduler {
                         // 因为关系已经删掉了，所以必须用倒数第二个节点的信息来判断影响了谁。
                         key: source.targetPath!.slice(0, -1).concat('id').join('.'),
                         value: ['in', [mutationEvent.record!.source.id, mutationEvent.record!.target.id]]
-                    }), undefined, dataDep.attributeQuery)
+                    }), undefined)
                 } else {
                     const isSource = relation?.sourceProperty === source.targetPath!.at(-1)
                     dirtyDataDepRecords = await this.controller.system.storage.find(source.sourceRecordName, MatchExp.atom({
                         // 因为关系已经删掉了，所以必须用倒数第二个节点的信息来判断影响了谁。
                         key: source.targetPath!.slice(0, -1).concat('id').join('.'),
                         value: ['=', mutationEvent.record![isSource ? 'source' : 'target']!.id]
-                    }), undefined, dataDep.attributeQuery)
+                    }), undefined)
                 }
                 
             }
@@ -365,12 +369,12 @@ export class Scheduler {
         let dirtyRecordsAndEvents: [any, EtityMutationEvent][] = []
 
         // 特殊处理 Global 类型的数据依赖
-        if (source.dataDep.type === 'global' && mutationEvent.recordName === '_System_') {
+        if (source.dataDep.type === 'global' && mutationEvent.recordName === SYSTEM_RECORD) {
             // 对于 Global 类型，需要找到所有依赖这个 global 值的记录
-            // 如果是 property 级别的计算，需要找到所有实体记录
+            // 如果是 property 级别的 dataContext，需要找到所有实体记录，就是记录都受影响了
             if (source.computation.dataContext.type === 'property') {
                 const propertyContext = source.computation.dataContext as PropertyDataContext
-                const allRecords = await this.controller.system.storage.find(propertyContext.host.name, undefined, {}, ['*'])
+                const allRecords = await this.controller.system.storage.find(propertyContext.host.name, MatchExp.atom({key:'id', value:['not', null]}), {}, ['*'])
                 dirtyRecordsAndEvents = allRecords.map(record => [record, {
                     dataDep: source.dataDep,
                     type: 'update',
@@ -387,11 +391,13 @@ export class Scheduler {
                 }]]
             }
         } else if(!source.targetPath?.length) {
+            // 就是本身变化了。
             dirtyRecordsAndEvents = [[mutationEvent.record, {
                 dataDep: source.dataDep,
                 ...mutationEvent
             }]]
         } else {
+            // 是关联关系或者关联实体变化了
             const dataDepRecords = await this.computeDirtyDataDepRecords(source, mutationEvent)
             dirtyRecordsAndEvents = dataDepRecords.map(record => [record, {
                 dataDep: source.dataDep,

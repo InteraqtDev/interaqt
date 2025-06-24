@@ -591,7 +591,8 @@ describe('Count computed handle', () => {
     
     // Update an issue priority to high
     const issues = await system.storage.find('Issue', BoolExp.atom({key: 'priority', value: ['=', 'medium']}));
-    await system.storage.update('Issue', BoolExp.atom({key: 'id', value: ['=', issues[0].id]}), {priority: 'high'});
+    const events:any[] = []
+    await system.storage.update('Issue', BoolExp.atom({key: 'id', value: ['=', issues[0].id]}), {priority: 'high'}, events);
     
     // Should count 3 high priority issues
     const project3 = await system.storage.findOne('Project', BoolExp.atom({key: 'id', value: ['=', project.id]}), undefined, ['*']);

@@ -1157,6 +1157,7 @@ WHERE "${entityInfo.idField}" = (${p()})
     // 修改TODO注释以反映已实现的功能
     async updateRecord(entityName: string, matchExpressionData: MatchExpressionData, newEntityData: NewRecordData, events?: RecordMutationEvent[]) {
         // 现在支持在 update 字段的同时，使用 null 来删除关系
+        // FIXME update 的 attributeQuery 应该按需查询，现在查询的记录太多
         const matchedEntities = await this.findRecords(RecordQuery.create(entityName, this.map, {
             matchExpression: matchExpressionData,
             attributeQuery: AttributeQuery.getAttributeQueryDataForRecord(entityName, this.map, true, true, true, true)

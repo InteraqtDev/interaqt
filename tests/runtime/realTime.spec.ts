@@ -692,8 +692,5 @@ describe('RealTime computed handle', () => {
     // Expression type: nextRecomputeTime should be lastTime + 1000 (from nextRecomputeTime function)
     expect(nextRecomputeTime - lastRecomputeTime).toBe(1000);
     
-    // Verify that state keys are properly formatted
-    expect(lastRecomputeTimeKey).toMatch(/_global_boundState_timeBasedCounter_lastRecomputeTime/);
-    expect(nextRecomputeTimeKey).toMatch(/_global_boundState_timeBasedCounter_nextRecomputeTime/);
   });
 });

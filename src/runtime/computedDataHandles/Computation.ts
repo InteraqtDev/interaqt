@@ -48,20 +48,19 @@ export class ComputationResultResolved extends ComputationResult{
 
 
 export class RecordBoundState<T> {
-    record!: string
     key!: string
     controller!: Controller
-    constructor(public defaultValue:any) { 
+    constructor(public defaultValue:any, public record?:string) { 
 
     }
     async set(record:any, value: any): Promise<T> {
-        await this.controller.system.storage.update(this.record, BoolExp.atom({key: 'id', value: ['=', record.id]}), {[this.key]: value})
+        await this.controller.system.storage.update(this.record!, BoolExp.atom({key: 'id', value: ['=', record.id]}), {[this.key]: value})
         return value
     }
     async get(record:any):Promise<T> {
         // TODO 如果 record 上不存在就重新查询
         if (record[this.key] === undefined) {
-            const fullRecord = await this.controller.system.storage.findOne(this.record, BoolExp.atom({key: 'id', value: ['=', record.id]}), undefined, [this.key])
+            const fullRecord = await this.controller.system.storage.findOne(this.record!, BoolExp.atom({key: 'id', value: ['=', record.id]}), undefined, [this.key])
             return fullRecord[this.key] as T
         }
         return record[this.key] as T

@@ -53,7 +53,8 @@ export class GlobalCountHandle implements DataBasedComputation {
     }
 
     async incrementalCompute(lastValue: number, mutationEvent: EtityMutationEvent, record: any, dataDeps: {[key: string]: any}): Promise<number|ComputationResult> {
-        if (mutationEvent.recordName !== (this.dataDeps.main as RecordsDataDep).source!.name) {
+        // 注意要同时检测名字和 relatedAttribute 才能确定是不是自己的更新，因为可能有自己和自己的关联关系的 dataDep。
+        if (mutationEvent.recordName !== (this.dataDeps.main as RecordsDataDep).source!.name || mutationEvent.relatedAttribute?.length) {
             return ComputationResult.fullRecompute('mutationEvent.recordName not match')
         }
 
@@ -101,6 +102,9 @@ export class GlobalCountHandle implements DataBasedComputation {
     }
 }
 
+
+type StateWithCallback = {[k:string]: RecordBoundState<boolean>}
+
 export class PropertyCountHandle implements DataBasedComputation {
     callback?: (this: Controller, item: any, dataDeps?: {[key: string]: any}) => boolean
     state!: ReturnType<typeof this.createState>
@@ -134,10 +138,10 @@ export class PropertyCountHandle implements DataBasedComputation {
         }
     }
 
-    createState() {
-        return {
-            count: new RecordBoundState<number>(0)
-        }   
+    createState(): {}| StateWithCallback {
+        return this.callback ? {
+            isItemMatchCount: new RecordBoundState<boolean>(false, this.relation.name)
+        } : {}
     }
     
     getDefaultValue() {
@@ -146,32 +150,42 @@ export class PropertyCountHandle implements DataBasedComputation {
 
     async compute({_current, ...dataDeps}: {_current: any, [key: string]: any}): Promise<number> {
         const relations = _current[this.relationAttr] || [];
-        let count: number;
+        let count: number = 0;
         
         if (this.callback) {
             // 如果有 callback，过滤符合条件的关联记录
-            count = relations.filter((item: any) => 
-                this.callback!.call(this.controller, item['&'], dataDeps)
-            ).length;
+            for(let relation of relations) {
+                const isItemMatch= this.callback!.call(this.controller, relation['&'], dataDeps)
+                if (isItemMatch) {
+                    (this.state as StateWithCallback).isItemMatchCount!.set(relation, true)
+                    count++
+                }
+            }
         } else {
             // 如果没有 callback，统计所有关联记录
             count = relations.length;
         }
         
-        await this.state.count.set(_current, count);
         return count;
     }
 
     async incrementalCompute(lastValue: number, mutationEvent: EtityMutationEvent, record: any, dataDeps: {[key: string]: any}): Promise<number|ComputationResult> {
-        if (mutationEvent.recordName !== this.dataContext.host.name) {
+        // 只能支持通过 args.record 指定的关联关系或者关联实体的增量更新。
+        if (
+            mutationEvent.recordName !== this.dataContext.host.name ||
+            !mutationEvent.relatedAttribute ||
+            mutationEvent.relatedAttribute.length === 0 || 
+            mutationEvent.relatedAttribute.length > 3 ||
+            mutationEvent.relatedAttribute[0] !== this.relationAttr ||
+            (mutationEvent.relatedAttribute[1] && mutationEvent.relatedAttribute[1] !== '&') ||
+            (mutationEvent.relatedAttribute[2] && mutationEvent.relatedAttribute[2] !== (this.isSource ? 'target' : 'source'))
+        ) {
             return ComputationResult.fullRecompute('mutationEvent.recordName not match')
         }
 
-        const relatedMutationEvent = mutationEvent.relatedMutationEvent;
-        if (!relatedMutationEvent) {
-            return ComputationResult.fullRecompute('No related mutation event')
-        }
-        let count = await this.state.count.get(mutationEvent.record) || lastValue || 0;
+        const relatedMutationEvent = mutationEvent.relatedMutationEvent!;
+        
+        let count = lastValue || 0;
 
         if (relatedMutationEvent.type === 'create' && relatedMutationEvent.recordName === this.relation.name) {
             // 关联关系的新建
@@ -186,27 +200,41 @@ export class PropertyCountHandle implements DataBasedComputation {
                 
                 const itemMatch = !!this.callback.call(this.controller, newRelationWithEntity, dataDeps);
                 if (itemMatch) {
+                    (this.state as StateWithCallback).isItemMatchCount!.set(newRelationWithEntity, true)
                     count = count + 1;
                 }
             } else {
                 count = count + 1;
             }
         } else if (relatedMutationEvent.type === 'delete' && relatedMutationEvent.recordName === this.relation.name) {
-            // 关联关系的删除
+            // 关联关系的删除。
             if (this.callback) {
-                // 对于删除操作，我们无法重新查询，需要依赖之前的状态或者触发全量重计算
-                return ComputationResult.fullRecompute('Cannot determine callback result for deleted relation')
+                if((await (this.state as StateWithCallback).isItemMatchCount!.get(relatedMutationEvent.oldRecord))) {
+                    count = count - 1
+                }
             } else {
                 count = count - 1;
             }
-        } else if (relatedMutationEvent.type === 'update' && this.callback) {
-            // 关联实体或关系的更新
-            return ComputationResult.fullRecompute('Complex update with callback requires full recompute')
+        } else if (relatedMutationEvent.type === 'update') {
+            // 这里可能是关联关系上的更新，也可能是关联实体的更新。不管哪一种，我们都重新查询一遍。
+            if(this.callback) {
+                const newRelationWithEntity = await this.controller.system.storage.findOne(
+                    this.relation.name, 
+                    MatchExp.atom({key: mutationEvent.relatedAttribute.slice(2).concat('id').join('.'), value: ['=', relatedMutationEvent.oldRecord!.id]}), 
+                    undefined, 
+                    this.relationAttributeQuery
+                );
+                
+                const isNewMatch = !!this.callback.call(this.controller, newRelationWithEntity, dataDeps);
+                const isOldMatch = await (this.state as StateWithCallback).isItemMatchCount!.get(newRelationWithEntity)
+                if (isNewMatch !== isOldMatch) {
+                    count = isNewMatch ? (count + 1) : (count-1);
+                }
+            }
+        } else {
+            return ComputationResult.fullRecompute(`unknown related mutation event for ${this.dataContext.host.name}.${this.dataContext.id.name}`)
         }
 
-        // 防止计数为负数
-        count = Math.max(0, count);
-        await this.state.count.set(mutationEvent.record, count);
         return count;
     }
 }

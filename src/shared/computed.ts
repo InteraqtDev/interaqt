@@ -116,6 +116,11 @@ export const WeightedSummation = createClass({
             collection: false,
             required: false
         },
+        dataDeps: {
+            instanceType: {} as unknown as {[key: string]: any},
+            collection: false,
+            required: false
+        },
     }
 })
 
@@ -136,6 +141,37 @@ export const Count = createClass({
             type: 'function',
             collection: false,
             required: false
+        },
+        attributeQuery: {
+            instanceType: {} as unknown as AttributeQueryData,
+            collection: false,
+            required: false
+        },
+        dataDeps: {
+            instanceType: {} as unknown as {[key: string]: any},
+            collection: false,
+            required: false
+        },
+    }
+})
+
+export const Sum = createClass({
+    name: 'Sum',
+    public: {
+        record: {
+            type: [Entity, Relation],
+            collection: false,
+            required: true
+        },
+        direction: {
+            type: 'string',
+            collection: false,
+            required: false,
+        },
+        callback: {
+            type: 'function',
+            collection: false,
+            required: true
         },
         attributeQuery: {
             instanceType: {} as unknown as AttributeQueryData,
@@ -272,7 +308,7 @@ export const RealTime = createClass({
 })
 
 // 修补 Entity computedData 里面的类型
-Relation.public.computedData.type.push(StateMachine, WeightedSummation, Count, Every, Any, Transform, RealTime)
-Entity.public.computedData.type.push(StateMachine, WeightedSummation, Count, Every, Any, Transform, RealTime)
-Property.public.computedData.type.push(StateMachine, WeightedSummation, Count, Every, Any, Transform, RealTime)
-Dictionary.public.computedData.type.push(StateMachine, WeightedSummation, Count, Every, Any, Transform, RealTime)
+Relation.public.computedData.type.push(StateMachine, WeightedSummation, Count, Sum, Every, Any, Transform, RealTime)
+Entity.public.computedData.type.push(StateMachine, WeightedSummation, Count, Sum, Every, Any, Transform, RealTime)
+Property.public.computedData.type.push(StateMachine, WeightedSummation, Count, Sum, Every, Any, Transform, RealTime)
+Dictionary.public.computedData.type.push(StateMachine, WeightedSummation, Count, Sum, Every, Any, Transform, RealTime)

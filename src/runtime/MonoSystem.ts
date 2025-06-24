@@ -166,15 +166,7 @@ export class MonoSystem implements System {
         states.forEach(({dataContext, state}) => {
             Object.entries(state).forEach(([stateName, stateItem]) => {
                 if (stateItem instanceof RecordBoundState) { 
-                    let entity!: KlassInstance<typeof Entity> 
-                    if (dataContext.type === 'property') {
-                        const propertyDataContext = dataContext as PropertyDataContext
-                        entity = propertyDataContext.host 
-                    } else if(dataContext.type === 'entity'||dataContext.type === 'relation') {
-                        entity = dataContext.id as KlassInstance<typeof Entity>
-                    } else {
-                        throw new Error(`Unsupported data context type: ${dataContext.type}`)
-                    }
+                    const entity = entities.find(entity => entity.name === stateItem.record)! || relations.find(entity => entity.name === stateItem.record)!
 
                     if (stateItem.defaultValue instanceof Property) {
                         // TODO 特别注意这里改了 name

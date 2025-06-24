@@ -42,7 +42,8 @@ export class GlobalAnyHandle implements DataBasedComputation {
     }
 
     async incrementalCompute(lastValue: boolean, mutationEvent: EtityMutationEvent, record: any, dataDeps: {[key: string]: any}): Promise<boolean|ComputationResult> {
-        if (mutationEvent.recordName !== (this.dataDeps.main as RecordsDataDep).source!.name) {
+        // 注意要同时检测名字和 relatedAttribute 才能确定是不是自己的更新，因为可能有自己和自己的关联关系的 dataDep。
+        if (mutationEvent.recordName !== (this.dataDeps.main as RecordsDataDep).source!.name || mutationEvent.relatedAttribute?.length) {
             return ComputationResult.fullRecompute('mutationEvent.recordName not match')
         }
 
@@ -118,7 +119,16 @@ export class PropertyAnyHandle implements DataBasedComputation {
     }
 
     async incrementalCompute(lastValue: boolean, mutationEvent: EtityMutationEvent, record: any, dataDeps: {[key: string]: any}): Promise<boolean|ComputationResult> {
-        if (mutationEvent.recordName !== this.dataContext.host.name) {
+        // 只能支持通过 args.record 指定的关联关系或者关联实体的增量更新。
+        if (
+            mutationEvent.recordName !== this.dataContext.host.name ||
+            !mutationEvent.relatedAttribute ||
+            mutationEvent.relatedAttribute.length === 0 || 
+            mutationEvent.relatedAttribute.length > 3 ||
+            mutationEvent.relatedAttribute[0] !== this.relationAttr ||
+            (mutationEvent.relatedAttribute[1] && mutationEvent.relatedAttribute[1] !== '&') ||
+            (mutationEvent.relatedAttribute[2] && mutationEvent.relatedAttribute[2] !== (this.isSource ? 'target' : 'source'))
+        ) {
             return ComputationResult.fullRecompute('mutationEvent.recordName not match')
         }
 
@@ -149,21 +159,11 @@ export class PropertyAnyHandle implements DataBasedComputation {
         } else if (relatedMutationEvent.type === 'update'&&(relatedMutationEvent.recordName === this.relation.name||relatedMutationEvent.recordName === this.relatedRecordName)) {
             // 关联实体或者关联关系上的字段的更新
             const currentRecord = mutationEvent.oldRecord!
-            const isRelationUpdate = mutationEvent.relatedMutationEvent?.recordName === this.relation.name
-
-            const relationMatch = isRelationUpdate ? 
-                MatchExp.atom({
-                    key: 'id',
-                    value: ['=', mutationEvent.relatedMutationEvent!.oldRecord!.id]
-                }) : 
-                MatchExp.atom({
-                    key: 'source.id',
-                    value: ['=', this.isSource ?  currentRecord.id: mutationEvent.relatedMutationEvent!.oldRecord!.id]
-                }).and({
-                    key: 'target.id',
-                    value: ['=', this.isSource ? mutationEvent.relatedMutationEvent!.oldRecord!.id : currentRecord.id]
-                })
-
+            // 关联关系或者关联实体的更新
+            const relationMatch = MatchExp.atom({
+                key: mutationEvent.relatedAttribute.slice(2).concat('id').join('.'),
+                value: ['=', relatedMutationEvent!.oldRecord!.id]
+            }) 
 
             const relationRecord = await this.controller.system.storage.findOne(this.relation.name, relationMatch, undefined, this.relationAttributeQuery)
 
