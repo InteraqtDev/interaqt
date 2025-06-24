@@ -155,8 +155,8 @@ export const Count = createClass({
     }
 })
 
-export const Sum = createClass({
-    name: 'Sum',
+export const Summation = createClass({
+    name: 'Summation',
     public: {
         record: {
             type: [Entity, Relation],
@@ -298,7 +298,7 @@ export const RealTime = createClass({
 })
 
 // 修补 Entity computedData 里面的类型
-Relation.public.computedData.type.push(StateMachine, WeightedSummation, Count, Sum, Every, Any, Transform, RealTime)
-Entity.public.computedData.type.push(StateMachine, WeightedSummation, Count, Sum, Every, Any, Transform, RealTime)
-Property.public.computedData.type.push(StateMachine, WeightedSummation, Count, Sum, Every, Any, Transform, RealTime)
-Dictionary.public.computedData.type.push(StateMachine, WeightedSummation, Count, Sum, Every, Any, Transform, RealTime)
+Relation.public.computedData.type.push(StateMachine, WeightedSummation, Count, Summation, Every, Any, Transform, RealTime)
+Entity.public.computedData.type.push(StateMachine, WeightedSummation, Count, Summation, Every, Any, Transform, RealTime)
+Property.public.computedData.type.push(StateMachine, WeightedSummation, Count, Summation, Every, Any, Transform, RealTime)
+Dictionary.public.computedData.type.push(StateMachine, WeightedSummation, Count, Summation, Every, Any, Transform, RealTime)

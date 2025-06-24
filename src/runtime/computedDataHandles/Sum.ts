@@ -1,5 +1,5 @@
 import { ComputedDataHandle, DataContext, PropertyDataContext } from "./ComputedDataHandle.js";
-import { Sum, KlassInstance, Relation, Entity } from "@shared";
+import { Summation, KlassInstance, Relation, Entity } from "@shared";
 import { Controller } from "../Controller.js";
 import { ComputationResult, DataBasedComputation, DataDep, RecordBoundState, RecordsDataDep } from "./Computation.js";
 import { EtityMutationEvent } from "../Scheduler.js";
@@ -12,7 +12,7 @@ export class GlobalSumHandle implements DataBasedComputation {
     dataDeps: {[key: string]: DataDep} = {}
     record: KlassInstance<typeof Entity|typeof Relation>
     sumFieldPath: string[]
-    constructor(public controller: Controller, public args: KlassInstance<typeof Sum>, public dataContext: DataContext) {
+    constructor(public controller: Controller, public args: KlassInstance<typeof Summation>, public dataContext: DataContext) {
         this.record = args.record
         
         // 获取 attributeQuery 的第一个字段作为求和字段
@@ -220,7 +220,7 @@ export class PropertySumHandle implements DataBasedComputation {
     }
 }
 
-ComputedDataHandle.Handles.set(Sum, {
+ComputedDataHandle.Handles.set(Summation, {
     global: GlobalSumHandle,
     property: PropertySumHandle
 });
