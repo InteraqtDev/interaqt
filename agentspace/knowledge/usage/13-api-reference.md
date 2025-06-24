@@ -438,6 +438,175 @@ const OrderStateMachine = StateMachine.create({
 })
 ```
 
+### RealTime.create()
+
+创建实时计算，用于处理基于时间的响应式计算。实时计算会自动管理状态（lastRecomputeTime 和 nextRecomputeTime），并根据返回类型采用不同的调度策略。
+
+**语法**
+```typescript
+RealTime.create(config: RealTimeConfig): KlassInstance<typeof RealTime>
+```
+
+**参数**
+- `config.callback` (function, required): 实时计算回调函数，接收 `(now: Expression, dataDeps: any) => Expression | Inequality | Equation`
+- `config.nextRecomputeTime` (function, optional): 重新计算间隔函数，接收 `(now: number, dataDeps: any) => number`，仅对 Expression 类型有效
+- `config.dataDeps` (object, optional): 数据依赖配置，格式为 `{[key: string]: DataDep}`
+- `config.attributeQuery` (AttributeQueryData, optional): 属性查询配置
+
+**返回类型与调度行为**
+- **Expression**: 返回数值计算结果，nextRecomputeTime = lastRecomputeTime + nextRecomputeTime函数返回值
+- **Inequality**: 返回布尔比较结果，nextRecomputeTime = solve() 的结果（状态变化的临界时间点）
+- **Equation**: 返回布尔等式结果，nextRecomputeTime = solve() 的结果（状态变化的临界时间点）
+
+**状态管理**
+
+RealTime 计算会自动创建和管理两个状态字段：
+- `lastRecomputeTime`: 上次计算的时间戳
+- `nextRecomputeTime`: 下次计算的时间戳
+
+状态字段命名规则：
+- 全局计算：`_global_boundState_{计算名称}_{状态名称}`
+- 属性计算：`_record_boundState_{实体名称}_{属性名称}_{状态名称}`
+
+**示例**
+
+```typescript
+// Expression 类型：手动指定重新计算间隔
+const currentTimestamp = Dictionary.create({
+    name: 'currentTimestamp',
+    type: 'number',
+    computedData: RealTime.create({
+        nextRecomputeTime: (now: number, dataDeps: any) => 1000, // 每秒更新
+        callback: async (now: Expression, dataDeps: any) => {
+            return now.divide(1000); // 转换为秒
+        }
+    })
+});
+
+// Inequality 类型：系统自动计算临界时间点
+const isAfterDeadline = Dictionary.create({
+    name: 'isAfterDeadline',
+    type: 'boolean',
+    computedData: RealTime.create({
+        dataDeps: {
+            project: {
+                type: 'records',
+                source: projectEntity,
+                attributeQuery: ['deadline']
+            }
+        },
+        callback: async (now: Expression, dataDeps: any) => {
+            const deadline = dataDeps.project?.[0]?.deadline || Date.now() + 86400000;
+            // 系统会自动在 deadline 时间点重新计算
+            return now.gt(deadline);
+        }
+    })
+});
+
+// Equation 类型：检查时间等式
+const isExactHour = Dictionary.create({
+    name: 'isExactHour',
+    type: 'boolean',
+    computedData: RealTime.create({
+        callback: async (now: Expression, dataDeps: any) => {
+            const millisecondsInHour = 3600000;
+            // 系统会自动在下一个整点时间重新计算
+            return now.modulo(millisecondsInHour).eq(0);
+        }
+    })
+});
+
+// 属性级实时计算
+const userEntity = Entity.create({
+    name: 'User',
+    properties: [
+        Property.create({ name: 'lastLoginAt', type: 'number' }),
+        Property.create({
+            name: 'isRecentlyActive',
+            type: 'boolean',
+            computedData: RealTime.create({
+                dataDeps: {
+                    _current: {
+                        type: 'property',
+                        attributeQuery: ['lastLoginAt']
+                    }
+                },
+                callback: async (now: Expression, dataDeps: any) => {
+                    const lastLogin = dataDeps._current?.lastLoginAt || 0;
+                    const oneHourAgo = now.subtract(3600000);
+                    return Expression.number(lastLogin).gt(oneHourAgo);
+                }
+            })
+        })
+    ]
+});
+
+// 复杂数据依赖的实时计算
+const businessMetrics = Dictionary.create({
+    name: 'businessMetrics',
+    type: 'object',
+    computedData: RealTime.create({
+        nextRecomputeTime: (now: number, dataDeps: any) => 300000, // 每5分钟更新
+        dataDeps: {
+            config: {
+                type: 'records',
+                source: configEntity,
+                attributeQuery: ['businessHourStart', 'businessHourEnd']
+            },
+            metrics: {
+                type: 'records',
+                source: metricsEntity,
+                attributeQuery: ['dailyTarget', 'currentValue']
+            }
+        },
+        callback: async (now: Expression, dataDeps: any) => {
+            const config = dataDeps.config?.[0] || {};
+            const metrics = dataDeps.metrics?.[0] || {};
+            
+            const startHour = config.businessHourStart || 9;
+            const endHour = config.businessHourEnd || 17;
+            const currentHour = now.divide(3600000).modulo(24);
+            
+            const isBusinessTime = currentHour.gt(startHour).and(currentHour.lt(endHour));
+            const progressRate = Expression.number(metrics.currentValue || 0).divide(metrics.dailyTarget || 1);
+            
+            return {
+                isBusinessTime: isBusinessTime.evaluate({now: Date.now()}),
+                progressRate: progressRate.evaluate({now: Date.now()}),
+                timestamp: now.evaluate({now: Date.now()})
+            };
+        }
+    })
+});
+```
+
+**状态访问示例**
+
+```typescript
+// 获取计算实例
+const realTimeComputation = Array.from(controller.scheduler.computations.values()).find(
+    computation => computation.dataContext.type === 'global' && 
+                 computation.dataContext.id === 'currentTimestamp'
+);
+
+// 获取状态键名
+const lastRecomputeTimeKey = controller.scheduler.getBoundStateName(
+    realTimeComputation.dataContext, 
+    'lastRecomputeTime', 
+    realTimeComputation.state.lastRecomputeTime
+);
+
+const nextRecomputeTimeKey = controller.scheduler.getBoundStateName(
+    realTimeComputation.dataContext, 
+    'nextRecomputeTime', 
+    realTimeComputation.state.nextRecomputeTime
+);
+
+// 读取状态值
+const lastRecomputeTime = await system.storage.get(DICTIONARY_RECORD, lastRecomputeTimeKey);
+const nextRecomputeTime = await system.storage.get(DICTIONARY_RECORD, nextRecomputeTimeKey);
+```
+
 ## 13.3 交互相关 API
 
 ### Interaction.create()

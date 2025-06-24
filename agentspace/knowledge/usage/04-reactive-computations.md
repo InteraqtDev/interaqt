@@ -801,6 +801,454 @@ const LeaveRequest = Entity.create({
 });
 ```
 
+## 使用 RealTime 实时计算
+
+RealTime 实时计算是 interaqt 框架中处理时间敏感数据和业务逻辑的核心特性。它允许你声明基于时间的计算，并自动管理计算状态和重新计算时机。
+
+### 理解实时计算
+
+#### 什么是实时计算
+
+实时计算是一种**时间感知的响应式计算**：
+- **时间驱动**：基于当前时间进行计算
+- **自动调度**：系统自动管理何时重新计算
+- **状态持久化**：计算状态被持久化存储
+- **临界感知**：能够计算出状态变化的临界时间点
+
+```typescript
+// 传统时间相关逻辑的问题
+function checkBusinessHours() {
+  const now = new Date();
+  const hour = now.getHours();
+  return hour >= 9 && hour <= 17;
+}
+
+// 问题：
+// 1. 需要手动轮询检查
+// 2. 无法预知状态变化时间点
+// 3. 状态不持久化
+
+// 使用 RealTime 的声明式方案
+const isBusinessHours = Dictionary.create({
+  name: 'isBusinessHours',
+  type: 'boolean',
+  computedData: RealTime.create({
+    callback: async (now: Expression, dataDeps) => {
+      const hour = now.divide(3600000).modulo(24); // 小时数
+      return hour.gt(9).and(hour.lt(17));
+    }
+  })
+});
+
+// ✅ 系统自动管理何时重新计算
+// ✅ 自动计算出临界变化时间点（9点和17点）
+// ✅ 状态持久化存储
+```
+
+#### RealTime vs 普通计算
+
+| 特性 | RealTime 计算 | 普通响应式计算 |
+|------|---------------|----------------|
+| **触发方式** | 时间驱动 + 数据驱动 | 仅数据驱动 |
+| **计算输入** | 当前时间 + 数据依赖 | 仅数据依赖 |
+| **调度管理** | 自动时间调度 | 仅数据变更触发 |
+| **状态管理** | 双状态跟踪 | 无特殊状态 |
+| **临界预测** | 支持临界时间点计算 | 不适用 |
+
+### RealTime 基本用法
+
+#### 创建实时计算
+
+```typescript
+import { RealTime, Expression, Dictionary } from 'interaqt';
+
+// 基本实时计算：当前时间戳（秒）
+const currentTimestamp = Dictionary.create({
+  name: 'currentTimestamp',
+  type: 'number',
+  computedData: RealTime.create({
+    nextRecomputeTime: (now: number, dataDeps: any) => 1000, // 每秒更新
+    callback: async (now: Expression, dataDeps: any) => {
+      return now.divide(1000); // 转换为秒
+    }
+  })
+});
+```
+
+#### Expression 类型计算
+
+Expression 类型的计算返回数值结果，适用于各种数学运算：
+
+```typescript
+// 复杂时间计算
+const timeBasedMetric = Dictionary.create({
+  name: 'timeBasedMetric',
+  type: 'number',
+  computedData: RealTime.create({
+    nextRecomputeTime: (now: number, dataDeps: any) => 5000, // 每5秒更新
+    dataDeps: {
+      config: {
+        type: 'records',
+        source: configEntity,
+        attributeQuery: ['multiplier']
+      }
+    },
+    callback: async (now: Expression, dataDeps: any) => {
+      const multiplier = dataDeps.config?.[0]?.multiplier || 1;
+      const timeInSeconds = now.divide(1000);
+      const timeInMinutes = now.divide(60000);
+      
+      // 复合计算：(时间秒数 * 系数) + √(时间分钟数)
+      return timeInSeconds.multiply(multiplier).add(timeInMinutes.sqrt());
+    }
+  })
+});
+```
+
+#### Inequality 类型计算
+
+Inequality 类型的计算返回布尔结果，系统会自动计算出状态变化的临界时间点：
+
+```typescript
+// 时间阈值检查
+const isAfterDeadline = Dictionary.create({
+  name: 'isAfterDeadline',
+  type: 'boolean',
+  computedData: RealTime.create({
+    dataDeps: {
+      project: {
+        type: 'records',
+        source: projectEntity,
+        attributeQuery: ['deadline']
+      }
+    },
+    callback: async (now: Expression, dataDeps: any) => {
+      const deadline = dataDeps.project?.[0]?.deadline || Date.now() + 86400000;
+      
+      // 检查当前时间是否超过截止时间
+      return now.gt(deadline);
+      // 系统会自动计算出在 deadline 时间点重新计算
+    }
+  })
+});
+```
+
+#### Equation 类型计算
+
+Equation 类型用于时间等式计算，同样会自动计算临界时间点：
+
+```typescript
+// 检查是否为整点时间
+const isExactHour = Dictionary.create({
+  name: 'isExactHour',
+  type: 'boolean',
+  computedData: RealTime.create({
+    callback: async (now: Expression, dataDeps: any) => {
+      const millisecondsInHour = 3600000;
+      
+      // 检查当前时间是否为整点
+      return now.modulo(millisecondsInHour).eq(0);
+      // 系统会自动计算出下一个整点时间进行重新计算
+    }
+  })
+});
+```
+
+### 属性级实时计算
+
+#### 定义属性级实时计算
+
+```typescript
+// 在实体属性上定义实时计算
+const userEntity = Entity.create({
+  name: 'User',
+  properties: [
+    Property.create({name: 'username', type: 'string'}),
+    Property.create({name: 'lastLoginAt', type: 'number'}),
+    
+    // 实时计算：用户是否最近活跃
+    Property.create({
+      name: 'isRecentlyActive',
+      type: 'boolean',
+      computedData: RealTime.create({
+        dataDeps: {
+          _current: {
+            type: 'property',
+            attributeQuery: ['lastLoginAt']
+          }
+        },
+        callback: async (now: Expression, dataDeps: any) => {
+          const lastLogin = dataDeps._current?.lastLoginAt || 0;
+          const oneHourAgo = now.subtract(3600000);
+          
+          // 检查用户是否在最近一小时内登录过
+          return Expression.number(lastLogin).gt(oneHourAgo);
+        }
+      })
+    }),
+    
+    // 实时计算：用户在线时长（分钟）
+    Property.create({
+      name: 'onlineMinutes',
+      type: 'number',
+      computedData: RealTime.create({
+        nextRecomputeTime: (now: number, dataDeps: any) => 60000, // 每分钟更新
+        dataDeps: {
+          _current: {
+            type: 'property',
+            attributeQuery: ['lastLoginAt']
+          }
+        },
+        callback: async (now: Expression, dataDeps: any) => {
+          const lastLogin = dataDeps._current?.lastLoginAt || now.evaluate({now: Date.now()});
+          
+          // 计算在线时长（分钟）
+          return now.subtract(lastLogin).divide(60000);
+        }
+      })
+    })
+  ]
+});
+```
+
+#### 属性级状态管理
+
+属性级实时计算的状态存储在每个记录上：
+
+```typescript
+// 查询用户数据时，状态字段会自动包含
+const user = await system.storage.findOne('User', 
+  BoolExp.atom({key: 'id', value: ['=', userId]}),
+  undefined,
+  ['*'] // 包含所有字段，包括状态字段
+);
+
+// user 对象将包含：
+// {
+//   id: 1,
+//   username: 'john',
+//   lastLoginAt: 1234567890000,
+//   isRecentlyActive: true,
+//   onlineMinutes: 45.2,
+//   // 状态字段（自动生成的字段名）：
+//   _record_boundState_User_isRecentlyActive_lastRecomputeTime: 1234567890123,
+//   _record_boundState_User_isRecentlyActive_nextRecomputeTime: 1234567891000,
+//   _record_boundState_User_onlineMinutes_lastRecomputeTime: 1234567890456,
+//   _record_boundState_User_onlineMinutes_nextRecomputeTime: 1234567950456
+// }
+```
+
+### RealTime 状态管理
+
+#### 状态字段
+
+每个 RealTime 计算都有两个状态字段：
+
+- **lastRecomputeTime**: 上次计算的时间戳
+- **nextRecomputeTime**: 下次计算的时间戳
+
+```typescript
+// 状态字段命名规则
+// 全局计算：_global_boundState_{计算名称}_{状态名称}
+// 属性计算：_record_boundState_{实体名称}_{属性名称}_{状态名称}
+
+// 示例状态字段名：
+// _global_boundState_currentTimestamp_lastRecomputeTime
+// _global_boundState_currentTimestamp_nextRecomputeTime
+// _record_boundState_User_isRecentlyActive_lastRecomputeTime
+// _record_boundState_User_isRecentlyActive_nextRecomputeTime
+```
+
+#### 状态计算逻辑
+
+状态的计算方式取决于返回值类型：
+
+```typescript
+// Expression 类型：nextRecomputeTime = lastRecomputeTime + nextRecomputeTime函数返回值
+RealTime.create({
+  nextRecomputeTime: (now: number, dataDeps: any) => 1000, // 1秒后重新计算
+  callback: async (now: Expression, dataDeps: any) => {
+    return now.divide(1000); // 返回 Expression
+  }
+  // nextRecomputeTime 将是 lastRecomputeTime + 1000
+});
+
+// Inequality/Equation 类型：nextRecomputeTime = solve() 的结果
+RealTime.create({
+  callback: async (now: Expression, dataDeps: any) => {
+    const deadline = 1640995200000; // 2022-01-01 00:00:00
+    return now.gt(deadline); // 返回 Inequality
+  }
+  // nextRecomputeTime 将是 1640995200000（临界时间点）
+});
+```
+
+#### 访问状态信息
+
+```typescript
+// 在测试或调试中访问状态信息
+const system = new MonoSystem();
+const controller = new Controller(system, entities, [], [], [], dictionary, []);
+await controller.setup(true);
+
+// 获取计算实例
+const realTimeComputation = Array.from(controller.scheduler.computations.values()).find(
+  computation => computation.dataContext.type === 'global' && 
+               computation.dataContext.id === 'currentTimestamp'
+);
+
+// 获取状态键名
+const lastRecomputeTimeKey = controller.scheduler.getBoundStateName(
+  realTimeComputation.dataContext, 
+  'lastRecomputeTime', 
+  realTimeComputation.state.lastRecomputeTime
+);
+
+const nextRecomputeTimeKey = controller.scheduler.getBoundStateName(
+  realTimeComputation.dataContext, 
+  'nextRecomputeTime', 
+  realTimeComputation.state.nextRecomputeTime
+);
+
+// 读取状态值
+const lastRecomputeTime = await system.storage.get(DICTIONARY_RECORD, lastRecomputeTimeKey);
+const nextRecomputeTime = await system.storage.get(DICTIONARY_RECORD, nextRecomputeTimeKey);
+
+console.log('上次计算时间:', new Date(lastRecomputeTime));
+console.log('下次计算时间:', new Date(nextRecomputeTime));
+```
+
+### RealTime 实际应用场景
+
+#### 业务时间检查
+
+```typescript
+// 工作时间检查
+const isWorkingHours = Dictionary.create({
+  name: 'isWorkingHours',
+  type: 'boolean',
+  computedData: RealTime.create({
+    dataDeps: {
+      schedule: {
+        type: 'records',
+        source: scheduleEntity,
+        attributeQuery: ['startTime', 'endTime', 'timezone']
+      }
+    },
+    callback: async (now: Expression, dataDeps: any) => {
+      const schedule = dataDeps.schedule?.[0] || {};
+      const startTime = schedule.startTime || 9;  // 9 AM
+      const endTime = schedule.endTime || 17;     // 5 PM
+      
+      // 计算当前小时（考虑时区）
+      const currentHour = now.divide(3600000).modulo(24);
+      
+      return currentHour.gt(startTime).and(currentHour.lt(endTime));
+    }
+  })
+});
+```
+
+#### 用户会话管理
+
+```typescript
+// 用户会话过期检查
+const userEntity = Entity.create({
+  name: 'User',
+  properties: [
+    Property.create({name: 'username', type: 'string'}),
+    Property.create({name: 'lastActivityAt', type: 'number'}),
+    
+    Property.create({
+      name: 'sessionExpired',
+      type: 'boolean',
+      computedData: RealTime.create({
+        dataDeps: {
+          _current: {
+            type: 'property',
+            attributeQuery: ['lastActivityAt']
+          },
+          settings: {
+            type: 'records',
+            source: settingsEntity,
+            attributeQuery: ['sessionTimeout']
+          }
+        },
+        callback: async (now: Expression, dataDeps: any) => {
+          const lastActivity = dataDeps._current?.lastActivityAt || 0;
+          const timeout = dataDeps.settings?.[0]?.sessionTimeout || 3600000; // 1小时
+          const expireTime = lastActivity + timeout;
+          
+          return now.gt(expireTime);
+        }
+      })
+    })
+  ]
+});
+```
+
+### RealTime 性能优化与最佳实践
+
+#### 合理设置重新计算间隔
+
+```typescript
+// ✅ 根据业务需求设置合适的间隔
+const highFrequency = RealTime.create({
+  nextRecomputeTime: (now, dataDeps) => 1000,    // 高频：每秒
+  callback: async (now, dataDeps) => {
+    // 用于需要实时更新的关键指标
+    return now.divide(1000);
+  }
+});
+
+const mediumFrequency = RealTime.create({
+  nextRecomputeTime: (now, dataDeps) => 60000,   // 中频：每分钟
+  callback: async (now, dataDeps) => {
+    // 用于一般业务状态检查
+    return now.modulo(3600000).eq(0);
+  }
+});
+
+const lowFrequency = RealTime.create({
+  nextRecomputeTime: (now, dataDeps) => 3600000, // 低频：每小时
+  callback: async (now, dataDeps) => {
+    // 用于报表统计等非关键数据
+    return now.divide(86400000);
+  }
+});
+
+// ❌ 避免过于频繁的更新
+const tooFrequent = RealTime.create({
+  nextRecomputeTime: (now, dataDeps) => 100,     // 每100ms更新一次，可能影响性能
+  callback: async (now, dataDeps) => now.divide(1000)
+});
+```
+
+#### 合理使用 Inequality/Equation 类型
+
+```typescript
+// ✅ 使用 Inequality 让系统自动计算最优重新计算时间
+const smartScheduling = RealTime.create({
+  // 不需要 nextRecomputeTime 函数
+  callback: async (now, dataDeps) => {
+    const deadline = 1640995200000;
+    return now.gt(deadline); // 系统会在 deadline 时间点自动重新计算
+  }
+});
+
+// ❌ 不必要的手动调度
+const manualScheduling = RealTime.create({
+  nextRecomputeTime: (now, dataDeps) => {
+    const deadline = 1640995200000;
+    return deadline - now; // 手动计算间隔，不如让系统自动处理
+  },
+  callback: async (now, dataDeps) => {
+    const deadline = 1640995200000;
+    return now.evaluate({now: Date.now()}) > deadline;
+  }
+});
+```
+
 ## 组合多种计算类型
 
 在实际应用中，通常需要组合使用多种计算类型：
