@@ -296,7 +296,7 @@ const UserOrderRelation = Relation.create({
 
 ### 4. 一切都是"函数"
 - 用户帖子数 = Count(用户的帖子关系)
-- 产品库存 = 初始库存 - Sum(订单中的该产品数量)
+- 产品库存 = 初始库存 - Count(订单中的该产品数量)
 - 通知 = Transform(交互事件)
 
 ## 练习：转换思维

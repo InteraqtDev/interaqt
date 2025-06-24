@@ -311,6 +311,122 @@ const globalWeightedScore = WeightedSummation.create({
 })
 ```
 
+### Summation.create()
+
+创建求和计算，用于对指定字段进行求和。
+
+**语法**
+```typescript
+Summation.create(config: SummationConfig): KlassInstance<typeof Summation>
+```
+
+**参数**
+- `config.record` (Entity|Relation, required): 要计算的实体或关系
+- `config.attributeQuery` (AttributeQueryData, required): 属性查询配置，指定要求和的字段路径
+- `config.direction` (string, optional): 关系方向，可选值：'source' | 'target'，仅适用于关系求和
+
+**工作原理**
+
+Summation 会对 `attributeQuery` 最左路径指向的字段进行求和。如果路径中的任何值为 `undefined`、`null`、`NaN` 或 `Infinity`，该值将被视为 0。
+
+**示例**
+```typescript
+// 基本全局求和（对所有交易的金额求和）
+const totalRevenue = Dictionary.create({
+    name: 'totalRevenue',
+    type: 'number',
+    collection: false,
+    computedData: Summation.create({
+        record: Transaction,
+        attributeQuery: ['amount']
+    })
+})
+
+// 属性级求和（计算用户的订单总金额）
+const userTotalSpent = Property.create({
+    name: 'totalSpent',
+    type: 'number',
+    defaultValue: () => 0,  // 必须提供默认值
+    computedData: Summation.create({
+        record: UserOrderRelation,
+        attributeQuery: [['target', {attributeQuery: ['totalAmount']}]]
+    })
+})
+
+// 嵌套路径求和（对关联实体的嵌套字段求和）
+const departmentBudget = Property.create({
+    name: 'totalBudget',
+    type: 'number',
+    defaultValue: () => 0,
+    computedData: Summation.create({
+        record: DepartmentProjectRelation,
+        attributeQuery: [['target', {
+            attributeQuery: [['budget', {
+                attributeQuery: ['allocatedAmount']
+            }]]
+        }]]
+    })
+})
+
+// 直接对关系属性求和
+const totalShippingCost = Property.create({
+    name: 'totalShippingCost',
+    type: 'number',
+    defaultValue: () => 0,
+    computedData: Summation.create({
+        record: OrderShipmentRelation,
+        attributeQuery: ['shippingFee']  // 关系自身的属性
+    })
+})
+
+// 全局求和，处理缺失值
+const totalBalance = Dictionary.create({
+    name: 'totalBalance',
+    type: 'number',
+    collection: false,
+    computedData: Summation.create({
+        record: Account,
+        attributeQuery: ['balance']  // null 或 undefined 值会被视为 0
+    })
+})
+```
+
+**与其他计算的配合使用**
+
+如果需要复杂的求和逻辑（如条件过滤、数据转换等），可以先使用其他计算（如 Transform）在记录上计算出需要的值，然后使用 Summation 进行简单求和：
+
+```typescript
+// 先用 Transform 计算折扣后价格
+const OrderItem = Entity.create({
+    name: 'OrderItem',
+    properties: [
+        Property.create({ name: 'price', type: 'number' }),
+        Property.create({ name: 'quantity', type: 'number' }),
+        Property.create({ name: 'discountRate', type: 'number' }),
+        Property.create({
+            name: 'finalPrice',
+            type: 'number',
+            computed: function(item) {
+                const subtotal = (item.price || 0) * (item.quantity || 0);
+                const discount = subtotal * (item.discountRate || 0);
+                return subtotal - discount;
+            }
+        })
+    ]
+});
+
+// 然后用 Summation 对计算后的值求和
+const orderTotal = Property.create({
+    name: 'total',
+    type: 'number',
+    defaultValue: () => 0,
+    computedData: Summation.create({
+        record: OrderItemRelation,
+        attributeQuery: [['target', {attributeQuery: ['finalPrice']}]]
+    })
+});
+```
+
 ### Every.create()
 
 创建全部满足条件的布尔判断计算。

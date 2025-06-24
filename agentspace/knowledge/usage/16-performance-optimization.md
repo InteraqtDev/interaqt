@@ -112,7 +112,7 @@ const User = Entity.create({
       name: 'totalPostLikes',
       type: 'number',
       defaultValue: () => 0,
-      computedData: Sum.create({
+      computedData: Summation.create({
         record: userPostRelation,  // User 1:n Post
         // 现在只需要访问 Post 的 likeCount 属性（已经预计算好的）
         attributeQuery: [['target', { attributeQuery: ['likeCount'] }]]
@@ -172,7 +172,7 @@ const Order = Entity.create({
       name: 'totalAmount',
       type: 'number',
       defaultValue: () => 0,
-      computedData: Sum.create({
+      computedData: Summation.create({
         record: orderItemRelation,
         attributeQuery: [['target', { attributeQuery: ['subtotal'] }]]  // 引用预计算结果
       })
@@ -204,8 +204,8 @@ Property.create({
 
 // ✅ 推荐：分层预计算
 // 第1层：Comment.likeCount
-// 第2层：Post.commentLikeCount = Sum(Comment.likeCount)
-// 第3层：User.totalCommentLikes = Sum(Post.commentLikeCount)
+// 第2层：Post.commentLikeCount = Summation(Comment.likeCount)
+// 第3层：User.totalCommentLikes = Summation(Post.commentLikeCount)
 ```
 
 ### 模式 3：合理使用 Every/Any 计算
@@ -275,7 +275,7 @@ MiddleEntity.properties.push(
 );
 
 // 2. 使用预计算结果
-const optimizedComputation = Sum.create({
+const optimizedComputation = Summation.create({
   record: topLevelRelation,
   attributeQuery: [['target', { attributeQuery: ['nestedCount'] }]]
 });
