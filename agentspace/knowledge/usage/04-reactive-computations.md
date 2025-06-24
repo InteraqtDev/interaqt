@@ -681,6 +681,294 @@ const Product = Entity.create({
 });
 ```
 
+### 从交互数据 Transform：声明式数据转换的核心
+
+Transform 最重要的应用场景之一是**从用户交互数据中 Transform 出其他业务数据**。这体现了 interaqt 框架的核心思想：**一切皆数据，数据从数据中转换而来**。
+
+#### 核心理念：交互是数据，数据从数据转换而来
+
+在 interaqt 中，用户交互（Interaction）本身就是一种数据，存储在 InteractionEventEntity 中。Transform 不是传统的"事件驱动+回调"模式，而是**声明式的数据转换关系**：
+
+> 声明：DirectorMemo **是** InteractionEventEntity 经过某种转换规则得到的结果
+
+这与传统事件驱动的区别：
+- **传统事件驱动**：当事件发生时，执行回调函数处理
+- **interaqt Transform**：声明一种数据是如何从另一种数据转换而来
+
+```typescript
+// ❌ 错误思维：命令式地在交互处理中手动创建数据
+async function handleUserLogin(userId) {
+  await createLoginRecord(userId);
+  
+  // 手动检查和创建 - 这是命令式的"如何做"
+  const loginCount = await getLoginCountThisMonth(userId);
+  if (loginCount >= 10) {
+    await createActivityReward(userId, 'frequent_user');
+  }
+}
+
+// ✅ 正确思维：声明式地定义数据转换关系
+// ActivityReward "是什么"：是满足条件的 InteractionEventEntity 的转换结果
+const ActivityReward = Entity.create({
+  name: 'ActivityReward',
+  properties: [
+    Property.create({ name: 'type', type: 'string' }),
+    Property.create({ name: 'description', type: 'string' }),
+    Property.create({ name: 'createdAt', type: 'string' })
+  ],
+  computedData: Transform.create({
+    record: InteractionEventEntity,
+    attributeQuery: ['interactionName', 'user', 'createdAt'],
+    dataDeps: {
+      users: {
+        type: 'records',
+        source: User,
+        attributeQuery: ['username', 'monthlyLoginCount']
+      }
+    },
+    callback: (interactionEvents, dataDeps) => {
+      // Transform 的本质：定义数据转换规则
+      // 输入：InteractionEventEntity 数据 + 依赖数据
+      // 输出：ActivityReward 数据（或 null）
+      
+      return interactionEvents
+        .filter(event => event.interactionName === 'userLogin')
+        .map(event => {
+          const user = dataDeps.users.find(u => u.id === event.user.id);
+          
+          // 声明转换条件：当用户月登录次数>=10时，此交互数据转换为奖励数据
+          if (user && user.monthlyLoginCount >= 10) {
+            return {
+              type: 'frequent_user',
+              description: `${user.username} 获得活跃用户奖励`,
+              createdAt: event.createdAt,
+              userId: user.id
+            };
+          }
+          
+          // 不满足转换条件时返回 null（表示此交互不产生奖励数据）
+          return null;
+        })
+        .filter(reward => reward !== null);
+    }
+  })
+});
+```
+
+#### Transform 的条件转换：null 返回机制
+
+Transform 支持返回 `null` 来表示"某些输入数据不参与转换"，这是实现条件转换的核心机制：
+
+```typescript
+// 请假系统示例：备忘录从请假交互中产生
+const DirectorMemo = Entity.create({
+  name: 'DirectorMemo',
+  properties: [
+    Property.create({ name: 'content', type: 'string' }),
+    Property.create({ name: 'priority', type: 'string' }),
+    Property.create({ name: 'createdAt', type: 'string' })
+  ],
+  computedData: Transform.create({
+    record: InteractionEventEntity,
+    attributeQuery: ['interactionName', 'user', 'payload', 'createdAt'],
+    dataDeps: {
+      users: {
+        type: 'records',
+        source: User,
+        attributeQuery: ['username', 'currentMonthLeaveCount']
+      }
+    },
+    callback: (interactionEvents, dataDeps) => {
+      // 声明数据转换关系：
+      // 输入：submitLeaveRequest 交互数据 + 用户数据
+      // 输出：满足条件的 DirectorMemo 数据
+      
+      return interactionEvents
+        .filter(event => event.interactionName === 'submitLeaveRequest')
+        .map(event => {
+          const user = dataDeps.users.find(u => u.id === event.user.id);
+          
+          // 转换规则：当用户本月请假次数 >= 3 时，此交互数据转换为备忘录数据
+          if (user && user.currentMonthLeaveCount >= 3) {
+            return {
+              content: `${user.username} 本月第 ${user.currentMonthLeaveCount} 次请假，需要关注`,
+              priority: user.currentMonthLeaveCount >= 5 ? 'urgent' : 'high',
+              createdAt: event.createdAt
+            };
+          }
+          
+          // 关键：不满足转换条件时返回 null，表示此交互数据不转换为备忘录
+          return null;
+        })
+        .filter(memo => memo !== null); // 过滤掉不参与转换的数据
+    }
+  })
+});
+```
+
+#### 一对多 Transform：一个交互数据转换为多种数据
+
+真实业务中，一个交互数据往往可以转换为多种不同的业务数据，这体现了 Transform 声明式转换的强大能力：
+
+```typescript
+// 声明用户下单交互数据如何转换为多种业务数据：
+// InteractionEventEntity (createOrder) → Order, InventoryChange, PointsReward
+
+const OrderInteraction = Interaction.create({
+  name: 'createOrder',
+  action: Action.create({ name: 'create' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({ name: 'orderData', base: Order }),
+      PayloadItem.create({ name: 'items', base: OrderItem, isCollection: true })
+    ]
+  })
+});
+
+// 1. 订单记录（主要转换）
+// 声明：Order 数据是 createOrder 交互数据的直接转换
+Order.computedData = Transform.create({
+  record: InteractionEventEntity,
+  callback: (interactionEvents) => {
+    return interactionEvents
+      .filter(event => event.interactionName === 'createOrder')
+      .map(event => ({
+        ...event.payload.orderData,
+        createdAt: event.createdAt,
+        userId: event.user.id
+      }));
+  }
+});
+
+// 2. 库存变更记录（衍生转换）
+// 声明：InventoryChange 数据是从 createOrder 交互数据中提取商品信息转换而来
+const InventoryChange = Entity.create({
+  name: 'InventoryChange',
+  computedData: Transform.create({
+    record: InteractionEventEntity,
+    callback: (interactionEvents) => {
+      const changes = [];
+      
+      interactionEvents
+        .filter(event => event.interactionName === 'createOrder')
+        .forEach(event => {
+          // 从交互数据中提取订单商品，转换为库存变更数据
+          event.payload.items.forEach(item => {
+            changes.push({
+              productId: item.productId,
+              changeAmount: -item.quantity,
+              reason: 'order_created',
+              orderId: event.id,
+              createdAt: event.createdAt
+            });
+          });
+        });
+      
+      return changes;
+    }
+  })
+});
+
+// 3. 积分奖励（条件转换）
+// 声明：PointsReward 数据是满足金额条件的 createOrder 交互数据的转换结果
+const PointsReward = Entity.create({
+  name: 'PointsReward',
+  computedData: Transform.create({
+    record: InteractionEventEntity,
+    callback: (interactionEvents) => {
+      return interactionEvents
+        .filter(event => event.interactionName === 'createOrder')
+        .map(event => {
+          const orderTotal = event.payload.orderData.totalAmount;
+          
+          // 转换条件：只有订单金额 > 100 的交互数据才转换为积分奖励
+          if (orderTotal > 100) {
+            return {
+              userId: event.user.id,
+              points: Math.floor(orderTotal / 10),
+              reason: 'order_reward',
+              orderId: event.id,
+              createdAt: event.createdAt
+            };
+          }
+          
+          return null; // 小额订单的交互数据不转换为积分
+        })
+        .filter(reward => reward !== null);
+    }
+  })
+});
+```
+
+#### 交互驱动 vs 状态驱动的选择
+
+选择从交互数据转换还是从状态数据转换取决于业务语义：
+
+```typescript
+// 交互驱动：适合"每个X交互可能转换为Y数据"
+// 强调的是：特定交互行为本身就产生了特定的业务数据
+const LoginBonusPoints = Entity.create({
+  name: 'LoginBonusPoints',
+  computedData: Transform.create({
+    record: InteractionEventEntity, // 从交互数据转换
+    callback: (interactionEvents) => {
+      return interactionEvents
+        .filter(event => event.interactionName === 'userLogin')
+        .map(event => {
+          // 每个登录交互都可能转换为登录奖励数据
+          return isFirstLoginToday(event) ? createLoginBonus(event) : null;
+        })
+        .filter(bonus => bonus !== null);
+    }
+  })
+});
+
+// 状态驱动：适合"当实体状态为X时，Y数据应该存在"
+// 强调的是：基于实体的当前状态计算出衍生数据
+const VIPStatus = Entity.create({
+  name: 'VIPStatus',
+  computedData: Transform.create({
+    record: User, // 从用户状态数据转换
+    callback: (users) => {
+      return users
+        .filter(user => user.totalSpent > 10000) // 状态转换条件
+        .map(user => ({
+          userId: user.id,
+          level: calculateVIPLevel(user.totalSpent),
+          activatedAt: new Date().toISOString()
+        }));
+    }
+  })
+});
+```
+
+#### 最佳实践
+
+1. **优先考虑交互驱动**：当业务数据与用户行为直接相关时
+2. **数据血缘清晰**：每个 Transform 出来的数据都能追溯到具体的源数据
+3. **善用 null 返回**：让条件转换逻辑变得简洁明确
+4. **一个数据源多个 Transform**：不要在一个 Transform 里处理所有转换逻辑
+
+```typescript
+// ✅ 好的实践：转换职责分离
+Order.computedData = Transform.create({ /* 只负责转换为订单数据 */ });
+InventoryChange.computedData = Transform.create({ /* 只负责转换为库存变更数据 */ });
+PointsReward.computedData = Transform.create({ /* 只负责转换为积分奖励数据 */ });
+
+// ❌ 不好的实践：混合转换职责
+Order.computedData = Transform.create({
+  callback: (interactionEvents) => {
+    // 在这里既转换为订单，又转换为库存变更，又转换为积分...
+  }
+});
+```
+
+**核心理解**：Transform 的本质是**声明式数据转换关系**，而不是传统的事件回调。每个用户交互数据都可能转换为多种业务数据，这种**数据→数据**的转换映射让业务逻辑变得清晰、可维护且自动响应。
+
+**关键区别**：
+- **传统事件驱动**：当事件发生时 → 执行回调函数 → 手动创建数据
+- **interaqt Transform**：声明数据转换关系 → 框架自动维护 → 源数据变化时目标数据自动更新
+
 ## 使用 StateMachine 管理状态
 
 StateMachine 用于基于状态转换的计算，特别适用于工作流和状态管理场景。
