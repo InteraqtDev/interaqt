@@ -104,7 +104,7 @@ export class PropertySumHandle implements DataBasedComputation {
     relationAttributeQuery: AttributeQueryData
     sumFieldPath: string[]
 
-    constructor(public controller: Controller, public args: KlassInstance<typeof Sum>, public dataContext: PropertyDataContext) {
+    constructor(public controller: Controller, public args: KlassInstance<typeof Summation>, public dataContext: PropertyDataContext) {
         // We assume in PropertySumHandle, the records array's first element is a Relation
         this.relation = args.record as KlassInstance<typeof Relation>
         this.isSource = args.direction ? args.direction === 'source' : this.relation.source.name === dataContext.host.name

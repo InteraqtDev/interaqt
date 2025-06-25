@@ -252,4 +252,75 @@ describe('Sum computed handle', () => {
     totalBalance = await system.storage.get(DICTIONARY_RECORD, 'totalBalance');
     expect(totalBalance).toBe(3500);
   });
+
+  test('should work with filtered entities', async () => {
+    // Create base entity
+    const orderEntity = Entity.create({
+      name: 'Order',
+      properties: [
+        Property.create({name: 'status', type: 'string'}),
+        Property.create({name: 'amount', type: 'number'})
+      ]
+    })
+    
+    // Create filtered entity for completed orders
+    const completedOrderEntity = Entity.create({
+      name: 'CompletedOrder',
+      sourceEntity: orderEntity,
+      filterCondition: MatchExp.atom({
+        key: 'status',
+        value: ['=', 'completed']
+      })
+    })
+    
+    const entities = [orderEntity, completedOrderEntity]
+    
+    // Create dictionary to store sum of completed orders
+    const dictionary = [
+      Dictionary.create({
+        name: 'completedOrdersTotal',
+        type: 'number',
+        collection: false,
+        computedData: Summation.create({
+          record: completedOrderEntity,
+          attributeQuery: ['amount']
+        })
+      })
+    ]
+    
+    // Setup system and controller
+    const system = new MonoSystem();
+    system.conceptClass = KlassByName;
+    const controller = new Controller(system, entities, [], [], [], dictionary, []);
+    await controller.setup(true);
+    
+    // Create orders with different statuses
+    await system.storage.create(orderEntity.name, {
+      status: 'pending',
+      amount: 100
+    })
+    
+    await system.storage.create(orderEntity.name, {
+      status: 'completed',
+      amount: 200
+    })
+    
+    await system.storage.create(orderEntity.name, {
+      status: 'completed',
+      amount: 300
+    })
+    
+    await system.storage.create(orderEntity.name, {
+      status: 'cancelled',
+      amount: 150
+    })
+    
+    // Check that only completed orders are summed
+    const total = await system.storage.get(
+      DICTIONARY_RECORD,
+      'completedOrdersTotal'
+    )
+    
+    expect(total).toBe(500) // 200 + 300 (only completed orders)
+  })
 }); 
