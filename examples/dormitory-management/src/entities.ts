@@ -24,7 +24,7 @@ export const User = Entity.create({
     Property.create({ 
       name: 'createdAt', 
       type: 'string',
-      defaultValue: () => new Date().toISOString()
+      // defaultValue: () => new Date().toISOString()
     })
   ]
 });
@@ -56,7 +56,7 @@ export const Dormitory = Entity.create({
     Property.create({ 
       name: 'createdAt', 
       type: 'string',
-      defaultValue: () => new Date().toISOString()
+      // defaultValue: () => new Date().toISOString()
     })
   ]
 });
@@ -78,7 +78,7 @@ export const DormitoryMember = Entity.create({
     Property.create({ 
       name: 'joinedAt', 
       type: 'string',
-      defaultValue: () => new Date().toISOString()
+      // defaultValue: () => new Date().toISOString()
     }),
     Property.create({ 
       name: 'status', 
@@ -116,12 +116,12 @@ export const DormitoryApplication = Entity.create({
     Property.create({ 
       name: 'createdAt', 
       type: 'string',
-      defaultValue: () => new Date().toISOString()
+      // defaultValue: () => new Date().toISOString()
     }),
     Property.create({ 
       name: 'updatedAt', 
       type: 'string',
-      defaultValue: () => new Date().toISOString()
+      // defaultValue: () => new Date().toISOString()
     })
   ]
 });
@@ -146,7 +146,7 @@ export const ScoreRecord = Entity.create({
     Property.create({ 
       name: 'createdAt', 
       type: 'string',
-      defaultValue: () => new Date().toISOString()
+      // defaultValue: () => new Date().toISOString()
     })
   ]
 });
@@ -171,7 +171,7 @@ export const KickRequest = Entity.create({
     Property.create({ 
       name: 'createdAt', 
       type: 'string',
-      defaultValue: () => new Date().toISOString()
+      // defaultValue: () => new Date().toISOString()
     }),
     Property.create({ 
       name: 'processedAt', 

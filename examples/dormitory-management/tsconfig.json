@@ -10,7 +10,10 @@
     "baseUrl": ".",
     "paths": {
       "@": ["../../src"],
-      "@/*": ["../../src/*"]
+      "interaqt": ["../../src"],
+      "@runtime": ["../../src/runtime"],
+      "@shared": ["../../src/shared"],
+      "@storage": ["../../src/storage"],
     }
   },
   "include": [

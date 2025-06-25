@@ -1,0 +1,25 @@
+{
+  "name": "dormitory-management",
+  "version": "1.0.0",
+  "description": "这是一个使用 @interaqt/runtime 框架构建的宿舍管理系统示例，展示了如何使用响应式编程和声明式方式构建复杂的业务系统。",
+  "main": "index.js",
+  "type": "module",
+  "directories": {
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "install": "tsx install.ts",
+    "start": "tsx index.ts"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@fastify/middie": "^9.0.3",
+    "cors": "^2.8.5",
+    "fastify": "^5.4.0",
+    "tsx": "^4.20.3",
+    "vite-tsconfig-paths": "^5.1.4",
+    "vitest": "^3.2.4"
+  }
+}
