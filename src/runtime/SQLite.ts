@@ -122,7 +122,7 @@ export class SQLiteDB implements Database{
     }
     mapToDBFieldType(type: string, collection?: boolean) {
         if (type === 'pk') {
-            return 'INTEGER PRIMARY KEY'
+            return 'UUID PRIMARY KEY'
         } else if (type === 'id') {
             return 'INT'
         } else if (collection || type === 'object'||type==='json') {

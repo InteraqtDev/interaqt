@@ -143,7 +143,7 @@ export class PGLiteDB implements Database{
         if (type === 'pk') {
             return 'SERIAL PRIMARY KEY'
         } else if (type === 'id') {
-            return 'INT'
+            return 'TEXT'
         } else if (collection || type === 'object') {
             return 'JSON'
         } else if (type === 'string') {

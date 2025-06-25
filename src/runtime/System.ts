@@ -86,7 +86,7 @@ export type DatabaseLogger = {
 
 // FIXME 这里应该继承自 storage？
 export type Database = {
-    open: () => Promise<any>
+    open: (forceDrop?:boolean) => Promise<any>
     logger: DatabaseLogger
     scheme: (sql:string, name?:string) => Promise<any>
     query: <T extends any>(sql: string, values: any[],name?:string) => Promise<T[]>

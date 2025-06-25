@@ -66,7 +66,7 @@ class MonoStorage implements Storage{
         }
     }
     async setup(entities: KlassInstance<typeof Entity>[], relations: KlassInstance<typeof Relation>[], createTables = false) {
-        await this.db.open()
+        await this.db.open(createTables)
         const dbSetup = new DBSetup(
             entities as any, 
             relations as any, 
