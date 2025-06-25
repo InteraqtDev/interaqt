@@ -323,4 +323,141 @@ describe('Sum computed handle', () => {
     
     expect(total).toBe(500) // 200 + 300 (only completed orders)
   })
+
+  test('should handle property level sum computation with relations', async () => {
+    // Define entities first
+    const customerEntity = Entity.create({
+      name: 'Customer',
+      properties: [
+        Property.create({name: 'name', type: 'string'})
+      ]
+    });
+    
+    const purchaseEntity = Entity.create({
+      name: 'Purchase',
+      properties: [
+        Property.create({name: 'product', type: 'string'}),
+        Property.create({name: 'amount', type: 'number'}),
+        Property.create({name: 'date', type: 'string'})
+      ]
+    });
+    
+    // Create relationship
+    const customerPurchaseRelation = Relation.create({
+      source: customerEntity,
+      sourceProperty: 'purchases',
+      target: purchaseEntity,
+      targetProperty: 'customer',
+      name: 'CustomerPurchase',
+      type: '1:n'
+    });
+    
+    // Add computed property to customer entity
+    customerEntity.properties.push(
+      Property.create({
+        name: 'totalPurchases',
+        type: 'number',
+        collection: false,
+        computedData: Summation.create({
+          record: customerPurchaseRelation,
+          attributeQuery: [['target', {attributeQuery: ['amount']}]]
+        })
+      })
+    );
+    
+    const entities = [customerEntity, purchaseEntity];
+    const relations = [customerPurchaseRelation];
+    
+    // Setup system and controller
+    const system = new MonoSystem();
+    system.conceptClass = KlassByName;
+    const controller = new Controller(system, entities, relations, [], [], [], []);
+    await controller.setup(true);
+    
+    // Create customers
+    const alice = await system.storage.create('Customer', { name: 'Alice' });
+    const bob = await system.storage.create('Customer', { name: 'Bob' });
+    
+    // Create purchases for Alice
+    await system.storage.create('Purchase', {
+      product: 'Laptop',
+      amount: 1200,
+      date: '2024-01-01',
+      customer: alice
+    });
+    
+    await system.storage.create('Purchase', {
+      product: 'Mouse',
+      amount: 50,
+      date: '2024-01-02',
+      customer: alice
+    });
+    
+    await system.storage.create('Purchase', {
+      product: 'Keyboard',
+      amount: 150,
+      date: '2024-01-03',
+      customer: alice
+    });
+    
+    // Create purchases for Bob
+    await system.storage.create('Purchase', {
+      product: 'Monitor',
+      amount: 500,
+      date: '2024-01-01',
+      customer: bob
+    });
+    
+    await system.storage.create('Purchase', {
+      product: 'Headphones',
+      amount: null, // Invalid amount
+      date: '2024-01-02',
+      customer: bob
+    });
+    
+    await system.storage.create('Purchase', {
+      product: 'Webcam',
+      amount: 100,
+      date: '2024-01-03',
+      customer: bob
+    });
+    
+    // Check computed totals
+    const updatedAlice = await system.storage.findOne(
+      'Customer',
+      MatchExp.atom({key: 'id', value: ['=', alice.id]}),
+      undefined,
+      ['totalPurchases']
+    );
+    
+    const updatedBob = await system.storage.findOne(
+      'Customer',
+      MatchExp.atom({key: 'id', value: ['=', bob.id]}),
+      undefined,
+      ['totalPurchases']
+    );
+    
+    expect(updatedAlice.totalPurchases).toBe(1400); // 1200 + 50 + 150
+    expect(updatedBob.totalPurchases).toBe(600); // 500 + 100 (null is ignored)
+    
+    // Test incremental update
+    const mousePurchase = await system.storage.findOne(
+      'Purchase',
+      MatchExp.atom({key: 'product', value: ['=', 'Mouse']})
+    );
+    
+    await system.storage.update('Purchase', 
+      BoolExp.atom({key: 'id', value: ['=', mousePurchase.id]}), 
+      { amount: 75 }
+    );
+    
+    const finalAlice = await system.storage.findOne(
+      'Customer',
+      MatchExp.atom({key: 'id', value: ['=', alice.id]}),
+      undefined,
+      ['totalPurchases']
+    );
+    
+    expect(finalAlice.totalPurchases).toBe(1425); // 1200 + 75 + 150
+  });
 }); 

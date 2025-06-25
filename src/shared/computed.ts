@@ -176,6 +176,27 @@ export const Summation = createClass({
     }
 })
 
+export const Average = createClass({
+    name: 'Average',
+    public: {
+        record: {
+            type: [Entity, Relation],
+            collection: false,
+            required: true
+        },
+        direction: {
+            type: 'string',
+            collection: false,
+            required: false,
+        },
+        attributeQuery: {
+            instanceType: {} as unknown as AttributeQueryData,
+            collection: false,
+            required: true
+        },
+    }
+})
+
 
 export const Every = createClass({
     name: 'Every',
@@ -298,7 +319,7 @@ export const RealTime = createClass({
 })
 
 // 修补 Entity computedData 里面的类型
-Relation.public.computedData.type.push(StateMachine, WeightedSummation, Count, Summation, Every, Any, Transform, RealTime)
-Entity.public.computedData.type.push(StateMachine, WeightedSummation, Count, Summation, Every, Any, Transform, RealTime)
-Property.public.computedData.type.push(StateMachine, WeightedSummation, Count, Summation, Every, Any, Transform, RealTime)
-Dictionary.public.computedData.type.push(StateMachine, WeightedSummation, Count, Summation, Every, Any, Transform, RealTime)
+Relation.public.computedData.type.push(StateMachine, WeightedSummation, Count, Summation, Average, Every, Any, Transform, RealTime)
+Entity.public.computedData.type.push(StateMachine, WeightedSummation, Count, Summation, Average, Every, Any, Transform, RealTime)
+Property.public.computedData.type.push(StateMachine, WeightedSummation, Count, Summation, Average, Every, Any, Transform, RealTime)
+Dictionary.public.computedData.type.push(StateMachine, WeightedSummation, Count, Summation, Average, Every, Any, Transform, RealTime)

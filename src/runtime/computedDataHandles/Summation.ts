@@ -49,9 +49,9 @@ export class GlobalSumHandle implements DataBasedComputation {
         let base:any = record
         for(let attr of sumFieldPath) {
             base = base[attr]
-            if (base === undefined||base === null||Number.isNaN(base)||!Number.isFinite(base)) return 0
+            if (base === undefined||base === null) return 0
         }
-        return base
+        return (Number.isNaN(base)||!Number.isFinite(base) ) ? 0: base
     }
     async compute({main: records}: {main: any[]}): Promise<number> {
         let sum = 0;
@@ -128,7 +128,7 @@ export class PropertySumHandle implements DataBasedComputation {
         this.dataDeps = {
             _current: {
                 type: 'property',
-                attributeQuery: [[this.relationAttr, {attributeQuery: this.relationAttributeQuery}]]
+                attributeQuery: [[this.relationAttr, {attributeQuery: [['&', {attributeQuery: this.relationAttributeQuery}]]}]]
             }
         }
     }
@@ -145,9 +145,9 @@ export class PropertySumHandle implements DataBasedComputation {
         let base:any = record
         for(let attr of sumFieldPath) {
             base = base[attr]
-            if (base === undefined||base === null||Number.isNaN(base)||!Number.isFinite(base)) return 0
+            if (base === undefined||base === null) return 0
         }
-        return base
+        return (Number.isNaN(base)||!Number.isFinite(base) ) ? 0: base
     }
 
     async compute({_current}: {_current: any}): Promise<number> {
@@ -210,9 +210,13 @@ export class PropertySumHandle implements DataBasedComputation {
             );
             const newValue = this.resolveSumField(newRelationWithEntity)
 
-            assert(!mutationEvent.relatedAttribute || mutationEvent.relatedAttribute.every((r, index) => r===this.sumFieldPath[index]), 'related update event should not trigger this sum.')
+            // 跳过 relatedAttribute 中的前缀部分（如 ['purchases', '&', 'target']），只比较实际的字段路径
+            const relatedAttrLength = mutationEvent.relatedAttribute?.length || 0
+            const fieldPathStart = this.sumFieldPath.findIndex(p => p !== 'target' && p !== 'source')
+            const actualFieldPath = fieldPathStart >= 0 ? this.sumFieldPath.slice(fieldPathStart) : []
+            
             const oldRecord = mutationEvent.relatedMutationEvent!.oldRecord 
-            const oldValue = this.resolveSumField(oldRecord, this.sumFieldPath.slice(mutationEvent.relatedAttribute!.length, Infinity));
+            const oldValue = this.resolveSumField(oldRecord, actualFieldPath);
             sum += newValue-oldValue 
         }
 
