@@ -40,12 +40,9 @@
   "license": "MIT",
   "dependencies": {
     "@electric-sql/pglite": "^0.3.2",
-    "@fastify/middie": "^9.0.3",
     "acorn": "^8.14.1",
     "better-sqlite3": "^11.8.1",
     "chalk": "^5.4.1",
-    "cors": "^2.8.5",
-    "fastify": "^5.2.1",
     "mysql2": "^3.13.0",
     "pg": "^8.14.0",
     "pino": "^9.6.0",

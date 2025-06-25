@@ -18,9 +18,10 @@ export const ASYNC_TASK_RECORD = '_ASYNC_TASK_'
 
 export class Scheduler {
     computations = new Set<Computation>()
-    private sourceMapManager: ComputationSourceMapManager = new ComputationSourceMapManager(this.controller)
+    private sourceMapManager: ComputationSourceMapManager
     
     constructor(public controller: Controller, entities: KlassInstance<typeof Entity>[], relations: KlassInstance<typeof Relation>[], dict: KlassInstance<typeof Property>[]) {
+        this.sourceMapManager = new ComputationSourceMapManager(this.controller)
         const computationInputs: {dataContext: DataContext, args: KlassInstance<any>}[] = []
         entities.forEach(entity => {
             if (entity.computedData) {

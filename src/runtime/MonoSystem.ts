@@ -8,7 +8,8 @@ import {
     System,
     SYSTEM_RECORD,
     SystemEntity,
-    SystemLogger
+    SystemLogger,
+    SystemLogType
 } from "./System.js";
 import { createClass, Entity, KlassInstance, Property, Relation } from "@shared";
 import {
@@ -21,9 +22,7 @@ import {
 } from '@storage';
 import { SQLiteDB } from "./SQLite.js";
 import pino from "pino";
-import { RecordBoundState, RelationBoundState } from "./computedDataHandles/Computation.js";
-import { DataContext, PropertyDataContext } from "./computedDataHandles/ComputedDataHandle.js";
-import { assert } from "./util.js";
+import { RecordBoundState } from "./computedDataHandles/Computation.js";
 
 function JSONStringify(value:any) {
     return encodeURI(JSON.stringify(value))
@@ -145,20 +144,38 @@ class MonoStorage implements Storage{
 
 
 
-export const defaultLogger = pino()
-export class ConsoleLogger implements DatabaseLogger{
+
+export class DBConsoleLogger implements DatabaseLogger{
     info({type, name, sql, params}: Parameters<DatabaseLogger["info"]>[0]) {
         console.log({type, name, sql, params})
     }
     child() {
-        return new ConsoleLogger()
+        return new DBConsoleLogger()
     }
 }
+
+export class SystemConsoleLogger implements SystemLogger{
+    error({label, message, ...rest}: SystemLogType) {
+        console.error(`[ERROR] ${label}: ${message}`, rest)
+    }
+    info({label, message, ...rest}: SystemLogType) {
+        console.info(`[INFO] ${label}: ${message}`, rest)
+    }
+    debug({label, message, ...rest}: SystemLogType) {
+        console.debug(`[DEBUG] ${label}: ${message}`, rest)
+    }
+    child(fixed: object) {
+        return new SystemConsoleLogger()
+    }
+}
+export const dbPinoLogger = pino()
+export const dbConsoleLogger = new DBConsoleLogger()
+export const systemConsoleLogger = new SystemConsoleLogger()
 
 export class MonoSystem implements System {
     conceptClass: Map<string, ReturnType<typeof createClass>> = new Map()
     storage: Storage
-    constructor(db: Database = new SQLiteDB(undefined,{logger: new ConsoleLogger()}), public logger: SystemLogger = defaultLogger) {
+    constructor(db: Database = new SQLiteDB(undefined,{logger: dbConsoleLogger}), public logger: SystemLogger = systemConsoleLogger) {
         this.storage = new MonoStorage(db)
     }
     

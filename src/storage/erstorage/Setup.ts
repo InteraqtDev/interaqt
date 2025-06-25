@@ -485,12 +485,47 @@ export class DBSetup {
 
     }
 
+    formatDefaultValue(value: any, fieldType?: string): string {
+        // 处理 null 值
+        if (value === null) {
+            return 'NULL';
+        }
+        
+        // 处理字符串类型
+        if (typeof value === 'string') {
+            // 对于 PostgreSQL/PGLite，字符串需要用单引号包裹
+            // 并且需要转义内部的单引号
+            return `'${value.replace(/'/g, "''")}'`;
+        }
+        
+        // 处理布尔值
+        if (typeof value === 'boolean') {
+            return value.toString();
+        }
+        
+        // 处理数字
+        if (typeof value === 'number') {
+            return value.toString();
+        }
+        
+        // 处理对象/数组（JSON类型）
+        if (typeof value === 'object' && value !== null) {
+            // 对于 JSON 类型，需要将对象序列化并用单引号包裹
+            const jsonStr = JSON.stringify(value);
+            // 转义单引号
+            return `'${jsonStr.replace(/'/g, "''")}'`;
+        }
+        
+        // 其他类型使用 JSON.stringify 作为后备方案
+        return JSON.stringify(value);
+    }
+
     createTableSQL() {
         return Object.keys(this.tables).map(tableName => (
             `
 CREATE TABLE "${tableName}" (
 ${Object.values(this.tables[tableName].columns).map(column => (`
-    "${column.name}" ${column.fieldType} ${column.defaultValue ? `DEFAULT ${JSON.stringify(column.defaultValue())}` : ''}`)).join(',')}
+    "${column.name}" ${column.fieldType} ${column.defaultValue ? `DEFAULT ${this.formatDefaultValue(column.defaultValue())}` : ''}`)).join(',')}
 )
 `
         ))

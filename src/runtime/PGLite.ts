@@ -141,7 +141,7 @@ export class PGLiteDB implements Database{
     }
     mapToDBFieldType(type: string, collection?: boolean) {
         if (type === 'pk') {
-            return 'INT GENERATED ALWAYS AS IDENTITY'
+            return 'SERIAL PRIMARY KEY'
         } else if (type === 'id') {
             return 'INT'
         } else if (collection || type === 'object') {

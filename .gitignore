@@ -30,3 +30,5 @@ coverage
 .next
 package-lock.json
 temp
+pgdata
+test-create.sqlite
