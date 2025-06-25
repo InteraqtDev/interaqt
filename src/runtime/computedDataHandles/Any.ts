@@ -1,7 +1,7 @@
 import { ComputedDataHandle, DataContext, PropertyDataContext } from "./ComputedDataHandle.js";
 import { Any, KlassInstance, Relation } from "@shared";
 import { Controller } from "../Controller.js";
-import { ComputationResult, DataDep, GlobalBoundState, RecordBoundState, RecordsDataDep, RelationBoundState } from "./Computation.js";
+import { ComputationResult, DataDep, GlobalBoundState, RecordBoundState, RecordsDataDep } from "./Computation.js";
 import { DataBasedComputation } from "./Computation.js";
 import { EtityMutationEvent } from "../ComputationSourceMap.js";
 import { MatchExp, AttributeQueryData } from "@storage";
@@ -104,8 +104,7 @@ export class PropertyAnyHandle implements DataBasedComputation {
     createState() {
         return {
             matchCount: new RecordBoundState<number>(0),
-            isItemMatch: new RelationBoundState<boolean>(false, this.relation.name)
-
+            isItemMatch: new RecordBoundState<boolean>(false, this.relation.name)
         }   
     }
     

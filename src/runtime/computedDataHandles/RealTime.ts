@@ -1,6 +1,6 @@
 import { KlassInstance, Property, RealTime } from "@shared";
 import { Controller } from "../Controller";
-import { ComputationResultSkip, ComputationResultPatch, ComputationResult, DataBasedComputation, RecordBoundState, RelationBoundState, GlobalBoundState } from "./Computation";
+import { ComputationResultPatch, ComputationResult, DataBasedComputation, RecordBoundState, GlobalBoundState } from "./Computation";
 import { ComputedDataHandle, DataContext } from "./ComputedDataHandle";
 import { Equation, Expression, Inequality } from "./MathResolver";
 

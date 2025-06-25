@@ -1,6 +1,6 @@
 import { ComputedDataHandle, PropertyDataContext } from "./ComputedDataHandle.js";
 import { Every, KlassInstance, Relation } from "@shared";
-import { ComputationResult, DataBasedComputation, DataDep, GlobalBoundState, RecordBoundState, RecordsDataDep, RelationBoundState } from "./Computation.js";
+import { ComputationResult, DataBasedComputation, DataDep, GlobalBoundState, RecordBoundState, RecordsDataDep } from "./Computation.js";
 import { Controller } from "../Controller.js";
 import { DataContext } from "./ComputedDataHandle.js";
 import { EtityMutationEvent } from "../Scheduler.js";
@@ -118,7 +118,7 @@ export class PropertyEveryHandle implements DataBasedComputation {
         return {
             matchCount: new RecordBoundState<number>(0),
             totalCount: new RecordBoundState<number>(0),
-            isItemMatch: new RelationBoundState<boolean>(false, this.relation.name)
+            isItemMatch: new RecordBoundState<boolean>(false, this.relation.name)
         }
     }
     

@@ -67,25 +67,6 @@ export class RecordBoundState<T> {
     }
 }
 
-export class RelationBoundState<T> {
-    key!: string
-    controller!: Controller
-    constructor(public defaultValue:any, public record:string) { 
-
-    }
-    async set(record:any, value: any): Promise<T> {
-        await this.controller.system.storage.update(this.record, BoolExp.atom({key: 'id', value: ['=', record.id]}), {[this.key]: value})
-        return value
-    }
-    async get(record:any):Promise<T> {
-        // TODO 如果 record 上不存在就重新查询
-        if (record[this.key] === undefined) {
-            const fullRecord = await this.controller.system.storage.findOne(this.record, BoolExp.atom({key: 'id', value: ['=', record.id]}), undefined, [this.key])
-            return fullRecord[this.key] as T
-        }
-        return record[this.key] as T
-    }
-}
 
 export class GlobalBoundState<T> {
     key!:string
@@ -137,7 +118,7 @@ export type DataDep = RecordsDataDep|PropertyDataDep|GlobalDataDep|DictionaryDat
 
 export interface DataBasedComputation {
     dataContext: DataContext
-    state: {[key: string]: RecordBoundState<any>|GlobalBoundState<any>|RelationBoundState<any>}
+    state: {[key: string]: RecordBoundState<any>|GlobalBoundState<any>}
     // 全量计算
     compute: (...args: any[]) => Promise<ComputationResult|any>
     // 增量计算
@@ -168,7 +149,7 @@ export type EventDep = InteractionEventDep|DataEventDep
 
 export interface EventBasedComputation {
     dataContext: DataContext
-    state: {[key: string]: RecordBoundState<any>|GlobalBoundState<any>|RelationBoundState<any>}
+    state: {[key: string]: RecordBoundState<any>|GlobalBoundState<any>}
     incrementalCompute?: (...args: any[]) => Promise<ComputationResult|any>
     incrementalPatchCompute?: (...args: any[]) => Promise<ComputationResult|ComputationResultPatch|ComputationResultPatch[]|undefined>
     createState?: (...args: any[]) => {[key: string]: RecordBoundState<any>|GlobalBoundState<any>}

@@ -3,7 +3,7 @@ import { DataContext, ComputedDataHandle, PropertyDataContext, EntityDataContext
 
 import { Entity, Klass, KlassInstance, Property, Relation } from "@shared";
 import { assert } from "./util.js";
-import { Computation, ComputationClass, ComputationResult, ComputationResultAsync, ComputationResultFullRecompute, ComputationResultResolved, ComputationResultSkip, DataBasedComputation, EventBasedComputation, GlobalBoundState, RecordBoundState, RecordsDataDep, RelationBoundState } from "./computedDataHandles/Computation.js";
+import { Computation, ComputationClass, ComputationResult, ComputationResultAsync, ComputationResultFullRecompute, ComputationResultResolved, ComputationResultSkip, DataBasedComputation, EventBasedComputation, GlobalBoundState, RecordBoundState, RecordsDataDep } from "./computedDataHandles/Computation.js";
 import { DICTIONARY_RECORD, RecordMutationEvent, SYSTEM_RECORD } from "./System.js";
 import { AttributeQueryData, MatchExp } from "@storage";
 import {
@@ -175,7 +175,7 @@ export class Scheduler {
             }
         }
     }
-    getBoundStateName(dataContext: DataContext, stateName: string, stateItem: RecordBoundState<any>|GlobalBoundState<any>|RelationBoundState<any>) {
+    getBoundStateName(dataContext: DataContext, stateName: string, stateItem: RecordBoundState<any>|GlobalBoundState<any>) {
 
         const stateDataContextKey = dataContext.type === 'property' ? 
             `${dataContext.host.name}_${dataContext.id.name}` : 
@@ -184,7 +184,7 @@ export class Scheduler {
         return `_${stateDataContextKey}_bound_${stateName}`
     }
     createStates() {
-        const states: {dataContext: DataContext, state: {[key: string]: RecordBoundState<any>|GlobalBoundState<any>|RelationBoundState<any>}}[] = []
+        const states: {dataContext: DataContext, state: {[key: string]: RecordBoundState<any>|GlobalBoundState<any>}}[] = []
         for(const computation of this.computations) {
             if (computation.createState) {
                 const state = computation.createState()

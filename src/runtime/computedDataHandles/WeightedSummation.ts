@@ -1,7 +1,7 @@
 import { ComputedDataHandle, DataContext, PropertyDataContext } from "./ComputedDataHandle.js";
 import { WeightedSummation, KlassInstance, Relation, Entity } from "@shared";
 import { Controller } from "../Controller.js";
-import { ComputationResult, DataDep,RecordsDataDep,  RecordBoundState, RelationBoundState } from "./Computation.js";
+import { ComputationResult, DataDep, RecordsDataDep, RecordBoundState } from "./Computation.js";
 import { DataBasedComputation } from "./Computation.js";
 import { EtityMutationEvent } from "../Scheduler.js";
 import { AttributeQueryData, MatchExp } from "@storage";
@@ -111,7 +111,7 @@ export class PropertyWeightedSummationHandle implements DataBasedComputation {
 
     createState() {
         return {
-            itemResult: new RelationBoundState<number>(0, this.relation.name)
+            itemResult: new RecordBoundState<number>(0, this.relation.name)
         }   
     }
     

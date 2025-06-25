@@ -182,24 +182,6 @@ export class MonoSystem implements System {
                             defaultValue: () => stateItem.defaultValue
                         }))
                     }
-                } else if (stateItem instanceof RelationBoundState) {   
-                    const relationName = stateItem.record
-                    const relation = relations.find(relation => relation.name === relationName)!
-                    assert(relation, `relation ${relationName} not found`)
-                    if (stateItem.defaultValue instanceof Property) {
-                        // TODO 特别注意这里改了 name
-                        stateItem.defaultValue.name = stateItem.key
-                        relation.properties.push(stateItem.defaultValue)
-                    } else {
-                        const defaultValuetype = typeof stateItem.defaultValue
-                        relation.properties.push(Property.create({
-                            name: stateItem.key,
-                            type: defaultValuetype,
-                            // 应该系统定义
-                            collection: Array.isArray(stateItem.defaultValue),
-                            defaultValue: () => stateItem.defaultValue
-                        }))
-                    }
                 }
             })
         })
