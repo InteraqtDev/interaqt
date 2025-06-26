@@ -17,6 +17,27 @@ export type JoinTables = {
     joinTarget: [string, string]
 }[]
 
+
+
+class FieldAliasMap {
+    aliasToPath: Map<string, string[]> = new Map()
+    pathStrToAlias: Map<string, string> = new Map()
+    aliasPlaceholder: number=0
+    getAlias(path:string[], forceCreate = false) {
+        const pathStr = path.join('.')
+        const alias = this.pathStrToAlias.get(pathStr)
+        if(alias||!forceCreate) return alias
+
+        const newAlias = `FIELD_${this.aliasPlaceholder++}`
+        this.pathStrToAlias.set(pathStr, newAlias)
+        this.aliasToPath.set(newAlias, path)
+        return newAlias
+    }
+    getPath(alias: string) {
+        return this.aliasToPath.get(alias)
+    }
+}
+
 export type Record = EntityIdRef & {
     [k: string]: any
 }
@@ -76,7 +97,7 @@ export class RecordQueryAgent {
     }
 
     // 有 prefix 说明是比人的子查询
-    buildXToOneFindQuery(recordQuery: RecordQuery, prefix = '', parentP?:PlaceholderGen): [string, any[]] {
+    buildXToOneFindQuery(recordQuery: RecordQuery, prefix = '', parentP?:PlaceholderGen): [string, any[], FieldAliasMap] {
         // 从所有条件里面构建出 join clause
         const fieldQueryTree = recordQuery.attributeQuery!.xToOneQueryTree
 
@@ -90,10 +111,10 @@ export class RecordQueryAgent {
 
         const [whereClause, params] = this.buildWhereClause(this.parseMatchExpressionValue(recordQuery.recordName, fieldMatchExp, recordQuery.contextRootEntity, p), prefix, p)
 
-        const selectClause = this.buildSelectClause(recordQuery.attributeQuery.getValueAndXToOneRecordFields(), prefix)
+        const [selectClause, fieldAliasMap] = this.buildSelectClause(recordQuery.attributeQuery.getValueAndXToOneRecordFields(), prefix)
         const fromClause = this.buildFromClause(recordQuery.recordName, prefix)
         const joinClause = this.buildJoinClause(joinTables, prefix)
-        const modifierClause = this.buildModifierClause(recordQuery.modifier, prefix)
+        const modifierClause = this.buildModifierClause(recordQuery.modifier, prefix, fieldAliasMap)
 
         return [`
 SELECT
@@ -106,16 +127,26 @@ ${whereClause}
 
 ${modifierClause}
 `,
-            params]
+            params,
+            fieldAliasMap
+        ]
 
 
     }
 
-    buildModifierClause(modifier: Modifier, prefix?: string) {
+    buildModifierClause(modifier: Modifier, prefix: string = '', fieldAliasMap: FieldAliasMap) {
         const {limit, offset, orderBy} = modifier
         const clauses = []
         if (orderBy.length) {
-            clauses.push(`ORDER BY ${orderBy.map(({attribute, recordName, order}) => `"${this.withPrefix(prefix)}${recordName}.${attribute}" ${order}`).join(',')}`)
+            
+            clauses.push(`ORDER BY ${orderBy.map(({attribute, recordName, order}) => {
+                const fieldPath = [
+                    `${this.withPrefix(prefix)}${recordName}`,
+                    attribute
+                ]
+                const field = fieldAliasMap.getAlias(fieldPath) || fieldPath.join('.')
+                return `"${field}" ${order}`
+            }).join(',')}`)
         }
 
         if (limit) {
@@ -131,12 +162,12 @@ ${modifierClause}
     }
 
 
-    structureRawReturns(rawReturns: { [k: string]: any }[], JSONFields: string[]) {
+    structureRawReturns(rawReturns: { [k: string]: any }[], JSONFields: string[], fieldAliasMap: FieldAliasMap) {
         return rawReturns.map(rawReturn => {
             const obj = {}
             Object.entries(rawReturn).forEach(([key, value]) => {
                 // CAUTION 注意这里去掉了最开始的 entityName
-                const attributePath = key.split('.').slice(1, Infinity)
+                const attributePath = fieldAliasMap.getPath(key)!.slice(1, Infinity)
                 if (attributePath.length === 1 && JSONFields.includes(attributePath[0]) && typeof value === 'string') {
                     value = JSON.parse(value)
                 }
@@ -188,8 +219,8 @@ ${modifierClause}
         // 0. 这里只通过合表或者 join  处理了 x:1 的关联查询，包括了 parentLinkRecordQuery 上字段的查询，以及从 parentLink 发出可以看做是 x:1 的关联字段查询。
         //  这个 x:1 是递归的，把一次性能通过 join 查到的都查了。
         // x:n 的查询是通过二次查询获取的。
-        const [querySQL, params] = this.buildXToOneFindQuery(entityQuery, '')
-        const records = this.structureRawReturns(await this.database.query(querySQL, params, queryName), this.map.getRecordInfo(entityQuery.recordName).JSONFields) as any[]
+        const [querySQL, params, fieldAliasMap] = this.buildXToOneFindQuery(entityQuery, '')
+        const records = this.structureRawReturns(await this.database.query(querySQL, params, queryName), this.map.getRecordInfo(entityQuery.recordName).JSONFields, fieldAliasMap) as any[]
 
         // 如果当前的 query 有 label，那么下面任何遍历 record 的地方都要 Push stack。
         const nextRecursiveContext = (entityQuery.label && entityQuery.label !== context.label) ? context.spawn(entityQuery.label) : context
@@ -527,14 +558,28 @@ ${modifierClause}
         return prefix ? `${prefix}___` : ''
     }
 
-    buildSelectClause(queryFields: ReturnType<AttributeQuery["getValueAndXToOneRecordFields"]>, prefix = '') {
-        if (!queryFields.length) return '1'
+    buildSelectClause(queryFields: ReturnType<AttributeQuery["getValueAndXToOneRecordFields"]>, prefix = ''): [string, FieldAliasMap] {
+
+        const fieldAliasMap= new FieldAliasMap()
+
+        if (!queryFields.length) return ['1', fieldAliasMap]
+
+        // CUATION 这里创建 fieldAliasMap 是因为有的数据库里标识符有长度限制，例如 PGLite限制为63，由于alias 是拼出来的路径，很可能会过长。
+        let aliasPlaceholder = 0
         // CAUTION 所有 entity 都要 select id
-        const aliasClauses= queryFields.map(({tableAliasAndField, attribute, nameContext}) => (
-            `"${this.withPrefix(prefix)}${tableAliasAndField[0]}"."${tableAliasAndField[1]}" AS "${this.withPrefix(prefix)}${nameContext.join(".")}.${attribute}"`
-        ))
+        const aliasClauses= queryFields.map(({tableAliasAndField, attribute, nameContext}) => {
+            const path = [
+                `${this.withPrefix(prefix)}${nameContext[0]}`,
+                ...nameContext.slice(1, Infinity),
+                attribute
+            ]
+            const aliasName = fieldAliasMap.getAlias(path, true)
+            return (
+                `"${this.withPrefix(prefix)}${tableAliasAndField[0]}"."${tableAliasAndField[1]}" AS "${aliasName}"`
+            ) 
+        })
         
-        return aliasClauses.join(',\n')
+        return [aliasClauses.join(',\n'), fieldAliasMap]
     }
 
     buildFromClause(entityName: string, prefix = '') {
@@ -623,7 +668,7 @@ EXISTS (
 ${innerQuerySQL}
 )
 `,
-                fieldParams: innerParams
+                fieldParams: innerParams,
             }
         })
     }

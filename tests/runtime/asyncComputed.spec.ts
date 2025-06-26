@@ -66,9 +66,9 @@ describe('async computed', () => {
 
 
         // 1. 创建了异步任务 
-        const url = await system.storage.create('URL', {url: 'https://not.exist.com'})
+        const urlEntity = await system.storage.create('URL', {url: 'https://not.exist.com'})
 
-        const crawlerTaskRecords = await system.storage.find(crawlerTaskRecordName)
+        const crawlerTaskRecords = await system.storage.find(crawlerTaskRecordName, undefined, undefined, ['*'])
         expect(crawlerTaskRecords.length).toBe(1)
         
         // 2. 模拟外部执行了异步任务
@@ -81,7 +81,8 @@ describe('async computed', () => {
         await controller.scheduler.handleAsyncReturn(crawlerComputation, updatedCrawlerTaskRecord)
         
         // 4. 检查 content 属性是否被更新
-        const entity = await system.storage.findOne(URLEntity.name, MatchExp.atom({key: 'id', value: ['=', crawlerTaskRecords[0].id]}), {}, ['*'])
+        const entity = await system.storage.findOne(URLEntity.name, MatchExp.atom({key: 'id', value: ['=', urlEntity.id]}), {}, ['*'])
+        // const entities= await system.storage.findOne(URLEntity.name, undefined, {}, ['*'])
         expect(entity.content).toBe(`${randomResult}_crawled_by_random`)
 
 

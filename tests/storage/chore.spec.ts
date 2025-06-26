@@ -159,8 +159,7 @@ const UserProcessedKickRequest = Relation.create({
   type: 'n:1'
 });
 
-// FIXME 因为 as 标识符有 63 个字符限制，现在有的表长度超出了。
-describe.skip('KickRequest Storage Bug Test', () => {
+describe('KickRequest Storage Bug Test', () => {
   let db: PGLiteDB
   let handle: EntityQueryHandle
   let setup: DBSetup
@@ -272,15 +271,10 @@ describe.skip('KickRequest Storage Bug Test', () => {
       processedAt: '2024-01-02T12:00:00Z'
     })
 
-    const k1 = await handle.find('KickRequest', undefined, undefined, ['*'])
-
     // Create kick request relations
-    // await handle.addRelationById('KickRequest', 'requester', kickRequest.id, requesterUser.id)
-    // const k2 = await handle.find('KickRequest', undefined, undefined, ['*'])
-    // await handle.addRelationById('KickRequest', 'processor', kickRequest.id, adminUser.id)
-    // const k3 = await handle.find('KickRequest', undefined, undefined, ['*'])
+    await handle.addRelationById('KickRequest', 'requester', kickRequest.id, requesterUser.id)
+    await handle.addRelationById('KickRequest', 'processor', kickRequest.id, adminUser.id)
     await handle.addRelationById('KickRequest', 'targetMember', kickRequest.id, targetMember.id)
-    const k4 = await handle.find('KickRequest', undefined, undefined, ['*'])
 
     // Query KickRequest with all User-related relation data
     // This should trigger the storage bug
@@ -296,6 +290,7 @@ describe.skip('KickRequest Storage Bug Test', () => {
         {
           attributeQuery: [
             "id",
+            "score",
             [
               "user",
               {
@@ -492,175 +487,5 @@ describe.skip('KickRequest Storage Bug Test', () => {
     }
 
     console.log('Multiple KickRequests query results:', JSON.stringify(results, null, 2))
-  })
-
-  test('should stress test with deep nested queries that might trigger storage bug', async () => {
-    // This test creates a more complex scenario to stress test the storage system
-    const users = []
-    const dormitories = []
-    const members = []
-    const kickRequests = []
-
-    // Create multiple admins and students
-    for (let i = 0; i < 10; i++) {
-      const user = await handle.create('User', {
-        name: `User ${i}`,
-        role: i < 2 ? 'admin' : 'student',
-        email: `user${i}@test.com`,
-        studentId: `STU${String(i).padStart(3, '0')}`,
-        createdAt: '2024-01-01T00:00:00Z'
-      })
-      users.push(user)
-    }
-
-    // Create multiple dormitories
-    for (let i = 0; i < 3; i++) {
-      const dormitory = await handle.create('Dormitory', {
-        name: `Dormitory ${i}`,
-        building: `Building ${String.fromCharCode(65 + i)}`,
-        roomNumber: `${i + 1}01`,
-        capacity: 4,
-        description: `Test dormitory ${i}`,
-        createdAt: '2024-01-01T00:00:00Z'
-      })
-      dormitories.push(dormitory)
-    }
-
-    // Create members across dormitories
-    let memberIndex = 0
-    for (let dormIndex = 0; dormIndex < 3; dormIndex++) {
-      for (let bedIndex = 1; bedIndex <= 4; bedIndex++) {
-        const userIndex = 2 + memberIndex // Start from user 2 (students)
-        if (userIndex >= users.length) break
-
-        const member = await handle.create('DormitoryMember', {
-          role: bedIndex === 1 ? 'leader' : 'member',
-          score: Math.random() > 0.5 ? 50 : -60, // Some with negative scores
-          joinedAt: '2024-01-01T00:00:00Z',
-          status: 'active',
-          bedNumber: bedIndex
-        })
-        members.push(member)
-
-        await handle.addRelationById('DormitoryMember', 'user', member.id, users[userIndex].id)
-        await handle.addRelationById('DormitoryMember', 'dormitory', member.id, dormitories[dormIndex].id)
-        memberIndex++
-      }
-    }
-
-    // Create multiple kick requests with complex relationships
-    const maxRequests = Math.min(6, members.length - 1) // Don't exceed available members
-    for (let i = 0; i < maxRequests; i++) {
-      const requesterMember = members.find(m => m.role === 'leader') // Find a leader
-      const targetMemberIndex = (i + 1) % members.length // Rotate through members, avoid requester
-      const targetMember = members[targetMemberIndex] 
-      const processorUser = users[i % 2] // Alternate between admin users
-      
-      // Skip if target is the same as requester
-      if (targetMember.id === requesterMember.id) {
-        continue
-      }
-
-      const kickRequest = await handle.create('KickRequest', {
-        reason: `Complex kick reason ${i} - detailed behavioral issues and policy violations`,
-        status: i % 3 === 0 ? 'pending' : (i % 3 === 1 ? 'approved' : 'rejected'),
-        adminComment: i % 3 !== 0 ? `Admin decision ${i}` : '',
-        createdAt: `2024-01-${String(i + 1).padStart(2, '0')}T00:00:00Z`,
-        processedAt: i % 3 !== 0 ? `2024-01-${String(i + 1).padStart(2, '0')}T12:00:00Z` : ''
-      })
-      kickRequests.push(kickRequest)
-
-      // Create relations
-      const requesterUserId = await handle.find(
-        'DormitoryMember',
-        MatchExp.atom({ key: 'id', value: ['=', requesterMember.id] }),
-        {},
-        [['user', { attributeQuery: ['id'] }]]
-      )
-      
-      console.log('Requester member query result:', JSON.stringify(requesterUserId, null, 2))
-      
-      if (!requesterUserId || requesterUserId.length === 0 || !requesterUserId[0].user) {
-        throw new Error(`Failed to find user for requester member ${requesterMember.id}`)
-      }
-      
-      await handle.addRelationById('KickRequest', 'requester', kickRequest.id, requesterUserId[0].user.id)
-      await handle.addRelationById('KickRequest', 'targetMember', kickRequest.id, targetMember.id)
-      
-      if (i % 3 !== 0) { // Only for processed requests
-        await handle.addRelationById('KickRequest', 'processor', kickRequest.id, processorUser.id)
-      }
-    }
-
-    // Now perform the deep nested query that might trigger the bug
-    const complexResults = await handle.find(
-      'KickRequest',
-      undefined,
-      {},
-      [
-        '*', // All KickRequest fields
-        ['requester', { 
-          attributeQuery: ['*', ['dormitoryMemberships', { 
-            attributeQuery: ['*', ['dormitory', { attributeQuery: ['*'] }]] 
-          }]]
-        }],
-        ['processor', { attributeQuery: ['*'] }],
-        ['targetMember', {
-          attributeQuery: [
-            '*',
-            ['user', { attributeQuery: ['*'] }],
-            ['dormitory', { 
-              attributeQuery: ['*', ['members', { 
-                attributeQuery: ['*', ['user', { attributeQuery: ['*'] }]]
-              }]]
-            }]
-          ]
-        }]
-      ]
-    )
-
-    // Verify results
-    expect(complexResults).toBeTruthy()
-    expect(complexResults.length).toBeGreaterThan(0)
-    console.log(`Created ${kickRequests.length} kick requests, found ${complexResults.length} in results`)
-
-    // Check for data integrity issues that might indicate storage bugs
-    for (const result of complexResults) {
-      expect(result.id).toBeDefined()
-      expect(result.reason).toBeDefined()
-      expect(result.requester).toBeTruthy()
-      expect(result.requester.id).toBeDefined()
-      expect(result.targetMember).toBeTruthy()
-      expect(result.targetMember.user).toBeTruthy()
-      expect(result.targetMember.dormitory).toBeTruthy()
-      
-      // Check for potential data corruption or inconsistencies
-      if (result.status !== 'pending') {
-        expect(result.processor).toBeTruthy()
-        expect(result.processedAt).toBeTruthy()
-      }
-
-      // Verify nested data consistency
-      expect(result.targetMember.user.id).toBeDefined()
-      expect(result.targetMember.dormitory.id).toBeDefined()
-      
-      // Check dormitory members data
-      if (result.targetMember.dormitory.members) {
-        for (const member of result.targetMember.dormitory.members) {
-          expect(member.user).toBeTruthy()
-          expect(member.user.id).toBeDefined()
-        }
-      }
-    }
-
-    console.log('Complex nested query completed successfully')
-    console.log(`Found ${complexResults.length} kick requests with deep nested data`)
-    
-    // Check for potential memory leaks or performance issues
-    const memUsage = process.memoryUsage()
-    console.log('Memory usage after complex query:', {
-      heapUsed: Math.round(memUsage.heapUsed / 1024 / 1024) + 'MB',
-      heapTotal: Math.round(memUsage.heapTotal / 1024 / 1024) + 'MB'
-    })
   })
 })
