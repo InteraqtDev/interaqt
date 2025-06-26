@@ -1,7 +1,7 @@
 {
-  "name": "axii-boilerplate",
+  "name": "dormitory-management-frontend",
   "version": "1.0.0",
-  "description": "",
+  "description": "宿舍管理系统前端",
   "scripts": {
     "dev": "vite"
   },
@@ -10,8 +10,6 @@
     "vite": "^6.2.2"
   },
   "dependencies": {
-    "axii": "^3.7.0",
-    "axii-ui": "^2.1.0",
-    "axii-ui-theme-inc": "^4.1.1"
+    "axii": "^3.7.0"
   }
 }

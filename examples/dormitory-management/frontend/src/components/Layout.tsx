@@ -1,106 +1,77 @@
-import { atom, RenderContext } from 'axii';
-import { Button } from 'axii-ui';
-import { styleSystem as s } from 'axii-ui-theme-inc';
-import { User, PageRoute } from '../types';
-import { getCurrentUser } from '../utils/mockData';
+/** @jsx createElement */
+import { createElement, atom, computed } from 'axii'
+import { Button } from './ui'
+import { User, PageRoute } from '../types'
+import { getCurrentUser } from '../utils/mockData'
+import './Layout.css'
 
 interface LayoutProps {
-  currentRoute: PageRoute;
-  onNavigate: (route: PageRoute) => void;
-  children: any;
+  currentRoute: PageRoute
+  onNavigate: (route: PageRoute) => void
+  children: any
 }
 
-export function Layout({ currentRoute, onNavigate, children }: LayoutProps, { createElement }: RenderContext) {
-  const currentUser = getCurrentUser();
-  const sidebarCollapsed = atom(false);
+interface NavItem {
+  label: string
+  route: PageRoute
+  icon: string
+}
 
-  const getMenuItems = (user: User) => {
-    const items = [
-      { route: '/dashboard' as PageRoute, label: '仪表板', icon: '📊' }
-    ];
+export function Layout({ currentRoute, onNavigate, children }: LayoutProps) {
+  const currentUser = getCurrentUser()
+  const sidebarCollapsed = atom(false)
 
-    if (user.role === 'admin') {
-      items.push(
-        { route: '/admin/dormitories' as PageRoute, label: '宿舍管理', icon: '🏠' },
-        { route: '/applications' as PageRoute, label: '申请管理', icon: '📋' },
-        { route: '/members' as PageRoute, label: '成员管理', icon: '👥' },
-        { route: '/admin/reports' as PageRoute, label: '报表中心', icon: '📈' }
-      );
-    } else if (user.role === 'student') {
-      // Check if student is a dormitory leader
-      const isLeader = true; // This should be determined from the data
-      
-      items.push({ route: '/student' as PageRoute, label: '学生门户', icon: '🎓' });
-      
-      if (isLeader) {
-        items.push(
-          { route: '/applications' as PageRoute, label: '申请管理', icon: '📋' },
-          { route: '/members' as PageRoute, label: '成员管理', icon: '👥' },
-          { route: '/scores' as PageRoute, label: '积分管理', icon: '⭐' }
-        );
-      }
-    }
+  const navItems: NavItem[] = [
+    { label: '仪表盘', route: '/dashboard', icon: '📊' },
+    { label: '学生门户', route: '/student', icon: '🎓' },
+    { label: '宿舍管理', route: '/admin/dormitories', icon: '🏠' },
+    { label: '申请管理', route: '/applications', icon: '📝' },
+    { label: '成员管理', route: '/members', icon: '👥' },
+    { label: '积分管理', route: '/scores', icon: '⭐' },
+    { label: '报表中心', route: '/admin/reports', icon: '📈' }
+  ]
 
-    return items;
-  };
+  const toggleSidebar = () => {
+    sidebarCollapsed(!sidebarCollapsed())
+  }
 
-  const menuItems = getMenuItems(currentUser);
+  const sidebarClass = computed(() => {
+    return `sidebar ${sidebarCollapsed() ? 'sidebar-collapsed' : ''}`
+  })
+
+  const navItemClass = (route: PageRoute) => {
+    return `sidebar-nav-item ${currentRoute === route ? 'active' : ''}`
+  }
 
   return (
-    <div style={{
-      display: 'flex',
-      flexDirection: 'row',
-      height: '100vh'
-    }}>
+    <div className="layout">
       {/* Sidebar */}
-      <div style={{
-        width: sidebarCollapsed() ? '60px' : '240px',
-        backgroundColor: '#001529',
-        color: 'white',
-        padding: '16px 0',
-        transition: 'width 0.3s',
-        display: 'flex',
-        flexDirection: 'column'
-      }}>
+      <aside className={() => sidebarClass()}>
         {/* Logo and Toggle */}
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          padding: '0 16px',
-          marginBottom: '24px'
-        }}>
-          {!sidebarCollapsed() && (
-            <div style={{ color: 'white', fontSize: '18px', fontWeight: 'bold' }}>
-              宿舍管理系统
+        <div className="sidebar-header">
+          {() => !sidebarCollapsed() && (
+            <div className="sidebar-logo">
+              <span className="sidebar-logo-icon">🏠</span>
+              <span className="sidebar-logo-text">宿舍管理系统</span>
             </div>
           )}
-          <Button
-            onClick={() => sidebarCollapsed(!sidebarCollapsed())}
-            style={{
-              border: 'none',
-              background: 'transparent',
-              color: 'white',
-              cursor: 'pointer'
-            }}
+          <button
+            className="sidebar-toggle"
+            onClick={toggleSidebar}
           >
-            {sidebarCollapsed() ? '→' : '←'}
-          </Button>
+            ☰
+          </button>
         </div>
 
         {/* User Info */}
-        <div style={{
-          padding: '0 16px',
-          marginBottom: '24px',
-          borderBottom: '1px solid #ffffff20',
-          paddingBottom: '16px'
-        }}>
-          {!sidebarCollapsed() && (
-            <div>
-              <div style={{ fontSize: '14px', marginBottom: '4px' }}>
-                {currentUser.name}
-              </div>
-              <div style={{ fontSize: '12px', color: '#ffffff80' }}>
+        <div className="sidebar-user">
+          <div className="sidebar-user-avatar">
+            {currentUser.name.charAt(0)}
+          </div>
+          {() => !sidebarCollapsed() && (
+            <div className="sidebar-user-info">
+              <div className="sidebar-user-name">{currentUser.name}</div>
+              <div className="sidebar-user-role">
                 {currentUser.role === 'admin' ? '管理员' : '学生'}
               </div>
             </div>
@@ -108,75 +79,70 @@ export function Layout({ currentRoute, onNavigate, children }: LayoutProps, { cr
         </div>
 
         {/* Navigation Menu */}
-        <div style={{ flex: 1 }}>
-          {menuItems.map(item => (
-            <div
+        <nav className="sidebar-nav">
+          {navItems.map(item => (
+            <button
               key={item.route}
+              className={navItemClass(item.route)}
               onClick={() => onNavigate(item.route)}
-              style={{
-                padding: '12px 16px',
-                cursor: 'pointer',
-                backgroundColor: currentRoute === item.route ? '#1890ff' : 'transparent',
-                borderRadius: currentRoute === item.route ? '6px' : '0',
-                margin: currentRoute === item.route ? '0 8px' : '0',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '12px',
-                transition: 'all 0.3s'
-              }}
             >
-              <span style={{ fontSize: '16px' }}>{item.icon}</span>
-              {!sidebarCollapsed() && (
-                <span style={{ fontSize: '14px' }}>{item.label}</span>
+              <span className="sidebar-nav-icon">{item.icon}</span>
+              {() => !sidebarCollapsed() && (
+                <span className="sidebar-nav-label">{item.label}</span>
               )}
-            </div>
+              {() => item.route === '/applications' && !sidebarCollapsed() && (
+                <span className="sidebar-nav-badge">3</span>
+              )}
+            </button>
           ))}
+        </nav>
+
+        {/* Logout */}
+        <div className="sidebar-footer">
+          {() => !sidebarCollapsed() && (
+            <div className="sidebar-footer-content">
+              <button className="sidebar-logout">
+                <span>🚪</span>
+                <span>退出登录</span>
+              </button>
+            </div>
+          )}
         </div>
-      </div>
+      </aside>
 
       {/* Main Content */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+      <div className="main-content">
         {/* Header */}
-        <div style={{
-          height: '64px',
-          backgroundColor: 'white',
-          borderBottom: '1px solid #f0f0f0',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '0 24px'
-        }}>
-          <div style={{ 
-            fontSize: s.sizes.fontSize.heading(3),
-            color: s.colors.text.normal() 
-          }}>
-            {menuItems.find(item => item.route === currentRoute)?.label || '宿舍管理系统'}
+        <header className="header">
+          <div className="header-content">
+            <h1 className="header-title">
+              {navItems.find(item => item.route === currentRoute)?.label || '宿舍管理系统'}
+            </h1>
+            
+            <div className="header-actions">
+              <button className="header-notification">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+                <span className="notification-badge">3</span>
+              </button>
+              <div className="header-user">
+                <span className="header-user-id">{currentUser.studentId}</span>
+                <div className="header-user-avatar">
+                  {currentUser.name.charAt(0)}
+                </div>
+              </div>
+            </div>
           </div>
-          
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '16px'
-          }}>
-            <span style={{ color: s.colors.text.normal(false, 'description') }}>
-              {currentUser.studentId}
-            </span>
-            <Button>
-              退出登录
-            </Button>
-          </div>
-        </div>
+        </header>
 
         {/* Content Area */}
-        <div style={{
-          flex: 1,
-          padding: '24px',
-          backgroundColor: '#f5f5f5',
-          overflow: 'auto'
-        }}>
-          {children}
-        </div>
+        <main className="content">
+          <div className="content-wrapper animate-fadeIn">
+            {children}
+          </div>
+        </main>
       </div>
     </div>
-  );
+  )
 }

@@ -1,0 +1,86 @@
+/* Card 基础样式 */
+.card {
+  background: white;
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+  transition: all var(--transition-base);
+  position: relative;
+}
+
+.card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, var(--primary-400), var(--primary-600));
+  opacity: 0;
+  transition: opacity var(--transition-base);
+}
+
+.card-hover:hover {
+  box-shadow: var(--shadow-lg);
+  transform: translateY(-2px);
+}
+
+.card-hover:hover::before {
+  opacity: 1;
+}
+
+.card-clickable {
+  cursor: pointer;
+}
+
+.card-clickable:active {
+  transform: translateY(0);
+  box-shadow: var(--shadow-md);
+}
+
+/* Card Header */
+.card-header {
+  padding: var(--spacing-lg);
+  border-bottom: 1px solid var(--gray-100);
+}
+
+.card-header h1,
+.card-header h2,
+.card-header h3,
+.card-header h4,
+.card-header h5,
+.card-header h6 {
+  margin: 0;
+  color: var(--gray-900);
+}
+
+/* Card Body */
+.card-body {
+  padding: var(--spacing-lg);
+}
+
+/* Card Footer */
+.card-footer {
+  padding: var(--spacing-md) var(--spacing-lg);
+  background-color: var(--gray-50);
+  border-top: 1px solid var(--gray-100);
+}
+
+/* Card 变体 */
+.card-gradient {
+  background: linear-gradient(135deg, var(--primary-50), var(--primary-100));
+}
+
+.card-dark {
+  background: var(--gray-800);
+  color: white;
+}
+
+.card-dark .card-header {
+  border-bottom-color: var(--gray-700);
+}
+
+.card-dark .card-footer {
+  background-color: var(--gray-900);
+  border-top-color: var(--gray-700);
+} 
