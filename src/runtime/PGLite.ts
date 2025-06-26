@@ -1,8 +1,9 @@
 import {Database, DatabaseLogger, EntityIdRef, ROW_ID_ATTR} from "./System.js";
 import { PGlite} from '@electric-sql/pglite'
 import {asyncInteractionContext} from "./asyncInteractionContext.js";
-import pino from "pino";
+import { uuidv7 } from "uuidv7";
 import {InteractionContext} from "./Controller.js";
+import { dbConsoleLogger } from "./MonoSystem.js";
 
 class IDSystem {
     constructor(public db: Database) {}
@@ -10,15 +11,7 @@ class IDSystem {
         return this.db.scheme(`CREATE Table IF NOT EXISTS "_IDS_" (last INTEGER, name TEXT)`)
     }
     async getAutoId(recordName: string) {
-        const lastId =  (await this.db.query<{last: number}>( `SELECT last FROM "_IDS_" WHERE name = '${recordName}'`, [], `finding last id of ${recordName}` ))[0]?.last
-        const newId = (lastId || 0) +1
-        const name =`set last id for ${recordName}: ${newId}`
-        if (lastId === undefined) {
-            await this.db.scheme(`INSERT INTO "_IDS_" (name, last) VALUES ('${recordName}', ${newId})`, name)
-        } else {
-            await this.db.update(`UPDATE "_IDS_" SET last = $1 WHERE name = $2`, [newId, recordName], undefined, name)
-        }
-        return newId as unknown as string
+        return uuidv7()
     }
 }
 
@@ -30,7 +23,7 @@ export class PGLiteDB implements Database{
     db: InstanceType<typeof PGlite>
     constructor(public database?:string, public options: PGLiteDBConfig = {}) {
         this.idSystem = new IDSystem(this)
-        this.logger = this.options?.logger || pino()
+        this.logger = this.options?.logger || dbConsoleLogger
         this.db = new PGlite(this.database)
     }
     async open(forceDrop = false) {
@@ -147,7 +140,7 @@ export class PGLiteDB implements Database{
         if (type === 'pk') {
             return 'SERIAL PRIMARY KEY'
         } else if (type === 'id') {
-            return 'TEXT'
+            return 'UUID'
         } else if (collection || type === 'object') {
             return 'JSON'
         } else if (type === 'string') {

@@ -48,7 +48,9 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         interactionSDK.getUsers(),
         interactionSDK.getApplications(),
         interactionSDK.getKickRequests(),
-        interactionSDK.getScoreRecords()
+        // Promise.resolve([]),
+        // interactionSDK.getScoreRecords()
+        Promise.resolve([]),
       ])
 
       dormitories(dormitoriesData)

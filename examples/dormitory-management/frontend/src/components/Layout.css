@@ -324,4 +324,24 @@
   .content-wrapper {
     padding: var(--spacing-md);
   }
+}
+
+/* Layout Loading and Error States */
+.layout-loading,
+.layout-error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  background: var(--background);
+}
+
+.layout-error {
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.layout-error p {
+  color: var(--text-secondary);
+  font-size: 1rem;
 } 

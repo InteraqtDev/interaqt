@@ -162,7 +162,7 @@ export class RecordQueryTree {
         Object.values(this.records).forEach(r => handle(r))
     }
     onlyIdField() {
-        return this.fields.length === 1 && this.fields[0] === 'id'
+        return this.fields.length === 1 && this.fields[0] === 'id' && !Object.keys(this.records).length
     }
     merge(otherTree: RecordQueryTree): RecordQueryTree {
         // 合并两个 tree，返回一个新的 tree

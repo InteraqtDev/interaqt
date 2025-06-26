@@ -46,6 +46,7 @@
     "mysql2": "^3.13.0",
     "pg": "^8.14.0",
     "pino": "^9.6.0",
+    "uuidv7": "^1.0.2",
     "winston": "^3.17.0"
   },
   "types": "./dist/index.d.ts",

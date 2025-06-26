@@ -24,6 +24,132 @@ export interface APIConfig {
   onError?: (error: Error) => void;
 }
 
+// 定义每个实体的默认查询字段（AttributeQueryData 格式）
+const ENTITY_ATTRIBUTE_QUERIES = {
+  Users: [
+    'id',
+    'name',
+    'role',
+    'email',
+    'studentId',
+    'createdAt',
+    // 计算属性
+    'isAdmin',
+    'hasActiveDormitory',
+    'totalScore',
+    'applicationCount'
+  ],
+  Dormitories: [
+    'id',
+    'name',
+    'building',
+    'roomNumber',
+    'capacity',
+    'description',
+    'createdAt',
+    // 计算属性
+    'totalMemberCount',
+    'currentOccupancy',
+    'isFull',
+    'availableBeds',
+    'hasLeader',
+    'pendingApplicationCount',
+    'totalScore',
+    'averageScore',
+    'allMembersActive'
+  ],
+  DormitoryMembers: [
+    'id',
+    'role',
+    'score',
+    'joinedAt',
+    'status',
+    'bedNumber',
+    // 计算属性
+    'isLeader',
+    'isActive',
+    'scoreRecordCount',
+    'atKickRisk',
+    // 关系
+    ['user', {
+      attributeQuery: ['id', 'name', 'studentId', 'email', 'role']
+    }],
+    ['dormitory', {
+      attributeQuery: ['id', 'name', 'building', 'roomNumber']
+    }]
+  ],
+  Applications: [
+    'id',
+    'status',
+    'message',
+    'leaderComment',
+    'adminComment',
+    'createdAt',
+    'updatedAt',
+    // 关系
+    ['applicant', {
+      attributeQuery: ['id', 'name', 'studentId', 'email']
+    }],
+    ['dormitory', {
+      attributeQuery: ['id', 'name', 'building', 'roomNumber']
+    }],
+    ['leaderApprover', {
+      attributeQuery: ['id', 'name']
+    }],
+    ['adminApprover', {
+      attributeQuery: ['id', 'name']
+    }]
+  ],
+  ScoreRecords: [
+    'id',
+    'points',
+    'reason',
+    'category',
+    'createdAt',
+    // 关系
+    ['member', {
+      attributeQuery: [
+        'id',
+        ['user', {
+          attributeQuery: ['id', 'name', 'studentId']
+        }],
+        ['dormitory', {
+          attributeQuery: ['id', 'name']
+        }]
+      ]
+    }],
+    ['recorder', {
+      attributeQuery: ['id', 'name']
+    }]
+  ],
+  KickRequests: [
+    'id',
+    'reason',
+    'status',
+    'adminComment',
+    'createdAt',
+    'processedAt',
+    // 关系
+    ['targetMember', {
+      attributeQuery: [
+        'id',
+        ['user', {
+          attributeQuery: ['id', 'name', 'studentId']
+        }],
+        ['dormitory', {
+          attributeQuery: ['id', 'name']
+        }]
+      ]
+    }],
+    ['requester', {
+      attributeQuery: ['id', 'name']
+    }],
+    ['processor', {
+      attributeQuery: ['id', 'name']
+    }]
+  ]
+};
+
 class InteractionSDK {
   private baseUrl: string;
   private currentUserId: string | null = null;
@@ -94,9 +220,17 @@ class InteractionSDK {
    * 获取数据的便捷方法
    */
   async getData<T = any>(entityName: string, query?: any): Promise<T[]> {
+    // 确保 query 对象存在
+    const finalQuery = query || {};
+    
+    // 如果没有指定 attributeQuery，使用默认的
+    if (!finalQuery.attributeQuery) {
+      finalQuery.attributeQuery = ENTITY_ATTRIBUTE_QUERIES[entityName as keyof typeof ENTITY_ATTRIBUTE_QUERIES];
+    }
+    
     const response = await this.callInteraction<T[]>({
       interaction: `Get${entityName}`,
-      query
+      query: finalQuery
     });
     
     return response.data || [];
@@ -332,7 +466,8 @@ class InteractionSDK {
     if (!this.currentUserId) return null;
     
     const users = await this.getAllUsers({
-      where: { id: this.currentUserId }
+      where: { id: this.currentUserId },
+      attributeQuery: ENTITY_ATTRIBUTE_QUERIES.Users
     });
     
     return users.length > 0 ? users[0] : null;
@@ -349,7 +484,8 @@ class InteractionSDK {
       where: { 
         'user.id': targetUserId,
         status: 'active'
-      }
+      },
+      attributeQuery: ENTITY_ATTRIBUTE_QUERIES.DormitoryMembers
     });
 
     return memberships.length > 0 ? memberships[0] : null;
@@ -364,7 +500,8 @@ class InteractionSDK {
 
     return this.getAllApplications({
       where: { 'applicant.id': targetUserId },
-      orderBy: [['createdAt', 'desc']]
+      orderBy: [['createdAt', 'desc']],
+      attributeQuery: ENTITY_ATTRIBUTE_QUERIES.Applications
     });
   }
 
@@ -376,7 +513,8 @@ class InteractionSDK {
       where: { 
         'dormitory.id': dormitoryId,
         status: 'active'
-      }
+      },
+      attributeQuery: ENTITY_ATTRIBUTE_QUERIES.DormitoryMembers
     });
   }
 
@@ -386,7 +524,8 @@ class InteractionSDK {
   async getDormitoryApplications(dormitoryId: string) {
     return this.getAllApplications({
       where: { 'dormitory.id': dormitoryId },
-      orderBy: [['createdAt', 'desc']]
+      orderBy: [['createdAt', 'desc']],
+      attributeQuery: ENTITY_ATTRIBUTE_QUERIES.Applications
     });
   }
 
@@ -396,7 +535,8 @@ class InteractionSDK {
   async getMemberScoreRecords(memberId: string) {
     return this.getAllScoreRecords({
       where: { 'member.id': memberId },
-      orderBy: [['createdAt', 'desc']]
+      orderBy: [['createdAt', 'desc']],
+      attributeQuery: ENTITY_ATTRIBUTE_QUERIES.ScoreRecords
     });
   }
 

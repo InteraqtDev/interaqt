@@ -90,18 +90,21 @@ export class RecordQueryAgent {
 
         const [whereClause, params] = this.buildWhereClause(this.parseMatchExpressionValue(recordQuery.recordName, fieldMatchExp, recordQuery.contextRootEntity, p), prefix, p)
 
+        const selectClause = this.buildSelectClause(recordQuery.attributeQuery.getValueAndXToOneRecordFields(), prefix)
+        const fromClause = this.buildFromClause(recordQuery.recordName, prefix)
+        const joinClause = this.buildJoinClause(joinTables, prefix)
+        const modifierClause = this.buildModifierClause(recordQuery.modifier, prefix)
 
         return [`
 SELECT
-${this.buildSelectClause(recordQuery.attributeQuery.getValueAndXToOneRecordFields(), prefix)}
+${selectClause}
 FROM
-${this.buildFromClause(recordQuery.recordName, prefix)}
-${this.buildJoinClause(joinTables, prefix)}
-
+${fromClause}
+${joinClause}
 WHERE
 ${whereClause}
 
-${this.buildModifierClause(recordQuery.modifier, prefix)}
+${modifierClause}
 `,
             params]
 
@@ -527,9 +530,11 @@ ${this.buildModifierClause(recordQuery.modifier, prefix)}
     buildSelectClause(queryFields: ReturnType<AttributeQuery["getValueAndXToOneRecordFields"]>, prefix = '') {
         if (!queryFields.length) return '1'
         // CAUTION 所有 entity 都要 select id
-        return queryFields.map(({tableAliasAndField, attribute, nameContext}) => (
+        const aliasClauses= queryFields.map(({tableAliasAndField, attribute, nameContext}) => (
             `"${this.withPrefix(prefix)}${tableAliasAndField[0]}"."${tableAliasAndField[1]}" AS "${this.withPrefix(prefix)}${nameContext.join(".")}.${attribute}"`
-        )).join(',\n')
+        ))
+        
+        return aliasClauses.join(',\n')
     }
 
     buildFromClause(entityName: string, prefix = '') {

@@ -138,4 +138,34 @@
     align-items: flex-start;
     gap: var(--spacing-sm);
   }
+}
+
+/* Risk and Status Badges */
+.risk-badge {
+  display: inline-block;
+  padding: 0.25rem 0.5rem;
+  background: linear-gradient(135deg, #ff6b6b, #ff4757);
+  color: white;
+  font-size: 0.75rem;
+  font-weight: 500;
+  border-radius: 4px;
+  margin-left: 0.5rem;
+}
+
+.kicked-badge {
+  display: inline-block;
+  padding: 0.25rem 0.5rem;
+  background: var(--text-tertiary);
+  color: white;
+  font-size: 0.75rem;
+  font-weight: 500;
+  border-radius: 4px;
+  margin-left: 0.5rem;
+}
+
+/* Member Actions */
+.member-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 } 

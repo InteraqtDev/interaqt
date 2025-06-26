@@ -132,14 +132,31 @@ export class ActivityManager {
 
         logger.info({label: "interaction", message: interactionCall.interaction.name})
         await this.controller.system.storage.beginTransaction(interactionCall.interaction.name)
-        
-        const result = await interactionCall.call(interactionEventArgs)
-        if (result.error) {
-            logger.error({label: "interaction", message: interactionCall.interaction.name})
-            await this.controller.system.storage.rollbackTransaction(interactionCall.interaction.name)
-        } else {
-            await this.controller.system.storage.commitTransaction(interactionCall.interaction.name)
-            await this.runRecordChangeSideEffects(result, logger)
+        let unknownError: any
+        let result: InteractionCallResponse
+        try {
+            result = await interactionCall.call(interactionEventArgs)
+        } catch(e) {
+            unknownError = e
+            result = {
+                error: e,
+                effects: [],
+                sideEffects: {},
+                data: undefined,
+                event: undefined,
+            }
+        } finally {
+            if (unknownError||result!.error) {
+                if (unknownError) {
+                    console.error(unknownError)
+                    logger.error({label: "systemError", message: 'unknownError', error: unknownError})
+                }
+                logger.error({label: "interaction", message: interactionCall.interaction.name, error: result!.error})
+                await this.controller.system.storage.rollbackTransaction(interactionCall.interaction.name)
+            } else {
+                await this.controller.system.storage.commitTransaction(interactionCall.interaction.name)
+                await this.runRecordChangeSideEffects(result!, logger)
+            }
         }
 
         return result
