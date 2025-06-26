@@ -486,6 +486,11 @@ export class DBSetup {
     }
 
     formatDefaultValue(value: any, fieldType?: string): string {
+        // 处理 undefined 值 - 不应该有默认值
+        if (value === undefined) {
+            return '';
+        }
+        
         // 处理 null 值
         if (value === null) {
             return 'NULL';
@@ -516,16 +521,27 @@ export class DBSetup {
             return `'${jsonStr.replace(/'/g, "''")}'`;
         }
         
-        // 其他类型使用 JSON.stringify 作为后备方案
-        return JSON.stringify(value);
+        // 其他类型返回空字符串
+        return '';
     }
 
     createTableSQL() {
         return Object.keys(this.tables).map(tableName => (
             `
 CREATE TABLE "${tableName}" (
-${Object.values(this.tables[tableName].columns).map(column => (`
-    "${column.name}" ${column.fieldType} ${column.defaultValue ? `DEFAULT ${this.formatDefaultValue(column.defaultValue())}` : ''}`)).join(',')}
+${Object.values(this.tables[tableName].columns).map(column => {
+    let sql = `    "${column.name}" ${column.fieldType}`;
+    if (column.defaultValue) {
+        const defaultVal = column.defaultValue();
+        if (defaultVal !== undefined) {
+            const formattedDefault = this.formatDefaultValue(defaultVal);
+            if (formattedDefault) {
+                sql += ` DEFAULT ${formattedDefault}`;
+            }
+        }
+    }
+    return sql;
+}).join(',')}
 )
 `
         ))

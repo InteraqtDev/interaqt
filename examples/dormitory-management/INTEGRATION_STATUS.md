@@ -73,22 +73,22 @@ npm run dev
 
 ```
 # 管理员身份
-http://localhost:5174/?userId=admin001
+http://localhost:5173/?userId=admin001
 
 # 宿舍长身份（李四 - 梅园1号楼101宿舍长）
-http://localhost:5174/?userId=student001
+http://localhost:5173/?userId=student001
 
 # 宿舍成员身份（王五 - 梅园1号楼101成员）
-http://localhost:5174/?userId=student002
+http://localhost:5173/?userId=student002
 
 # 有待处理申请的学生（赵六）
-http://localhost:5174/?userId=student003
+http://localhost:5173/?userId=student003
 
 # 申请已通过宿舍长审批的学生（孙七）
-http://localhost:5174/?userId=student004
+http://localhost:5173/?userId=student004
 
 # 无宿舍的学生（周八）
-http://localhost:5174/?userId=student005
+http://localhost:5173/?userId=student005
 ```
 
 ### 测试场景说明

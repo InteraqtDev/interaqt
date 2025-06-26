@@ -107,14 +107,22 @@ Dormitory.properties.push(
   Property.create({
     name: 'isFull',
     type: 'boolean',
-    computed: (dormitory) => dormitory.currentOccupancy >= dormitory.capacity
+    computed: (dormitory) => {
+      const capacity = dormitory.capacity || 0;
+      const currentOccupancy = dormitory.currentOccupancy || 0;
+      return currentOccupancy >= capacity;
+    }
   }),
   
   // 剩余床位数
   Property.create({
     name: 'availableBeds',
     type: 'number',
-    computed: (dormitory) => dormitory.capacity - dormitory.currentOccupancy
+    computed: (dormitory) => {
+      const capacity = dormitory.capacity || 0;
+      const currentOccupancy = dormitory.currentOccupancy || 0;
+      return capacity - currentOccupancy;
+    }
   }),
   
   // 是否有宿舍长
@@ -166,8 +174,8 @@ Dormitory.properties.push(
     name: 'averageScore',
     type: 'number',
     computed: (dormitory) => {
-      if (dormitory.currentOccupancy === 0) return 0;
-      return dormitory.totalScore / dormitory.currentOccupancy;
+      if (!dormitory.currentOccupancy || dormitory.currentOccupancy === 0) return 0;
+      return Math.floor(dormitory.totalScore / dormitory.currentOccupancy);
     }
   }),
   
@@ -252,6 +260,8 @@ const memberStatusStateMachine = StateMachine.create({
 })
 
 // 将状态机应用到 DormitoryMember 的 status 属性
-const memberStatusProperty = DormitoryMember.properties.find(p => p.name === 'status')!
-memberStatusProperty.computedData = memberStatusStateMachine
-memberStatusProperty.defaultValue = () => memberStatusStateMachine.defaultState.name 
+const memberStatusProperty = DormitoryMember.properties.find((p: any) => p.name === 'status')
+if (memberStatusProperty) {
+  (memberStatusProperty as any).computedData = memberStatusStateMachine;
+  (memberStatusProperty as any).defaultValue = () => 'active' // 直接使用字符串值
+} 

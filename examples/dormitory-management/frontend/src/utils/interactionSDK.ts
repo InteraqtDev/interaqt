@@ -256,36 +256,71 @@ class InteractionSDK {
   /**
    * 获取用户列表
    */
-  async getUsers(query?: any) {
+  async getAllUsers(query?: any) {
     return this.getData('Users', query);
+  }
+
+  /**
+   * 获取用户列表 (兼容方法)
+   */
+  async getUsers(query?: any) {
+    return this.getAllUsers(query);
   }
 
   /**
    * 获取宿舍成员
    */
-  async getDormitoryMembers(query?: any) {
+  async getAllDormitoryMembers(query?: any) {
     return this.getData('DormitoryMembers', query);
+  }
+
+  /**
+   * 获取宿舍成员 (兼容方法)
+   */
+  async getDormitoryMembers(query?: any) {
+    return this.getAllDormitoryMembers(query);
   }
 
   /**
    * 获取申请列表
    */
-  async getApplications(query?: any) {
+  async getAllApplications(query?: any) {
     return this.getData('Applications', query);
+  }
+
+  /**
+   * 获取申请列表 (兼容方法)
+   */
+  async getApplications(query?: any) {
+    return this.getAllApplications(query);
   }
 
   /**
    * 获取积分记录
    */
-  async getScoreRecords(query?: any) {
+  async getAllScoreRecords(query?: any) {
     return this.getData('ScoreRecords', query);
+  }
+
+  /**
+   * 获取积分记录 (兼容方法)
+   */
+  async getScoreRecords(query?: any) {
+    return this.getAllScoreRecords(query);
   }
 
   /**
    * 获取踢出申请
    */
-  async getKickRequests(query?: any) {
+  async getAllKickRequests(query?: any) {
     return this.getData('KickRequests', query);
+  }
+
+  /**
+   * 获取踢出申请 (兼容方法)
+   */
+  async getKickRequests(query?: any) {
+    return this.getAllKickRequests(query);
   }
 
   // ============== 高级查询方法 ==============
@@ -296,7 +331,7 @@ class InteractionSDK {
   async getCurrentUser() {
     if (!this.currentUserId) return null;
     
-    const users = await this.getUsers({
+    const users = await this.getAllUsers({
       where: { id: this.currentUserId }
     });
     
@@ -310,7 +345,7 @@ class InteractionSDK {
     const targetUserId = userId || this.currentUserId;
     if (!targetUserId) return null;
 
-    const memberships = await this.getDormitoryMembers({
+    const memberships = await this.getAllDormitoryMembers({
       where: { 
         'user.id': targetUserId,
         status: 'active'
@@ -327,7 +362,7 @@ class InteractionSDK {
     const targetUserId = userId || this.currentUserId;
     if (!targetUserId) return [];
 
-    return this.getApplications({
+    return this.getAllApplications({
       where: { 'applicant.id': targetUserId },
       orderBy: [['createdAt', 'desc']]
     });
@@ -337,7 +372,7 @@ class InteractionSDK {
    * 获取宿舍的成员列表
    */
   async getDormitoryMembersByDormitoryId(dormitoryId: string) {
-    return this.getDormitoryMembers({
+    return this.getAllDormitoryMembers({
       where: { 
         'dormitory.id': dormitoryId,
         status: 'active'
@@ -349,7 +384,7 @@ class InteractionSDK {
    * 获取宿舍的申请列表
    */
   async getDormitoryApplications(dormitoryId: string) {
-    return this.getApplications({
+    return this.getAllApplications({
       where: { 'dormitory.id': dormitoryId },
       orderBy: [['createdAt', 'desc']]
     });
@@ -359,7 +394,7 @@ class InteractionSDK {
    * 获取成员的积分记录
    */
   async getMemberScoreRecords(memberId: string) {
-    return this.getScoreRecords({
+    return this.getAllScoreRecords({
       where: { 'member.id': memberId },
       orderBy: [['createdAt', 'desc']]
     });
@@ -400,6 +435,11 @@ export const {
   callInteraction,
   getCurrentUser,
   getDormitories,
+  getAllUsers,
+  getAllDormitoryMembers,
+  getAllApplications,
+  getAllScoreRecords,
+  getAllKickRequests,
   getUsers,
   getDormitoryMembers,
   getApplications,

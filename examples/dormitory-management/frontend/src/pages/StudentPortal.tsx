@@ -1,13 +1,8 @@
 import { atom, RenderContext } from 'axii';
 import { Button, Input } from 'axii-ui';
 import { styleSystem as s } from 'axii-ui-theme-inc';
-import { 
-  getCurrentUser, 
-  mockDormitories, 
-  mockApplications,
-  mockDormitoryMembers,
-  getApplicationsByUserId
-} from '../utils/mockData';
+import { User, Dormitory, DormitoryApplication, DormitoryMember } from '../types';
+import { interactionSDK } from '../utils/interactionSDK';
 
 // Simple Card component
 function Card({ children, style }: { children: any, style?: any }, { createElement }: RenderContext) {
@@ -56,41 +51,100 @@ function Modal({ visible, onClose, children }: { visible: boolean, onClose: () =
 }
 
 export function StudentPortal({}, { createElement }: RenderContext) {
-  const currentUser = getCurrentUser();
+  const currentUser = atom<User | null>(null);
+  const userMembership = atom<DormitoryMember | null>(null);
+  const dormitories = atom<Dormitory[]>([]);
+  const userApplications = atom<DormitoryApplication[]>([]);
+  const loading = atom(true);
+  const error = atom<string | null>(null);
+  
+  // Modal and form state
   const showApplyModal = atom(false);
   const selectedDormitory = atom<string>('');
   const applicationMessage = atom('');
+  const submitting = atom(false);
 
-  // Get user's current dormitory
-  const userMembership = mockDormitoryMembers.find(m => 
-    m.user.id === currentUser.id && m.status === 'active'
-  );
+  // Load data function
+  const loadData = async () => {
+    try {
+      loading(true);
+      error(null);
 
-  // Get user's applications
-  const userApplications = getApplicationsByUserId(currentUser.id);
+      // Load current user info
+      const user = await interactionSDK.getCurrentUser();
+      if (user) {
+        currentUser(user);
+        
+        // Load user's membership info
+        const membership = await interactionSDK.getUserMembership();
+        userMembership(membership);
+        
+        // Load user's applications
+        const applications = await interactionSDK.getUserApplications();
+        userApplications(applications);
+      }
 
-  // Get available dormitories (not full)
-  const availableDormitories = mockDormitories.filter(d => !d.isFull);
+      // Load available dormitories
+      const dormitoriesData = await interactionSDK.getDormitories();
+      dormitories(dormitoriesData);
+
+    } catch (err) {
+      console.error('Failed to load student portal data:', err);
+      error(err instanceof Error ? err.message : 'Failed to load data');
+    } finally {
+      loading(false);
+    }
+  };
+
+  // Load data on component mount
+  loadData();
 
   const handleApplyToDormitory = (dormitoryId: string) => {
     selectedDormitory(dormitoryId);
+    applicationMessage('');
     showApplyModal(true);
   };
 
-  const handleSubmitApplication = () => {
-    console.log('Submitting application:', {
-      dormitoryId: selectedDormitory(),
-      message: applicationMessage()
-    });
-    // Here would integrate with ApplyForDormitory interaction
-    showApplyModal(false);
-    applicationMessage('');
-    selectedDormitory('');
+  const handleSubmitApplication = async () => {
+    try {
+      submitting(true);
+      const dormitoryId = selectedDormitory();
+      const message = applicationMessage();
+      
+      if (!dormitoryId || !message.trim()) {
+        alert('请填写申请信息');
+        return;
+      }
+
+      await interactionSDK.applyForDormitory(dormitoryId, message);
+      
+      showApplyModal(false);
+      selectedDormitory('');
+      applicationMessage('');
+      
+      // Reload data to show new application
+      await loadData();
+      
+    } catch (err) {
+      console.error('Failed to submit application:', err);
+      alert('申请提交失败: ' + (err instanceof Error ? err.message : '未知错误'));
+    } finally {
+      submitting(false);
+    }
   };
 
-  const handleCancelApplication = (applicationId: string) => {
-    console.log('Cancelling application:', applicationId);
-    // Here would integrate with CancelApplication interaction
+  const handleCancelApplication = async (applicationId: string) => {
+    if (!confirm('确定要取消这个申请吗？')) {
+      return;
+    }
+
+    try {
+      await interactionSDK.cancelApplication(applicationId);
+      await loadData(); // Reload data
+    } catch (err) {
+      console.error('Failed to cancel application:', err);
+      alert('取消申请失败: ' + (err instanceof Error ? err.message : '未知错误'));
+    }
   };
 
   const getStatusColor = (status: string) => {
@@ -100,171 +154,226 @@ export function StudentPortal({}, { createElement }: RenderContext) {
       case 'admin_approved': return s.colors.text.success();
       case 'rejected': return s.colors.text.danger();
       case 'cancelled': return s.colors.text.normal(false, 'description');
-      default: return s.colors.text.normal(false, 'description');
+      default: return s.colors.text.normal();
     }
   };
 
   const getStatusText = (status: string) => {
     switch (status) {
-      case 'pending': return '等待宿舍长审批';
-      case 'leader_approved': return '宿舍长已批准，等待管理员审批';
-      case 'admin_approved': return '申请已通过';
-      case 'rejected': return '申请被拒绝';
-      case 'cancelled': return '申请已取消';
+      case 'pending': return '等待审批';
+      case 'leader_approved': return '宿舍长已批准';
+      case 'admin_approved': return '已通过';
+      case 'rejected': return '已拒绝';
+      case 'cancelled': return '已取消';
       default: return status;
     }
   };
 
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-      {/* Personal Status Card */}
-      <Card style={{ padding: '20px' }}>
-        <h3 style={{ 
-          fontSize: s.sizes.fontSize.heading(3),
-          color: s.colors.text.normal(),
-          margin: '0 0 16px 0'
+  const renderContent = () => {
+    if (loading()) {
+      return (
+        <div style={{ 
+          display: 'flex', 
+          justifyContent: 'center', 
+          alignItems: 'center', 
+          height: '400px',
+          color: s.colors.text.normal() 
         }}>
-          我的宿舍状态
-        </h3>
-        {userMembership ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <div style={{ 
-              display: 'grid', 
-              gridTemplateColumns: 'repeat(2, 1fr)', 
-              gap: '16px' 
-            }}>
-              <div>
-                <div style={{ color: s.colors.text.normal(false, 'description') }}>当前宿舍</div>
-                <div style={{ color: s.colors.text.normal() }}>{userMembership.dormitory.name}</div>
-              </div>
-              <div>
-                <div style={{ color: s.colors.text.normal(false, 'description') }}>楼栋</div>
-                <div style={{ color: s.colors.text.normal() }}>{userMembership.dormitory.building}</div>
-              </div>
-              <div>
-                <div style={{ color: s.colors.text.normal(false, 'description') }}>床位号</div>
-                <div style={{ color: s.colors.text.normal() }}>{userMembership.bedNumber}号床</div>
-              </div>
-              <div>
-                <div style={{ color: s.colors.text.normal(false, 'description') }}>角色</div>
-                <div style={{ color: s.colors.text.normal() }}>
-                  {userMembership.role === 'leader' ? '宿舍长' : '成员'}
-                </div>
-              </div>
-              <div>
-                <div style={{ color: s.colors.text.normal(false, 'description') }}>个人积分</div>
-                <div style={{ 
-                  fontSize: '20px', 
-                  fontWeight: 'bold',
-                  color: userMembership.score >= 0 ? s.colors.text.success() : s.colors.text.danger()
-                }}>
-                  {userMembership.score}
-                </div>
-              </div>
-              <div>
-                <div style={{ color: s.colors.text.normal(false, 'description') }}>入住时间</div>
-                <div style={{ color: s.colors.text.normal() }}>
-                  {new Date(userMembership.joinedAt).toLocaleDateString()}
-                </div>
-              </div>
-            </div>
-            
-            <div style={{ padding: '16px', backgroundColor: '#f6ffed', border: '1px solid #b7eb8f', borderRadius: '6px' }}>
-              <div style={{ color: s.colors.text.normal() }}>✅ 您已成功入住宿舍</div>
-              <div style={{ color: s.colors.text.normal(false, 'description') }}>宿舍描述：{userMembership.dormitory.description}</div>
-            </div>
-          </div>
-        ) : (
-          <div style={{ padding: '16px', backgroundColor: '#fff7e6', border: '1px solid #ffd591', borderRadius: '6px' }}>
-            <div style={{ color: s.colors.text.normal() }}>⚠️ 您尚未分配到宿舍</div>
-            <div style={{ color: s.colors.text.normal(false, 'description') }}>请从下方可申请宿舍中选择并提交申请</div>
-          </div>
-        )}
-      </Card>
+          加载中...
+        </div>
+      );
+    }
 
-      {/* Available Dormitories - only show if user has no dormitory */}
-      {!userMembership && (
+    if (error()) {
+      return (
+        <div style={{ 
+          display: 'flex', 
+          flexDirection: 'column',
+          justifyContent: 'center', 
+          alignItems: 'center', 
+          height: '400px',
+          gap: '16px'
+        }}>
+          <div style={{ color: s.colors.text.danger() }}>
+            加载数据失败: {error()}
+          </div>
+          <Button onClick={loadData}>
+            重试
+          </Button>
+        </div>
+      );
+    }
+
+    const user = currentUser();
+    if (!user) {
+      return (
+        <div style={{ 
+          textAlign: 'center', 
+          padding: '40px',
+          color: s.colors.text.normal()
+        }}>
+          <h3>未找到用户信息</h3>
+          <p style={{ color: s.colors.text.normal(false, 'description') }}>
+            请确保 URL 中包含有效的 userId 参数
+          </p>
+        </div>
+      );
+    }
+
+    const membership = userMembership();
+    const applications = userApplications();
+    const availableDormitories = dormitories().filter(d => (d.currentOccupancy || 0) < d.capacity);
+
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+        {/* Header */}
         <Card style={{ padding: '20px' }}>
-          <h3 style={{ 
-            fontSize: s.sizes.fontSize.heading(3),
+          <div>
+            <h3 style={{ 
+              fontSize: s.sizes.fontSize.heading(3),
+              color: s.colors.text.normal(),
+              margin: '0 0 8px 0'
+            }}>
+              学生门户
+            </h3>
+            <p style={{ color: s.colors.text.normal(false, 'description'), margin: 0 }}>
+              申请宿舍，查看申请状态和个人信息
+            </p>
+          </div>
+        </Card>
+
+        {/* Current Status */}
+        <Card style={{ padding: '20px' }}>
+          <h4 style={{ 
+            fontSize: s.sizes.fontSize.heading(4),
             color: s.colors.text.normal(),
             margin: '0 0 16px 0'
           }}>
-            可申请宿舍
-          </h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            {availableDormitories.map(dormitory => (
-              <div key={dormitory.id} style={{
-                border: '1px solid #d9d9d9',
-                borderRadius: '8px',
-                padding: '16px',
-                backgroundColor: 'white'
-              }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                  <div style={{ flex: 1 }}>
-                    <h4 style={{ 
-                      fontSize: s.sizes.fontSize.heading(4),
-                      color: s.colors.text.normal(),
-                      margin: '0 0 8px 0'
-                    }}>
-                      {dormitory.name}
-                    </h4>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      <div style={{ color: s.colors.text.normal(false, 'description') }}>
-                        📍 {dormitory.building} {dormitory.roomNumber}
-                      </div>
-                      <div style={{ color: s.colors.text.normal(false, 'description') }}>
-                        👥 当前入住: {dormitory.currentOccupancy}/{dormitory.capacity} 人
-                        (剩余 {dormitory.availableBeds} 个床位)
-                      </div>
-                      <div style={{ color: s.colors.text.normal(false, 'description') }}>
-                        {dormitory.description}
-                      </div>
-                      {dormitory.hasLeader && (
-                        <div style={{ color: s.colors.text.normal(false, 'description') }}>
-                          ✅ 已有宿舍长
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  <Button onClick={() => handleApplyToDormitory(dormitory.id)}>
-                    申请入住
-                  </Button>
-                </div>
+            当前状态
+          </h4>
+          <div style={{ 
+            display: 'grid', 
+            gridTemplateColumns: 'repeat(2, 1fr)', 
+            gap: '16px' 
+          }}>
+            <div>
+              <div style={{ color: s.colors.text.normal(false, 'description') }}>姓名</div>
+              <div style={{ color: s.colors.text.normal() }}>{user.name}</div>
+            </div>
+            <div>
+              <div style={{ color: s.colors.text.normal(false, 'description') }}>学号</div>
+              <div style={{ color: s.colors.text.normal() }}>{user.studentId}</div>
+            </div>
+            <div>
+              <div style={{ color: s.colors.text.normal(false, 'description') }}>当前宿舍</div>
+              <div style={{ color: s.colors.text.normal() }}>
+                {membership ? membership.dormitory.name : '未分配'}
               </div>
-            ))}
+            </div>
+            <div>
+              <div style={{ color: s.colors.text.normal(false, 'description') }}>床位号</div>
+              <div style={{ color: s.colors.text.normal() }}>
+                {membership ? `${membership.bedNumber}号床` : '未分配'}
+              </div>
+            </div>
+            <div>
+              <div style={{ color: s.colors.text.normal(false, 'description') }}>个人积分</div>
+              <div style={{ 
+                fontSize: '20px', 
+                fontWeight: 'bold',
+                color: membership && membership.score >= 0 ? s.colors.text.success() : s.colors.text.danger()
+              }}>
+                {membership?.score || 0}
+              </div>
+            </div>
+            <div>
+              <div style={{ color: s.colors.text.normal(false, 'description') }}>角色</div>
+              <div style={{ color: s.colors.text.normal() }}>
+                {membership?.role === 'leader' ? '宿舍长' : membership ? '成员' : '未分配'}
+              </div>
+            </div>
           </div>
         </Card>
-      )}
 
-      {/* Application History */}
-      <Card style={{ padding: '20px' }}>
-        <h3 style={{ 
-          fontSize: s.sizes.fontSize.heading(3),
-          color: s.colors.text.normal(),
-          margin: '0 0 16px 0'
-        }}>
-          我的申请记录
-        </h3>
-        {userApplications.length > 0 ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            {userApplications.map(application => (
+        {/* Available Dormitories (if no current dormitory) */}
+        {!membership && (
+          <Card style={{ padding: '20px' }}>
+            <h4 style={{ 
+              fontSize: s.sizes.fontSize.heading(4),
+              color: s.colors.text.normal(),
+              margin: '0 0 16px 0'
+            }}>
+              可申请宿舍
+            </h4>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {availableDormitories.map(dormitory => (
+                <div key={dormitory.id} style={{
+                  padding: '16px',
+                  border: '1px solid #f0f0f0',
+                  borderRadius: '8px',
+                  backgroundColor: '#fafafa'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ 
+                        fontSize: s.sizes.fontSize.heading(5),
+                        color: s.colors.text.normal(),
+                        marginBottom: '4px'
+                      }}>
+                        {dormitory.name}
+                      </div>
+                      <div style={{ color: s.colors.text.normal(false, 'description'), marginBottom: '8px' }}>
+                        {dormitory.building} • {dormitory.currentOccupancy || 0}/{dormitory.capacity} 人 • 剩余 {dormitory.capacity - (dormitory.currentOccupancy || 0)} 床位
+                      </div>
+                      <div style={{ color: s.colors.text.normal() }}>
+                        {dormitory.description}
+                      </div>
+                    </div>
+                    <Button 
+                      onClick={() => handleApplyToDormitory(dormitory.id)}
+                      style={{ marginLeft: '16px' }}
+                    >
+                      申请
+                    </Button>
+                  </div>
+                </div>
+              ))}
+              {availableDormitories.length === 0 && (
+                <div style={{ 
+                  textAlign: 'center', 
+                  padding: '20px', 
+                  color: s.colors.text.normal(false, 'description') 
+                }}>
+                  暂无可申请的宿舍
+                </div>
+              )}
+            </div>
+          </Card>
+        )}
+
+        {/* Application History */}
+        <Card style={{ padding: '20px' }}>
+          <h4 style={{ 
+            fontSize: s.sizes.fontSize.heading(4),
+            color: s.colors.text.normal(),
+            margin: '0 0 16px 0'
+          }}>
+            我的申请记录
+          </h4>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {applications.map(application => (
               <div key={application.id} style={{
-                border: '1px solid #d9d9d9',
-                borderRadius: '8px',
                 padding: '16px',
-                backgroundColor: 'white'
+                border: '1px solid #f0f0f0',
+                borderRadius: '8px',
+                backgroundColor: '#fafafa'
               }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <div style={{ flex: 1 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                      <h4 style={{ 
-                        fontSize: s.sizes.fontSize.heading(4),
-                        color: s.colors.text.normal(),
-                        margin: 0
-                      }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+                      <span style={{ fontWeight: 'bold', color: s.colors.text.normal() }}>
                         {application.dormitory.name}
-                      </h4>
+                      </span>
                       <div style={{
                         padding: '4px 8px',
                         fontSize: '12px',
@@ -275,95 +384,119 @@ export function StudentPortal({}, { createElement }: RenderContext) {
                         {getStatusText(application.status)}
                       </div>
                     </div>
-                    
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '8px' }}>
-                      <div style={{ color: s.colors.text.normal(false, 'description') }}>
-                        申请时间: {new Date(application.createdAt).toLocaleString()}
-                      </div>
-                      <div style={{ color: s.colors.text.normal(false, 'description') }}>
-                        申请留言: {application.message}
-                      </div>
-                      {application.leaderComment && (
-                        <div style={{ color: s.colors.text.normal(false, 'description') }}>
-                          宿舍长意见: {application.leaderComment}
-                        </div>
-                      )}
-                      {application.adminComment && (
-                        <div style={{ color: s.colors.text.normal(false, 'description') }}>
-                          管理员意见: {application.adminComment}
-                        </div>
-                      )}
+                    <div style={{ color: s.colors.text.normal(false, 'description'), marginBottom: '4px' }}>
+                      申请时间: {new Date(application.createdAt).toLocaleString()}
                     </div>
+                    <div style={{ color: s.colors.text.normal(), marginBottom: '8px' }}>
+                      申请留言: {application.message}
+                    </div>
+                    {application.leaderComment && (
+                      <div style={{ 
+                        color: s.colors.text.normal(),
+                        padding: '8px',
+                        backgroundColor: '#e6f7ff',
+                        borderRadius: '4px',
+                        marginBottom: '4px'
+                      }}>
+                        宿舍长意见: {application.leaderComment}
+                      </div>
+                    )}
+                    {application.adminComment && (
+                      <div style={{ 
+                        color: s.colors.text.normal(),
+                        padding: '8px',
+                        backgroundColor: '#f6ffed',
+                        borderRadius: '4px'
+                      }}>
+                        管理员意见: {application.adminComment}
+                      </div>
+                    )}
                   </div>
-                  
                   {application.status === 'pending' && (
-                    <Button onClick={() => handleCancelApplication(application.id)}>
+                    <Button 
+                      onClick={() => handleCancelApplication(application.id)}
+                      style={{ 
+                        marginLeft: '16px',
+                        backgroundColor: '#ff4d4f',
+                        color: 'white',
+                        border: 'none'
+                      }}
+                    >
                       取消申请
                     </Button>
                   )}
                 </div>
               </div>
             ))}
+            {applications.length === 0 && (
+              <div style={{ 
+                textAlign: 'center', 
+                padding: '20px', 
+                color: s.colors.text.normal(false, 'description') 
+              }}>
+                暂无申请记录
+              </div>
+            )}
           </div>
-        ) : (
-          <div style={{ textAlign: 'center', padding: '40px', color: '#999' }}>
-            暂无申请记录
-          </div>
-        )}
-      </Card>
+        </Card>
 
-      {/* Apply Modal */}
-      <Modal 
-        visible={showApplyModal()} 
-        onClose={() => showApplyModal(false)}
-      >
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', padding: '20px' }}>
-          <h3 style={{ 
-            fontSize: s.sizes.fontSize.heading(3),
-            color: s.colors.text.normal(),
-            margin: 0
-          }}>
-            申请入住宿舍
-          </h3>
-          
-          {selectedDormitory() && (
-            <div style={{
-              padding: '12px',
-              backgroundColor: '#f6ffed',
-              borderRadius: '6px',
-              border: '1px solid #b7eb8f'
+        {/* Apply Modal */}
+        <Modal 
+          visible={showApplyModal()} 
+          onClose={() => showApplyModal(false)}
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', padding: '20px' }}>
+            <h3 style={{ 
+              fontSize: s.sizes.fontSize.heading(3),
+              color: s.colors.text.normal(),
+              margin: 0
             }}>
-              <div style={{ color: s.colors.text.normal() }}>
-                宿舍: {mockDormitories.find(d => d.id === selectedDormitory())?.name}
+              申请加入宿舍
+            </h3>
+            
+            {selectedDormitory() && (
+              <div style={{
+                padding: '12px',
+                backgroundColor: '#f6ffed',
+                borderRadius: '6px',
+                border: '1px solid #b7eb8f'
+              }}>
+                <div style={{ color: s.colors.text.normal() }}>
+                  宿舍: {dormitories().find(d => d.id === selectedDormitory())?.name}
+                </div>
+                <div style={{ color: s.colors.text.normal(false, 'description') }}>
+                  楼栋: {dormitories().find(d => d.id === selectedDormitory())?.building}
+                </div>
               </div>
-              <div style={{ color: s.colors.text.normal(false, 'description') }}>
-                {mockDormitories.find(d => d.id === selectedDormitory())?.description}
-              </div>
+            )}
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <label style={{ color: s.colors.text.normal() }}>申请留言</label>
+              <Input
+                value={applicationMessage()}
+                onChange={(value) => applicationMessage(value)}
+                placeholder="请说明您申请加入这个宿舍的理由..."
+                style={{ minHeight: '80px' }}
+              />
             </div>
-          )}
-          
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <label style={{ color: s.colors.text.normal() }}>申请留言</label>
-            <Input
-              value={applicationMessage}
-              placeholder="请简要介绍自己，说明申请理由..."
-              style={{ minHeight: '80px' }}
-            />
+            
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+              <Button onClick={() => showApplyModal(false)}>
+                取消
+              </Button>
+              <Button 
+                onClick={handleSubmitApplication}
+                style={{ backgroundColor: '#1890ff', color: 'white', border: 'none' }}
+                disabled={submitting() || !applicationMessage().trim()}
+              >
+                {submitting() ? '提交中...' : '提交申请'}
+              </Button>
+            </div>
           </div>
-          
-          <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
-            <Button onClick={() => showApplyModal(false)}>
-              取消
-            </Button>
-            <Button 
-              onClick={handleSubmitApplication}
-              disabled={!applicationMessage().trim()}
-            >
-              提交申请
-            </Button>
-          </div>
-        </div>
-      </Modal>
-    </div>
-  );
+        </Modal>
+      </div>
+    );
+  };
+
+  return renderContent;
 }

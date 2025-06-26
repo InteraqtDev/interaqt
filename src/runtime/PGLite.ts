@@ -34,21 +34,25 @@ export class PGLiteDB implements Database{
         this.db = new PGlite(this.database)
     }
     async open(forceDrop = false) {
-        // 要不要有存在 就删掉的？
-        // SELECT 'DROP DATABASE your_database_name' WHERE EXISTS (SELECT FROM pg_database WHERE dataname = 'your_database_name');
-        const databaseExist = await this.db.query(`SELECT FROM pg_database WHERE datname = '${this.database}'`)
-        if (databaseExist.rows.length === 0) {
-            await this.db.query(`CREATE DATABASE ${this.database}`)
-        } else {
-            if (forceDrop) {
-                await this.db.query(`DROP DATABASE ${this.database}`)
-                await this.db.query(`CREATE DATABASE ${this.database}`)
+        // PGLite doesn't support CREATE/DROP DATABASE commands
+        // When forceDrop is true, we'll drop all existing tables instead
+        
+        if (forceDrop) {
+            // Get all table names except system tables
+            const tables = await this.db.query<{tablename: string}>(`
+                SELECT tablename FROM pg_tables 
+                WHERE schemaname = 'public' 
+                AND tablename NOT LIKE 'pg_%'
+                AND tablename NOT LIKE 'sql_%'
+            `)
+            
+            // Drop each table
+            for (const table of tables.rows) {
+                await this.db.query(`DROP TABLE IF EXISTS "${table.tablename}" CASCADE`)
             }
-            this.db = new PGlite(this.database)
         }
 
         await this.idSystem.setup()
-
     }
     async query<T extends any>(sql:string, params: any[] =[], name= '')  {
         const context= asyncInteractionContext.getStore() as InteractionContext

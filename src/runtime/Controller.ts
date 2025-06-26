@@ -2,9 +2,7 @@ import { DICTIONARY_RECORD, RecordMutationEvent, System, SystemCallback, SystemL
 import {
     Activity,
     BoolExp, Dictionary, Entity,
-    Interaction, KlassInstance,
-    Property,
-    Relation
+    Interaction, KlassInstance, Relation
 } from "@shared";
 import './computedDataHandles/index.js';
 import { InteractionCallResponse } from "./InteractionCall.js";
