@@ -9,7 +9,8 @@ import {
   StateMachine,
   StateNode,
   StateTransfer,
-  InteractionEventArgs
+  InteractionEventArgs,
+  Transform
 } from '@'
 import { User, Dormitory, DormitoryMember, DormitoryApplication, ScoreRecord, KickRequest } from './entities'
 import { ApproveKickRequest } from './interactions'
@@ -26,6 +27,24 @@ import {
   UserLeaderApprovedApplication,
   UserAdminApprovedApplication
 } from './relations'
+
+// 为 Dormitory 实体添加数据映射 - 响应 CreateDormitory 交互
+Dormitory.computedData = Transform.create({
+  record: 'Interaction',
+  callback: (interaction) => {
+    if (interaction.interactionName === 'CreateDormitory') {
+      return {
+        name: interaction.payload.name,
+        building: interaction.payload.building,
+        roomNumber: interaction.payload.roomNumber,
+        capacity: interaction.payload.capacity,
+        description: interaction.payload.description,
+        createdAt: new Date().toISOString()
+      };
+    }
+    return null;
+  }
+});
 
 // 为 User 实体添加响应式计算属性
 User.properties.push(
@@ -249,7 +268,7 @@ const activeToKickedTransfer = StateTransfer.create({
     if (!kickRequest) return null
     
     // 返回需要更新状态的 DormitoryMember
-    return { id: kickRequest.targetMember }
+    return { id: kickRequest.targetMember.id }
   }
 })
 

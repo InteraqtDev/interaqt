@@ -3,6 +3,11 @@ import tsconfigPaths from 'vite-tsconfig-paths'
 import path from 'path'
 export default defineConfig({
     test: {
+        coverage: {
+            include: ['src/**/*'],
+            exclude: ['src/**/*.spec.ts', 'src/**/*.test.ts'],
+            reporter: ['text', 'json', 'html']
+        }
     },
     plugins: [
         tsconfigPaths({
