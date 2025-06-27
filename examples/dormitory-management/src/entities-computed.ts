@@ -1,8 +1,5 @@
 import {
-  Entity,
-  Property,
-  Relation,
-  Count,
+  Property, Count,
   WeightedSummation,
   Any,
   Every,
@@ -10,35 +7,33 @@ import {
   StateNode,
   StateTransfer,
   InteractionEventArgs,
-  Transform
-} from '@'
-import { User, Dormitory, DormitoryMember, DormitoryApplication, ScoreRecord, KickRequest } from './entities'
-import { ApproveKickRequest } from './interactions'
+  Transform,
+  InteractionEventEntity
+} from '@';
+import { User, Dormitory, DormitoryMember } from './entities';
+import { ApproveKickRequest } from './interactions';
 import {
   UserDormitoryMember,
   DormitoryDormitoryMember,
   UserDormitoryApplication,
   DormitoryDormitoryApplication,
-  DormitoryMemberScoreRecord,
-  UserScoreRecord,
-  DormitoryMemberKickRequest,
-  UserKickRequest,
-  UserProcessedKickRequest,
-  UserLeaderApprovedApplication,
-  UserAdminApprovedApplication
-} from './relations'
+  DormitoryMemberScoreRecord
+} from './relations';
 
 // 为 Dormitory 实体添加数据映射 - 响应 CreateDormitory 交互
+// 根据 interaqt 框架理念：Dormitory 数据是从 CreateDormitory 交互数据中 Transform 而来
 Dormitory.computedData = Transform.create({
-  record: 'Interaction',
-  callback: (interaction) => {
+  record: InteractionEventEntity,
+  attributeQuery: ['*'],
+  callback: (interaction: any) => {
     if (interaction.interactionName === 'CreateDormitory') {
+      const payload = interaction.payload as any
       return {
-        name: interaction.payload.name,
-        building: interaction.payload.building,
-        roomNumber: interaction.payload.roomNumber,
-        capacity: interaction.payload.capacity,
-        description: interaction.payload.description,
+        name: payload.name,
+        building: payload.building,
+        roomNumber: payload.roomNumber,
+        capacity: payload.capacity,
+        description: payload.description,
         createdAt: new Date().toISOString()
       };
     }
@@ -264,11 +259,18 @@ const activeToKickedTransfer = StateTransfer.create({
   computeTarget: async function (this: any, eventArgs: InteractionEventArgs) {
     // 从 kickRequest 中获取对应的 member
     const kickRequestId = eventArgs.payload!.kickRequestId.id
-    const kickRequest = await this.controller.system.storage.get('KickRequest', kickRequestId)
+    
+    // 查询KickRequest时包含targetMember关系数据
+    const { MatchExp } = this.controller.globals;
+    const kickRequest = await this.controller.system.storage.findOne('KickRequest',
+      MatchExp.atom({ key: 'id', value: ['=', kickRequestId] }),
+      undefined,
+      ['*', ['targetMember', { attributeQuery: ['id'] }]] // 获取targetMember的id
+    );
     if (!kickRequest) return null
     
     // 返回需要更新状态的 DormitoryMember
-    return { id: kickRequest.targetMember.id }
+    return { id: kickRequest.targetMember.id };
   }
 })
 

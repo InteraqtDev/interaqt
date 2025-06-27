@@ -278,15 +278,18 @@ export class InteractionCall {
             }
 
 
-            if (payloadDef.isCollection) {
-                const result = await everyWithErrorAsync(payloadItem,(item => this.checkConcept(item, payloadDef.base as KlassInstance<typeof Entity>)))
-                if (result !== true) {
-                    throw new AttributeError(`${payloadDef.name} check concept failed`, result)
-                }
-            } else {
-                const result = await this.checkConcept(payloadItem, payloadDef.base as KlassInstance<typeof Entity>)
-                if (result !== true) {
-                    throw new AttributeError(`${payloadDef.name} check concept failed`, result)
+            // Only check concept if base is defined (for entity references)
+            if (payloadDef.base) {
+                if (payloadDef.isCollection) {
+                    const result = await everyWithErrorAsync(payloadItem,(item => this.checkConcept(item, payloadDef.base as KlassInstance<typeof Entity>)))
+                    if (result !== true) {
+                        throw new AttributeError(`${payloadDef.name} check concept failed`, result)
+                    }
+                } else {
+                    const result = await this.checkConcept(payloadItem, payloadDef.base as KlassInstance<typeof Entity>)
+                    if (result !== true) {
+                        throw new AttributeError(`${payloadDef.name} check concept failed`, result)
+                    }
                 }
             }
 
@@ -412,7 +415,8 @@ export class InteractionCall {
         const payloadDefs = this.interaction.payload?.items || []
         const savedPayload: InteractionEventArgs["payload"] = {}
         for(let payloadDef of payloadDefs) {
-            if (!payloadDef.isRef ) {
+            // Only create records for payload items that have a base entity but are not references
+            if (!payloadDef.isRef && payloadDef.base) {
                 const payloadItem = payload![payloadDef.name!]
                 if (payloadItem) {
                     const recordName = (payloadDef.base as KlassInstance<typeof Entity>).name

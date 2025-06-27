@@ -56,24 +56,6 @@ const DormitoryLeaderAttributive = Attributive.create({
   }
 });
 
-// 宿舍成员权限
-const DormitoryMemberAttributive = Attributive.create({
-  name: 'DormitoryMemberCheck',
-  content: async function(this: Controller, targetUser, { user, payload }) {
-    const { MatchExp } = this.globals;
-    
-    if (payload?.dormitoryId) {
-      const membership = await this.system.storage.findOne('DormitoryMember',
-        MatchExp.atom({ key: 'user.id', value: ['=', user.id] })
-          .and({ key: 'dormitory.id', value: ['=', payload.dormitoryId] })
-          .and({ key: 'status', value: ['=', 'active'] })
-      );
-      return !!membership;
-    }
-    
-    return false;
-  }
-});
 
 // 没有活跃宿舍的学生
 const NoActiveDormitoryAttributive = Attributive.create({

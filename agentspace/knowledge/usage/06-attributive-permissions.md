@@ -1252,67 +1252,278 @@ const BatchPermissionAttributive = Attributive.create({
 });
 ```
 
-## 错误处理和调试
+## 测试 Attributive 权限系统
 
-### 权限错误处理
+### 测试环境搭建
+
+测试 Attributive 时需要模拟完整的用户交互环境，包括用户、权限上下文和数据库状态：
 
 ```javascript
-const SafeAttributive = Attributive.create({
-  name: 'SafePermission',
-  content: async function SafePermission(targetUser, eventArgs) {
-    try {
-      // 执行权限检查逻辑
-      const hasPermission = await this.checkComplexPermission(eventArgs);
-      return hasPermission;
-    } catch (error) {
-      // 记录错误但不阻止执行
-      console.error('Permission check error:', error);
-      
-      // 在权限检查出错时，可以选择默认拒绝或允许
-      return false;  // 默认拒绝
+// tests/attributive/setup.ts
+import { describe, test, expect, beforeEach } from 'vitest';
+import { Controller, MonoSystem, KlassByName } from '@';
+import { entities, relations, interactions, activities } from '../src/index.js';
+
+describe('Attributive 权限测试', () => {
+  let system: MonoSystem;
+  let controller: Controller;
+  
+  beforeEach(async () => {
+    // 为每个测试创建独立的系统实例
+    system = new MonoSystem();
+    system.conceptClass = KlassByName;
+    
+    controller = new Controller(
+      system,
+      entities,
+      relations,
+      activities,
+      interactions,
+      [],
+      []
+    );
+    
+    await controller.setup(true);
+  });
+  
+  // 测试辅助函数：创建测试用户
+  async function createTestUser(userData: any) {
+    return await system.storage.create('User', {
+      name: '测试用户',
+      role: 'student',
+      email: 'test@example.com',
+      ...userData
+    });
+  }
+  
+  // 测试辅助函数：执行交互并捕获权限错误
+  async function executeInteractionWithUser(
+    interactionName: string,
+    user: any,
+    payload: any
+  ) {
+    const interactionCall = controller.activityManager?.interactionCallsByName.get(interactionName);
+    if (!interactionCall) {
+      throw new Error(`找不到交互: ${interactionName}`);
     }
+    
+    return await controller.callInteraction(interactionCall.interaction.uuid, {
+      user,
+      payload
+    });
   }
 });
-
-// 扩展 Controller 以添加权限检查方法
-Controller.prototype.checkComplexPermission = async function(eventArgs) {
-  // 复杂的权限检查逻辑
-  return true;
-};
 ```
 
-### 权限调试
+### 测试基本角色权限
 
 ```javascript
-const DebuggableAttributive = Attributive.create({
-  name: 'DebuggablePermission',
-  content: async function DebuggablePermission(targetUser, eventArgs) {
-    const user = eventArgs.user;
-    const payload = eventArgs.payload;
-    
-    console.log('权限检查开始:', {
-      user: user.id,
-      role: user.role,
-      interaction: this.interaction?.name,
-      payload: payload
+describe('基本角色权限测试', () => {
+  test('管理员应该能够创建宿舍', async () => {
+    // 创建管理员用户
+    const admin = await createTestUser({
+      name: '张管理员',
+      role: 'admin',
+      email: 'admin@example.com'
     });
-    
-    const hasPermission = await this.performPermissionCheck(eventArgs);
-    
-    console.log('权限检查结果:', {
-      userId: user.id,
-      hasPermission: hasPermission,
-      reason: hasPermission ? '权限通过' : '权限拒绝'
-    });
-    
-    return hasPermission;
-  }
-});
 
-Controller.prototype.performPermissionCheck = async function(eventArgs) {
-  // 实际的权限检查逻辑
-  return true;
-};
+    // 执行CreateDormitory交互
+    const result = await executeInteractionWithUser('CreateDormitory', admin, {
+      name: '测试宿舍',
+      building: '测试楼',
+      roomNumber: '101',
+      capacity: 4,
+      description: '测试用宿舍'
+    });
+
+    // 验证权限通过，交互执行成功
+    expect(result.error).toBeUndefined();
+    
+    // 验证宿舍确实被创建
+    const { MatchExp } = controller.globals;
+    const dormitory = await system.storage.findOne('Dormitory', 
+      MatchExp.atom({ key: 'name', value: ['=', '测试宿舍'] })
+    );
+    expect(dormitory).toBeTruthy();
+  });
+
+  test('普通学生不应该能够创建宿舍', async () => {
+    // 创建普通学生用户
+    const student = await createTestUser({
+      name: '李学生',
+      role: 'student',
+      email: 'student@example.com'
+    });
+
+    // 尝试执行CreateDormitory交互
+    const result = await executeInteractionWithUser('CreateDormitory', student, {
+      name: '测试宿舍',
+      building: '测试楼',
+      roomNumber: '101',
+      capacity: 4,
+      description: '测试用宿舍'
+    });
+
+    // 验证权限被拒绝
+    expect(result.error).toBeTruthy();
+    expect(result.error.message).toContain('permission'); // 权限错误信息
+  });
+});
+```
+
+### 测试复杂权限条件
+
+```javascript
+describe('复杂权限条件测试', () => {
+  test('只有宿舍长能在自己宿舍记录积分', async () => {
+    // 1. 创建测试数据
+    const leader = await createTestUser({
+      name: '宿舍长',
+      role: 'student',
+      email: 'leader@example.com'
+    });
+
+    const member = await createTestUser({
+      name: '普通成员',
+      role: 'student', 
+      email: 'member@example.com'
+    });
+
+    const admin = await createTestUser({
+      name: '管理员',
+      role: 'admin',
+      email: 'admin@example.com'
+    });
+
+    // 2. 创建宿舍
+    const dormitory = await system.storage.create('Dormitory', {
+      name: '权限测试宿舍',
+      building: '权限测试楼',
+      roomNumber: '999',
+      capacity: 4
+    });
+
+    // 3. 创建宿舍成员关系（宿舍长）
+    const leaderMember = await system.storage.create('DormitoryMember', {
+      user: leader,
+      dormitory: dormitory,
+      role: 'leader', // 宿舍长
+      status: 'active',
+      bedNumber: 1,
+      joinedAt: new Date().toISOString()
+    });
+
+    // 4. 创建普通成员关系
+    const normalMember = await system.storage.create('DormitoryMember', {
+      user: member,
+      dormitory: dormitory, 
+      role: 'member', // 普通成员
+      status: 'active',
+      bedNumber: 2,
+      joinedAt: new Date().toISOString()
+    });
+
+    // 5. 测试宿舍长可以记录积分
+    const leaderResult = await executeInteractionWithUser('RecordScore', leader, {
+      memberId: normalMember,
+      points: 10,
+      reason: '打扫卫生',
+      category: 'hygiene'
+    });
+    expect(leaderResult.error).toBeUndefined();
+
+    // 6. 测试普通成员不能记录积分
+    const memberResult = await executeInteractionWithUser('RecordScore', member, {
+      memberId: leaderMember,
+      points: 10,
+      reason: '尝试记录积分',
+      category: 'hygiene'
+    });
+    expect(memberResult.error).toBeTruthy();
+
+    // 7. 测试管理员不受宿舍长限制（如果管理员也有权限）
+    const adminResult = await executeInteractionWithUser('AdminAssignScore', admin, {
+      memberId: normalMember,
+      points: 5,
+      reason: '管理员加分',
+      category: 'other'
+    });
+    expect(adminResult.error).toBeUndefined();
+  });
+});
+```
+
+### 测试 Payload 级别的 Attributive
+
+```javascript
+describe('Payload级别权限测试', () => {
+  test('只能编辑自己宿舍的成员信息', async () => {
+    // 创建两个不同宿舍的宿舍长
+    const leader1 = await createTestUser({
+      name: '宿舍长1',
+      role: 'student',
+      email: 'leader1@example.com'
+    });
+
+    const leader2 = await createTestUser({
+      name: '宿舍长2', 
+      role: 'student',
+      email: 'leader2@example.com'
+    });
+
+    // 创建两个宿舍
+    const dormitory1 = await system.storage.create('Dormitory', {
+      name: '宿舍1',
+      building: '测试楼',
+      roomNumber: '201',
+      capacity: 4
+    });
+
+    const dormitory2 = await system.storage.create('Dormitory', {
+      name: '宿舍2',
+      building: '测试楼', 
+      roomNumber: '202',
+      capacity: 4
+    });
+
+    // 创建成员关系
+    const member1 = await system.storage.create('DormitoryMember', {
+      user: leader1,
+      dormitory: dormitory1,
+      role: 'leader',
+      status: 'active',
+      bedNumber: 1,
+      joinedAt: new Date().toISOString()
+    });
+
+    const member2 = await system.storage.create('DormitoryMember', {
+      user: leader2,
+      dormitory: dormitory2,
+      role: 'leader', 
+      status: 'active',
+      bedNumber: 1,
+      joinedAt: new Date().toISOString()
+    });
+
+    // 宿舍长1应该能记录自己宿舍成员的积分
+    const validResult = await executeInteractionWithUser('RecordScore', leader1, {
+      memberId: member1, // 自己宿舍的成员
+      points: 10,
+      reason: '清洁卫生',
+      category: 'hygiene'
+    });
+    expect(validResult.error).toBeUndefined();
+
+    // 宿舍长1不应该能记录其他宿舍成员的积分
+    const invalidResult = await executeInteractionWithUser('RecordScore', leader1, {
+      memberId: member2, // 其他宿舍的成员
+      points: 10,
+      reason: '尝试跨宿舍记录',
+      category: 'hygiene'
+    });
+    expect(invalidResult.error).toBeTruthy();
+  });
+});
 ```
 
 ## 最佳实践
@@ -1320,22 +1531,33 @@ Controller.prototype.performPermissionCheck = async function(eventArgs) {
 ### 1. 权限粒度设计
 
 ```javascript
-// ✅ 合适的权限粒度
-const PostAuthorAttributive = Attributive.create({
-  name: 'PostAuthor',
-  condition: async (context) => {
-    const post = await context.findOne('Post', { id: context.payload.postId });
-    return post.author === context.user.id;
+// ✅ 合适的权限粒度 - 基于角色和关系
+const DormitoryLeaderAttributive = Attributive.create({
+  name: 'DormitoryLeader',
+  content: async function(targetUser, eventArgs) {
+    const { MatchExp } = this.globals;
+    const member = await this.system.storage.findOne('DormitoryMember',
+      MatchExp.atom({ key: 'user', value: ['=', eventArgs.user.id] })
+        .and({ key: 'role', value: ['=', 'leader'] })
+        .and({ key: 'status', value: ['=', 'active'] })
+    );
+    return !!member;
   }
 });
 
 // ❌ 过于细粒度的权限
-const PostAuthorOnMondayAttributive = Attributive.create({
-  name: 'PostAuthorOnMonday',
-  condition: async (context) => {
-    const post = await context.findOne('Post', { id: context.payload.postId });
-    const isMonday = new Date().getDay() === 1;
-    return post.author === context.user.id && isMonday;
+const DormitoryLeaderOnWeekdaysAttributive = Attributive.create({
+  name: 'DormitoryLeaderOnWeekdays',
+  content: async function(targetUser, eventArgs) {
+    const isWeekday = [1, 2, 3, 4, 5].includes(new Date().getDay());
+    if (!isWeekday) return false;
+    
+    const { MatchExp } = this.globals;
+    const member = await this.system.storage.findOne('DormitoryMember',
+      MatchExp.atom({ key: 'user', value: ['=', eventArgs.user.id] })
+        .and({ key: 'role', value: ['=', 'leader'] })
+    );
+    return !!member;
   }
 });
 ```
@@ -1343,10 +1565,11 @@ const PostAuthorOnMondayAttributive = Attributive.create({
 ### 2. 权限命名规范
 
 ```javascript
-// ✅ 清晰的命名
-const ResourceOwnerAttributive = Attributive.create({ name: 'ResourceOwner' });
+// ✅ 清晰的命名 - 描述具体权限
 const AdminAttributive = Attributive.create({ name: 'Admin' });
-const ProjectMemberAttributive = Attributive.create({ name: 'ProjectMember' });
+const DormitoryLeaderAttributive = Attributive.create({ name: 'DormitoryLeader' });
+const NoActiveDormitoryAttributive = Attributive.create({ name: 'NoActiveDormitory' });
+const DormitoryNotFullAttributive = Attributive.create({ name: 'DormitoryNotFull' });
 
 // ❌ 模糊的命名
 const CheckAttributive = Attributive.create({ name: 'Check' });
@@ -1357,46 +1580,39 @@ const OkAttributive = Attributive.create({ name: 'Ok' });
 ### 3. 性能考虑
 
 ```javascript
-// ✅ 高效的权限检查
-const EfficientAttributive = Attributive.create({
-  name: 'Efficient',
-  condition: async (context) => {
-    // 先检查简单条件
-    if (context.user.role === 'admin') {
-      return true;
+// ✅ 高效的权限检查 - 先检查简单条件
+const EfficientLeaderAttributive = Attributive.create({
+  name: 'EfficientLeader',
+  content: async function(targetUser, eventArgs) {
+    // 先检查用户角色（简单条件）
+    if (eventArgs.user.role === 'admin') {
+      return true; // 管理员直接通过
     }
     
-    // 再检查复杂条件
-    return await checkComplexCondition(context);
+    // 再检查复杂的数据库查询
+    const { MatchExp } = this.globals;
+    const member = await this.system.storage.findOne('DormitoryMember',
+      MatchExp.atom({ key: 'user', value: ['=', eventArgs.user.id] })
+        .and({ key: 'role', value: ['=', 'leader'] })
+        .and({ key: 'status', value: ['=', 'active'] })
+    );
+    return !!member;
   }
 });
 
-// ❌ 低效的权限检查
-const InefficientAttributive = Attributive.create({
-  name: 'Inefficient',
-  condition: async (context) => {
-    // 总是执行复杂查询
-    const complexResult = await performExpensiveQuery(context);
-    return complexResult || context.user.role === 'admin';
-  }
-});
-```
-
-### 4. 错误处理
-
-```javascript
-// ✅ 适当的错误处理
-const RobustAttributive = Attributive.create({
-  name: 'Robust',
-  condition: async (context) => {
-    try {
-      return await checkPermission(context);
-    } catch (error) {
-      console.error('Permission check failed:', error);
-      return false;  // 默认拒绝
-    }
+// ❌ 低效的权限检查 - 总是执行复杂查询
+const InefficientLeaderAttributive = Attributive.create({
+  name: 'InefficientLeader',
+  content: async function(targetUser, eventArgs) {
+    // 总是执行数据库查询，即使用户是管理员
+    const { MatchExp } = this.globals;
+    const member = await this.system.storage.findOne('DormitoryMember',
+      MatchExp.atom({ key: 'user', value: ['=', eventArgs.user.id] })
+        .and({ key: 'role', value: ['=', 'leader'] })
+    );
+    return !!member || eventArgs.user.role === 'admin';
   }
 });
 ```
 
-定语系统为 interaqt 提供了强大而灵活的权限控制机制。通过合理设计和使用定语，可以实现复杂的权限控制逻辑，同时保持代码的清晰和可维护性。 
+定语系统为 interaqt 提供了强大而灵活的权限控制机制。通过合理设计、系统测试和持续优化，可以实现复杂的权限控制逻辑，同时保持代码的清晰性和可维护性。正确的测试策略不仅能验证权限逻辑的正确性，还能提高系统的安全性和用户体验。 

@@ -744,9 +744,462 @@ describe('Full Workflow Integration', () => {
 });
 ```
 
-## 12.6 测试最佳实践
+## 12.6 测试权限和定语 (Attributive)
 
-### 12.6.1 测试组织
+### 12.6.1 权限测试基础
+
+权限测试是 interaqt 应用测试的重要组成部分，需要验证不同用户在不同场景下的访问权限：
+
+```typescript
+// tests/permissions/setup.ts
+import { describe, test, expect, beforeEach } from 'vitest';
+import { Controller, MonoSystem, KlassByName } from '@';
+
+describe('权限测试', () => {
+  let system: MonoSystem;
+  let controller: Controller;
+  
+  beforeEach(async () => {
+    system = new MonoSystem();
+    system.conceptClass = KlassByName;
+    
+    controller = new Controller(
+      system,
+      entities,
+      relations,
+      activities,
+      interactions,
+      [],
+      []
+    );
+    
+    await controller.setup(true);
+  });
+  
+  // 创建测试用户的辅助函数
+  async function createTestUser(userData: any) {
+    return await system.storage.create('User', {
+      name: '测试用户',
+      role: 'student',
+      email: 'test@example.com',
+      ...userData
+    });
+  }
+  
+  // 执行交互的辅助函数
+  async function executeInteractionWithUser(
+    interactionName: string,
+    user: any,
+    payload: any
+  ) {
+    const interactionCall = controller.activityManager?.interactionCallsByName.get(interactionName);
+    if (!interactionCall) {
+      throw new Error(`找不到交互: ${interactionName}`);
+    }
+    
+    return await controller.callInteraction(interactionCall.interaction.uuid, {
+      user,
+      payload
+    });
+  }
+});
+```
+
+### 12.6.2 基本角色权限测试
+
+```typescript
+describe('基本角色权限测试', () => {
+  test('管理员权限测试', async () => {
+    // 创建管理员用户
+    const admin = await createTestUser({
+      name: '张管理员',
+      role: 'admin',
+      email: 'admin@example.com'
+    });
+
+    // 测试管理员可以执行特权操作
+    const result = await executeInteractionWithUser('CreateDormitory', admin, {
+      name: '管理员创建的宿舍',
+      building: '管理楼',
+      roomNumber: '001',
+      capacity: 4,
+      description: '测试宿舍'
+    });
+
+    expect(result.error).toBeUndefined();
+    
+    // 验证宿舍确实被创建
+    const { MatchExp } = controller.globals;
+    const dormitory = await system.storage.findOne('Dormitory', 
+      MatchExp.atom({ key: 'name', value: ['=', '管理员创建的宿舍'] })
+    );
+    expect(dormitory).toBeTruthy();
+  });
+
+  test('普通用户权限限制测试', async () => {
+    const student = await createTestUser({
+      name: '普通学生',
+      role: 'student',
+      email: 'student@example.com'
+    });
+
+    // 普通学生不应该能创建宿舍
+    const result = await executeInteractionWithUser('CreateDormitory', student, {
+      name: '学生尝试创建的宿舍',
+      building: '学生楼',
+      roomNumber: '002',
+      capacity: 4,
+      description: '无权限测试'
+    });
+
+    expect(result.error).toBeTruthy();
+    expect(result.error.message).toContain('Admin'); // 权限错误应该提到具体要求
+  });
+});
+```
+
+### 12.6.3 复杂权限逻辑测试
+
+```typescript
+describe('复杂权限逻辑测试', () => {
+  test('宿舍长权限测试', async () => {
+    // 设置测试场景
+    const leader = await createTestUser({
+      name: '宿舍长',
+      role: 'student',
+      email: 'leader@example.com'
+    });
+
+    const member = await createTestUser({
+      name: '普通成员',
+      role: 'student',
+      email: 'member@example.com'
+    });
+
+    // 创建宿舍和成员关系
+    const dormitory = await system.storage.create('Dormitory', {
+      name: '权限测试宿舍',
+      building: '权限测试楼',
+      roomNumber: '999',
+      capacity: 4
+    });
+
+    const leaderMember = await system.storage.create('DormitoryMember', {
+      user: leader,
+      dormitory: dormitory,
+      role: 'leader',
+      status: 'active',
+      bedNumber: 1,
+      joinedAt: new Date().toISOString()
+    });
+
+    const normalMember = await system.storage.create('DormitoryMember', {
+      user: member,
+      dormitory: dormitory,
+      role: 'member',
+      status: 'active',
+      bedNumber: 2,
+      joinedAt: new Date().toISOString()
+    });
+
+    // 测试宿舍长可以记录积分
+    const leaderResult = await executeInteractionWithUser('RecordScore', leader, {
+      memberId: normalMember,
+      points: 10,
+      reason: '打扫卫生',
+      category: 'hygiene'
+    });
+    expect(leaderResult.error).toBeUndefined();
+
+    // 测试普通成员不能记录积分
+    const memberResult = await executeInteractionWithUser('RecordScore', member, {
+      memberId: leaderMember,
+      points: 10,
+      reason: '尝试记录积分',
+      category: 'hygiene'
+    });
+    expect(memberResult.error).toBeTruthy();
+  });
+});
+```
+
+### 12.6.4 Payload 级别权限测试
+
+```typescript
+describe('Payload级别权限测试', () => {
+  test('只能操作自己宿舍的数据', async () => {
+    // 创建两个宿舍的宿舍长
+    const leader1 = await createTestUser({
+      name: '宿舍长1',
+      role: 'student',
+      email: 'leader1@example.com'
+    });
+
+    const leader2 = await createTestUser({
+      name: '宿舍长2',
+      role: 'student',
+      email: 'leader2@example.com'
+    });
+
+    // 创建两个宿舍
+    const dormitory1 = await system.storage.create('Dormitory', {
+      name: '宿舍1',
+      building: '测试楼',
+      roomNumber: '201',
+      capacity: 4
+    });
+
+    const dormitory2 = await system.storage.create('Dormitory', {
+      name: '宿舍2',
+      building: '测试楼',
+      roomNumber: '202',
+      capacity: 4
+    });
+
+    // 建立成员关系
+    const member1 = await system.storage.create('DormitoryMember', {
+      user: leader1,
+      dormitory: dormitory1,
+      role: 'leader',
+      status: 'active',
+      bedNumber: 1,
+      joinedAt: new Date().toISOString()
+    });
+
+    const member2 = await system.storage.create('DormitoryMember', {
+      user: leader2,
+      dormitory: dormitory2,
+      role: 'leader',
+      status: 'active',
+      bedNumber: 1,
+      joinedAt: new Date().toISOString()
+    });
+
+    // 宿舍长1应该能操作自己宿舍的成员
+    const validResult = await executeInteractionWithUser('RecordScore', leader1, {
+      memberId: member1,
+      points: 10,
+      reason: '清洁卫生',
+      category: 'hygiene'
+    });
+    expect(validResult.error).toBeUndefined();
+
+    // 宿舍长1不应该能操作其他宿舍的成员
+    const invalidResult = await executeInteractionWithUser('RecordScore', leader1, {
+      memberId: member2,
+      points: 10,
+      reason: '尝试跨宿舍操作',
+      category: 'hygiene'
+    });
+    expect(invalidResult.error).toBeTruthy();
+  });
+});
+```
+
+### 12.6.5 权限边界情况测试
+
+```typescript
+describe('权限边界情况测试', () => {
+  test('宿舍满员时的申请限制', async () => {
+    const student = await createTestUser({
+      name: '申请学生',
+      role: 'student',
+      email: 'applicant@example.com'
+    });
+
+    // 创建已满的宿舍
+    const fullDormitory = await system.storage.create('Dormitory', {
+      name: '已满宿舍',
+      building: '测试楼',
+      roomNumber: '301',
+      capacity: 2
+    });
+
+    // 添加成员直到满员
+    for (let i = 0; i < 2; i++) {
+      const user = await createTestUser({
+        name: `成员${i + 1}`,
+        role: 'student',
+        email: `member${i + 1}@example.com`
+      });
+
+      await system.storage.create('DormitoryMember', {
+        user: user,
+        dormitory: fullDormitory,
+        role: 'member',
+        status: 'active',
+        bedNumber: i + 1,
+        joinedAt: new Date().toISOString()
+      });
+    }
+
+    // 尝试申请加入已满的宿舍
+    const result = await executeInteractionWithUser('ApplyForDormitory', student, {
+      dormitoryId: fullDormitory,
+      message: '希望加入这个宿舍'
+    });
+
+    expect(result.error).toBeTruthy();
+    expect(result.error.message).toContain('DormitoryNotFull');
+  });
+
+  test('重复申请的限制', async () => {
+    const student = await createTestUser({
+      name: '有宿舍学生',
+      role: 'student',
+      email: 'hasdorm@example.com'
+    });
+
+    // 创建宿舍
+    const dormitory1 = await system.storage.create('Dormitory', {
+      name: '当前宿舍',
+      building: '测试楼',
+      roomNumber: '401',
+      capacity: 4
+    });
+
+    const dormitory2 = await system.storage.create('Dormitory', {
+      name: '目标宿舍',
+      building: '测试楼',
+      roomNumber: '402',
+      capacity: 4
+    });
+
+    // 学生已在宿舍1
+    await system.storage.create('DormitoryMember', {
+      user: student,
+      dormitory: dormitory1,
+      role: 'member',
+      status: 'active',
+      bedNumber: 1,
+      joinedAt: new Date().toISOString()
+    });
+
+    // 尝试申请宿舍2
+    const result = await executeInteractionWithUser('ApplyForDormitory', student, {
+      dormitoryId: dormitory2,
+      message: '想换宿舍'
+    });
+
+    expect(result.error).toBeTruthy();
+    expect(result.error.message).toContain('NoActiveDormitory');
+  });
+});
+```
+
+### 12.6.6 状态机权限测试
+
+```typescript
+describe('状态机权限测试', () => {
+  test('状态机computeTarget函数覆盖测试', async () => {
+    // 创建管理员和目标用户
+    const admin = await createTestUser({
+      name: '状态机测试管理员',
+      role: 'admin',
+      email: 'statemachine@test.com'
+    });
+
+    const targetUser = await createTestUser({
+      name: '被踢出的学生',
+      role: 'student',
+      email: 'target@test.com',
+      studentId: 'TARGET001'
+    });
+
+    // 创建宿舍和成员
+    const dormitory = await system.storage.create('Dormitory', {
+      name: '状态机测试宿舍',
+      building: '状态机测试楼',
+      roomNumber: '999',
+      capacity: 4
+    });
+
+    const targetMember = await system.storage.create('DormitoryMember', {
+      user: targetUser,
+      dormitory: dormitory,
+      role: 'member',
+      status: 'active',
+      score: -60,
+      bedNumber: 1,
+      joinedAt: new Date().toISOString()
+    });
+
+    // 创建踢出请求
+    const kickRequest = await system.storage.create('KickRequest', {
+      targetMember: targetMember,
+      requester: admin,
+      reason: '违反宿舍规定，积分过低',
+      status: 'pending',
+      createdAt: new Date().toISOString()
+    });
+
+    // 执行ApproveKickRequest交互，触发状态机
+    const result = await executeInteractionWithUser('ApproveKickRequest', admin, {
+      kickRequestId: kickRequest,
+      adminComment: '管理员批准踢出请求'
+    });
+
+    expect(result.error).toBeUndefined();
+
+    // 验证状态机成功执行了状态转换
+    const { MatchExp } = controller.globals;
+    const updatedMember = await system.storage.findOne('DormitoryMember', 
+      MatchExp.atom({ key: 'id', value: ['=', targetMember.id] }),
+      undefined,
+      ['status']
+    );
+
+    expect(updatedMember.status).toBe('kicked');
+  });
+});
+```
+
+### 12.6.7 权限调试和错误处理测试
+
+```typescript
+describe('权限调试和错误处理', () => {
+  test('应该提供清晰的权限错误信息', async () => {
+    const student = await createTestUser({
+      name: '普通学生',
+      role: 'student',
+      email: 'student@example.com'
+    });
+
+    const result = await executeInteractionWithUser('CreateDormitory', student, {
+      name: '测试宿舍',
+      building: '测试楼',
+      roomNumber: '101',
+      capacity: 4,
+      description: '测试用宿舍'
+    });
+
+    expect(result.error).toBeTruthy();
+    expect(result.error.message).toContain('Admin');
+  });
+
+  test('权限检查应该处理数据库查询错误', async () => {
+    const student = await createTestUser({
+      name: '测试学生',
+      role: 'student',
+      email: 'test@example.com'
+    });
+
+    // 传递无效ID触发查询错误
+    const result = await executeInteractionWithUser('RecordScore', student, {
+      memberId: { id: 'invalid-member-id' },
+      points: 10,
+      reason: '测试错误处理',
+      category: 'hygiene'
+    });
+
+    expect(result.error).toBeTruthy();
+  });
+});
+```
+
+## 12.7 测试最佳实践
+
+### 12.7.1 测试组织
 
 ```typescript
 // 使用测试套件组织相关测试
@@ -766,56 +1219,11 @@ describe('User Management', () => {
     test('should update friend count', () => {});
     test('should calculate user score', () => {});
   });
+  
+  describe('User Permissions', () => {
+    test('should enforce role-based access', () => {});
+    test('should handle complex attributive logic', () => {});
+    test('should test permission edge cases', () => {});
+  });
 });
 ```
-
-### 12.6.2 测试数据管理
-
-```typescript
-// 使用工厂模式创建测试数据
-class TestScenarios {
-  constructor(private system: MonoSystem) {}
-  
-  async createBlogScenario() {
-    // 创建博客相关的测试数据
-    const author = await this.system.storage.create('User', {
-      username: 'author',
-      email: 'author@example.com'
-    });
-    
-    const posts = await Promise.all([
-      this.system.storage.create('Post', {
-        title: 'Post 1',
-        content: 'Content 1',
-        authorId: author.id
-      }),
-      this.system.storage.create('Post', {
-        title: 'Post 2',
-        content: 'Content 2',
-        authorId: author.id
-      })
-    ]);
-    
-    return { author, posts };
-  }
-  
-  async createSocialScenario() {
-    // 创建社交网络相关的测试数据
-    const users = await Promise.all([
-      this.system.storage.create('User', { username: 'alice' }),
-      this.system.storage.create('User', { username: 'bob' }),
-      this.system.storage.create('User', { username: 'charlie' })
-    ]);
-    
-    // 建立好友关系
-    await this.system.storage.create('User_friends_friends_User', {
-      source: users[0].id,
-      target: users[1].id
-    });
-    
-    return { users };
-  }
-}
-```
-
-通过系统化的测试方法，可以确保 interaqt 应用的稳定性和可靠性。测试不仅能够验证功能的正确性，还能帮助发现性能问题和边界情况，为应用的长期维护提供保障。 
