@@ -123,12 +123,12 @@ export class ActivityManager {
         })
     }
 
-    async callInteraction(interactionId: string, interactionEventArgs: InteractionEventArgs): Promise<InteractionCallResponse> {
+    async callInteraction(interactionName: string, interactionEventArgs: InteractionEventArgs): Promise<InteractionCallResponse> {
         const context = asyncInteractionContext.getStore() as InteractionContext
         const logger = this.controller.system.logger.child(context?.logContext || {})
 
-        const interactionCall = this.interactionCalls.get(interactionId)!
-        assert(!!interactionCall, `cannot find interaction for ${interactionId}`)
+        const interactionCall = this.interactionCallsByName.get(interactionName)!
+        assert(!!interactionCall, `cannot find interaction for ${interactionName}`)
 
         logger.info({label: "interaction", message: interactionCall.interaction.name})
         await this.controller.system.storage.beginTransaction(interactionCall.interaction.name)

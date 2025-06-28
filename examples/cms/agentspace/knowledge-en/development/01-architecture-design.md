@@ -296,13 +296,13 @@ export class ActivityManager {
         // Initialize activity callers
         activities.forEach(activity => {
             const activityCall = new ActivityCall(activity, controller)
-            this.activityCalls.set(activity.uuid, activityCall)
+            this.activityCalls.set(activity.name, activityCall)
         })
         
         // Initialize interaction callers
         interactions.forEach(interaction => {
             const interactionCall = new InteractionCall(interaction, controller)
-            this.interactionCalls.set(interaction.uuid, interactionCall)
+            this.interactionCalls.set(interaction.name, interactionCall)
         })
     }
 }

@@ -317,8 +317,8 @@ export class ActivityManager {
 
 #### Interaction Call Processing
 ```typescript
-async callInteraction(interactionId: string, args: InteractionEventArgs): Promise<InteractionCallResponse> {
-    const interactionCall = this.interactionCalls.get(interactionId)
+async callInteraction(interactionName: string, args: InteractionEventArgs): Promise<InteractionCallResponse> {
+    const interactionCall = this.interactionCallsByName.get(interactionName)
     
     // Begin transaction
     await this.controller.system.storage.beginTransaction(interactionCall.interaction.name)

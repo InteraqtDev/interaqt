@@ -418,7 +418,7 @@ describe('User Interactions', () => {
     await controller.setup(true);
     
     // Execute registration interaction
-    const result = await controller.callInteraction(registerInteraction.uuid, {
+    const result = await controller.callInteraction(registerInteraction.name, {
       userData: {
         username: 'newuser',
         email: 'newuser@example.com'
@@ -528,7 +528,7 @@ describe('Approval Process Activity', () => {
     });
     
     // Execute submit interaction
-    await controller.callInteraction(submitInteraction.uuid, {
+    await controller.callInteraction(submitInteraction.name, {
       requestId: request.id
     });
     
@@ -540,7 +540,7 @@ describe('Approval Process Activity', () => {
     expect(updatedRequest.status).toBe('reviewing');
     
     // Execute approve interaction
-    await controller.callInteraction(approveInteraction.uuid, {
+    await controller.callInteraction(approveInteraction.name, {
       requestId: request.id
     });
     
@@ -797,7 +797,7 @@ describe('Permission Testing', () => {
       throw new Error(`Interaction not found: ${interactionName}`);
     }
     
-    return await controller.callInteraction(interactionCall.interaction.uuid, {
+    return await controller.callInteraction(interactionCall.interaction.name, {
       user,
       payload
     });

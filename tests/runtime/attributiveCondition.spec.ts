@@ -72,13 +72,13 @@ describe('attributive and condition checks', () => {
             const normalUser = await system.storage.create('User', { name: 'Normal', role: 'user' })
 
             // Test admin user - should pass
-            const adminResult = await controller.callInteraction(DeletePost.uuid, {
+            const adminResult = await controller.callInteraction(DeletePost.name, {
                 user: adminUser
             })
             expect(adminResult.error).toBeUndefined()
 
             // Test normal user - should fail
-            const normalResult = await controller.callInteraction(DeletePost.uuid, {
+            const normalResult = await controller.callInteraction(DeletePost.name, {
                 user: normalUser
             })
             expect(normalResult.error).toBeDefined()
@@ -136,19 +136,19 @@ describe('attributive and condition checks', () => {
             const normalUser = await system.storage.create('User', { name: 'Normal', role: 'user', level: 2 })
 
             // Test admin user - should pass (is admin)
-            const adminResult = await controller.callInteraction(ModerateContent.uuid, {
+            const adminResult = await controller.callInteraction(ModerateContent.name, {
                 user: adminUser
             })
             expect(adminResult.error).toBeUndefined()
 
             // Test high level user - should pass (level >= 5)
-            const highLevelResult = await controller.callInteraction(ModerateContent.uuid, {
+            const highLevelResult = await controller.callInteraction(ModerateContent.name, {
                 user: highLevelUser
             })
             expect(highLevelResult.error).toBeUndefined()
 
             // Test normal user - should fail (neither admin nor high level)
-            const normalResult = await controller.callInteraction(ModerateContent.uuid, {
+            const normalResult = await controller.callInteraction(ModerateContent.name, {
                 user: normalUser
             })
             expect(normalResult.error).toBeDefined()
@@ -222,7 +222,7 @@ describe('attributive and condition checks', () => {
             })
 
             // Test with published post - should pass
-            const publishedResult = await controller.callInteraction(SharePost.uuid, {
+            const publishedResult = await controller.callInteraction(SharePost.name, {
                 user: user,
                 payload: {
                     post: { id: publishedPost.id }
@@ -231,7 +231,7 @@ describe('attributive and condition checks', () => {
             expect(publishedResult.error).toBeUndefined()
 
             // Test with draft post - should fail
-            const draftResult = await controller.callInteraction(SharePost.uuid, {
+            const draftResult = await controller.callInteraction(SharePost.name, {
                 user: user,
                 payload: {
                     post: { id: draftPost.id }
@@ -301,7 +301,7 @@ describe('attributive and condition checks', () => {
             const inactiveTag = await system.storage.create('Tag', { name: 'Inactive', isActive: false })
 
             // Test with all active tags - should pass
-            const activeResult = await controller.callInteraction(CreatePost.uuid, {
+            const activeResult = await controller.callInteraction(CreatePost.name, {
                 user: user,
                 payload: {
                     tags: [{ id: activeTag1.id }, { id: activeTag2.id }]
@@ -310,7 +310,7 @@ describe('attributive and condition checks', () => {
             expect(activeResult.error).toBeUndefined()
 
             // Test with inactive tag included - should fail
-            const mixedResult = await controller.callInteraction(CreatePost.uuid, {
+            const mixedResult = await controller.callInteraction(CreatePost.name, {
                 user: user,
                 payload: {
                     tags: [{ id: activeTag1.id }, { id: inactiveTag.id }]
@@ -386,13 +386,13 @@ describe('attributive and condition checks', () => {
             // Test viewing regular post - should pass for both users
             const regularPost = { title: 'Regular Post', isPremium: false }
             
-            const richRegularResult = await controller.callInteraction(ViewPost.uuid, {
+            const richRegularResult = await controller.callInteraction(ViewPost.name, {
                 user: richUser,
                 payload: { post: regularPost }
             })
             expect(richRegularResult.error).toBeUndefined()
 
-            const poorRegularResult = await controller.callInteraction(ViewPost.uuid, {
+            const poorRegularResult = await controller.callInteraction(ViewPost.name, {
                 user: poorUser,
                 payload: { post: regularPost }
             })
@@ -402,14 +402,14 @@ describe('attributive and condition checks', () => {
             const premiumPost = { title: 'Premium Post', isPremium: true }
 
             // Rich user should pass
-            const richPremiumResult = await controller.callInteraction(ViewPost.uuid, {
+            const richPremiumResult = await controller.callInteraction(ViewPost.name, {
                 user: richUser,
                 payload: { post: premiumPost }
             })
             expect(richPremiumResult.error).toBeUndefined()
 
             // Poor user should fail
-            const poorPremiumResult = await controller.callInteraction(ViewPost.uuid, {
+            const poorPremiumResult = await controller.callInteraction(ViewPost.name, {
                 user: poorUser,
                 payload: { post: premiumPost }
             })
@@ -483,13 +483,13 @@ describe('attributive and condition checks', () => {
             const unverifiedUser = await system.storage.create('User', { name: 'Unverified', isVerified: false })
 
             // Test verified user when system is not in maintenance - should pass
-            const verifiedResult = await controller.callInteraction(PublishContent.uuid, {
+            const verifiedResult = await controller.callInteraction(PublishContent.name, {
                 user: verifiedUser
             })
             expect(verifiedResult.error).toBeUndefined()
 
             // Test unverified user - should fail
-            const unverifiedResult = await controller.callInteraction(PublishContent.uuid, {
+            const unverifiedResult = await controller.callInteraction(PublishContent.name, {
                 user: unverifiedUser
             })
             expect(unverifiedResult.error).toBeDefined()
@@ -498,7 +498,7 @@ describe('attributive and condition checks', () => {
             await system.storage.update('System', undefined, { maintenanceMode: true })
 
             // Test verified user when system is in maintenance - should fail
-            const maintenanceResult = await controller.callInteraction(PublishContent.uuid, {
+            const maintenanceResult = await controller.callInteraction(PublishContent.name, {
                 user: verifiedUser
             })
             expect(maintenanceResult.error).toBeDefined()
@@ -541,7 +541,7 @@ describe('attributive and condition checks', () => {
             const user = await system.storage.create('User', { name: 'TestUser' })
 
             // Should catch error and treat as false
-            const result = await controller.callInteraction(BuggyInteraction.uuid, {
+            const result = await controller.callInteraction(BuggyInteraction.name, {
                 user: user
             })
             expect(result.error).toBeDefined()
@@ -584,7 +584,7 @@ describe('attributive and condition checks', () => {
             const user = await system.storage.create('User', { name: 'TestUser' })
 
             // Should treat undefined as true
-            const result = await controller.callInteraction(IncompleteInteraction.uuid, {
+            const result = await controller.callInteraction(IncompleteInteraction.name, {
                 user: user
             })
             expect(result.error).toBeUndefined()

@@ -87,9 +87,6 @@ When using LLM to generate interaqt applications, you must follow **test-case dr
    - Write corresponding tests immediately after completing each module
 
 ### 4. Test-Driven Validation
-
-🔴 **CRITICAL BLOCKING REQUIREMENT**: All tests MUST pass with 100% coverage before proceeding to any subsequent steps. This is a non-negotiable checkpoint.
-
 1. **Test Framework Setup**:
    - Use vitest as testing framework
    - Configure test database (use PGLite memory mode)
@@ -101,35 +98,10 @@ When using LLM to generate interaqt applications, you must follow **test-case dr
    - All properties with computedData must verify auto-calculation logic
    - All permission controls must have positive and negative tests
 
-3. **Test Execution & Validation**:
+3. **Test Execution**:
    ```bash
    npm test                    # Run all tests
    npm test -- --coverage      # View test coverage
-   ```
-
-4. **🚫 BLOCKING CONDITIONS - DO NOT PROCEED UNLESS**:
-   - [ ] **ALL tests pass without any failures**
-   - [ ] **Test coverage reaches exactly 100%**
-   - [ ] **No test cases are skipped or pending**
-   - [ ] **All Entity CRUD operations verified**
-   - [ ] **All Interaction success/failure scenarios tested**
-   - [ ] **All computed properties validated**
-   - [ ] **All permission controls tested**
-
-   **⚠️ WARNING**: If any test fails or coverage is below 100%, you MUST:
-   1. Fix all failing tests immediately
-   2. Add missing test cases to reach 100% coverage
-   3. Re-run validation until all conditions are met
-   4. Only then proceed to documentation generation
-
-5. **Coverage Validation Commands**:
-   ```bash
-   # Ensure 100% coverage
-   npm test -- --coverage --reporter=text
-   npm test -- --coverage --reporter=html  # Detailed HTML report
-   
-   # Check for uncovered lines
-   npm test -- --coverage --reporter=text-summary
    ```
 
 ### 5. Documentation Generation
@@ -141,42 +113,20 @@ Create `docs/` directory with:
 
 ### 6. Backend Quality Assurance Checklist
 
-🔴 **MANDATORY BLOCKING CHECKLIST** - All items must be checked before proceeding to frontend development:
-
-**Test Quality & Coverage**:
-- [ ] **ALL tests pass without any failures or errors**
-- [ ] **Test coverage reaches EXACTLY 100% - no exceptions**
-- [ ] **No test cases are skipped, pending, or commented out**
 - [ ] All requirements have corresponding test cases
 - [ ] All test cases have corresponding test code
-
-**Entity & Data Validation**:
+- [ ] Test coverage reaches 100%
 - [ ] No fictional non-existent Entity or Interaction
-- [ ] All Entity CRUD operations have tests
 - [ ] All reactive computations trigger correctly
-- [ ] All computedData properties verify auto-calculation logic
-- [ ] All relations have correct cascade behavior tests
-
-**Interaction & Permission Validation**:
-- [ ] All Interactions have success and failure cases
 - [ ] Permission control tests complete
-- [ ] All user roles and operations covered
-
-**Documentation Consistency**:
+- [ ] All Entity CRUD operations have tests
+- [ ] All Interactions have success and failure cases
+- [ ] All computedData properties verify auto-calculation logic
 - [ ] test-cases.md document complete and consistent with code
 - [ ] interaction-matrix.md covers all user roles and operations
-
-**⚠️ CRITICAL RULE**: If ANY checkbox above is unchecked, you MUST NOT proceed to frontend development. Fix all issues first.
+- [ ] All relations have correct cascade behavior tests
 
 ## II. Frontend Generation Process
-
-🔴 **PREREQUISITE CHECKPOINT**: Before starting frontend development, verify that:
-- [ ] **Backend implementation is 100% complete**
-- [ ] **ALL backend tests pass without failures**
-- [ ] **Test coverage is EXACTLY 100%**
-- [ ] **All items in Backend Quality Assurance Checklist are checked**
-
-⚠️ **DO NOT START FRONTEND DEVELOPMENT** until all backend requirements are fully satisfied.
 
 ### 1. Frontend Project Initialization
 ```bash
@@ -343,11 +293,7 @@ cd frontend
 
 4. **Avoid Test Gaps**:
    - ❌ Don't write code first then add tests
-   - ❌ Don't proceed with incomplete test coverage
-   - ❌ Don't ignore failing tests or skip test validation
    - ✅ Test case driven, tests first
-   - ✅ Achieve 100% test coverage before any next step
-   - ✅ All tests must pass - zero tolerance for failures
 
 5. **Avoid Frontend-Backend Disconnection**:
    - ❌ Don't add features in frontend that don't exist in backend (like local filtering, sorting)

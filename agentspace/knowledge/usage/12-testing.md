@@ -418,7 +418,7 @@ describe('User Interactions', () => {
     await controller.setup(true);
     
     // 执行注册交互
-    const result = await controller.callInteraction(registerInteraction.uuid, {
+    const result = await controller.callInteraction(registerInteraction.name, {
       userData: {
         username: 'newuser',
         email: 'newuser@example.com'
@@ -528,7 +528,7 @@ describe('Approval Process Activity', () => {
     });
     
     // 执行提交交互
-    await controller.callInteraction(submitInteraction.uuid, {
+    await controller.callInteraction(submitInteraction.name, {
       requestId: request.id
     });
     
@@ -540,7 +540,7 @@ describe('Approval Process Activity', () => {
     expect(updatedRequest.status).toBe('reviewing');
     
     // 执行批准交互
-    await controller.callInteraction(approveInteraction.uuid, {
+    await controller.callInteraction(approveInteraction.name, {
       requestId: request.id
     });
     
@@ -797,7 +797,7 @@ describe('权限测试', () => {
       throw new Error(`找不到交互: ${interactionName}`);
     }
     
-    return await controller.callInteraction(interactionCall.interaction.uuid, {
+    return await controller.callInteraction(interactionCall.interaction.name, {
       user,
       payload
     });

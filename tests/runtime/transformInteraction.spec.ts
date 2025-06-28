@@ -16,8 +16,8 @@ type User = {
 describe('map interaction', () => {
 
     let system: MonoSystem
-    let sendRequestUUID: string
-    let approveRequestUUID: string
+    let sendRequestName: string
+    let approveRequestName: string
     let controller: Controller
 
     let userAId: string
@@ -49,8 +49,8 @@ describe('map interaction', () => {
             []
         )
         await controller.setup(true)
-        sendRequestUUID = Interaction.instances!.find(i => i.name === 'sendRequest')!.uuid
-        approveRequestUUID = Interaction.instances!.find(i => i.name === 'approve')!.uuid
+        sendRequestName = 'sendRequest'
+        approveRequestName = 'approve'
 
         const userARef = await system.storage.create('User', {name: 'A', age: 10})
         userAId = userARef.id
@@ -95,7 +95,7 @@ describe('map interaction', () => {
                 reason: 'let use make friend'
             }
         }
-        const res1 = await controller.callInteraction(sendRequestUUID,  {user: userA, payload})
+        const res1 = await controller.callInteraction(sendRequestName,  {user: userA, payload})
         expect(res1.error).toBeUndefined()
 
         const requests1 = await controller.system.storage.find('Request', undefined, undefined, ['*', ['from', {attributeQuery: ["*"]}], ['to', {attributeQuery: ["*"]}]])
@@ -114,7 +114,7 @@ describe('map interaction', () => {
 
 
         // should throw
-        const _res2 = await controller.callInteraction(approveRequestUUID,  {user: userC, payload: _payload2})
+        const _res2 = await controller.callInteraction(approveRequestName,  {user: userC, payload: _payload2})
         expect(_res2.error).toBeInstanceOf(AttributeError)
         // FIXME 获取 userAttribute error 信息
 
@@ -122,7 +122,7 @@ describe('map interaction', () => {
         const payload2 = {
             request: requests1[0]
         }
-        const res2 = await controller.callInteraction(approveRequestUUID,  {user: userB, payload: payload2})
+        const res2 = await controller.callInteraction(approveRequestName,  {user: userB, payload: payload2})
         const requests2 = await controller.system.storage.find(
             'Request',
             undefined,

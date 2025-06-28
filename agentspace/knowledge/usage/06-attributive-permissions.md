@@ -1307,7 +1307,7 @@ describe('Attributive 权限测试', () => {
       throw new Error(`找不到交互: ${interactionName}`);
     }
     
-    return await controller.callInteraction(interactionCall.interaction.uuid, {
+    return await controller.callInteraction(interactionCall.interaction.name, {
       user,
       payload
     });

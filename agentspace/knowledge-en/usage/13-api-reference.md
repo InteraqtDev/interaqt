@@ -1047,7 +1047,7 @@ Initialize system.
 await controller.setup(true) // Create database tables
 ```
 
-#### callInteraction(interactionId: string, args: InteractionEventArgs)
+#### callInteraction(interactionName: string, args: InteractionEventArgs)
 Call interaction.
 ```typescript
 const result = await controller.callInteraction('createPost', {

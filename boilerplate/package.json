@@ -11,7 +11,8 @@
     "test": "vitest run",
     "coverage": "vitest run --coverage",
     "install": "tsx install.ts",
-    "start": "tsx index.ts"
+    "start": "tsx index.ts",
+    "generate-interaction-functions": "tsx scripts/generate-interaction-functions.ts"
   },
   "author": "",
   "license": "ISC",

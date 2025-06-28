@@ -347,7 +347,7 @@ class ActivitySeqState {
         }
         
         // Notify parent of state change
-        this.parent?.onChange(uuid, node.next?.uuid)
+        this.parent?.onChange(uuid, node.next?.name)
     }
     
     // Check if interaction is available
@@ -360,7 +360,7 @@ class ActivitySeqState {
                 .some(child => child.isInteractionAvailable(uuid))
         } else {
             // Check current state
-            return this.current.node!.uuid === uuid
+            return this.current.node!.name === uuid
         }
     }
 }

@@ -1036,7 +1036,7 @@ console.log('Interaction result:', result);
 const createPostInteraction = Interaction.instances.find(i => i.name === 'CreatePost');
 
 if (createPostInteraction) {
-  const result = await controller.callInteraction(createPostInteraction.uuid, {
+  const result = await controller.callInteraction(createPostInteraction.name, {
     user: { id: 'user123' },
     payload: {
       title: 'Another Post',

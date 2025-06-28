@@ -30,7 +30,7 @@ describe('StateMachineRunner', () => {
         expect(post1[0].status).toBe('normal')
         expect(post1[1].status).toBe('normal')
         // 2. 针对一个 post 执行 interaction。查看 status 变化
-        await controller.callInteraction(draftInteraction.uuid, {
+        await controller.callInteraction(draftInteraction.name, {
             user: user1,
             payload: {
                 content: {
@@ -44,7 +44,7 @@ describe('StateMachineRunner', () => {
         expect(post2[1].status).toBe('normal')
 
         // draft 不能直接 publish
-        await controller.callInteraction(publishInteraction.uuid, {
+        await controller.callInteraction(publishInteraction.name, {
             user: user1,
             payload: {
                 content: {
@@ -57,7 +57,7 @@ describe('StateMachineRunner', () => {
         expect(post3[1].status).toBe('normal')
 
         // draft 可以 finalize
-        await controller.callInteraction(finalizeInteraction.uuid, {
+        await controller.callInteraction(finalizeInteraction.name, {
             user: user1,
             payload: {
                 content: {
@@ -70,7 +70,7 @@ describe('StateMachineRunner', () => {
         expect(post4[1].status).toBe('normal')
         
         // normal 可以 publish
-        await controller.callInteraction(publishInteraction.uuid, {
+        await controller.callInteraction(publishInteraction.name, {
             user: user1,
             payload: {
                 content: {
@@ -100,13 +100,13 @@ describe('StateMachineRunner', () => {
         const globalState = await controller.system.storage.get(DICTIONARY_RECORD, 'globalState')
         expect(globalState).toBe('enabled')
 
-        await controller.callInteraction(disableInteraction.uuid, {
+        await controller.callInteraction(disableInteraction.name, {
             user: user1,
         })
         const globalState2 = await controller.system.storage.get(DICTIONARY_RECORD, 'globalState')
         expect(globalState2).toBe('disabled')
 
-        await controller.callInteraction(enableInteraction.uuid, {
+        await controller.callInteraction(enableInteraction.name, {
             user: user1,
         })
         const globalState3 = await controller.system.storage.get(DICTIONARY_RECORD, 'globalState')
@@ -133,7 +133,7 @@ describe('StateMachineRunner', () => {
             name: 'user3',
         })
 
-        const {error} =await controller.callInteraction(sendInteraction.uuid, {
+        const {error} =await controller.callInteraction(sendInteraction.name, {
             user: user1,
             payload: {
                 to: user2,
@@ -147,7 +147,7 @@ describe('StateMachineRunner', () => {
         expect(request[0].title).toBe('request1')
         expect(request[0].to.id).toBe(user2.id)
 
-        await controller.callInteraction(transferReviewersInteraction.uuid, {
+        await controller.callInteraction(transferReviewersInteraction.name, {
             user: user1,
             payload: {
                 reviewer: user3,

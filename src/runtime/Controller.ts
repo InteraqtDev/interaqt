@@ -179,8 +179,8 @@ export class Controller {
     }
     callbacks: Map<any, Set<SystemCallback>> = new Map()
 
-    async callInteraction(interactionId:string, interactionEventArgs: InteractionEventArgs) {
-        return this.activityManager.callInteraction(interactionId, interactionEventArgs)
+    async callInteraction(interactionName:string, interactionEventArgs: InteractionEventArgs) {
+        return this.activityManager.callInteraction(interactionName, interactionEventArgs)
     }
     async callActivityInteraction(activityCallId:string, interactionCallId:string, activityId: string|undefined, interactionEventArgs: InteractionEventArgs) {
         return this.activityManager.callActivityInteraction(activityCallId, interactionCallId, activityId, interactionEventArgs)

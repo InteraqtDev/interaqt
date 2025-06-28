@@ -301,8 +301,8 @@ export class ActivityManager {
 
 #### 交互调用处理
 ```typescript
-async callInteraction(interactionId: string, args: InteractionEventArgs): Promise<InteractionCallResponse> {
-    const interactionCall = this.interactionCalls.get(interactionId)
+async callInteraction(interactionName: string, args: InteractionEventArgs): Promise<InteractionCallResponse> {
+    const interactionCall = this.interactionCallsByName.get(interactionName)
     
     // 开始事务
     await this.controller.system.storage.beginTransaction(interactionCall.interaction.name)

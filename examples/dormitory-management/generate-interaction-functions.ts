@@ -9,7 +9,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // 直接导入 interactions
-import { interactions } from '../backend/index.js';
+import { interactions } from './src/interactions.js';
 
 // 从 interactions 数组中提取信息
 function extractInteractionInfo(): Array<{
@@ -187,7 +187,7 @@ function main() {
   console.log('🔨 Generating frontend functions...');
   const fileContent = generateFileContent(interactionInfos);
   
-  const outputPath = path.join(__dirname, '../frontend/src/utils/apis.ts');
+  const outputPath = path.join(__dirname, 'frontend/src/utils/generatedInteractions.ts');
   fs.writeFileSync(outputPath, fileContent, 'utf-8');
   
   console.log('✅ Generated frontend functions successfully!');

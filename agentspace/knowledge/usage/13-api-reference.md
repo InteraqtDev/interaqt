@@ -1047,7 +1047,7 @@ new Controller(
 await controller.setup(true) // 创建数据库表
 ```
 
-#### callInteraction(interactionId: string, args: InteractionEventArgs)
+#### callInteraction(interactionName: string, args: InteractionEventArgs)
 调用交互。
 ```typescript
 const result = await controller.callInteraction('createPost', {

@@ -725,7 +725,7 @@ describe('Attributive Permission Tests', () => {
       throw new Error(`Interaction not found: ${interactionName}`);
     }
     
-    return await controller.callInteraction(interactionCall.interaction.uuid, {
+    return await controller.callInteraction(interactionCall.interaction.name, {
       user,
       payload
     });
