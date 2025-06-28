@@ -1052,9 +1052,9 @@ if (createPostInteraction) {
 ```javascript
 // Execute interaction as part of an activity
 const result = await controller.callActivityInteraction(
-  'activity-id',
-  'interaction-id', 
-  'activity-instance-id',
+  'OrderProcess',        // activity name
+  'processPayment',      // interaction name
+  'activity-instance-id',// activity instance ID
   {
     user: { id: 'user123' },
     payload: { /* ... */ }
@@ -1064,9 +1064,12 @@ const result = await controller.callActivityInteraction(
 
 ## Error Handling
 
+> **Important**: The interaqt framework automatically catches and handles all errors, never throwing uncaught exceptions. All errors are returned through the `error` field in the return value of `callInteraction` or `callActivityInteraction`. Therefore, **DO NOT use try-catch to test error cases**, instead check the `error` field in the return value.
+
 ### Parameter Validation Errors
 
 ```javascript
+// ✅ Correct error handling approach
 const result = await controller.callInteraction('CreatePost', {
   user: { id: 'user123' },
   payload: {
@@ -1080,6 +1083,13 @@ if (result.error) {
   console.log('Error type:', result.error.type);
   console.log('Error message:', result.error.message);
 }
+
+// ❌ Wrong approach: DO NOT use try-catch
+// try {
+//   const result = await controller.callInteraction('CreatePost', {...});
+// } catch (e) {
+//   // This code will never execute as the framework doesn't throw exceptions
+// }
 ```
 
 ### Permission Errors

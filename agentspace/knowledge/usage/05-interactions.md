@@ -1270,9 +1270,12 @@ const DeletePost = Interaction.create({
 
 ## 错误处理
 
+> **重要提示**：interaqt 框架会自动捕获并处理所有错误，不会抛出未捕获的异常。所有错误都会在 `callInteraction` 或 `callActivityInteraction` 的返回值中通过 `error` 字段返回。因此，**不要使用 try-catch 来测试错误情况**，而应该检查返回值中的 `error` 字段。
+
 ### 参数验证错误
 
 ```javascript
+// ✅ 正确的错误处理方式
 const result = await controller.callInteraction('CreatePost', {
   user: { id: 'user123' },
   payload: {
@@ -1286,6 +1289,13 @@ if (result.error) {
   console.log('Error type:', result.error.type);
   console.log('Error message:', result.error.message);
 }
+
+// ❌ 错误的处理方式：不要使用 try-catch
+// try {
+//   const result = await controller.callInteraction('CreatePost', {...});
+// } catch (e) {
+//   // 框架不会抛出异常，这里的代码不会执行
+// }
 ```
 
 ### 权限错误

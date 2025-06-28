@@ -746,6 +746,29 @@ describe('Full Workflow Integration', () => {
 
 ## 12.6 测试权限和定语 (Attributive)
 
+> **重要提示：错误处理的正确方式**
+> 
+> interaqt 框架会自动捕获所有错误（包括 Attributive 验证失败、权限不足等），并通过返回值中的 `error` 字段返回错误信息。框架**不会抛出未捕获的异常**。
+> 
+> 因此，在编写测试时：
+> - ✅ **正确做法**：检查返回值的 `error` 字段
+> - ❌ **错误做法**：使用 try-catch 捕获异常
+> 
+> ```javascript
+> // ✅ 正确的测试方式
+> const result = await controller.callInteraction('SomeInteraction', {...});
+> expect(result.error).toBeTruthy();
+> expect(result.error.message).toContain('permission denied');
+> 
+> // ❌ 错误的测试方式
+> try {
+>   await controller.callInteraction('SomeInteraction', {...});
+>   fail('Should have thrown error');
+> } catch (e) {
+>   // 这段代码永远不会执行，因为框架不会抛出异常
+> }
+> ```
+
 ### 12.6.1 权限测试基础
 
 权限测试是 interaqt 应用测试的重要组成部分，需要验证不同用户在不同场景下的访问权限：

@@ -518,7 +518,7 @@ describe("createClass types", () => {
         // TypeScript type validation
         assertType<string>(instance.name);
         assertType<number | undefined>(instance.count);
-        assertType<string>(instance.name);
+        assertType<string>(instance.uuid);
     });
     
     test('should handle complex type relationships', () => {
@@ -556,7 +556,7 @@ describe('utility functions', () => {
         
         expect(parsed.type).toBe('TestClass');
         expect(parsed.public.name).toBe('test');
-        expect(parsed.name).toBe(instance.name);
+        expect(parsed.uuid).toBe(instance.uuid);
     });
 });
 ```

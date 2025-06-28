@@ -1047,7 +1047,7 @@ Initialize system.
 await controller.setup(true) // Create database tables
 ```
 
-#### callInteraction(interactionId: string, args: InteractionEventArgs)
+#### callInteraction(interactionName: string, args: InteractionEventArgs)
 Call interaction.
 ```typescript
 const result = await controller.callInteraction('createPost', {
@@ -1056,13 +1056,13 @@ const result = await controller.callInteraction('createPost', {
 })
 ```
 
-#### callActivityInteraction(activityCallId: string, interactionCallId: string, activityId: string, args: InteractionEventArgs)
+#### callActivityInteraction(activityName: string, interactionName: string, activityId: string, args: InteractionEventArgs)
 Call interaction within activity.
 ```typescript
 const result = await controller.callActivityInteraction(
-    'activity-call-1',
-    'interaction-call-1',
     'OrderProcess',
+    'confirmOrder',
+    'activity-instance-1',
     { user: { id: 'user1' }, payload: { orderData: {...} } }
 )
 ```

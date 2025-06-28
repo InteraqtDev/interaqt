@@ -746,6 +746,29 @@ describe('Full Workflow Integration', () => {
 
 ## 12.6 Testing Permissions and Attributives
 
+> **Important: Correct Error Handling Approach**
+> 
+> The interaqt framework automatically catches all errors (including Attributive validation failures, insufficient permissions, etc.) and returns error information through the `error` field in the return value. The framework **does not throw uncaught exceptions**.
+> 
+> Therefore, when writing tests:
+> - ✅ **Correct approach**: Check the `error` field in the return value
+> - ❌ **Wrong approach**: Use try-catch to catch exceptions
+> 
+> ```javascript
+> // ✅ Correct testing approach
+> const result = await controller.callInteraction('SomeInteraction', {...});
+> expect(result.error).toBeTruthy();
+> expect(result.error.message).toContain('permission denied');
+> 
+> // ❌ Wrong testing approach
+> try {
+>   await controller.callInteraction('SomeInteraction', {...});
+>   fail('Should have thrown error');
+> } catch (e) {
+>   // This code will never execute as the framework doesn't throw exceptions
+> }
+> ```
+
 ### 12.6.1 Permission Testing Basics
 
 Permission testing is an important component of InterAQT application testing, requiring verification of access permissions for different users in different scenarios:

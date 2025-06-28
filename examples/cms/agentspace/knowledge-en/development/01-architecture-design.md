@@ -296,13 +296,13 @@ export class ActivityManager {
         // Initialize activity callers
         activities.forEach(activity => {
             const activityCall = new ActivityCall(activity, controller)
-            this.activityCalls.set(activity.name, activityCall)
+            this.activityCalls.set(activity.uuid, activityCall)
         })
         
         // Initialize interaction callers
         interactions.forEach(interaction => {
             const interactionCall = new InteractionCall(interaction, controller)
-            this.interactionCalls.set(interaction.name, interactionCall)
+            this.interactionCalls.set(interaction.uuid, interactionCall)
         })
     }
 }
@@ -317,8 +317,8 @@ export class ActivityManager {
 
 #### Interaction Call Processing
 ```typescript
-async callInteraction(interactionId: string, args: InteractionEventArgs): Promise<InteractionCallResponse> {
-    const interactionCall = this.interactionCalls.get(interactionId)
+async callInteraction(interactionName: string, args: InteractionEventArgs): Promise<InteractionCallResponse> {
+    const interactionCall = this.interactionCallsByName.get(interactionName)
     
     // Begin transaction
     await this.controller.system.storage.beginTransaction(interactionCall.interaction.name)
