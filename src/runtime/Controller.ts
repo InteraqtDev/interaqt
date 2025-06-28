@@ -182,8 +182,8 @@ export class Controller {
     async callInteraction(interactionName:string, interactionEventArgs: InteractionEventArgs) {
         return this.activityManager.callInteraction(interactionName, interactionEventArgs)
     }
-    async callActivityInteraction(activityCallId:string, interactionCallId:string, activityId: string|undefined, interactionEventArgs: InteractionEventArgs) {
-        return this.activityManager.callActivityInteraction(activityCallId, interactionCallId, activityId, interactionEventArgs)
+    async callActivityInteraction(activityName:string, interactionName:string, activityId: string|undefined, interactionEventArgs: InteractionEventArgs) {
+        return this.activityManager.callActivityInteraction(activityName, interactionName, activityId, interactionEventArgs)
     }
     async runRecordChangeSideEffects(result: InteractionCallResponse, logger: SystemLogger) {
         const mutationEvents = result.effects as RecordMutationEvent[]

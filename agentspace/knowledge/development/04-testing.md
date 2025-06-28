@@ -374,24 +374,24 @@ describe("activity state", () => {
         let activityId;
         
         // 1. 测试交互顺序错误
-        const res1 = await controller.callActivityInteraction(activityUUID, approveUUID, activityId, {user: userA});
+        const res1 = await controller.callActivityInteraction('createFriendRelation', 'approve', activityId, {user: userA});
         expect(res1.error).toBeDefined();
 
         // 2. 正确发起请求
-        const res2 = await controller.callActivityInteraction(activityUUID, sendRequestUUID, activityId, {user: userA, payload: {to: userB}});
+        const res2 = await controller.callActivityInteraction('createFriendRelation', 'sendRequest', activityId, {user: userA, payload: {to: userB}});
         expect(res2.error).toBeUndefined();
         activityId = res2.context!.activityId;
 
         // 3. 测试重复操作错误
-        const res3 = await controller.callActivityInteraction(activityUUID, sendRequestUUID, activityId, {user: userA});
+        const res3 = await controller.callActivityInteraction('createFriendRelation', 'sendRequest', activityId, {user: userA});
         expect(res3.error).toBeDefined();
 
         // 4. 测试角色权限错误
-        const res4 = await controller.callActivityInteraction(activityUUID, approveUUID, activityId, {user: userA});
+        const res4 = await controller.callActivityInteraction('createFriendRelation', 'approve', activityId, {user: userA});
         expect(res4.error).toBeDefined();
 
         // 5. 正确批准请求
-        const res5 = await controller.callActivityInteraction(activityUUID, approveUUID, activityId, {user: userB});
+        const res5 = await controller.callActivityInteraction('createFriendRelation', 'approve', activityId, {user: userB});
         expect(res5.error).toBeUndefined();
         
         // 6. 验证关系创建

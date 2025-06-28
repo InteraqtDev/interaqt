@@ -162,17 +162,21 @@ export class ActivityManager {
         return result
     }
 
-    async callActivityInteraction(activityCallId: string, interactionCallId: string, activityId: string | undefined, interactionEventArgs: InteractionEventArgs): Promise<InteractionCallResponse> {
+    async callActivityInteraction(activityName: string, interactionName: string, activityId: string | undefined, interactionEventArgs: InteractionEventArgs): Promise<InteractionCallResponse> {
         const context = asyncInteractionContext.getStore() as InteractionContext
         const logger = this.controller.system.logger.child(context?.logContext || {})
 
-        const activityCall = this.activityCalls.get(activityCallId)!
-        assert(!!activityCall, `cannot find activity for ${activityCallId}`)
+        const activityCall = this.activityCallsByName.get(activityName)!
+        assert(!!activityCall, `cannot find activity for ${activityName}`)
 
         logger.info({label: "activity", message: activityCall.activity.name})
         await this.controller.system.storage.beginTransaction(activityCall.activity.name)
         
-        const result = await activityCall.callInteraction(activityId, interactionCallId, interactionEventArgs)
+        // 获取 interaction UUID 通过名称
+        const interactionCall = activityCall.interactionCallByName.get(interactionName)
+        assert(!!interactionCall, `cannot find interaction ${interactionName} in activity ${activityName}`)
+        
+        const result = await activityCall.callInteraction(activityId, interactionCall!.interaction.uuid, interactionEventArgs)
         if (result.error) {
             logger.error({label: "activity", message: activityCall.activity.name})
             await this.controller.system.storage.rollbackTransaction(activityCall.activity.name)

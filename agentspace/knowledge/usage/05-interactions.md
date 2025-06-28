@@ -1235,9 +1235,9 @@ if (createPostInteraction) {
 ```javascript
 // 作为活动的一部分执行交互
 const result = await controller.callActivityInteraction(
-  'activity-id',
-  'interaction-id', 
-  'activity-instance-id',
+  'OrderProcess',        // 活动名称
+  'processPayment',      // 交互名称
+  'activity-instance-id',// 活动实例ID
   {
     user: { id: 'user123' },
     payload: { /* ... */ }

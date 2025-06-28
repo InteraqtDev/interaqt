@@ -1052,9 +1052,9 @@ if (createPostInteraction) {
 ```javascript
 // Execute interaction as part of an activity
 const result = await controller.callActivityInteraction(
-  'activity-id',
-  'interaction-id', 
-  'activity-instance-id',
+  'OrderProcess',        // activity name
+  'processPayment',      // interaction name
+  'activity-instance-id',// activity instance ID
   {
     user: { id: 'user123' },
     payload: { /* ... */ }

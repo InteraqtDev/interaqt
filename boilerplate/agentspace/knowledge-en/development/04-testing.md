@@ -374,24 +374,24 @@ describe("activity state", () => {
         let activityId;
         
         // 1. Test interaction order error
-        const res1 = await controller.callActivityInteraction(activityUUID, approveUUID, activityId, {user: userA});
+        const res1 = await controller.callActivityInteraction('createFriendRelation', 'approve', activityId, {user: userA});
         expect(res1.error).toBeDefined();
 
         // 2. Correctly initiate request
-        const res2 = await controller.callActivityInteraction(activityUUID, sendRequestUUID, activityId, {user: userA, payload: {to: userB}});
+        const res2 = await controller.callActivityInteraction('createFriendRelation', 'sendRequest', activityId, {user: userA, payload: {to: userB}});
         expect(res2.error).toBeUndefined();
         activityId = res2.context!.activityId;
 
         // 3. Test duplicate operation error
-        const res3 = await controller.callActivityInteraction(activityUUID, sendRequestUUID, activityId, {user: userA});
+        const res3 = await controller.callActivityInteraction('createFriendRelation', 'sendRequest', activityId, {user: userA});
         expect(res3.error).toBeDefined();
 
         // 4. Test role permission error
-        const res4 = await controller.callActivityInteraction(activityUUID, approveUUID, activityId, {user: userA});
+        const res4 = await controller.callActivityInteraction('createFriendRelation', 'approve', activityId, {user: userA});
         expect(res4.error).toBeDefined();
 
         // 5. Correctly approve request
-        const res5 = await controller.callActivityInteraction(activityUUID, approveUUID, activityId, {user: userB});
+        const res5 = await controller.callActivityInteraction('createFriendRelation', 'approve', activityId, {user: userB});
         expect(res5.error).toBeUndefined();
         
         // 6. Verify relation creation

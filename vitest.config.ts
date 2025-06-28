@@ -3,7 +3,8 @@ import tsconfigPaths from 'vite-tsconfig-paths'
 import path from 'path'
 export default defineConfig({
     test: {
-        setupFiles: './scripts/vitest.setup.js'
+        setupFiles: './scripts/vitest.setup.js',
+        include: ['tests/**/*.test.ts', 'tests/**/*.spec.ts']
     },
     plugins: [
         tsconfigPaths({
