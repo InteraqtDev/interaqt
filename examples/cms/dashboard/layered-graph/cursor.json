@@ -1,0 +1,104 @@
+{
+  "name": "Axii Boilerplate",
+  "description": "Rules for the Axii framework, a reactive UI library for building web applications",
+  "rules": [
+    {
+      "name": "Axii Core Concepts",
+      "description": "Understand the core concepts of Axii framework",
+      "resources": [
+        {
+          "name": "Axii GitHub Repository",
+          "url": "https://github.com/axiijs/axii"
+        },
+        {
+          "name": "Axii Documentation",
+          "url": "https://github.com/axiijs/site/tree/main/docs/tutorial"
+        }
+      ],
+      "examples": [
+        {
+          "name": "Basic Component",
+          "code": "import { atom, RenderContext } from 'axii';\n\nexport function Counter({}, { createElement }: RenderContext) {\n  const count = atom(0);\n  \n  return (\n    <div>\n      <div>Count: {count}</div>\n      <button onClick={() => count(count() + 1)}>Increment</button>\n    </div>\n  );\n}"
+        },
+        {
+          "name": "Using Reactive State",
+          "code": "import { atom, computed, RenderContext } from 'axii';\n\nexport function Temperature({}, { createElement }: RenderContext) {\n  const celsius = atom(25);\n  const fahrenheit = computed(() => celsius() * 9/5 + 32);\n  \n  return (\n    <div>\n      <div>Celsius: {celsius}°C</div>\n      <div>Fahrenheit: {fahrenheit}°F</div>\n      <input \n        type=\"range\" \n        min=\"0\" \n        max=\"100\" \n        value={celsius} \n        onInput={(e) => celsius(Number(e.target.value))} \n      />\n    </div>\n  );\n}"
+        }
+      ]
+    },
+    {
+      "name": "Reactive Data Structures",
+      "description": "Learn how to use Axii's reactive data structures like RxList and RxObject",
+      "examples": [
+        {
+          "name": "RxList Example",
+          "code": "import { atom, RxList, RenderContext } from 'axii';\n\nexport function TodoList({}, { createElement }: RenderContext) {\n  const newTodo = atom('');\n  const todos = new RxList([\n    { text: 'Learn Axii', completed: false },\n    { text: 'Build an app', completed: false }\n  ]);\n\n  const addTodo = () => {\n    if (newTodo()) {\n      todos.push({ text: newTodo(), completed: false });\n      newTodo('');\n    }\n  };\n\n  const toggleTodo = (index) => {\n    const todo = todos[index];\n    todo.completed = !todo.completed;\n  };\n\n  return (\n    <div>\n      <h2>Todo List</h2>\n      <div>\n        <input value={newTodo} placeholder=\"Add new todo\" />\n        <button onClick={addTodo}>Add</button>\n      </div>\n      <ul>\n        {todos.map((todo, index) => (\n          <li \n            style={{ textDecoration: todo.completed ? 'line-through' : 'none' }}\n            onClick={() => toggleTodo(index.raw)}\n          >\n            {todo.text}\n          </li>\n        ))}\n      </ul>\n    </div>\n  );\n}"
+        },
+        {
+          "name": "RxObject Example",
+          "code": "import { RxObject, RenderContext } from 'axii';\n\nexport function UserProfile({}, { createElement }: RenderContext) {\n  const user = new RxObject({\n    name: 'John Doe',\n    email: 'john@example.com',\n    preferences: {\n      theme: 'dark',\n      notifications: true\n    }\n  });\n\n  const toggleTheme = () => {\n    user.preferences.theme = user.preferences.theme === 'dark' ? 'light' : 'dark';\n  };\n\n  const toggleNotifications = () => {\n    user.preferences.notifications = !user.preferences.notifications;\n  };\n\n  return (\n    <div>\n      <h2>User Profile</h2>\n      <div>Name: {user.name}</div>\n      <div>Email: {user.email}</div>\n      <div>Theme: {user.preferences.theme}</div>\n      <button onClick={toggleTheme}>Toggle Theme</button>\n      <div>Notifications: {String(user.preferences.notifications)}</div>\n      <button onClick={toggleNotifications}>Toggle Notifications</button>\n    </div>\n  );\n}"
+        }
+      ]
+    },
+    {
+      "name": "Axii UI Components",
+      "description": "Learn how to use the official Axii UI component library",
+      "resources": [
+        {
+          "name": "Axii UI Components Source",
+          "url": "https://github.com/axiijs/ui/tree/main/packages/components"
+        },
+        {
+          "name": "Axii UI Components Demo",
+          "url": "https://github.com/axiijs/ui/tree/main/packages/playground/demo"
+        }
+      ],
+      "examples": [
+        {
+          "name": "Basic UI Components",
+          "code": "import { atom, RenderContext } from 'axii';\nimport { Button, Input, Select, Modal } from 'axii-ui';\nimport { styleSystem as s } from 'axii-ui-theme-inc';\n\nexport function FormExample({}, { createElement }: RenderContext) {\n  const username = atom('');\n  const password = atom('');\n  const role = atom('user');\n  const showModal = atom(false);\n\n  const handleSubmit = () => {\n    showModal(true);\n  };\n\n  return (\n    <div style={s.layout.column({ gap: 16 })}>\n      <h2 style={s.heading()}>Registration Form</h2>\n      \n      <div style={s.layout.column({ gap: 8 })}>\n        <label>Username</label>\n        <Input value={username} placeholder=\"Enter username\" />\n      </div>\n      \n      <div style={s.layout.column({ gap: 8 })}>\n        <label>Password</label>\n        <Input type=\"password\" value={password} placeholder=\"Enter password\" />\n      </div>\n      \n      <div style={s.layout.column({ gap: 8 })}>\n        <label>Role</label>\n        <Select value={role} options={[\n          { label: 'User', value: 'user' },\n          { label: 'Admin', value: 'admin' },\n          { label: 'Guest', value: 'guest' }\n        ]} />\n      </div>\n      \n      <Button onClick={handleSubmit}>Submit</Button>\n      \n      <Modal visible={showModal} onClose={() => showModal(false)}>\n        <div style={s.layout.column({ gap: 16, padding: 16 })}>\n          <h3>Registration Details</h3>\n          <p>Username: {username}</p>\n          <p>Role: {role}</p>\n          <Button onClick={() => showModal(false)}>Close</Button>\n        </div>\n      </Modal>\n    </div>\n  );\n}"
+        },
+        {
+          "name": "Table Component",
+          "code": "import { RxList, atom, RenderContext } from 'axii';\nimport { Table, Button, Input } from 'axii-ui';\nimport { styleSystem as s } from 'axii-ui-theme-inc';\n\nexport function UsersTable({}, { createElement }: RenderContext) {\n  const searchTerm = atom('');\n  \n  const users = new RxList([\n    { id: 1, name: 'Alice', email: 'alice@example.com', role: 'Admin' },\n    { id: 2, name: 'Bob', email: 'bob@example.com', role: 'User' },\n    { id: 3, name: 'Charlie', email: 'charlie@example.com', role: 'User' }\n  ]);\n  \n  const filteredUsers = users.filter(user => {\n    const term = searchTerm().toLowerCase();\n    return !term || \n      user.name.toLowerCase().includes(term) || \n      user.email.toLowerCase().includes(term);\n  });\n  \n  const columns = [\n    { title: 'ID', dataIndex: 'id' },\n    { title: 'Name', dataIndex: 'name' },\n    { title: 'Email', dataIndex: 'email' },\n    { title: 'Role', dataIndex: 'role' },\n    {\n      title: 'Actions',\n      render: (_, user, index) => (\n        <Button \n          onClick={() => users.splice(index.raw, 1)}\n          style={s.textBox({ colorBox: true, color: s.colorScheme.error })}\n        >\n          Delete\n        </Button>\n      )\n    }\n  ];\n  \n  return (\n    <div style={s.layout.column({ gap: 16 })}>\n      <h2 style={s.heading()}>Users Management</h2>\n      \n      <div>\n        <Input \n          value={searchTerm} \n          placeholder=\"Search users...\" \n          style={{ width: '300px' }}\n        />\n      </div>\n      \n      <Table \n        dataSource={filteredUsers} \n        columns={columns} \n        style={s.table()}\n      />\n      \n      <div>Total Users: {filteredUsers.length}</div>\n    </div>\n  );\n}"
+        },
+        {
+          "name": "DatePicker Component",
+          "code": "import { atom, RenderContext } from 'axii';\nimport { DatePicker, Button } from 'axii-ui';\nimport { styleSystem as s } from 'axii-ui-theme-inc';\n\nexport function DatePickerExample({}, { createElement }: RenderContext) {\n  const selectedDate = atom(new Date());\n  const showDateInfo = atom(false);\n  \n  const handleDateChange = (date) => {\n    selectedDate(date);\n  };\n  \n  const formatDate = (date) => {\n    return date.toLocaleDateString('en-US', {\n      year: 'numeric',\n      month: 'long',\n      day: 'numeric'\n    });\n  };\n  \n  return (\n    <div style={s.layout.column({ gap: 16 })}>\n      <h2 style={s.heading()}>Date Picker Example</h2>\n      \n      <div style={s.layout.column({ gap: 8 })}>\n        <label>Select a date:</label>\n        <DatePicker \n          value={selectedDate} \n          onChange={handleDateChange}\n        />\n      </div>\n      \n      <Button onClick={() => showDateInfo(!showDateInfo())}>\n        {showDateInfo() ? 'Hide Date Info' : 'Show Date Info'}\n      </Button>\n      \n      {showDateInfo() && (\n        <div style={s.card({ padding: 16 })}>\n          <h3>Selected Date Information</h3>\n          <p>Date: {formatDate(selectedDate())}</p>\n          <p>Day of week: {selectedDate().toLocaleDateString('en-US', { weekday: 'long' })}</p>\n          <p>Is weekend: {[0, 6].includes(selectedDate().getDay()) ? 'Yes' : 'No'}</p>\n        </div>\n      )}\n    </div>\n  );\n}"
+        },
+        {
+          "name": "Tabs Component",
+          "code": "import { atom, RenderContext } from 'axii';\nimport { Tabs, Card } from 'axii-ui';\nimport { styleSystem as s } from 'axii-ui-theme-inc';\n\nexport function TabsExample({}, { createElement }: RenderContext) {\n  const activeTab = atom('1');\n  \n  const handleTabChange = (tabKey) => {\n    activeTab(tabKey);\n  };\n  \n  return (\n    <div style={s.layout.column({ gap: 16 })}>\n      <h2 style={s.heading()}>Tabs Example</h2>\n      \n      <Tabs \n        activeKey={activeTab} \n        onChange={handleTabChange}\n        items={[\n          {\n            key: '1',\n            label: 'Tab 1',\n            children: (\n              <Card style={s.card({ padding: 16 })}>\n                <h3>Tab 1 Content</h3>\n                <p>This is the content of the first tab.</p>\n              </Card>\n            )\n          },\n          {\n            key: '2',\n            label: 'Tab 2',\n            children: (\n              <Card style={s.card({ padding: 16 })}>\n                <h3>Tab 2 Content</h3>\n                <p>This is the content of the second tab.</p>\n              </Card>\n            )\n          },\n          {\n            key: '3',\n            label: 'Tab 3',\n            children: (\n              <Card style={s.card({ padding: 16 })}>\n                <h3>Tab 3 Content</h3>\n                <p>This is the content of the third tab.</p>\n              </Card>\n            )\n          }\n        ]}\n      />\n      \n      <div>Current active tab: {activeTab}</div>\n    </div>\n  );\n}"
+        }
+      ]
+    },
+    {
+      "name": "Axii Styling",
+      "description": "Learn how to style components in Axii using the styleSystem",
+      "examples": [
+        {
+          "name": "Style System Usage",
+          "code": "import { RenderContext } from 'axii';\nimport { styleSystem as s } from 'axii-ui-theme-inc';\n\nexport function StyledComponent({}, { createElement }: RenderContext) {\n  return (\n    <div style={s.layout.column({ gap: 20, padding: 16 })}>\n      <h1 style={s.heading({ level: 1 })}>Main Heading</h1>\n      <h2 style={s.heading({ level: 2 })}>Sub Heading</h2>\n      \n      <div style={s.card({ padding: 16 })}>\n        <p style={s.mainText()}>This is a card with some text content.</p>\n        <p style={s.secondaryText()}>This is secondary text with less emphasis.</p>\n      </div>\n      \n      <div style={s.layout.row({ gap: 10, alignItems: 'center' })}>\n        <div style={s.textBox({ colorBox: true, color: s.colorScheme.primary })}>Primary</div>\n        <div style={s.textBox({ colorBox: true, color: s.colorScheme.success })}>Success</div>\n        <div style={s.textBox({ colorBox: true, color: s.colorScheme.warning })}>Warning</div>\n        <div style={s.textBox({ colorBox: true, color: s.colorScheme.error })}>Error</div>\n      </div>\n      \n      <div style={s.layout.grid({ columns: 3, gap: 16 })}>\n        <div style={s.card({ padding: 16 })}>Grid Item 1</div>\n        <div style={s.card({ padding: 16 })}>Grid Item 2</div>\n        <div style={s.card({ padding: 16 })}>Grid Item 3</div>\n        <div style={s.card({ padding: 16 })}>Grid Item 4</div>\n        <div style={s.card({ padding: 16 })}>Grid Item 5</div>\n        <div style={s.card({ padding: 16 })}>Grid Item 6</div>\n      </div>\n    </div>\n  );\n}"
+        }
+      ]
+    },
+    {
+      "name": "Advanced Patterns",
+      "description": "Advanced patterns and best practices for Axii applications",
+      "examples": [
+        {
+          "name": "Custom Hooks",
+          "code": "import { atom, computed, RenderContext } from 'axii';\n\n// Custom hook for form handling\nfunction useForm(initialValues = {}) {\n  const values = {};\n  const errors = {};\n  const touched = {};\n  \n  // Initialize form fields\n  Object.entries(initialValues).forEach(([key, value]) => {\n    values[key] = atom(value);\n    errors[key] = atom('');\n    touched[key] = atom(false);\n  });\n  \n  // Form is valid when all fields have no errors\n  const isValid = computed(() => {\n    return Object.values(errors).every(error => !error());\n  });\n  \n  // Set field value and mark as touched\n  const setFieldValue = (field, value) => {\n    if (values[field]) {\n      values[field](value);\n      touched[field](true);\n    }\n  };\n  \n  // Validate a specific field\n  const validateField = (field, validator) => {\n    if (values[field] && validator) {\n      const error = validator(values[field]());\n      errors[field](error || '');\n      return !error;\n    }\n    return true;\n  };\n  \n  // Reset the form\n  const resetForm = () => {\n    Object.entries(initialValues).forEach(([key, value]) => {\n      values[key](value);\n      errors[key]('');\n      touched[key](false);\n    });\n  };\n  \n  return {\n    values,\n    errors,\n    touched,\n    isValid,\n    setFieldValue,\n    validateField,\n    resetForm\n  };\n}\n\n// Example usage\nexport function SignupForm({}, { createElement }: RenderContext) {\n  const { \n    values, \n    errors, \n    touched, \n    isValid, \n    setFieldValue, \n    validateField, \n    resetForm \n  } = useForm({\n    username: '',\n    email: '',\n    password: ''\n  });\n  \n  const validators = {\n    username: value => value.length < 3 ? 'Username must be at least 3 characters' : '',\n    email: value => !value.includes('@') ? 'Invalid email address' : '',\n    password: value => value.length < 6 ? 'Password must be at least 6 characters' : ''\n  };\n  \n  const handleChange = (field, e) => {\n    setFieldValue(field, e.target.value);\n    validateField(field, validators[field]);\n  };\n  \n  const handleSubmit = () => {\n    // Validate all fields\n    const allValid = Object.keys(values).every(field => \n      validateField(field, validators[field])\n    );\n    \n    if (allValid) {\n      console.log('Form submitted:', {\n        username: values.username(),\n        email: values.email(),\n        password: values.password()\n      });\n      resetForm();\n    }\n  };\n  \n  return (\n    <div>\n      <h2>Sign Up</h2>\n      \n      <div>\n        <label>Username</label>\n        <input \n          value={values.username} \n          onInput={e => handleChange('username', e)} \n          onBlur={() => validateField('username', validators.username)}\n        />\n        {touched.username() && errors.username() && (\n          <div style={{ color: 'red' }}>{errors.username()}</div>\n        )}\n      </div>\n      \n      <div>\n        <label>Email</label>\n        <input \n          value={values.email} \n          onInput={e => handleChange('email', e)}\n          onBlur={() => validateField('email', validators.email)}\n        />\n        {touched.email() && errors.email() && (\n          <div style={{ color: 'red' }}>{errors.email()}</div>\n        )}\n      </div>\n      \n      <div>\n        <label>Password</label>\n        <input \n          type=\"password\"\n          value={values.password} \n          onInput={e => handleChange('password', e)}\n          onBlur={() => validateField('password', validators.password)}\n        />\n        {touched.password() && errors.password() && (\n          <div style={{ color: 'red' }}>{errors.password()}</div>\n        )}\n      </div>\n      \n      <button onClick={handleSubmit} disabled={!isValid()}>\n        Sign Up\n      </button>\n    </div>\n  );\n}"
+        },
+        {
+          "name": "Component Composition",
+          "code": "import { atom, RenderContext } from 'axii';\nimport { styleSystem as s } from 'axii-ui-theme-inc';\n\n// Reusable Card component\nfunction Card({ title, children }, { createElement }: RenderContext) {\n  return (\n    <div style={s.card({ padding: 16 })}>\n      {title && <h3 style={s.heading({ level: 3 })}>{title}</h3>}\n      <div>{children}</div>\n    </div>\n  );\n}\n\n// Reusable Tabs component\nfunction Tabs({ tabs }, { createElement }: RenderContext) {\n  const activeTab = atom(0);\n  \n  return (\n    <div>\n      <div style={s.layout.row({ gap: 0 })}>\n        {tabs.map((tab, index) => (\n          <div \n            onClick={() => activeTab(index)}\n            style={{\n              padding: '8px 16px',\n              cursor: 'pointer',\n              borderBottom: activeTab() === index ? '2px solid #1890ff' : '2px solid transparent',\n              color: activeTab() === index ? '#1890ff' : 'inherit'\n            }}\n          >\n            {tab.label}\n          </div>\n        ))}\n      </div>\n      <div style={{ padding: '16px 0' }}>\n        {tabs[activeTab()].content}\n      </div>\n    </div>\n  );\n}\n\n// Main component using composition\nexport function Dashboard({}, { createElement }: RenderContext) {\n  return (\n    <div style={s.layout.column({ gap: 20 })}>\n      <h1 style={s.heading()}>Dashboard</h1>\n      \n      <div style={s.layout.grid({ columns: 2, gap: 16 })}>\n        <Card title=\"Statistics\">\n          <div style={s.layout.column({ gap: 8 })}>\n            <div>Total Users: 1,234</div>\n            <div>Active Users: 789</div>\n            <div>Revenue: $12,345</div>\n          </div>\n        </Card>\n        \n        <Card title=\"Quick Actions\">\n          <div style={s.layout.row({ gap: 8 })}>\n            <button>Add User</button>\n            <button>Generate Report</button>\n            <button>Settings</button>\n          </div>\n        </Card>\n      </div>\n      \n      <Card>\n        <Tabs tabs={[\n          { \n            label: 'Recent Activity', \n            content: (\n              <ul>\n                <li>User John signed up</li>\n                <li>Payment received from Alice</li>\n                <li>New comment on post #123</li>\n              </ul>\n            ) \n          },\n          { \n            label: 'Notifications', \n            content: (\n              <ul>\n                <li>System update scheduled</li>\n                <li>3 new messages</li>\n                <li>Subscription expires soon</li>\n              </ul>\n            ) \n          },\n          { \n            label: 'Tasks', \n            content: (\n              <ul>\n                <li>Review pending orders</li>\n                <li>Update documentation</li>\n                <li>Respond to support tickets</li>\n              </ul>\n            ) \n          }\n        ]} />\n      </Card>\n    </div>\n  );\n}"
+        }
+      ]
+    }
+  ],
+  "filePatterns": {
+    "include": ["**/*.tsx", "**/*.ts", "**/*.jsx", "**/*.js"],
+    "exclude": ["node_modules/**", "dist/**", ".git/**"]
+  }
+} 
