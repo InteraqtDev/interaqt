@@ -1287,31 +1287,7 @@ describe('Attributive 权限测试', () => {
   });
   
   // 测试辅助函数：创建测试用户
-  async function createTestUser(userData: any) {
-    return await system.storage.create('User', {
-      name: '测试用户',
-      role: 'student',
-      email: 'test@example.com',
-      ...userData
-    });
-  }
-  
-  // 测试辅助函数：执行交互并捕获权限错误
-  async function executeInteractionWithUser(
-    interactionName: string,
-    user: any,
-    payload: any
-  ) {
-    const interactionCall = controller.activityManager?.interactionCallsByName.get(interactionName);
-    if (!interactionCall) {
-      throw new Error(`找不到交互: ${interactionName}`);
-    }
-    
-    return await controller.callInteraction(interactionCall.interaction.name, {
-      user,
-      payload
-    });
-  }
+
 });
 ```
 
@@ -1321,14 +1297,16 @@ describe('Attributive 权限测试', () => {
 describe('基本角色权限测试', () => {
   test('管理员应该能够创建宿舍', async () => {
     // 创建管理员用户
-    const admin = await createTestUser({
+    const admin = await system.storage.create('User', {
       name: '张管理员',
       role: 'admin',
       email: 'admin@example.com'
     });
 
     // 执行CreateDormitory交互
-    const result = await executeInteractionWithUser('CreateDormitory', admin, {
+    const result = await controller.callInteraction('CreateDormitory', {
+      user: admin,
+      payload: {
       name: '测试宿舍',
       building: '测试楼',
       roomNumber: '101',
@@ -1349,14 +1327,16 @@ describe('基本角色权限测试', () => {
 
   test('普通学生不应该能够创建宿舍', async () => {
     // 创建普通学生用户
-    const student = await createTestUser({
+    const student = await system.storage.create('User', {
       name: '李学生',
       role: 'student',
       email: 'student@example.com'
     });
 
     // 尝试执行CreateDormitory交互
-    const result = await executeInteractionWithUser('CreateDormitory', student, {
+    const result = await controller.callInteraction('CreateDormitory', {
+      user: student,
+      payload: {
       name: '测试宿舍',
       building: '测试楼',
       roomNumber: '101',
@@ -1377,19 +1357,19 @@ describe('基本角色权限测试', () => {
 describe('复杂权限条件测试', () => {
   test('只有宿舍长能在自己宿舍记录积分', async () => {
     // 1. 创建测试数据
-    const leader = await createTestUser({
+    const leader = await system.storage.create('User', {
       name: '宿舍长',
       role: 'student',
       email: 'leader@example.com'
     });
 
-    const member = await createTestUser({
+    const member = await system.storage.create('User', {
       name: '普通成员',
       role: 'student', 
       email: 'member@example.com'
     });
 
-    const admin = await createTestUser({
+    const admin = await system.storage.create('User', {
       name: '管理员',
       role: 'admin',
       email: 'admin@example.com'
@@ -1424,7 +1404,9 @@ describe('复杂权限条件测试', () => {
     });
 
     // 5. 测试宿舍长可以记录积分
-    const leaderResult = await executeInteractionWithUser('RecordScore', leader, {
+    const leaderResult = await controller.callInteraction('RecordScore', {
+      user: leader,
+      payload: {
       memberId: normalMember,
       points: 10,
       reason: '打扫卫生',
@@ -1433,7 +1415,9 @@ describe('复杂权限条件测试', () => {
     expect(leaderResult.error).toBeUndefined();
 
     // 6. 测试普通成员不能记录积分
-    const memberResult = await executeInteractionWithUser('RecordScore', member, {
+    const memberResult = await controller.callInteraction('RecordScore', {
+      user: member,
+      payload: {
       memberId: leaderMember,
       points: 10,
       reason: '尝试记录积分',
@@ -1442,7 +1426,9 @@ describe('复杂权限条件测试', () => {
     expect(memberResult.error).toBeTruthy();
 
     // 7. 测试管理员不受宿舍长限制（如果管理员也有权限）
-    const adminResult = await executeInteractionWithUser('AdminAssignScore', admin, {
+    const adminResult = await controller.callInteraction('AdminAssignScore', {
+      user: admin,
+      payload: {
       memberId: normalMember,
       points: 5,
       reason: '管理员加分',
@@ -1459,13 +1445,13 @@ describe('复杂权限条件测试', () => {
 describe('Payload级别权限测试', () => {
   test('只能编辑自己宿舍的成员信息', async () => {
     // 创建两个不同宿舍的宿舍长
-    const leader1 = await createTestUser({
+    const leader1 = await system.storage.create('User', {
       name: '宿舍长1',
       role: 'student',
       email: 'leader1@example.com'
     });
 
-    const leader2 = await createTestUser({
+    const leader2 = await system.storage.create('User', {
       name: '宿舍长2', 
       role: 'student',
       email: 'leader2@example.com'
@@ -1506,7 +1492,9 @@ describe('Payload级别权限测试', () => {
     });
 
     // 宿舍长1应该能记录自己宿舍成员的积分
-    const validResult = await executeInteractionWithUser('RecordScore', leader1, {
+    const validResult = await controller.callInteraction('RecordScore', {
+      user: leader1,
+      payload: {
       memberId: member1, // 自己宿舍的成员
       points: 10,
       reason: '清洁卫生',
@@ -1515,7 +1503,9 @@ describe('Payload级别权限测试', () => {
     expect(validResult.error).toBeUndefined();
 
     // 宿舍长1不应该能记录其他宿舍成员的积分
-    const invalidResult = await executeInteractionWithUser('RecordScore', leader1, {
+    const invalidResult = await controller.callInteraction('RecordScore', {
+      user: leader1,
+      payload: {
       memberId: member2, // 其他宿舍的成员
       points: 10,
       reason: '尝试跨宿舍记录',

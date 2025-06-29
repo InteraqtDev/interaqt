@@ -43,44 +43,11 @@ export { testSystem };
 ### 12.1.2 Test Database Configuration
 
 ```typescript
-// tests/testDatabase.ts
-import { MonoSystem, PGLiteDB, MemoryDB } from 'interaqt';
+// Use interaqt API directly in tests
+import { MonoSystem, PGLiteDB } from 'interaqt';
 
-export function createTestSystem() {
-  // Use in-memory database for fast testing
-  return new MonoSystem(new MemoryDB());
-}
-
-export function createPersistentTestSystem() {
-  // Use persistent database for integration testing
-  return new MonoSystem(new PGLiteDB({
-    database: ':memory:' // Memory mode, auto-cleanup after tests
-  }));
-}
-
-// Test data factory
-export class TestDataFactory {
-  constructor(private system: MonoSystem) {}
-  
-  async createUser(overrides: any = {}) {
-    return await this.system.storage.create('User', {
-      username: 'testuser',
-      email: 'test@example.com',
-      isActive: true,
-      ...overrides
-    });
-  }
-  
-  async createPost(userId: string, overrides: any = {}) {
-    return await this.system.storage.create('Post', {
-      title: 'Test Post',
-      content: 'Test content',
-      authorId: userId,
-      status: 'published',
-      ...overrides
-    });
-  }
-}
+// Use in-memory database for fast testing
+const testSystem = new MonoSystem(new PGLiteDB());
 ```
 
 ## 12.2 Testing Entities and Relations
@@ -91,12 +58,11 @@ export class TestDataFactory {
 // tests/entities/user.spec.ts
 import { describe, test, expect } from 'vitest';
 import { Entity, Property, Controller } from 'interaqt';
-import { createTestSystem, TestDataFactory } from '../testDatabase';
+import { MonoSystem } from 'interaqt'; //import from '../testDatabase';
 
 describe('User Entity', () => {
   test('should create user with basic properties', async () => {
-    const system = createTestSystem();
-    const factory = new TestDataFactory(system);
+    const system = new MonoSystem();
     
     const userEntity = Entity.create({
       name: 'User',
@@ -110,7 +76,7 @@ describe('User Entity', () => {
     const controller = new Controller(system, [userEntity], [], [], [], [], []);
     await controller.setup(true);
     
-    const user = await factory.createUser({
+    const user = await system.storage.create('User',({
       username: 'alice',
       email: 'alice@example.com'
     });
@@ -121,7 +87,7 @@ describe('User Entity', () => {
   });
   
   test('should validate required properties', async () => {
-    const system = createTestSystem();
+    const system = new MonoSystem();
     
     // Try to create user missing required properties
     await expect(
@@ -137,8 +103,7 @@ describe('User Entity', () => {
 // tests/relations/friendship.spec.ts
 describe('Friendship Relation', () => {
   test('should create bidirectional friendship', async () => {
-    const system = createTestSystem();
-    const factory = new TestDataFactory(system);
+    const system = new MonoSystem();
     
     // Create user entity and friendship relation
     const userEntity = Entity.create({
@@ -171,8 +136,8 @@ describe('Friendship Relation', () => {
     await controller.setup(true);
     
     // Create two users
-    const alice = await factory.createUser({ username: 'alice' });
-    const bob = await factory.createUser({ username: 'bob' });
+    const alice = await system.storage.create('User',({ username: 'alice' });
+    const bob = await system.storage.create('User',({ username: 'bob' });
     
     // Establish friendship
     const friendship = await system.storage.create('User_friends_friendOf_User', {
@@ -208,7 +173,7 @@ describe('Friendship Relation', () => {
 // tests/computations/count.spec.ts
 describe('Count Computation', () => {
   test('should update user count automatically', async () => {
-    const system = createTestSystem();
+    const system = new MonoSystem();
     
     const userEntity = Entity.create({
       name: 'User',
@@ -288,7 +253,7 @@ describe('Count Computation', () => {
 // tests/computations/transform.spec.ts
 describe('Transform Computation', () => {
   test('should calculate user statistics correctly', async () => {
-    const system = createTestSystem();
+    const system = new MonoSystem();
     
     const userEntity = Entity.create({
       name: 'User',
@@ -382,7 +347,7 @@ describe('Transform Computation', () => {
 // tests/interactions/userActions.spec.ts
 describe('User Interactions', () => {
   test('should handle user registration interaction', async () => {
-    const system = createTestSystem();
+    const system = new MonoSystem();
     
     const userEntity = Entity.create({
       name: 'User',
@@ -448,7 +413,7 @@ describe('User Interactions', () => {
 // tests/activities/approvalProcess.spec.ts
 describe('Approval Process Activity', () => {
   test('should handle complete approval workflow', async () => {
-    const system = createTestSystem();
+    const system = new MonoSystem();
     
     // Create request entity
     const requestEntity = Entity.create({
@@ -554,197 +519,7 @@ describe('Approval Process Activity', () => {
 });
 ```
 
-## 12.5 Performance and Integration Testing
-
-### 12.5.1 Performance Testing
-
-```typescript
-// tests/performance/computation.spec.ts
-describe('Performance Tests', () => {
-  test('should handle large dataset efficiently', async () => {
-    const system = createTestSystem();
-    const factory = new TestDataFactory(system);
-    
-    // Setup entities and computations
-    const userEntity = Entity.create({
-      name: 'User',
-      properties: [
-        Property.create({ name: 'username', type: 'string' }),
-        Property.create({ name: 'score', type: 'number' })
-      ]
-    });
-    
-    const avgScoreDict = Dictionary.create({
-      name: 'avgScore',
-      type: 'number',
-      collection: false,
-      computedData: WeightedSummation.create({
-        record: userEntity,
-        attributeQuery: ['score'],
-        callback: (user: any) => ({
-          weight: 1,
-          value: user.score || 0
-        })
-      })
-    });
-    
-    const controller = new Controller(
-      system,
-      [userEntity],
-      [],
-      [],
-      [],
-      [avgScoreDict],
-      []
-    );
-    await controller.setup(true);
-    
-    // Performance test: create large number of users
-    const startTime = Date.now();
-    const userCount = 1000;
-    
-    for (let i = 0; i < userCount; i++) {
-      await factory.createUser({
-        username: `user${i}`,
-        score: Math.floor(Math.random() * 100)
-      });
-    }
-    
-    const endTime = Date.now();
-    const duration = endTime - startTime;
-    
-    console.log(`Created ${userCount} users in ${duration}ms`);
-    expect(duration).toBeLessThan(5000); // Should complete within 5 seconds
-    
-    // Verify computation result
-    const avgScore = await system.storage.get('state', 'avgScore');
-    expect(typeof avgScore).toBe('number');
-    expect(avgScore).toBeGreaterThan(0);
-  });
-});
-```
-
-### 12.5.2 Integration Testing
-
-```typescript
-// tests/integration/fullWorkflow.spec.ts
-describe('Full Workflow Integration', () => {
-  test('should handle complete user lifecycle', async () => {
-    const system = createTestSystem();
-    
-    // Setup complete system
-    const userEntity = Entity.create({
-      name: 'User',
-      properties: [
-        Property.create({ name: 'username', type: 'string' }),
-        Property.create({ name: 'email', type: 'string' }),
-        Property.create({ name: 'isActive', type: 'boolean', defaultValue: () => true })
-      ]
-    });
-    
-    const postEntity = Entity.create({
-      name: 'Post',
-      properties: [
-        Property.create({ name: 'title', type: 'string' }),
-        Property.create({ name: 'content', type: 'string' }),
-        Property.create({ name: 'status', type: 'string', defaultValue: () => 'draft' })
-      ]
-    });
-    
-    const userPostRelation = Relation.create({
-      name: 'UserPost',
-      source: userEntity,
-      sourceProperty: 'posts',
-      target: postEntity,
-      targetProperty: 'author',
-      type: '1:n'
-    });
-    
-    // Add computed property
-    userEntity.properties.push(
-      Property.create({
-        name: 'postCount',
-        type: 'number',
-        computedData: Count.create({
-          record: userPostRelation,
-          attributeQuery: [['target', { attributeQuery: ['status'] }]],
-          callback: (relation: any) => relation.target.status === 'published'
-        })
-      })
-    );
-    
-    const controller = new Controller(
-      system,
-      [userEntity, postEntity],
-      [userPostRelation],
-      [],
-      [],
-      [],
-      []
-    );
-    await controller.setup(true);
-    
-    // 1. Create user
-    const user = await system.storage.create('User', {
-      username: 'blogger',
-      email: 'blogger@example.com'
-    });
-    
-    // 2. Create posts
-    const post1 = await system.storage.create('Post', {
-      title: 'First Post',
-      content: 'This is my first post',
-      status: 'published'
-    });
-    
-    const post2 = await system.storage.create('Post', {
-      title: 'Draft Post',
-      content: 'This is a draft',
-      status: 'draft'
-    });
-    
-    // 3. Establish relations
-    await system.storage.create('User_posts_author_Post', {
-      source: user.id,
-      target: post1.id
-    });
-    
-    await system.storage.create('User_posts_author_Post', {
-      source: user.id,
-      target: post2.id
-    });
-    
-    // 4. Verify computed property
-    const updatedUser = await system.storage.findOne(
-      'User',
-      MatchExp.atom({ key: 'id', value: ['=', user.id] }),
-      {},
-      ['id', 'username', 'postCount']
-    );
-    
-    expect(updatedUser.postCount).toBe(1); // Only count published posts
-    
-    // 5. Publish draft post
-    await system.storage.update(
-      'Post',
-      MatchExp.atom({ key: 'id', value: ['=', post2.id] }),
-      { status: 'published' }
-    );
-    
-    // 6. Verify computation update
-    const finalUser = await system.storage.findOne(
-      'User',
-      MatchExp.atom({ key: 'id', value: ['=', user.id] }),
-      {},
-      ['id', 'username', 'postCount']
-    );
-    
-    expect(finalUser.postCount).toBe(2); // Should now count both published posts
-  });
-});
-```
-
-## 12.6 Testing Permissions and Attributives
+## 12.5 Testing Permissions and Attributives
 
 > **Important: Correct Error Handling Approach**
 > 
@@ -769,7 +544,7 @@ describe('Full Workflow Integration', () => {
 > }
 > ```
 
-### 12.6.1 Permission Testing Basics
+### 12.5.1 Permission Testing Basics
 
 Permission testing is an important component of InterAQT application testing, requiring verification of access permissions for different users in different scenarios:
 
@@ -799,49 +574,26 @@ describe('Permission Testing', () => {
     await controller.setup(true);
   });
   
-  // Helper function to create test users
-  async function createTestUser(userData: any) {
-    return await system.storage.create('User', {
-      name: 'Test User',
-      role: 'student',
-      email: 'test@example.com',
-      ...userData
-    });
-  }
-  
-  // Helper function to execute interactions
-  async function executeInteractionWithUser(
-    interactionName: string,
-    user: any,
-    payload: any
-  ) {
-    const interactionCall = controller.activityManager?.interactionCallsByName.get(interactionName);
-    if (!interactionCall) {
-      throw new Error(`Interaction not found: ${interactionName}`);
-    }
-    
-    return await controller.callInteraction(interactionCall.interaction.name, {
-      user,
-      payload
-    });
-  }
+
 });
 ```
 
-### 12.6.2 Basic Role Permission Testing
+### 12.5.2 Basic Role Permission Testing
 
 ```typescript
 describe('Basic Role Permission Testing', () => {
   test('admin permission test', async () => {
     // Create admin user
-    const admin = await createTestUser({
+    const admin = await system.storage.create('User', {
       name: 'Admin User',
       role: 'admin',
       email: 'admin@example.com'
     });
 
     // Test that admin can perform privileged operations
-    const result = await executeInteractionWithUser('CreateDormitory', admin, {
+    const result = await controller.callInteraction('CreateDormitory', {
+      user: admin,
+      payload: {
       name: 'Admin Created Dormitory',
       building: 'Admin Building',
       roomNumber: '001',
@@ -860,14 +612,16 @@ describe('Basic Role Permission Testing', () => {
   });
 
   test('regular user permission restriction test', async () => {
-    const student = await createTestUser({
+    const student = await system.storage.create('User', {
       name: 'Regular Student',
       role: 'student',
       email: 'student@example.com'
     });
 
     // Regular student should not be able to create dormitory
-    const result = await executeInteractionWithUser('CreateDormitory', student, {
+    const result = await controller.callInteraction('CreateDormitory', {
+      user: student,
+      payload: {
       name: 'Student Attempted Dormitory',
       building: 'Student Building',
       roomNumber: '002',
@@ -881,19 +635,19 @@ describe('Basic Role Permission Testing', () => {
 });
 ```
 
-### 12.6.3 Complex Permission Logic Testing
+### 12.5.3 Complex Permission Logic Testing
 
 ```typescript
 describe('Complex Permission Logic Testing', () => {
   test('dormitory leader permission test', async () => {
     // Setup test scenario
-    const leader = await createTestUser({
+    const leader = await system.storage.create('User', {
       name: 'Dormitory Leader',
       role: 'student',
       email: 'leader@example.com'
     });
 
-    const member = await createTestUser({
+    const member = await system.storage.create('User', {
       name: 'Regular Member',
       role: 'student',
       email: 'member@example.com'
@@ -926,7 +680,9 @@ describe('Complex Permission Logic Testing', () => {
     });
 
     // Test that leader can record scores
-    const leaderResult = await executeInteractionWithUser('RecordScore', leader, {
+    const leaderResult = await controller.callInteraction('RecordScore', {
+      user: leader,
+      payload: {
       memberId: normalMember,
       points: 10,
       reason: 'Cleaning duties',
@@ -935,7 +691,9 @@ describe('Complex Permission Logic Testing', () => {
     expect(leaderResult.error).toBeUndefined();
 
     // Test that regular member cannot record scores
-    const memberResult = await executeInteractionWithUser('RecordScore', member, {
+    const memberResult = await controller.callInteraction('RecordScore', {
+      user: member,
+      payload: {
       memberId: leaderMember,
       points: 10,
       reason: 'Attempted score recording',
@@ -946,19 +704,19 @@ describe('Complex Permission Logic Testing', () => {
 });
 ```
 
-### 12.6.4 Payload-level Permission Testing
+### 12.5.4 Payload-level Permission Testing
 
 ```typescript
 describe('Payload-level Permission Testing', () => {
   test('can only operate on own dormitory data', async () => {
     // Create two dormitory leaders
-    const leader1 = await createTestUser({
+    const leader1 = await system.storage.create('User', {
       name: 'Leader 1',
       role: 'student',
       email: 'leader1@example.com'
     });
 
-    const leader2 = await createTestUser({
+    const leader2 = await system.storage.create('User', {
       name: 'Leader 2',
       role: 'student',
       email: 'leader2@example.com'
@@ -999,7 +757,9 @@ describe('Payload-level Permission Testing', () => {
     });
 
     // Leader 1 should be able to operate on own dormitory members
-    const validResult = await executeInteractionWithUser('RecordScore', leader1, {
+    const validResult = await controller.callInteraction('RecordScore', {
+      user: leader1,
+      payload: {
       memberId: member1,
       points: 10,
       reason: 'Cleanliness',
@@ -1008,7 +768,9 @@ describe('Payload-level Permission Testing', () => {
     expect(validResult.error).toBeUndefined();
 
     // Leader 1 should not be able to operate on other dormitory members
-    const invalidResult = await executeInteractionWithUser('RecordScore', leader1, {
+    const invalidResult = await controller.callInteraction('RecordScore', {
+      user: leader1,
+      payload: {
       memberId: member2,
       points: 10,
       reason: 'Cross-dormitory operation attempt',
@@ -1019,12 +781,12 @@ describe('Payload-level Permission Testing', () => {
 });
 ```
 
-### 12.6.5 Permission Edge Case Testing
+### 12.5.5 Permission Edge Case Testing
 
 ```typescript
 describe('Permission Edge Case Testing', () => {
   test('application restriction when dormitory is full', async () => {
-    const student = await createTestUser({
+    const student = await system.storage.create('User', {
       name: 'Applicant Student',
       role: 'student',
       email: 'applicant@example.com'
@@ -1040,7 +802,7 @@ describe('Permission Edge Case Testing', () => {
 
     // Add members until full
     for (let i = 0; i < 2; i++) {
-      const user = await createTestUser({
+      const user = await system.storage.create('User', {
         name: `Member ${i + 1}`,
         role: 'student',
         email: `member${i + 1}@example.com`
@@ -1057,7 +819,9 @@ describe('Permission Edge Case Testing', () => {
     }
 
     // Try to apply to full dormitory
-    const result = await executeInteractionWithUser('ApplyForDormitory', student, {
+    const result = await controller.callInteraction('ApplyForDormitory', {
+      user: student,
+      payload: {
       dormitoryId: fullDormitory,
       message: 'Hope to join this dormitory'
     });
@@ -1067,7 +831,7 @@ describe('Permission Edge Case Testing', () => {
   });
 
   test('duplicate application restriction', async () => {
-    const student = await createTestUser({
+    const student = await system.storage.create('User', {
       name: 'Student with Dormitory',
       role: 'student',
       email: 'hasdorm@example.com'
@@ -1099,7 +863,9 @@ describe('Permission Edge Case Testing', () => {
     });
 
     // Try to apply to dormitory2
-    const result = await executeInteractionWithUser('ApplyForDormitory', student, {
+    const result = await controller.callInteraction('ApplyForDormitory', {
+      user: student,
+      payload: {
       dormitoryId: dormitory2,
       message: 'Want to change dormitory'
     });
@@ -1110,19 +876,19 @@ describe('Permission Edge Case Testing', () => {
 });
 ```
 
-### 12.6.6 State Machine Permission Testing
+### 12.5.6 State Machine Permission Testing
 
 ```typescript
 describe('State Machine Permission Testing', () => {
   test('state machine computeTarget function coverage test', async () => {
     // Create admin and target user
-    const admin = await createTestUser({
+    const admin = await system.storage.create('User', {
       name: 'State Machine Test Admin',
       role: 'admin',
       email: 'statemachine@test.com'
     });
 
-    const targetUser = await createTestUser({
+    const targetUser = await system.storage.create('User', {
       name: 'Student to be Kicked',
       role: 'student',
       email: 'target@test.com',
@@ -1157,7 +923,9 @@ describe('State Machine Permission Testing', () => {
     });
 
     // Execute ApproveKickRequest interaction, trigger state machine
-    const result = await executeInteractionWithUser('ApproveKickRequest', admin, {
+    const result = await controller.callInteraction('ApproveKickRequest', {
+      user: admin,
+      payload: {
       kickRequestId: kickRequest,
       adminComment: 'Admin approved kick request'
     });
@@ -1177,18 +945,20 @@ describe('State Machine Permission Testing', () => {
 });
 ```
 
-### 12.6.7 Permission Debugging and Error Handling Testing
+### 12.5.7 Permission Debugging and Error Handling Testing
 
 ```typescript
 describe('Permission Debugging and Error Handling', () => {
   test('should provide clear permission error messages', async () => {
-    const student = await createTestUser({
+    const student = await system.storage.create('User', {
       name: 'Regular Student',
       role: 'student',
       email: 'student@example.com'
     });
 
-    const result = await executeInteractionWithUser('CreateDormitory', student, {
+    const result = await controller.callInteraction('CreateDormitory', {
+      user: student,
+      payload: {
       name: 'Test Dormitory',
       building: 'Test Building',
       roomNumber: '101',
@@ -1201,14 +971,16 @@ describe('Permission Debugging and Error Handling', () => {
   });
 
   test('permission checks should handle database query errors', async () => {
-    const student = await createTestUser({
+    const student = await system.storage.create('User', {
       name: 'Test Student',
       role: 'student',
       email: 'test@example.com'
     });
 
     // Pass invalid ID to trigger query error
-    const result = await executeInteractionWithUser('RecordScore', student, {
+    const result = await controller.callInteraction('RecordScore', {
+      user: student,
+      payload: {
       memberId: { id: 'invalid-member-id' },
       points: 10,
       reason: 'Test error handling',
@@ -1220,9 +992,9 @@ describe('Permission Debugging and Error Handling', () => {
 });
 ```
 
-## 12.7 Testing Best Practices
+## 12.6 Testing Best Practices
 
-### 12.7.1 Test Organization
+### 12.6.1 Test Organization
 
 ```typescript
 // Use test suites to organize related tests
@@ -1249,135 +1021,6 @@ describe('User Management', () => {
     test('should test permission edge cases', () => {});
   });
 });
-```
-
-### 12.7.2 Test Data Management
-
-```typescript
-// Create reusable test data builders
-class TestDataBuilder {
-  constructor(private system: MonoSystem) {}
-  
-  userBuilder() {
-    return {
-      username: 'testuser',
-      email: 'test@example.com',
-      isActive: true,
-      withUsername: function(username: string) {
-        this.username = username;
-        return this;
-      },
-      withEmail: function(email: string) {
-        this.email = email;
-        return this;
-      },
-      withRole: function(role: string) {
-        this.role = role;
-        return this;
-      },
-      build: async () => {
-        return await this.system.storage.create('User', this);
-      }
-    };
-  }
-  
-  dormitoryBuilder() {
-    return {
-      name: 'Test Dormitory',
-      building: 'Test Building',
-      roomNumber: '101',
-      capacity: 4,
-      withName: function(name: string) {
-        this.name = name;
-        return this;
-      },
-      withCapacity: function(capacity: number) {
-        this.capacity = capacity;
-        return this;
-      },
-      build: async () => {
-        return await this.system.storage.create('Dormitory', this);
-      }
-    };
-  }
-}
-
-// Usage
-const builder = new TestDataBuilder(system);
-const user = await builder.userBuilder()
-  .withUsername('alice')
-  .withEmail('alice@example.com')
-  .withRole('admin')
-  .build();
-```
-
-### 12.7.3 Assertion Helpers
-
-```typescript
-// Create custom assertion helpers
-class TestAssertions {
-  static async assertUserExists(system: MonoSystem, username: string) {
-    const user = await system.storage.findOne(
-      'User',
-      MatchExp.atom({ key: 'username', value: ['=', username] })
-    );
-    expect(user).toBeTruthy();
-    return user;
-  }
-  
-  static async assertComputationResult(
-    system: MonoSystem, 
-    dictionaryName: string, 
-    expectedValue: any
-  ) {
-    const value = await system.storage.get('state', dictionaryName);
-    expect(value).toBe(expectedValue);
-  }
-  
-  static assertInteractionSuccess(result: any) {
-    expect(result.error).toBeUndefined();
-  }
-  
-  static assertInteractionError(result: any, errorPattern?: string) {
-    expect(result.error).toBeTruthy();
-    if (errorPattern) {
-      expect(result.error.message).toContain(errorPattern);
-    }
-  }
-}
-
-// Usage
-await TestAssertions.assertUserExists(system, 'alice');
-TestAssertions.assertInteractionSuccess(result);
-TestAssertions.assertInteractionError(result, 'Admin');
-```
-
-### 12.7.4 Test Configuration
-
-```typescript
-// Environment-specific test configuration
-const testConfig = {
-  development: {
-    database: ':memory:',
-    timeout: 10000,
-    verbose: true
-  },
-  
-  ci: {
-    database: ':memory:',
-    timeout: 30000,
-    verbose: false
-  },
-  
-  integration: {
-    database: './test.db',
-    timeout: 60000,
-    verbose: true
-  }
-};
-
-// Use different configurations based on environment
-const config = testConfig[process.env.TEST_ENV || 'development'];
 ```
 
 Testing is a crucial aspect of building reliable InterAQT applications. Through comprehensive testing of entities, relations, computations, interactions, activities, and permissions, developers can ensure their reactive applications work correctly and maintain quality as they evolve. Proper test organization, data management, and assertion patterns make tests maintainable and effective for long-term development.

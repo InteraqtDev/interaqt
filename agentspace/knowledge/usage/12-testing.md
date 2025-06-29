@@ -43,44 +43,11 @@ export { testSystem };
 ### 12.1.2 测试数据库配置
 
 ```typescript
-// tests/testDatabase.ts
-import { MonoSystem, PGLiteDB, MemoryDB } from 'interaqt';
+// 在测试中直接使用 interaqt 的 API
+import { MonoSystem, PGLiteDB } from 'interaqt';
 
-export function createTestSystem() {
-  // 使用内存数据库进行快速测试
-  return new MonoSystem(new MemoryDB());
-}
-
-export function createPersistentTestSystem() {
-  // 使用持久化数据库进行集成测试
-  return new MonoSystem(new PGLiteDB({
-    database: ':memory:' // 内存模式，测试结束后自动清理
-  }));
-}
-
-// 测试数据工厂
-export class TestDataFactory {
-  constructor(private system: MonoSystem) {}
-  
-  async createUser(overrides: any = {}) {
-    return await this.system.storage.create('User', {
-      username: 'testuser',
-      email: 'test@example.com',
-      isActive: true,
-      ...overrides
-    });
-  }
-  
-  async createPost(userId: string, overrides: any = {}) {
-    return await this.system.storage.create('Post', {
-      title: 'Test Post',
-      content: 'Test content',
-      authorId: userId,
-      status: 'published',
-      ...overrides
-    });
-  }
-}
+// 使用内存数据库进行快速测试
+const testSystem = new MonoSystem();
 ```
 
 ## 12.2 测试实体和关系
@@ -90,13 +57,11 @@ export class TestDataFactory {
 ```typescript
 // tests/entities/user.spec.ts
 import { describe, test, expect } from 'vitest';
-import { Entity, Property, Controller } from 'interaqt';
-import { createTestSystem, TestDataFactory } from '../testDatabase';
+import { Entity, Property, Controller, MonoSystem } from 'interaqt';
 
 describe('User Entity', () => {
   test('should create user with basic properties', async () => {
-    const system = createTestSystem();
-    const factory = new TestDataFactory(system);
+    const system = new MonoSystem();
     
     const userEntity = Entity.create({
       name: 'User',
@@ -110,9 +75,11 @@ describe('User Entity', () => {
     const controller = new Controller(system, [userEntity], [], [], [], [], []);
     await controller.setup(true);
     
-    const user = await factory.createUser({
+    // 直接使用 interaqt API 创建用户
+    const user = await system.storage.create('User', {
       username: 'alice',
-      email: 'alice@example.com'
+      email: 'alice@example.com',
+      isActive: true
     });
     
     expect(user.username).toBe('alice');
@@ -121,7 +88,7 @@ describe('User Entity', () => {
   });
   
   test('should validate required properties', async () => {
-    const system = createTestSystem();
+    const system = new MonoSystem();
     
     // 尝试创建缺少必需属性的用户
     await expect(
@@ -135,10 +102,12 @@ describe('User Entity', () => {
 
 ```typescript
 // tests/relations/friendship.spec.ts
+import { describe, test, expect } from 'vitest';
+import { Entity, Property, Relation, Controller, MonoSystem, MatchExp } from 'interaqt';
+
 describe('Friendship Relation', () => {
   test('should create bidirectional friendship', async () => {
-    const system = createTestSystem();
-    const factory = new TestDataFactory(system);
+    const system = new MonoSystem();
     
     // 创建用户实体和好友关系
     const userEntity = Entity.create({
@@ -170,9 +139,9 @@ describe('Friendship Relation', () => {
     );
     await controller.setup(true);
     
-    // 创建两个用户
-    const alice = await factory.createUser({ username: 'alice' });
-    const bob = await factory.createUser({ username: 'bob' });
+    // 直接使用 interaqt API 创建用户
+    const alice = await system.storage.create('User', { username: 'alice' });
+    const bob = await system.storage.create('User', { username: 'bob' });
     
     // 建立好友关系
     const friendship = await system.storage.create('User_friends_friendOf_User', {
@@ -206,9 +175,12 @@ describe('Friendship Relation', () => {
 
 ```typescript
 // tests/computations/count.spec.ts
+import { describe, test, expect } from 'vitest';
+import { Entity, Property, Dictionary, Count, Controller, MonoSystem } from 'interaqt';
+
 describe('Count Computation', () => {
   test('should update user count automatically', async () => {
-    const system = createTestSystem();
+    const system = new MonoSystem();
     
     const userEntity = Entity.create({
       name: 'User',
@@ -288,7 +260,7 @@ describe('Count Computation', () => {
 // tests/computations/transform.spec.ts
 describe('Transform Computation', () => {
   test('should calculate user statistics correctly', async () => {
-    const system = createTestSystem();
+    const system = new MonoSystem();
     
     const userEntity = Entity.create({
       name: 'User',
@@ -382,7 +354,7 @@ describe('Transform Computation', () => {
 // tests/interactions/userActions.spec.ts
 describe('User Interactions', () => {
   test('should handle user registration interaction', async () => {
-    const system = createTestSystem();
+    const system = new MonoSystem();
     
     const userEntity = Entity.create({
       name: 'User',
@@ -448,7 +420,7 @@ describe('User Interactions', () => {
 // tests/activities/approvalProcess.spec.ts
 describe('Approval Process Activity', () => {
   test('should handle complete approval workflow', async () => {
-    const system = createTestSystem();
+    const system = new MonoSystem();
     
     // 创建请求实体
     const requestEntity = Entity.create({
@@ -554,197 +526,7 @@ describe('Approval Process Activity', () => {
 });
 ```
 
-## 12.5 性能和集成测试
-
-### 12.5.1 性能测试
-
-```typescript
-// tests/performance/computation.spec.ts
-describe('Performance Tests', () => {
-  test('should handle large dataset efficiently', async () => {
-    const system = createTestSystem();
-    const factory = new TestDataFactory(system);
-    
-    // 设置实体和计算
-    const userEntity = Entity.create({
-      name: 'User',
-      properties: [
-        Property.create({ name: 'username', type: 'string' }),
-        Property.create({ name: 'score', type: 'number' })
-      ]
-    });
-    
-    const avgScoreDict = Dictionary.create({
-      name: 'avgScore',
-      type: 'number',
-      collection: false,
-      computedData: WeightedSummation.create({
-        record: userEntity,
-        attributeQuery: ['score'],
-        callback: (user: any) => ({
-          weight: 1,
-          value: user.score || 0
-        })
-      })
-    });
-    
-    const controller = new Controller(
-      system,
-      [userEntity],
-      [],
-      [],
-      [],
-      [avgScoreDict],
-      []
-    );
-    await controller.setup(true);
-    
-    // 性能测试：创建大量用户
-    const startTime = Date.now();
-    const userCount = 1000;
-    
-    for (let i = 0; i < userCount; i++) {
-      await factory.createUser({
-        username: `user${i}`,
-        score: Math.floor(Math.random() * 100)
-      });
-    }
-    
-    const endTime = Date.now();
-    const duration = endTime - startTime;
-    
-    console.log(`Created ${userCount} users in ${duration}ms`);
-    expect(duration).toBeLessThan(5000); // 应该在5秒内完成
-    
-    // 验证计算结果
-    const avgScore = await system.storage.get('state', 'avgScore');
-    expect(typeof avgScore).toBe('number');
-    expect(avgScore).toBeGreaterThan(0);
-  });
-});
-```
-
-### 12.5.2 集成测试
-
-```typescript
-// tests/integration/fullWorkflow.spec.ts
-describe('Full Workflow Integration', () => {
-  test('should handle complete user lifecycle', async () => {
-    const system = createTestSystem();
-    
-    // 设置完整的系统
-    const userEntity = Entity.create({
-      name: 'User',
-      properties: [
-        Property.create({ name: 'username', type: 'string' }),
-        Property.create({ name: 'email', type: 'string' }),
-        Property.create({ name: 'isActive', type: 'boolean', defaultValue: () => true })
-      ]
-    });
-    
-    const postEntity = Entity.create({
-      name: 'Post',
-      properties: [
-        Property.create({ name: 'title', type: 'string' }),
-        Property.create({ name: 'content', type: 'string' }),
-        Property.create({ name: 'status', type: 'string', defaultValue: () => 'draft' })
-      ]
-    });
-    
-    const userPostRelation = Relation.create({
-      name: 'UserPost',
-      source: userEntity,
-      sourceProperty: 'posts',
-      target: postEntity,
-      targetProperty: 'author',
-      type: '1:n'
-    });
-    
-    // 添加计算属性
-    userEntity.properties.push(
-      Property.create({
-        name: 'postCount',
-        type: 'number',
-        computedData: Count.create({
-          record: userPostRelation,
-          attributeQuery: [['target', { attributeQuery: ['status'] }]],
-          callback: (relation: any) => relation.target.status === 'published'
-        })
-      })
-    );
-    
-    const controller = new Controller(
-      system,
-      [userEntity, postEntity],
-      [userPostRelation],
-      [],
-      [],
-      [],
-      []
-    );
-    await controller.setup(true);
-    
-    // 1. 创建用户
-    const user = await system.storage.create('User', {
-      username: 'blogger',
-      email: 'blogger@example.com'
-    });
-    
-    // 2. 创建文章
-    const post1 = await system.storage.create('Post', {
-      title: 'First Post',
-      content: 'This is my first post',
-      status: 'published'
-    });
-    
-    const post2 = await system.storage.create('Post', {
-      title: 'Draft Post',
-      content: 'This is a draft',
-      status: 'draft'
-    });
-    
-    // 3. 建立关系
-    await system.storage.create('User_posts_author_Post', {
-      source: user.id,
-      target: post1.id
-    });
-    
-    await system.storage.create('User_posts_author_Post', {
-      source: user.id,
-      target: post2.id
-    });
-    
-    // 4. 验证计算属性
-    const updatedUser = await system.storage.findOne(
-      'User',
-      MatchExp.atom({ key: 'id', value: ['=', user.id] }),
-      {},
-      ['id', 'username', 'postCount']
-    );
-    
-    expect(updatedUser.postCount).toBe(1); // 只计算已发布的文章
-    
-    // 5. 发布草稿文章
-    await system.storage.update(
-      'Post',
-      MatchExp.atom({ key: 'id', value: ['=', post2.id] }),
-      { status: 'published' }
-    );
-    
-    // 6. 验证计算更新
-    const finalUser = await system.storage.findOne(
-      'User',
-      MatchExp.atom({ key: 'id', value: ['=', user.id] }),
-      {},
-      ['id', 'username', 'postCount']
-    );
-    
-    expect(finalUser.postCount).toBe(2); // 现在应该计算两篇已发布的文章
-  });
-});
-```
-
-## 12.6 测试权限和定语 (Attributive)
+## 12.5 测试权限和定语 (Attributive)
 
 > **重要提示：错误处理的正确方式**
 > 
@@ -769,7 +551,7 @@ describe('Full Workflow Integration', () => {
 > }
 > ```
 
-### 12.6.1 权限测试基础
+### 12.5.1 权限测试基础
 
 权限测试是 interaqt 应用测试的重要组成部分，需要验证不同用户在不同场景下的访问权限：
 
@@ -799,54 +581,32 @@ describe('权限测试', () => {
     await controller.setup(true);
   });
   
-  // 创建测试用户的辅助函数
-  async function createTestUser(userData: any) {
-    return await system.storage.create('User', {
-      name: '测试用户',
-      role: 'student',
-      email: 'test@example.com',
-      ...userData
-    });
-  }
-  
-  // 执行交互的辅助函数
-  async function executeInteractionWithUser(
-    interactionName: string,
-    user: any,
-    payload: any
-  ) {
-    const interactionCall = controller.activityManager?.interactionCallsByName.get(interactionName);
-    if (!interactionCall) {
-      throw new Error(`找不到交互: ${interactionName}`);
-    }
-    
-    return await controller.callInteraction(interactionCall.interaction.name, {
-      user,
-      payload
-    });
-  }
+
 });
 ```
 
-### 12.6.2 基本角色权限测试
+### 12.5.2 基本角色权限测试
 
 ```typescript
 describe('基本角色权限测试', () => {
   test('管理员权限测试', async () => {
     // 创建管理员用户
-    const admin = await createTestUser({
+    const admin = await system.storage.create('User', {
       name: '张管理员',
       role: 'admin',
       email: 'admin@example.com'
     });
 
     // 测试管理员可以执行特权操作
-    const result = await executeInteractionWithUser('CreateDormitory', admin, {
-      name: '管理员创建的宿舍',
-      building: '管理楼',
-      roomNumber: '001',
-      capacity: 4,
-      description: '测试宿舍'
+    const result = await controller.callInteraction('CreateDormitory', {
+      user: admin,
+      payload: {
+        name: '管理员创建的宿舍',
+        building: '管理楼',
+        roomNumber: '001',
+        capacity: 4,
+        description: '测试宿舍'
+      }
     });
 
     expect(result.error).toBeUndefined();
@@ -860,19 +620,22 @@ describe('基本角色权限测试', () => {
   });
 
   test('普通用户权限限制测试', async () => {
-    const student = await createTestUser({
+    const student = await system.storage.create('User', {
       name: '普通学生',
       role: 'student',
       email: 'student@example.com'
     });
 
     // 普通学生不应该能创建宿舍
-    const result = await executeInteractionWithUser('CreateDormitory', student, {
-      name: '学生尝试创建的宿舍',
-      building: '学生楼',
-      roomNumber: '002',
-      capacity: 4,
-      description: '无权限测试'
+    const result = await controller.callInteraction('CreateDormitory', {
+      user: student,
+      payload: {
+        name: '学生尝试创建的宿舍',
+        building: '学生楼',
+        roomNumber: '002',
+        capacity: 4,
+        description: '无权限测试'
+      }
     });
 
     expect(result.error).toBeTruthy();
@@ -881,19 +644,19 @@ describe('基本角色权限测试', () => {
 });
 ```
 
-### 12.6.3 复杂权限逻辑测试
+### 12.5.3 复杂权限逻辑测试
 
 ```typescript
 describe('复杂权限逻辑测试', () => {
   test('宿舍长权限测试', async () => {
     // 设置测试场景
-    const leader = await createTestUser({
+    const leader = await system.storage.create('User', {
       name: '宿舍长',
       role: 'student',
       email: 'leader@example.com'
     });
 
-    const member = await createTestUser({
+    const member = await system.storage.create('User', {
       name: '普通成员',
       role: 'student',
       email: 'member@example.com'
@@ -926,7 +689,9 @@ describe('复杂权限逻辑测试', () => {
     });
 
     // 测试宿舍长可以记录积分
-    const leaderResult = await executeInteractionWithUser('RecordScore', leader, {
+    const leaderResult = await controller.callInteraction('RecordScore', {
+      user: leader,
+      payload: {
       memberId: normalMember,
       points: 10,
       reason: '打扫卫生',
@@ -935,7 +700,9 @@ describe('复杂权限逻辑测试', () => {
     expect(leaderResult.error).toBeUndefined();
 
     // 测试普通成员不能记录积分
-    const memberResult = await executeInteractionWithUser('RecordScore', member, {
+    const memberResult = await controller.callInteraction('RecordScore', {
+      user: member,
+      payload: {
       memberId: leaderMember,
       points: 10,
       reason: '尝试记录积分',
@@ -946,19 +713,19 @@ describe('复杂权限逻辑测试', () => {
 });
 ```
 
-### 12.6.4 Payload 级别权限测试
+### 12.5.4 Payload 级别权限测试
 
 ```typescript
 describe('Payload级别权限测试', () => {
   test('只能操作自己宿舍的数据', async () => {
     // 创建两个宿舍的宿舍长
-    const leader1 = await createTestUser({
+    const leader1 = await system.storage.create('User', {
       name: '宿舍长1',
       role: 'student',
       email: 'leader1@example.com'
     });
 
-    const leader2 = await createTestUser({
+    const leader2 = await system.storage.create('User', {
       name: '宿舍长2',
       role: 'student',
       email: 'leader2@example.com'
@@ -999,7 +766,9 @@ describe('Payload级别权限测试', () => {
     });
 
     // 宿舍长1应该能操作自己宿舍的成员
-    const validResult = await executeInteractionWithUser('RecordScore', leader1, {
+    const validResult = await controller.callInteraction('RecordScore', {
+      user: leader1,
+      payload: {
       memberId: member1,
       points: 10,
       reason: '清洁卫生',
@@ -1008,7 +777,9 @@ describe('Payload级别权限测试', () => {
     expect(validResult.error).toBeUndefined();
 
     // 宿舍长1不应该能操作其他宿舍的成员
-    const invalidResult = await executeInteractionWithUser('RecordScore', leader1, {
+    const invalidResult = await controller.callInteraction('RecordScore', {
+      user: leader1,
+      payload: {
       memberId: member2,
       points: 10,
       reason: '尝试跨宿舍操作',
@@ -1019,12 +790,12 @@ describe('Payload级别权限测试', () => {
 });
 ```
 
-### 12.6.5 权限边界情况测试
+### 12.5.5 权限边界情况测试
 
 ```typescript
 describe('权限边界情况测试', () => {
   test('宿舍满员时的申请限制', async () => {
-    const student = await createTestUser({
+    const student = await system.storage.create('User', {
       name: '申请学生',
       role: 'student',
       email: 'applicant@example.com'
@@ -1040,7 +811,7 @@ describe('权限边界情况测试', () => {
 
     // 添加成员直到满员
     for (let i = 0; i < 2; i++) {
-      const user = await createTestUser({
+      const user = await system.storage.create('User', {
         name: `成员${i + 1}`,
         role: 'student',
         email: `member${i + 1}@example.com`
@@ -1057,7 +828,9 @@ describe('权限边界情况测试', () => {
     }
 
     // 尝试申请加入已满的宿舍
-    const result = await executeInteractionWithUser('ApplyForDormitory', student, {
+    const result = await controller.callInteraction('ApplyForDormitory', {
+      user: student,
+      payload: {
       dormitoryId: fullDormitory,
       message: '希望加入这个宿舍'
     });
@@ -1067,7 +840,7 @@ describe('权限边界情况测试', () => {
   });
 
   test('重复申请的限制', async () => {
-    const student = await createTestUser({
+    const student = await system.storage.create('User', {
       name: '有宿舍学生',
       role: 'student',
       email: 'hasdorm@example.com'
@@ -1099,7 +872,9 @@ describe('权限边界情况测试', () => {
     });
 
     // 尝试申请宿舍2
-    const result = await executeInteractionWithUser('ApplyForDormitory', student, {
+    const result = await controller.callInteraction('ApplyForDormitory', {
+      user: student,
+      payload: {
       dormitoryId: dormitory2,
       message: '想换宿舍'
     });
@@ -1110,19 +885,19 @@ describe('权限边界情况测试', () => {
 });
 ```
 
-### 12.6.6 状态机权限测试
+### 12.5.6 状态机权限测试
 
 ```typescript
 describe('状态机权限测试', () => {
   test('状态机computeTarget函数覆盖测试', async () => {
     // 创建管理员和目标用户
-    const admin = await createTestUser({
+    const admin = await system.storage.create('User', {
       name: '状态机测试管理员',
       role: 'admin',
       email: 'statemachine@test.com'
     });
 
-    const targetUser = await createTestUser({
+    const targetUser = await system.storage.create('User', {
       name: '被踢出的学生',
       role: 'student',
       email: 'target@test.com',
@@ -1157,7 +932,9 @@ describe('状态机权限测试', () => {
     });
 
     // 执行ApproveKickRequest交互，触发状态机
-    const result = await executeInteractionWithUser('ApproveKickRequest', admin, {
+    const result = await controller.callInteraction('ApproveKickRequest', {
+      user: admin,
+      payload: {
       kickRequestId: kickRequest,
       adminComment: '管理员批准踢出请求'
     });
@@ -1177,18 +954,20 @@ describe('状态机权限测试', () => {
 });
 ```
 
-### 12.6.7 权限调试和错误处理测试
+### 12.5.7 权限调试和错误处理测试
 
 ```typescript
 describe('权限调试和错误处理', () => {
   test('应该提供清晰的权限错误信息', async () => {
-    const student = await createTestUser({
+    const student = await system.storage.create('User', {
       name: '普通学生',
       role: 'student',
       email: 'student@example.com'
     });
 
-    const result = await executeInteractionWithUser('CreateDormitory', student, {
+    const result = await controller.callInteraction('CreateDormitory', {
+      user: student,
+      payload: {
       name: '测试宿舍',
       building: '测试楼',
       roomNumber: '101',
@@ -1201,14 +980,16 @@ describe('权限调试和错误处理', () => {
   });
 
   test('权限检查应该处理数据库查询错误', async () => {
-    const student = await createTestUser({
+    const student = await system.storage.create('User', {
       name: '测试学生',
       role: 'student',
       email: 'test@example.com'
     });
 
     // 传递无效ID触发查询错误
-    const result = await executeInteractionWithUser('RecordScore', student, {
+    const result = await controller.callInteraction('RecordScore', {
+      user: student,
+      payload: {
       memberId: { id: 'invalid-member-id' },
       points: 10,
       reason: '测试错误处理',
@@ -1220,9 +1001,9 @@ describe('权限调试和错误处理', () => {
 });
 ```
 
-## 12.7 测试最佳实践
+## 12.6 测试最佳实践
 
-### 12.7.1 测试组织
+### 12.6.1 测试组织
 
 ```typescript
 // 使用测试套件组织相关测试

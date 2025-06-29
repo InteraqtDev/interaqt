@@ -705,31 +705,7 @@ describe('Attributive Permission Tests', () => {
   });
   
   // Test helper function: create test user
-  async function createTestUser(userData: any) {
-    return await system.storage.create('User', {
-      name: 'Test User',
-      role: 'student',
-      email: 'test@example.com',
-      ...userData
-    });
-  }
-  
-  // Test helper function: execute interaction and catch permission errors
-  async function executeInteractionWithUser(
-    interactionName: string,
-    user: any,
-    payload: any
-  ) {
-    const interactionCall = controller.activityManager?.interactionCallsByName.get(interactionName);
-    if (!interactionCall) {
-      throw new Error(`Interaction not found: ${interactionName}`);
-    }
-    
-    return await controller.callInteraction(interactionCall.interaction.name, {
-      user,
-      payload
-    });
-  }
+
 });
 ```
 
@@ -739,14 +715,16 @@ describe('Attributive Permission Tests', () => {
 describe('Basic Role Permission Tests', () => {
   test('Administrators should be able to create dormitories', async () => {
     // Create administrator user
-    const admin = await createTestUser({
+    const admin = await system.storage.create('User', {
       name: 'Admin Zhang',
       role: 'admin',
       email: 'admin@example.com'
     });
 
     // Execute CreateDormitory interaction
-    const result = await executeInteractionWithUser('CreateDormitory', admin, {
+    const result = await controller.callInteraction('CreateDormitory', {
+      user: admin,
+      payload: {
       name: 'Test Dormitory',
       building: 'Test Building',
       roomNumber: '101',
@@ -767,14 +745,16 @@ describe('Basic Role Permission Tests', () => {
 
   test('Regular students should not be able to create dormitories', async () => {
     // Create regular student user
-    const student = await createTestUser({
+    const student = await system.storage.create('User', {
       name: 'Student Li',
       role: 'student',
       email: 'student@example.com'
     });
 
     // Attempt to execute CreateDormitory interaction
-    const result = await executeInteractionWithUser('CreateDormitory', student, {
+    const result = await controller.callInteraction('CreateDormitory', {
+      user: student,
+      payload: {
       name: 'Test Dormitory',
       building: 'Test Building',
       roomNumber: '101',
@@ -795,19 +775,19 @@ describe('Basic Role Permission Tests', () => {
 describe('Complex Permission Condition Tests', () => {
   test('Only dormitory leaders can record points in their own dormitory', async () => {
     // 1. Create test data
-    const leader = await createTestUser({
+    const leader = await system.storage.create('User', {
       name: 'Dormitory Leader',
       role: 'student',
       email: 'leader@example.com'
     });
 
-    const member = await createTestUser({
+    const member = await system.storage.create('User', {
       name: 'Regular Member',
       role: 'student', 
       email: 'member@example.com'
     });
 
-    const admin = await createTestUser({
+    const admin = await system.storage.create('User', {
       name: 'Administrator',
       role: 'admin',
       email: 'admin@example.com'
@@ -842,7 +822,9 @@ describe('Complex Permission Condition Tests', () => {
     });
 
     // 5. Test dormitory leader can record points
-    const leaderResult = await executeInteractionWithUser('RecordScore', leader, {
+    const leaderResult = await controller.callInteraction('RecordScore', {
+      user: leader,
+      payload: {
       memberId: normalMember,
       points: 10,
       reason: 'Cleaning',
@@ -851,7 +833,9 @@ describe('Complex Permission Condition Tests', () => {
     expect(leaderResult.error).toBeUndefined();
 
     // 6. Test regular member cannot record points
-    const memberResult = await executeInteractionWithUser('RecordScore', member, {
+    const memberResult = await controller.callInteraction('RecordScore', {
+      user: member,
+      payload: {
       memberId: leaderMember,
       points: 10,
       reason: 'Attempt to record points',
@@ -860,7 +844,9 @@ describe('Complex Permission Condition Tests', () => {
     expect(memberResult.error).toBeTruthy();
 
     // 7. Test administrator is not restricted by dormitory leader limitation (if admin also has permission)
-    const adminResult = await executeInteractionWithUser('AdminAssignScore', admin, {
+    const adminResult = await controller.callInteraction('AdminAssignScore', {
+      user: admin,
+      payload: {
       memberId: normalMember,
       points: 5,
       reason: 'Admin bonus points',
