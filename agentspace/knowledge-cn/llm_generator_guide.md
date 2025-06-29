@@ -65,7 +65,7 @@
    │   ├── detailed-requirements.md
    │   ├── test-cases.md
    │   └── interaction-matrix.md
-   ├── src/                   # 后端源码
+   ├── backend/                   # 后端源码
    │   ├── entities/
    │   ├── relations/
    │   ├── interactions/

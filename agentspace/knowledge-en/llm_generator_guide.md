@@ -65,14 +65,13 @@ When using LLM to generate interaqt applications, you must follow **test-case dr
    │   ├── detailed-requirements.md
    │   ├── test-cases.md
    │   └── interaction-matrix.md
-   ├── src/                   # Backend source code
+   ├── backend/                   # Backend source code
    │   ├── entities/
    │   ├── relations/
    │   ├── interactions/
    │   ├── computations/
    │   └── index.ts
    ├── tests/                 # Test code
-   │   ├── entities/
    │   ├── interactions/
    │   ├── computations/
    │   └── e2e/
@@ -85,23 +84,25 @@ When using LLM to generate interaqt applications, you must follow **test-case dr
    - Next implement all Computation (Count, Transform, etc.)
    - Finally implement all Interaction and Activity
    - Write corresponding tests immediately after completing each module
+   - **TypeScript Type Check**: After generating source code, ensure there are NO TypeScript type errors (run `npx tsc --noEmit`)
+   - **Test Type Check**: After generating test code, ensure test files also have NO TypeScript type errors
 
-### 4. Test-Driven Validation
+### 4. Test-Driven Validation (Critical Step)
 1. **Test Framework Setup**:
    - Use vitest as testing framework
    - Configure test database (use PGLite memory mode)
    - Create test utility functions and data factories
 
 2. **Test Coverage Requirements**:
-   - All Entity CRUD operations must have tests
    - All Interactions must have at least one success case and one failure case
    - All properties with computedData must verify auto-calculation logic
    - All permission controls must have positive and negative tests
 
-3. **Test Execution**:
+3. **Test Execution** (Strictly Follow):
    ```bash
-   npm test                    # Run all tests
-   npm test -- --coverage      # View test coverage
+   npx tsc --noEmit           # Check TypeScript types (must pass with no errors)
+   npm test                    # Run all tests (must pass with no errors)
+   npm test -- --coverage      # View test coverage (must 100% coverage)
    ```
 
 ### 5. Documentation Generation
@@ -115,11 +116,13 @@ Create `docs/` directory with:
 
 - [ ] All requirements have corresponding test cases
 - [ ] All test cases have corresponding test code
-- [ ] Test coverage reaches 100%
+- [ ] **No TypeScript type errors in source code** (run `npx tsc --noEmit`)
+- [ ] **No TypeScript type errors in test code**
+- [ ] All test cases passed (Critical Step)
+- [ ] Test coverage reaches 100% (Critical Step)
 - [ ] No fictional non-existent Entity or Interaction
 - [ ] All reactive computations trigger correctly
 - [ ] Permission control tests complete
-- [ ] All Entity CRUD operations have tests
 - [ ] All Interactions have success and failure cases
 - [ ] All computedData properties verify auto-calculation logic
 - [ ] test-cases.md document complete and consistent with code

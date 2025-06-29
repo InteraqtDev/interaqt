@@ -1,0 +1,20 @@
+{
+  "name": "axii-boilerplate",
+  "version": "1.0.0",
+  "description": "",
+  "scripts": {
+    "dev": "vite",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.10",
+    "happy-dom": "^18.0.1",
+    "vite": "^6.2.2",
+    "vitest": "^3.2.4"
+  },
+  "dependencies": {
+    "axii": "^3.7.0",
+    "axii-ui": "^2.1.0",
+    "axii-ui-theme-inc": "^4.1.1"
+  }
+}
