@@ -1,38 +1,12 @@
 # 第四章：测试指南
 
-本章介绍如何为 @interaqt/runtime 框架编写全面的测试用例，包括单元测试、集成测试和端到端测试的最佳实践。
+本章介绍如何为 interaqt 框架编写全面的测试用例，包括单元测试、集成测试和端到端测试的最佳实践。
 
 ## 4.1 测试环境设置
 
 ### 4.1.1 测试框架配置
 
-框架使用 Vitest 作为测试运行器，配置文件位于 `vitest.config.ts`：
-
-```typescript
-import { defineConfig } from 'vitest/config'
-import tsconfigPaths from 'vite-tsconfig-paths'
-import path from 'path'
-
-export default defineConfig({
-    test: {
-        setupFiles: './scripts/vitest.setup.js'
-    },
-    plugins: [
-        tsconfigPaths({
-            root: path.resolve(__dirname, './')
-        })
-    ],
-    resolve: {
-        alias: {
-            '@/SQLite.js': path.resolve(__dirname, './src/runtime/SQLite.ts'),
-            '@runtime': path.resolve(__dirname, './src/runtime/index.ts'),
-            '@shared': path.resolve(__dirname, './src/shared/index.ts'),
-            '@storage': path.resolve(__dirname, './src/storage/index.ts'),
-            '@': path.resolve(__dirname, './src'),
-        }
-    }
-})
-```
+框架使用 Vitest 作为测试运行器.
 
 ### 4.1.2 测试环境初始化
 
@@ -717,4 +691,4 @@ export const createECommerceScenario = () => ({
 });
 ```
 
-通过遵循这些测试指南和最佳实践，可以确保 @interaqt/runtime 框架的代码质量和稳定性，同时为新功能的开发提供可靠的测试基础。 
+通过遵循这些测试指南和最佳实践，可以确保 interaqt 框架的代码质量和稳定性，同时为新功能的开发提供可靠的测试基础。 

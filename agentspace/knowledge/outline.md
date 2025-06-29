@@ -1,4 +1,4 @@
-# @interaqt/runtime 文档大纲
+# interaqt 文档大纲
 
 ## 一、使用文档（Usage Documentation）
 

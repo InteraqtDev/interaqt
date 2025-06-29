@@ -7,7 +7,7 @@ Data querying is one of the core functionalities in the InterAQT framework, prov
 ### 11.1.1 findOne - Query Single Record
 
 ```typescript
-import { MatchExp } from '@interaqt/storage';
+import { MatchExp } from 'interaqt';
 
 // Basic single record query
 const user = await system.storage.findOne(

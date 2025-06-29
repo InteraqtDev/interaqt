@@ -538,7 +538,7 @@ describe('CustomDB Adapter', () => {
 
 ## 小结
 
-本章详细介绍了 @interaqt/runtime 的扩展开发机制：
+本章详细介绍了 interaqt 的扩展开发机制：
 
 1. **自定义计算类型**：
    - 通过实现 `DataBasedComputation` 接口创建新的计算类型

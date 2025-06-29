@@ -538,7 +538,7 @@ describe('CustomDB Adapter', () => {
 
 ## Summary
 
-This chapter provides detailed introduction to the extension development mechanisms of @interaqt/runtime:
+This chapter provides detailed introduction to the extension development mechanisms of interaqt:
 
 1. **Custom Computation Types**:
    - Create new computation types by implementing the `DataBasedComputation` interface

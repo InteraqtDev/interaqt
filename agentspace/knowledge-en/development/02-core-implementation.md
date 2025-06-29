@@ -588,7 +588,7 @@ async runComputationWithTransaction(computation: Computation, mutationEvent: Rec
 
 ## Summary
 
-This chapter provides detailed introduction to the four core implementation modules of @interaqt/runtime:
+This chapter provides detailed introduction to the four core implementation modules of interaqt:
 
 1. **Reactive Computation Engine**: Establishes data dependency mapping through ComputationSourceMap, implements precise incremental computation and dependency tracking
 2. **Data Change Tracking**: Standardized event model and propagation mechanism ensure data changes correctly trigger related computations

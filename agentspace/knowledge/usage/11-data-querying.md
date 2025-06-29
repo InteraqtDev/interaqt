@@ -7,7 +7,7 @@
 ### 11.1.1 findOne 查询单条记录
 
 ```typescript
-import { MatchExp } from '@interaqt/storage';
+import { MatchExp } from 'interaqt';
 
 // 基本的单条查询
 const user = await system.storage.findOne(

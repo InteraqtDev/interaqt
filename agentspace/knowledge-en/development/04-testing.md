@@ -1,38 +1,12 @@
 # Chapter 4: Testing Guide
 
-This chapter introduces how to write comprehensive test cases for the @interaqt/runtime framework, including best practices for unit testing, integration testing, and end-to-end testing.
+This chapter introduces how to write comprehensive test cases for the interaqt framework, including best practices for unit testing, integration testing, and end-to-end testing.
 
 ## 4.1 Test Environment Setup
 
 ### 4.1.1 Test Framework Configuration
 
-The framework uses Vitest as the test runner, with configuration in `vitest.config.ts`:
-
-```typescript
-import { defineConfig } from 'vitest/config'
-import tsconfigPaths from 'vite-tsconfig-paths'
-import path from 'path'
-
-export default defineConfig({
-    test: {
-        setupFiles: './scripts/vitest.setup.js'
-    },
-    plugins: [
-        tsconfigPaths({
-            root: path.resolve(__dirname, './')
-        })
-    ],
-    resolve: {
-        alias: {
-            '@/SQLite.js': path.resolve(__dirname, './src/runtime/SQLite.ts'),
-            '@runtime': path.resolve(__dirname, './src/runtime/index.ts'),
-            '@shared': path.resolve(__dirname, './src/shared/index.ts'),
-            '@storage': path.resolve(__dirname, './src/storage/index.ts'),
-            '@': path.resolve(__dirname, './src'),
-        }
-    }
-})
-```
+The framework uses Vitest as the test runner.
 
 ### 4.1.2 Test Environment Initialization
 
@@ -717,4 +691,4 @@ export const createECommerceScenario = () => ({
 });
 ```
 
-By following these testing guidelines and best practices, you can ensure code quality and stability of the @interaqt/runtime framework while providing a reliable testing foundation for new feature development. 
+By following these testing guidelines and best practices, you can ensure code quality and stability of the interaqt framework while providing a reliable testing foundation for new feature development. 

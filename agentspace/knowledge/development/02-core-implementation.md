@@ -588,7 +588,7 @@ async runComputationWithTransaction(computation: Computation, mutationEvent: Rec
 
 ## 小结
 
-本章详细介绍了 @interaqt/runtime 的四个核心实现模块：
+本章详细介绍了 interaqt 的四个核心实现模块：
 
 1. **响应式计算引擎**：通过 ComputationSourceMap 建立数据依赖映射，实现精确的增量计算和依赖追踪
 2. **数据变更追踪**：标准化的事件模型和传播机制，确保数据变更能够正确触发相关计算

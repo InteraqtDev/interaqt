@@ -1,8 +1,8 @@
-# @interaqt/runtime 项目概述
+# interaqt 项目概述
 
 ## 项目简介
 
-@interaqt/runtime 是一个创新的后端响应式框架，实现了一种全新的应用开发范式。它可以被理解为 Web Framework + ORM/CMS + BPM Engine 的替代方案。
+interaqt 是一个创新的后端响应式框架，实现了一种全新的应用开发范式。它可以被理解为 Web Framework + ORM/CMS + BPM Engine 的替代方案。
 
 ### 核心理念
 
@@ -344,4 +344,4 @@ console.log(updatedUser.friendCount); // 自动计算的好友数量
 
 ## 总结
 
-@interaqt/runtime 通过响应式编程范式，让开发者能够专注于业务逻辑的描述，而不需要关心数据变化的具体实现。这种方式不仅提高了开发效率，还大大减少了因手动数据操作导致的错误，是现代后端开发的一种创新尝试。
+interaqt 通过响应式编程范式，让开发者能够专注于业务逻辑的描述，而不需要关心数据变化的具体实现。这种方式不仅提高了开发效率，还大大减少了因手动数据操作导致的错误，是现代后端开发的一种创新尝试。

@@ -1,12 +1,12 @@
 # Chapter 1: Architecture Design
 
-This chapter provides a detailed introduction to the overall architecture design of the @interaqt/runtime framework, including module division, data flow, and relationships between core components.
+This chapter provides a detailed introduction to the overall architecture design of the interaqt framework, including module division, data flow, and relationships between core components.
 
 ## 1.1 Overall Architecture
 
 ### Module Division
 
-The @interaqt/runtime framework adopts a three-layer architecture design, with each layer having clear responsibilities:
+The interaqt framework adopts a three-layer architecture design, with each layer having clear responsibilities:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -617,4 +617,4 @@ const Attributive = createClass({
 - **Error Handling**: Complete error prompts and debugging information
 - **Complete Documentation**: Detailed API documentation and usage examples
 
-This architectural design ensures that @interaqt/runtime maintains both high performance and extensibility while providing an excellent developer experience, making it a truly enterprise-ready reactive backend framework. 
+This architectural design ensures that interaqt maintains both high performance and extensibility while providing an excellent developer experience, making it a truly enterprise-ready reactive backend framework. 
