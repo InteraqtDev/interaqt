@@ -18,7 +18,7 @@ import {
     Conditions,
     boolExpToAttributives,
     boolExpToConditions
-} from '@';
+} from 'interaqt';
 
 describe('attributive and condition checks', () => {
     let system: MonoSystem

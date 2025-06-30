@@ -11,7 +11,7 @@ import {
   Count,
   MatchExp,
   DICTIONARY_RECORD
-} from '@';
+} from 'interaqt';
 
 describe('Count computed handle', () => {
   

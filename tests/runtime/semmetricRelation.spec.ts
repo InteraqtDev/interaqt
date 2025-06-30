@@ -8,7 +8,7 @@ import {
   Property,
   Relation,
   Count
-} from '@';
+} from 'interaqt';
 
 describe('symmetric relation computation cycle bug', () => {
   

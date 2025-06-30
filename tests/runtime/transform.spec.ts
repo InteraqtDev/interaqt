@@ -8,7 +8,7 @@ import {
   Property,
   Relation,
   Transform
-} from '@';
+} from 'interaqt';
 
 describe('Transform computed handle', () => {
   

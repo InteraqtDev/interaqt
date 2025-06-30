@@ -9,7 +9,7 @@ import {
   Relation,
   Count,
   MatchExp
-} from '@';
+} from 'interaqt';
 
 describe('Symmetric relation computation', () => {
   

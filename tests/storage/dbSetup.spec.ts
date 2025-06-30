@@ -1,8 +1,7 @@
 import {expect, test, describe} from "vitest";
 import {existsSync, unlinkSync} from 'fs'
 import {DBSetup,RecordQueryAgent,EntityToTableMap,MatchExp,RecordQuery} from "@storage";
-// @ts-ignore
-import { SQLiteDB } from '@/SQLite.js'
+import { PGLiteDB, SQLiteDB } from 'interaqt'
 import {createCommonData} from "./data/common";
 
 const { entities, relations } = createCommonData()
@@ -10,7 +9,7 @@ const { entities, relations } = createCommonData()
 
 describe("db setup", () => {    
     test('validate 1:1 relation map', async () => {
-        const db = new SQLiteDB()
+        const db = new PGLiteDB()
         await db.open()
         // Profile & User
         const clues = [

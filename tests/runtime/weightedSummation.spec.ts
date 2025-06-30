@@ -10,7 +10,7 @@ import {
   Relation,
   WeightedSummation,
   DICTIONARY_RECORD
-} from '@';
+} from 'interaqt';
 
 // 创建简单测试环境，直接测试 WeightedSummationHandle 的具体方法
 describe('WeightedSummation computed handle', () => {

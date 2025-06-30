@@ -1,5 +1,5 @@
 import { describe, expect, test, beforeAll } from "vitest";
-import { Controller, MonoSystem, Property, Entity, RealTime, Dictionary, BoolExp, DICTIONARY_RECORD } from '@';
+import { Controller, MonoSystem, Property, Entity, RealTime, Dictionary, BoolExp, DICTIONARY_RECORD } from 'interaqt';
 import { Expression } from '../../src/runtime/computedDataHandles/MathResolver';
 
 describe('RealTime computed handle', () => {

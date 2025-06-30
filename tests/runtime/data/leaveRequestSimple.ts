@@ -21,7 +21,7 @@ import {
     Controller, 
     InteractionEventArgs, 
     InteractionEventEntity 
-} from '@';
+} from 'interaqt';
 
 export const globalUserRole = createUserRoleAttributive({})
 

@@ -11,7 +11,7 @@ import {
   Average,
   MatchExp,
   DICTIONARY_RECORD
-} from '@';
+} from 'interaqt';
 
 describe('Average computed handle', () => {
   

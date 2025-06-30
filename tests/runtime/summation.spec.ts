@@ -11,7 +11,7 @@ import {
   Summation,
   MatchExp,
   DICTIONARY_RECORD
-} from '@';
+} from 'interaqt';
 
 describe('Sum computed handle', () => {
   

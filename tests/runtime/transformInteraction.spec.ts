@@ -3,7 +3,7 @@ import {
     Controller, MonoSystem,
     BoolExp, Interaction,
     KlassByName, SQLiteDB, AttributeError
-} from '@';
+} from 'interaqt';
 import { createData } from './data/leaveRequest.js';
 
 // 里面有所有必须的数据？

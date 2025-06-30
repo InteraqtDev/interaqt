@@ -15,7 +15,7 @@ import {
     Action, Activity, Interaction, Payload, PayloadItem, USER_ENTITY,
     PropertyStateMachineHandle, RecordStateMachineHandle, 
     ActivityGroup
-} from '@';
+} from 'interaqt';
 import { MatchExp } from "@storage";
 
 

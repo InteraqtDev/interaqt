@@ -13,11 +13,10 @@ export default defineConfig({
     ],
     resolve: {
         alias: {
-            '@/SQLite.js': path.resolve(__dirname, './src/runtime/SQLite.ts'),
             '@runtime': path.resolve(__dirname, './src/runtime/index.ts'),
             '@shared': path.resolve(__dirname, './src/shared/index.ts'),
             '@storage': path.resolve(__dirname, './src/storage/index.ts'),
-            '@': path.resolve(__dirname, './src'),
+            'interaqt': path.resolve(__dirname, './src'),
         }
     }
 })

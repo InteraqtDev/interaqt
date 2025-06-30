@@ -5,7 +5,7 @@ import {
     MonoSystem,
     KlassInstance,
     Relation
-} from '@';
+} from 'interaqt';
 import { createData } from './data/activity/index.js';
 
 describe("activity state", () => {
