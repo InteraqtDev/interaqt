@@ -90,8 +90,8 @@ When using LLM to generate interaqt applications, you must follow **test-case dr
 ### 4. Test-Driven Validation (Critical Step)
 1. **Test Framework Setup**:
    - Use vitest as testing framework
-   - Configure test database (use PGLite memory mode)
-   - Create test utility functions and data factories
+   - Configure test database
+   - Use framework APIs directly in tests (no need for test utilities)
 
 2. **Test Coverage Requirements**:
    - All Interactions must have at least one success case and one failure case

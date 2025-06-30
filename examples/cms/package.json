@@ -17,10 +17,10 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "interaqt": "file:../../",
     "@fastify/middie": "^9.0.3",
     "cors": "^2.8.5",
     "fastify": "^5.4.0",
+    "interaqt": "file:../../",
     "tsx": "^4.20.3",
     "vite-tsconfig-paths": "^5.1.4",
     "vitest": "^3.2.4"

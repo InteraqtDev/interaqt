@@ -500,7 +500,6 @@ describe('Approval Process Activity', () => {
 Permission testing is an important component of InterAQT application testing, requiring verification of access permissions for different users in different scenarios:
 
 ```typescript
-// tests/permissions/setup.ts
 import { describe, test, expect, beforeEach } from 'vitest';
 import { Controller, MonoSystem, KlassByName, PGLiteDB } from 'interaqt';
 

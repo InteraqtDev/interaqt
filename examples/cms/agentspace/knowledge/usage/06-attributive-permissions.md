@@ -677,7 +677,6 @@ const queryExamples = {
 Testing Attributives requires simulating a complete user interaction environment, including users, permission context, and database state:
 
 ```javascript
-// tests/attributive/setup.ts
 import { describe, test, expect, beforeEach } from 'vitest';
 import { Controller, MonoSystem, KlassByName, PGLiteDB } from 'interaqt';
 import { entities, relations, interactions, activities } from '../src/index.js';
@@ -703,8 +702,6 @@ describe('Attributive Permission Tests', () => {
     
     await controller.setup(true);
   });
-  
-  // Test helper function: create test user
 
 });
 ```
