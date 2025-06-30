@@ -1,150 +1,132 @@
-import { Entity, Property, Count } from '@interaqt/runtime'
-import { StyleVersionRelation } from './relations'
+import { Entity, Property, Count, Transform, Any } from '@'
 
-export const Style = Entity.create({
-  name: 'Style',
-  properties: [
-    Property.create({
-      name: 'id',
-      type: 'string',
-      collection: false,
-      required: true
-    }),
-    Property.create({
-      name: 'label',
-      type: 'string',
-      collection: false,
-      required: true
-    }),
-    Property.create({
-      name: 'slug',
-      type: 'string',
-      collection: false,
-      required: true
-    }),
-    Property.create({
-      name: 'description',
-      type: 'string',
-      collection: false,
-      required: false
-    }),
-    Property.create({
-      name: 'type',
-      type: 'string',
-      collection: false,
-      required: true
-    }),
-    Property.create({
-      name: 'thumb_key',
-      type: 'string',
-      collection: false,
-      required: false
-    }),
-    Property.create({
-      name: 'priority',
-      type: 'number',
-      collection: false,
-      required: true
-    }),
-    Property.create({
-      name: 'status',
-      type: 'string',
-      collection: false,
-      required: true
-    }),
-    Property.create({
-      name: 'created_at',
-      type: 'string',
-      collection: false,
-      required: true
-    }),
-    Property.create({
-      name: 'updated_at',
-      type: 'string',
-      collection: false,
-      required: true
-    })
-  ]
-})
-
-export const Version = Entity.create({
-  name: 'Version',
-  properties: [
-    Property.create({
-      name: 'id',
-      type: 'string',
-      collection: false,
-      required: true
-    }),
-    Property.create({
-      name: 'version_number',
-      type: 'string',
-      collection: false,
-      required: true
-    }),
-    Property.create({
-      name: 'description',
-      type: 'string',
-      collection: false,
-      required: false
-    }),
-    Property.create({
-      name: 'created_at',
-      type: 'string',
-      collection: false,
-      required: true
-    }),
-    Property.create({
-      name: 'is_current',
-      type: 'boolean',
-      collection: false,
-      required: true
-    }),
-    Property.create({
-      name: 'created_by',
-      type: 'string',
-      collection: false,
-      required: true
-    }),
-    Property.create({
-      name: 'styles_count',
-      type: 'number',
-      collection: false,
-      required: false,
-      computedData: Count.create({
-        record: StyleVersionRelation,
-        recordName: 'StyleVersionRelation'
-      })
-    })
-  ]
-})
-
+// User Entity for permission control
 export const User = Entity.create({
   name: 'User',
   properties: [
     Property.create({
       name: 'id',
       type: 'string',
-      collection: false,
-      required: true
+      collection: false
     }),
     Property.create({
       name: 'username',
       type: 'string',
-      collection: false,
-      required: true
+      collection: false
+    }),
+    Property.create({
+      name: 'email',
+      type: 'string',
+      collection: false
     }),
     Property.create({
       name: 'role',
       type: 'string',
-      collection: false,
-      required: true
+      collection: false
     }),
     Property.create({
-      name: 'created_at',
+      name: 'createdAt',
       type: 'string',
-      collection: false,
-      required: true
+      collection: false
+    }),
+    Property.create({
+      name: 'updatedAt',
+      type: 'string',
+      collection: false
+    })
+  ]
+})
+
+// Version Entity for version management
+export const Version = Entity.create({
+  name: 'Version',
+  properties: [
+    Property.create({
+      name: 'id',
+      type: 'string',
+      collection: false
+    }),
+    Property.create({
+      name: 'name',
+      type: 'string',
+      collection: false
+    }),
+    Property.create({
+      name: 'description',
+      type: 'string',
+      collection: false
+    }),
+    Property.create({
+      name: 'status',
+      type: 'string',
+      collection: false
+    }),
+    Property.create({
+      name: 'createdAt',
+      type: 'string',
+      collection: false
+    }),
+    Property.create({
+      name: 'publishedAt',
+      type: 'string',
+      collection: false
+    })
+  ]
+})
+
+// Style Entity - the main entity for style management
+export const Style = Entity.create({
+  name: 'Style',
+  properties: [
+    Property.create({
+      name: 'id',
+      type: 'string',
+      collection: false
+    }),
+    Property.create({
+      name: 'label',
+      type: 'string',
+      collection: false
+    }),
+    Property.create({
+      name: 'slug',
+      type: 'string',
+      collection: false
+    }),
+    Property.create({
+      name: 'description',
+      type: 'string',
+      collection: false
+    }),
+    Property.create({
+      name: 'type',
+      type: 'string',
+      collection: false
+    }),
+    Property.create({
+      name: 'thumbKey',
+      type: 'string',
+      collection: false
+    }),
+    Property.create({
+      name: 'priority',
+      type: 'number',
+      collection: false
+    }),
+    Property.create({
+      name: 'status',
+      type: 'string',
+      collection: false
+    }),
+    Property.create({
+      name: 'createdAt',
+      type: 'string',
+      collection: false
+    }),
+    Property.create({
+      name: 'updatedAt',
+      type: 'string',
+      collection: false
     })
   ]
 })

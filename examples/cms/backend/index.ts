@@ -1,61 +1,54 @@
-import { Controller } from '@interaqt/runtime'
-import { Style, Version, User } from './entities'
-import { StyleVersionRelation, UserVersionRelation } from './relations'
-import {
-  TotalStylesCount,
-  PublishedStylesCount,
-  DraftStylesCount,
-  OfflineStylesCount,
-  StylesByTypeCount,
-  MaxStylePriority,
-  MinStylePriority,
-  StyleStatusStateMachine,
-  CurrentVersionCount
-} from './computations'
+export * from './entities'
+export * from './relations'
+export * from './interactions'
+
+// Import computations to initialize them
+import './computations'
+
+// Export arrays for convenience
+import { User, Version, Style } from './entities'
+import { StyleVersionRelation, UserStylesRelation, UserVersionsRelation } from './relations'
 import {
   CreateStyleInteraction,
   UpdateStyleInteraction,
-  UpdateStyleStatusInteraction,
+  PublishStyleInteraction,
+  OfflineStyleInteraction,
   DeleteStyleInteraction,
   ReorderStylesInteraction,
-  BulkCreateStylesInteraction,
+  BatchUpdatePriorityInteraction,
   CreateVersionInteraction,
-  RollbackToVersionInteraction,
-  PublishStyleInteraction,
-  TakeStyleOfflineInteraction,
-  CreateUserInteraction
+  PublishVersionInteraction,
+  RollbackVersionInteraction,
+  GetStylesByStatusInteraction,
+  GetStylesByTypeInteraction,
+  SearchStylesInteraction,
+  GetVersionStatsInteraction
 } from './interactions'
 
-export const controller = Controller.create({
-  entities: [Style, Version, User],
-  relations: [StyleVersionRelation, UserVersionRelation],
-  computations: [
-    TotalStylesCount,
-    PublishedStylesCount,
-    DraftStylesCount,
-    OfflineStylesCount,
-    StylesByTypeCount,
-    MaxStylePriority,
-    MinStylePriority,
-    StyleStatusStateMachine,
-    CurrentVersionCount
-  ],
-  interactions: [
-    CreateStyleInteraction,
-    UpdateStyleInteraction,
-    UpdateStyleStatusInteraction,
-    DeleteStyleInteraction,
-    ReorderStylesInteraction,
-    BulkCreateStylesInteraction,
-    CreateVersionInteraction,
-    RollbackToVersionInteraction,
-    PublishStyleInteraction,
-    TakeStyleOfflineInteraction,
-    CreateUserInteraction
-  ]
-})
+export const entities = [User, Version, Style]
 
-export * from './entities'
-export * from './relations'
-export * from './computations'
-export * from './interactions'
+export const relations = [
+  StyleVersionRelation,
+  UserStylesRelation,
+  UserVersionsRelation
+]
+
+export const interactions = [
+  CreateStyleInteraction,
+  UpdateStyleInteraction,
+  PublishStyleInteraction,
+  OfflineStyleInteraction,
+  DeleteStyleInteraction,
+  ReorderStylesInteraction,
+  BatchUpdatePriorityInteraction,
+  CreateVersionInteraction,
+  PublishVersionInteraction,
+  RollbackVersionInteraction,
+  GetStylesByStatusInteraction,
+  GetStylesByTypeInteraction,
+  SearchStylesInteraction,
+  GetVersionStatsInteraction
+]
+
+export const activities = []
+export const dicts = []

@@ -1,336 +1,91 @@
-import { 
-  Interaction, 
-  Action, 
-  Payload, 
-  Controller, 
-  Attributive,
-  PayloadItem,
-  CreateAction,
-  UpdateAction,
-  DeleteAction
-} from '@interaqt/runtime'
-import { Style, Version, User } from './entities'
-import { v4 as uuid } from 'uuid'
+import { Interaction, Action } from '@'
 
-const AdminAttributive = Attributive.create({
-  name: 'AdminOnly',
-  content: async (ctx) => {
-    return ctx.user?.role === 'admin'
-  }
-})
+// Define basic actions
+export const CreateStyleAction = Action.create({ name: 'createStyle' })
+export const UpdateStyleAction = Action.create({ name: 'updateStyle' })
+export const PublishStyleAction = Action.create({ name: 'publishStyle' })
+export const OfflineStyleAction = Action.create({ name: 'offlineStyle' })
+export const DeleteStyleAction = Action.create({ name: 'deleteStyle' })
 
-const EditorAttributive = Attributive.create({
-  name: 'EditorOrAdmin',
-  content: async (ctx) => {
-    return ctx.user?.role === 'admin' || ctx.user?.role === 'editor'
-  }
-})
+export const ReorderStylesAction = Action.create({ name: 'reorderStyles' })
+export const BatchUpdatePriorityAction = Action.create({ name: 'batchUpdatePriority' })
 
-const ViewerAttributive = Attributive.create({
-  name: 'AnyUser',
-  content: async (ctx) => {
-    return !!ctx.user
-  }
-})
+export const CreateVersionAction = Action.create({ name: 'createVersion' })
+export const PublishVersionAction = Action.create({ name: 'publishVersion' })
+export const RollbackVersionAction = Action.create({ name: 'rollbackVersion' })
 
+export const GetStylesByStatusAction = Action.create({ name: 'getStylesByStatus' })
+export const GetStylesByTypeAction = Action.create({ name: 'getStylesByType' })
+export const SearchStylesAction = Action.create({ name: 'searchStyles' })
+export const GetVersionStatsAction = Action.create({ name: 'getVersionStats' })
+
+// Define basic interactions
 export const CreateStyleInteraction = Interaction.create({
-  name: 'CreateStyle',
-  action: CreateAction.create({
-    entity: Style
-  }),
-  payload: Payload.create({
-    items: [
-      PayloadItem.create({
-        name: 'label',
-        base: 'string',
-        required: true
-      }),
-      PayloadItem.create({
-        name: 'slug',
-        base: 'string',
-        required: true
-      }),
-      PayloadItem.create({
-        name: 'description',
-        base: 'string',
-        required: false
-      }),
-      PayloadItem.create({
-        name: 'type',
-        base: 'string',
-        required: true
-      }),
-      PayloadItem.create({
-        name: 'thumb_key',
-        base: 'string',
-        required: false
-      }),
-      PayloadItem.create({
-        name: 'priority',
-        base: 'number',
-        required: true
-      }),
-      PayloadItem.create({
-        name: 'status',
-        base: 'string',
-        required: false
-      })
-    ]
-  }),
-  attributives: [EditorAttributive],
-  dataAttributives: {
-    id: () => uuid(),
-    status: (payload) => payload.status || 'draft',
-    created_at: () => new Date().toISOString(),
-    updated_at: () => new Date().toISOString()
-  }
+  name: 'CreateStyleInteraction',
+  action: CreateStyleAction
 })
 
 export const UpdateStyleInteraction = Interaction.create({
-  name: 'UpdateStyle',
-  action: UpdateAction.create({
-    entity: Style,
-    recordSelection: 'byId'
-  }),
-  payload: Payload.create({
-    items: [
-      PayloadItem.create({
-        name: 'id',
-        base: 'string',
-        required: true
-      }),
-      PayloadItem.create({
-        name: 'label',
-        base: 'string',
-        required: false
-      }),
-      PayloadItem.create({
-        name: 'slug',
-        base: 'string',
-        required: false
-      }),
-      PayloadItem.create({
-        name: 'description',
-        base: 'string',
-        required: false
-      }),
-      PayloadItem.create({
-        name: 'type',
-        base: 'string',
-        required: false
-      }),
-      PayloadItem.create({
-        name: 'thumb_key',
-        base: 'string',
-        required: false
-      }),
-      PayloadItem.create({
-        name: 'priority',
-        base: 'number',
-        required: false
-      })
-    ]
-  }),
-  attributives: [EditorAttributive],
-  dataAttributives: {
-    updated_at: () => new Date().toISOString()
-  }
-})
-
-export const UpdateStyleStatusInteraction = Interaction.create({
-  name: 'UpdateStyleStatus',
-  action: UpdateAction.create({
-    entity: Style,
-    recordSelection: 'byId'
-  }),
-  payload: Payload.create({
-    items: [
-      PayloadItem.create({
-        name: 'id',
-        base: 'string',
-        required: true
-      }),
-      PayloadItem.create({
-        name: 'status',
-        base: 'string',
-        required: true
-      })
-    ]
-  }),
-  attributives: [EditorAttributive],
-  dataAttributives: {
-    updated_at: () => new Date().toISOString()
-  }
-})
-
-export const DeleteStyleInteraction = Interaction.create({
-  name: 'DeleteStyle',
-  action: DeleteAction.create({
-    entity: Style,
-    recordSelection: 'byId'
-  }),
-  payload: Payload.create({
-    items: [
-      PayloadItem.create({
-        name: 'id',
-        base: 'string',
-        required: true
-      })
-    ]
-  }),
-  attributives: [AdminAttributive]
-})
-
-export const ReorderStylesInteraction = Interaction.create({
-  name: 'ReorderStyles',
-  action: Action.create({
-    name: 'ReorderStyles'
-  }),
-  payload: Payload.create({
-    items: [
-      PayloadItem.create({
-        name: 'style_id',
-        base: 'string',
-        required: true
-      }),
-      PayloadItem.create({
-        name: 'new_position',
-        base: 'number',
-        required: true
-      })
-    ]
-  }),
-  attributives: [EditorAttributive]
-})
-
-export const BulkCreateStylesInteraction = Interaction.create({
-  name: 'BulkCreateStyles',
-  action: Action.create({
-    name: 'BulkCreateStyles'
-  }),
-  payload: Payload.create({
-    items: [
-      PayloadItem.create({
-        name: 'styles',
-        base: 'object',
-        required: true
-      })
-    ]
-  }),
-  attributives: [AdminAttributive]
-})
-
-export const CreateVersionInteraction = Interaction.create({
-  name: 'CreateVersion',
-  action: CreateAction.create({
-    entity: Version
-  }),
-  payload: Payload.create({
-    items: [
-      PayloadItem.create({
-        name: 'version_number',
-        base: 'string',
-        required: true
-      }),
-      PayloadItem.create({
-        name: 'description',
-        base: 'string',
-        required: false
-      })
-    ]
-  }),
-  attributives: [AdminAttributive],
-  dataAttributives: {
-    id: () => uuid(),
-    created_at: () => new Date().toISOString(),
-    is_current: () => true,
-    created_by: (payload, ctx) => ctx.user?.id || 'system'
-  }
-})
-
-export const RollbackToVersionInteraction = Interaction.create({
-  name: 'RollbackToVersion',
-  action: Action.create({
-    name: 'RollbackToVersion'
-  }),
-  payload: Payload.create({
-    items: [
-      PayloadItem.create({
-        name: 'version_id',
-        base: 'string',
-        required: true
-      })
-    ]
-  }),
-  attributives: [AdminAttributive]
+  name: 'UpdateStyleInteraction',
+  action: UpdateStyleAction
 })
 
 export const PublishStyleInteraction = Interaction.create({
-  name: 'PublishStyle',
-  action: UpdateAction.create({
-    entity: Style,
-    recordSelection: 'byId'
-  }),
-  payload: Payload.create({
-    items: [
-      PayloadItem.create({
-        name: 'id',
-        base: 'string',
-        required: true
-      })
-    ]
-  }),
-  attributives: [EditorAttributive],
-  dataAttributives: {
-    status: () => 'published',
-    updated_at: () => new Date().toISOString()
-  }
+  name: 'PublishStyleInteraction',
+  action: PublishStyleAction
 })
 
-export const TakeStyleOfflineInteraction = Interaction.create({
-  name: 'TakeStyleOffline',
-  action: UpdateAction.create({
-    entity: Style,
-    recordSelection: 'byId'
-  }),
-  payload: Payload.create({
-    items: [
-      PayloadItem.create({
-        name: 'id',
-        base: 'string',
-        required: true
-      })
-    ]
-  }),
-  attributives: [EditorAttributive],
-  dataAttributives: {
-    status: () => 'offline',
-    updated_at: () => new Date().toISOString()
-  }
+export const OfflineStyleInteraction = Interaction.create({
+  name: 'OfflineStyleInteraction',
+  action: OfflineStyleAction
 })
 
-export const CreateUserInteraction = Interaction.create({
-  name: 'CreateUser',
-  action: CreateAction.create({
-    entity: User
-  }),
-  payload: Payload.create({
-    items: [
-      PayloadItem.create({
-        name: 'username',
-        base: 'string',
-        required: true
-      }),
-      PayloadItem.create({
-        name: 'role',
-        base: 'string',
-        required: true
-      })
-    ]
-  }),
-  attributives: [AdminAttributive],
-  dataAttributives: {
-    id: () => uuid(),
-    created_at: () => new Date().toISOString()
-  }
+export const DeleteStyleInteraction = Interaction.create({
+  name: 'DeleteStyleInteraction',
+  action: DeleteStyleAction
+})
+
+export const ReorderStylesInteraction = Interaction.create({
+  name: 'ReorderStylesInteraction',
+  action: ReorderStylesAction
+})
+
+export const BatchUpdatePriorityInteraction = Interaction.create({
+  name: 'BatchUpdatePriorityInteraction',
+  action: BatchUpdatePriorityAction
+})
+
+export const CreateVersionInteraction = Interaction.create({
+  name: 'CreateVersionInteraction',
+  action: CreateVersionAction
+})
+
+export const PublishVersionInteraction = Interaction.create({
+  name: 'PublishVersionInteraction',
+  action: PublishVersionAction
+})
+
+export const RollbackVersionInteraction = Interaction.create({
+  name: 'RollbackVersionInteraction',
+  action: RollbackVersionAction
+})
+
+export const GetStylesByStatusInteraction = Interaction.create({
+  name: 'GetStylesByStatusInteraction',
+  action: GetStylesByStatusAction
+})
+
+export const GetStylesByTypeInteraction = Interaction.create({
+  name: 'GetStylesByTypeInteraction',
+  action: GetStylesByTypeAction
+})
+
+export const SearchStylesInteraction = Interaction.create({
+  name: 'SearchStylesInteraction',
+  action: SearchStylesAction
+})
+
+export const GetVersionStatsInteraction = Interaction.create({
+  name: 'GetVersionStatsInteraction',
+  action: GetVersionStatsAction
 })

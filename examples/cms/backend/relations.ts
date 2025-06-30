@@ -1,30 +1,32 @@
-import { Relation } from '@interaqt/runtime'
-import { Style, Version, User } from './entities'
+import { Relation } from '@'
+import { User, Version, Style } from './entities'
 
+// Style belongs to Version (many-to-one)
 export const StyleVersionRelation = Relation.create({
   source: Style,
-  sourceProperty: 'versions',
+  sourceProperty: 'version',
   target: Version,
   targetProperty: 'styles',
-  relType: 'n:n',
-  properties: [
-    {
-      name: 'snapshot_data',
-      type: 'object',
-      collection: false
-    },
-    {
-      name: 'created_at',
-      type: 'string',
-      collection: false
-    }
-  ]
+  name: 'StyleVersionRelation',
+  type: 'n:1'
 })
 
-export const UserVersionRelation = Relation.create({
+// User creates Styles (one-to-many)
+export const UserStylesRelation = Relation.create({
   source: User,
-  sourceProperty: 'created_versions',
+  sourceProperty: 'createdStyles',
+  target: Style,
+  targetProperty: 'creator',
+  name: 'UserStylesRelation',
+  type: '1:n'
+})
+
+// User creates Versions (one-to-many)
+export const UserVersionsRelation = Relation.create({
+  source: User,
+  sourceProperty: 'createdVersions',
   target: Version,
   targetProperty: 'creator',
-  relType: '1:n'
+  name: 'UserVersionsRelation',
+  type: '1:n'
 })

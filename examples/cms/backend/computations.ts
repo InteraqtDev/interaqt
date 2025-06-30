@@ -1,91 +1,146 @@
-import { Count, MapOf, WeightedSummation, Match, StateMachine } from '@interaqt/runtime'
-import { Style, Version } from './entities'
-import { StyleVersionRelation } from './relations'
+import { Property, Count, Transform, Any } from '@'
+import { User, Version, Style } from './entities'
+import { StyleVersionRelation, UserStylesRelation, UserVersionsRelation } from './relations'
 
-export const TotalStylesCount = Count.create({
-  record: Style,
-  recordName: 'Style'
-})
+// Add computed properties to entities after relations are defined
 
-export const PublishedStylesCount = Count.create({
-  record: Style,
-  recordName: 'Style',
-  match: Match.create({
-    'status': 'published'
+// User computed properties
+User.properties.push(
+  Property.create({
+    name: 'stylesCount',
+    type: 'number',
+    collection: false,
+    defaultValue: () => 0,
+    computedData: Count.create({
+      record: UserStylesRelation
+    })
   })
-})
+)
 
-export const DraftStylesCount = Count.create({
-  record: Style,
-  recordName: 'Style',
-  match: Match.create({
-    'status': 'draft'
+User.properties.push(
+  Property.create({
+    name: 'versionsCount',
+    type: 'number',
+    collection: false,
+    defaultValue: () => 0,
+    computedData: Count.create({
+      record: UserVersionsRelation
+    })
   })
-})
+)
 
-export const OfflineStylesCount = Count.create({
-  record: Style,
-  recordName: 'Style',
-  match: Match.create({
-    'status': 'offline'
+// Version computed properties
+Version.properties.push(
+  Property.create({
+    name: 'stylesCount',
+    type: 'number',
+    collection: false,
+    defaultValue: () => 0,
+    computedData: Count.create({
+      record: StyleVersionRelation
+    })
   })
-})
+)
 
-export const StylesByTypeCount = MapOf.create({
-  record: Style,
-  recordName: 'Style',
-  key: 'type',
-  computation: Count.create({
-    record: Style,
-    recordName: 'Style'
+// Count styles by status in version
+Version.properties.push(
+  Property.create({
+    name: 'publishedStylesCount',
+    type: 'number',
+    collection: false,
+    defaultValue: () => 0,
+    computedData: Count.create({
+      record: StyleVersionRelation,
+      attributeQuery: [['source', {attributeQuery: ['status']}]],
+      callback: function(relation) {
+        return relation.source.status === 'published'
+      }
+    })
   })
-})
+)
 
-export const MaxStylePriority = WeightedSummation.create({
-  record: Style,
-  recordName: 'Style',
-  value: 'priority',
-  aggregator: 'max'
-})
-
-export const MinStylePriority = WeightedSummation.create({
-  record: Style,
-  recordName: 'Style',
-  value: 'priority',
-  aggregator: 'min'
-})
-
-export const StyleStatusStateMachine = StateMachine.create({
-  states: ['draft', 'published', 'offline'],
-  initial: 'draft',
-  transitions: [
-    {
-      from: 'draft',
-      to: 'published',
-      condition: 'can_publish'
-    },
-    {
-      from: 'published',
-      to: 'offline',
-      condition: 'can_take_offline'
-    },
-    {
-      from: 'offline',
-      to: 'published',
-      condition: 'can_republish'
-    },
-    {
-      from: 'published',
-      to: 'draft',
-      condition: 'can_unpublish'
-    }
-  ]
-})
-
-export const CurrentVersionCount = Count.create({
-  record: Version,
-  recordName: 'Version',
-  match: Match.create({
-    'is_current': true
+Version.properties.push(
+  Property.create({
+    name: 'draftStylesCount',
+    type: 'number',
+    collection: false,
+    defaultValue: () => 0,
+    computedData: Count.create({
+      record: StyleVersionRelation,
+      attributeQuery: [['source', {attributeQuery: ['status']}]],
+      callback: function(relation) {
+        return relation.source.status === 'draft'
+      }
+    })
   })
-})
+)
+
+Version.properties.push(
+  Property.create({
+    name: 'offlineStylesCount',
+    type: 'number',
+    collection: false,
+    defaultValue: () => 0,
+    computedData: Count.create({
+      record: StyleVersionRelation,
+      attributeQuery: [['source', {attributeQuery: ['status']}]],
+      callback: function(relation) {
+        return relation.source.status === 'offline'
+      }
+    })
+  })
+)
+
+// Check if version can be published (has at least one published style)
+Version.properties.push(
+  Property.create({
+    name: 'canBePublished',
+    type: 'boolean',
+    collection: false,
+    defaultValue: () => false,
+    computedData: Any.create({
+      record: StyleVersionRelation,
+      attributeQuery: [['source', {attributeQuery: ['status']}]],
+      callback: function(relation) {
+        return relation.source.status === 'published'
+      }
+    })
+  })
+)
+
+// Get maximum priority in version for new style priority calculation
+Version.properties.push(
+  Property.create({
+    name: 'maxPriority',
+    type: 'number',
+    collection: false,
+    defaultValue: () => 0,
+    computedData: Transform.create({
+      record: StyleVersionRelation,
+      attributeQuery: [['source', {attributeQuery: ['priority']}]],
+      callback: function(relations) {
+        if (relations.length === 0) return 0
+        return Math.max(...relations.map(r => r.source.priority || 0))
+      }
+    })
+  })
+)
+
+// Calculate next style priority for new styles
+Version.properties.push(
+  Property.create({
+    name: 'nextStylePriority',
+    type: 'number',
+    collection: false,
+    defaultValue: () => 1,
+    computedData: Transform.create({
+      record: StyleVersionRelation,
+      attributeQuery: [['source', {attributeQuery: ['priority']}]],
+      callback: function(relations) {
+        if (relations.length === 0) return 1
+        const maxPriority = Math.max(...relations.map(r => r.source.priority || 0))
+        return maxPriority + 1
+      }
+    })
+  })
+)
