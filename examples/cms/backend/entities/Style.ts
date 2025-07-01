@@ -1,78 +1,61 @@
-import { Entity, Property, Count, Transform } from 'interaqt'
+import { Entity, Property } from 'interaqt'
 
 export const Style = Entity.create({
   name: 'Style',
   properties: [
     Property.create({
+      name: 'id',
+      type: 'string',
+      collection: false
+    }),
+    Property.create({
       name: 'label',
-      type: 'string'
+      type: 'string',
+      collection: false
     }),
     Property.create({
       name: 'slug',
-      type: 'string'
+      type: 'string',
+      collection: false
     }),
     Property.create({
       name: 'description',
-      type: 'string'
+      type: 'string',
+      collection: false
     }),
     Property.create({
       name: 'type',
-      type: 'string'
+      type: 'string',
+      collection: false
     }),
     Property.create({
       name: 'thumbKey',
-      type: 'string'
+      type: 'string',
+      collection: false
     }),
     Property.create({
       name: 'priority',
       type: 'number',
+      collection: false,
       defaultValue: () => 0
     }),
     Property.create({
       name: 'status',
       type: 'string',
+      collection: false,
       defaultValue: () => 'draft'
     }),
     Property.create({
       name: 'createdAt',
-      type: 'string'
+      type: 'string',
+      collection: false,
+      defaultValue: () => new Date().toISOString()
     }),
     Property.create({
       name: 'updatedAt',
-      type: 'string'
-    }),
-    Property.create({
-      name: 'createdBy',
-      type: 'string'
-    }),
-    Property.create({
-      name: 'versionCount',
-      type: 'number',
-      defaultValue: () => 0,
-      computedData: Count.create({
-        record: () => StyleVersionRelation
-      })
-    }),
-    Property.create({
-      name: 'isReferencedByPublishedVersion',
-      type: 'boolean',
-      defaultValue: () => false,
-      computedData: Transform.create({
-        record: () => StyleVersionRelation,
-        callback: (styleVersions, style) => {
-          return styleVersions.some(sv => {
-            if (sv.source === style.id) {
-              // Check if the target version is published
-              const version = sv.target
-              return version && version.status === 'published'
-            }
-            return false
-          })
-        }
-      })
+      type: 'string',
+      collection: false,
+      defaultValue: () => new Date().toISOString()
     })
   ]
 })
-
-// Import relations - these will be defined later
-import { StyleVersionRelation } from '../relations/StyleVersionRelation'

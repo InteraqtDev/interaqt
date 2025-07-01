@@ -1,10 +1,243 @@
+# Testing
+
+In the interaqt framework, testing is part of the design philosophy. The reactive programming model makes testing more intuitive and reliable. This chapter will detail testing strategies, patterns, and best practices.
+
+## Testing API Quick Reference
+
+### ⚠️ Common API Mistakes to Avoid
+
+Many LLMs generate incorrect API usage. Here's the correct way to use interaqt testing APIs:
+
+```typescript
+// ❌ WRONG: These APIs do NOT exist
+controller.run()                           // ❌ No such method
+storage.findByProperty('Entity', 'prop')   // ❌ No such method
+controller.execute()                       // ❌ No such method
+controller.dispatch()                      // ❌ No such method
+
+// ✅ CORRECT: Use these APIs instead
+controller.callInteraction('InteractionName', args)  // ✅ Call interactions
+storage.findOne('Entity', MatchExp)                  // ✅ Find single record
+storage.find('Entity', MatchExp)                     // ✅ Find multiple records
+storage.create('Entity', data)                       // ✅ Create record
+```
+
+### Complete Test Template
+
+```typescript
+import { describe, test, expect, beforeEach } from 'vitest'
+import { Controller, MonoSystem, KlassByName, PGLiteDB, MatchExp } from 'interaqt'
+import { entities, relations, interactions, activities } from '../backend'
+// If you need UUID, install and import it:
+// npm install uuid @types/uuid
+// import { v4 as uuid } from 'uuid'
+
+describe('Feature Tests', () => {
+  let system: MonoSystem
+  let controller: Controller
+
+  beforeEach(async () => {
+    // ✅ Correct setup
+    system = new MonoSystem(new PGLiteDB())
+    system.conceptClass = KlassByName
+
+    // Note: When creating relations, DO NOT specify name property
+    // The framework automatically generates relation names:
+    // - User + Post → UserPost
+    // - Post + Comment → PostComment
+    
+    controller = new Controller(
+      system,
+      entities,
+      relations,       // Relations with auto-generated names
+      activities,      // 4th parameter
+      interactions,    // 5th parameter
+      [],             // 6th parameter: global dictionaries (NOT computations)
+      []              // 7th parameter: side effects
+    )
+
+    await controller.setup(true)
+  })
+
+  test('interaction test example', async () => {
+    // ✅ CORRECT: Use callInteraction
+    const result = await controller.callInteraction('CreateUser', {
+      user: { id: 'system', role: 'admin' },  // Must include user object
+      payload: {
+        username: 'testuser',
+        email: 'test@example.com',
+        role: 'user'
+      }
+    })
+
+    // Check for errors
+    expect(result.error).toBeUndefined()
+
+    // ✅ CORRECT: Use storage.findOne with MatchExp
+    const user = await system.storage.findOne(
+      'User',
+      MatchExp.atom({ key: 'username', value: ['=', 'testuser'] })
+    )
+
+    expect(user).toBeTruthy()
+    expect(user.email).toBe('test@example.com')
+  })
+
+  test('finding records examples', async () => {
+    // ✅ Find by single field
+    const user = await system.storage.findOne(
+      'User',
+      MatchExp.atom({ key: 'id', value: ['=', userId] })
+    )
+
+    // ✅ Find with multiple conditions
+    const activeUsers = await system.storage.find(
+      'User',
+      MatchExp.atom({ key: 'status', value: ['=', 'active'] })
+        .and({ key: 'role', value: ['=', 'user'] })
+    )
+
+    // ✅ Find with complex conditions
+    const posts = await system.storage.find(
+      'Post',
+      MatchExp.atom({ key: 'author.id', value: ['=', userId] })
+        .and({ key: 'status', value: ['in', ['published', 'draft']] })
+    )
+  })
+
+  test('creating and updating records', async () => {
+    // ✅ Create record directly (for test setup)
+    const user = await system.storage.create('User', {
+      username: 'testuser',
+      email: 'test@example.com',
+      role: 'user'
+    })
+
+    // ✅ Update record
+    await system.storage.update(
+      'User',
+      MatchExp.atom({ key: 'id', value: ['=', user.id] }),
+      { status: 'active' }
+    )
+
+    // ✅ Delete record
+    await system.storage.delete(
+      'User',
+      MatchExp.atom({ key: 'id', value: ['=', user.id] })
+    )
+  })
+})
+```
+
+### Key API Methods
+
+#### 1. Controller APIs
+
+```typescript
+// Call an interaction (the ONLY way to execute business logic)
+const result = await controller.callInteraction(interactionName: string, args: {
+  user: { id: string, [key: string]: any },  // Required user object
+  payload?: { [key: string]: any }           // Optional payload
+})
+
+// Call activity interaction
+const result = await controller.callActivityInteraction(
+  activityName: string,
+  interactionName: string,
+  activityId: string,
+  args: InteractionEventArgs
+)
+```
+
+#### 2. Storage APIs
+
+```typescript
+// Create a record (usually for test setup)
+const record = await system.storage.create(entityName: string, data: object)
+
+// Find one record
+const record = await system.storage.findOne(
+  entityName: string,
+  matchExp: MatchExp,
+  modifier?: Modifier,
+  attributeQuery?: AttributeQuery
+)
+
+// Find multiple records
+const records = await system.storage.find(
+  entityName: string,
+  matchExp: MatchExp,
+  modifier?: Modifier,
+  attributeQuery?: AttributeQuery
+)
+
+// Update records
+await system.storage.update(
+  entityName: string,
+  matchExp: MatchExp,
+  data: object
+)
+
+// Delete records
+await system.storage.delete(
+  entityName: string,
+  matchExp: MatchExp
+)
+```
+
+#### 3. MatchExp Usage
+
+```typescript
+// Simple equality
+MatchExp.atom({ key: 'field', value: ['=', value] })
+
+// Multiple conditions (AND)
+MatchExp.atom({ key: 'status', value: ['=', 'active'] })
+  .and({ key: 'role', value: ['=', 'admin'] })
+
+// OR conditions
+MatchExp.atom({ key: 'role', value: ['=', 'admin'] })
+  .or({ key: 'role', value: ['=', 'moderator'] })
+
+// Complex operators
+MatchExp.atom({ key: 'age', value: ['>', 18] })
+MatchExp.atom({ key: 'name', value: ['like', '%john%'] })
+MatchExp.atom({ key: 'status', value: ['in', ['active', 'pending']] })
+MatchExp.atom({ key: 'score', value: ['between', [60, 100]] })
+
+// Nested field access
+MatchExp.atom({ key: 'user.profile.city', value: ['=', 'Beijing'] })
+```
+
+### Error Handling in Tests
+
+```typescript
+test('should handle errors correctly', async () => {
+  // ✅ CORRECT: Check error field in result
+  const result = await controller.callInteraction('SomeInteraction', {
+    user: { id: 'user1' },
+    payload: { invalid: 'data' }
+  })
+
+  expect(result.error).toBeDefined()
+  expect(result.error.message).toContain('expected error message')
+
+  // ❌ WRONG: interaqt doesn't throw exceptions
+  // try {
+  //   await controller.callInteraction(...)
+  // } catch (e) {
+  //   // This won't work
+  // }
+})
+```
+
 # 12. How to Perform Testing
 
-Testing is a crucial component for ensuring the quality of InterAQT applications. The framework provides comprehensive testing support, including unit testing, integration testing, and end-to-end testing. This chapter will detail how to write effective tests for reactive applications.
+Testing is a crucial component for ensuring the quality of interaqt applications. The framework provides comprehensive testing support, including unit testing, integration testing, and end-to-end testing. This chapter will detail how to write effective tests for reactive applications.
 
-## ⚠️ CRITICAL: InterAQT Testing Philosophy
+## ⚠️ CRITICAL: interaqt Testing Philosophy
 
-**In the InterAQT framework, ALL data is derived from interaction events.** This fundamental principle changes how we approach testing:
+**In the interaqt framework, ALL data is derived from interaction events.** This fundamental principle changes how we approach testing:
 
 1. **Focus on Interaction Testing**: Since all Entity and Relation data are created, modified, and deleted through Interactions, comprehensive Interaction testing naturally covers all data operations.
 
@@ -407,7 +640,7 @@ describe('Approval Process Activity', () => {
 
 ### 12.3.1 Permission Testing Basics
 
-Permission testing is an important component of InterAQT application testing, requiring verification of access permissions for different users in different scenarios:
+Permission testing is an important component of interaqt application testing, requiring verification of access permissions for different users in different scenarios:
 
 ```typescript
 import { describe, test, expect, beforeEach } from 'vitest';
@@ -902,4 +1135,4 @@ describe('User Management Interactions', () => {
 });
 ```
 
-Testing is a crucial aspect of building reliable InterAQT applications. By focusing on comprehensive Interaction testing, developers can ensure their reactive applications work correctly and maintain quality as they evolve. Remember: in InterAQT, all data flows from Interactions, so testing Interactions thoroughly is sufficient to achieve complete test coverage. Skip entity and relation unit tests - they're automatically covered when you test the Interactions that use them. Proper test organization, edge case coverage, and permission testing make tests maintainable and effective for long-term development.
+Testing is a crucial aspect of building reliable interaqt applications. By focusing on comprehensive Interaction testing, developers can ensure their reactive applications work correctly and maintain quality as they evolve. Remember: in interaqt, all data flows from Interactions, so testing Interactions thoroughly is sufficient to achieve complete test coverage. Skip entity and relation unit tests - they're automatically covered when you test the Interactions that use them. Proper test organization, edge case coverage, and permission testing make tests maintainable and effective for long-term development.

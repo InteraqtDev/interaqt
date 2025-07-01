@@ -3,25 +3,44 @@ export * from './relations'
 export * from './interactions'
 
 import { User, Style, Version } from './entities'
-import { StyleUserRelation, VersionUserRelation, StyleVersionRelation } from './relations'
+import { UserStyleRelation, UserVersionRelation } from './relations'
 import {
-  CreateStyle, UpdateStyle, DeleteStyle, UpdateStyleStatus, UpdateStylePriority, BatchUpdateStyles,
-  GetStyleList, GetStyleDetail, SearchStyles,
-  CreateVersion, UpdateVersion, DeleteVersion, PublishVersion, ArchiveVersion, RollbackVersion,
-  GetVersionList, GetVersionDetail, CompareVersions, AddStyleToVersion, RemoveStyleFromVersion,
-  UpdateStyleOrderInVersion,
-  CreateUser, UpdateUser, DeleteUser, GetUserList, GetCurrentUser, UpdateProfile
+  CreateStyle,
+  UpdateStyle,
+  DeleteStyle,
+  PublishStyle,
+  UnpublishStyle,
+  ListStylesAdmin,
+  GetPublishedStyles,
+  BulkUpdatePriorities,
+  CreateVersion,
+  ListVersions,
+  RollbackToVersion,
+  DeleteVersion,
+  AdminLogin,
+  ValidateAdminToken,
+  CheckPermissions
 } from './interactions'
 
+// Export arrays for convenience
 export const entities = [User, Style, Version]
-export const relations = [StyleUserRelation, VersionUserRelation, StyleVersionRelation]
+export const relations = [UserStyleRelation, UserVersionRelation]
 export const interactions = [
-  CreateStyle, UpdateStyle, DeleteStyle, UpdateStyleStatus, UpdateStylePriority, BatchUpdateStyles,
-  GetStyleList, GetStyleDetail, SearchStyles,
-  CreateVersion, UpdateVersion, DeleteVersion, PublishVersion, ArchiveVersion, RollbackVersion,
-  GetVersionList, GetVersionDetail, CompareVersions, AddStyleToVersion, RemoveStyleFromVersion,
-  UpdateStyleOrderInVersion,
-  CreateUser, UpdateUser, DeleteUser, GetUserList, GetCurrentUser, UpdateProfile
+  CreateStyle,
+  UpdateStyle,
+  DeleteStyle,
+  PublishStyle,
+  UnpublishStyle,
+  ListStylesAdmin,
+  GetPublishedStyles,
+  BulkUpdatePriorities,
+  CreateVersion,
+  ListVersions,
+  RollbackToVersion,
+  DeleteVersion,
+  AdminLogin,
+  ValidateAdminToken,
+  CheckPermissions
 ]
 export const activities = []
 export const dicts = []

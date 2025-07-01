@@ -1,6 +1,6 @@
 # 10. How to Use Global Dictionaries
 
-Global dictionaries are an important mechanism in the InterAQT framework for managing global state and configuration. They provide a declarative way to define and maintain system-level data that can be referenced and reacted to by other components throughout the application.
+Global dictionaries are an important mechanism in the interaqt framework for managing global state and configuration. They provide a declarative way to define and maintain system-level data that can be referenced and reacted to by other components throughout the application.
 
 ## 10.1 Understanding Dictionary Concepts
 
@@ -939,4 +939,4 @@ await batch.setMultiple({
 });
 ```
 
-Global dictionaries provide the InterAQT framework with powerful global state management capabilities. Through proper use of dictionaries, you can implement system configuration management, real-time statistics, caching mechanisms, and other features, providing a solid foundation for building complex reactive applications.
+Global dictionaries provide the interaqt framework with powerful global state management capabilities. Through proper use of dictionaries, you can implement system configuration management, real-time statistics, caching mechanisms, and other features, providing a solid foundation for building complex reactive applications.

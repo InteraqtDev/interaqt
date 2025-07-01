@@ -1,49 +1,34 @@
-import { Entity, Property, Count } from 'interaqt'
+import { Entity, Property } from 'interaqt'
 
 export const User = Entity.create({
   name: 'User',
   properties: [
     Property.create({
-      name: 'username',
-      type: 'string'
+      name: 'id',
+      type: 'string',
+      collection: false
     }),
     Property.create({
       name: 'email',
-      type: 'string'
-    }),
-    Property.create({
-      name: 'role',
       type: 'string',
-      defaultValue: () => 'viewer'
+      collection: false
     }),
     Property.create({
-      name: 'isActive',
-      type: 'boolean',
-      defaultValue: () => true
+      name: 'roles',
+      type: 'string',
+      collection: true,
+      defaultValue: () => ['admin']
+    }),
+    Property.create({
+      name: 'name',
+      type: 'string',
+      collection: false
     }),
     Property.create({
       name: 'createdAt',
-      type: 'string'
-    }),
-    Property.create({
-      name: 'styleCount',
-      type: 'number',
-      defaultValue: () => 0,
-      computedData: Count.create({
-        record: () => StyleUserRelation
-      })
-    }),
-    Property.create({
-      name: 'versionCount', 
-      type: 'number',
-      defaultValue: () => 0,
-      computedData: Count.create({
-        record: () => VersionUserRelation
-      })
+      type: 'string',
+      collection: false,
+      defaultValue: () => new Date().toISOString()
     })
   ]
 })
-
-// Import relations - these will be defined later
-import { StyleUserRelation } from '../relations/StyleUserRelation'
-import { VersionUserRelation } from '../relations/VersionUserRelation'

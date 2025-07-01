@@ -1,6 +1,6 @@
 # 11. How to Handle Data Querying
 
-Data querying is one of the core functionalities in the InterAQT framework, providing powerful and flexible data retrieval capabilities. The framework supports advanced features such as complex query conditions, relational queries, and deep queries, enabling developers to efficiently obtain the required data.
+Data querying is one of the core functionalities in the interaqt framework, providing powerful and flexible data retrieval capabilities. The framework supports advanced features such as complex query conditions, relational queries, and deep queries, enabling developers to efficiently obtain the required data.
 
 ## 11.1 Basic Query Operations
 
@@ -1030,4 +1030,4 @@ async function onUserDataChanged() {
 }
 ```
 
-Data querying is key to building efficient applications. By mastering the query capabilities provided by the InterAQT framework, developers can flexibly obtain required data while maintaining good performance. Proper use of query conditions, attribute selection, relationship preloading, and caching strategies can significantly improve application response speed and user experience.
+Data querying is key to building efficient applications. By mastering the query capabilities provided by the interaqt framework, developers can flexibly obtain required data while maintaining good performance. Proper use of query conditions, attribute selection, relationship preloading, and caching strategies can significantly improve application response speed and user experience.

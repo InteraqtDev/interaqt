@@ -1,6 +1,33 @@
 # How to Establish Entity Relations
 
-Relations are bridges that connect different entities, defining how entities are associated with each other. InterAQT supports various types of relations, including one-to-one, one-to-many, many-to-many, and symmetric relations.
+Relations are bridges that connect different entities, defining how entities are associated with each other. interaqt supports various types of relations, including one-to-one, one-to-many, many-to-many, and symmetric relations.
+
+## Important: Relation Names are Auto-Generated
+
+When creating relations, you **DO NOT** need to specify a `name` property. The framework automatically generates the relation name based on the source and target entities. For example:
+- A relation between `User` and `Post` will automatically be named `UserPost`
+- A relation between `Post` and `Comment` will automatically be named `PostComment`
+
+```javascript
+// ✅ Correct: No name specified
+const UserPosts = Relation.create({
+  source: User,
+  sourceProperty: 'posts',
+  target: Post,
+  targetProperty: 'author',
+  type: 'n:1'
+});
+
+// ❌ Wrong: Do not specify name
+const UserPosts = Relation.create({
+  name: 'UserPost',  // DON'T do this - name is auto-generated
+  source: User,
+  sourceProperty: 'posts',
+  target: Post,
+  targetProperty: 'author',
+  type: 'n:1'
+});
+```
 
 ## Creating One-to-One Relations
 

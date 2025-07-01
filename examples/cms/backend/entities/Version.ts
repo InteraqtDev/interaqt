@@ -1,70 +1,33 @@
-import { Entity, Property, Count, Transform } from 'interaqt'
+import { Entity, Property } from 'interaqt'
 
 export const Version = Entity.create({
   name: 'Version',
   properties: [
     Property.create({
-      name: 'versionNumber',
-      type: 'number'
+      name: 'id',
+      type: 'string',
+      collection: false
     }),
     Property.create({
       name: 'name',
-      type: 'string'
+      type: 'string',
+      collection: false
     }),
     Property.create({
       name: 'description',
-      type: 'string'
-    }),
-    Property.create({
-      name: 'status',
       type: 'string',
-      defaultValue: () => 'draft'
+      collection: false
     }),
     Property.create({
-      name: 'publishedAt',
-      type: 'string'
+      name: 'snapshot',
+      type: 'string',
+      collection: false
     }),
     Property.create({
       name: 'createdAt',
-      type: 'string'
-    }),
-    Property.create({
-      name: 'createdBy',
-      type: 'string'
-    }),
-    Property.create({
-      name: 'styleCount',
-      type: 'number',
-      defaultValue: () => 0,
-      computedData: Count.create({
-        record: () => StyleVersionRelation
-      })
-    }),
-    Property.create({
-      name: 'activeStyleCount',
-      type: 'number',
-      defaultValue: () => 0,
-      computedData: Count.create({
-        record: () => StyleVersionRelation,
-        callback: (relations, version) => {
-          return relations.filter(rel => rel.target === version.id && rel.isActive === true).length
-        }
-      })
-    }),
-    Property.create({
-      name: 'nextVersionNumber',
-      type: 'number',
-      defaultValue: () => 1,
-      computedData: Transform.create({
-        record: () => Version,
-        callback: (versions) => {
-          const maxVersion = Math.max(...versions.map(v => v.versionNumber || 0))
-          return maxVersion + 1
-        }
-      })
+      type: 'string',
+      collection: false,
+      defaultValue: () => new Date().toISOString()
     })
   ]
 })
-
-// Import relations - these will be defined later
-import { StyleVersionRelation } from '../relations/StyleVersionRelation'

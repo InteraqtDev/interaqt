@@ -158,9 +158,9 @@ export const interactions = [CreatePost, UpdatePost, DeletePost]
 
 ### Phase 3: Test-Driven Validation (MANDATORY - DO NOT SKIP)
 
-#### ⚠️ CRITICAL TESTING PRINCIPLE in Interaqt
+#### ⚠️ CRITICAL TESTING PRINCIPLE in interaqt
 
-In the Interaqt framework, **ALL data is derived from interaction events**. This fundamentally changes how we approach testing:
+In the interaqt framework, **ALL data is derived from interaction events**. This fundamentally changes how we approach testing:
 
 - **Focus on Interaction Testing**: Since all Entity and Relation data are created through Interactions, testing Interactions comprehensively will naturally cover all data structures.
 - **No Separate Entity/Relation Tests Needed**: You do NOT need to write separate tests for Entity CRUD or Relation creation/deletion. These are automatically covered when you test the Interactions that create them.
@@ -453,7 +453,9 @@ I will follow the test-case driven development workflow:
 - ❌ Don't create Transform.create() as standalone entities
 - ❌ Don't pass computations array to Controller constructor
 - ❌ Don't create a separate computations/ directory
+- ❌ Don't use function form for record parameter
 - ✅ Define all computations in the `computedData` field of Properties
+- ✅ Always use direct references for record parameter
 - ✅ Example:
   ```typescript
   Property.create({
@@ -461,7 +463,7 @@ I will follow the test-case driven development workflow:
     type: 'number',
     defaultValue: () => 0,
     computedData: Count.create({
-      record: UserPostRelation
+      record: UserPostRelation  // Direct reference, not () => UserPostRelation
     })
   })
   ```
@@ -496,6 +498,82 @@ I will follow the test-case driven development workflow:
 - ✅ Always use PGLiteDB from 'interaqt' package
 - ✅ Create system with: `new MonoSystem(new PGLiteDB())`
 - ✅ Let interaqt handle all database configuration
+
+### Module Organization and Forward References
+- ❌ Don't use arrow functions to solve forward reference issues
+  ```typescript
+  // WRONG: This is not how to handle forward references
+  computedData: Count.create({
+    record: () => StyleVersionRelation
+  })
+  ```
+- ❌ Don't reference the entity being defined in its own Transform
+  ```typescript
+  // WRONG: Circular reference
+  const Version = Entity.create({
+    name: 'Version',
+    properties: [
+      Property.create({
+        name: 'nextVersion',
+        computedData: Transform.create({
+          record: Version  // Circular reference!
+        })
+      })
+    ]
+  })
+  ```
+- ✅ Organize imports properly to avoid forward references
+  ```typescript
+  // entities/Version.ts
+  import { StyleVersionRelation } from '../relations/StyleVersionRelation'
+  
+  export const Version = Entity.create({
+    properties: [
+      Property.create({
+        name: 'styleCount',
+        computedData: Count.create({
+          record: StyleVersionRelation  // Direct reference
+        })
+      })
+    ]
+  })
+  ```
+- ✅ If circular dependencies exist, define basic structure first, add computed properties later
+
+### Test API Usage
+- ❌ Don't use non-existent Controller methods
+  ```typescript
+  // WRONG: These methods don't exist
+  controller.run(...)          // ❌
+  controller.execute(...)      // ❌
+  controller.dispatch(...)     // ❌
+  ```
+- ❌ Don't use non-existent Storage methods
+  ```typescript
+  // WRONG: This method doesn't exist
+  storage.findByProperty('Entity', 'field', value)  // ❌
+  ```
+- ✅ Use correct Controller API
+  ```typescript
+  // CORRECT: Use callInteraction
+  const result = await controller.callInteraction('InteractionName', {
+    user: { id: 'userId', role: 'user' },  // Required user object
+    payload: { /* data */ }
+  })
+  ```
+- ✅ Use correct Storage API with MatchExp
+  ```typescript
+  // CORRECT: Use findOne/find with MatchExp
+  const record = await system.storage.findOne(
+    'EntityName',
+    MatchExp.atom({ key: 'field', value: ['=', value] })
+  )
+  ```
+- ✅ Always check for UUID package when needed
+  ```typescript
+  // If tests need UUID generation
+  import { v4 as uuid } from 'uuid'  // Must install: npm install uuid @types/uuid
+  ```
 
 ## VII. Emergency Protocols
 

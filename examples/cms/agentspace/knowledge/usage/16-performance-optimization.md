@@ -2,13 +2,13 @@
 
 ## Overview
 
-This chapter introduces key performance optimization strategies in the InterAQT framework, particularly incremental computation optimization for reactive computations. Proper data modeling and dependency design can greatly improve system performance and avoid unnecessary full table scans.
+This chapter introduces key performance optimization strategies in the interaqt framework, particularly incremental computation optimization for reactive computations. Proper data modeling and dependency design can greatly improve system performance and avoid unnecessary full table scans.
 
 ## Core Principle: Incremental vs Full Computation
 
 ### Advantages of Incremental Computation
 
-The core advantage of the InterAQT framework lies in its **incremental computation** capability. When data changes occur, the framework can:
+The core advantage of the interaqt framework lies in its **incremental computation** capability. When data changes occur, the framework can:
 
 1. **Precise Targeting**: Only recompute affected portions
 2. **Incremental Updates**: Directly calculate new results using change deltas
@@ -281,4 +281,4 @@ const optimizedComputation = Summation.create({
 });
 ```
 
-By following these performance optimization principles, you can ensure that InterAQT applications maintain high-performance reactive computation capabilities even with large-scale data.
+By following these performance optimization principles, you can ensure that interaqt applications maintain high-performance reactive computation capabilities even with large-scale data.

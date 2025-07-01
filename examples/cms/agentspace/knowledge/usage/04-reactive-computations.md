@@ -2,7 +2,7 @@
 
 ⚠️ **Prerequisite: Please read [00-mindset-shift.md](./00-mindset-shift.md) first to understand declarative thinking**
 
-Reactive computation is the core feature of the InterAQT framework. Its essence is **declaring what data is**, rather than specifying how to compute data.
+Reactive computation is the core feature of the interaqt framework. Its essence is **declaring what data is**, rather than specifying how to compute data.
 
 ## ⚠️ IMPORTANT: Correct Usage of Computations
 
@@ -67,7 +67,7 @@ Reactive computation is a **declarative way of defining data**:
 
 ### Core Principle: Data Existence
 
-In InterAQT, all data has its "reason for existence":
+In interaqt, all data has its "reason for existence":
 - User post count **exists** because it is the Count of user-post relations
 - Order total amount **exists** because it is the weighted sum of order items
 - Product inventory **exists** because it is initial inventory minus sales quantity
@@ -594,25 +594,74 @@ const Order = Entity.create({
 
 Transform is the most flexible reactive computation type, allowing you to define custom transformation logic.
 
+### ⚠️ CRITICAL: When to Use Transform vs getValue
+
+**Transform** is designed for creating **derived entities** from other entities or relations:
+- ✅ Use Transform when creating a new entity type based on data from another entity
+- ✅ Use Transform when transforming relation data into entity data
+- ✅ Use Transform when the source data comes from InteractionEventEntity
+
+**getValue** is for computed properties within the same entity:
+- ✅ Use getValue for simple computed properties (like fullName from firstName + lastName)
+- ✅ Use getValue when the computation only needs data from the current record
+
+❌ **NEVER** use Transform with `record` pointing to the entity being defined - this creates a circular reference!
+
 ### Basic Usage
 
 ```javascript
+// For simple property transformations within the same entity, use getValue instead of Transform
 const User = Entity.create({
   name: 'User',
   properties: [
     Property.create({ name: 'firstName', type: 'string' }),
     Property.create({ name: 'lastName', type: 'string' }),
-    // Use Transform to generate full name
+    // ✅ Correct: Use getValue for computed properties within the same entity
     Property.create({
       name: 'fullName',
       type: 'string',
-      defaultValue: () => '',
-      computedData: Transform.create({
-        record: User,
-        callback: (record) => `${record.firstName} ${record.lastName}`
-      })
+      getValue: (record) => `${record.firstName} ${record.lastName}`
     })
   ]
+});
+
+// ⚠️ IMPORTANT: Transform should NOT reference the entity being defined
+// Transform is meant for creating derived entities from other entities or relations
+```
+
+### Correct Transform Usage Example
+
+```javascript
+// ✅ Correct: Create a derived entity based on another entity
+const Product = Entity.create({
+  name: 'Product',
+  properties: [
+    Property.create({ name: 'name', type: 'string' }),
+    Property.create({ name: 'price', type: 'number' }),
+    Property.create({ name: 'isAvailable', type: 'boolean' })
+  ]
+});
+
+// Transform creates a new entity type from existing Product data
+const DiscountedProduct = Entity.create({
+  name: 'DiscountedProduct',
+  properties: [
+    Property.create({ name: 'name', type: 'string' }),
+    Property.create({ name: 'originalPrice', type: 'number' }),
+    Property.create({ name: 'discountedPrice', type: 'number' }),
+    Property.create({ name: 'discount', type: 'string' })
+  ],
+  computedData: Transform.create({
+    record: Product,  // References a different, already-defined entity
+    callback: (product) => {
+      return {
+        name: product.name,
+        originalPrice: product.price,
+        discountedPrice: product.price * 0.9,
+        discount: '10%'
+      };
+    }
+  })
 });
 ```
 
@@ -687,24 +736,20 @@ const Product = Entity.create({
     Property.create({ name: 'name', type: 'string' }),
     Property.create({ name: 'price', type: 'number' }),
     Property.create({ name: 'currency', type: 'string', defaultValue: 'USD' }),
-    // Format price display
+    // ✅ Correct: Use getValue for simple property formatting
     Property.create({
       name: 'formattedPrice',
       type: 'string',
-      defaultValue: () => '',
-      computedData: Transform.create({
-        record: Product,
-        callback: (record) => {
-          const currencySymbols = {
-            'USD': '$',
-            'EUR': '€',
-            'GBP': '£',
-            'CNY': '¥'
-          };
-          const symbol = currencySymbols[record.currency] || record.currency;
-          return `${symbol}${record.price.toFixed(2)}`;
-        }
-      })
+      getValue: (record) => {
+        const currencySymbols = {
+          'USD': '$',
+          'EUR': '€',
+          'GBP': '£',
+          'CNY': '¥'
+        };
+        const symbol = currencySymbols[record.currency] || record.currency;
+        return `${symbol}${record.price.toFixed(2)}`;
+      }
     })
   ]
 });
@@ -712,17 +757,17 @@ const Product = Entity.create({
 
 ### Transform from Interaction Data: Core of Declarative Data Transformation
 
-One of the most important use cases for Transform is **transforming from user interaction data to other business data**. This embodies the core philosophy of InterAQT framework: **everything is data, data transforms from data**.
+One of the most important use cases for Transform is **transforming from user interaction data to other business data**. This embodies the core philosophy of interaqt framework: **everything is data, data transforms from data**.
 
 #### Core Concept: Interactions Are Data, Data Transforms from Data
 
-In InterAQT, user interactions (Interaction) are themselves data, stored in InteractionEventEntity. Transform is not the traditional "event-driven + callback" pattern, but **declarative data transformation relationships**:
+In interaqt, user interactions (Interaction) are themselves data, stored in InteractionEventEntity. Transform is not the traditional "event-driven + callback" pattern, but **declarative data transformation relationships**:
 
 > Declaration: DirectorMemo **is** the result of transforming InteractionEventEntity through certain transformation rules
 
 This differs from traditional event-driven approaches:
 - **Traditional event-driven**: When event occurs → Execute callback function → Manually create data
-- **InterAQT Transform**: Declare how one type of data transforms from another type of data
+- **interaqt Transform**: Declare how one type of data transforms from another type of data
 
 ```typescript
 // ❌ Wrong mindset: Imperatively create data manually in interaction handling
@@ -996,7 +1041,7 @@ Order.computedData = Transform.create({
 
 **Key Difference**:
 - **Traditional event-driven**: When event occurs → Execute callback function → Manually create data
-- **InterAQT Transform**: Declare data transformation relationships → Framework automatically maintains → Target data automatically updates when source data changes
+- **interaqt Transform**: Declare data transformation relationships → Framework automatically maintains → Target data automatically updates when source data changes
 
 ## Using StateMachine for State Management
 
@@ -1120,7 +1165,7 @@ const LeaveRequest = Entity.create({
 
 ## Using RealTime for Real-time Computations
 
-RealTime computation is a core feature in the InterAQT framework for handling time-sensitive data and business logic. It allows you to declare time-based computations and automatically manages computation state and recomputation timing.
+RealTime computation is a core feature in the interaqt framework for handling time-sensitive data and business logic. It allows you to declare time-based computations and automatically manages computation state and recomputation timing.
 
 ### Understanding Real-time Computation
 
@@ -1760,4 +1805,164 @@ const Post = Entity.create({
 });
 ```
 
-Reactive computation is the core advantage of InterAQT. By appropriately using various computation types, you can greatly simplify business logic implementation while ensuring data consistency and system performance. 
+Reactive computation is the core advantage of interaqt. By appropriately using various computation types, you can greatly simplify business logic implementation while ensuring data consistency and system performance. 
+
+## Best Practices for Module Organization and Forward References
+
+### The Forward Reference Problem
+
+When defining computed properties that reference relations not yet defined in the same file, you might encounter forward reference issues:
+
+```javascript
+// ❌ WRONG: Using function form to "solve" forward reference
+const Version = Entity.create({
+  name: 'Version',
+  properties: [
+    Property.create({
+      name: 'styleCount',
+      type: 'number',
+      computedData: Count.create({
+        record: () => StyleVersionRelation  // ❌ Function form is NOT the solution
+      })
+    })
+  ]
+});
+
+// StyleVersionRelation defined later or imported at bottom
+import { StyleVersionRelation } from '../relations/StyleVersionRelation'
+```
+
+### Correct Solutions
+
+#### Solution 1: Organize File Structure Properly
+
+Structure your files to avoid forward references:
+
+```javascript
+// relations/StyleVersionRelation.ts
+import { Relation } from 'interaqt'
+import { Style } from '../entities/Style'
+import { Version } from '../entities/Version'
+
+export const StyleVersionRelation = Relation.create({
+  source: Style,
+  target: Version,
+  type: 'n:n'
+})
+
+// entities/Version.ts
+import { Entity, Property, Count } from 'interaqt'
+import { StyleVersionRelation } from '../relations/StyleVersionRelation'
+
+export const Version = Entity.create({
+  name: 'Version',
+  properties: [
+    Property.create({
+      name: 'styleCount',
+      type: 'number',
+      computedData: Count.create({
+        record: StyleVersionRelation  // ✅ Direct reference, properly imported
+      })
+    })
+  ]
+})
+```
+
+#### Solution 2: Define Basic Structure First, Add Computed Properties Later
+
+If you have circular dependencies between entities and relations:
+
+```javascript
+// entities/Version.ts - Step 1: Define basic entity
+export const Version = Entity.create({
+  name: 'Version',
+  properties: [
+    Property.create({ name: 'versionNumber', type: 'number' }),
+    Property.create({ name: 'name', type: 'string' })
+    // Don't add computed properties that depend on relations yet
+  ]
+})
+
+// relations/StyleVersionRelation.ts - Step 2: Define relations
+import { Version } from '../entities/Version'
+import { Style } from '../entities/Style'
+
+export const StyleVersionRelation = Relation.create({
+  source: Style,
+  target: Version,
+  type: 'n:n'
+})
+
+// setup/computedProperties.ts - Step 3: Add computed properties
+import { Property, Count } from 'interaqt'
+import { Version } from '../entities/Version'
+import { StyleVersionRelation } from '../relations/StyleVersionRelation'
+
+// Add computed properties after all entities and relations are defined
+Version.properties.push(
+  Property.create({
+    name: 'styleCount',
+    type: 'number',
+    computedData: Count.create({
+      record: StyleVersionRelation  // ✅ Now safely reference the relation
+    })
+  })
+)
+```
+
+### Key Principles
+
+1. **Never use function form for record parameter**: The `record` parameter in Count, Transform, etc. should always be a direct reference to an Entity or Relation, never a function.
+
+2. **Avoid circular references**: Never reference the entity being defined in its own Transform computation.
+
+3. **Proper import order**: Ensure dependencies are imported before they're used.
+
+4. **File organization matters**: Structure your modules to minimize forward references:
+   ```
+   entities/
+   ├── base/           # Basic entities without computed properties
+   ├── index.ts        # Export all entities
+   relations/
+   ├── index.ts        # Export all relations
+   computed/
+   └── setup.ts        # Add computed properties that depend on relations
+   ```
+
+5. **Use getValue for same-entity computations**: For computed properties that only depend on the same entity's data, use `getValue` instead of Transform:
+   ```javascript
+   Property.create({
+     name: 'displayName',
+     type: 'string',
+     getValue: (record) => `${record.firstName} ${record.lastName}`  // ✅ Simple, same-entity computation
+   })
+   ```
+
+### Common Mistakes to Avoid
+
+```javascript
+// ❌ DON'T: Use arrow functions for record parameter
+computedData: Count.create({
+  record: () => SomeRelation  // This is NOT how to handle forward references
+})
+
+// ❌ DON'T: Reference entity being defined in Transform
+const Version = Entity.create({
+  name: 'Version',
+  properties: [
+    Property.create({
+      name: 'nextVersionNumber',
+      computedData: Transform.create({
+        record: Version  // Circular reference!
+      })
+    })
+  ]
+})
+
+// ✅ DO: Use proper imports and direct references
+import { StyleVersionRelation } from '../relations/StyleVersionRelation'
+
+computedData: Count.create({
+  record: StyleVersionRelation  // Direct reference
+})
+``` 

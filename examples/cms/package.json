@@ -18,10 +18,12 @@
   "license": "ISC",
   "dependencies": {
     "@fastify/middie": "^9.0.3",
+    "@types/uuid": "^10.0.0",
     "cors": "^2.8.5",
     "fastify": "^5.4.0",
     "interaqt": "file:../../",
     "tsx": "^4.20.3",
+    "uuid": "^11.1.0",
     "vite-tsconfig-paths": "^5.1.4",
     "vitest": "^3.2.4"
   }

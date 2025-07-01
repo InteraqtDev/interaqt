@@ -1,6 +1,6 @@
 # Reactive Patterns for Entity CRUD Operations
 
-In InterAQT, all data operations follow reactive design principles. This chapter will detail how to correctly handle entity creation, update, and deletion operations.
+In interaqt, all data operations follow reactive design principles. This chapter will detail how to correctly handle entity creation, update, and deletion operations.
 
 ## Core Principles
 

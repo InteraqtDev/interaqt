@@ -1,16 +1,19 @@
 import { describe, test, expect, beforeEach } from 'vitest'
-import { Controller, MonoSystem, KlassByName, PGLiteDB } from 'interaqt'
-import { entities, relations, interactions, activities } from '../backend'
+import { Controller, MonoSystem, KlassByName, PGLiteDB, MatchExp } from 'interaqt'
 import { v4 as uuid } from 'uuid'
+import { entities, relations, interactions, activities } from '../backend'
 
-describe('Permission Control Tests', () => {
+describe('Permission and Security Tests', () => {
   let system: MonoSystem
   let controller: Controller
+  let adminUserId: string
+  let adminUser: any
+  let regularUserId: string
 
   beforeEach(async () => {
     system = new MonoSystem(new PGLiteDB())
     system.conceptClass = KlassByName
-
+    
     controller = new Controller(
       system,
       entities,
@@ -20,766 +23,468 @@ describe('Permission Control Tests', () => {
       [],
       []
     )
-
+    
     await controller.setup(true)
+    
+    // Create admin user
+    adminUserId = uuid()
+    adminUser = await system.storage.create('User', {
+      id: adminUserId,
+      email: 'admin@test.com',
+      roles: ['admin'],
+      name: 'Admin User',
+      createdAt: new Date().toISOString()
+    })
+
+    // Create regular user
+    regularUserId = uuid()
+    await system.storage.create('User', {
+      id: regularUserId,
+      email: 'user@test.com',
+      roles: ['user'],
+      name: 'Regular User',
+      createdAt: new Date().toISOString()
+    })
   })
 
-  test('TC012: Editor can only edit own styles', async () => {
-    const editor1Id = uuid()
-    const editor2Id = uuid()
-    const style1Id = uuid()
-    const style2Id = uuid()
-    const now = new Date().toISOString()
+  describe('TC011: Invalid Authentication', () => {
+    test('should reject requests with invalid user ID', async () => {
+      const result = await controller.callInteraction('CreateStyle', {
+        user: { id: 'invalid-user-id' },
+        payload: {
+          label: 'Test Style',
+          slug: 'test-style',
+          description: 'Test description',
+          type: 'animation',
+          thumbKey: 'test-thumb.jpg',
+          priority: 100
+        }
+      })
 
-    // Create two editors
-    await controller.run({
-      name: 'CreateUser',
-      payload: {
-        id: editor1Id,
-        username: 'editor1',
-        email: 'editor1@example.com',
-        role: 'editor',
-        createdAt: now
-      },
-      user: { id: 'system', role: 'admin' }
+      expect(result.error).toBeDefined()
     })
 
-    await controller.run({
-      name: 'CreateUser',
-      payload: {
-        id: editor2Id,
-        username: 'editor2',
-        email: 'editor2@example.com',
-        role: 'editor',
-        createdAt: now
-      },
-      user: { id: 'system', role: 'admin' }
+    test('should handle missing user object gracefully', async () => {
+      const result = await controller.callInteraction('CreateStyle', {
+        user: null as any,
+        payload: {
+          label: 'Test Style',
+          slug: 'test-style',
+          description: 'Test description',
+          type: 'animation',
+          thumbKey: 'test-thumb.jpg',
+          priority: 100
+        }
+      })
+
+      expect(result.error).toBeDefined()
     })
 
-    // Editor1 creates a style
-    await controller.run({
-      name: 'CreateStyle',
-      payload: {
-        id: style1Id,
-        label: 'Editor1 Style',
-        slug: 'editor1-style',
-        description: 'Style created by editor1',
-        type: 'animation',
-        createdAt: now,
-        updatedAt: now,
-        createdBy: editor1Id
-      },
-      user: { id: editor1Id, role: 'editor' }
+    test('should handle undefined user gracefully', async () => {
+      const result = await controller.callInteraction('CreateStyle', {
+        user: undefined as any,
+        payload: {
+          label: 'Test Style',
+          slug: 'test-style',
+          description: 'Test description',
+          type: 'animation',
+          thumbKey: 'test-thumb.jpg',
+          priority: 100
+        }
+      })
+
+      expect(result.error).toBeDefined()
     })
-
-    // Editor2 creates a style
-    await controller.run({
-      name: 'CreateStyle',
-      payload: {
-        id: style2Id,
-        label: 'Editor2 Style',
-        slug: 'editor2-style',
-        description: 'Style created by editor2',
-        type: 'animation',
-        createdAt: now,
-        updatedAt: now,
-        createdBy: editor2Id
-      },
-      user: { id: editor2Id, role: 'editor' }
-    })
-
-    // Editor1 should be able to edit their own style
-    const updateOwnResult = await controller.run({
-      name: 'UpdateStyle',
-      payload: {
-        styleId: style1Id,
-        label: 'Updated Editor1 Style',
-        updatedAt: now
-      },
-      user: { id: editor1Id, role: 'editor' }
-    })
-
-    expect(updateOwnResult.error).toBeUndefined()
-
-    // Editor1 should NOT be able to edit editor2's style
-    const updateOthersResult = await controller.run({
-      name: 'UpdateStyle',
-      payload: {
-        styleId: style2Id,
-        label: 'Hacked Style',
-        updatedAt: now
-      },
-      user: { id: editor1Id, role: 'editor' }
-    })
-
-    expect(updateOthersResult.error).toBeDefined()
-
-    // Editor1 should be able to delete their own style
-    const deleteOwnResult = await controller.run({
-      name: 'DeleteStyle',
-      payload: {
-        styleId: style1Id
-      },
-      user: { id: editor1Id, role: 'editor' }
-    })
-
-    expect(deleteOwnResult.error).toBeUndefined()
-
-    // Editor1 should NOT be able to delete editor2's style
-    const deleteOthersResult = await controller.run({
-      name: 'DeleteStyle',
-      payload: {
-        styleId: style2Id
-      },
-      user: { id: editor1Id, role: 'editor' }
-    })
-
-    expect(deleteOthersResult.error).toBeDefined()
   })
 
-  test('TC012: Editor can only edit own versions', async () => {
-    const editor1Id = uuid()
-    const editor2Id = uuid()
-    const version1Id = uuid()
-    const version2Id = uuid()
-    const styleId = uuid()
-    const now = new Date().toISOString()
+  describe('TC012: Unauthorized Access', () => {
+    test('should deny regular user access to admin operations', async () => {
+      const adminOperations = [
+        {
+          interaction: 'CreateStyle',
+          payload: {
+            label: 'Test Style',
+            slug: 'test-style',
+            description: 'Test description',
+            type: 'animation',
+            thumbKey: 'test-thumb.jpg',
+            priority: 100
+          }
+        },
+        {
+          interaction: 'UpdateStyle',
+          payload: {
+            styleId: uuid(),
+            label: 'Updated Style'
+          }
+        },
+        {
+          interaction: 'DeleteStyle',
+          payload: {
+            styleId: uuid()
+          }
+        },
+        {
+          interaction: 'PublishStyle',
+          payload: {
+            styleId: uuid()
+          }
+        },
+        {
+          interaction: 'UnpublishStyle',
+          payload: {
+            styleId: uuid()
+          }
+        },
+        {
+          interaction: 'BulkUpdatePriorities',
+          payload: {
+            updates: JSON.stringify([])
+          }
+        },
+        {
+          interaction: 'CreateVersion',
+          payload: {
+            name: 'Test Version',
+            description: 'Test description',
+            snapshot: JSON.stringify({ styles: [] })
+          }
+        },
+        {
+          interaction: 'ListVersions',
+          payload: {}
+        },
+        {
+          interaction: 'RollbackToVersion',
+          payload: {
+            versionId: uuid()
+          }
+        },
+        {
+          interaction: 'DeleteVersion',
+          payload: {
+            versionId: uuid()
+          }
+        }
+      ]
 
-    // Setup users and style
-    await controller.run({
-      name: 'CreateUser',
-      payload: {
-        id: editor1Id,
-        username: 'editor1',
-        email: 'editor1@example.com',
-        role: 'editor',
-        createdAt: now
-      },
-      user: { id: 'system', role: 'admin' }
+      for (const operation of adminOperations) {
+        const result = await controller.callInteraction(operation.interaction, {
+          user: { id: regularUserId },
+          payload: operation.payload
+        })
+
+        expect(result.error).toBeDefined()
+      }
     })
 
-    await controller.run({
-      name: 'CreateUser',
-      payload: {
-        id: editor2Id,
-        username: 'editor2',
-        email: 'editor2@example.com',
-        role: 'editor',
-        createdAt: now
-      },
-      user: { id: 'system', role: 'admin' }
-    })
-
-    await controller.run({
-      name: 'CreateStyle',
-      payload: {
-        id: styleId,
-        label: 'Shared Style',
-        slug: 'shared-style',
-        description: 'Style for versions',
-        type: 'animation',
-        createdAt: now,
-        updatedAt: now,
-        createdBy: editor1Id
-      },
-      user: { id: editor1Id, role: 'editor' }
-    })
-
-    // Editor1 creates a version
-    await controller.run({
-      name: 'CreateVersion',
-      payload: {
-        id: version1Id,
-        versionNumber: 1,
-        name: 'Editor1 Version',
-        description: 'Version by editor1',
-        styleIds: [styleId],
-        createdAt: now,
-        createdBy: editor1Id
-      },
-      user: { id: editor1Id, role: 'editor' }
-    })
-
-    // Editor2 creates a version
-    await controller.run({
-      name: 'CreateVersion',
-      payload: {
-        id: version2Id,
-        versionNumber: 2,
-        name: 'Editor2 Version',
-        description: 'Version by editor2',
-        styleIds: [styleId],
-        createdAt: now,
-        createdBy: editor2Id
-      },
-      user: { id: editor2Id, role: 'editor' }
-    })
-
-    // Editor1 should be able to update their own version
-    const updateOwnResult = await controller.run({
-      name: 'UpdateVersion',
-      payload: {
-        versionId: version1Id,
-        name: 'Updated Editor1 Version'
-      },
-      user: { id: editor1Id, role: 'editor' }
-    })
-
-    expect(updateOwnResult.error).toBeUndefined()
-
-    // Editor1 should NOT be able to update editor2's version
-    const updateOthersResult = await controller.run({
-      name: 'UpdateVersion',
-      payload: {
-        versionId: version2Id,
-        name: 'Hacked Version'
-      },
-      user: { id: editor1Id, role: 'editor' }
-    })
-
-    expect(updateOthersResult.error).toBeDefined()
-  })
-
-  test('TC012: Editor cannot publish versions', async () => {
-    const editorId = uuid()
-    const versionId = uuid()
-    const styleId = uuid()
-    const now = new Date().toISOString()
-
-    // Setup
-    await controller.run({
-      name: 'CreateUser',
-      payload: {
-        id: editorId,
-        username: 'editor',
-        email: 'editor@example.com',
-        role: 'editor',
-        createdAt: now
-      },
-      user: { id: 'system', role: 'admin' }
-    })
-
-    await controller.run({
-      name: 'CreateStyle',
-      payload: {
-        id: styleId,
-        label: 'Test Style',
-        slug: 'test-style',
-        description: 'Test description',
-        type: 'animation',
-        createdAt: now,
-        updatedAt: now,
-        createdBy: editorId
-      },
-      user: { id: editorId, role: 'editor' }
-    })
-
-    await controller.run({
-      name: 'CreateVersion',
-      payload: {
-        id: versionId,
-        versionNumber: 1,
-        name: 'Test Version',
-        description: 'Test version',
-        styleIds: [styleId],
-        createdAt: now,
-        createdBy: editorId
-      },
-      user: { id: editorId, role: 'editor' }
-    })
-
-    // Editor should NOT be able to publish version
-    const publishResult = await controller.run({
-      name: 'PublishVersion',
-      payload: {
-        versionId: versionId,
-        publishedAt: now
-      },
-      user: { id: editorId, role: 'editor' }
-    })
-
-    expect(publishResult.error).toBeDefined()
-
-    // Editor should NOT be able to rollback version
-    const rollbackResult = await controller.run({
-      name: 'RollbackVersion',
-      payload: {
-        targetVersionId: versionId,
-        publishedAt: now
-      },
-      user: { id: editorId, role: 'editor' }
-    })
-
-    expect(rollbackResult.error).toBeDefined()
-  })
-
-  test('TC011: Admin has full permissions', async () => {
-    const adminId = uuid()
-    const editorId = uuid()
-    const styleId = uuid()
-    const versionId = uuid()
-    const now = new Date().toISOString()
-
-    // Create admin and editor
-    await controller.run({
-      name: 'CreateUser',
-      payload: {
-        id: adminId,
-        username: 'admin',
-        email: 'admin@example.com',
-        role: 'admin',
-        createdAt: now
-      },
-      user: { id: 'system', role: 'admin' }
-    })
-
-    await controller.run({
-      name: 'CreateUser',
-      payload: {
-        id: editorId,
-        username: 'editor',
-        email: 'editor@example.com',
-        role: 'editor',
-        createdAt: now
-      },
-      user: { id: 'system', role: 'admin' }
-    })
-
-    // Editor creates style and version
-    await controller.run({
-      name: 'CreateStyle',
-      payload: {
-        id: styleId,
-        label: 'Editor Style',
-        slug: 'editor-style',
-        description: 'Style by editor',
-        type: 'animation',
-        createdAt: now,
-        updatedAt: now,
-        createdBy: editorId
-      },
-      user: { id: editorId, role: 'editor' }
-    })
-
-    await controller.run({
-      name: 'CreateVersion',
-      payload: {
-        id: versionId,
-        versionNumber: 1,
-        name: 'Editor Version',
-        description: 'Version by editor',
-        styleIds: [styleId],
-        createdAt: now,
-        createdBy: editorId
-      },
-      user: { id: editorId, role: 'editor' }
-    })
-
-    // Admin should be able to edit editor's style
-    const updateStyleResult = await controller.run({
-      name: 'UpdateStyle',
-      payload: {
-        styleId: styleId,
-        label: 'Admin Updated Style',
-        updatedAt: now
-      },
-      user: { id: adminId, role: 'admin' }
-    })
-
-    expect(updateStyleResult.error).toBeUndefined()
-
-    // Admin should be able to edit editor's version
-    const updateVersionResult = await controller.run({
-      name: 'UpdateVersion',
-      payload: {
-        versionId: versionId,
-        name: 'Admin Updated Version'
-      },
-      user: { id: adminId, role: 'admin' }
-    })
-
-    expect(updateVersionResult.error).toBeUndefined()
-
-    // Admin should be able to publish version
-    const publishResult = await controller.run({
-      name: 'PublishVersion',
-      payload: {
-        versionId: versionId,
-        publishedAt: now
-      },
-      user: { id: adminId, role: 'admin' }
-    })
-
-    expect(publishResult.error).toBeUndefined()
-
-    // Admin should be able to delete editor's style (even if referenced by published version)
-    const deleteStyleResult = await controller.run({
-      name: 'DeleteStyle',
-      payload: {
-        styleId: styleId
-      },
-      user: { id: adminId, role: 'admin' }
-    })
-
-    // This might fail due to business rules, but should not fail due to permissions
-    // The error should be about business constraints, not permissions
-  })
-
-  test('TC013: Viewer has read-only access', async () => {
-    const viewerId = uuid()
-    const editorId = uuid()
-    const styleId = uuid()
-    const versionId = uuid()
-    const now = new Date().toISOString()
-
-    // Setup
-    await controller.run({
-      name: 'CreateUser',
-      payload: {
-        id: viewerId,
-        username: 'viewer',
-        email: 'viewer@example.com',
-        role: 'viewer',
-        createdAt: now
-      },
-      user: { id: 'system', role: 'admin' }
-    })
-
-    await controller.run({
-      name: 'CreateUser',
-      payload: {
-        id: editorId,
-        username: 'editor',
-        email: 'editor@example.com',
-        role: 'editor',
-        createdAt: now
-      },
-      user: { id: 'system', role: 'admin' }
-    })
-
-    await controller.run({
-      name: 'CreateStyle',
-      payload: {
-        id: styleId,
-        label: 'Public Style',
-        slug: 'public-style',
-        description: 'Public style',
-        type: 'animation',
-        createdAt: now,
-        updatedAt: now,
-        createdBy: editorId
-      },
-      user: { id: editorId, role: 'editor' }
-    })
-
-    await controller.run({
-      name: 'UpdateStyleStatus',
-      payload: {
-        styleId: styleId,
-        status: 'published',
-        updatedAt: now
-      },
-      user: { id: editorId, role: 'editor' }
-    })
-
-    // Viewer should be able to read published styles
-    const getStyleResult = await controller.run({
-      name: 'GetStyleDetail',
-      payload: {
-        styleId: styleId
-      },
-      user: { id: viewerId, role: 'viewer' }
-    })
-
-    expect(getStyleResult.error).toBeUndefined()
-
-    // Viewer should NOT be able to create styles
-    const createStyleResult = await controller.run({
-      name: 'CreateStyle',
-      payload: {
+    test('should allow public access to GetPublishedStyles', async () => {
+      // Create a published style first
+      await system.storage.create('Style', {
         id: uuid(),
-        label: 'Viewer Style',
-        slug: 'viewer-style',
-        description: 'Attempted by viewer',
+        label: 'Published Style',
+        slug: 'published-style',
+        description: 'Published description',
         type: 'animation',
-        createdAt: now,
-        updatedAt: now,
-        createdBy: viewerId
-      },
-      user: { id: viewerId, role: 'viewer' }
+        thumbKey: 'published-thumb.jpg',
+        priority: 100,
+        status: 'published',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      })
+
+      const result = await controller.callInteraction('GetPublishedStyles', {
+        user: { id: 'anonymous' },
+        payload: {}
+      })
+
+      expect(result.error).toBeUndefined()
     })
 
-    expect(createStyleResult.error).toBeDefined()
+    test('should deny unknown roles access to admin operations', async () => {
+      const unknownUserId = uuid()
+      await system.storage.create('User', {
+        id: unknownUserId,
+        email: 'unknown@test.com',
+        roles: ['unknown'],
+        name: 'Unknown User',
+        createdAt: new Date().toISOString()
+      })
 
-    // Viewer should NOT be able to update styles
-    const updateStyleResult = await controller.run({
-      name: 'UpdateStyle',
-      payload: {
-        styleId: styleId,
-        label: 'Hacked Style',
-        updatedAt: now
-      },
-      user: { id: viewerId, role: 'viewer' }
+      const result = await controller.callInteraction('CreateStyle', {
+        user: { id: unknownUserId },
+        payload: {
+          label: 'Test Style',
+          slug: 'test-style',
+          description: 'Test description',
+          type: 'animation',
+          thumbKey: 'test-thumb.jpg',
+          priority: 100
+        }
+      })
+
+      expect(result.error).toBeDefined()
+    })
+  })
+
+  describe('TC013: Concurrent Style Updates', () => {
+    let styleId: string
+
+    beforeEach(async () => {
+      styleId = uuid()
+      await system.storage.create('Style', {
+        id: styleId,
+        label: 'Concurrent Test Style',
+        slug: 'concurrent-test',
+        description: 'For concurrent testing',
+        type: 'animation',
+        thumbKey: 'concurrent-thumb.jpg',
+        priority: 100,
+        status: 'draft',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      })
     })
 
-    expect(updateStyleResult.error).toBeDefined()
+    test('should handle concurrent updates gracefully', async () => {
+      // Simulate concurrent updates
+      const update1Promise = controller.callInteraction('UpdateStyle', {
+        user: adminUser,
+        payload: {
+          styleId,
+          label: 'Updated by Admin 1',
+          priority: 200
+        }
+      })
 
-    // Viewer should NOT be able to delete styles
-    const deleteStyleResult = await controller.run({
-      name: 'DeleteStyle',
-      payload: {
-        styleId: styleId
-      },
-      user: { id: viewerId, role: 'viewer' }
+      const update2Promise = controller.callInteraction('UpdateStyle', {
+        user: adminUser,
+        payload: {
+          styleId,
+          label: 'Updated by Admin 2',
+          priority: 300
+        }
+      })
+
+      const [result1, result2] = await Promise.all([update1Promise, update2Promise])
+
+      // At least one should succeed
+      const successfulUpdates = [result1, result2].filter(r => !r.error)
+      expect(successfulUpdates.length).toBeGreaterThanOrEqual(1)
+
+      // Final state should be consistent
+      const finalStyle = await system.storage.findOne('Style',
+        MatchExp.atom({ key: 'id', value: ['=', styleId] })
+      )
+      expect(finalStyle).toBeDefined()
+      expect(finalStyle.updatedAt).toBeDefined()
     })
 
-    expect(deleteStyleResult.error).toBeDefined()
+    test('should maintain data consistency under concurrent load', async () => {
+      // Create multiple concurrent operations
+      const operations = []
+      
+      for (let i = 0; i < 5; i++) {
+        operations.push(
+          controller.callInteraction('UpdateStyle', {
+            user: adminUser,
+            payload: {
+              styleId,
+              priority: 100 + i
+            }
+          })
+        )
+      }
 
-    // Viewer should NOT be able to create versions
-    const createVersionResult = await controller.run({
-      name: 'CreateVersion',
-      payload: {
+      const results = await Promise.all(operations)
+
+      // Verify system remains stable
+      const finalStyle = await system.storage.findOne('Style',
+        MatchExp.atom({ key: 'id', value: ['=', styleId] })
+      )
+      
+      expect(finalStyle).toBeDefined()
+      expect(finalStyle.id).toBe(styleId)
+      expect(typeof finalStyle.priority).toBe('number')
+    })
+  })
+
+  describe('TC014: Slug Uniqueness Validation', () => {
+    beforeEach(async () => {
+      // Create style with 'manga' slug
+      await system.storage.create('Style', {
         id: uuid(),
-        versionNumber: 1,
-        name: 'Viewer Version',
-        description: 'Attempted by viewer',
-        styleIds: [styleId],
-        createdAt: now,
-        createdBy: viewerId
-      },
-      user: { id: viewerId, role: 'viewer' }
+        label: 'Manga Style',
+        slug: 'manga',
+        description: 'Japanese animation style',
+        type: 'animation',
+        thumbKey: 'manga-thumb.jpg',
+        priority: 100,
+        status: 'draft',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      })
     })
 
-    expect(createVersionResult.error).toBeDefined()
+    test('should enforce slug uniqueness on creation', async () => {
+      const result = await controller.callInteraction('CreateStyle', {
+        user: adminUser,
+        payload: {
+          label: 'Another Manga',
+          slug: 'manga',
+          description: 'Another manga style',
+          type: 'animation',
+          thumbKey: 'another-manga-thumb.jpg',
+          priority: 200
+        }
+      })
+
+      expect(result.error).toBeDefined()
+
+      // Verify only one 'manga' slug exists
+      const mangaStyles = await system.storage.find('Style',
+        MatchExp.atom({ key: 'slug', value: ['=', 'manga'] })
+      )
+      expect(mangaStyles).toHaveLength(1)
+    })
+
+    test('should enforce case-insensitive slug uniqueness', async () => {
+      const result = await controller.callInteraction('CreateStyle', {
+        user: adminUser,
+        payload: {
+          label: 'Manga Uppercase',
+          slug: 'MANGA',
+          description: 'Uppercase manga slug',
+          type: 'animation',
+          thumbKey: 'manga-upper-thumb.jpg',
+          priority: 200
+        }
+      })
+
+      expect(result.error).toBeDefined()
+    })
+
+    test('should handle special characters in slug validation', async () => {
+      const testSlugs = ['manga-style', 'manga_style', 'manga123']
+      
+      for (const slug of testSlugs) {
+        const result = await controller.callInteraction('CreateStyle', {
+          user: adminUser,
+          payload: {
+            label: `Style ${slug}`,
+            slug: slug,
+            description: `Style with ${slug} slug`,
+            type: 'animation',
+            thumbKey: `${slug}-thumb.jpg`,
+            priority: 100
+          }
+        })
+
+        expect(result.error).toBeUndefined()
+      }
+    })
   })
 
-  test('TC015: Business rule - Cannot delete style referenced by published version', async () => {
-    const adminId = uuid()
-    const styleId = uuid()
-    const versionId = uuid()
-    const now = new Date().toISOString()
+  describe('TC015: Bulk Operation Failure Recovery', () => {
+    let validStyleIds: string[]
 
-    // Setup
-    await controller.run({
-      name: 'CreateUser',
-      payload: {
-        id: adminId,
-        username: 'admin',
-        email: 'admin@example.com',
-        role: 'admin',
-        createdAt: now
-      },
-      user: { id: 'system', role: 'admin' }
+    beforeEach(async () => {
+      validStyleIds = [uuid(), uuid(), uuid()]
+      
+      for (let i = 0; i < validStyleIds.length; i++) {
+        await system.storage.create('Style', {
+          id: validStyleIds[i],
+          label: `Bulk Test Style ${i}`,
+          slug: `bulk-test-${i}`,
+          description: `Bulk test description ${i}`,
+          type: 'animation',
+          thumbKey: `bulk-test-${i}-thumb.jpg`,
+          priority: (i + 1) * 10,
+          status: 'draft',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        })
+      }
     })
 
-    await controller.run({
-      name: 'CreateStyle',
-      payload: {
-        id: styleId,
-        label: 'Protected Style',
-        slug: 'protected-style',
-        description: 'Style that will be protected',
-        type: 'animation',
-        createdAt: now,
-        updatedAt: now,
-        createdBy: adminId
-      },
-      user: { id: adminId, role: 'admin' }
+    test('should rollback all changes on any failure in bulk update', async () => {
+      // Store original priorities
+      const originalStyles = []
+      for (const styleId of validStyleIds) {
+        const style = await system.storage.findOne('Style',
+          MatchExp.atom({ key: 'id', value: ['=', styleId] })
+        )
+        originalStyles.push({ id: styleId, priority: style.priority })
+      }
+
+      // Attempt bulk update with one invalid ID
+      const updates = JSON.stringify([
+        { styleId: validStyleIds[0], priority: 100 },
+        { styleId: 'invalid-style-id', priority: 200 },
+        { styleId: validStyleIds[2], priority: 300 }
+      ])
+
+      const result = await controller.callInteraction('BulkUpdatePriorities', {
+        user: adminUser,
+        payload: { updates }
+      })
+
+      expect(result.error).toBeDefined()
+
+      // Verify all styles maintain original priorities
+      for (const original of originalStyles) {
+        const currentStyle = await system.storage.findOne('Style',
+          MatchExp.atom({ key: 'id', value: ['=', original.id] })
+        )
+        expect(currentStyle.priority).toBe(original.priority)
+      }
     })
 
-    await controller.run({
-      name: 'UpdateStyleStatus',
-      payload: {
-        styleId: styleId,
-        status: 'published',
-        updatedAt: now
-      },
-      user: { id: adminId, role: 'admin' }
+    test('should handle database constraint violations gracefully', async () => {
+      // Try to update with invalid priority values
+      const updates = JSON.stringify([
+        { styleId: validStyleIds[0], priority: -1 },
+        { styleId: validStyleIds[1], priority: 'invalid' as any },
+        { styleId: validStyleIds[2], priority: null as any }
+      ])
+
+      const result = await controller.callInteraction('BulkUpdatePriorities', {
+        user: adminUser,
+        payload: { updates }
+      })
+
+      expect(result.error).toBeDefined()
+
+      // Verify system remains stable
+      const styles = await system.storage.find('Style', {})
+      expect(styles.length).toBeGreaterThanOrEqual(3)
     })
 
-    await controller.run({
-      name: 'CreateVersion',
-      payload: {
-        id: versionId,
-        versionNumber: 1,
-        name: 'Published Version',
-        description: 'This version will be published',
-        styleIds: [styleId],
-        createdAt: now,
-        createdBy: adminId
-      },
-      user: { id: adminId, role: 'admin' }
+    test('should maintain referential integrity on bulk failures', async () => {
+      // Create relations that might be affected
+      await system.storage.create('UserStyleRelation', {
+        source: adminUserId,
+        target: validStyleIds[0]
+      })
+
+      // Attempt operation that might affect relations
+      const updates = JSON.stringify([
+        { styleId: validStyleIds[0], priority: 100 },
+        { styleId: 'non-existent-id', priority: 200 }
+      ])
+
+      const result = await controller.callInteraction('BulkUpdatePriorities', {
+        user: adminUser,
+        payload: { updates }
+      })
+
+      expect(result.error).toBeDefined()
+
+      // Verify relations are intact
+      const relations = await system.storage.find('UserStyleRelation',
+        MatchExp.atom({ key: 'source', value: ['=', adminUserId] })
+      )
+      expect(relations.length).toBeGreaterThanOrEqual(1)
     })
-
-    await controller.run({
-      name: 'PublishVersion',
-      payload: {
-        versionId: versionId,
-        publishedAt: now
-      },
-      user: { id: adminId, role: 'admin' }
-    })
-
-    // Verify style is marked as referenced by published version
-    const styleData = await controller.system.storage.findByProperty('Style', 'id', styleId)
-    expect(styleData.isReferencedByPublishedVersion).toBe(true)
-
-    // Try to delete style - should fail due to business rule
-    const deleteResult = await controller.run({
-      name: 'DeleteStyle',
-      payload: {
-        styleId: styleId
-      },
-      user: { id: adminId, role: 'admin' }
-    })
-
-    // Should fail even for admin due to business constraint
-    expect(deleteResult.error).toBeDefined()
-    expect(deleteResult.error.code).toBe('REFERENCE_CONSTRAINT')
-  })
-
-  test('TC014: Concurrent operations - Version publishing conflict', async () => {
-    const admin1Id = uuid()
-    const admin2Id = uuid()
-    const version1Id = uuid()
-    const version2Id = uuid()
-    const styleId = uuid()
-    const now = new Date().toISOString()
-
-    // Setup
-    await controller.run({
-      name: 'CreateUser',
-      payload: {
-        id: admin1Id,
-        username: 'admin1',
-        email: 'admin1@example.com',
-        role: 'admin',
-        createdAt: now
-      },
-      user: { id: 'system', role: 'admin' }
-    })
-
-    await controller.run({
-      name: 'CreateUser',
-      payload: {
-        id: admin2Id,
-        username: 'admin2',
-        email: 'admin2@example.com',
-        role: 'admin',
-        createdAt: now
-      },
-      user: { id: 'system', role: 'admin' }
-    })
-
-    await controller.run({
-      name: 'CreateStyle',
-      payload: {
-        id: styleId,
-        label: 'Concurrent Style',
-        slug: 'concurrent-style',
-        description: 'Style for concurrent test',
-        type: 'animation',
-        createdAt: now,
-        updatedAt: now,
-        createdBy: admin1Id
-      },
-      user: { id: admin1Id, role: 'admin' }
-    })
-
-    await controller.run({
-      name: 'UpdateStyleStatus',
-      payload: {
-        styleId: styleId,
-        status: 'published',
-        updatedAt: now
-      },
-      user: { id: admin1Id, role: 'admin' }
-    })
-
-    // Create two versions
-    await controller.run({
-      name: 'CreateVersion',
-      payload: {
-        id: version1Id,
-        versionNumber: 1,
-        name: 'Version 1',
-        description: 'First version',
-        styleIds: [styleId],
-        createdAt: now,
-        createdBy: admin1Id
-      },
-      user: { id: admin1Id, role: 'admin' }
-    })
-
-    await controller.run({
-      name: 'CreateVersion',
-      payload: {
-        id: version2Id,
-        versionNumber: 2,
-        name: 'Version 2',
-        description: 'Second version',
-        styleIds: [styleId],
-        createdAt: now,
-        createdBy: admin2Id
-      },
-      user: { id: admin2Id, role: 'admin' }
-    })
-
-    // Simulate concurrent publishing
-    const publish1Promise = controller.run({
-      name: 'PublishVersion',
-      payload: {
-        versionId: version1Id,
-        publishedAt: now
-      },
-      user: { id: admin1Id, role: 'admin' }
-    })
-
-    const publish2Promise = controller.run({
-      name: 'PublishVersion',
-      payload: {
-        versionId: version2Id,
-        publishedAt: now
-      },
-      user: { id: admin2Id, role: 'admin' }
-    })
-
-    const [result1, result2] = await Promise.all([publish1Promise, publish2Promise])
-
-    // One should succeed, one should fail (or both succeed with proper conflict resolution)
-    const successCount = [result1, result2].filter(r => !r.error).length
-    expect(successCount).toBeGreaterThanOrEqual(1)
-
-    // Verify only one version is published
-    const version1Data = await controller.system.storage.findByProperty('Version', 'id', version1Id)
-    const version2Data = await controller.system.storage.findByProperty('Version', 'id', version2Id)
-
-    const publishedVersions = [version1Data, version2Data].filter(v => v.status === 'published')
-    expect(publishedVersions).toHaveLength(1)
-  })
-
-  test('Permission validation with invalid user roles', async () => {
-    const invalidUserId = uuid()
-    const styleId = uuid()
-    const now = new Date().toISOString()
-
-    // Try to create style with non-existent user
-    const result = await controller.run({
-      name: 'CreateStyle',
-      payload: {
-        id: styleId,
-        label: 'Invalid User Style',
-        slug: 'invalid-user-style',
-        description: 'Style by invalid user',
-        type: 'animation',
-        createdAt: now,
-        updatedAt: now,
-        createdBy: invalidUserId
-      },
-      user: { id: invalidUserId, role: 'invalid-role' }
-    })
-
-    // Should fail due to invalid user/role
-    expect(result.error).toBeDefined()
   })
 })

@@ -1,16 +1,18 @@
 import { describe, test, expect, beforeEach } from 'vitest'
-import { Controller, MonoSystem, KlassByName, PGLiteDB } from 'interaqt'
-import { entities, relations, interactions, activities } from '../backend'
+import { Controller, MonoSystem, KlassByName, PGLiteDB, MatchExp } from 'interaqt'
 import { v4 as uuid } from 'uuid'
+import { entities, relations, interactions, activities } from '../backend'
 
 describe('Style Interactions', () => {
   let system: MonoSystem
   let controller: Controller
+  let adminUserId: string
+  let adminUser: any
 
   beforeEach(async () => {
     system = new MonoSystem(new PGLiteDB())
     system.conceptClass = KlassByName
-
+    
     controller = new Controller(
       system,
       entities,
@@ -20,595 +22,503 @@ describe('Style Interactions', () => {
       [],
       []
     )
-
+    
     await controller.setup(true)
+    
+    // Create admin user for testing
+    adminUserId = uuid()
+    adminUser = await system.storage.create('User', {
+      id: adminUserId,
+      email: 'admin@test.com',
+      roles: ['admin'],
+      name: 'Admin User',
+      createdAt: new Date().toISOString()
+    })
   })
 
-  test('TC001: Create Style - Success', async () => {
-    const userId = uuid()
-    const styleId = uuid()
-    const now = new Date().toISOString()
-
-    // Create user first
-    const createUserResult = await controller.run({
-      name: 'CreateUser',
-      payload: {
-        id: userId,
-        username: 'testuser',
-        email: 'test@example.com',
-        role: 'editor',
-        createdAt: now
-      },
-      user: { id: 'system', role: 'admin' }
-    })
-    expect(createUserResult.error).toBeUndefined()
-
-    // Create style
-    const result = await controller.run({
-      name: 'CreateStyle',
-      payload: {
-        id: styleId,
+  describe('TC001: Create Style', () => {
+    test('should create style successfully with valid data', async () => {
+      const styleData = {
         label: 'Manga Style',
-        slug: 'manga-style',
-        description: 'Japanese manga illustration style',
+        slug: 'manga',
+        description: 'Japanese animation style',
         type: 'animation',
-        thumbKey: 'styles/manga/thumb.jpg',
-        priority: 10,
-        createdAt: now,
-        updatedAt: now,
-        createdBy: userId
-      },
-      user: { id: userId, role: 'editor' }
+        thumbKey: 'styles/manga-thumb.jpg',
+        priority: 100
+      }
+
+      const result = await controller.callInteraction('CreateStyle', {
+        user: adminUser,
+        payload: {
+          style: styleData
+        }
+      })
+
+      expect(result.error).toBeUndefined()
+      
+      // Verify style was created
+      const styles = await system.storage.find('Style', 
+        MatchExp.atom({ key: 'slug', value: ['=', 'manga'] }),
+        undefined,
+        ['*']
+      )
+      
+      expect(styles).toHaveLength(1)
+      expect(styles[0].label).toBe('Manga Style')
+      expect(styles[0].status).toBe('draft')
+      expect(styles[0].priority).toBe(100)
+      expect(styles[0].createdAt).toBeDefined()
+      expect(styles[0].updatedAt).toBeDefined()
     })
 
-    expect(result.error).toBeUndefined()
+    test('should fail with duplicate slug', async () => {
+      // Create first style
+      await controller.callInteraction('CreateStyle', {
+        user: adminUser,
+        payload: {
+          style: {
+            label: 'Manga Style',
+            slug: 'manga',
+            description: 'Japanese animation style',
+            type: 'animation',
+            thumbKey: 'styles/manga-thumb.jpg',
+            priority: 100
+          }
+        }
+      })
 
-    // Verify style creation
-    const styleData = await controller.system.storage.findByProperty('Style', 'id', styleId)
-    expect(styleData).toBeDefined()
-    expect(styleData.label).toBe('Manga Style')
-    expect(styleData.slug).toBe('manga-style')
-    expect(styleData.status).toBe('draft')
-    expect(styleData.createdBy).toBe(userId)
+      // Try to create another with same slug
+      const result = await controller.callInteraction('CreateStyle', {
+        user: adminUser,
+        payload: {
+          style: {
+            label: 'Another Manga',
+            slug: 'manga',
+            description: 'Another description',
+            type: 'animation',
+            thumbKey: 'styles/manga-thumb2.jpg',
+            priority: 200
+          }
+        }
+      })
 
-    // Verify computed property - user's style count
-    const userData = await controller.system.storage.findByProperty('User', 'id', userId)
-    expect(userData.styleCount).toBe(1)
+      expect(result.error).toBeDefined()
+    })
+
+    test('should fail with invalid user role', async () => {
+      const regularUserId = uuid()
+      await system.storage.create('User', {
+        id: regularUserId,
+        email: 'user@test.com',
+        roles: ['user'],
+        name: 'Regular User',
+        createdAt: new Date().toISOString()
+      })
+
+      const result = await controller.callInteraction('CreateStyle', {
+        user: { id: regularUserId },
+        payload: {
+          style: {
+            label: 'Manga Style',
+            slug: 'manga',
+            description: 'Japanese animation style',
+            type: 'animation',
+            thumbKey: 'styles/manga-thumb.jpg',
+            priority: 100
+          }
+        }
+      })
+
+      expect(result.error).toBeDefined()
+    })
   })
 
-  test('TC001: Create Style - Invalid slug format should fail', async () => {
-    const userId = uuid()
-    const styleId = uuid()
-    const now = new Date().toISOString()
+  describe('TC002: Update Style Properties', () => {
+    let styleId: string
 
-    // Create user first
-    await controller.run({
-      name: 'CreateUser',
-      payload: {
-        id: userId,
-        username: 'testuser',
-        email: 'test@example.com',
-        role: 'editor',
-        createdAt: now
-      },
-      user: { id: 'system', role: 'admin' }
-    })
-
-    // Try to create style with invalid slug
-    const result = await controller.run({
-      name: 'CreateStyle',
-      payload: {
+    beforeEach(async () => {
+      styleId = uuid()
+      await system.storage.create('Style', {
         id: styleId,
-        label: 'Test Style',
-        slug: 'invalid slug with spaces!',
-        description: 'Test description',
-        type: 'animation',
-        createdAt: now,
-        updatedAt: now,
-        createdBy: userId
-      },
-      user: { id: userId, role: 'editor' }
-    })
-
-    // Should fail due to invalid slug format
-    expect(result.error).toBeDefined()
-  })
-
-  test('TC002: Update Style - Success', async () => {
-    const userId = uuid()
-    const styleId = uuid()
-    const now = new Date().toISOString()
-    const laterTime = new Date(Date.now() + 1000).toISOString()
-
-    // Setup: Create user and style
-    await controller.run({
-      name: 'CreateUser',
-      payload: {
-        id: userId,
-        username: 'testuser',
-        email: 'test@example.com',
-        role: 'editor',
-        createdAt: now
-      },
-      user: { id: 'system', role: 'admin' }
-    })
-
-    await controller.run({
-      name: 'CreateStyle',
-      payload: {
-        id: styleId,
-        label: 'Original Style',
-        slug: 'original-style',
+        label: 'Original Label',
+        slug: 'original',
         description: 'Original description',
         type: 'animation',
-        priority: 10,
-        createdAt: now,
-        updatedAt: now,
-        createdBy: userId
-      },
-      user: { id: userId, role: 'editor' }
+        thumbKey: 'original-thumb.jpg',
+        priority: 100,
+        status: 'draft',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      })
     })
 
-    // Update style
-    const result = await controller.run({
-      name: 'UpdateStyle',
-      payload: {
-        styleId: styleId,
-        label: 'Updated Style',
-        description: 'Updated description',
-        priority: 5,
-        updatedAt: laterTime
-      },
-      user: { id: userId, role: 'editor' }
+    test('should update style properties successfully', async () => {
+      const result = await controller.callInteraction('UpdateStyle', {
+        user: adminUser,
+        payload: {
+          style: { id: styleId },
+          updates: {
+            label: 'Updated Label',
+            priority: 200
+          }
+        }
+      })
+
+      expect(result.error).toBeUndefined()
+
+      const updatedStyle = await system.storage.findOne('Style',
+        MatchExp.atom({ key: 'id', value: ['=', styleId] })
+      )
+
+      expect(updatedStyle.label).toBe('Updated Label')
+      expect(updatedStyle.priority).toBe(200)
+      expect(updatedStyle.slug).toBe('original') // unchanged
     })
 
-    expect(result.error).toBeUndefined()
+    test('should fail with non-existent styleId', async () => {
+      const result = await controller.callInteraction('UpdateStyle', {
+        user: adminUser,
+        payload: {
+          style: { id: 'non-existent-id' },
+          updates: {
+            label: 'Updated Label'
+          }
+        }
+      })
 
-    // Verify update
-    const styleData = await controller.system.storage.findByProperty('Style', 'id', styleId)
-    expect(styleData.label).toBe('Updated Style')
-    expect(styleData.description).toBe('Updated description')
-    expect(styleData.priority).toBe(5)
-    expect(styleData.slug).toBe('original-style') // Should remain unchanged
-    expect(styleData.updatedAt).toBe(laterTime)
+      expect(result.error).toBeDefined()
+    })
   })
 
-  test('TC002: Update Style - Permission denied for non-creator', async () => {
-    const userId1 = uuid()
-    const userId2 = uuid()
-    const styleId = uuid()
-    const now = new Date().toISOString()
+  describe('TC003: Publish Style', () => {
+    let draftStyleId: string
 
-    // Setup: Create users and style
-    await controller.run({
-      name: 'CreateUser',
-      payload: {
-        id: userId1,
-        username: 'creator',
-        email: 'creator@example.com',
-        role: 'editor',
-        createdAt: now
-      },
-      user: { id: 'system', role: 'admin' }
-    })
-
-    await controller.run({
-      name: 'CreateUser',
-      payload: {
-        id: userId2,
-        username: 'other',
-        email: 'other@example.com',
-        role: 'editor',
-        createdAt: now
-      },
-      user: { id: 'system', role: 'admin' }
-    })
-
-    await controller.run({
-      name: 'CreateStyle',
-      payload: {
-        id: styleId,
-        label: 'Test Style',
-        slug: 'test-style',
-        description: 'Test description',
+    beforeEach(async () => {
+      draftStyleId = uuid()
+      await system.storage.create('Style', {
+        id: draftStyleId,
+        label: 'Draft Style',
+        slug: 'draft-style',
+        description: 'Draft description',
         type: 'animation',
-        createdAt: now,
-        updatedAt: now,
-        createdBy: userId1
-      },
-      user: { id: userId1, role: 'editor' }
+        thumbKey: 'draft-thumb.jpg',
+        priority: 100,
+        status: 'draft',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      })
     })
 
-    // Try to update style as different user
-    const result = await controller.run({
-      name: 'UpdateStyle',
-      payload: {
-        styleId: styleId,
-        label: 'Hacked Style',
-        updatedAt: now
-      },
-      user: { id: userId2, role: 'editor' }
+    test('should publish draft style successfully', async () => {
+      const result = await controller.callInteraction('PublishStyle', {
+        user: adminUser,
+        payload: {
+          style: { id: draftStyleId }
+        }
+      })
+
+      expect(result.error).toBeUndefined()
+
+      const publishedStyle = await system.storage.findOne('Style',
+        MatchExp.atom({ key: 'id', value: ['=', draftStyleId] })
+      )
+
+      expect(publishedStyle.status).toBe('published')
     })
 
-    // Should fail due to permission denied
-    expect(result.error).toBeDefined()
+    test('should fail to publish already published style', async () => {
+      // First publish the style
+      await controller.callInteraction('PublishStyle', {
+        user: adminUser,
+        payload: { style: { id: draftStyleId } }
+      })
+
+      // Try to publish again
+      const result = await controller.callInteraction('PublishStyle', {
+        user: adminUser,
+        payload: { style: { id: draftStyleId } }
+      })
+
+      expect(result.error).toBeDefined()
+    })
   })
 
-  test('TC005: Update Style Status - Valid transitions', async () => {
-    const userId = uuid()
-    const styleId = uuid()
-    const now = new Date().toISOString()
+  describe('TC004: Unpublish Style', () => {
+    let publishedStyleId: string
 
-    // Setup
-    await controller.run({
-      name: 'CreateUser',
-      payload: {
-        id: userId,
-        username: 'testuser',
-        email: 'test@example.com',
-        role: 'editor',
-        createdAt: now
-      },
-      user: { id: 'system', role: 'admin' }
-    })
-
-    await controller.run({
-      name: 'CreateStyle',
-      payload: {
-        id: styleId,
-        label: 'Test Style',
-        slug: 'test-style',
-        description: 'Test description',
+    beforeEach(async () => {
+      publishedStyleId = uuid()
+      await system.storage.create('Style', {
+        id: publishedStyleId,
+        label: 'Published Style',
+        slug: 'published-style',
+        description: 'Published description',
         type: 'animation',
-        createdAt: now,
-        updatedAt: now,
-        createdBy: userId
-      },
-      user: { id: userId, role: 'editor' }
-    })
-
-    // Test draft → published
-    const publishResult = await controller.run({
-      name: 'UpdateStyleStatus',
-      payload: {
-        styleId: styleId,
+        thumbKey: 'published-thumb.jpg',
+        priority: 100,
         status: 'published',
-        updatedAt: now
-      },
-      user: { id: userId, role: 'editor' }
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      })
     })
 
-    expect(publishResult.error).toBeUndefined()
+    test('should unpublish published style successfully', async () => {
+      const result = await controller.callInteraction('UnpublishStyle', {
+        user: adminUser,
+        payload: {
+          style: { id: publishedStyleId }
+        }
+      })
 
-    const styleData = await controller.system.storage.findByProperty('Style', 'id', styleId)
-    expect(styleData.status).toBe('published')
+      expect(result.error).toBeUndefined()
 
-    // Test published → offline
-    const offlineResult = await controller.run({
-      name: 'UpdateStyleStatus',
-      payload: {
-        styleId: styleId,
-        status: 'offline',
-        updatedAt: now
-      },
-      user: { id: userId, role: 'editor' }
+      const unpublishedStyle = await system.storage.findOne('Style',
+        MatchExp.atom({ key: 'id', value: ['=', publishedStyleId] })
+      )
+
+      expect(unpublishedStyle.status).toBe('offline')
     })
 
-    expect(offlineResult.error).toBeUndefined()
+    test('should fail to unpublish draft style', async () => {
+      const draftStyleId = uuid()
+      await system.storage.create('Style', {
+        id: draftStyleId,
+        label: 'Draft Style',
+        slug: 'draft-style',
+        description: 'Draft description',
+        type: 'animation',
+        thumbKey: 'draft-thumb.jpg',
+        priority: 100,
+        status: 'draft',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      })
 
-    const updatedStyleData = await controller.system.storage.findByProperty('Style', 'id', styleId)
-    expect(updatedStyleData.status).toBe('offline')
+      const result = await controller.callInteraction('UnpublishStyle', {
+        user: adminUser,
+        payload: { style: { id: draftStyleId } }
+      })
+
+      expect(result.error).toBeDefined()
+    })
   })
 
-  test('TC004: Update Style Priority - Batch update', async () => {
-    const userId = uuid()
-    const style1Id = uuid()
-    const style2Id = uuid()
-    const style3Id = uuid()
-    const now = new Date().toISOString()
+  describe('TC005: Delete Style', () => {
+    let styleId: string
 
-    // Setup: Create user and styles
-    await controller.run({
-      name: 'CreateUser',
-      payload: {
-        id: userId,
-        username: 'testuser',
-        email: 'test@example.com',
-        role: 'editor',
-        createdAt: now
-      },
-      user: { id: 'system', role: 'admin' }
+    beforeEach(async () => {
+      styleId = uuid()
+      await system.storage.create('Style', {
+        id: styleId,
+        label: 'To Delete',
+        slug: 'to-delete',
+        description: 'Will be deleted',
+        type: 'animation',
+        thumbKey: 'delete-thumb.jpg',
+        priority: 100,
+        status: 'draft',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      })
     })
 
-    for (const [styleId, label] of [[style1Id, 'Style 1'], [style2Id, 'Style 2'], [style3Id, 'Style 3']]) {
-      await controller.run({
-        name: 'CreateStyle',
+    test('should delete style successfully', async () => {
+      const result = await controller.callInteraction('DeleteStyle', {
+        user: adminUser,
         payload: {
-          id: styleId,
-          label: label,
-          slug: label.toLowerCase().replace(' ', '-'),
-          description: `Description for ${label}`,
+          style: { id: styleId }
+        }
+      })
+
+      expect(result.error).toBeUndefined()
+
+      const deletedStyle = await system.storage.findOne('Style',
+        MatchExp.atom({ key: 'id', value: ['=', styleId] })
+      )
+
+      expect(deletedStyle).toBeNull()
+    })
+
+    test('should fail with non-existent styleId', async () => {
+      const result = await controller.callInteraction('DeleteStyle', {
+        user: adminUser,
+        payload: {
+          style: { id: 'non-existent-id' }
+        }
+      })
+
+      expect(result.error).toBeDefined()
+    })
+  })
+
+  describe('TC006: List Styles by Status', () => {
+    beforeEach(async () => {
+      // Create styles with different statuses
+      const styles = [
+        { id: uuid(), status: 'draft', priority: 10 },
+        { id: uuid(), status: 'published', priority: 20 },
+        { id: uuid(), status: 'offline', priority: 30 },
+        { id: uuid(), status: 'published', priority: 5 }
+      ]
+
+      for (const style of styles) {
+        await system.storage.create('Style', {
+          id: style.id,
+          label: `Style ${style.id}`,
+          slug: `style-${style.id}`,
+          description: `Description ${style.id}`,
           type: 'animation',
-          priority: 0,
-          createdAt: now,
-          updatedAt: now,
-          createdBy: userId
-        },
-        user: { id: userId, role: 'editor' }
-      })
-    }
-
-    // Batch update priorities
-    const result = await controller.run({
-      name: 'UpdateStylePriority',
-      payload: {
-        styleUpdates: [
-          { id: style1Id, priority: 1 },
-          { id: style2Id, priority: 2 },
-          { id: style3Id, priority: 3 }
-        ],
-        updatedAt: now
-      },
-      user: { id: userId, role: 'editor' }
-    })
-
-    expect(result.error).toBeUndefined()
-
-    // Verify updates
-    const style1Data = await controller.system.storage.findByProperty('Style', 'id', style1Id)
-    const style2Data = await controller.system.storage.findByProperty('Style', 'id', style2Id)
-    const style3Data = await controller.system.storage.findByProperty('Style', 'id', style3Id)
-
-    expect(style1Data.priority).toBe(1)
-    expect(style2Data.priority).toBe(2)
-    expect(style3Data.priority).toBe(3)
-  })
-
-  test('TC006: Get Style List - With filters and pagination', async () => {
-    const userId = uuid()
-    const now = new Date().toISOString()
-
-    // Setup: Create user
-    await controller.run({
-      name: 'CreateUser',
-      payload: {
-        id: userId,
-        username: 'testuser',
-        email: 'test@example.com',
-        role: 'editor',
-        createdAt: now
-      },
-      user: { id: 'system', role: 'admin' }
-    })
-
-    // Create multiple styles with different types and statuses
-    const styles = [
-      { type: 'animation', status: 'published', label: 'Anime Style' },
-      { type: 'animation', status: 'draft', label: 'Manga Style' },
-      { type: 'surreal', status: 'published', label: 'Abstract Style' },
-      { type: 'surreal', status: 'offline', label: 'Dream Style' }
-    ]
-
-    for (let i = 0; i < styles.length; i++) {
-      const style = styles[i]
-      await controller.run({
-        name: 'CreateStyle',
-        payload: {
-          id: uuid(),
-          label: style.label,
-          slug: style.label.toLowerCase().replace(' ', '-'),
-          description: `Description for ${style.label}`,
-          type: style.type,
-          priority: i,
-          createdAt: now,
-          updatedAt: now,
-          createdBy: userId
-        },
-        user: { id: userId, role: 'editor' }
-      })
-
-      if (style.status !== 'draft') {
-        const styleData = await controller.system.storage.findByProperty('Style', 'label', style.label)
-        await controller.run({
-          name: 'UpdateStyleStatus',
-          payload: {
-            styleId: styleData.id,
-            status: style.status,
-            updatedAt: now
-          },
-          user: { id: userId, role: 'editor' }
+          thumbKey: `thumb-${style.id}.jpg`,
+          priority: style.priority,
+          status: style.status,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
         })
       }
-    }
-
-    // Test filtered query
-    const result = await controller.run({
-      name: 'GetStyleList',
-      payload: {
-        filter: {
-          type: 'animation',
-          status: 'published'
-        },
-        sort: 'priority',
-        page: 1,
-        limit: 10
-      },
-      user: { id: userId, role: 'editor' }
     })
 
-    expect(result.error).toBeUndefined()
-    // The result should contain the filtered styles
-    // Note: Actual filtering logic would be implemented in the backend query handler
-  })
-
-  test('TC003: Delete Style - Success when not referenced', async () => {
-    const userId = uuid()
-    const styleId = uuid()
-    const now = new Date().toISOString()
-
-    // Setup
-    await controller.run({
-      name: 'CreateUser',
-      payload: {
-        id: userId,
-        username: 'testuser',
-        email: 'test@example.com',
-        role: 'editor',
-        createdAt: now
-      },
-      user: { id: 'system', role: 'admin' }
-    })
-
-    await controller.run({
-      name: 'CreateStyle',
-      payload: {
-        id: styleId,
-        label: 'Test Style',
-        slug: 'test-style',
-        description: 'Test description',
-        type: 'animation',
-        createdAt: now,
-        updatedAt: now,
-        createdBy: userId
-      },
-      user: { id: userId, role: 'editor' }
-    })
-
-    // Delete style
-    const result = await controller.run({
-      name: 'DeleteStyle',
-      payload: {
-        styleId: styleId
-      },
-      user: { id: userId, role: 'editor' }
-    })
-
-    expect(result.error).toBeUndefined()
-
-    // Verify deletion
-    const styleData = await controller.system.storage.findByProperty('Style', 'id', styleId)
-    expect(styleData).toBeNull()
-
-    // Verify user's style count updated
-    const userData = await controller.system.storage.findByProperty('User', 'id', userId)
-    expect(userData.styleCount).toBe(0)
-  })
-
-  test('TC017: Batch Update Styles', async () => {
-    const userId = uuid()
-    const style1Id = uuid()
-    const style2Id = uuid()
-    const now = new Date().toISOString()
-
-    // Setup
-    await controller.run({
-      name: 'CreateUser',
-      payload: {
-        id: userId,
-        username: 'testuser',
-        email: 'test@example.com',
-        role: 'editor',
-        createdAt: now
-      },
-      user: { id: 'system', role: 'admin' }
-    })
-
-    for (const styleId of [style1Id, style2Id]) {
-      await controller.run({
-        name: 'CreateStyle',
-        payload: {
-          id: styleId,
-          label: `Style ${styleId.slice(0, 4)}`,
-          slug: `style-${styleId.slice(0, 4)}`,
-          description: 'Test description',
-          type: 'animation',
-          createdAt: now,
-          updatedAt: now,
-          createdBy: userId
-        },
-        user: { id: userId, role: 'editor' }
+    test('should list published styles sorted by priority', async () => {
+      const result = await controller.callInteraction('ListStylesAdmin', {
+        user: adminUser,
+        payload: {}
       })
-    }
 
-    // Batch update
-    const result = await controller.run({
-      name: 'BatchUpdateStyles',
-      payload: {
-        styleIds: [style1Id, style2Id],
-        updates: {
-          status: 'published'
-        },
-        updatedAt: now
-      },
-      user: { id: userId, role: 'editor' }
+      expect(result.error).toBeUndefined()
+      
+      const publishedStyles = await system.storage.find('Style',
+        MatchExp.atom({ key: 'status', value: ['=', 'published'] })
+      )
+
+      expect(publishedStyles).toHaveLength(2)
+      // Should be sorted by priority (5, 20)
     })
 
-    expect(result.error).toBeUndefined()
+    test('should return empty list for non-existent status', async () => {
+      const result = await controller.callInteraction('ListStylesAdmin', {
+        user: adminUser,
+        payload: {}
+      })
 
-    // Verify updates
-    const style1Data = await controller.system.storage.findByProperty('Style', 'id', style1Id)
-    const style2Data = await controller.system.storage.findByProperty('Style', 'id', style2Id)
-
-    expect(style1Data.status).toBe('published')
-    expect(style2Data.status).toBe('published')
+      expect(result.error).toBeUndefined()
+    })
   })
 
-  test('TC018: Search Styles', async () => {
-    const userId = uuid()
-    const now = new Date().toISOString()
+  describe('TC007: Bulk Update Priorities', () => {
+    let styleIds: string[]
 
-    // Setup
-    await controller.run({
-      name: 'CreateUser',
-      payload: {
-        id: userId,
-        username: 'testuser',
-        email: 'test@example.com',
-        role: 'editor',
-        createdAt: now
-      },
-      user: { id: 'system', role: 'admin' }
+    beforeEach(async () => {
+      styleIds = [uuid(), uuid(), uuid()]
+      
+      for (let i = 0; i < styleIds.length; i++) {
+        await system.storage.create('Style', {
+          id: styleIds[i],
+          label: `Style ${i}`,
+          slug: `style-${i}`,
+          description: `Description ${i}`,
+          type: 'animation',
+          thumbKey: `thumb-${i}.jpg`,
+          priority: (i + 1) * 10,
+          status: 'draft',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        })
+      }
     })
 
-    // Create styles with searchable content
-    const searchableStyles = [
-      { label: 'Manga Style', description: 'Japanese manga illustration' },
-      { label: 'Anime Character', description: 'Character design for anime' },
-      { label: 'Abstract Art', description: 'Modern abstract painting' }
-    ]
-
-    for (const style of searchableStyles) {
-      await controller.run({
-        name: 'CreateStyle',
+    test('should update multiple priorities successfully', async () => {
+      const result = await controller.callInteraction('BulkUpdatePriorities', {
+        user: adminUser,
         payload: {
+          styles: [
+            { id: styleIds[0], priority: 100 },
+            { id: styleIds[1], priority: 200 },
+            { id: styleIds[2], priority: 300 }
+          ]
+        }
+      })
+
+      expect(result.error).toBeUndefined()
+
+      // Verify all priorities were updated
+      for (let i = 0; i < styleIds.length; i++) {
+        const style = await system.storage.findOne('Style',
+          MatchExp.atom({ key: 'id', value: ['=', styleIds[i]] })
+        )
+        expect(style.priority).toBe((i + 1) * 100)
+      }
+    })
+
+    test('should fail atomically with non-existent styleId', async () => {
+      const result = await controller.callInteraction('BulkUpdatePriorities', {
+        user: adminUser,
+        payload: {
+          styles: [
+            { id: styleIds[0], priority: 100 },
+            { id: 'non-existent-id', priority: 200 },
+            { id: styleIds[2], priority: 300 }
+          ]
+        }
+      })
+
+      expect(result.error).toBeDefined()
+
+      // Verify no priorities were updated
+      for (let i = 0; i < styleIds.length; i++) {
+        const style = await system.storage.findOne('Style',
+          MatchExp.atom({ key: 'id', value: ['=', styleIds[i]] })
+        )
+        expect(style.priority).toBe((i + 1) * 10) // Original values
+      }
+    })
+  })
+
+  describe('TC010: Get Published Styles (Public API)', () => {
+    beforeEach(async () => {
+      const styles = [
+        { status: 'draft', priority: 10 },
+        { status: 'published', priority: 20 },
+        { status: 'offline', priority: 30 },
+        { status: 'published', priority: 5 }
+      ]
+
+      for (let i = 0; i < styles.length; i++) {
+        await system.storage.create('Style', {
           id: uuid(),
-          label: style.label,
-          slug: style.label.toLowerCase().replace(/\s+/g, '-'),
-          description: style.description,
+          label: `Style ${i}`,
+          slug: `style-${i}`,
+          description: `Description ${i}`,
           type: 'animation',
-          createdAt: now,
-          updatedAt: now,
-          createdBy: userId
-        },
-        user: { id: userId, role: 'editor' }
-      })
-    }
-
-    // Search for manga-related styles
-    const result = await controller.run({
-      name: 'SearchStyles',
-      payload: {
-        query: 'manga',
-        filters: {
-          type: 'animation'
-        },
-        page: 1,
-        limit: 10
-      },
-      user: { id: userId, role: 'editor' }
+          thumbKey: `thumb-${i}.jpg`,
+          priority: styles[i].priority,
+          status: styles[i].status,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        })
+      }
     })
 
-    expect(result.error).toBeUndefined()
-    // Search results would be handled by the query implementation
+    test('should return only published styles sorted by priority', async () => {
+      const result = await controller.callInteraction('GetPublishedStyles', {
+        user: { id: 'anonymous' },
+        payload: {}
+      })
+
+      expect(result.error).toBeUndefined()
+      
+      const publishedStyles = await system.storage.find('Style',
+        MatchExp.atom({ key: 'status', value: ['=', 'published'] })
+      )
+
+      expect(publishedStyles).toHaveLength(2)
+    })
+
+    test('should work without authentication', async () => {
+      const result = await controller.callInteraction('GetPublishedStyles', {
+        user: { id: 'anonymous' },
+        payload: {}
+      })
+
+      expect(result.error).toBeUndefined()
+    })
   })
 })

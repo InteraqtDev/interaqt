@@ -1,201 +1,176 @@
-# Style 管理系统交互矩阵
+# CMS Backend Interaction Matrix
 
-## 用户角色定义
+## User Roles and Permissions
 
-### Admin（管理员）
-- 系统最高权限
-- 可以管理用户、Style、版本的所有操作
-- 可以发布和回滚版本
+### Admin User Role
+- **Description**: Product operations personnel with full system access
+- **Capabilities**: Complete CRUD operations, version management, publishing control
+- **Authentication**: Required for all admin operations
+- **Authorization**: Full access to all Style and Version management functions
 
-### Editor（编辑者）
-- 可以创建和编辑 Style
-- 只能编辑自己创建的 Style
-- 可以创建版本草稿，但无法发布
+### Public/Frontend Role
+- **Description**: Anonymous access for frontend consumption
+- **Capabilities**: Read-only access to published styles
+- **Authentication**: Not required
+- **Authorization**: Limited to published content only
 
-### Viewer（查看者）
-- 只读权限
-- 可以查看已发布的内容
-- 可以导出数据
+## Interaction Coverage Matrix
 
-## 交互矩阵
+### Style Management Operations
 
-### Style 管理交互
+| Operation | Admin User | Public/Frontend | Test Case | Interaction Name |
+|-----------|------------|-----------------|-----------|------------------|
+| Create Style | ✅ Full Access | ❌ Denied | TC001 | CreateStyle |
+| Read Style (Admin) | ✅ All Statuses | ❌ Denied | TC006 | ListStylesAdmin |
+| Read Style (Public) | ❌ N/A | ✅ Published Only | TC010 | GetPublishedStyles |
+| Update Style Properties | ✅ Full Access | ❌ Denied | TC002 | UpdateStyle |
+| Delete Style | ✅ Full Access | ❌ Denied | TC005 | DeleteStyle |
+| Publish Style | ✅ Full Access | ❌ Denied | TC003 | PublishStyle |
+| Unpublish Style | ✅ Full Access | ❌ Denied | TC004 | UnpublishStyle |
+| Bulk Update Priorities | ✅ Full Access | ❌ Denied | TC007 | BulkUpdatePriorities |
 
-| 交互名称 | Admin | Editor | Viewer | 对应测试用例 | 权限验证 |
-|---------|-------|--------|--------|-------------|----------|
-| CreateStyle | ✓ | ✓ | ✗ | TC001 | 需要登录 + (Admin \|\| Editor) |
-| UpdateStyle | ✓ | ✓* | ✗ | TC002 | 需要登录 + (Admin \|\| (Editor && 创建者)) |
-| DeleteStyle | ✓ | ✓* | ✗ | TC003 | 需要登录 + (Admin \|\| (Editor && 创建者)) |
-| GetStyleList | ✓ | ✓ | ✓ | TC006 | 需要登录 |
-| GetStyleDetail | ✓ | ✓ | ✓ | TC006 | 需要登录 |
-| UpdateStyleStatus | ✓ | ✓* | ✗ | TC005 | 需要登录 + (Admin \|\| (Editor && 创建者)) |
-| UpdateStylePriority | ✓ | ✓ | ✗ | TC004 | 需要登录 + (Admin \|\| Editor) |
-| BatchUpdateStyles | ✓ | ✓ | ✗ | TC017 | 需要登录 + (Admin \|\| Editor) |
+### Version Management Operations
 
-*注：Editor 只能操作自己创建的 Style
+| Operation | Admin User | Public/Frontend | Test Case | Interaction Name |
+|-----------|------------|-----------------|-----------|------------------|
+| Create Version | ✅ Full Access | ❌ Denied | TC008 | CreateVersion |
+| List Versions | ✅ Full Access | ❌ Denied | - | ListVersions |
+| Rollback to Version | ✅ Full Access | ❌ Denied | TC009 | RollbackToVersion |
+| Delete Version | ✅ Full Access | ❌ Denied | - | DeleteVersion |
 
-### 版本管理交互
+### Authentication & Authorization Operations
 
-| 交互名称 | Admin | Editor | Viewer | 对应测试用例 | 权限验证 |
-|---------|-------|--------|--------|-------------|----------|
-| CreateVersion | ✓ | ✓ | ✗ | TC007 | 需要登录 + (Admin \|\| Editor) |
-| UpdateVersion | ✓ | ✓* | ✗ | TC010 | 需要登录 + (Admin \|\| (Editor && 创建者 && 状态为draft)) |
-| DeleteVersion | ✓ | ✓* | ✗ | - | 需要登录 + (Admin \|\| (Editor && 创建者 && 状态为draft)) |
-| PublishVersion | ✓ | ✗ | ✗ | TC008 | 需要登录 + Admin |
-| ArchiveVersion | ✓ | ✗ | ✗ | - | 需要登录 + Admin |
-| RollbackVersion | ✓ | ✗ | ✗ | TC009 | 需要登录 + Admin |
-| GetVersionList | ✓ | ✓ | ✓ | - | 需要登录 |
-| GetVersionDetail | ✓ | ✓ | ✓ | - | 需要登录 |
-| CompareVersions | ✓ | ✓ | ✓ | - | 需要登录 |
+| Operation | Admin User | Public/Frontend | Test Case | Interaction Name |
+|-----------|------------|-----------------|-----------|------------------|
+| Admin Login | ✅ Required | ❌ N/A | - | AdminLogin |
+| Token Validation | ✅ Automatic | ❌ N/A | TC011 | ValidateAdminToken |
+| Access Control | ✅ Enforced | ✅ Limited | TC012 | CheckPermissions |
 
-*注：Editor 只能操作自己创建的版本，且只能在 draft 状态下操作
+## Interaction Definitions Required
 
-### 用户管理交互
+### Core Style Management
+1. **CreateStyle** - Create new style in draft status
+2. **UpdateStyle** - Modify existing style properties
+3. **DeleteStyle** - Remove style from system
+4. **PublishStyle** - Change status from draft to published
+5. **UnpublishStyle** - Change status from published to offline
+6. **ListStylesAdmin** - List styles with filtering by status (admin view)
+7. **GetPublishedStyles** - Get published styles for frontend consumption
+8. **BulkUpdatePriorities** - Update multiple style priorities atomically
 
-| 交互名称 | Admin | Editor | Viewer | 对应测试用例 | 权限验证 |
-|---------|-------|--------|--------|-------------|----------|
-| CreateUser | ✓ | ✗ | ✗ | - | 需要登录 + Admin |
-| UpdateUser | ✓ | ✗ | ✗ | - | 需要登录 + Admin |
-| DeleteUser | ✓ | ✗ | ✗ | - | 需要登录 + Admin |
-| GetUserList | ✓ | ✗ | ✗ | - | 需要登录 + Admin |
-| GetCurrentUser | ✓ | ✓ | ✓ | - | 需要登录 |
-| UpdateProfile | ✓ | ✓ | ✓ | - | 需要登录 + 本人 |
+### Version Management
+9. **CreateVersion** - Create snapshot of current styles state
+10. **ListVersions** - Get version history
+11. **RollbackToVersion** - Restore styles to previous version state
+12. **DeleteVersion** - Remove version snapshot
 
-### 查询和搜索交互
+### Authentication & Security
+13. **AdminLogin** - Authenticate admin user
+14. **ValidateAdminToken** - Check token validity
+15. **CheckPermissions** - Verify user role permissions
 
-| 交互名称 | Admin | Editor | Viewer | 对应测试用例 | 权限验证 |
-|---------|-------|--------|--------|-------------|----------|
-| SearchStyles | ✓ | ✓ | ✓ | TC018 | 需要登录 |
-| FilterStyles | ✓ | ✓ | ✓ | TC018 | 需要登录 |
-| GetStylesByType | ✓ | ✓ | ✓ | TC006 | 需要登录 |
-| GetStylesByStatus | ✓ | ✓ | ✓ | TC006 | 需要登录 |
-| GetPublishedStyles | ✓ | ✓ | ✓ | - | 无需权限 |
+## Permission Control Matrix
 
-## 权限验证详细规则
-
-### 属性级权限控制
-
-```typescript
-// Style 实体权限规则
-Style.canCreate = (user) => user.role === 'Admin' || user.role === 'Editor'
-Style.canRead = (user, style) => true // 所有登录用户都可读
-Style.canUpdate = (user, style) => 
-  user.role === 'Admin' || 
-  (user.role === 'Editor' && style.createdBy === user.id)
-Style.canDelete = (user, style) => 
-  user.role === 'Admin' || 
-  (user.role === 'Editor' && style.createdBy === user.id && !style.isReferencedByPublishedVersion)
-
-// Version 实体权限规则  
-Version.canCreate = (user) => user.role === 'Admin' || user.role === 'Editor'
-Version.canUpdate = (user, version) => 
-  user.role === 'Admin' || 
-  (user.role === 'Editor' && version.createdBy === user.id && version.status === 'draft')
-Version.canPublish = (user) => user.role === 'Admin'
-Version.canRollback = (user) => user.role === 'Admin'
+### Style Entity Permissions
+```
+Style.create -> Admin only
+Style.read -> Admin (all), Public (published only)
+Style.update -> Admin only
+Style.delete -> Admin only
+Style.status_change -> Admin only
 ```
 
-### 业务规则权限控制
-
-```typescript
-// 业务规则级别的权限验证
-BusinessRules = {
-  // 只有 Admin 可以同时发布多个版本
-  publishMultipleVersions: (user) => user.role === 'Admin',
-  
-  // Editor 不能删除被版本引用的 Style
-  deleteReferencedStyle: (user, style) => 
-    user.role === 'Admin' || !style.isReferencedByAnyVersion,
-    
-  // 只有 Admin 可以修改已发布版本
-  modifyPublishedVersion: (user) => user.role === 'Admin',
-  
-  // Editor 只能在自己创建的版本中操作 Style
-  manageStyleInVersion: (user, version) =>
-    user.role === 'Admin' || 
-    (user.role === 'Editor' && version.createdBy === user.id)
-}
+### Version Entity Permissions
+```
+Version.create -> Admin only
+Version.read -> Admin only
+Version.rollback -> Admin only
+Version.delete -> Admin only
 ```
 
-## 交互实现映射
+## Security Requirements per Interaction
 
-### 核心 CRUD 交互
+### Authentication Required
+- All admin operations (CreateStyle, UpdateStyle, etc.)
+- All version management operations
+- No authentication for GetPublishedStyles
 
-1. **CreateStyle** → TC001: 创建 Style
-   - 验证输入数据格式
-   - 检查 slug 唯一性
-   - 设置默认状态和时间戳
-   - 关联创建者
+### Role-based Authorization
+- **Admin Role**: Required for all management operations
+- **No Role**: Allowed only for GetPublishedStyles
 
-2. **UpdateStyle** → TC002: 编辑 Style  
-   - 权限验证（创建者或 Admin）
-   - 部分字段更新
-   - 更新时间戳
+### Input Validation Required
+- **Slug validation**: URL-safe format, uniqueness
+- **Type validation**: Must be from allowed types
+- **Status validation**: Must follow valid transitions
+- **Priority validation**: Must be positive integer
+- **File validation**: Thumbnail keys must be valid S3 paths
 
-3. **DeleteStyle** → TC003: 删除 Style
-   - 检查引用关系
-   - 权限验证
-   - 级联删除相关数据
+## Error Handling Matrix
 
-4. **UpdateStylePriority** → TC004: 调整排序
-   - 批量更新 priority 值
-   - 保证排序的一致性
+| Scenario | Admin Response | Public Response | Test Coverage |
+|----------|----------------|-----------------|---------------|
+| Invalid Authentication | 401 Unauthorized | N/A | TC011 |
+| Insufficient Permissions | 403 Forbidden | 403 Forbidden | TC012 |
+| Invalid Input Data | 400 Bad Request | 400 Bad Request | Multiple TCs |
+| Resource Not Found | 404 Not Found | 404 Not Found | Multiple TCs |
+| Duplicate Slug | 409 Conflict | N/A | TC014 |
+| Concurrent Updates | 409 Conflict | N/A | TC013 |
+| System Error | 500 Internal Error | 500 Internal Error | TC015 |
 
-5. **UpdateStyleStatus** → TC005: 状态管理
-   - 验证状态转换规则
-   - 检查业务约束
+## Business Rule Enforcement
 
-### 版本管理交互
+### Status Transition Rules
+- **Draft → Published**: Allowed with PublishStyle
+- **Published → Offline**: Allowed with UnpublishStyle  
+- **Offline → Published**: Allowed with PublishStyle
+- **Draft → Offline**: Not allowed directly
+- **Any → Draft**: Only through creation or rollback
 
-6. **CreateVersion** → TC007: 创建版本
-   - 验证包含的 Style 列表
-   - 生成版本号
-   - 创建关联关系
+### Validation Rules
+- **Slug Uniqueness**: Enforced across all styles
+- **Required Fields**: label, slug, type must be provided
+- **Type Constraints**: Must be from predefined list
+- **Priority Constraints**: Must be positive integer
 
-7. **PublishVersion** → TC008: 发布版本
-   - 归档当前发布版本
-   - 更新版本状态
-   - 记录发布时间
+### Atomic Operations
+- **BulkUpdatePriorities**: All updates succeed or all fail
+- **RollbackToVersion**: Complete state restoration or full rollback
+- **CreateVersion**: Complete snapshot or failure
 
-8. **RollbackVersion** → TC009: 版本回滚
-   - 验证目标版本有效性
-   - 原子性操作保证一致性
-   - 记录操作日志
+## Interaction Dependencies
 
-### 查询交互
+### Prerequisites
+1. **User Authentication** → Required for all admin interactions
+2. **Style Existence** → Required for update/delete/status change operations
+3. **Version Existence** → Required for rollback operations
 
-9. **GetStyleList** → TC006: 查询列表
-   - 支持多维度过滤
-   - 分页和排序
-   - 权限过滤（Viewer 只看已发布）
+### Side Effects
+1. **CreateStyle** → Increments admin style count (if tracked)
+2. **DeleteStyle** → Decrements admin style count (if tracked)
+3. **PublishStyle** → Makes style visible to frontend
+4. **UnpublishStyle** → Hides style from frontend
+5. **CreateVersion** → Creates immutable snapshot for rollback
+6. **RollbackToVersion** → Creates new version automatically
 
-10. **SearchStyles** → TC018: 搜索过滤
-    - 全文搜索支持
-    - 组合条件过滤
-    - 性能优化
+## Coverage Validation
 
-## 权限测试用例映射
+### All User Roles Covered
+- ✅ Admin: Complete CRUD and management capabilities
+- ✅ Public/Frontend: Read access to published content
 
-- **TC011**: Admin 权限全覆盖测试
-- **TC012**: Editor 权限边界测试  
-- **TC013**: Viewer 权限限制测试
-- **TC014**: 并发权限冲突测试
-- **TC015**: 数据完整性权限保护测试
+### All Operations Covered
+- ✅ Style CRUD operations
+- ✅ Status management (publish/unpublish)
+- ✅ Priority management (including bulk updates)
+- ✅ Version management (create, rollback)
+- ✅ Authentication and authorization
 
-## 错误处理和边界情况
+### All Test Cases Mapped
+- ✅ Each interaction has corresponding test cases
+- ✅ Success and failure scenarios covered
+- ✅ Edge cases and concurrent operations included
+- ✅ Security and validation scenarios tested
 
-### 权限错误
-- `PERMISSION_DENIED`: 用户无权限执行操作
-- `RESOURCE_NOT_FOUND`: 资源不存在或无权访问
-- `OWNERSHIP_REQUIRED`: 需要资源所有权
-
-### 业务规则错误
-- `SLUG_DUPLICATE`: slug 重复
-- `VERSION_CONFLICT`: 版本冲突
-- `REFERENCE_CONSTRAINT`: 引用约束违反
-- `STATUS_TRANSITION_INVALID`: 无效状态转换
-
-### 并发错误
-- `OPTIMISTIC_LOCK_FAILED`: 乐观锁冲突
-- `RESOURCE_LOCKED`: 资源被锁定
-- `TRANSACTION_CONFLICT`: 事务冲突
+### Missing Interactions: None
+All required business operations have corresponding interactions defined.

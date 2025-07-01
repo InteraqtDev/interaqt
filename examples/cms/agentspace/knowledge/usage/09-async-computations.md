@@ -1,6 +1,6 @@
 # How to Use Async Computations
 
-Async computations are an advanced feature of the InterAQT framework that allow calling external APIs, performing time-consuming operations, or executing complex data processing during reactive computation processes. This chapter will detail how to implement and use async computations at different levels.
+Async computations are an advanced feature of the interaqt framework that allow calling external APIs, performing time-consuming operations, or executing complex data processing during reactive computation processes. This chapter will detail how to implement and use async computations at different levels.
 
 ## Understanding Async Computation Scenarios
 
@@ -733,4 +733,4 @@ setInterval(() => {
 }, 5000); // Process async tasks every 5 seconds
 ```
 
-Async computations provide the InterAQT framework with powerful extension capabilities, enabling the system to handle complex business logic and external integration requirements. Through proper use of async computations, you can build feature-rich, high-performance reactive application systems.
+Async computations provide the interaqt framework with powerful extension capabilities, enabling the system to handle complex business logic and external integration requirements. Through proper use of async computations, you can build feature-rich, high-performance reactive application systems.

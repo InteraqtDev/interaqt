@@ -1,3 +1,2 @@
-export { StyleUserRelation } from './StyleUserRelation'
-export { VersionUserRelation } from './VersionUserRelation'
-export { StyleVersionRelation } from './StyleVersionRelation'
+export { UserStyleRelation } from './UserStyleRelation'
+export { UserVersionRelation } from './UserVersionRelation'

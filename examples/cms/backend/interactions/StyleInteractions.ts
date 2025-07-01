@@ -1,99 +1,132 @@
-import { Interaction, PayloadItem } from 'interaqt'
+import { Interaction, Action, Payload, PayloadItem, createUserRoleAttributive } from 'interaqt'
+import { User } from '../entities/User'
+import { Style } from '../entities/Style'
+import { UserStyleRelation } from '../relations/UserStyleRelation'
+
+const AdminRole = createUserRoleAttributive({ name: 'admin' })
 
 export const CreateStyle = Interaction.create({
   name: 'CreateStyle',
-  action: 'create',
-  payload: [
-    PayloadItem.create({ name: 'label', required: true }),
-    PayloadItem.create({ name: 'slug', required: true }),
-    PayloadItem.create({ name: 'description' }),
-    PayloadItem.create({ name: 'type', required: true }),
-    PayloadItem.create({ name: 'thumbKey' }),
-    PayloadItem.create({ name: 'priority' }),
-    PayloadItem.create({ name: 'createdAt', required: true }),
-    PayloadItem.create({ name: 'updatedAt', required: true }),
-    PayloadItem.create({ name: 'createdBy', required: true })
-  ]
+  action: Action.create({ name: 'create' }),
+  userAttributives: AdminRole,
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({
+        name: 'style',
+        base: Style,
+        isRef: false,
+        required: true,
+        isCollection: false
+      })
+    ]
+  })
 })
 
 export const UpdateStyle = Interaction.create({
   name: 'UpdateStyle',
-  action: 'update',
-  payload: [
-    PayloadItem.create({ name: 'styleId', required: true }),
-    PayloadItem.create({ name: 'label' }),
-    PayloadItem.create({ name: 'slug' }),
-    PayloadItem.create({ name: 'description' }),
-    PayloadItem.create({ name: 'type' }),
-    PayloadItem.create({ name: 'thumbKey' }),
-    PayloadItem.create({ name: 'priority' }),
-    PayloadItem.create({ name: 'updatedAt', required: true })
-  ]
+  action: Action.create({ name: 'update' }),
+  userAttributives: AdminRole,
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({
+        name: 'style',
+        base: Style,
+        isRef: true,
+        required: true,
+        isCollection: false
+      }),
+      PayloadItem.create({
+        name: 'updates',
+        base: Style,
+        isRef: false,
+        required: true,
+        isCollection: false
+      })
+    ]
+  })
 })
 
 export const DeleteStyle = Interaction.create({
   name: 'DeleteStyle',
-  action: 'delete',
-  payload: [
-    PayloadItem.create({ name: 'styleId', required: true })
-  ]
+  action: Action.create({ name: 'delete' }),
+  userAttributives: AdminRole,
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({
+        name: 'style',
+        base: Style,
+        isRef: true,
+        required: true,
+        isCollection: false
+      })
+    ]
+  })
 })
 
-export const UpdateStyleStatus = Interaction.create({
-  name: 'UpdateStyleStatus',
-  action: 'update',
-  payload: [
-    PayloadItem.create({ name: 'styleId', required: true }),
-    PayloadItem.create({ name: 'status', required: true }),
-    PayloadItem.create({ name: 'updatedAt', required: true })
-  ]
+export const PublishStyle = Interaction.create({
+  name: 'PublishStyle',
+  action: Action.create({ name: 'publish' }),
+  userAttributives: AdminRole,
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({
+        name: 'style',
+        base: Style,
+        isRef: true,
+        required: true,
+        isCollection: false
+      })
+    ]
+  })
 })
 
-export const UpdateStylePriority = Interaction.create({
-  name: 'UpdateStylePriority',
-  action: 'update',
-  payload: [
-    PayloadItem.create({ name: 'styleUpdates', required: true }),
-    PayloadItem.create({ name: 'updatedAt', required: true })
-  ]
+export const UnpublishStyle = Interaction.create({
+  name: 'UnpublishStyle',
+  action: Action.create({ name: 'unpublish' }),
+  userAttributives: AdminRole,
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({
+        name: 'style',
+        base: Style,
+        isRef: true,
+        required: true,
+        isCollection: false
+      })
+    ]
+  })
 })
 
-export const BatchUpdateStyles = Interaction.create({
-  name: 'BatchUpdateStyles',
-  action: 'update',
-  payload: [
-    PayloadItem.create({ name: 'styleIds', required: true }),
-    PayloadItem.create({ name: 'updates', required: true }),
-    PayloadItem.create({ name: 'updatedAt', required: true })
-  ]
+export const ListStylesAdmin = Interaction.create({
+  name: 'ListStylesAdmin',
+  action: Action.create({ name: 'listAdmin' }),
+  userAttributives: AdminRole,
+  payload: Payload.create({
+    items: []
+  })
 })
 
-export const GetStyleList = Interaction.create({
-  name: 'GetStyleList',
-  action: 'read',
-  payload: [
-    PayloadItem.create({ name: 'filter' }),
-    PayloadItem.create({ name: 'sort' }),
-    PayloadItem.create({ name: 'page' }),
-    PayloadItem.create({ name: 'limit' })
-  ]
+export const GetPublishedStyles = Interaction.create({
+  name: 'GetPublishedStyles',
+  action: Action.create({ name: 'getPublished' }),
+  payload: Payload.create({
+    items: []
+  })
 })
 
-export const GetStyleDetail = Interaction.create({
-  name: 'GetStyleDetail',
-  action: 'read',
-  payload: [
-    PayloadItem.create({ name: 'styleId', required: true })
-  ]
-})
-
-export const SearchStyles = Interaction.create({
-  name: 'SearchStyles',
-  action: 'read',
-  payload: [
-    PayloadItem.create({ name: 'query', required: true }),
-    PayloadItem.create({ name: 'filters' }),
-    PayloadItem.create({ name: 'page' }),
-    PayloadItem.create({ name: 'limit' })
-  ]
+export const BulkUpdatePriorities = Interaction.create({
+  name: 'BulkUpdatePriorities',
+  action: Action.create({ name: 'bulkUpdate' }),
+  userAttributives: AdminRole,
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({
+        name: 'styles',
+        base: Style,
+        isRef: true,
+        required: true,
+        isCollection: true
+      })
+    ]
+  })
 })

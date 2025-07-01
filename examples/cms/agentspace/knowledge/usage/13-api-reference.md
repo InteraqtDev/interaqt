@@ -1,6 +1,6 @@
 # Chapter 13: API Reference
 
-This chapter provides detailed reference documentation for all core APIs in the InterAQT framework, including complete parameter descriptions, type definitions, and usage examples.
+This chapter provides detailed reference documentation for all core APIs in the interaqt framework, including complete parameter descriptions, type definitions, and usage examples.
 
 ## 13.1 Entity-Related APIs
 
@@ -102,6 +102,12 @@ Create relationship definition between entities.
 ```typescript
 Relation.create(config: RelationConfig): KlassInstance<typeof Relation>
 ```
+
+**Important: Auto-Generated Relation Names**
+
+⚠️ **DO NOT specify a `name` property when creating relations.** The framework automatically generates the relation name based on the source and target entities. For example:
+- A relation between `User` and `Post` → automatically named `UserPost`
+- A relation between `Post` and `Comment` → automatically named `PostComment`
 
 **Parameters**
 - `config.source` (Entity|Relation, required): Source entity of the relationship
@@ -1434,4 +1440,4 @@ await controller.callInteraction('likePost', {
 })
 ```
 
-This API reference documentation covers all core APIs of the InterAQT framework, providing complete parameter descriptions and practical usage examples. Developers can quickly get started and deeply use various framework features based on this documentation.
+This API reference documentation covers all core APIs of the interaqt framework, providing complete parameter descriptions and practical usage examples. Developers can quickly get started and deeply use various framework features based on this documentation.
