@@ -48,6 +48,12 @@ This document provides comprehensive guidelines for Claude when working with the
    agentspace/knowledge/development/05-realtime-implementation.md
    ```
 
+4. **Testing Philosophy**:
+   - In interaqt, ALL data is derived from interaction events
+   - Focus testing efforts on Interactions, not on Entity/Relation CRUD
+   - 100% test coverage is achieved by thoroughly testing all Interactions
+   - If coverage is insufficient, you're likely missing Interaction definitions or edge cases
+
 ### ⚠️ Knowledge Loading Validation
 
 After reading the knowledge base, you MUST demonstrate understanding by:

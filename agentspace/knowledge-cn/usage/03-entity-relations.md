@@ -2,6 +2,33 @@
 
 关系（Relation）是连接不同实体的桥梁，它定义了实体之间的关联方式。interaqt 支持多种类型的关系，包括一对一、一对多、多对多和对称关系。
 
+## 重要提示：关系名称自动生成
+
+创建关系时，**不需要指定 `name` 属性**。框架会根据源实体和目标实体自动生成关系名称。例如：
+- `User` 和 `Post` 之间的关系会自动命名为 `UserPost`
+- `Post` 和 `Comment` 之间的关系会自动命名为 `PostComment`
+
+```javascript
+// ✅ 正确：不指定 name
+const UserPosts = Relation.create({
+  source: User,
+  sourceProperty: 'posts',
+  target: Post,
+  targetProperty: 'author',
+  type: 'n:1'
+});
+
+// ❌ 错误：不要指定 name
+const UserPosts = Relation.create({
+  name: 'UserPost',  // 不要这样做 - name 是自动生成的
+  source: User,
+  sourceProperty: 'posts',
+  target: Post,
+  targetProperty: 'author',
+  type: 'n:1'
+});
+```
+
 ## 创建一对一关系
 
 一对一关系表示两个实体之间的唯一对应关系，如用户与个人资料的关系。

@@ -103,6 +103,12 @@ const postCount = Property.create({
 Relation.create(config: RelationConfig): KlassInstance<typeof Relation>
 ```
 
+**重要提示：关系名称自动生成**
+
+⚠️ **创建关系时不要指定 `name` 属性。** 框架会根据源实体和目标实体自动生成关系名称。例如：
+- `User` 和 `Post` 之间的关系 → 自动命名为 `UserPost`
+- `Post` 和 `Comment` 之间的关系 → 自动命名为 `PostComment`
+
 **参数**
 - `config.source` (Entity|Relation, required): 关系的源实体
 - `config.sourceProperty` (string, required): 源实体中的关系属性名

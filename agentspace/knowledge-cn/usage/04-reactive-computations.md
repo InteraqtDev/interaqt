@@ -565,25 +565,74 @@ const Order = Entity.create({
 
 Transform 是最灵活的响应式计算类型，允许你定义自定义的转换逻辑。
 
+### ⚠️ 重要：Transform vs getValue 的使用场景
+
+**Transform** 用于从其他实体或关系创建**派生实体**：
+- ✅ 当基于其他实体的数据创建新的实体类型时使用 Transform
+- ✅ 当将关系数据转换为实体数据时使用 Transform
+- ✅ 当源数据来自 InteractionEventEntity 时使用 Transform
+
+**getValue** 用于同一实体内的计算属性：
+- ✅ 对于简单的计算属性（如从 firstName + lastName 生成 fullName）使用 getValue
+- ✅ 当计算只需要当前记录的数据时使用 getValue
+
+❌ **绝对不要**在 Transform 的 `record` 参数中引用正在定义的实体 - 这会造成循环引用！
+
 ### 基本用法
 
 ```javascript
+// 对于同一实体内的简单属性转换，应使用 getValue 而不是 Transform
 const User = Entity.create({
   name: 'User',
   properties: [
     Property.create({ name: 'firstName', type: 'string' }),
     Property.create({ name: 'lastName', type: 'string' }),
-    // 使用 Transform 生成全名
+    // ✅ 正确：使用 getValue 计算同一实体内的属性
     Property.create({
       name: 'fullName',
       type: 'string',
-      defaultValue: () => '',
-      computedData: Transform.create({
-        record: User,
-        callback: (record) => `${record.firstName} ${record.lastName}`
-      })
+      getValue: (record) => `${record.firstName} ${record.lastName}`
     })
   ]
+});
+
+// ⚠️ 重要：Transform 不应该引用正在定义的实体
+// Transform 是用于从其他实体或关系创建派生实体的
+```
+
+### Transform 的正确使用示例
+
+```javascript
+// ✅ 正确：基于其他实体创建派生实体
+const Product = Entity.create({
+  name: 'Product',
+  properties: [
+    Property.create({ name: 'name', type: 'string' }),
+    Property.create({ name: 'price', type: 'number' }),
+    Property.create({ name: 'isAvailable', type: 'boolean' })
+  ]
+});
+
+// Transform 从现有的 Product 数据创建新的实体类型
+const DiscountedProduct = Entity.create({
+  name: 'DiscountedProduct',
+  properties: [
+    Property.create({ name: 'name', type: 'string' }),
+    Property.create({ name: 'originalPrice', type: 'number' }),
+    Property.create({ name: 'discountedPrice', type: 'number' }),
+    Property.create({ name: 'discount', type: 'string' })
+  ],
+  computedData: Transform.create({
+    record: Product,  // 引用一个不同的、已经定义好的实体
+    callback: (product) => {
+      return {
+        name: product.name,
+        originalPrice: product.price,
+        discountedPrice: product.price * 0.9,
+        discount: '10%'
+      };
+    }
+  })
 });
 ```
 
@@ -658,24 +707,20 @@ const Product = Entity.create({
     Property.create({ name: 'name', type: 'string' }),
     Property.create({ name: 'price', type: 'number' }),
     Property.create({ name: 'currency', type: 'string', defaultValue: 'USD' }),
-    // 格式化价格显示
+    // ✅ 正确：使用 getValue 进行简单的属性格式化
     Property.create({
       name: 'formattedPrice',
       type: 'string',
-      defaultValue: () => '',
-      computedData: Transform.create({
-        record: Product,
-        callback: (record) => {
-          const currencySymbols = {
-            'USD': '$',
-            'EUR': '€',
-            'GBP': '£',
-            'CNY': '¥'
-          };
-          const symbol = currencySymbols[record.currency] || record.currency;
-          return `${symbol}${record.price.toFixed(2)}`;
-        }
-      })
+      getValue: (record) => {
+        const currencySymbols = {
+          'USD': '$',
+          'EUR': '€',
+          'GBP': '£',
+          'CNY': '¥'
+        };
+        const symbol = currencySymbols[record.currency] || record.currency;
+        return `${symbol}${record.price.toFixed(2)}`;
+      }
     })
   ]
 });
@@ -1765,4 +1810,164 @@ const Post = Entity.create({
 });
 ```
 
-响应式计算是 interaqt 的核心优势，通过合理使用各种计算类型，可以大大简化业务逻辑的实现，同时保证数据的一致性和系统的性能。 
+响应式计算是 interaqt 的核心优势，通过合理使用各种计算类型，可以大大简化业务逻辑的实现，同时保证数据的一致性和系统的性能。
+
+## 模块组织和前向引用的最佳实践
+
+### 前向引用问题
+
+在定义引用尚未定义的关系的计算属性时，可能会遇到前向引用问题：
+
+```javascript
+// ❌ 错误：使用函数形式来"解决"前向引用
+const Version = Entity.create({
+  name: 'Version',
+  properties: [
+    Property.create({
+      name: 'styleCount',
+      type: 'number',
+      computedData: Count.create({
+        record: () => StyleVersionRelation  // ❌ 函数形式不是解决方案
+      })
+    })
+  ]
+});
+
+// StyleVersionRelation 在后面定义或在文件底部导入
+import { StyleVersionRelation } from '../relations/StyleVersionRelation'
+```
+
+### 正确的解决方案
+
+#### 方案1：正确组织文件结构
+
+组织文件结构以避免前向引用：
+
+```javascript
+// relations/StyleVersionRelation.ts
+import { Relation } from 'interaqt'
+import { Style } from '../entities/Style'
+import { Version } from '../entities/Version'
+
+export const StyleVersionRelation = Relation.create({
+  source: Style,
+  target: Version,
+  type: 'n:n'
+})
+
+// entities/Version.ts
+import { Entity, Property, Count } from 'interaqt'
+import { StyleVersionRelation } from '../relations/StyleVersionRelation'
+
+export const Version = Entity.create({
+  name: 'Version',
+  properties: [
+    Property.create({
+      name: 'styleCount',
+      type: 'number',
+      computedData: Count.create({
+        record: StyleVersionRelation  // ✅ 直接引用，正确导入
+      })
+    })
+  ]
+})
+```
+
+#### 方案2：先定义基本结构，后添加计算属性
+
+如果实体和关系之间存在循环依赖：
+
+```javascript
+// entities/Version.ts - 第1步：定义基本实体
+export const Version = Entity.create({
+  name: 'Version',
+  properties: [
+    Property.create({ name: 'versionNumber', type: 'number' }),
+    Property.create({ name: 'name', type: 'string' })
+    // 暂时不添加依赖关系的计算属性
+  ]
+})
+
+// relations/StyleVersionRelation.ts - 第2步：定义关系
+import { Version } from '../entities/Version'
+import { Style } from '../entities/Style'
+
+export const StyleVersionRelation = Relation.create({
+  source: Style,
+  target: Version,
+  type: 'n:n'
+})
+
+// setup/computedProperties.ts - 第3步：添加计算属性
+import { Property, Count } from 'interaqt'
+import { Version } from '../entities/Version'
+import { StyleVersionRelation } from '../relations/StyleVersionRelation'
+
+// 在所有实体和关系定义后添加计算属性
+Version.properties.push(
+  Property.create({
+    name: 'styleCount',
+    type: 'number',
+    computedData: Count.create({
+      record: StyleVersionRelation  // ✅ 现在可以安全引用关系
+    })
+  })
+)
+```
+
+### 关键原则
+
+1. **永远不要对 record 参数使用函数形式**：Count、Transform 等中的 `record` 参数应该始终是对实体或关系的直接引用，而不是函数。
+
+2. **避免循环引用**：永远不要在实体自己的 Transform 计算中引用正在定义的实体。
+
+3. **正确的导入顺序**：确保依赖项在使用之前已经导入。
+
+4. **文件组织很重要**：组织模块结构以最小化前向引用：
+   ```
+   entities/
+   ├── base/           # 不含计算属性的基本实体
+   ├── index.ts        # 导出所有实体
+   relations/
+   ├── index.ts        # 导出所有关系
+   computed/
+   └── setup.ts        # 添加依赖关系的计算属性
+   ```
+
+5. **对同实体计算使用 getValue**：对于只依赖同一实体数据的计算属性，使用 `getValue` 而不是 Transform：
+   ```javascript
+   Property.create({
+     name: 'displayName',
+     type: 'string',
+     getValue: (record) => `${record.firstName} ${record.lastName}`  // ✅ 简单的同实体计算
+   })
+   ```
+
+### 常见错误
+
+```javascript
+// ❌ 不要：对 record 参数使用箭头函数
+computedData: Count.create({
+  record: () => SomeRelation  // 这不是处理前向引用的方法
+})
+
+// ❌ 不要：在 Transform 中引用正在定义的实体
+const Version = Entity.create({
+  name: 'Version',
+  properties: [
+    Property.create({
+      name: 'nextVersionNumber',
+      computedData: Transform.create({
+        record: Version  // 循环引用！
+      })
+    })
+  ]
+})
+
+// ✅ 正确：使用正确的导入和直接引用
+import { StyleVersionRelation } from '../relations/StyleVersionRelation'
+
+computedData: Count.create({
+  record: StyleVersionRelation  // 直接引用
+})
+``` 

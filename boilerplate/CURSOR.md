@@ -412,6 +412,103 @@ export async function createTestArticle(overrides = {}) {
 }
 ```
 
+### Correct Test API Usage
+
+#### ❌ Common API Mistakes
+```typescript
+// These methods DO NOT exist:
+controller.run()                    // ❌ Wrong
+controller.execute()                // ❌ Wrong  
+controller.dispatch()               // ❌ Wrong
+storage.findByProperty()            // ❌ Wrong
+storage.getById()                   // ❌ Wrong
+```
+
+#### ✅ Correct API Usage
+```typescript
+// Calling interactions
+const result = await controller.callInteraction('InteractionName', {
+  user: { id: 'userId' },           // Required user object
+  payload: { /* data */ }           // Optional payload
+});
+
+// Finding records
+const record = await system.storage.findOne(
+  'EntityName',
+  MatchExp.atom({ key: 'field', value: ['=', value] })
+);
+
+// Finding multiple records
+const records = await system.storage.find(
+  'EntityName',
+  MatchExp.atom({ key: 'status', value: ['=', 'active'] })
+);
+
+// Creating records (for test setup)
+const record = await system.storage.create('EntityName', {
+  field1: 'value1',
+  field2: 'value2'
+});
+```
+
+#### Complete Test Example
+```typescript
+import { describe, test, expect, beforeEach } from 'vitest';
+import { Controller, MonoSystem, KlassByName, PGLiteDB, MatchExp } from 'interaqt';
+import { entities, relations, interactions, activities } from '../src';
+
+describe('Feature Test', () => {
+  let system: MonoSystem;
+  let controller: Controller;
+  
+  beforeEach(async () => {
+    system = new MonoSystem(new PGLiteDB());
+    system.conceptClass = KlassByName;
+    
+    controller = new Controller(
+      system,
+      entities,
+      relations,
+      activities,
+      interactions,
+      [],  // global dictionaries
+      []   // side effects
+    );
+    
+    await controller.setup(true);
+  });
+  
+  test('should perform interaction correctly', async () => {
+    // Setup test data
+    const user = await system.storage.create('User', {
+      name: 'Test User',
+      email: 'test@example.com'
+    });
+    
+    // Call interaction
+    const result = await controller.callInteraction('CreateArticle', {
+      user: { id: user.id },
+      payload: {
+        title: 'Test Article',
+        content: 'Test content'
+      }
+    });
+    
+    // Verify results
+    expect(result.error).toBeUndefined();
+    
+    // Find created article
+    const article = await system.storage.findOne(
+      'Article',
+      MatchExp.atom({ key: 'title', value: ['=', 'Test Article'] })
+    );
+    
+    expect(article).toBeTruthy();
+    expect(article.author.id).toBe(user.id);
+  });
+});
+```
+
 ## VI. Frontend Integration
 
 ### API Client Generation
@@ -473,6 +570,43 @@ const AdminAttributive = Attributive.create({
   name: 'Admin',
   content: (_, { user }) => user.role === 'admin'
 });
+
+// ❌ Don't use function form for record parameter
+Property.create({
+  name: 'postCount',
+  computedData: Count.create({
+    record: () => UserPostRelation  // Wrong!
+  })
+})
+
+// ✅ Use direct references
+Property.create({
+  name: 'postCount',
+  computedData: Count.create({
+    record: UserPostRelation  // Direct reference
+  })
+})
+
+// ❌ Don't create circular references in Transform
+const Entity1 = Entity.create({
+  name: 'Entity1',
+  properties: [
+    Property.create({
+      name: 'derived',
+      computedData: Transform.create({
+        record: Entity1  // Circular reference!
+      })
+    })
+  ]
+})
+
+// ✅ Use Transform with different entities
+const DerivedEntity = Entity.create({
+  name: 'DerivedEntity',
+  computedData: Transform.create({
+    record: SourceEntity  // Different entity
+  })
+})
 ```
 
 ## VIII. Success Criteria

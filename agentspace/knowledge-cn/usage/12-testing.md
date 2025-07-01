@@ -1,4 +1,237 @@
-# 12. 如何进行测试
+# 如何进行测试
+
+在 interaqt 框架中，测试是设计理念的一部分。响应式编程模型使得测试变得更加直观和可靠。本章将详细介绍测试策略、模式和最佳实践。
+
+## 测试 API 快速参考
+
+### ⚠️ 常见的 API 错误
+
+许多大语言模型会生成错误的 API 用法。以下是 InterAQT 测试 API 的正确使用方式：
+
+```typescript
+// ❌ 错误：这些 API 不存在
+controller.run()                           // ❌ 没有这个方法
+storage.findByProperty('Entity', 'prop')   // ❌ 没有这个方法
+controller.execute()                       // ❌ 没有这个方法
+controller.dispatch()                      // ❌ 没有这个方法
+
+// ✅ 正确：使用这些 API
+controller.callInteraction('InteractionName', args)  // ✅ 调用交互
+storage.findOne('Entity', MatchExp)                  // ✅ 查找单条记录
+storage.find('Entity', MatchExp)                     // ✅ 查找多条记录
+storage.create('Entity', data)                       // ✅ 创建记录
+```
+
+### 完整的测试模板
+
+```typescript
+import { describe, test, expect, beforeEach } from 'vitest'
+import { Controller, MonoSystem, KlassByName, PGLiteDB, MatchExp } from 'interaqt'
+import { entities, relations, interactions, activities } from '../backend'
+// 如果需要 UUID，请安装并导入：
+// npm install uuid @types/uuid
+// import { v4 as uuid } from 'uuid'
+
+describe('功能测试', () => {
+  let system: MonoSystem
+  let controller: Controller
+
+  beforeEach(async () => {
+    // ✅ 正确的设置
+    system = new MonoSystem(new PGLiteDB())
+    system.conceptClass = KlassByName
+
+    // 注意：创建关系时，不要指定 name 属性
+    // 框架会自动生成关系名称：
+    // - User + Post → UserPost
+    // - Post + Comment → PostComment
+    
+    controller = new Controller(
+      system,
+      entities,
+      relations,       // 关系名称自动生成
+      activities,      // 第4个参数
+      interactions,    // 第5个参数
+      [],             // 第6个参数：全局字典（不是计算）
+      []              // 第7个参数：副作用
+    )
+
+    await controller.setup(true)
+  })
+
+  test('交互测试示例', async () => {
+    // ✅ 正确：使用 callInteraction
+    const result = await controller.callInteraction('CreateUser', {
+      user: { id: 'system', role: 'admin' },  // 必须包含 user 对象
+      payload: {
+        username: 'testuser',
+        email: 'test@example.com',
+        role: 'user'
+      }
+    })
+
+    // 检查错误
+    expect(result.error).toBeUndefined()
+
+    // ✅ 正确：使用 storage.findOne 配合 MatchExp
+    const user = await system.storage.findOne(
+      'User',
+      MatchExp.atom({ key: 'username', value: ['=', 'testuser'] })
+    )
+
+    expect(user).toBeTruthy()
+    expect(user.email).toBe('test@example.com')
+  })
+
+  test('查找记录示例', async () => {
+    // ✅ 按单个字段查找
+    const user = await system.storage.findOne(
+      'User',
+      MatchExp.atom({ key: 'id', value: ['=', userId] })
+    )
+
+    // ✅ 多条件查找
+    const activeUsers = await system.storage.find(
+      'User',
+      MatchExp.atom({ key: 'status', value: ['=', 'active'] })
+        .and({ key: 'role', value: ['=', 'user'] })
+    )
+
+    // ✅ 复杂条件查找
+    const posts = await system.storage.find(
+      'Post',
+      MatchExp.atom({ key: 'author.id', value: ['=', userId] })
+        .and({ key: 'status', value: ['in', ['published', 'draft']] })
+    )
+  })
+
+  test('创建和更新记录', async () => {
+    // ✅ 直接创建记录（用于测试准备）
+    const user = await system.storage.create('User', {
+      username: 'testuser',
+      email: 'test@example.com',
+      role: 'user'
+    })
+
+    // ✅ 更新记录
+    await system.storage.update(
+      'User',
+      MatchExp.atom({ key: 'id', value: ['=', user.id] }),
+      { status: 'active' }
+    )
+
+    // ✅ 删除记录
+    await system.storage.delete(
+      'User',
+      MatchExp.atom({ key: 'id', value: ['=', user.id] })
+    )
+  })
+})
+```
+
+### 关键 API 方法
+
+#### 1. Controller API
+
+```typescript
+// 调用交互（执行业务逻辑的唯一方式）
+const result = await controller.callInteraction(interactionName: string, args: {
+  user: { id: string, [key: string]: any },  // 必需的用户对象
+  payload?: { [key: string]: any }           // 可选的载荷
+})
+
+// 调用活动中的交互
+const result = await controller.callActivityInteraction(
+  activityName: string,
+  interactionName: string,
+  activityId: string,
+  args: InteractionEventArgs
+)
+```
+
+#### 2. Storage API
+
+```typescript
+// 创建记录（通常用于测试准备）
+const record = await system.storage.create(entityName: string, data: object)
+
+// 查找单条记录
+const record = await system.storage.findOne(
+  entityName: string,
+  matchExp: MatchExp,
+  modifier?: Modifier,
+  attributeQuery?: AttributeQuery
+)
+
+// 查找多条记录
+const records = await system.storage.find(
+  entityName: string,
+  matchExp: MatchExp,
+  modifier?: Modifier,
+  attributeQuery?: AttributeQuery
+)
+
+// 更新记录
+await system.storage.update(
+  entityName: string,
+  matchExp: MatchExp,
+  data: object
+)
+
+// 删除记录
+await system.storage.delete(
+  entityName: string,
+  matchExp: MatchExp
+)
+```
+
+#### 3. MatchExp 使用方法
+
+```typescript
+// 简单相等
+MatchExp.atom({ key: 'field', value: ['=', value] })
+
+// 多条件（AND）
+MatchExp.atom({ key: 'status', value: ['=', 'active'] })
+  .and({ key: 'role', value: ['=', 'admin'] })
+
+// OR 条件
+MatchExp.atom({ key: 'role', value: ['=', 'admin'] })
+  .or({ key: 'role', value: ['=', 'moderator'] })
+
+// 复杂操作符
+MatchExp.atom({ key: 'age', value: ['>', 18] })
+MatchExp.atom({ key: 'name', value: ['like', '%john%'] })
+MatchExp.atom({ key: 'status', value: ['in', ['active', 'pending']] })
+MatchExp.atom({ key: 'score', value: ['between', [60, 100]] })
+
+// 嵌套字段访问
+MatchExp.atom({ key: 'user.profile.city', value: ['=', 'Beijing'] })
+```
+
+### 测试中的错误处理
+
+```typescript
+test('应该正确处理错误', async () => {
+  // ✅ 正确：检查结果中的 error 字段
+  const result = await controller.callInteraction('SomeInteraction', {
+    user: { id: 'user1' },
+    payload: { invalid: 'data' }
+  })
+
+  expect(result.error).toBeDefined()
+  expect(result.error.message).toContain('expected error message')
+
+  // ❌ 错误：InterAQT 不会抛出异常
+  // try {
+  //   await controller.callInteraction(...)
+  // } catch (e) {
+  //   // 这不会工作
+  // }
+})
+```
+
+## 12. 如何进行测试
 
 测试是确保 interaqt 应用质量的重要环节。框架提供了完整的测试支持，包括单元测试、集成测试和端到端测试。本章将详细介绍如何为响应式应用编写有效的测试。
 
@@ -118,7 +351,6 @@ describe('Friendship Relation', () => {
     });
     
     const friendshipRelation = Relation.create({
-      name: 'Friendship',
       source: userEntity,
       sourceProperty: 'friends',
       target: userEntity,
