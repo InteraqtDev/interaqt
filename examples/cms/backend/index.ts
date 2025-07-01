@@ -2,53 +2,26 @@ export * from './entities'
 export * from './relations'
 export * from './interactions'
 
-// Import computations to initialize them
-import './computations'
-
-// Export arrays for convenience
-import { User, Version, Style } from './entities'
-import { StyleVersionRelation, UserStylesRelation, UserVersionsRelation } from './relations'
+import { User, Style, Version } from './entities'
+import { StyleUserRelation, VersionUserRelation, StyleVersionRelation } from './relations'
 import {
-  CreateStyleInteraction,
-  UpdateStyleInteraction,
-  PublishStyleInteraction,
-  OfflineStyleInteraction,
-  DeleteStyleInteraction,
-  ReorderStylesInteraction,
-  BatchUpdatePriorityInteraction,
-  CreateVersionInteraction,
-  PublishVersionInteraction,
-  RollbackVersionInteraction,
-  GetStylesByStatusInteraction,
-  GetStylesByTypeInteraction,
-  SearchStylesInteraction,
-  GetVersionStatsInteraction
+  CreateStyle, UpdateStyle, DeleteStyle, UpdateStyleStatus, UpdateStylePriority, BatchUpdateStyles,
+  GetStyleList, GetStyleDetail, SearchStyles,
+  CreateVersion, UpdateVersion, DeleteVersion, PublishVersion, ArchiveVersion, RollbackVersion,
+  GetVersionList, GetVersionDetail, CompareVersions, AddStyleToVersion, RemoveStyleFromVersion,
+  UpdateStyleOrderInVersion,
+  CreateUser, UpdateUser, DeleteUser, GetUserList, GetCurrentUser, UpdateProfile
 } from './interactions'
 
-export const entities = [User, Version, Style]
-
-export const relations = [
-  StyleVersionRelation,
-  UserStylesRelation,
-  UserVersionsRelation
-]
-
+export const entities = [User, Style, Version]
+export const relations = [StyleUserRelation, VersionUserRelation, StyleVersionRelation]
 export const interactions = [
-  CreateStyleInteraction,
-  UpdateStyleInteraction,
-  PublishStyleInteraction,
-  OfflineStyleInteraction,
-  DeleteStyleInteraction,
-  ReorderStylesInteraction,
-  BatchUpdatePriorityInteraction,
-  CreateVersionInteraction,
-  PublishVersionInteraction,
-  RollbackVersionInteraction,
-  GetStylesByStatusInteraction,
-  GetStylesByTypeInteraction,
-  SearchStylesInteraction,
-  GetVersionStatsInteraction
+  CreateStyle, UpdateStyle, DeleteStyle, UpdateStyleStatus, UpdateStylePriority, BatchUpdateStyles,
+  GetStyleList, GetStyleDetail, SearchStyles,
+  CreateVersion, UpdateVersion, DeleteVersion, PublishVersion, ArchiveVersion, RollbackVersion,
+  GetVersionList, GetVersionDetail, CompareVersions, AddStyleToVersion, RemoveStyleFromVersion,
+  UpdateStyleOrderInVersion,
+  CreateUser, UpdateUser, DeleteUser, GetUserList, GetCurrentUser, UpdateProfile
 ]
-
 export const activities = []
 export const dicts = []

@@ -4,6 +4,35 @@
 
 Reactive computation is the core feature of the InterAQT framework. Its essence is **declaring what data is**, rather than specifying how to compute data.
 
+## ⚠️ IMPORTANT: Correct Usage of Computations
+
+Computations (such as Count, Transform, WeightedSummation, etc.) **MUST and ONLY** be placed in the `computedData` field of Entity, Relation, or Property definitions.
+
+❌ **WRONG**: Declaring computations separately and passing them to Controller
+```javascript
+// Wrong: Separately declaring computations
+const UserCreationTransform = Transform.create({...})
+const computations = [UserCreationTransform, ...]
+
+// Wrong: Passing to Controller
+const controller = new Controller(system, entities, relations, [], interactions, computations, [])
+```
+
+✅ **CORRECT**: Using computations in the computedData field
+```javascript
+// Correct: Using computedData in Property definition
+Property.create({
+  name: 'userCount',
+  type: 'number',
+  defaultValue: () => 0,
+  computedData: Count.create({
+    record: User
+  })
+})
+```
+
+**Note**: Controller does NOT accept a computations parameter. All computations should be defined within the `computedData` field of Entity/Relation/Property definitions.
+
 ## Core Mindset: What Data "Is", Not "How to Compute"
 
 ### ❌ Wrong Mindset: Trying to Compute Data

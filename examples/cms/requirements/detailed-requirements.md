@@ -1,82 +1,157 @@
-# 详细需求分析 - Style 管理系统
+# Style 管理系统详细需求分析
 
 ## 业务背景
-构建一个内容管理系统，让产品运营人员能够在线管理预置的 Style 数据，包括拖拽排序、版本管理和发布控制等功能。
 
-## 数据模型分析
+需要为产品运营人员提供一套在线管理预置数据的后台操作界面，主要管理 Style 对象数据结构。
 
-### 核心实体：Style
-Style 对象代表一种风格样式，具有以下属性：
+## 数据分析视角
 
-| 字段 | 类型 | 必填 | 描述 | 业务规则 |
-|------|------|------|------|----------|
-| id | uuid | 是 | 唯一标识符 | 系统自动生成 |
-| label | text | 是 | 显示名称 | 如 "Manga"，用于前端展示 |
-| slug | text | 是 | URL安全标识 | 全局唯一，如 "manga"，对应旧系统 value |
-| description | text | 否 | 描述信息 | 详细说明该风格 |
-| type | varchar(32) | 是 | 风格类型 | 如 "animation", "surreal" 等 |
-| thumb_key | text | 否 | 缩略图地址 | S3 存储地址 |
-| priority | int | 是 | 排序优先级 | 用于前端排序显示，数值越小优先级越高 |
-| status | varchar(16) | 是 | 状态 | draft/published/offline |
-| created_at | timestamptz | 是 | 创建时间 | 系统自动设置 |
-| updated_at | timestamptz | 是 | 更新时间 | 系统自动维护 |
+### 核心实体分析
 
-### 辅助实体：Version
-为支持版本管理和回滚功能，需要版本控制实体：
+#### Style 实体
+Style 是系统的核心数据实体，包含以下属性：
 
-| 字段 | 类型 | 必填 | 描述 |
-|------|------|------|------|
-| id | uuid | 是 | 版本标识符 |
-| name | text | 是 | 版本名称 |
-| description | text | 否 | 版本描述 |
-| status | varchar(16) | 是 | draft/published |
-| created_at | timestamptz | 是 | 创建时间 |
-| published_at | timestamptz | 否 | 发布时间 |
+**基础属性**：
+- `id` (UUID): 系统自动生成的唯一标识
+- `label` (Text): 前端展示用名称，如 "Manga"
+- `slug` (Text): URL安全的唯一标识符，对应旧代码的 value，如 "manga"
+- `description` (Text): 详细描述信息
+- `type` (varchar(32)): 分类类型，如 "animation"、"surreal" 等
+- `thumb_key` (Text): S3上的缩略图地址
+- `priority` (Integer): 前端排序权重，数值越小越靠前
+- `status` (varchar(16)): 状态，支持 "draft"、"published"、"offline"
 
-### 关系模型
-- Style 与 Version 是多对一关系
-- 每个 Style 属于一个 Version
-- 一个 Version 可以包含多个 Style
+**时间戳属性**：
+- `created_at` (timestamptz): 创建时间，自动设置为当前时间
+- `updated_at` (timestamptz): 更新时间，每次修改时自动更新
 
-## 功能需求分析
+#### Version 实体（版本管理）
+为支持版本管理和回滚功能，需要版本实体：
 
-### 1. Style 管理功能
-- **创建 Style**：新建风格样式记录
-- **编辑 Style**：修改现有风格样式信息
-- **删除 Style**：软删除（设置状态为 offline）
-- **状态管理**：draft → published → offline 状态流转
+**基础属性**：
+- `id` (UUID): 版本唯一标识
+- `version_number` (Integer): 版本号，自动递增
+- `name` (Text): 版本名称，如 "v1.0"、"春节活动版本"
+- `description` (Text): 版本描述
+- `status` (varchar(16)): 版本状态 "draft"、"published"、"archived"
+- `published_at` (timestamptz): 发布时间
+- `created_at` (timestamptz): 创建时间
+- `created_by` (UUID): 创建者ID
 
-### 2. 排序功能
-- **拖拽排序**：支持用户通过拖拽调整 Style 显示顺序
-- **批量排序**：一次性调整多个 Style 的 priority 值
-- **自动排序**：新建 Style 时自动分配合适的 priority 值
+#### User 实体（操作用户）
+为支持权限控制和操作记录：
 
-### 3. 版本管理功能
-- **创建版本**：创建新的 Style 版本
-- **发布版本**：将草稿版本发布为正式版本
-- **回滚版本**：回滚到历史版本
-- **版本对比**：查看不同版本间的差异
+**基础属性**：
+- `id` (UUID): 用户唯一标识
+- `username` (Text): 用户名
+- `email` (Text): 邮箱
+- `role` (varchar(32)): 角色，"admin"、"editor"、"viewer"
+- `is_active` (Boolean): 是否激活
+- `created_at` (timestamptz): 创建时间
 
-### 4. 查询功能
-- **按状态查询**：获取特定状态的 Style 列表
-- **按类型查询**：获取特定类型的 Style 列表
-- **按版本查询**：获取特定版本下的 Style 列表
-- **搜索功能**：根据 label 或 description 搜索
+### 关系分析
 
-## 权限需求
-- **管理员**：完整的 CRUD 权限，版本管理权限
-- **编辑者**：可以创建和编辑 Style，但不能发布版本
-- **查看者**：仅能查看已发布的 Style
+#### StyleVersion 关系（Style - Version）
+- 类型：n:n 关系
+- 描述：一个 Style 可以属于多个版本，一个版本包含多个 Style
+- 额外属性：
+  - `sort_order` (Integer): 在该版本中的排序位置
+  - `is_active` (Boolean): 在该版本中是否激活
 
-## 业务规则
-1. **唯一性约束**：同一版本内 slug 必须唯一
-2. **状态流转**：draft → published → offline，不可逆向流转
-3. **版本约束**：已发布版本不可修改，只能创建新版本
-4. **排序约束**：priority 值在同一版本内不能重复
-5. **删除约束**：已发布的 Style 不能直接删除，只能设置为 offline
+#### UserVersion 关系（User - Version）
+- 类型：n:1 关系
+- 描述：记录版本的创建者和管理者
 
-## 技术约束
-1. 使用 interaqt 框架的响应式编程模式
-2. 所有数据变更必须通过 Interaction 触发
-3. 排序、状态变更等需要通过 Computation 自动维护
-4. 必须支持事务性操作确保数据一致性
+## 交互分析视角
+
+### 用户角色和权限
+
+#### Admin（管理员）
+- 创建、编辑、删除 Style
+- 创建、发布、回滚版本
+- 管理用户权限
+- 查看所有操作日志
+
+#### Editor（编辑者）
+- 创建、编辑 Style（仅自己创建的）
+- 创建版本草稿
+- 查看版本历史
+
+#### Viewer（查看者）
+- 查看已发布的 Style 和版本
+- 导出数据
+
+### 核心业务流程
+
+#### Style 管理流程
+1. **创建 Style**：填写基本信息，状态默认为 draft
+2. **编辑 Style**：修改任意字段，自动更新 updated_at
+3. **排序管理**：拖拽调整 priority 值
+4. **状态管理**：在 draft、published、offline 之间切换
+5. **删除 Style**：软删除或硬删除
+
+#### 版本管理流程
+1. **创建版本**：选择要包含的 Style，生成新版本
+2. **编辑版本**：调整版本中的 Style 列表和排序
+3. **发布版本**：将版本状态改为 published，记录发布时间
+4. **回滚版本**：恢复到历史版本的 Style 配置
+
+### 关键业务规则
+
+#### 数据约束
+- `slug` 必须唯一且符合 URL 安全规范
+- `priority` 值必须为非负整数
+- 同一时间只能有一个版本处于 published 状态
+- 删除 Style 时需检查是否被版本引用
+
+#### 权限约束
+- Editor 只能编辑自己创建的 Style
+- 只有 Admin 可以发布版本
+- Viewer 无法进行任何修改操作
+
+#### 业务约束
+- Style 状态为 offline 时不能被新版本引用
+- 已发布版本中的 Style 不能被删除
+- 版本发布后不能修改其中的 Style 列表
+
+## 系统功能需求
+
+### 基础 CRUD 功能
+1. Style 的增删改查
+2. Version 的增删改查
+3. User 的基础管理
+
+### 高级功能
+1. **排序功能**：通过拖拽调整 Style 的 priority 值
+2. **批量操作**：批量修改 Style 状态、删除等
+3. **搜索过滤**：按 type、status、label 等条件搜索
+4. **版本对比**：对比不同版本之间的差异
+5. **操作日志**：记录所有关键操作的历史
+
+### 数据完整性需求
+1. **事务一致性**：版本发布时的所有操作必须在同一事务中
+2. **引用完整性**：删除被引用的 Style 时需要提示
+3. **数据备份**：版本发布前自动备份当前状态
+
+## 性能需求
+
+### 响应时间
+- Style 列表加载：< 500ms
+- 版本切换：< 1s
+- 排序拖拽：< 200ms
+
+### 并发需求
+- 支持多用户同时编辑不同 Style
+- 版本发布时需要加锁防止并发冲突
+
+## 安全需求
+
+### 数据安全
+- 敏感操作需要二次确认
+- 关键操作记录操作日志
+- 定期数据备份
+
+### 访问控制
+- 基于角色的权限控制
+- API 接口需要身份验证
+- 操作权限实时校验

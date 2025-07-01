@@ -1,159 +1,201 @@
-# 交互矩阵 - Style 管理系统
+# Style 管理系统交互矩阵
 
 ## 用户角色定义
 
-### 管理员 (Admin)
-- 完整的系统访问权限
-- 可以管理版本、发布内容
-- 可以管理用户权限
+### Admin（管理员）
+- 系统最高权限
+- 可以管理用户、Style、版本的所有操作
+- 可以发布和回滚版本
 
-### 编辑者 (Editor) 
-- 可以创建和编辑内容
-- 不能发布版本或管理权限
-- 只能操作草稿状态内容
+### Editor（编辑者）
+- 可以创建和编辑 Style
+- 只能编辑自己创建的 Style
+- 可以创建版本草稿，但无法发布
 
-### 查看者 (Viewer)
+### Viewer（查看者）
 - 只读权限
-- 只能查看已发布的内容
-- 不能进行任何修改操作
+- 可以查看已发布的内容
+- 可以导出数据
 
-## 交互权限矩阵
+## 交互矩阵
 
-| 交互操作 | 管理员 | 编辑者 | 查看者 | 对应测试用例 | 权限表达式 |
-|----------|--------|--------|--------|--------------|------------|
-| **Style 管理** |
-| CreateStyle | ✅ | ✅ | ❌ | TC001 | `user.role in ['admin', 'editor']` |
-| UpdateStyle | ✅ | ✅* | ❌ | TC002 | `user.role in ['admin', 'editor'] && style.status == 'draft'` |
-| PublishStyle | ✅ | ❌ | ❌ | TC003 | `user.role == 'admin'` |
-| OfflineStyle | ✅ | ❌ | ❌ | TC004 | `user.role == 'admin'` |
-| DeleteStyle | ✅ | ✅* | ❌ | TC018 | `user.role in ['admin', 'editor'] && style.status == 'draft'` |
-| GetStyle | ✅ | ✅ | ✅ | TC010 | `true` (公开读取) |
-| **排序管理** |
-| ReorderStyles | ✅ | ✅ | ❌ | TC005 | `user.role in ['admin', 'editor']` |
-| BatchUpdatePriority | ✅ | ✅ | ❌ | TC006 | `user.role in ['admin', 'editor']` |
-| **版本管理** |
-| CreateVersion | ✅ | ❌ | ❌ | TC007 | `user.role == 'admin'` |
-| PublishVersion | ✅ | ❌ | ❌ | TC008 | `user.role == 'admin'` |
-| RollbackVersion | ✅ | ❌ | ❌ | TC009 | `user.role == 'admin'` |
-| GetVersion | ✅ | ✅ | ✅** | - | `user.role in ['admin', 'editor'] \|\| version.status == 'published'` |
-| **查询操作** |
-| GetStylesByStatus | ✅ | ✅ | ✅** | TC010 | `user.role in ['admin', 'editor'] \|\| status == 'published'` |
-| GetStylesByType | ✅ | ✅ | ✅** | TC011 | `user.role in ['admin', 'editor'] \|\| style.status == 'published'` |
-| SearchStyles | ✅ | ✅ | ✅** | TC012 | `user.role in ['admin', 'editor'] \|\| style.status == 'published'` |
-| GetVersionStats | ✅ | ✅ | ❌ | TC016 | `user.role in ['admin', 'editor']` |
+### Style 管理交互
 
-*编辑者只能编辑草稿状态的内容  
-**查看者只能看到已发布的内容
+| 交互名称 | Admin | Editor | Viewer | 对应测试用例 | 权限验证 |
+|---------|-------|--------|--------|-------------|----------|
+| CreateStyle | ✓ | ✓ | ✗ | TC001 | 需要登录 + (Admin \|\| Editor) |
+| UpdateStyle | ✓ | ✓* | ✗ | TC002 | 需要登录 + (Admin \|\| (Editor && 创建者)) |
+| DeleteStyle | ✓ | ✓* | ✗ | TC003 | 需要登录 + (Admin \|\| (Editor && 创建者)) |
+| GetStyleList | ✓ | ✓ | ✓ | TC006 | 需要登录 |
+| GetStyleDetail | ✓ | ✓ | ✓ | TC006 | 需要登录 |
+| UpdateStyleStatus | ✓ | ✓* | ✗ | TC005 | 需要登录 + (Admin \|\| (Editor && 创建者)) |
+| UpdateStylePriority | ✓ | ✓ | ✗ | TC004 | 需要登录 + (Admin \|\| Editor) |
+| BatchUpdateStyles | ✓ | ✓ | ✗ | TC017 | 需要登录 + (Admin \|\| Editor) |
 
-## 详细权限规则
+*注：Editor 只能操作自己创建的 Style
 
-### Style 操作权限
+### 版本管理交互
 
-#### CreateStyle 权限
+| 交互名称 | Admin | Editor | Viewer | 对应测试用例 | 权限验证 |
+|---------|-------|--------|--------|-------------|----------|
+| CreateVersion | ✓ | ✓ | ✗ | TC007 | 需要登录 + (Admin \|\| Editor) |
+| UpdateVersion | ✓ | ✓* | ✗ | TC010 | 需要登录 + (Admin \|\| (Editor && 创建者 && 状态为draft)) |
+| DeleteVersion | ✓ | ✓* | ✗ | - | 需要登录 + (Admin \|\| (Editor && 创建者 && 状态为draft)) |
+| PublishVersion | ✓ | ✗ | ✗ | TC008 | 需要登录 + Admin |
+| ArchiveVersion | ✓ | ✗ | ✗ | - | 需要登录 + Admin |
+| RollbackVersion | ✓ | ✗ | ✗ | TC009 | 需要登录 + Admin |
+| GetVersionList | ✓ | ✓ | ✓ | - | 需要登录 |
+| GetVersionDetail | ✓ | ✓ | ✓ | - | 需要登录 |
+| CompareVersions | ✓ | ✓ | ✓ | - | 需要登录 |
+
+*注：Editor 只能操作自己创建的版本，且只能在 draft 状态下操作
+
+### 用户管理交互
+
+| 交互名称 | Admin | Editor | Viewer | 对应测试用例 | 权限验证 |
+|---------|-------|--------|--------|-------------|----------|
+| CreateUser | ✓ | ✗ | ✗ | - | 需要登录 + Admin |
+| UpdateUser | ✓ | ✗ | ✗ | - | 需要登录 + Admin |
+| DeleteUser | ✓ | ✗ | ✗ | - | 需要登录 + Admin |
+| GetUserList | ✓ | ✗ | ✗ | - | 需要登录 + Admin |
+| GetCurrentUser | ✓ | ✓ | ✓ | - | 需要登录 |
+| UpdateProfile | ✓ | ✓ | ✓ | - | 需要登录 + 本人 |
+
+### 查询和搜索交互
+
+| 交互名称 | Admin | Editor | Viewer | 对应测试用例 | 权限验证 |
+|---------|-------|--------|--------|-------------|----------|
+| SearchStyles | ✓ | ✓ | ✓ | TC018 | 需要登录 |
+| FilterStyles | ✓ | ✓ | ✓ | TC018 | 需要登录 |
+| GetStylesByType | ✓ | ✓ | ✓ | TC006 | 需要登录 |
+| GetStylesByStatus | ✓ | ✓ | ✓ | TC006 | 需要登录 |
+| GetPublishedStyles | ✓ | ✓ | ✓ | - | 无需权限 |
+
+## 权限验证详细规则
+
+### 属性级权限控制
+
 ```typescript
-// 用户必须是管理员或编辑者
-const canCreateStyle = user.role === 'admin' || user.role === 'editor'
-// 必须是草稿版本
-const isDraftVersion = version.status === 'draft'
-// 最终权限
-const permission = canCreateStyle && isDraftVersion
+// Style 实体权限规则
+Style.canCreate = (user) => user.role === 'Admin' || user.role === 'Editor'
+Style.canRead = (user, style) => true // 所有登录用户都可读
+Style.canUpdate = (user, style) => 
+  user.role === 'Admin' || 
+  (user.role === 'Editor' && style.createdBy === user.id)
+Style.canDelete = (user, style) => 
+  user.role === 'Admin' || 
+  (user.role === 'Editor' && style.createdBy === user.id && !style.isReferencedByPublishedVersion)
+
+// Version 实体权限规则  
+Version.canCreate = (user) => user.role === 'Admin' || user.role === 'Editor'
+Version.canUpdate = (user, version) => 
+  user.role === 'Admin' || 
+  (user.role === 'Editor' && version.createdBy === user.id && version.status === 'draft')
+Version.canPublish = (user) => user.role === 'Admin'
+Version.canRollback = (user) => user.role === 'Admin'
 ```
 
-#### UpdateStyle 权限
+### 业务规则权限控制
+
 ```typescript
-// 基础权限：管理员或编辑者
-const hasBasicPermission = user.role === 'admin' || user.role === 'editor'
-// Style 必须是草稿状态
-const isStyleDraft = style.status === 'draft'
-// 管理员可以编辑任何状态，编辑者只能编辑草稿
-const permission = user.role === 'admin' || (hasBasicPermission && isStyleDraft)
+// 业务规则级别的权限验证
+BusinessRules = {
+  // 只有 Admin 可以同时发布多个版本
+  publishMultipleVersions: (user) => user.role === 'Admin',
+  
+  // Editor 不能删除被版本引用的 Style
+  deleteReferencedStyle: (user, style) => 
+    user.role === 'Admin' || !style.isReferencedByAnyVersion,
+    
+  // 只有 Admin 可以修改已发布版本
+  modifyPublishedVersion: (user) => user.role === 'Admin',
+  
+  // Editor 只能在自己创建的版本中操作 Style
+  manageStyleInVersion: (user, version) =>
+    user.role === 'Admin' || 
+    (user.role === 'Editor' && version.createdBy === user.id)
+}
 ```
-
-#### PublishStyle 权限
-```typescript
-// 只有管理员可以发布
-const canPublish = user.role === 'admin'
-// Style 必须是草稿状态
-const isStyleDraft = style.status === 'draft'
-// 最终权限
-const permission = canPublish && isStyleDraft
-```
-
-### 版本操作权限
-
-#### CreateVersion 权限
-```typescript
-// 只有管理员可以创建版本
-const permission = user.role === 'admin'
-```
-
-#### PublishVersion 权限
-```typescript
-// 只有管理员可以发布版本
-const canPublish = user.role === 'admin'
-// 版本必须是草稿状态
-const isVersionDraft = version.status === 'draft'
-// 版本必须包含至少一个已发布的 Style
-const hasPublishedStyles = version.styles.some(style => style.status === 'published')
-// 最终权限
-const permission = canPublish && isVersionDraft && hasPublishedStyles
-```
-
-### 查询操作权限
-
-#### 数据可见性规则
-```typescript
-// 管理员和编辑者可以看到所有数据
-const canSeeAllData = user.role === 'admin' || user.role === 'editor'
-// 查看者只能看到已发布的数据
-const canSeePublishedData = user.role === 'viewer' && data.status === 'published'
-// 最终可见性
-const isVisible = canSeeAllData || canSeePublishedData
-```
-
-## 错误处理策略
-
-### 权限拒绝错误
-- **错误代码**: `PERMISSION_DENIED`
-- **HTTP 状态码**: 403
-- **错误消息**: 根据具体操作提供详细说明
-
-### 状态约束错误
-- **错误代码**: `INVALID_STATE`
-- **HTTP 状态码**: 400
-- **错误消息**: 说明当前状态不允许执行该操作
-
-### 数据约束错误
-- **错误代码**: `CONSTRAINT_VIOLATION`
-- **HTTP 状态码**: 409
-- **错误消息**: 说明具体的约束违反情况
 
 ## 交互实现映射
 
-| 交互名称 | 对应 Interaction | 权限检查点 | 异常处理 |
-|----------|------------------|------------|----------|
-| CreateStyle | CreateStyleInteraction | 创建前检查用户角色和版本状态 | TC001 异常场景 |
-| UpdateStyle | UpdateStyleInteraction | 更新前检查用户角色和 Style 状态 | TC002 异常场景 |
-| PublishStyle | PublishStyleInteraction | 发布前检查管理员权限 | TC003 异常场景 |
-| OfflineStyle | OfflineStyleInteraction | 下线前检查管理员权限 | TC004 异常场景 |
-| ReorderStyles | ReorderStylesInteraction | 排序前检查编辑权限 | TC005 异常场景 |
-| BatchUpdatePriority | BatchUpdatePriorityInteraction | 批量更新前检查权限 | TC006 异常场景 |
-| CreateVersion | CreateVersionInteraction | 创建前检查管理员权限 | TC007 异常场景 |
-| PublishVersion | PublishVersionInteraction | 发布前检查权限和状态 | TC008 异常场景 |
-| RollbackVersion | RollbackVersionInteraction | 回滚前检查管理员权限 | TC009 异常场景 |
-| GetStylesByStatus | GetStylesByStatusInteraction | 查询时过滤可见数据 | TC010 |
-| GetStylesByType | GetStylesByTypeInteraction | 查询时过滤可见数据 | TC011 |
-| SearchStyles | SearchStylesInteraction | 搜索时过滤可见数据 | TC012 |
-| ValidateSlugUniqueness | ValidateSlugUniquenessInteraction | 验证前检查写入权限 | TC013 |
+### 核心 CRUD 交互
 
-## 审计日志要求
+1. **CreateStyle** → TC001: 创建 Style
+   - 验证输入数据格式
+   - 检查 slug 唯一性
+   - 设置默认状态和时间戳
+   - 关联创建者
 
-所有权限相关的操作都需要记录审计日志：
-- 用户信息
-- 操作时间
-- 操作类型
-- 操作对象
-- 操作结果（成功/失败）
-- 失败原因（如权限不足）
+2. **UpdateStyle** → TC002: 编辑 Style  
+   - 权限验证（创建者或 Admin）
+   - 部分字段更新
+   - 更新时间戳
 
-这些日志用于安全审计和问题排查。
+3. **DeleteStyle** → TC003: 删除 Style
+   - 检查引用关系
+   - 权限验证
+   - 级联删除相关数据
+
+4. **UpdateStylePriority** → TC004: 调整排序
+   - 批量更新 priority 值
+   - 保证排序的一致性
+
+5. **UpdateStyleStatus** → TC005: 状态管理
+   - 验证状态转换规则
+   - 检查业务约束
+
+### 版本管理交互
+
+6. **CreateVersion** → TC007: 创建版本
+   - 验证包含的 Style 列表
+   - 生成版本号
+   - 创建关联关系
+
+7. **PublishVersion** → TC008: 发布版本
+   - 归档当前发布版本
+   - 更新版本状态
+   - 记录发布时间
+
+8. **RollbackVersion** → TC009: 版本回滚
+   - 验证目标版本有效性
+   - 原子性操作保证一致性
+   - 记录操作日志
+
+### 查询交互
+
+9. **GetStyleList** → TC006: 查询列表
+   - 支持多维度过滤
+   - 分页和排序
+   - 权限过滤（Viewer 只看已发布）
+
+10. **SearchStyles** → TC018: 搜索过滤
+    - 全文搜索支持
+    - 组合条件过滤
+    - 性能优化
+
+## 权限测试用例映射
+
+- **TC011**: Admin 权限全覆盖测试
+- **TC012**: Editor 权限边界测试  
+- **TC013**: Viewer 权限限制测试
+- **TC014**: 并发权限冲突测试
+- **TC015**: 数据完整性权限保护测试
+
+## 错误处理和边界情况
+
+### 权限错误
+- `PERMISSION_DENIED`: 用户无权限执行操作
+- `RESOURCE_NOT_FOUND`: 资源不存在或无权访问
+- `OWNERSHIP_REQUIRED`: 需要资源所有权
+
+### 业务规则错误
+- `SLUG_DUPLICATE`: slug 重复
+- `VERSION_CONFLICT`: 版本冲突
+- `REFERENCE_CONSTRAINT`: 引用约束违反
+- `STATUS_TRANSITION_INVALID`: 无效状态转换
+
+### 并发错误
+- `OPTIMISTIC_LOCK_FAILED`: 乐观锁冲突
+- `RESOURCE_LOCKED`: 资源被锁定
+- `TRANSACTION_CONFLICT`: 事务冲突

@@ -52,8 +52,9 @@ When using LLM to generate interaqt applications, you must follow **test-case dr
    ../../tests/runtime/
    ```
    - Learn comprehensive testing patterns from existing test cases
-   - Understand how to test entities, relations, interactions, and computations
+   - Understand how to test interactions and their effects on data
    - Study integration testing approaches and edge case handling
+   - Note: Focus on Interaction tests, not separate Entity/Relation tests
 
 
 ### ⚠️ Knowledge Loading Validation
@@ -114,20 +115,18 @@ generated-project/
 │   ├── test-cases.md
 │   └── interaction-matrix.md
 ├── backend/               # Backend source code
-│   ├── entities/
-│   ├── relations/
-│   ├── interactions/
-│   ├── computations/
+│   ├── entities/         # Entity definitions (with computedData)
+│   ├── relations/        # Relation definitions
+│   ├── interactions/     # Interaction definitions
 │   └── index.ts          # DO NOT instantiate Controller here
 ├── tests/                 # Test code
-│   ├── interactions/
-│   ├── computations/
-│   └── e2e/
 └── frontend/             # Frontend code
 ```
 
+⚠️ **IMPORTANT**: There is NO separate `computations/` directory. All computations (Count, Transform, etc.) are defined within the `computedData` field of Entity/Relation/Property definitions.
+
 **Important: Backend Code Organization**
-- The `backend/index.ts` file should ONLY export entities, relations, computations, interactions arrays
+- The `backend/index.ts` file should ONLY export entities, relations, interactions arrays
 - DO NOT instantiate Controller in `backend/index.ts`
 - Controller should be instantiated in test files or server entry point
 - Example of correct `backend/index.ts`:
@@ -135,26 +134,47 @@ generated-project/
 // backend/index.ts
 export * from './entities'
 export * from './relations'
-export * from './computations'
 export * from './interactions'
 
 // Optionally export arrays for convenience
 export const entities = [User, Post, Comment]
 export const relations = [UserPostRelation, PostCommentRelation]
-export const computations = [PostCount, CommentCount]
 export const interactions = [CreatePost, UpdatePost, DeletePost]
+
+// Note: NO computations export - computations are defined in computedData fields
 ```
 
 #### 2.2 Implementation Order (STRICTLY FOLLOW)
 1. First implement all Entity and Property
+   - Include computedData (Count, Transform, etc.) in Property definitions where needed
 2. Then implement all Relation
-3. Next implement all Computation (Count, Transform, etc.)
-4. Finally implement all Interaction and Activity
-5. Write corresponding tests immediately after completing each module
-6. **TypeScript Type Check**: After generating source code, ensure there are NO TypeScript type errors
-7. **Test Type Check**: After generating test code, ensure test files also have NO TypeScript type errors
+   - Include computedData in Relation definitions where needed
+3. Finally implement all Interaction and Activity
+4. Write corresponding tests immediately after completing each module
+5. **TypeScript Type Check**: After generating source code, ensure there are NO TypeScript type errors
+6. **Test Type Check**: After generating test code, ensure test files also have NO TypeScript type errors
+
+**⚠️ Note about Computations**: Do NOT create separate Computation files or modules. All computations (Count, Transform, WeightedSummation, etc.) must be defined within the `computedData` field of the Property/Entity/Relation where they belong.
 
 ### Phase 3: Test-Driven Validation (MANDATORY - DO NOT SKIP)
+
+#### ⚠️ CRITICAL TESTING PRINCIPLE in Interaqt
+
+In the Interaqt framework, **ALL data is derived from interaction events**. This fundamentally changes how we approach testing:
+
+- **Focus on Interaction Testing**: Since all Entity and Relation data are created through Interactions, testing Interactions comprehensively will naturally cover all data structures.
+- **No Separate Entity/Relation Tests Needed**: You do NOT need to write separate tests for Entity CRUD or Relation creation/deletion. These are automatically covered when you test the Interactions that create them.
+- **Coverage Analysis**: If your test coverage is below 100% after testing all Interactions, it likely means:
+  - You're missing some Interaction definitions
+  - You haven't tested all edge cases and error scenarios for existing Interactions
+  - There might be unused code that should be removed
+
+**Testing Strategy**:
+1. Test every Interaction with success cases
+2. Test every Interaction with failure/error cases
+3. Test edge cases and boundary conditions
+4. Verify that computed properties (computedData) update correctly after Interactions
+5. Ensure permission controls work as expected
 
 #### 3.1 Test Framework Setup
 - Use vitest as testing framework
@@ -208,10 +228,15 @@ import { PGLiteDB } from 'interaqt'
 const system = new MonoSystem(new PGLiteDB())
 ```
 
-#### 3.2 Test Coverage Requirements
-- All Interactions must have at least one success case and one failure case
-- All properties with computedData must verify auto-calculation logic
-- All permission controls must have positive and negative tests
+#### 3.2 Test Coverage Requirements (Interaction-Centric)
+- **Primary Focus**: All Interactions must have comprehensive test coverage:
+  - At least one success case per Interaction
+  - At least one failure case per Interaction (invalid inputs, permission denied, etc.)
+  - Edge cases and boundary conditions
+  - Concurrent operation scenarios where applicable
+- **Computed Properties**: Verify that properties with computedData update correctly after Interactions execute
+- **Permission Controls**: Test both positive (allowed) and negative (denied) permission scenarios
+- **NO Entity/Relation Unit Tests**: Do not write separate tests for Entity CRUD or Relation operations - these are covered through Interaction tests
 
 #### 3.3 Test Execution (STRICTLY FOLLOW)
 After writing each test module, you MUST:
@@ -234,21 +259,22 @@ Create `docs/` directory with:
 
 ### Phase 5: Backend Quality Assurance Checklist
 
-- [ ] All requirements have corresponding test cases
+- [ ] All requirements have corresponding test cases (focused on Interactions)
 - [ ] All test cases have corresponding test code
 - [ ] **No TypeScript type errors in source code** (run `npx tsc --noEmit`)
 - [ ] **No TypeScript type errors in test code**
-- [ ] All test cases passed (Critical Step)
-- [ ] Test coverage reaches 100% (Critical Step)
+- [ ] All Interaction tests passed (Critical Step)
+- [ ] Test coverage reaches 100% through Interaction testing (Critical Step)
 - [ ] No fictional non-existent Entity or Interaction
-- [ ] All reactive computations trigger correctly
-- [ ] Permission control tests complete
+- [ ] All reactive computations trigger correctly when Interactions execute
+- [ ] Permission control tests complete for all Interactions
 - [ ] All Interactions have success and failure cases
-- [ ] All computedData properties verify auto-calculation logic
+- [ ] All computedData properties verified through Interaction side effects
 - [ ] test-cases.md document complete and consistent with code
 - [ ] interaction-matrix.md covers all user roles and operations
-- [ ] All relations have correct cascade behavior tests
+- [ ] Relation cascade behaviors verified through Interaction tests (not separate tests)
 - [ ] Package imports use correct name: `interaqt` (not `@interaqt/runtime`)
+- [ ] **No separate Entity/Relation unit tests** (all covered through Interactions)
 
 ## III. Frontend Generation Process
 
@@ -418,9 +444,27 @@ I will follow the test-case driven development workflow:
 - ❌ Don't treat interaqt like traditional MVC frameworks
 - ❌ Don't write imperative business logic in Interactions
 - ❌ Don't use `@interaqt/runtime` as package name
+- ❌ Don't create separate Computation modules or pass them to Controller
 - ✅ Embrace reactive, declarative programming
-- ✅ Use Computations to declare data relationships
+- ✅ Use Computations to declare data relationships within `computedData` fields
 - ✅ Use correct package name: `interaqt`
+
+### Computation Usage
+- ❌ Don't create Transform.create() as standalone entities
+- ❌ Don't pass computations array to Controller constructor
+- ❌ Don't create a separate computations/ directory
+- ✅ Define all computations in the `computedData` field of Properties
+- ✅ Example:
+  ```typescript
+  Property.create({
+    name: 'postCount',
+    type: 'number',
+    defaultValue: () => 0,
+    computedData: Count.create({
+      record: UserPostRelation
+    })
+  })
+  ```
 
 ### Test-Driven Development
 - ❌ Don't start coding without complete test cases

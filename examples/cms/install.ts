@@ -1,11 +1,11 @@
 import { Controller, MonoSystem, KlassByName, PGLiteDB } from 'interaqt';
-import { entities, relations, interactions, activities } from './backend/index.js';
+import { entities, relations, interactions, activities, dicts } from './backend/index.js';
 import * as initialData from './initialData.js';
 
 const system = new MonoSystem(new PGLiteDB('pgdata'));
 system.conceptClass = KlassByName;
 
-const controller = new Controller(system, entities, relations, activities, interactions, [], []);
+const controller = new Controller(system, entities, relations, activities, interactions, dicts, []);
 await controller.setup(true);
 
 

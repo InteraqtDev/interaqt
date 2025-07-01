@@ -1034,10 +1034,12 @@ new Controller(
     relations: KlassInstance<typeof Relation>[],
     activities: KlassInstance<typeof Activity>[],
     interactions: KlassInstance<typeof Interaction>[],
-    dict?: KlassInstance<typeof Property>[],
+    dict?: KlassInstance<typeof Property>[],  // Note: This is for global dictionaries, NOT computations
     recordMutationSideEffects?: RecordMutationSideEffect[]
 )
 ```
+
+⚠️ **IMPORTANT**: Controller does NOT accept a computations parameter. All computations should be defined within the `computedData` field of Entity/Relation/Property definitions. The 6th parameter `dict` is for global dictionary definitions (Dictionary.create), not for computation definitions.
 
 **Main Methods**
 
