@@ -1163,6 +1163,180 @@ const LeaveRequest = Entity.create({
 });
 ```
 
+### Dynamic Value Computation with StateNode
+
+StateMachine supports dynamic value computation through the `computeValue` function in StateNode. This allows you to compute and update property values during state transitions.
+
+```javascript
+// Example 1: Simple timestamp recording when state changes
+// First declare the state node
+const triggeredState = StateNode.create({
+  name: 'triggered',
+  // computeValue is called when entering this state
+  computeValue: function(lastValue) {
+    // Record current timestamp
+    return Date.now();
+  }
+});
+
+const EventEntity = Entity.create({
+  name: 'Event',
+  properties: [
+    Property.create({ name: 'name', type: 'string' }),
+    Property.create({
+      name: 'lastTriggeredAt',
+      type: 'number',
+      defaultValue: () => 0,
+      computation: StateMachine.create({
+        states: [triggeredState],
+        transfers: [
+          StateTransfer.create({
+            // Self-transition: stays in the same state but triggers computeValue
+            current: triggeredState,
+            next: triggeredState,
+            trigger: TriggerEventInteraction,
+            computeTarget: (event) => ({ id: event.payload.eventId })
+          })
+        ],
+        defaultState: triggeredState
+      })
+    })
+  ]
+});
+```
+
+```javascript
+// Example 2: Counter with dynamic increment
+// First declare the state nodes
+const idleState = StateNode.create({
+  name: 'idle',
+  // Keep current value when idle
+  computeValue: function(lastValue) {
+    return lastValue || 0;
+  }
+});
+
+const incrementingState = StateNode.create({
+  name: 'incrementing',
+  // Increment value by 1 when entering this state
+  computeValue: function(lastValue) {
+    const currentValue = lastValue || 0;
+    return currentValue + 1;
+  }
+});
+
+const CounterEntity = Entity.create({
+  name: 'Counter',
+  properties: [
+    Property.create({ name: 'name', type: 'string' }),
+    Property.create({
+      name: 'count',
+      type: 'number',
+      defaultValue: () => 0,
+      computation: StateMachine.create({
+        states: [idleState, incrementingState],
+        transfers: [
+          StateTransfer.create({
+            current: idleState,
+            next: incrementingState,
+            trigger: IncrementInteraction,
+            computeTarget: (event) => ({ id: event.payload.counterId })
+          }),
+          StateTransfer.create({
+            current: incrementingState,
+            next: idleState,
+            trigger: ResetInteraction,
+            computeTarget: (event) => ({ id: event.payload.counterId })
+          })
+        ],
+        defaultState: idleState
+      })
+    })
+  ]
+});
+```
+
+```javascript
+// Example 3: Complex computation based on context
+// First declare all state nodes
+const newState = StateNode.create({
+  name: 'new',
+  computeValue: () => 10  // Base score for new tasks
+});
+
+const inProgressState = StateNode.create({
+  name: 'inProgress',
+  computeValue: function(lastValue) {
+    // Add 20 points when task starts
+    return (lastValue || 0) + 20;
+  }
+});
+
+const completedState = StateNode.create({
+  name: 'completed',
+  computeValue: function(lastValue) {
+    // Double the score when completed
+    return (lastValue || 0) * 2;
+  }
+});
+
+const cancelledState = StateNode.create({
+  name: 'cancelled',
+  computeValue: () => 0  // Reset score to 0 when cancelled
+});
+
+const TaskEntity = Entity.create({
+  name: 'Task',
+  properties: [
+    Property.create({ name: 'title', type: 'string' }),
+    Property.create({ name: 'priority', type: 'number' }),
+    Property.create({
+      name: 'score',
+      type: 'number',
+      defaultValue: () => 0,
+      computation: StateMachine.create({
+        states: [newState, inProgressState, completedState, cancelledState],
+        transfers: [
+          StateTransfer.create({
+            current: newState,
+            next: inProgressState,
+            trigger: StartTaskInteraction,
+            computeTarget: (event) => ({ id: event.payload.taskId })
+          }),
+          StateTransfer.create({
+            current: inProgressState,
+            next: completedState,
+            trigger: CompleteTaskInteraction,
+            computeTarget: (event) => ({ id: event.payload.taskId })
+          }),
+          StateTransfer.create({
+            current: inProgressState,
+            next: cancelledState,
+            trigger: CancelTaskInteraction,
+            computeTarget: (event) => ({ id: event.payload.taskId })
+          })
+        ],
+        defaultState: newState
+      })
+    })
+  ]
+});
+```
+
+#### Key Points about computeValue
+
+1. **Function Signature**: `computeValue(lastValue)` receives the last computed value as parameter
+2. **Return Value**: The function should return the new value for the property
+3. **Execution Timing**: Called when entering the state (during state transition)
+4. **Self-Transitions**: You can use self-transitions (same state to same state) to trigger computeValue without changing the state name
+5. **Initial Value**: When there's no `lastValue` (first computation), it's `undefined`, so handle this case appropriately
+
+This feature is particularly useful for:
+- Recording timestamps of state changes
+- Maintaining counters and accumulators
+- Computing scores or metrics based on workflow progress
+- Any scenario where property values should change based on state transitions
+
 ## Using RealTime for Real-time Computations
 
 RealTime computation is a core feature in the interaqt framework for handling time-sensitive data and business logic. It allows you to declare time-based computations and automatically manages computation state and recomputation timing.

@@ -541,6 +541,184 @@ const ArticleHistory = Entity.create({
 });
 ```
 
+### Recording Timestamps with Single-Node StateMachine
+
+For properties that need to record timestamps of specific events (like last activity time, last update time, etc.), you can use a single-node StateMachine with `computeValue` to dynamically compute timestamps:
+
+```javascript
+// Define interaction to track activity
+const RecordActivity = Interaction.create({
+  name: 'RecordActivity',
+  action: Action.create({ name: 'recordActivity' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({ name: 'entityId', base: SomeEntity, isRef: true })
+    ]
+  })
+});
+
+// Single-node StateMachine for timestamp recording
+const TimestampState = StateNode.create({
+  name: 'active',
+  // computeValue is called each time the state is entered
+  computeValue: function(lastValue) {
+    // Always return current timestamp
+    return Date.now();
+  }
+});
+
+const TimestampStateMachine = StateMachine.create({
+  name: 'TimestampRecorder',
+  states: [TimestampState],
+  defaultState: TimestampState,
+  transfers: [
+    // Self-transition: stays in same state but triggers computeValue
+    StateTransfer.create({
+      current: TimestampState,
+      next: TimestampState,
+      trigger: RecordActivity,
+      computeTarget: (event) => ({ id: event.payload.entityId })
+    })
+  ]
+});
+
+// Apply to entity property
+const SomeEntity = Entity.create({
+  name: 'SomeEntity',
+  properties: [
+    Property.create({ name: 'name', type: 'string' }),
+    Property.create({
+      name: 'lastActivityAt',
+      type: 'number',
+      defaultValue: () => 0,
+      computation: TimestampStateMachine
+    })
+  ]
+});
+```
+
+This pattern is particularly useful for:
+
+1. **User Activity Tracking**:
+```javascript
+// First declare the state node
+const activeState = StateNode.create({
+  name: 'active',
+  computeValue: () => Date.now()
+});
+
+const User = Entity.create({
+  name: 'User',
+  properties: [
+    Property.create({ name: 'username', type: 'string' }),
+    Property.create({
+      name: 'lastActiveAt',
+      type: 'number',
+      defaultValue: () => 0,
+      computation: StateMachine.create({
+        states: [activeState],
+        transfers: [
+          StateTransfer.create({
+            current: activeState,
+            next: activeState,
+            trigger: UserActivityInteraction,
+            computeTarget: (event) => ({ id: event.user.id })
+          })
+        ],
+        defaultState: activeState
+      })
+    })
+  ]
+});
+```
+
+2. **Entity Update Tracking**:
+```javascript
+// First declare the state node
+const modifiedState = StateNode.create({
+  name: 'modified',
+  computeValue: () => Date.now()
+});
+
+const Article = Entity.create({
+  name: 'Article',
+  properties: [
+    Property.create({ name: 'title', type: 'string' }),
+    Property.create({ name: 'content', type: 'string' }),
+    Property.create({
+      name: 'lastModifiedAt',
+      type: 'number',
+      defaultValue: () => Date.now(),
+      computation: StateMachine.create({
+        states: [modifiedState],
+        transfers: [
+          StateTransfer.create({
+            current: modifiedState,
+            next: modifiedState,
+            trigger: UpdateArticleInteraction,
+            computeTarget: (event) => ({ id: event.payload.articleId })
+          })
+        ],
+        defaultState: modifiedState
+      })
+    })
+  ]
+});
+```
+
+3. **Event Occurrence Tracking**:
+```javascript
+// First declare the state node
+const triggeredState = StateNode.create({
+  name: 'triggered',
+  computeValue: () => Date.now()
+});
+
+const Sensor = Entity.create({
+  name: 'Sensor',
+  properties: [
+    Property.create({ name: 'location', type: 'string' }),
+    Property.create({
+      name: 'lastTriggeredAt',
+      type: 'number',
+      defaultValue: () => 0,
+      computation: StateMachine.create({
+        states: [triggeredState],
+        transfers: [
+          StateTransfer.create({
+            current: triggeredState,
+            next: triggeredState,
+            trigger: SensorTriggerInteraction,
+            computeTarget: (event) => ({ id: event.payload.sensorId })
+          })
+        ],
+        defaultState: triggeredState
+      })
+    })
+  ]
+});
+```
+
+#### Advantages of This Pattern
+
+1. **Reactive**: Timestamps are automatically updated when specific interactions occur
+2. **Declarative**: No need to manually set timestamps in interaction handlers
+3. **Consistent**: Ensures timestamp recording logic is centralized and consistent
+4. **Efficient**: Only updates when the specific interaction is triggered
+5. **Flexible**: Can be combined with other state machines for complex workflows
+
+#### When to Use This Pattern vs Transform
+
+- **Use Single-Node StateMachine with computeValue** when:
+  - You need to record timestamps for specific entity instances
+  - The timestamp is a property of the entity itself
+  - You want the timestamp to update on specific interactions
+
+- **Use Transform** when:
+  - You need to create new records (like history/audit logs)
+  - You need to record multiple fields or complex data
+  - You want to maintain a complete history of changes
+
 ## Complete Example: Blog System CRUD Operations
 
 ```javascript

@@ -163,4 +163,321 @@ describe('StateMachineRunner', () => {
         
         
     })
+
+    test('state machine with dynamic computeValue', async () => {
+        // 创建一个带有动态计算值的状态机
+        const { Entity, Property, Interaction, Action, Payload, PayloadItem, StateMachine, StateNode, StateTransfer } = await import('interaqt')
+        
+        // 创建用户实体
+        const User = Entity.create({
+            name: 'User',
+            properties: [
+                Property.create({
+                    name: 'name',
+                    type: 'string',
+                })
+            ]
+        })
+
+        // 创建一个计数器实体
+        const Counter = Entity.create({
+            name: 'Counter',
+            properties: [
+                Property.create({
+                    name: 'count',
+                    type: 'number',
+                    defaultValue: () => 0
+                }),
+                Property.create({
+                    name: 'state',
+                    type: 'string',
+                    defaultValue: () => 'idle'
+                })
+            ]
+        })
+
+        // 创建交互
+        const IncrementInteraction = Interaction.create({
+            name: 'increment',
+            action: Action.create({ name: 'increment' }),
+            payload: Payload.create({
+                items: [
+                    PayloadItem.create({
+                        name: 'counter',
+                        isRef: true,
+                        base: Counter
+                    })
+                ]
+            })
+        })
+
+        const ResetInteraction = Interaction.create({
+            name: 'reset',
+            action: Action.create({ name: 'reset' }),
+            payload: Payload.create({
+                items: [
+                    PayloadItem.create({
+                        name: 'counter',
+                        isRef: true,
+                        base: Counter
+                    })
+                ]
+            })
+        })
+
+        // 创建带有动态计算值的状态节点
+        const IncrementingState = StateNode.create({
+            name: 'incrementing',
+            // 动态计算：返回一个增量后的值
+            computeValue: function(lastValue: any) {
+                const baseValue = typeof lastValue === 'number' ? lastValue : 0
+                return baseValue + 1
+            }
+        })
+
+        const IdleState = StateNode.create({
+            name: 'idle',
+            // idle 状态不改变值
+            computeValue: function(lastValue: any) {
+                return typeof lastValue === 'number' ? lastValue : 0
+            }
+        })
+
+        // 创建状态转移
+        const IdleToIncrementingTransfer = StateTransfer.create({
+            trigger: IncrementInteraction,
+            current: IdleState,
+            next: IncrementingState,
+            computeTarget: (event: any) => {
+                return { id: event.payload!.counter.id }
+            }
+        })
+
+        const IncrementingToIdleTransfer = StateTransfer.create({
+            trigger: ResetInteraction,
+            current: IncrementingState,
+            next: IdleState,
+            computeTarget: (event: any) => {
+                return { id: event.payload!.counter.id }
+            }
+        })
+
+        // 创建状态机 - 用于计算 count 值
+        const CountStateMachine = StateMachine.create({
+            states: [IdleState, IncrementingState],
+            transfers: [IdleToIncrementingTransfer, IncrementingToIdleTransfer],
+            defaultState: IdleState
+        })
+
+        // 创建状态机 - 用于 state 属性（只返回状态名）
+        const idleStateForName = StateNode.create({ name: 'idle' })
+        const incrementingStateForName = StateNode.create({ name: 'incrementing' })
+        
+        const StateStateMachine = StateMachine.create({
+            states: [idleStateForName, incrementingStateForName],
+            transfers: [
+                StateTransfer.create({
+                    trigger: IncrementInteraction,
+                    current: idleStateForName,
+                    next: incrementingStateForName,
+                    computeTarget: (event: any) => ({ id: event.payload!.counter.id })
+                }),
+                StateTransfer.create({
+                    trigger: ResetInteraction,
+                    current: incrementingStateForName,
+                    next: idleStateForName,
+                    computeTarget: (event: any) => ({ id: event.payload!.counter.id })
+                })
+            ],
+            defaultState: idleStateForName
+        })
+
+        // 将状态机附加到属性
+        const countProperty = Counter.properties.find(p => p.name === 'count')!
+        countProperty.computation = CountStateMachine
+        
+        const stateProperty = Counter.properties.find(p => p.name === 'state')!
+        stateProperty.computation = StateStateMachine
+
+        // 设置测试环境
+        const system = new MonoSystem()
+        const controller = new Controller(
+            system, 
+            [User, Counter], 
+            [], 
+            [], 
+            [IncrementInteraction, ResetInteraction], 
+            [], 
+            []
+        )
+        await controller.setup(true)
+
+        // 创建用户和计数器
+        const user = await controller.system.storage.create('User', { name: 'testUser' })
+        const counter = await controller.system.storage.create('Counter', {})
+
+        // 验证初始状态
+        let counterData = await controller.system.storage.findOne('Counter', undefined, undefined, ['*'])
+        expect(counterData.count).toBe(0)
+        expect(counterData.state).toBe('idle')
+
+        // 第一次增加 - 应该切换到 incrementing 状态，count 增加 1
+        await controller.callInteraction('increment', {
+            user,
+            payload: { counter: { id: counter.id } }
+        })
+
+        counterData = await controller.system.storage.findOne('Counter', undefined, undefined, ['*'])
+        expect(counterData.count).toBe(1)
+        expect(counterData.state).toBe('incrementing')
+
+        // 重置 - 应该回到 idle 状态，但 count 保持不变
+        await controller.callInteraction('reset', {
+            user,
+            payload: { counter: { id: counter.id } }
+        })
+
+        counterData = await controller.system.storage.findOne('Counter', undefined, undefined, ['*'])
+        expect(counterData.count).toBe(1)
+        expect(counterData.state).toBe('idle')
+
+        // 再次增加 - count 应该增加到 2
+        await controller.callInteraction('increment', {
+            user,
+            payload: { counter: { id: counter.id } }
+        })
+
+        counterData = await controller.system.storage.findOne('Counter', undefined, undefined, ['*'])
+        expect(counterData.count).toBe(2)
+        expect(counterData.state).toBe('incrementing')
+    })
+
+    test('state machine with timestamp recording', async () => {
+        // 创建一个记录时间戳的简单状态机
+        const { Entity, Property, Interaction, Action, Payload, PayloadItem, StateMachine, StateNode, StateTransfer } = await import('interaqt')
+        
+        // 创建实体
+        const TimeLogger = Entity.create({
+            name: 'TimeLogger',
+            properties: [
+                Property.create({
+                    name: 'lastTimestamp',
+                    type: 'number',
+                    defaultValue: () => 0
+                })
+            ]
+        })
+
+        // 创建交互
+        const LogTimeInteraction = Interaction.create({
+            name: 'logTime',
+            action: Action.create({ name: 'logTime' }),
+            payload: Payload.create({
+                items: [
+                    PayloadItem.create({
+                        name: 'logger',
+                        isRef: true,
+                        base: TimeLogger
+                    })
+                ]
+            })
+        })
+
+        // 创建状态节点 - 每次触发时记录当前时间戳
+        const LoggingState = StateNode.create({
+            name: 'logging',
+            computeValue: function() {
+                return Date.now()
+            }
+        })
+
+        // 创建状态转移 - 自循环转换
+        const LoggingToLoggingTransfer = StateTransfer.create({
+            trigger: LogTimeInteraction,
+            current: LoggingState,
+            next: LoggingState,
+            computeTarget: (event: any) => {
+                return { id: event.payload!.logger.id }
+            }
+        })
+
+        // 创建状态机
+        const TimestampStateMachine = StateMachine.create({
+            states: [LoggingState],
+            transfers: [LoggingToLoggingTransfer],
+            defaultState: LoggingState
+        })
+
+        // 将状态机附加到属性
+        const timestampProperty = TimeLogger.properties.find(p => p.name === 'lastTimestamp')!
+        timestampProperty.computation = TimestampStateMachine
+
+        // 设置测试环境
+        const system = new MonoSystem()
+        const controller = new Controller(
+            system, 
+            [TimeLogger], 
+            [], 
+            [], 
+            [LogTimeInteraction], 
+            [], 
+            []
+        )
+        await controller.setup(true)
+
+        // 创建 TimeLogger 实例
+        const logger = await controller.system.storage.create('TimeLogger', {})
+
+        // 验证初始状态
+        let loggerData = await controller.system.storage.findOne('TimeLogger', undefined, undefined, ['*'])
+        const initialTimestamp = loggerData.lastTimestamp
+        expect(initialTimestamp).toBe(0)
+
+        // 第一次触发 - 记录时间戳
+        const beforeFirst = Date.now()
+        await controller.callInteraction('logTime', {
+            user: { id: 'system', name: 'system' },
+            payload: { logger: { id: logger.id } }
+        })
+        const afterFirst = Date.now()
+
+        loggerData = await controller.system.storage.findOne('TimeLogger', undefined, undefined, ['*'])
+        const firstTimestamp = loggerData.lastTimestamp
+        expect(firstTimestamp).toBeGreaterThan(0)
+        expect(firstTimestamp).toBeGreaterThanOrEqual(beforeFirst)
+        expect(firstTimestamp).toBeLessThanOrEqual(afterFirst)
+
+        // 等待一小段时间
+        await new Promise(resolve => setTimeout(resolve, 10))
+
+        // 第二次触发 - 记录新的时间戳
+        const beforeSecond = Date.now()
+        await controller.callInteraction('logTime', {
+            user: { id: 'system', name: 'system' },
+            payload: { logger: { id: logger.id } }
+        })
+        const afterSecond = Date.now()
+
+        loggerData = await controller.system.storage.findOne('TimeLogger', undefined, undefined, ['*'])
+        const secondTimestamp = loggerData.lastTimestamp
+        expect(secondTimestamp).toBeGreaterThan(firstTimestamp)
+        expect(secondTimestamp).toBeGreaterThanOrEqual(beforeSecond)
+        expect(secondTimestamp).toBeLessThanOrEqual(afterSecond)
+
+        // 第三次触发 - 再次记录时间戳
+        await new Promise(resolve => setTimeout(resolve, 10))
+        
+        const beforeThird = Date.now()
+        await controller.callInteraction('logTime', {
+            user: { id: 'system', name: 'system' },
+            payload: { logger: { id: logger.id } }
+        })
+        const afterThird = Date.now()
+
+        loggerData = await controller.system.storage.findOne('TimeLogger', undefined, undefined, ['*'])
+        const thirdTimestamp = loggerData.lastTimestamp
+        expect(thirdTimestamp).toBeGreaterThan(secondTimestamp)
+        expect(thirdTimestamp).toBeGreaterThanOrEqual(beforeThird)
+        expect(thirdTimestamp).toBeLessThanOrEqual(afterThird)
+    })
 });     

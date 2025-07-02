@@ -544,22 +544,23 @@ StateMachine.create(config: StateMachineConfig): KlassInstance<typeof StateMachi
 
 **Examples**
 ```typescript
+// First declare state nodes
+const pendingState = StateNode.create({ name: 'pending' });
+const confirmedState = StateNode.create({ name: 'confirmed' });
+const shippedState = StateNode.create({ name: 'shipped' });
+const deliveredState = StateNode.create({ name: 'delivered' });
+
 // Order state machine
 const OrderStateMachine = StateMachine.create({
-    states: [
-        StateNode.create({ name: 'pending' }),
-        StateNode.create({ name: 'confirmed' }),
-        StateNode.create({ name: 'shipped' }),
-        StateNode.create({ name: 'delivered' })
-    ],
+    states: [pendingState, confirmedState, shippedState, deliveredState],
     transfers: [
         StateTransfer.create({
-            current: StateNode.create({ name: 'pending' }),
-            next: StateNode.create({ name: 'confirmed' }),
+            current: pendingState,
+            next: confirmedState,
             trigger: ConfirmOrderInteraction
         })
     ],
-    defaultState: StateNode.create({ name: 'pending' })
+    defaultState: pendingState
 })
 ```
 
