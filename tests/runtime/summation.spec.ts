@@ -33,7 +33,7 @@ describe('Sum computed handle', () => {
         name: 'totalAmount',
         type: 'number',
         collection: false,
-        computedData: Summation.create({
+        computation: Summation.create({
           record: transactionEntity,
           attributeQuery: ['amount']
         })
@@ -101,7 +101,7 @@ describe('Sum computed handle', () => {
         name: 'totalScore',
         type: 'number',
         collection: false,
-        computedData: Summation.create({
+        computation: Summation.create({
           record: scoreEntity,
           attributeQuery: ['value']
         })
@@ -142,7 +142,7 @@ describe('Sum computed handle', () => {
         name: 'sumOfItems',
         type: 'number',
         collection: false,
-        computedData: Summation.create({
+        computation: Summation.create({
           record: itemEntity,
           attributeQuery: ['value']
         })
@@ -176,7 +176,7 @@ describe('Sum computed handle', () => {
         name: 'dataSum',
         type: 'number',
         collection: false,
-        computedData: Summation.create({
+        computation: Summation.create({
           record: dataEntity,
           attributeQuery: ['value']
         })
@@ -216,7 +216,7 @@ describe('Sum computed handle', () => {
         name: 'totalBalance',
         type: 'number',
         collection: false,
-        computedData: Summation.create({
+        computation: Summation.create({
           record: accountEntity,
           attributeQuery: ['balance']
         })
@@ -281,7 +281,7 @@ describe('Sum computed handle', () => {
         name: 'completedOrdersTotal',
         type: 'number',
         collection: false,
-        computedData: Summation.create({
+        computation: Summation.create({
           record: completedOrderEntity,
           attributeQuery: ['amount']
         })
@@ -358,7 +358,7 @@ describe('Sum computed handle', () => {
         name: 'totalPurchases',
         type: 'number',
         collection: false,
-        computedData: Summation.create({
+        computation: Summation.create({
           record: customerPurchaseRelation,
           attributeQuery: [['target', {attributeQuery: ['amount']}]]
         })

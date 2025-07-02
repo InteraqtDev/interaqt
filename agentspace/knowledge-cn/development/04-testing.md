@@ -134,7 +134,7 @@ describe('Count computed handle', () => {
                 name: 'productCount',
                 type: 'number',
                 collection: false,
-                computedData: Count.create({
+                computation: Count.create({
                     record: productEntity
                 })
             })
@@ -195,7 +195,7 @@ test('should calculate property count correctly', async () => {
             name: 'taskCount',
             type: 'number',
             defaultValue: () => 0,
-            computedData: Count.create({
+            computation: Count.create({
                 record: ownsTaskRelation
             })
         })
@@ -225,7 +225,7 @@ test('should calculate property count correctly', async () => {
 ### 4.4.2 异步计算测试
 
 ```typescript
-import { ComputedDataHandle, DataBasedComputation, ComputationResult } from '@';
+import { ComputationHandle, DataBasedComputation, ComputationResult } from '@';
 
 // 1. 定义异步计算类
 const TestCrawlerComputed = createClass({
@@ -264,7 +264,7 @@ class TestCrawlerComputation implements DataBasedComputation {
 }
 
 // 3. 注册计算处理器
-ComputedDataHandle.Handles.set(TestCrawlerComputed, {
+ComputationHandle.Handles.set(TestCrawlerComputed, {
     property: TestCrawlerComputation
 });
 
@@ -278,7 +278,7 @@ describe('async computed', () => {
                 Property.create({
                     name: 'content', 
                     type: 'string',
-                    computedData: TestCrawlerComputed.create({ source: 'url'})
+                    computation: TestCrawlerComputed.create({ source: 'url'})
                 }),
             ]
         });

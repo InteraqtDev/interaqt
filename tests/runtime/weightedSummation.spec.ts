@@ -33,7 +33,7 @@ describe('WeightedSummation computed handle', () => {
         name: 'totalValue',
         type: 'number',
         collection: false,
-        computedData: WeightedSummation.create({
+        computation: WeightedSummation.create({
           record: productEntity,
           attributeQuery: ['price', 'quantity'],
           callback: (product: any) => {
@@ -127,7 +127,7 @@ describe('WeightedSummation computed handle', () => {
       Property.create({
         name: 'totalPurchaseValue',
         type: 'number',
-        computedData: WeightedSummation.create({
+        computation: WeightedSummation.create({
           record: purchaseRelation,
           attributeQuery: [['target', {attributeQuery: ['quantity', 'price']}]],
           callback: (relation: any) => {
@@ -192,7 +192,7 @@ describe('WeightedSummation computed handle', () => {
         name: 'totalValue',
         type: 'number',
         collection: false,
-        computedData: WeightedSummation.create({
+        computation: WeightedSummation.create({
           record: productEntity,
           callback: (product: any) => {
             return {
@@ -243,7 +243,7 @@ describe('WeightedSummation computed handle', () => {
         name: 'netBalance',
         type: 'number',
         collection: false,
-        computedData: WeightedSummation.create({
+        computation: WeightedSummation.create({
           record: accountEntity,
           callback: (account: any) => {
             return {

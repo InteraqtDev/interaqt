@@ -115,7 +115,7 @@ generated-project/
 │   ├── test-cases.md
 │   └── interaction-matrix.md
 ├── backend/               # Backend source code
-│   ├── entities/         # Entity definitions (with computedData)
+│   ├── entities/         # Entity definitions (with computation)
 │   ├── relations/        # Relation definitions
 │   ├── interactions/     # Interaction definitions
 │   └── index.ts          # DO NOT instantiate Controller here
@@ -123,7 +123,7 @@ generated-project/
 └── frontend/             # Frontend code
 ```
 
-⚠️ **IMPORTANT**: There is NO separate `computations/` directory. All computations (Count, Transform, etc.) are defined within the `computedData` field of Entity/Relation/Property definitions.
+⚠️ **IMPORTANT**: There is NO separate `computations/` directory. All computations (Count, Transform, etc.) are defined within the `computation` field of Entity/Relation/Property definitions.
 
 **Important: Backend Code Organization**
 - The `backend/index.ts` file should ONLY export entities, relations, interactions arrays
@@ -141,20 +141,20 @@ export const entities = [User, Post, Comment]
 export const relations = [UserPostRelation, PostCommentRelation]
 export const interactions = [CreatePost, UpdatePost, DeletePost]
 
-// Note: NO computations export - computations are defined in computedData fields
+// Note: NO computations export - computations are defined in computation fields
 ```
 
 #### 2.2 Implementation Order (STRICTLY FOLLOW)
 1. First implement all Entity and Property
-   - Include computedData (Count, Transform, etc.) in Property definitions where needed
+   - Include computation (Count, Transform, etc.) in Property definitions where needed
 2. Then implement all Relation
-   - Include computedData in Relation definitions where needed
+   - Include computation in Relation definitions where needed
 3. Finally implement all Interaction and Activity
 4. Write corresponding tests immediately after completing each module
 5. **TypeScript Type Check**: After generating source code, ensure there are NO TypeScript type errors
 6. **Test Type Check**: After generating test code, ensure test files also have NO TypeScript type errors
 
-**⚠️ Note about Computations**: Do NOT create separate Computation files or modules. All computations (Count, Transform, WeightedSummation, etc.) must be defined within the `computedData` field of the Property/Entity/Relation where they belong.
+**⚠️ Note about Computations**: Do NOT create separate Computation files or modules. All computations (Count, Transform, WeightedSummation, etc.) must be defined within the `computation` field of the Property/Entity/Relation where they belong.
 
 ### Phase 3: Test-Driven Validation (MANDATORY - DO NOT SKIP)
 
@@ -173,7 +173,7 @@ In the interaqt framework, **ALL data is derived from interaction events**. This
 1. Test every Interaction with success cases
 2. Test every Interaction with failure/error cases
 3. Test edge cases and boundary conditions
-4. Verify that computed properties (computedData) update correctly after Interactions
+4. Verify that computed properties (computation) update correctly after Interactions
 5. Ensure permission controls work as expected
 
 #### 3.1 Test Framework Setup
@@ -234,7 +234,7 @@ const system = new MonoSystem(new PGLiteDB())
   - At least one failure case per Interaction (invalid inputs, permission denied, etc.)
   - Edge cases and boundary conditions
   - Concurrent operation scenarios where applicable
-- **Computed Properties**: Verify that properties with computedData update correctly after Interactions execute
+- **Computed Properties**: Verify that properties with computation update correctly after Interactions execute
 - **Permission Controls**: Test both positive (allowed) and negative (denied) permission scenarios
 - **NO Entity/Relation Unit Tests**: Do not write separate tests for Entity CRUD or Relation operations - these are covered through Interaction tests
 
@@ -269,7 +269,7 @@ Create `docs/` directory with:
 - [ ] All reactive computations trigger correctly when Interactions execute
 - [ ] Permission control tests complete for all Interactions
 - [ ] All Interactions have success and failure cases
-- [ ] All computedData properties verified through Interaction side effects
+- [ ] All computation properties verified through Interaction side effects
 - [ ] test-cases.md document complete and consistent with code
 - [ ] interaction-matrix.md covers all user roles and operations
 - [ ] Relation cascade behaviors verified through Interaction tests (not separate tests)
@@ -446,7 +446,7 @@ I will follow the test-case driven development workflow:
 - ❌ Don't use `@interaqt/runtime` as package name
 - ❌ Don't create separate Computation modules or pass them to Controller
 - ✅ Embrace reactive, declarative programming
-- ✅ Use Computations to declare data relationships within `computedData` fields
+- ✅ Use Computations to declare data relationships within `computation` fields
 - ✅ Use correct package name: `interaqt`
 
 ### Computation Usage
@@ -454,7 +454,7 @@ I will follow the test-case driven development workflow:
 - ❌ Don't pass computations array to Controller constructor
 - ❌ Don't create a separate computations/ directory
 - ❌ Don't use function form for record parameter
-- ✅ Define all computations in the `computedData` field of Properties
+- ✅ Define all computations in the `computation` field of Properties
 - ✅ Always use direct references for record parameter
 - ✅ Example:
   ```typescript
@@ -462,7 +462,7 @@ I will follow the test-case driven development workflow:
     name: 'postCount',
     type: 'number',
     defaultValue: () => 0,
-    computedData: Count.create({
+    computation: Count.create({
       record: UserPostRelation  // Direct reference, not () => UserPostRelation
     })
   })
@@ -503,7 +503,7 @@ I will follow the test-case driven development workflow:
 - ❌ Don't use arrow functions to solve forward reference issues
   ```typescript
   // WRONG: This is not how to handle forward references
-  computedData: Count.create({
+  computation: Count.create({
     record: () => StyleVersionRelation
   })
   ```
@@ -515,7 +515,7 @@ I will follow the test-case driven development workflow:
     properties: [
       Property.create({
         name: 'nextVersion',
-        computedData: Transform.create({
+        computation: Transform.create({
           record: Version  // Circular reference!
         })
       })
@@ -531,7 +531,7 @@ I will follow the test-case driven development workflow:
     properties: [
       Property.create({
         name: 'styleCount',
-        computedData: Count.create({
+        computation: Count.create({
           record: StyleVersionRelation  // Direct reference
         })
       })

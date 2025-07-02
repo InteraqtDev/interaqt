@@ -1,4 +1,4 @@
-import { ComputedDataHandle, DataContext, PropertyDataContext } from "./ComputedDataHandle.js";
+import { ComputationHandle, DataContext, PropertyDataContext } from "./ComputationHandle.js";
 import { Any, KlassInstance, Relation } from "@shared";
 import { Controller } from "../Controller.js";
 import { ComputationResult, DataDep, GlobalBoundState, RecordBoundState, RecordsDataDep } from "./Computation.js";
@@ -183,7 +183,7 @@ export class PropertyAnyHandle implements DataBasedComputation {
 }
 
 
-ComputedDataHandle.Handles.set(Any, {
+ComputationHandle.Handles.set(Any, {
     global: GlobalAnyHandle,
     property: PropertyAnyHandle
 })

@@ -1,4 +1,4 @@
-import { ComputedDataHandle, DataContext, EntityDataContext } from "./ComputedDataHandle.js";
+import { ComputationHandle, DataContext, EntityDataContext } from "./ComputationHandle.js";
 import { Transform, KlassInstance, Relation, Entity, Activity, Interaction, BoolExp } from "@shared";
 import { Controller } from "../Controller.js";
 import { ComputationResultPatch, DataDep, RecordBoundState, RecordsDataDep } from "./Computation.js";
@@ -109,8 +109,8 @@ export class RecordsTransformHandle implements DataBasedComputation {
 }
 
 
-// Register the Transform with ComputedDataHandle
-ComputedDataHandle.Handles.set(Transform, {
+// Register the Transform with ComputationHandle
+ComputationHandle.Handles.set(Transform, {
     entity: RecordsTransformHandle,
     relation: RecordsTransformHandle
 });

@@ -238,7 +238,7 @@ export function createData() {
         target: UserEntity,
         targetProperty: 'friends',
         type: 'n:n',
-        computedData: friendRelationSM
+        computation: friendRelationSM
     })
     
     
@@ -248,7 +248,7 @@ export function createData() {
         name: 'totalFriendCount',
         type: 'number',
         collection: false,
-        computedData: Count.create({
+        computation: Count.create({
             record: friendRelation,
         })
     }))
@@ -297,7 +297,7 @@ export function createData() {
     
      const requestEntity = Entity.create({
         name: 'Request',
-        computedData: Transform.create({
+        computation: Transform.create({
             record: InteractionEventEntity,
             attributeQuery: ['*', ['activity', {attributeQuery:['id']}]],
             callback: (interactionEvent) => {
@@ -316,7 +316,7 @@ export function createData() {
                 name: 'result',
                 type: 'boolean',
                 collection: false,
-                computedData: resultStateMachine
+                computation: resultStateMachine
             }),
             Property.create({
                 name: 'message',
@@ -382,14 +382,14 @@ export function createData() {
         name: 'totalUnhandledRequest',
         type: 'number',
         collection: false,
-        computedData: userTotalUnhandledRequest
+        computation: userTotalUnhandledRequest
     }))
     
     UserEntity.properties.push(Property.create({
         name: 'everySendRequestHandled',
         type: 'boolean',
         collection: false,
-        computedData: Every.create({
+        computation: Every.create({
             record: sendRequestRelation,
             attributeQuery: [['source', {attributeQuery: ['result']}]],
             callback: (relation) => relation.source.result !== 'pending'
@@ -400,7 +400,7 @@ export function createData() {
         name: 'anySendRequestHandled',
         type: 'boolean',
         collection: false,
-        computedData: Any.create({
+        computation: Any.create({
             record: sendRequestRelation,
             attributeQuery: [['source', {attributeQuery: ['result']}]],
             callback: (relation) => relation.source.result !== 'pending'
@@ -414,7 +414,7 @@ export function createData() {
         name: 'totalFriendRelation',
         type: 'number',
         collection: false,
-        computedData: Count.create({
+        computation: Count.create({
             record: friendRelation,
         })
     })
@@ -422,7 +422,7 @@ export function createData() {
         name: 'everyRequestHandled',
         type: 'boolean',
         collection: false,
-        computedData: Every.create({
+        computation: Every.create({
             record: requestEntity,
             callback: (request) => {
                 return request.result !== 'pending'
@@ -434,7 +434,7 @@ export function createData() {
         name: 'anyRequestHandled',
         type: 'boolean',
         collection: false,
-        computedData: Any.create({
+        computation: Any.create({
             record: requestEntity,
             callback: (request) => {
                 return request.result !== 'pending'

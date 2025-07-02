@@ -1,7 +1,7 @@
 import { KlassInstance, Property, RealTime } from "@shared";
 import { Controller } from "../Controller";
 import { ComputationResultPatch, ComputationResult, DataBasedComputation, RecordBoundState, GlobalBoundState } from "./Computation";
-import { ComputedDataHandle, DataContext } from "./ComputedDataHandle";
+import { ComputationHandle, DataContext } from "./ComputationHandle";
 import { Equation, Expression, Inequality } from "./MathResolver";
 
 export class GlobalRealTimeComputation implements DataBasedComputation {
@@ -111,7 +111,7 @@ export class PropertyRealTimeComputation implements DataBasedComputation {
     }
 }
 
-ComputedDataHandle.Handles.set(RealTime, {
+ComputationHandle.Handles.set(RealTime, {
     global: GlobalRealTimeComputation,
     property: PropertyRealTimeComputation
 })  

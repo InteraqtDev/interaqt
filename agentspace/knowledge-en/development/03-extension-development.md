@@ -189,7 +189,7 @@ After implementation, you need to register the computation type in the system:
 
 ```typescript
 // Register computation handlers
-ComputedDataHandle.Handles.set(Count, {
+ComputationHandle.Handles.set(Count, {
     global: GlobalCountHandle,
     property: PropertyCountHandle
 });
@@ -205,7 +205,7 @@ type HandlesForType = {
     property?: { new(...args: any[]): Computation },
 }
 
-export class ComputedDataHandle {
+export class ComputationHandle {
     public static Handles: Map<Klass<any>, HandlesForType> = new Map()
 }
 ```
@@ -304,7 +304,7 @@ export class GlobalAverageHandle implements DataBasedComputation {
 }
 
 // Register computation handler
-ComputedDataHandle.Handles.set(Average, {
+ComputationHandle.Handles.set(Average, {
     global: GlobalAverageHandle
 });
 ```

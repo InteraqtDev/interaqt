@@ -273,7 +273,7 @@ describe('Count Computation', () => {
       type: 'number',
       collection: false,
       defaultValue: () => 0,
-      computedData: Count.create({
+      computation: Count.create({
         record: userEntity
       })
     });
@@ -283,7 +283,7 @@ describe('Count Computation', () => {
       type: 'number',
       collection: false,
       defaultValue: () => 0,
-      computedData: Count.create({
+      computation: Count.create({
         record: userEntity
       })
     });
@@ -354,7 +354,7 @@ describe('Transform Computation', () => {
       type: 'object',
       collection: false,
       defaultValue: () => ({}),
-      computedData: Transform.create({
+      computation: Transform.create({
         record: userEntity,
         attributeQuery: ['age', 'score'],
         callback: (users: any[]) => {

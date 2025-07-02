@@ -4,7 +4,7 @@ import {
   Entity,
   MonoSystem,
   Property,
-  ComputedDataHandle,
+  ComputationHandle,
   createClass,
   DataDep,
   PropertyDataContext,
@@ -65,7 +65,7 @@ class GlobalDependentComputation implements DataBasedComputation {
 }
 
 // 注册计算处理器
-ComputedDataHandle.Handles.set(GlobalDependentComputed, {
+ComputationHandle.Handles.set(GlobalDependentComputed, {
   property: GlobalDependentComputation
 })
 
@@ -79,7 +79,7 @@ describe('Global data dependency', () => {
         Property.create({
           name: 'adjustedScore',
           type: 'number',
-          computedData: GlobalDependentComputed.create({
+          computation: GlobalDependentComputed.create({
             globalKey: 'globalMultiplier',
             multiplier: 2
           })
@@ -185,7 +185,7 @@ describe('Global data dependency', () => {
       }
     }
     
-    ComputedDataHandle.Handles.set(MultiGlobalComputed, {
+    ComputationHandle.Handles.set(MultiGlobalComputed, {
       property: MultiGlobalComputation
     });
     
@@ -198,7 +198,7 @@ describe('Global data dependency', () => {
         Property.create({
           name: 'finalPrice',
           type: 'number',
-          computedData: MultiGlobalComputed.create({})
+          computation: MultiGlobalComputed.create({})
         })
       ]
     });

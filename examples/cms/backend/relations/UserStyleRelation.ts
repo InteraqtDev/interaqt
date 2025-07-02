@@ -10,7 +10,7 @@ export const UserStyleRelation = Relation.create({
   targetProperty: 'createdBy',
   type: '1:n',
   properties: [],
-  computedData: Transform.create({
+  computation: Transform.create({
     record: InteractionEventEntity,
     callback: function(interactionEvent) {
       if (interactionEvent.interactionName === 'CreateStyle') {

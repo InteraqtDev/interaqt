@@ -36,7 +36,7 @@ const User = Entity.create({
   properties: [
     Property.create({
       name: 'postCount',
-      computedData: Count.create({
+      computation: Count.create({
         record: UserPostRelation
       })
     })
@@ -48,7 +48,7 @@ const Tag = Entity.create({
   properties: [
     Property.create({
       name: 'hotness',
-      computedData: Count.create({
+      computation: Count.create({
         record: PostTagRelation
       })
     })
@@ -57,7 +57,7 @@ const Tag = Entity.create({
 
 // 3. Follower notifications "are" a Transform of follow relationships
 const Notification = Entity.create({
-  computedData: Transform.create({
+  computation: Transform.create({
     record: InteractionEventEntity,  // Listen to all interaction events
     callback: (event) => {
       if (event.interactionName === 'CreatePost') {
@@ -129,7 +129,7 @@ const Post = Entity.create({
   properties: [
     Property.create({
       name: 'likeCount',
-      computedData: Count.create({
+      computation: Count.create({
         record: LikeRelation  // Like count "is" the number of like relationships
       })
     })
@@ -151,7 +151,7 @@ const LikePost = Interaction.create({
 const LikeRelation = Relation.create({
   source: User,
   target: Post,
-  computedData: Transform.create({
+  computation: Transform.create({
     record: InteractionEventEntity,
     callback: (event) => {
       if (event.interactionName === 'LikePost') {
@@ -213,7 +213,7 @@ const Product = Entity.create({
     Property.create({ name: 'initialStock', type: 'number' }),
     Property.create({
       name: 'currentStock',
-      computedData: WeightedSummation.create({
+      computation: WeightedSummation.create({
         record: OrderItemRelation,
         callback: (orderItem) => ({
           weight: -1,  // Reduce inventory
@@ -223,7 +223,7 @@ const Product = Entity.create({
     }),
     Property.create({
       name: 'totalSales',
-      computedData: WeightedSummation.create({
+      computation: WeightedSummation.create({
         record: OrderItemRelation,
         callback: (orderItem) => ({
           weight: 1,
@@ -239,7 +239,7 @@ const User = Entity.create({
   properties: [
     Property.create({
       name: 'orderCount',
-      computedData: Count.create({
+      computation: Count.create({
         record: UserOrderRelation
       })
     })
@@ -262,7 +262,7 @@ const PlaceOrder = Interaction.create({
 const UserOrderRelation = Relation.create({
   source: User,
   target: Order,
-  computedData: Transform.create({
+  computation: Transform.create({
     record: InteractionEventEntity,
     callback: (event) => {
       if (event.interactionName === 'PlaceOrder') {

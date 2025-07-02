@@ -1,9 +1,9 @@
 import { Controller } from "./Controller.js";
-import { DataContext, ComputedDataHandle, PropertyDataContext, EntityDataContext, RelationDataContext } from "./computedDataHandles/ComputedDataHandle.js";
+import { DataContext, ComputationHandle, PropertyDataContext, EntityDataContext, RelationDataContext } from "./computationHandles/ComputationHandle.js";
 
 import { Entity, Klass, KlassInstance, Property, Relation } from "@shared";
 import { assert } from "./util.js";
-import { Computation, ComputationClass, ComputationResult, ComputationResultAsync, ComputationResultFullRecompute, ComputationResultResolved, ComputationResultSkip, DataBasedComputation, EventBasedComputation, GlobalBoundState, RecordBoundState, RecordsDataDep } from "./computedDataHandles/Computation.js";
+import { Computation, ComputationClass, ComputationResult, ComputationResultAsync, ComputationResultFullRecompute, ComputationResultResolved, ComputationResultSkip, DataBasedComputation, EventBasedComputation, GlobalBoundState, RecordBoundState, RecordsDataDep } from "./computationHandles/Computation.js";
 import { DICTIONARY_RECORD, RecordMutationEvent, SYSTEM_RECORD } from "./System.js";
 import { AttributeQueryData, MatchExp } from "@storage";
 import {
@@ -24,14 +24,14 @@ export class Scheduler {
         this.sourceMapManager = new ComputationSourceMapManager(this.controller)
         const computationInputs: {dataContext: DataContext, args: KlassInstance<any>}[] = []
         entities.forEach(entity => {
-            if (entity.computedData) {
-                computationInputs.push({dataContext: {type: 'entity',id: entity},args: entity.computedData})
+                    if (entity.computation) {
+            computationInputs.push({dataContext: {type: 'entity',id: entity},args: entity.computation})
             }
 
             // property 的
             entity.properties?.forEach(property => {
-                if (property.computedData) {
-                    computationInputs.push({dataContext: {type: 'property',host: entity,id: property},args: property.computedData})
+                            if (property.computation) {
+                computationInputs.push({dataContext: {type: 'property',host: entity,id: property},args: property.computation})
                 }
             })
         })
@@ -39,22 +39,22 @@ export class Scheduler {
         // relation 的
         relations.forEach(relation => {
             const relationAny = relation as any;
-            if(relationAny.computedData) {
-                computationInputs.push({dataContext: {type: 'relation',id: relation},args: relationAny.computedData})
+            if(relationAny.computation) {
+                computationInputs.push({dataContext: {type: 'relation',id: relation},args: relationAny.computation})
             }
 
             if (relationAny.properties) {
                 relationAny.properties.forEach((property: any) => {
-                    if (property.computedData) {
-                        computationInputs.push({dataContext: {type: 'property',host: relation,id: property},args: property.computedData})
+                                    if (property.computation) {
+                    computationInputs.push({dataContext: {type: 'property',host: relation,id: property},args: property.computation})
                     }
                 })
             }
         })
 
         dict.forEach(dictItem => {
-            if (dictItem.computedData) {
-                computationInputs.push({dataContext: {type: 'global',id: dictItem.name},args: dictItem.computedData})
+            if (dictItem.computation) {
+                computationInputs.push({dataContext: {type: 'global',id: dictItem.name},args: dictItem.computation})
             }
         })
 
@@ -62,7 +62,7 @@ export class Scheduler {
         for(const computationInput of computationInputs) {
             const dataContext = computationInput.dataContext
             const args = computationInput.args
-            const handles = ComputedDataHandle.Handles
+            const handles = ComputationHandle.Handles
             const ComputationCtor = handles.get(args.constructor as Klass<any>)![dataContext.type]! as ComputationClass
             assert(!!ComputationCtor, `cannot find Computation handle for ${(args.constructor as any).displayName || (args.constructor as any).name}`)
             const computation = new ComputationCtor(this.controller, args, dataContext)

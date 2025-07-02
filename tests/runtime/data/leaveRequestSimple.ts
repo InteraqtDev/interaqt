@@ -110,7 +110,7 @@ const sendRequestRelation = Relation.create({
     target: UserEntity,
     targetProperty: 'request',
     type: 'n:1',
-    computedData: Transform.create({
+    computation: Transform.create({
         record: InteractionEventEntity,
         callback: function map(event: any) {
             if (event.interactionName === createInteraction.name) {
@@ -133,7 +133,7 @@ const reviewerRelation = Relation.create({
     targetProperty: 'request',
     type: 'n:n',
     // TODO 改 interaction，没有 mapInteractionItem 了
-    computedData: Transform.create({
+    computation: Transform.create({
         record: createInteraction,
         callback: async function map(this: Controller, event: any) {
             const {BoolExp} = this.globals
@@ -173,7 +173,7 @@ const reviewerRelation = Relation.create({
             type: 'string',
             collection: false,
             // TODO 改 statemachine
-            computedData: Transform.create({
+            computation: Transform.create({
                 // FIXME
                 record: approveInteraction,
                 map: () => 'approved',
@@ -195,7 +195,7 @@ RequestEntity.properties.push(
         name: 'approved',
         type: 'boolean',
         collection: false,
-        computedData: Every.create({
+        computation: Every.create({
             record: reviewerRelation,
             notEmpty: true,
             callback:(relation) => {
@@ -207,7 +207,7 @@ RequestEntity.properties.push(
         name: 'rejected',
         type: 'boolean',
         collection: false,
-        computedData: Any.create({
+        computation: Any.create({
             record: reviewerRelation,
             callback: (relation) => {
                 return relation.result === 'rejected'
@@ -240,7 +240,7 @@ UserEntity.properties.push(
         name: 'pendingRequestCount',
         type: 'number',
         collection: false,
-        computedData: pendingRequestCount
+        computation: pendingRequestCount
     })
 )
 
@@ -250,7 +250,7 @@ UserEntity.properties.push(
         name: 'pendingSubRequestCount',
         type: 'number',
         collection: false,
-        computedData: Count.create({
+        computation: Count.create({
             relation: reviewerRelation,
             relationDirection: 'target',
             match: function (request, relation) {

@@ -54,7 +54,7 @@ export const Action = createClass({
 
 正确的做法是：
 - Action 只是交互动作的名字标识
-- 实际的数据变化通过 Relation 和 Property 的 `computedData` 来声明式地定义
+- 实际的数据变化通过 Relation 和 Property 的 `computation` 来声明式地定义
 - 使用 `Transform.create()` 来监听交互事件并创建关系或更新数据
 
 ### 错误2的原因分析：生成的项目跑不起来
@@ -81,7 +81,7 @@ export const Action = createClass({
 
 1. **修正文档错误**：
    - 更新 `05-interactions.md` 中的所有示例，移除 Action 中的 `operation` 数组
-   - 增加正确的示例，展示如何使用 `Transform` 和 `computedData` 来处理数据变化
+   - 增加正确的示例，展示如何使用 `Transform` 和 `computation` 来处理数据变化
 
 2. **完善示例指导**：
    - 在 `examples.md` 中明确说明系统的业务边界

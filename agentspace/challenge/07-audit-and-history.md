@@ -32,7 +32,7 @@ const User = Entity.create({
   properties: [
     Property.create({
       name: 'accountBalance',
-      computedData: WeightedSummation.create({
+      computation: WeightedSummation.create({
         record: TransactionRelation,
         callback: (transaction) => ({
           weight: 1,
@@ -56,7 +56,7 @@ const Product = Entity.create({
   properties: [
     Property.create({
       name: 'currentPrice',
-      computedData: Transform.create({
+      computation: Transform.create({
         record: PriceUpdateEvent,
         callback: (priceEvents) => {
           // ❌ 问题：
@@ -82,7 +82,7 @@ const User = Entity.create({
   properties: [
     Property.create({
       name: 'vipLevel',
-      computedData: Transform.create({
+      computation: Transform.create({
         record: UserOrderRelation,
         callback: (orders) => {
           // ❌ 问题：
@@ -205,7 +205,7 @@ const PriceHistory = Entity.create({
 // 假设的时间版本支持
 Property.create({
   name: 'accountBalance',
-  computedData: TemporalComputation.create({
+  computation: TemporalComputation.create({
     record: TransactionRelation,
     timeField: 'timestamp',
     computation: WeightedSummation.create({
@@ -234,7 +234,7 @@ const balanceAt2023 = await system.getPropertyAt(
 // 假设的审计支持
 const AuditableProperty = Property.create({
   name: 'vipLevel',
-  computedData: Transform.create({
+  computation: Transform.create({
     record: UserOrderRelation,
     callback: (orders) => calculateVipLevel(orders)
   }),
@@ -259,7 +259,7 @@ const AuditableProperty = Property.create({
 // 假设的不可变存储支持
 Property.create({
   name: 'medicalDiagnosis',
-  computedData: ImmutableTransform.create({
+  computation: ImmutableTransform.create({
     record: DiagnosisEvent,
     callback: (events) => generateDiagnosis(events),
     immutable: true,

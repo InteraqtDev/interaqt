@@ -189,7 +189,7 @@ export class PropertyCountHandle implements DataBasedComputation {
 
 ```typescript
 // 注册计算处理器
-ComputedDataHandle.Handles.set(Count, {
+ComputationHandle.Handles.set(Count, {
     global: GlobalCountHandle,
     property: PropertyCountHandle
 });
@@ -205,7 +205,7 @@ type HandlesForType = {
     property?: { new(...args: any[]): Computation },
 }
 
-export class ComputedDataHandle {
+export class ComputationHandle {
     public static Handles: Map<Klass<any>, HandlesForType> = new Map()
 }
 ```
@@ -304,7 +304,7 @@ export class GlobalAverageHandle implements DataBasedComputation {
 }
 
 // 注册计算处理器
-ComputedDataHandle.Handles.set(Average, {
+ComputationHandle.Handles.set(Average, {
     global: GlobalAverageHandle
 });
 ```

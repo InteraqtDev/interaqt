@@ -17,7 +17,7 @@ describe('Every and Any computed handle', () => {
             name: 'everyRequestHandled',
             type: 'boolean',
             collection: false,
-            computedData: Every.create({
+            computation: Every.create({
                 record: requestEntity,
                 attributeQuery: ['handled'],
                 callback: (request:any) => {
@@ -80,7 +80,7 @@ describe('Every and Any computed handle', () => {
             name: 'anyRequestHandled',
             type: 'boolean',
             collection: false,
-            computedData: Any.create({
+            computation: Any.create({
                 record: requestEntity,
                 attributeQuery: ['handled'],
                 callback: (request:any) => {
@@ -156,7 +156,7 @@ describe('Every and Any computed handle', () => {
     userEntity.properties.push(Property.create({
         name: 'anyRequestHandled', 
         type: 'boolean',
-        computedData: Any.create({
+        computation: Any.create({
             record: requestRelation,
             attributeQuery: [['target', {attributeQuery: ['handled']}]],
             callback: (relation:any) => {
@@ -241,7 +241,7 @@ describe('Every and Any computed handle', () => {
     userEntity.properties.push(Property.create({
         name: 'everyRequestHandled',
         type: 'boolean',
-        computedData: Every.create({
+        computation: Every.create({
             record: requestRelation,
             attributeQuery: [['target', {attributeQuery: ['handled']}]],
             notEmpty: true,
@@ -341,7 +341,7 @@ describe('Every and Any computed handle', () => {
     userEntity.properties.push(Property.create({
         name: 'everyRequestHasTwoItems',
         type: 'boolean',
-        computedData: Every.create({
+        computation: Every.create({
             record: requestRelation,
             attributeQuery: [['target', {attributeQuery: [['items', {attributeQuery: ['name']}]]}]],
             notEmpty: true,
@@ -400,7 +400,7 @@ describe('Every and Any computed handle', () => {
         name: 'isEveryUserAgeGreaterThanAgeLimit',
         type: 'boolean',
         collection: false,
-        computedData: Every.create({
+        computation: Every.create({
             record: userEntity,
             attributeQuery: ['age'],
             dataDeps: {
@@ -463,7 +463,7 @@ describe('Every and Any computed handle', () => {
         name: 'isAnyUserAgeGreaterThanAgeLimit',
         type: 'boolean',
         collection: false,
-        computedData: Any.create({
+        computation: Any.create({
             record: userEntity,
             attributeQuery: ['age'],
             dataDeps: {

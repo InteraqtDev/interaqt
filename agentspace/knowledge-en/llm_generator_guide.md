@@ -95,7 +95,7 @@ When using LLM to generate interaqt applications, you must follow **test-case dr
 
 2. **Test Coverage Requirements**:
    - All Interactions must have at least one success case and one failure case
-   - All properties with computedData must verify auto-calculation logic
+   - All properties with computation must verify auto-calculation logic
    - All permission controls must have positive and negative tests
 
 3. **Test Execution** (Strictly Follow):
@@ -124,7 +124,7 @@ Create `docs/` directory with:
 - [ ] All reactive computations trigger correctly
 - [ ] Permission control tests complete
 - [ ] All Interactions have success and failure cases
-- [ ] All computedData properties verify auto-calculation logic
+- [ ] All computation properties verify auto-calculation logic
 - [ ] test-cases.md document complete and consistent with code
 - [ ] interaction-matrix.md covers all user roles and operations
 - [ ] All relations have correct cascade behavior tests

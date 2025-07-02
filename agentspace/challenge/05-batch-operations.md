@@ -85,7 +85,7 @@ const ProductImport = Transform.create({
 // 例如：积分过期处理
 Property.create({
   name: 'activePoints',
-  computedData: Transform.create({
+  computation: Transform.create({
     record: UserPointsRelation,
     callback: (userPoints) => {
       // ❌ 问题：
@@ -109,7 +109,7 @@ const User = Entity.create({
   properties: [
     Property.create({
       name: 'vipLevel',
-      computedData: Transform.create({
+      computation: Transform.create({
         record: UserOrderRelation,
         callback: (orders) => {
           const totalSpent = orders.reduce((sum, order) => sum + order.amount, 0);

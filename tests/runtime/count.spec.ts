@@ -33,7 +33,7 @@ describe('Count computed handle', () => {
         name: 'productCount',
         type: 'number',
         collection: false,
-        computedData: Count.create({
+        computation: Count.create({
           record: productEntity
         })
       })
@@ -117,7 +117,7 @@ describe('Count computed handle', () => {
         name: 'taskCount',
         type: 'number',
         defaultValue: () => 0,
-        computedData: Count.create({
+        computation: Count.create({
           record: ownsTaskRelation
         })
       })
@@ -196,7 +196,7 @@ describe('Count computed handle', () => {
         name: 'taskCount',
         type: 'number',
         defaultValue: () => 0,
-        computedData: Count.create({
+        computation: Count.create({
           record: ownsTaskRelation
         })
       })
@@ -285,7 +285,7 @@ describe('Count computed handle', () => {
         name: 'groupCount',
         type: 'number',
         defaultValue: () => 0,
-        computedData: Count.create({
+        computation: Count.create({
           record: userGroupRelation
         })
       })
@@ -297,7 +297,7 @@ describe('Count computed handle', () => {
         name: 'memberCount',
         type: 'number',
         defaultValue: () => 0,
-        computedData: Count.create({
+        computation: Count.create({
           record: userGroupRelation
         })
       })
@@ -392,7 +392,7 @@ describe('Count computed handle', () => {
         name: 'bookCount',
         type: 'number',
         defaultValue: () => 0,
-        computedData: Count.create({
+        computation: Count.create({
           record: authorBookRelation
         })
       })
@@ -403,7 +403,7 @@ describe('Count computed handle', () => {
         name: 'authorCount',
         type: 'number',
         defaultValue: () => 0,
-        computedData: Count.create({
+        computation: Count.create({
           record: authorBookRelation
         })
       })
@@ -463,7 +463,7 @@ describe('Count computed handle', () => {
         name: 'completedOrderCount',
         type: 'number',
         collection: false,
-        computedData: Count.create({
+        computation: Count.create({
           record: orderEntity,
           attributeQuery: ['status'],
           callback: function(order) {
@@ -556,7 +556,7 @@ describe('Count computed handle', () => {
         name: 'highPriorityIssueCount',
         type: 'number',
         defaultValue: () => 0,
-        computedData: Count.create({
+        computation: Count.create({
           record: projectIssueRelation,
           attributeQuery: [['target', {attributeQuery: ['priority']}]],
           callback: function(relation) {
@@ -646,7 +646,7 @@ describe('Count computed handle', () => {
         name: 'vipPurchaseCount',
         type: 'number',
         defaultValue: () => 0,
-        computedData: Count.create({
+        computation: Count.create({
           record: customerPurchaseRelation,
           attributeQuery: [['target', {attributeQuery: ['amount']}]],
           callback: function(relation, dataDeps) {
@@ -710,7 +710,7 @@ describe('Count computed handle', () => {
         name: 'activeItemCount',
         type: 'number',
         collection: false,
-        computedData: Count.create({
+        computation: Count.create({
           record: itemEntity,
           callback: function(item) {
             return item.status === 'active';
@@ -785,7 +785,7 @@ describe('Count computed handle', () => {
         name: 'followerCount',
         type: 'number',
         defaultValue: () => 0,
-        computedData: Count.create({
+        computation: Count.create({
           record: followRelation,
           direction: 'target' // Count as target (being followed)
         })
@@ -794,7 +794,7 @@ describe('Count computed handle', () => {
         name: 'followingCount',
         type: 'number',
         defaultValue: () => 0,
-        computedData: Count.create({
+        computation: Count.create({
           record: followRelation,
           direction: 'source' // Count as source (following others)
         })

@@ -33,7 +33,7 @@ const User = Entity.create({
   properties: [
     Property.create({
       name: 'influenceScore',
-      computedData: Transform.create({
+      computation: Transform.create({
         record: FollowRelation,
         callback: (followRelations) => {
           // ❌ 问题：如何实现迭代计算？
@@ -63,7 +63,7 @@ const UserCommunity = Entity.create({
   properties: [
     Property.create({
       name: 'communityId',
-      computedData: Transform.create({
+      computation: Transform.create({
         record: User, // ❌ 这里就有问题了
         callback: (user) => {
           // ❌ 问题：
@@ -87,7 +87,7 @@ const User = Entity.create({
   properties: [
     Property.create({
       name: 'friendRecommendations',
-      computedData: Transform.create({
+      computation: Transform.create({
         record: FriendRelation,
         callback: (userFriends) => {
           // ❌ 问题：如何获取朋友的朋友？
@@ -116,7 +116,7 @@ const User = Entity.create({
   properties: [
     Property.create({
       name: 'influenceScore',
-      computedData: Transform.create({
+      computation: Transform.create({
         record: FollowRelation,
         callback: (follows, context) => {
           // ❌ 循环依赖问题：
@@ -189,7 +189,7 @@ const ItemRecommendation = Transform.create({
 // 用简单的统计指标替代复杂算法
 Property.create({
   name: 'simpleInfluence',
-  computedData: Count.create({
+  computation: Count.create({
     record: FollowRelation // 只计算粉丝数，忽略质量
   })
 });
@@ -231,7 +231,7 @@ const UserInfluence = GraphComputation.create({
 
 Property.create({
   name: 'influenceScore',
-  computedData: UserInfluence
+  computation: UserInfluence
 });
 ```
 
@@ -240,7 +240,7 @@ Property.create({
 // 假设的图查询支持
 Property.create({
   name: 'friendRecommendations',
-  computedData: GraphQuery.create({
+  computation: GraphQuery.create({
     query: `
       MATCH (user)-[:FRIEND]-(friend)-[:FRIEND]-(fof)
       WHERE NOT (user)-[:FRIEND]-(fof) AND user != fof
@@ -257,7 +257,7 @@ Property.create({
 // 假设的迭代计算支持
 Property.create({
   name: 'communityId',
-  computedData: IterativeComputation.create({
+  computation: IterativeComputation.create({
     algorithm: LouvainCommunityDetection,
     convergence: {
       maxIterations: 100,

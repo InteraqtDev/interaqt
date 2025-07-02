@@ -161,20 +161,20 @@ Scheduler 是响应式引擎的核心，负责：
 ```typescript
 // 从实体定义中发现计算
 entities.forEach(entity => {
-    if (entity.computedData) {
+    if (entity.computation) {
         // 实体级别的计算
         computationInputs.push({
             dataContext: {type: 'entity', id: entity},
-            args: entity.computedData
+            args: entity.computation
         })
     }
     
     // 属性级别的计算
     entity.properties?.forEach(property => {
-        if (property.computedData) {
+        if (property.computation) {
             computationInputs.push({
                 dataContext: {type: 'property', host: entity, id: property.name},
-                args: property.computedData
+                args: property.computation
             })
         }
     })
@@ -185,7 +185,7 @@ entities.forEach(entity => {
 ```typescript
 // 为每个计算建立依赖关系
 for(const computationInput of computationInputs) {
-    const ComputationCtor = ComputedDataHandle.Handles.get(args.constructor)![dataContext.type]
+    const ComputationCtor = ComputationHandle.Handles.get(args.constructor)![dataContext.type]
     const computation = new ComputationCtor(this.controller, args, dataContext)
     
     // 注册到调度器
@@ -466,7 +466,7 @@ const Entity = createClass({
     public: {
         name: { type: 'string', required: true },
         properties: { type: Property, collection: true, required: true },
-        computedData: { type: [], collection: false, required: false },
+        computation: { type: [], collection: false, required: false },
         // 过滤实体字段
         sourceEntity: { type: [Entity, Relation], collection: false, required: false },
         filterCondition: { type: 'object', collection: false, required: false }
@@ -482,7 +482,7 @@ const Property = createClass({
         collection: { type: 'boolean', required: false },
         defaultValue: { type: 'function', required: false },
         computed: { type: 'function', required: false },
-        computedData: { type: [], collection: false, required: false }
+        computation: { type: [], collection: false, required: false }
     }
 })
 

@@ -105,7 +105,7 @@ const PostEntity = Entity.create({
     Property.create({
       name: 'likeCount',
       type: 'number',
-      computedData: Count.create({
+      computation: Count.create({
         record: likeRelation // 引用点赞关系
       })
     })
@@ -181,7 +181,7 @@ const leaveRequestActivity = Activity.create({
 const reviewerRelation = Relation.create({
   source: RequestEntity,
   target: UserEntity,
-  computedData: MapInteractionToRecord.create({
+  computation: MapInteractionToRecord.create({
     sourceInteraction: createRequestInteraction,
     map: async function(event) {
       // 当创建请求时，自动建立请求与审批人的关系
@@ -202,7 +202,7 @@ const reviewerRelation = Relation.create({
 Property.create({
   name: 'status',
   type: 'string',
-  computedData: MapInteractionToProperty.create({
+  computation: MapInteractionToProperty.create({
     items: [
       MapInteractionToPropertyItem.create({
         interaction: approveInteraction,
@@ -267,7 +267,7 @@ UserEntity.properties.push(
   Property.create({
     name: 'friendCount',
     type: 'number',
-    computedData: Count.create({
+    computation: Count.create({
       record: friendRelation
     })
   })

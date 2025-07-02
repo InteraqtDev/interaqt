@@ -22,7 +22,7 @@ import {
 } from '@storage';
 import { SQLiteDB } from "./SQLite.js";
 import pino from "pino";
-import { RecordBoundState } from "./computedDataHandles/Computation.js";
+import { RecordBoundState } from "./computationHandles/Computation.js";
 
 function JSONStringify(value:any) {
     return encodeURI(JSON.stringify(value))

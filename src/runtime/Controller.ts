@@ -4,11 +4,11 @@ import {
     BoolExp, Dictionary, Entity,
     Interaction, KlassInstance, Relation
 } from "@shared";
-import './computedDataHandles/index.js';
+import './computationHandles/index.js';
 import { InteractionCallResponse } from "./InteractionCall.js";
 import { InteractionEventArgs } from "./InteractionCall.js";
-import { DataContext, EntityDataContext, PropertyDataContext, RelationDataContext } from "./computedDataHandles/ComputedDataHandle.js";
-import { ComputationResult, ComputationResultSkip, ComputationResultPatch } from "./computedDataHandles/Computation.js";
+import { DataContext, EntityDataContext, PropertyDataContext, RelationDataContext } from "./computationHandles/ComputationHandle.js";
+import { ComputationResult, ComputationResultSkip, ComputationResultPatch } from "./computationHandles/Computation.js";
 import { Scheduler } from "./Scheduler.js";
 import { MatchExp } from "@storage";
 import { ActivityManager } from "./ActivityManager.js";
@@ -44,7 +44,7 @@ export type InteractionContext = {
     [k: string]: any
 }
 
-export type ComputedDataType = 'global' | 'entity' | 'relation' | 'property'
+export type ComputationType = 'global' | 'entity' | 'relation' | 'property'
 
 export class Controller {
     // 因为很多 function 都会bind controller 作为 this，所以我们也把 controller 的 globals 作为注入全局工具的入口。

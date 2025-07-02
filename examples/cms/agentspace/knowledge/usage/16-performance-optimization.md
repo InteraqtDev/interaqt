@@ -54,7 +54,7 @@ const User = Entity.create({
       name: 'totalPostLikes',
       type: 'number',
       defaultValue: () => 0,
-      computedData: Count.create({
+      computation: Count.create({
         record: userPostRelation,  // User 1:n Post
         // Issue: accessing Post's likes through relationship path
         attributeQuery: [['target', { attributeQuery: ['likes'] }]]  // Post 1:n Like
@@ -97,7 +97,7 @@ const Post = Entity.create({
       name: 'likeCount',
       type: 'number',
       defaultValue: () => 0,
-      computedData: Count.create({
+      computation: Count.create({
         record: postLikeRelation  // Post 1:n Like, simple one-level relationship
       })
     })
@@ -112,7 +112,7 @@ const User = Entity.create({
       name: 'totalPostLikes',
       type: 'number',
       defaultValue: () => 0,
-      computedData: Summation.create({
+      computation: Summation.create({
         record: userPostRelation,  // User 1:n Post
         // Now only need to access Post's likeCount property (already pre-computed)
         attributeQuery: [['target', { attributeQuery: ['likeCount'] }]]
@@ -155,7 +155,7 @@ const OrderItem = Entity.create({
     Property.create({
       name: 'subtotal',
       type: 'number',
-      computedData: Transform.create({
+      computation: Transform.create({
         record: OrderItem,
         callback: (record) => record.quantity * record.unitPrice
       })
@@ -172,7 +172,7 @@ const Order = Entity.create({
       name: 'totalAmount',
       type: 'number',
       defaultValue: () => 0,
-      computedData: Summation.create({
+      computation: Summation.create({
         record: orderItemRelation,
         attributeQuery: [['target', { attributeQuery: ['subtotal'] }]]  // Reference pre-computed result
       })
@@ -189,7 +189,7 @@ const Order = Entity.create({
 // ❌ Avoid: Deep dependency paths
 Property.create({
   name: 'badMetric',
-  computedData: Count.create({
+  computation: Count.create({
     record: userRelation,
     // Issue: User → Posts → Comments → Likes (3 levels of x:n relationships)
     attributeQuery: [['target', { 
@@ -221,7 +221,7 @@ const User = Entity.create({
       name: 'allPostsPopular',
       type: 'boolean',
       defaultValue: () => false,
-      computedData: Every.create({
+      computation: Every.create({
         record: userPostRelation,
         // Use Post's pre-computed property
         attributeQuery: [['target', { attributeQuery: ['likeCount'] }]],
@@ -267,7 +267,7 @@ const problematicComputation = Count.create({
 MiddleEntity.properties.push(
   Property.create({
     name: 'nestedCount',
-    computedData: Count.create({
+    computation: Count.create({
       record: simpleRelation,
       attributeQuery: [['target', { attributeQuery: ['path'] }]]
     })

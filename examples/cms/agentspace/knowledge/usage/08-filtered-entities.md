@@ -50,7 +50,7 @@ const GlobalStats = Entity.create({
       name: 'publishedPostCount',
       type: 'number',
       defaultValue: () => 0,
-      computedData: Count.create({
+      computation: Count.create({
         record: PublishedPost
       })  // Automatically updates
     })
@@ -351,7 +351,7 @@ const User = Entity.create({
       name: 'publishedPostCount',
       type: 'number',
       defaultValue: () => 0,
-      computedData: Count.create({
+      computation: Count.create({
         record: UserPublishedPosts
       })
     }),
@@ -361,7 +361,7 @@ const User = Entity.create({
       name: 'popularPostCount',
       type: 'number',
       defaultValue: () => 0,
-      computedData: Count.create({
+      computation: Count.create({
         record: UserPopularPosts
       })
     }),
@@ -371,7 +371,7 @@ const User = Entity.create({
       name: 'totalViews',
       type: 'number',
       defaultValue: () => 0,
-      computedData: WeightedSummation.create({
+      computation: WeightedSummation.create({
         record: UserPublishedPosts,
         callback: (relation) => ({
           weight: 1,
@@ -385,7 +385,7 @@ const User = Entity.create({
       name: 'isActiveAuthor',
       type: 'boolean',
       defaultValue: () => false,
-      computedData: Transform.create({
+      computation: Transform.create({
         record: UserRecentPosts,
         callback: (recentPosts) => recentPosts.length >= 3  // Has 3 or more recent posts
       })
@@ -405,7 +405,7 @@ const GlobalStats = Entity.create({
       name: 'totalPublishedPosts',
       type: 'number',
       defaultValue: () => 0,
-      computedData: Count.create({
+      computation: Count.create({
         record: PublishedPost
       })
     }),
@@ -414,7 +414,7 @@ const GlobalStats = Entity.create({
       name: 'totalPopularPosts',
       type: 'number',
       defaultValue: () => 0,
-      computedData: Count.create({
+      computation: Count.create({
         record: PopularPost
       })
     }),
@@ -423,7 +423,7 @@ const GlobalStats = Entity.create({
       name: 'totalTechPosts',
       type: 'number',
       defaultValue: () => 0,
-      computedData: Count.create({
+      computation: Count.create({
         record: TechPost
       })
     }),
@@ -433,7 +433,7 @@ const GlobalStats = Entity.create({
       name: 'activeUserCount',
       type: 'number',
       defaultValue: () => 0,
-      computedData: Count.create({
+      computation: Count.create({
         record: ActiveUser
       })
     }),
@@ -442,7 +442,7 @@ const GlobalStats = Entity.create({
       name: 'authorCount',
       type: 'number',
       defaultValue: () => 0,
-      computedData: Count.create({
+      computation: Count.create({
         record: AuthorUser
       })
     }),
@@ -452,7 +452,7 @@ const GlobalStats = Entity.create({
       name: 'averageViewsPerPost',
       type: 'number',
       defaultValue: () => 0,
-      computedData: Transform.create({
+      computation: Transform.create({
         record: PublishedPost,
         callback: (posts) => {
           if (posts.length === 0) return 0;

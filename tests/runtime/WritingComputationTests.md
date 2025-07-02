@@ -51,7 +51,7 @@ const dictionary = [
     name: 'totalValue',
     type: 'number',
     collection: false,
-    computedData: WeightedSummation.create({
+    computation: WeightedSummation.create({
       record: productEntity,
       attributeQuery: ['price', 'quantity'],
       callback: (product: any) => {
@@ -69,7 +69,7 @@ userEntity.properties.push(
   Property.create({
     name: 'everyRequestHandled',
     type: 'boolean',
-    computedData: Every.create({
+    computation: Every.create({
       record: requestRelation,
       attributeQuery: ['handled'],
       notEmpty: true,

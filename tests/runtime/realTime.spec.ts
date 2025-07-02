@@ -1,6 +1,6 @@
 import { describe, expect, test, beforeAll } from "vitest";
 import { Controller, MonoSystem, Property, Entity, RealTime, Dictionary, BoolExp, DICTIONARY_RECORD } from 'interaqt';
-import { Expression } from '../../src/runtime/computedDataHandles/MathResolver';
+import { Expression } from '../../src/runtime/computationHandles/MathResolver';
 
 describe('RealTime computed handle', () => {
   
@@ -17,7 +17,7 @@ describe('RealTime computed handle', () => {
       Dictionary.create({
         name: 'currentTimestamp',
         type: 'number',
-        computedData: RealTime.create({
+        computation: RealTime.create({
           nextRecomputeTime: (now: number, dataDeps: any) => 1000, // 1 second interval
           dataDeps: {
             config: {
@@ -88,7 +88,7 @@ describe('RealTime computed handle', () => {
       Dictionary.create({
         name: 'isTimeExpired',
         type: 'boolean',
-        computedData: RealTime.create({
+        computation: RealTime.create({
           nextRecomputeTime: (now: number, dataDeps: any) => 1000, // 1 second interval
           dataDeps: {
             config: {
@@ -159,7 +159,7 @@ describe('RealTime computed handle', () => {
       Dictionary.create({
         name: 'isExactMinute',
         type: 'boolean',
-        computedData: RealTime.create({
+        computation: RealTime.create({
           nextRecomputeTime: (now: number, dataDeps: any) => 1000, // 1 second interval
           dataDeps: {
             config: {
@@ -232,7 +232,7 @@ describe('RealTime computed handle', () => {
       Property.create({
         name: 'currentTimeSeconds',
         type: 'number',
-        computedData: RealTime.create({
+        computation: RealTime.create({
           nextRecomputeTime: (now: number, dataDeps: any) => 1000, // 1 second interval
           attributeQuery: ['triggerField'], // Depend on triggerField to trigger computation
           callback: async (now: Expression, dataDeps: any) => {
@@ -304,7 +304,7 @@ describe('RealTime computed handle', () => {
       Dictionary.create({
         name: 'complexTimeValue',
         type: 'number',
-        computedData: RealTime.create({
+        computation: RealTime.create({
           nextRecomputeTime: (now: number, dataDeps: any) => 1000, // 1 second interval
           dataDeps: {
             config: {
@@ -380,7 +380,7 @@ describe('RealTime computed handle', () => {
       Dictionary.create({
         name: 'scaledTimestamp',
         type: 'number',
-        computedData: RealTime.create({
+        computation: RealTime.create({
           nextRecomputeTime: (now: number, dataDeps: any) => 1000, // 1 second interval
           dataDeps: {
             config: {
@@ -454,7 +454,7 @@ describe('RealTime computed handle', () => {
       Dictionary.create({
         name: 'isBusinessHours',
         type: 'boolean',
-        computedData: RealTime.create({
+        computation: RealTime.create({
           nextRecomputeTime: (now: number, dataDeps: any) => 60000, // Check every minute
           dataDeps: {
             config: {
@@ -534,7 +534,7 @@ describe('RealTime computed handle', () => {
       Property.create({
         name: 'isRecentlyActive',
         type: 'boolean',
-        computedData: RealTime.create({
+        computation: RealTime.create({
           dataDeps: {
             _current: {
               type: 'property',
@@ -631,7 +631,7 @@ describe('RealTime computed handle', () => {
       Dictionary.create({
         name: 'timeBasedCounter',
         type: 'number',
-        computedData: RealTime.create({
+        computation: RealTime.create({
           nextRecomputeTime: (now: number, dataDeps: any) => 1000, // 1 second interval
           dataDeps: {
             config: {

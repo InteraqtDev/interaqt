@@ -62,7 +62,7 @@ const CreatePost = Interaction.create({
 
 // ✅ Correct: Declare data existence through reactive computations
 const UserPostRelation = Relation.create({
-  computedData: Transform.create({
+  computation: Transform.create({
     record: InteractionEventEntity,
     callback: (event) => {
       if (event.interactionName === 'CreatePost') {
@@ -84,7 +84,7 @@ const UserPostRelation = Relation.create({
 
 Property.create({
   name: 'postCount',
-  computedData: Count.create({
+  computation: Count.create({
     record: UserPostRelation
   })
 });

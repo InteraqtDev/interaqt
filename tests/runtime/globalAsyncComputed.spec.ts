@@ -4,7 +4,7 @@ import {
   Entity,
   MonoSystem,
   Property,
-  ComputedDataHandle,
+  ComputationHandle,
   createClass,
   MatchExp,
   DataDep,
@@ -62,7 +62,7 @@ class GlobalWeatherComputation implements DataBasedComputation {
 }
 
 // 注册全局计算处理器
-ComputedDataHandle.Handles.set(GlobalWeatherComputed, {
+ComputationHandle.Handles.set(GlobalWeatherComputed, {
   global: GlobalWeatherComputation
 })
 
@@ -131,7 +131,7 @@ describe('Global async computed', () => {
       }
     }
     
-    ComputedDataHandle.Handles.set(GlobalStatsComputed, {
+    ComputationHandle.Handles.set(GlobalStatsComputed, {
       global: GlobalStatsComputation
     });
     
@@ -143,7 +143,7 @@ describe('Global async computed', () => {
         name: 'productStats',
         type: 'object',
         collection: false,
-        computedData: GlobalStatsComputed.create({
+        computation: GlobalStatsComputed.create({
           entityName: 'Product'
         })
       })

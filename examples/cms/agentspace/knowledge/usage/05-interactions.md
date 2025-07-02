@@ -100,7 +100,7 @@ const CreatePost = Interaction.create({
       PayloadItem.create({ name: 'authorId', base: User, isRef: true })
     ]
   })
-  // Data changes are declaratively defined through Relation or Property computedData
+  // Data changes are declaratively defined through Relation or Property computation
 });
 ```
 
@@ -153,7 +153,7 @@ const CreateArticle = Interaction.create({
 // 2. Use Transform to listen to interaction events and create entities
 import { Transform, InteractionEventEntity } from 'interaqt';
 
-// When defining Article entity, use Transform in computedData to create entities reactively
+// When defining Article entity, use Transform in computation to create entities reactively
 const Article = Entity.create({
   name: 'Article',
   properties: [
@@ -162,8 +162,8 @@ const Article = Entity.create({
     Property.create({ name: 'status', type: 'string', defaultValue: () => 'draft' }),
     Property.create({ name: 'createdAt', type: 'string' })
   ],
-  // Transform in Entity's computedData creates entities from interactions
-  computedData: Transform.create({
+  // Transform in Entity's computation creates entities from interactions
+  computation: Transform.create({
     record: InteractionEventEntity,
     callback: function(event) {
       if (event.interactionName === 'CreateArticle') {
@@ -208,7 +208,7 @@ const UpdateUserProfile = Interaction.create({
 });
 
 // 2. Use Transform or StateMachine to respond to interactions and update data
-// This is usually defined in Property's computedData
+// This is usually defined in Property's computation
 ```
 
 ## Defining Interaction Parameters (Payload)
@@ -285,14 +285,14 @@ const CreateComment = Interaction.create({
   })
 });
 
-// Comment entity with Transform in computedData for reactive creation
+// Comment entity with Transform in computation for reactive creation
 const Comment = Entity.create({
   name: 'Comment',
   properties: [
     Property.create({ name: 'content', type: 'string' }),
     Property.create({ name: 'createdAt', type: 'string' })
   ],
-  computedData: Transform.create({
+  computation: Transform.create({
     record: InteractionEventEntity,
     callback: function(event) {
       if (event.interactionName === 'CreateComment') {
@@ -308,7 +308,7 @@ const Comment = Entity.create({
   })
 });
 
-// Relations are defined normally without computedData for creation
+// Relations are defined normally without computation for creation
 const CommentAuthorRelation = Relation.create({
   source: Comment,
   sourceProperty: 'author',
@@ -447,7 +447,7 @@ const CreatePost = Interaction.create({
 const UserPostRelation = Relation.create({
   source: User,
   target: Post,
-  computedData: Transform.create({
+  computation: Transform.create({
     record: InteractionEventEntity,  // Listen to all interaction events
     callback: (event) => {
       if (event.interactionName === 'CreatePost') {
@@ -470,7 +470,7 @@ const User = Entity.create({
   properties: [
     Property.create({
       name: 'postCount',
-      computedData: Count.create({
+      computation: Count.create({
         record: UserPostRelation
       })
     })
@@ -504,7 +504,7 @@ const CreateBlogPost = Interaction.create({
   })
 });
 
-// 2. Create blog posts through Entity's computedData
+// 2. Create blog posts through Entity's computation
 const Post = Entity.create({
   name: 'Post',
   properties: [
@@ -514,7 +514,7 @@ const Post = Entity.create({
     Property.create({ name: 'createdAt', type: 'string' }),
     Property.create({ name: 'slug', type: 'string' })
   ],
-  computedData: Transform.create({
+  computation: Transform.create({
     record: InteractionEventEntity,
     callback: function(event) {
       if (event.interactionName === 'CreateBlogPost') {
@@ -533,7 +533,7 @@ const Post = Entity.create({
   })
 });
 
-// 3. Define relation (no computedData needed for creation)
+// 3. Define relation (no computation needed for creation)
 const UserPostRelation = Relation.create({
   source: Post,
   sourceProperty: 'author',
@@ -549,7 +549,7 @@ const User = Entity.create({
     Property.create({
       name: 'postCount',
       type: 'number',
-      computedData: Count.create({
+      computation: Count.create({
         record: UserPostRelation,
         direction: 'target'
       })
@@ -582,7 +582,7 @@ const User = Entity.create({
     Property.create({
       name: 'name',
       type: 'string',
-      computedData: Transform.create({
+      computation: Transform.create({
         record: InteractionEventEntity,
         callback: function(event) {
           if (event.interactionName === 'UpdateUserProfile' && 
@@ -597,7 +597,7 @@ const User = Entity.create({
     Property.create({
       name: 'bio',
       type: 'string',
-      computedData: Transform.create({
+      computation: Transform.create({
         record: InteractionEventEntity,
         callback: function(event) {
           if (event.interactionName === 'UpdateUserProfile' && 
@@ -637,7 +637,7 @@ const Post = Entity.create({
       name: 'status',
       type: 'string',
       defaultValue: () => 'draft',
-      computedData: StateMachine.create({
+      computation: StateMachine.create({
         states: ['draft', 'published', 'deleted'],
         initialState: 'draft',
         transitions: [
@@ -698,7 +698,7 @@ const Order = Entity.create({
     Property.create({
       name: 'status',
       type: 'string',
-      computedData: StateMachine.create({
+      computation: StateMachine.create({
         states: ['pending', 'confirmed', 'shipped', 'delivered', 'cancelled'],
         initialState: 'pending',
         transitions: [
@@ -712,7 +712,7 @@ const Order = Entity.create({
     Property.create({
       name: 'totalAmount',
       type: 'number',
-      computedData: Transform.create({
+      computation: Transform.create({
         record: InteractionEventEntity,
         callback: function(event) {
           if (event.interactionName === 'SubmitOrder') {
@@ -724,7 +724,7 @@ const Order = Entity.create({
       })
     })
   ],
-  computedData: Transform.create({
+  computation: Transform.create({
     record: InteractionEventEntity,
     callback: function(event) {
       if (event.interactionName === 'SubmitOrder') {
@@ -765,7 +765,7 @@ const Review = Entity.create({
     Property.create({
       name: 'status',
       type: 'string',
-      computedData: Transform.create({
+      computation: Transform.create({
         record: InteractionEventEntity,
         dataDeps: {
           user: {
@@ -794,7 +794,7 @@ const Review = Entity.create({
       })
     })
   ],
-  computedData: Transform.create({
+  computation: Transform.create({
     record: InteractionEventEntity,
     callback: function(event) {
       if (event.interactionName === 'SubmitReview') {
@@ -918,7 +918,7 @@ const LikeRelation = Relation.create({
       type: 'string'
     })
   ],
-  computedData: Transform.create({
+  computation: Transform.create({
     record: InteractionEventEntity,
     callback: function(event) {
       if (event.interactionName === 'LikePost') {
@@ -940,7 +940,7 @@ const Post = Entity.create({
     Property.create({
       name: 'likeCount',
       type: 'number',
-      computedData: Count.create({
+      computation: Count.create({
         relation: LikeRelation,
         relationDirection: 'target'
       })
@@ -1014,7 +1014,7 @@ const Order = Entity.create({
     Property.create({
       name: 'status',
       type: 'string',
-      computedData: OrderStateMachine
+      computation: OrderStateMachine
     }),
     // Calculate other properties based on state
     Property.create({
@@ -1027,7 +1027,7 @@ const Order = Entity.create({
     Property.create({
       name: 'paymentInfo',
       type: 'object',
-      computedData: Transform.create({
+      computation: Transform.create({
         record: InteractionEventEntity,
         callback: function(event) {
           if (event.interactionName === 'PayOrder' && event.payload.orderId === this.id) {
@@ -1153,7 +1153,7 @@ const Order = Entity.create({
     Property.create({
       name: 'isValid',
       type: 'boolean',
-      computedData: Every.create({
+      computation: Every.create({
         record: OrderItemRelation,
         relationDirection: 'source',
         callback: function(orderItem) {
@@ -1261,7 +1261,7 @@ const CreatePost = Interaction.create({
 // Data changes automatically handled through reactive definitions
 const UserPostRelation = Relation.create({
   // ... relation definition
-  computedData: Transform.create({
+  computation: Transform.create({
     record: InteractionEventEntity,
     callback: function(event) {
       if (event.interactionName === 'CreatePost') {
@@ -1279,7 +1279,7 @@ const User = Entity.create({
     Property.create({
       name: 'postCount',
       type: 'number',
-      computedData: Count.create({
+      computation: Count.create({
         relation: UserPostRelation,
         relationDirection: 'target'
       })

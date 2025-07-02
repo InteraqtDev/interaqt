@@ -39,6 +39,6 @@ type HandlesForType = {
     property?: { new(...args: any[]): Computation },
 }
 
-export class ComputedDataHandle {
+export class ComputationHandle {
     public static  Handles: Map<Klass<any>,  HandlesForType> = new Map()
 }

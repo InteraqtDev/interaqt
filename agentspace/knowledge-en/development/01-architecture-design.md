@@ -177,20 +177,20 @@ Scheduler is the core of the reactive engine, responsible for:
 ```typescript
 // Discover computations from entity definitions
 entities.forEach(entity => {
-    if (entity.computedData) {
+    if (entity.computation) {
         // Entity-level computations
         computationInputs.push({
             dataContext: {type: 'entity', id: entity},
-            args: entity.computedData
+            args: entity.computation
         })
     }
     
     // Property-level computations
     entity.properties?.forEach(property => {
-        if (property.computedData) {
+        if (property.computation) {
             computationInputs.push({
                 dataContext: {type: 'property', host: entity, id: property.name},
-                args: property.computedData
+                args: property.computation
             })
         }
     })
@@ -201,7 +201,7 @@ entities.forEach(entity => {
 ```typescript
 // Establish dependency relationships for each computation
 for(const computationInput of computationInputs) {
-    const ComputationCtor = ComputedDataHandle.Handles.get(args.constructor)![dataContext.type]
+    const ComputationCtor = ComputationHandle.Handles.get(args.constructor)![dataContext.type]
     const computation = new ComputationCtor(this.controller, args, dataContext)
     
     // Register with scheduler
@@ -482,7 +482,7 @@ const Entity = createClass({
     public: {
         name: { type: 'string', required: true },
         properties: { type: Property, collection: true, required: true },
-        computedData: { type: [], collection: false, required: false },
+        computation: { type: [], collection: false, required: false },
         // Filtered entity fields
         sourceEntity: { type: [Entity, Relation], collection: false, required: false },
         filterCondition: { type: 'object', collection: false, required: false }
@@ -498,7 +498,7 @@ const Property = createClass({
         collection: { type: 'boolean', required: false },
         defaultValue: { type: 'function', required: false },
         computed: { type: 'function', required: false },
-        computedData: { type: [], collection: false, required: false }
+        computation: { type: [], collection: false, required: false }
     }
 })
 

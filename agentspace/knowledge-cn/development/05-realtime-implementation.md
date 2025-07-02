@@ -62,7 +62,7 @@ interface RealTimeState {
 状态持久化基于 interaqt 的响应式存储系统：
 
 ```typescript
-// src/runtime/computedDataHandles/RealTime.ts (核心逻辑)
+// src/runtime/computationHandles/RealTime.ts (核心逻辑)
 export class RealTimeComputation implements DataBasedComputation {
   state: {
     lastRecomputeTime: PropertyDataDep;

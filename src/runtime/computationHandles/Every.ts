@@ -1,8 +1,8 @@
-import { ComputedDataHandle, PropertyDataContext } from "./ComputedDataHandle.js";
+import { ComputationHandle, PropertyDataContext } from "./ComputationHandle.js";
 import { Every, KlassInstance, Relation } from "@shared";
 import { ComputationResult, DataBasedComputation, DataDep, GlobalBoundState, RecordBoundState, RecordsDataDep } from "./Computation.js";
 import { Controller } from "../Controller.js";
-import { DataContext } from "./ComputedDataHandle.js";
+import { DataContext } from "./ComputationHandle.js";
 import { EtityMutationEvent } from "../Scheduler.js";
 import { AttributeQueryData, MatchExp } from "@storage";
 import { assert } from "../util.js";
@@ -219,7 +219,7 @@ export class PropertyEveryHandle implements DataBasedComputation {
 
 
 
-ComputedDataHandle.Handles.set(Every, {
+ComputationHandle.Handles.set(Every, {
     global: GlobalEveryHandle,
     property: PropertyEveryHandle
 })

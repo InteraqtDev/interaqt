@@ -37,7 +37,7 @@ const Post = Entity.create({
     Property.create({
       name: 'likeCount',
       // 声明：点赞数"就是"点赞关系的数量
-      computedData: Count.create({ record: LikeRelation })
+      computation: Count.create({ record: LikeRelation })
     })
   ]
 });
@@ -154,7 +154,7 @@ const CreatePost = Interaction.create({
 
 ### 3. 测试要求
 - 所有 Interaction 必须有测试
-- 所有带 computedData 的属性必须有测试
+- 所有带 computation 的属性必须有测试
 - 使用 vitest 编写测试
 
 ## 常见模式
@@ -163,7 +163,7 @@ const CreatePost = Interaction.create({
 ```typescript
 Property.create({
   name: 'followerCount',
-  computedData: Count.create({
+  computation: Count.create({
     record: Relation.create({ source: '*', target: User })
   })
 })
@@ -173,7 +173,7 @@ Property.create({
 ```typescript
 Property.create({
   name: 'status',
-  computedData: StateMachine.create({
+  computation: StateMachine.create({
     states: ['pending', 'approved', 'rejected'],
     default: 'pending',
     transitions: [

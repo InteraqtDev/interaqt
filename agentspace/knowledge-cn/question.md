@@ -109,7 +109,7 @@ User.properties.push(
     name: 'currentMonthLeaveCount',
     type: 'number',
     defaultValue: () => 0,
-    computedData: Count.create({
+    computation: Count.create({
       record: UserLeaveRelation,
       attributeQuery: [['target', { attributeQuery: ['createdAt', 'status'] }]],
       callback: function(relation) {
@@ -176,7 +176,7 @@ class MemoGenerationComputation implements DataBasedComputation {
 }
 
 // 注册计算处理器
-ComputedDataHandle.Handles.set(MemoGenerationComputed, {
+ComputationHandle.Handles.set(MemoGenerationComputed, {
   global: MemoGenerationComputation
 });
 
@@ -185,7 +185,7 @@ const directorMemos = Dictionary.create({
   name: 'directorMemos',
   type: 'object',
   collection: true,
-  computedData: MemoGenerationComputed.create({})
+  computation: MemoGenerationComputed.create({})
 });
 ```
 
@@ -210,7 +210,7 @@ const SubmitLeaveRequestInteraction = Interaction.create({
 });
 
 // 关键：DirectorMemo 从请假交互数据中 Transform 出来
-DirectorMemo.computedData = Transform.create({
+DirectorMemo.computation = Transform.create({
   record: InteractionEventEntity, // 从交互数据转换
   attributeQuery: ['interactionName', 'payload', 'user', 'createdAt'],
   dataDeps: {
@@ -252,7 +252,7 @@ DirectorMemo.computedData = Transform.create({
 });
 
 // 或者更精确地，直接在关系上定义 Transform
-UserMemoRelation.computedData = Transform.create({
+UserMemoRelation.computation = Transform.create({
   record: InteractionEventEntity,
   attributeQuery: ['interactionName', 'payload', 'user', 'createdAt'],
   dataDeps: {
@@ -299,7 +299,7 @@ User.properties.push(
     name: 'needsDirectorAttention',
     type: 'boolean',
     defaultValue: () => false,
-    computedData: RealTime.create({
+    computation: RealTime.create({
       nextRecomputeTime: (now: number) => 3600000, // 每小时检查一次
       dataDeps: {
         _current: {
@@ -331,7 +331,7 @@ User.properties.push(
 #### 1. **真正的数据转换关系**
 ```typescript
 // ✅ 正确：备忘录数据是请假交互数据的转换结果
-DirectorMemo.computedData = Transform.create({
+DirectorMemo.computation = Transform.create({
   record: InteractionEventEntity, // 从交互数据转换
   callback: (interactionEvents) => {
     // 声明转换关系：每个请假交互数据都可能转换为备忘录数据
@@ -405,7 +405,7 @@ User.properties.push(
     name: 'leaveAnalysis',
     type: 'object',
     defaultValue: () => ({}),
-    computedData: Transform.create({
+    computation: Transform.create({
       record: UserLeaveRelation,
       attributeQuery: [['target', { attributeQuery: ['startDate', 'endDate', 'reason', 'status', 'createdAt'] }]],
       callback: (leaves: any[]) => {

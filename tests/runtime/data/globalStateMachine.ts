@@ -61,7 +61,7 @@ export function createData() {
     const dict = Dictionary.create({
         name: 'globalState',
         type: 'string',
-        computedData: globalStateMachine,
+        computation: globalStateMachine,
     })
 
     return {

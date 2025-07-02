@@ -67,7 +67,7 @@ const sendRequestRelation = Relation.create({
     target: UserEntity,
     targetProperty: 'request',
     type: 'n:1',
-    computedData:  
+    computation:  
     Transform.create({
         callback: function map(event: any){
             if (event.interactionName === sendInteraction.name) {
@@ -307,12 +307,12 @@ const reviewerRelation = Relation.create({
     target: UserEntity,
     targetProperty: 'request',
     type: 'n:1',
-    computedData:  reviewerRelationSM,
+    computation:  reviewerRelationSM,
     properties: [Property.create({
         name: 'result',
         type: 'string',
         collection: false,
-        computedData: resultSM
+        computation: resultSM
     })]
 })
 
@@ -321,7 +321,7 @@ RequestEntity.properties.push(
         name: 'approved',
         type: 'boolean',
         collection: false,
-        computedData: Every.create({
+        computation: Every.create({
             record: reviewerRelation,
             attributeQuery: ['result'],
             notEmpty: true,
@@ -334,7 +334,7 @@ RequestEntity.properties.push(
         name: 'rejected',
         type: 'boolean',
         collection: false,
-        computedData: Any.create({
+        computation: Any.create({
             record: reviewerRelation,
             attributeQuery: ['result'],
             callback:(relation) => {

@@ -1,4 +1,4 @@
-import { ComputedDataHandle, DataContext, PropertyDataContext } from "./ComputedDataHandle.js";
+import { ComputationHandle, DataContext, PropertyDataContext } from "./ComputationHandle.js";
 import { Count, KlassInstance, Relation, Entity } from "@shared";
 import { Controller } from "../Controller.js";
 import { ComputationResult, DataBasedComputation, DataDep, GlobalBoundState, RecordBoundState, RecordsDataDep } from "./Computation.js";
@@ -239,7 +239,7 @@ export class PropertyCountHandle implements DataBasedComputation {
     }
 }
 
-ComputedDataHandle.Handles.set(Count, {
+ComputationHandle.Handles.set(Count, {
     global: GlobalCountHandle,
     property: PropertyCountHandle
 });

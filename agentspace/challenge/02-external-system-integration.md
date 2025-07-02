@@ -42,7 +42,7 @@ const Order = Entity.create({
   properties: [
     Property.create({
       name: 'status',
-      computedData: StateMachine.create({
+      computation: StateMachine.create({
         states: ['pending', 'processing', 'paid', 'failed'],
         transitions: [
           { from: 'pending', to: 'processing', on: PaymentSubmit },
@@ -62,7 +62,7 @@ const User = Entity.create({
   properties: [
     Property.create({
       name: 'creditScore',
-      computedData: Transform.create({
+      computation: Transform.create({
         record: InteractionEvent,
         callback: async (event) => {
           if (event.interactionName === 'CreateUser') {
@@ -151,7 +151,7 @@ const Order = Entity.create({
   properties: [
     Property.create({
       name: 'status',
-      computedData: StateMachine.create({
+      computation: StateMachine.create({
         transitions: [
           { from: 'processing', to: 'paid', on: PaymentWebhook }
         ]
@@ -166,7 +166,7 @@ const Order = Entity.create({
 // 假设的异步计算支持
 Property.create({
   name: 'creditScore',
-  computedData: AsyncTransform.create({
+  computation: AsyncTransform.create({
     trigger: CreateUserInteraction,
     externalCall: async (user) => {
       return await creditAPI.check(user.idCard);

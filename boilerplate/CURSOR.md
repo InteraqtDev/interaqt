@@ -66,7 +66,7 @@ export const Article = Entity.create({
     Property.create({
       name: 'likeCount',
       type: 'number',
-      computedData: Count.create({
+      computation: Count.create({
         sourceRelation: 'likes',
         filterExpression: BoolExp.atom(Attributive.create({
           name: 'ActiveLike',
@@ -97,7 +97,7 @@ Property.create({ name: 'tags', type: 'string', collection: true })
 Property.create({
   name: 'fullName',
   type: 'string',
-  computedData: Transform.create({
+  computation: Transform.create({
     sourceProperty: ['firstName', 'lastName'],
     expression: (firstName, lastName) => `${firstName} ${lastName}`
   })
@@ -338,7 +338,7 @@ const articles = await controller.system.storage.find('Article',
 Property.create({
   name: 'articleCount',
   type: 'number',
-  computedData: Count.create({
+  computation: Count.create({
     sourceRelation: 'articles',
     filterExpression: BoolExp.atom({
       key: 'status',
@@ -555,7 +555,7 @@ article.likeCount = article.likeCount + 1;
 Property.create({
   name: 'likeCount',
   type: 'number',
-  computedData: Count.create({
+  computation: Count.create({
     sourceRelation: 'likes'
   })
 })
@@ -574,7 +574,7 @@ const AdminAttributive = Attributive.create({
 // ❌ Don't use function form for record parameter
 Property.create({
   name: 'postCount',
-  computedData: Count.create({
+  computation: Count.create({
     record: () => UserPostRelation  // Wrong!
   })
 })
@@ -582,7 +582,7 @@ Property.create({
 // ✅ Use direct references
 Property.create({
   name: 'postCount',
-  computedData: Count.create({
+  computation: Count.create({
     record: UserPostRelation  // Direct reference
   })
 })
@@ -593,7 +593,7 @@ const Entity1 = Entity.create({
   properties: [
     Property.create({
       name: 'derived',
-      computedData: Transform.create({
+      computation: Transform.create({
         record: Entity1  // Circular reference!
       })
     })
@@ -603,7 +603,7 @@ const Entity1 = Entity.create({
 // ✅ Use Transform with different entities
 const DerivedEntity = Entity.create({
   name: 'DerivedEntity',
-  computedData: Transform.create({
+  computation: Transform.create({
     record: SourceEntity  // Different entity
   })
 })

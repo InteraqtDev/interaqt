@@ -13,17 +13,17 @@ In interaqt, all data operations follow reactive design principles. This chapter
 
 Understanding where to place Transform is crucial:
 
-1. **Entity's computedData + Transform**: Use when you need to create new entities from interaction events
+1. **Entity's computation + Transform**: Use when you need to create new entities from interaction events
    - The entity listens to InteractionEventEntity
    - Returns entity data to be created
    - Related entities can be referenced directly in the returned data
 
-2. **Relation's computedData + Transform**: Use when you need to create relations between existing entities
+2. **Relation's computation + Transform**: Use when you need to create relations between existing entities
    - The relation listens to InteractionEventEntity
    - Returns relation data (source, target, and any relation properties)
    - Both source and target entities must already exist
 
-3. **Property's computedData + Transform**: Use when you need to transform data from other entities/relations
+3. **Property's computation + Transform**: Use when you need to transform data from other entities/relations
    - Should reference different, already-defined entities
    - Never reference the entity being defined (use getValue for same-entity computations)
 
@@ -31,7 +31,7 @@ Understanding where to place Transform is crucial:
 
 ### Basic Pattern
 
-By using Transform in an Entity's `computedData`, you can listen to interaction events and create entities. When creating an entity that needs relations, include the related entity reference directly in the creation data:
+By using Transform in an Entity's `computation`, you can listen to interaction events and create entities. When creating an entity that needs relations, include the related entity reference directly in the creation data:
 
 ```javascript
 import { Entity, Property, Relation, Transform, InteractionEventEntity, Interaction, Action, Payload, PayloadItem } from 'interaqt';
@@ -54,8 +54,8 @@ const Article = Entity.create({
     Property.create({ name: 'createdAt', type: 'string' }),
     Property.create({ name: 'updatedAt', type: 'string' })
   ],
-  // Transform in Entity's computedData listens to interactions to create entities
-  computedData: Transform.create({
+  // Transform in Entity's computation listens to interactions to create entities
+  computation: Transform.create({
     record: InteractionEventEntity,
     callback: function(event) {
       if (event.interactionName === 'CreateArticle') {
@@ -88,7 +88,7 @@ const CreateArticle = Interaction.create({
   })
 });
 
-// 3. Define relation - no computedData needed for creation
+// 3. Define relation - no computation needed for creation
 const UserArticleRelation = Relation.create({
   source: Article,
   sourceProperty: 'author',
@@ -100,7 +100,7 @@ const UserArticleRelation = Relation.create({
 
 ### Creating Relations Between Existing Entities
 
-When you need to create relations between already existing entities, use Transform in Relation's `computedData`:
+When you need to create relations between already existing entities, use Transform in Relation's `computation`:
 
 ```javascript
 // Define interaction to add article to favorites
@@ -114,7 +114,7 @@ const AddToFavorites = Interaction.create({
   })
 });
 
-// Favorite relation with Transform in computedData
+// Favorite relation with Transform in computation
 const UserFavoriteRelation = Relation.create({
   source: User,
   sourceProperty: 'favorites',
@@ -125,7 +125,7 @@ const UserFavoriteRelation = Relation.create({
     Property.create({ name: 'addedAt', type: 'string' })
   ],
   // Transform creates relation between existing entities
-  computedData: Transform.create({
+  computation: Transform.create({
     record: InteractionEventEntity,
     callback: function(event) {
       if (event.interactionName === 'AddToFavorites') {
@@ -165,7 +165,7 @@ const Article = Entity.create({
     Property.create({ name: 'updatedAt', type: 'string' })
   ],
   // Transform creates article and its relations
-  computedData: Transform.create({
+  computation: Transform.create({
     record: InteractionEventEntity,
     callback: function(event) {
       if (event.interactionName === 'CreateArticle') {
@@ -208,7 +208,7 @@ const CreateArticleWithTags = Interaction.create({
   })
 });
 
-// Article-Tag relation - no computedData needed for initial creation
+// Article-Tag relation - no computation needed for initial creation
 const ArticleTagRelation = Relation.create({
   source: Article,
   sourceProperty: 'tags',
@@ -233,7 +233,7 @@ const AddTagsToArticle = Interaction.create({
 });
 
 // Add Transform to handle adding tags to existing articles
-ArticleTagRelation.computedData = Transform.create({
+ArticleTagRelation.computation = Transform.create({
   record: InteractionEventEntity,
   callback: function(event) {
     if (event.interactionName === 'AddTagsToArticle') {
@@ -330,13 +330,13 @@ const Article = Entity.create({
     Property.create({
       name: 'status',
       type: 'string',
-      computedData: ArticleStatusStateMachine,
+      computation: ArticleStatusStateMachine,
       defaultValue: () => ArticleStatusStateMachine.defaultState.name
     }),
     Property.create({
       name: 'deletedAt',
       type: 'string',
-      computedData: Transform.create({
+      computation: Transform.create({
         record: InteractionEventEntity,
         callback: function(event) {
           if (event.interactionName === 'DeleteArticle' && 
@@ -507,7 +507,7 @@ const ArticleHistory = Entity.create({
     Property.create({ name: 'updatedAt', type: 'string' }),
     Property.create({ name: 'updatedBy', type: 'string' })
   ],
-  computedData: Transform.create({
+  computation: Transform.create({
     record: InteractionEventEntity,
     callback: function(event) {
       if (event.interactionName === 'UpdateArticle') {
@@ -559,7 +559,7 @@ const User = Entity.create({
     Property.create({
       name: 'articleCount',
       type: 'number',
-      computedData: Count.create({
+      computation: Count.create({
         record: UserArticleRelation,
         direction: 'target',
         callback: (relation) => relation.source.status !== 'deleted'
@@ -579,7 +579,7 @@ const Article = Entity.create({
     Property.create({
       name: 'status',
       type: 'string',
-      computedData: ArticleLifecycleStateMachine,
+      computation: ArticleLifecycleStateMachine,
       defaultValue: () => 'draft'
     }),
     Property.create({
@@ -589,7 +589,7 @@ const Article = Entity.create({
     })
   ],
   // Transform to create articles from interactions
-  computedData: Transform.create({
+  computation: Transform.create({
     record: InteractionEventEntity,
     callback: function(event) {
       if (event.interactionName === 'CreateArticle') {
@@ -695,7 +695,7 @@ const UserArticleRelation = Relation.create({
   target: User,
   targetProperty: 'articles',
   type: 'n:1'
-  // No computedData needed - relation is created automatically when Article is created with author reference
+  // No computation needed - relation is created automatically when Article is created with author reference
 });
 
 // === Usage Examples ===

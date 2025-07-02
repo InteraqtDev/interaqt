@@ -1,4 +1,4 @@
-import { ComputedDataHandle, DataContext, PropertyDataContext } from "./ComputedDataHandle.js";
+import { ComputationHandle, DataContext, PropertyDataContext } from "./ComputationHandle.js";
 import { Average, KlassInstance, Relation, Entity } from "@shared";
 import { Controller } from "../Controller.js";
 import { ComputationResult, DataBasedComputation, DataDep, RecordBoundState, GlobalBoundState, RecordsDataDep } from "./Computation.js";
@@ -289,7 +289,7 @@ export class PropertyAverageHandle implements DataBasedComputation {
     }
 }
 
-ComputedDataHandle.Handles.set(Average, {
+ComputationHandle.Handles.set(Average, {
     global: GlobalAverageHandle,
     property: PropertyAverageHandle
 }); 

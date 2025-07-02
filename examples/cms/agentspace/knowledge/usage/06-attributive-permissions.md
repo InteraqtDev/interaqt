@@ -348,14 +348,14 @@ const CreatePost = Interaction.create({
   userAttributives: VerifiedUserAttributive
 });
 
-// Create entities through Relation's computedData
+// Create entities through Relation's computation
 const UserPostRelation = Relation.create({
   source: Post,
   sourceProperty: 'author',
   target: User,
   targetProperty: 'posts',
   type: 'n:1',
-  computedData: Transform.create({
+  computation: Transform.create({
     record: InteractionEventEntity,
     callback: function(event) {
       if (event.interactionName === 'CreatePost') {

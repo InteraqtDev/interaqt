@@ -34,7 +34,7 @@ const Order = Entity.create({
   properties: [
     Property.create({
       name: 'finalPrice',
-      computedData: Transform.create({
+      computation: Transform.create({
         record: OrderItemRelation,
         callback: (orderItems, context) => {
           // ❌ 问题：如何处理多种优惠券的组合？
@@ -73,7 +73,7 @@ const Order = Entity.create({
   properties: [
     Property.create({
       name: 'pointsDiscount',
-      computedData: Transform.create({
+      computation: Transform.create({
         record: UserPointsRelation,
         callback: (userPoints, context) => {
           // ❌ 问题：条件判断过于复杂
@@ -171,18 +171,18 @@ const couponRules = {
 // 试图拆分成多个计算，但依赖关系复杂
 Property.create({
   name: 'memberDiscount',
-  computedData: Transform.create({...})
+  computation: Transform.create({...})
 }),
 Property.create({
   name: 'couponDiscount',
-  computedData: Transform.create({
+  computation: Transform.create({
     // 依赖 memberDiscount 的结果
     // 但计算顺序难以保证
   })
 }),
 Property.create({
   name: 'finalPrice',
-  computedData: Transform.create({
+  computation: Transform.create({
     // 依赖所有前面的计算
     // 复杂度仍然很高
   })
@@ -215,7 +215,7 @@ const PricingRules = RuleEngine.create({
 
 Property.create({
   name: 'finalPrice',
-  computedData: RuleBasedComputation.create({
+  computation: RuleBasedComputation.create({
     ruleEngine: PricingRules,
     input: ['basePrice', 'quantity', 'user', 'coupons']
   })

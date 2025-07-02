@@ -62,7 +62,7 @@ State field naming follows these rules:
 State persistence is based on interaqt's reactive storage system:
 
 ```typescript
-// src/runtime/computedDataHandles/RealTime.ts (core logic)
+// src/runtime/computationHandles/RealTime.ts (core logic)
 export class RealTimeComputation implements DataBasedComputation {
   state: {
     lastRecomputeTime: PropertyDataDep;

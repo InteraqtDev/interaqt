@@ -6,7 +6,7 @@ Reactive computation is the core feature of the interaqt framework. Its essence 
 
 ## ⚠️ IMPORTANT: Correct Usage of Computations
 
-Computations (such as Count, Transform, WeightedSummation, etc.) **MUST and ONLY** be placed in the `computedData` field of Entity, Relation, or Property definitions.
+Computations (such as Count, Transform, WeightedSummation, etc.) **MUST and ONLY** be placed in the `computation` field of Entity, Relation, or Property definitions.
 
 ❌ **WRONG**: Declaring computations separately and passing them to Controller
 ```javascript
@@ -18,20 +18,20 @@ const computations = [UserCreationTransform, ...]
 const controller = new Controller(system, entities, relations, [], interactions, computations, [])
 ```
 
-✅ **CORRECT**: Using computations in the computedData field
+✅ **CORRECT**: Using computations in the computation field
 ```javascript
-// Correct: Using computedData in Property definition
+// Correct: Using computation in Property definition
 Property.create({
   name: 'userCount',
   type: 'number',
   defaultValue: () => 0,
-  computedData: Count.create({
+  computation: Count.create({
     record: User
   })
 })
 ```
 
-**Note**: Controller does NOT accept a computations parameter. All computations should be defined within the `computedData` field of Entity/Relation/Property definitions.
+**Note**: Controller does NOT accept a computations parameter. All computations should be defined within the `computation` field of Entity/Relation/Property definitions.
 
 ## Core Mindset: What Data "Is", Not "How to Compute"
 
@@ -49,7 +49,7 @@ function updateLikeCount(postId) {
 // Correct: Declare that like count "is" the count of like relations
 Property.create({
   name: 'likeCount',
-  computedData: Count.create({
+  computation: Count.create({
     record: LikeRelation  // Like count is the Count of like relations
   })
 })
@@ -99,7 +99,7 @@ const Post = Entity.create({
       name: 'likeCount',
       type: 'number',
       defaultValue: () => 0,
-      computedData: Count.create({
+      computation: Count.create({
         record: likeRelation  // Pass relation instance, not entity
       })  // Automatically maintained, high performance
     })
@@ -134,7 +134,7 @@ const Post = Entity.create({
       name: 'likeCount',
       type: 'number',
       defaultValue: () => 0,
-      computedData: Count.create({
+      computation: Count.create({
         record: Like
       })
     })
@@ -172,7 +172,7 @@ const User = Entity.create({
       name: 'publishedPostCount',
       type: 'number',
       defaultValue: () => 0,
-      computedData: Count.create({
+      computation: Count.create({
         record: UserPostRelation,
         attributeQuery: [['target', {attributeQuery: ['status']}]],
         callback: function(relation) {
@@ -206,7 +206,7 @@ const User = Entity.create({
       name: 'highScorePostCount',
       type: 'number',
       defaultValue: () => 0,
-      computedData: Count.create({
+      computation: Count.create({
         record: UserPostRelation,
         attributeQuery: [['target', {attributeQuery: ['score']}]],
         dataDeps: {
@@ -232,7 +232,7 @@ const activeUsersCount = Dictionary.create({
   name: 'activeUsersCount',
   type: 'number',
   collection: false,
-  computedData: Count.create({
+  computation: Count.create({
     record: User,
     attributeQuery: ['lastLoginDate'],
     dataDeps: {
@@ -267,7 +267,7 @@ const User = Entity.create({
       name: 'authoredPostCount',
       type: 'number',
       defaultValue: () => 0,
-      computedData: Count.create({
+      computation: Count.create({
         record: UserPostRelation,
         direction: 'target'  // From user perspective to posts
       })
@@ -277,7 +277,7 @@ const User = Entity.create({
       name: 'followingCount',
       type: 'number',
       defaultValue: () => 0,
-      computedData: Count.create({
+      computation: Count.create({
         record: FollowRelation,
         direction: 'target'  // From user perspective to followed users
       })
@@ -298,7 +298,7 @@ const User = Entity.create({
       name: 'completedTaskCount',
       type: 'number',
       defaultValue: () => 0,
-      computedData: Count.create({
+      computation: Count.create({
         record: UserTaskRelation,
         attributeQuery: [['target', {attributeQuery: ['status', 'completedAt']}]],
         callback: function(relation) {
@@ -370,7 +370,7 @@ const Order = Entity.create({
       name: 'totalAmount',
       type: 'number',
       defaultValue: () => 0,
-      computedData: WeightedSummation.create({
+      computation: WeightedSummation.create({
         record: OrderItems,
         attributeQuery: [['target', { attributeQuery: ['quantity', 'price'] }]],
         callback: (relation) => ({
@@ -416,7 +416,7 @@ const Student = Entity.create({
       name: 'gpa',
       type: 'number',
       defaultValue: () => 0,
-      computedData: WeightedSummation.create({
+      computation: WeightedSummation.create({
         record: StudentGrades,
         callback: (relation) => ({
           weight: relation.target.credit,
@@ -429,7 +429,7 @@ const Student = Entity.create({
       name: 'totalCredits',
       type: 'number',
       defaultValue: () => 0,
-      computedData: WeightedSummation.create({
+      computation: WeightedSummation.create({
         record: StudentGrades,
         callback: (relation) => ({
           weight: 1,
@@ -455,7 +455,7 @@ const Student = Entity.create({
       name: 'passedCredits',
       type: 'number',
       defaultValue: () => 0,
-      computedData: WeightedSummation.create({
+      computation: WeightedSummation.create({
         record: StudentGrades,
         callback: (relation) => {
           // Only count subjects with score >= 60
@@ -494,7 +494,7 @@ const Project = Entity.create({
       name: 'isCompleted',
       type: 'boolean',
       defaultValue: () => false,
-      computedData: Every.create({
+      computation: Every.create({
         record: ProjectTasks,
         callback: (relation) => relation.target.status === 'completed'
       })
@@ -531,7 +531,7 @@ const Project = Entity.create({
       name: 'hasAdmin',
       type: 'boolean',
       defaultValue: () => false,
-      computedData: Any.create({
+      computation: Any.create({
         record: ProjectMember,
         callback: (relation) => relation.role === 'admin'
       })
@@ -565,7 +565,7 @@ const Order = Entity.create({
       name: 'allItemsInStock',
       type: 'boolean',
       defaultValue: () => false,
-      computedData: Every.create({
+      computation: Every.create({
         record: OrderItems,
         callback: (relation) => {
           const item = relation.target;
@@ -578,7 +578,7 @@ const Order = Entity.create({
       name: 'hasHighValueItem',
       type: 'boolean',
       defaultValue: () => false,
-      computedData: Any.create({
+      computation: Any.create({
         record: OrderItems,
         callback: (relation) => {
           const item = relation.target;
@@ -651,7 +651,7 @@ const DiscountedProduct = Entity.create({
     Property.create({ name: 'discountedPrice', type: 'number' }),
     Property.create({ name: 'discount', type: 'string' })
   ],
-  computedData: Transform.create({
+  computation: Transform.create({
     record: Product,  // References a different, already-defined entity
     callback: (product) => {
       return {
@@ -677,7 +677,7 @@ const User = Entity.create({
       name: 'tagSummary',
       type: 'string',
       defaultValue: () => '',
-      computedData: Transform.create({
+      computation: Transform.create({
         record: UserTag,
         callback: (tags) => {
           if (tags.length === 0) return 'No tags';
@@ -704,7 +704,7 @@ const User = Entity.create({
       name: 'activityStats',
       type: 'object',
       defaultValue: () => ({}),
-      computedData: Transform.create({
+      computation: Transform.create({
         record: UserPosts,
         callback: (posts) => {
           const now = new Date();
@@ -790,7 +790,7 @@ const ActivityReward = Entity.create({
     Property.create({ name: 'description', type: 'string' }),
     Property.create({ name: 'createdAt', type: 'string' })
   ],
-  computedData: Transform.create({
+  computation: Transform.create({
     record: InteractionEventEntity,
     attributeQuery: ['interactionName', 'user', 'createdAt'],
     dataDeps: {
@@ -842,7 +842,7 @@ const DirectorMemo = Entity.create({
     Property.create({ name: 'priority', type: 'string' }),
     Property.create({ name: 'createdAt', type: 'string' })
   ],
-  computedData: Transform.create({
+  computation: Transform.create({
     record: InteractionEventEntity,
     attributeQuery: ['interactionName', 'user', 'payload', 'createdAt'],
     dataDeps: {
@@ -901,7 +901,7 @@ const OrderInteraction = Interaction.create({
 
 // 1. Order records (primary transformation)
 // Declaration: Order data is direct transformation of createOrder interaction data
-Order.computedData = Transform.create({
+Order.computation = Transform.create({
   record: InteractionEventEntity,
   callback: (interactionEvents) => {
     return interactionEvents
@@ -918,7 +918,7 @@ Order.computedData = Transform.create({
 // Declaration: InventoryChange data is transformed from product information extracted from createOrder interaction data
 const InventoryChange = Entity.create({
   name: 'InventoryChange',
-  computedData: Transform.create({
+  computation: Transform.create({
     record: InteractionEventEntity,
     callback: (interactionEvents) => {
       const changes = [];
@@ -947,7 +947,7 @@ const InventoryChange = Entity.create({
 // Declaration: PointsReward data is transformation result of createOrder interaction data meeting amount condition
 const PointsReward = Entity.create({
   name: 'PointsReward',
-  computedData: Transform.create({
+  computation: Transform.create({
     record: InteractionEventEntity,
     callback: (interactionEvents) => {
       return interactionEvents
@@ -983,7 +983,7 @@ Choose transformation from interaction data or state data based on business sema
 // Emphasizes: specific interaction behavior itself produces specific business data
 const LoginBonusPoints = Entity.create({
   name: 'LoginBonusPoints',
-  computedData: Transform.create({
+  computation: Transform.create({
     record: InteractionEventEntity, // Transform from interaction data
     callback: (interactionEvents) => {
       return interactionEvents
@@ -1001,7 +1001,7 @@ const LoginBonusPoints = Entity.create({
 // Emphasizes: derive data based on entity's current state
 const VIPStatus = Entity.create({
   name: 'VIPStatus',
-  computedData: Transform.create({
+  computation: Transform.create({
     record: User, // Transform from user state data
     callback: (users) => {
       return users
@@ -1025,12 +1025,12 @@ const VIPStatus = Entity.create({
 
 ```typescript
 // ✅ Good practice: separation of transformation responsibilities
-Order.computedData = Transform.create({ /* Only responsible for transforming to order data */ });
-InventoryChange.computedData = Transform.create({ /* Only responsible for transforming to inventory change data */ });
-PointsReward.computedData = Transform.create({ /* Only responsible for transforming to points reward data */ });
+Order.computation = Transform.create({ /* Only responsible for transforming to order data */ });
+InventoryChange.computation = Transform.create({ /* Only responsible for transforming to inventory change data */ });
+PointsReward.computation = Transform.create({ /* Only responsible for transforming to points reward data */ });
 
 // ❌ Bad practice: mixed transformation responsibilities
-Order.computedData = Transform.create({
+Order.computation = Transform.create({
   callback: (interactionEvents) => {
     // Here both transforming to orders, inventory changes, and points...
   }
@@ -1194,7 +1194,7 @@ function checkBusinessHours() {
 const isBusinessHours = Dictionary.create({
   name: 'isBusinessHours',
   type: 'boolean',
-  computedData: RealTime.create({
+  computation: RealTime.create({
     callback: async (now: Expression, dataDeps) => {
       const hour = now.divide(3600000).modulo(24); // Hour number
       return hour.gt(9).and(hour.lt(17));
@@ -1228,7 +1228,7 @@ import { RealTime, Expression, Dictionary } from 'interaqt';
 const currentTimestamp = Dictionary.create({
   name: 'currentTimestamp',
   type: 'number',
-  computedData: RealTime.create({
+  computation: RealTime.create({
     nextRecomputeTime: (now: number, dataDeps: any) => 1000, // Update every second
     callback: async (now: Expression, dataDeps: any) => {
       return now.divide(1000); // Convert to seconds
@@ -1246,7 +1246,7 @@ Expression type computations return numerical results, suitable for various math
 const timeBasedMetric = Dictionary.create({
   name: 'timeBasedMetric',
   type: 'number',
-  computedData: RealTime.create({
+  computation: RealTime.create({
     nextRecomputeTime: (now: number, dataDeps: any) => 5000, // Update every 5 seconds
     dataDeps: {
       config: {
@@ -1276,7 +1276,7 @@ Inequality type computations return boolean results, and the system automaticall
 const isAfterDeadline = Dictionary.create({
   name: 'isAfterDeadline',
   type: 'boolean',
-  computedData: RealTime.create({
+  computation: RealTime.create({
     dataDeps: {
       project: {
         type: 'records',
@@ -1304,7 +1304,7 @@ Equation type is used for time equation calculations, also automatically calcula
 const isExactHour = Dictionary.create({
   name: 'isExactHour',
   type: 'boolean',
-  computedData: RealTime.create({
+  computation: RealTime.create({
     callback: async (now: Expression, dataDeps: any) => {
       const millisecondsInHour = 3600000;
       
@@ -1332,7 +1332,7 @@ const userEntity = Entity.create({
     Property.create({
       name: 'isRecentlyActive',
       type: 'boolean',
-      computedData: RealTime.create({
+      computation: RealTime.create({
         dataDeps: {
           _current: {
             type: 'property',
@@ -1353,7 +1353,7 @@ const userEntity = Entity.create({
     Property.create({
       name: 'onlineMinutes',
       type: 'number',
-      computedData: RealTime.create({
+      computation: RealTime.create({
         nextRecomputeTime: (now: number, dataDeps: any) => 60000, // Update every minute
         dataDeps: {
           _current: {
@@ -1454,7 +1454,7 @@ RealTime.create({
 const isWorkingHours = Dictionary.create({
   name: 'isWorkingHours',
   type: 'boolean',
-  computedData: RealTime.create({
+  computation: RealTime.create({
     dataDeps: {
       schedule: {
         type: 'records',
@@ -1489,7 +1489,7 @@ const userEntity = Entity.create({
     Property.create({
       name: 'sessionExpired',
       type: 'boolean',
-      computedData: RealTime.create({
+      computation: RealTime.create({
         dataDeps: {
           _current: {
             type: 'property',
@@ -1593,7 +1593,7 @@ const Post = Entity.create({
       name: 'likeCount',
       type: 'number',
       defaultValue: () => 0,
-      computedData: Count.create({
+      computation: Count.create({
         record: PostLikes
       })
     }),
@@ -1603,7 +1603,7 @@ const Post = Entity.create({
       name: 'commentCount',
       type: 'number',
       defaultValue: () => 0,
-      computedData: Count.create({
+      computation: Count.create({
         record: PostComments
       })
     }),
@@ -1613,7 +1613,7 @@ const Post = Entity.create({
       name: 'engagementScore',
       type: 'number',
       defaultValue: () => 0,
-      computedData: WeightedSummation.create({
+      computation: WeightedSummation.create({
         record: PostInteractions,
         callback: (relation) => {
           const interaction = relation.target;
@@ -1632,7 +1632,7 @@ const Post = Entity.create({
       name: 'summary',
       type: 'string',
       defaultValue: () => '',
-      computedData: Transform.create({
+      computation: Transform.create({
         record: Post,
         callback: (record) => {
           const content = record.content || '';
@@ -1648,7 +1648,7 @@ const Post = Entity.create({
       name: 'allCommentsModerated',
       type: 'boolean',
       defaultValue: () => false,
-      computedData: Every.create({
+      computation: Every.create({
         record: PostComments,
         callback: (relation) => relation.target.status === 'approved'
       })
@@ -1667,7 +1667,7 @@ Property.create({
   name: 'followerCount',
   type: 'number',
   defaultValue: () => 0,
-  computedData: Count.create({
+  computation: Count.create({
     record: Follow
   })
 });
@@ -1677,7 +1677,7 @@ Property.create({
   name: 'followerCount',
   type: 'number',
   defaultValue: () => 0,
-  computedData: Transform.create({
+  computation: Transform.create({
     record: Follow,
     callback: (followers) => followers.length  // Inefficient
   })
@@ -1692,7 +1692,7 @@ Property.create({
   name: 'activeUserCount',
   type: 'number',
   defaultValue: () => 0,
-  computedData: Count.create({
+  computation: Count.create({
     record: User,
     callback: (user) => user.status === 'active'
   })
@@ -1703,7 +1703,7 @@ Property.create({
   name: 'activeUserCount',
   type: 'number',
   defaultValue: () => 0,
-  computedData: Transform.create({
+  computation: Transform.create({
     record: User,
     callback: (users) => users.filter(u => u.status === 'active').length  // Memory filtering
   })
@@ -1720,7 +1720,7 @@ const User = Entity.create({
       name: 'score',
       type: 'number',
       defaultValue: () => 0,
-      computedData: Transform.create({
+      computation: Transform.create({
         record: UserPosts,
         callback: (posts) => posts.reduce((sum, p) => sum + p.userScore, 0)
       })
@@ -1734,7 +1734,7 @@ const Post = Entity.create({
       name: 'userScore',
       type: 'number',
       defaultValue: () => 0,
-      computedData: Transform.create({
+      computation: Transform.create({
         record: Post,
         callback: (record) => record.baseScore * 0.1  // Avoid circular dependency
       })
@@ -1759,7 +1759,7 @@ const Post = Entity.create({
       name: 'publishedPostCount',
       type: 'number',
       defaultValue: () => 0,
-      computedData: Count.create({
+      computation: Count.create({
         record: UserPosts
       })
     })
@@ -1821,7 +1821,7 @@ const Version = Entity.create({
     Property.create({
       name: 'styleCount',
       type: 'number',
-      computedData: Count.create({
+      computation: Count.create({
         record: () => StyleVersionRelation  // ❌ Function form is NOT the solution
       })
     })
@@ -1860,7 +1860,7 @@ export const Version = Entity.create({
     Property.create({
       name: 'styleCount',
       type: 'number',
-      computedData: Count.create({
+      computation: Count.create({
         record: StyleVersionRelation  // ✅ Direct reference, properly imported
       })
     })
@@ -1903,7 +1903,7 @@ Version.properties.push(
   Property.create({
     name: 'styleCount',
     type: 'number',
-    computedData: Count.create({
+    computation: Count.create({
       record: StyleVersionRelation  // ✅ Now safely reference the relation
     })
   })
@@ -1942,7 +1942,7 @@ Version.properties.push(
 
 ```javascript
 // ❌ DON'T: Use arrow functions for record parameter
-computedData: Count.create({
+computation: Count.create({
   record: () => SomeRelation  // This is NOT how to handle forward references
 })
 
@@ -1952,7 +1952,7 @@ const Version = Entity.create({
   properties: [
     Property.create({
       name: 'nextVersionNumber',
-      computedData: Transform.create({
+      computation: Transform.create({
         record: Version  // Circular reference!
       })
     })
@@ -1962,7 +1962,7 @@ const Version = Entity.create({
 // ✅ DO: Use proper imports and direct references
 import { StyleVersionRelation } from '../relations/StyleVersionRelation'
 
-computedData: Count.create({
+computation: Count.create({
   record: StyleVersionRelation  // Direct reference
 })
 ``` 

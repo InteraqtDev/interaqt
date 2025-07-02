@@ -130,7 +130,7 @@ export function createData() {
         target: UserEntity,
         targetProperty: 'request',
         type: 'n:1',
-        computedData:  reviewerRelationSM,
+        computation:  reviewerRelationSM,
         properties: [Property.create({
             name: 'result',
             type: 'string',

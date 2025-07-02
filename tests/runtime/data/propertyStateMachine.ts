@@ -155,7 +155,7 @@ export function createData() {
         defaultState: normalState
     })
 
-    statusProperty.computedData = stateMachine
+    statusProperty.computation = stateMachine
     statusProperty.defaultValue = () =>stateMachine.defaultState.name
 
     return {

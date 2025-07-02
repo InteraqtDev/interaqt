@@ -4,7 +4,7 @@ import {
   Entity,
   MonoSystem,
   Property,
-  ComputedDataHandle,
+  ComputationHandle,
   createClass,
   MatchExp,
   DataDep,
@@ -73,7 +73,7 @@ class EntityRecommendationComputation implements DataBasedComputation {
 }
 
 // 注册计算处理器
-ComputedDataHandle.Handles.set(EntityRecommendationComputed, {
+ComputationHandle.Handles.set(EntityRecommendationComputed, {
   entity: EntityRecommendationComputation
 })
 
@@ -97,7 +97,7 @@ describe('Entity async computed', () => {
         Property.create({name: 'score', type: 'string'}),
         Property.create({name: 'reason', type: 'string'})
       ],
-      computedData: EntityRecommendationComputed.create({
+      computation: EntityRecommendationComputed.create({
         category: 'electronics'
       })
     });

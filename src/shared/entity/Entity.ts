@@ -35,7 +35,7 @@ type PropertyPublic = {
         type: 'function',
         required: false,
     },
-    computedData: {
+    computation: {
         type: Klass<any>[],
         collection: false,
         required: false,
@@ -59,7 +59,7 @@ type EntityPublic = {
         },
         defaultValue: () => any[]
     },
-    computedData: {
+    computation: {
         type: Klass<any>[],
         collection: false,
         required: false,
@@ -114,7 +114,7 @@ export const Property: Klass<PropertyPublic> = createClass({
             type: 'function',
             required: false,
         },
-        computedData: {
+        computation: {
             // CAUTION 这里的具体类型等着外面注册 IncrementalComputationHandle 的时候修补
             type: [] as Klass<any>[],
             collection: false,
@@ -161,7 +161,7 @@ export const Entity: Klass<EntityPublic> = createClass({
                 return []
             }
         },
-        computedData: {
+        computation: {
             // CAUTION 这里的具体类型等着外面注册 IncrementalComputationHandle 的时候修补
             type: [] as Klass<any>[],
             collection: false,
@@ -231,7 +231,7 @@ export type RelationPublic = {
         collection: false,
         required: true,
     },
-    computedData: {
+    computation: {
         type: Klass<any>[],
         collection: false,
         required: false,
@@ -329,7 +329,7 @@ export const Relation: Klass<RelationPublic> = createClass({
             required: true,
             collection: false,
         },
-        computedData: {
+        computation: {
             // CAUTION 这里的具体类型等着外面注册 IncrementalComputationHandle 的时候修补
             type: [] as Klass<any>[],
             collection: false,

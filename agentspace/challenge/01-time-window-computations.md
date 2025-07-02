@@ -17,13 +17,13 @@ const User = Entity.create({
   properties: [
     Property.create({
       name: 'totalOrders',
-      computedData: Count.create({
+      computation: Count.create({
         record: UserOrderRelation  // ✅ 能做：总订单数
       })
     }),
     Property.create({
       name: 'last7DaysOrders',
-      computedData: Count.create({
+      computation: Count.create({
         record: UserOrderRelation,
         // ❌ 问题：无法表达"过去7天"的时间窗口
         // 框架缺乏时间窗口的内置支持
@@ -72,7 +72,7 @@ const User = Entity.create({
 // 假设的时间窗口支持
 Property.create({
   name: 'last7DaysOrders',
-  computedData: TimeWindowCount.create({
+  computation: TimeWindowCount.create({
     record: UserOrderRelation,
     window: { days: 7 },
     scheduler: 'daily'  // 每天重新计算
@@ -85,7 +85,7 @@ Property.create({
 // 假设的定时任务支持
 Property.create({
   name: 'monthlyActiveScore',
-  computedData: ScheduledComputation.create({
+  computation: ScheduledComputation.create({
     record: UserActivityRelation,
     schedule: 'monthly',
     reset: true  // 每月重置

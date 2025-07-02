@@ -4,7 +4,7 @@ import {
   Entity,
   MonoSystem,
   Property,
-  ComputedDataHandle,
+  ComputationHandle,
   createClass,
   MatchExp,
   DataDep,
@@ -79,7 +79,7 @@ class RelationScoreComputation implements DataBasedComputation {
 }
 
 // 注册计算处理器
-ComputedDataHandle.Handles.set(RelationScoreComputed, {
+ComputationHandle.Handles.set(RelationScoreComputed, {
   relation: RelationScoreComputation
 })
 
@@ -118,7 +118,7 @@ describe('Relation async computed', () => {
         Property.create({name: 'algorithm', type: 'string'}),
         Property.create({name: 'computedAt', type: 'string'})
       ],
-      computedData: RelationScoreComputed.create({
+      computation: RelationScoreComputed.create({
         algorithm: 'collaborative_filtering'
       })
     });

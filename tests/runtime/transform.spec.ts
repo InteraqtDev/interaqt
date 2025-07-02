@@ -32,7 +32,7 @@ describe('Transform computed handle', () => {
         Property.create({name: 'discountedPrice', type: 'number'}),
         Property.create({name: 'discount', type: 'string'})
       ],
-      computedData: Transform.create({
+      computation: Transform.create({
         record: productEntity,
         attributeQuery: ['name', 'price', 'isAvailable'],
         callback: (product) => {
@@ -128,7 +128,7 @@ describe('Transform computed handle', () => {
         Property.create({name: 'totalAmount', type: 'number'}),
         Property.create({name: 'orderDate', type: 'string'})
       ],
-      computedData: Transform.create({
+      computation: Transform.create({
         record: orderRelation,
         attributeQuery: [['target', {attributeQuery: ['product', 'quantity', 'price', 'status']}]],
         callback: (orderRelation) => {

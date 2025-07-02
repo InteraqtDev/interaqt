@@ -32,7 +32,7 @@ const Product = Entity.create({
   properties: [
     Property.create({
       name: 'remainingStock',
-      computedData: WeightedSummation.create({
+      computation: WeightedSummation.create({
         record: OrderItemRelation,
         callback: (orderItem) => ({
           weight: -1,
@@ -93,7 +93,7 @@ const Auction = Entity.create({
   properties: [
     Property.create({
       name: 'currentHighestBid',
-      computedData: Transform.create({
+      computation: Transform.create({
         record: BidRelation,
         callback: (bids) => {
           // ❌ 问题：
@@ -201,7 +201,7 @@ const SecKillOrder = AtomicInteraction.create({
 // 假设的实时计算支持
 Property.create({
   name: 'currentPrice',
-  computedData: RealtimeTransform.create({
+  computation: RealtimeTransform.create({
     record: TradeRelation,
     latency: 'microsecond',
     consistency: 'strong'
@@ -214,7 +214,7 @@ Property.create({
 // 假设的优先级支持
 Property.create({
   name: 'stockCount',
-  computedData: PriorityComputation.create({
+  computation: PriorityComputation.create({
     priority: 'critical',
     isolation: 'serializable'
   })

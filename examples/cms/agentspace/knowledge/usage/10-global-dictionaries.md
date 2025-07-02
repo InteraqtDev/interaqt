@@ -206,7 +206,7 @@ const totalUsers = Dictionary.create({
   type: 'number',
   collection: false,
   defaultValue: () => 0,
-  computedData: Count.create({
+  computation: Count.create({
     record: userEntity
   })
 });
@@ -217,7 +217,7 @@ const activeUsers = Dictionary.create({
   type: 'number',
   collection: false,
   defaultValue: () => 0,
-  computedData: Count.create({
+  computation: Count.create({
     record: userEntity
   })
 });
@@ -271,7 +271,7 @@ const totalFriendships = Dictionary.create({
   type: 'number',
   collection: false,
   defaultValue: () => 0,
-  computedData: Count.create({
+  computation: Count.create({
     record: friendRelation
   })
 });
@@ -282,7 +282,7 @@ const closeFriendships = Dictionary.create({
   type: 'number',
   collection: false,
   defaultValue: () => 0,
-  computedData: Count.create({
+  computation: Count.create({
     record: friendRelation
   })
 });
@@ -293,7 +293,7 @@ const averageCloseness = Dictionary.create({
   type: 'number',
   collection: false,
   defaultValue: () => 0,
-  computedData: WeightedSummation.create({
+  computation: WeightedSummation.create({
     record: friendRelation,
     attributeQuery: ['closeness'],
     callback: (friendship: any) => ({
@@ -328,7 +328,7 @@ const totalLogins = Dictionary.create({
   type: 'number',
   collection: false,
   defaultValue: () => 0,
-  computedData: Count.create({
+  computation: Count.create({
     record: InteractionEventEntity
   })
 });
@@ -339,7 +339,7 @@ const todayLogins = Dictionary.create({
   type: 'number',
   collection: false,
   defaultValue: () => 0,
-  computedData: Count.create({
+  computation: Count.create({
     record: InteractionEventEntity
   })
 });
@@ -364,7 +364,7 @@ const salesSummary = Dictionary.create({
   type: 'object',
   collection: false,
   defaultValue: () => ({}),
-  computedData: Transform.create({
+  computation: Transform.create({
     record: orderEntity,
     attributeQuery: ['amount', 'status', 'createdAt'],
     callback: (orders: any[]) => {
@@ -547,7 +547,7 @@ class UserScoreComputation implements DataBasedComputation {
 }
 
 // Register computation handler
-ComputedDataHandle.Handles.set(UserScoreComputed, {
+ComputationHandle.Handles.set(UserScoreComputed, {
   property: UserScoreComputation
 });
 
@@ -556,7 +556,7 @@ userEntity.properties.push(
   Property.create({
     name: 'score',
     type: 'number',
-    computedData: UserScoreComputed.create({
+    computation: UserScoreComputed.create({
       baseScore: 100
     })
   })
@@ -737,7 +737,7 @@ const realtimeStats = Dictionary.create({
   name: 'realtimeStats',
   type: 'object',
   collection: false,
-  computedData: Transform.create({
+  computation: Transform.create({
     record: userEntity,
     attributeQuery: ['isActive', 'createdAt', 'lastLoginAt'],
     callback: (users: any[]) => {

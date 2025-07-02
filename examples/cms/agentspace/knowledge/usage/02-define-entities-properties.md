@@ -264,7 +264,7 @@ const Post = Entity.create({
       name: 'likeCount',
       type: 'number',
       defaultValue: () => 0,
-      computedData: Count.create({
+      computation: Count.create({
         record: Like  // This will be persisted to the database
       })
     })

@@ -95,7 +95,7 @@
 2. **测试覆盖要求**：
    - 所有 Entity 的 CRUD 操作必须有测试
    - 所有 Interaction 必须有至少一个成功用例和一个失败用例
-   - 所有带 computedData 的属性必须验证其自动计算逻辑
+   - 所有带 computation 的属性必须验证其自动计算逻辑
    - 所有权限控制必须有正面和负面测试
 
 3. **测试执行**：
@@ -121,7 +121,7 @@
 - [ ] 权限控制测试完整
 - [ ] 所有 Entity 的 CRUD 操作都有测试
 - [ ] 所有 Interaction 都有成功和失败用例
-- [ ] 所有 computedData 属性都验证了自动计算逻辑
+- [ ] 所有 computation 属性都验证了自动计算逻辑
 - [ ] test-cases.md 文档完整且与代码一致
 - [ ] interaction-matrix.md 覆盖所有用户角色和操作
 - [ ] 所有关系（Relation）都有正确的级联行为测试

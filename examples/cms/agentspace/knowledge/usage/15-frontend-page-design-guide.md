@@ -12,7 +12,7 @@ This document guides how to systematically design frontend page architecture and
 - **Interaction Maps to Functions**: Each Interaction should have a corresponding operation entry in the interface
 
 ### 2. Reactive Data Display
-- **Reactive Computations**: All properties with `computedData` should be displayed in real-time in the interface
+- **Reactive Computations**: All properties with `computation` should be displayed in real-time in the interface
 - **State-Aware**: Dynamically display different operation options based on entity state
 - **Permission Control**: Control interface element visibility based on Attributive definitions
 
@@ -322,7 +322,7 @@ Home > Content Management > Article List > Article Detail
 ### 1. Real-time Data Updates
 
 #### 1.1 Computed Property Display
-For properties containing `computedData`:
+For properties containing `computation`:
 - **Real-time Display**: Real-time display of computation results in interface
 - **Change Indicators**: Provide visual feedback when data changes
 - **Loading States**: Display loading indicators during computation

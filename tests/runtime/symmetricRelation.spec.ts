@@ -45,7 +45,7 @@ describe('Symmetric relation computation', () => {
         name: 'friendCount',
         type: 'number',
         defaultValue: () => 0,
-        computedData: Count.create({
+        computation: Count.create({
           record: friendRelation
         })
       })
@@ -127,7 +127,7 @@ describe('Symmetric relation computation', () => {
         name: 'friendCount',
         type: 'number',
         defaultValue: () => 0,
-        computedData: Count.create({
+        computation: Count.create({
           record: friendRelation
         })
       })

@@ -1,4 +1,4 @@
-import { Controller, Entity, MonoSystem, Property, ComputedDataHandle, createClass, MatchExp, DataDep, PropertyDataContext, KlassInstance, PGLiteDB, DataBasedComputation, ComputationResult } from "@";
+import { Controller, Entity, MonoSystem, Property, ComputationHandle, createClass, MatchExp, DataDep, PropertyDataContext, KlassInstance, PGLiteDB, DataBasedComputation, ComputationResult } from "@";
 import { expect, test, describe } from "vitest";
 
 const TestCrawlerComputed = createClass({
@@ -35,7 +35,7 @@ class TestCrawlerComputation implements DataBasedComputation {
 }
 
 // 全局注册可用了
-ComputedDataHandle.Handles.set(TestCrawlerComputed, {
+ComputationHandle.Handles.set(TestCrawlerComputed, {
     // global: TestCrawlerComputation,
     property: TestCrawlerComputation
 })
@@ -51,7 +51,7 @@ describe('async computed', () => {
                 Property.create({
                     name: 'content', 
                     type: 'string',
-                    computedData: TestCrawlerComputed.create({ source: 'url'})
+                    computation: TestCrawlerComputed.create({ source: 'url'})
                 }),
             ]
         })

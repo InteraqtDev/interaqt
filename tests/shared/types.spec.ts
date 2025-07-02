@@ -81,7 +81,7 @@ describe("createClass types", () => {
                     required: true,
                     collection: false
                 },
-                computedData: {
+                computation: {
                     type: [] as Klass<any>[],
                     collection: false,
                     required: false,
@@ -89,7 +89,7 @@ describe("createClass types", () => {
             }
         });
         
-        assertType<"content"|"uuid"|"_options"|"_type"|"computedData">({} as unknown as keyof KlassInstance<typeof TestClass>)
+        assertType<"content"|"uuid"|"_options"|"_type"|"computation">({} as unknown as keyof KlassInstance<typeof TestClass>)
         assertType<KlassInstance<typeof TestClass>["content"]>({} as unknown as (...arg: any[]) => any )
         assertType<(...arg: any[]) => any >({} as unknown as KlassInstance<typeof TestClass>["content"])
         assertType<KlassInstance<typeof TestClass>["uuid"]>({} as unknown as string )
@@ -143,7 +143,7 @@ type TestKlass = Klass<{
         required: true,
         collection: false
     },
-    computedData: {
+    computation: {
         // CAUTION 这里的具体类型等着外面注册 IncrementalComputationHandle 的时候修补
         type: Klass<any>[],
         collection: false,

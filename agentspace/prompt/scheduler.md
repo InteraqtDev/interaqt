@@ -66,7 +66,7 @@ Scheduler 是整个响应式系统的核心调度器，负责：
 
 #### 1. 初始化流程
 ```
-1. 构造函数：收集所有带 computedData 的实体、属性、关系
+1. 构造函数：收集所有带 computation 的实体、属性、关系
 2. createStates()：为计算创建持久化状态存储
 3. setupDefaultValues()：设置计算的默认值
 4. setupStateDefaultValues()：设置状态的默认值

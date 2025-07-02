@@ -33,7 +33,7 @@ describe('Average computed handle', () => {
         name: 'averageScore',
         type: 'number',
         collection: false,
-        computedData: Average.create({
+        computation: Average.create({
           record: studentEntity,
           attributeQuery: ['score']
         })
@@ -101,7 +101,7 @@ describe('Average computed handle', () => {
         name: 'dataAverage',
         type: 'number',
         collection: false,
-        computedData: Average.create({
+        computation: Average.create({
           record: dataEntity,
           attributeQuery: ['value']
         })
@@ -144,7 +144,7 @@ describe('Average computed handle', () => {
         name: 'averagePrice',
         type: 'number',
         collection: false,
-        computedData: Average.create({
+        computation: Average.create({
           record: itemEntity,
           attributeQuery: ['price']
         })
@@ -190,7 +190,7 @@ describe('Average computed handle', () => {
         name: 'averageEngineerSalary',
         type: 'number',
         collection: false,
-        computedData: Average.create({
+        computation: Average.create({
           record: engineerEntity,
           attributeQuery: ['salary']
         })
@@ -272,7 +272,7 @@ describe('Average computed handle', () => {
         name: 'averageScore',
         type: 'number',
         defaultValue: () => 0,
-        computedData: Average.create({
+        computation: Average.create({
           record: studentExamRelation,
           attributeQuery: [['target', {attributeQuery: ['score']}]]
         })
@@ -378,7 +378,7 @@ describe('Average computed handle', () => {
         name: 'averageMeasurement',
         type: 'number',
         collection: false,
-        computedData: Average.create({
+        computation: Average.create({
           record: measurementEntity,
           attributeQuery: ['value']
         })

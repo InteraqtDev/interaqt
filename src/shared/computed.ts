@@ -74,9 +74,9 @@ export const StateMachine = createClass({
 
 
 
-// ComputedData 的基础结构
-export const ComputedData = createClass({
-    name: 'ComputedData',
+// Computation 的基础结构
+export const Computation = createClass({
+  name: 'Computation',
     public: {
         computeEffect: {
             type: 'string',
@@ -318,8 +318,8 @@ export const RealTime = createClass({
     }
 })
 
-// 修补 Entity computedData 里面的类型
-Relation.public.computedData.type.push(StateMachine, WeightedSummation, Count, Summation, Average, Every, Any, Transform, RealTime)
-Entity.public.computedData.type.push(StateMachine, WeightedSummation, Count, Summation, Average, Every, Any, Transform, RealTime)
-Property.public.computedData.type.push(StateMachine, WeightedSummation, Count, Summation, Average, Every, Any, Transform, RealTime)
-Dictionary.public.computedData.type.push(StateMachine, WeightedSummation, Count, Summation, Average, Every, Any, Transform, RealTime)
+// 修补 Entity computation 里面的类型
+Relation.public.computation.type.push(StateMachine, WeightedSummation, Count, Summation, Average, Every, Any, Transform, RealTime)
+Entity.public.computation.type.push(StateMachine, WeightedSummation, Count, Summation, Average, Every, Any, Transform, RealTime)
+Property.public.computation.type.push(StateMachine, WeightedSummation, Count, Summation, Average, Every, Any, Transform, RealTime)
+Dictionary.public.computation.type.push(StateMachine, WeightedSummation, Count, Summation, Average, Every, Any, Transform, RealTime)

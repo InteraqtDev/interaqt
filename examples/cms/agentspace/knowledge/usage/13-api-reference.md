@@ -16,7 +16,7 @@ Entity.create(config: EntityConfig): KlassInstance<typeof Entity>
 **Parameters**
 - `config.name` (string, required): Entity name, must match `/^[a-zA-Z0-9_]+$/` format
 - `config.properties` (Property[], required): Entity property list, defaults to empty array
-- `config.computedData` (ComputedData[], optional): Entity-level computed data
+- `config.computation` (Computation[], optional): Entity-level computed data
 - `config.sourceEntity` (Entity|Relation, optional): Source entity for filtered entity (used to create filtered entities)
 - `config.filterCondition` (MatchExp, optional): Filter condition (used to create filtered entities)
 
@@ -57,7 +57,7 @@ Property.create(config: PropertyConfig): KlassInstance<typeof Property>
 - `config.collection` (boolean, optional): Whether it's a collection type
 - `config.defaultValue` (function, optional): Default value function
 - `config.computed` (function, optional): Computed property function
-- `config.computedData` (ComputedData, optional): Property computed data
+- `config.computation` (Computation, optional): Property computed data
 
 **Examples**
 ```typescript
@@ -88,7 +88,7 @@ const postCount = Property.create({
     name: 'postCount',
     type: 'number',
     defaultValue: () => 0,  // Must provide default value
-    computedData: Count.create({
+    computation: Count.create({
         record: UserPostRelation
     })
 })
@@ -116,7 +116,7 @@ Relation.create(config: RelationConfig): KlassInstance<typeof Relation>
 - `config.targetProperty` (string, required): Relationship property name in target entity
 - `config.type` (string, required): Relationship type, options: '1:1' | '1:n' | 'n:1' | 'n:n'
 - `config.properties` (Property[], optional): Properties of the relationship itself
-- `config.computedData` (ComputedData[], optional): Relationship-level computed data
+- `config.computation` (Computation, optional): Relationship-level computed data
 
 **Note on Symmetric Relations**: The system automatically detects symmetric relations when `source === target` AND `sourceProperty === targetProperty`. There is no need to specify a `symmetric` parameter.
 
@@ -194,7 +194,7 @@ const userPostCount = Property.create({
     name: 'postCount',
     type: 'number',
     defaultValue: () => 0,  // Must provide default value
-    computedData: Count.create({
+    computation: Count.create({
         record: UserPostRelation
     })
 })
@@ -204,7 +204,7 @@ const publishedPostCount = Property.create({
     name: 'publishedPostCount',
     type: 'number',
     defaultValue: () => 0,
-    computedData: Count.create({
+    computation: Count.create({
         record: UserPostRelation,
         attributeQuery: [['target', {attributeQuery: ['status']}]],
         callback: function(relation) {
@@ -223,7 +223,7 @@ const highScorePostCount = Property.create({
     name: 'highScorePostCount',
     type: 'number',
     defaultValue: () => 0,
-    computedData: Count.create({
+    computation: Count.create({
         record: UserPostRelation,
         attributeQuery: [['target', {attributeQuery: ['score']}]],
         dataDeps: {
@@ -248,7 +248,7 @@ const activeUsersCount = Dictionary.create({
     name: 'activeUsersCount',
     type: 'number',
     collection: false,
-    computedData: Count.create({
+    computation: Count.create({
         record: User,
         attributeQuery: ['lastLoginDate'],
         dataDeps: {
@@ -269,7 +269,7 @@ const authorPostCount = Property.create({
     name: 'authoredPostCount',
     type: 'number',
     defaultValue: () => 0,
-    computedData: Count.create({
+    computation: Count.create({
         record: UserPostRelation,
         direction: 'target'  // Count related posts from user perspective
     })
@@ -297,7 +297,7 @@ const userTotalScore = Property.create({
     name: 'totalScore',
     type: 'number',
     defaultValue: () => 0,  // Must provide default value
-    computedData: WeightedSummation.create({
+    computation: WeightedSummation.create({
         record: UserScoreRelation,
         callback: function(scoreRecord) {
             return {
@@ -345,7 +345,7 @@ const totalRevenue = Dictionary.create({
     name: 'totalRevenue',
     type: 'number',
     collection: false,
-    computedData: Summation.create({
+    computation: Summation.create({
         record: Transaction,
         attributeQuery: ['amount']
     })
@@ -356,7 +356,7 @@ const userTotalSpent = Property.create({
     name: 'totalSpent',
     type: 'number',
     defaultValue: () => 0,  // Must provide default value
-    computedData: Summation.create({
+    computation: Summation.create({
         record: UserOrderRelation,
         attributeQuery: [['target', {attributeQuery: ['totalAmount']}]]
     })
@@ -367,7 +367,7 @@ const departmentBudget = Property.create({
     name: 'totalBudget',
     type: 'number',
     defaultValue: () => 0,
-    computedData: Summation.create({
+    computation: Summation.create({
         record: DepartmentProjectRelation,
         attributeQuery: [['target', {
             attributeQuery: [['budget', {
@@ -382,7 +382,7 @@ const totalShippingCost = Property.create({
     name: 'totalShippingCost',
     type: 'number',
     defaultValue: () => 0,
-    computedData: Summation.create({
+    computation: Summation.create({
         record: OrderShipmentRelation,
         attributeQuery: ['shippingFee']  // Relation's own property
     })
@@ -393,7 +393,7 @@ const totalBalance = Dictionary.create({
     name: 'totalBalance',
     type: 'number',
     collection: false,
-    computedData: Summation.create({
+    computation: Summation.create({
         record: Account,
         attributeQuery: ['balance']  // null or undefined values treated as 0
     })
@@ -429,7 +429,7 @@ const orderTotal = Property.create({
     name: 'total',
     type: 'number',
     defaultValue: () => 0,
-    computedData: Summation.create({
+    computation: Summation.create({
         record: OrderItemRelation,
         attributeQuery: [['target', {attributeQuery: ['finalPrice']}]]
     })
@@ -458,7 +458,7 @@ const completedAllRequired = Property.create({
     name: 'completedAllRequired',
     type: 'boolean',
     defaultValue: () => false,  // Must provide default value
-    computedData: Every.create({
+    computation: Every.create({
         record: UserCourseRelation,
         callback: function(courseRelation) {
             return courseRelation.status === 'completed'
@@ -489,7 +489,7 @@ const hasPendingTasks = Property.create({
     name: 'hasPendingTasks',
     type: 'boolean',
     defaultValue: () => false,  // Must provide default value
-    computedData: Any.create({
+    computation: Any.create({
         record: UserTaskRelation,
         callback: function(taskRelation) {
             return taskRelation.status === 'pending'
@@ -519,7 +519,7 @@ const userSummary = Property.create({
     name: 'summary',
     type: 'string',
     defaultValue: () => '',  // Must provide default value
-    computedData: Transform.create({
+    computation: Transform.create({
         record: User,
         callback: function(user) {
             return `${user.username} (${user.email}) - ${user.posts?.length || 0} posts`
@@ -600,7 +600,7 @@ State field naming convention:
 const currentTimestamp = Dictionary.create({
     name: 'currentTimestamp',
     type: 'number',
-    computedData: RealTime.create({
+    computation: RealTime.create({
         nextRecomputeTime: (now: number, dataDeps: any) => 1000, // Update every second
         callback: async (now: Expression, dataDeps: any) => {
             return now.divide(1000); // Convert to seconds
@@ -612,7 +612,7 @@ const currentTimestamp = Dictionary.create({
 const isAfterDeadline = Dictionary.create({
     name: 'isAfterDeadline',
     type: 'boolean',
-    computedData: RealTime.create({
+    computation: RealTime.create({
         dataDeps: {
             project: {
                 type: 'records',
@@ -632,7 +632,7 @@ const isAfterDeadline = Dictionary.create({
 const isExactHour = Dictionary.create({
     name: 'isExactHour',
     type: 'boolean',
-    computedData: RealTime.create({
+    computation: RealTime.create({
         callback: async (now: Expression, dataDeps: any) => {
             const millisecondsInHour = 3600000;
             // System will automatically recompute at next exact hour
@@ -649,7 +649,7 @@ const userEntity = Entity.create({
         Property.create({
             name: 'isRecentlyActive',
             type: 'boolean',
-            computedData: RealTime.create({
+            computation: RealTime.create({
                 dataDeps: {
                     _current: {
                         type: 'property',
@@ -670,7 +670,7 @@ const userEntity = Entity.create({
 const businessMetrics = Dictionary.create({
     name: 'businessMetrics',
     type: 'object',
-    computedData: RealTime.create({
+    computation: RealTime.create({
         nextRecomputeTime: (now: number, dataDeps: any) => 300000, // Update every 5 minutes
         dataDeps: {
             config: {
@@ -747,7 +747,7 @@ Dictionary.create(config: DictionaryConfig): KlassInstance<typeof Dictionary>
 - `config.collection` (boolean, required): Whether it's a collection type, defaults to false
 - `config.args` (object, optional): Type-specific arguments (e.g., string length, number range)
 - `config.defaultValue` (function, optional): Default value generator function
-- `config.computedData` (ComputedData, optional): Reactive computation for the dictionary value
+- `config.computation` (Computation, optional): Reactive computation for the dictionary value
 
 **Examples**
 ```typescript
@@ -757,7 +757,7 @@ const userCountDict = Dictionary.create({
     type: 'number',
     collection: false,
     defaultValue: () => 0,
-    computedData: Count.create({
+    computation: Count.create({
         record: User
     })
 })
@@ -778,7 +778,7 @@ const currentTime = Dictionary.create({
     name: 'currentTime',
     type: 'number',
     collection: false,
-    computedData: RealTime.create({
+    computation: RealTime.create({
         nextRecomputeTime: () => 1000, // Update every second
         callback: async (now) => {
             return now.divide(1000);
@@ -792,7 +792,7 @@ const activeUsers = Dictionary.create({
     type: 'string',
     collection: true,
     defaultValue: () => [],
-    computedData: Transform.create({
+    computation: Transform.create({
         record: User,
         attributeQuery: ['id', 'lastLoginTime'],
         callback: (users) => {
@@ -991,7 +991,7 @@ const CreatePost = Interaction.create({
 const UserPostRelation = Relation.create({
   source: User,
   target: Post,
-  computedData: Transform.create({
+  computation: Transform.create({
     record: InteractionEventEntity,
     callback: (event) => {
       if (event.interactionName === 'CreatePost') {
@@ -1210,7 +1210,7 @@ new Controller(
 )
 ```
 
-⚠️ **IMPORTANT**: Controller does NOT accept a computations parameter. All computations should be defined within the `computedData` field of Entity/Relation/Property definitions. The 6th parameter `dict` is for global dictionary definitions (Dictionary.create), not for computation definitions.
+⚠️ **IMPORTANT**: Controller does NOT accept a computations parameter. All computations should be defined within the `computation` field of Entity/Relation/Property definitions. The 6th parameter `dict` is for global dictionary definitions (Dictionary.create), not for computation definitions.
 
 **Main Methods**
 
@@ -1502,7 +1502,7 @@ const User = Entity.create({
         Property.create({
             name: 'postCount',
             type: 'number',
-            computedData: Count.create({ record: UserPostRelation })
+            computation: Count.create({ record: UserPostRelation })
         })
     ]
 })
@@ -1515,7 +1515,7 @@ const Post = Entity.create({
         Property.create({
             name: 'likeCount',
             type: 'number',
-            computedData: Count.create({ record: PostLikeRelation })
+            computation: Count.create({ record: PostLikeRelation })
         })
     ]
 })

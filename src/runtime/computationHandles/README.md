@@ -160,10 +160,10 @@ async incrementalCompute(lastValue: number, mutationEvent: ERRecordMutationEvent
 
 ### 7. 注册计算处理器
 
-最后，需要将实现的处理类注册到 ComputedDataHandle 中：
+最后，需要将实现的处理类注册到 ComputationHandle 中：
 
 ```typescript
-ComputedDataHandle.Handles.set(XXX, {
+ComputationHandle.Handles.set(XXX, {
     global: GlobalXXXHandle,
     property: PropertyXXXHandle
 });

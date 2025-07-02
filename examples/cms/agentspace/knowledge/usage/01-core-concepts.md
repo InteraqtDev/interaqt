@@ -47,7 +47,7 @@ const Post = Entity.create({
     Property.create({
       name: 'likeCount',
       // Like count "is" the number of like relationships
-      computedData: Count.create({
+      computation: Count.create({
         record: LikeRelation
       })
     })
@@ -69,7 +69,7 @@ const LikePost = Interaction.create({
 const LikeRelation = Relation.create({
   source: User,
   target: Post,
-  computedData: Transform.create({
+  computation: Transform.create({
     record: InteractionEventEntity,
     callback: (event) => {
       if (event.interactionName === 'LikePost') {

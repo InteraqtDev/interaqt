@@ -1,4 +1,4 @@
-import { ComputedDataHandle, DataContext, PropertyDataContext } from "./ComputedDataHandle.js";
+import { ComputationHandle, DataContext, PropertyDataContext } from "./ComputationHandle.js";
 import { WeightedSummation, KlassInstance, Relation, Entity } from "@shared";
 import { Controller } from "../Controller.js";
 import { ComputationResult, DataDep, RecordsDataDep, RecordBoundState } from "./Computation.js";
@@ -188,7 +188,7 @@ export class PropertyWeightedSummationHandle implements DataBasedComputation {
     }
 }
 
-ComputedDataHandle.Handles.set(WeightedSummation, {
+ComputationHandle.Handles.set(WeightedSummation, {
     global: GlobalWeightedSummationHandle,
     property: PropertyWeightedSummationHandle
 });

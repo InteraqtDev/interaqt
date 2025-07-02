@@ -2,7 +2,7 @@ import { KlassInstance, StateMachine, StateNode } from "@shared";
 import { Controller } from "../Controller.js";
 import { EntityIdRef, RecordMutationEvent } from '../System.js';
 import {INTERACTION_RECORD} from "../ActivityManager";
-import { ComputedDataHandle, DataContext, EntityDataContext } from "./ComputedDataHandle.js";
+import { ComputationHandle, DataContext, EntityDataContext } from "./ComputationHandle.js";
 import { ComputationResult, ComputationResultPatch, EventBasedComputation, EventDep, GlobalBoundState, RecordBoundState } from "./Computation.js";
 import { EtityMutationEvent } from "../Scheduler.js";
 import { TransitionFinder } from "./TransitionFinder.js";
@@ -201,7 +201,7 @@ export class RecordStateMachineHandle implements EventBasedComputation {
 
 
     
-ComputedDataHandle.Handles.set(StateMachine, {
+ComputationHandle.Handles.set(StateMachine, {
     global: GlobalStateMachineHandle,
     property: PropertyStateMachineHandle,
     relation: RecordStateMachineHandle,

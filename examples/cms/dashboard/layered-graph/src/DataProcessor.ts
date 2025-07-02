@@ -15,7 +15,7 @@ export interface Property {
   collection?: boolean;
   defaultValue?: () => any;
   computed?: (entity: any) => any;
-  computedData?: any;
+  computation?: any;
 }
 
 export interface Relation {

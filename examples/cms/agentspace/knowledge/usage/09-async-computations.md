@@ -124,10 +124,10 @@ class GlobalWeatherComputation implements DataBasedComputation {
 ### Registering Computation Handlers
 
 ```typescript
-import { ComputedDataHandle } from 'interaqt';
+import { ComputationHandle } from 'interaqt';
 
 // Register global computation handler
-ComputedDataHandle.Handles.set(GlobalWeatherComputed, {
+ComputationHandle.Handles.set(GlobalWeatherComputed, {
   global: GlobalWeatherComputation
 });
 ```
@@ -140,7 +140,7 @@ const weatherDictionary = Dictionary.create({
   name: 'currentWeather',
   type: 'object',
   collection: false,
-  computedData: GlobalWeatherComputed.create({
+  computation: GlobalWeatherComputed.create({
     city: 'Beijing',
     apiKey: process.env.WEATHER_API_KEY
   })
@@ -295,7 +295,7 @@ class ProductRecommendationComputation implements DataBasedComputation {
 }
 
 // Register entity computation handler
-ComputedDataHandle.Handles.set(ProductRecommendationComputed, {
+ComputationHandle.Handles.set(ProductRecommendationComputed, {
   entity: ProductRecommendationComputation
 });
 ```
@@ -322,7 +322,7 @@ const recommendationEntity = Entity.create({
     Property.create({name: 'algorithm', type: 'string'}),
     Property.create({name: 'generatedAt', type: 'number'})
   ],
-  computedData: ProductRecommendationComputed.create({
+  computation: ProductRecommendationComputed.create({
     algorithm: 'collaborative_filtering',
     maxResults: 5
   })
@@ -409,7 +409,7 @@ class RelationSimilarityComputation implements DataBasedComputation {
 }
 
 // Register relation computation handler
-ComputedDataHandle.Handles.set(RelationSimilarityComputed, {
+ComputationHandle.Handles.set(RelationSimilarityComputed, {
   relation: RelationSimilarityComputation
 });
 ```
