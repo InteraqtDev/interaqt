@@ -47,6 +47,15 @@ When using LLM to generate interaqt applications, you must follow **test-case dr
    agentspace/knowledge/usage/16-performance-optimization.md
    ```
 
+   **🔴 CRITICAL for CRUD Operations**:
+   - **MUST carefully study `14-entity-crud-patterns.md`** for implementing entity creation, update, and deletion
+   - This document shows the CORRECT reactive patterns:
+     - Entity creation: Use Transform in Entity's computation
+     - Entity updates: Use Transform or StateMachine in Property's computation
+     - Entity deletion: Use soft delete with StateMachine
+     - Relations: Define structure only, no computation needed for basic creation
+   - **WARNING**: Not all business logic follows CRUD patterns - use these patterns for standard CRUD operations, but adapt for complex business scenarios
+
 3. **Test Cases Learning**:
    ```
    ../../tests/runtime/
@@ -147,6 +156,31 @@ export const interactions = [CreatePost, UpdatePost, DeletePost]
 #### 2.2 Implementation Order (STRICTLY FOLLOW)
 1. First implement all Entity and Property
    - Include computation (Count, Transform, etc.) in Property definitions where needed
+   - **🔴 MUST follow patterns in `14-entity-crud-patterns.md`**:
+     - For entity creation: Add Transform in Entity's computation listening to InteractionEventEntity
+     - For property updates: Add Transform or StateMachine in Property's computation
+     - For soft delete: Use StateMachine to manage entity lifecycle states
+     - Example of correct entity with creation logic:
+     ```typescript
+     const Style = Entity.create({
+       name: 'Style',
+       properties: [...],
+       computation: Transform.create({
+         record: InteractionEventEntity,
+         callback: function(event) {
+           if (event.interactionName === 'CreateStyle') {
+             return {
+               ...event.payload.style,
+               createdAt: new Date().toISOString(),
+               updatedAt: new Date().toISOString(),
+               createdBy: { id: event.user.id }  // Relations created automatically
+             };
+           }
+           return null;
+         }
+       })
+     })
+     ```
 2. Then implement all Relation
    - Include computation in Relation definitions where needed
 3. Finally implement all Interaction and Activity
