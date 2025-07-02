@@ -57,7 +57,7 @@ Property.create(config: PropertyConfig): KlassInstance<typeof Property>
 - `config.collection` (boolean, optional): Whether it's a collection type
 - `config.defaultValue` (function, optional): Default value function
 - `config.computed` (function, optional): Computed property function
-- `config.computedData` (ComputedData[], optional): Property computed data
+- `config.computedData` (ComputedData, optional): Property computed data
 
 **Examples**
 ```typescript
@@ -214,6 +214,11 @@ const publishedPostCount = Property.create({
 })
 
 // Count with data dependencies (filter based on global minimum score setting)
+const minScoreThreshold = Dictionary.create({
+    name: 'minScoreThreshold',
+    type: 'number',
+    collection: false
+})
 const highScorePostCount = Property.create({
     name: 'highScorePostCount',
     type: 'number',
@@ -224,11 +229,7 @@ const highScorePostCount = Property.create({
         dataDeps: {
             minScore: {
                 type: 'global',
-                source: Dictionary.create({
-                    name: 'minScoreThreshold',
-                    type: 'number',
-                    collection: false
-                })
+                source: minScoreThreshold
             }
         },
         callback: function(relation, dataDeps) {
@@ -238,6 +239,11 @@ const highScorePostCount = Property.create({
 })
 
 // Global count with filter and data dependencies
+const userActiveDays = Dictionary.create({
+    name: 'userActiveDays',
+    type: 'number',
+    collection: false
+})
 const activeUsersCount = Dictionary.create({
     name: 'activeUsersCount',
     type: 'number',
@@ -248,11 +254,7 @@ const activeUsersCount = Dictionary.create({
         dataDeps: {
             activeDays: {
                 type: 'global',
-                source: Dictionary.create({
-                    name: 'userActiveDays',
-                    type: 'number',
-                    collection: false
-                })
+                source: userActiveDays
             }
         },
         callback: function(user, dataDeps) {

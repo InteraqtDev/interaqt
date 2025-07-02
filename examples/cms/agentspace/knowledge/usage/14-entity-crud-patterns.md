@@ -441,9 +441,9 @@ const User = Entity.create({
       name: 'articleCount',
       type: 'number',
       computedData: Count.create({
-        relation: UserArticleRelation,
-        relationDirection: 'target',
-        match: (article) => article.status !== 'deleted'
+        record: UserArticleRelation,
+        direction: 'target',
+        callback: (article) => article.status !== 'deleted'
       })
     })
   ]
