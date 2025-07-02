@@ -1,6 +1,6 @@
 # How to Use Activities for Process Management
 
-Activities are the core mechanism in InterAQT for managing complex business processes. They allow you to define multi-step, multi-role business processes and control the execution order and conditions of processes through a state machine model.
+Activities are the core mechanism in interaqt for managing complex business processes. They allow you to define multi-step, multi-role business processes and control the execution order and conditions of processes through a state machine model.
 
 ## Understanding Activity Concepts
 
@@ -860,4 +860,4 @@ const EfficientCondition = Condition.create({
 });
 ```
 
-The activity system provides InterAQT with powerful process management capabilities. Through proper design of activities, states, and transfers, you can implement complex business process control while maintaining code clarity and maintainability. 
+The activity system provides interaqt with powerful process management capabilities. Through proper design of activities, states, and transfers, you can implement complex business process control while maintaining code clarity and maintainability. 

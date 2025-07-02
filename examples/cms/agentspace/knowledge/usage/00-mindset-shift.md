@@ -263,7 +263,7 @@ const UserOrderRelation = Relation.create({
   source: User,
   target: Order,
   computedData: Transform.create({
-    record: InteractionEvent,
+    record: InteractionEventEntity,
     callback: (event) => {
       if (event.interactionName === 'PlaceOrder') {
         return {

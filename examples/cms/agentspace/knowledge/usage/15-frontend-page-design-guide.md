@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document guides how to systematically design frontend page architecture and user interaction flows based on the backend definitions (entities, relations, interactions, etc.) of InterAQT applications. It focuses on conceptual design aspects such as page division, user interaction points, and data flow, rather than specific technical implementation.
+This document guides how to systematically design frontend page architecture and user interaction flows based on the backend definitions (entities, relations, interactions, etc.) of interaqt applications. It focuses on conceptual design aspects such as page division, user interaction points, and data flow, rather than specific technical implementation.
 
 ## Design Principles
 
@@ -474,7 +474,7 @@ After completing page design, use the following checklist to verify design compl
 
 ## Summary
 
-Frontend page design based on the InterAQT framework should:
+Frontend page design based on the interaqt framework should:
 
 1. **Data-Centric**: Design page structure around entities and relationships
 2. **Reactive-First**: Fully utilize the framework's reactive computation features

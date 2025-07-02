@@ -1,11 +1,11 @@
-# InterAQT Framework Learning Guide
+# interaqt Framework Learning Guide
 
 ⚠️ **Important: Please follow the learning order below. Skipping any step may lead to misunderstanding**
 
 ## 📚 Required Reading Order
 
 ### 1. 🧠 [Mindset Shift](./00-mindset-shift.md) **← Most Important!**
-Before learning anything else, you **must** first understand the mindset shift from imperative to declarative thinking. This is the key to understanding InterAQT.
+Before learning anything else, you **must** first understand the mindset shift from imperative to declarative thinking. This is the key to understanding interaqt.
 
 ### 2. 🎯 [Core Concepts](./01-core-concepts.md)
 Understand the basic concepts and reactive mechanisms of the framework.
@@ -63,7 +63,7 @@ const CreatePost = Interaction.create({
 // ✅ Correct: Declare data existence through reactive computations
 const UserPostRelation = Relation.create({
   computedData: Transform.create({
-    record: InteractionEvent,
+    record: InteractionEventEntity,
     callback: (event) => {
       if (event.interactionName === 'CreatePost') {
         return { /* post data */ };
@@ -139,4 +139,4 @@ Remember: **Stop thinking "how to do", start thinking "what is"**!
 
 ## 📞 Need Help?
 
-If you find yourself still thinking about "how to operate data", please re-read [Mindset Shift](./00-mindset-shift.md). This mindset shift is a prerequisite for using InterAQT. 
+If you find yourself still thinking about "how to operate data", please re-read [Mindset Shift](./00-mindset-shift.md). This mindset shift is a prerequisite for using interaqt. 

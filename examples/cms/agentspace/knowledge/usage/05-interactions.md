@@ -1,10 +1,10 @@
 # How to Define and Execute Interactions
 
-Interactions are the only way users interact with the system in InterAQT, and the source of all data changes in the system. By defining interactions, you can describe what operations users can perform and how these operations affect data in the system.
+Interactions are the only way users interact with the system in interaqt, and the source of all data changes in the system. By defining interactions, you can describe what operations users can perform and how these operations affect data in the system.
 
 ## Important Note: About User Identity
 
-**InterAQT focuses on reactive processing of business logic and does not include user authentication functionality.**
+**interaqt focuses on reactive processing of business logic and does not include user authentication functionality.**
 
 When using this framework, please note:
 - The system assumes user identity has already been authenticated through other means (such as JWT, Session, etc.)
@@ -86,7 +86,7 @@ app.post('/api/posts', async (req, res) => {
   res.json(post);
 });
 
-// InterAQT interaction approach
+// interaqt interaction approach
 const CreatePost = Interaction.create({
   name: 'CreatePost',
   action: Action.create({
@@ -122,7 +122,7 @@ const SayHello = Interaction.create({
 
 ### Interaction for Creating Entities
 
-In InterAQT, interactions don't directly operate on data. Data creation, updating, and deletion are all implemented through reactive computations.
+In interaqt, interactions don't directly operate on data. Data creation, updating, and deletion are all implemented through reactive computations.
 
 ```javascript
 // 1. Define interaction
@@ -382,7 +382,7 @@ const orderValidation = Transform.create({
 
 ## Implementing Data Change Logic
 
-⚠️ **Important: In InterAQT, never try to "operate" data in interactions!**
+⚠️ **Important: In interaqt, never try to "operate" data in interactions!**
 
 Interactions only declare "what users can do" and contain no data operation logic. All data changes are **inherent properties** of data, automatically maintained through reactive computations.
 
@@ -854,7 +854,7 @@ const ModerationPermission = Attributive.create({
 
 ## Using Transform to Listen to Interactions and Create Data
 
-Transform is a core concept in InterAQT, used to listen to events in the system (such as interaction events) and reactively create or update data.
+Transform is a core concept in interaqt, used to listen to events in the system (such as interaction events) and reactively create or update data.
 
 ### Listening to Interaction Events to Create Relations
 
@@ -1254,4 +1254,4 @@ const User = Entity.create({
 });
 ```
 
-Interactions are the bridge connecting user operations and data changes in InterAQT. By properly designing interactions and combining them with the framework's reactive features, you can create business logic systems that are both easy to understand and efficiently executed. Remember: interactions only define "what to do", while the specific "how to do it" is implemented through reactive computations. 
+Interactions are the bridge connecting user operations and data changes in interaqt. By properly designing interactions and combining them with the framework's reactive features, you can create business logic systems that are both easy to understand and efficiently executed. Remember: interactions only define "what to do", while the specific "how to do it" is implemented through reactive computations. 

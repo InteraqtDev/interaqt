@@ -116,8 +116,9 @@ Relation.create(config: RelationConfig): KlassInstance<typeof Relation>
 - `config.targetProperty` (string, required): Relationship property name in target entity
 - `config.type` (string, required): Relationship type, options: '1:1' | '1:n' | 'n:1' | 'n:n'
 - `config.properties` (Property[], optional): Properties of the relationship itself
-- `config.symmetric` (boolean, optional): Whether it's a symmetric relationship (only for n:n relationships)
 - `config.computedData` (ComputedData[], optional): Relationship-level computed data
+
+**Note on Symmetric Relations**: The system automatically detects symmetric relations when `source === target` AND `sourceProperty === targetProperty`. There is no need to specify a `symmetric` parameter.
 
 **Examples**
 ```typescript
@@ -140,13 +141,13 @@ const UserTagRelation = Relation.create({
 })
 
 // Symmetric relationship (friendship)
+// Note: System detects symmetric relations automatically when source === target AND sourceProperty === targetProperty
 const FriendRelation = Relation.create({
     source: User,
     sourceProperty: 'friends',
     target: User,
-    targetProperty: 'friends',
-    type: 'n:n',
-    symmetric: true
+    targetProperty: 'friends',  // Same as sourceProperty - automatically symmetric
+    type: 'n:n'
 })
 
 // Relationship with properties
@@ -729,6 +730,167 @@ const lastRecomputeTime = await system.storage.get(DICTIONARY_RECORD, lastRecomp
 const nextRecomputeTime = await system.storage.get(DICTIONARY_RECORD, nextRecomputeTimeKey);
 ```
 
+### Dictionary.create()
+
+Create global dictionary for storing system-wide state and values.
+
+**Syntax**
+```typescript
+Dictionary.create(config: DictionaryConfig): KlassInstance<typeof Dictionary>
+```
+
+**Parameters**
+- `config.name` (string, required): Dictionary name
+- `config.type` (string, required): Value type, must be one of PropertyTypes (e.g., 'string', 'number', 'boolean', 'object', etc.)
+- `config.collection` (boolean, required): Whether it's a collection type, defaults to false
+- `config.args` (object, optional): Type-specific arguments (e.g., string length, number range)
+- `config.defaultValue` (function, optional): Default value generator function
+- `config.computedData` (ComputedData, optional): Reactive computation for the dictionary value
+
+**Examples**
+```typescript
+// Simple global counter
+const userCountDict = Dictionary.create({
+    name: 'userCount',
+    type: 'number',
+    collection: false,
+    defaultValue: () => 0,
+    computedData: Count.create({
+        record: User
+    })
+})
+
+// System configuration
+const systemConfig = Dictionary.create({
+    name: 'config',
+    type: 'object',
+    collection: false,
+    defaultValue: () => ({
+        maxUsers: 1000,
+        maintenanceMode: false
+    })
+})
+
+// Real-time values
+const currentTime = Dictionary.create({
+    name: 'currentTime',
+    type: 'number',
+    collection: false,
+    computedData: RealTime.create({
+        nextRecomputeTime: () => 1000, // Update every second
+        callback: async (now) => {
+            return now.divide(1000);
+        }
+    })
+})
+
+// Collection type dictionary
+const activeUsers = Dictionary.create({
+    name: 'activeUsers',
+    type: 'string',
+    collection: true,
+    defaultValue: () => [],
+    computedData: Transform.create({
+        record: User,
+        attributeQuery: ['id', 'lastLoginTime'],
+        callback: (users) => {
+            const oneHourAgo = Date.now() - 3600000;
+            return users
+                .filter(u => u.lastLoginTime > oneHourAgo)
+                .map(u => u.id);
+        }
+    })
+})
+```
+
+**Usage in Controller**
+
+Dictionaries are passed as the 6th parameter to Controller:
+
+```typescript
+const controller = new Controller(
+    system,
+    entities,
+    relations,
+    activities,
+    interactions,
+    [userCountDict, systemConfig, currentTime, activeUsers], // Dictionaries
+    []
+);
+```
+
+### StateNode.create()
+
+Create state node for state machine computation.
+
+**Syntax**
+```typescript
+StateNode.create(config: StateNodeConfig): KlassInstance<typeof StateNode>
+```
+
+**Parameters**
+- `config.name` (string, required): State name identifier
+- `config.computeValue` (function, optional): Function to compute value for this state
+
+**Examples**
+```typescript
+// Simple state node
+const pendingState = StateNode.create({ name: 'pending' });
+
+// State node with computed value
+const activeState = StateNode.create({
+    name: 'active',
+    computeValue: (context) => {
+        // Compute state-specific value
+        return {
+            activatedAt: Date.now(),
+            priority: context.priority || 'normal'
+        };
+    }
+});
+```
+
+### StateTransfer.create()
+
+Create state transfer for state machine computation.
+
+**Syntax**
+```typescript
+StateTransfer.create(config: StateTransferConfig): KlassInstance<typeof StateTransfer>
+```
+
+**Parameters**
+- `config.trigger` (any, required): Trigger for the state transfer (usually an Interaction)
+- `config.current` (StateNode, required): Current state node
+- `config.next` (StateNode, required): Next state node
+- `config.computeTarget` (function, optional): Function to dynamically compute the target state
+
+**Examples**
+```typescript
+// Simple state transfer
+const approveTransfer = StateTransfer.create({
+    trigger: ApproveInteraction,
+    current: pendingState,
+    next: approvedState
+});
+
+// State transfer with dynamic target computation
+const conditionalTransfer = StateTransfer.create({
+    trigger: ProcessInteraction,
+    current: pendingState,
+    next: approvedState, // Default next state
+    computeTarget: (context) => {
+        // Dynamically determine next state based on context
+        if (context.autoApprove) {
+            return approvedState;
+        } else if (context.requiresReview) {
+            return reviewState;
+        }
+        return rejectedState;
+    }
+});
+```
+
 ## 13.3 Interaction-Related APIs
 
 ### Interaction.create()
@@ -749,6 +911,7 @@ Interaction.create(config: InteractionConfig): KlassInstance<typeof Interaction>
 - `config.sideEffects` (SideEffect[], optional): Side effect handlers
 - `config.data` (Entity|Relation, optional): Associated data entity
 - `config.dataAttributives` (DataAttributive|DataAttributives, optional): Data permission attributives
+- `config.query` (Query, optional): Query definition for data fetching
 
 **Examples**
 ```typescript
@@ -827,7 +990,7 @@ const UserPostRelation = Relation.create({
   source: User,
   target: Post,
   computedData: Transform.create({
-    record: InteractionEvent,
+    record: InteractionEventEntity,
     callback: (event) => {
       if (event.interactionName === 'CreatePost') {
         // This is where the actual creation logic is

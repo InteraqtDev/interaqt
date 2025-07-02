@@ -1,12 +1,12 @@
 # How to Use Attributives for Permission Control
 
-Attributives are the core mechanism for permission control in InterAQT. They allow you to define who can perform specific operations in a declarative way, controlling access permissions based on user roles, relationships, or other dynamic conditions.
+Attributives are the core mechanism for permission control in interaqt. They allow you to define who can perform specific operations in a declarative way, controlling access permissions based on user roles, relationships, or other dynamic conditions.
 
 ## Understanding the Attributive Concept
 
 ### What is an Attributive
 
-An attributive is a descriptive constraint condition used to limit who can perform a specific operation. In natural language, attributives are used to modify nouns; in InterAQT, attributives are used to modify interactions and entities, defining access rules.
+An attributive is a descriptive constraint condition used to limit who can perform a specific operation. In natural language, attributives are used to modify nouns; in interaqt, attributives are used to modify interactions and entities, defining access rules.
 
 For example:
 - "**Authors** can edit posts" - "Authors" is an attributive
@@ -61,7 +61,7 @@ app.put('/api/posts/:id', async (req, res) => {
   res.json(updatedPost);
 });
 
-// InterAQT attributive approach
+// interaqt attributive approach
 const UpdatePost = Interaction.create({
   name: 'UpdatePost',
   action: Action.create({
@@ -328,7 +328,7 @@ const EditDraft = Interaction.create({
 
 ## Controlling Entity Operation Permissions Through Interactions
 
-In InterAQT, entity-level permission control is implemented through Interactions, not directly on entity definitions. Here's how to restrict entity creation, querying, and updating:
+In interaqt, entity-level permission control is implemented through Interactions, not directly on entity definitions. Here's how to restrict entity creation, querying, and updating:
 
 ### Restricting Entity Creation
 
@@ -445,7 +445,7 @@ const UpdateUserProfile = Interaction.create({
 
 ## Combining Multiple Attributives
 
-A powerful feature of InterAQT is the ability to directly use BoolExp in Interaction definitions to combine multiple atomic Attributives. The Controller automatically recognizes and processes these combinations, executing permission checks according to boolean logic.
+A powerful feature of interaqt is the ability to directly use BoolExp in Interaction definitions to combine multiple atomic Attributives. The Controller automatically recognizes and processes these combinations, executing permission checks according to boolean logic.
 
 ### AND Logic Combination
 
@@ -492,7 +492,7 @@ const EditPostV2 = Interaction.create({
 
 ## Using BoolExp to Build Complex Permission Conditions
 
-In InterAQT, both `userAttributives` and PayloadItem's `attributives` support directly using BoolExp to combine multiple atomic Attributives. The Controller automatically recognizes and processes these BoolExp expressions, allowing you to flexibly build complex permission rules.
+In interaqt, both `userAttributives` and PayloadItem's `attributives` support directly using BoolExp to combine multiple atomic Attributives. The Controller automatically recognizes and processes these BoolExp expressions, allowing you to flexibly build complex permission rules.
 
 ### Core Concepts of BoolExp Combining Attributives
 
@@ -943,4 +943,4 @@ const InefficientLeaderAttributive = Attributive.create({
 });
 ```
 
-The attributive system provides InterAQT with a powerful and flexible permission control mechanism. Through proper design, systematic testing, and continuous optimization, you can implement complex permission control logic while maintaining code clarity and maintainability. The right testing strategy not only verifies the correctness of permission logic but also improves system security and user experience.
+The attributive system provides interaqt with a powerful and flexible permission control mechanism. Through proper design, systematic testing, and continuous optimization, you can implement complex permission control logic while maintaining code clarity and maintainability. The right testing strategy not only verifies the correctness of permission logic but also improves system security and user experience.

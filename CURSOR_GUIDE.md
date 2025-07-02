@@ -93,10 +93,14 @@ const User = Entity.create({
 实体之间的连接，本质上也是特殊的 Entity。
 
 ```typescript
+// 注意：系统会自动检测对称关系
+// 当 source === target 且 sourceProperty === targetProperty 时
 const Friendship = Relation.create({
   source: User,
+  sourceProperty: 'friends',
   target: User,
-  symmetric: true  // 对称关系
+  targetProperty: 'friends',  // 相同的属性名 - 自动成为对称关系
+  type: 'n:n'
 });
 ```
 

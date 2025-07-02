@@ -302,13 +302,14 @@ Symmetric relations are a special type of many-to-many relation where both ends 
 
 ```javascript
 // Friend relation
+// Note: The system automatically detects symmetric relations when:
+// source === target (both User) AND sourceProperty === targetProperty (both 'friends')
 const Friendship = Relation.create({
   source: User,
   sourceProperty: 'friends',
   target: User,
-  targetProperty: 'friends',
+  targetProperty: 'friends',  // Same as sourceProperty - automatically symmetric
   type: 'n:n',
-  symmetric: true,  // Mark as symmetric relation
   properties: [
     Property.create({ 
       name: 'createdAt', 
