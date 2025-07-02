@@ -9,16 +9,42 @@ In interaqt, all data operations follow reactive design principles. This chapter
 3. **Update**: Reactively update entity state through StateMachine or Transform
 4. **Reference**: For entities that support deletion, use Filtered Entity to create "non-deleted" views
 
+## Transform Usage Guidelines
+
+Understanding where to place Transform is crucial:
+
+1. **Entity's computedData + Transform**: Use when you need to create new entities from interaction events
+   - The entity listens to InteractionEventEntity
+   - Returns entity data to be created
+   - Related entities can be referenced directly in the returned data
+
+2. **Relation's computedData + Transform**: Use when you need to create relations between existing entities
+   - The relation listens to InteractionEventEntity
+   - Returns relation data (source, target, and any relation properties)
+   - Both source and target entities must already exist
+
+3. **Property's computedData + Transform**: Use when you need to transform data from other entities/relations
+   - Should reference different, already-defined entities
+   - Never reference the entity being defined (use getValue for same-entity computations)
+
 ## Creating Entities - Using Transform
 
 ### Basic Pattern
 
-By using Transform in a Relation's `computedData`, you can listen to interaction events and create entities:
+By using Transform in an Entity's `computedData`, you can listen to interaction events and create entities. When creating an entity that needs relations, include the related entity reference directly in the creation data:
 
 ```javascript
 import { Entity, Property, Relation, Transform, InteractionEventEntity, Interaction, Action, Payload, PayloadItem } from 'interaqt';
 
 // 1. Define entities
+const User = Entity.create({
+  name: 'User',
+  properties: [
+    Property.create({ name: 'username', type: 'string' }),
+    Property.create({ name: 'email', type: 'string' })
+  ]
+});
+
 const Article = Entity.create({
   name: 'Article',
   properties: [
@@ -27,15 +53,26 @@ const Article = Entity.create({
     Property.create({ name: 'status', type: 'string', defaultValue: () => 'draft' }),
     Property.create({ name: 'createdAt', type: 'string' }),
     Property.create({ name: 'updatedAt', type: 'string' })
-  ]
-});
-
-const User = Entity.create({
-  name: 'User',
-  properties: [
-    Property.create({ name: 'username', type: 'string' }),
-    Property.create({ name: 'email', type: 'string' })
-  ]
+  ],
+  // Transform in Entity's computedData listens to interactions to create entities
+  computedData: Transform.create({
+    record: InteractionEventEntity,
+    callback: function(event) {
+      if (event.interactionName === 'CreateArticle') {
+        // Return entity data with relation reference
+        // The relation will be created automatically
+        return {
+          title: event.payload.title,
+          content: event.payload.content,
+          status: 'draft',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          author: {id: event.payload.authorId}  // Direct reference to User entity
+        };
+      }
+      return null;
+    }
+  })
 });
 
 // 2. Define creation interaction
@@ -51,27 +88,51 @@ const CreateArticle = Interaction.create({
   })
 });
 
-// 3. Define relation with creation logic in computedData
+// 3. Define relation - no computedData needed for creation
 const UserArticleRelation = Relation.create({
   source: Article,
   sourceProperty: 'author',
   target: User,
   targetProperty: 'articles',
-  type: 'n:1',
+  type: 'n:1'
+});
+```
+
+### Creating Relations Between Existing Entities
+
+When you need to create relations between already existing entities, use Transform in Relation's `computedData`:
+
+```javascript
+// Define interaction to add article to favorites
+const AddToFavorites = Interaction.create({
+  name: 'AddToFavorites',
+  action: Action.create({ name: 'addToFavorites' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({ name: 'articleId', base: Article, isRef: true, required: true })
+    ]
+  })
+});
+
+// Favorite relation with Transform in computedData
+const UserFavoriteRelation = Relation.create({
+  source: User,
+  sourceProperty: 'favorites',
+  target: Article,
+  targetProperty: 'favoritedBy',
+  type: 'n:n',
+  properties: [
+    Property.create({ name: 'addedAt', type: 'string' })
+  ],
+  // Transform creates relation between existing entities
   computedData: Transform.create({
     record: InteractionEventEntity,
     callback: function(event) {
-      if (event.interactionName === 'CreateArticle') {
-        // Return relation and entity data to create
+      if (event.interactionName === 'AddToFavorites') {
         return {
-          source: {
-            title: event.payload.title,
-            content: event.payload.content,
-            status: 'draft',
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-          },
-          target: event.payload.authorId
+          source: event.user,  // Current user
+          target: {id:event.payload.articleId},  // Article to favorite
+          addedAt: new Date().toISOString()
         };
       }
       return null;
@@ -82,10 +143,58 @@ const UserArticleRelation = Relation.create({
 
 ### Creating Entities with Complex Relations
 
-For entities that need to create multiple relations simultaneously, use multiple Transforms:
+For entities that need to create multiple relations simultaneously, you can reference multiple entities in the creation data:
 
 ```javascript
-// Create article with tags
+// Define Tag entity
+const Tag = Entity.create({
+  name: 'Tag',
+  properties: [
+    Property.create({ name: 'name', type: 'string' })
+  ]
+});
+
+// Update Article entity to handle creation with tags
+const Article = Entity.create({
+  name: 'Article',
+  properties: [
+    Property.create({ name: 'title', type: 'string' }),
+    Property.create({ name: 'content', type: 'string' }),
+    Property.create({ name: 'status', type: 'string', defaultValue: () => 'draft' }),
+    Property.create({ name: 'createdAt', type: 'string' }),
+    Property.create({ name: 'updatedAt', type: 'string' })
+  ],
+  // Transform creates article and its relations
+  computedData: Transform.create({
+    record: InteractionEventEntity,
+    callback: function(event) {
+      if (event.interactionName === 'CreateArticle') {
+        return {
+          title: event.payload.title,
+          content: event.payload.content,
+          status: 'draft',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          author: {id:event.payload.authorId}
+        };
+      }
+      if (event.interactionName === 'CreateArticleWithTags') {
+        return {
+          title: event.payload.title,
+          content: event.payload.content,
+          status: 'draft',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          author: {id:event.payload.authorId},
+          tags: event.payload.tagIds.map(id=> {id})  // Multiple relations
+        };
+      }
+      return null;
+    }
+  })
+});
+
+// Create article with tags interaction
 const CreateArticleWithTags = Interaction.create({
   name: 'CreateArticleWithTags',
   action: Action.create({ name: 'createArticleWithTags' }),
@@ -99,7 +208,7 @@ const CreateArticleWithTags = Interaction.create({
   })
 });
 
-// Article-Tag relation
+// Article-Tag relation - no computedData needed for initial creation
 const ArticleTagRelation = Relation.create({
   source: Article,
   sourceProperty: 'tags',
@@ -107,25 +216,35 @@ const ArticleTagRelation = Relation.create({
   targetProperty: 'articles',
   type: 'n:n',
   properties: [
-    Property.create({ name: 'addedAt', type: 'string' })
-  ],
-  computedData: Transform.create({
-    record: InteractionEventEntity,
-    callback: function(event) {
-      if (event.interactionName === 'CreateArticleWithTags' && event.payload.tagIds) {
-        // Need to get the created article ID
-        // Usually saved in UserArticleRelation's Transform
-        const articleId = event._createdArticleId;
-        
-        return event.payload.tagIds.map(tagId => ({
-          source: articleId,
-          target: tagId,
-          addedAt: new Date().toISOString()
-        }));
-      }
-      return null;
-    }
+    Property.create({ name: 'addedAt', type: 'string', defaultValue: () => new Date().toISOString() })
+  ]
+});
+
+// If you need to add tags to existing articles later, use Transform in relation
+const AddTagsToArticle = Interaction.create({
+  name: 'AddTagsToArticle',
+  action: Action.create({ name: 'addTagsToArticle' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({ name: 'articleId', base: Article, isRef: true, required: true }),
+      PayloadItem.create({ name: 'tagIds', base: Tag, isCollection: true, isRef: true })
+    ]
   })
+});
+
+// Add Transform to handle adding tags to existing articles
+ArticleTagRelation.computedData = Transform.create({
+  record: InteractionEventEntity,
+  callback: function(event) {
+    if (event.interactionName === 'AddTagsToArticle') {
+      return event.payload.tagIds.map(tagId => ({
+        source: {id:event.payload.articleId},
+        target: {id:tagId},
+        addedAt: new Date().toISOString()
+      }));
+    }
+    return null;
+  }
 });
 ```
 
@@ -443,7 +562,7 @@ const User = Entity.create({
       computedData: Count.create({
         record: UserArticleRelation,
         direction: 'target',
-        callback: (article) => article.status !== 'deleted'
+        callback: (relation) => relation.source.status !== 'deleted'
       })
     })
   ]
@@ -468,7 +587,22 @@ const Article = Entity.create({
       type: 'boolean',
       computed: (article) => article.status === 'deleted'
     })
-  ]
+  ],
+  // Transform to create articles from interactions
+  computedData: Transform.create({
+    record: InteractionEventEntity,
+    callback: function(event) {
+      if (event.interactionName === 'CreateArticle') {
+        return {
+          title: event.payload.title,
+          content: event.payload.content,
+          createdAt: new Date().toISOString(),
+          author: {id:event.payload.authorId } // Relation created automatically
+        };
+      }
+      return null;
+    }
+  })
 });
 
 // === Filtered Entities ===
@@ -560,23 +694,8 @@ const UserArticleRelation = Relation.create({
   sourceProperty: 'author',
   target: User,
   targetProperty: 'articles',
-  type: 'n:1',
-  computedData: Transform.create({
-    record: InteractionEventEntity,
-    callback: function(event) {
-      if (event.interactionName === 'CreateArticle') {
-        return {
-          source: {
-            title: event.payload.title,
-            content: event.payload.content,
-            createdAt: new Date().toISOString()
-          },
-          target: event.payload.authorId
-        };
-      }
-      return null;
-    }
-  })
+  type: 'n:1'
+  // No computedData needed - relation is created automatically when Article is created with author reference
 });
 
 // === Usage Examples ===

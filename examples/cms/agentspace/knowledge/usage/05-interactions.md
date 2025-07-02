@@ -153,25 +153,33 @@ const CreateArticle = Interaction.create({
 // 2. Use Transform to listen to interaction events and create entities
 import { Transform, InteractionEventEntity } from 'interaqt';
 
-// When defining Article entity relations, you can add reactive creation logic
-const ArticleCreation = Transform.create({
-  record: InteractionEventEntity,
-  callback: function(event) {
-    if (event.interactionName === 'CreateArticle') {
-      // Return Article data to be created
-      return {
-        title: event.payload.title,
-        content: event.payload.content,
-        categoryId: event.payload.categoryId,
-        status: 'draft',
-        createdAt: new Date().toISOString()
-      };
+// When defining Article entity, use Transform in computedData to create entities reactively
+const Article = Entity.create({
+  name: 'Article',
+  properties: [
+    Property.create({ name: 'title', type: 'string' }),
+    Property.create({ name: 'content', type: 'string' }),
+    Property.create({ name: 'status', type: 'string', defaultValue: () => 'draft' }),
+    Property.create({ name: 'createdAt', type: 'string' })
+  ],
+  // Transform in Entity's computedData creates entities from interactions
+  computedData: Transform.create({
+    record: InteractionEventEntity,
+    callback: function(event) {
+      if (event.interactionName === 'CreateArticle') {
+        // Return Article data to be created
+        return {
+          title: event.payload.title,
+          content: event.payload.content,
+          category: {id:event.payload.categoryId},  // Relation will be created automatically
+          status: 'draft',
+          createdAt: new Date().toISOString()
+        };
+      }
+      return null;
     }
-    return null;
-  }
+  })
 });
-
-// Attach this Transform to a property or relation of the Article entity
 ```
 
 ### Interaction for Updating Entities
@@ -277,28 +285,44 @@ const CreateComment = Interaction.create({
   })
 });
 
-// Comment creation is implemented through Relation's computedData
-const CommentRelation = Relation.create({
-  source: Comment,
-  sourceProperty: 'author',
-  target: User,
-  targetProperty: 'comments',
-  type: 'n:1',
+// Comment entity with Transform in computedData for reactive creation
+const Comment = Entity.create({
+  name: 'Comment',
+  properties: [
+    Property.create({ name: 'content', type: 'string' }),
+    Property.create({ name: 'createdAt', type: 'string' })
+  ],
   computedData: Transform.create({
     record: InteractionEventEntity,
     callback: function(event) {
       if (event.interactionName === 'CreateComment') {
         return {
-          source: {
-            content: event.payload.content,
-            createdAt: new Date().toISOString()
-          },
-          target: event.payload.authorId
+          content: event.payload.content,
+          createdAt: new Date().toISOString(),
+          author: {id:event.payload.authorId},  // Relation created automatically
+          post: {id:event.payload.postId }      // Relation created automatically
         };
       }
       return null;
     }
   })
+});
+
+// Relations are defined normally without computedData for creation
+const CommentAuthorRelation = Relation.create({
+  source: Comment,
+  sourceProperty: 'author',
+  target: User,
+  targetProperty: 'comments',
+  type: 'n:1'
+});
+
+const CommentPostRelation = Relation.create({
+  source: Comment,
+  sourceProperty: 'post',
+  target: Post,
+  targetProperty: 'comments',
+  type: 'n:1'
 });
 ```
 
@@ -480,27 +504,28 @@ const CreateBlogPost = Interaction.create({
   })
 });
 
-// 2. Create blog posts through Relation's computedData
-const UserPostRelation = Relation.create({
-  source: Post,
-  sourceProperty: 'author',
-  target: User,
-  targetProperty: 'posts',
-  type: 'n:1',
+// 2. Create blog posts through Entity's computedData
+const Post = Entity.create({
+  name: 'Post',
+  properties: [
+    Property.create({ name: 'title', type: 'string' }),
+    Property.create({ name: 'content', type: 'string' }),
+    Property.create({ name: 'status', type: 'string', defaultValue: () => 'draft' }),
+    Property.create({ name: 'createdAt', type: 'string' }),
+    Property.create({ name: 'slug', type: 'string' })
+  ],
   computedData: Transform.create({
     record: InteractionEventEntity,
     callback: function(event) {
       if (event.interactionName === 'CreateBlogPost') {
-        // Return relation to be created, which will also create Post entity
+        // Return entity data with relation reference
         return {
-          source: {
-            title: event.payload.title,
-            content: event.payload.content,
-            status: 'draft',
-            createdAt: new Date().toISOString(),
-            slug: event.payload.title.toLowerCase().replace(/\s+/g, '-')
-          },
-          target: event.payload.authorId
+          title: event.payload.title,
+          content: event.payload.content,
+          status: 'draft',
+          createdAt: new Date().toISOString(),
+          slug: event.payload.title.toLowerCase().replace(/\s+/g, '-'),
+          author: {id:event.payload.authorId}  // Relation will be created automatically
         };
       }
       return null;
@@ -508,7 +533,16 @@ const UserPostRelation = Relation.create({
   })
 });
 
-// 3. User's postCount property will automatically update
+// 3. Define relation (no computedData needed for creation)
+const UserPostRelation = Relation.create({
+  source: Post,
+  sourceProperty: 'author',
+  target: User,
+  targetProperty: 'posts',
+  type: 'n:1'
+});
+
+// 4. User's postCount property will automatically update
 const User = Entity.create({
   name: 'User',
   properties: [
@@ -516,8 +550,8 @@ const User = Entity.create({
       name: 'postCount',
       type: 'number',
       computedData: Count.create({
-        relation: UserPostRelation,
-        relationDirection: 'target'
+        record: UserPostRelation,
+        direction: 'target'
       })
     })
   ]
