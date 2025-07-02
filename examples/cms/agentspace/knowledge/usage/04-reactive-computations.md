@@ -387,7 +387,7 @@ const OrderItems = Relation.create({
   sourceProperty: 'items',
   target: OrderItem,
   targetProperty: 'order',
-  relType: 'one:many'
+  type: '1:n'
 });
 ```
 
@@ -507,7 +507,7 @@ const ProjectTasks = Relation.create({
   sourceProperty: 'tasks',
   target: Task,
   targetProperty: 'project',
-  relType: 'one:many'
+  type: '1:n'
 });
 ```
 
@@ -544,9 +544,9 @@ const ProjectMember = Relation.create({
   sourceProperty: 'members',
   target: User,
   targetProperty: 'projects',
-  relType: 'many:many',
+  type: 'n:n',
   properties: [
-    Property.create({ name: 'role', type: 'string', defaultValue: 'member' })
+    Property.create({ name: 'role', type: 'string', defaultValue: () => 'member' })
   ]
 });
 ```
@@ -735,7 +735,7 @@ const Product = Entity.create({
   properties: [
     Property.create({ name: 'name', type: 'string' }),
     Property.create({ name: 'price', type: 'number' }),
-    Property.create({ name: 'currency', type: 'string', defaultValue: 'USD' }),
+    Property.create({ name: 'currency', type: 'string', defaultValue: () => 'USD' }),
     // ✅ Correct: Use getValue for simple property formatting
     Property.create({
       name: 'formattedPrice',

@@ -1,23 +1,18 @@
 export {
   CreateStyle,
   UpdateStyle,
-  DeleteStyle,
-  PublishStyle,
-  UnpublishStyle,
-  ListStylesAdmin,
-  GetPublishedStyles,
-  BulkUpdatePriorities
+  UpdateStyleStatus,
+  DeleteStyle,  
+  ListStyles,
+  GetStyleDetail,
+  UpdateStylePriorities,
+  SearchStyles
 } from './StyleInteractions'
 
 export {
   CreateVersion,
+  PublishVersion,
+  RollbackVersion,
   ListVersions,
-  RollbackToVersion,
-  DeleteVersion
+  GetVersionDetail
 } from './VersionInteractions'
-
-export {
-  AdminLogin,
-  ValidateAdminToken,
-  CheckPermissions
-} from './UserInteractions'

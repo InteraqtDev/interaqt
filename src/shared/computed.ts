@@ -73,25 +73,6 @@ export const StateMachine = createClass({
 
 
 
-
-// Computation 的基础结构
-export const Computation = createClass({
-  name: 'Computation',
-    public: {
-        computeEffect: {
-            type: 'string',
-            collection: false,
-            required: true
-        },
-        computation: {
-            type: 'string',
-            collection: false,
-            required: true
-        }
-    }
-})
-
-
 // 整个系统的加权和count
 export const WeightedSummation = createClass({
     name: 'WeightedSummation',

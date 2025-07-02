@@ -4,58 +4,41 @@ export const Style = Entity.create({
   name: 'Style',
   properties: [
     Property.create({
-      name: 'id',
-      type: 'string',
-      collection: false
-    }),
-    Property.create({
       name: 'label',
-      type: 'string',
-      collection: false
+      type: 'string'
     }),
     Property.create({
       name: 'slug',
-      type: 'string',
-      collection: false
+      type: 'string'
     }),
     Property.create({
       name: 'description',
-      type: 'string',
-      collection: false
+      type: 'string'
     }),
     Property.create({
       name: 'type',
-      type: 'string',
-      collection: false
+      type: 'string'
     }),
     Property.create({
-      name: 'thumbKey',
-      type: 'string',
-      collection: false
+      name: 'thumb_key',
+      type: 'string'
     }),
     Property.create({
       name: 'priority',
-      type: 'number',
-      collection: false,
-      defaultValue: () => 0
+      type: 'number'
     }),
     Property.create({
       name: 'status',
       type: 'string',
-      collection: false,
       defaultValue: () => 'draft'
     }),
     Property.create({
-      name: 'createdAt',
-      type: 'string',
-      collection: false,
-      defaultValue: () => new Date().toISOString()
+      name: 'created_at',
+      type: 'string'
     }),
     Property.create({
-      name: 'updatedAt',
-      type: 'string',
-      collection: false,
-      defaultValue: () => new Date().toISOString()
+      name: 'updated_at',
+      type: 'string'
     })
   ]
 })

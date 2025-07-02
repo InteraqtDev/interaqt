@@ -1,176 +1,187 @@
-# CMS Backend Interaction Matrix
+# CMS Style Management System - Interaction Matrix
 
-## User Roles and Permissions
+## User Roles Definition
 
-### Admin User Role
-- **Description**: Product operations personnel with full system access
-- **Capabilities**: Complete CRUD operations, version management, publishing control
-- **Authentication**: Required for all admin operations
-- **Authorization**: Full access to all Style and Version management functions
+### Admin
+- Full system access
+- Can perform all operations
+- Can publish and rollback versions
+- Can delete styles
 
-### Public/Frontend Role
-- **Description**: Anonymous access for frontend consumption
-- **Capabilities**: Read-only access to published styles
-- **Authentication**: Not required
-- **Authorization**: Limited to published content only
+### Editor  
+- Content creation and editing
+- Can create and update styles
+- Can create versions but not publish them
+- Cannot delete styles
 
-## Interaction Coverage Matrix
+### Viewer
+- Read-only access
+- Can view published content only
+- Cannot perform any modification operations
 
-### Style Management Operations
+## Interaction-Role Permission Matrix
 
-| Operation | Admin User | Public/Frontend | Test Case | Interaction Name |
-|-----------|------------|-----------------|-----------|------------------|
-| Create Style | ✅ Full Access | ❌ Denied | TC001 | CreateStyle |
-| Read Style (Admin) | ✅ All Statuses | ❌ Denied | TC006 | ListStylesAdmin |
-| Read Style (Public) | ❌ N/A | ✅ Published Only | TC010 | GetPublishedStyles |
-| Update Style Properties | ✅ Full Access | ❌ Denied | TC002 | UpdateStyle |
-| Delete Style | ✅ Full Access | ❌ Denied | TC005 | DeleteStyle |
-| Publish Style | ✅ Full Access | ❌ Denied | TC003 | PublishStyle |
-| Unpublish Style | ✅ Full Access | ❌ Denied | TC004 | UnpublishStyle |
-| Bulk Update Priorities | ✅ Full Access | ❌ Denied | TC007 | BulkUpdatePriorities |
+| Interaction | Admin | Editor | Viewer | Description |
+|-------------|-------|---------|---------|-------------|
+| **Style Management** |
+| CreateStyle | ✅ | ✅ | ❌ | Create new style record |
+| UpdateStyle | ✅ | ✅* | ❌ | Modify existing style (*own content only for editor) |
+| UpdateStyleStatus | ✅ | ✅ | ❌ | Change style status (draft/published/offline) |
+| DeleteStyle | ✅ | ❌ | ❌ | Soft delete style (admin only) |
+| ListStyles | ✅ | ✅ | ✅** | Query styles with filters (**published only for viewer) |
+| GetStyleDetail | ✅ | ✅ | ✅** | Get single style details (**published only for viewer) |
+| UpdateStylePriorities | ✅ | ✅ | ❌ | Bulk update style priorities |
+| SearchStyles | ✅ | ✅ | ✅** | Text search in styles (**published only for viewer) |
+| **Version Management** |
+| CreateVersion | ✅ | ✅ | ❌ | Create version snapshot |
+| PublishVersion | ✅ | ❌ | ❌ | Mark version as current (admin only) |
+| RollbackVersion | ✅ | ❌ | ❌ | Revert to previous version (admin only) |
+| ListVersions | ✅ | ✅ | ✅** | Query available versions (**published only for viewer) |
+| GetVersionDetail | ✅ | ✅ | ✅** | Get version with styles (**published only for viewer) |
 
-### Version Management Operations
+## Detailed Permission Rules
 
-| Operation | Admin User | Public/Frontend | Test Case | Interaction Name |
-|-----------|------------|-----------------|-----------|------------------|
-| Create Version | ✅ Full Access | ❌ Denied | TC008 | CreateVersion |
-| List Versions | ✅ Full Access | ❌ Denied | - | ListVersions |
-| Rollback to Version | ✅ Full Access | ❌ Denied | TC009 | RollbackToVersion |
-| Delete Version | ✅ Full Access | ❌ Denied | - | DeleteVersion |
+### CreateStyle
+- **Admin**: Can create any style
+- **Editor**: Can create any style
+- **Viewer**: No access
+- **Business Rule**: New styles default to "draft" status
 
-### Authentication & Authorization Operations
+### UpdateStyle  
+- **Admin**: Can update any style regardless of creator
+- **Editor**: Can update styles they created + styles in "draft" status
+- **Viewer**: No access
+- **Business Rule**: Updates preserve audit trail
 
-| Operation | Admin User | Public/Frontend | Test Case | Interaction Name |
-|-----------|------------|-----------------|-----------|------------------|
-| Admin Login | ✅ Required | ❌ N/A | - | AdminLogin |
-| Token Validation | ✅ Automatic | ❌ N/A | TC011 | ValidateAdminToken |
-| Access Control | ✅ Enforced | ✅ Limited | TC012 | CheckPermissions |
+### UpdateStyleStatus
+- **Admin**: Can change any style to any status
+- **Editor**: Can change draft→published, published→draft (not to offline)
+- **Viewer**: No access
+- **Business Rule**: Status transitions must be valid
 
-## Interaction Definitions Required
+### DeleteStyle (Soft Delete)
+- **Admin**: Can delete any style
+- **Editor**: No access
+- **Viewer**: No access  
+- **Business Rule**: Cannot delete style included in current published version
 
-### Core Style Management
-1. **CreateStyle** - Create new style in draft status
-2. **UpdateStyle** - Modify existing style properties
-3. **DeleteStyle** - Remove style from system
-4. **PublishStyle** - Change status from draft to published
-5. **UnpublishStyle** - Change status from published to offline
-6. **ListStylesAdmin** - List styles with filtering by status (admin view)
-7. **GetPublishedStyles** - Get published styles for frontend consumption
-8. **BulkUpdatePriorities** - Update multiple style priorities atomically
+### ListStyles
+- **Admin**: See all styles regardless of status
+- **Editor**: See all styles regardless of status
+- **Viewer**: See only published styles
+- **Business Rule**: Results filtered by permission level
 
-### Version Management
-9. **CreateVersion** - Create snapshot of current styles state
-10. **ListVersions** - Get version history
-11. **RollbackToVersion** - Restore styles to previous version state
-12. **DeleteVersion** - Remove version snapshot
+### GetStyleDetail
+- **Admin**: Can view any style with full details
+- **Editor**: Can view any style with full details
+- **Viewer**: Can view published styles only
+- **Business Rule**: Includes audit information based on role
 
-### Authentication & Security
-13. **AdminLogin** - Authenticate admin user
-14. **ValidateAdminToken** - Check token validity
-15. **CheckPermissions** - Verify user role permissions
+### UpdateStylePriorities
+- **Admin**: Can update priorities for any styles
+- **Editor**: Can update priorities for styles they have edit access to
+- **Viewer**: No access
+- **Business Rule**: Bulk operation is atomic
 
-## Permission Control Matrix
+### SearchStyles
+- **Admin**: Search across all styles
+- **Editor**: Search across all styles  
+- **Viewer**: Search only published styles
+- **Business Rule**: Search respects permission filters
 
-### Style Entity Permissions
+### CreateVersion
+- **Admin**: Can create versions with any published styles
+- **Editor**: Can create versions with any published styles
+- **Viewer**: No access
+- **Business Rule**: Can only include published styles
+
+### PublishVersion
+- **Admin**: Can publish any version
+- **Editor**: No access
+- **Viewer**: No access
+- **Business Rule**: Only one version can be current
+
+### RollbackVersion
+- **Admin**: Can rollback to any previous version
+- **Editor**: No access
+- **Viewer**: No access
+- **Business Rule**: Target version must have been previously published
+
+### ListVersions
+- **Admin**: See all versions regardless of status
+- **Editor**: See all versions regardless of status
+- **Viewer**: See only published versions
+- **Business Rule**: Results filtered by permission level
+
+### GetVersionDetail
+- **Admin**: Can view any version with full details
+- **Editor**: Can view any version with full details  
+- **Viewer**: Can view published versions only
+- **Business Rule**: Shows styles included at time of version creation
+
+## Permission Enforcement Patterns
+
+### Role-Based Filtering
+Each interaction implements role-based data filtering:
+```typescript
+// Example pattern for data access
+if (user.role === 'viewer') {
+  // Filter to published content only
+  filters.status = 'published'
+} else {
+  // Admin and Editor see all content
+}
 ```
-Style.create -> Admin only
-Style.read -> Admin (all), Public (published only)
-Style.update -> Admin only
-Style.delete -> Admin only
-Style.status_change -> Admin only
+
+### Ownership-Based Access
+For update operations, additional ownership checks:
+```typescript
+// Example pattern for update permissions
+if (user.role === 'editor') {
+  // Check if user created the style or style is in draft
+  if (style.createdBy !== user.id && style.status !== 'draft') {
+    throw new PermissionError('Cannot edit this style')
+  }
+}
 ```
 
-### Version Entity Permissions
+### Operation-Specific Rules
+Critical operations have additional restrictions:
+```typescript
+// Example pattern for critical operations
+if (interactionName === 'PublishVersion' && user.role !== 'admin') {
+  throw new PermissionError('Only admins can publish versions')
+}
 ```
-Version.create -> Admin only
-Version.read -> Admin only
-Version.rollback -> Admin only
-Version.delete -> Admin only
-```
 
-## Security Requirements per Interaction
+## Test Coverage Requirements
 
-### Authentication Required
-- All admin operations (CreateStyle, UpdateStyle, etc.)
-- All version management operations
-- No authentication for GetPublishedStyles
+### Positive Permission Tests
+Each interaction must have tests verifying:
+- Admin can perform operation successfully
+- Editor can perform operation when allowed
+- Viewer can perform read operations on published content
 
-### Role-based Authorization
-- **Admin Role**: Required for all management operations
-- **No Role**: Allowed only for GetPublishedStyles
+### Negative Permission Tests  
+Each interaction must have tests verifying:
+- Editor cannot perform admin-only operations
+- Viewer cannot perform write operations
+- Ownership rules are enforced for editors
 
-### Input Validation Required
-- **Slug validation**: URL-safe format, uniqueness
-- **Type validation**: Must be from allowed types
-- **Status validation**: Must follow valid transitions
-- **Priority validation**: Must be positive integer
-- **File validation**: Thumbnail keys must be valid S3 paths
+### Edge Case Permission Tests
+- Style in current version cannot be deleted
+- Status transitions follow business rules
+- Bulk operations respect individual item permissions
+- Version operations maintain data consistency
 
-## Error Handling Matrix
+## Error Handling Standards
 
-| Scenario | Admin Response | Public Response | Test Coverage |
-|----------|----------------|-----------------|---------------|
-| Invalid Authentication | 401 Unauthorized | N/A | TC011 |
-| Insufficient Permissions | 403 Forbidden | 403 Forbidden | TC012 |
-| Invalid Input Data | 400 Bad Request | 400 Bad Request | Multiple TCs |
-| Resource Not Found | 404 Not Found | 404 Not Found | Multiple TCs |
-| Duplicate Slug | 409 Conflict | N/A | TC014 |
-| Concurrent Updates | 409 Conflict | N/A | TC013 |
-| System Error | 500 Internal Error | 500 Internal Error | TC015 |
+### Permission Error Messages
+- Clear indication of what permission is missing
+- Guidance on required role or conditions
+- No exposure of sensitive system information
 
-## Business Rule Enforcement
-
-### Status Transition Rules
-- **Draft → Published**: Allowed with PublishStyle
-- **Published → Offline**: Allowed with UnpublishStyle  
-- **Offline → Published**: Allowed with PublishStyle
-- **Draft → Offline**: Not allowed directly
-- **Any → Draft**: Only through creation or rollback
-
-### Validation Rules
-- **Slug Uniqueness**: Enforced across all styles
-- **Required Fields**: label, slug, type must be provided
-- **Type Constraints**: Must be from predefined list
-- **Priority Constraints**: Must be positive integer
-
-### Atomic Operations
-- **BulkUpdatePriorities**: All updates succeed or all fail
-- **RollbackToVersion**: Complete state restoration or full rollback
-- **CreateVersion**: Complete snapshot or failure
-
-## Interaction Dependencies
-
-### Prerequisites
-1. **User Authentication** → Required for all admin interactions
-2. **Style Existence** → Required for update/delete/status change operations
-3. **Version Existence** → Required for rollback operations
-
-### Side Effects
-1. **CreateStyle** → Increments admin style count (if tracked)
-2. **DeleteStyle** → Decrements admin style count (if tracked)
-3. **PublishStyle** → Makes style visible to frontend
-4. **UnpublishStyle** → Hides style from frontend
-5. **CreateVersion** → Creates immutable snapshot for rollback
-6. **RollbackToVersion** → Creates new version automatically
-
-## Coverage Validation
-
-### All User Roles Covered
-- ✅ Admin: Complete CRUD and management capabilities
-- ✅ Public/Frontend: Read access to published content
-
-### All Operations Covered
-- ✅ Style CRUD operations
-- ✅ Status management (publish/unpublish)
-- ✅ Priority management (including bulk updates)
-- ✅ Version management (create, rollback)
-- ✅ Authentication and authorization
-
-### All Test Cases Mapped
-- ✅ Each interaction has corresponding test cases
-- ✅ Success and failure scenarios covered
-- ✅ Edge cases and concurrent operations included
-- ✅ Security and validation scenarios tested
-
-### Missing Interactions: None
-All required business operations have corresponding interactions defined.
+### Validation Error Messages
+- Specific field validation failures
+- Business rule violation explanations
+- Actionable guidance for correction

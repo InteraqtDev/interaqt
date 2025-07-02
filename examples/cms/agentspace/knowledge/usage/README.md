@@ -25,13 +25,16 @@ Learn how to define user interactions (Remember: Action is just an identifier!).
 ### 7. 🔐 [Attributive Permissions](./06-attributive-permissions.md)
 Understand how to control access permissions.
 
-### 8. 📋 [Activities](./07-activities.md)
+### 8. 📦 [Payload Parameters](./07-payload-parameters.md)
+Learn how to define and validate interaction parameters.
+
+### 9. 📋 [Activities](./08-activities.md)
 Design complex business processes.
 
-### 9. 🎪 [Other Advanced Features](./08-filtered-entities.md)
+### 10. 🎪 [Other Advanced Features](./09-filtered-entities.md)
 Filtered entities, async computations, etc.
 
-### 10. 📖 [API Reference](./13-api-reference.md)
+### 11. 📖 [API Reference](./14-api-reference.md)
 Detailed API documentation.
 
 ## ⚠️ Common Misconceptions
@@ -122,20 +125,21 @@ Remember: **Stop thinking "how to do", start thinking "what is"**!
 5. [Reactive Computations](./04-reactive-computations.md) - Declarative data computation
 6. [Interactions](./05-interactions.md) - User interaction definition
 7. [Attributive Permissions](./06-attributive-permissions.md) - Access control
-8. [Activities](./07-activities.md) - Complex business processes
+8. [Payload Parameters](./07-payload-parameters.md) - Interaction parameter validation
+9. [Activities](./08-activities.md) - Complex business processes
 
 ### Advanced Features
-9. [Filtered Entities](./08-filtered-entities.md) - Entity filtering and views
-10. [Async Computations](./09-async-computations.md) - Asynchronous operations
-11. [Global Dictionaries](./10-global-dictionaries.md) - Global state management
-12. [Data Querying](./11-data-querying.md) - Advanced query patterns
+10. [Filtered Entities](./09-filtered-entities.md) - Entity filtering and views
+11. [Async Computations](./10-async-computations.md) - Asynchronous operations
+12. [Global Dictionaries](./11-global-dictionaries.md) - Global state management
+13. [Data Querying](./12-data-querying.md) - Advanced query patterns
 
 ### Reference
-13. [Testing](./12-testing.md) - Testing strategies
-14. [API Reference](./13-api-reference.md) - Complete API documentation
-15. [CRUD Patterns](./14-entity-crud-patterns.md) - Common patterns
-16. [Frontend Integration](./15-frontend-page-design-guide.md) - UI integration
-17. [Performance Optimization](./16-performance-optimization.md) - Performance tips
+14. [Testing](./13-testing.md) - Testing strategies
+15. [API Reference](./14-api-reference.md) - Complete API documentation
+16. [CRUD Patterns](./15-entity-crud-patterns.md) - Common patterns
+17. [Frontend Integration](./16-frontend-page-design-guide.md) - UI integration
+18. [Performance Optimization](./17-performance-optimization.md) - Performance tips
 
 ## 📞 Need Help?
 

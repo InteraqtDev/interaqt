@@ -4,9 +4,8 @@ import { Version } from '../entities/Version'
 
 export const UserVersionRelation = Relation.create({
   source: User,
-  sourceProperty: 'versions',
+  sourceProperty: 'createdVersions',
   target: Version,
   targetProperty: 'createdBy',
-  type: '1:n',
-  properties: []
+  type: 'n:1'
 })

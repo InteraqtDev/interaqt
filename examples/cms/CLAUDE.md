@@ -77,6 +77,37 @@ After reading the knowledge base, you MUST demonstrate understanding by:
 
 ### Phase 1: Requirements Analysis & Test Case Design
 
+#### 🔴 CRITICAL: User Authentication Handling
+**interaqt does NOT handle user authentication**. This is a fundamental principle:
+- The framework assumes user identity has already been authenticated through external means (JWT, Session, OAuth, etc.)
+- **DO NOT** create user registration, login, logout interactions
+- **DO NOT** implement authentication logic within the interaqt system
+- In tests, directly create user objects with required properties (id, role, etc.)
+- When calling interactions, pass pre-authenticated user objects
+
+Example of correct test user handling:
+```typescript
+// ✅ CORRECT: Directly create test users
+const adminUser = await system.storage.create('User', {
+  id: 'admin-123',
+  name: 'Admin User',
+  role: 'admin',
+  email: 'admin@test.com'
+})
+
+// ✅ CORRECT: Use pre-authenticated user in interactions
+await controller.callInteraction('CreatePost', {
+  user: adminUser,  // Already authenticated user
+  payload: { ... }
+})
+
+// ❌ WRONG: Don't create authentication interactions
+const LoginInteraction = Interaction.create({  // DON'T DO THIS
+  name: 'Login',
+  // ...
+})
+```
+
 #### 1.1 Deep Requirements Analysis
 - Analyze user business requirements, supplement vague or missing details
 - Analyze from data perspective: identify all entities, properties, relationships
@@ -479,9 +510,34 @@ I will follow the test-case driven development workflow:
 - ❌ Don't write imperative business logic in Interactions
 - ❌ Don't use `@interaqt/runtime` as package name
 - ❌ Don't create separate Computation modules or pass them to Controller
+- ❌ Don't implement user authentication within interaqt (login, register, etc.)
 - ✅ Embrace reactive, declarative programming
 - ✅ Use Computations to declare data relationships within `computation` fields
 - ✅ Use correct package name: `interaqt`
+- ✅ Assume users are pre-authenticated; pass user objects directly
+
+
+Example of what NOT to do:
+```typescript
+// ❌ WRONG: Authentication should not be in interaqt
+const UserLogin = Interaction.create({
+  name: 'UserLogin',
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({ name: 'email' }),
+      PayloadItem.create({ name: 'password' })
+    ]
+  })
+  // This is wrong! interaqt doesn't handle authentication
+})
+
+// ❌ WRONG: Don't verify passwords
+const User = Entity.create({
+  properties: [
+    Property.create({ name: 'passwordHash' })  // Don't store passwords
+  ]
+})
+```
 
 ### Computation Usage
 - ❌ Don't create Transform.create() as standalone entities

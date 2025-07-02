@@ -1,66 +1,64 @@
-import { Interaction, Action, Payload, PayloadItem, createUserRoleAttributive } from 'interaqt'
-import { User } from '../entities/User'
-import { Version } from '../entities/Version'
-import { UserVersionRelation } from '../relations/UserVersionRelation'
-
-const AdminRole = createUserRoleAttributive({ name: 'admin' })
+import { Interaction, Action, Payload, PayloadItem } from 'interaqt'
 
 export const CreateVersion = Interaction.create({
   name: 'CreateVersion',
-  action: Action.create({ name: 'create' }),
-  userAttributives: AdminRole,
+  action: Action.create({
+    name: 'CreateVersion'
+  }),
   payload: Payload.create({
     items: [
-      PayloadItem.create({
-        name: 'version',
-        base: Version,
-        isRef: false,
-        required: true,
-        isCollection: false
-      })
+      PayloadItem.create({ name: 'name' }),
+      PayloadItem.create({ name: 'description' }),
+      PayloadItem.create({ name: 'styleIds' })
+    ]
+  })
+})
+
+export const PublishVersion = Interaction.create({
+  name: 'PublishVersion',
+  action: Action.create({
+    name: 'PublishVersion'
+  }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({ name: 'versionId' })
+    ]
+  })
+})
+
+export const RollbackVersion = Interaction.create({
+  name: 'RollbackVersion',
+  action: Action.create({
+    name: 'RollbackVersion'
+  }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({ name: 'versionId' })
     ]
   })
 })
 
 export const ListVersions = Interaction.create({
   name: 'ListVersions',
-  action: Action.create({ name: 'list' }),
-  userAttributives: AdminRole,
-  payload: Payload.create({
-    items: []
-  })
-})
-
-export const RollbackToVersion = Interaction.create({
-  name: 'RollbackToVersion',
-  action: Action.create({ name: 'rollback' }),
-  userAttributives: AdminRole,
+  action: Action.create({
+    name: 'ListVersions'
+  }),
   payload: Payload.create({
     items: [
-      PayloadItem.create({
-        name: 'version',
-        base: Version,
-        isRef: true,
-        required: true,
-        isCollection: false
-      })
+      PayloadItem.create({ name: 'limit', required: false }),
+      PayloadItem.create({ name: 'offset', required: false })
     ]
   })
 })
 
-export const DeleteVersion = Interaction.create({
-  name: 'DeleteVersion',
-  action: Action.create({ name: 'delete' }),
-  userAttributives: AdminRole,
+export const GetVersionDetail = Interaction.create({
+  name: 'GetVersionDetail',
+  action: Action.create({
+    name: 'GetVersionDetail'
+  }),
   payload: Payload.create({
     items: [
-      PayloadItem.create({
-        name: 'version',
-        base: Version,
-        isRef: true,
-        required: true,
-        isCollection: false
-      })
+      PayloadItem.create({ name: 'versionId' })
     ]
   })
 })

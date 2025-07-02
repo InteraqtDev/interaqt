@@ -49,6 +49,7 @@ export type InteractionEventArgs = {
 
 export type EventUser = {
     id: string,
+    [k: string]: any
 }
 
 
