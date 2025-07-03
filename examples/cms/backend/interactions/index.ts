@@ -1,18 +1,16 @@
 export {
   CreateStyle,
   UpdateStyle,
-  UpdateStyleStatus,
-  DeleteStyle,  
-  ListStyles,
-  GetStyleDetail,
-  UpdateStylePriorities,
-  SearchStyles
+  PublishStyle,
+  OfflineStyle,
+  ReorderStyles
 } from './StyleInteractions'
 
 export {
   CreateVersion,
+  AddStyleToVersion,
+  RemoveStyleFromVersion,
   PublishVersion,
   RollbackVersion,
-  ListVersions,
-  GetVersionDetail
+  ArchiveVersion
 } from './VersionInteractions'

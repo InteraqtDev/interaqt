@@ -85,9 +85,27 @@ After reading the knowledge base, you MUST demonstrate understanding by:
 - In tests, directly create user objects with required properties (id, role, etc.)
 - When calling interactions, pass pre-authenticated user objects
 
-Example of correct test user handling:
+**⚠️ IMPORTANT: You MUST Still Define User Entity**
+Even though interaqt doesn't handle authentication, you still need to:
+1. **Define a User entity** in your application with necessary properties
+2. **Create test users directly in storage** for testing purposes
+3. **Pass these user objects** when calling interactions
+
+Example of User entity definition and test usage:
 ```typescript
-// ✅ CORRECT: Directly create test users
+// ✅ CORRECT: Define User entity (in entities/User.ts)
+export const User = Entity.create({
+  name: 'User',
+  properties: [
+    Property.create({ name: 'name', type: 'string' }),
+    Property.create({ name: 'email', type: 'string' }),
+    Property.create({ name: 'role', type: 'string' }),
+    // Add other properties your application needs
+    // But NO password or authentication-related fields
+  ]
+})
+
+// ✅ CORRECT: Create test users directly in test setup
 const adminUser = await system.storage.create('User', {
   id: 'admin-123',
   name: 'Admin User',
@@ -264,7 +282,7 @@ describe('Test Suite', () => {
     
     controller = new Controller(
       system,
-      entities,
+      entities,      // Must include User entity
       relations,
       activities,
       interactions,
@@ -273,6 +291,14 @@ describe('Test Suite', () => {
     )
     
     await controller.setup(true)
+    
+    // ✅ IMPORTANT: Create test users for interactions
+    // User entity must be defined in your entities
+    const testUser = await system.storage.create('User', {
+      name: 'Test User',
+      email: 'test@example.com',
+      role: 'user'
+    })
   })
   
   // Your tests here...
@@ -326,20 +352,19 @@ Create `docs/` directory with:
 
 - [ ] All requirements have corresponding test cases (focused on Interactions)
 - [ ] All test cases have corresponding test code
+- [ ] No fictional non-existent Entity or Interaction
+- [ ] All Interactions have success and failure cases
+- [ ] **No separate Entity/Relation unit tests** (all covered through Interactions)
 - [ ] **No TypeScript type errors in source code** (run `npx tsc --noEmit`)
 - [ ] **No TypeScript type errors in test code**
 - [ ] All Interaction tests passed (Critical Step)
 - [ ] Test coverage reaches 100% through Interaction testing (Critical Step)
-- [ ] No fictional non-existent Entity or Interaction
 - [ ] All reactive computations trigger correctly when Interactions execute
 - [ ] Permission control tests complete for all Interactions
-- [ ] All Interactions have success and failure cases
 - [ ] All computation properties verified through Interaction side effects
 - [ ] test-cases.md document complete and consistent with code
 - [ ] interaction-matrix.md covers all user roles and operations
 - [ ] Relation cascade behaviors verified through Interaction tests (not separate tests)
-- [ ] Package imports use correct name: `interaqt` (not `@interaqt/runtime`)
-- [ ] **No separate Entity/Relation unit tests** (all covered through Interactions)
 
 ## III. Frontend Generation Process
 
@@ -511,10 +536,12 @@ I will follow the test-case driven development workflow:
 - ❌ Don't use `@interaqt/runtime` as package name
 - ❌ Don't create separate Computation modules or pass them to Controller
 - ❌ Don't implement user authentication within interaqt (login, register, etc.)
+- ❌ Don't forget to define User entity even though authentication is external
 - ✅ Embrace reactive, declarative programming
 - ✅ Use Computations to declare data relationships within `computation` fields
 - ✅ Use correct package name: `interaqt`
 - ✅ Assume users are pre-authenticated; pass user objects directly
+- ✅ Always define User entity with business-relevant properties (no passwords)
 
 
 Example of what NOT to do:
@@ -531,10 +558,31 @@ const UserLogin = Interaction.create({
   // This is wrong! interaqt doesn't handle authentication
 })
 
-// ❌ WRONG: Don't verify passwords
+// ❌ WRONG: Don't store authentication-related fields
 const User = Entity.create({
   properties: [
-    Property.create({ name: 'passwordHash' })  // Don't store passwords
+    Property.create({ name: 'passwordHash' }),  // Don't store passwords
+    Property.create({ name: 'salt' }),          // Don't store salt
+    Property.create({ name: 'sessionToken' })   // Don't manage sessions
+  ]
+})
+
+// ❌ WRONG: Don't forget to define User entity at all
+// Even though authentication is external, you still need User entity!
+```
+
+Example of CORRECT User entity:
+```typescript
+// ✅ CORRECT: Define User entity with business properties only
+export const User = Entity.create({
+  name: 'User',
+  properties: [
+    Property.create({ name: 'name', type: 'string' }),
+    Property.create({ name: 'email', type: 'string' }),
+    Property.create({ name: 'role', type: 'string' }),
+    Property.create({ name: 'department', type: 'string' }),
+    Property.create({ name: 'isActive', type: 'boolean', defaultValue: () => true }),
+    // Business-related properties, NOT authentication
   ]
 })
 ```

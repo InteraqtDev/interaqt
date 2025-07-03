@@ -502,14 +502,16 @@ const hasPendingTasks = Property.create({
 
 Create custom transformation computation.
 
+Transform is fundamentally about **transforming data from one collection to another collection**. It transforms sets of data (e.g., InteractionEventEntity → Entity/Relation, Entity → different Entity). Transform **cannot** be used for property computations within the same entity - use `getValue` for that purpose.
+
 **Syntax**
 ```typescript
 Transform.create(config: TransformConfig): KlassInstance<typeof Transform>
 ```
 
 **Parameters**
-- `config.record` (Entity|Relation, required): Entity or relation to transform
-- `config.callback` (function, required): Transformation function
+- `config.record` (Entity|Relation, required): Entity or relation to transform from (source collection)
+- `config.callback` (function, required): Transformation function that converts source data to target data
 - `config.attributeQuery` (AttributeQueryData, required): Attribute query configuration
 
 **Examples**

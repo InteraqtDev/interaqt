@@ -1,157 +1,156 @@
-# CMS Style Management System - Detailed Requirements
+# Detailed Requirements Analysis - Style Management System
 
-## Business Context
-The system needs to provide a management interface for product operations personnel to manage preset data (Style objects) for an online platform. This is a content management system specifically focused on Style configuration and versioning.
+## Overview
+A content management system for product operations personnel to manage pre-configured Style data with version control and publishing capabilities.
 
-## Core Entities and Data Analysis
+## Data Structure Analysis
 
-### Style Entity
-The core entity represents a style configuration with the following properties:
+### Core Entities
 
-| Field | Type | Input Method | Description |
-|-------|------|--------------|-------------|
-| id | UUID | Automatic | System-generated unique identifier |
-| label | Text | Manual | Display name for frontend (e.g., "Manga") |
-| slug | Text | Manual | Unique, URL-safe identifier (e.g., "manga"), corresponds to legacy 'value' field |
-| description | Text | Manual | Detailed description of the style |
-| type | VARCHAR(32) | Manual | Style category (e.g., "animation", "surreal") |
-| thumb_key | Text | Manual | S3 address for thumbnail image |
-| priority | Integer | Manual | Frontend sorting priority, follows legacy logic |
-| status | VARCHAR(16) | Manual | Lifecycle status: "draft", "published", "offline" |
-| created_at | TimestampTZ | Automatic | Creation timestamp, defaults to now() |
-| updated_at | TimestampTZ | Automatic | Last modification timestamp |
+#### 1. Style Entity
+- **id**: UUID (auto-generated)
+- **label**: Text (manual) - Display name for frontend (e.g., "Manga")
+- **slug**: Text (manual) - Unique, URL-safe identifier (e.g., "manga", corresponds to old "value")
+- **description**: Text (manual) - Style description
+- **type**: varchar(32) (manual) - Category like "animation", "surreal", etc.
+- **thumb_key**: Text (manual) - S3 address for thumbnail
+- **priority**: Integer (manual) - Frontend sorting order
+- **status**: varchar(16) (manual) - "draft" | "published" | "offline"
+- **created_at**: Timestamp (auto) - Creation time, default now()
+- **updated_at**: Timestamp (auto) - Last modification time
 
-### User Entity (for permission management)
-Required for tracking who performs operations:
+#### 2. User Entity (for operations personnel)
+Note: interaqt does not handle authentication - users are pre-authenticated
+- **id**: UUID (auto-generated)
+- **name**: Text - User display name
+- **email**: Text - User email
+- **role**: Text - User role ("admin", "editor", "viewer")
+- **created_at**: Timestamp (auto)
 
-| Field | Type | Description |
-|-------|------|-------------|
-| id | UUID | User identifier |
-| name | Text | User display name |
-| role | Text | User role (admin, editor, viewer) |
-| email | Text | User email |
+#### 3. Version Entity (for version management and rollback)
+- **id**: UUID (auto-generated)
+- **version_number**: Text - Semantic version like "v1.0", "v1.1"
+- **description**: Text - Version description
+- **status**: varchar(16) - "draft" | "published" | "archived"
+- **created_at**: Timestamp (auto)
+- **created_by**: Reference to User
+- **published_at**: Timestamp (nullable) - When version was published
 
-### Version Entity (for version management)
-To support version management and rollback functionality:
+## Relationship Analysis
 
-| Field | Type | Description |
-|-------|------|-------------|
-| id | UUID | Version identifier |
-| name | Text | Version name/label |
-| description | Text | Version description |
-| created_at | TimestampTZ | Version creation time |
-| created_by | UUID | User who created this version |
-| is_current | Boolean | Whether this is the current active version |
+### Relations
+1. **User-Style Relation**: Who created/modified which styles
+   - Type: 1:n (One user can create many styles)
+   - User.styles → Style.created_by
 
-## Relationships Analysis
+2. **Style-Version Relation**: Which styles belong to which version
+   - Type: n:m (Many styles can be in many versions)
+   - Style.versions ↔ Version.styles
 
-### Style-User Relations
-- **StyleCreatedBy**: 1:n relationship between User and Style (who created each style)
-- **StyleUpdatedBy**: 1:n relationship between User and Style (who last updated each style)
-
-### Style-Version Relations  
-- **StyleVersion**: n:n relationship between Style and Version (styles included in each version)
+3. **User-Version Relation**: Who created which versions
+   - Type: 1:n (One user can create many versions)
+   - User.versions → Version.created_by
 
 ## Interaction Analysis
 
-### Core CRUD Operations
-1. **CreateStyle**: Create a new style record
-2. **UpdateStyle**: Modify existing style properties
-3. **DeleteStyle**: Soft delete a style (set status to offline)
-4. **ListStyles**: Query styles with filtering and sorting
-5. **GetStyleDetail**: Retrieve single style with full details
+### Core Operations Required
 
-### Version Management Operations
-6. **CreateVersion**: Create a new version snapshot
-7. **PublishVersion**: Mark a version as current/active
-8. **RollbackVersion**: Revert to a previous version
-9. **ListVersions**: Query available versions
-10. **GetVersionDetail**: Retrieve version with included styles
+1. **Style Management**
+   - Create Style (draft status by default)
+   - Update Style properties
+   - Delete Style (soft delete - change to "offline")
+   - Change Style status (draft → published → offline)
+   - Reorder Styles (update priority)
 
-### Administrative Operations
-11. **UpdateStylePriority**: Bulk update style priorities for sorting
-12. **BulkUpdateStyleStatus**: Change status of multiple styles
+2. **Version Management**
+   - Create Version
+   - Add Styles to Version
+   - Remove Styles from Version
+   - Publish Version (make all included styles "published")
+   - Rollback to Previous Version
+   - Archive Version
+
+3. **Query Operations**
+   - List Styles (with filtering by status, type)
+   - Get Style Details
+   - List Versions
+   - Get Version Details with included Styles
+   - Search Styles by label/slug/type
 
 ## Permission Requirements
 
 ### Role-Based Access Control
 - **Admin**: Full access to all operations
-- **Editor**: Can create, update styles; can create versions but not publish
-- **Viewer**: Read-only access to published content
+- **Editor**: Can manage styles and create versions, cannot delete or publish
+- **Viewer**: Read-only access
 
 ### Operation Permissions
-- CreateStyle: Admin, Editor
-- UpdateStyle: Admin, Editor (own content), Admin (all content)
-- DeleteStyle: Admin only
-- CreateVersion: Admin, Editor
-- PublishVersion: Admin only
-- RollbackVersion: Admin only
+- **Create Style**: Admin, Editor
+- **Update Style**: Admin, Editor (own styles), Admin (all styles)
+- **Delete Style**: Admin only
+- **Change Style Status**: Admin only
+- **Create Version**: Admin, Editor
+- **Publish Version**: Admin only
+- **Rollback Version**: Admin only
 
 ## Business Process Analysis
 
-### Style Management Workflow
-1. Editor creates new style in "draft" status
-2. Editor refines style properties and sets priority
-3. Editor changes status to "published" when ready
-4. Admin can publish versions containing published styles
-5. Users can rollback to previous versions if needed
+### Style Lifecycle
+1. **Creation**: Editor creates style in "draft" status
+2. **Editing**: Editor can modify draft styles
+3. **Review**: Admin reviews and can publish or reject
+4. **Publishing**: Admin changes status to "published"
+5. **Maintenance**: Admin can set to "offline" for maintenance
+6. **Deletion**: Admin can soft delete (set to "offline" permanently)
 
-### Version Management Workflow  
-1. User creates version with current published styles
-2. Version is created in draft state
-3. Admin reviews and publishes version
-4. Published version becomes current active version
-5. Previous versions remain available for rollback
+### Version Management Workflow
+1. **Version Creation**: Editor creates new version
+2. **Style Assignment**: Editor adds styles to version
+3. **Review**: Admin reviews version content
+4. **Publishing**: Admin publishes version (all included styles become "published")
+5. **Rollback**: If issues found, Admin can rollback to previous version
+6. **Archival**: Old versions are archived but kept for reference
 
-## Data Validation Rules
+## Computed Properties Needed
+
+### Style Entity Computations
+- **version_count**: Number of versions this style appears in
+- **is_published**: Boolean indicating if style is currently published
+- **last_published_at**: When this style was last published
+
+### Version Entity Computations
+- **style_count**: Number of styles in this version
+- **is_current**: Boolean indicating if this is the currently published version
+
+### User Entity Computations
+- **created_styles_count**: Number of styles created by this user
+- **created_versions_count**: Number of versions created by this user
+
+## Data Validation Requirements
 
 ### Style Validation
-- `slug` must be unique across all styles
-- `slug` must be URL-safe (lowercase, alphanumeric, hyphens only)
-- `priority` must be positive integer
-- `status` must be one of: "draft", "published", "offline"
-- `type` must match predefined categories
+- **slug**: Must be unique, URL-safe (alphanumeric + hyphens/underscores)
+- **type**: Must be from predefined list
+- **priority**: Must be positive integer
+- **status**: Must be one of "draft", "published", "offline"
 
 ### Version Validation
-- Version `name` must be unique
-- Only one version can be marked as `is_current = true`
-- Cannot delete version that is currently active
+- **version_number**: Must follow semantic versioning pattern
+- **status**: Must be one of "draft", "published", "archived"
+- **Business Rule**: Only one version can be "published" at a time
 
-## Sorting and Filtering Requirements
+## Additional Requirements
 
-### Style Sorting Options
-- By priority (ascending/descending)
-- By created_at (newest/oldest)
-- By updated_at (most/least recently modified)
-- By status (draft, published, offline)
-- By type (alphabetical)
+### Sorting Support
+- Styles must be sortable by priority field
+- Default sorting: priority ASC, created_at DESC
 
-### Style Filtering Options
-- By status (draft/published/offline)
-- By type (animation, surreal, etc.)
-- By date range (created/updated within period)
-- Search by label or description (text search)
+### Version Control Features
+- Track which user created/modified each style
+- Track version history for rollback capability
+- Maintain audit trail of all changes
 
-## Integration Requirements
-
-### S3 Integration
-- `thumb_key` field stores S3 object keys
-- System should validate S3 key existence (optional)
-- Frontend will construct full S3 URLs from keys
-
-### Legacy System Compatibility
-- `slug` field corresponds to legacy `value` field
-- Priority logic must match existing frontend sorting
-- Status transitions must preserve backward compatibility
-
-## Performance Requirements
-
-### Query Performance
-- Style listing with sorting should support pagination
-- Filter operations should be optimized for large datasets
-- Version operations should be efficient for rollback scenarios
-
-### Data Consistency
-- Version snapshots must maintain referential integrity
-- Style updates should not affect published versions
-- Rollback operations must be atomic and consistent
+### Data Integrity
+- Soft delete only (never physically delete data)
+- Maintain referential integrity between entities
+- Ensure only one published version exists at any time

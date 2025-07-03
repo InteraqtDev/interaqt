@@ -1,45 +1,64 @@
-# Implementation Errors #01 - TypeScript Type Issues
+# Implementation Errors - Attempt 1
 
 ## Error Summary
-During the first TypeScript type check (npx tsc --noEmit), encountered multiple type errors related to:
+TypeScript compilation failed with multiple errors during Phase 2: Code Generation & Implementation.
 
-1. **Primary key property**: `primary` property does not exist in Property type
-2. **StateMachine states**: Incorrect states definition format
-3. **AttributivePredicate**: Not exported from interaqt package
-4. **PayloadItem type**: `type` property does not exist
-5. **Interaction preCondition**: Should be `conditions` not `preCondition`
+## Main Error Categories
 
-## Root Cause Analysis
+### 1. Circular Reference Issues
+- `backend/entities/Style.ts(59,17): error TS2448: Block-scoped variable 'Style' used before its declaration.`
+- `backend/entities/Version.ts(42,17): error TS2448: Block-scoped variable 'Version' used before its declaration.`
 
-### Issue 1: Property Primary Key
-**Error**: `'primary' does not exist in type 'KlassInstanceArgs<PropertyPublic>'`
-**Cause**: Incorrectly assumed interaqt uses `primary` property to mark primary keys
-**Fix**: Need to check correct API for primary key definition
+**Root Cause**: Used self-reference in computed properties within the same entity definition, causing circular dependency.
 
-### Issue 2: StateMachine States
-**Error**: `'draft' does not exist in type 'unknown[]'`
-**Cause**: Incorrect StateMachine states definition - used object format instead of array
-**Fix**: Need to correct StateMachine API usage
+**Code Pattern That Failed**:
+```typescript
+export const Style = Entity.create({
+  properties: [
+    Property.create({
+      name: 'is_published',
+      computation: Transform.create({
+        record: Style,  // ❌ Circular reference to self
+        callback: function(style) {
+          return style.status === 'published'
+        }
+      })
+    })
+  ]
+})
+```
 
-### Issue 3: AttributivePredicate Import
-**Error**: `Module '"interaqt"' has no exported member 'AttributivePredicate'`
-**Cause**: Incorrectly assumed AttributivePredicate exists as export
-**Fix**: Need to check correct permission/condition API
+### 2. PayloadItem Type Issues
+Multiple errors like:
+- `backend/interactions/StyleInteractions.ts(8,43): error TS2353: Object literal may only specify known properties, and 'type' does not exist in type 'KlassInstanceArgs<...>`
 
-### Issue 4: PayloadItem Type
-**Error**: `'type' does not exist in PayloadItem`
-**Cause**: Assumed PayloadItem has type property like traditional form schemas
-**Fix**: Need to check correct PayloadItem API
+**Root Cause**: Used `type` property in PayloadItem.create() which doesn't exist in the interaqt API.
 
-### Issue 5: Interaction Conditions
-**Error**: `'preCondition' does not exist... Did you mean to write 'conditions'?`
-**Cause**: Used wrong property name for interaction conditions
-**Fix**: Change to `conditions`
+**Code Pattern That Failed**:
+```typescript
+PayloadItem.create({ name: 'label', type: 'string', required: true })  // ❌ 'type' property invalid
+```
 
-## Lesson Learned
-The main mistake was not carefully checking the actual interaqt API before implementing. I made assumptions based on common patterns from other frameworks instead of following the documented API precisely.
+### 3. Last Published At Logic Issue
+The `last_published_at` computation uses `this.id` which is not available in the callback context.
+
+## Analysis of Documentation Issues
+
+### Missing Information in Knowledge Base
+1. **PayloadItem API**: The knowledge base doesn't clearly specify the correct properties for PayloadItem.create()
+2. **Self-Reference Patterns**: No clear guidance on how to handle computed properties that depend on the entity's own current state
+3. **Context Access**: Unclear how to access entity instance data within computation callbacks
+
+### Pattern Misunderstanding
+The CRUD patterns in document 14 show Transform listening to InteractionEventEntity, but I incorrectly tried to use Transform to compute derived properties from the entity's own current state.
+
+## Correction Strategy
+1. Fix circular references by removing self-referencing computations or using different patterns
+2. Remove invalid `type` properties from PayloadItem definitions
+3. Simplify property computations to use defaultValue or proper Transform patterns
+4. Re-examine the interaqt API documentation for correct PayloadItem syntax
 
 ## Next Steps
-1. Fix all type errors by using correct interaqt API
-2. Re-run type check to ensure clean compilation
-3. Proceed with test implementation only after types are correct
+- Fix these fundamental issues before proceeding
+- Re-validate against interaqt knowledge base for correct API usage
+- Focus on simpler computation patterns that don't require self-reference

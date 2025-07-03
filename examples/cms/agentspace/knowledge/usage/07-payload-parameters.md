@@ -546,6 +546,35 @@ try {
 }
 ```
 
+## Known Issues and Workarounds
+
+### Entity Resolution with Circular Dependencies
+
+In some cases, using entity references in PayloadItem can cause resolution issues, particularly when entities have circular dependencies:
+
+```javascript
+// May cause "entity undefined not found" error
+PayloadItem.create({ 
+  name: 'version',
+  base: Version,  // Entity with circular dependencies
+  isRef: false
+})
+
+// Workaround: Use generic object type
+// do not set base property to avoids resolution issues
+PayloadItem.create({ 
+  name: 'version',
+  isRef: false
+})
+```
+
+This issue typically occurs when:
+- Entities reference each other in complex ways
+- The entity being referenced has forward references
+- The interaction is defined before all entities are fully initialized
+
+NOT setting base property maintains the same functionality but avoids the resolution problem, though you lose framework-level validation.
+
 ## Summary
 
 The Payload system in interaqt provides a powerful way to:

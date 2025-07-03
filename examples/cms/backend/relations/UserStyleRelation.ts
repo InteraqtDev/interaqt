@@ -2,18 +2,10 @@ import { Relation } from 'interaqt'
 import { User } from '../entities/User'
 import { Style } from '../entities/Style'
 
-export const UserStyleCreatedByRelation = Relation.create({
+export const UserStyleRelation = Relation.create({
   source: User,
-  sourceProperty: 'createdStyles',
-  target: Style, 
-  targetProperty: 'createdBy',
-  type: 'n:1'
-})
-
-export const UserStyleUpdatedByRelation = Relation.create({
-  source: User,
-  sourceProperty: 'updatedStyles',
+  sourceProperty: 'styles',
   target: Style,
-  targetProperty: 'updatedBy', 
-  type: 'n:1'
+  targetProperty: 'created_by',
+  type: '1:n'
 })

@@ -1,262 +1,316 @@
-# CMS Style Management System - Test Cases
+# Test Cases - Style Management System
 
-## TC001: Create Style
-**Description**: Create a new style with all required properties
-- **Preconditions**: User has admin or editor role and is authenticated
+## User Management Test Cases
+
+### TC001: Create User (Setup Only - No Authentication Logic)
+- **Preconditions**: System setup
 - **Input Data**: 
   ```json
   {
-    "label": "Manga Art",
-    "slug": "manga-art", 
-    "description": "Japanese manga style artwork",
+    "name": "John Editor",
+    "email": "john@example.com", 
+    "role": "editor"
+  }
+  ```
+- **Expected Results**:
+  1. Create new User record with auto-generated ID
+  2. created_at is current timestamp
+  3. User can be retrieved by ID
+- **Post Validation**: User appears in system storage
+
+## Style Management Test Cases
+
+### TC002: Create Style (Draft)
+- **Preconditions**: User with "editor" or "admin" role exists
+- **Input Data**:
+  ```json
+  {
+    "label": "Manga Style",
+    "slug": "manga",
+    "description": "Japanese manga illustration style",
     "type": "animation",
-    "thumb_key": "styles/thumbnails/manga-art.jpg",
-    "priority": 100
+    "thumb_key": "s3://bucket/manga-thumb.jpg",
+    "priority": 1
   }
   ```
 - **Expected Results**:
-  1. Create new Style record with provided data
-  2. Auto-generate UUID for id field
-  3. Set status to "draft" by default
-  4. Set created_at to current timestamp
-  5. Set updated_at to current timestamp
-  6. Link style to creating user via StyleCreatedBy relation
-  7. Link style to updating user via StyleUpdatedBy relation
-- **Post Validation**: Style appears in styles list with draft status
+  1. Create new Style record with auto-generated ID
+  2. Status is "draft" by default
+  3. created_at and updated_at are current timestamp
+  4. created_by links to the user
+  5. User's created_styles_count automatically +1
+- **Post Validation**: Style appears in draft styles list
 
-## TC002: Update Style Properties
-**Description**: Modify existing style properties
-- **Preconditions**: Style exists and user has permission to update
-- **Input Data**: 
+### TC003: Update Style Properties
+- **Preconditions**: Draft style exists, user has permission
+- **Input Data**:
   ```json
   {
-    "styleId": "existing-style-id",
-    "label": "Updated Manga Art",
-    "description": "Updated description for manga style",
-    "priority": 150
+    "styleId": "style-123",
+    "label": "Updated Manga Style",
+    "description": "Updated description",
+    "priority": 2
   }
   ```
 - **Expected Results**:
-  1. Update specified properties on existing style
-  2. Update updated_at timestamp
-  3. Link style to updating user via StyleUpdatedBy relation
-  4. Preserve unchanged properties
-  5. Maintain creation audit trail
-- **Post Validation**: Style shows updated values and new updated_at timestamp
+  1. Style properties are updated
+  2. updated_at timestamp is refreshed
+  3. Other properties remain unchanged
+- **Exception Scenario**: Cannot update published styles by non-admin users
 
-## TC003: Change Style Status
-**Description**: Change style lifecycle status (draft → published → offline)
-- **Preconditions**: Style exists in draft status, user has appropriate permissions
-- **Input Data**: 
+### TC004: Publish Style
+- **Preconditions**: Draft style exists, user has "admin" role
+- **Input Data**:
   ```json
   {
-    "styleId": "existing-style-id",
-    "status": "published"
+    "styleId": "style-123"
   }
   ```
 - **Expected Results**:
-  1. Update style status to "published"
-  2. Update updated_at timestamp
-  3. Style becomes visible in published styles list
-  4. Style becomes available for version inclusion
-- **Post Validation**: Style status changed and audit trail preserved
+  1. Style status changes to "published"
+  2. is_published computation becomes true
+  3. last_published_at is set to current timestamp
+  4. updated_at is refreshed
+- **Exception Scenario**: Non-admin users cannot publish styles
 
-## TC004: Soft Delete Style
-**Description**: Mark style as offline (soft delete)
-- **Preconditions**: Style exists, user has admin role
-- **Input Data**: 
+### TC005: Soft Delete Style
+- **Preconditions**: Style exists, user has "admin" role
+- **Input Data**:
   ```json
   {
-    "styleId": "existing-style-id"
+    "styleId": "style-123"
   }
   ```
 - **Expected Results**:
-  1. Set style status to "offline"
-  2. Update updated_at timestamp
-  3. Style disappears from active styles list
-  4. Style data preserved for audit purposes
-- **Exception Scenario**: Cannot delete style that is part of current published version
+  1. Style status changes to "offline"
+  2. Style no longer appears in active styles list
+  3. Style still exists in storage (soft delete)
+  4. All relations remain intact
+- **Exception Scenario**: Non-admin users cannot delete styles
 
-## TC005: List Styles with Filtering
-**Description**: Query styles with various filters and sorting
-- **Preconditions**: Multiple styles exist with different statuses and properties
-- **Input Data**: 
+### TC006: Reorder Styles
+- **Preconditions**: Multiple styles exist, user has permission
+- **Input Data**:
   ```json
   {
-    "status": "published",
-    "type": "animation", 
-    "sortBy": "priority",
-    "sortOrder": "desc",
-    "limit": 10,
-    "offset": 0
-  }
-  ```
-- **Expected Results**:
-  1. Return only styles matching filter criteria
-  2. Sort results by specified field and order
-  3. Include pagination metadata
-  4. Return related user information for audit
-- **Post Validation**: Results match filter criteria and sorting order
-
-## TC006: Get Style Detail
-**Description**: Retrieve complete style information including relationships
-- **Preconditions**: Style exists and user has read permission
-- **Input Data**: 
-  ```json
-  {
-    "styleId": "existing-style-id"
-  }
-  ```
-- **Expected Results**:
-  1. Return complete style data
-  2. Include created_by user information
-  3. Include updated_by user information
-  4. Include version associations if any
-- **Post Validation**: All related data is properly populated
-
-## TC007: Create Version
-**Description**: Create a new version snapshot with selected styles
-- **Preconditions**: Published styles exist, user has editor or admin role
-- **Input Data**: 
-  ```json
-  {
-    "name": "Version 1.2.0",
-    "description": "New styles for Q2 release",
-    "styleIds": ["style-id-1", "style-id-2", "style-id-3"]
-  }
-  ```
-- **Expected Results**:
-  1. Create new Version record
-  2. Link specified styles to version via StyleVersion relations
-  3. Set version status to draft initially
-  4. Link version to creating user
-  5. Preserve style data at time of version creation
-- **Exception Scenario**: Cannot include draft or offline styles in version
-
-## TC008: Publish Version
-**Description**: Mark a version as current active version
-- **Preconditions**: Version exists in draft status, user has admin role
-- **Input Data**: 
-  ```json
-  {
-    "versionId": "version-id"
-  }
-  ```
-- **Expected Results**:
-  1. Set specified version is_current = true
-  2. Set all other versions is_current = false
-  3. Update version timestamps
-  4. Version becomes active for frontend consumption
-- **Post Validation**: Only one version has is_current = true
-
-## TC009: Rollback to Previous Version
-**Description**: Revert to a previously published version
-- **Preconditions**: Target version exists and was previously published, user has admin role
-- **Input Data**: 
-  ```json
-  {
-    "versionId": "previous-version-id"
-  }
-  ```
-- **Expected Results**:
-  1. Set target version is_current = true
-  2. Set current version is_current = false
-  3. Update version timestamps
-  4. Frontend sees styles from target version
-- **Post Validation**: Target version is now current, style data matches version snapshot
-
-## TC010: Update Style Priorities (Bulk)
-**Description**: Update priority values for multiple styles at once
-- **Preconditions**: Multiple styles exist, user has admin or editor role
-- **Input Data**: 
-  ```json
-  {
-    "updates": [
-      {"styleId": "style-1", "priority": 100},
-      {"styleId": "style-2", "priority": 200},
-      {"styleId": "style-3", "priority": 300}
+    "reorderList": [
+      {"styleId": "style-1", "priority": 1},
+      {"styleId": "style-2", "priority": 2},
+      {"styleId": "style-3", "priority": 3}
     ]
   }
   ```
 - **Expected Results**:
-  1. Update priority for each specified style
-  2. Update updated_at for each style
-  3. Maintain audit trail for each change
-  4. Operation is atomic (all succeed or all fail)
-- **Post Validation**: All styles have new priority values and updated timestamps
+  1. All specified styles have their priority updated
+  2. updated_at timestamp refreshed for all modified styles
+  3. Styles appear in new order when queried with priority sorting
 
-## TC011: Duplicate Slug Validation
-**Description**: Prevent creation of styles with duplicate slugs
-- **Preconditions**: Style with slug "manga-art" already exists
-- **Input Data**: 
+## Version Management Test Cases
+
+### TC007: Create Version
+- **Preconditions**: User with "editor" or "admin" role exists
+- **Input Data**:
   ```json
   {
-    "label": "Another Manga",
-    "slug": "manga-art",
-    "description": "Different manga style",
-    "type": "animation"
+    "version_number": "v1.0",
+    "description": "Initial style collection release"
   }
   ```
 - **Expected Results**:
-  1. Interaction fails with validation error
-  2. Error message indicates slug must be unique
-  3. No style record is created
-- **Exception Scenario**: This is the expected failure case
+  1. Create new Version record with auto-generated ID
+  2. Status is "draft" by default
+  3. created_at is current timestamp
+  4. created_by links to the user
+  5. User's created_versions_count automatically +1
+  6. style_count is 0 initially
+- **Post Validation**: Version appears in versions list
 
-## TC012: Invalid Status Transition
-**Description**: Prevent invalid status changes
-- **Preconditions**: Style exists in "offline" status
-- **Input Data**: 
+### TC008: Add Style to Version
+- **Preconditions**: Version and Style exist in draft status
+- **Input Data**:
   ```json
   {
-    "styleId": "offline-style-id",
-    "status": "published"
+    "versionId": "version-123",
+    "styleId": "style-456"
   }
   ```
 - **Expected Results**:
-  1. Interaction fails with validation error
-  2. Error message indicates invalid status transition
-  3. Style status remains unchanged
-- **Exception Scenario**: Direct offline → published transition should not be allowed
+  1. Create StyleVersion relation record
+  2. Version's style_count automatically +1
+  3. Style's version_count automatically +1
+- **Exception Scenario**: Cannot add offline styles to version
 
-## TC013: Permission Denied - Editor Deleting Style
-**Description**: Verify permission controls work correctly
-- **Preconditions**: Style exists, user has editor role (not admin)
-- **Input Data**: 
+### TC009: Remove Style from Version
+- **Preconditions**: Style is already in version, version is draft
+- **Input Data**:
   ```json
   {
-    "styleId": "existing-style-id"
+    "versionId": "version-123",
+    "styleId": "style-456"
   }
   ```
 - **Expected Results**:
-  1. DeleteStyle interaction fails with permission error
-  2. Style data remains unchanged
-  3. Error message indicates insufficient permissions
-- **Exception Scenario**: This is the expected failure case
+  1. Remove StyleVersion relation record
+  2. Version's style_count automatically -1
+  3. Style's version_count automatically -1
+- **Exception Scenario**: Cannot modify published versions
 
-## TC014: Search Styles by Text
-**Description**: Find styles using text search on label and description
-- **Preconditions**: Multiple styles exist with various labels and descriptions
-- **Input Data**: 
+### TC010: Publish Version
+- **Preconditions**: Draft version with styles exists, user has "admin" role
+- **Input Data**:
   ```json
   {
-    "searchText": "manga",
-    "searchFields": ["label", "description"]
+    "versionId": "version-123"
   }
   ```
 - **Expected Results**:
-  1. Return styles where label or description contains "manga"
-  2. Search is case-insensitive
-  3. Results include relevance scoring
-  4. Pagination works with search results
-- **Post Validation**: All returned styles contain search term in specified fields
+  1. Version status changes to "published"
+  2. published_at is set to current timestamp
+  3. is_current computation becomes true
+  4. All other versions' is_current becomes false (only one current version)
+  5. All styles in this version become "published"
+- **Exception Scenario**: Non-admin users cannot publish versions
 
-## TC015: Version Content Immutability
-**Description**: Verify that published versions preserve style data even after style updates
-- **Preconditions**: Version published with specific styles, styles subsequently updated
-- **Input Data**: Query published version content
+### TC011: Rollback to Previous Version
+- **Preconditions**: Multiple versions exist, at least one published, user has "admin" role
+- **Input Data**:
+  ```json
+  {
+    "targetVersionId": "version-456"
+  }
+  ```
 - **Expected Results**:
-  1. Version shows original style data at time of version creation
-  2. Subsequent style updates do not affect version content
-  3. Version maintains referential integrity
-- **Post Validation**: Version content remains stable regardless of style changes
+  1. Target version status changes to "published"
+  2. Current version status changes to "archived"
+  3. Target version's is_current becomes true
+  4. All styles in target version become "published"
+  5. Styles not in target version become "draft" or remain "offline"
+- **Exception Scenario**: Cannot rollback to non-existent or deleted versions
+
+## Query Operations Test Cases
+
+### TC012: List Styles with Filtering
+- **Preconditions**: Multiple styles with different statuses and types exist
+- **Input Data**:
+  ```json
+  {
+    "status": "published",
+    "type": "animation",
+    "orderBy": "priority",
+    "order": "ASC"
+  }
+  ```
+- **Expected Results**:
+  1. Return only styles matching filter criteria
+  2. Results sorted by priority ascending
+  3. Include computed properties (version_count, is_published)
+- **Variations**: Filter by different combinations of status, type
+
+### TC013: Get Style Details
+- **Preconditions**: Style exists
+- **Input Data**:
+  ```json
+  {
+    "styleId": "style-123"
+  }
+  ```
+- **Expected Results**:
+  1. Return complete style data
+  2. Include all computed properties
+  3. Include created_by user information
+  4. Include list of versions containing this style
+
+### TC014: List Versions with Styles
+- **Preconditions**: Multiple versions with styles exist
+- **Input Data**:
+  ```json
+  {
+    "includeStyles": true,
+    "orderBy": "created_at",
+    "order": "DESC"
+  }
+  ```
+- **Expected Results**:
+  1. Return all versions ordered by creation date (newest first)
+  2. Include computed properties (style_count, is_current)
+  3. Include full style data for each version
+  4. Include created_by user information
+
+### TC015: Search Styles
+- **Preconditions**: Multiple styles with different labels and descriptions exist
+- **Input Data**:
+  ```json
+  {
+    "searchTerm": "manga",
+    "searchFields": ["label", "description", "type"]
+  }
+  ```
+- **Expected Results**:
+  1. Return styles where any specified field contains search term (case-insensitive)
+  2. Include relevance scoring if possible
+  3. Exclude offline styles unless specifically requested
+
+## Permission Control Test Cases
+
+### TC016: Editor Creates Style
+- **Preconditions**: User with "editor" role
+- **Expected Results**: Successfully creates style in draft status
+
+### TC017: Editor Attempts to Publish Style
+- **Preconditions**: User with "editor" role, draft style exists
+- **Expected Results**: Operation fails with permission denied error
+
+### TC018: Viewer Attempts to Create Style
+- **Preconditions**: User with "viewer" role
+- **Expected Results**: Operation fails with permission denied error
+
+### TC019: Admin Full Access
+- **Preconditions**: User with "admin" role
+- **Expected Results**: Can perform all operations successfully
+
+## Edge Cases and Error Scenarios
+
+### TC020: Duplicate Slug Prevention
+- **Preconditions**: Style with slug "manga" exists
+- **Input Data**: New style with same slug "manga"
+- **Expected Results**: Operation fails with duplicate slug error
+
+### TC021: Invalid Version Number Format
+- **Preconditions**: Creating new version
+- **Input Data**: Invalid version number like "1.0.0.0.0"
+- **Expected Results**: Operation fails with invalid format error
+
+### TC022: Multiple Current Versions Prevention
+- **Preconditions**: One published version exists
+- **Input Data**: Attempt to publish second version
+- **Expected Results**: Previous version automatically becomes "archived"
+
+### TC023: Offline Style in Version
+- **Preconditions**: Style with "offline" status
+- **Input Data**: Attempt to add to version
+- **Expected Results**: Operation fails with status validation error
+
+### TC024: Version Rollback to Same Version
+- **Preconditions**: Currently published version
+- **Input Data**: Attempt to rollback to same version
+- **Expected Results**: Operation succeeds but no changes made (idempotent)
+
+## Data Consistency Validation
+
+### TC025: Computed Property Accuracy
+- **Preconditions**: Complex style-version relationships exist
+- **Validation Points**:
+  1. style_count matches actual relation count
+  2. version_count matches actual relation count
+  3. created_styles_count matches user's actual styles
+  4. is_current computation is accurate
+  5. Only one version has is_current = true
+
+### TC026: Cascade Behavior Verification
+- **Preconditions**: Version with multiple styles published
+- **Operations**: Delete version, modify style status
+- **Validation Points**:
+  1. Relation cleanup works correctly
+  2. Computed properties update appropriately
+  3. No orphaned records created
+  4. Data consistency maintained across all operations

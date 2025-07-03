@@ -19,6 +19,7 @@
     "vitest": "^3.1.2"
   },
   "scripts": {
+    "check": "tsc --noEmit",
     "test": "vitest run",
     "test:runtime": "vitest run tests/runtime",
     "test:storage": "vitest run tests/storage",

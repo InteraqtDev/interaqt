@@ -140,6 +140,8 @@ Remember: **Stop thinking "how to do", start thinking "what is"**!
 16. [CRUD Patterns](./15-entity-crud-patterns.md) - Common patterns
 17. [Frontend Integration](./16-frontend-page-design-guide.md) - UI integration
 18. [Performance Optimization](./17-performance-optimization.md) - Performance tips
+19. [API Exports Reference](./18-api-exports-reference.md) - Complete list of available imports
+20. [Common Anti-Patterns](./19-common-anti-patterns.md) - Mistakes to avoid
 
 ## 📞 Need Help?
 

@@ -594,6 +594,17 @@ const Order = Entity.create({
 
 Transform is the most flexible reactive computation type, allowing you to define custom transformation logic.
 
+### Understanding Transform's Essence
+
+Transform is fundamentally about **transforming data from one collection to another collection**. It's a declarative way to express how one set of data transforms into another set of data. Common examples include:
+
+- Transforming `InteractionEventEntity` data into specific entity data (e.g., user interactions → entities)
+- Transforming `InteractionEventEntity` data into relation data (e.g., follow action → user follow relation)
+- Transforming one entity type into another entity type (e.g., Product → DiscountedProduct)
+- Transforming relation data into derived entity data
+
+**Important**: Transform **cannot** be used to express property computations within the same entity. For property-level computations that depend only on the current record's data, use `getValue` instead. Transform is about inter-collection transformations, not intra-record calculations.
+
 ### ⚠️ CRITICAL: When to Use Transform vs getValue
 
 **Transform** is designed for creating **derived entities** from other entities or relations:
@@ -2120,17 +2131,33 @@ computation: Count.create({
   record: () => SomeRelation  // This is NOT how to handle forward references
 })
 
-// ❌ DON'T: Reference entity being defined in Transform
+// ❌ DON'T: Use Transform for property computation
 const Version = Entity.create({
   name: 'Version',
   properties: [
     Property.create({
       name: 'nextVersionNumber',
       computation: Transform.create({
-        record: Version  // Circular reference!
+        record: Version  // Wrong! Transform is for collection-to-collection transformation, not property computation
       })
     })
   ]
+})
+
+// ❌ DON'T: Use Transform for property-level calculations
+Property.create({
+  name: 'formattedPrice',
+  computation: Transform.create({
+    record: Product,  // Wrong! Transform cannot be used for property computation
+    callback: (product) => `$${product.price}`
+  })
+})
+
+// ✅ DO: Use getValue for property-level computations
+Property.create({
+  name: 'formattedPrice',
+  type: 'string',
+  getValue: (record) => `$${record.price}`  // Correct! getValue is for same-entity property computation
 })
 
 // ✅ DO: Use proper imports and direct references
