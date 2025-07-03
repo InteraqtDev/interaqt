@@ -278,6 +278,81 @@ test('should fail validation', async () => {
 });
 ```
 
+### ❌ Using storage.create() to Test Validation
+
+```javascript
+// ❌ WRONG: storage.create bypasses ALL validation
+test('should fail with invalid data', async () => {
+  const result = await system.storage.create('Style', {
+    label: '',    // Empty label
+    slug: ''      // Empty slug
+  });
+  // This will ALWAYS succeed! storage.create bypasses validation
+  expect(result).toBeTruthy();  // Wrong expectation!
+});
+
+// ✅ CORRECT: Test validation through Interactions
+test('should fail with invalid data', async () => {
+  const result = await controller.callInteraction('CreateStyle', {
+    user: testUser,
+    payload: {
+      label: '',    // Empty label
+      slug: ''      // Empty slug
+    }
+  });
+  
+  expect(result.error).toBeDefined();
+  expect(result.error.type).toBe('validation failed');
+});
+
+// ✅ CORRECT: Use storage.create ONLY for test setup
+beforeEach(async () => {
+  // Create test data that should already exist
+  testUser = await system.storage.create('User', {
+    name: 'Test User',
+    role: 'admin'
+  });
+  
+  existingStyle = await system.storage.create('Style', {
+    label: 'Existing Style',
+    slug: 'existing-style'
+  });
+});
+```
+
+### ❌ Testing Entity/Relation Directly
+
+```javascript
+// ❌ WRONG: Don't test entities separately
+test('should create User entity', async () => {
+  const user = await system.storage.create('User', {
+    name: 'John',
+    email: 'john@example.com'
+  });
+  expect(user.name).toBe('John');
+  // This is testing storage, not business logic!
+});
+
+// ✅ CORRECT: Test through Interactions
+test('should create user through interaction', async () => {
+  const result = await controller.callInteraction('CreateUser', {
+    user: adminUser,
+    payload: {
+      name: 'John',
+      email: 'john@example.com'
+    }
+  });
+  
+  expect(result.error).toBeUndefined();
+  
+  // Verify side effects
+  const user = await system.storage.findOne('User',
+    MatchExp.atom({ key: 'email', value: ['=', 'john@example.com'] })
+  );
+  expect(user.name).toBe('John');
+});
+```
+
 ## 7. Payload Entity Reference Issues
 
 ### ❌ Entity Resolution Problems
@@ -333,6 +408,9 @@ await controller.callInteraction('CreatePost', {
 5. **Transform is for collection transformations, not property computations**
 6. **Always use object references in StateMachine, not strings**
 7. **Check result.error for errors, don't use try-catch**
-8. **When in doubt, check the [API Exports Reference](./18-api-exports-reference.md)**
+8. **storage.create() bypasses ALL validation - use only for test setup**
+9. **ALL business logic testing must use callInteraction()**
+10. **Never test Entity/Relation directly - test through Interactions**
+11. **When in doubt, check the [API Exports Reference](./18-api-exports-reference.md)**
 
 Remember: The framework is about **declaring what data is**, not **how to manipulate it**. 

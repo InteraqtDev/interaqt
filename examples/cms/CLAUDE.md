@@ -135,8 +135,11 @@ const LoginInteraction = Interaction.create({  // DON'T DO THIS
 #### 1.2 Test Case Documentation (CRITICAL)
 Create `requirements/test-cases.md` document with complete test cases:
 
+**🔴 CRITICAL: All test cases MUST be based on Interactions, NOT on Entity/Relation operations**
+
 ```markdown
-## TC001: Create Article
+## TC001: Create Article (via CreateArticle Interaction)
+- Interaction: CreateArticle
 - Preconditions: User logged in with publishing permission
 - Input Data: title="Tech Sharing", content="Content...", tags=["frontend", "React"]
 - Expected Results:
@@ -147,14 +150,26 @@ Create `requirements/test-cases.md` document with complete test cases:
   5. User's article count automatically +1
 - Post Validation: Article appears in user's article list
 
-## TC002: Like Article
+## TC002: Create Article with Invalid Data (via CreateArticle Interaction)
+- Interaction: CreateArticle
+- Preconditions: User logged in with publishing permission
+- Input Data: title="", content=""  // Empty required fields
+- Expected Results:
+  1. Interaction returns error
+  2. Error type is "validation failed"
+  3. No article record created
+  4. User's article count unchanged
+- Note: Do NOT test this with storage.create - it bypasses validation!
+
+## TC003: Like Article (via LikeArticle Interaction)
+- Interaction: LikeArticle
 - Preconditions: Article exists and user hasn't liked it
 - Input Data: postId="post123"
 - Expected Results:
   1. Create like relationship record
   2. Article's like count automatically +1
   3. User's like list includes this article
-- Exception Scenario: Duplicate like should fail
+- Exception Scenario: Duplicate like should fail at Interaction level
 ```
 
 #### 1.3 Interaction Matrix
@@ -252,12 +267,61 @@ In the interaqt framework, **ALL data is derived from interaction events**. This
   - You haven't tested all edge cases and error scenarios for existing Interactions
   - There might be unused code that should be removed
 
+**🔴 CRITICAL: Understanding storage.create vs callInteraction**
+- `storage.create()` is a **LOW-LEVEL API** that bypasses ALL business logic and validation
+- It should ONLY be used for **test data preparation** (creating prerequisite records)
+- **ALL validation happens at the Interaction level**, not at the storage level
+- **NEVER use storage.create() to test validation failures** - it will always succeed!
+
 **Testing Strategy**:
 1. Test every Interaction with success cases
-2. Test every Interaction with failure/error cases
-3. Test edge cases and boundary conditions
+2. Test every Interaction with failure/error cases **using callInteraction**
+3. Test edge cases and boundary conditions **through Interactions**
 4. Verify that computed properties (computation) update correctly after Interactions
-5. Ensure permission controls work as expected
+5. Ensure permission controls work as expected **through Interactions**
+
+**Example of CORRECT vs WRONG testing**:
+```typescript
+// ❌ WRONG: Testing validation with storage.create
+test('should fail with invalid data', async () => {
+  // This is WRONG! storage.create bypasses validation
+  const result = await system.storage.create('Style', {
+    label: '',  // Invalid empty label
+    slug: ''
+  })
+  // This will NOT fail! storage.create always succeeds
+})
+
+// ✅ CORRECT: Testing validation with callInteraction
+test('should fail with invalid data', async () => {
+  const result = await controller.callInteraction('CreateStyle', {
+    user: testUser,
+    payload: {
+      label: '',  // Invalid empty label
+      slug: ''
+    }
+  })
+  
+  // Check for validation error
+  expect(result.error).toBeDefined()
+  expect(result.error.message).toContain('validation failed')
+})
+
+// ✅ CORRECT: Using storage.create for test setup only
+beforeEach(async () => {
+  // Create prerequisite test data
+  testUser = await system.storage.create('User', {
+    name: 'Test User',
+    role: 'admin'
+  })
+  
+  // Create existing records for relationship tests
+  existingStyle = await system.storage.create('Style', {
+    label: 'Existing Style',
+    slug: 'existing-style'
+  })
+})
+```
 
 #### 3.1 Test Framework Setup
 - Use vitest as testing framework
@@ -328,6 +392,39 @@ const system = new MonoSystem(new PGLiteDB())
 - **Computed Properties**: Verify that properties with computation update correctly after Interactions execute
 - **Permission Controls**: Test both positive (allowed) and negative (denied) permission scenarios
 - **NO Entity/Relation Unit Tests**: Do not write separate tests for Entity CRUD or Relation operations - these are covered through Interaction tests
+- **NO storage.create() for Validation Testing**: Remember that storage.create() bypasses all validation - use it ONLY for test setup
+
+**Test Case Structure**:
+```typescript
+describe('Style Interactions', () => {
+  test('TC001: CreateStyle - Success case', async () => {
+    const result = await controller.callInteraction('CreateStyle', {
+      user: adminUser,
+      payload: { label: 'Valid Style', slug: 'valid-style' }
+    })
+    expect(result.error).toBeUndefined()
+    // Verify side effects through storage queries
+  })
+  
+  test('TC002: CreateStyle - Validation failure', async () => {
+    // ✅ Test validation through Interaction, NOT storage.create
+    const result = await controller.callInteraction('CreateStyle', {
+      user: adminUser,
+      payload: { label: '', slug: '' }  // Invalid data
+    })
+    expect(result.error).toBeDefined()
+  })
+  
+  test('TC003: CreateStyle - Permission denied', async () => {
+    const result = await controller.callInteraction('CreateStyle', {
+      user: regularUser,  // No permission
+      payload: { label: 'Style', slug: 'style' }
+    })
+    expect(result.error).toBeDefined()
+    expect(result.error.type).toBe('permission denied')
+  })
+})
+```
 
 #### 3.3 Test Execution (STRICTLY FOLLOW)
 After writing each test module, you MUST:
@@ -691,9 +788,19 @@ export const User = Entity.create({
   // WRONG: This method doesn't exist
   storage.findByProperty('Entity', 'field', value)  // ❌
   ```
+- ❌ Don't use storage.create() to test validation failures
+  ```typescript
+  // WRONG: storage.create bypasses ALL validation
+  test('should fail validation', async () => {
+    const result = await system.storage.create('Entity', {
+      invalidField: ''  // This will NOT trigger validation!
+    })
+    // storage.create always succeeds regardless of data validity
+  })
+  ```
 - ✅ Use correct Controller API
   ```typescript
-  // CORRECT: Use callInteraction
+  // CORRECT: Use callInteraction for ALL business logic tests
   const result = await controller.callInteraction('InteractionName', {
     user: { id: 'userId', role: 'user' },  // Required user object
     payload: { /* data */ }
@@ -701,11 +808,33 @@ export const User = Entity.create({
   ```
 - ✅ Use correct Storage API with MatchExp
   ```typescript
-  // CORRECT: Use findOne/find with MatchExp
+  // CORRECT: Use storage APIs ONLY for:
+  // 1. Test data setup (creating prerequisite records)
+  // 2. Verifying side effects after interactions
+  
+  // Setup test data
+  const testData = await system.storage.create('User', {
+    name: 'Test User',
+    role: 'admin'
+  })
+  
+  // Query after interaction
   const record = await system.storage.findOne(
     'EntityName',
     MatchExp.atom({ key: 'field', value: ['=', value] })
   )
+  ```
+- ✅ Always test validation through Interactions
+  ```typescript
+  // CORRECT: Test validation failures through callInteraction
+  test('should reject invalid data', async () => {
+    const result = await controller.callInteraction('CreateEntity', {
+      user: testUser,
+      payload: { invalidData: '' }
+    })
+    expect(result.error).toBeDefined()
+    expect(result.error.type).toBe('validation failed')
+  })
   ```
 - ✅ Always check for UUID package when needed
   ```typescript
@@ -743,8 +872,11 @@ export const User = Entity.create({
 
 ### For Project Generation
 - [ ] Complete test-case driven workflow followed
-- [ ] Backend implementation with 100% test coverage
+- [ ] Backend implementation with 100% test coverage through Interaction tests
 - [ ] All tests executed and passing
+- [ ] **NO tests using storage.create() for validation testing**
+- [ ] **ALL validation tests done through callInteraction**
+- [ ] **NO separate Entity/Relation unit tests**
 - [ ] Frontend perfectly aligned with backend
 - [ ] All documentation requirements met
 - [ ] Integration testing completed successfully

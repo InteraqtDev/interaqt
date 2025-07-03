@@ -106,14 +106,16 @@ describe('Feature Tests', () => {
   })
 
   test('creating and updating records', async () => {
-    // ✅ Create record directly (for test setup)
+    // ✅ Create record directly (ONLY for test setup)
+    // ⚠️ WARNING: storage.create bypasses ALL validation!
+    // NEVER use it to test business logic or validation
     const user = await system.storage.create('User', {
       username: 'testuser',
       email: 'test@example.com',
       role: 'user'
     })
 
-    // ✅ Update record
+    // ✅ Update record (also bypasses validation - use only for test setup)
     await system.storage.update(
       'User',
       MatchExp.atom({ key: 'id', value: ['=', user.id] }),
@@ -151,11 +153,16 @@ const result = await controller.callActivityInteraction(
 
 #### 2. Storage APIs
 
+⚠️ **WARNING: Storage APIs bypass ALL validation and business logic!**
+- Use `storage.create/update/delete` ONLY for test data setup
+- NEVER use them to test validation or business logic
+- ALL business logic tests must use `callInteraction`
+
 ```typescript
-// Create a record (usually for test setup)
+// Create a record (ONLY for test setup - bypasses ALL validation!)
 const record = await system.storage.create(entityName: string, data: object)
 
-// Find one record
+// Find one record (safe for reading data)
 const record = await system.storage.findOne(
   entityName: string,
   matchExp: MatchExp,
@@ -163,7 +170,7 @@ const record = await system.storage.findOne(
   attributeQuery?: AttributeQuery
 )
 
-// Find multiple records
+// Find multiple records (safe for reading data)
 const records = await system.storage.find(
   entityName: string,
   matchExp: MatchExp,
@@ -171,14 +178,14 @@ const records = await system.storage.find(
   attributeQuery?: AttributeQuery
 )
 
-// Update records
+// Update records (ONLY for test setup - bypasses ALL validation!)
 await system.storage.update(
   entityName: string,
   matchExp: MatchExp,
   data: object
 )
 
-// Delete records
+// Delete records (ONLY for test cleanup - bypasses ALL business logic!)
 await system.storage.delete(
   entityName: string,
   matchExp: MatchExp
@@ -249,6 +256,12 @@ Testing is a crucial component for ensuring the quality of interaqt applications
    - Unused code that should be removed
 
 4. **Test What Matters**: Test the business logic and user scenarios through Interactions, not the framework mechanics.
+
+5. **Storage APIs are LOW-LEVEL**: 
+   - `storage.create()`, `storage.update()`, `storage.delete()` bypass ALL validation and business logic
+   - Use them ONLY for test data setup (creating prerequisite records)
+   - NEVER use them to test validation failures - they will always succeed!
+   - ALL business logic testing must go through `callInteraction()`
 
 ## 12.1 Testing Reactive Computations
 
