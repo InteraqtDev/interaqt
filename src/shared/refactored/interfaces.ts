@@ -105,7 +105,7 @@ export interface InteractionEventArgs {
 export type ActivityInstanceType = import('./Activity.js').ActivityInstance;
 export type ActivityGroupInstanceType = import('./Activity.js').ActivityGroupInstance;
 export type GatewayInstanceType = import('./Gateway.js').GatewayInstance;
-export type TransferInstanceType = unknown; // Transfer 类型未定义
+export type TransferInstanceType = import('./Activity.js').TransferInstance;
 
 // 其他常用的实例类型别名
 export type EntityInstanceType = import('./Entity.js').EntityInstance;

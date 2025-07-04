@@ -174,8 +174,8 @@ export class ComputationSourceMapManager {
                 ERMutationEventsSource.push({
                     dataDep: dataDep,
                     type: 'create',
-                    recordName: dataDep.source.name,
-                    sourceRecordName: dataDep.source.name,
+                    recordName: dataDep.source.name!,
+                    sourceRecordName: dataDep.source.name!,
                     computation,
                     isInitial,
                 })
@@ -184,8 +184,8 @@ export class ComputationSourceMapManager {
                 ERMutationEventsSource.push({    
                     dataDep: dataDep,
                     type: 'delete',
-                    recordName: dataDep.source.name,
-                    sourceRecordName: dataDep.source.name,
+                    recordName: dataDep.source.name!,
+                    sourceRecordName: dataDep.source.name!,
                     computation
                 })
             }
@@ -193,7 +193,7 @@ export class ComputationSourceMapManager {
             if (!eventType || eventType === 'update') {
                 // 监听 update
                 if (dataDep.attributeQuery) {
-                    ERMutationEventsSource.push(...this.convertAttrsToERMutationEventsSourceMap(dataDep, dataDep.source.name, dataDep.attributeQuery, [], computation, false))
+                    ERMutationEventsSource.push(...this.convertAttrsToERMutationEventsSourceMap(dataDep, dataDep.source.name!, dataDep.attributeQuery, [], computation, false))
                 }
             }
             
@@ -204,7 +204,7 @@ export class ComputationSourceMapManager {
 
             if (dataDep.attributeQuery) {
                 // 注意这里的 recordName 应该是当前数据 entity 的 name，因为依赖的是 property 所在的自身 entity
-                ERMutationEventsSource.push(...this.convertAttrsToERMutationEventsSourceMap(dataDep, dataContext.host.name, dataDep.attributeQuery, [], computation, true))
+                ERMutationEventsSource.push(...this.convertAttrsToERMutationEventsSourceMap(dataDep, dataContext.host.name!, dataDep.attributeQuery, [], computation, true))
             }
         } else if (dataDep.type ==='global') {
             // 依赖的是全局的一个 Dict 值。注意这里理论上只有 create 和 update，初始化的时候会得到创建的事件。全局的值是不会删除的。

@@ -86,7 +86,7 @@ export class GlobalAverageHandle implements DataBasedComputation {
 
         if (mutationEvent.type === 'create') {
             const newRecord = await this.controller.system.storage.findOne(
-                this.record.name, 
+                this.record.name!, 
                 MatchExp.atom({key:'id', value:['=', mutationEvent.record!.id]}), 
                 undefined, 
                 this.args.attributeQuery
@@ -101,7 +101,7 @@ export class GlobalAverageHandle implements DataBasedComputation {
             return ComputationResult.fullRecompute('No oldRecord in delete event');
         } else if (mutationEvent.type === 'update') {
             const newRecord = await this.controller.system.storage.findOne(
-                this.record.name, 
+                this.record.name!, 
                 MatchExp.atom({key:'id', value:['=', mutationEvent.record!.id]}), 
                 undefined, 
                 this.args.attributeQuery
@@ -150,7 +150,7 @@ export class PropertyAverageHandle implements DataBasedComputation {
         this.relation = args.record as KlassInstance<typeof Relation>
         this.isSource = args.direction ? args.direction === 'source' : this.relation.source.name === dataContext.host.name
         this.relationAttr = this.isSource ? this.relation.sourceProperty : this.relation.targetProperty
-        this.relatedRecordName = this.isSource ? this.relation.target.name : this.relation.source.name
+        this.relatedRecordName = this.isSource ? this.relation.target.name! : this.relation.source.name!
         
         this.relationAttributeQuery = args.attributeQuery || []
         
@@ -236,11 +236,11 @@ export class PropertyAverageHandle implements DataBasedComputation {
         let sum = (lastValue || 0) * count
 
 
-        if (relatedMutationEvent.type === 'create' && relatedMutationEvent.recordName === this.relation.name) {
+        if (relatedMutationEvent.type === 'create' && relatedMutationEvent.recordName === this.relation.name!) {
             // 关联关系的新建
             const relationRecord = relatedMutationEvent.record!;
             const newRelationWithEntity = await this.controller.system.storage.findOne(
-                this.relation.name, 
+                this.relation.name!, 
                 MatchExp.atom({key: 'id', value: ['=', relationRecord.id]}), 
                 undefined, 
                 this.relationAttributeQuery
@@ -251,13 +251,13 @@ export class PropertyAverageHandle implements DataBasedComputation {
                 sum += value;
                 count++;
             }
-        } else if (relatedMutationEvent.type === 'delete' && relatedMutationEvent.recordName === this.relation.name) {
+        } else if (relatedMutationEvent.type === 'delete' && relatedMutationEvent.recordName === this.relation.name!) {
             // FIXME 关联关系的删除 - 无法知道原本的字段值
             return ComputationResult.fullRecompute('Cannot determine average value for deleted relation')
         } else if (relatedMutationEvent.type === 'update') {
             // 可能是关系更新也可能是关联实体更新
             const newRelationWithEntity = await this.controller.system.storage.findOne(
-                this.relation.name, 
+                this.relation.name!, 
                 MatchExp.atom({key: mutationEvent.relatedAttribute.slice(2).concat('id').join('.'), value: ['=', relatedMutationEvent.oldRecord!.id]}), 
                 undefined, 
                 this.relationAttributeQuery

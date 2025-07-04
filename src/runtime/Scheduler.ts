@@ -61,7 +61,7 @@ export class Scheduler {
 
         for(const computationInput of computationInputs) {
             const dataContext = computationInput.dataContext
-            const args = computationInput.args
+            const args = computationInput.args as any
             const handles = ComputationHandle.Handles
             const ComputationCtor = handles.get(args.constructor as Klass<any>)![dataContext.type]! as ComputationClass
             assert(!!ComputationCtor, `cannot find Computation handle for ${(args.constructor as any).displayName || (args.constructor as any).name}`)
@@ -338,11 +338,11 @@ export class Scheduler {
             // 如果是 property 级别的 dataContext，需要找到所有实体记录，就是记录都受影响了
             if (source.computation.dataContext.type === 'property') {
                 const propertyContext = source.computation.dataContext as PropertyDataContext
-                const allRecords = await this.controller.system.storage.find(propertyContext.host.name, MatchExp.atom({key:'id', value:['not', null]}), {}, ['*'])
+                const allRecords = await this.controller.system.storage.find(propertyContext.host.name!, MatchExp.atom({key:'id', value:['not', null]}), {}, ['*'])
                 dirtyRecordsAndEvents = allRecords.map(record => [record, {
                     dataDep: source.dataDep,
                     type: 'update',
-                    recordName: propertyContext.host.name,
+                    recordName: propertyContext.host.name!,
                     record: record,
                     oldRecord: record,
                     relatedMutationEvent: mutationEvent
@@ -557,11 +557,11 @@ export class Scheduler {
 
             const values: any[] = await Promise.all(Object.values(computation.dataDeps).map(async dataDep => {
                 if (dataDep.type === 'records') {
-                    return await this.controller.system.storage.find(dataDep.source.name, undefined, {}, dataDep.attributeQuery)
+                    return await this.controller.system.storage.find(dataDep.source.name!, undefined, {}, dataDep.attributeQuery)
                 } else if (dataDep.type === 'property') {
-                    return this.controller.system.storage.findOne((computation.dataContext as PropertyDataContext).host.name, MatchExp.atom({key: 'id', value: ['=', record.id]}), {}, dataDep.attributeQuery)
+                    return this.controller.system.storage.findOne((computation.dataContext as PropertyDataContext).host.name!, MatchExp.atom({key: 'id', value: ['=', record.id]}), {}, dataDep.attributeQuery)
                 } else if (dataDep.type === 'global') {
-                    return await this.controller.system.storage.get(DICTIONARY_RECORD, dataDep.source.name)
+                    return await this.controller.system.storage.get(DICTIONARY_RECORD, dataDep.source.name!)
                 }
             }))
             return Object.fromEntries(Object.entries(computation.dataDeps).map(([dataDepName, dataDep], index) => [dataDepName, values[index]]))

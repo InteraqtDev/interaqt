@@ -123,7 +123,7 @@ export class PropertyCountHandle implements DataBasedComputation {
         this.relation = args.record as KlassInstance<typeof Relation>
         this.isSource = args.direction ? args.direction === 'source' : this.relation.source.name === dataContext.host.name
         this.relationAttr = this.isSource ? this.relation.sourceProperty : this.relation.targetProperty
-        this.relatedRecordName = this.isSource ? this.relation.target.name : this.relation.source.name
+        this.relatedRecordName = this.isSource ? this.relation.target.name! : this.relation.source.name!
         
         this.relationAttributeQuery = args.attributeQuery || []
         
@@ -140,7 +140,7 @@ export class PropertyCountHandle implements DataBasedComputation {
 
     createState(): {}| StateWithCallback {
         return this.callback ? {
-            isItemMatchCount: new RecordBoundState<boolean>(false, this.relation.name)
+            isItemMatchCount: new RecordBoundState<boolean>(false, this.relation.name!)
         } : {}
     }
     
@@ -187,12 +187,12 @@ export class PropertyCountHandle implements DataBasedComputation {
         
         let count = lastValue || 0;
 
-        if (relatedMutationEvent.type === 'create' && relatedMutationEvent.recordName === this.relation.name) {
+        if (relatedMutationEvent.type === 'create' && relatedMutationEvent.recordName === this.relation.name!) {
             // 关联关系的新建
             if (this.callback) {
                 const relationRecord = relatedMutationEvent.record!;
                 const newRelationWithEntity = await this.controller.system.storage.findOne(
-                    this.relation.name, 
+                    this.relation.name!, 
                     MatchExp.atom({key: 'id', value: ['=', relationRecord.id]}), 
                     undefined, 
                     this.relationAttributeQuery
@@ -206,7 +206,7 @@ export class PropertyCountHandle implements DataBasedComputation {
             } else {
                 count = count + 1;
             }
-        } else if (relatedMutationEvent.type === 'delete' && relatedMutationEvent.recordName === this.relation.name) {
+        } else if (relatedMutationEvent.type === 'delete' && relatedMutationEvent.recordName === this.relation.name!) {
             // 关联关系的删除。
             if (this.callback) {
                 if((await (this.state as StateWithCallback).isItemMatchCount!.get(relatedMutationEvent.oldRecord))) {
@@ -219,7 +219,7 @@ export class PropertyCountHandle implements DataBasedComputation {
             // 这里可能是关联关系上的更新，也可能是关联实体的更新。不管哪一种，我们都重新查询一遍。
             if(this.callback) {
                 const newRelationWithEntity = await this.controller.system.storage.findOne(
-                    this.relation.name, 
+                    this.relation.name!, 
                     MatchExp.atom({key: mutationEvent.relatedAttribute.slice(2).concat('id').join('.'), value: ['=', relatedMutationEvent.oldRecord!.id]}), 
                     undefined, 
                     this.relationAttributeQuery

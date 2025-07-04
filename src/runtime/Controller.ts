@@ -112,38 +112,38 @@ export class Controller {
             // Entity 级别的计算结果完全替换实体表中的所有记录
             const entityContext = dataContext as EntityDataContext
             // 先删除所有记录
-            await this.system.storage.delete(entityContext.id.name, BoolExp.atom({key: 'id', value: ['not', null]}))
+            await this.system.storage.delete(entityContext.id.name!, BoolExp.atom({key: 'id', value: ['not', null]}))
             // 然后插入新记录，result 必须是数组
             const items = Array.isArray(result) ? result : [result]
             for (const item of items) {
-                await this.system.storage.create(entityContext.id.name, item)
+                await this.system.storage.create(entityContext.id.name!, item)
             }
         } else if (dataContext.type === 'relation') {
             if (result === undefined || result === null) return
             // Relation 级别的计算结果完全替换关系表中的所有记录
             const relationContext = dataContext as RelationDataContext
             // 先删除所有记录
-            await this.system.storage.delete(relationContext.id.name, BoolExp.atom({key: 'id', value: ['not', null]}))
+            await this.system.storage.delete(relationContext.id.name!, BoolExp.atom({key: 'id', value: ['not', null]}))
             // 然后插入新记录，result 必须是数组
             const items = Array.isArray(result) ? result : [result]
             for (const item of items) {
-                await this.system.storage.create(relationContext.id.name, item)
+                await this.system.storage.create(relationContext.id.name!, item)
             }
         } else {
             const propertyDataContext = dataContext as PropertyDataContext
-            await this.system.storage.update(propertyDataContext.host.name, BoolExp.atom({key: 'id', value: ['=', record.id]}), {[propertyDataContext.id.name]: result})
+            await this.system.storage.update(propertyDataContext.host.name!, BoolExp.atom({key: 'id', value: ['=', record.id]}), {[propertyDataContext.id.name]: result})
         }   
     }
     async retrieveLastValue(dataContext: DataContext, record?: any) {
         if (dataContext.type === 'global') {
             return this.system.storage.get(DICTIONARY_RECORD, dataContext.id! as string)
         } else if (dataContext.type === 'entity'||dataContext.type === 'relation') {
-            return this.system.storage.find(dataContext.id.name, undefined, undefined, ['*'])
+            return this.system.storage.find(dataContext.id.name!, undefined, undefined, ['*'])
         } else {
             const propertyDataContext = dataContext as PropertyDataContext
             if (record[propertyDataContext.id.name]) return record[propertyDataContext.id.name]
 
-            const item = await this.system.storage.findOne(propertyDataContext.host.name, BoolExp.atom({key: 'id', value: ['=', record!.id]}), undefined, ['*'])
+            const item = await this.system.storage.findOne(propertyDataContext.host.name!, BoolExp.atom({key: 'id', value: ['=', record!.id]}), undefined, ['*'])
             return item[propertyDataContext.id.name]
         }
     }
@@ -157,22 +157,22 @@ export class Controller {
             } else if (dataContext.type === 'entity'||dataContext.type === 'relation') {
                 const erDataContext = dataContext as EntityDataContext|RelationDataContext
                 if (patch.type === 'insert') {  
-                    await this.system.storage.create(erDataContext.id.name, patch.data)
+                    await this.system.storage.create(erDataContext.id.name!, patch.data)
                 } else if (patch.type === 'update') {
                     const match = MatchExp.atom({key: 'id', value: ['=', patch.affectedId]})
-                    await this.system.storage.update(erDataContext.id.name, match, patch.data)
+                    await this.system.storage.update(erDataContext.id.name!, match, patch.data)
                 } else if (patch.type === 'delete') {
                     const match = MatchExp.atom({key: 'id', value: ['=', patch.affectedId]})
-                    await this.system.storage.delete(erDataContext.id.name, match)
+                    await this.system.storage.delete(erDataContext.id.name!, match)
                 }
             } else {
                 const propertyDataContext = dataContext as PropertyDataContext
                 if (patch.type === 'insert') {
-                    await this.system.storage.update(propertyDataContext.host.name, BoolExp.atom({key: 'id', value: ['=', record.id]}), {[propertyDataContext.id.name]: patch.data})
+                    await this.system.storage.update(propertyDataContext.host.name!, BoolExp.atom({key: 'id', value: ['=', record.id]}), {[propertyDataContext.id.name]: patch.data})
                 } else if (patch.type === 'update') {
-                    await this.system.storage.update(propertyDataContext.host.name, BoolExp.atom({key: 'id', value: ['=', record.id]}), {[propertyDataContext.id.name]: patch.data})
+                    await this.system.storage.update(propertyDataContext.host.name!, BoolExp.atom({key: 'id', value: ['=', record.id]}), {[propertyDataContext.id.name]: patch.data})
                 } else if (patch.type === 'delete') {
-                    await this.system.storage.update(propertyDataContext.host.name, BoolExp.atom({key: 'id', value: ['=', record.id]}), {[propertyDataContext.id.name]: null})
+                    await this.system.storage.update(propertyDataContext.host.name!, BoolExp.atom({key: 'id', value: ['=', record.id]}), {[propertyDataContext.id.name]: null})
                 }
             }
         }

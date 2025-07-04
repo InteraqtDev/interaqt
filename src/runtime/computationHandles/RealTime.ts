@@ -16,8 +16,13 @@ export class GlobalRealTimeComputation implements DataBasedComputation {
 
     constructor(public controller: Controller, public args: KlassInstance<typeof RealTime>, public dataContext: DataContext) {
         this.dataDeps = args.dataDeps ?? {};
-        this.callback = args.callback;
-        this.nextRecomputeTime = args.nextRecomputeTime;
+        this.callback = (now: Expression, dataDeps: {[key: string]: any}) => {
+            return (args.callback as any).call(this.controller, now, dataDeps);
+        };
+        this.nextRecomputeTime = args.nextRecomputeTime ? 
+            (now: number, dataDeps: {[key: string]: any}) => {
+                return (args.nextRecomputeTime as any).call(this.controller, now, dataDeps);
+            } : undefined;
     }
     createState() {
         return {
@@ -73,8 +78,13 @@ export class PropertyRealTimeComputation implements DataBasedComputation {
             ...(args.dataDeps || {})
         }
         this.isResultNumber = (this.dataContext.id as KlassInstance<typeof Property>).type === 'number'
-        this.callback = args.callback;
-        this.nextRecomputeTime = args.nextRecomputeTime;
+        this.callback = (now: Expression, dataDeps: {[key: string]: any}) => {
+            return (args.callback as any).call(this.controller, now, dataDeps);
+        };
+        this.nextRecomputeTime = args.nextRecomputeTime ? 
+            (now: number, dataDeps: {[key: string]: any}) => {
+                return (args.nextRecomputeTime as any).call(this.controller, now, dataDeps);
+            } : undefined;
     }
     createState() {
         return {

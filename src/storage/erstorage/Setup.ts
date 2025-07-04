@@ -134,9 +134,9 @@ export class DBSetup {
                 prop.name,
                 {
                     type: prop.type,
-                    computed: prop.computed,
+                    computed: prop.computed as ((record: any) => any) | undefined,
                     collection: prop.collection,
-                    defaultValue: prop.defaultValue,
+                    defaultValue: prop.defaultValue as (() => any) | undefined,
                     fieldType: this.database!.mapToDBFieldType(prop.type, prop.collection)
                 }
             ];

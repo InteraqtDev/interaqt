@@ -50,7 +50,7 @@ export class RecordsTransformHandle implements DataBasedComputation {
         if (mutationEvent.type === 'create') {
             const matchSourceRecord = BoolExp.atom({key: 'id', value: ['=', mutationEvent.record!.id]})
             const souceDataDep = this.dataDeps.main as RecordsDataDep
-            const sourceRecord = await this.controller.system.storage.findOne(souceDataDep.source.name, matchSourceRecord, undefined, souceDataDep.attributeQuery)
+            const sourceRecord = await this.controller.system.storage.findOne(souceDataDep.source.name!, matchSourceRecord, undefined, souceDataDep.attributeQuery)
             const transformedRecord = this.transformCallback.call(this.controller, sourceRecord)
             // 允许返回 Null，表示不插入
             if(transformedRecord) {
@@ -65,7 +65,7 @@ export class RecordsTransformHandle implements DataBasedComputation {
         } else if (mutationEvent.type === 'update'||mutationEvent.type === 'delete') {
             const sourceRecordId = mutationEvent.oldRecord?.id ?? mutationEvent.record!.id
             const match = BoolExp.atom({key: this.state.sourceRecordId.key, value: ['=', sourceRecordId]})
-            const mappedRecord = await this.controller.system.storage.findOne(dataContext.id.name, match, undefined, ['*'])
+            const mappedRecord = await this.controller.system.storage.findOne(dataContext.id.name!, match, undefined, ['*'])
             if (mutationEvent.type === 'delete') {
                 if (mappedRecord) {
                     return {
@@ -75,7 +75,7 @@ export class RecordsTransformHandle implements DataBasedComputation {
                 }
             } else {
                 const matchSourceRecord = BoolExp.atom({key: 'id', value: ['=', sourceRecordId]})
-                const sourceRecord = await this.controller.system.storage.findOne((this.dataDeps.main as RecordsDataDep).source.name, matchSourceRecord, undefined, (this.dataDeps.main as RecordsDataDep).attributeQuery)
+                const sourceRecord = await this.controller.system.storage.findOne((this.dataDeps.main as RecordsDataDep).source.name!, matchSourceRecord, undefined, (this.dataDeps.main as RecordsDataDep).attributeQuery)
                 const transformedRecord = this.transformCallback.call(this.controller, sourceRecord)
                 if (transformedRecord) {
                     const data = {

@@ -106,7 +106,7 @@ export type InteractionCallResponse= {
 
 type HandleAttributive = (attributive: KlassInstance<typeof Attributive>) => Promise<boolean>
 
-type Attributive = {
+type AttributiveType = {
     content: (...args: any[]) => any
     name: string
 }
@@ -119,7 +119,7 @@ export class InteractionCall {
         this.system = controller.system
     }
     async checkAttributive(inputAttributive: any, interactionEvent: InteractionEventArgs|undefined, attributiveTarget: any) {
-        const  attributive = inputAttributive as unknown as Attributive
+        const  attributive = inputAttributive as unknown as AttributiveType
         if (attributive.content) {
             // CAUTION! 第一参数应该是 User 它描述的 User（其实就是 event.user） 然后才是 event! this 指向当前，用户可以用 this.system 里面的东西来做任何查询操作
             // const testFn = new Function('attributiveTarget', 'event', `return (${attributive.content}).call(this, attributiveTarget, event)`)
@@ -187,7 +187,7 @@ export class InteractionCall {
 
         if (attributives) {
             const handleAttributives = (attributive: KlassInstance<typeof Attributive>) => this.checkMixedAttributive(attributive, instance)
-            const attrMatchRes = await this.checkAttributives(new BoolExp<KlassInstance<typeof Attributive>>(attributives), handleAttributives , currentStack)
+            const attrMatchRes = await this.checkAttributives(BoolExp.fromValue<KlassInstance<typeof Attributive>>(attributives as ExpressionData<KlassInstance<typeof Attributive>>), handleAttributives , currentStack)
             if (attrMatchRes !== true) return attrMatchRes
         }
 
@@ -197,7 +197,13 @@ export class InteractionCall {
         const currentStack = stack.concat({type: 'isConcept', values: {concept}})
 
         if (this.isDerivedConcept(concept)) {
-            return this.checkConcept(instance, (concept as DerivedConcept).base!, (concept as DerivedConcept).attributive!, currentStack)
+            const derivedConcept = concept as DerivedConcept;
+            if (derivedConcept.attributive) {
+                return this.checkConcept(instance, derivedConcept.base!, derivedConcept.attributive as BoolExpressionRawData<KlassInstance<typeof Attributive>>, currentStack);
+            } else {
+                // 如果没有 attributive，只检查 base
+                return this.isConcept(instance, derivedConcept.base!, currentStack);
+            }
         }
 
         if (this.isConceptAlias(concept)) {
@@ -229,7 +235,7 @@ export class InteractionCall {
             // Entity 或者其他具备 check 能力的
             const constructorCheck = (concept.constructor as Klass<any>)?.check
             if (constructorCheck) {
-                return constructorCheck(instance) ? true : {name: concept.name, type: 'conceptCheck', stack: currentStack, error: 'constructor check error'}
+                return constructorCheck(instance as object) ? true : {name: concept.name, type: 'conceptCheck', stack: currentStack, error: 'constructor check error'}
             }
 
             // 对于重构后的代码，检查是否是 Entity 或其他具有静态 check 方法的类
@@ -259,7 +265,7 @@ export class InteractionCall {
 
             // instanceCheck
             if (typeof concept === 'function') {
-                return instance instanceof concept ? true : {name: concept.name, type: 'conceptCheck', stack: currentStack, error: 'instanceof check error'}
+                return instance instanceof concept ? true : {name: (concept as Function).name, type: 'conceptCheck', stack: currentStack, error: 'instanceof check error'}
             }
 
             console.warn(`unknown concept ${concept}, cannot check ${instance}. pass.`)
@@ -307,12 +313,12 @@ export class InteractionCall {
             // Only check concept if base is defined (for entity references)
             if (payloadDef.base) {
                 if (payloadDef.isCollection) {
-                    const result = await everyWithErrorAsync(payloadItem,(item => this.checkConcept(item, payloadDef.base as KlassInstance<typeof Entity>)))
+                    const result = await everyWithErrorAsync(payloadItem,(item => this.checkConcept(item, payloadDef.base as unknown as Concept)))
                     if (result !== true) {
                         throw new AttributeError(`${payloadDef.name} check concept failed`, result)
                     }
                 } else {
-                    const result = await this.checkConcept(payloadItem, payloadDef.base as KlassInstance<typeof Entity>)
+                    const result = await this.checkConcept(payloadItem, payloadDef.base as unknown as Concept)
                     if (result !== true) {
                         throw new AttributeError(`${payloadDef.name} check concept failed`, result)
                     }
@@ -332,8 +338,8 @@ export class InteractionCall {
                     })
 
                 fullPayloadItem = payloadDef.isCollection ?
-                    await this.system.storage.find(payloadDef.base!.name, itemMatch, undefined, ['*']) :
-                    await this.system.storage.findOne(payloadDef.base!.name, itemMatch, undefined, ['*'])
+                    await this.system.storage.find(payloadDef.base!.name!, itemMatch, undefined, ['*']) :
+                    await this.system.storage.findOne(payloadDef.base!.name!, itemMatch, undefined, ['*'])
             }
 
             if (payloadDef.attributives) {
@@ -484,7 +490,7 @@ export class InteractionCall {
 
         let data: any
         if (Entity.is(this.interaction.data) || Relation.is(this.interaction.data)) {
-            const recordName = (this.interaction.data as KlassInstance<typeof Entity>).name
+            const recordName = (this.interaction.data as KlassInstance<typeof Entity>).name!
             const {modifier: fixedModifier, attributeQuery: fixedAttributeQuery} = Object.fromEntries(
                 this.interaction.query?.items?.map(item => [(item as any).name, (item as any).value as any]) || [])
             const modifier = {...(interactionEvent.query?.modifier||{}), ...(fixedModifier||{})}

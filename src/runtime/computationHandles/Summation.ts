@@ -73,14 +73,14 @@ export class GlobalSumHandle implements DataBasedComputation {
         let sum = lastValue || 0;
         
         if (mutationEvent.type === 'create') {
-            const newRecord = await this.controller.system.storage.findOne(this.record.name, MatchExp.atom({key:'id', value:['=', mutationEvent.record!.id]}), undefined, this.args.attributeQuery)
+            const newRecord = await this.controller.system.storage.findOne(this.record.name!, MatchExp.atom({key:'id', value:['=', mutationEvent.record!.id]}), undefined, this.args.attributeQuery)
             const value = this.resolveSumField(newRecord);
             sum += value;
         } else if (mutationEvent.type === 'delete') {
             // FIXME 必须同时知道删掉的关联关系，才能支持 attributeQuery 跨关系的 oldValue
             return ComputationResult.fullRecompute('No oldRecord in delete event');
         } else if (mutationEvent.type === 'update') {
-            const newRecord = await this.controller.system.storage.findOne(this.record.name, MatchExp.atom({key:'id', value:['=', mutationEvent.record!.id]}), undefined, this.args.attributeQuery)
+            const newRecord = await this.controller.system.storage.findOne(this.record.name!, MatchExp.atom({key:'id', value:['=', mutationEvent.record!.id]}), undefined, this.args.attributeQuery)
             const newValue = this.resolveSumField(newRecord);
             
             assert(!mutationEvent.relatedAttribute || mutationEvent.relatedAttribute.every((r, index) => r===this.sumFieldPath[index]), 'related update event should not trigger this sum.')
@@ -109,7 +109,7 @@ export class PropertySumHandle implements DataBasedComputation {
         this.relation = args.record as KlassInstance<typeof Relation>
         this.isSource = args.direction ? args.direction === 'source' : this.relation.source.name === dataContext.host.name
         this.relationAttr = this.isSource ? this.relation.sourceProperty : this.relation.targetProperty
-        this.relatedRecordName = this.isSource ? this.relation.target.name : this.relation.source.name
+        this.relatedRecordName = this.isSource ? this.relation.target.name! : this.relation.source.name!
         
         this.relationAttributeQuery = args.attributeQuery || []
         
@@ -184,26 +184,26 @@ export class PropertySumHandle implements DataBasedComputation {
         
         let sum = lastValue || 0;
 
-        if (relatedMutationEvent.type === 'create' && relatedMutationEvent.recordName === this.relation.name) {
+        if (relatedMutationEvent.type === 'create' && relatedMutationEvent.recordName === this.relation.name!) {
             // 关联关系的新建
             const relationRecord = relatedMutationEvent.record!;
             const newRelationWithEntity = await this.controller.system.storage.findOne(
-                this.relation.name, 
+                this.relation.name!,
                 MatchExp.atom({key: 'id', value: ['=', relationRecord.id]}), 
                 undefined, 
-                this.relationAttributeQuery || []
+                this.relationAttributeQuery
             );
             
             // 获取字段值
             const value = this.resolveSumField(newRelationWithEntity, this.sumFieldPath)
             sum += value;
-        } else if (relatedMutationEvent.type === 'delete' && relatedMutationEvent.recordName === this.relation.name) {
+        } else if (relatedMutationEvent.type === 'delete' && relatedMutationEvent.recordName === this.relation.name!) {
             // FIXME 关联关系的删除 - 无法知道原本的字段值
             return ComputationResult.fullRecompute('Cannot determine sum value for deleted relation')
         } else if (relatedMutationEvent.type === 'update') {
             // 可能是关系更新也可能是关联实体更新
             const newRelationWithEntity = await this.controller.system.storage.findOne(
-                this.relation.name, 
+                this.relation.name!,
                 MatchExp.atom({key: mutationEvent.relatedAttribute.slice(2).concat('id').join('.'), value: ['=', relatedMutationEvent.oldRecord!.id]}), 
                 undefined, 
                 this.relationAttributeQuery
