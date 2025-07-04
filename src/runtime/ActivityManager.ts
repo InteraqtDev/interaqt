@@ -1,4 +1,4 @@
-import { ActivityInstance, InteractionInstance } from "@shared";
+import { ActivityInstance, InteractionInstance, IInstance } from "@shared";
 import { RecordMutationEvent, SystemLogger } from "./System.js";
 import {
     Entity, Property,
@@ -201,15 +201,22 @@ export class ActivityManager {
                                 result: await sideEffect.content(event),
                             }
                         } else {
-                            // Handle KlassInstance case if needed
-                            const sideEffectAny = sideEffect as any;
-                            result.sideEffects[sideEffectAny.name] = {
-                                result: await sideEffectAny.content(event),
+                            // Handle IInstance case - check if it has the required properties
+                            const instanceSideEffect = sideEffect as IInstance & { name?: string; content?: (event: RecordMutationEvent) => Promise<unknown> };
+                            if (instanceSideEffect.name && typeof instanceSideEffect.content === 'function') {
+                                result.sideEffects[instanceSideEffect.name] = {
+                                    result: await instanceSideEffect.content(event),
+                                }
                             }
                         }
                     } catch (e){
-                        const effectName = sideEffect instanceof RecordMutationSideEffect ?
-                            sideEffect.name : (sideEffect as any).name;
+                        let effectName = 'unknown';
+                        if (sideEffect instanceof RecordMutationSideEffect) {
+                            effectName = sideEffect.name;
+                        } else {
+                            const instanceSideEffect = sideEffect as IInstance & { name?: string };
+                            effectName = instanceSideEffect.name || 'unknown';
+                        }
                         logger.error({label: "recordMutationSideEffect", message: effectName})
                         result.sideEffects[effectName] = {
                             error: e
@@ -219,14 +226,26 @@ export class ActivityManager {
             }
         }
     }
-    async createActivity(activity: any) {
+    async createActivity(activity: {
+        name: string;
+        uuid: string;
+        state: unknown;
+        refs: unknown;
+        [key: string]: unknown;
+    }) {
         return this.controller.system.storage.create(ACTIVITY_RECORD, {
             ...activity,
             state: activity.state,
             refs: activity.refs,
         })
     }
-    async updateActivity(match: MatchExpressionData, activity: any) {
+    async updateActivity(match: MatchExpressionData, activity: {
+        name?: string;
+        uuid?: string;
+        state?: unknown;
+        refs?: unknown;
+        [key: string]: unknown;
+    }) {
         const data = {
             ...activity
         }
@@ -247,7 +266,7 @@ export class ActivityManager {
             refs: activity.refs,
         }))
     }
-    async saveEvent(event: InteractionEvent, mutationEvents: RecordMutationEvent[] = []): Promise<any> {
+    async saveEvent(event: InteractionEvent, mutationEvents: RecordMutationEvent[] = []): Promise<unknown> {
         return this.controller.system.storage.create(INTERACTION_RECORD, event, mutationEvents)
     }
     async getEvent(query?: MatchExpressionData ) {

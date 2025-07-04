@@ -22,13 +22,13 @@ import { Controller, InteractionContext } from "./Controller.js";
 
 export type EventQuery = {
     match?: BoolExp<EntityInstance>,
-    modifier?: Record<string, any>,
+    modifier?: Record<string, unknown>,
     attributeQuery?: string[],
 }
 
 
 export type EventPayload = {
-    [k: string]: any
+    [k: string]: unknown
 }
 
 export type InteractionEvent  = {
@@ -36,27 +36,27 @@ export type InteractionEvent  = {
     interactionId: string,
     user: EventUser,
     query: EventQuery,
-    payload: any,
+    payload: EventPayload,
     activityId?: string,
 }
 
 export type InteractionEventArgs = {
     user: EventUser,
-    query?: any,
-    payload?: any,
+    query?: EventQuery,
+    payload?: EventPayload,
     activityId?: string,
 }
 
 export type EventUser = {
     id: string,
-    [k: string]: any
+    [k: string]: unknown
 }
 
 
 type ConceptCheckStack = {
     type: string,
     values: {
-        [k: string]: any
+        [k: string]: unknown
     }
 }
 
@@ -68,38 +68,38 @@ type AtomError = {
     type: string,
     stack?: ConceptCheckStack[],
     content?: string,
-    error?: any
+    error?: unknown
 }
 
 
 export class AttributeError {
-    constructor(public type: string, public error: any) {
+    constructor(public type: string, public error: unknown) {
     }
 }
 
 export class ConditionError {
-    constructor(public type: string, public error: any) {
+    constructor(public type: string, public error: unknown) {
     }
 }
 
 type SideEffectResult = {
-    result?: any,
-    error?: any
+    result?: unknown,
+    error?: unknown
 }
 
 export type InteractionCallResponse= {
-    error?: any,
+    error?: unknown,
     // 获取数据的 interaction 返回的数据
-    data?: any,
+    data?: unknown,
     event?: InteractionEvent
     // interaction 中产生的 record create/update 等行为
-    effects? : any[]
+    effects?: RecordMutationEvent[]
     sideEffects?: {
         [k: string]: SideEffectResult
     }
     // interaction 附加产生的上下文，例如 activityId
     context?: {
-        [k: string]: any
+        [k: string]: unknown
     }
 }
 
@@ -107,7 +107,7 @@ export type InteractionCallResponse= {
 type HandleAttributive = (attributive: AttributiveInstance) => Promise<boolean>
 
 type AttributiveType = {
-    content: (...args: any[]) => any
+    content: (attributiveTarget: unknown, event: InteractionEventArgs | undefined) => Promise<boolean> | boolean
     name: string
 }
 
@@ -300,11 +300,11 @@ export class InteractionCall {
             }
 
             if (payloadDef.isCollection) {
-                if (payloadDef.isRef && !(payloadItem as {id: string}[]).every(item => !!item.id)) {
+                if (payloadDef.isRef && !((payloadItem as unknown[]) as {id: string}[]).every(item => !!item.id)) {
                     throw new AttributeError(`${payloadDef.name} data not every is ref`, payloadItem)
                 }
             } else {
-                if (payloadDef.isRef && !payloadItem.id) {
+                if (payloadDef.isRef && !(payloadItem as {id: string}).id) {
                     throw new AttributeError(`${payloadDef.name} data is not a ref`, payloadItem)
                 }
             }
@@ -313,7 +313,7 @@ export class InteractionCall {
             // Only check concept if base is defined (for entity references)
             if (payloadDef.base) {
                 if (payloadDef.isCollection) {
-                    const result = await everyWithErrorAsync(payloadItem,(item => this.checkConcept(item, payloadDef.base as unknown as Concept)))
+                    const result = await everyWithErrorAsync(payloadItem as unknown[],(item => this.checkConcept(item, payloadDef.base as unknown as Concept)))
                     if (result !== true) {
                         throw new AttributeError(`${payloadDef.name} check concept failed`, result)
                     }
@@ -325,16 +325,16 @@ export class InteractionCall {
                 }
             }
 
-            let fullPayloadItem: any|any[] = payloadItem
+            let fullPayloadItem: unknown | unknown[] = payloadItem
             if (payloadDef.isRef) {
                 const itemMatch = payloadDef.isCollection ?
                     BoolExp.atom({
                         key: 'id',
-                        value: ['in', payloadItem.map((item: any) => item.id)]
+                        value: ['in', ((payloadItem as unknown[]) as {id: string}[]).map((item) => item.id)]
                     }) :
                     BoolExp.atom({
                         key: 'id',
-                        value: ['=', payloadItem.id]
+                        value: ['=', (payloadItem as {id: string}).id]
                     })
 
                 fullPayloadItem = payloadDef.isCollection ?
@@ -349,7 +349,7 @@ export class InteractionCall {
 
                 // 作为整体是否合法应该放到 condition 里面做
                 if (payloadDef.isCollection) {
-                    const result = await everyWithErrorAsync(fullPayloadItem, (item => {
+                    const result = await everyWithErrorAsync(fullPayloadItem as unknown[], (item => {
                         const handleAttribute = this.createHandleAttributive(
                             Attributive,
                             interactionEvent,
@@ -496,7 +496,7 @@ export class InteractionCall {
             const modifier = {...(interactionEvent.query?.modifier||{}), ...(fixedModifier||{})}
             // TODO 怎么判断 attributeQuery 是在 fixed 的q范围里面？？？？
             const attributeQuery = interactionEvent.query?.attributeQuery || []
-            const matchInQuery = interactionEvent.query?.match ? BoolExp.fromValue(interactionEvent.query?.match) : undefined
+            const matchInQuery = interactionEvent.query?.match ? BoolExp.fromValue(interactionEvent.query?.match as ExpressionData<EntityInstance>) : undefined
             const finalMatch = (matchInQuery && match) ? match.and(matchInQuery) : (match || matchInQuery)
             data = await this.system.storage.find(recordName, finalMatch, modifier, attributeQuery)
         // } else if (Computation.is(this.interaction.data)){
@@ -534,7 +534,7 @@ export class InteractionCall {
                 interactionName: this.interaction.name,
                 interactionId: this.interaction.uuid,
                 user: interactionEventArgs.user,
-                query: interactionEventArgs.query,
+                query: interactionEventArgs.query || {},
                 payload: {
                     ...interactionEventArgs.payload,
                     ...savedPayload

@@ -195,15 +195,22 @@ export class Controller {
                                 result: await sideEffect.content(event),
                             }
                         } else {
-                            // Handle KlassInstance case if needed
-                            const sideEffectAny = sideEffect as any;
-                            result.sideEffects![sideEffectAny.name] = {
-                                result: await sideEffectAny.content(event),
+                            // Handle IInstance case - check if it has the required properties
+                            const instanceSideEffect = sideEffect as IInstance & { name?: string; content?: (event: RecordMutationEvent) => Promise<unknown> };
+                            if (instanceSideEffect.name && typeof instanceSideEffect.content === 'function') {
+                                result.sideEffects![instanceSideEffect.name] = {
+                                    result: await instanceSideEffect.content(event),
+                                }
                             }
                         }
                     } catch (e){
-                        const effectName = sideEffect instanceof RecordMutationSideEffect ?
-                            sideEffect.name : (sideEffect as any).name;
+                        let effectName = 'unknown';
+                        if (sideEffect instanceof RecordMutationSideEffect) {
+                            effectName = sideEffect.name;
+                        } else {
+                            const instanceSideEffect = sideEffect as IInstance & { name?: string };
+                            effectName = instanceSideEffect.name || 'unknown';
+                        }
                         logger.error({label: "recordMutationSideEffect", message: effectName})
                         result.sideEffects![effectName] = {
                             error: e

@@ -406,9 +406,9 @@ export class ActivityCall {
                 if (payloadDef.isCollection) {
                     if(!refs[payloadDef.itemRef!.name!]) refs[payloadDef.itemRef!.name!] = []
 
-                    refs[payloadDef.itemRef!.name!].push(payloadItem.id)
+                    refs[payloadDef.itemRef!.name!].push((payloadItem as {id: string}).id)
                 } else {
-                    refs[payloadDef.itemRef!.name!] = payloadItem.id
+                    refs[payloadDef.itemRef!.name!] = (payloadItem as {id: string}).id
                 }
             }
         })

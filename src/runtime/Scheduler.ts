@@ -40,15 +40,15 @@ export class Scheduler {
 
         // relation 的
         relations.forEach(relation => {
-            const relationAny = relation as any;
-            if(relationAny.computation) {
-                computationInputs.push({dataContext: {type: 'relation',id: relation},args: relationAny.computation})
+            const relationWithComputation = relation as RelationInstance & { computation?: unknown; properties?: PropertyInstance[] };
+            if(relationWithComputation.computation) {
+                computationInputs.push({dataContext: {type: 'relation',id: relation},args: relationWithComputation.computation})
             }
 
-            if (relationAny.properties) {
-                relationAny.properties.forEach((property: any) => {
-                                    if (property.computation) {
-                    computationInputs.push({dataContext: {type: 'property',host: relation,id: property},args: property.computation})
+            if (relationWithComputation.properties) {
+                relationWithComputation.properties.forEach((property: PropertyInstance) => {
+                    if (property.computation) {
+                        computationInputs.push({dataContext: {type: 'property',host: relation,id: property},args: property.computation})
                     }
                 })
             }
@@ -63,10 +63,10 @@ export class Scheduler {
 
         for(const computationInput of computationInputs) {
             const dataContext = computationInput.dataContext
-            const args = computationInput.args as any
+            const args = computationInput.args as { constructor: { displayName?: string; name?: string } }
             const handles = ComputationHandle.Handles
-            const ComputationCtor = handles.get(args.constructor as any)![dataContext.type]! as ComputationClass
-            assert(!!ComputationCtor, `cannot find Computation handle for ${(args.constructor as any).displayName || (args.constructor as any).name}`)
+            const ComputationCtor = handles.get(args.constructor)![dataContext.type]! as ComputationClass
+            assert(!!ComputationCtor, `cannot find Computation handle for ${args.constructor.displayName || args.constructor.name}`)
             const computation = new ComputationCtor(this.controller, args, dataContext)
             this.computations.add(computation)
 
