@@ -178,10 +178,6 @@ export class MonoSystem implements System {
     constructor(db: Database = new SQLiteDB(undefined,{logger: dbConsoleLogger}), public logger: SystemLogger = systemConsoleLogger) {
         this.storage = new MonoStorage(db)
     }
-<<<<<<< Updated upstream
-=======
-    
->>>>>>> Stashed changes
     
     setup(entities: KlassInstance<typeof Entity>[], relations: KlassInstance<typeof Relation>[], states: ComputationState[], install = false){
         states.forEach(({dataContext, state}) => {
@@ -207,7 +203,7 @@ export class MonoSystem implements System {
             })
         })
         
-        // Pass the prepared entities to entities.setup
+        // Pass the prepared entities to storage.setup
         return this.storage.setup(
             [...entities, SystemEntity], 
             relations,

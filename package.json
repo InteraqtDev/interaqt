@@ -21,6 +21,8 @@
   "scripts": {
     "check": "tsc --noEmit",
     "check:shared": "tsc --noEmit --strict --skipLibCheck src/shared/refactored/*.ts",
+    "check:runtime": "tsc --noEmit --strict --skipLibCheck src/runtime/*.ts",
+    "check:storage": "tsc --noEmit --strict --skipLibCheck src/storage/*.ts",
     "test": "vitest run",
     "test:runtime": "vitest run tests/runtime",
     "test:storage": "vitest run tests/storage",

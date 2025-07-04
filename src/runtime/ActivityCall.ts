@@ -305,7 +305,7 @@ export class ActivityCall {
         return this.uuidToNode.get(uuid)
     }
     async getState(activityId: string) {
-        // return this.system.entities.get('ActivityState', activityId)
+        // return this.system.storage.get('ActivityState', activityId)
         return (await this.getActivity(activityId))?.state
     }
     async getActivity(activityId: string) {
@@ -380,7 +380,7 @@ export class ActivityCall {
         assert(stateCompleteResult, 'change activity state failed')
         // 完成了。存新的 state。
         const nextState = state.toJSON()
-        // await this.system.entities.set('ActivityState', activityId, nextState)
+        // await this.system.storage.set('ActivityState', activityId, nextState)
         await this.setActivity( activityId!, {'state':nextState})
 
 
@@ -394,7 +394,7 @@ export class ActivityCall {
     }
     // TODO 我们没有处理 interaction 循环的情况
     async saveUserRefs(activityId: string, interactionCall: InteractionCall, interactionEventArgs: InteractionEventArgs) {
-        // const refs = await this.system.entities.get('ActivityRefs', activityId, {})!
+        // const refs = await this.system.storage.get('ActivityRefs', activityId, {})!
         const refs = (await this.getActivity(activityId))?.refs! || {}
         if (interactionCall.interaction.userRef?.name) {
             refs[interactionCall.interaction.userRef?.name] = interactionEventArgs.user.id
@@ -413,7 +413,7 @@ export class ActivityCall {
             }
         })
 
-        // await this.system.entities.set('ActivityRefs', activityId, refs)
+        // await this.system.storage.set('ActivityRefs', activityId, refs)
         await this.setActivity( activityId, {refs})
     }
 

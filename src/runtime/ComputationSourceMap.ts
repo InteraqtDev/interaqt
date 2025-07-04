@@ -257,9 +257,9 @@ export class ComputationSourceMapManager {
             let recordName = baseRecordName
             if (context.length>0) {
                 if (context.at(-1) === '&') {
-                    recordName = this.controller.system.entities.getRelationName(baseRecordName, context.slice(0, -1).join('.'))
+                    recordName = this.controller.system.storage.getRelationName(baseRecordName, context.slice(0, -1).join('.'))
                 } else {
-                    recordName = this.controller.system.entities.getEntityName(baseRecordName, context.join('.'))
+                    recordName = this.controller.system.storage.getEntityName(baseRecordName, context.join('.'))
                 }
             }
             // 当依赖是 property 的时候，record 的创建也要监听，相当于初次就要执行 computation
@@ -296,7 +296,7 @@ export class ComputationSourceMapManager {
 
         if (context.at(-1) !== '&') {
             // 1. 先监听"关联实体关系"的 create/delete
-            const realtionRecordName = this.controller.system.entities.getRelationName(baseRecordName, context.join('.'))
+            const realtionRecordName = this.controller.system.storage.getRelationName(baseRecordName, context.join('.'))
             ERMutationEventsSource.push({
                 dataDep,
                 type: 'create',

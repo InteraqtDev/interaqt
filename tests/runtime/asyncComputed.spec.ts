@@ -65,40 +65,30 @@ describe('async computed', () => {
         const crawlerTaskRecordName = controller.scheduler.getAsyncTaskRecordKey(crawlerComputation)
 
 
-        // 1. 创建了异步任务 
-<<<<<<< Updated upstream
+        // 1. 创建了异步任务
         const urlEntity = await system.storage.create('URL', {url: 'https://not.exist.com'})
 
         const crawlerTaskRecords = await system.storage.find(crawlerTaskRecordName, undefined, undefined, ['*'])
-=======
-        const url = await system.entities.create('URL', {url: 'https://not.exist.com'})
-
-        const crawlerTaskRecords = await system.entities.find(crawlerTaskRecordName)
->>>>>>> Stashed changes
         expect(crawlerTaskRecords.length).toBe(1)
         
         // 2. 模拟外部执行了异步任务
         const randomResult = Math.random().toString()
-        await system.entities.update(crawlerTaskRecordName, MatchExp.atom({key: 'id', value: ['=', crawlerTaskRecords[0].id]}), {result: randomResult, status: 'success'})
+        await system.storage.update(crawlerTaskRecordName, MatchExp.atom({key: 'id', value: ['=', crawlerTaskRecords[0].id]}), {result: randomResult, status: 'success'})
 
 
         // 3. 模拟 asyncComputation demon 来处理异步任务
-        const updatedCrawlerTaskRecord = await system.entities.findOne(crawlerTaskRecordName, MatchExp.atom({key: 'id', value: ['=', crawlerTaskRecords[0].id]}), {}, ['*'])
+        const updatedCrawlerTaskRecord = await system.storage.findOne(crawlerTaskRecordName, MatchExp.atom({key: 'id', value: ['=', crawlerTaskRecords[0].id]}), {}, ['*'])
         await controller.scheduler.handleAsyncReturn(crawlerComputation, updatedCrawlerTaskRecord)
         
         // 4. 检查 content 属性是否被更新
-<<<<<<< Updated upstream
         const entity = await system.storage.findOne(URLEntity.name, MatchExp.atom({key: 'id', value: ['=', urlEntity.id]}), {}, ['*'])
         // const entities= await system.storage.findOne(URLEntity.name, undefined, {}, ['*'])
-=======
-        const entity = await system.entities.findOne(URLEntity.name, MatchExp.atom({key: 'id', value: ['=', crawlerTaskRecords[0].id]}), {}, ['*'])
->>>>>>> Stashed changes
         expect(entity.content).toBe(`${randomResult}_crawled_by_random`)
 
 
         // test async computed with resolved return
-        const url2 = await system.entities.create('URL', {url: 'https://www.interaqt.dev'})
-        const entity2 = await system.entities.findOne(URLEntity.name, MatchExp.atom({key: 'id', value: ['=', url2.id]}), {}, ['*'])
+        const url2 = await system.storage.create('URL', {url: 'https://www.interaqt.dev'})
+        const entity2 = await system.storage.findOne(URLEntity.name, MatchExp.atom({key: 'id', value: ['=', url2.id]}), {}, ['*'])
         expect(entity2.content).toBe('reactive backend framwork_crawled_by_preset')
 
         await system.destroy()

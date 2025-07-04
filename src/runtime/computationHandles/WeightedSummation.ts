@@ -154,7 +154,7 @@ export class PropertyWeightedSummationHandle implements DataBasedComputation {
 
         if (relatedMutationEvent.type === 'create') {
             // 关联关系的新建
-            const newRelationRecord = await this.controller.system.entities.findOne(this.relation.name, MatchExp.atom({
+            const newRelationRecord = await this.controller.system.storage.findOne(this.relation.name, MatchExp.atom({
                 key: 'id',
                 value: ['=', relatedMutationEvent.record!.id]
             }), undefined, this.relationAttributeQuery);
@@ -175,7 +175,7 @@ export class PropertyWeightedSummationHandle implements DataBasedComputation {
                 value: ['=', relatedMutationEvent!.oldRecord!.id]
             }) 
 
-            const newRelationRecord = await this.controller.system.entities.findOne(this.relation.name, relationMatch, undefined, this.relationAttributeQuery);
+            const newRelationRecord = await this.controller.system.storage.findOne(this.relation.name, relationMatch, undefined, this.relationAttributeQuery);
 
             const oldResult = await this.state!.itemResult.get(relatedMutationEvent.oldRecord);
             const newValueAndWeight = this.matchRecordToWeight.call(this.controller, newRelationRecord);
