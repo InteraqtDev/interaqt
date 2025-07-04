@@ -201,7 +201,7 @@ export class RecordStateMachineHandle implements EventBasedComputation {
 
 
     
-ComputationHandle.Handles.set(StateMachine, {
+ComputationHandle.Handles.set(StateMachine as any, {
     global: GlobalStateMachineHandle,
     property: PropertyStateMachineHandle,
     relation: RecordStateMachineHandle,

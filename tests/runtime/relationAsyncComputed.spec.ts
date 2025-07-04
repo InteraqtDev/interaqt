@@ -5,11 +5,9 @@ import {
   MonoSystem,
   Property,
   ComputationHandle,
-  createClass,
   MatchExp,
   DataDep,
   RelationDataContext,
-  KlassInstance,
   PGLiteDB,
   DataBasedComputation,
   ComputationResult,
@@ -18,16 +16,79 @@ import {
   Relation
 } from "@";
 
-// 创建一个关系级别异步计算的类
-const RelationScoreComputed = createClass({
-  name: 'RelationScoreComputed',
-  public: {
-    algorithm: {
-      type: 'string',
-      required: true
-    }
+// RelationScoreComputed as a standard ES6 class
+interface RelationScoreComputedInstance {
+  _type: string;
+  _options?: { uuid?: string };
+  uuid: string;
+  algorithm: string;
+}
+
+interface RelationScoreComputedCreateArgs {
+  algorithm: string;
+}
+
+class RelationScoreComputed implements RelationScoreComputedInstance {
+  public uuid: string;
+  public _type = 'RelationScoreComputed';
+  public _options?: { uuid?: string };
+  public algorithm: string;
+  
+  constructor(args: RelationScoreComputedCreateArgs, options?: { uuid?: string }) {
+    this._options = options;
+    this.uuid = options?.uuid || Math.random().toString(36).substr(2, 9);
+    this.algorithm = args.algorithm;
   }
-})
+  
+  static isKlass = true as const;
+  static displayName = 'RelationScoreComputed';
+  static instances: RelationScoreComputedInstance[] = [];
+  
+  static public = {
+    algorithm: {
+      type: 'string' as const,
+      required: true as const
+    }
+  };
+  
+  static create(args: RelationScoreComputedCreateArgs, options?: { uuid?: string }): RelationScoreComputedInstance {
+    const instance = new RelationScoreComputed(args, options);
+    
+    const existing = this.instances.find(i => i.uuid === instance.uuid);
+    if (existing) {
+      throw new Error(`duplicate uuid in options ${instance.uuid}, RelationScoreComputed`);
+    }
+    
+    this.instances.push(instance);
+    return instance;
+  }
+  
+  static stringify(instance: RelationScoreComputedInstance): string {
+    return JSON.stringify({
+      type: 'RelationScoreComputed',
+      options: instance._options,
+      uuid: instance.uuid,
+      public: { algorithm: instance.algorithm }
+    });
+  }
+  
+  static parse(json: string): RelationScoreComputedInstance {
+    const data = JSON.parse(json);
+    return this.create(data.public, data.options);
+  }
+  
+  static clone(instance: RelationScoreComputedInstance, deep: boolean): RelationScoreComputedInstance {
+    return this.create({ algorithm: instance.algorithm });
+  }
+  
+  static is(obj: unknown): obj is RelationScoreComputedInstance {
+    return obj !== null && typeof obj === 'object' && '_type' in obj && (obj as any)._type === 'RelationScoreComputed';
+  }
+  
+  static check(data: unknown): boolean {
+    return data !== null && typeof data === 'object' && typeof (data as any).uuid === 'string';
+  }
+}
 
 // 实现关系级别异步计算
 class RelationScoreComputation implements DataBasedComputation {
@@ -36,7 +97,7 @@ class RelationScoreComputation implements DataBasedComputation {
   
   constructor(
     public controller: Controller, 
-    public args: KlassInstance<typeof RelationScoreComputed>, 
+    public args: RelationScoreComputedInstance, 
     public dataContext: RelationDataContext
   ) {
     // Relation 计算需要依赖关系本身的数据
@@ -79,7 +140,7 @@ class RelationScoreComputation implements DataBasedComputation {
 }
 
 // 注册计算处理器
-ComputationHandle.Handles.set(RelationScoreComputed, {
+ComputationHandle.Handles.set(RelationScoreComputed as any, {
   relation: RelationScoreComputation
 })
 
@@ -120,7 +181,7 @@ describe('Relation async computed', () => {
       ],
       computation: RelationScoreComputed.create({
         algorithm: 'collaborative_filtering'
-      })
+      }) as any
     });
     
     const entities = [userEntity, itemEntity];

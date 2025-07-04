@@ -2,6 +2,10 @@
 export * from "./utils.js";
 export * from "./interfaces.js";
 
+// 初始化并导出 KlassByName
+import './init.js';
+export { KlassByName } from './utils.js';
+
 // 导出简单对象
 export * from "./Action.js";
 export * from "./Gateway.js";

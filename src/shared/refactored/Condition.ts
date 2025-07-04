@@ -1,6 +1,10 @@
 import { IInstance, SerializedData, generateUUID } from './interfaces.js';
 import { stringifyAttribute } from './utils.js';
 
+// 兼容性函数
+import { BoolExp, BoolAtomData, BoolExpressionData, type BoolExpressionRawData } from './BoolExp.js';
+import { Conditions } from './Conditions.js';
+
 export interface ConditionInstance extends IInstance {
   content: Function;
   name?: string;
@@ -97,4 +101,30 @@ export class Condition implements ConditionInstance {
     
     return this.create(args, data.options);
   }
+}
+
+// 兼容性函数
+function toConditions(obj?: BoolExp<ConditionInstance>): BoolAtomData | BoolExpressionData | undefined {
+  if (!obj) return undefined;
+
+  if (obj.raw.type === 'atom') {
+    return BoolAtomData.create({
+      type: 'atom',
+      data: obj.raw.data as unknown as { content?: Function; [key: string]: unknown }
+    });
+  }
+
+  const expData = obj.raw as BoolExpressionRawData<ConditionInstance>;
+  return BoolExpressionData.create({
+    type: 'expression',
+    operator: expData.operator,
+    left: toConditions(obj.left) as BoolAtomData | BoolExpressionData,
+    right: toConditions(obj.right) as BoolAtomData | BoolExpressionData | undefined,
+  });
+}
+
+export function boolExpToConditions(obj: BoolExp<ConditionInstance>) {
+  return Conditions.create({
+    content: toConditions(obj) as BoolExpressionData
+  });
 } 

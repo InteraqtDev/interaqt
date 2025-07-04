@@ -42,4 +42,81 @@ export function clearAllInstances(...klasses: Array<{ instances: IInstance[] }>)
   for (const klass of klasses) {
     klass.instances.length = 0;
   }
+}
+
+// 向后兼容性支持：提供一个空的 removeAllInstance 函数
+// 在重构后的代码中，我们不再使用全局实例管理，所以这个函数不做任何事情
+export function removeAllInstance() {
+  // No-op: 在重构后的版本中，实例管理是局部的，不需要全局清理
+}
+
+// KlassByName 兼容层
+// 导出一个符合原始 Klass 接口的类型
+export interface Klass<T = any> {
+  new(arg: object, options?: { uuid?: string }): any;
+  create(arg: any, options?: { uuid?: string }): any;
+  displayName: string;
+  isKlass: true;
+  public: any;
+  constraints?: any;
+  instances: any[];
+  display?: (obj: any) => string;
+  stringify: (instance: any) => string;
+  parse: (json: string) => any;
+  check: (data: object) => boolean;
+  is: (arg: any) => boolean;
+  clone: <V>(obj: V, deep: boolean) => V;
+}
+
+// 全局的类注册表
+export const KlassByName = new Map<string, Klass>();
+
+// 注册一个重构后的类到 KlassByName
+export function registerKlass(name: string, klassLike: any) {
+  if (klassLike && klassLike.isKlass && klassLike.displayName) {
+    KlassByName.set(name, klassLike as Klass);
+  }
+}
+
+// 序列化所有实例
+export function stringifyAllInstances(): string {
+  const result: string[] = [];
+  // 使用 Array.from 来避免迭代问题
+  Array.from(KlassByName.entries()).forEach(([, Klass]) => {
+    if (Klass.instances && Array.isArray(Klass.instances) && Klass.stringify) {
+      result.push(...Klass.instances.map((instance: any) => Klass.stringify(instance)));
+    }
+  });
+  return `[${result.join(',')}]`;
+}
+
+// 从字符串创建实例
+export function createInstancesFromString(objStr: string) {
+  const objects = JSON.parse(objStr);
+  return createInstances(objects);
+}
+
+// 创建实例
+export function createInstances(objects: any[]) {
+  const uuidToInstance = new Map<string, any>();
+  const unsatisfiedInstances = new Map<any, object>();
+  
+  objects.forEach(({ type, options = {}, uuid, public: rawProps }: any) => {
+    const Klass = KlassByName.get(type);
+    if (!Klass) {
+      console.warn(`Class ${type} not found in KlassByName`);
+      return;
+    }
+    
+    const instance = Klass.create(rawProps || {}, { ...options, uuid });
+    uuidToInstance.set(uuid, instance);
+  });
+  
+  return uuidToInstance;
+}
+
+// 导出 createClass 作为空操作
+export function createClass(meta: any): any {
+  console.warn('createClass is deprecated in refactored code');
+  return null;
 } 

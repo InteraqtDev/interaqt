@@ -198,4 +198,32 @@ export class Attributives implements AttributivesInstance {
     const data: SerializedData<AttributivesCreateArgs> = JSON.parse(json);
     return this.create(data.public, data.options);
   }
+}
+
+// 兼容性函数
+import { BoolExp, BoolAtomData, BoolExpressionData, type BoolExpressionRawData } from './BoolExp.js';
+
+function toAttributives(obj?: BoolExp<AttributiveInstance>): BoolAtomData | BoolExpressionData | undefined {
+  if (!obj) return undefined;
+
+  if (obj.raw.type === 'atom') {
+    return BoolAtomData.create({
+      type: 'atom',
+      data: obj.raw.data as unknown as { content?: Function; [key: string]: unknown }
+    });
+  }
+
+  const expData = obj.raw as BoolExpressionRawData<AttributiveInstance>;
+  return BoolExpressionData.create({
+    type: 'expression',
+    operator: expData.operator,
+    left: toAttributives(obj.left) as BoolAtomData | BoolExpressionData,
+    right: toAttributives(obj.right) as BoolAtomData | BoolExpressionData | undefined,
+  });
+}
+
+export function boolExpToAttributives(obj: BoolExp<AttributiveInstance>) {
+  return Attributives.create({
+    content: toAttributives(obj) as BoolExpressionData
+  });
 } 

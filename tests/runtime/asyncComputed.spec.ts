@@ -1,20 +1,84 @@
-import { Controller, Entity, MonoSystem, Property, ComputationHandle, createClass, MatchExp, DataDep, PropertyDataContext, KlassInstance, PGLiteDB, DataBasedComputation, ComputationResult } from "@";
+import { Controller, Entity, MonoSystem, Property, ComputationHandle, MatchExp, DataDep, PropertyDataContext, PGLiteDB, DataBasedComputation, ComputationResult } from "@";
 import { expect, test, describe } from "vitest";
 
-const TestCrawlerComputed = createClass({
-    name: 'TestCrawlerComputed',
-    public: {
-        source: {
-            type: 'string',
-            required: true
-        }
+// TestCrawlerComputed as a standard ES6 class
+interface TestCrawlerComputedInstance {
+  _type: string;
+  _options?: { uuid?: string };
+  uuid: string;
+  source: string;
+}
+
+interface TestCrawlerComputedCreateArgs {
+  source: string;
+}
+
+class TestCrawlerComputed implements TestCrawlerComputedInstance {
+  public uuid: string;
+  public _type = 'TestCrawlerComputed';
+  public _options?: { uuid?: string };
+  public source: string;
+  
+  constructor(args: TestCrawlerComputedCreateArgs, options?: { uuid?: string }) {
+    this._options = options;
+    this.uuid = options?.uuid || Math.random().toString(36).substr(2, 9);
+    this.source = args.source;
+  }
+  
+  static isKlass = true as const;
+  static displayName = 'TestCrawlerComputed';
+  static instances: TestCrawlerComputedInstance[] = [];
+  
+  static public = {
+    source: {
+      type: 'string' as const,
+      required: true as const
     }
-})
+  };
+  
+  static create(args: TestCrawlerComputedCreateArgs, options?: { uuid?: string }): TestCrawlerComputedInstance {
+    const instance = new TestCrawlerComputed(args, options);
+    
+    const existing = this.instances.find(i => i.uuid === instance.uuid);
+    if (existing) {
+      throw new Error(`duplicate uuid in options ${instance.uuid}, TestCrawlerComputed`);
+    }
+    
+    this.instances.push(instance);
+    return instance;
+  }
+  
+  static stringify(instance: TestCrawlerComputedInstance): string {
+    return JSON.stringify({
+      type: 'TestCrawlerComputed',
+      options: instance._options,
+      uuid: instance.uuid,
+      public: { source: instance.source }
+    });
+  }
+  
+  static parse(json: string): TestCrawlerComputedInstance {
+    const data = JSON.parse(json);
+    return this.create(data.public, data.options);
+  }
+  
+  static clone(instance: TestCrawlerComputedInstance, deep: boolean): TestCrawlerComputedInstance {
+    return this.create({ source: instance.source });
+  }
+  
+  static is(obj: unknown): obj is TestCrawlerComputedInstance {
+    return obj !== null && typeof obj === 'object' && '_type' in obj && (obj as any)._type === 'TestCrawlerComputed';
+  }
+  
+  static check(data: unknown): boolean {
+    return data !== null && typeof data === 'object' && typeof (data as any).uuid === 'string';
+  }
+}
 
 class TestCrawlerComputation implements DataBasedComputation {
     state = {}
     dataDeps: {[key: string]: DataDep} = {}
-    constructor(public controller: Controller, public args: KlassInstance<typeof TestCrawlerComputed>, public dataContext: PropertyDataContext) {
+    constructor(public controller: Controller, public args: TestCrawlerComputedInstance, public dataContext: PropertyDataContext) {
         // 声明数据依赖
         this.dataDeps = {
             _current: {
@@ -35,7 +99,7 @@ class TestCrawlerComputation implements DataBasedComputation {
 }
 
 // 全局注册可用了
-ComputationHandle.Handles.set(TestCrawlerComputed, {
+ComputationHandle.Handles.set(TestCrawlerComputed as any, {
     // global: TestCrawlerComputation,
     property: TestCrawlerComputation
 })
@@ -51,7 +115,7 @@ describe('async computed', () => {
                 Property.create({
                     name: 'content', 
                     type: 'string',
-                    computation: TestCrawlerComputed.create({ source: 'url'})
+                    computation: TestCrawlerComputed.create({ source: 'url'}) as any
                 }),
             ]
         })

@@ -188,7 +188,7 @@ export class PropertyWeightedSummationHandle implements DataBasedComputation {
     }
 }
 
-ComputationHandle.Handles.set(WeightedSummation, {
+ComputationHandle.Handles.set(WeightedSummation as any, {
     global: GlobalWeightedSummationHandle,
     property: PropertyWeightedSummationHandle
 });

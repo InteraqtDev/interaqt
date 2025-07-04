@@ -224,7 +224,7 @@ export class PropertySumHandle implements DataBasedComputation {
     }
 }
 
-ComputationHandle.Handles.set(Summation, {
+ComputationHandle.Handles.set(Summation as any, {
     global: GlobalSumHandle,
     property: PropertySumHandle
 });

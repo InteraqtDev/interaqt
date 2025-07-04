@@ -5,11 +5,9 @@ import {
   MonoSystem,
   Property,
   ComputationHandle,
-  createClass,
   MatchExp,
   DataDep,
   EntityDataContext,
-  KlassInstance,
   PGLiteDB,
   DataBasedComputation,
   ComputationResult,
@@ -18,16 +16,79 @@ import {
   Relation
 } from "@";
 
-// 创建一个实体级别异步计算的类
-const EntityRecommendationComputed = createClass({
-  name: 'EntityRecommendationComputed',
-  public: {
-    category: {
-      type: 'string',
-      required: true
-    }
+// EntityRecommendationComputed as a standard ES6 class
+interface EntityRecommendationComputedInstance {
+  _type: string;
+  _options?: { uuid?: string };
+  uuid: string;
+  category: string;
+}
+
+interface EntityRecommendationComputedCreateArgs {
+  category: string;
+}
+
+class EntityRecommendationComputed implements EntityRecommendationComputedInstance {
+  public uuid: string;
+  public _type = 'EntityRecommendationComputed';
+  public _options?: { uuid?: string };
+  public category: string;
+  
+  constructor(args: EntityRecommendationComputedCreateArgs, options?: { uuid?: string }) {
+    this._options = options;
+    this.uuid = options?.uuid || Math.random().toString(36).substr(2, 9);
+    this.category = args.category;
   }
-})
+  
+  static isKlass = true as const;
+  static displayName = 'EntityRecommendationComputed';
+  static instances: EntityRecommendationComputedInstance[] = [];
+  
+  static public = {
+    category: {
+      type: 'string' as const,
+      required: true as const
+    }
+  };
+  
+  static create(args: EntityRecommendationComputedCreateArgs, options?: { uuid?: string }): EntityRecommendationComputedInstance {
+    const instance = new EntityRecommendationComputed(args, options);
+    
+    const existing = this.instances.find(i => i.uuid === instance.uuid);
+    if (existing) {
+      throw new Error(`duplicate uuid in options ${instance.uuid}, EntityRecommendationComputed`);
+    }
+    
+    this.instances.push(instance);
+    return instance;
+  }
+  
+  static stringify(instance: EntityRecommendationComputedInstance): string {
+    return JSON.stringify({
+      type: 'EntityRecommendationComputed',
+      options: instance._options,
+      uuid: instance.uuid,
+      public: { category: instance.category }
+    });
+  }
+  
+  static parse(json: string): EntityRecommendationComputedInstance {
+    const data = JSON.parse(json);
+    return this.create(data.public, data.options);
+  }
+  
+  static clone(instance: EntityRecommendationComputedInstance, deep: boolean): EntityRecommendationComputedInstance {
+    return this.create({ category: instance.category });
+  }
+  
+  static is(obj: unknown): obj is EntityRecommendationComputedInstance {
+    return obj !== null && typeof obj === 'object' && '_type' in obj && (obj as any)._type === 'EntityRecommendationComputed';
+  }
+  
+  static check(data: unknown): boolean {
+    return data !== null && typeof data === 'object' && typeof (data as any).uuid === 'string';
+  }
+}
 
 // 实现实体级别异步计算
 class EntityRecommendationComputation implements DataBasedComputation {
@@ -36,7 +97,7 @@ class EntityRecommendationComputation implements DataBasedComputation {
   
   constructor(
     public controller: Controller, 
-    public args: KlassInstance<typeof EntityRecommendationComputed>, 
+    public args: EntityRecommendationComputedInstance, 
     public dataContext: EntityDataContext
   ) {
     // Entity 计算可以依赖其他实体的数据
@@ -73,7 +134,7 @@ class EntityRecommendationComputation implements DataBasedComputation {
 }
 
 // 注册计算处理器
-ComputationHandle.Handles.set(EntityRecommendationComputed, {
+ComputationHandle.Handles.set(EntityRecommendationComputed as any, {
   entity: EntityRecommendationComputation
 })
 
@@ -99,7 +160,7 @@ describe('Entity async computed', () => {
       ],
       computation: EntityRecommendationComputed.create({
         category: 'electronics'
-      })
+      }) as any
     });
     
     const entities = [productEntity, recommendationEntity];

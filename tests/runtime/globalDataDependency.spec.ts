@@ -5,11 +5,9 @@ import {
   MonoSystem,
   Property,
   ComputationHandle,
-  createClass,
   DataDep,
   PropertyDataContext,
   GlobalDataContext,
-  KlassInstance,
   PGLiteDB,
   DataBasedComputation,
   ComputationResult,
@@ -19,20 +17,87 @@ import {
   DICTIONARY_RECORD
 } from "@";
 
-// 创建一个依赖全局数据的计算
-const GlobalDependentComputed = createClass({
-  name: 'GlobalDependentComputed',
-  public: {
+// GlobalDependentComputed as a standard ES6 class
+interface GlobalDependentComputedInstance {
+  _type: string;
+  _options?: { uuid?: string };
+  uuid: string;
+  globalKey: string;
+  multiplier?: number;
+}
+
+interface GlobalDependentComputedCreateArgs {
+  globalKey: string;
+  multiplier?: number;
+}
+
+class GlobalDependentComputed implements GlobalDependentComputedInstance {
+  public uuid: string;
+  public _type = 'GlobalDependentComputed';
+  public _options?: { uuid?: string };
+  public globalKey: string;
+  public multiplier?: number;
+  
+  constructor(args: GlobalDependentComputedCreateArgs, options?: { uuid?: string }) {
+    this._options = options;
+    this.uuid = options?.uuid || Math.random().toString(36).substr(2, 9);
+    this.globalKey = args.globalKey;
+    this.multiplier = args.multiplier;
+  }
+  
+  static isKlass = true as const;
+  static displayName = 'GlobalDependentComputed';
+  static instances: GlobalDependentComputedInstance[] = [];
+  
+  static public = {
     globalKey: {
-      type: 'string',
-      required: true
+      type: 'string' as const,
+      required: true as const
     },
     multiplier: {
-      type: 'number',
-      required: false
+      type: 'number' as const,
+      required: false as const
     }
+  };
+  
+  static create(args: GlobalDependentComputedCreateArgs, options?: { uuid?: string }): GlobalDependentComputedInstance {
+    const instance = new GlobalDependentComputed(args, options);
+    
+    const existing = this.instances.find(i => i.uuid === instance.uuid);
+    if (existing) {
+      throw new Error(`duplicate uuid in options ${instance.uuid}, GlobalDependentComputed`);
+    }
+    
+    this.instances.push(instance);
+    return instance;
   }
-})
+  
+  static stringify(instance: GlobalDependentComputedInstance): string {
+    return JSON.stringify({
+      type: 'GlobalDependentComputed',
+      options: instance._options,
+      uuid: instance.uuid,
+      public: { globalKey: instance.globalKey, multiplier: instance.multiplier }
+    });
+  }
+  
+  static parse(json: string): GlobalDependentComputedInstance {
+    const data = JSON.parse(json);
+    return this.create(data.public, data.options);
+  }
+  
+  static clone(instance: GlobalDependentComputedInstance, deep: boolean): GlobalDependentComputedInstance {
+    return this.create({ globalKey: instance.globalKey, multiplier: instance.multiplier });
+  }
+  
+  static is(obj: unknown): obj is GlobalDependentComputedInstance {
+    return obj !== null && typeof obj === 'object' && '_type' in obj && (obj as any)._type === 'GlobalDependentComputed';
+  }
+  
+  static check(data: unknown): boolean {
+    return data !== null && typeof data === 'object' && typeof (data as any).uuid === 'string';
+  }
+}
 
 // 实现依赖全局数据的计算
 class GlobalDependentComputation implements DataBasedComputation {
@@ -41,7 +106,7 @@ class GlobalDependentComputation implements DataBasedComputation {
   
   constructor(
     public controller: Controller, 
-    public args: KlassInstance<typeof GlobalDependentComputed>, 
+    public args: GlobalDependentComputedInstance, 
     public dataContext: PropertyDataContext
   ) {
     // 依赖全局数据
@@ -65,7 +130,7 @@ class GlobalDependentComputation implements DataBasedComputation {
 }
 
 // 注册计算处理器
-ComputationHandle.Handles.set(GlobalDependentComputed, {
+ComputationHandle.Handles.set(GlobalDependentComputed as any, {
   property: GlobalDependentComputation
 })
 
@@ -82,7 +147,7 @@ describe('Global data dependency', () => {
           computation: GlobalDependentComputed.create({
             globalKey: 'globalMultiplier',
             multiplier: 2
-          })
+          }) as any
         })
       ]
     });
@@ -139,11 +204,67 @@ describe('Global data dependency', () => {
   });
   
   test('should handle multiple global dependencies', async () => {
-    // 创建一个依赖多个全局数据的计算
-    const MultiGlobalComputed = createClass({
-      name: 'MultiGlobalComputed',
-      public: {}
-    });
+    // MultiGlobalComputed as a standard ES6 class
+    interface MultiGlobalComputedInstance {
+      _type: string;
+      _options?: { uuid?: string };
+      uuid: string;
+    }
+    
+    class MultiGlobalComputed implements MultiGlobalComputedInstance {
+      public uuid: string;
+      public _type = 'MultiGlobalComputed';
+      public _options?: { uuid?: string };
+      
+      constructor(args: {}, options?: { uuid?: string }) {
+        this._options = options;
+        this.uuid = options?.uuid || Math.random().toString(36).substr(2, 9);
+      }
+      
+      static isKlass = true as const;
+      static displayName = 'MultiGlobalComputed';
+      static instances: MultiGlobalComputedInstance[] = [];
+      
+      static public = {};
+      
+      static create(args: {}, options?: { uuid?: string }): MultiGlobalComputedInstance {
+        const instance = new MultiGlobalComputed(args, options);
+        
+        const existing = this.instances.find(i => i.uuid === instance.uuid);
+        if (existing) {
+          throw new Error(`duplicate uuid in options ${instance.uuid}, MultiGlobalComputed`);
+        }
+        
+        this.instances.push(instance);
+        return instance;
+      }
+      
+      static stringify(instance: MultiGlobalComputedInstance): string {
+        return JSON.stringify({
+          type: 'MultiGlobalComputed',
+          options: instance._options,
+          uuid: instance.uuid,
+          public: {}
+        });
+      }
+      
+      static parse(json: string): MultiGlobalComputedInstance {
+        const data = JSON.parse(json);
+        return this.create(data.public || {}, data.options);
+      }
+      
+      static clone(instance: MultiGlobalComputedInstance, deep: boolean): MultiGlobalComputedInstance {
+        return this.create({});
+      }
+      
+      static is(obj: unknown): obj is MultiGlobalComputedInstance {
+        return obj !== null && typeof obj === 'object' && '_type' in obj && (obj as any)._type === 'MultiGlobalComputed';
+      }
+      
+      static check(data: unknown): boolean {
+        return data !== null && typeof data === 'object' && typeof (data as any).uuid === 'string';
+      }
+    }
     
     class MultiGlobalComputation implements DataBasedComputation {
       state = {}
@@ -151,7 +272,7 @@ describe('Global data dependency', () => {
       
       constructor(
         public controller: Controller, 
-        public args: KlassInstance<typeof MultiGlobalComputed>, 
+        public args: MultiGlobalComputedInstance, 
         public dataContext: PropertyDataContext
       ) {
         // 依赖多个全局数据
@@ -185,7 +306,7 @@ describe('Global data dependency', () => {
       }
     }
     
-    ComputationHandle.Handles.set(MultiGlobalComputed, {
+    ComputationHandle.Handles.set(MultiGlobalComputed as any, {
       property: MultiGlobalComputation
     });
     
@@ -198,7 +319,7 @@ describe('Global data dependency', () => {
         Property.create({
           name: 'finalPrice',
           type: 'number',
-          computation: MultiGlobalComputed.create({})
+          computation: MultiGlobalComputed.create({}) as any
         })
       ]
     });

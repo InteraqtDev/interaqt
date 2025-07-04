@@ -53,12 +53,8 @@ export class Relation implements RelationInstance {
     this.computation = args.computation;
     this.properties = args.properties || [];
     
-    // Compute name if not provided
-    if (!args.name && args.source && args.target) {
-      this.name = `${args.source.name}_${args.sourceProperty}_${args.targetProperty}_${args.target.name}`;
-    } else {
-      this.name = args.name;
-    }
+    // 始终使用计算出的完整名称
+    this.name = `${args.source.name}_${args.sourceProperty}_${args.targetProperty}_${args.target.name}`;
   }
   
   // 静态属性和方法

@@ -68,4 +68,48 @@ export abstract class BaseKlass<TInstance extends IInstance, TCreateArgs> {
 // 生成 UUID 的辅助函数
 export function generateUUID(options?: { uuid?: string }): string {
   return options?.uuid || crypto.randomUUID();
-} 
+}
+
+// 为了向后兼容，添加类型别名
+export type KlassInstance<T> = T extends { create(args: infer A, options?: any): infer R } ? R : never;
+
+// 概念相关的类型
+export interface Concept {
+  name: string;
+  [key: string]: unknown;
+}
+
+export interface DerivedConcept extends Concept {
+  base?: Concept;
+  attributive?: unknown;
+}
+
+export interface ConceptAlias extends Concept {
+  for: Concept[];
+}
+
+export type ConceptInstance = unknown;
+
+// Interaction 相关类型
+export type InteractionInstanceType = import('./Interaction.js').InteractionInstance;
+
+// InteractionEventArgs 类型定义
+export interface InteractionEventArgs {
+  type?: string;
+  payload?: {
+    [key: string]: any;
+  };
+}
+
+// Activity 相关类型别名
+export type ActivityInstanceType = import('./Activity.js').ActivityInstance;
+export type ActivityGroupInstanceType = import('./Activity.js').ActivityGroupInstance;
+export type GatewayInstanceType = import('./Gateway.js').GatewayInstance;
+export type TransferInstanceType = unknown; // Transfer 类型未定义
+
+// 其他常用的实例类型别名
+export type EntityInstanceType = import('./Entity.js').EntityInstance;
+export type RelationInstanceType = import('./Relation.js').RelationInstance;
+export type PropertyInstanceType = import('./Property.js').PropertyInstance;
+export type AttributiveInstanceType = import('./Attributive.js').AttributiveInstance;
+export type ConditionInstanceType = import('./Condition.js').ConditionInstance; 

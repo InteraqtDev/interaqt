@@ -5,11 +5,9 @@ import {
   MonoSystem,
   Property,
   ComputationHandle,
-  createClass,
   MatchExp,
   DataDep,
   GlobalDataContext,
-  KlassInstance,
   PGLiteDB,
   DataBasedComputation,
   ComputationResult,
@@ -17,16 +15,79 @@ import {
   DICTIONARY_RECORD
 } from "@";
 
-// 创建一个全局异步计算的类
-const GlobalWeatherComputed = createClass({
-  name: 'GlobalWeatherComputed',
-  public: {
-    city: {
-      type: 'string',
-      required: true
-    }
+// GlobalWeatherComputed as a standard ES6 class
+interface GlobalWeatherComputedInstance {
+  _type: string;
+  _options?: { uuid?: string };
+  uuid: string;
+  city: string;
+}
+
+interface GlobalWeatherComputedCreateArgs {
+  city: string;
+}
+
+class GlobalWeatherComputed implements GlobalWeatherComputedInstance {
+  public uuid: string;
+  public _type = 'GlobalWeatherComputed';
+  public _options?: { uuid?: string };
+  public city: string;
+  
+  constructor(args: GlobalWeatherComputedCreateArgs, options?: { uuid?: string }) {
+    this._options = options;
+    this.uuid = options?.uuid || Math.random().toString(36).substr(2, 9);
+    this.city = args.city;
   }
-})
+  
+  static isKlass = true as const;
+  static displayName = 'GlobalWeatherComputed';
+  static instances: GlobalWeatherComputedInstance[] = [];
+  
+  static public = {
+    city: {
+      type: 'string' as const,
+      required: true as const
+    }
+  };
+  
+  static create(args: GlobalWeatherComputedCreateArgs, options?: { uuid?: string }): GlobalWeatherComputedInstance {
+    const instance = new GlobalWeatherComputed(args, options);
+    
+    const existing = this.instances.find(i => i.uuid === instance.uuid);
+    if (existing) {
+      throw new Error(`duplicate uuid in options ${instance.uuid}, GlobalWeatherComputed`);
+    }
+    
+    this.instances.push(instance);
+    return instance;
+  }
+  
+  static stringify(instance: GlobalWeatherComputedInstance): string {
+    return JSON.stringify({
+      type: 'GlobalWeatherComputed',
+      options: instance._options,
+      uuid: instance.uuid,
+      public: { city: instance.city }
+    });
+  }
+  
+  static parse(json: string): GlobalWeatherComputedInstance {
+    const data = JSON.parse(json);
+    return this.create(data.public, data.options);
+  }
+  
+  static clone(instance: GlobalWeatherComputedInstance, deep: boolean): GlobalWeatherComputedInstance {
+    return this.create({ city: instance.city });
+  }
+  
+  static is(obj: unknown): obj is GlobalWeatherComputedInstance {
+    return obj !== null && typeof obj === 'object' && '_type' in obj && (obj as any)._type === 'GlobalWeatherComputed';
+  }
+  
+  static check(data: unknown): boolean {
+    return data !== null && typeof data === 'object' && typeof (data as any).uuid === 'string';
+  }
+}
 
 // 实现全局异步计算
 class GlobalWeatherComputation implements DataBasedComputation {
@@ -35,7 +96,7 @@ class GlobalWeatherComputation implements DataBasedComputation {
   
   constructor(
     public controller: Controller, 
-    public args: KlassInstance<typeof GlobalWeatherComputed>, 
+    public args: GlobalWeatherComputedInstance, 
     public dataContext: GlobalDataContext
   ) {
     // Global 计算可以依赖实体数据
@@ -62,22 +123,85 @@ class GlobalWeatherComputation implements DataBasedComputation {
 }
 
 // 注册全局计算处理器
-ComputationHandle.Handles.set(GlobalWeatherComputed, {
+ComputationHandle.Handles.set(GlobalWeatherComputed as any, {
   global: GlobalWeatherComputation
 })
 
 describe('Global async computed', () => {
   test('should handle global async computation with entity dependencies', async () => {
-    // 创建一个依赖实体数据的全局异步计算
-    const GlobalStatsComputed = createClass({
-      name: 'GlobalStatsComputed',
-      public: {
-        entityName: {
-          type: 'string',
-          required: true
-        }
+    // GlobalStatsComputed as a standard ES6 class
+    interface GlobalStatsComputedInstance {
+      _type: string;
+      _options?: { uuid?: string };
+      uuid: string;
+      entityName: string;
+    }
+    
+    interface GlobalStatsComputedCreateArgs {
+      entityName: string;
+    }
+    
+    class GlobalStatsComputed implements GlobalStatsComputedInstance {
+      public uuid: string;
+      public _type = 'GlobalStatsComputed';
+      public _options?: { uuid?: string };
+      public entityName: string;
+      
+      constructor(args: GlobalStatsComputedCreateArgs, options?: { uuid?: string }) {
+        this._options = options;
+        this.uuid = options?.uuid || Math.random().toString(36).substr(2, 9);
+        this.entityName = args.entityName;
       }
-    });
+      
+      static isKlass = true as const;
+      static displayName = 'GlobalStatsComputed';
+      static instances: GlobalStatsComputedInstance[] = [];
+      
+      static public = {
+        entityName: {
+          type: 'string' as const,
+          required: true as const
+        }
+      };
+      
+      static create(args: GlobalStatsComputedCreateArgs, options?: { uuid?: string }): GlobalStatsComputedInstance {
+        const instance = new GlobalStatsComputed(args, options);
+        
+        const existing = this.instances.find(i => i.uuid === instance.uuid);
+        if (existing) {
+          throw new Error(`duplicate uuid in options ${instance.uuid}, GlobalStatsComputed`);
+        }
+        
+        this.instances.push(instance);
+        return instance;
+      }
+      
+      static stringify(instance: GlobalStatsComputedInstance): string {
+        return JSON.stringify({
+          type: 'GlobalStatsComputed',
+          options: instance._options,
+          uuid: instance.uuid,
+          public: { entityName: instance.entityName }
+        });
+      }
+      
+      static parse(json: string): GlobalStatsComputedInstance {
+        const data = JSON.parse(json);
+        return this.create(data.public, data.options);
+      }
+      
+      static clone(instance: GlobalStatsComputedInstance, deep: boolean): GlobalStatsComputedInstance {
+        return this.create({ entityName: instance.entityName });
+      }
+      
+      static is(obj: unknown): obj is GlobalStatsComputedInstance {
+        return obj !== null && typeof obj === 'object' && '_type' in obj && (obj as any)._type === 'GlobalStatsComputed';
+      }
+      
+      static check(data: unknown): boolean {
+        return data !== null && typeof data === 'object' && typeof (data as any).uuid === 'string';
+      }
+    }
     
     // 创建产品实体 - 必须在 GlobalStatsComputation 之前定义
     const productEntity = Entity.create({
@@ -94,7 +218,7 @@ describe('Global async computed', () => {
       
       constructor(
         public controller: Controller, 
-        public args: KlassInstance<typeof GlobalStatsComputed>, 
+        public args: GlobalStatsComputedInstance, 
         public dataContext: GlobalDataContext
       ) {
         // 依赖产品实体的数据 - 使用外部定义的 productEntity
@@ -131,7 +255,7 @@ describe('Global async computed', () => {
       }
     }
     
-    ComputationHandle.Handles.set(GlobalStatsComputed, {
+    ComputationHandle.Handles.set(GlobalStatsComputed as any, {
       global: GlobalStatsComputation
     });
     
@@ -145,7 +269,7 @@ describe('Global async computed', () => {
         collection: false,
         computation: GlobalStatsComputed.create({
           entityName: 'Product'
-        })
+        }) as any
       })
     ];
     

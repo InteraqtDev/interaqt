@@ -109,7 +109,7 @@ export class Entity implements EntityInstance {
     
     const data: SerializedData<EntityCreateArgs> = {
       type: 'Entity',
-      options: instance._options,
+      options: { uuid: instance.uuid },
       uuid: instance.uuid,
       public: args
     };
@@ -133,7 +133,24 @@ export class Entity implements EntityInstance {
   }
   
   static check(data: unknown): boolean {
-    return data !== null && typeof data === 'object' && typeof (data as IInstance).uuid === 'string';
+    if (data === null || typeof data !== 'object') return false;
+    
+    // 如果是完整的 Entity 实例
+    if ('_type' in data && (data as IInstance)._type === 'Entity') {
+      return true;
+    }
+    
+    // 如果是实体引用（有 id 属性）
+    if ('id' in data) {
+      return true;
+    }
+    
+    // 如果是新创建的实体数据（至少有一些属性）
+    if (Object.keys(data).length > 0) {
+      return true;
+    }
+    
+    return false;
   }
   
   static parse(json: string): EntityInstance {

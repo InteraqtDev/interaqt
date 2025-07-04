@@ -242,6 +242,7 @@ describe('Count computed handle', () => {
   });
 
 
+
   test('should only count self relation twice on n:n relation', async () => {
     // Create User entity with computed property
     const userEntity = Entity.create({

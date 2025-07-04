@@ -1,6 +1,8 @@
 import { IInstance, SerializedData, generateUUID } from './interfaces.js';
 import { stringifyAttribute } from './utils.js';
 import type { EntityInstance, RelationInstance, AttributeQueryData, DataDependencies } from './types.js';
+import { Entity } from './Entity.js';
+import { Relation } from './Relation.js';
 
 export interface CountInstance extends IInstance {
   record: EntityInstance | RelationInstance;
@@ -103,8 +105,20 @@ export class Count implements CountInstance {
   }
   
   static clone(instance: CountInstance, deep: boolean): CountInstance {
+    // 对于 Entity 和 Relation，即使是深度克隆，也只克隆引用
+    // 因为它们是全局单例管理的
+    let record = instance.record;
+    if (deep) {
+      // 如果是深度克隆，对 Entity 或 Relation 调用它们的 clone 方法
+      if (Entity.is(instance.record)) {
+        record = Entity.clone(instance.record, deep);
+      } else if (Relation.is(instance.record)) {
+        record = Relation.clone(instance.record, deep);
+      }
+    }
+    
     return this.create({
-      record: instance.record,
+      record: record,
       direction: instance.direction,
       callback: instance.callback,
       attributeQuery: instance.attributeQuery,

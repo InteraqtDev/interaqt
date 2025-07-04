@@ -111,7 +111,7 @@ export class PropertyRealTimeComputation implements DataBasedComputation {
     }
 }
 
-ComputationHandle.Handles.set(RealTime, {
+ComputationHandle.Handles.set(RealTime as any, {
     global: GlobalRealTimeComputation,
     property: PropertyRealTimeComputation
 })  

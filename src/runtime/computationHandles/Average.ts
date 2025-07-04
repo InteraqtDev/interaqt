@@ -289,7 +289,7 @@ export class PropertyAverageHandle implements DataBasedComputation {
     }
 }
 
-ComputationHandle.Handles.set(Average, {
+ComputationHandle.Handles.set(Average as any, {
     global: GlobalAverageHandle,
     property: PropertyAverageHandle
 }); 

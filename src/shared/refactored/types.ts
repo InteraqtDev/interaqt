@@ -71,11 +71,15 @@ export type ComputationRecord =
 
 /**
  * Attribute query data structure
+ * Compatible with storage/erstorage/AttributeQuery.ts
  */
-export interface AttributeQueryData {
-  $entity?: string;
-  $relation?: string;
-  $id?: string | string[];
+export type AttributeQueryDataRecordItem = [string, RecordQueryData, boolean?];
+export type AttributeQueryDataItem = string | AttributeQueryDataRecordItem;
+export type AttributeQueryData = AttributeQueryDataItem[];
+
+// RecordQueryData interface from storage
+export interface RecordQueryData {
+  attributeQuery?: AttributeQueryData;
   [key: string]: unknown;
 }
 

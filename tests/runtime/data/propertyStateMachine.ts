@@ -9,7 +9,7 @@ import {
     StateNode,
     StateTransfer,
     StateMachine
-} from 'interaqt';
+} from '@shared';
 
 
 export function createData() {

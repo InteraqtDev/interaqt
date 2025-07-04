@@ -239,7 +239,7 @@ export class PropertyCountHandle implements DataBasedComputation {
     }
 }
 
-ComputationHandle.Handles.set(Count, {
+ComputationHandle.Handles.set(Count as any, {
     global: GlobalCountHandle,
     property: PropertyCountHandle
 });

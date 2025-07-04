@@ -219,7 +219,7 @@ export class PropertyEveryHandle implements DataBasedComputation {
 
 
 
-ComputationHandle.Handles.set(Every, {
+ComputationHandle.Handles.set(Every as any, {
     global: GlobalEveryHandle,
     property: PropertyEveryHandle
 })

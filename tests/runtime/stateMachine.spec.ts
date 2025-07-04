@@ -166,7 +166,7 @@ describe('StateMachineRunner', () => {
 
     test('state machine with dynamic computeValue', async () => {
         // 创建一个带有动态计算值的状态机
-        const { Entity, Property, Interaction, Action, Payload, PayloadItem, StateMachine, StateNode, StateTransfer } = await import('interaqt')
+        const { Entity, Property, Interaction, Action, Payload, PayloadItem, StateMachine, StateNode, StateTransfer } = await import('@shared')
         
         // 创建用户实体
         const User = Entity.create({
@@ -354,7 +354,7 @@ describe('StateMachineRunner', () => {
 
     test('state machine with timestamp recording', async () => {
         // 创建一个记录时间戳的简单状态机
-        const { Entity, Property, Interaction, Action, Payload, PayloadItem, StateMachine, StateNode, StateTransfer } = await import('interaqt')
+        const { Entity, Property, Interaction, Action, Payload, PayloadItem, StateMachine, StateNode, StateTransfer } = await import('@shared')
         
         // 创建实体
         const TimeLogger = Entity.create({

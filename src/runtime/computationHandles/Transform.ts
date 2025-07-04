@@ -110,7 +110,7 @@ export class RecordsTransformHandle implements DataBasedComputation {
 
 
 // Register the Transform with ComputationHandle
-ComputationHandle.Handles.set(Transform, {
+ComputationHandle.Handles.set(Transform as any, {
     entity: RecordsTransformHandle,
     relation: RecordsTransformHandle
 });

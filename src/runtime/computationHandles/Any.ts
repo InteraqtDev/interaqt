@@ -183,7 +183,7 @@ export class PropertyAnyHandle implements DataBasedComputation {
 }
 
 
-ComputationHandle.Handles.set(Any, {
+ComputationHandle.Handles.set(Any as any, {
     global: GlobalAnyHandle,
     property: PropertyAnyHandle
 })

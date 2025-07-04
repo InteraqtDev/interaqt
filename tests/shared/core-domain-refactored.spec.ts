@@ -111,10 +111,15 @@ describe("Core Domain Classes Refactored", () => {
       });
       
       const stringified = Entity.stringify(original);
+      
+      // Clear instances before parsing to avoid duplicate UUID error
+      clearAllInstances(Entity);
+      
       const parsed = Entity.parse(stringified);
 
       expect(parsed.name).toBe("Article");
       expect(parsed.properties).toHaveLength(1);
+      expect(parsed.uuid).toBe(original.uuid); // Should preserve UUID
     });
   });
 
@@ -165,7 +170,7 @@ describe("Core Domain Classes Refactored", () => {
         type: "1:n"
       });
 
-      expect(relation.name).toBe("UserPostRelation");
+      expect(relation.name).toBe("User_posts_author_Post");
     });
 
     test("should create relation with properties", () => {
