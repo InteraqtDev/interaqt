@@ -256,8 +256,8 @@ describe('Every and Any computed handle', () => {
     await controller.setup(true)
 
     // 创建 1 个 user 和 2 个 request
-    const user = await system.storage.create('User', {everyRequestHandled: false})  
-    const request1 = await system.storage.create('Request', {handled: false, owner: user})      
+    const user = await system.storage.create('User', {everyRequestHandled: false})
+    const request1 = await system.storage.create('Request', {handled: false, owner: user})
     const request2 = await system.storage.create('Request', {handled: false, owner: user})
 
     // 重新获取用户数据，查看 everyRequestHandled 的值

@@ -164,7 +164,7 @@ export class PropertyEveryHandle implements DataBasedComputation {
         if (relatedMutationEvent.type === 'create'&&relatedMutationEvent.recordName === this.relation.name) {
             // 关联关系的新建
             const relationRecord = relatedMutationEvent.record!
-            const newRelationWithEntity = await this.controller.system.storage.findOne(this.relation.name, MatchExp.atom({
+            const newRelationWithEntity = await this.controller.system.entities.findOne(this.relation.name, MatchExp.atom({
                 key: 'id',
                 value: ['=', relationRecord.id]
             }), undefined, this.relationAttributeQuery)
@@ -195,7 +195,7 @@ export class PropertyEveryHandle implements DataBasedComputation {
                 value: ['=', relatedMutationEvent!.oldRecord!.id]
             }) 
 
-            const relationRecord = await this.controller.system.storage.findOne(this.relation.name, relationMatch, undefined, this.relationAttributeQuery)
+            const relationRecord = await this.controller.system.entities.findOne(this.relation.name, relationMatch, undefined, this.relationAttributeQuery)
 
             const oldItemMatch = !!await this.state!.isItemMatch.get(relationRecord)
             const newItemMatch = !!this.callback.call(this.controller, relationRecord, dataDeps) 

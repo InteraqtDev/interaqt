@@ -71,12 +71,12 @@ export class Attributive implements AttributiveInstance {
   }
   
   static stringify(instance: AttributiveInstance): string {
-    const args: Partial<AttributiveCreateArgs> = {
-      content: stringifyAttribute(instance.content) as Function
+    const args: AttributiveCreateArgs = {
+      content: stringifyAttribute(instance.content) as Function,
+      stringContent: instance.stringContent,
+      name: instance.name,
+      isRef: instance.isRef
     };
-    if (instance.stringContent !== undefined) args.stringContent = instance.stringContent;
-    if (instance.name !== undefined) args.name = instance.name;
-    if (instance.isRef !== undefined) args.isRef = instance.isRef;
     
     const data: SerializedData<AttributiveCreateArgs> = {
       type: 'Attributive',
@@ -111,8 +111,8 @@ export class Attributive implements AttributiveInstance {
     const args = data.public;
     
     // 反序列化函数
-    if (args.content && typeof args.content === 'string' && args.content.startsWith('func::')) {
-      args.content = new Function('return ' + args.content.substring(6))();
+    if (args.content && typeof args.content === 'string' && (args.content as any).startsWith('func::')) {
+      args.content = new Function('return ' + (args.content as any).substring(6))();
     }
     
     return this.create(args, data.options);
@@ -195,7 +195,7 @@ export class Attributives implements AttributivesInstance {
   }
   
   static parse(json: string): AttributivesInstance {
-    const data: SerializedData<AttributiveCreateArgs> = JSON.parse(json);
+    const data: SerializedData<AttributivesCreateArgs> = JSON.parse(json);
     return this.create(data.public, data.options);
   }
 } 

@@ -70,20 +70,20 @@ export class Property implements PropertyInstance {
     },
     collection: {
       type: 'boolean' as const,
-      required: false as const,
+      required: false as const
     },
     defaultValue: {
       type: 'function' as const,
-      required: false as const,
+      required: false as const
     },
     computed: {
       type: 'function' as const,
-      required: false as const,
+      required: false as const
     },
     computation: {
       type: [] as const,
       collection: false as const,
-      required: false as const,
+      required: false as const
     }
   };
   
@@ -101,14 +101,15 @@ export class Property implements PropertyInstance {
   }
   
   static stringify(instance: PropertyInstance): string {
-    const args: Partial<PropertyCreateArgs> = {
+    const args: PropertyCreateArgs = {
       name: instance.name,
-      type: instance.type
+      type: instance.type,
+      collection: instance.collection,
+      
+      
+      defaultValue: instance.defaultValue ? stringifyAttribute(instance.defaultValue) as Function : undefined,
+      computed: instance.computed || undefined
     };
-    if (instance.collection !== undefined) args.collection = instance.collection;
-    if (instance.defaultValue !== undefined) args.defaultValue = stringifyAttribute(instance.defaultValue) as Function;
-    if (instance.computed !== undefined) args.computed = stringifyAttribute(instance.computed) as Function;
-    if (instance.computation !== undefined) args.computation = stringifyAttribute(instance.computation) as ComputationInstance;
     
     const data: SerializedData<PropertyCreateArgs> = {
       type: 'Property',
@@ -145,11 +146,11 @@ export class Property implements PropertyInstance {
     const args = data.public;
     
     // 反序列化函数
-    if (args.defaultValue && typeof args.defaultValue === 'string' && args.defaultValue.startsWith('func::')) {
-      args.defaultValue = new Function('return ' + args.defaultValue.substring(6))();
+    if (args.defaultValue && typeof args.defaultValue === 'string' && (args.defaultValue as any).startsWith('func::')) {
+      args.defaultValue = new Function('return ' + (args.defaultValue as any).substring(6))();
     }
-    if (args.computed && typeof args.computed === 'string' && args.computed.startsWith('func::')) {
-      args.computed = new Function('return ' + args.computed.substring(6))();
+    if (args.computed && typeof args.computed === 'string' && (args.computed as any).startsWith('func::')) {
+      args.computed = new Function('return ' + (args.computed as any).substring(6))();
     }
     
     return this.create(args, data.options);

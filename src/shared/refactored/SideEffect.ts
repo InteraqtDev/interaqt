@@ -57,14 +57,16 @@ export class SideEffect implements SideEffectInstance {
   }
   
   static stringify(instance: SideEffectInstance): string {
+    const args: SideEffectCreateArgs = {
+      name: instance.name,
+      handle: stringifyAttribute(instance.handle) as Function
+    };
+    
     const data: SerializedData<SideEffectCreateArgs> = {
       type: 'SideEffect',
       options: instance._options,
       uuid: instance.uuid,
-      public: {
-        name: instance.name,
-        handle: stringifyAttribute(instance.handle)
-      }
+      public: args
     };
     return JSON.stringify(data);
   }
@@ -89,8 +91,8 @@ export class SideEffect implements SideEffectInstance {
     const args = data.public;
     
     // 反序列化函数
-    if (args.handle && typeof args.handle === 'string' && args.handle.startsWith('func::')) {
-      args.handle = new Function('return ' + args.handle.substring(6))();
+    if (args.handle && typeof args.handle === 'string' && (args.handle as any).startsWith('func::')) {
+      args.handle = new Function('return ' + (args.handle as any).substring(6))();
     }
     
     return this.create(args, data.options);

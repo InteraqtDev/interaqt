@@ -67,11 +67,10 @@ export class Summation implements SummationInstance {
   }
   
   static stringify(instance: SummationInstance): string {
-    const args: Partial<SummationCreateArgs> = {
-      record: stringifyAttribute(instance.record) as EntityInstance | RelationInstance,
+    const args: SummationCreateArgs = {
+      record: instance.record,
       attributeQuery: stringifyAttribute(instance.attributeQuery) as AttributeQueryData
     };
-    if (instance.direction !== undefined) args.direction = instance.direction;
     
     const data: SerializedData<SummationCreateArgs> = {
       type: 'Summation',

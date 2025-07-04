@@ -20,6 +20,7 @@
   },
   "scripts": {
     "check": "tsc --noEmit",
+    "check:shared": "tsc --noEmit --strict --skipLibCheck src/shared/refactored/*.ts",
     "test": "vitest run",
     "test:runtime": "vitest run tests/runtime",
     "test:storage": "vitest run tests/storage",

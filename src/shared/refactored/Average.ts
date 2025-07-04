@@ -67,11 +67,10 @@ export class Average implements AverageInstance {
   }
   
   static stringify(instance: AverageInstance): string {
-    const args: Partial<AverageCreateArgs> = {
-      record: stringifyAttribute(instance.record) as EntityInstance | RelationInstance,
+    const args: AverageCreateArgs = {
+      record: instance.record,
       attributeQuery: stringifyAttribute(instance.attributeQuery) as AttributeQueryData
     };
-    if (instance.direction !== undefined) args.direction = instance.direction;
     
     const data: SerializedData<AverageCreateArgs> = {
       type: 'Average',

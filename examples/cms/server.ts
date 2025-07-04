@@ -130,7 +130,7 @@ export async function startServer(controller: Controller, options: ServerOptions
                 throw { statusCode: 401, message: 'Unauthorized' }
             }
 
-            let user = await controller.system.storage.findOne(USER_ENTITY, MatchExp.atom({key:'id', value: ['=', userId]}), undefined, ['*'])
+            let user = await controller.system.entities.findOne(USER_ENTITY, MatchExp.atom({key:'id', value: ['=', userId]}), undefined, ['*'])
             if (!user) {
                 throw { statusCode: 500, message: 'User not synced' }
             }
@@ -146,7 +146,11 @@ export async function startServer(controller: Controller, options: ServerOptions
                 // 还需要区分 create 和 call
                 const activityCallId = controller.activityManager.activityCallsByName.get(activityName)?.activity.uuid
                 const interactionId = controller.activityManager.activityCallsByName.get(activityName)!.interactionCallByName.get(interactionName!)?.interaction.uuid
+<<<<<<< Updated upstream:examples/cms/server.ts
                 result = await controller.callActivityInteraction(activityCallId!, interactionId!, activityId, eventArgs)
+=======
+                result = await controller.activityManager.callActivityInteraction(activityCallId!, interactionId!, activityId, eventArgs)
+>>>>>>> Stashed changes:src/runtime/server.ts
             } else {
                 const interactionId = controller.activityManager.interactionCallsByName.get(interactionName!)?.interaction.uuid
                 result = await controller.callInteraction(interactionId!, eventArgs)
@@ -179,7 +183,7 @@ export async function startServer(controller: Controller, options: ServerOptions
                 throw { statusCode: 401, message: 'Unauthorized' }
             }
 
-            user = await controller.system.storage.findOne(USER_ENTITY, MatchExp.atom({key:'id', value: ['=', userId]}), undefined, ['*'])
+            user = await controller.system.entities.findOne(USER_ENTITY, MatchExp.atom({key:'id', value: ['=', userId]}), undefined, ['*'])
             if (!user) {
                 throw { statusCode: 500, message: 'User not synced' }
             }

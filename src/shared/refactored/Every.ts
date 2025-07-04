@@ -94,14 +94,13 @@ export class Every implements EveryInstance {
   }
   
   static stringify(instance: EveryInstance): string {
-    const args: Partial<EveryCreateArgs> = {
-      record: stringifyAttribute(instance.record) as EntityInstance | RelationInstance,
-      callback: stringifyAttribute(instance.callback) as Function
+    const args: EveryCreateArgs = {
+      record: instance.record,
+      attributeQuery: instance.attributeQuery ? stringifyAttribute(instance.attributeQuery) as AttributeQueryData : undefined,
+      
+      dataDeps: instance.dataDeps,
+      callback: instance.callback ? stringifyAttribute(instance.callback) as Function : (() => true)
     };
-    if (instance.direction !== undefined) args.direction = instance.direction;
-    if (instance.attributeQuery !== undefined) args.attributeQuery = stringifyAttribute(instance.attributeQuery) as AttributeQueryData;
-    if (instance.dataDeps !== undefined) args.dataDeps = instance.dataDeps;
-    if (instance.notEmpty !== undefined) args.notEmpty = instance.notEmpty;
     
     const data: SerializedData<EveryCreateArgs> = {
       type: 'Every',
@@ -138,8 +137,8 @@ export class Every implements EveryInstance {
     const args = data.public;
     
     // 反序列化函数
-    if (args.callback && typeof args.callback === 'string' && args.callback.startsWith('func::')) {
-      args.callback = new Function('return ' + args.callback.substring(6))();
+    if (args.callback && typeof args.callback === 'string' && (args.callback as any).startsWith('func::')) {
+      args.callback = new Function('return ' + (args.callback as any).substring(6))();
     }
     
     return this.create(args, data.options);

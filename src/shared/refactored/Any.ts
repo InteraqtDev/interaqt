@@ -85,13 +85,13 @@ export class Any implements AnyInstance {
   }
   
   static stringify(instance: AnyInstance): string {
-    const args: Partial<AnyCreateArgs> = {
-      record: stringifyAttribute(instance.record) as EntityInstance | RelationInstance,
-      callback: stringifyAttribute(instance.callback) as Function
+    const args: AnyCreateArgs = {
+      record: instance.record,
+      attributeQuery: instance.attributeQuery,
+      
+      dataDeps: instance.dataDeps,
+      callback: instance.callback ? stringifyAttribute(instance.callback) as Function : (() => {})
     };
-    if (instance.direction !== undefined) args.direction = instance.direction;
-    if (instance.attributeQuery !== undefined) args.attributeQuery = stringifyAttribute(instance.attributeQuery) as AttributeQueryData;
-    if (instance.dataDeps !== undefined) args.dataDeps = instance.dataDeps;
     
     const data: SerializedData<AnyCreateArgs> = {
       type: 'Any',
@@ -125,8 +125,8 @@ export class Any implements AnyInstance {
     const args = data.public;
     
     // 反序列化函数
-    if (args.callback && typeof args.callback === 'string' && args.callback.startsWith('func::')) {
-      args.callback = new Function('return ' + args.callback.substring(6))();
+    if (args.callback && typeof args.callback === 'string' && (args.callback as any).startsWith('func::')) {
+      args.callback = new Function('return ' + (args.callback as any).substring(6))();
     }
     
     return this.create(args, data.options);

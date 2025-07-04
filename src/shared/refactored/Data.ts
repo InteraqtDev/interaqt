@@ -56,10 +56,10 @@ export class DataAttributive implements DataAttributiveInstance {
   }
   
   static stringify(instance: DataAttributiveInstance): string {
-    const args: Partial<DataAttributiveCreateArgs> = {
-      content: stringifyAttribute(instance.content) as Function
+    const args: DataAttributiveCreateArgs = {
+      content: stringifyAttribute(instance.content) as Function,
+      name: instance.name
     };
-    if (instance.name !== undefined) args.name = instance.name;
     
     const data: SerializedData<DataAttributiveCreateArgs> = {
       type: 'DataAttributive',
@@ -92,8 +92,8 @@ export class DataAttributive implements DataAttributiveInstance {
     const args = data.public;
     
     // 反序列化函数
-    if (args.content && typeof args.content === 'string' && args.content.startsWith('func::')) {
-      args.content = new Function('return ' + args.content.substring(6))();
+    if (args.content && typeof args.content === 'string' && (args.content as any).startsWith('func::')) {
+      args.content = new Function('return ' + (args.content as any).substring(6))();
     }
     
     return this.create(args, data.options);

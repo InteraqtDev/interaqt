@@ -85,13 +85,13 @@ export class Count implements CountInstance {
   }
   
   static stringify(instance: CountInstance): string {
-    const args: Partial<CountCreateArgs> = {
-      record: stringifyAttribute(instance.record) as EntityInstance | RelationInstance
+    const args: CountCreateArgs = {
+      record: instance.record,
+      direction: instance.direction,
+      attributeQuery: instance.attributeQuery ? stringifyAttribute(instance.attributeQuery) as AttributeQueryData : undefined,
+      dataDeps: instance.dataDeps,
+      callback: instance.callback ? stringifyAttribute(instance.callback) as Function : undefined
     };
-    if (instance.direction !== undefined) args.direction = instance.direction;
-    if (instance.callback !== undefined) args.callback = stringifyAttribute(instance.callback) as Function;
-    if (instance.attributeQuery !== undefined) args.attributeQuery = stringifyAttribute(instance.attributeQuery) as AttributeQueryData;
-    if (instance.dataDeps !== undefined) args.dataDeps = instance.dataDeps;
     
     const data: SerializedData<CountCreateArgs> = {
       type: 'Count',
@@ -125,8 +125,8 @@ export class Count implements CountInstance {
     const args = data.public;
     
     // 反序列化函数
-    if (args.callback && typeof args.callback === 'string' && args.callback.startsWith('func::')) {
-      args.callback = new Function('return ' + args.callback.substring(6))();
+    if (args.callback && typeof args.callback === 'string' && (args.callback as any).startsWith('func::')) {
+      args.callback = new Function('return ' + (args.callback as any).substring(6))();
     }
     
     return this.create(args, data.options);

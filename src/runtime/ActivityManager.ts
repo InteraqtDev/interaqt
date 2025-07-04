@@ -1,4 +1,4 @@
-import { RecordMutationEvent, System, SystemLogger } from "./System.js";
+import { RecordMutationEvent, SystemLogger } from "./System.js";
 import {
     Activity,
     Entity,
@@ -131,6 +131,7 @@ export class ActivityManager {
         assert(!!interactionCall, `cannot find interaction for ${interactionName}`)
 
         logger.info({label: "interaction", message: interactionCall.interaction.name})
+<<<<<<< Updated upstream
         await this.controller.system.storage.beginTransaction(interactionCall.interaction.name)
         let unknownError: any
         let result: InteractionCallResponse
@@ -157,6 +158,17 @@ export class ActivityManager {
                 await this.controller.system.storage.commitTransaction(interactionCall.interaction.name)
                 await this.runRecordChangeSideEffects(result!, logger)
             }
+=======
+                    await this.controller.system.entities.beginTransaction(interactionCall.interaction.name)
+        
+        const result = await interactionCall.call(interactionEventArgs)
+        if (result.error) {
+            logger.error({label: "interaction", message: interactionCall.interaction.name})
+            await this.controller.system.entities.rollbackTransaction(interactionCall.interaction.name)
+        } else {
+            await this.controller.system.entities.commitTransaction(interactionCall.interaction.name)
+            await this.runRecordChangeSideEffects(result, logger)
+>>>>>>> Stashed changes
         }
 
         return result
@@ -170,7 +182,7 @@ export class ActivityManager {
         assert(!!activityCall, `cannot find activity for ${activityName}`)
 
         logger.info({label: "activity", message: activityCall.activity.name})
-        await this.controller.system.storage.beginTransaction(activityCall.activity.name)
+        await this.controller.system.entities.beginTransaction(activityCall.activity.name)
         
         // 获取 interaction UUID 通过名称
         const interactionCall = activityCall.interactionCallByName.get(interactionName)
@@ -179,9 +191,9 @@ export class ActivityManager {
         const result = await activityCall.callInteraction(activityId, interactionCall!.interaction.uuid, interactionEventArgs)
         if (result.error) {
             logger.error({label: "activity", message: activityCall.activity.name})
-            await this.controller.system.storage.rollbackTransaction(activityCall.activity.name)
+            await this.controller.system.entities.rollbackTransaction(activityCall.activity.name)
         } else {
-            await this.controller.system.storage.commitTransaction(activityCall.activity.name)
+            await this.controller.system.entities.commitTransaction(activityCall.activity.name)
             await this.runRecordChangeSideEffects(result, logger)
         }
 
@@ -222,7 +234,7 @@ export class ActivityManager {
         }
     }
     async createActivity(activity: any) {
-        return this.controller.system.storage.create(ACTIVITY_RECORD, {
+        return this.controller.system.entities.create(ACTIVITY_RECORD, {
             ...activity,
             state: activity.state,
             refs: activity.refs,
@@ -240,20 +252,20 @@ export class ActivityManager {
         if (activity.refs) {
             data.refs = activity.refs
         }
-        return this.controller.system.storage.update(ACTIVITY_RECORD, match, data)
+        return this.controller.system.entities.update(ACTIVITY_RECORD, match, data)
     }
     async getActivity(query?: MatchExpressionData) {
-        return (await this.controller.system.storage.find(ACTIVITY_RECORD, query, undefined, ['*'])).map(activity => ({
+        return (await this.controller.system.entities.find(ACTIVITY_RECORD, query, undefined, ['*'])).map(activity => ({
             ...activity,
             state: activity.state,
             refs: activity.refs,
         }))
     }
     async saveEvent(event: InteractionEvent, mutationEvents: RecordMutationEvent[] = []): Promise<any> {
-        return this.controller.system.storage.create(INTERACTION_RECORD, event, mutationEvents)
+        return this.controller.system.entities.create(INTERACTION_RECORD, event, mutationEvents)
     }
     async getEvent(query?: MatchExpressionData ) {
-        return (await this.controller.system.storage.find(INTERACTION_RECORD, query, undefined, ['*'])).map(event => ({
+        return (await this.controller.system.entities.find(INTERACTION_RECORD, query, undefined, ['*'])).map(event => ({
             ...event,
         })) as unknown as InteractionEvent[]
     }

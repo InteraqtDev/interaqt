@@ -59,12 +59,12 @@ export class PayloadItem implements PayloadItemInstance {
     },
     attributives: {
       type: ['Attributives', 'Attributive'] as const,
-      collection: false as const,
+      collection: false as const
     },
     base: {
       type: 'Entity' as const,
       required: false as const,
-      collection: false as const,
+      collection: false as const
     },
     isRef: {
       type: 'boolean' as const,
@@ -84,7 +84,7 @@ export class PayloadItem implements PayloadItemInstance {
     itemRef: {
       collection: false as const,
       required: false as const,
-      type: ['Attributive', 'Entity'] as const,
+      type: ['Attributive', 'Entity'] as const
     }
   };
   
@@ -102,15 +102,14 @@ export class PayloadItem implements PayloadItemInstance {
   }
   
   static stringify(instance: PayloadItemInstance): string {
-    const args: Partial<PayloadItemCreateArgs> = {
-      name: instance.name
+    const args: PayloadItemCreateArgs = {
+      name: instance.name,
+      base: instance.base,
+      isCollection: instance.isCollection,
+      required: instance.required,
+      isRef: instance.isRef,
+      attributives: instance.attributives
     };
-    if (instance.attributives !== undefined) args.attributives = stringifyAttribute(instance.attributives) as AttributiveInstance | AttributivesInstance;
-    if (instance.base !== undefined) args.base = stringifyAttribute(instance.base) as EntityInstance;
-    if (instance.isRef !== false) args.isRef = instance.isRef;
-    if (instance.required !== false) args.required = instance.required;
-    if (instance.isCollection !== false) args.isCollection = instance.isCollection;
-    if (instance.itemRef !== undefined) args.itemRef = stringifyAttribute(instance.itemRef) as AttributiveInstance | EntityInstance;
     
     const data: SerializedData<PayloadItemCreateArgs> = {
       type: 'PayloadItem',

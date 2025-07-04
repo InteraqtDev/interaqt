@@ -91,7 +91,7 @@ export function createData() {
         current: isReviewerState,
         next: notReviewerState,
         computeTarget: async function(this: RecordStateMachineHandle,eventArgs) {
-            const originRelation = await this.controller.system.storage.findOne(this.dataContext.id.name,
+            const originRelation = await this.controller.system.entities.findOne(this.dataContext.id.name,
                 MatchExp.atom({
                     key:'source.id',
                     value: ['=', eventArgs.payload.request.id]

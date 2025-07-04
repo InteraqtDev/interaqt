@@ -55,10 +55,10 @@ export class Condition implements ConditionInstance {
   }
   
   static stringify(instance: ConditionInstance): string {
-    const args: Partial<ConditionCreateArgs> = {
-      content: stringifyAttribute(instance.content) as Function
+    const args: ConditionCreateArgs = {
+      content: stringifyAttribute(instance.content) as Function,
+      name: instance.name
     };
-    if (instance.name !== undefined) args.name = instance.name;
     
     const data: SerializedData<ConditionCreateArgs> = {
       type: 'Condition',
@@ -91,8 +91,8 @@ export class Condition implements ConditionInstance {
     const args = data.public;
     
     // 反序列化函数
-    if (args.content && typeof args.content === 'string' && args.content.startsWith('func::')) {
-      args.content = new Function('return ' + args.content.substring(6))();
+    if (args.content && typeof args.content === 'string' && (args.content as any).startsWith('func::')) {
+      args.content = new Function('return ' + (args.content as any).substring(6))();
     }
     
     return this.create(args, data.options);

@@ -121,14 +121,14 @@ export class Activity implements ActivityInstance {
   }
   
   static stringify(instance: ActivityInstance): string {
-    const args: Partial<ActivityCreateArgs> = {
-      name: instance.name
+    const args: ActivityCreateArgs = {
+      name: instance.name,
+      interactions: instance.interactions.length > 0 ? instance.interactions.map(i => stringifyAttribute(i) as InteractionInstance) : undefined,
+      gateways: instance.gateways.length > 0 ? instance.gateways.map(g => stringifyAttribute(g) as GatewayInstance) : undefined,
+      transfers: instance.transfers.length > 0 ? instance.transfers.map(t => stringifyAttribute(t) as TransferInstance) : undefined,
+      groups: instance.groups.length > 0 ? instance.groups.map(g => stringifyAttribute(g) as ActivityGroupInstance) : undefined,
+      events: instance.events.length > 0 ? instance.events.map(e => stringifyAttribute(e) as EventInstance) : undefined
     };
-    if (instance.interactions && instance.interactions.length > 0) args.interactions = instance.interactions.map(i => stringifyAttribute(i) as InteractionInstance);
-    if (instance.gateways && instance.gateways.length > 0) args.gateways = instance.gateways.map(g => stringifyAttribute(g) as GatewayInstance);
-    if (instance.transfers && instance.transfers.length > 0) args.transfers = instance.transfers.map(t => stringifyAttribute(t) as TransferInstance);
-    if (instance.groups && instance.groups.length > 0) args.groups = instance.groups.map(g => stringifyAttribute(g) as ActivityGroupInstance);
-    if (instance.events && instance.events.length > 0) args.events = instance.events.map(e => stringifyAttribute(e) as EventInstance);
     
     const data: SerializedData<ActivityCreateArgs> = {
       type: 'Activity',
@@ -213,12 +213,12 @@ export class ActivityGroup implements ActivityGroupInstance {
   }
   
   static stringify(instance: ActivityGroupInstance): string {
-    const args: Partial<ActivityGroupCreateArgs> = {
-      type: instance.type
+    const args: ActivityGroupCreateArgs = {
+      type: instance.type,
+      activities: instance.activities && instance.activities.length > 0 
+        ? instance.activities.map(a => stringifyAttribute(a) as ActivityInstance)
+        : undefined
     };
-    if (instance.activities && instance.activities.length > 0) {
-      args.activities = instance.activities.map(a => stringifyAttribute(a) as ActivityInstance);
-    }
     
     const data: SerializedData<ActivityGroupCreateArgs> = {
       type: 'ActivityGroup',
@@ -247,7 +247,7 @@ export class ActivityGroup implements ActivityGroupInstance {
   }
   
   static parse(json: string): ActivityGroupInstance {
-    const data: SerializedData<ActivityCreateArgs> = JSON.parse(json);
+    const data: SerializedData<ActivityGroupCreateArgs> = JSON.parse(json);
     return this.create(data.public, data.options);
   }
 }
@@ -311,8 +311,8 @@ export class Transfer implements TransferInstance {
       uuid: instance.uuid,
       public: {
         name: instance.name,
-        source: stringifyAttribute(instance.source),
-        target: stringifyAttribute(instance.target)
+        source: stringifyAttribute(instance.source) as InteractionInstance | ActivityGroupInstance | GatewayInstance,
+        target: stringifyAttribute(instance.target) as InteractionInstance | ActivityGroupInstance | GatewayInstance
       }
     };
     return JSON.stringify(data);
@@ -335,7 +335,7 @@ export class Transfer implements TransferInstance {
   }
   
   static parse(json: string): TransferInstance {
-    const data: SerializedData<ActivityCreateArgs> = JSON.parse(json);
+    const data: SerializedData<TransferCreateArgs> = JSON.parse(json);
     return this.create(data.public, data.options);
   }
 }

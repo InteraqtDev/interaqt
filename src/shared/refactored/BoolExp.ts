@@ -59,10 +59,10 @@ export class BoolAtomData implements BoolAtomDataInstance {
   }
   
   static stringify(instance: BoolAtomDataInstance): string {
-    const args: Partial<BoolAtomDataCreateArgs> = {
+    const args: BoolAtomDataCreateArgs = {
+      type: instance.type,
       data: stringifyAttribute(instance.data) as { content?: Function; [key: string]: unknown }
     };
-    if (instance.type !== 'atom') args.type = instance.type;
     
     const data: SerializedData<BoolAtomDataCreateArgs> = {
       type: 'BoolAtomData',
@@ -174,12 +174,12 @@ export class BoolExpressionData implements BoolExpressionDataInstance {
   }
   
   static stringify(instance: BoolExpressionDataInstance): string {
-    const args: Partial<BoolExpressionDataCreateArgs> = {
-      left: stringifyAttribute(instance.left) as BoolAtomDataInstance | BoolExpressionDataInstance
+    const args: BoolExpressionDataCreateArgs = {
+      type: instance.type,
+      operator: instance.operator,
+      left: stringifyAttribute(instance.left) as BoolAtomDataInstance | BoolExpressionDataInstance,
+      right: instance.right ? stringifyAttribute(instance.right) as BoolAtomDataInstance | BoolExpressionDataInstance : undefined
     };
-    if (instance.type !== 'expression') args.type = instance.type;
-    if (instance.operator !== 'and') args.operator = instance.operator;
-    if (instance.right !== undefined) args.right = stringifyAttribute(instance.right) as BoolAtomDataInstance | BoolExpressionDataInstance;
     
     const data: SerializedData<BoolExpressionDataCreateArgs> = {
       type: 'BoolExpressionData',
@@ -210,7 +210,7 @@ export class BoolExpressionData implements BoolExpressionDataInstance {
   }
   
   static parse(json: string): BoolExpressionDataInstance {
-    const data: SerializedData<BoolAtomDataCreateArgs> = JSON.parse(json);
+    const data: SerializedData<BoolExpressionDataCreateArgs> = JSON.parse(json);
     return this.create(data.public, data.options);
   }
 } 
