@@ -49,10 +49,10 @@ export class DataAttributives implements DataAttributivesInstance {
   }
   
   static stringify(instance: DataAttributivesInstance): string {
-    const args: any = {};
-    if (instance.content !== undefined) args.content = stringifyAttribute(instance.content);
+    const args: Partial<DataAttributivesCreateArgs> = {};
+    if (instance.content !== undefined) args.content = stringifyAttribute(instance.content) as BoolAtomDataInstance | BoolExpressionDataInstance;
     
-    const data: SerializedData<any> = {
+    const data: SerializedData<DataAttributivesCreateArgs> = {
       type: 'DataAttributives',
       options: instance._options,
       uuid: instance.uuid,
@@ -77,7 +77,7 @@ export class DataAttributives implements DataAttributivesInstance {
   }
   
   static parse(json: string): DataAttributivesInstance {
-    const data: SerializedData<any> = JSON.parse(json);
+    const data: SerializedData<DataAttributivesCreateArgs> = JSON.parse(json);
     return this.create(data.public, data.options);
   }
 } 

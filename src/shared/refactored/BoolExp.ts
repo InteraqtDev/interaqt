@@ -4,12 +4,12 @@ import { stringifyAttribute } from './utils.js';
 // BoolAtomData
 export interface BoolAtomDataInstance extends IInstance {
   type: string;
-  data: any; // Should be an object with content function
+  data: { content?: Function; [key: string]: unknown };
 }
 
 export interface BoolAtomDataCreateArgs {
   type?: string;
-  data: any;
+  data: { content?: Function; [key: string]: unknown };
 }
 
 export class BoolAtomData implements BoolAtomDataInstance {
@@ -17,7 +17,7 @@ export class BoolAtomData implements BoolAtomDataInstance {
   public _type = 'BoolAtomData';
   public _options?: { uuid?: string };
   public type: string;
-  public data: any;
+  public data: { content?: Function; [key: string]: unknown };
   
   constructor(args: BoolAtomDataCreateArgs, options?: { uuid?: string }) {
     this._options = options;
@@ -39,7 +39,7 @@ export class BoolAtomData implements BoolAtomDataInstance {
       defaultValue: () => 'atom'
     },
     data: {
-      instanceType: {} as unknown as any,
+      instanceType: {} as unknown as { content?: Function; [key: string]: unknown },
       required: true as const,
       collection: false as const,
     }
@@ -60,11 +60,11 @@ export class BoolAtomData implements BoolAtomDataInstance {
   
   static stringify(instance: BoolAtomDataInstance): string {
     const args: Partial<BoolAtomDataCreateArgs> = {
-      data: stringifyAttribute(instance.data)
+      data: stringifyAttribute(instance.data) as { content?: Function; [key: string]: unknown }
     };
     if (instance.type !== 'atom') args.type = instance.type;
     
-    const data: SerializedData<any> = {
+    const data: SerializedData<BoolAtomDataCreateArgs> = {
       type: 'BoolAtomData',
       options: instance._options,
       uuid: instance.uuid,
@@ -82,8 +82,8 @@ export class BoolAtomData implements BoolAtomDataInstance {
     return this.create(args);
   }
   
-  static is(obj: any): obj is BoolAtomDataInstance {
-    return obj && obj._type === 'BoolAtomData';
+  static is(obj: unknown): obj is BoolAtomDataInstance {
+    return obj !== null && typeof obj === 'object' && '_type' in obj && (obj as IInstance)._type === 'BoolAtomData';
   }
   
     static check(data: unknown): boolean {
@@ -91,7 +91,7 @@ export class BoolAtomData implements BoolAtomDataInstance {
   }
   
   static parse(json: string): BoolAtomDataInstance {
-    const data: SerializedData<any> = JSON.parse(json);
+    const data: SerializedData<BoolAtomDataCreateArgs> = JSON.parse(json);
     return this.create(data.public, data.options);
   }
 }
@@ -149,12 +149,12 @@ export class BoolExpressionData implements BoolExpressionDataInstance {
       defaultValue: () => 'and'
     },
     left: {
-      instanceType: {} as unknown as any,
+      instanceType: {} as unknown as { content?: Function; [key: string]: unknown },
       required: true as const,
       collection: false as const,
     },
     right: {
-      instanceType: {} as unknown as any,
+      instanceType: {} as unknown as { content?: Function; [key: string]: unknown },
       required: false as const,
       collection: false as const,
     }
@@ -181,7 +181,7 @@ export class BoolExpressionData implements BoolExpressionDataInstance {
     if (instance.operator !== 'and') args.operator = instance.operator;
     if (instance.right !== undefined) args.right = stringifyAttribute(instance.right) as BoolAtomDataInstance | BoolExpressionDataInstance;
     
-    const data: SerializedData<any> = {
+    const data: SerializedData<BoolExpressionDataCreateArgs> = {
       type: 'BoolExpressionData',
       options: instance._options,
       uuid: instance.uuid,
@@ -201,8 +201,8 @@ export class BoolExpressionData implements BoolExpressionDataInstance {
     return this.create(args);
   }
   
-  static is(obj: any): obj is BoolExpressionDataInstance {
-    return obj && obj._type === 'BoolExpressionData';
+  static is(obj: unknown): obj is BoolExpressionDataInstance {
+    return obj !== null && typeof obj === 'object' && '_type' in obj && (obj as IInstance)._type === 'BoolExpressionData';
   }
   
     static check(data: unknown): boolean {
@@ -210,7 +210,7 @@ export class BoolExpressionData implements BoolExpressionDataInstance {
   }
   
   static parse(json: string): BoolExpressionDataInstance {
-    const data: SerializedData<any> = JSON.parse(json);
+    const data: SerializedData<BoolAtomDataCreateArgs> = JSON.parse(json);
     return this.create(data.public, data.options);
   }
 } 

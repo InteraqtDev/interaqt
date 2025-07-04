@@ -1,6 +1,7 @@
 import { IInstance, SerializedData, generateUUID } from './interfaces.js';
 import { PropertyTypes } from './RealDictionary.js';
 import { stringifyAttribute } from './utils.js';
+import type { ComputationInstance } from './types.js';
 
 const validNameFormatExp = /^[a-zA-Z0-9_]+$/;
 
@@ -10,7 +11,7 @@ export interface PropertyInstance extends IInstance {
   collection?: boolean;
   defaultValue?: Function;
   computed?: Function;
-  computation?: any;
+  computation?: ComputationInstance;
 }
 
 export interface PropertyCreateArgs {
@@ -19,7 +20,7 @@ export interface PropertyCreateArgs {
   collection?: boolean;
   defaultValue?: Function;
   computed?: Function;
-  computation?: any;
+  computation?: ComputationInstance;
 }
 
 export class Property implements PropertyInstance {
@@ -31,7 +32,7 @@ export class Property implements PropertyInstance {
   public collection?: boolean;
   public defaultValue?: Function;
   public computed?: Function;
-  public computation?: any;
+  public computation?: ComputationInstance;
   
   constructor(args: PropertyCreateArgs, options?: { uuid?: string }) {
     this._options = options;
@@ -107,9 +108,9 @@ export class Property implements PropertyInstance {
     if (instance.collection !== undefined) args.collection = instance.collection;
     if (instance.defaultValue !== undefined) args.defaultValue = stringifyAttribute(instance.defaultValue) as Function;
     if (instance.computed !== undefined) args.computed = stringifyAttribute(instance.computed) as Function;
-    if (instance.computation !== undefined) args.computation = stringifyAttribute(instance.computation);
+    if (instance.computation !== undefined) args.computation = stringifyAttribute(instance.computation) as ComputationInstance;
     
-    const data: SerializedData<any> = {
+    const data: SerializedData<PropertyCreateArgs> = {
       type: 'Property',
       options: instance._options,
       uuid: instance.uuid,
@@ -140,7 +141,7 @@ export class Property implements PropertyInstance {
   }
   
   static parse(json: string): PropertyInstance {
-    const data: SerializedData<any> = JSON.parse(json);
+    const data: SerializedData<PropertyCreateArgs> = JSON.parse(json);
     const args = data.public;
     
     // 反序列化函数

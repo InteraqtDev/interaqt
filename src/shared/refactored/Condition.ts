@@ -60,7 +60,7 @@ export class Condition implements ConditionInstance {
     };
     if (instance.name !== undefined) args.name = instance.name;
     
-    const data: SerializedData<any> = {
+    const data: SerializedData<ConditionCreateArgs> = {
       type: 'Condition',
       options: instance._options,
       uuid: instance.uuid,
@@ -87,7 +87,7 @@ export class Condition implements ConditionInstance {
   }
   
   static parse(json: string): ConditionInstance {
-    const data: SerializedData<any> = JSON.parse(json);
+    const data: SerializedData<ConditionCreateArgs> = JSON.parse(json);
     const args = data.public;
     
     // 反序列化函数

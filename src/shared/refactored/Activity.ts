@@ -130,7 +130,7 @@ export class Activity implements ActivityInstance {
     if (instance.groups && instance.groups.length > 0) args.groups = instance.groups.map(g => stringifyAttribute(g) as ActivityGroupInstance);
     if (instance.events && instance.events.length > 0) args.events = instance.events.map(e => stringifyAttribute(e) as EventInstance);
     
-    const data: SerializedData<any> = {
+    const data: SerializedData<ActivityCreateArgs> = {
       type: 'Activity',
       options: instance._options,
       uuid: instance.uuid,
@@ -161,7 +161,7 @@ export class Activity implements ActivityInstance {
   }
   
   static parse(json: string): ActivityInstance {
-    const data: SerializedData<any> = JSON.parse(json);
+    const data: SerializedData<ActivityCreateArgs> = JSON.parse(json);
     return this.create(data.public, data.options);
   }
 }
@@ -220,7 +220,7 @@ export class ActivityGroup implements ActivityGroupInstance {
       args.activities = instance.activities.map(a => stringifyAttribute(a) as ActivityInstance);
     }
     
-    const data: SerializedData<any> = {
+    const data: SerializedData<ActivityGroupCreateArgs> = {
       type: 'ActivityGroup',
       options: instance._options,
       uuid: instance.uuid,
@@ -238,8 +238,8 @@ export class ActivityGroup implements ActivityGroupInstance {
     return this.create(args);
   }
   
-  static is(obj: any): obj is ActivityGroupInstance {
-    return obj && obj._type === 'ActivityGroup';
+  static is(obj: unknown): obj is ActivityGroupInstance {
+    return obj !== null && typeof obj === 'object' && '_type' in obj && (obj as IInstance)._type === 'ActivityGroup';
   }
   
     static check(data: unknown): boolean {
@@ -247,7 +247,7 @@ export class ActivityGroup implements ActivityGroupInstance {
   }
   
   static parse(json: string): ActivityGroupInstance {
-    const data: SerializedData<any> = JSON.parse(json);
+    const data: SerializedData<ActivityCreateArgs> = JSON.parse(json);
     return this.create(data.public, data.options);
   }
 }
@@ -305,7 +305,7 @@ export class Transfer implements TransferInstance {
   }
   
   static stringify(instance: TransferInstance): string {
-    const data: SerializedData<any> = {
+    const data: SerializedData<TransferCreateArgs> = {
       type: 'Transfer',
       options: instance._options,
       uuid: instance.uuid,
@@ -326,8 +326,8 @@ export class Transfer implements TransferInstance {
     });
   }
   
-  static is(obj: any): obj is TransferInstance {
-    return obj && obj._type === 'Transfer';
+  static is(obj: unknown): obj is TransferInstance {
+    return obj !== null && typeof obj === 'object' && '_type' in obj && (obj as IInstance)._type === 'Transfer';
   }
   
     static check(data: unknown): boolean {
@@ -335,7 +335,7 @@ export class Transfer implements TransferInstance {
   }
   
   static parse(json: string): TransferInstance {
-    const data: SerializedData<any> = JSON.parse(json);
+    const data: SerializedData<ActivityCreateArgs> = JSON.parse(json);
     return this.create(data.public, data.options);
   }
 }
@@ -343,7 +343,7 @@ export class Transfer implements TransferInstance {
 // Helper functions
 export function forEachInteraction(
   activity: ActivityInstance, 
-  handle: (i: InteractionInstance, g?: ActivityGroupInstance) => any, 
+  handle: (i: InteractionInstance, g?: ActivityGroupInstance) => void, 
   parentGroup?: ActivityGroupInstance
 ) {
   activity.interactions.forEach(i => handle(i, parentGroup));

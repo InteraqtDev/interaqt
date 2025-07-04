@@ -52,7 +52,7 @@ export class Conditions implements ConditionsInstance {
     const args: Partial<ConditionsCreateArgs> = {};
     if (instance.content !== undefined) args.content = stringifyAttribute(instance.content) as BoolAtomDataInstance | BoolExpressionDataInstance;
     
-    const data: SerializedData<any> = {
+    const data: SerializedData<ConditionsCreateArgs> = {
       type: 'Conditions',
       options: instance._options,
       uuid: instance.uuid,
@@ -77,7 +77,7 @@ export class Conditions implements ConditionsInstance {
   }
   
   static parse(json: string): ConditionsInstance {
-    const data: SerializedData<any> = JSON.parse(json);
+    const data: SerializedData<ConditionsCreateArgs> = JSON.parse(json);
     return this.create(data.public, data.options);
   }
 } 

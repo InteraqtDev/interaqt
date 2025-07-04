@@ -2,14 +2,14 @@ import { IInstance, SerializedData, generateUUID } from './interfaces.js';
 import { StateNodeInstance } from './StateNode.js';
 
 export interface StateTransferInstance extends IInstance {
-  trigger: {[key:string]:any};
+  trigger: {[key:string]: unknown};
   current: StateNodeInstance;
   next: StateNodeInstance;
   computeTarget?: Function;
 }
 
 export interface StateTransferCreateArgs {
-  trigger: {[key:string]:any};
+  trigger: {[key:string]: unknown};
   current: StateNodeInstance;
   next: StateNodeInstance;
   computeTarget?: Function;
@@ -19,7 +19,7 @@ export class StateTransfer implements StateTransferInstance {
   public uuid: string;
   public _type = 'StateTransfer';
   public _options?: { uuid?: string };
-  public trigger: {[key:string]:any};
+  public trigger: {[key:string]: unknown};
   public current: StateNodeInstance;
   public next: StateNodeInstance;
   public computeTarget?: Function;
@@ -40,7 +40,7 @@ export class StateTransfer implements StateTransferInstance {
   
   static public = {
     trigger: {
-      instanceType: {} as unknown as {[key:string]:any},
+      instanceType: {} as unknown as {[key:string]: unknown},
       collection: false as const,
       required: true as const
     },

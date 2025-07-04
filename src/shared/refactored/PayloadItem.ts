@@ -112,7 +112,7 @@ export class PayloadItem implements PayloadItemInstance {
     if (instance.isCollection !== false) args.isCollection = instance.isCollection;
     if (instance.itemRef !== undefined) args.itemRef = stringifyAttribute(instance.itemRef) as AttributiveInstance | EntityInstance;
     
-    const data: SerializedData<any> = {
+    const data: SerializedData<PayloadItemCreateArgs> = {
       type: 'PayloadItem',
       options: instance._options,
       uuid: instance.uuid,
@@ -144,7 +144,7 @@ export class PayloadItem implements PayloadItemInstance {
   }
   
   static parse(json: string): PayloadItemInstance {
-    const data: SerializedData<any> = JSON.parse(json);
+    const data: SerializedData<PayloadItemCreateArgs> = JSON.parse(json);
     return this.create(data.public, data.options);
   }
 } 

@@ -57,7 +57,7 @@ export class SideEffect implements SideEffectInstance {
   }
   
   static stringify(instance: SideEffectInstance): string {
-    const data: SerializedData<any> = {
+    const data: SerializedData<SideEffectCreateArgs> = {
       type: 'SideEffect',
       options: instance._options,
       uuid: instance.uuid,
@@ -85,7 +85,7 @@ export class SideEffect implements SideEffectInstance {
   }
   
   static parse(json: string): SideEffectInstance {
-    const data: SerializedData<any> = JSON.parse(json);
+    const data: SerializedData<SideEffectCreateArgs> = JSON.parse(json);
     const args = data.public;
     
     // 反序列化函数

@@ -4,14 +4,14 @@ import { stringifyAttribute } from './utils.js';
 
 export interface RealTimeInstance extends IInstance {
   attributeQuery?: AttributeQueryData; // AttributeQueryData
-  dataDeps?: {[key: string]: any};
+  dataDeps?: DataDependencies;
   nextRecomputeTime?: Function;
   callback: Function;
 }
 
 export interface RealTimeCreateArgs {
   attributeQuery?: AttributeQueryData; // AttributeQueryData
-  dataDeps?: {[key: string]: any};
+  dataDeps?: DataDependencies;
   nextRecomputeTime?: Function;
   callback: Function;
 }
@@ -21,7 +21,7 @@ export class RealTime implements RealTimeInstance {
   public _type = 'RealTimeValue';
   public _options?: { uuid?: string };
   public attributeQuery?: AttributeQueryData;
-  public dataDeps?: {[key: string]: any};
+  public dataDeps?: DataDependencies;
   public nextRecomputeTime?: Function;
   public callback: Function;
   
@@ -41,12 +41,12 @@ export class RealTime implements RealTimeInstance {
   
   static public = {
     attributeQuery: {
-      instanceType: {} as unknown as any,
+      instanceType: {} as unknown as {[key: string]: unknown},
       collection: false as const,
       required: false as const
     },
     dataDeps: {
-      instanceType: {} as unknown as {[key: string]: any},
+      instanceType: {} as unknown as {[key: string]: unknown},
       collection: false as const,
       required: false as const
     },
@@ -76,14 +76,14 @@ export class RealTime implements RealTimeInstance {
   }
   
   static stringify(instance: RealTimeInstance): string {
-    const args: any = {
-      callback: stringifyAttribute(instance.callback)
+    const args: Partial<RealTimeCreateArgs> = {
+      callback: stringifyAttribute(instance.callback) as Function
     };
-    if (instance.attributeQuery !== undefined) args.attributeQuery = stringifyAttribute(instance.attributeQuery);
+    if (instance.attributeQuery !== undefined) args.attributeQuery = stringifyAttribute(instance.attributeQuery) as AttributeQueryData;
     if (instance.dataDeps !== undefined) args.dataDeps = instance.dataDeps;
-    if (instance.nextRecomputeTime !== undefined) args.nextRecomputeTime = stringifyAttribute(instance.nextRecomputeTime);
+    if (instance.nextRecomputeTime !== undefined) args.nextRecomputeTime = stringifyAttribute(instance.nextRecomputeTime) as Function;
     
-    const data: SerializedData<any> = {
+    const data: SerializedData<Partial<RealTimeCreateArgs>> = {
       type: 'RealTimeValue',
       options: instance._options,
       uuid: instance.uuid,
@@ -112,17 +112,22 @@ export class RealTime implements RealTimeInstance {
   }
   
   static parse(json: string): RealTimeInstance {
-    const data: SerializedData<any> = JSON.parse(json);
-    const args = data.public;
+    const data = JSON.parse(json) as SerializedData<{
+      attributeQuery?: AttributeQueryData;
+      dataDeps?: DataDependencies;
+      nextRecomputeTime?: Function | string;
+      callback: Function | string;
+    }>;
+    const args = { ...data.public };
     
     // 反序列化函数
-    if (args.callback && typeof args.callback === 'string' && args.callback.startsWith('func::')) {
+    if (typeof args.callback === 'string' && args.callback.startsWith('func::')) {
       args.callback = new Function('return ' + args.callback.substring(6))();
     }
-    if (args.nextRecomputeTime && typeof args.nextRecomputeTime === 'string' && args.nextRecomputeTime.startsWith('func::')) {
+    if (typeof args.nextRecomputeTime === 'string' && args.nextRecomputeTime.startsWith('func::')) {
       args.nextRecomputeTime = new Function('return ' + args.nextRecomputeTime.substring(6))();
     }
     
-    return this.create(args, data.options);
+    return this.create(args as RealTimeCreateArgs, data.options);
   }
 } 

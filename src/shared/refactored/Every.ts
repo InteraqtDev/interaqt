@@ -1,21 +1,22 @@
 import { IInstance, SerializedData, generateUUID } from './interfaces.js';
 import { stringifyAttribute } from './utils.js';
+import type { EntityInstance, RelationInstance, AttributeQueryData, DataDependencies } from './types.js';
 
 export interface EveryInstance extends IInstance {
-  record: any; // Entity or Relation
+  record: EntityInstance | RelationInstance;
   direction?: string;
   callback: Function;
-  attributeQuery?: any; // AttributeQueryData
-  dataDeps?: {[key: string]: any};
+  attributeQuery?: AttributeQueryData;
+  dataDeps?: DataDependencies;
   notEmpty?: boolean;
 }
 
 export interface EveryCreateArgs {
-  record: any; // Entity or Relation
+  record: EntityInstance | RelationInstance;
   direction?: string;
   callback: Function;
-  attributeQuery?: any; // AttributeQueryData
-  dataDeps?: {[key: string]: any};
+  attributeQuery?: AttributeQueryData;
+  dataDeps?: DataDependencies;
   notEmpty?: boolean;
 }
 
@@ -23,11 +24,11 @@ export class Every implements EveryInstance {
   public uuid: string;
   public _type = 'Every';
   public _options?: { uuid?: string };
-  public record: any;
+  public record: EntityInstance | RelationInstance;
   public direction?: string;
   public callback: Function;
-  public attributeQuery?: any;
-  public dataDeps?: {[key: string]: any};
+  public attributeQuery?: AttributeQueryData;
+  public dataDeps?: DataDependencies;
   public notEmpty?: boolean;
   
   constructor(args: EveryCreateArgs, options?: { uuid?: string }) {
@@ -63,12 +64,12 @@ export class Every implements EveryInstance {
       required: true as const
     },
     attributeQuery: {
-      instanceType: {} as unknown as any,
+      instanceType: {} as unknown as {[key: string]: unknown},
       collection: false as const,
       required: false as const
     },
     dataDeps: {
-      instanceType: {} as unknown as {[key: string]: any},
+      instanceType: {} as unknown as {[key: string]: unknown},
       collection: false as const,
       required: false as const
     },
@@ -94,15 +95,15 @@ export class Every implements EveryInstance {
   
   static stringify(instance: EveryInstance): string {
     const args: Partial<EveryCreateArgs> = {
-      record: stringifyAttribute(instance.record),
+      record: stringifyAttribute(instance.record) as EntityInstance | RelationInstance,
       callback: stringifyAttribute(instance.callback) as Function
     };
     if (instance.direction !== undefined) args.direction = instance.direction;
-    if (instance.attributeQuery !== undefined) args.attributeQuery = stringifyAttribute(instance.attributeQuery);
+    if (instance.attributeQuery !== undefined) args.attributeQuery = stringifyAttribute(instance.attributeQuery) as AttributeQueryData;
     if (instance.dataDeps !== undefined) args.dataDeps = instance.dataDeps;
     if (instance.notEmpty !== undefined) args.notEmpty = instance.notEmpty;
     
-    const data: SerializedData<any> = {
+    const data: SerializedData<EveryCreateArgs> = {
       type: 'Every',
       options: instance._options,
       uuid: instance.uuid,
@@ -133,7 +134,7 @@ export class Every implements EveryInstance {
   }
   
   static parse(json: string): EveryInstance {
-    const data: SerializedData<any> = JSON.parse(json);
+    const data: SerializedData<EveryCreateArgs> = JSON.parse(json);
     const args = data.public;
     
     // 反序列化函数

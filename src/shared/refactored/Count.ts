@@ -1,31 +1,32 @@
 import { IInstance, SerializedData, generateUUID } from './interfaces.js';
 import { stringifyAttribute } from './utils.js';
+import type { EntityInstance, RelationInstance, AttributeQueryData, DataDependencies } from './types.js';
 
 export interface CountInstance extends IInstance {
-  record: any; // Entity or Relation
+  record: EntityInstance | RelationInstance;
   direction?: string;
   callback?: Function;
-  attributeQuery?: any; // AttributeQueryData
-  dataDeps?: {[key: string]: any};
+  attributeQuery?: AttributeQueryData;
+  dataDeps?: DataDependencies;
 }
 
 export interface CountCreateArgs {
-  record: any; // Entity or Relation
+  record: EntityInstance | RelationInstance;
   direction?: string;
   callback?: Function;
-  attributeQuery?: any; // AttributeQueryData
-  dataDeps?: {[key: string]: any};
+  attributeQuery?: AttributeQueryData;
+  dataDeps?: DataDependencies;
 }
 
 export class Count implements CountInstance {
   public uuid: string;
   public _type = 'Count';
   public _options?: { uuid?: string };
-  public record: any;
+  public record: EntityInstance | RelationInstance;
   public direction?: string;
   public callback?: Function;
-  public attributeQuery?: any;
-  public dataDeps?: {[key: string]: any};
+  public attributeQuery?: AttributeQueryData;
+  public dataDeps?: DataDependencies;
   
   constructor(args: CountCreateArgs, options?: { uuid?: string }) {
     this._options = options;
@@ -59,12 +60,12 @@ export class Count implements CountInstance {
       required: false as const
     },
     attributeQuery: {
-      instanceType: {} as unknown as any,
+      instanceType: {} as unknown as {[key: string]: unknown},
       collection: false as const,
       required: false as const
     },
     dataDeps: {
-      instanceType: {} as unknown as {[key: string]: any},
+      instanceType: {} as unknown as {[key: string]: unknown},
       collection: false as const,
       required: false as const
     }
@@ -85,14 +86,14 @@ export class Count implements CountInstance {
   
   static stringify(instance: CountInstance): string {
     const args: Partial<CountCreateArgs> = {
-      record: stringifyAttribute(instance.record)
+      record: stringifyAttribute(instance.record) as EntityInstance | RelationInstance
     };
     if (instance.direction !== undefined) args.direction = instance.direction;
     if (instance.callback !== undefined) args.callback = stringifyAttribute(instance.callback) as Function;
-    if (instance.attributeQuery !== undefined) args.attributeQuery = stringifyAttribute(instance.attributeQuery);
+    if (instance.attributeQuery !== undefined) args.attributeQuery = stringifyAttribute(instance.attributeQuery) as AttributeQueryData;
     if (instance.dataDeps !== undefined) args.dataDeps = instance.dataDeps;
     
-    const data: SerializedData<any> = {
+    const data: SerializedData<CountCreateArgs> = {
       type: 'Count',
       options: instance._options,
       uuid: instance.uuid,
@@ -120,7 +121,7 @@ export class Count implements CountInstance {
   }
   
   static parse(json: string): CountInstance {
-    const data: SerializedData<any> = JSON.parse(json);
+    const data: SerializedData<CountCreateArgs> = JSON.parse(json);
     const args = data.public;
     
     // 反序列化函数

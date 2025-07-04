@@ -1,25 +1,26 @@
 import { IInstance, SerializedData, generateUUID } from './interfaces.js';
 import { stringifyAttribute } from './utils.js';
+import type { EntityInstance, RelationInstance, AttributeQueryData } from './types.js';
 
 export interface SummationInstance extends IInstance {
-  record: any; // Entity or Relation
+  record: EntityInstance | RelationInstance;
   direction?: string;
-  attributeQuery: any; // AttributeQueryData
+  attributeQuery: AttributeQueryData;
 }
 
 export interface SummationCreateArgs {
-  record: any; // Entity or Relation
+  record: EntityInstance | RelationInstance;
   direction?: string;
-  attributeQuery: any; // AttributeQueryData
+  attributeQuery: AttributeQueryData;
 }
 
 export class Summation implements SummationInstance {
   public uuid: string;
   public _type = 'Summation';
   public _options?: { uuid?: string };
-  public record: any;
+  public record: EntityInstance | RelationInstance;
   public direction?: string;
-  public attributeQuery: any;
+  public attributeQuery: AttributeQueryData;
   
   constructor(args: SummationCreateArgs, options?: { uuid?: string }) {
     this._options = options;
@@ -46,7 +47,7 @@ export class Summation implements SummationInstance {
       required: false as const
     },
     attributeQuery: {
-      instanceType: {} as unknown as any,
+      instanceType: {} as unknown as {[key: string]: unknown},
       collection: false as const,
       required: true as const
     }
@@ -67,12 +68,12 @@ export class Summation implements SummationInstance {
   
   static stringify(instance: SummationInstance): string {
     const args: Partial<SummationCreateArgs> = {
-      record: stringifyAttribute(instance.record),
-      attributeQuery: stringifyAttribute(instance.attributeQuery)
+      record: stringifyAttribute(instance.record) as EntityInstance | RelationInstance,
+      attributeQuery: stringifyAttribute(instance.attributeQuery) as AttributeQueryData
     };
     if (instance.direction !== undefined) args.direction = instance.direction;
     
-    const data: SerializedData<any> = {
+    const data: SerializedData<SummationCreateArgs> = {
       type: 'Summation',
       options: instance._options,
       uuid: instance.uuid,
@@ -98,7 +99,7 @@ export class Summation implements SummationInstance {
   }
   
   static parse(json: string): SummationInstance {
-    const data: SerializedData<any> = JSON.parse(json);
+    const data: SerializedData<SummationCreateArgs> = JSON.parse(json);
     return this.create(data.public, data.options);
   }
 } 

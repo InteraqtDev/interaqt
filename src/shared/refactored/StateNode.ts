@@ -3,13 +3,13 @@ import { IInstance, SerializedData, generateUUID } from './interfaces.js';
 // StateNode 实例接口
 export interface StateNodeInstance extends IInstance {
   name: string;
-  computeValue?: () => any;
+  computeValue?: () => unknown;
 }
 
 // StateNode 创建参数
 export interface StateNodeCreateArgs {
   name: string;
-  computeValue?: () => any;
+  computeValue?: () => unknown;
 }
 
 // StateNode 类定义
@@ -18,7 +18,7 @@ export class StateNode implements StateNodeInstance {
   public _type = 'StateNode';
   public _options?: { uuid?: string };
   public name: string;
-  public computeValue?: () => any;
+  public computeValue?: () => unknown;
 
   constructor(args: StateNodeCreateArgs, options?: { uuid?: string }) {
     this._options = options;

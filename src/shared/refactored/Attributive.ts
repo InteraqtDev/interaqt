@@ -78,7 +78,7 @@ export class Attributive implements AttributiveInstance {
     if (instance.name !== undefined) args.name = instance.name;
     if (instance.isRef !== undefined) args.isRef = instance.isRef;
     
-    const data: SerializedData<any> = {
+    const data: SerializedData<AttributiveCreateArgs> = {
       type: 'Attributive',
       options: instance._options,
       uuid: instance.uuid,
@@ -107,7 +107,7 @@ export class Attributive implements AttributiveInstance {
   }
   
   static parse(json: string): AttributiveInstance {
-    const data: SerializedData<any> = JSON.parse(json);
+    const data: SerializedData<AttributiveCreateArgs> = JSON.parse(json);
     const args = data.public;
     
     // 反序列化函数
@@ -170,7 +170,7 @@ export class Attributives implements AttributivesInstance {
     const args: Partial<AttributivesCreateArgs> = {};
     if (instance.content !== undefined) args.content = stringifyAttribute(instance.content) as BoolExpressionDataInstance | BoolAtomDataInstance;
     
-    const data: SerializedData<any> = {
+    const data: SerializedData<AttributivesCreateArgs> = {
       type: 'Attributives',
       options: instance._options,
       uuid: instance.uuid,
@@ -186,8 +186,8 @@ export class Attributives implements AttributivesInstance {
     return this.create(args);
   }
   
-  static is(obj: any): obj is AttributivesInstance {
-    return obj && obj._type === 'Attributives';
+  static is(obj: unknown): obj is AttributivesInstance {
+    return obj !== null && typeof obj === 'object' && '_type' in obj && (obj as IInstance)._type === 'Attributives';
   }
   
     static check(data: unknown): boolean {
@@ -195,7 +195,7 @@ export class Attributives implements AttributivesInstance {
   }
   
   static parse(json: string): AttributivesInstance {
-    const data: SerializedData<any> = JSON.parse(json);
+    const data: SerializedData<AttributiveCreateArgs> = JSON.parse(json);
     return this.create(data.public, data.options);
   }
 } 

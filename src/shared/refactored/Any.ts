@@ -3,30 +3,30 @@ import type { AttributeQueryData, DataDependencies, EntityInstance, RelationInst
 import { stringifyAttribute } from './utils.js';
 
 export interface AnyInstance extends IInstance {
-  record: any; // Entity or Relation
+  record: EntityInstance | RelationInstance;
   direction?: string;
   callback: Function;
   attributeQuery?: AttributeQueryData; // AttributeQueryData
-  dataDeps?: {[key: string]: any};
+  dataDeps?: DataDependencies;
 }
 
 export interface AnyCreateArgs {
-  record: any; // Entity or Relation
+  record: EntityInstance | RelationInstance;
   direction?: string;
   callback: Function;
   attributeQuery?: AttributeQueryData; // AttributeQueryData
-  dataDeps?: {[key: string]: any};
+  dataDeps?: DataDependencies;
 }
 
 export class Any implements AnyInstance {
   public uuid: string;
   public _type = 'Any';
   public _options?: { uuid?: string };
-  public record: any;
+  public record: EntityInstance | RelationInstance;
   public direction?: string;
   public callback: Function;
   public attributeQuery?: AttributeQueryData;
-  public dataDeps?: {[key: string]: any};
+  public dataDeps?: DataDependencies;
   
   constructor(args: AnyCreateArgs, options?: { uuid?: string }) {
     this._options = options;
@@ -60,12 +60,12 @@ export class Any implements AnyInstance {
       required: true as const
     },
     attributeQuery: {
-      instanceType: {} as unknown as any,
+      instanceType: {} as unknown as {[key: string]: unknown},
       collection: false as const,
       required: false as const
     },
     dataDeps: {
-      instanceType: {} as unknown as {[key: string]: any},
+      instanceType: {} as unknown as {[key: string]: unknown},
       collection: false as const,
       required: false as const
     }
@@ -85,15 +85,15 @@ export class Any implements AnyInstance {
   }
   
   static stringify(instance: AnyInstance): string {
-    const args: any = {
-      record: stringifyAttribute(instance.record),
-      callback: stringifyAttribute(instance.callback)
+    const args: Partial<AnyCreateArgs> = {
+      record: stringifyAttribute(instance.record) as EntityInstance | RelationInstance,
+      callback: stringifyAttribute(instance.callback) as Function
     };
     if (instance.direction !== undefined) args.direction = instance.direction;
-    if (instance.attributeQuery !== undefined) args.attributeQuery = stringifyAttribute(instance.attributeQuery);
+    if (instance.attributeQuery !== undefined) args.attributeQuery = stringifyAttribute(instance.attributeQuery) as AttributeQueryData;
     if (instance.dataDeps !== undefined) args.dataDeps = instance.dataDeps;
     
-    const data: SerializedData<any> = {
+    const data: SerializedData<AnyCreateArgs> = {
       type: 'Any',
       options: instance._options,
       uuid: instance.uuid,
@@ -121,7 +121,7 @@ export class Any implements AnyInstance {
   }
   
   static parse(json: string): AnyInstance {
-    const data: SerializedData<any> = JSON.parse(json);
+    const data: SerializedData<AnyCreateArgs> = JSON.parse(json);
     const args = data.public;
     
     // 反序列化函数

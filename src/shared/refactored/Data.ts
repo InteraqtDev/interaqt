@@ -61,7 +61,7 @@ export class DataAttributive implements DataAttributiveInstance {
     };
     if (instance.name !== undefined) args.name = instance.name;
     
-    const data: SerializedData<any> = {
+    const data: SerializedData<DataAttributiveCreateArgs> = {
       type: 'DataAttributive',
       options: instance._options,
       uuid: instance.uuid,
@@ -79,8 +79,8 @@ export class DataAttributive implements DataAttributiveInstance {
     return this.create(args);
   }
   
-  static is(obj: any): obj is DataAttributiveInstance {
-    return obj && obj._type === 'DataAttributive';
+  static is(obj: unknown): obj is DataAttributiveInstance {
+    return obj !== null && typeof obj === 'object' && '_type' in obj && (obj as IInstance)._type === 'DataAttributive';
   }
   
     static check(data: unknown): boolean {
@@ -88,7 +88,7 @@ export class DataAttributive implements DataAttributiveInstance {
   }
   
   static parse(json: string): DataAttributiveInstance {
-    const data: SerializedData<any> = JSON.parse(json);
+    const data: SerializedData<DataAttributiveCreateArgs> = JSON.parse(json);
     const args = data.public;
     
     // 反序列化函数
@@ -176,8 +176,8 @@ export class QueryItem implements QueryItemInstance {
     });
   }
   
-  static is(obj: any): obj is QueryItemInstance {
-    return obj && obj._type === 'QueryItem';
+  static is(obj: unknown): obj is QueryItemInstance {
+    return obj !== null && typeof obj === 'object' && '_type' in obj && (obj as IInstance)._type === 'QueryItem';
   }
   
     static check(data: unknown): boolean {
@@ -255,8 +255,8 @@ export class Query implements QueryInstance {
     });
   }
   
-  static is(obj: any): obj is QueryInstance {
-    return obj && obj._type === 'Query';
+  static is(obj: unknown): obj is QueryInstance {
+    return obj !== null && typeof obj === 'object' && '_type' in obj && (obj as IInstance)._type === 'Query';
   }
   
     static check(data: unknown): boolean {
