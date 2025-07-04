@@ -1,8 +1,8 @@
-import { Entity, KlassInstance, Property, Relation } from '@shared';
 import { LinkMapItem, MapData, RecordAttribute, RecordMapItem, ValueAttribute } from "./EntityToTableMap.js";
 import { assert } from "../utils.js";
+import { EntityInstance, RelationInstance, PropertyInstance } from "@shared";
 import { isRelation } from "./util.js";
-import { ID_ATTR, ROW_ID_ATTR,Database } from "@runtime";
+import { ID_ATTR, ROW_ID_ATTR, Database } from "@runtime";
 
 // Define the types we need
 
@@ -33,8 +33,8 @@ export class DBSetup {
     public tables:TableData = {}
     public map: MapData = { links: {}, records: {}}
     constructor(
-        public entities: KlassInstance<typeof Entity>[],
-        public relations: KlassInstance<typeof Relation>[],
+        public entities: EntityInstance[],
+        public relations: RelationInstance[],
         public database?: Database,
         public mergeLinks: MergeLinks = []
     ) {
@@ -110,7 +110,7 @@ export class DBSetup {
     }
 
 
-    resolveBaseSourceEntityAndFilter(entity: KlassInstance<typeof Entity>) {
+    resolveBaseSourceEntityAndFilter(entity: EntityInstance) {
         const entityWithProps = entity
         let sourceEntity = (entityWithProps as any).sourceEntity
         let filterCondition = (entityWithProps as any).filterCondition
@@ -125,10 +125,10 @@ export class DBSetup {
         return { sourceEntity, filterCondition }
     }
 
-    createRecord(entity: KlassInstance<typeof Entity> | KlassInstance<typeof Relation>, isRelation? :boolean) {
+    createRecord(entity: EntityInstance | RelationInstance, isRelation? :boolean) {
         
         const entityWithProps = entity
-        const attributes: {[k:string]: Omit<ValueAttribute, 'field'>} = Object.fromEntries(entityWithProps.properties.map((property:KlassInstance<typeof Property>) => {
+        const attributes: {[k:string]: Omit<ValueAttribute, 'field'>} = Object.fromEntries(entityWithProps.properties.map((property:PropertyInstance) => {
             const prop = property
             return [
                 prop.name,
@@ -177,7 +177,7 @@ export class DBSetup {
             filteredBy: filteredBy.length ? filteredBy.map(e => e.name) : undefined,
         } as RecordMapItem
     }
-    createLink(relationName: string, relation: KlassInstance<typeof Relation>) {
+    createLink(relationName: string, relation: RelationInstance) {
         const relationWithProps = relation
         if (!relationWithProps.type) debugger
         return {
@@ -191,17 +191,17 @@ export class DBSetup {
             isTargetReliance: relationWithProps.isTargetReliance
         } as LinkMapItem
     }
-    getRecordName(rawRecord: KlassInstance<typeof Entity> | KlassInstance<typeof Relation>): string {
+    getRecordName(rawRecord: EntityInstance | RelationInstance): string {
         if (isRelation(rawRecord)) {
-            const record = rawRecord as KlassInstance<typeof Relation>
+            const record = rawRecord as RelationInstance
             return `${record.source.name}_${record.sourceProperty}_${record.targetProperty}_${record.target.name}`
         } else {
-            const record = rawRecord as KlassInstance<typeof Entity>
+            const record = rawRecord as EntityInstance
             return record.name
         }
     }
     //虚拟 link
-    createLinkOfRelationAndEntity(relationEntityName: string, relationName: string, relation: KlassInstance<typeof Relation>, isSource: boolean) {
+    createLinkOfRelationAndEntity(relationEntityName: string, relationName: string, relation: RelationInstance, isSource: boolean) {
         const relationWithProps = relation 
         const [sourceRelType, targetRelType] = relationWithProps.type.split(':');
         return {

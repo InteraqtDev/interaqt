@@ -1,6 +1,7 @@
 import { ComputationHandle, DataContext, PropertyDataContext } from "./ComputationHandle.js";
-import { WeightedSummation, KlassInstance, Relation, Entity } from "@shared";
+import { WeightedSummation } from "@shared";
 import { Controller } from "../Controller.js";
+import { WeightedSummationInstance, EntityInstance, RelationInstance } from "@shared";
 import { ComputationResult, DataDep, RecordsDataDep, RecordBoundState } from "./Computation.js";
 import { DataBasedComputation } from "./Computation.js";
 import { EtityMutationEvent } from "../Scheduler.js";
@@ -11,9 +12,9 @@ export class GlobalWeightedSummationHandle implements DataBasedComputation {
     state!: ReturnType<typeof this.createState>
     useLastValue: boolean = true
     dataDeps: {[key: string]: DataDep} = {}
-    record: KlassInstance<typeof Entity|typeof Relation>
+    record: (EntityInstance|RelationInstance)
 
-    constructor(public controller: Controller, args: KlassInstance<typeof WeightedSummation>, public dataContext: DataContext) {
+    constructor(public controller: Controller, args: WeightedSummationInstance, public dataContext: DataContext) {
         this.matchRecordToWeight = args.callback.bind(this)
         this.record = args.record
         
@@ -87,14 +88,14 @@ export class PropertyWeightedSummationHandle implements DataBasedComputation {
     relationAttr: string
     relatedRecordName: string
     isSource: boolean
-    relation: KlassInstance<typeof Relation>
+    relation: RelationInstance
     relationAttributeQuery: AttributeQueryData
 
-    constructor(public controller: Controller, public args: KlassInstance<typeof WeightedSummation>, public dataContext: PropertyDataContext) {
+    constructor(public controller: Controller, public args: WeightedSummationInstance, public dataContext: PropertyDataContext) {
         this.matchRecordToWeight = args.callback.bind(this)
 
         // 我们假设在PropertyWeightedSummationHandle中，records数组的第一个元素是一个Relation
-        this.relation = args.record as KlassInstance<typeof Relation>
+        this.relation = args.record as RelationInstance
         this.relationAttr = this.relation.source.name === dataContext.host.name ? this.relation.sourceProperty : this.relation.targetProperty
         this.isSource = this.relation.source.name === dataContext.host.name
         this.relatedRecordName = this.isSource ? this.relation.target.name! : this.relation.source.name!

@@ -1,5 +1,5 @@
 import { ComputationHandle, DataContext, PropertyDataContext } from "./ComputationHandle.js";
-import { Average, KlassInstance, Relation, Entity } from "@shared";
+import { Average, Relation, Entity, AverageInstance, RelationInstance, EntityInstance } from "@shared";
 import { Controller } from "../Controller.js";
 import { ComputationResult, DataBasedComputation, DataDep, RecordBoundState, GlobalBoundState, RecordsDataDep } from "./Computation.js";
 import { EtityMutationEvent } from "../Scheduler.js";
@@ -10,10 +10,10 @@ export class GlobalAverageHandle implements DataBasedComputation {
     state!: ReturnType<typeof this.createState>
     useLastValue: boolean = true
     dataDeps: {[key: string]: DataDep} = {}
-    record: KlassInstance<typeof Entity|typeof Relation>
+    record: (EntityInstance|RelationInstance)
     avgFieldPath: string[]
     
-    constructor(public controller: Controller, public args: KlassInstance<typeof Average>, public dataContext: DataContext) {
+    constructor(public controller: Controller, public args: AverageInstance, public dataContext: DataContext) {
         this.record = args.record
         
         // 获取 attributeQuery 的第一个字段作为平均值计算字段
@@ -108,7 +108,7 @@ export class GlobalAverageHandle implements DataBasedComputation {
             )
             const newValue = this.resolveAvgField(newRecord);
             
-            assert(!mutationEvent.relatedAttribute || mutationEvent.relatedAttribute.every((r, index) => r===this.avgFieldPath[index]), 'related update event should not trigger this average.')
+            assert(!mutationEvent.relatedAttribute || mutationEvent.relatedAttribute.every((r: any, index: number) => r===this.avgFieldPath[index]), 'related update event should not trigger this average.')
             const oldRecord = mutationEvent.relatedAttribute ? mutationEvent.relatedMutationEvent!.oldRecord : mutationEvent.oldRecord!
             const oldValue = this.resolveAvgField(oldRecord, this.avgFieldPath.slice(mutationEvent.relatedAttribute?.length||0, Infinity));
             
@@ -141,13 +141,13 @@ export class PropertyAverageHandle implements DataBasedComputation {
     relationAttr: string
     relatedRecordName: string
     isSource: boolean
-    relation: KlassInstance<typeof Relation>
+    relation: RelationInstance
     relationAttributeQuery: AttributeQueryData
     avgFieldPath: string[]
 
-    constructor(public controller: Controller, public args: KlassInstance<typeof Average>, public dataContext: PropertyDataContext) {
+    constructor(public controller: Controller, public args: AverageInstance, public dataContext: PropertyDataContext) {
         // We assume in PropertyAverageHandle, the records array's first element is a Relation
-        this.relation = args.record as KlassInstance<typeof Relation>
+        this.relation = args.record as RelationInstance
         this.isSource = args.direction ? args.direction === 'source' : this.relation.source.name === dataContext.host.name
         this.relationAttr = this.isSource ? this.relation.sourceProperty : this.relation.targetProperty
         this.relatedRecordName = this.isSource ? this.relation.target.name! : this.relation.source.name!
@@ -264,7 +264,7 @@ export class PropertyAverageHandle implements DataBasedComputation {
             );
             const newValue = this.resolveAvgField(newRelationWithEntity)
 
-            assert(!mutationEvent.relatedAttribute || mutationEvent.relatedAttribute.every((r, index) => r===this.avgFieldPath[index]), 'related update event should not trigger this average.')
+            assert(!mutationEvent.relatedAttribute || mutationEvent.relatedAttribute.every((r: any, index: number) => r===this.avgFieldPath[index]), 'related update event should not trigger this average.')
             const oldRecord = mutationEvent.relatedMutationEvent!.oldRecord 
             const oldValue = this.resolveAvgField(oldRecord, this.avgFieldPath.slice(mutationEvent.relatedAttribute!.length, Infinity));
             

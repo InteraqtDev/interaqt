@@ -1,14 +1,16 @@
+import { EtityMutationEvent } from "./ComputationSourceMap.js";
 import { Controller } from "./Controller.js";
 import { DataContext, ComputationHandle, PropertyDataContext, EntityDataContext, RelationDataContext } from "./computationHandles/ComputationHandle.js";
+export { EtityMutationEvent };
 
-import { Entity, Klass, KlassInstance, Property, Relation } from "@shared";
+import { EntityInstance, RelationInstance, PropertyInstance, IInstance } from "@shared";
+import { Entity, Property, Relation } from "@shared";
 import { assert } from "./util.js";
 import { Computation, ComputationClass, ComputationResult, ComputationResultAsync, ComputationResultFullRecompute, ComputationResultResolved, ComputationResultSkip, DataBasedComputation, EventBasedComputation, GlobalBoundState, RecordBoundState, RecordsDataDep } from "./computationHandles/Computation.js";
 import { DICTIONARY_RECORD, RecordMutationEvent, SYSTEM_RECORD } from "./System.js";
-import { AttributeQueryData, MatchExp } from "@storage";
+import { MatchExp } from "@storage";
 import {
     EntityEventSourceMap,
-    type EtityMutationEvent,
     DataSourceMapTree,
     ComputationSourceMapManager,
     EntityCreateEventsSourceMap
@@ -20,9 +22,9 @@ export class Scheduler {
     computations = new Set<Computation>()
     private sourceMapManager: ComputationSourceMapManager
     
-    constructor(public controller: Controller, entities: KlassInstance<typeof Entity>[], relations: KlassInstance<typeof Relation>[], dict: KlassInstance<typeof Property>[]) {
+    constructor(public controller: Controller, entities: EntityInstance[], relations: RelationInstance[], dict: PropertyInstance[]) {
         this.sourceMapManager = new ComputationSourceMapManager(this.controller)
-        const computationInputs: {dataContext: DataContext, args: KlassInstance<any>}[] = []
+        const computationInputs: {dataContext: DataContext, args: IInstance}[] = []
         entities.forEach(entity => {
                     if (entity.computation) {
             computationInputs.push({dataContext: {type: 'entity',id: entity},args: entity.computation})
@@ -63,7 +65,7 @@ export class Scheduler {
             const dataContext = computationInput.dataContext
             const args = computationInput.args as any
             const handles = ComputationHandle.Handles
-            const ComputationCtor = handles.get(args.constructor as Klass<any>)![dataContext.type]! as ComputationClass
+            const ComputationCtor = handles.get(args.constructor as any)![dataContext.type]! as ComputationClass
             assert(!!ComputationCtor, `cannot find Computation handle for ${(args.constructor as any).displayName || (args.constructor as any).name}`)
             const computation = new ComputationCtor(this.controller, args, dataContext)
             this.computations.add(computation)
@@ -588,6 +590,4 @@ export class Scheduler {
         await this.setupGlobalDict()
     }
 }
-
-export { EtityMutationEvent };
 

@@ -1,4 +1,4 @@
-import { KlassInstance, Klass, Property } from "@shared";
+import { Property, EntityInstance, RelationInstance, PropertyInstance } from "@shared";
 import { Entity, Relation } from "@shared";
 import { Computation } from "./Computation.js";
 
@@ -9,18 +9,18 @@ export type GlobalDataContext = {
 
 export type EntityDataContext = {
     type: 'entity',
-    id: KlassInstance<typeof Entity>
+    id: EntityInstance
 }
 
 export type RelationDataContext = {
     type: 'relation',
-    id: KlassInstance<typeof Relation>
+    id: RelationInstance
 }
 
 export type PropertyDataContext = {
     type: 'property',
-    host: KlassInstance<typeof Entity> |  KlassInstance<typeof Relation>,
-    id: KlassInstance<typeof Property>
+    host: EntityInstance |  RelationInstance,
+    id: PropertyInstance
 }
 
 
@@ -40,5 +40,5 @@ type HandlesForType = {
 }
 
 export class ComputationHandle {
-    public static  Handles: Map<Klass<any>,  HandlesForType> = new Map()
+    public static  Handles: Map<any,  HandlesForType> = new Map()
 }

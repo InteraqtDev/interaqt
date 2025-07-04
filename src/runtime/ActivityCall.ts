@@ -1,13 +1,13 @@
 import {
     ActivityGroup,
-    ActivityGroupInstanceType,
-    ActivityInstanceType,
+    ActivityGroupInstance as ActivityGroupInstanceType,
+    ActivityInstance as ActivityInstanceType,
     Attributive,
+    AttributiveInstance,
     Gateway,
-    GatewayInstanceType,
-    InteractionInstanceType,
-    KlassInstance,
-    TransferInstanceType,
+    GatewayInstance as GatewayInstanceType,
+    InteractionInstance as InteractionInstanceType,
+    TransferInstance as TransferInstanceType
 } from "@shared";
 import { assert } from "./util.js";
 import { System } from "./System.js";
@@ -417,7 +417,7 @@ export class ActivityCall {
         await this.setActivity( activityId, {refs})
     }
 
-    checkUserRef = async (attributive: KlassInstance<typeof Attributive>, eventUser: EventUser, activityId: string): Promise<boolean> => {
+    checkUserRef = async (attributive: AttributiveInstance, eventUser: EventUser, activityId: string): Promise<boolean> => {
         assert(attributive.isRef, 'attributive must be ref')
         const refs = (await this.getActivity(activityId))?.refs
         return refs[attributive.name!] === eventUser.id

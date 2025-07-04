@@ -1,7 +1,7 @@
-import { KlassInstance, StateMachine, StateNode } from "@shared";
+import { StateMachine, StateMachineInstance, StateNodeInstance } from "@shared";
 import { Controller } from "../Controller.js";
 import { EntityIdRef, RecordMutationEvent } from '../System.js';
-import {INTERACTION_RECORD} from "../ActivityManager";
+import { INTERACTION_RECORD } from "../ActivityManager";
 import { ComputationHandle, DataContext, EntityDataContext } from "./ComputationHandle.js";
 import { ComputationResult, ComputationResultPatch, EventBasedComputation, EventDep, GlobalBoundState, RecordBoundState } from "./Computation.js";
 import { EtityMutationEvent } from "../Scheduler.js";
@@ -17,8 +17,8 @@ export class GlobalStateMachineHandle implements EventBasedComputation {
     state!: {[key: string]: GlobalBoundState<any>}
     useLastValue: boolean = true
     eventDeps: {[key: string]: EventDep} = {}
-    defaultState: KlassInstance<typeof StateNode>
-    constructor(public controller: Controller, public args: KlassInstance<typeof StateMachine>, public dataContext: DataContext) {
+    defaultState: StateNodeInstance
+    constructor(public controller: Controller, public args: StateMachineInstance, public dataContext: DataContext) {
         this.transitionFinder = new TransitionFinder(args)
         this.defaultState = args.defaultState
     }
@@ -63,8 +63,8 @@ export class PropertyStateMachineHandle implements EventBasedComputation {
     state!: {[key: string]: RecordBoundState<any>|GlobalBoundState<any>}
     useLastValue: boolean = true
     eventDeps: {[key: string]: EventDep} = {}
-    defaultState: KlassInstance<typeof StateNode>
-    constructor(public controller: Controller, args: KlassInstance<typeof StateMachine>, public dataContext: DataContext) {
+    defaultState: StateNodeInstance
+    constructor(public controller: Controller, args: StateMachineInstance, public dataContext: DataContext) {
         this.transitionFinder = new TransitionFinder(args)
         this.defaultState = args.defaultState
 
@@ -120,9 +120,9 @@ export class RecordStateMachineHandle implements EventBasedComputation {
     state!: {[key: string]: RecordBoundState<any>|GlobalBoundState<any>}
     useLastValue: boolean = false
     eventDeps: {[key: string]: EventDep} = {}
-    defaultState: KlassInstance<typeof StateNode>
+    defaultState: StateNodeInstance
     dataContext: EntityDataContext
-    constructor(public controller: Controller, args: KlassInstance<typeof StateMachine>, dataContext: DataContext) {
+    constructor(public controller: Controller, args: StateMachineInstance, dataContext: DataContext) {
         this.transitionFinder = new TransitionFinder(args)
         this.defaultState = args.defaultState
         this.dataContext = dataContext as EntityDataContext

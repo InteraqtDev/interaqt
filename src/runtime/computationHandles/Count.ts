@@ -1,19 +1,19 @@
 import { ComputationHandle, DataContext, PropertyDataContext } from "./ComputationHandle.js";
-import { Count, KlassInstance, Relation, Entity } from "@shared";
+import { Count } from "@shared";
 import { Controller } from "../Controller.js";
+import { CountInstance, EntityInstance, RelationInstance } from "@shared";
 import { ComputationResult, DataBasedComputation, DataDep, GlobalBoundState, RecordBoundState, RecordsDataDep } from "./Computation.js";
 import { EtityMutationEvent } from "../Scheduler.js";
-import { AttributeQueryData, MatchExp } from "@storage";
-import { assert } from "../util.js";
+import { MatchExp } from "@storage";
 
 export class GlobalCountHandle implements DataBasedComputation {
     callback?: (this: Controller, item: any, dataDeps?: {[key: string]: any}) => boolean
     state!: ReturnType<typeof this.createState>
     useLastValue: boolean = true
     dataDeps: {[key: string]: DataDep} = {}
-    record: KlassInstance<typeof Entity|typeof Relation>
+    record: (EntityInstance|RelationInstance)
 
-    constructor(public controller: Controller, args: KlassInstance<typeof Count>, public dataContext: DataContext) {
+    constructor(public controller: Controller, args: CountInstance, public dataContext: DataContext) {
         this.record = args.record
         this.callback = args.callback?.bind(this)
         
@@ -113,14 +113,14 @@ export class PropertyCountHandle implements DataBasedComputation {
     relationAttr: string
     relatedRecordName: string
     isSource: boolean
-    relation: KlassInstance<typeof Relation>
+    relation: RelationInstance
     relationAttributeQuery: any
 
-    constructor(public controller: Controller, public args: KlassInstance<typeof Count>, public dataContext: PropertyDataContext) {
+    constructor(public controller: Controller, public args: CountInstance, public dataContext: PropertyDataContext) {
         this.callback = args.callback?.bind(this)
         
         // We assume in PropertyCountHandle, the records array's first element is a Relation
-        this.relation = args.record as KlassInstance<typeof Relation>
+        this.relation = args.record as RelationInstance
         this.isSource = args.direction ? args.direction === 'source' : this.relation.source.name === dataContext.host.name
         this.relationAttr = this.isSource ? this.relation.sourceProperty : this.relation.targetProperty
         this.relatedRecordName = this.isSource ? this.relation.target.name! : this.relation.source.name!

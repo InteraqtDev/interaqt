@@ -1,5 +1,9 @@
-import { Activity, Interaction, Relation } from "@shared"
-import { KlassInstance } from "@shared"
+import {
+    Activity, Interaction, Relation,
+    EntityInstance, RelationInstance,
+    ActivityInstance, InteractionInstance,
+    DictionaryInstance
+} from "@shared";
 import { Entity } from "@shared"
 import { BoolExp } from "@shared"
 import { Controller } from "../Controller"
@@ -87,7 +91,7 @@ export class GlobalBoundState<T> {
 
 export type RecordsDataDep = {
     type: 'records',
-    source: KlassInstance<typeof Entity>|KlassInstance<typeof Relation>|KlassInstance<typeof Activity>|KlassInstance<typeof Interaction>,
+    source: EntityInstance|RelationInstance|ActivityInstance|InteractionInstance,
     match?: MatchExpressionData,
     modifier?: ModifierData,
     attributeQuery?: AttributeQueryData
@@ -95,7 +99,7 @@ export type RecordsDataDep = {
 
 export type GlobalDataDep = {
     type: 'global',
-    source: KlassInstance<typeof Dictionary>
+    source: DictionaryInstance
 }
 
 // 同一 record 的 property 依赖
@@ -108,7 +112,7 @@ export type PropertyDataDep = {
 // 现在没用
 export type DictionaryDataDep = {
     type: 'dict',
-    source: KlassInstance<typeof Dictionary>
+    source: DictionaryInstance
     keys: string[]
 }
 
@@ -136,7 +140,7 @@ export interface DataBasedComputation {
 
 export type InteractionEventDep = {
     type: 'interaction',
-    interaction: KlassInstance<typeof Interaction>
+    interaction: InteractionInstance
 }
 
 export type DataEventDep = {

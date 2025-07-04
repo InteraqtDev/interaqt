@@ -70,9 +70,6 @@ export function generateUUID(options?: { uuid?: string }): string {
   return options?.uuid || crypto.randomUUID();
 }
 
-// 为了向后兼容，添加类型别名
-export type KlassInstance<T> = T extends { create(args: infer A, options?: any): infer R } ? R : never;
-
 // 概念相关的类型
 export interface Concept {
   name: string;

@@ -28,7 +28,7 @@ export function deepClone<T>(obj: T, deepCloneKlass?: boolean): T {
     return new Map(Array.from((obj as Map<unknown, unknown>).entries()).map(([k, v]) => [k, deepClone(v, deepCloneKlass)])) as T;
   }
 
-  // 如果是 Klass 实例
+  // 如果是类实例
   const instance = obj as IInstance & { constructor?: { clone?: (obj: unknown, deep: boolean) => unknown } };
   if (deepCloneKlass && instance._type && instance.constructor?.clone) {
     return instance.constructor.clone(obj, deepCloneKlass) as T;
@@ -51,30 +51,13 @@ export function removeAllInstance() {
 }
 
 // KlassByName 兼容层
-// 导出一个符合原始 Klass 接口的类型
-export interface Klass<T = any> {
-  new(arg: object, options?: { uuid?: string }): any;
-  create(arg: any, options?: { uuid?: string }): any;
-  displayName: string;
-  isKlass: true;
-  public: any;
-  constraints?: any;
-  instances: any[];
-  display?: (obj: any) => string;
-  stringify: (instance: any) => string;
-  parse: (json: string) => any;
-  check: (data: object) => boolean;
-  is: (arg: any) => boolean;
-  clone: <V>(obj: V, deep: boolean) => V;
-}
-
 // 全局的类注册表
-export const KlassByName = new Map<string, Klass>();
+export const KlassByName = new Map<string, any>();
 
 // 注册一个重构后的类到 KlassByName
 export function registerKlass(name: string, klassLike: any) {
   if (klassLike && klassLike.isKlass && klassLike.displayName) {
-    KlassByName.set(name, klassLike as Klass);
+    KlassByName.set(name, klassLike);
   }
 }
 

@@ -1,5 +1,4 @@
 import { IInstance, SerializedData, generateUUID } from './interfaces.js';
-import { stringifyAttribute } from './utils.js';
 import { AttributiveInstance, AttributivesInstance } from './Attributive.js';
 import { EntityInstance } from './Entity.js';
 

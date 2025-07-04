@@ -1,6 +1,7 @@
-import { KlassInstance, Property, RealTime } from "@shared";
+import { RealTime } from "@shared";
 import { Controller } from "../Controller";
 import { ComputationResultPatch, ComputationResult, DataBasedComputation, RecordBoundState, GlobalBoundState } from "./Computation";
+import { RealTimeInstance, PropertyInstance } from "@shared";
 import { ComputationHandle, DataContext } from "./ComputationHandle";
 import { Equation, Expression, Inequality } from "./MathResolver";
 
@@ -14,7 +15,7 @@ export class GlobalRealTimeComputation implements DataBasedComputation {
     callback: (now: Expression, dataDeps: {[key: string]: any}) => Promise<Expression|Inequality|Equation>
     nextRecomputeTime?: (now: number, dataDeps: {[key: string]: any}) => number
 
-    constructor(public controller: Controller, public args: KlassInstance<typeof RealTime>, public dataContext: DataContext) {
+    constructor(public controller: Controller, public args: RealTimeInstance, public dataContext: DataContext) {
         this.dataDeps = args.dataDeps ?? {};
         this.callback = (now: Expression, dataDeps: {[key: string]: any}) => {
             return (args.callback as any).call(this.controller, now, dataDeps);
@@ -69,7 +70,7 @@ export class PropertyRealTimeComputation implements DataBasedComputation {
     callback: (now: Expression, dataDeps: {[key: string]: any}) => Promise<Expression|Inequality|Equation>
     nextRecomputeTime?: (now: number, dataDeps: {[key: string]: any}) => number
     isResultNumber: boolean
-    constructor(public controller: Controller, public args: KlassInstance<typeof RealTime>, public dataContext: DataContext) {
+    constructor(public controller: Controller, public args: RealTimeInstance, public dataContext: DataContext) {
         this.dataDeps = {
             _current: {
                 type: 'property',
@@ -77,7 +78,7 @@ export class PropertyRealTimeComputation implements DataBasedComputation {
             },
             ...(args.dataDeps || {})
         }
-        this.isResultNumber = (this.dataContext.id as KlassInstance<typeof Property>).type === 'number'
+        this.isResultNumber = (this.dataContext.id as PropertyInstance).type === 'number'
         this.callback = (now: Expression, dataDeps: {[key: string]: any}) => {
             return (args.callback as any).call(this.controller, now, dataDeps);
         };

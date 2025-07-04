@@ -1,6 +1,7 @@
 import { ComputationHandle, DataContext, EntityDataContext } from "./ComputationHandle.js";
-import { Transform, KlassInstance, Relation, Entity, Activity, Interaction, BoolExp } from "@shared";
+import { Transform, TransformInstance, EntityInstance, RelationInstance, ActivityInstance, InteractionInstance } from "@shared";
 import { Controller } from "../Controller.js";
+import { BoolExp } from "@shared";
 import { ComputationResultPatch, DataDep, RecordBoundState, RecordsDataDep } from "./Computation.js";
 import { DataBasedComputation } from "./Computation.js";
 import { EtityMutationEvent } from "../ComputationSourceMap.js";
@@ -11,13 +12,13 @@ export class RecordsTransformHandle implements DataBasedComputation {
     useLastValue: boolean = true
     dataDeps: {[key: string]: DataDep} = {}
     
-    constructor(public controller: Controller, args: KlassInstance<typeof Transform>, public dataContext: DataContext) {
+    constructor(public controller: Controller, args: TransformInstance, public dataContext: DataContext) {
         this.transformCallback = args.callback.bind(this)
         
         this.dataDeps = {
             main: {
                 type: 'records',
-                source: args.record as KlassInstance<typeof Entity>|KlassInstance<typeof Relation>|KlassInstance<typeof Activity>|KlassInstance<typeof Interaction>,
+                source: args.record as EntityInstance|RelationInstance|ActivityInstance|InteractionInstance,
                 attributeQuery: args.attributeQuery || ['*']
             }
         }

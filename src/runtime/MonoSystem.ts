@@ -11,7 +11,7 @@ import {
     SystemLogger,
     SystemLogType
 } from "./System.js";
-import { createClass, Entity, KlassInstance, Property, Relation } from "@shared";
+import { createClass, Property, EntityInstance, RelationInstance } from "@shared";
 import {
     DBSetup,
     EntityQueryHandle,
@@ -65,7 +65,7 @@ class MonoStorage implements Storage{
             return this.callWithEvents(this.queryHandle!.create.bind(this.queryHandle), [SYSTEM_RECORD, { concept, key: key.toString(), value: encodeURI(JSON.stringify(value))}], events)
         }
     }
-    async setup(entities: KlassInstance<typeof Entity>[], relations: KlassInstance<typeof Relation>[], createTables = false) {
+    async setup(entities: EntityInstance[], relations: RelationInstance[], createTables = false) {
         await this.db.open(createTables)
         const dbSetup = new DBSetup(
             entities as any, 
@@ -179,7 +179,7 @@ export class MonoSystem implements System {
         this.storage = new MonoStorage(db)
     }
     
-    setup(entities: KlassInstance<typeof Entity>[], relations: KlassInstance<typeof Relation>[], states: ComputationState[], install = false){
+    setup(entities: EntityInstance[], relations: RelationInstance[], states: ComputationState[], install = false){
         states.forEach(({dataContext, state}) => {
             Object.entries(state).forEach(([stateName, stateItem]) => {
                 if (stateItem instanceof RecordBoundState) { 

@@ -1,8 +1,6 @@
 import { DICTIONARY_RECORD, RecordMutationEvent, System, SystemCallback, SystemLogger } from "./System.js";
 import {
-    Activity,
-    BoolExp, Dictionary, Entity,
-    Interaction, KlassInstance, Relation
+    BoolExp, IInstance, EntityInstance, RelationInstance, ActivityInstance, InteractionInstance, DictionaryInstance
 } from "@shared";
 import './computationHandles/index.js';
 import { InteractionCallResponse } from "./InteractionCall.js";
@@ -48,26 +46,26 @@ export type ComputationType = 'global' | 'entity' | 'relation' | 'property'
 
 export class Controller {
     // 因为很多 function 都会bind controller 作为 this，所以我们也把 controller 的 globals 作为注入全局工具的入口。
-    public recordNameToSideEffects = new Map<string, Set<KlassInstance<any> | RecordMutationSideEffect>>()
+    public recordNameToSideEffects = new Map<string, Set<IInstance | RecordMutationSideEffect>>()
     public globals = {
         BoolExp,
         MatchExp
     }
     public scheduler: Scheduler
     public activityManager: ActivityManager
-    public entities: KlassInstance<typeof Entity>[]
-    public relations: KlassInstance<typeof Relation>[]
-    public activities: KlassInstance<typeof Activity>[]
-    public interactions: KlassInstance<typeof Interaction>[]
-    public dict: KlassInstance<typeof Dictionary>[] = []
+    public entities: EntityInstance[]
+    public relations: RelationInstance[]
+    public activities: ActivityInstance[]
+    public interactions: InteractionInstance[]
+    public dict: DictionaryInstance[] = []
     public recordMutationSideEffects: RecordMutationSideEffect[] = []
     constructor(
         public system: System,
-        entities: KlassInstance<typeof Entity>[],
-        relations: KlassInstance<typeof Relation>[],
-        activities: KlassInstance<typeof Activity>[],
-        interactions: KlassInstance<typeof Interaction>[],
-        dict: KlassInstance<typeof Dictionary>[] = [],
+        entities: EntityInstance[],
+        relations: RelationInstance[],
+        activities: ActivityInstance[],
+        interactions: InteractionInstance[],
+        dict: DictionaryInstance[] = [],
         recordMutationSideEffects: RecordMutationSideEffect[] = []
     ) {
         // 因为我们会对 entities 数组进行补充。如果外部复用了传入的数组对象，就会发生混乱，例如在测试用例中复用。

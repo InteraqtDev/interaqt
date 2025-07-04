@@ -1,7 +1,8 @@
 import { ComputationHandle, DataContext, PropertyDataContext } from "./ComputationHandle.js";
-import { Summation, KlassInstance, Relation, Entity } from "@shared";
+import { Summation } from "@shared";
 import { Controller } from "../Controller.js";
-import { ComputationResult, DataBasedComputation, DataDep, RecordBoundState, RecordsDataDep } from "./Computation.js";
+import { SummationInstance, EntityInstance, RelationInstance } from "@shared";
+import { ComputationResult, DataBasedComputation, DataDep, RecordsDataDep } from "./Computation.js";
 import { EtityMutationEvent } from "../Scheduler.js";
 import { MatchExp, AttributeQueryData } from "@storage";
 import { assert } from "../util.js";
@@ -10,9 +11,9 @@ export class GlobalSumHandle implements DataBasedComputation {
     state!: ReturnType<typeof this.createState>
     useLastValue: boolean = true
     dataDeps: {[key: string]: DataDep} = {}
-    record: KlassInstance<typeof Entity|typeof Relation>
+    record: (EntityInstance|RelationInstance)
     sumFieldPath: string[]
-    constructor(public controller: Controller, public args: KlassInstance<typeof Summation>, public dataContext: DataContext) {
+    constructor(public controller: Controller, public args: SummationInstance, public dataContext: DataContext) {
         this.record = args.record
         
         // 获取 attributeQuery 的第一个字段作为求和字段
@@ -83,7 +84,7 @@ export class GlobalSumHandle implements DataBasedComputation {
             const newRecord = await this.controller.system.storage.findOne(this.record.name!, MatchExp.atom({key:'id', value:['=', mutationEvent.record!.id]}), undefined, this.args.attributeQuery)
             const newValue = this.resolveSumField(newRecord);
             
-            assert(!mutationEvent.relatedAttribute || mutationEvent.relatedAttribute.every((r, index) => r===this.sumFieldPath[index]), 'related update event should not trigger this sum.')
+            assert(!mutationEvent.relatedAttribute || mutationEvent.relatedAttribute.every((r: any, index: number) => r===this.sumFieldPath[index]), 'related update event should not trigger this sum.')
             const oldRecord = mutationEvent.relatedAttribute ? mutationEvent.relatedMutationEvent!.oldRecord : mutationEvent.oldRecord!
             const oldValue = this.resolveSumField(oldRecord, this.sumFieldPath.slice(mutationEvent.relatedAttribute?.length||0, Infinity));
             sum += newValue-oldValue 
@@ -100,13 +101,13 @@ export class PropertySumHandle implements DataBasedComputation {
     relationAttr: string
     relatedRecordName: string
     isSource: boolean
-    relation: KlassInstance<typeof Relation>
+    relation: RelationInstance
     relationAttributeQuery: AttributeQueryData
     sumFieldPath: string[]
 
-    constructor(public controller: Controller, public args: KlassInstance<typeof Summation>, public dataContext: PropertyDataContext) {
+    constructor(public controller: Controller, public args: SummationInstance, public dataContext: PropertyDataContext) {
         // We assume in PropertySumHandle, the records array's first element is a Relation
-        this.relation = args.record as KlassInstance<typeof Relation>
+        this.relation = args.record as RelationInstance
         this.isSource = args.direction ? args.direction === 'source' : this.relation.source.name === dataContext.host.name
         this.relationAttr = this.isSource ? this.relation.sourceProperty : this.relation.targetProperty
         this.relatedRecordName = this.isSource ? this.relation.target.name! : this.relation.source.name!

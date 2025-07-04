@@ -1,5 +1,4 @@
-import { KlassInstance } from "@shared";
-import { StateMachine } from "@shared";
+import { StateMachineInstance } from "@shared";
 
 function shallowEqual(a: {[key:string]:any}, b: {[key:string]:any}) {
     if (a===b) return true
@@ -15,7 +14,7 @@ function shallowEqual(a: {[key:string]:any}, b: {[key:string]:any}) {
 
 export class TransitionFinder {
     map: {[stateName: string]: any} = {}
-    constructor(public data: KlassInstance<typeof StateMachine>) {
+    constructor(public data: StateMachineInstance) {
         for(const transfer of data.transfers) {
             if(!this.map[transfer.current.name]) {
                 this.map[transfer.current.name] = []

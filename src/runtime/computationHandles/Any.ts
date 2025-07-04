@@ -1,6 +1,7 @@
 import { ComputationHandle, DataContext, PropertyDataContext } from "./ComputationHandle.js";
-import { Any, KlassInstance, Relation } from "@shared";
+import { Any } from "@shared";
 import { Controller } from "../Controller.js";
+import { AnyInstance, RelationInstance } from "@shared";
 import { ComputationResult, DataDep, GlobalBoundState, RecordBoundState, RecordsDataDep } from "./Computation.js";
 import { DataBasedComputation } from "./Computation.js";
 import { EtityMutationEvent } from "../ComputationSourceMap.js";
@@ -12,7 +13,7 @@ export class GlobalAnyHandle implements DataBasedComputation {
     state!: ReturnType<typeof this.createState>
     useLastValue: boolean = true
     dataDeps: {[key: string]: DataDep} = {}
-    constructor(public controller: Controller,  args: KlassInstance<typeof Any>,  public dataContext: DataContext, ) {
+    constructor(public controller: Controller,  args: AnyInstance,  public dataContext: DataContext, ) {
         this.callback = args.callback.bind(this)
         this.dataDeps = {
             main: {
@@ -81,12 +82,12 @@ export class PropertyAnyHandle implements DataBasedComputation {
     relationAttr: string
     relatedRecordName: string
     isSource: boolean
-    relation: KlassInstance<typeof Relation>
+    relation: RelationInstance
     relationAttributeQuery: AttributeQueryData
-    constructor(public controller: Controller,  args: KlassInstance<typeof Any>,  public dataContext: PropertyDataContext ) {
+    constructor(public controller: Controller,  args: AnyInstance,  public dataContext: PropertyDataContext ) {
         this.callback = args.callback.bind(this)
 
-        const relation = args.record as KlassInstance<typeof Relation>
+        const relation = args.record as RelationInstance
         this.relation = relation
         this.isSource = args.direction ? args.direction === 'source' :relation.source.name === dataContext.host.name
         this.relationAttr = this.isSource ? relation.sourceProperty : relation.targetProperty

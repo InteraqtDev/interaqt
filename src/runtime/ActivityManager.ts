@@ -1,10 +1,8 @@
+import { ActivityInstance, InteractionInstance } from "@shared";
 import { RecordMutationEvent, SystemLogger } from "./System.js";
 import {
-    Activity,
-    Entity,
-    Interaction, KlassInstance,
-    Property,
-    Relation,
+    Entity, Property,
+    Relation
 } from "@shared";
 import { ActivityCall } from "./ActivityCall.js";
 import { InteractionCall, InteractionCallResponse, InteractionEvent } from "./InteractionCall.js";
@@ -95,8 +93,8 @@ export class ActivityManager {
 
     constructor(
         private controller: Controller,
-        activities: KlassInstance<typeof Activity>[],
-        interactions: KlassInstance<typeof Interaction>[]
+        activities: ActivityInstance[],
+        interactions: InteractionInstance[]
     ) {
 
         this.controller.entities.push(ActivityStateEntity, InteractionEventEntity)

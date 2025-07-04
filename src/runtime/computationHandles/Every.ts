@@ -1,6 +1,7 @@
 import { ComputationHandle, PropertyDataContext } from "./ComputationHandle.js";
-import { Every, KlassInstance, Relation } from "@shared";
+import { Every } from "@shared";
 import { ComputationResult, DataBasedComputation, DataDep, GlobalBoundState, RecordBoundState, RecordsDataDep } from "./Computation.js";
+import { EveryInstance, RelationInstance } from "@shared";
 import { Controller } from "../Controller.js";
 import { DataContext } from "./ComputationHandle.js";
 import { EtityMutationEvent } from "../Scheduler.js";
@@ -14,7 +15,7 @@ export class GlobalEveryHandle implements DataBasedComputation {
     useLastValue: boolean = true
     dataDeps: {[key: string]: DataDep} = {}
     defaultValue: boolean
-    constructor(public controller: Controller,  public args: KlassInstance<typeof Every>,  public dataContext: DataContext, ) {
+    constructor(public controller: Controller,  public args: EveryInstance,  public dataContext: DataContext, ) {
         this.callback = args.callback.bind(this)
         this.dataDeps = {
             main: {
@@ -88,14 +89,14 @@ export class PropertyEveryHandle implements DataBasedComputation {
     useLastValue: boolean = true
     dataDeps: {[key: string]: DataDep} = {}
     relationAttr: string
-    relation: KlassInstance<typeof Relation>
+    relation: RelationInstance
     relatedRecordName: string
     isSource: boolean   
     relationAttributeQuery: AttributeQueryData
-    constructor(public controller: Controller,  public args: KlassInstance<typeof Every>,  public dataContext: PropertyDataContext ) {
+    constructor(public controller: Controller,  public args: EveryInstance,  public dataContext: PropertyDataContext ) {
         this.callback = args.callback.bind(this)
 
-        const relation = args.record as KlassInstance<typeof Relation>
+        const relation = args.record as RelationInstance
         assert(relation.source.name === dataContext.host.name || relation.target.name === dataContext.host.name, 'relation source or target must be the same as the host')
         this.relation = relation
         this.isSource = args.direction ? args.direction === 'source' :relation.source.name === dataContext.host.name

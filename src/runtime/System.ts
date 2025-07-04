@@ -1,6 +1,7 @@
-import { createClass, Entity, KlassInstance, Property, Relation } from "@shared";
+import { createClass, Entity, Property } from "@shared";
 import { GlobalBoundState } from "./computationHandles/Computation.js";
 import { RecordBoundState } from "./computationHandles/Computation.js";
+import { EntityInstance, RelationInstance } from "@shared";
 import { DataContext } from "./computationHandles/ComputationHandle.js";
 import { InteractionEvent } from "./InteractionCall.js";
 export type SystemCallback =  (...arg: any[]) => any
@@ -19,7 +20,7 @@ export type Storage = {
     get: (itemName: string, id: string, initialValue?: any) => Promise<any>
     set: (itemName: string, id: string, value: any, events?: RecordMutationEvent[]) => Promise<any>,
     // er存储
-    setup: (entities: KlassInstance<typeof Entity>[], relations: KlassInstance<typeof Relation>[], createTables?: boolean) => any
+    setup: (entities: EntityInstance[], relations: RelationInstance[], createTables?: boolean) => any
     findOne: (entityName: string, ...arg: any[]) => Promise<any>,
     update: (entityName: string, ...arg: any[]) => Promise<any>,
     find: (entityName: string, ...arg: any[]) => Promise<any[]>,
@@ -67,7 +68,7 @@ export interface System {
     conceptClass: Map<string, ReturnType<typeof createClass>>
     storage: Storage
     logger: SystemLogger
-    setup: (entities: KlassInstance<typeof Entity>[], relations: KlassInstance<typeof Relation>[], states: ComputationState[], install?: boolean) => Promise<any>
+    setup: (entities: EntityInstance[], relations: RelationInstance[], states: ComputationState[], install?: boolean) => Promise<any>
 }
 
 export type EntityIdRef = {
