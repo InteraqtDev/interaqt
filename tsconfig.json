@@ -17,6 +17,7 @@
     "removeComments": false,
     "lib": ["esnext", "dom"],
     "types": ["node"],
+    "downlevelIteration": true,
     "paths": {
         "@": ["src"],
         "interaqt": ["src"],

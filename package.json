@@ -20,9 +20,10 @@
   },
   "scripts": {
     "check": "tsc --noEmit",
+    "check:all": "npm run check:shared && npm run check:runtime && npm run check:storage",
     "check:shared": "tsc --noEmit --strict --skipLibCheck src/shared/refactored/*.ts",
-    "check:runtime": "tsc --noEmit --strict --skipLibCheck src/runtime/*.ts",
-    "check:storage": "tsc --noEmit --strict --skipLibCheck src/storage/*.ts",
+    "check:runtime": "tsc --project tsconfig.runtime.json",
+    "check:storage": "tsc --project tsconfig.storage.json",
     "test": "vitest run",
     "test:runtime": "vitest run tests/runtime",
     "test:storage": "vitest run tests/storage",
