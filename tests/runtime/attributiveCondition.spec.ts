@@ -82,7 +82,7 @@ describe('attributive and condition checks', () => {
                 user: normalUser
             })
             expect(normalResult.error).toBeDefined()
-            expect(normalResult.error.type).toBe('check user failed')
+            expect((normalResult.error as any).type).toBe('check user failed')
         })
 
         test('should handle BoolExp combinations in userAttributives', async () => {
@@ -238,7 +238,7 @@ describe('attributive and condition checks', () => {
                 }
             })
             expect(draftResult.error).toBeDefined()
-            expect(draftResult.error.type).toBe('post not match attributive')
+            expect((draftResult.error as any).type).toBe('post not match attributive')
         })
 
         test('should check collection payload attributives', async () => {
@@ -317,7 +317,7 @@ describe('attributive and condition checks', () => {
                 }
             })
             expect(mixedResult.error).toBeDefined()
-            expect(mixedResult.error.type).toBe('tags not every item match attribute')
+            expect((mixedResult.error as any).type).toBe('tags not every item match attribute')
         })
     })
 
@@ -414,7 +414,7 @@ describe('attributive and condition checks', () => {
                 payload: { post: premiumPost }
             })
             expect(poorPremiumResult.error).toBeDefined()
-            expect(poorPremiumResult.error.type).toBe('condition check failed')
+            expect((poorPremiumResult.error as any).type).toBe('condition check failed')
         })
 
         test('should handle BoolExp combinations in conditions', async () => {
@@ -545,7 +545,7 @@ describe('attributive and condition checks', () => {
                 user: user
             })
             expect(result.error).toBeDefined()
-            expect(result.error.type).toBe('check user failed')
+            expect((result.error as any).type).toBe('check user failed')
         })
 
         test('should handle undefined return from attributive', async () => {

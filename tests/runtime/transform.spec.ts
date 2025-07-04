@@ -35,7 +35,7 @@ describe('Transform computed handle', () => {
       computation: Transform.create({
         record: productEntity,
         attributeQuery: ['name', 'price', 'isAvailable'],
-        callback: (product) => {
+        callback: (product: any) => {
           return {
             name: product.name,
             originalPrice: product.price,
@@ -131,7 +131,7 @@ describe('Transform computed handle', () => {
       computation: Transform.create({
         record: orderRelation,
         attributeQuery: [['target', {attributeQuery: ['product', 'quantity', 'price', 'status']}]],
-        callback: (orderRelation) => {
+        callback: (orderRelation: any) => {
           return {
             product: orderRelation.target.product,
             totalAmount: orderRelation.target.quantity * orderRelation.target.price,

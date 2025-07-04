@@ -22,9 +22,9 @@ describe('bool expression', () => {
 
 
         expect(result).not.toBe(true)
-        expect(result.data.key).toBe('falseB')
-        expect(result.stack.length).toBe(1)
-        expect(result.stack[0]).toMatchObject({type: 'expression', operator: 'and'})
+        expect((result as any).data.key).toBe('falseB')
+        expect((result as any).stack.length).toBe(1)
+        expect((result as any).stack[0]).toMatchObject({type: 'expression', operator: 'and'})
     })
 
     test('simple or op', () => {
@@ -39,9 +39,9 @@ describe('bool expression', () => {
         const result = evaluator3.evaluate(handle) as EvaluateError
 
         expect(result).not.toBe(true)
-        expect(result.data.key).toBe('falseB')
-        expect(result.stack.length).toBe(1)
-        expect(result.stack[0].operator).toBe('or')
+        expect((result as any).data.key).toBe('falseB')
+        expect((result as any).stack.length).toBe(1)
+        expect((result as any).stack[0].operator).toBe('or')
     })
 
     test('group of or op', () => {
@@ -55,9 +55,9 @@ describe('bool expression', () => {
         const evaluator3 = parse<AtomType>(`trueA  && (falseA || falseB)`)
         const result = evaluator3.evaluate(handle) as EvaluateError
         expect(result).not.toBe(true)
-        expect(result.data.key).toBe('falseB')
-        expect(result.stack.length).toBe(2)
-        expect(result.stack[0]).toMatchObject({type: 'expression', operator: 'and'})
+        expect((result as any).data.key).toBe('falseB')
+        expect((result as any).stack.length).toBe(2)
+        expect((result as any).stack[0]).toMatchObject({type: 'expression', operator: 'and'})
     })
 
     test('group of or op', () => {
@@ -71,9 +71,9 @@ describe('bool expression', () => {
         const evaluator3 = parse<AtomType>(`trueA  && (falseA || falseB)`)
         const result = evaluator3.evaluate(handle) as EvaluateError
         expect(result).not.toBe(true)
-        expect(result.data.key).toBe('falseB')
-        expect(result.stack.length).toBe(2)
-        expect(result.stack[0]).toMatchObject({type: 'expression', operator: 'and'})
+        expect((result as any).data.key).toBe('falseB')
+        expect((result as any).stack.length).toBe(2)
+        expect((result as any).stack[0]).toMatchObject({type: 'expression', operator: 'and'})
     })
 
     test('simple not op', () => {
@@ -83,9 +83,9 @@ describe('bool expression', () => {
         const evaluator2 = parse<AtomType>(`!trueA`)
         const result = evaluator2.evaluate(handle) as EvaluateError
         expect(result).not.toBe(true)
-        expect(result.data.key).toBe('trueA')
-        expect(result.inverse).toBe(true)
-        expect(result.stack.length).toBe(1)
-        expect(result.stack[0]).toMatchObject({operator: "not"})
+        expect((result as any).data.key).toBe('trueA')
+        expect((result as any).inverse).toBe(true)
+        expect((result as any).stack.length).toBe(1)
+        expect((result as any).stack[0]).toMatchObject({operator: "not"})
     })
 })

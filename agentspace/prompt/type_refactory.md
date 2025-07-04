@@ -6,6 +6,8 @@
 - [x] 接下来的重构是以完全去掉 createClass 为目标，将其中 export 的 entity 等所有对象全部变成简单的形式，同时还要去掉 KlassInstance 等类型工具。注意，你需要先编写 entity 等所有使用 createClass 创建出来的对象的测试用例，保障重构去掉 createClass 之后仍然正确。
 - [x] 开始去掉所有的 createClass，将 entity 等概念改成直接实现。要保证测试用例全部通过。
 - [] 修正 src/runtime  src/storage 里面的所有相关的类型应引用。
+- [] ！类型很可能有问题
+- [] as 类型很可能有问题 
 
 
 在你完成任务时，每一次完成一个任务就停下来等待我的确认。把你完成任务时的关键信息放到下面的章节。

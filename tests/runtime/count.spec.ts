@@ -467,7 +467,7 @@ describe('Count computed handle', () => {
         computation: Count.create({
           record: orderEntity,
           attributeQuery: ['status'],
-          callback: function(order) {
+          callback: function(order: any) {
             return order.status === 'completed';
           }
         })
@@ -560,7 +560,7 @@ describe('Count computed handle', () => {
         computation: Count.create({
           record: projectIssueRelation,
           attributeQuery: [['target', {attributeQuery: ['priority']}]],
-          callback: function(relation) {
+          callback: function(relation: any) {
             return relation.target.priority === 'high';
           }
         })
@@ -650,7 +650,7 @@ describe('Count computed handle', () => {
         computation: Count.create({
           record: customerPurchaseRelation,
           attributeQuery: [['target', {attributeQuery: ['amount']}]],
-          callback: function(relation, dataDeps) {
+          callback: function(relation: any, dataDeps: any) {
             debugger
             return relation.target.amount >= dataDeps.minAmount;
           },
@@ -713,7 +713,7 @@ describe('Count computed handle', () => {
         collection: false,
         computation: Count.create({
           record: itemEntity,
-          callback: function(item) {
+          callback: function(item: any) {
             return item.status === 'active';
           },
           attributeQuery: ['name', 'status'] // Only fetch needed fields, not description

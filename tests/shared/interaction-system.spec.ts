@@ -157,7 +157,7 @@ describe("Interaction System - createClass functionality", () => {
 
       expect(group.type).toBe("sequential");
       expect(group.activities).toHaveLength(1);
-      expect(group.activities[0].name).toBe("SubActivity");
+      expect(group.activities![0].name).toBe("SubActivity");
       expect(group._type).toBe("ActivityGroup");
     });
   });
@@ -207,12 +207,12 @@ describe("Interaction System - createClass functionality", () => {
 
       const atom1 = BoolAtomData.create({
         type: "atom",
-        data: cond1
+        data: cond1 as any
       });
 
       const atom2 = BoolAtomData.create({
         type: "atom",
-        data: cond1
+        data: cond1 as any
       });
 
       const conditions = Conditions.create({
@@ -248,7 +248,7 @@ describe("Interaction System - createClass functionality", () => {
 
       const atom = BoolAtomData.create({
         type: "atom",
-        data: attr1
+        data: attr1 as any
       });
 
       const attrs = DataAttributives.create({
@@ -307,7 +307,7 @@ describe("Interaction System - createClass functionality", () => {
 
       const atom = BoolAtomData.create({
         type: "atom",
-        data: attr1
+        data: attr1 as any
       });
 
       const attrs = Attributives.create({
@@ -341,7 +341,7 @@ describe("Interaction System - createClass functionality", () => {
       
       const atom = BoolAtomData.create({
         type: "atom",
-        data: cond
+        data: cond as any
       });
 
       expect(atom.data).toBe(cond);
@@ -356,7 +356,7 @@ describe("Interaction System - createClass functionality", () => {
       
       const left = BoolAtomData.create({
         type: "atom",
-        data: cond1
+        data: cond1 as any
       });
 
       const cond2 = Condition.create({
@@ -366,7 +366,7 @@ describe("Interaction System - createClass functionality", () => {
       
       const right = BoolAtomData.create({
         type: "atom",
-        data: cond2
+        data: cond2 as any
       });
 
       const expr = BoolExpressionData.create({
@@ -409,7 +409,8 @@ describe("Interaction System - createClass functionality", () => {
       expect(interaction.name).toBe("SubmitOrder");
       expect(interaction.action.name).toBe("submitOrder");
       expect(interaction.payload?.items).toHaveLength(2);
-      expect(interaction.sideEffects[0].name).toBe("notifyWarehouse");
+      expect(interaction.sideEffects).toHaveLength(1);
+      expect(interaction.sideEffects![0].name).toBe("notifyWarehouse");
     });
 
     test("should stringify and parse complex structures", () => {

@@ -51,14 +51,14 @@ describe("Computation Classes Refactored", () => {
         record: userPostRelation,
         direction: "target",
         callback: (item: any) => item.active,
-        attributeQuery: { attribute: "status", value: "published" },
+        attributeQuery: ["status"],
         dataDeps: { minCount: 5 }
       });
 
       expect(count.record).toBe(userPostRelation);
       expect(count.direction).toBe("target");
       expect(count.callback).toBeDefined();
-      expect(count.attributeQuery).toEqual({ attribute: "status", value: "published" });
+      expect(count.attributeQuery).toEqual(["status"]);
       expect(count.dataDeps).toEqual({ minCount: 5 });
     });
 
@@ -80,7 +80,7 @@ describe("Computation Classes Refactored", () => {
     test("should clone count", () => {
       const original = Count.create({
         record: userEntity,
-        attributeQuery: { attribute: "active" }
+        attributeQuery: ["active"]
       });
       const cloned = Count.clone(original, false);
 
@@ -95,11 +95,11 @@ describe("Computation Classes Refactored", () => {
     test("should create summation instance", () => {
       const summation = Summation.create({
         record: postEntity,
-        attributeQuery: { attribute: "views" }
+        attributeQuery: ["views"]
       });
 
       expect(summation.record).toBe(postEntity);
-      expect(summation.attributeQuery).toEqual({ attribute: "views" });
+      expect(summation.attributeQuery).toEqual(["views"]);
       expect(summation.uuid).toBeDefined();
       expect(summation._type).toBe("Summation");
     });
@@ -108,7 +108,7 @@ describe("Computation Classes Refactored", () => {
       const summation = Summation.create({
         record: userPostRelation,
         direction: "target",
-        attributeQuery: { attribute: "likes" }
+        attributeQuery: ["likes"]
       });
 
       expect(summation.direction).toBe("target");
@@ -117,13 +117,13 @@ describe("Computation Classes Refactored", () => {
     test("should stringify and parse summation", () => {
       const original = Summation.create({
         record: postEntity,
-        attributeQuery: { attribute: "score" }
+        attributeQuery: ["score"]
       });
       
       const stringified = Summation.stringify(original);
       const parsed = Summation.parse(stringified);
 
-      expect(parsed.attributeQuery).toEqual({ attribute: "score" });
+      expect(parsed.attributeQuery).toEqual(["score"]);
       expect(parsed._type).toBe("Summation");
     });
   });
@@ -132,11 +132,11 @@ describe("Computation Classes Refactored", () => {
     test("should create average instance", () => {
       const average = Average.create({
         record: postEntity,
-        attributeQuery: { attribute: "rating" }
+        attributeQuery: ["rating"]
       });
 
       expect(average.record).toBe(postEntity);
-      expect(average.attributeQuery).toEqual({ attribute: "rating" });
+      expect(average.attributeQuery).toEqual(["rating"]);
       expect(average.uuid).toBeDefined();
       expect(average._type).toBe("Average");
     });
@@ -145,7 +145,7 @@ describe("Computation Classes Refactored", () => {
       const average = Average.create({
         record: userPostRelation,
         direction: "source",
-        attributeQuery: { attribute: "score" }
+        attributeQuery: ["score"]
       });
 
       expect(average.direction).toBe("source");
@@ -154,13 +154,13 @@ describe("Computation Classes Refactored", () => {
     test("should stringify and parse average", () => {
       const original = Average.create({
         record: userEntity,
-        attributeQuery: { attribute: "age" }
+        attributeQuery: ["age"]
       });
       
       const stringified = Average.stringify(original);
       const parsed = Average.parse(stringified);
 
-      expect(parsed.attributeQuery).toEqual({ attribute: "age" });
+      expect(parsed.attributeQuery).toEqual(["age"]);
       expect(parsed._type).toBe("Average");
     });
 
@@ -168,7 +168,7 @@ describe("Computation Classes Refactored", () => {
       const original = Average.create({
         record: postEntity,
         direction: "both",
-        attributeQuery: { attribute: "price" }
+        attributeQuery: ["price"]
       });
       const cloned = Average.clone(original, false);
 
@@ -197,12 +197,12 @@ describe("Computation Classes Refactored", () => {
         record: userPostRelation,
         direction: "target",
         callback: (item: any) => item.value,
-        attributeQuery: { attribute: "weighted" },
+        attributeQuery: ["weighted"],
         dataDeps: { factor: 2 }
       });
 
       expect(ws.direction).toBe("target");
-      expect(ws.attributeQuery).toEqual({ attribute: "weighted" });
+      expect(ws.attributeQuery).toEqual(["weighted"]);
       expect(ws.dataDeps).toEqual({ factor: 2 });
     });
   });
@@ -222,11 +222,11 @@ describe("Computation Classes Refactored", () => {
     test("should create transform with attributeQuery", () => {
       const transform = Transform.create({
         record: userEntity,
-        attributeQuery: { filter: "active" },
+        attributeQuery: ["active"],
         callback: (item: any) => item
       });
 
-      expect(transform.attributeQuery).toEqual({ filter: "active" });
+      expect(transform.attributeQuery).toEqual(["active"]);
     });
   });
 
@@ -247,12 +247,12 @@ describe("Computation Classes Refactored", () => {
         record: userPostRelation,
         direction: "source",
         callback: (item: any) => item.active,
-        attributeQuery: { status: "enabled" },
+        attributeQuery: ["status"],
         dataDeps: { threshold: 1 }
       });
 
       expect(any.direction).toBe("source");
-      expect(any.attributeQuery).toEqual({ status: "enabled" });
+      expect(any.attributeQuery).toEqual(["status"]);
       expect(any.dataDeps).toEqual({ threshold: 1 });
     });
   });
@@ -294,12 +294,12 @@ describe("Computation Classes Refactored", () => {
       const realtime = RealTime.create({
         callback: () => Date.now(),
         nextRecomputeTime: () => Date.now() + 1000,
-        attributeQuery: { type: "timestamp" },
+        attributeQuery: ["timestamp"],
         dataDeps: { interval: 1000 }
       });
 
       expect(realtime.nextRecomputeTime).toBeDefined();
-      expect(realtime.attributeQuery).toEqual({ type: "timestamp" });
+      expect(realtime.attributeQuery).toEqual(["timestamp"]);
       expect(realtime.dataDeps).toEqual({ interval: 1000 });
     });
   });
@@ -330,8 +330,8 @@ describe("Computation Classes Refactored", () => {
     test("should track instances", () => {
       const c1 = Count.create({ record: userEntity });
       const c2 = Count.create({ record: postEntity });
-      const s1 = Summation.create({ record: userEntity, attributeQuery: {} });
-      const a1 = Average.create({ record: postEntity, attributeQuery: {} });
+      const s1 = Summation.create({ record: userEntity, attributeQuery: [] });
+      const a1 = Average.create({ record: postEntity, attributeQuery: [] });
       const ws1 = WeightedSummation.create({ record: userEntity, callback: () => 1 });
       const t1 = Transform.create({ record: postEntity, callback: (x: any) => x });
       const any1 = Any.create({ record: userEntity, callback: () => true });
@@ -350,7 +350,7 @@ describe("Computation Classes Refactored", () => {
 
     test("should use is() for type checking", () => {
       const count = Count.create({ record: userEntity });
-      const sum = Summation.create({ record: userEntity, attributeQuery: {} });
+      const sum = Summation.create({ record: userEntity, attributeQuery: [] });
       
       expect(Count.is(count)).toBe(true);
       expect(Count.is(sum)).toBe(false);

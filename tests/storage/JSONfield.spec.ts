@@ -5,7 +5,7 @@ import { EntityToTableMap } from "@storage";
 import { MatchExp } from "@storage";
 import { EntityQueryHandle } from "@storage";
 import TestLogger from "./testLogger.js";
-import { Entity, KlassInstance, Property } from '@shared';
+import { Entity, EntityInstance, Property } from '@shared';
 describe('json field test', () => {
     let db: SQLiteDB
     let setup
@@ -13,7 +13,7 @@ describe('json field test', () => {
     let logger
 
     beforeEach(async () => {
-        const userEntity: KlassInstance<typeof Entity> = Entity.create({
+        const userEntity: EntityInstance = Entity.create({
             name: 'User',
             properties: [
                 Property.create({

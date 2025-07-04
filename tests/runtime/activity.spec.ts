@@ -3,8 +3,7 @@ import {
     KlassByName, Controller, EntityIdRef, RecordMutationEvent,
     ActivityCall, ActivityGroupNode,
     MonoSystem,
-    KlassInstance,
-    Relation
+    RelationInstance
 } from 'interaqt';
 import { createData } from './data/activity/index.js';
 
@@ -24,7 +23,7 @@ describe("activity state", () => {
     let relationCreateEvent: RecordMutationEvent|undefined
     let relationDeleteEvent: RecordMutationEvent|undefined
     let controller!: Controller
-    let friendRelation!: KlassInstance<typeof Relation>
+    let friendRelation!: RelationInstance
 
     beforeEach(async () => {
         const { entities, relations, interactions, dicts, activities }  = createData()
@@ -67,7 +66,7 @@ describe("activity state", () => {
         // const { activityId, state } = await  createFriendRelationActivityCall.create()
         // expect(activityId).not.toBe(null)
         // expect(state.current!.uuid).toBe(sendRequestName)
-        let activityId
+        let activityId: string | undefined
 
         // 2. 交互顺序错误 approve
         const res1 = await controller.callActivityInteraction(activityName, approveName, activityId, {user: userA})
@@ -81,7 +80,7 @@ describe("activity state", () => {
         // 3. a 发起 sendFriendRequest
         const res2 = await controller.callActivityInteraction(activityName, sendRequestName, activityId, {user: userA, payload: {to: userB}})
         expect(res2.error).toBeUndefined()
-        activityId = res2.context!.activityId
+        activityId = res2.context!.activityId as string
 
 
         // 4. 交互顺序错误 a sendFriendRequest
@@ -94,7 +93,7 @@ describe("activity state", () => {
         // 6. 正确 b approve
         const res5 = await controller.callActivityInteraction(activityName, approveName, activityId,{user: userB})
         // 查询关系是否正确建立
-        const relations = await controller.system.storage.findRelationByName(friendRelation.name, undefined, undefined, ['*', ['source', {attributeQuery: ['*']}], ['target', {attributeQuery: ['*']}]])
+        const relations = await controller.system.storage.findRelationByName(friendRelation.name!, undefined, undefined, ['*', ['source', {attributeQuery: ['*']}], ['target', {attributeQuery: ['*']}]])
         expect(relations.length).toBe(1)
         expect(relations[0].source.id).toBe(userA.id)
         expect(relations[0].target.id).toBe(userB.id)
@@ -109,7 +108,7 @@ describe("activity state", () => {
         const res7 = await controller.callActivityInteraction(activityName,cancelName, activityId, {user: userA})
         expect(res7.error).toBeDefined()
         // 8. 获取 activity 状态是否 complete
-        const currentState = await createFriendRelationActivityCall.getState(activityId)
+        const currentState = await createFriendRelationActivityCall.getState(activityId!)
         expect(currentState.current).toBeUndefined()
     })
 

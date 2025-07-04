@@ -229,23 +229,23 @@ describe('StateMachineRunner', () => {
         const IncrementingState = StateNode.create({
             name: 'incrementing',
             // 动态计算：返回一个增量后的值
-            computeValue: function(lastValue: any) {
+            computeValue: ((lastValue: any) => {
                 const baseValue = typeof lastValue === 'number' ? lastValue : 0
                 return baseValue + 1
-            }
+            }) as any
         })
 
         const IdleState = StateNode.create({
             name: 'idle',
             // idle 状态不改变值
-            computeValue: function(lastValue: any) {
+            computeValue: ((lastValue: any) => {
                 return typeof lastValue === 'number' ? lastValue : 0
-            }
+            }) as any
         })
 
         // 创建状态转移
         const IdleToIncrementingTransfer = StateTransfer.create({
-            trigger: IncrementInteraction,
+            trigger: IncrementInteraction as any,
             current: IdleState,
             next: IncrementingState,
             computeTarget: (event: any) => {
@@ -254,7 +254,7 @@ describe('StateMachineRunner', () => {
         })
 
         const IncrementingToIdleTransfer = StateTransfer.create({
-            trigger: ResetInteraction,
+            trigger: ResetInteraction as any,
             current: IncrementingState,
             next: IdleState,
             computeTarget: (event: any) => {
@@ -277,13 +277,13 @@ describe('StateMachineRunner', () => {
             states: [idleStateForName, incrementingStateForName],
             transfers: [
                 StateTransfer.create({
-                    trigger: IncrementInteraction,
+                    trigger: IncrementInteraction as any,
                     current: idleStateForName,
                     next: incrementingStateForName,
                     computeTarget: (event: any) => ({ id: event.payload!.counter.id })
                 }),
                 StateTransfer.create({
-                    trigger: ResetInteraction,
+                    trigger: ResetInteraction as any,
                     current: incrementingStateForName,
                     next: idleStateForName,
                     computeTarget: (event: any) => ({ id: event.payload!.counter.id })
@@ -386,14 +386,14 @@ describe('StateMachineRunner', () => {
         // 创建状态节点 - 每次触发时记录当前时间戳
         const LoggingState = StateNode.create({
             name: 'logging',
-            computeValue: function() {
+            computeValue: (() => {
                 return Date.now()
-            }
+            }) as any
         })
 
         // 创建状态转移 - 自循环转换
         const LoggingToLoggingTransfer = StateTransfer.create({
-            trigger: LogTimeInteraction,
+            trigger: LogTimeInteraction as any,
             current: LoggingState,
             next: LoggingState,
             computeTarget: (event: any) => {
