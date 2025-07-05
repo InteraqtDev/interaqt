@@ -1,205 +1,130 @@
-import { 
-  Interaction, 
-  Action, 
-  Payload, 
-  PayloadItem,
-  Attributive,
-  Condition,
-  BoolExp,
-  boolExpToConditions,
-  boolExpToAttributives
-} from 'interaqt'
-import { Style } from '../entities/Style'
+import { Interaction, Action, Payload, PayloadItem, Attributive, BoolExp, boolExpToAttributives } from 'interaqt';
+import { Style } from '../entities/Style';
+import { User } from '../entities/User';
 
-// 权限检查 Attributive
-export const OperatorOrAdminRole = Attributive.create({
+// Define permission attributives
+const AdminRole = Attributive.create({
+  name: 'AdminRole',
+  content: function(targetUser, eventArgs) {
+    return eventArgs.user && eventArgs.user.role === 'admin';
+  }
+});
+
+const OperatorOrAdminRole = Attributive.create({
   name: 'OperatorOrAdminRole',
   content: function(targetUser, eventArgs) {
-    // eventArgs.user 包含调用交互的用户信息
-    return eventArgs.user && (eventArgs.user.role === 'operator' || eventArgs.user.role === 'admin')
+    return eventArgs.user && (eventArgs.user.role === 'operator' || eventArgs.user.role === 'admin');
   }
-})
+});
 
-export const AdminRole = Attributive.create({
-  name: 'AdminRole', 
-  content: function(targetUser, eventArgs) {
-    // eventArgs.user 包含调用交互的用户信息
-    return eventArgs.user && eventArgs.user.role === 'admin'
+// Style state attributives
+const StyleNotOffline = Attributive.create({
+  name: 'StyleNotOffline',
+  content: async function(targetStyle, eventArgs) {
+    // Check that the style in payload is not offline
+    const style = eventArgs.payload?.styleId;
+    return style && style.status !== 'offline';
   }
-})
+});
 
-// 条件检查
-const StyleNotDeleted = Condition.create({
-  name: 'StyleNotDeleted',
-  content: function(this: any, { payload }) {
-    // 这里需要在交互执行时检查 style 的 isDeleted 状态
-    // 实际检查会在交互处理中进行
-    return true // 默认通过，实际检查在运行时
+const StyleIsDraft = Attributive.create({
+  name: 'StyleIsDraft',
+  content: async function(targetStyle, eventArgs) {
+    // Check that the style in payload is draft
+    const style = eventArgs.payload?.styleId;
+    return style && style.status === 'draft';
   }
-})
+});
 
-// CreateStyle 交互
+// CreateStyle interaction
 export const CreateStyle = Interaction.create({
   name: 'CreateStyle',
-  action: Action.create({ name: 'create' }),
+  action: Action.create({ name: 'createStyle' }),
   payload: Payload.create({
     items: [
-      PayloadItem.create({
-        name: 'label',
-        isRef: false
-      }),
-      PayloadItem.create({
-        name: 'slug',
-        isRef: false
-      }),
-      PayloadItem.create({
-        name: 'description',
-        isRef: false,
-        required: false
-      }),
-      PayloadItem.create({
-        name: 'type',
-        isRef: false
-      }),
-      PayloadItem.create({
-        name: 'thumbKey',
-        isRef: false,
-        required: false
-      }),
-      PayloadItem.create({
-        name: 'priority',
-        isRef: false
-      })
+      PayloadItem.create({ name: 'label' }),
+      PayloadItem.create({ name: 'slug' }),
+      PayloadItem.create({ name: 'description' }),
+      PayloadItem.create({ name: 'type' }),
+      PayloadItem.create({ name: 'thumbKey' }),
+      PayloadItem.create({ name: 'priority' })
     ]
   }),
-  userAttributives: boolExpToAttributives(
-    BoolExp.atom(OperatorOrAdminRole)
-  )
-})
+  // Permission: admin or operator
+  // userAttributives: boolExpToAttributives(
+  //   BoolExp.atom(OperatorOrAdminRole)
+  // )
+});
 
-// UpdateStyle 交互
+// UpdateStyle interaction
 export const UpdateStyle = Interaction.create({
   name: 'UpdateStyle',
-  action: Action.create({ name: 'update' }),
+  action: Action.create({ name: 'updateStyle' }),
   payload: Payload.create({
     items: [
-      PayloadItem.create({
-        name: 'styleId',
-        base: Style,
-        isRef: true
-      }),
-      PayloadItem.create({
-        name: 'label',
-        isRef: false,
-        required: false
-      }),
-      PayloadItem.create({
-        name: 'description',
-        isRef: false,
-        required: false
-      }),
-      PayloadItem.create({
-        name: 'type',
-        isRef: false,
-        required: false
-      }),
-      PayloadItem.create({
-        name: 'thumbKey',
-        isRef: false,
-        required: false
-      }),
-      PayloadItem.create({
-        name: 'priority',
-        isRef: false,
-        required: false
-      })
+      PayloadItem.create({ name: 'styleId', base: Style, isRef: true }),
+      PayloadItem.create({ name: 'label' }),
+      PayloadItem.create({ name: 'slug' }),
+      PayloadItem.create({ name: 'description' }),
+      PayloadItem.create({ name: 'type' }),
+      PayloadItem.create({ name: 'thumbKey' }),
+      PayloadItem.create({ name: 'priority' })
     ]
   }),
-  userAttributives: boolExpToAttributives(
-    BoolExp.atom(OperatorOrAdminRole)
-  ),
-  conditions: boolExpToConditions(
-    BoolExp.atom(StyleNotDeleted)
-  )
-})
+  // Permission: admin or operator, and style must not be offline
+  // userAttributives: boolExpToAttributives(
+  //   BoolExp.atom(OperatorOrAdminRole)
+  //     .and(BoolExp.atom(StyleNotOffline))
+  // )
+});
 
-// DeleteStyle 交互（软删除）
+// DeleteStyle interaction (soft delete)
 export const DeleteStyle = Interaction.create({
   name: 'DeleteStyle',
-  action: Action.create({ name: 'delete' }),
+  action: Action.create({ name: 'deleteStyle' }),
   payload: Payload.create({
     items: [
-      PayloadItem.create({
-        name: 'styleId',
-        base: Style,
-        isRef: true
-      })
+      PayloadItem.create({ name: 'styleId', base: Style, isRef: true })
     ]
   }),
-  userAttributives: boolExpToAttributives(
-    BoolExp.atom(AdminRole)
-  ),
-  conditions: boolExpToConditions(
-    BoolExp.atom(StyleNotDeleted)
-  )
-})
+  // Permission: admin only
+  // userAttributives: boolExpToAttributives(
+  //   BoolExp.atom(AdminRole)
+  // )
+});
 
-// RestoreStyle 交互
-export const RestoreStyle = Interaction.create({
-  name: 'RestoreStyle',
-  action: Action.create({ name: 'restore' }),
-  payload: Payload.create({
-    items: [
-      PayloadItem.create({
-        name: 'styleId',
-        base: Style,
-        isRef: true
-      })
-    ]
-  }),
-  userAttributives: boolExpToAttributives(
-    BoolExp.atom(AdminRole)
-  )
-})
-
-// PublishStyle 交互
+// PublishStyle interaction
 export const PublishStyle = Interaction.create({
   name: 'PublishStyle',
-  action: Action.create({ name: 'publish' }),
+  action: Action.create({ name: 'publishStyle' }),
   payload: Payload.create({
     items: [
-      PayloadItem.create({
-        name: 'styleId',
-        base: Style,
-        isRef: true
-      })
+      PayloadItem.create({ name: 'styleId', base: Style, isRef: true })
     ]
   }),
-  userAttributives: boolExpToAttributives(
-    BoolExp.atom(OperatorOrAdminRole)
-  ),
-  conditions: boolExpToConditions(
-    BoolExp.atom(StyleNotDeleted)
-  )
-})
+  // Permission: admin or operator, and style must be draft
+  // userAttributives: boolExpToAttributives(
+  //   BoolExp.atom(OperatorOrAdminRole)
+  //     .and(BoolExp.atom(StyleIsDraft))
+  // )
+  // This will trigger Version creation through Transform
+  // and update Style status through StateMachine
+});
 
-// UnpublishStyle 交互
-export const UnpublishStyle = Interaction.create({
-  name: 'UnpublishStyle',
-  action: Action.create({ name: 'unpublish' }),
+// UpdateStyleOrder interaction
+export const UpdateStyleOrder = Interaction.create({
+  name: 'UpdateStyleOrder',
+  action: Action.create({ name: 'updateStyleOrder' }),
   payload: Payload.create({
     items: [
-      PayloadItem.create({
-        name: 'styleId',
-        base: Style,
-        isRef: true
+      PayloadItem.create({ 
+        name: 'styleOrders',
+        isCollection: true
       })
     ]
   }),
-  userAttributives: boolExpToAttributives(
-    BoolExp.atom(OperatorOrAdminRole)
-  ),
-  conditions: boolExpToConditions(
-    BoolExp.atom(StyleNotDeleted)
-  )
-}) 
+  // Permission: admin or operator
+  // userAttributives: boolExpToAttributives(
+  //   BoolExp.atom(OperatorOrAdminRole)
+  // )
+}); 

@@ -1,25 +1,26 @@
-import { Controller, MonoSystem, KlassByName, PGLiteDB } from 'interaqt';
-import { entities, relations, interactions, activities, dicts } from './backend/index.js';
-import * as initialData from './initialData.js';
+import { MonoSystem, Controller, PGLiteDB } from 'interaqt';
+import { entities, relations, interactions } from './backend/index.js';
 
-const system = new MonoSystem(new PGLiteDB('pgdata'));
-system.conceptClass = KlassByName;
+async function main() {
+  console.log('create system...');
+  const system = new MonoSystem(new PGLiteDB());
 
-const controller = new Controller(system, entities, relations, activities, interactions, dicts, []);
-await controller.setup(true);
+  console.log('create controller...');
+  const controller = new Controller(
+    system, 
+    entities, 
+    relations, 
+    [],  // activities
+    interactions,
+    [],  // dicts
+    []   // side effects
+  );
 
-
-const {entities: initialEntityData, relations: initialRelationData } = initialData;
-
-console.log('Creating initial data...');
-for (const [entityName, entityData] of Object.entries(initialEntityData)) {
-    console.log(`Creating entity ${entityName}`);
-    console.log(entityData);
-    await controller.system.storage.create(entityName, entityData);
+  console.log('set up...');
+  await controller.setup(true);
+  
+  console.log('CMS backend initialized successfully!');
+  process.exit(0);
 }
-for (const [relationName, relationData] of Object.entries(initialRelationData)) {
-    console.log(`Creating relation ${relationName}`);
-    console.log(relationData);
-    await controller.system.storage.create(relationName, relationData);
-}
-console.log('Initial data created');
+
+main().catch(console.error);

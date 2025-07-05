@@ -1,13 +1,9 @@
-export { User } from './User'
-export { 
-  Style, 
-  draftState, 
-  publishedState, 
-  offlineState,
-  activeState,
-  deletedState,
-  StatusStateMachine,
-  DeletionStateMachine,
-  updateStyleStateMachines 
-} from './Style'
-export { Version } from './Version' 
+export * from './User';
+export * from './Style';
+export * from './Version';
+
+import { User } from './User';
+import { Style } from './Style';
+import { Version } from './Version';
+
+export const entities = [User, Style, Version]; 

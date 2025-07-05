@@ -2,7 +2,8 @@ import { describe, test, expect, beforeEach } from 'vitest'
 import { 
   Entity, Property, Relation, Interaction, Action, Payload, PayloadItem,
   Transform, StateMachine, StateNode, StateTransfer, Count, MatchExp,
-  InteractionEventEntity, Controller, MonoSystem, PGLiteDB
+  InteractionEventEntity, Controller, MonoSystem, PGLiteDB,
+  Attributive, BoolExp, boolExpToAttributives
 } from 'interaqt'
 
 describe('Simple CRUD Example', () => {
@@ -15,6 +16,7 @@ describe('Simple CRUD Example', () => {
     properties: [
       Property.create({ name: 'username', type: 'string' }),
       Property.create({ name: 'email', type: 'string' }),
+      Property.create({ name: 'role', type: 'string', defaultValue: () => 'user' }),
       // Article count will be added after relation is defined
     ]
   })
@@ -100,6 +102,97 @@ describe('Simple CRUD Example', () => {
     })
   )
 
+  // === Attributives ===
+  
+  // Admin role attributive
+  const AdminAttributive = Attributive.create({
+    name: 'Admin',
+    content: function Admin(targetUser, eventArgs) {
+      return eventArgs.user.role === 'admin'
+    }
+  })
+
+  // Author role attributive - basic author role
+  const AuthorAttributive = Attributive.create({
+    name: 'Author',
+    content: function Author(targetUser, eventArgs) {
+      return eventArgs.user.role === 'author' || eventArgs.user.role === 'admin'
+    }
+  })
+
+  // Article author attributive - check if user is the author of the article
+  const ArticleAuthorAttributive = Attributive.create({
+    name: 'ArticleAuthor',
+    content: async function ArticleAuthor(targetUser, eventArgs) {
+      // this is bound to controller instance
+      const { MatchExp } = this.globals
+      const articleId = eventArgs.payload.article?.id
+      
+      if (!articleId) return false
+      
+      const article = await this.system.storage.findOne('Article',
+        MatchExp.atom({ key: 'id', value: ['=', articleId] }),
+        undefined,
+        [['author', { attributeQuery: ['id'] }]]
+      )
+      
+      return article && article.author.id === eventArgs.user.id
+    }
+  })
+
+  // Draft article attributive - payload constraint to only allow draft articles
+  const DraftArticleAttributive = Attributive.create({
+    name: 'DraftArticle',
+    content: async function DraftArticle(article, eventArgs) {
+      // article is the payload item value
+      if (!article?.id) return false
+      
+      // this is bound to controller instance
+      const { MatchExp } = this.globals
+      const articleData = await this.system.storage.findOne('Article',
+        MatchExp.atom({ key: 'id', value: ['=', article.id] }),
+        undefined,
+        ['status']
+      )
+      
+      return articleData && articleData.status === 'draft'
+    }
+  })
+
+  // Not deleted article attributive - payload constraint
+  const NotDeletedArticleAttributive = Attributive.create({
+    name: 'NotDeletedArticle', 
+    content: async function NotDeletedArticle(article, eventArgs) {
+      if (!article?.id) return false
+      
+      const { MatchExp } = this.globals
+      const articleData = await this.system.storage.findOne('Article',
+        MatchExp.atom({ key: 'id', value: ['=', article.id] }),
+        undefined,
+        ['status']
+      )
+      
+      return articleData && articleData.status !== 'deleted'
+    }
+  })
+
+  // Deleted article attributive - payload constraint for restore
+  const DeletedArticleAttributive = Attributive.create({
+    name: 'DeletedArticle',
+    content: async function DeletedArticle(article, eventArgs) {
+      if (!article?.id) return false
+      
+      const { MatchExp } = this.globals
+      const articleData = await this.system.storage.findOne('Article',
+        MatchExp.atom({ key: 'id', value: ['=', article.id] }),
+        undefined,
+        ['status']
+      )
+      
+      return articleData && articleData.status === 'deleted'
+    }
+  })
+
   // === Interactions ===
   const CreateArticle = Interaction.create({
     name: 'CreateArticle',
@@ -110,7 +203,11 @@ describe('Simple CRUD Example', () => {
         PayloadItem.create({ name: 'content', required: true }),
         PayloadItem.create({ name: 'authorId', base: User, isRef: true, required: true })
       ]
-    })
+    }),
+    // Only authors or admins can create articles
+    userAttributives: boolExpToAttributives(
+      BoolExp.atom(AuthorAttributive)
+    )
   })
 
   const PublishArticle = Interaction.create({
@@ -118,9 +215,23 @@ describe('Simple CRUD Example', () => {
     action: Action.create({ name: 'publishArticle' }),
     payload: Payload.create({
       items: [
-        PayloadItem.create({ name: 'articleId', base: Article, isRef: true, required: true })
+        PayloadItem.create({ 
+          name: 'article', 
+          base: Article, 
+          isRef: true, 
+          required: true,
+          // Can only publish draft articles
+          attributives: boolExpToAttributives(
+            BoolExp.atom(DraftArticleAttributive)
+          )
+        })
       ]
-    })
+    }),
+    // Only article author or admin can publish
+    userAttributives: boolExpToAttributives(
+      BoolExp.atom(ArticleAuthorAttributive)
+        .or(BoolExp.atom(AdminAttributive))
+    )
   })
 
   const DeleteArticle = Interaction.create({
@@ -128,9 +239,23 @@ describe('Simple CRUD Example', () => {
     action: Action.create({ name: 'deleteArticle' }),
     payload: Payload.create({
       items: [
-        PayloadItem.create({ name: 'articleId', base: Article, isRef: true, required: true })
+        PayloadItem.create({ 
+          name: 'article', 
+          base: Article, 
+          isRef: true, 
+          required: true,
+          // Can only delete non-deleted articles
+          attributives: boolExpToAttributives(
+            BoolExp.atom(NotDeletedArticleAttributive)
+          )
+        })
       ]
-    })
+    }),
+    // Only article author or admin can delete
+    userAttributives: boolExpToAttributives(
+      BoolExp.atom(ArticleAuthorAttributive)
+        .or(BoolExp.atom(AdminAttributive))
+    )
   })
 
   const RestoreArticle = Interaction.create({
@@ -138,9 +263,22 @@ describe('Simple CRUD Example', () => {
     action: Action.create({ name: 'restoreArticle' }),
     payload: Payload.create({
       items: [
-        PayloadItem.create({ name: 'articleId', base: Article, isRef: true, required: true })
+        PayloadItem.create({ 
+          name: 'article', 
+          base: Article, 
+          isRef: true, 
+          required: true,
+          // Can only restore deleted articles
+          attributives: boolExpToAttributives(
+            BoolExp.atom(DeletedArticleAttributive)
+          )
+        })
       ]
-    })
+    }),
+    // Only admins can restore deleted articles
+    userAttributives: boolExpToAttributives(
+      BoolExp.atom(AdminAttributive)
+    )
   })
 
   // Now add transfers to the state machine
@@ -149,25 +287,25 @@ describe('Simple CRUD Example', () => {
       current: draftState,
       next: publishedState,
       trigger: PublishArticle,
-      computeTarget: (event) => ({ id: event.payload.articleId.id })
+      computeTarget: (event) => ({ id: event.payload.article.id })
     }),
     StateTransfer.create({
       current: publishedState,
       next: deletedState,
       trigger: DeleteArticle,
-      computeTarget: (event) => ({ id: event.payload.articleId.id })
+      computeTarget: (event) => ({ id: event.payload.article.id })
     }),
     StateTransfer.create({
       current: draftState,
       next: deletedState,
       trigger: DeleteArticle,
-      computeTarget: (event) => ({ id: event.payload.articleId.id })
+      computeTarget: (event) => ({ id: event.payload.article.id })
     }),
     StateTransfer.create({
       current: deletedState,
       next: draftState,
       trigger: RestoreArticle,
-      computeTarget: (event) => ({ id: event.payload.articleId.id })
+      computeTarget: (event) => ({ id: event.payload.article.id })
     })
   ]
 
@@ -194,10 +332,11 @@ describe('Simple CRUD Example', () => {
   })
 
   test('should create an article', async () => {
-    // Setup: Create a test user
+    // Setup: Create a test user with author role
     const testUser = await system.storage.create('User', {
       username: 'john_doe',
-      email: 'john@example.com'
+      email: 'john@example.com',
+      role: 'author'  // Set author role
     })
 
     // Act: Create an article
@@ -237,10 +376,11 @@ describe('Simple CRUD Example', () => {
   })
 
   test('should publish an article', async () => {
-    // Setup: Create user and article
+    // Setup: Create user with author role and article
     const testUser = await system.storage.create('User', {
       username: 'jane_doe',
-      email: 'jane@example.com'
+      email: 'jane@example.com',
+      role: 'author'  // Set author role
     })
 
     const createResult = await controller.callInteraction('CreateArticle', {
@@ -260,11 +400,11 @@ describe('Simple CRUD Example', () => {
       ['id', 'title', 'status']
     )
 
-    // Act: Publish the article
+    // Act: Publish the article (author can publish their own article)
     const publishResult = await controller.callInteraction('PublishArticle', {
       user: testUser,
       payload: {
-        articleId: { id: article.id }
+        article: { id: article.id }
       }
     })
 
@@ -281,10 +421,11 @@ describe('Simple CRUD Example', () => {
   })
 
   test('should soft delete an article', async () => {
-    // Setup: Create user and article
+    // Setup: Create user with author role and article
     const testUser = await system.storage.create('User', {
       username: 'delete_test',
-      email: 'delete@example.com'
+      email: 'delete@example.com',
+      role: 'author'  // Set author role
     })
 
     await controller.callInteraction('CreateArticle', {
@@ -302,11 +443,11 @@ describe('Simple CRUD Example', () => {
       ['id']
     )
 
-    // Act: Delete the article
+    // Act: Delete the article (author can delete their own article)
     const deleteResult = await controller.callInteraction('DeleteArticle', {
       user: testUser,
       payload: {
-        articleId: { id: article.id }
+        article: { id: article.id }
       }
     })
 
@@ -335,10 +476,11 @@ describe('Simple CRUD Example', () => {
   })
 
   test('should filter active articles using ActiveArticle entity', async () => {
-    // Setup: Create user and multiple articles
+    // Setup: Create user with author role and multiple articles
     const testUser = await system.storage.create('User', {
       username: 'filter_test',
-      email: 'filter@example.com'
+      email: 'filter@example.com',
+      role: 'author'  // Set author role
     })
 
     // Create 3 articles
@@ -353,7 +495,7 @@ describe('Simple CRUD Example', () => {
       })
     }
 
-    // Delete the second article
+    // Delete the second article (author can delete their own article)
     const articleToDelete = await system.storage.findOne('Article',
       MatchExp.atom({ key: 'title', value: ['=', 'Article 2'] }),
       undefined,
@@ -363,7 +505,7 @@ describe('Simple CRUD Example', () => {
     await controller.callInteraction('DeleteArticle', {
       user: testUser,
       payload: {
-        articleId: { id: articleToDelete.id }
+        article: { id: articleToDelete.id }
       }
     })
 
@@ -382,18 +524,26 @@ describe('Simple CRUD Example', () => {
   })
 
   test('should restore a deleted article', async () => {
-    // Setup: Create and delete an article
-    const testUser = await system.storage.create('User', {
-      username: 'restore_test',
-      email: 'restore@example.com'
+    // Setup: Create author and admin users
+    const authorUser = await system.storage.create('User', {
+      username: 'author_user',
+      email: 'author@example.com',
+      role: 'author'
     })
 
+    const adminUser = await system.storage.create('User', {
+      username: 'admin_user',
+      email: 'admin@example.com',
+      role: 'admin'
+    })
+
+    // Author creates an article
     await controller.callInteraction('CreateArticle', {
-      user: testUser,
+      user: authorUser,
       payload: {
         title: 'Article to Restore',
         content: 'This article will be restored.',
-        authorId: { id: testUser.id }
+        authorId: { id: authorUser.id }
       }
     })
 
@@ -403,11 +553,11 @@ describe('Simple CRUD Example', () => {
       ['id']
     )
 
-    // Delete the article
+    // Author deletes the article
     await controller.callInteraction('DeleteArticle', {
-      user: testUser,
+      user: authorUser,
       payload: {
-        articleId: { id: article.id }
+        article: { id: article.id }
       }
     })
 
@@ -419,11 +569,11 @@ describe('Simple CRUD Example', () => {
     )
     expect(currentArticle.status).toBe('deleted')
 
-    // Act: Restore the article
+    // Act: Admin restores the article
     const restoreResult = await controller.callInteraction('RestoreArticle', {
-      user: testUser,
+      user: adminUser,
       payload: {
-        articleId: { id: article.id }
+        article: { id: article.id }
       }
     })
 
@@ -447,9 +597,9 @@ describe('Simple CRUD Example', () => {
     )
     expect(activeArticles.length).toBe(1)
 
-    // User's article count should be 1 again
+    // Author's article count should be 1 again
     const updatedUser = await system.storage.findOne('User',
-      MatchExp.atom({ key: 'id', value: ['=', testUser.id] }),
+      MatchExp.atom({ key: 'id', value: ['=', authorUser.id] }),
       undefined,
       ['articleCount']
     )
@@ -457,19 +607,20 @@ describe('Simple CRUD Example', () => {
   })
 
   test('should handle complex workflow: create → publish → delete → restore', async () => {
-    // Setup
-    const testUser = await system.storage.create('User', {
-      username: 'workflow_test',
-      email: 'workflow@example.com'
+    // Setup: Use admin user who can perform all operations
+    const adminUser = await system.storage.create('User', {
+      username: 'workflow_admin',
+      email: 'workflow@example.com',
+      role: 'admin'
     })
 
     // Create
     const createResult = await controller.callInteraction('CreateArticle', {
-      user: testUser,
+      user: adminUser,
       payload: {
         title: 'Workflow Article',
         content: 'Testing complete workflow',
-        authorId: { id: testUser.id }
+        authorId: { id: adminUser.id }
       }
     })
     expect(createResult.error).toBeUndefined()
@@ -483,8 +634,8 @@ describe('Simple CRUD Example', () => {
 
     // Publish
     const publishResult = await controller.callInteraction('PublishArticle', {
-      user: testUser,
-      payload: { articleId: { id: article.id } }
+      user: adminUser,
+      payload: { article: { id: article.id } }
     })
     expect(publishResult.error).toBeUndefined()
 
@@ -497,8 +648,8 @@ describe('Simple CRUD Example', () => {
 
     // Delete
     const deleteResult = await controller.callInteraction('DeleteArticle', {
-      user: testUser,
-      payload: { articleId: { id: article.id } }
+      user: adminUser,
+      payload: { article: { id: article.id } }
     })
     expect(deleteResult.error).toBeUndefined()
 
@@ -512,8 +663,8 @@ describe('Simple CRUD Example', () => {
 
     // Restore
     const restoreResult = await controller.callInteraction('RestoreArticle', {
-      user: testUser,
-      payload: { articleId: { id: article.id } }
+      user: adminUser,
+      payload: { article: { id: article.id } }
     })
     expect(restoreResult.error).toBeUndefined()
 
@@ -525,5 +676,284 @@ describe('Simple CRUD Example', () => {
     
     expect(currentArticle.status).toBe('draft')  // Restored to draft
     expect(currentArticle.isDeleted).toBe(false)
+  })
+
+  // === Permission System Tests ===
+  
+  test('should deny regular users from creating articles', async () => {
+    // Setup: Create a regular user (not author or admin)
+    const regularUser = await system.storage.create('User', {
+      username: 'regular_user',
+      email: 'regular@example.com',
+      role: 'user'  // Regular user role
+    })
+
+    // Act: Try to create an article
+    const result = await controller.callInteraction('CreateArticle', {
+      user: regularUser,
+      payload: {
+        title: 'Unauthorized Article',
+        content: 'This should fail',
+        authorId: { id: regularUser.id }
+      }
+    })
+
+    // Assert: Should fail with permission error
+    expect(result.error).toBeTruthy()
+    expect((result.error as any).type).toBe('check user failed')
+  })
+
+  test('should deny non-authors from publishing other users articles', async () => {
+    // Setup: Create two authors
+    const author1 = await system.storage.create('User', {
+      username: 'author1',
+      email: 'author1@example.com',
+      role: 'author'
+    })
+
+    const author2 = await system.storage.create('User', {
+      username: 'author2', 
+      email: 'author2@example.com',
+      role: 'author'
+    })
+
+    // Author1 creates an article
+    await controller.callInteraction('CreateArticle', {
+      user: author1,
+      payload: {
+        title: 'Author1 Article',
+        content: 'Created by author1',
+        authorId: { id: author1.id }
+      }
+    })
+
+    const article = await system.storage.findOne('Article',
+      MatchExp.atom({ key: 'title', value: ['=', 'Author1 Article'] }),
+      undefined,
+      ['id']
+    )
+
+    // Act: Author2 tries to publish author1's article
+    const publishResult = await controller.callInteraction('PublishArticle', {
+      user: author2,
+      payload: {
+        article: { id: article.id }
+      }
+    })
+
+    // Assert: Should fail with permission error
+    expect(publishResult.error).toBeTruthy()
+    expect((publishResult.error as any).type).toBe('check user failed')
+  })
+
+  test('should allow admins to operate on any article', async () => {
+    // Setup: Create author and admin
+    const author = await system.storage.create('User', {
+      username: 'content_author',
+      email: 'content_author@example.com',
+      role: 'author'
+    })
+
+    const admin = await system.storage.create('User', {
+      username: 'super_admin',
+      email: 'admin@example.com',
+      role: 'admin'
+    })
+
+    // Author creates an article
+    await controller.callInteraction('CreateArticle', {
+      user: author,
+      payload: {
+        title: 'Author Article',
+        content: 'Created by author',
+        authorId: { id: author.id }
+      }
+    })
+
+    const article = await system.storage.findOne('Article',
+      MatchExp.atom({ key: 'title', value: ['=', 'Author Article'] }),
+      undefined,
+      ['id']
+    )
+
+    // Act: Admin publishes author's article
+    const publishResult = await controller.callInteraction('PublishArticle', {
+      user: admin,
+      payload: {
+        article: { id: article.id }
+      }
+    })
+
+    // Assert: Admin can publish any article
+    expect(publishResult.error).toBeUndefined()
+
+    // Admin can also delete it
+    const deleteResult = await controller.callInteraction('DeleteArticle', {
+      user: admin,
+      payload: {
+        article: { id: article.id }
+      }
+    })
+    expect(deleteResult.error).toBeUndefined()
+  })
+
+  test('should enforce payload attributive constraints', async () => {
+    // Setup: Create admin user
+    const admin = await system.storage.create('User', {
+      username: 'payload_test_admin',
+      email: 'payload_admin@example.com',
+      role: 'admin'
+    })
+
+    // Create and publish an article
+    await controller.callInteraction('CreateArticle', {
+      user: admin,
+      payload: {
+        title: 'Payload Test Article',
+        content: 'Testing payload constraints',
+        authorId: { id: admin.id }
+      }
+    })
+
+    const article = await system.storage.findOne('Article',
+      MatchExp.atom({ key: 'title', value: ['=', 'Payload Test Article'] }),
+      undefined,
+      ['id']
+    )
+
+    await controller.callInteraction('PublishArticle', {
+      user: admin,
+      payload: { article: { id: article.id } }
+    })
+
+    // Act 1: Try to publish an already published article
+    const republishResult = await controller.callInteraction('PublishArticle', {
+      user: admin,
+      payload: { article: { id: article.id } }
+    })
+
+    // Assert: Should fail because article is not in draft status
+    expect(republishResult.error).toBeTruthy()
+    expect((republishResult.error as any).type).toBe('article not match attributive')
+
+    // Act 2: Delete the article
+    await controller.callInteraction('DeleteArticle', {
+      user: admin,
+      payload: { article: { id: article.id } }
+    })
+
+    // Try to delete again
+    const redeleteResult = await controller.callInteraction('DeleteArticle', {
+      user: admin,
+      payload: { article: { id: article.id } }
+    })
+
+    // Assert: Should fail because article is already deleted
+    expect(redeleteResult.error).toBeTruthy()
+    expect((redeleteResult.error as any).type).toBe('article not match attributive')
+
+    // Act 3: Try to restore a non-deleted article (create a new one first)
+    await controller.callInteraction('CreateArticle', {
+      user: admin,
+      payload: {
+        title: 'Active Article',
+        content: 'This article is not deleted',
+        authorId: { id: admin.id }
+      }
+    })
+
+    const activeArticle = await system.storage.findOne('Article',
+      MatchExp.atom({ key: 'title', value: ['=', 'Active Article'] }),
+      undefined,
+      ['id']
+    )
+
+    const restoreActiveResult = await controller.callInteraction('RestoreArticle', {
+      user: admin,
+      payload: { article: { id: activeArticle.id } }
+    })
+
+    // Assert: Should fail because article is not deleted
+    expect(restoreActiveResult.error).toBeTruthy()
+    expect((restoreActiveResult.error as any).type).toBe('article not match attributive')
+  })
+
+  test('should allow multiple attributives with OR logic', async () => {
+    // The PublishArticle interaction allows either the article author OR an admin
+    const author = await system.storage.create('User', {
+      username: 'or_test_author',
+      email: 'or_author@example.com',
+      role: 'author'
+    })
+
+    const admin = await system.storage.create('User', {
+      username: 'or_test_admin',
+      email: 'or_admin@example.com',
+      role: 'admin'
+    })
+
+    const regularUser = await system.storage.create('User', {
+      username: 'or_test_regular',
+      email: 'or_regular@example.com',
+      role: 'user'
+    })
+
+    // Author creates article
+    await controller.callInteraction('CreateArticle', {
+      user: author,
+      payload: {
+        title: 'OR Logic Test Article',
+        content: 'Testing OR attributive logic',
+        authorId: { id: author.id }
+      }
+    })
+
+    const article = await system.storage.findOne('Article',
+      MatchExp.atom({ key: 'title', value: ['=', 'OR Logic Test Article'] }),
+      undefined,
+      ['id']
+    )
+
+    // Test 1: Author can publish (ArticleAuthorAttributive passes)
+    const authorPublishResult = await controller.callInteraction('PublishArticle', {
+      user: author,
+      payload: { article: { id: article.id } }
+    })
+    expect(authorPublishResult.error).toBeUndefined()
+
+    // Reset article to draft for next test
+    await controller.callInteraction('DeleteArticle', {
+      user: author,
+      payload: { article: { id: article.id } }
+    })
+    await controller.callInteraction('RestoreArticle', {
+      user: admin,
+      payload: { article: { id: article.id } }
+    })
+
+    // Test 2: Admin can publish (AdminAttributive passes)
+    const adminPublishResult = await controller.callInteraction('PublishArticle', {
+      user: admin,
+      payload: { article: { id: article.id } }
+    })
+    expect(adminPublishResult.error).toBeUndefined()
+
+    // Reset article to draft for next test
+    await controller.callInteraction('DeleteArticle', {
+      user: admin,
+      payload: { article: { id: article.id } }
+    })
+    await controller.callInteraction('RestoreArticle', {
+      user: admin,
+      payload: { article: { id: article.id } }
+    })
+
+    // Test 3: Regular user cannot publish (neither attributive passes)
+    const regularPublishResult = await controller.callInteraction('PublishArticle', {
+      user: regularUser,
+      payload: { article: { id: article.id } }
+    })
+    expect(regularPublishResult.error).toBeTruthy()
+    expect((regularPublishResult.error as any).type).toBe('check user failed')
   })
 }) 

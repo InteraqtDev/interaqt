@@ -1,30 +1,32 @@
-// Style Management
-export { 
+export * from './StyleInteractions';
+export * from './VersionInteractions';
+export * from './QueryInteractions';
+
+import { 
+  CreateStyle, 
+  UpdateStyle, 
+  DeleteStyle, 
+  PublishStyle, 
+  UpdateStyleOrder 
+} from './StyleInteractions';
+import { RollbackVersion } from './VersionInteractions';
+import { 
+  GetStyles, 
+  GetStyleDetail, 
+  GetVersionHistory 
+} from './QueryInteractions';
+
+export const interactions = [
+  // Style management
   CreateStyle,
   UpdateStyle,
   DeleteStyle,
-  RestoreStyle,
   PublishStyle,
-  UnpublishStyle,
-  OperatorOrAdminRole,
-  AdminRole
-} from './StyleInteractions'
-
-// Style Ordering
-export {
-  UpdateStylePriority,
-  ReorderStyles
-} from './StyleOrderingInteractions'
-
-// Version Management
-export {
-  CreateVersion,
-  RollbackToVersion
-} from './VersionInteractions'
-
-// Query Operations
-export {
-  QueryStyles,
-  QueryVersions,
-  QueryVersionStyles
-} from './QueryInteractions' 
+  UpdateStyleOrder,
+  // Version management
+  RollbackVersion,
+  // Queries
+  GetStyles,
+  GetStyleDetail,
+  GetVersionHistory
+]; 

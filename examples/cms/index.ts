@@ -1,17 +1,19 @@
-import { startServer } from "./server";
-import { Controller, MonoSystem, KlassByName, PGLiteDB } from 'interaqt';
-import { entities, relations, interactions, activities } from './backend/index.js';
+import { Controller, MonoSystem, PGLiteDB } from 'interaqt';
+import { entities, relations, interactions } from './backend/index.js';
 
-const system = new MonoSystem(new PGLiteDB('pgdata'));
-system.conceptClass = KlassByName;
+const system = new MonoSystem(new PGLiteDB());
+const controller = new Controller(
+  system,
+  entities,
+  relations,
+  [],  // activities
+  interactions,
+  [],  // dicts
+  []   // side effects
+);
 
-const controller = new Controller(system, entities, relations, activities, interactions, [], []);
-await controller.setup(false);
+async function setup() {
+  await controller.setup();
+}
 
-startServer(controller, {
-    port: 3000,
-    parseUserId: (headers) => Promise.resolve(headers.authorization?.split(' ')[1]),
-    cors: {
-        origin: '*'
-    }
-})
+export { controller, setup };

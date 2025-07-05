@@ -1,50 +1,78 @@
-import { Entity, Property, Transform, InteractionEventEntity } from 'interaqt'
+import { Entity, Property, Transform, InteractionEventEntity, Count, StateMachine, StateNode } from 'interaqt';
+
+// Define state node for active status tracking
+const activeState = StateNode.create({
+  name: 'active',
+  computeValue: () => true  // Active state returns true
+});
+
+const inactiveState = StateNode.create({
+  name: 'inactive', 
+  computeValue: () => false
+});
+
+// State machine for tracking active version (will be set in interactions)
+export const VersionActiveStateMachine = StateMachine.create({
+  states: [activeState, inactiveState],
+  defaultState: inactiveState,
+  transfers: [] // Will be populated after interactions are defined
+});
 
 export const Version = Entity.create({
   name: 'Version',
   properties: [
-    Property.create({
-      name: 'versionNumber',
+    Property.create({ 
+      name: 'versionNumber', 
       type: 'number'
     }),
-    Property.create({
-      name: 'publishedAt',
+    Property.create({ 
+      name: 'publishedAt', 
+      type: 'string',
+      defaultValue: () => new Date().toISOString()
+    }),
+    Property.create({ 
+      name: 'isActive', 
+      type: 'boolean',
+      computation: VersionActiveStateMachine,
+      defaultValue: () => false
+    }),
+    Property.create({ 
+      name: 'createdAt', 
       type: 'string',
       defaultValue: () => new Date().toISOString()
     }),
     Property.create({
-      name: 'isActive',
-      type: 'boolean',
-      defaultValue: () => false
-    }),
-    Property.create({
-      name: 'comment',
-      type: 'string'
+      name: 'styleCount',
+      type: 'number',
+      defaultValue: () => 0,
+      // Count will be computed based on StyleVersionRelation - configure later to avoid circular dependency
     })
   ],
-  // Transform to create Version from CreateVersion interaction
+  // Transform listens to PublishStyle interaction to create version
   computation: Transform.create({
     record: InteractionEventEntity,
-    attributeQuery: ['interactionName', 'payload', 'user'],
     callback: function(event) {
-      if (event.interactionName === 'CreateVersion') {
+      if (event.interactionName === 'PublishStyle') {
+        // Get next version number (this will be handled in the interaction)
         return {
-          versionNumber: Date.now(), // 使用时间戳作为版本号，确保递增
-          comment: event.payload.comment || 'Version created',
+          versionNumber: event.payload.versionNumber || 1,
+          publishedAt: new Date().toISOString(),
           isActive: true,
-          publishedBy: { id: event.user.id }
-        }
+          createdAt: new Date().toISOString(),
+          publishedBy: { id: event.user.id } // Relation will be created automatically
+        };
       }
-      if (event.interactionName === 'RollbackToVersion') {
-        // 回滚时创建新版本
+      // Handle rollback - create new version from old version data
+      if (event.interactionName === 'RollbackVersion') {
         return {
-          versionNumber: Date.now(),
-          comment: `Rollback to version ${event.payload.versionId}`,
+          versionNumber: event.payload.newVersionNumber,
+          publishedAt: new Date().toISOString(),
           isActive: true,
+          createdAt: new Date().toISOString(),
           publishedBy: { id: event.user.id }
-        }
+        };
       }
-      return null
+      return null;
     }
   })
-}) 
+}); 
