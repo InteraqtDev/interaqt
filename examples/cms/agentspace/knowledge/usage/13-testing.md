@@ -76,7 +76,9 @@ describe('Feature Tests', () => {
     // ✅ CORRECT: Use storage.findOne with MatchExp
     const user = await system.storage.findOne(
       'User',
-      MatchExp.atom({ key: 'username', value: ['=', 'testuser'] })
+      MatchExp.atom({ key: 'username', value: ['=', 'testuser'] }),
+      undefined,
+      ['id', 'username', 'email', 'role', 'status']
     )
 
     expect(user).toBeTruthy()
@@ -87,21 +89,27 @@ describe('Feature Tests', () => {
     // ✅ Find by single field
     const user = await system.storage.findOne(
       'User',
-      MatchExp.atom({ key: 'id', value: ['=', userId] })
+      MatchExp.atom({ key: 'id', value: ['=', userId] }),
+      undefined,
+      ['id', 'username', 'email', 'status', 'role']
     )
 
     // ✅ Find with multiple conditions
     const activeUsers = await system.storage.find(
       'User',
       MatchExp.atom({ key: 'status', value: ['=', 'active'] })
-        .and({ key: 'role', value: ['=', 'user'] })
+        .and({ key: 'role', value: ['=', 'user'] }),
+      undefined,
+      ['id', 'username', 'email', 'lastLoginDate']
     )
 
     // ✅ Find with complex conditions
     const posts = await system.storage.find(
       'Post',
       MatchExp.atom({ key: 'author.id', value: ['=', userId] })
-        .and({ key: 'status', value: ['in', ['published', 'draft']] })
+        .and({ key: 'status', value: ['in', ['published', 'draft']] }),
+      undefined,
+      ['id', 'title', 'content', 'status', 'createdAt', 'author']
     )
   })
 
@@ -157,6 +165,11 @@ const result = await controller.callActivityInteraction(
 - Use `storage.create/update/delete` ONLY for test data setup
 - NEVER use them to test validation or business logic
 - ALL business logic tests must use `callInteraction`
+
+🔴 **CRITICAL: Always specify attributeQuery when using find/findOne!**
+- Without `attributeQuery`, only the `id` field is returned
+- This is the most common cause of test failures
+- Always explicitly list all fields you need to verify
 
 ```typescript
 // Create a record (ONLY for test setup - bypasses ALL validation!)
@@ -497,7 +510,9 @@ describe('User Interactions', () => {
     // Verify user creation
     const user = await system.storage.findOne(
       'User',
-      MatchExp.atom({ key: 'username', value: ['=', 'newuser'] })
+      MatchExp.atom({ key: 'username', value: ['=', 'newuser'] }),
+      undefined,
+      ['id', 'username', 'email', 'isActive']  // Specify fields to verify
     );
     
     expect(user).toBeTruthy();
@@ -604,7 +619,9 @@ describe('Approval Process Activity', () => {
     // Verify state transition
     let updatedRequest = await system.storage.findOne(
       'Request',
-      MatchExp.atom({ key: 'id', value: ['=', request.id] })
+      MatchExp.atom({ key: 'id', value: ['=', request.id] }),
+      undefined,
+      ['id', 'title', 'status', 'submitterId']  // Specify fields
     );
     expect(updatedRequest.status).toBe('reviewing');
     
@@ -619,7 +636,9 @@ describe('Approval Process Activity', () => {
     // Verify final state
     updatedRequest = await system.storage.findOne(
       'Request',
-      MatchExp.atom({ key: 'id', value: ['=', request.id] })
+      MatchExp.atom({ key: 'id', value: ['=', request.id] }),
+      undefined,
+      ['id', 'title', 'status', 'submitterId']  // Specify fields
     );
     expect(updatedRequest.status).toBe('approved');
   });
@@ -713,7 +732,9 @@ describe('Basic Role Permission Testing', () => {
     // Verify dormitory was actually created
     const { MatchExp } = controller.globals;
     const dormitory = await system.storage.findOne('Dormitory', 
-      MatchExp.atom({ key: 'name', value: ['=', 'Admin Created Dormitory'] })
+      MatchExp.atom({ key: 'name', value: ['=', 'Admin Created Dormitory'] }),
+      undefined,
+      ['id', 'name', 'building', 'roomNumber', 'capacity', 'description']  // Specify fields
     );
     expect(dormitory).toBeTruthy();
   });

@@ -58,7 +58,7 @@ When using LLM to generate interaqt applications, you must follow **test-case dr
 
 3. **Test Cases Learning**:
    ```
-   ../../tests/runtime/
+   ./tests/runtime/*.example.test.ts
    ```
    - Learn comprehensive testing patterns from existing test cases
    - Understand how to test interactions and their effects on data
@@ -788,6 +788,22 @@ export const User = Entity.create({
   // WRONG: This method doesn't exist
   storage.findByProperty('Entity', 'field', value)  // ❌
   ```
+- ❌ Don't forget to specify attributeQuery in storage.find/findOne
+  ```typescript
+  // WRONG: Without attributeQuery, only id is returned
+  const user = await system.storage.findOne('User',
+    MatchExp.atom({ key: 'email', value: ['=', 'test@example.com'] })
+  )
+  console.log(user.name)  // undefined! Only id was returned
+  
+  // CORRECT: Always specify all fields you need
+  const user = await system.storage.findOne('User',
+    MatchExp.atom({ key: 'email', value: ['=', 'test@example.com'] }),
+    undefined,  // modifier
+    ['id', 'name', 'email', 'role', 'status']  // attributeQuery - REQUIRED!
+  )
+  console.log(user.name)  // 'Test User' ✓
+  ```
 - ❌ Don't use storage.create() to test validation failures
   ```typescript
   // WRONG: storage.create bypasses ALL validation
@@ -818,10 +834,12 @@ export const User = Entity.create({
     role: 'admin'
   })
   
-  // Query after interaction
+  // Query after interaction - ALWAYS specify attributeQuery!
   const record = await system.storage.findOne(
     'EntityName',
-    MatchExp.atom({ key: 'field', value: ['=', value] })
+    MatchExp.atom({ key: 'field', value: ['=', value] }),
+    undefined,  // modifier
+    ['id', 'field1', 'field2', 'field3']  // attributeQuery - list ALL fields you need!
   )
   ```
 - ✅ Always test validation through Interactions
@@ -841,6 +859,12 @@ export const User = Entity.create({
   // If tests need UUID generation
   import { v4 as uuid } from 'uuid'  // Must install: npm install uuid @types/uuid
   ```
+
+🔴 **CRITICAL: attributeQuery Parameter**
+- **ALWAYS** specify the `attributeQuery` parameter when using `storage.find()` or `storage.findOne()`
+- Without it, **only the `id` field is returned**, causing test failures when verifying other fields
+- This is the **#1 cause of test failures** in interaqt applications
+- Make it a habit: whenever you use `find` or `findOne`, immediately add the attributeQuery parameter listing all fields you need
 
 ## VII. Emergency Protocols
 

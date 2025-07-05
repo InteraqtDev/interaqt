@@ -1249,21 +1249,45 @@ Storage layer interface providing data persistence functionality.
 **Main Methods**
 
 #### Entity/Relation Operations
+
+🔴 **CRITICAL: Always specify attributeQuery parameter!**
+- Without `attributeQuery`, only the `id` field is returned
+- This is a common source of bugs in tests and applications
+- Always explicitly list all fields you need
+
 ```typescript
+// ❌ WRONG: Only returns { id: '...' }
+const user = await storage.findOne('User', MatchExp.atom({
+  key: 'email',
+  value: ['=', 'user@example.com']
+}))
+console.log(user.name)  // undefined!
+
+// ✅ CORRECT: Returns all specified fields
+const user = await storage.findOne('User', 
+  MatchExp.atom({
+    key: 'email',
+    value: ['=', 'user@example.com']
+  }),
+  undefined,  // modifier
+  ['id', 'name', 'email', 'role', 'createdAt']  // attributeQuery
+)
+console.log(user.name)  // 'John Doe' ✓
+
 // Create record
 await storage.create('User', { username: 'john', email: 'john@example.com' })
 
-// Find single record
+// Find single record (MUST specify attributeQuery!)
 const user = await storage.findOne('User', MatchExp.atom({
     key: 'username',
     value: ['=', 'john']
-}))
+}), undefined, ['id', 'username', 'email', 'status'])
 
-// Find multiple records
+// Find multiple records (MUST specify attributeQuery!)
 const users = await storage.find('User', MatchExp.atom({
     key: 'status',
     value: ['=', 'active']
-}))
+}), undefined, ['id', 'username', 'email', 'lastLoginDate'])
 
 // Update record
 await storage.update('User', MatchExp.atom({

@@ -41,11 +41,29 @@ export const dicts = []
   fs.writeFileSync(path.join(backendDir, 'index.ts'), indexContent, 'utf8');
   console.log('Recreated backend/index.ts');
 
-  // 3. Delete all files in tests directory
+  // 3. Delete all test files except *.example.test.ts
   const testsDir = path.join(projectRoot, 'tests');
   if (fs.existsSync(testsDir)) {
-    fs.rmSync(testsDir, { recursive: true, force: true });
-    console.log('Deleted tests directory');
+    const files = fs.readdirSync(testsDir);
+    for (const file of files) {
+      if (!file.endsWith('.example.test.ts')) {
+        const filePath = path.join(testsDir, file);
+        if (fs.statSync(filePath).isDirectory()) {
+          fs.rmSync(filePath, { recursive: true, force: true });
+        } else {
+          fs.unlinkSync(filePath);
+        }
+      }
+    }
+    console.log('Cleaned tests directory (kept *.example.test.ts files)');
+  }
+
+
+  // 4. Delete .claude directory
+  const claudeDir = path.join(projectRoot, '.claude');
+  if (fs.existsSync(claudeDir)) {
+    fs.rmSync(claudeDir, { recursive: true, force: true });
+    console.log('Deleted .claude directory');
   }
   
   console.log('Project reset completed successfully!');
