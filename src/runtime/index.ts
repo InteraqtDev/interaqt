@@ -6,7 +6,15 @@ export * from './PostgreSQL.js'
 export * from './PGLite.js'
 export * from './Mysql.js'
 export * from './asyncInteractionContext.js'
-export * from './util.js'
+// Export everything from util except indexBy to avoid conflict with shared module
+export { 
+  assert, 
+  filterMap, 
+  mapObject, 
+  everyAsync, 
+  someAsync, 
+  everyWithErrorAsync 
+} from './util.js'
 export * from './computationHandles/index.js'
 export * from './ActivityCall.js'
 export * from './InteractionCall.js'
