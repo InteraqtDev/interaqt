@@ -2,7 +2,6 @@ import {
     Action,
     Entity,
     Interaction,
-    InteractionEventArgs,
     Payload,
     PayloadItem,
     Property,
@@ -117,7 +116,7 @@ export function createData() {
         trigger: finalizeInteraction,
         current: draftState,
         next: normalState,
-        computeTarget: (event: InteractionEventArgs) => {
+        computeTarget: (event: any) => {
             return {id: event.payload!.content.id}
         }
     })
@@ -126,7 +125,7 @@ export function createData() {
         trigger: draftInteraction,
         current: normalState,
         next: draftState,
-        computeTarget: (event: InteractionEventArgs) => {
+        computeTarget: (event: any) => {
             return {id: event.payload!.content.id}
         }
     })
@@ -135,7 +134,7 @@ export function createData() {
         trigger: publishInteraction,
         current: normalState,
         next: publishedState,
-        computeTarget: (event: InteractionEventArgs) => {
+        computeTarget: (event: any) => {
             return {id: event.payload!.content.id}
         }
     })
@@ -144,7 +143,7 @@ export function createData() {
         trigger: withdrawInteraction,
         current: publishedState,
         next: normalState,
-        computeTarget: (event: InteractionEventArgs) => {
+        computeTarget: (event: any) => {
             return {id: event.payload!.content.id}
         }
     })

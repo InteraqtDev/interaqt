@@ -3,7 +3,8 @@ import {
     Any,
     Attributive,
     Attributives,
-    BoolAtomData,
+    BoolExp,
+    boolExpToAttributives,
     Controller,
     createUserRoleAttributive,
     Entity,
@@ -46,9 +47,7 @@ const RequestEntity= Entity.create({
         items: [
             PayloadItem.create({
                 name: 'to',
-                attributives: Attributives.create({
-                    content: BoolAtomData.create({data: OtherAttr, type: 'atom'})
-                }),
+                attributives: boolExpToAttributives(BoolExp.atom(OtherAttr)),
                 base: UserEntity,
                 isRef: true,
             }),
@@ -89,7 +88,7 @@ const sendRequestRelation = Relation.create({
 const MyAttr = Attributive.create({
     name: 'Mine',
     content:
-    async function Mine(this: Controller, request, {user}) {
+    async function Mine(this: Controller, request: any, {user}: {user: any}) {
         const {BoolExp}  = this.globals
         const match = BoolExp.atom({
             key: 'id', 
@@ -112,9 +111,7 @@ const MyAttr = Attributive.create({
             PayloadItem.create({
                 name: 'request',
                 // FIXME 增加定语： 我的、未完成的
-                attributives: Attributives.create({
-                    content: BoolAtomData.create({data: MyAttr, type: 'atom'})
-                }),
+                attributives: boolExpToAttributives(BoolExp.atom(MyAttr)),
                 base: RequestEntity,
                 isRef: true
             })
@@ -148,9 +145,7 @@ const rejectInteraction = Interaction.create({
         items: [
             PayloadItem.create({
                 name: 'reviewers',
-                attributives: Attributives.create({
-                    content: BoolAtomData.create({data: OtherAttr, type: 'atom'})
-                }),
+                attributives: boolExpToAttributives(BoolExp.atom(OtherAttr)),
                 isCollection: true,
                 base: UserEntity,
                 isRef:true,
@@ -174,9 +169,7 @@ const rejectInteraction = Interaction.create({
         items: [
             PayloadItem.create({
                 name: 'reviewer',
-                attributives: Attributives.create({
-                    content: BoolAtomData.create({data: OtherAttr, type: 'atom'})
-                }),
+                attributives: boolExpToAttributives(BoolExp.atom(OtherAttr)),
                 base: UserEntity,
                 isRef: true
             }),
@@ -204,7 +197,7 @@ const sendRequestTransfer = StateTransfer.create({
     trigger: sendInteraction,
     current: notReviewerState,
     next: isReviewerState,
-    computeTarget: async function(eventArgs) {
+    computeTarget: async function(eventArgs: any) {
         
         return {
             source: eventArgs.payload.request,
@@ -217,7 +210,7 @@ const addReviewerTransfer = StateTransfer.create({
     trigger: addReviewersInteraction,
     current: isReviewerState,
     next: notReviewerState,
-    computeTarget: async function(eventArgs) {
+    computeTarget: async function(eventArgs: any) {
         return eventArgs.payload.reviewer.map((reviewer: any) => {
             return {
                 source: eventArgs.payload.request,
@@ -231,7 +224,7 @@ const transferReviewerTransfer = StateTransfer.create({
     trigger: transferReviewersInteraction,
     current: isReviewerState,
     next: notReviewerState,
-    computeTarget: async function(eventArgs) {
+    computeTarget: async function(eventArgs: any) {
         return {
             source: eventArgs.payload.request,
             target: eventArgs.payload.reviewer
@@ -244,7 +237,7 @@ const transferFromReviewerTransfer = StateTransfer.create({
     trigger: transferReviewersInteraction,
     current: notReviewerState,
     next: isReviewerState,
-    computeTarget: async function(eventArgs) {
+    computeTarget: async function(eventArgs: any) {
         return {
             source: eventArgs.payload.request,
             target: eventArgs.user
@@ -274,7 +267,7 @@ const pendingToApprovedTransfer = StateTransfer.create({
     trigger: approveInteraction,
     current: pendingStateNode,
     next: approvedStateNode,
-    computeTarget: async function(eventArgs) {
+    computeTarget: async function(eventArgs: any) {
         return {
             id: eventArgs.payload.request.id,
         }
@@ -285,7 +278,7 @@ const pendingToRejectedTransfer = StateTransfer.create({
     trigger: rejectInteraction,
     current: pendingStateNode,
     next: rejectedStateNode,
-    computeTarget: async function(eventArgs) {
+    computeTarget: async function(eventArgs: any) {
         return {
             id: eventArgs.payload.request.id,
         }
@@ -325,7 +318,7 @@ RequestEntity.properties.push(
             record: reviewerRelation,
             attributeQuery: ['result'],
             notEmpty: true,
-            callback:(relation) => {
+            callback:(relation: any) => {
                 return relation.result === 'approved'
             }
         })
@@ -337,7 +330,7 @@ RequestEntity.properties.push(
         computation: Any.create({
             record: reviewerRelation,
             attributeQuery: ['result'],
-            callback:(relation) => {
+            callback:(relation: any) => {
                 return relation.result === 'rejected'
             }
 

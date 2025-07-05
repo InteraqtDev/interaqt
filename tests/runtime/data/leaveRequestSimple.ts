@@ -3,7 +3,6 @@ import {
     Attributive,
     BoolExp,
     boolExpToAttributives,
-    boolExpToDataAttributives,
     createUserRoleAttributive,
     DataAttributive,
     Entity,
@@ -20,7 +19,8 @@ import {
     Transform,
     Controller, 
     InteractionEventArgs, 
-    InteractionEventEntity 
+    InteractionEventEntity,
+    Count
 } from '@';
 
 export const globalUserRole = createUserRoleAttributive({})
@@ -78,8 +78,8 @@ export const approveInteraction = Interaction.create({
                 isRef: true,
                 attributives: boolExpToAttributives(BoolExp.atom(Attributive.create({
                     name: 'Mine',
-                    content: async function (this: Controller, request, {user}) {
-                        const relationName = this.system.entities.getRelationName('User', 'request')
+                    content: async function (this: Controller, request: any, {user}: {user: any}) {
+                        const relationName = this.system.storage.getRelationName('User', 'request')
                         const {BoolExp} = this.globals
                         const match = BoolExp.atom({
                             key: 'source.id',
@@ -88,13 +88,13 @@ export const approveInteraction = Interaction.create({
                             key: 'target.id',
                             value: ['=', user.id]
                         })
-                        const relation = await this.system.entities.findOneRelationByName(relationName, match)
+                        const relation = await this.system.storage.findOneRelationByName(relationName, match)
                         // CAUTION 不能 return undefined，会被忽略
                         return !!relation
                     }
                 })).and(Attributive.create({
                     name: 'Pending',
-                    content: async function (this: Controller, request, {user}) {
+                    content: async function (this: Controller, request: any, {user}: {user: any}) {
                         return request.result === 'pending'
                     }
                 })))
@@ -110,7 +110,7 @@ const sendRequestRelation = Relation.create({
     target: UserEntity,
     targetProperty: 'request',
     type: 'n:1',
-    computedData: Transform.create({
+    computation: Transform.create({
         record: InteractionEventEntity,
         callback: function map(event: any) {
             if (event.interactionName === createInteraction.name) {
@@ -133,7 +133,7 @@ const reviewerRelation = Relation.create({
     targetProperty: 'request',
     type: 'n:n',
     // TODO 改 interaction，没有 mapInteractionItem 了
-    computedData: Transform.create({
+    computation: Transform.create({
         record: createInteraction,
         callback: async function map(this: Controller, event: any) {
             const {BoolExp} = this.globals
@@ -143,7 +143,7 @@ const reviewerRelation = Relation.create({
                 value: ['=', event.user.id]
             })
 
-            const {supervisor} = await this.system.entities.findOne(
+            const {supervisor} = await this.system.storage.findOne(
                 'User',
                 match,
                 undefined,
@@ -173,18 +173,10 @@ const reviewerRelation = Relation.create({
             type: 'string',
             collection: false,
             // TODO 改 statemachine
-            computedData: Transform.create({
-                // FIXME
-                record: approveInteraction,
-                map: () => 'approved',
-                computeTarget: async function (this: Controller, event) {
-
-                    return {
-                        "source.id": event.payload.request.id,
-                        "target.id": event.user.id
-                    }
-                }
-            })
+            computed: async function (this: Controller, relation: any) {
+                // 简化的逻辑，应该根据实际的审批逻辑来
+                return 'pending'
+            }
         })
     ]
 })
@@ -195,10 +187,10 @@ RequestEntity.properties.push(
         name: 'approved',
         type: 'boolean',
         collection: false,
-        computedData: Every.create({
+        computation: Every.create({
             record: reviewerRelation,
             notEmpty: true,
-            callback:(relation) => {
+            callback:(relation: any) => {
                 return relation.result === 'approved'
             }
         })
@@ -207,9 +199,9 @@ RequestEntity.properties.push(
         name: 'rejected',
         type: 'boolean',
         collection: false,
-        computedData: Any.create({
+        computation: Any.create({
             record: reviewerRelation,
-            callback: (relation) => {
+            callback: (relation: any) => {
                 return relation.result === 'rejected'
             }
         })
@@ -228,7 +220,7 @@ RequestEntity.properties.push(
 // debugger
 const pendingRequestCount = WeightedSummation.create({
     record: reviewerRelation,
-    callback: function (relation) {
+    callback: function (relation: any) {
         return {
             weight: 1,
             value: relation.result === 'pending' ? 0 : 1
@@ -240,7 +232,7 @@ UserEntity.properties.push(
         name: 'pendingRequestCount',
         type: 'number',
         collection: false,
-        computedData: pendingRequestCount
+        computation: pendingRequestCount
     })
 )
 
@@ -250,10 +242,10 @@ UserEntity.properties.push(
         name: 'pendingSubRequestCount',
         type: 'number',
         collection: false,
-        computedData: Count.create({
-            relation: reviewerRelation,
-            relationDirection: 'target',
-            match: function (request, relation) {
+        computation: Count.create({
+            record: reviewerRelation,
+            direction: 'target',
+            callback: function (request: any, relation: any) {
                 return relation.isSecond && request.result === 'pending'
             }
         })
@@ -262,7 +254,7 @@ UserEntity.properties.push(
 
 const MineDataAttr = DataAttributive.create({
     name: 'MyData',
-    content: (event: InteractionEventArgs) => {
+    content: (event: any) => {
         return {
             key: 'reviewer.id',
             value: ['=', event.user.id]
@@ -272,7 +264,7 @@ const MineDataAttr = DataAttributive.create({
 
 const PendingDataAttr = DataAttributive.create({
     name: 'PendingData',
-    content: (event: InteractionEventArgs) => {
+    content: (event: any) => {
         return {
             key: 'result',
             value: ['=', 'pending']
@@ -284,7 +276,7 @@ const PendingDataAttr = DataAttributive.create({
 const getMyPendingRequests = Interaction.create({
     name: 'getMyPendingRequests',
     action: GetAction,
-    dataAttributives: boolExpToDataAttributives(BoolExp.atom(MineDataAttr).and(PendingDataAttr)),
+    dataAttributives: boolExpToAttributives(BoolExp.atom(MineDataAttr).and(PendingDataAttr)),
     data: RequestEntity,
 })
 

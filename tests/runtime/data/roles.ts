@@ -34,7 +34,7 @@ export const Old3Attr = Attributive.create({
 export const OtherAttr = Attributive.create({
     name: 'Other',
     content: 
-function Other(targetUser, { user }){ 
+function Other(targetUser: any, { user }: { user: any }){ 
     return user.id !== targetUser.id 
 }
 

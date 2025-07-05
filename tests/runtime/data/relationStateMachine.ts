@@ -1,4 +1,4 @@
-import { Entity, Action, Attributives, BoolAtomData, createUserRoleAttributive, Interaction, Payload, PayloadItem, Property, Relation, StateMachine, StateNode, StateTransfer } from "@shared";
+import { Entity, Action, Attributives, BoolExp, boolExpToAttributives, createUserRoleAttributive, Interaction, Payload, PayloadItem, Property, Relation, StateMachine, StateNode, StateTransfer } from "@shared";
 import { OtherAttr } from "./roles";
 import { RecordStateMachineHandle } from "@runtime";
 import { MatchExp } from "@storage";
@@ -23,9 +23,7 @@ export function createData() {
             items: [
                 PayloadItem.create({
                     name: 'to',
-                    attributives: Attributives.create({
-                        content: BoolAtomData.create({data: OtherAttr, type: 'atom'})
-                    }),
+                    attributives: boolExpToAttributives(BoolExp.atom(OtherAttr)),
                     base: UserEntity,
                     isRef: true,
                 }),
@@ -46,9 +44,7 @@ export function createData() {
             items: [
                 PayloadItem.create({
                     name: 'reviewer',
-                    attributives: Attributives.create({
-                        content: BoolAtomData.create({data: OtherAttr, type: 'atom'})
-                    }),
+                    attributives: boolExpToAttributives(BoolExp.atom(OtherAttr)),
                     base: UserEntity,
                     isRef: true
                 }),
@@ -76,7 +72,7 @@ export function createData() {
         trigger: sendInteraction,
         current: notReviewerState,
         next: isReviewerState,
-        computeTarget: async function(this: RecordStateMachineHandle, eventArgs) {
+        computeTarget: async function(this: RecordStateMachineHandle, eventArgs: any) {
             // FIXME 它应该新建，它没有影响任何，这里应该如何表达？
             return {
                 source: eventArgs.payload.request,
@@ -90,7 +86,7 @@ export function createData() {
         trigger: transferReviewersInteraction,
         current: isReviewerState,
         next: notReviewerState,
-        computeTarget: async function(this: RecordStateMachineHandle,eventArgs) {
+        computeTarget: async function(this: RecordStateMachineHandle,eventArgs: any) {
             const originRelation = await this.controller.system.storage.findOne(this.dataContext.id.name,
                 MatchExp.atom({
                     key:'source.id',
@@ -107,7 +103,7 @@ export function createData() {
         trigger: transferReviewersInteraction,
         current: notReviewerState,
         next: isReviewerState,
-        computeTarget: async function(this: RecordStateMachineHandle,eventArgs) {
+        computeTarget: async function(this: RecordStateMachineHandle,eventArgs: any) {
             return {
                 source: eventArgs.payload.request,
                 target: eventArgs.payload.reviewer

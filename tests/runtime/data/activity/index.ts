@@ -42,7 +42,7 @@ export function createData() {
     
      const OtherAttr = Attributive.create({
         name: 'Other',
-        content: function Other(targetUser, { user }){ 
+        content: function Other(targetUser: any, { user }: { user: any }){ 
             return user.id !== targetUser.id 
         }
     })
@@ -84,7 +84,7 @@ export function createData() {
      const MyFriend = Attributive.create({
         name: 'MyFriend',
         content:
-            async function MyFriend(this: Controller, target, { user }){
+            async function MyFriend(this: Controller, target: any, { user }: { user: any }){
                 const relationName = this.system.storage.getRelationName('User', 'friends')
                 const match = MatchExp.atom({
                     key: 'source.id',
@@ -198,7 +198,7 @@ export function createData() {
         trigger: approveInteraction,
         current: notFriendState,
         next: isFriendState,
-        computeTarget: async function (this: RecordStateMachineHandle, eventArgs) {
+        computeTarget: async function (this: RecordStateMachineHandle, eventArgs: any) {
             const match = MatchExp.atom({
                 key: 'interactionName',
                 value: ['=', sendInteraction.name]
@@ -218,7 +218,7 @@ export function createData() {
         trigger: deleteInteraction,
         current: isFriendState,
         next: notFriendState,
-        computeTarget: async function ( eventArgs) {
+        computeTarget: async function ( eventArgs: any) {
             return {
                 source: eventArgs.user,
                 target: eventArgs.payload.target
@@ -269,7 +269,7 @@ export function createData() {
         trigger: approveInteraction,
         current: resultPendingState,
         next: resultApprovedState,
-        computeTarget: async function (this: PropertyStateMachineHandle, eventArgs) {
+        computeTarget: async function (this: PropertyStateMachineHandle, eventArgs: any) {
             const request= await this.controller.system.storage.findOne('Request', MatchExp.atom({
                 key: 'activityId',
                 value: ['=', eventArgs.activity.id]
@@ -281,7 +281,7 @@ export function createData() {
         trigger: rejectInteraction,
         current: resultPendingState,
         next: resultRejectedState,
-        computeTarget: async function (this: PropertyStateMachineHandle, eventArgs) {
+        computeTarget: async function (this: PropertyStateMachineHandle, eventArgs: any) {
             return this.controller.system.storage.findOne('Request', MatchExp.atom({
                 key: 'activityId',
                 value: ['=', eventArgs.activity.id]
@@ -300,7 +300,7 @@ export function createData() {
         computation: Transform.create({
             record: InteractionEventEntity,
             attributeQuery: ['*', ['activity', {attributeQuery:['id']}]],
-            callback: (interactionEvent) => {
+            callback: (interactionEvent: any) => {
                 if (interactionEvent.interactionName === sendInteraction.name) {
                     return {
                         from: interactionEvent.user,
@@ -365,7 +365,7 @@ export function createData() {
      const userTotalUnhandledRequest = WeightedSummation.create({
         record: receivedRequestRelation,
         attributeQuery: [['source', {attributeQuery: ['result']}]],
-        callback: (relation) => {
+        callback: (relation: any) => {
             return {
                 weight: 1,
                 value: relation.source.result === 'pending' ? 0 : 1,
@@ -392,7 +392,7 @@ export function createData() {
         computation: Every.create({
             record: sendRequestRelation,
             attributeQuery: [['source', {attributeQuery: ['result']}]],
-            callback: (relation) => relation.source.result !== 'pending'
+            callback: (relation: any) => relation.source.result !== 'pending'
         })
     }))
     
@@ -403,7 +403,7 @@ export function createData() {
         computation: Any.create({
             record: sendRequestRelation,
             attributeQuery: [['source', {attributeQuery: ['result']}]],
-            callback: (relation) => relation.source.result !== 'pending'
+            callback: (relation: any) => relation.source.result !== 'pending'
         })
     }))
     
@@ -424,7 +424,7 @@ export function createData() {
         collection: false,
         computation: Every.create({
             record: requestEntity,
-            callback: (request) => {
+            callback: (request: any) => {
                 return request.result !== 'pending'
             },
             attributeQuery: ['result']
@@ -436,7 +436,7 @@ export function createData() {
         collection: false,
         computation: Any.create({
             record: requestEntity,
-            callback: (request) => {
+            callback: (request: any) => {
                 return request.result !== 'pending'
             },
             attributeQuery: ['result']
