@@ -8,6 +8,7 @@ In interaqt, all data operations follow reactive design principles. This chapter
 2. **Deletion**: Use soft delete pattern, manage deletion state through StateMachine
 3. **Update**: Reactively update entity state through StateMachine or Transform
 4. **Reference**: For entities that support deletion, use Filtered Entity to create "non-deleted" views
+5. **Transform Restriction**: Transform can ONLY be used in Entity or Relation computation, NEVER in Property computation
 
 ## Transform Usage Guidelines
 
@@ -23,6 +24,68 @@ Understanding where to place Transform is crucial:
    - Returns relation data (source, target, and any relation properties)
    - Both source and target entities must already exist
 
+### ⚠️ CRITICAL: Transform CANNOT be Used in Property Computation
+
+**Transform is ONLY for Entity or Relation computation, NEVER for Property computation!**
+
+```javascript
+// ❌ WRONG: Never use Transform in Property computation
+Property.create({
+  name: 'status',
+  type: 'string',
+  computation: Transform.create({  // ❌ ERROR!
+    record: InteractionEventEntity,
+    callback: function(event) {
+      // This is WRONG! Transform cannot be used at Property level
+    }
+  })
+})
+
+// ✅ CORRECT: Use appropriate computation for Properties
+Property.create({
+  name: 'status',
+  type: 'string',
+  computation: StateMachine.create({  // ✅ Use StateMachine for state management
+    states: [activeState, inactiveState],
+    // ...
+  })
+})
+
+// ✅ CORRECT: Use computed for simple calculations
+Property.create({
+  name: 'fullName',
+  type: 'string',
+  computed: function(user) {  // ✅ Use computed for derived values
+    return `${user.firstName} ${user.lastName}`;
+  }
+})
+
+// ✅ CORRECT: Use getValue as an alternative
+Property.create({
+  name: 'displayName',
+  type: 'string',
+  getValue: (record) => {  // ✅ Use getValue for simple transformations
+    return record.name.toUpperCase();
+  }
+})
+```
+
+### Why Transform Cannot Be Used in Properties
+
+1. **Transform is for collection-to-collection transformation**: It transforms sets of data (e.g., InteractionEventEntity → Entity/Relation)
+2. **Properties are record-level**: They belong to a single entity instance, not a collection
+3. **No `this` context in Transform**: Transform callbacks don't have access to the current entity instance
+4. **Circular reference issues**: Using Transform with the entity being defined creates circular dependencies
+
+### What to Use Instead for Property Computation
+
+| Use Case | Correct Approach | Example |
+|----------|-----------------|---------|
+| State management | StateMachine | Status tracking, workflow states |
+| Simple calculations | computed/getValue | Derived values, formatting |
+| Timestamp recording | Single-node StateMachine with computeValue | lastActivityAt, updatedAt |
+| Aggregations | Count, Summation, Every, Any | Counting relations, summing values |
+| Time-based | RealTime | Time-sensitive calculations |
 
 ## Creating Entities - Using Transform
 
@@ -499,6 +562,8 @@ const ArticlePublishStateMachine = StateMachine.create({
 
 ### Using Transform to Record Update History
 
+**Note**: The following example uses Transform in Entity's computation to create new history records, NOT to update properties. This is a correct use of Transform.
+
 ```javascript
 const UpdateArticle = Interaction.create({
   name: 'UpdateArticle',
@@ -523,6 +588,7 @@ const ArticleHistory = Entity.create({
     Property.create({ name: 'updatedAt', type: 'string' }),
     Property.create({ name: 'updatedBy', type: 'string' })
   ],
+  // ✅ CORRECT: Transform in Entity's computation creates new history records
   computation: Transform.create({
     record: InteractionEventEntity,
     callback: function(event) {
@@ -734,6 +800,45 @@ const Sensor = Entity.create({
   - You need to create new records (like history/audit logs)
   - You need to record multiple fields or complex data
   - You want to maintain a complete history of changes
+  - **REMEMBER**: Transform can ONLY be used at Entity or Relation level, NEVER at Property level!
+
+**❌ Common Mistake to Avoid**:
+```javascript
+// ❌ NEVER do this - Transform in Property computation
+Property.create({
+  name: 'lastActivityAt',
+  computation: Transform.create({  // ❌ WRONG!
+    record: InteractionEventEntity,
+    callback: function(event) {
+      if (event.user.id === this.id) {  // ❌ No 'this' context!
+        return new Date().toISOString();
+      }
+    }
+  })
+})
+
+// ✅ CORRECT approach - Use StateMachine with computeValue
+const activeState = StateNode.create({
+  name: 'active',
+  computeValue: () => new Date().toISOString()
+});
+
+Property.create({
+  name: 'lastActivityAt',
+  computation: StateMachine.create({
+    states: [activeState],
+    defaultState: activeState,
+    transfers: [
+      StateTransfer.create({
+        current: activeState,
+        next: activeState,
+        trigger: UserActivityInteraction,
+        computeTarget: (event) => ({ id: event.user.id })
+      })
+    ]
+  })
+})
+```
 
 ## Complete Example: Blog System CRUD Operations
 
@@ -939,5 +1044,11 @@ await controller.callInteraction('DeleteArticle', {
 5. **Consider Relation Validity**: When entities support deletion, related relations also need validity management.
 
 6. **Avoid Cascading Physical Deletion**: Even when "deleting" related data is needed, it should be implemented through marking or state management.
+
+7. **Never Use Transform in Property Computation**: Transform is designed for collection-to-collection transformation (Entity/Relation creation). For property-level computations, use:
+   - **StateMachine**: For state management and interaction-driven updates
+   - **computed/getValue**: For simple derived values
+   - **Count/Summation/Every/Any**: For aggregations based on relations
+   - **RealTime**: For time-based computations
 
 By following these patterns, you can build a robust, traceable, and easily maintainable reactive data system.

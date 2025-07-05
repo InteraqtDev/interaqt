@@ -57,8 +57,8 @@ describe("activity state", () => {
         const mainActivity = activities.find(a => a.name === 'createFriendRelation')!
         createFriendRelationActivityCall = new ActivityCall(mainActivity, controller)
 
-        userA = await controller.system.storage.create('User', { id: "a", roles: ['user']})
-        userB = await controller.system.storage.create('User', { id: "b", roles: ['user']})
+        userA = await controller.system.storage.create('User', { roles: ['user']})
+        userB = await controller.system.storage.create('User', { roles: ['user']})
     })
 
     test("call friend request activity with approve response", async () => {

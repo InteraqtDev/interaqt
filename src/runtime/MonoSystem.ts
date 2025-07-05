@@ -130,7 +130,7 @@ class MonoStorage implements Storage{
     async dispatch(events: RecordMutationEvent[]) {
         const newEvents: RecordMutationEvent[] = []
         for(let callback of this.callbacks) {
-            const callbackResult = await callback(events)
+            const callbackResult = (await callback(events)) as {events?: RecordMutationEvent[]}
             if (callbackResult?.events) {
                 newEvents.push(...callbackResult.events)
             }

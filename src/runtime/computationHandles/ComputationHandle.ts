@@ -1,5 +1,4 @@
-import { Property, EntityInstance, RelationInstance, PropertyInstance } from "@shared";
-import { Entity, Relation } from "@shared";
+import { EntityInstance, RelationInstance, PropertyInstance } from "@shared";
 import { Computation } from "./Computation.js";
 
 export type GlobalDataContext = {

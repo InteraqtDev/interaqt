@@ -1,7 +1,6 @@
 // User utility functions (not a class)
 
 import { AttributiveInstance, Attributive } from './Attributive.js';
-import type { IInstance } from './interfaces.js';
 import type { UserRoleType } from './types.js';
 
 export interface UserRoleAttributiveOptions {

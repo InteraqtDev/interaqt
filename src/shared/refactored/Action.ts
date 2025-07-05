@@ -1,4 +1,4 @@
-import { IInstance, IKlass, SerializedData, generateUUID } from './interfaces.js';
+import { IInstance, SerializedData, generateUUID } from './interfaces.js';
 
 // Action 实例接口
 export interface ActionInstance extends IInstance {

@@ -1,16 +1,13 @@
 import {
-    Activity, Interaction, Relation,
     EntityInstance, RelationInstance,
     ActivityInstance, InteractionInstance,
     DictionaryInstance
 } from "@shared";
-import { Entity } from "@shared"
-import { BoolExp } from "@shared"
-import { Controller } from "../Controller"
-import { DataContext } from "./ComputationHandle"
-import { AttributeQueryData, MatchExpressionData, ModifierData } from "@storage"
-import { Dictionary } from "@shared"
-import { DICTIONARY_RECORD } from "../System"
+import { BoolExp } from "@shared";
+import { Controller } from "../Controller";
+import { DataContext } from "./ComputationHandle";
+import { AttributeQueryData, MatchExpressionData, ModifierData } from "@storage";
+import { DICTIONARY_RECORD } from "../System";
 
 
 export type ComputationResultPatch = {

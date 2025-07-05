@@ -1,5 +1,5 @@
 import { ComputationHandle, DataContext, PropertyDataContext } from "./ComputationHandle.js";
-import { Average, Relation, Entity, AverageInstance, RelationInstance, EntityInstance } from "@shared";
+import { Average, AverageInstance, RelationInstance, EntityInstance } from "@shared";
 import { Controller } from "../Controller.js";
 import { ComputationResult, DataBasedComputation, DataDep, RecordBoundState, GlobalBoundState, RecordsDataDep } from "./Computation.js";
 import { EtityMutationEvent } from "../Scheduler.js";

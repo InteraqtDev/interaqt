@@ -1,14 +1,13 @@
-import {EntityToTableMap} from "./EntityToTableMap.js";
-import {MatchExp, MatchExpressionData} from "./MatchExp.js";
-import {ModifierData} from "./Modifier.js";
-import {AttributeQueryData} from "./AttributeQuery.js";
-import {assert} from "../utils.js";
-import {RecordQuery} from "./RecordQuery.js";
-import {NewRecordData, RawEntityData} from "./NewRecordData.js";
-import {RecordQueryAgent} from "./RecordQueryAgent.js";
-import {EntityIdRef, Database, RecordMutationEvent} from "@runtime";
-import {Entity} from "@shared";
-import {Record} from "./RecordQueryAgent.js";
+import { EntityToTableMap } from "./EntityToTableMap.js";
+import { MatchExp, MatchExpressionData } from "./MatchExp.js";
+import { ModifierData } from "./Modifier.js";
+import { AttributeQueryData } from "./AttributeQuery.js";
+import { assert } from "../utils.js";
+import { RecordQuery } from "./RecordQuery.js";
+import { NewRecordData, RawEntityData } from "./NewRecordData.js";
+import { RecordQueryAgent } from "./RecordQueryAgent.js";
+import { EntityIdRef, Database, RecordMutationEvent, ID_ATTR } from "@runtime";
+import { Record } from "./RecordQueryAgent.js";
 
 export class EntityQueryHandle {
     agent: RecordQueryAgent
@@ -62,6 +61,7 @@ export class EntityQueryHandle {
     }
 
     async create(entityName: string, rawData: RawEntityData, events?: RecordMutationEvent[]): Promise<EntityIdRef> {
+        assert(rawData[ID_ATTR] === null || rawData[ID_ATTR] === undefined, `${ID_ATTR} should be null or undefined when creating new record`)
         const newEntityData = new NewRecordData(this.map, entityName, rawData)
         return this.agent.createRecord(newEntityData, `create record ${entityName} from handle`, events)
     }
