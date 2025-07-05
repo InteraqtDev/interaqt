@@ -2,7 +2,7 @@ import { atom, RenderContext, RxDOMRect, RxList } from 'axii';
 import { Entity } from './Entity';
 import { Connection, ConnectionManager, convertEntitiesToGraphData, EntityManager, EntityTreeNode, getRelationName, RelationConnection } from './DataProcessor';
 import { ConnectionLines } from './ConnectionLines';
-import { Entity as EntityType, Relation as RelationType, KlassInstance} from '@shared'
+import { EntityInstance, RelationInstance } from '@shared'
 // Graph组件的节点数据接口（保持向后兼容）
 export interface GraphNodeData {
   id: string;
@@ -25,8 +25,8 @@ interface TreeNode {
 
 // 新的基于 EntityTreeNode 的 props 接口
 export interface EntityGraphProps {
-  entities: RxList<KlassInstance<typeof EntityType>>;
-  relations: RxList<KlassInstance<typeof RelationType>>;
+  entities: RxList<EntityInstance>;
+  relations: RxList<RelationInstance>;
   entityWidth?: number;
 }
 
@@ -48,7 +48,10 @@ export function Graph(props: EntityGraphProps, { createElement, useLayoutEffect 
       entityNode: entityNode,
       children: entityNode.children.map(child => convertEntityNodeToTreeNode(child)),
       connections: entityNode.relations.map(relation => {
-        return connectionManager.connectionsByName.get(getRelationName(relation))!
+        const sourceEntity = relation.source as EntityInstance;
+        const targetEntity = relation.target as EntityInstance;
+        const relationName = `${sourceEntity.name}-${relation.sourceProperty}-${targetEntity.name}-${relation.targetProperty}`;
+        return connectionManager.connectionsByName.get(relationName)!
       })
     };
   };

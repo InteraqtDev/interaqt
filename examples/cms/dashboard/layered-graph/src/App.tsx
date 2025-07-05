@@ -1,12 +1,12 @@
 import { RenderContext, RxList } from "axii";
 import { Graph } from "./Graph";
-import { Entity as EntityType, Relation as RelationType, KlassInstance } from '@shared';
+import { EntityInstance, RelationInstance } from '@shared';
 
 // 导入实体和关系数据
 
 type AppProps = {
-    entities: KlassInstance<typeof EntityType>[]
-    relations: KlassInstance<typeof RelationType>[]
+    entities: EntityInstance[]
+    relations: RelationInstance[]
 }
 
 export function App({entities, relations}: AppProps, {createElement}: RenderContext)  {

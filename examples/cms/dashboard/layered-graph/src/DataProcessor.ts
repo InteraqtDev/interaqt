@@ -1,7 +1,7 @@
 // 数据处理模块：将 Entity/Relation 图转换为树形结构
 
 import { atom, RxDOMRect, RxList, RxMap } from "axii";
-import { Entity as EntityType, Relation as RelationType, KlassInstance} from '@shared'
+import { EntityInstance, RelationInstance, PropertyInstance } from '@shared'
 
 // 导入 Entity/Relation 数据的类型定义
 export interface Entity {
@@ -31,10 +31,10 @@ export interface Relation {
 export interface EntityTreeNode {
   id: string;
   name: string;
-  properties: Property[];
+  properties: PropertyInstance[];
   children: EntityTreeNode[];
   level: number;
-  relations: Relation[]; // 与该节点相关的关系
+  relations: RelationInstance[]; // 与该节点相关的关系
 }
 
 export function getRelationName(relation:Relation) {
@@ -46,7 +46,7 @@ export class EntityManager {
   private globalVisited: Set<string> = new Set(); // 全局已访问的节点
   public entityNodesByName: RxMap<string, EntityTreeNode> = new RxMap([]);
   public treeNodes: EntityTreeNode[] = [];
-  constructor(public entities: RxList<Entity>, public relations: RxList<Relation>, rootEntityName: string = 'User') {
+  constructor(public entities: RxList<EntityInstance>, public relations: RxList<RelationInstance>, rootEntityName: string = 'User') {
     this.treeNodes = this.convertToTree(rootEntityName);
   }
 
@@ -64,7 +64,7 @@ export class EntityManager {
   }
 
   // 递归构建树节点
-  private buildTreeNode(entity: Entity, parentPath: string[]): EntityTreeNode | null {
+  private buildTreeNode(entity: EntityInstance, parentPath: string[]): EntityTreeNode | null {
     // 环检测1：检测直接路径上的环（避免无限递归）
     if (parentPath.includes(entity.name)) {
       return null; // 不显示循环引用节点
@@ -105,20 +105,20 @@ export class EntityManager {
   }
 
   // 获取与指定 Entity 相关的所有关系
-  private getRelationsForEntity(entity: Entity): Relation[] {
+  private getRelationsForEntity(entity: EntityInstance): RelationInstance[] {
     return this.relations.raw.filter(relation => 
       relation.source === entity || relation.target === entity
     );
   }
 
   // 获取通过关系连接到当前实体的其他实体
-  private getConnectedEntities(entity: Entity, relations: Relation[]): [Entity[], Relation[]] {
-    const connectedEntities: Entity[] = [];
-    const connectedRelations: Relation[] = []
+  private getConnectedEntities(entity: EntityInstance, relations: RelationInstance[]): [EntityInstance[], RelationInstance[]] {
+    const connectedEntities: EntityInstance[] = [];
+    const connectedRelations: RelationInstance[] = []
     const seen = new Set<string>();
 
     relations.forEach(relation => {
-      let targetEntity: Entity | null = null;
+      let targetEntity: EntityInstance | RelationInstance | null = null;
       
       if (relation.source === entity && relation.target !== entity) {
         targetEntity = relation.target;
@@ -126,9 +126,9 @@ export class EntityManager {
         targetEntity = relation.source;
       }
       
-      if (targetEntity && !seen.has(targetEntity.name)) {
+      if (targetEntity && 'name' in targetEntity && targetEntity.name && !seen.has(targetEntity.name)) {
         seen.add(targetEntity.name);
-        connectedEntities.push(targetEntity);
+        connectedEntities.push(targetEntity as EntityInstance);
         connectedRelations.push(relation)
       }
     });
@@ -137,12 +137,12 @@ export class EntityManager {
   }
 
   // 获取特定关系的连接信息（用于绘制连线）
-  static getRelationConnections(relations: Relation[]): RelationConnection[] {
+  static getRelationConnections(relations: RelationInstance[]): RelationConnection[] {
     return relations.map(relation => ({
-      id: `${relation.source.name}-${relation.target.name}`,
-      sourceEntity: relation.source.name,
+      id: `${(relation.source as EntityInstance).name}-${(relation.target as EntityInstance).name}`,
+      sourceEntity: (relation.source as EntityInstance).name,
       sourceProperty: relation.sourceProperty,
-      targetEntity: relation.target.name,
+      targetEntity: (relation.target as EntityInstance).name,
       targetProperty: relation.targetProperty,
       type: relation.type,
       properties: relation.properties || []
@@ -158,11 +158,11 @@ export interface RelationConnection {
   targetEntity: string;
   targetProperty: string;
   type: string;
-  properties: Property[];
+  properties: PropertyInstance[];
 }
 
 export interface Connection {
-  relation: Relation;
+  relation: RelationInstance;
   name: string;
   sourceEntityName: string;
   targetEntityName: string;
@@ -181,15 +181,17 @@ export class ConnectionManager {
   public connectionsByName: RxMap<string, Connection> = new RxMap([])
   public connectionsBySourceEntityName: RxMap<string, RxList<Connection>> = new RxMap([]);
   public connectionsByTargetEntityName: RxMap<string, RxList<Connection>> = new RxMap([]);
-  constructor(public relations: RxList<Relation>, public entityManager: EntityManager) {
+  constructor(public relations: RxList<RelationInstance>, public entityManager: EntityManager) {
     this.connections = relations.map(relation => {
+      const sourceEntity = relation.source as EntityInstance;
+      const targetEntity = relation.target as EntityInstance;
       return {
         relation,
-        name: getRelationName(relation),
-        sourceEntityNode: entityManager.entityNodesByName.get(relation.source.name)!,
-        targetEntityNode: entityManager.entityNodesByName.get(relation.target.name)!,
-        sourceEntityName: relation.source.name,
-        targetEntityName: relation.target.name,
+        name: `${sourceEntity.name}-${relation.sourceProperty}-${targetEntity.name}-${relation.targetProperty}`,
+        sourceEntityNode: entityManager.entityNodesByName.get(sourceEntity.name)!,
+        targetEntityNode: entityManager.entityNodesByName.get(targetEntity.name)!,
+        sourceEntityName: sourceEntity.name,
+        targetEntityName: targetEntity.name,
         sourceProperty: relation.sourceProperty,
         targetProperty: relation.targetProperty,
         sourceRect: new RxDOMRect(atom(null), {type: 'interval', duration:500}),
@@ -204,8 +206,8 @@ export class ConnectionManager {
 
 // 导出辅助函数 
 export function convertEntitiesToGraphData(
-  entities: RxList<KlassInstance<typeof EntityType>>, 
-  relations: RxList<KlassInstance<typeof RelationType>>, 
+  entities: RxList<EntityInstance>, 
+  relations: RxList<RelationInstance>, 
   rootEntityName: string = 'User' 
 ): { entityManager: EntityManager, connectionManager: ConnectionManager } {
   const entityManager = new EntityManager(entities, relations, rootEntityName);

@@ -3,6 +3,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
+import { InteractionInstance } from 'interaqt';
 
 // 获取当前文件的目录路径 (ES module)
 const __filename = fileURLToPath(import.meta.url);
@@ -23,7 +24,7 @@ function extractInteractionInfo(): Array<{
     isGetInteraction: boolean;
   }> = [];
   
-  interactions.forEach(interaction => {
+  (interactions as InteractionInstance[]).forEach(interaction => {
     const name = interaction.name;
     const isGetInteraction = name.startsWith('Get');
     const payloadParams: string[] = [];
