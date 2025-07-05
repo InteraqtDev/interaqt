@@ -19,7 +19,7 @@
     "vitest": "^3.1.2"
   },
   "scripts": {
-    "check": "tsc --noEmit",
+    "check": "tsc --noEmit --skipLibCheck",
     "check:all": "npm run check:shared && npm run check:runtime && npm run check:storage",
     "check:shared": "tsc --noEmit --strict --skipLibCheck src/shared/refactored/*.ts",
     "check:runtime": "tsc --project tsconfig.runtime.json",

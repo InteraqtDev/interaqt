@@ -1,9 +1,9 @@
-import { Entity, KlassInstance, Property, Relation } from '@shared';
+import { Entity, EntityInstance, Property, Relation, RelationInstance } from '@shared';
 
 
-export function createCommonData(): { entities: KlassInstance<typeof Entity>[], relations: KlassInstance<typeof Relation>[] } {
+export function createCommonData(): { entities: EntityInstance[], relations: RelationInstance[] } {
 
-    const userEntity: KlassInstance<typeof Entity> = Entity.create({
+    const userEntity: EntityInstance = Entity.create({
         name: 'User',
         properties: [
             Property.create({ name: 'name', type: 'String' }),
@@ -12,17 +12,17 @@ export function createCommonData(): { entities: KlassInstance<typeof Entity>[], 
         ]
     })
 
-    const profileEntity: KlassInstance<typeof Entity> = Entity.create({
+    const profileEntity: EntityInstance = Entity.create({
         name: 'Profile',
         properties: [Property.create({ name: 'title', type: 'String' })]
     })
 
-    const fileEntity: KlassInstance<typeof Entity> = Entity.create({
+    const fileEntity: EntityInstance = Entity.create({
         name: 'File',
         properties: [Property.create({ name: 'fileName', type: 'String' })]
     });
 
-    const fileOwnerRelation: KlassInstance<typeof Relation> = Relation.create({
+    const fileOwnerRelation: RelationInstance = Relation.create({
         source: fileEntity,
         sourceProperty: 'owner',
         target: userEntity,
@@ -33,7 +33,7 @@ export function createCommonData(): { entities: KlassInstance<typeof Entity>[], 
         ]
     });
 
-    const profileOwnerRelation: KlassInstance<typeof Relation> = Relation.create({
+    const profileOwnerRelation: RelationInstance = Relation.create({
         source: profileEntity,
         sourceProperty: 'owner',
         target: userEntity,
@@ -44,7 +44,7 @@ export function createCommonData(): { entities: KlassInstance<typeof Entity>[], 
         ]
     });
 
-    const leaderMemberRelation: KlassInstance<typeof Relation> = Relation.create({
+    const leaderMemberRelation: RelationInstance = Relation.create({
         source: userEntity,
         sourceProperty: 'leader',
         target: userEntity,
@@ -53,7 +53,7 @@ export function createCommonData(): { entities: KlassInstance<typeof Entity>[], 
         properties: []
     });
 
-    const friendRelation: KlassInstance<typeof Relation> = Relation.create({
+    const friendRelation: RelationInstance = Relation.create({
         source: userEntity,
         sourceProperty: 'friends',
         target: userEntity,
@@ -64,12 +64,12 @@ export function createCommonData(): { entities: KlassInstance<typeof Entity>[], 
         ]
     });
 
-    const itemEntity: KlassInstance<typeof Entity> = Entity.create({
+    const itemEntity: EntityInstance = Entity.create({
         name: 'Item',
         properties: [Property.create({ name: 'itemName', type: 'String' })]
     });
 
-    const itemOwnerRelation: KlassInstance<typeof Relation> = Relation.create({
+    const itemOwnerRelation: RelationInstance = Relation.create({
         source: userEntity,
         sourceProperty: 'item',
         target: itemEntity,
@@ -79,26 +79,26 @@ export function createCommonData(): { entities: KlassInstance<typeof Entity>[], 
         properties: []
     });
 
-    const teamEntity: KlassInstance<typeof Entity> = Entity.create({
+    const teamEntity: EntityInstance = Entity.create({
         name: 'Team',
         properties: [Property.create({ name: 'name', type: 'String' })]
     });
 
-    const locEntity: KlassInstance<typeof Entity> = Entity.create({
+    const locEntity: EntityInstance = Entity.create({
         name: 'Location',
         properties: [
             Property.create({ name: 'name', type: 'String' })
         ]
     });
 
-    const matchEntity: KlassInstance<typeof Entity> = Entity.create({
+    const matchEntity: EntityInstance = Entity.create({
         name: 'Match',
         properties: [
             Property.create({ name: 'name', type: 'String' })
         ]
     });
 
-    const teamRelation: KlassInstance<typeof Relation> = Relation.create({
+    const teamRelation: RelationInstance = Relation.create({
         source: userEntity,
         sourceProperty: 'teams',
         target: teamEntity,
@@ -109,7 +109,7 @@ export function createCommonData(): { entities: KlassInstance<typeof Entity>[], 
         ]
     });
 
-    const teamBaseRelation: KlassInstance<typeof Relation> = Relation.create({
+    const teamBaseRelation: RelationInstance = Relation.create({
         source: teamRelation,
         sourceProperty: 'base',
         target: locEntity,
@@ -118,7 +118,7 @@ export function createCommonData(): { entities: KlassInstance<typeof Entity>[], 
         properties: []
     });
 
-    const teamMatchHostRelation: KlassInstance<typeof Relation> = Relation.create({
+    const teamMatchHostRelation: RelationInstance = Relation.create({
         source: teamEntity,
         sourceProperty: 'matches',
         target: matchEntity,
@@ -127,7 +127,7 @@ export function createCommonData(): { entities: KlassInstance<typeof Entity>[], 
         properties: []
     });
 
-    const teamMatchParticipantRelation: KlassInstance<typeof Relation> = Relation.create({
+    const teamMatchParticipantRelation: RelationInstance = Relation.create({
         source: teamEntity ,
         sourceProperty: 'participates',
         target: matchEntity,
@@ -136,14 +136,14 @@ export function createCommonData(): { entities: KlassInstance<typeof Entity>[], 
         properties: []
     });
 
-    const powerEntity: KlassInstance<typeof Entity> = Entity.create({
+    const powerEntity: EntityInstance = Entity.create({
         name: 'Power',
         properties: [
             Property.create({ name: 'powerName', type: 'String' })
         ]
     });
 
-    const powerOwnerRelation: KlassInstance<typeof Relation> = Relation.create({
+    const powerOwnerRelation: RelationInstance = Relation.create({
         source: userEntity,
         sourceProperty: 'powers',
         target: powerEntity,
@@ -153,14 +153,14 @@ export function createCommonData(): { entities: KlassInstance<typeof Entity>[], 
         properties: []
     });
 
-    const departmentEntity: KlassInstance<typeof Entity> = Entity.create({
+    const departmentEntity: EntityInstance = Entity.create({
         name: 'Department',
         properties: [
             Property.create({ name: 'name', type: 'String' })
         ]
     });
 
-    const departmentHierarchyRelation: KlassInstance<typeof Relation> = Relation.create({
+    const departmentHierarchyRelation: RelationInstance = Relation.create({
         source: departmentEntity,
         sourceProperty: 'parent',
         target: departmentEntity,
@@ -169,7 +169,7 @@ export function createCommonData(): { entities: KlassInstance<typeof Entity>[], 
         properties: []
     });
 
-    const entities: KlassInstance<typeof Entity>[] = [
+    const entities: EntityInstance[] = [
         userEntity,
         profileEntity,
         fileEntity,
@@ -181,7 +181,7 @@ export function createCommonData(): { entities: KlassInstance<typeof Entity>[], 
         departmentEntity,
     ];
     
-    const relations: KlassInstance<typeof Relation>[] = [
+    const relations: RelationInstance[] = [
         fileOwnerRelation,
         profileOwnerRelation,
         leaderMemberRelation,

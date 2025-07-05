@@ -138,9 +138,4 @@ type InferType<T> = T extends { type: 'string' } ? string :
         // 添加更多类型映射
         unknown;
 
-export type EntityInstanceType<T extends EntityType> = {
-    [P in T['properties'][number] as P['name']]: P['collection'] extends true ? Array<InferType<P>> : InferType<P>;
-}
-
-
 export type InteractionEventRecord = InteractionEvent & EntityIdRef

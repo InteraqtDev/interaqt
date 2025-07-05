@@ -245,7 +245,7 @@ describe('StateMachineRunner', () => {
 
         // 创建状态转移
         const IdleToIncrementingTransfer = StateTransfer.create({
-            trigger: IncrementInteraction as any,
+            trigger: IncrementInteraction,
             current: IdleState,
             next: IncrementingState,
             computeTarget: (event: any) => {
@@ -254,7 +254,7 @@ describe('StateMachineRunner', () => {
         })
 
         const IncrementingToIdleTransfer = StateTransfer.create({
-            trigger: ResetInteraction as any,
+            trigger: ResetInteraction,
             current: IncrementingState,
             next: IdleState,
             computeTarget: (event: any) => {
@@ -277,13 +277,13 @@ describe('StateMachineRunner', () => {
             states: [idleStateForName, incrementingStateForName],
             transfers: [
                 StateTransfer.create({
-                    trigger: IncrementInteraction as any,
+                    trigger: IncrementInteraction,
                     current: idleStateForName,
                     next: incrementingStateForName,
                     computeTarget: (event: any) => ({ id: event.payload!.counter.id })
                 }),
                 StateTransfer.create({
-                    trigger: ResetInteraction as any,
+                    trigger: ResetInteraction,
                     current: incrementingStateForName,
                     next: idleStateForName,
                     computeTarget: (event: any) => ({ id: event.payload!.counter.id })
@@ -393,7 +393,7 @@ describe('StateMachineRunner', () => {
 
         // 创建状态转移 - 自循环转换
         const LoggingToLoggingTransfer = StateTransfer.create({
-            trigger: LogTimeInteraction as any,
+            trigger: LogTimeInteraction,
             current: LoggingState,
             next: LoggingState,
             computeTarget: (event: any) => {

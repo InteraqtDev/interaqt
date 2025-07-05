@@ -90,14 +90,6 @@ export type ConceptInstance = unknown;
 // Interaction 相关类型
 export type InteractionInstanceType = import('./Interaction.js').InteractionInstance;
 
-// InteractionEventArgs 类型定义
-export interface InteractionEventArgs {
-  type?: string;
-  payload?: {
-    [key: string]: any;
-  };
-}
-
 // Activity 相关类型别名
 export type ActivityInstanceType = import('./Activity.js').ActivityInstance;
 export type ActivityGroupInstanceType = import('./Activity.js').ActivityGroupInstance;

@@ -1,4 +1,4 @@
-import {MapData} from "@interaqt/storage";
+import {MapData} from "@storage";
 
 export const entityToTableMapData: MapData = {
     "links": {
