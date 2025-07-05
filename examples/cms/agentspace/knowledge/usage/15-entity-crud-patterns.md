@@ -334,33 +334,38 @@ const Article = Entity.create({
       name: 'deletedAt',
       type: 'string',
       defaultValue: () => null,
-      computation: StateMachine.create({
-        states: [
-          StateNode.create({
-            name: 'active',
-            computeValue: () => null  // Active articles have no deletion time
-          }),
-          StateNode.create({
-            name: 'deleted',
-            computeValue: () => new Date().toISOString()  // Record deletion time
-          })
-        ],
-        transfers: [
-          StateTransfer.create({
-            current: StateNode.create({ name: 'active' }),
-            next: StateNode.create({ name: 'deleted' }),
-            trigger: DeleteArticle,
-            computeTarget: (event) => ({ id: event.payload.articleId })
-          }),
-          StateTransfer.create({
-            current: StateNode.create({ name: 'deleted' }),
-            next: StateNode.create({ name: 'active' }),
-            trigger: RestoreArticle,
-            computeTarget: (event) => ({ id: event.payload.articleId })
-          })
-        ],
-        defaultState: StateNode.create({ name: 'active' })
-      })
+      computation: (() => {
+        // First declare state nodes
+        const activeState = StateNode.create({
+          name: 'active',
+          computeValue: () => null  // Active articles have no deletion time
+        });
+        const deletedState = StateNode.create({
+          name: 'deleted',
+          computeValue: () => new Date().toISOString()  // Record deletion time
+        });
+        
+        // Then create state machine with references
+        return StateMachine.create({
+          name: 'DeletionTimeTracker',
+          states: [activeState, deletedState],
+          transfers: [
+            StateTransfer.create({
+              current: activeState,
+              next: deletedState,
+              trigger: DeleteArticle,
+              computeTarget: (event) => ({ id: event.payload.articleId })
+            }),
+            StateTransfer.create({
+              current: deletedState,
+              next: activeState,
+              trigger: RestoreArticle,
+              computeTarget: (event) => ({ id: event.payload.articleId })
+            })
+          ],
+          defaultState: activeState
+        });
+      })()
     })
   ]
 });

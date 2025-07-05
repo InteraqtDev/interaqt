@@ -646,7 +646,23 @@ const DeletePost = Interaction.create({
   })
 });
 
-// 2. Use StateMachine to manage post status
+// Define PublishPost interaction
+const PublishPost = Interaction.create({
+  name: 'PublishPost',
+  action: Action.create({ name: 'publishPost' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({ name: 'postId', base: Post, isRef: true })
+    ]
+  })
+});
+
+// 2. Declare state nodes for Post status
+const draftState = StateNode.create({ name: 'draft' });
+const publishedState = StateNode.create({ name: 'published' });
+const deletedState = StateNode.create({ name: 'deleted' });
+
+// 3. Use StateMachine to manage post status
 const Post = Entity.create({
   name: 'Post',
   properties: [
@@ -657,31 +673,35 @@ const Post = Entity.create({
       type: 'string',
       defaultValue: () => 'draft',
       computation: StateMachine.create({
-        states: ['draft', 'published', 'deleted'],
-        initialState: 'draft',
-        transitions: [
-          {
-            from: 'draft',
-            to: 'published',
-            on: 'PublishPost'
-          },
-          {
-            from: 'published',
-            to: 'deleted',
-            on: 'DeletePost'
-          },
-          {
-            from: 'draft',
-            to: 'deleted',
-            on: 'DeletePost'
-          }
+        name: 'PostStatus',
+        states: [draftState, publishedState, deletedState],
+        defaultState: draftState,
+        transfers: [
+          StateTransfer.create({
+            current: draftState,
+            next: publishedState,
+            trigger: PublishPost,
+            computeTarget: (event) => ({ id: event.payload.postId })
+          }),
+          StateTransfer.create({
+            current: publishedState,
+            next: deletedState,
+            trigger: DeletePost,
+            computeTarget: (event) => ({ id: event.payload.postId })
+          }),
+          StateTransfer.create({
+            current: draftState,
+            next: deletedState,
+            trigger: DeletePost,
+            computeTarget: (event) => ({ id: event.payload.postId })
+          })
         ]
       })
     })
   ]
 });
 
-// 3. Filter active posts (exclude deleted ones)
+// 4. Filter active posts (exclude deleted ones)
 const ActivePosts = FilteredEntity.create({
   name: 'ActivePosts',
   baseEntity: Post,
@@ -696,6 +716,47 @@ const ActivePosts = FilteredEntity.create({
 ### Multi-Step Business Process
 
 ```javascript
+// Define order status interactions
+const ConfirmPayment = Interaction.create({
+  name: 'ConfirmPayment',
+  action: Action.create({ name: 'confirmPayment' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({ name: 'orderId', base: Order, isRef: true })
+    ]
+  })
+});
+
+const ShipOrder = Interaction.create({
+  name: 'ShipOrder',
+  action: Action.create({ name: 'shipOrder' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({ name: 'orderId', base: Order, isRef: true })
+    ]
+  })
+});
+
+const ConfirmDelivery = Interaction.create({
+  name: 'ConfirmDelivery',
+  action: Action.create({ name: 'confirmDelivery' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({ name: 'orderId', base: Order, isRef: true })
+    ]
+  })
+});
+
+const CancelOrder = Interaction.create({
+  name: 'CancelOrder',
+  action: Action.create({ name: 'cancelOrder' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({ name: 'orderId', base: Order, isRef: true })
+    ]
+  })
+});
+
 // Order submission process with multiple steps
 const SubmitOrder = Interaction.create({
   name: 'SubmitOrder',
@@ -710,6 +771,13 @@ const SubmitOrder = Interaction.create({
   })
 });
 
+// Declare order state nodes
+const pendingState = StateNode.create({ name: 'pending' });
+const confirmedState = StateNode.create({ name: 'confirmed' });
+const shippedState = StateNode.create({ name: 'shipped' });
+const deliveredState = StateNode.create({ name: 'delivered' });
+const cancelledState = StateNode.create({ name: 'cancelled' });
+
 // Order entity with computed properties responding to submission
 const Order = Entity.create({
   name: 'Order',
@@ -722,13 +790,34 @@ const Order = Entity.create({
       name: 'status',
       type: 'string',
       computation: StateMachine.create({
-        states: ['pending', 'confirmed', 'shipped', 'delivered', 'cancelled'],
-        initialState: 'pending',
-        transitions: [
-          { from: 'pending', to: 'confirmed', on: 'ConfirmPayment' },
-          { from: 'confirmed', to: 'shipped', on: 'ShipOrder' },
-          { from: 'shipped', to: 'delivered', on: 'ConfirmDelivery' },
-          { from: 'pending', to: 'cancelled', on: 'CancelOrder' }
+        name: 'OrderStatus',
+        states: [pendingState, confirmedState, shippedState, deliveredState, cancelledState],
+        defaultState: pendingState,
+        transfers: [
+          StateTransfer.create({
+            current: pendingState,
+            next: confirmedState,
+            trigger: ConfirmPayment,
+            computeTarget: (event) => ({ id: event.payload.orderId })
+          }),
+          StateTransfer.create({
+            current: confirmedState,
+            next: shippedState,
+            trigger: ShipOrder,
+            computeTarget: (event) => ({ id: event.payload.orderId })
+          }),
+          StateTransfer.create({
+            current: shippedState,
+            next: deliveredState,
+            trigger: ConfirmDelivery,
+            computeTarget: (event) => ({ id: event.payload.orderId })
+          }),
+          StateTransfer.create({
+            current: pendingState,
+            next: cancelledState,
+            trigger: CancelOrder,
+            computeTarget: (event) => ({ id: event.payload.orderId })
+          })
         ]
       })
     }),
@@ -1013,17 +1102,19 @@ const OrderStateMachine = StateMachine.create({
   name: 'OrderStatus',
   states: [PendingState, PaidState, ShippedState, DeliveredState],
   defaultState: PendingState,
-  transitions: [
-    {
-      from: PendingState,
-      to: PaidState,
-      on: PayOrder
-    },
-    {
-      from: PaidState,
-      to: ShippedState,
-      on: ShipOrder
-    }
+  transfers: [
+    StateTransfer.create({
+      current: PendingState,
+      next: PaidState,
+      trigger: PayOrder,
+      computeTarget: (event) => ({ id: event.payload.orderId })
+    }),
+    StateTransfer.create({
+      current: PaidState,
+      next: ShippedState,
+      trigger: ShipOrder,
+      computeTarget: (event) => ({ id: event.payload.orderId })
+    })
   ]
 });
 
