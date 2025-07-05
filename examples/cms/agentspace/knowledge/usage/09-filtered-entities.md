@@ -385,10 +385,11 @@ const User = Entity.create({
       name: 'isActiveAuthor',
       type: 'boolean',
       defaultValue: () => false,
-      computation: Transform.create({
-        record: UserRecentPosts,
-        callback: (recentPosts) => recentPosts.length >= 3  // Has 3 or more recent posts
-      })
+      computed: function(user) {
+        // Assuming user has a recentPosts property that's an array
+        const recentPosts = user.recentPosts || [];
+        return recentPosts.length >= 3;  // Has 3 or more recent posts
+      }
     })
   ]
 });
@@ -444,21 +445,6 @@ const GlobalStats = Entity.create({
       defaultValue: () => 0,
       computation: Count.create({
         record: AuthorUser
-      })
-    }),
-    
-    // Composite statistics
-    Property.create({
-      name: 'averageViewsPerPost',
-      type: 'number',
-      defaultValue: () => 0,
-      computation: Transform.create({
-        record: PublishedPost,
-        callback: (posts) => {
-          if (posts.length === 0) return 0;
-          const totalViews = posts.reduce((sum, post) => sum + post.viewCount, 0);
-          return totalViews / posts.length;
-        }
       })
     }),
     

@@ -514,21 +514,6 @@ Transform.create(config: TransformConfig): KlassInstance<typeof Transform>
 - `config.callback` (function, required): Transformation function that converts source data to target data
 - `config.attributeQuery` (AttributeQueryData, required): Attribute query configuration
 
-**Examples**
-```typescript
-// Generate user summary information
-const userSummary = Property.create({
-    name: 'summary',
-    type: 'string',
-    defaultValue: () => '',  // Must provide default value
-    computation: Transform.create({
-        record: User,
-        callback: function(user) {
-            return `${user.username} (${user.email}) - ${user.posts?.length || 0} posts`
-        }
-    })
-})
-```
 
 ### StateMachine.create()
 

@@ -1,13 +1,16 @@
 import { describe, test, expect, beforeEach } from 'vitest'
-import { Controller, MonoSystem, KlassByName, PGLiteDB, MatchExp } from 'interaqt'
-import { entities, relations, interactions, activities, dicts } from '../backend'
-import { v4 as uuid } from 'uuid'
+import { Controller, MonoSystem, KlassByName, PGLiteDB } from 'interaqt'
+import { entities, relations, interactions, activities } from '../backend'
 
-describe('Version Interactions Tests', () => {
+describe('Version Interactions', () => {
   let system: MonoSystem
   let controller: Controller
-  
+  let adminUser: any
+  let editorUser: any
+  let testStyleId: string
+
   beforeEach(async () => {
+    // Setup test database and controller
     system = new MonoSystem(new PGLiteDB())
     system.conceptClass = KlassByName
     
@@ -22,240 +25,382 @@ describe('Version Interactions Tests', () => {
     )
     
     await controller.setup(true)
-  })
-
-  // TC008: Create Version (Success Case)
-  test('TC008: Create Version - Should create new version with styles', async () => {
-    const adminUser = await system.storage.create('User', {
-      id: uuid(),
+    
+    // Create test users
+    adminUser = await system.storage.create('User', {
       name: 'Admin User',
-      role: 'admin',
-      email: 'admin@test.com'
+      email: 'admin@test.com',
+      role: 'admin'
+    })
+    
+    editorUser = await system.storage.create('User', {
+      name: 'Editor User',
+      email: 'editor@test.com',
+      role: 'editor'
     })
 
-    // Create styles first
-    const style1Data = {
-      id: uuid(),
-      label: 'Style 1',
-      slug: 'style-1',
-      description: 'First style',
-      type: 'animation',
-      thumb_key: 'style1.jpg',
-      priority: 10,
-      status: 'published'
-    }
-
-    const style2Data = {
-      id: uuid(),
-      label: 'Style 2',
-      slug: 'style-2',
-      description: 'Second style',
-      type: 'surreal',
-      thumb_key: 'style2.jpg',
-      priority: 20,
-      status: 'published'
-    }
-
+    // Create a test style to use in version tests
     await controller.callInteraction('CreateStyle', {
-      user: adminUser,
-      payload: { style: style1Data }
-    })
-
-    await controller.callInteraction('CreateStyle', {
-      user: adminUser,
-      payload: { style: style2Data }
-    })
-
-    const styles = await system.storage.find('Style')
-    const styleIds = styles.map(s => s.id)
-
-    // Create version
-    const versionData = {
-      id: uuid(),
-      name: 'v1.0.0',
-      description: 'Initial release'
-    }
-
-    await controller.callInteraction('CreateVersion', {
       user: adminUser,
       payload: {
-        version: versionData,
-        styleIds: styleIds
+        label: 'Test Style',
+        slug: 'test-style',
+        type: 'animation',
+        priority: 100
       }
     })
 
+    // Publish the style
+    const styles = await system.storage.find('Style')
+    testStyleId = styles[0].id
+    
+    await controller.callInteraction('PublishStyle', {
+      user: adminUser,
+      payload: { styleId: testStyleId }
+    })
+  })
+
+  // TC007: Create Version
+  test('TC007: should create version successfully', async () => {
+    const result = await controller.callInteraction('CreateVersion', {
+      user: adminUser,
+      payload: {
+        label: 'Spring 2024 Collection',
+        description: 'Spring collection with new animation styles'
+      }
+    })
+
+    expect(result.error).toBeUndefined()
+    
     // Verify version was created
     const versions = await system.storage.find('Version')
     expect(versions).toHaveLength(1)
+    expect(versions[0].label).toBe('Spring 2024 Collection')
+    expect(versions[0].description).toBe('Spring collection with new animation styles')
+    expect(versions[0].isActive).toBe(false)
+    expect(versions[0].versionNumber).toBeDefined()
+    expect(versions[0].createdAt).toBeDefined()
+  })
+
+  // TC008: Publish Version
+  test('TC008: should publish version successfully', async () => {
+    // Create version
+    await controller.callInteraction('CreateVersion', {
+      user: adminUser,
+      payload: {
+        label: 'Test Version',
+        description: 'Test version'
+      }
+    })
+
+    const versions = await system.storage.find('Version')
+    const versionId = versions[0].id
+
+    // Publish the version
+    const result = await controller.callInteraction('PublishVersion', {
+      user: adminUser,
+      payload: {
+        versionId: versionId
+      }
+    })
+
+    expect(result.error).toBeUndefined()
     
-    const createdVersion = versions[0]
-    expect(createdVersion.id).toBe(versionData.id)
-    expect(createdVersion.name).toBe(versionData.name)
-    expect(createdVersion.description).toBe(versionData.description)
-    expect(createdVersion.published_at).toBeDefined()
-    expect(createdVersion.is_current).toBe(true)
-
-    // Verify relations were created
-    const userVersionRelations = await system.storage.find('UserVersionRelation')
-    expect(userVersionRelations).toHaveLength(1)
-    expect(userVersionRelations[0].source).toBe(adminUser.id)
-    expect(userVersionRelations[0].target).toBe(createdVersion.id)
+    // Verify version is active
+    const publishedVersions = await system.storage.find('Version')
+    expect(publishedVersions[0].isActive).toBe(true)
   })
 
-  // TC009: Create Version (Duplicate Name)
-  test('TC009: Create Version - Should handle duplicate version names', async () => {
-    const adminUser = await system.storage.create('User', {
-      id: uuid(),
-      name: 'Admin User',
-      role: 'admin',
-      email: 'admin@test.com'
-    })
-
-    // Create first version
-    const versionData1 = {
-      id: uuid(),
-      name: 'v1.0.0',
-      description: 'First version'
-    }
-
+  // TC009: Add Style to Version
+  test('TC009: should add style to version successfully', async () => {
+    // Create version
     await controller.callInteraction('CreateVersion', {
       user: adminUser,
       payload: {
-        version: versionData1,
-        styleIds: []
-      }
-    })
-
-    // Attempt to create second version with same name
-    const versionData2 = {
-      id: uuid(),
-      name: 'v1.0.0', // Duplicate name
-      description: 'Duplicate version'
-    }
-
-    try {
-      await controller.callInteraction('CreateVersion', {
-        user: adminUser,
-        payload: {
-          version: versionData2,
-          styleIds: []
-        }
-      })
-    } catch (error) {
-      // Expected to fail with unique constraint in real implementation
-    }
-
-    // Verify only one version exists
-    const versions = await system.storage.find('Version')
-    expect(versions).toHaveLength(1)
-    expect(versions[0].name).toBe('v1.0.0')
-    expect(versions[0].description).toBe('First version')
-  })
-
-  // TC010: Rollback to Previous Version
-  test('TC010: Rollback Version - Should set previous version as current', async () => {
-    const adminUser = await system.storage.create('User', {
-      id: uuid(),
-      name: 'Admin User',
-      role: 'admin',
-      email: 'admin@test.com'
-    })
-
-    // Create multiple versions
-    const version1Data = {
-      id: uuid(),
-      name: 'v1.0.0',
-      description: 'First version'
-    }
-
-    const version2Data = {
-      id: uuid(),
-      name: 'v1.1.0',
-      description: 'Second version'
-    }
-
-    await controller.callInteraction('CreateVersion', {
-      user: adminUser,
-      payload: {
-        version: version1Data,
-        styleIds: []
-      }
-    })
-
-    await controller.callInteraction('CreateVersion', {
-      user: adminUser,
-      payload: {
-        version: version2Data,
-        styleIds: []
+        label: 'Test Version',
+        description: 'Test version'
       }
     })
 
     const versions = await system.storage.find('Version')
-    const version1 = versions.find(v => v.name === 'v1.0.0')
+    const versionId = versions[0].id
 
-    // Rollback to v1.0.0
-    await controller.callInteraction('RollbackVersion', {
+    // Add style to version
+    const result = await controller.callInteraction('AddStyleToVersion', {
       user: adminUser,
       payload: {
-        versionId: version1.id
+        versionId: versionId,
+        styleId: testStyleId,
+        order: 1
       }
     })
 
-    // Verify rollback interaction was called successfully
-    expect(versions).toHaveLength(2)
+    expect(result.error).toBeUndefined()
+    
+    // Verify StyleVersion relation was created
+    const styleVersions = await system.storage.find('StyleVersion')
+    expect(styleVersions).toHaveLength(1)
+    expect(styleVersions[0].order).toBe(1)
+    expect(styleVersions[0].status).toBe('active')
   })
 
-  // TC011: List Versions with History
-  test('TC011: List Versions - Should retrieve all versions with metadata', async () => {
-    const adminUser = await system.storage.create('User', {
-      id: uuid(),
-      name: 'Admin User',
-      role: 'admin',
-      email: 'admin@test.com'
+  // TC010: Reorder Styles in Version
+  test('TC010: should reorder styles in version successfully', async () => {
+    // Create second style
+    await controller.callInteraction('CreateStyle', {
+      user: adminUser,
+      payload: {
+        label: 'Second Style',
+        slug: 'second-style',
+        type: 'surreal',
+        priority: 200
+      }
     })
 
-    // Create multiple versions
-    const versions = [
-      {
-        id: uuid(),
-        name: 'v1.0.0',
+    const styles = await system.storage.find('Style')
+    const secondStyleId = styles.find(s => s.slug === 'second-style').id
+
+    // Publish second style
+    await controller.callInteraction('PublishStyle', {
+      user: adminUser,
+      payload: { styleId: secondStyleId }
+    })
+
+    // Create version
+    await controller.callInteraction('CreateVersion', {
+      user: adminUser,
+      payload: {
+        label: 'Test Version',
+        description: 'Test version'
+      }
+    })
+
+    const versions = await system.storage.find('Version')
+    const versionId = versions[0].id
+
+    // Add both styles to version
+    await controller.callInteraction('AddStyleToVersion', {
+      user: adminUser,
+      payload: {
+        versionId: versionId,
+        styleId: testStyleId,
+        order: 1
+      }
+    })
+
+    await controller.callInteraction('AddStyleToVersion', {
+      user: adminUser,
+      payload: {
+        versionId: versionId,
+        styleId: secondStyleId,
+        order: 2
+      }
+    })
+
+    // Reorder styles in version
+    const result = await controller.callInteraction('ReorderStylesInVersion', {
+      user: adminUser,
+      payload: {
+        versionId: versionId,
+        styleOrders: [
+          { styleId: testStyleId, order: 3 },
+          { styleId: secondStyleId, order: 1 }
+        ]
+      }
+    })
+
+    expect(result.error).toBeUndefined()
+    
+    // Verify reordering
+    const styleVersions = await system.storage.find('StyleVersion')
+    const firstStyleVersion = styleVersions.find(sv => sv.style?.id === testStyleId)
+    const secondStyleVersion = styleVersions.find(sv => sv.style?.id === secondStyleId)
+    
+    expect(firstStyleVersion.order).toBe(3)
+    expect(secondStyleVersion.order).toBe(1)
+  })
+
+  // TC011: Permission Denied - Editor Cannot Publish Version
+  test('TC011: editor should not be able to publish version', async () => {
+    // Create version as admin
+    await controller.callInteraction('CreateVersion', {
+      user: adminUser,
+      payload: {
+        label: 'Test Version',
+        description: 'Test version'
+      }
+    })
+
+    const versions = await system.storage.find('Version')
+    const versionId = versions[0].id
+
+    // Try to publish as editor
+    const result = await controller.callInteraction('PublishVersion', {
+      user: editorUser,
+      payload: {
+        versionId: versionId
+      }
+    })
+
+    expect(result.error).toBeDefined()
+    expect((result.error as any)?.type).toBe('permission denied')
+    
+    // Verify version not published
+    const unchangedVersions = await system.storage.find('Version')
+    expect(unchangedVersions[0].isActive).toBe(false)
+  })
+
+  // TC013: Rollback to Previous Version
+  test('TC013: should rollback to previous version successfully', async () => {
+    // Create first version and publish it
+    await controller.callInteraction('CreateVersion', {
+      user: adminUser,
+      payload: {
+        label: 'Version 1',
         description: 'First version'
-      },
-      {
-        id: uuid(),
-        name: 'v1.1.0',
+      }
+    })
+
+    const firstVersions = await system.storage.find('Version')
+    const firstVersionId = firstVersions[0].id
+
+    await controller.callInteraction('PublishVersion', {
+      user: adminUser,
+      payload: { versionId: firstVersionId }
+    })
+
+    // Create second version and publish it
+    await controller.callInteraction('CreateVersion', {
+      user: adminUser,
+      payload: {
+        label: 'Version 2',
         description: 'Second version'
       }
-    ]
+    })
 
-    for (const versionData of versions) {
-      await controller.callInteraction('CreateVersion', {
-        user: adminUser,
-        payload: {
-          version: versionData,
-          styleIds: []
-        }
-      })
-    }
+    const allVersions = await system.storage.find('Version')
+    const secondVersionId = allVersions.find(v => v.label === 'Version 2').id
 
-    // List versions
-    await controller.callInteraction('ListVersions', {
+    await controller.callInteraction('PublishVersion', {
+      user: adminUser,
+      payload: { versionId: secondVersionId }
+    })
+
+    // Verify second version is active
+    let currentVersions = await system.storage.find('Version')
+    expect(currentVersions.find(v => v.id === firstVersionId).isActive).toBe(false)
+    expect(currentVersions.find(v => v.id === secondVersionId).isActive).toBe(true)
+
+    // Rollback to first version
+    const rollbackResult = await controller.callInteraction('PublishVersion', {
+      user: adminUser,
+      payload: { versionId: firstVersionId }
+    })
+
+    expect(rollbackResult.error).toBeUndefined()
+    
+    // Verify rollback
+    currentVersions = await system.storage.find('Version')
+    expect(currentVersions.find(v => v.id === firstVersionId).isActive).toBe(true)
+    expect(currentVersions.find(v => v.id === secondVersionId).isActive).toBe(false)
+  })
+
+  // Test remove style from version
+  test('should remove style from version successfully', async () => {
+    // Create version
+    await controller.callInteraction('CreateVersion', {
       user: adminUser,
       payload: {
-        sort: {
-          field: 'published_at',
-          order: 'desc'
-        }
+        label: 'Test Version',
+        description: 'Test version'
       }
     })
 
-    // Verify all versions exist
-    const allVersions = await system.storage.find('Version')
-    expect(allVersions).toHaveLength(2)
+    const versions = await system.storage.find('Version')
+    const versionId = versions[0].id
+
+    // Add style to version
+    await controller.callInteraction('AddStyleToVersion', {
+      user: adminUser,
+      payload: {
+        versionId: versionId,
+        styleId: testStyleId,
+        order: 1
+      }
+    })
+
+    // Verify style was added
+    let styleVersions = await system.storage.find('StyleVersion')
+    expect(styleVersions).toHaveLength(1)
+    expect(styleVersions[0].status).toBe('active')
+
+    // Remove style from version
+    const result = await controller.callInteraction('RemoveStyleFromVersion', {
+      user: adminUser,
+      payload: {
+        versionId: versionId,
+        styleId: testStyleId
+      }
+    })
+
+    expect(result.error).toBeUndefined()
     
-    // Verify version names
-    const versionNames = allVersions.map(v => v.name)
-    expect(versionNames).toContain('v1.0.0')
-    expect(versionNames).toContain('v1.1.0')
+    // Verify style was removed (soft delete)
+    styleVersions = await system.storage.find('StyleVersion')
+    expect(styleVersions[0].status).toBe('removed')
+    expect(styleVersions[0].isActive).toBe(false)
+  })
+
+  // Test editor cannot create versions
+  test('should not allow editor to create versions', async () => {
+    const result = await controller.callInteraction('CreateVersion', {
+      user: editorUser,
+      payload: {
+        label: 'Editor Version',
+        description: 'Version by editor'
+      }
+    })
+
+    expect(result.error).toBeDefined()
+    expect((result.error as any)?.type).toBe('permission denied')
+    
+    // Verify no version created
+    const versions = await system.storage.find('Version')
+    expect(versions).toHaveLength(0)
+  })
+
+  // Test multiple active versions scenario
+  test('should ensure only one version is active at a time', async () => {
+    // Create multiple versions
+    await controller.callInteraction('CreateVersion', {
+      user: adminUser,
+      payload: { label: 'Version A', description: 'First version' }
+    })
+
+    await controller.callInteraction('CreateVersion', {
+      user: adminUser,
+      payload: { label: 'Version B', description: 'Second version' }
+    })
+
+    await controller.callInteraction('CreateVersion', {
+      user: adminUser,
+      payload: { label: 'Version C', description: 'Third version' }
+    })
+
+    const versions = await system.storage.find('Version')
+    expect(versions).toHaveLength(3)
+
+    // Publish middle version
+    const versionBId = versions.find(v => v.label === 'Version B').id
+    await controller.callInteraction('PublishVersion', {
+      user: adminUser,
+      payload: { versionId: versionBId }
+    })
+
+    // Verify only Version B is active
+    const updatedVersions = await system.storage.find('Version')
+    const activeVersions = updatedVersions.filter(v => v.isActive)
+    expect(activeVersions).toHaveLength(1)
+    expect(activeVersions[0].label).toBe('Version B')
   })
 })

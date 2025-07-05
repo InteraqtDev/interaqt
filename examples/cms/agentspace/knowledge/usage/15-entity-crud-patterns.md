@@ -23,9 +23,6 @@ Understanding where to place Transform is crucial:
    - Returns relation data (source, target, and any relation properties)
    - Both source and target entities must already exist
 
-3. **Property's computation + Transform**: Use when you need to transform data from other entities/relations
-   - Should reference different, already-defined entities
-   - Never reference the entity being defined (use getValue for same-entity computations)
 
 ## Creating Entities - Using Transform
 
@@ -336,19 +333,33 @@ const Article = Entity.create({
     Property.create({
       name: 'deletedAt',
       type: 'string',
-      computation: Transform.create({
-        record: InteractionEventEntity,
-        callback: function(event) {
-          if (event.interactionName === 'DeleteArticle' && 
-              event.payload.articleId === this.id) {
-            return new Date().toISOString();
-          }
-          if (event.interactionName === 'RestoreArticle' && 
-              event.payload.articleId === this.id) {
-            return null; // Clear deletion time when restoring
-          }
-          return undefined; // Keep original value
-        }
+      defaultValue: () => null,
+      computation: StateMachine.create({
+        states: [
+          StateNode.create({
+            name: 'active',
+            computeValue: () => null  // Active articles have no deletion time
+          }),
+          StateNode.create({
+            name: 'deleted',
+            computeValue: () => new Date().toISOString()  // Record deletion time
+          })
+        ],
+        transfers: [
+          StateTransfer.create({
+            current: StateNode.create({ name: 'active' }),
+            next: StateNode.create({ name: 'deleted' }),
+            trigger: DeleteArticle,
+            computeTarget: (event) => ({ id: event.payload.articleId })
+          }),
+          StateTransfer.create({
+            current: StateNode.create({ name: 'deleted' }),
+            next: StateNode.create({ name: 'active' }),
+            trigger: RestoreArticle,
+            computeTarget: (event) => ({ id: event.payload.articleId })
+          })
+        ],
+        defaultState: StateNode.create({ name: 'active' })
       })
     })
   ]

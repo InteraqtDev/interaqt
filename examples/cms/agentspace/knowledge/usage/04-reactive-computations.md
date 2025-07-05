@@ -688,14 +688,13 @@ const User = Entity.create({
       name: 'tagSummary',
       type: 'string',
       defaultValue: () => '',
-      computation: Transform.create({
-        record: UserTag,
-        callback: (tags) => {
-          if (tags.length === 0) return 'No tags';
-          if (tags.length <= 3) return tags.map(t => t.name).join(', ');
-          return `${tags.slice(0, 3).map(t => t.name).join(', ')} and ${tags.length - 3} more`;
-        }
-      })
+      computed: function(user) {
+        // Assuming user has a tags property that's an array
+        const tags = user.tags || [];
+        if (tags.length === 0) return 'No tags';
+        if (tags.length <= 3) return tags.map(t => t.name).join(', ');
+        return `${tags.slice(0, 3).map(t => t.name).join(', ')} and ${tags.length - 3} more`;
+      }
     })
   ]
 });
@@ -715,24 +714,23 @@ const User = Entity.create({
       name: 'activityStats',
       type: 'object',
       defaultValue: () => ({}),
-      computation: Transform.create({
-        record: UserPosts,
-        callback: (posts) => {
-          const now = new Date();
-          const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-          const oneMonthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-          
-          const recentPosts = posts.filter(p => new Date(p.createdAt) > oneWeekAgo);
-          const monthlyPosts = posts.filter(p => new Date(p.createdAt) > oneMonthAgo);
-          
-          return {
-            totalPosts: posts.length,
-            recentPosts: recentPosts.length,
-            monthlyPosts: monthlyPosts.length,
-            averageLikes: posts.reduce((sum, p) => sum + (p.likeCount || 0), 0) / posts.length || 0
-          };
-        }
-      })
+      computed: function(user) {
+        // Assuming user has posts property that's an array
+        const posts = user.posts || [];
+        const now = new Date();
+        const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        const oneMonthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        
+        const recentPosts = posts.filter(p => new Date(p.createdAt) > oneWeekAgo);
+        const monthlyPosts = posts.filter(p => new Date(p.createdAt) > oneMonthAgo);
+        
+        return {
+          totalPosts: posts.length,
+          recentPosts: recentPosts.length,
+          monthlyPosts: monthlyPosts.length,
+          averageLikes: posts.reduce((sum, p) => sum + (p.likeCount || 0), 0) / posts.length || 0
+        };
+      }
     })
   ]
 });
@@ -1623,7 +1621,7 @@ RealTime.create({
 // Inequality/Equation type: nextRecomputeTime = solve() result
 RealTime.create({
   callback: async (now: Expression, dataDeps: any) => {
-    const deadline = 1640995200000; // 2022-01-01 00:00:00
+    const deadline = 1640995200000;
     return now.gt(deadline); // Return Inequality
   }
   // nextRecomputeTime will be 1640995200000 (critical time point)
@@ -1812,20 +1810,16 @@ const Post = Entity.create({
       })
     }),
     
-    // Transform: Generate content summary
     Property.create({
       name: 'summary',
       type: 'string',
       defaultValue: () => '',
-      computation: Transform.create({
-        record: Post,
-        callback: (record) => {
-          const content = record.content || '';
-          return content.length > 100 
-            ? content.substring(0, 100) + '...'
-            : content;
-        }
-      })
+      computed: function(post) {
+        const content = post.content || '';
+        return content.length > 100 
+          ? content.substring(0, 100) + '...'
+          : content;
+      }
     }),
     
     // Every: Check if all comments are moderated
@@ -2092,7 +2086,7 @@ Version.properties.push(
       record: StyleVersionRelation  // ✅ Now safely reference the relation
     })
   })
-)
+) 
 ```
 
 ### Key Principles
@@ -2114,12 +2108,20 @@ Version.properties.push(
    └── setup.ts        # Add computed properties that depend on relations
    ```
 
-5. **Use getValue for same-entity computations**: For computed properties that only depend on the same entity's data, use `getValue` instead of Transform:
+5. **Use getValue or computed for same-entity computations**: For computed properties that only depend on the same entity's data, use `getValue` or `computed` instead of Transform:
    ```javascript
    Property.create({
      name: 'displayName',
      type: 'string',
      getValue: (record) => `${record.firstName} ${record.lastName}`  // ✅ Simple, same-entity computation
+   })
+   // or
+   Property.create({
+     name: 'displayName',
+     type: 'string',
+     computed: function(record) {
+       return `${record.firstName} ${record.lastName}`;  // ✅ Also correct
+     }
    })
    ```
 
@@ -2153,7 +2155,7 @@ Property.create({
   })
 })
 
-// ✅ DO: Use getValue for property-level computations
+// ✅ DO: Use getValue or computed for property-level computations
 Property.create({
   name: 'formattedPrice',
   type: 'string',
@@ -2166,4 +2168,3 @@ import { StyleVersionRelation } from '../relations/StyleVersionRelation'
 computation: Count.create({
   record: StyleVersionRelation  // Direct reference
 })
-``` 

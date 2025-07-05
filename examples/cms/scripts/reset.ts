@@ -40,6 +40,13 @@ export const dicts = []
   
   fs.writeFileSync(path.join(backendDir, 'index.ts'), indexContent, 'utf8');
   console.log('Recreated backend/index.ts');
+
+  // 3. Delete all files in tests directory
+  const testsDir = path.join(projectRoot, 'tests');
+  if (fs.existsSync(testsDir)) {
+    fs.rmSync(testsDir, { recursive: true, force: true });
+    console.log('Deleted tests directory');
+  }
   
   console.log('Project reset completed successfully!');
 }

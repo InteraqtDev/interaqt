@@ -155,10 +155,9 @@ const OrderItem = Entity.create({
     Property.create({
       name: 'subtotal',
       type: 'number',
-      computation: Transform.create({
-        record: OrderItem,
-        callback: (record) => record.quantity * record.unitPrice
-      })
+      computed: function(item) {
+        return (item.quantity || 0) * (item.unitPrice || 0);
+      }
     })
   ]
 });

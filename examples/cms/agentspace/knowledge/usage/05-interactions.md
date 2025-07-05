@@ -576,37 +576,56 @@ const UpdateUserProfile = Interaction.create({
 });
 
 // 2. User properties respond to update interactions
+// First declare state nodes for tracking updates
+const NameUpdatedState = StateNode.create({
+  name: 'nameUpdated',
+  computeValue: function(lastValue, context) {
+    // When entering this state due to UpdateUserProfile, return the new name
+    return context.event.payload.name || lastValue;
+  }
+});
+
+const BioUpdatedState = StateNode.create({
+  name: 'bioUpdated', 
+  computeValue: function(lastValue, context) {
+    // When entering this state due to UpdateUserProfile, return the new bio
+    return context.event.payload.bio || lastValue;
+  }
+});
+
 const User = Entity.create({
   name: 'User',
   properties: [
     Property.create({
       name: 'name',
       type: 'string',
-      computation: Transform.create({
-        record: InteractionEventEntity,
-        callback: function(event) {
-          if (event.interactionName === 'UpdateUserProfile' && 
-              event.payload.userId === this.id && 
-              event.payload.name) {
-            return event.payload.name;
-          }
-          return this.name; // Keep existing value
-        }
+      computation: StateMachine.create({
+        states: [NameUpdatedState],
+        transfers: [
+          StateTransfer.create({
+            current: NameUpdatedState,
+            next: NameUpdatedState,
+            trigger: UpdateUserProfile,
+            computeTarget: (event) => ({ id: event.payload.userId })
+          })
+        ],
+        defaultState: NameUpdatedState
       })
     }),
     Property.create({
       name: 'bio',
       type: 'string',
-      computation: Transform.create({
-        record: InteractionEventEntity,
-        callback: function(event) {
-          if (event.interactionName === 'UpdateUserProfile' && 
-              event.payload.userId === this.id && 
-              event.payload.bio) {
-            return event.payload.bio;
-          }
-          return this.bio; // Keep existing value
-        }
+      computation: StateMachine.create({
+        states: [BioUpdatedState],
+        transfers: [
+          StateTransfer.create({
+            current: BioUpdatedState,
+            next: BioUpdatedState,
+            trigger: UpdateUserProfile,
+            computeTarget: (event) => ({ id: event.payload.userId })
+          })
+        ],
+        defaultState: BioUpdatedState
       })
     })
   ]
@@ -695,6 +714,10 @@ const SubmitOrder = Interaction.create({
 const Order = Entity.create({
   name: 'Order',
   properties: [
+    Property.create({ name: 'items', type: 'object', collection: true }),
+    Property.create({ name: 'shippingAddress', type: 'object' }),
+    Property.create({ name: 'paymentMethod', type: 'string' }),
+    Property.create({ name: 'couponCode', type: 'string' }),
     Property.create({
       name: 'status',
       type: 'string',
@@ -712,16 +735,11 @@ const Order = Entity.create({
     Property.create({
       name: 'totalAmount',
       type: 'number',
-      computation: Transform.create({
-        record: InteractionEventEntity,
-        callback: function(event) {
-          if (event.interactionName === 'SubmitOrder') {
-            const items = event.payload.items;
-            return items.reduce((total, item) => total + (item.price * item.quantity), 0);
-          }
-          return this.totalAmount;
-        }
-      })
+      // Calculate from order items
+      computed: function(order) {
+        const items = order.items || [];
+        return items.reduce((total, item) => total + (item.price * item.quantity), 0);
+      }
     })
   ],
   computation: Transform.create({
@@ -762,48 +780,50 @@ const SubmitReview = Interaction.create({
 const Review = Entity.create({
   name: 'Review',
   properties: [
+    Property.create({ name: 'productId', type: 'string' }),
+    Property.create({ name: 'rating', type: 'number' }),
+    Property.create({ name: 'content', type: 'string' }),
+    Property.create({ name: 'userId', type: 'string' }),
+    Property.create({ name: 'createdAt', type: 'string' }),
     Property.create({
       name: 'status',
       type: 'string',
-      computation: Transform.create({
-        record: InteractionEventEntity,
-        dataDeps: {
-          user: {
-            type: 'property',
-            attributeQuery: ['trustLevel']
-          }
-        },
-        callback: function(event, dataDeps) {
-          if (event.interactionName === 'SubmitReview') {
-            const userTrustLevel = dataDeps.user?.trustLevel || 0;
-            
-            // Auto-approve reviews from trusted users
-            if (userTrustLevel >= 80) {
-              return 'approved';
-            }
-            
-            // Reviews with low ratings require manual approval
-            if (event.payload.rating <= 2) {
-              return 'pending_review';
-            }
-            
-            return 'pending';
-          }
-          return this.status;
-        }
-      })
+      defaultValue: () => 'pending'
     })
   ],
   computation: Transform.create({
     record: InteractionEventEntity,
-    callback: function(event) {
+    dataDeps: {
+      users: {
+        type: 'records',
+        source: User,
+        attributeQuery: ['id', 'trustLevel']
+      }
+    },
+    callback: function(event, dataDeps) {
       if (event.interactionName === 'SubmitReview') {
+        const user = dataDeps.users?.find(u => u.id === event.user.id);
+        const userTrustLevel = user?.trustLevel || 0;
+        
+        // Determine initial status based on trust level and rating
+        let initialStatus = 'pending';
+        
+        // Auto-approve reviews from trusted users
+        if (userTrustLevel >= 80) {
+          initialStatus = 'approved';
+        }
+        // Reviews with low ratings require manual approval
+        else if (event.payload.rating <= 2) {
+          initialStatus = 'pending_review';
+        }
+        
         return {
           productId: event.payload.productId,
           rating: event.payload.rating,
           content: event.payload.content,
           userId: event.user.id,
-          createdAt: new Date().toISOString()
+          createdAt: new Date().toISOString(),
+          status: initialStatus
         };
       }
       return null;
@@ -1024,24 +1044,33 @@ const Order = Entity.create({
         return order.status === 'pending' || order.status === 'paid';
       }
     }),
-    Property.create({
-      name: 'paymentInfo',
-      type: 'object',
-      computation: Transform.create({
-        record: InteractionEventEntity,
-        callback: function(event) {
-          if (event.interactionName === 'PayOrder' && event.payload.orderId === this.id) {
-            return {
-              method: event.payload.paymentMethod,
-              amount: event.payload.amount,
-              paidAt: new Date().toISOString()
-            };
-          }
-          return null;
-        }
-      })
-    })
+    // Payment info is stored in separate Payment entity
   ]
+});
+
+// Create Payment entity to record payment history
+const Payment = Entity.create({
+  name: 'Payment',
+  properties: [
+    Property.create({ name: 'orderId', type: 'string' }),
+    Property.create({ name: 'method', type: 'string' }),
+    Property.create({ name: 'amount', type: 'number' }),
+    Property.create({ name: 'paidAt', type: 'string' })
+  ],
+  computation: Transform.create({
+    record: InteractionEventEntity,
+    callback: function(event) {
+      if (event.interactionName === 'PayOrder') {
+        return {
+          orderId: event.payload.orderId,
+          method: event.payload.paymentMethod,
+          amount: event.payload.amount,
+          paidAt: new Date().toISOString()
+        };
+      }
+      return null;
+    }
+  })
 });
 ```
 
