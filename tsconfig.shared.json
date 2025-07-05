@@ -9,7 +9,7 @@
     "allowSyntheticDefaultImports": true
   },
   "include": [
-    "src/storage/**/*",
-    "tests/storage/**/*"
+    "src/shared/**/*",
+    "tests/shared/**/*"
   ]
 } 

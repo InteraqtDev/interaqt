@@ -3,7 +3,7 @@ import {
   StateNode, StateTransfer, StateMachine,
   Count, Summation, Average, Every, Any,
   WeightedSummation, Transform, RealTime,
-  Entity, Relation 
+  Entity, Relation, Interaction, Action 
 } from "@shared";
 
 describe("Computation System - createClass functionality", () => {
@@ -31,14 +31,20 @@ describe("Computation System - createClass functionality", () => {
     test("should create state transfer", () => {
       const fromNode = StateNode.create({ name: "start" });
       const toNode = StateNode.create({ name: "end" });
+      
+      // Create a proper Interaction instance for trigger
+      const completeInteraction = Interaction.create({
+        name: "complete",
+        action: Action.create({ name: "complete" })
+      });
 
       const transfer = StateTransfer.create({
-        trigger: { eventType: "complete" },
+        trigger: completeInteraction,
         current: fromNode,
         next: toNode
       });
 
-      expect(transfer.trigger).toEqual({ eventType: "complete" });
+      expect(transfer.trigger).toBe(completeInteraction);
       expect(transfer.current).toBe(fromNode);
       expect(transfer.next).toBe(toNode);
       expect(transfer._type).toBe("StateTransfer");
@@ -49,14 +55,25 @@ describe("Computation System - createClass functionality", () => {
       const activeNode = StateNode.create({ name: "active" });
       const doneNode = StateNode.create({ name: "done" });
 
+      // Create proper Interaction instances
+      const startInteraction = Interaction.create({
+        name: "start",
+        action: Action.create({ name: "start" })
+      });
+
+      const completeInteraction = Interaction.create({
+        name: "complete",
+        action: Action.create({ name: "complete" })
+      });
+
       const startTransfer = StateTransfer.create({
-        trigger: { action: "start" },
+        trigger: startInteraction,
         current: pendingNode,
         next: activeNode
       });
 
       const completeTransfer = StateTransfer.create({
-        trigger: { action: "complete" },
+        trigger: completeInteraction,
         current: activeNode,
         next: doneNode
       });

@@ -1,7 +1,6 @@
 import { IInstance, SerializedData, generateUUID } from './interfaces.js';
-import { stringifyAttribute } from './utils.js';
+import { stringifyAttribute, indexBy } from './utils.js';
 import { parse as parseStr } from 'acorn';
-import { indexBy } from '../utils.js';
 
 // BoolAtomData
 export interface BoolAtomDataInstance extends IInstance {

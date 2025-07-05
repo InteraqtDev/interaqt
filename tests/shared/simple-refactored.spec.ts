@@ -5,12 +5,14 @@ import { Dictionary } from "../../src/shared/refactored/RealDictionary";
 import { StateNode } from "../../src/shared/refactored/StateNode";
 import { StateTransfer } from "../../src/shared/refactored/StateTransfer";
 import { StateMachine } from "../../src/shared/refactored/StateMachine";
+import { Interaction } from "../../src/shared/refactored/Interaction";
+import { Action } from "../../src/shared/refactored/Action";
 import { clearAllInstances } from "../../src/shared/refactored/utils";
 
 describe("Simple Objects Refactored - compatibility test", () => {
   beforeEach(() => {
     // 清空实例列表
-    clearAllInstances(Gateway, Event, Dictionary, StateNode, StateTransfer, StateMachine);
+    clearAllInstances(Gateway, Event, Dictionary, StateNode, StateTransfer, StateMachine, Interaction, Action);
   });
 
   describe("Gateway", () => {
@@ -156,13 +158,19 @@ describe("Simple Objects Refactored - compatibility test", () => {
       const idle = StateNode.create({ name: "idle" });
       const active = StateNode.create({ name: "active" });
       
+      // Create a proper Interaction instance
+      const startInteraction = Interaction.create({
+        name: "start",
+        action: Action.create({ name: "start" })
+      });
+      
       const transfer = StateTransfer.create({
-        trigger: { event: "start" },
+        trigger: startInteraction,
         current: idle,
         next: active
       });
       
-      expect(transfer.trigger).toEqual({ event: "start" });
+      expect(transfer.trigger).toBe(startInteraction);
       expect(transfer.current).toBe(idle);
       expect(transfer.next).toBe(active);
       expect(transfer._type).toBe("StateTransfer");
@@ -172,8 +180,14 @@ describe("Simple Objects Refactored - compatibility test", () => {
       const idle = StateNode.create({ name: "idle" });
       const active = StateNode.create({ name: "active" });
       
+      // Create a proper Interaction instance
+      const startInteraction = Interaction.create({
+        name: "start",
+        action: Action.create({ name: "start" })
+      });
+      
       const transfer = StateTransfer.create({
-        trigger: { event: "start" },
+        trigger: startInteraction,
         current: idle,
         next: active,
         computeTarget: () => "computed"
@@ -188,8 +202,15 @@ describe("Simple Objects Refactored - compatibility test", () => {
     test("should create StateMachine instance", () => {
       const idle = StateNode.create({ name: "idle" });
       const active = StateNode.create({ name: "active" });
+      
+      // Create a proper Interaction instance
+      const startInteraction = Interaction.create({
+        name: "start",
+        action: Action.create({ name: "start" })
+      });
+      
       const transfer = StateTransfer.create({
-        trigger: { event: "start" },
+        trigger: startInteraction,
         current: idle,
         next: active
       });
@@ -233,8 +254,15 @@ describe("Simple Objects Refactored - compatibility test", () => {
       const d1 = Dictionary.create({ name: "d1", type: "string" });
       const n1 = StateNode.create({ name: "n1" });
       const n2 = StateNode.create({ name: "n2" });
+      
+      // Create a proper Interaction instance
+      const testInteraction = Interaction.create({
+        name: "test",
+        action: Action.create({ name: "test" })
+      });
+      
       const t1 = StateTransfer.create({ 
-        trigger: { event: "test" }, 
+        trigger: testInteraction, 
         current: n1, 
         next: n2 
       });
