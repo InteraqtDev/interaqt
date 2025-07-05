@@ -68,6 +68,57 @@ Property.create({
 
 **ONLY use in Entity/Relation computation, NEVER in Property!**
 
+#### 🔴 CRITICAL: Transform Collection Conversion Concept
+
+Transform converts one collection (source) into another collection (target). Understanding this is crucial:
+
+1. **Collection to Collection**: Transform maps items from source collection to target collection
+   - Source: InteractionEventEntity collection (all interaction events)
+   - Target: Entity/Relation collection being created
+
+2. **Callback Returns Single Item**: The callback returns data for ONE item in the new collection
+   ```typescript
+   callback: function(event) {
+     // event is ONE item from InteractionEventEntity collection
+     // return is ONE item for target Entity collection
+     return { /* single entity data */ };
+   }
+   ```
+
+3. **System Auto-generates IDs**: NEVER include `id` in callback return value
+   ```typescript
+   // ❌ WRONG: Including id in new entity
+   callback: function(event) {
+     return {
+       id: uuid(),  // NEVER DO THIS!
+       label: event.payload.label,
+       slug: event.payload.slug
+     };
+   }
+   
+   // ✅ CORRECT: Let system generate id
+   callback: function(event) {
+     return {
+       label: event.payload.label,
+       slug: event.payload.slug
+     };
+   }
+   ```
+
+4. **Entity References Use ID**: When referencing existing entities in relations, use `{ id: ... }`
+   ```typescript
+   // ✅ CORRECT: Reference existing entity
+   callback: function(event) {
+     return {
+       title: event.payload.title,
+       author: event.user,  // event.user already has id
+       category: { id: event.payload.categoryId }  // Reference by id
+     };
+   }
+   ```
+
+Remember: Transform is a **mapping function** that converts each matching source item into a new target item. The framework handles ID generation, storage, and relationship management.
+
 #### Entity Creation via Transform
 ```typescript
 import { Transform, InteractionEventEntity, Entity, Property, Interaction, Action, Payload, PayloadItem } from 'interaqt';

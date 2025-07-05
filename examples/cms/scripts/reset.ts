@@ -65,7 +65,20 @@ export const dicts = []
     fs.rmSync(claudeDir, { recursive: true, force: true });
     console.log('Deleted .claude directory');
   }
-  
+  // 5. Delete all files in errors directory but keep the directory
+  const errorsDir = path.join(projectRoot, 'errors');
+  if (fs.existsSync(errorsDir)) {
+    const files = fs.readdirSync(errorsDir);
+    for (const file of files) {
+      const filePath = path.join(errorsDir, file);
+      if (fs.statSync(filePath).isDirectory()) {
+        fs.rmSync(filePath, { recursive: true, force: true });
+      } else {
+        fs.unlinkSync(filePath);
+      }
+    }
+    console.log('Cleaned errors directory (kept directory structure)');
+  }
   console.log('Project reset completed successfully!');
 }
 

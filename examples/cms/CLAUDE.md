@@ -96,7 +96,7 @@ Common issues that can be avoided by reading the API reference:
 
 - [ ] Generate all interactions from use cases
 - [ ] Start with simple payload-only interactions. No userAttributive or dataAttributive initially
-- [ ] Ensure TypeScript type checking passes
+- [ ] Ensure TypeScript type checking passes by using `npm run check`
 
 ### 2.3 Computation Implementation
 **📖 Reference: `./agentspace/knowledge/generator/computation-implementation.md`**
