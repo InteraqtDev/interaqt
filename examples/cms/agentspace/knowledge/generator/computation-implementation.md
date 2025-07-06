@@ -119,6 +119,76 @@ Transform converts one collection (source) into another collection (target). Und
 
 Remember: Transform is a **mapping function** that converts each matching source item into a new target item. The framework handles ID generation, storage, and relationship management.
 
+#### 🔴 CRITICAL: InteractionEventEntity Transform Limitations
+
+When using `InteractionEventEntity` as the Transform input source, understand these fundamental limitations:
+
+1. **ONLY Creates, Never Updates or Deletes**
+   - Transform with InteractionEventEntity can ONLY create new entities
+   - It CANNOT update existing entities
+   - It CANNOT delete entities
+
+2. **Why This Limitation Exists**
+   - InteractionEventEntity represents system interaction events
+   - Events are **immutable** - once occurred, they never change
+   - Events are **append-only** - the collection only grows, never shrinks
+   - Each interaction creates a NEW event, it doesn't modify old events
+
+3. **How to Handle Updates and Deletes**
+
+   ```typescript
+   // ❌ WRONG: Trying to update with Transform
+   Entity.create({
+     name: 'Style',
+     computation: Transform.create({
+       record: InteractionEventEntity,
+       callback: function(event) {
+         if (event.interactionName === 'UpdateStyle') {
+           // This will CREATE a new Style, not update existing!
+           return { id: event.payload.id, ... }  // WRONG!
+         }
+       }
+     })
+   })
+   
+   // ✅ CORRECT: Use StateMachine for updates
+   Property.create({
+     name: 'updatedAt',
+     type: 'number',
+     computation: StateMachine.create({
+       states: [updatedState],
+       transfers: [
+         StateTransfer.create({
+           trigger: UpdateStyleInteraction,
+           current: updatedState,
+           next: updatedState,
+           computeTarget: (event) => ({ id: event.payload.id })
+         })
+       ]
+     })
+   })
+   
+   // ✅ CORRECT: Use soft delete with status
+   Property.create({
+     name: 'status',
+     type: 'string',
+     defaultValue: () => 'active',
+     computation: StateMachine.create({
+       states: [activeState, deletedState],
+       transfers: [
+         StateTransfer.create({
+           trigger: DeleteStyleInteraction,
+           current: activeState,
+           next: deletedState,
+           computeTarget: (event) => ({ id: event.payload.id })
+         })
+       ]
+     })
+   })
+   ```
+
+**Summary**: Think of InteractionEventEntity Transform as a "factory" that produces new entities from events. For any modifications to existing entities, use StateMachine. For deletions, use soft delete patterns with status fields.
+
 #### Entity Creation via Transform
 ```typescript
 import { Transform, InteractionEventEntity, Entity, Property, Interaction, Action, Payload, PayloadItem } from 'interaqt';

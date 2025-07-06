@@ -1210,11 +1210,57 @@ await controller.setup(true) // Create database tables
 
 #### callInteraction(interactionName: string, args: InteractionEventArgs)
 Call interaction.
+
+**Return Type**
+```typescript
+type InteractionCallResponse = {
+  // Contains error information if the interaction failed
+  error?: unknown
+  
+  // For GET interactions: contains the retrieved data
+  data?: unknown
+  
+  // The interaction event that was processed
+  event?: InteractionEvent
+  
+  // Record mutations (create/update/delete) that occurred
+  effects?: RecordMutationEvent[]
+  
+  // Results from side effects defined in the interaction
+  sideEffects?: {
+    [effectName: string]: {
+      result?: unknown
+      error?: unknown
+    }
+  }
+  
+  // Additional context (e.g., activityId for activity interactions)
+  context?: {
+    [key: string]: unknown
+  }
+}
+```
+
+**Example**
 ```typescript
 const result = await controller.callInteraction('createPost', {
     user: { id: 'user1' },
     payload: { postData: { title: 'Hello', content: 'World' } }
 })
+
+// Check for errors
+if (result.error) {
+    console.error('Interaction failed:', result.error)
+    return
+}
+
+// Access created record ID from effects
+const createdPostId = result.effects?.[0]?.record?.id
+
+// Check side effects
+if (result.sideEffects?.emailNotification?.error) {
+    console.warn('Email notification failed')
+}
 ```
 
 #### callActivityInteraction(activityName: string, interactionName: string, activityId: string, args: InteractionEventArgs)
@@ -1248,6 +1294,26 @@ Storage layer interface providing data persistence functionality.
 
 **Main Methods**
 
+#### Transaction Operations
+
+**beginTransaction(transactionName?: string)**
+Begin a database transaction.
+```typescript
+await storage.beginTransaction('updateOrder')
+```
+
+**commitTransaction(transactionName?: string)**
+Commit a database transaction.
+```typescript
+await storage.commitTransaction('updateOrder')
+```
+
+**rollbackTransaction(transactionName?: string)**
+Rollback a database transaction.
+```typescript
+await storage.rollbackTransaction('updateOrder')
+```
+
 #### Entity/Relation Operations
 
 🔴 **CRITICAL: Always specify attributeQuery parameter!**
@@ -1255,60 +1321,254 @@ Storage layer interface providing data persistence functionality.
 - This is a common source of bugs in tests and applications
 - Always explicitly list all fields you need
 
-```typescript
-// ❌ WRONG: Only returns { id: '...' }
-const user = await storage.findOne('User', MatchExp.atom({
-  key: 'email',
-  value: ['=', 'user@example.com']
-}))
-console.log(user.name)  // undefined!
+**find(entityName: string, matchExpression?: MatchExpressionData, modifier?: ModifierData, attributeQuery?: AttributeQueryData)**
+Find multiple records matching the criteria.
 
+**Parameters**
+- `entityName` (string): Name of the entity to query
+- `matchExpression` (MatchExpressionData, optional): Query conditions
+- `modifier` (ModifierData, optional): Query modifiers (limit, offset, orderBy, etc.)
+- `attributeQuery` (AttributeQueryData, optional but critical): Fields to retrieve
+
+```typescript
+// ✅ CORRECT: Returns all specified fields
+const users = await storage.find('User', 
+  MatchExp.atom({ key: 'status', value: ['=', 'active'] }),
+  { limit: 10, orderBy: { createdAt: 'desc' } },
+  ['id', 'username', 'email', 'lastLoginDate']
+)
+```
+
+**findOne(entityName: string, matchExpression?: MatchExpressionData, modifier?: ModifierData, attributeQuery?: AttributeQueryData)**
+Find a single record matching the criteria.
+
+**Parameters**
+- Same as `find()` but returns only the first result
+
+```typescript
 // ✅ CORRECT: Returns all specified fields
 const user = await storage.findOne('User', 
-  MatchExp.atom({
-    key: 'email',
-    value: ['=', 'user@example.com']
-  }),
-  undefined,  // modifier
-  ['id', 'name', 'email', 'role', 'createdAt']  // attributeQuery
+  MatchExp.atom({ key: 'email', value: ['=', 'user@example.com'] }),
+  undefined,
+  ['id', 'name', 'email', 'role', 'createdAt']
 )
-console.log(user.name)  // 'John Doe' ✓
+```
 
-// Create record
-await storage.create('User', { username: 'john', email: 'john@example.com' })
+**create(entityName: string, data: any, events?: RecordMutationEvent[])**
+Create a new record.
 
-// Find single record (MUST specify attributeQuery!)
-const user = await storage.findOne('User', MatchExp.atom({
-    key: 'username',
-    value: ['=', 'john']
-}), undefined, ['id', 'username', 'email', 'status'])
+**Parameters**
+- `entityName` (string): Name of the entity
+- `data` (any): Entity data (do NOT include id field)
+- `events` (RecordMutationEvent[], optional): Mutation events array
 
-// Find multiple records (MUST specify attributeQuery!)
-const users = await storage.find('User', MatchExp.atom({
-    key: 'status',
-    value: ['=', 'active']
-}), undefined, ['id', 'username', 'email', 'lastLoginDate'])
+```typescript
+const user = await storage.create('User', { 
+  username: 'john', 
+  email: 'john@example.com',
+  role: 'user'
+})
+// Returns created record with generated id
+```
 
-// Update record
-await storage.update('User', MatchExp.atom({
-    key: 'id',
-    value: ['=', 'user1']
-}), { status: 'inactive' })
+**update(entityName: string, matchExpression: MatchExpressionData, data: any, events?: RecordMutationEvent[])**
+Update existing records.
 
-// Delete record
-await storage.delete('User', MatchExp.atom({
-    key: 'id',
-    value: ['=', 'user1']
-}))
+**Parameters**
+- `entityName` (string): Name of the entity
+- `matchExpression` (MatchExpressionData): Which records to update
+- `data` (any): Fields to update
+- `events` (RecordMutationEvent[], optional): Mutation events array
+
+```typescript
+await storage.update('User', 
+  MatchExp.atom({ key: 'id', value: ['=', userId] }), 
+  { status: 'inactive', lastModified: Date.now() }
+)
+```
+
+**delete(entityName: string, matchExpression: MatchExpressionData, events?: RecordMutationEvent[])**
+Delete records.
+
+**Parameters**
+- `entityName` (string): Name of the entity
+- `matchExpression` (MatchExpressionData): Which records to delete
+- `events` (RecordMutationEvent[], optional): Mutation events array
+
+```typescript
+await storage.delete('User', 
+  MatchExp.atom({ key: 'id', value: ['=', userId] })
+)
+```
+
+#### Relation-Specific Operations
+
+**findRelationByName(relationName: string, matchExpression?: MatchExpressionData, modifier?: ModifierData, attributeQuery?: AttributeQueryData)**
+Find relation records by relation name.
+
+```typescript
+const userPosts = await storage.findRelationByName('UserPostRelation',
+  MatchExp.atom({ key: 'source.id', value: ['=', userId] }),
+  { limit: 10 },
+  ['id', 'createdAt', ['target', { attributeQuery: ['title', 'status'] }]]
+)
+```
+
+**findOneRelationByName(relationName: string, matchExpression: MatchExpressionData, modifier?: ModifierData, attributeQuery?: AttributeQueryData)**
+Find a single relation record by relation name.
+
+```typescript
+const relation = await storage.findOneRelationByName('UserPostRelation',
+  MatchExp.atom({ key: 'id', value: ['=', relationId] }),
+  undefined,
+  ['*']
+)
+```
+
+**addRelationByNameById(relationName: string, sourceEntityId: string, targetEntityId: string, data?: any, events?: RecordMutationEvent[])**
+Create a relation between two entities by their IDs.
+
+```typescript
+// Create relation between user and post
+await storage.addRelationByNameById('UserPostRelation', 
+  userId, 
+  postId,
+  { createdAt: Date.now() }  // Optional relation properties
+)
+```
+
+**updateRelationByName(relationName: string, matchExpression: MatchExpressionData, data: any, events?: RecordMutationEvent[])**
+Update relation properties (cannot update source/target).
+
+```typescript
+await storage.updateRelationByName('UserPostRelation',
+  MatchExp.atom({ key: 'id', value: ['=', relationId] }),
+  { priority: 'high' }  // Only update relation properties
+)
+```
+
+**removeRelationByName(relationName: string, matchExpression: MatchExpressionData, events?: RecordMutationEvent[])**
+Remove relations.
+
+```typescript
+await storage.removeRelationByName('UserPostRelation',
+  MatchExp.atom({ key: 'id', value: ['=', relationId] })
+)
 ```
 
 #### KV Storage Operations
+
+**get(itemName: string, id: string, initialValue?: any)**
+Get value from key-value storage.
+
 ```typescript
-// Set value
+// Get value with default
+const maxUsers = await storage.get('config', 'maxUsers', 100)
+```
+
+**set(itemName: string, id: string, value: any, events?: RecordMutationEvent[])**
+Set value in key-value storage.
+
+```typescript
+// Set configuration value
 await storage.set('config', 'maxUsers', 1000)
 
-// Get value
-const maxUsers = await storage.get('config', 'maxUsers', 100) // Default value 100
+// Store complex objects
+await storage.set('cache', 'userPreferences', {
+  theme: 'dark',
+  language: 'en',
+  notifications: true
+})
+```
+
+#### Utility Methods
+
+**getRelationName(entityName: string, attributeName: string)**
+Get the internal relation name for an entity's relation property.
+
+```typescript
+const relationName = storage.getRelationName('User', 'posts')
+// Returns something like 'User_posts_author_Post'
+```
+
+**getEntityName(entityName: string, attributeName: string)**
+Get the target entity name for a relation property.
+
+```typescript
+const targetEntity = storage.getEntityName('User', 'posts')
+// Returns 'Post'
+```
+
+**listen(callback: RecordMutationCallback)**
+Register a callback to listen for record mutations.
+
+```typescript
+storage.listen(async (events) => {
+  for (const event of events) {
+    console.log(`${event.type} on ${event.recordName}`, event.record)
+  }
+})
+```
+
+#### AttributeQueryData Format
+
+AttributeQuery specifies which fields to retrieve and supports nested queries for relations:
+
+```typescript
+type AttributeQueryData = (string | [string, { attributeQuery?: AttributeQueryData }])[]
+
+// Examples:
+// Simple fields
+['id', 'name', 'email']
+
+// All fields
+['*']
+
+// Nested relation query
+[
+  'id', 
+  'name',
+  ['posts', { 
+    attributeQuery: ['title', 'status', 'createdAt'] 
+  }]
+]
+
+// Multi-level nesting
+[
+  'id',
+  ['posts', { 
+    attributeQuery: [
+      'title',
+      ['comments', { 
+        attributeQuery: ['content', 'author'] 
+      }]
+    ] 
+  }]
+]
+```
+
+#### ModifierData Format
+
+Modifiers control query behavior:
+
+```typescript
+type ModifierData = {
+  limit?: number
+  offset?: number
+  orderBy?: {
+    [field: string]: 'asc' | 'desc'
+  }
+}
+
+// Example
+{
+  limit: 20,
+  offset: 40,
+  orderBy: {
+    createdAt: 'desc',
+    priority: 'asc'
+  }
+}
 ```
 
 ## 13.6 Utility Function APIs
