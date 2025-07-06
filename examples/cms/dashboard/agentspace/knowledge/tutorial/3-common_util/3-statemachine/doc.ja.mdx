@@ -1,0 +1,52 @@
+# ステートマシン
+
+Axiiは、複雑な状態遷移ロジックを管理するためのstatemachine0ライブラリを提供しています。これは有限状態機械の概念に基づいており、状態、イベント、遷移ルールを明確に定義できます。
+
+## 基本的な使い方
+
+ステートマシンインスタンスを作成し、状態遷移ルールを定義します：
+
+```jsx
+const transitions = [{
+    name: 't1', from: 'initial', event: 'process', to: 'processing'
+}, {
+    name: 't2', from: 'processing', event: 'done', to: 'done'
+}, {
+    name: 't3', from: 'done', event: 'reset', to: 'initial'
+}]
+
+const stateMachine = new Machine('initial', transitions)
+```
+
+## カスタム状態
+
+各状態に対してカスタム状態クラスを作成し、特定の動作を実装できます：
+
+```jsx
+stateMachine.addState(new CommonState('initial'))
+stateMachine.addState(new ProcessingState())
+stateMachine.addState(new CommonState('done'))
+```
+
+## ミドルウェア
+
+ミドルウェアを追加して状態遷移プロセスを傍受し、ロギング、権限チェックなどの機能を実装できます：
+
+```jsx
+stateMachine.use(log)
+stateMachine.use(checkCredential)
+```
+
+## 状態遷移のトリガー
+
+イベントをディスパッチして状態遷移をトリガーします：
+
+```jsx
+// 遷移イベントを作成
+const processEvent = createTransitionEvent('process')
+
+// 状態遷移をトリガー
+stateMachine.transition(processEvent)
+```
+
+statemachine0ライブラリは、複雑な状態管理をシンプルで保守しやすくし、特に明確に定義された状態フローを持つアプリケーションに適しています。 

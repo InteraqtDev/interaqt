@@ -1,0 +1,4 @@
+axii supports using useEffect and useLayoutEffect to create side effects.
+
+Additionally, axii provides a more elegant way to handle side effects.
+Users can declare a class that inherits from ManualCleanup and implement the destroy method. Any ManualCleanup subclass instantiated in a component will automatically call the destroy method when the component is destroyed.

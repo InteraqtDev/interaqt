@@ -1,0 +1,55 @@
+Axii 提供了强大而灵活的样式系统，支持各种 CSS 特性，包括过渡和动画效果。
+
+## 基本样式
+
+Axii 的样式系统支持多种 CSS 表达方式：
+
+```jsx
+const style = {
+    // 普通形式
+    margin: 10,
+    // 数组形式
+    padding: [10, 20],
+    // 嵌套和伪类
+    '&:hover': {
+        background: 'blue'
+    },
+    // 嵌套选择器
+    '& span': {
+        color: 'white'
+    }
+}
+```
+
+## 关键帧动画
+
+Axii 支持直接在组件中定义关键帧动画：
+
+```jsx
+const style = {
+    // 定义关键帧
+    '@keyframes': {
+        from: { transform: 'rotate(0deg)' },
+        to: { transform: 'rotate(359deg)' }
+    },
+    // 使用动画，@self 引用当前元素的关键帧
+    animation: `@self 4s linear infinite`,
+    transformOrigin: 'center center'
+}
+```
+
+## 过渡效果
+
+Axii 支持 CSS 过渡效果，可以通过数组形式定义过渡属性：
+
+```jsx
+const style = {
+    transition: ['all 0.3s ease', 'opacity 0.5s ease'],
+    '&:hover': {
+        opacity: 0.8,
+        transform: 'scale(1.1)'
+    }
+}
+```
+
+Axii 的样式系统设计简洁而强大，可以满足大多数复杂的样式需求，同时保持代码的可读性和可维护性。 

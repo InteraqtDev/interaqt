@@ -1,0 +1,120 @@
+In axii, we often encapsulate complex UIs into individual components and then compose them. However, sometimes the simple nesting structure can cause trouble:
+
+- Certain DOM elements or specific properties inside a child component need to be exposed for the parent to configure or use.
+- If we keep passing props through each layer, we end up with lots of “meaningless” intermediate wrappers, making the component tree more complicated.
+
+To address this, axii offers an "AOP-like" capability allowing you to directly penetrate child components from the parent, flexibly **overwriting** or **patching** the internal DOM or child components. This lets us maintain component encapsulation while still allowing property and event passthrough as needed, with minimal boilerplate.
+
+## Core Idea
+
+Within axii’s implementation, `ComponentHost` parses the props you pass to a component. If a prop key starts with `$`, axii considers it an **infiltration** or **aspect-oriented** configuration aimed at the child component or DOM element, rather than a normal prop for the component itself.
+
+In these “infiltration” props, the portion after the colon (`:`) indicates which attribute or method is being applied. For example:
+
+- `$xxx:style` means: apply the inline `style` property to the DOM/child component labeled `as="xxx"`.
+- `$xxx:value` means: set the `value` (usually for an `<input>` or similar component) for `as="xxx"`.
+- `$xxx:style_` indicates you can define a custom merging strategy for style, rather than a simple deep-merge or override.
+- `$xxx:children` replaces the children of the corresponding node.
+- `$xxx:_props` applies a custom merging logic to all the props of an internal node or child component.
+
+In the source code, these `$`-prefixed props are collected and merged into `itemConfig`. Eventually, when rendering, `ComponentHost` applies all these rules to the relevant DOM nodes or child components. Consequently, you can do something like this in the parent component:
+
+```typescript
+/ @jsx createElement /
+import { atom, RenderContext } from "axii"
+import { Child } from "./Child.js";
+export function App({}, { createElement }: RenderContext) {
+    const name = atom('world')
+    return (
+        <Child
+            // Add inline style to the element labeled "as=root" in the child component
+            $root:style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}
+            // Bind an atom to the <input> element labeled "as=main"
+            $main:value={name}
+            // Customize merge logic via style_
+            $main:style_={() => ({ border: '1px solid black', padding: '10px' })}
+            // Provide further configurations for the "grandChild" node
+            $grandChild={{
+                '$root:style': { color: 'cyan' }
+            }}
+        />
+    )
+}
+```
+
+
+In this way, if a child component `Child` has multiple nodes labeled with `as="root"`, `as="main"`, `as="grandChild"`, etc., the parent only needs to define `$root:xxx`, `$main:xxx`, `$grandChild:xxx`, etc. to directly pass or override the specific DOM/child component’s attributes.
+
+In the `Child` component, you might write:
+
+```typescript
+/ @jsx createElement /
+import { RenderContext } from "axii";
+import { GrandChild } from "./GrandChild.js";
+export function Child({}, { createElement }: RenderContext) {
+    return (
+        <div as="root">
+            <input as="main" />
+            <button as="trigger">Submit</button>
+            <GrandChild as="grandChild" />
+        </div>
+    )
+}
+```
+
+And in `GrandChild`:
+
+```typescript
+/ @jsx createElement /
+import { RenderContext } from "axii";
+export function GrandChild({}, { createElement }: RenderContext) {
+    return (
+        <div as="root">
+            this is grand child
+        </div>
+    )
+}
+```
+
+
+The final result is:
+- The configurations for `$root:style`, `$main:value`, `$main:style_`, and `$grandChild` in `App` merge into the corresponding DOM elements/child components.
+- Neither `Child` nor `GrandChild` needs any extra props or prop drilling; they only mark the nodes that require infiltration with `as="xxx"`.
+
+## How It Works Under the Hood
+
+This mechanism mainly relies on the implementation in `ComponentHost`:
+
+1. When the component is rendered, axii creates a `ComponentHost` object to manage the component’s props, render context, and lifecycle.
+2. The props are split so that everything starting with `$` is recognized as an **infiltration/autonomous config** (also called “component AOP”).
+3. Such infiltration configs get merged into `itemConfig`, forming a list of requirements like “apply which attribute to the node labeled as=xxx.” For example:
+   - `use`: fully replace that element with an existing DOM element.
+   - `props`: combine these attributes into that DOM or child component.
+   - `eventTarget`, `_use`, `_props`, etc. similarly follow the same principle.
+4. When generating DOM or child components, `ComponentHost` looks at the merged configuration and applies the relevant props or event bindings.
+
+Hence, in a parent component, you can “slice in” your logic to a child component’s internal DOM or child components without passing props through each layer or writing dedicated pass-through code in the child.
+
+## More Examples and Notes
+
+1. **Avoid naming collisions**  
+   If you label a DOM element or child component with `as="root"` in the child, the parent’s infiltration config must be `$root:xxx`. Make sure different nodes have unique, meaningful `as` labels.
+
+2. **Use custom merge logic**  
+   - `$xxx:style_={() => {...}}` indicates further control over merging styles.
+   - `$xxx:[prop]_` can also do something similar, letting you apply a custom merge function for specific props.
+
+3. **Nested composition**  
+   If the parent sets `$grandChild` and inside it references `$root`, axii continues merging it into the corresponding nodes of `GrandChild`. This can go multiple levels deep.
+
+4. **Reserved for the component’s own Props**  
+   `$xxx:xxx` is used only for infiltration into child nodes. If your component itself has props like `foo={atomValue}`, the normal props remain valid for your component—it will not be overridden by infiltration logic.
+
+5. **Flexible node replacement or reuse**  
+   If you provide a DOM element directly to `use`, you can completely replace the internal node, which might be useful for advanced scenarios such as replacing the default DOM in a child with your own DOM or an element from a third-party library.
+
+## Summary
+
+With this infiltration (AOP-like) mechanism, axii lets users configure a child component’s internal DOM elements or sub-components directly from the parent, or even “patch in” logic that would otherwise reside in the child component itself. This provides a more flexible component usage experience, keeping encapsulation while making customization a lot easier. It drastically reduces overhead from typical patterns (such as frequent prop hoisting or callback passing in React).
+
+This “component AOP” approach isn’t meant for every situation. **If normal props are sufficient, prefer the standard interface to keep the component encapsulated.** But if you need deeper modifications in certain places, this mechanism can save a lot of redundant prop passing, letting the parent “penetrate” the child component and apply highly specific customizations.

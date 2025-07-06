@@ -1,0 +1,60 @@
+和其他框架一样，Axii 允许通过 context 来传递数据。Context 机制使得组件树中的数据可以不通过 props 层层传递，而是直接从上层组件传递到任意深度的下层组件。
+
+## 创建 Context
+
+使用 `createContext` 函数创建一个 context：
+
+```jsx
+import { createContext } from "axii";
+
+export const RootContext = createContext('root')
+```
+
+`createContext` 函数接受一个参数作为默认值。
+
+## 提供 Context 值
+
+使用 `ContextProvider` 组件来为子组件树提供 context 值：
+
+```jsx
+<ContextProvider contextType={RootContext} value={'red'}>
+    <Child />
+</ContextProvider>
+```
+
+`ContextProvider` 组件接受两个属性：
+- `contextType`：要提供的 context 类型
+- `value`：要提供的 context 值
+
+## 消费 Context 值
+
+在子组件中，可以通过 `RenderContext` 中的 `context` 对象来获取 context 值：
+
+```jsx
+export function Child({}, { createElement, context }: RenderContext) {
+    return (
+        <div style={{color: context.get(RootContext)}}>
+            child component
+        </div>
+    )
+}
+```
+
+使用 `context.get(ContextType)` 方法来获取指定类型的 context 值。
+
+## 嵌套 Context
+
+可以嵌套使用多个 `ContextProvider`，内层的 provider 会覆盖外层的同类型 provider：
+
+```jsx
+<ContextProvider contextType={RootContext} value={'red'}>
+    <div>
+        <!-- 这里的组件会获取到 'red' -->
+        <ContextProvider contextType={RootContext} value={'blue'}>
+            <!-- 这里的组件会获取到 'blue' -->
+        </ContextProvider>
+    </div>
+</ContextProvider>
+```
+
+Context 机制在管理全局状态、主题、用户偏好等场景中非常有用，可以避免 props 的层层传递，使代码更加简洁和可维护。

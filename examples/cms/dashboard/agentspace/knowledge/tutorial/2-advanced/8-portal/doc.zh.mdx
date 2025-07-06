@@ -1,0 +1,51 @@
+Axii 支持将组件 render 到不同的根节点下，常用于弹出框、模态框等场景。
+
+## 创建 Portal
+
+使用 `createPortal` 函数创建一个 portal：
+
+```jsx
+const portalNode = createPortal(() => {
+    const containerStyle = {
+        position: 'fixed',
+        top: 0,
+        bottom: 0,
+        left: 0,
+        right: 0,
+        background: 'black',
+        color: 'white',
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+    }
+    return (
+        <div style={containerStyle} onClick={() => portalVisible(false)}>
+            <div>content</div>
+        </div>
+    )
+}, document.body)
+```
+
+`createPortal` 函数接受两个参数：
+- 第一个参数是一个返回 JSX 的函数，定义了要渲染的内容
+- 第二个参数是目标 DOM 节点，指定了内容要渲染到哪里
+
+## 使用 Portal
+
+创建 portal 后，可以在条件渲染中使用它：
+
+```jsx
+const portalVisible = atom(false)
+
+return <div>
+    <button onClick={() => portalVisible(true)}>open portal</button>
+    {() => portalVisible() ? portalNode : null}
+</div>
+```
+
+Portal 在以下场景特别有用：
+- 模态框和对话框
+- 悬浮提示和弹出菜单
+- 需要突破父组件 CSS 限制的场景
+
+使用 Portal 可以将组件渲染到 DOM 树中的任何位置，同时保持组件的逻辑和状态管理在原始组件中。

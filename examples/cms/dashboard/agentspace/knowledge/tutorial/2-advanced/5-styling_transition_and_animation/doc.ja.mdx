@@ -1,0 +1,57 @@
+# スタイリング、トランジション、アニメーション
+
+Axiiは、トランジションやアニメーションを含む様々なCSS機能をサポートする強力で柔軟なスタイリングシステムを提供しています。
+
+## 基本的なスタイリング
+
+Axiiのスタイリングシステムは複数のCSS表現形式をサポートしています：
+
+```jsx
+const style = {
+    // 標準形式
+    margin: 10,
+    // 配列形式
+    padding: [10, 20],
+    // ネスティングと疑似クラス
+    '&:hover': {
+        background: 'blue'
+    },
+    // ネストされたセレクタ
+    '& span': {
+        color: 'white'
+    }
+}
+```
+
+## キーフレームアニメーション
+
+Axiiはコンポーネント内で直接キーフレームアニメーションを定義することをサポートしています：
+
+```jsx
+const style = {
+    // キーフレームを定義
+    '@keyframes': {
+        from: { transform: 'rotate(0deg)' },
+        to: { transform: 'rotate(359deg)' }
+    },
+    // アニメーションを使用、@selfは現在の要素のキーフレームを参照
+    animation: `@self 4s linear infinite`,
+    transformOrigin: 'center center'
+}
+```
+
+## トランジション効果
+
+Axiiは配列形式を使用して定義できるCSSトランジション効果をサポートしています：
+
+```jsx
+const style = {
+    transition: ['all 0.3s ease', 'opacity 0.5s ease'],
+    '&:hover': {
+        opacity: 0.8,
+        transform: 'scale(1.1)'
+    }
+}
+```
+
+Axiiのスタイリングシステムは簡潔でありながら強力に設計されており、コードの読みやすさと保守性を維持しながら、ほとんどの複雑なスタイリングニーズを満たすことができます。 

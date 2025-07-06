@@ -1,0 +1,60 @@
+Like other frameworks, Axii allows data to be passed through context. The context mechanism enables data to be passed directly from upper components to any depth of lower components without having to pass props through each level.
+
+## Creating Context
+
+Use the `createContext` function to create a context:
+
+```jsx
+import { createContext } from "axii";
+
+export const RootContext = createContext('root')
+```
+
+The `createContext` function accepts a parameter as the default value.
+
+## Providing Context Values
+
+Use the `ContextProvider` component to provide context values to the child component tree:
+
+```jsx
+<ContextProvider contextType={RootContext} value={'red'}>
+    <Child />
+</ContextProvider>
+```
+
+The `ContextProvider` component accepts two properties:
+- `contextType`: The type of context to provide
+- `value`: The context value to provide
+
+## Consuming Context Values
+
+In child components, you can access the context value through the `context` object in `RenderContext`:
+
+```jsx
+export function Child({}, { createElement, context }: RenderContext) {
+    return (
+        <div style={{color: context.get(RootContext)}}>
+            child component
+        </div>
+    )
+}
+```
+
+Use the `context.get(ContextType)` method to get the context value of the specified type.
+
+## Nested Contexts
+
+You can nest multiple `ContextProvider` components, where the inner provider will override the outer provider of the same type:
+
+```jsx
+<ContextProvider contextType={RootContext} value={'red'}>
+    <div>
+        <!-- Components here will get 'red' -->
+        <ContextProvider contextType={RootContext} value={'blue'}>
+            <!-- Components here will get 'blue' -->
+        </ContextProvider>
+    </div>
+</ContextProvider>
+```
+
+The context mechanism is very useful in managing global state, themes, user preferences, and other scenarios, avoiding the need to pass props through multiple levels and making the code more concise and maintainable.

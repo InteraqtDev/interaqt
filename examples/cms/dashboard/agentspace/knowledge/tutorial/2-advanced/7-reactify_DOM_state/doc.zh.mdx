@@ -1,0 +1,11 @@
+dom 状态不是 reactive 的，我们往往需要：
+
+- 通过事件回调来监听状态变化。
+- 通过 api 来将数据的变化转化为 dom 状态的变化。
+
+axii 中提供了经常会用到的 dom 状态的响应式封装，用户也可以继承 ReactiveDOMState 来自定义 dom 状态的响应式封装。
+已有的封装有：
+- RxDOMSize
+- RxDOMRect
+- RxDragPosition
+- RxScrollPosition
