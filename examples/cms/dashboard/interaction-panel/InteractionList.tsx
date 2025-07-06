@@ -1,16 +1,17 @@
-import { RenderContext, atom, RxList } from "axii";
+import { RenderContext, atom, RxList, Atom } from "axii";
 import { InteractionInstance } from "@shared";
+import { Router } from "router0";
 
 type InteractionListProps = {
     interactions: RxList<InteractionInstance>;
-    selectedInteraction: ReturnType<typeof atom<InteractionInstance | null>>;
-    onSelect: (interaction: InteractionInstance) => void;
+    selectedInteraction: Atom<InteractionInstance | null>;
+    router: Router<any>;
 }
 
 export function InteractionList({ 
     interactions, 
     selectedInteraction,
-    onSelect 
+    router
 }: InteractionListProps, { createElement }: RenderContext) {
     
     const listStyle = {
@@ -121,6 +122,11 @@ export function InteractionList({
         return actionIconMap[actionName] || actionIconMap[interaction.name.toLowerCase()] || '📋';
     };
 
+    const handleInteractionClick = (interaction: InteractionInstance) => {
+        // Navigate to the interaction using router
+        router.push(`/${interaction.name}`);
+    };
+
     return (
         <div style={listStyle}>
             <h2>
@@ -132,7 +138,7 @@ export function InteractionList({
                     <div
                         key={interaction.name}
                         style={() =>interactionItemStyle(selectedInteraction() === interaction)}
-                        onClick={() => onSelect(interaction)}
+                        onClick={() => handleInteractionClick(interaction)}
                         className="interaction-item"
                     >
                         <div className="name">

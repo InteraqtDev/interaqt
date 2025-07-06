@@ -129,11 +129,18 @@ export function Dashboard({ entities, relations, interactions }: DashboardProps,
 
     // Render current route handler
     const renderContent = () => {
-        switch (router.pathname()) {
+        console.log('router.path', router.path());
+        switch (router.path()) {
             case '/entity-relation':
                 return <EntityRelationPanel entities={entities} relations={relations} />;
             case '/interactions':
-                return <InteractionPanel interactions={interactions} />;
+                // Create derived router for interactions panel
+                const SubRouter = router.derive('/interactions');
+                return (
+                    <ContextProvider contextType={RouterContext} value={SubRouter}>
+                        <InteractionPanel interactions={interactions} />
+                    </ContextProvider>
+                );
             default:
                 return <EntityRelationPanel entities={entities} relations={relations} />;
         }
@@ -154,7 +161,7 @@ export function Dashboard({ entities, relations, interactions }: DashboardProps,
                             <div
                                 key={item.path}
                                 onClick={() => router.push(item.path)}
-                                style={() =>navItemStyle(router.pathname() === item.path)}
+                                style={() =>navItemStyle(router.path() === item.path)}
                             >
                                 {item.icon && <span style={{ fontSize: '18px' }}>{item.icon}</span>}
                                 <span>{item.label}</span>

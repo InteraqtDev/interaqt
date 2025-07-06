@@ -1,15 +1,45 @@
-import { RenderContext, atom, RxList } from "axii";
+import { RenderContext, atom, RxList, ContextProvider, computed } from "axii";
+import { Router } from 'router0';
 import { InteractionDetail } from "./InteractionDetail";
 import { InteractionList } from "./InteractionList";
 import { InteractionInstance } from "@shared";
+import { RouterContext } from "../Dashboard";
 
 type InteractionPanelProps = {
     interactions: InteractionInstance[]
 }
 
-export function InteractionPanel({ interactions }: InteractionPanelProps, { createElement }: RenderContext) {
+// Create a sub-router context for interaction panel
+export const InteractionRouterContext = Symbol('InteractionRouterContext');
+
+export function InteractionPanel({ interactions }: InteractionPanelProps, { createElement, context }: RenderContext) {
     const interactionList = new RxList(interactions);
-    const selectedInteraction = atom<InteractionInstance | null>(null);
+    
+    // Get the derived router class from context
+    const SubRouter = context.get(RouterContext) as typeof Router;
+    
+    // Create router instance for interaction panel
+    const router = new SubRouter([
+        {
+            path: '/:name',
+            handler: () => null, // We handle rendering in the panel itself
+        },
+        {
+            path: '/',
+            handler: () => null,
+        }
+    ]);
+    
+    // Compute selected interaction based on router pathname
+    const selectedInteraction = computed<InteractionInstance | null>(() => {
+        const params = router.params();
+        const name = params?.name;
+        
+        if (name) {
+            return interactions.find(i => i.name === name) || null;
+        }
+        return null;
+    });
 
     // Container style with dark theme
     const containerStyle = {
@@ -26,20 +56,18 @@ export function InteractionPanel({ interactions }: InteractionPanelProps, { crea
         animation: 'fadeIn 0.3s ease-out'
     };
 
-    const handleInteractionSelect = (interaction: InteractionInstance) => {
-        selectedInteraction(interaction);
-    };
-
     return (
-        <div style={containerStyle}>
-            <InteractionList 
-                interactions={interactionList}
-                selectedInteraction={selectedInteraction}
-                onSelect={handleInteractionSelect}
-            />
+        <ContextProvider contextType={InteractionRouterContext} value={router}>
+            <div style={containerStyle}>
+                <InteractionList 
+                    interactions={interactionList}
+                    selectedInteraction={selectedInteraction}
+                    router={router}
+                />
 
-            <InteractionDetail interaction={selectedInteraction} />
-        </div>
+                <InteractionDetail interaction={selectedInteraction} />
+            </div>
+        </ContextProvider>
     );
 }
 

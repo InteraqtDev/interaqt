@@ -1,8 +1,7 @@
-import { EtityMutationEvent } from "./ComputationSourceMap.js";
+import { type EtityMutationEvent } from "./ComputationSourceMap.js";
 import { Controller } from "./Controller.js";
 import { DataContext, ComputationHandle, PropertyDataContext, EntityDataContext, RelationDataContext } from "./computationHandles/ComputationHandle.js";
 export { EtityMutationEvent };
-
 import { EntityInstance, RelationInstance, PropertyInstance, IInstance } from "@shared";
 import { Entity, Property, Relation } from "@shared";
 import { assert } from "./util.js";
