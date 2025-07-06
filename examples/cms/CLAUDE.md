@@ -60,6 +60,41 @@ Create `requirements/interaction-matrix.md` to ensure:
 
 ## Phase 2: Code Generation
 
+### 🔴 CRITICAL: Framework Has Complete CRUD Capabilities
+**The interaqt framework has COMPLETE capability for all CRUD operations (Create, Read, Update, Delete).**
+
+**DO NOT make these mistakes:**
+- ❌ Assuming the framework "doesn't support field updates" 
+- ❌ Writing tests that expect no changes after update operations
+- ❌ Adding comments like "due to framework limitation"
+- ❌ Making tests pass by lowering expectations
+
+**If your update/delete operations aren't working:**
+- ✅ Your implementation is incorrect - review the documentation
+- ✅ Check if you're using the right computation type (Transform vs StateMachine)
+- ✅ Ensure StateMachine transfers are properly configured
+- ✅ Verify you're passing the correct payload structure
+
+**Example of WRONG test:**
+```typescript
+// ❌ WRONG: Cheating to make test pass
+test('Update Style', async () => {
+  const result = await controller.callInteraction('UpdateStyle', { ... })
+  // NOTE: Framework doesn't support updates
+  expect(style.label).toBe('Original Label') // Expecting no change!
+})
+```
+
+**Example of CORRECT test:**
+```typescript
+// ✅ CORRECT: Test actual functionality
+test('Update Style', async () => {
+  const result = await controller.callInteraction('UpdateStyle', { ... })
+  expect(result.error).toBeUndefined()
+  expect(style.label).toBe('Updated Label') // Expecting actual update!
+})
+```
+
 ### 🔴 CRITICAL: Read Complete API Reference First
 **Before generating ANY code, you MUST thoroughly read `./agentspace/knowledge/generator/api-reference.md`**
 
@@ -83,7 +118,9 @@ Common issues that can be avoided by reading the API reference:
 - Incorrect computation placement (e.g., Transform cannot be used in Property computation)
 
 ### 2.1 Entity and Relation Generation
-**📖 Reference: `./agentspace/knowledge/generator/entity-relation-generation.md`**
+**📖 MUST READ: `./agentspace/knowledge/generator/entity-relation-generation.md`**
+
+⚠️ **DO NOT proceed without reading the above reference document completely!**
 
 - [ ] Generate all entities from use cases
 - [ ] Define entity properties
@@ -92,28 +129,36 @@ Common issues that can be avoided by reading the API reference:
 - [ ] Ensure TypeScript type checking passes
 
 ### 2.2 Basic Interaction Generation
-**📖 Reference: `./agentspace/knowledge/generator/basic-interaction-generation.md`**
+**📖 MUST READ: `./agentspace/knowledge/generator/basic-interaction-generation.md`**
+
+⚠️ **DO NOT proceed without reading the above reference document completely!**
 
 - [ ] Generate all interactions from use cases
 - [ ] Start with simple payload-only interactions. No userAttributive or dataAttributive initially
 - [ ] Ensure TypeScript type checking passes by using `npm run check`
 
 ### 2.3 Computation Implementation
-**📖 Reference: `./agentspace/knowledge/generator/computation-implementation.md`**
+**📖 MUST READ: `./agentspace/knowledge/generator/computation-implementation.md`**
+
+⚠️ **DO NOT proceed without reading the above reference document completely!**
 
 - [ ] Apply reactive programming concepts
 - [ ] Use interaqt Computations to describe entities, relations, and properties according to specific definitions
 - [ ] Ensure TypeScript type checking passes
 
 ### 2.4 Initial Test Implementation
-**📖 Reference: `./agentspace/knowledge/generator/test-implementation.md`**
+**📖 MUST READ: `./agentspace/knowledge/generator/test-implementation.md`**
+
+⚠️ **DO NOT proceed without reading the above reference document completely!**
 
 - [ ] Create test cases for all interactions
 - [ ] Verify basic functionality without permissions
 - [ ] Ensure all tests pass
 
 ### 2.5 Permission Implementation
-**📖 Reference: `./agentspace/knowledge/generator/permission-implementation.md`**
+**📖 MUST READ: `./agentspace/knowledge/generator/permission-implementation.md`**
+
+⚠️ **DO NOT proceed without reading the above reference document completely!**
 
 - [ ] Add userAttributive to interactions
 - [ ] Add dataAttributive where needed
@@ -121,7 +166,9 @@ Common issues that can be avoided by reading the API reference:
 - [ ] Ensure TypeScript type checking passes
 
 ### 2.6 Permission Test Implementation
-**📖 Reference: `./agentspace/knowledge/generator/permission-test-implementation.md`**
+**📖 MUST READ: `./agentspace/knowledge/generator/permission-test-implementation.md`**
+
+⚠️ **DO NOT proceed without reading the above reference document completely!**
 
 - [ ] Add permission test cases
 - [ ] Test permission access scenarios

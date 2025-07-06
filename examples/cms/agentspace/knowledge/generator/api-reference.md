@@ -10,7 +10,7 @@ Create entity definition. Entities are the basic units of data in the system.
 
 **Syntax**
 ```typescript
-Entity.create(config: EntityConfig): KlassInstance<typeof Entity>
+Entity.create(config: EntityConfig): EntityInstance
 ```
 
 **Parameters**
@@ -48,7 +48,7 @@ Create entity property definition.
 
 **Syntax**
 ```typescript
-Property.create(config: PropertyConfig): KlassInstance<typeof Property>
+Property.create(config: PropertyConfig): PropertyInstance
 ```
 
 **Parameters**
@@ -100,7 +100,7 @@ Create relationship definition between entities.
 
 **Syntax**
 ```typescript
-Relation.create(config: RelationConfig): KlassInstance<typeof Relation>
+Relation.create(config: RelationConfig): RelationInstance
 ```
 
 **Important: Auto-Generated Relation Names**
@@ -172,7 +172,7 @@ Create count computation for counting records.
 
 **Syntax**
 ```typescript
-Count.create(config: CountConfig): KlassInstance<typeof Count>
+Count.create(config: CountConfig): CountInstance
 ```
 
 **Parameters**
@@ -282,7 +282,7 @@ Create weighted summation computation.
 
 **Syntax**
 ```typescript
-WeightedSummation.create(config: WeightedSummationConfig): KlassInstance<typeof WeightedSummation>
+WeightedSummation.create(config: WeightedSummationConfig): WeightedSummationInstance
 ```
 
 **Parameters**
@@ -326,7 +326,7 @@ Create summation computation for summing specified fields.
 
 **Syntax**
 ```typescript
-Summation.create(config: SummationConfig): KlassInstance<typeof Summation>
+Summation.create(config: SummationConfig): SummationInstance
 ```
 
 **Parameters**
@@ -442,7 +442,7 @@ Create boolean computation that checks if all records meet a condition.
 
 **Syntax**
 ```typescript
-Every.create(config: EveryConfig): KlassInstance<typeof Every>
+Every.create(config: EveryConfig): EveryInstance
 ```
 
 **Parameters**
@@ -474,7 +474,7 @@ Create boolean computation that checks if any record meets a condition.
 
 **Syntax**
 ```typescript
-Any.create(config: AnyConfig): KlassInstance<typeof Any>
+Any.create(config: AnyConfig): AnyInstance
 ```
 
 **Parameters**
@@ -506,7 +506,7 @@ Transform is fundamentally about **transforming data from one collection to anot
 
 **Syntax**
 ```typescript
-Transform.create(config: TransformConfig): KlassInstance<typeof Transform>
+Transform.create(config: TransformConfig): TransformInstance
 ```
 
 **Parameters**
@@ -521,7 +521,7 @@ Create state machine computation.
 
 **Syntax**
 ```typescript
-StateMachine.create(config: StateMachineConfig): KlassInstance<typeof StateMachine>
+StateMachine.create(config: StateMachineConfig): StateMachineInstance
 ```
 
 **Parameters**
@@ -557,7 +557,7 @@ Create real-time computation for handling time-based reactive computations. Real
 
 **Syntax**
 ```typescript
-RealTime.create(config: RealTimeConfig): KlassInstance<typeof RealTime>
+RealTime.create(config: RealTimeConfig): RealTimeInstance
 ```
 
 **Parameters**
@@ -726,7 +726,7 @@ Create global dictionary for storing system-wide state and values.
 
 **Syntax**
 ```typescript
-Dictionary.create(config: DictionaryConfig): KlassInstance<typeof Dictionary>
+Dictionary.create(config: DictionaryConfig): DictionaryInstance
 ```
 
 **Parameters**
@@ -815,7 +815,7 @@ Create state node for state machine computation.
 
 **Syntax**
 ```typescript
-StateNode.create(config: StateNodeConfig): KlassInstance<typeof StateNode>
+StateNode.create(config: StateNodeConfig): StateNodeInstance
 ```
 
 **Parameters**
@@ -846,7 +846,7 @@ Create state transfer for state machine computation.
 
 **Syntax**
 ```typescript
-StateTransfer.create(config: StateTransferConfig): KlassInstance<typeof StateTransfer>
+StateTransfer.create(config: StateTransferConfig): StateTransferInstance
 ```
 
 **Parameters**
@@ -889,7 +889,7 @@ Create user interaction definition.
 
 **Syntax**
 ```typescript
-Interaction.create(config: InteractionConfig): KlassInstance<typeof Interaction>
+Interaction.create(config: InteractionConfig): InteractionInstance
 ```
 
 **Parameters**
@@ -937,7 +937,7 @@ Action is just a name for interaction types, like event type labels. It contains
 
 **Syntax**
 ```typescript
-Action.create(config: ActionConfig): KlassInstance<typeof Action>
+Action.create(config: ActionConfig): ActionInstance
 ```
 
 **Parameters**
@@ -1003,7 +1003,7 @@ Create interaction parameter definition.
 
 **Syntax**
 ```typescript
-Payload.create(config: PayloadConfig): KlassInstance<typeof Payload>
+Payload.create(config: PayloadConfig): PayloadInstance
 ```
 
 **Parameters**
@@ -1033,7 +1033,7 @@ Create interaction parameter item.
 
 **Syntax**
 ```typescript
-PayloadItem.create(config: PayloadItemConfig): KlassInstance<typeof PayloadItem>
+PayloadItem.create(config: PayloadItemConfig): PayloadItemInstance
 ```
 
 **Parameters**
@@ -1097,7 +1097,7 @@ Create business activity definition.
 
 **Syntax**
 ```typescript
-Activity.create(config: ActivityConfig): KlassInstance<typeof Activity>
+Activity.create(config: ActivityConfig): ActivityInstance
 ```
 
 **Parameters**
@@ -1139,7 +1139,7 @@ Create activity state transfer.
 
 **Syntax**
 ```typescript
-Transfer.create(config: TransferConfig): KlassInstance<typeof Transfer>
+Transfer.create(config: TransferConfig): TransferInstance
 ```
 
 **Parameters**
@@ -1162,7 +1162,7 @@ Create activity execution condition.
 
 **Syntax**
 ```typescript
-Condition.create(config: ConditionConfig): KlassInstance<typeof Condition>
+Condition.create(config: ConditionConfig): ConditionInstance
 ```
 
 **Parameters**
@@ -1189,11 +1189,11 @@ System controller that coordinates the work of various components.
 ```typescript
 new Controller(
     system: System,
-    entities: KlassInstance<typeof Entity>[],
-    relations: KlassInstance<typeof Relation>[],
-    activities: KlassInstance<typeof Activity>[],
-    interactions: KlassInstance<typeof Interaction>[],
-    dict?: KlassInstance<typeof Property>[],  // Note: This is for global dictionaries, NOT computations
+    entities: EntityInstance[],
+    relations: RelationInstance[],
+    activities: ActivityInstance[],
+    interactions: InteractionInstance[],
+    dict?: DictionaryInstance[],  // Note: This is for global dictionaries, NOT computations
     recordMutationSideEffects?: RecordMutationSideEffect[]
 )
 ```
@@ -1648,7 +1648,7 @@ Create permission attributive for access control.
 
 **Syntax**
 ```typescript
-Attributive.create(config: AttributiveConfig): KlassInstance<typeof Attributive>
+Attributive.create(config: AttributiveConfig): AttributiveInstance
 ```
 
 **Parameters**
@@ -1700,12 +1700,6 @@ const combined = expr1.and(expr2).or({ condition: 'isOwner' })
 ### Core Types
 
 ```typescript
-// Entity instance types
-type EntityInstance = KlassInstance<typeof Entity>
-type RelationInstance = KlassInstance<typeof Relation>
-type InteractionInstance = KlassInstance<typeof Interaction>
-type ActivityInstance = KlassInstance<typeof Activity>
-
 // Interaction event arguments
 type InteractionEventArgs = {
     user: { id: string, [key: string]: any }

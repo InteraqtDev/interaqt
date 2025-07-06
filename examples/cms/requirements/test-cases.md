@@ -1,321 +1,185 @@
-# Style Management System - Test Cases
-
-🔴 **CRITICAL: All test cases are based on Interactions, NOT on Entity/Relation operations**
+# CMS Style Management System - Test Cases
 
 ## TC001: Create Style (via CreateStyle Interaction)
 - **Interaction**: CreateStyle
-- **Preconditions**: User logged in with editor or admin role
+- **Preconditions**: User logged in with admin/editor role
 - **Input Data**: 
   ```json
   {
-    "label": "Modern Art",
-    "slug": "modern-art",
-    "description": "Contemporary artistic styles",
-    "type": "artistic",
-    "thumb_key": "s3://bucket/modern-art-thumb.jpg",
+    "label": "Cyberpunk",
+    "slug": "cyberpunk",
+    "description": "Futuristic digital art style",
+    "type": "digital",
+    "thumb_key": "styles/cyberpunk-thumb.jpg",
     "priority": 10
   }
   ```
 - **Expected Results**:
   1. Create new Style record with status "draft"
-  2. Auto-generate unique id (uuid)
-  3. Set created_at to current timestamp
-  4. Set updated_at to current timestamp
-  5. User's created style count automatically +1
-- **Post Validation**: Style appears in user's created styles list with draft status
+  2. Auto-generate UUID for id
+  3. Set created_at and updated_at to current time
+  4. Create initial version record
+  5. Return success with Style data
+- **Post Validation**: Style appears in draft list with correct data
 
 ## TC002: Create Style with Invalid Data (via CreateStyle Interaction)
 - **Interaction**: CreateStyle
-- **Preconditions**: User logged in with editor or admin role
+- **Preconditions**: User logged in with admin/editor role
 - **Input Data**: 
   ```json
   {
     "label": "",
-    "slug": "",
-    "description": "",
-    "type": "",
-    "thumb_key": "",
-    "priority": -1
+    "slug": "invalid slug!@#",
+    "type": "unknown_type"
   }
   ```
 - **Expected Results**:
   1. Interaction returns validation error
-  2. Error type is "validation failed"
-  3. No Style record created
-  4. User's created style count unchanged
-- **Note**: Do NOT test this with storage.create - it bypasses validation!
+  2. No Style record created
+  3. Error details include field-specific messages
+- **Note**: Do NOT test with storage.create - it bypasses validation!
 
-## TC003: Create Style with Duplicate Slug (via CreateStyle Interaction)
-- **Interaction**: CreateStyle
-- **Preconditions**: 
-  - User logged in with editor or admin role
-  - Style with slug "existing-slug" already exists
-- **Input Data**: 
-  ```json
-  {
-    "label": "New Style",
-    "slug": "existing-slug",
-    "description": "This should fail",
-    "type": "test",
-    "thumb_key": "s3://bucket/test.jpg",
-    "priority": 5
-  }
-  ```
-- **Expected Results**:
-  1. Interaction returns uniqueness constraint error
-  2. Error message indicates slug already exists
-  3. No new Style record created
-  4. Existing style with same slug unchanged
-
-## TC004: Update Style (via UpdateStyle Interaction)
+## TC003: Update Style (via UpdateStyle Interaction)
 - **Interaction**: UpdateStyle
-- **Preconditions**: 
-  - User logged in with appropriate permissions
-  - Style exists with id "style123"
-  - User is creator of the style OR has admin role
-- **Input Data**: 
+- **Preconditions**: Style exists, user has edit permission
+- **Input Data**:
   ```json
   {
-    "styleId": "style123",
-    "updates": {
-      "label": "Updated Modern Art",
-      "description": "Updated description",
-      "priority": 15
-    }
+    "id": "existing-style-id",
+    "label": "Updated Cyberpunk",
+    "description": "Enhanced futuristic art style",
+    "priority": 15
   }
   ```
 - **Expected Results**:
-  1. Update specified fields in Style record
-  2. updated_at timestamp changes to current time
-  3. created_at timestamp remains unchanged
-  4. Other fields remain unchanged
-  5. Style status remains the same
-- **Post Validation**: Updated data persists and is retrievable
+  1. Update Style record with new values
+  2. Update updated_at timestamp
+  3. Create new version record
+  4. Preserve other unchanged fields
+  5. Return success with updated Style
 
-## TC005: Update Style Without Permission (via UpdateStyle Interaction)
-- **Interaction**: UpdateStyle
-- **Preconditions**: 
-  - User logged in with editor role
-  - Style exists created by different user
-  - Current user is NOT admin
-- **Input Data**: 
-  ```json
-  {
-    "styleId": "style123",
-    "updates": {
-      "label": "Unauthorized Update"
-    }
-  }
-  ```
-- **Expected Results**:
-  1. Interaction returns permission denied error
-  2. No changes made to Style record
-  3. updated_at timestamp unchanged
-- **Exception Scenario**: Permission check happens at Interaction level
-
-## TC006: Publish Style (via PublishStyle Interaction)
+## TC004: Publish Style (via PublishStyle Interaction)
 - **Interaction**: PublishStyle
-- **Preconditions**: 
-  - User logged in with publish permission (editor or admin)
-  - Style exists with status "draft"
-- **Input Data**: 
-  ```json
-  {
-    "styleId": "style123"
-  }
-  ```
+- **Preconditions**: Style exists in "draft" status, user is admin
+- **Input Data**: `{ "id": "style-id" }`
 - **Expected Results**:
-  1. Style status changes from "draft" to "published"
-  2. updated_at timestamp updated
-  3. System published style count automatically +1
-  4. System draft style count automatically -1
-- **Post Validation**: Style appears in published styles list
+  1. Change Style status to "published"
+  2. Update updated_at timestamp
+  3. Create version record for status change
+  4. Style becomes visible to end users
 
-## TC007: Unpublish Style (via UnpublishStyle Interaction)
+## TC005: Unpublish Style (via UnpublishStyle Interaction)
 - **Interaction**: UnpublishStyle
-- **Preconditions**: 
-  - User logged in with admin role
-  - Style exists with status "published"
-- **Input Data**: 
-  ```json
-  {
-    "styleId": "style123"
-  }
-  ```
+- **Preconditions**: Style exists in "published" status, user is admin
+- **Input Data**: `{ "id": "style-id" }`
 - **Expected Results**:
-  1. Style status changes from "published" to "offline"
-  2. updated_at timestamp updated
-  3. System published style count automatically -1
-  4. System offline style count automatically +1
-- **Post Validation**: Style no longer appears in published styles list
+  1. Change Style status to "offline"
+  2. Update updated_at timestamp
+  3. Create version record for status change
+  4. Style hidden from end users but preserved
 
-## TC008: Delete Style (via DeleteStyle Interaction)
+## TC006: Delete Style (via DeleteStyle Interaction)
 - **Interaction**: DeleteStyle
-- **Preconditions**: 
-  - User logged in with admin role
-  - Style exists with any status
-- **Input Data**: 
-  ```json
-  {
-    "styleId": "style123"
-  }
-  ```
+- **Preconditions**: Style exists, user is admin
+- **Input Data**: `{ "id": "style-id" }`
 - **Expected Results**:
-  1. Style record marked as deleted (soft delete)
-  2. Style no longer appears in normal queries
-  3. Audit trail preserved
-  4. System total style count -1
-- **Post Validation**: Style not found in regular list queries
+  1. Remove Style record from database
+  2. Preserve version history for audit
+  3. Return success confirmation
 
-## TC009: Reorder Styles (via ReorderStyles Interaction)
+## TC007: Reorder Styles (via ReorderStyles Interaction)
 - **Interaction**: ReorderStyles
-- **Preconditions**: 
-  - User logged in with editor or admin role
-  - Multiple styles exist
-- **Input Data**: 
+- **Preconditions**: Multiple Styles exist, user is admin
+- **Input Data**:
   ```json
   {
-    "styleUpdates": [
-      {"styleId": "style1", "priority": 1},
-      {"styleId": "style2", "priority": 2},
-      {"styleId": "style3", "priority": 3}
+    "style_orders": [
+      { "id": "style-1", "priority": 1 },
+      { "id": "style-2", "priority": 2 },
+      { "id": "style-3", "priority": 3 }
     ]
   }
   ```
 - **Expected Results**:
-  1. Each style's priority updated to specified value
-  2. All specified styles have updated_at timestamp changed
-  3. Styles appear in new order when queried with sorting
-- **Post Validation**: Query results respect new priority ordering
+  1. Update priority values for all specified Styles
+  2. Update updated_at for modified Styles
+  3. Create version records for changes
+  4. Return success with updated order
 
-## TC010: List Styles with Filtering (via ListStyles Interaction)
-- **Interaction**: ListStyles
-- **Preconditions**: 
-  - User logged in
-  - Multiple styles exist with different statuses and types
-- **Input Data**: 
-  ```json
-  {
-    "filters": {
-      "status": "published",
-      "type": "artistic"
-    },
-    "sortBy": "priority",
-    "sortOrder": "asc"
-  }
-  ```
+## TC008: Rollback Style Version (via RollbackStyleVersion Interaction)
+- **Interaction**: RollbackStyleVersion
+- **Preconditions**: Style has version history, user is admin
+- **Input Data**: `{ "style_id": "style-id", "target_version": 3 }`
 - **Expected Results**:
-  1. Return only styles matching filter criteria
-  2. Results sorted by priority ascending
-  3. Each style includes all requested fields
-  4. Pagination metadata included if applicable
-- **Post Validation**: All returned styles match filter criteria
+  1. Restore Style to state from target version
+  2. Create new version record (no destructive rollback)
+  3. Update updated_at timestamp
+  4. Preserve all version history
 
-## TC011: Search Styles (via SearchStyles Interaction)
-- **Interaction**: SearchStyles
-- **Preconditions**: 
-  - User logged in
-  - Styles exist with searchable content
-- **Input Data**: 
-  ```json
-  {
-    "searchTerm": "modern",
-    "searchFields": ["label", "description"],
-    "limit": 10
-  }
-  ```
+## TC009: Create Style - Permission Denied (via CreateStyle Interaction)
+- **Interaction**: CreateStyle
+- **Preconditions**: User logged in with "viewer" role
+- **Input Data**: Valid Style data
 - **Expected Results**:
-  1. Return styles where label or description contains "modern"
-  2. Results limited to specified count
-  3. Search is case-insensitive
-  4. Results ranked by relevance
-- **Post Validation**: All results contain search term in specified fields
+  1. Interaction returns permission error
+  2. No Style record created
+  3. Error indicates insufficient permissions
 
-## TC012: Create Version (via CreateVersion Interaction)
-- **Interaction**: CreateVersion
-- **Preconditions**: 
-  - User logged in with admin role
-  - Current published styles exist
-- **Input Data**: 
-  ```json
-  {
-    "versionName": "v2.1.0",
-    "description": "Added new artistic styles and updated priorities"
-  }
-  ```
+## TC010: Update Style - Permission Denied (via UpdateStyle Interaction)
+- **Interaction**: UpdateStyle
+- **Preconditions**: Style exists, user is editor but not owner, user not admin
+- **Input Data**: Valid update data
 - **Expected Results**:
-  1. Create new Version record
-  2. Snapshot current state of all published styles
-  3. Version marked as working version (not published)
-  4. created_at timestamp set
-- **Post Validation**: Version appears in version history
+  1. Interaction returns permission error
+  2. Style record unchanged
+  3. No version record created
 
-## TC013: Publish Version (via PublishVersion Interaction)
-- **Interaction**: PublishVersion
-- **Preconditions**: 
-  - User logged in with admin role
-  - Version exists in non-published state
-  - Version contains valid style data
-- **Input Data**: 
-  ```json
-  {
-    "versionId": "version123"
-  }
-  ```
+## TC011: List Published Styles (via ListPublishedStyles Interaction)
+- **Interaction**: ListPublishedStyles
+- **Preconditions**: Multiple Styles with different statuses exist
+- **Input Data**: `{ "page": 1, "limit": 10 }`
 - **Expected Results**:
-  1. Version marked as current/published
-  2. All styles in version become active
-  3. Previous version marked as historical
-  4. published_at timestamp set
-  5. System current version automatically updated
-- **Post Validation**: Version shows as current in system status
+  1. Return only Styles with "published" status
+  2. Sort by priority (ascending)
+  3. Include pagination metadata
+  4. Exclude draft and offline Styles
 
-## TC014: Rollback Version (via RollbackVersion Interaction)
-- **Interaction**: RollbackVersion
-- **Preconditions**: 
-  - User logged in with admin role
-  - Target version exists and was previously published
-  - Current system state differs from target version
-- **Input Data**: 
-  ```json
-  {
-    "targetVersionId": "version120"
-  }
-  ```
+## TC012: List All Styles for Admin (via ListAllStyles Interaction)
+- **Interaction**: ListAllStyles
+- **Preconditions**: User is admin, multiple Styles exist
+- **Input Data**: `{ "page": 1, "limit": 10 }`
 - **Expected Results**:
-  1. System state reverted to target version
-  2. All styles restored to target version state
-  3. New rollback version created for audit trail
-  4. Current version reference updated
-- **Post Validation**: All style data matches target version snapshot
+  1. Return all Styles regardless of status
+  2. Sort by priority (ascending)
+  3. Include status information
+  4. Include pagination metadata
 
-## TC015: Unauthorized Access (via Any Interaction)
-- **Interaction**: Any restricted interaction
-- **Preconditions**: 
-  - User NOT logged in OR insufficient permissions
-- **Input Data**: Any valid data for the interaction
+## TC013: Get Style Version History (via GetStyleVersions Interaction)
+- **Interaction**: GetStyleVersions
+- **Preconditions**: Style exists with version history, user has read permission
+- **Input Data**: `{ "style_id": "style-id" }`
 - **Expected Results**:
-  1. Interaction returns authentication/authorization error
-  2. No data changes occur
-  3. Error message indicates permission issue
-  4. Audit log records access attempt
-- **Exception Scenario**: Authentication/authorization check happens at Interaction level
+  1. Return chronological list of versions
+  2. Include version number, timestamp, and creator
+  3. Include snapshot data for each version
+  4. Sort by creation time (newest first)
 
-## Permission Matrix
+## TC014: Duplicate Slug Validation (via CreateStyle Interaction)
+- **Interaction**: CreateStyle
+- **Preconditions**: Style with slug "existing-slug" already exists
+- **Input Data**: Style data with slug "existing-slug"
+- **Expected Results**:
+  1. Interaction returns slug uniqueness error
+  2. No Style record created
+  3. Error message indicates slug already exists
 
-| Role | CreateStyle | UpdateStyle | DeleteStyle | PublishStyle | UnpublishStyle | CreateVersion | PublishVersion | RollbackVersion |
-|------|-------------|-------------|-------------|--------------|----------------|---------------|----------------|-----------------|
-| Admin | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Editor | ✅ | ✅ (own) | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ |
-| Viewer | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-
-## Edge Cases and Error Scenarios
-
-1. **Concurrent Updates**: Multiple users updating same style simultaneously
-2. **Network Failures**: Interaction interrupted during execution
-3. **Data Corruption**: Invalid data states requiring recovery
-4. **Version Conflicts**: Rollback when current data has newer changes
-5. **Storage Limits**: Exceeding system capacity limits
-6. **Invalid References**: Referencing non-existent entities
-
-Each edge case should be tested through the appropriate Interaction, not through direct storage manipulation.
+## TC015: Upload Style Thumbnail (via UploadStyleThumbnail Interaction)
+- **Interaction**: UploadStyleThumbnail
+- **Preconditions**: Style exists, user has edit permission
+- **Input Data**: `{ "style_id": "style-id", "image_file": <file_data> }`
+- **Expected Results**:
+  1. Upload image to S3 storage
+  2. Update Style thumb_key with S3 key
+  3. Update updated_at timestamp
+  4. Create version record
+  5. Return S3 URL for immediate use

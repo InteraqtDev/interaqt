@@ -1,128 +1,105 @@
-# Style Management System - Detailed Requirements Analysis
+# CMS Style Management System - Detailed Requirements
 
-## Business Domain Analysis
+## Overview
+A content management system for managing Style objects with version control, publishing workflow, and administrative interface.
 
-This is a content management system for Style objects, designed for product operations personnel to manage preset data through a backend interface.
+## Data Analysis
 
-### Data Perspective Analysis
+### Entities
+**Style Entity**
+- `id`: UUID - Unique identifier (auto-generated)
+- `label`: Text - Display name (e.g., "Manga") 
+- `slug`: Text - URL-safe unique identifier (e.g., "manga")
+- `description`: Text - Detailed description
+- `type`: String - Category type (e.g., "animation", "surreal")
+- `thumb_key`: Text - S3 storage key for thumbnail image
+- `priority`: Integer - Sorting priority for frontend display
+- `status`: String - Workflow status ("draft", "published", "offline")
+- `created_at`: Timestamp - Creation time (auto-generated)
+- `updated_at`: Timestamp - Last modification time (auto-generated)
 
-#### Core Entity: Style
-Based on the requirements, the Style entity has the following properties:
+**User Entity** (Required for operations)
+- `id`: UUID - Unique identifier
+- `username`: String - Login username
+- `role`: String - User role ("admin", "editor", "viewer")
+- `created_at`: Timestamp - Account creation time
 
-**Required Properties:**
-- `id` (uuid, auto-generated): Unique identifier
-- `label` (text, manual): Display name for frontend (e.g., "Manga")
-- `slug` (text, manual): Unique, URL-safe identifier (e.g., "manga"), corresponds to legacy "value"
-- `description` (text, manual): Style description
-- `type` (varchar(32), manual): Style category (e.g., "animation", "surreal")
-- `thumb_key` (text, manual): S3 storage address for thumbnail
-- `priority` (int, manual): Frontend display priority/sorting order
-- `status` (varchar(16), manual): Publication status (draft/published/offline)
-- `created_at` (timestamptz, auto): Creation timestamp
-- `updated_at` (timestamptz, auto): Last update timestamp
+**Version Entity** (For version management)
+- `id`: UUID - Unique identifier
+- `style_id`: UUID - Reference to Style
+- `version_number`: Integer - Version sequence number
+- `snapshot_data`: JSON - Complete Style state at this version
+- `created_at`: Timestamp - Version creation time
+- `created_by`: UUID - User who created this version
 
-**Computed Properties:**
-- Total count of styles in different statuses
-- Version history tracking
+### Relations
+- **User-Style**: One-to-many (User can manage multiple Styles)
+- **Style-Version**: One-to-many (Style has multiple versions)
+- **User-Version**: One-to-many (User creates multiple versions)
 
-#### Supporting Entities
+## Interaction Analysis
 
-**User Entity:**
-- `id` (uuid): User identifier
-- `username` (string): Username
-- `role` (string): User role (admin, editor, viewer)
-- `email` (string): Email address
-- `created_at` (timestamptz): Account creation time
-- `last_login_at` (timestamptz): Last login time
+### User Operations & Permissions
 
-**Version Entity (for version management):**
-- `id` (uuid): Version identifier
-- `version_name` (string): Version name/number
-- `description` (string): Version description
-- `created_at` (timestamptz): Version creation time
-- `published_at` (timestamptz): Version publication time
-- `is_current` (boolean): Whether this is the current active version
+**Admin Role:**
+- Create new Styles
+- Edit any Style
+- Delete any Style
+- Publish/unpublish Styles
+- Manage version history
+- Sort/reorder Styles
 
-### Interaction Perspective Analysis
+**Editor Role:**
+- Create new Styles
+- Edit own Styles
+- Submit for review
+- View published Styles
 
-#### Core Operations and Required Interactions
+**Viewer Role:**
+- View published Styles only
 
-1. **Style Management Operations:**
-   - CreateStyle: Create new style entry
-   - UpdateStyle: Modify existing style
-   - DeleteStyle: Remove style (soft delete)
-   - PublishStyle: Change status to published
-   - UnpublishStyle: Change status to offline
-   - ReorderStyles: Update priority values for sorting
+### Business Processes
 
-2. **Version Management Operations:**
-   - CreateVersion: Create new version snapshot
-   - PublishVersion: Make a version active
-   - RollbackVersion: Revert to previous version
-   - ViewVersionHistory: List all versions
+**Style Creation Workflow:**
+1. User creates Style in "draft" status
+2. User edits Style properties
+3. User submits for review (admin approval)
+4. Admin publishes Style (status: "published")
 
-3. **Query Operations:**
-   - ListStyles: Get styles with filtering and sorting
-   - GetStyle: Get single style details
-   - SearchStyles: Search styles by label/description
+**Version Management:**
+1. Every significant change creates a new version
+2. Users can view version history
+3. Admin can rollback to previous versions
+4. Version rollback creates a new version (no destructive changes)
 
-#### Permission Requirements
-
-**Role-based Access Control:**
-- **Admin**: Full access to all operations
-- **Editor**: Can create, update, and publish styles; cannot manage versions
-- **Viewer**: Read-only access
-
-**Data-level Permissions:**
-- Users can only edit styles they created (unless admin)
-- Only published styles are visible to frontend
-- Draft styles are only visible to creators and admins
-
-#### Business Process Analysis
-
-**Style Lifecycle:**
-1. Draft → (Publish) → Published
-2. Published → (Unpublish) → Offline
-3. Any Status → (Delete) → Deleted (soft delete)
-
-**Version Management Process:**
-1. Create working version from current published version
-2. Make changes to styles in working version
-3. Publish entire version (atomically updates all styles)
-4. Option to rollback to previous version if issues found
+**Publishing Control:**
+1. Only published Styles are visible to end users
+2. Draft Styles are work-in-progress
+3. Offline Styles are temporarily hidden but preserved
 
 ## Technical Requirements
 
-### State Management
-- Style status state machine: draft → published → offline
-- Version management for rollback capability
-- Audit trail for all changes
+### Data Validation
+- `slug` must be unique across all Styles
+- `slug` must be URL-safe (alphanumeric, hyphens, underscores only)
+- `label` cannot be empty
+- `type` must be from predefined list
+- `priority` must be positive integer
+- `status` must be one of: "draft", "published", "offline"
 
-### Performance Requirements
-- Efficient sorting by priority
-- Quick search functionality
-- Optimized queries for frontend data serving
+### Sorting & Ordering
+- Styles sorted by `priority` field (ascending)
+- Support for reordering via priority updates
+- Frontend pagination support
 
-### Data Integrity
-- Unique slug validation
-- Referential integrity between styles and versions
-- Automated timestamps
+### File Management
+- Thumbnail images stored in S3
+- `thumb_key` contains S3 object key
+- Support for image upload/replacement
+- Automatic thumbnail generation if needed
 
-### API Requirements
-- RESTful interface for frontend integration
-- Real-time updates for collaborative editing
-- Bulk operations support
-
-## Gaps and Clarifications
-
-The original requirements need clarification on:
-1. **Version Management Scope**: Are versions per-style or system-wide?
-2. **Rollback Granularity**: Individual style rollback or entire system rollback?
-3. **Deletion Strategy**: Hard delete or soft delete preferred?
-4. **Concurrent Editing**: How to handle multiple users editing simultaneously?
-
-**Assumptions Made:**
-- Version management is system-wide (snapshot of all styles)
-- Soft delete strategy for data preservation
-- Priority values are integers, lower numbers = higher priority
-- Slug uniqueness is enforced across all styles regardless of status
+### Performance Considerations
+- Efficient queries for published Styles
+- Indexed searching by slug
+- Pagination for large Style lists
+- Caching for frequently accessed data

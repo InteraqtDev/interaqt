@@ -220,8 +220,8 @@ export const Style = Entity.create({
     Property.create({ name: 'thumbKey', type: 'string' }),
     Property.create({ name: 'priority', type: 'number', defaultValue: () => 0 }),
     Property.create({ name: 'status', type: 'string', defaultValue: () => 'draft' }),
-    Property.create({ name: 'createdAt', type: 'number', defaultValue: () => Date.now() }),
-    Property.create({ name: 'updatedAt', type: 'number', defaultValue: () => Date.now() })
+    Property.create({ name: 'createdAt', type: 'bigint', defaultValue: () => Date.now() }),
+    Property.create({ name: 'updatedAt', type: 'bigint', defaultValue: () => Date.now() })
   ],
   // Transform in Entity's computation property
   computation: Transform.create({
@@ -248,43 +248,88 @@ export const Style = Entity.create({
 ```
 
 #### Relation Creation via Transform
-```typescript
-// Add styles to favorites
-export const AddToFavorites = Interaction.create({
-  name: 'AddToFavorites',
-  action: Action.create({ name: 'addToFavorites' }),
-  payload: Payload.create({
-    items: [
-      PayloadItem.create({ name: 'styleId', base: Style, isRef: true, required: true })
-    ]
-  })
-});
 
-export const UserFavoriteRelation = Relation.create({
-  source: User,
-  sourceProperty: 'favorites',
-  target: Style,
-  targetProperty: 'favoritedBy',
-  type: 'n:n',
-  properties: [
-    Property.create({ name: 'addedAt', type: 'number', defaultValue: () => Date.now() })
-  ],
-  // Transform creates relation between existing entities
-  computation: Transform.create({
-    record: InteractionEventEntity,
-    callback: function(event) {
-      if (event.interactionName === 'AddToFavorites') {
-        return {
-          source: event.user,
-          target: { id: event.payload.styleId },
-          addedAt: Date.now()
-        };
-      }
-      return null;
-    }
-  })
-});
-```
+**🔴 CRITICAL: When to Use Transform for Relations**
+
+**Most relations are created automatically when entities are created!** You only need Transform in Relation's computation for specific scenarios:
+
+1. **Automatic Relation Creation (MOST COMMON)**
+   - When creating an entity that references another entity, the relation is created automatically
+   - No Transform needed in the Relation definition
+   - This covers 90% of relation creation cases
+
+   ```typescript
+   // Entity creation with automatic relation
+   const Article = Entity.create({
+     name: 'Article',
+     computation: Transform.create({
+       record: InteractionEventEntity,
+       callback: function(event) {
+         if (event.interactionName === 'CreateArticle') {
+           return {
+             title: event.payload.title,
+             content: event.payload.content,
+             author: event.user  // ← Relation created automatically!
+           };
+         }
+       }
+     })
+   });
+   
+   // Relation definition - NO computation needed
+   const UserArticleRelation = Relation.create({
+     source: User,
+     target: Article,
+     type: 'n:1'
+     // No computation - relation is created when Article is created
+   });
+   ```
+
+2. **Transform for Relations Between Existing Entities (LESS COMMON)**
+   - Only use Transform when creating relations between already existing entities
+   - Examples: favorites, follows, likes, tags added later
+
+   ```typescript
+   // Only for connecting existing entities
+   export const AddToFavorites = Interaction.create({
+     name: 'AddToFavorites',
+     action: Action.create({ name: 'addToFavorites' }),
+     payload: Payload.create({
+       items: [
+         PayloadItem.create({ name: 'styleId', base: Style, isRef: true, required: true })
+       ]
+     })
+   });
+   
+   export const UserFavoriteRelation = Relation.create({
+     source: User,
+     sourceProperty: 'favorites',
+     target: Style,
+     targetProperty: 'favoritedBy',
+     type: 'n:n',
+     properties: [
+       Property.create({ name: 'addedAt', type: 'bigint', defaultValue: () => Date.now() })
+     ],
+     // Transform ONLY for connecting existing entities
+     computation: Transform.create({
+       record: InteractionEventEntity,
+       callback: function(event) {
+         if (event.interactionName === 'AddToFavorites') {
+           return {
+             source: event.user,
+             target: { id: event.payload.styleId },
+             addedAt: Date.now()
+           };
+         }
+         return null;
+       }
+     })
+   });
+   ```
+
+**Key Principle**: Ask yourself - "Am I creating a new entity with relations, or connecting two existing entities?"
+- Creating new entity → Relations created automatically through entity references
+- Connecting existing entities → Use Transform in Relation's computation
 
 ### 2. StateMachine - Updates Entities
 
@@ -370,7 +415,7 @@ const updatedState = StateNode.create({
 
 Property.create({
   name: 'updatedAt',
-  type: 'number',
+  type: 'bigint',
   defaultValue: () => Date.now(),
   computation: StateMachine.create({
     name: 'UpdatedAt',
@@ -586,7 +631,7 @@ const updatedState = StateNode.create({
 
 Property.create({
   name: 'updatedAt',
-  type: 'number',
+  type: 'bigint',
   defaultValue: () => Date.now(),
   computation: StateMachine.create({
     states: [updatedState],
@@ -675,7 +720,7 @@ Property.create({
 // Created at - set once
 Property.create({
   name: 'createdAt',
-  type: 'number',
+  type: 'bigint',
   defaultValue: () => Date.now()
 })
 
@@ -687,7 +732,7 @@ const updatedState = StateNode.create({
 
 Property.create({
   name: 'updatedAt',
-  type: 'number',
+  type: 'bigint',
   defaultValue: () => Date.now(),
   computation: StateMachine.create({
     states: [updatedState],
@@ -721,7 +766,7 @@ export const Version = Entity.create({
   name: 'Version',
   properties: [
     Property.create({ name: 'version', type: 'number' }),
-    Property.create({ name: 'publishedAt', type: 'number' }),
+    Property.create({ name: 'publishedAt', type: 'bigint' }),
     Property.create({ name: 'isActive', type: 'boolean', defaultValue: () => true })
   ],
   computation: Transform.create({
@@ -761,4 +806,4 @@ export const Version = Entity.create({
 - [ ] No circular dependencies
 - [ ] Computations are pure functions
 - [ ] Correct computation type for each use case
-- [ ] TypeScript compilation passes 
+- [ ] TypeScript compilation passes

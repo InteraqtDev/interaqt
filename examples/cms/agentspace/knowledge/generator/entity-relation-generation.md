@@ -95,7 +95,7 @@ Property.create({
 // Dynamic defaults
 Property.create({ 
   name: 'createdAt', 
-  type: 'number',
+  type: 'bigint',
   defaultValue: () => Date.now()
 });
 ```
@@ -129,7 +129,7 @@ const UserStyleRelation = Relation.create({
   properties: [
     Property.create({ 
       name: 'createdAt', 
-      type: 'number',
+      type: 'bigint',
       defaultValue: () => Date.now()
     })
   ]
@@ -179,8 +179,8 @@ export const Style = Entity.create({
     Property.create({ name: 'thumbKey', type: 'string' }),
     Property.create({ name: 'priority', type: 'number', defaultValue: () => 0 }),
     Property.create({ name: 'status', type: 'string', defaultValue: () => 'draft' }),
-    Property.create({ name: 'createdAt', type: 'number', defaultValue: () => Date.now() }),
-    Property.create({ name: 'updatedAt', type: 'number', defaultValue: () => Date.now() })
+    Property.create({ name: 'createdAt', type: 'bigint', defaultValue: () => Date.now() }),
+    Property.create({ name: 'updatedAt', type: 'bigint', defaultValue: () => Date.now() })
   ]
 });
 
@@ -189,7 +189,7 @@ export const Version = Entity.create({
   properties: [
     Property.create({ name: 'data', type: 'object' }),  // Style snapshot
     Property.create({ name: 'isActive', type: 'boolean', defaultValue: () => false }),
-    Property.create({ name: 'publishedAt', type: 'number', defaultValue: () => Date.now() })
+    Property.create({ name: 'publishedAt', type: 'bigint', defaultValue: () => Date.now() })
   ]
 });
 
@@ -207,7 +207,7 @@ export const StyleVersionRelation = Relation.create({
   properties: [
     Property.create({ 
       name: 'createdAt', 
-      type: 'number',
+      type: 'bigint',
       defaultValue: () => Date.now()
     })
   ]
@@ -226,6 +226,164 @@ export const UserVersionRelation = Relation.create({
 - Timestamp properties (createdAt, updatedAt)
 - Soft delete patterns (isDeleted, deletedAt)
 
+## Filtered Entities
+
+Filtered entities are derived entities that automatically filter records from a source entity based on specific conditions. They are useful for creating logical subsets of data without duplicating storage.
+
+### Creating Filtered Entities
+
+```typescript
+const PublishedStyle = Entity.create({
+  name: 'PublishedStyle',
+  sourceEntity: Style,  // The entity to filter from
+  filterCondition: MatchExp.atom({
+    key: 'status',
+    value: ['=', 'published']
+  })
+});
+```
+
+### FilterCondition Property Type
+
+The `filterCondition` uses `MatchExp` expressions to define filtering criteria:
+
+#### Basic Conditions
+```typescript
+// Single condition
+filterCondition: MatchExp.atom({
+  key: 'status',
+  value: ['=', 'active']
+})
+
+// Numeric comparison
+filterCondition: MatchExp.atom({
+  key: 'priority',
+  value: ['>', 5]
+})
+
+// Pattern matching
+filterCondition: MatchExp.atom({
+  key: 'email',
+  value: ['like', '%@admin.com']
+})
+```
+
+#### Complex Conditions
+```typescript
+// AND conditions
+filterCondition: MatchExp.atom({
+  key: 'status',
+  value: ['=', 'published']
+}).and({
+  key: 'priority',
+  value: ['>=', 10]
+})
+
+// OR conditions
+filterCondition: MatchExp.atom({
+  key: 'type',
+  value: ['=', 'premium']
+}).or({
+  key: 'featured',
+  value: ['=', true]
+})
+
+// Combined AND/OR
+filterCondition: MatchExp.atom({
+  key: 'status',
+  value: ['=', 'active']
+}).and({
+  key: 'createdAt',
+  value: ['>', Date.now() - 86400000]  // Last 24 hours
+}).or({
+  key: 'isPinned',
+  value: ['=', true]
+})
+```
+
+#### Available Operators
+- `['=', value]` - Equals
+- `['!=', value]` - Not equals
+- `['>', value]` - Greater than
+- `['<', value]` - Less than
+- `['>=', value]` - Greater than or equal
+- `['<=', value]` - Less than or equal
+- `['like', pattern]` - Pattern matching (% for wildcard)
+- `['in', array]` - Value in array
+- `['between', [min, max]]` - Value in range
+- `['not', null]` - Not null check
+
+### Practical Examples
+
+#### Active Users
+```typescript
+const ActiveUser = Entity.create({
+  name: 'ActiveUser',
+  sourceEntity: User,
+  filterCondition: MatchExp.atom({
+    key: 'status',
+    value: ['=', 'active']
+  }).and({
+    key: 'lastLoginDate',
+    value: ['>', Date.now() - 7 * 24 * 60 * 60 * 1000]  // Last 7 days
+  })
+});
+```
+
+#### High Priority Styles
+```typescript
+const HighPriorityStyle = Entity.create({
+  name: 'HighPriorityStyle',
+  sourceEntity: Style,
+  filterCondition: MatchExp.atom({
+    key: 'priority',
+    value: ['>=', 8]
+  }).and({
+    key: 'status',
+    value: ['!=', 'archived']
+  })
+});
+```
+
+#### Premium or Featured Content
+```typescript
+const FeaturedContent = Entity.create({
+  name: 'FeaturedContent',
+  sourceEntity: Article,
+  filterCondition: MatchExp.atom({
+    key: 'type',
+    value: ['=', 'premium']
+  }).or({
+    key: 'featured',
+    value: ['=', true]
+  }).or({
+    key: 'editorPick',
+    value: ['=', true]
+  })
+});
+```
+
+### Filtering from Relations
+You can also create filtered entities from relations:
+
+```typescript
+const RecentUserPost = Entity.create({
+  name: 'RecentUserPost',
+  sourceEntity: UserPostRelation,
+  filterCondition: MatchExp.atom({
+    key: 'createdAt',
+    value: ['>', Date.now() - 30 * 24 * 60 * 60 * 1000]  // Last 30 days
+  })
+});
+```
+
+### Important Notes
+- Filtered entities are read-only views - you cannot create records directly in them
+- They automatically update when the source entity changes
+- Use them for queries and computations, not for direct data manipulation
+- They share the same storage as the source entity (no data duplication)
+- Properties are inherited from the source entity
+
 ## Validation Checklist
 - [ ] All entity names are PascalCase and singular
 - [ ] All properties have correct types
@@ -233,4 +391,5 @@ export const UserVersionRelation = Relation.create({
 - [ ] No relation has a name property (auto-generated)
 - [ ] Relation types use correct format ('1:1', 'n:1', etc.)
 - [ ] No entities are imported from interaqt package
+- [ ] Filtered entities have valid sourceEntity and filterCondition
 - [ ] TypeScript compilation passes 
