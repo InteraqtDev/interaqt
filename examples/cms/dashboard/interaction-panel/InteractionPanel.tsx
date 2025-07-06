@@ -1,5 +1,5 @@
 import { RenderContext, atom, RxList } from "axii";
-import { InteractionDetail, InteractionData } from "./InteractionDetail";
+import { InteractionDetail } from "./InteractionDetail";
 import { InteractionList } from "./InteractionList";
 import { InteractionInstance } from "@shared";
 
@@ -8,20 +8,8 @@ type InteractionPanelProps = {
 }
 
 export function InteractionPanel({ interactions }: InteractionPanelProps, { createElement }: RenderContext) {
-    // Convert InteractionInstance to InteractionData format
-    const interactionData = interactions.map((interaction): InteractionData => ({
-        id: interaction.name, // Use name as ID
-        name: interaction.name,
-        action: interaction.action?.name || 'unknown',
-        hasPermissions: !!interaction.userAttributives,
-        hasPayload: !!interaction.payload && interaction.payload.items?.length > 0,
-        description: getInteractionDescription(interaction),
-        // Store the full interaction instance for detail view
-        _instance: interaction
-    }));
-
-    const interactionList = new RxList(interactionData);
-    const selectedInteraction = atom<InteractionData | null>(null);
+    const interactionList = new RxList(interactions);
+    const selectedInteraction = atom<InteractionInstance | null>(null);
 
     // Container style with dark theme
     const containerStyle = {
@@ -38,7 +26,7 @@ export function InteractionPanel({ interactions }: InteractionPanelProps, { crea
         animation: 'fadeIn 0.3s ease-out'
     };
 
-    const handleInteractionSelect = (interaction: InteractionData) => {
+    const handleInteractionSelect = (interaction: InteractionInstance) => {
         selectedInteraction(interaction);
     };
 

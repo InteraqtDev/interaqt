@@ -1,10 +1,10 @@
 import { RenderContext, atom, RxList } from "axii";
-import { InteractionData } from "./InteractionDetail";
+import { InteractionInstance } from "@shared";
 
 type InteractionListProps = {
-    interactions: RxList<InteractionData>;
-    selectedInteraction: ReturnType<typeof atom<InteractionData | null>>;
-    onSelect: (interaction: InteractionData) => void;
+    interactions: RxList<InteractionInstance>;
+    selectedInteraction: ReturnType<typeof atom<InteractionInstance | null>>;
+    onSelect: (interaction: InteractionInstance) => void;
 }
 
 export function InteractionList({ 
@@ -103,11 +103,23 @@ export function InteractionList({
 
     const actionIconMap: Record<string, string> = {
         create: '✨',
+        createStyle: '✨',
         update: '📝',
+        updateStyle: '📝',
         delete: '🗑️',
-        publish: '🚀'
+        deleteStyle: '🗑️',
+        publish: '🚀',
+        publishStyle: '🚀',
+        get: '🔍',
+        list: '📋',
+        upload: '📤',
+        rollback: '⏪'
     };
 
+    const getActionIcon = (interaction: InteractionInstance): string => {
+        const actionName = interaction.action?.name || '';
+        return actionIconMap[actionName] || actionIconMap[interaction.name.toLowerCase()] || '📋';
+    };
 
     return (
         <div style={listStyle}>
@@ -118,20 +130,22 @@ export function InteractionList({
             <div>
                 {interactions.map(interaction => (
                     <div
-                        style={() => interactionItemStyle(selectedInteraction() === interaction)}
+                        key={interaction.name}
+                        style={() =>interactionItemStyle(selectedInteraction() === interaction)}
                         onClick={() => onSelect(interaction)}
                         className="interaction-item"
                     >
                         <div className="name">
-                            {actionIconMap[interaction.action] || '📋'} {interaction.name}
+                            {getActionIcon(interaction)} {interaction.name}
                         </div>
                         <div className="action">
-                            Action: {interaction.action}
-                            {interaction.hasPermissions && <span className="badge">Permissions</span>}
+                            Action: {interaction.action?.name || 'unknown'}
+                            {interaction.userAttributives && <span className="badge">Permissions</span>}
                         </div>
                     </div>
                 ))}
             </div>
+            
         </div>
     );
 } 

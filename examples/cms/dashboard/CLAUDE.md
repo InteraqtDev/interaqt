@@ -1,5 +1,94 @@
 # Axii Framework Guide for LLMs
 
+## ⚠️ CRITICAL: Understanding Axii's Reactive Core
+
+**Axii's reactivity is fundamentally different from React!** This is the most important concept to understand:
+
+### The Core Difference
+- **React**: Reactivity through component re-rendering and virtual DOM diffing
+- **Axii**: Reactivity through reactive data structures tracked directly in JSX
+
+### Key Rules for Reactive Data
+
+1. **NEVER destructure reactive values before passing to components**
+```typescript
+// ❌ WRONG: Loses reactivity by extracting value
+const selectedItem = atom(null);
+<DetailPanel item={selectedItem()} />  // This breaks reactivity!
+
+// ✅ CORRECT: Pass the atom itself
+<DetailPanel item={selectedItem} />    // Component receives the reactive atom
+```
+
+2. **NEVER execute reactive functions outside JSX**
+```typescript
+// ❌ WRONG: Executes function and passes static result
+const renderContent = () => { /* ... */ };
+<div>{renderContent()}</div>  // Result is static, not reactive!
+
+// ✅ CORRECT: Pass the function itself
+<div>{renderContent}</div>     // Framework can track reactive dependencies
+```
+
+3. **Always wrap dynamic content in functions within JSX**
+```typescript
+// ❌ WRONG: Conditional rendering without function wrapper
+<div>
+  {isVisible() ? <Content /> : null}  // Won't update when isVisible changes!
+</div>
+
+// ✅ CORRECT: Wrap in a function
+<div>
+  {() => isVisible() ? <Content /> : null}  // Properly reactive
+</div>
+```
+
+4. **Access atom values inside components using ()**
+```typescript
+type Props = {
+  count: Atom<number>;  // Receive atom, not value
+}
+
+function Component({ count }: Props) {
+  return <div>Count: {count()}</div>  // Access value with ()
+}
+```
+
+### Common Patterns
+
+**Computed values must be reactive**
+```typescript
+// ❌ WRONG
+const total = computed(() => price() * quantity());
+<div>{total()}</div>  // Breaks if used in multiple places
+
+// ✅ CORRECT  
+const total = computed(() => price() * quantity());
+<div>{total}</div>    // Pass the computed itself
+// OR inline it
+<div>{() => price() * quantity()}</div>
+```
+
+**Collections stay reactive**
+```typescript
+const items = new RxList([1, 2, 3]);
+
+// ✅ CORRECT
+const mappedItems = items.map(item => <Item value={item} />);
+<div>{mappedItems}</div>  // Static snapshot!
+
+// ✅ BOTH CORRECT
+<div>{items.map(item => <Item value={item} />)}</div>  // Reactive updates
+```
+
+### Summary
+- Reactive data structures (atom, RxList, RxMap, computed) must flow through your app intact
+- The framework tracks dependencies by detecting reactive data access within JSX
+- Breaking the reactive chain by extracting values means updates won't propagate
+- When in doubt, pass the reactive container, not its value
+
+---
+
 ## Overview
 Axii is a reactive frontend framework that provides powerful features without Virtual DOM. This guide helps LLMs understand and correctly use Axii's features.
 

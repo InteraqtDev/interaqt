@@ -1,327 +1,273 @@
-import { Atom, RenderContext, atom, computed } from "axii";
+import { RenderContext, Atom, Fragment } from "axii";
 import { InteractionInstance } from "@shared";
 
-export type InteractionData = {
-    id: string;
-    name: string;
-    action: string;
-    hasPermissions: boolean;
-    hasPayload: boolean;
-    description?: string;
-    _instance?: InteractionInstance; // Full interaction instance
-}
-
 type InteractionDetailProps = {
-    interaction: Atom<InteractionData | null>;
+    interaction: Atom<InteractionInstance | null>;
 }
 
 export function InteractionDetail({ interaction }: InteractionDetailProps, { createElement }: RenderContext) {
-    // Advanced styles with Axii features
     const detailStyle = {
-        flex: 1,
+        flex: '1',
         backgroundColor: '#1a1a1a',
         borderRadius: '12px',
-        padding: '32px',
-        boxShadow: '0 4px 8px rgba(0,0,0,0.5)',
+        padding: '24px',
         overflowY: 'auto' as const,
-        '& h3': {
-            margin: '0 0 24px 0',
-            fontSize: '24px',
-            fontWeight: '700',
+        maxHeight: '100%',
+        boxShadow: '0 4px 8px rgba(0,0,0,0.5)',
+        '@keyframes fadeIn': {
+            from: { opacity: 0 },
+            to: { opacity: 1 }
+        },
+        animation: 'fadeIn 0.3s ease-out',
+        '& h2': {
+            margin: '0 0 20px 0',
+            fontSize: '20px',
+            fontWeight: '600',
             color: '#fff',
-            '@keyframes slideIn': {
-                from: { opacity: 0, transform: 'translateY(-10px)' },
-                to: { opacity: 1, transform: 'translateY(0)' }
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            '& .action-badge': {
+                fontSize: '14px',
+                padding: '4px 12px',
+                borderRadius: '6px',
+                backgroundColor: 'rgba(59, 130, 246, 0.2)',
+                color: '#60a5fa',
+                fontWeight: '500'
+            }
+        },
+        '& .empty-state': {
+            display: 'flex',
+            flexDirection: 'column' as const,
+            alignItems: 'center',
+            justifyContent: 'center',
+            height: '100%',
+            minHeight: '400px',
+            color: '#6b7280',
+            textAlign: 'center' as const,
+            gap: '16px',
+            '& .icon': {
+                fontSize: '48px',
+                opacity: 0.5
             },
-            animation: 'slideIn 0.3s ease-out'
+            '& .message': {
+                fontSize: '16px'
+            }
         },
         '& .section': {
             marginBottom: '24px',
-            '& h4': {
+            padding: '16px',
+            backgroundColor: '#262626',
+            borderRadius: '8px',
+            '& h3': {
                 margin: '0 0 12px 0',
-                fontSize: '14px',
+                fontSize: '16px',
                 fontWeight: '600',
-                color: '#9ca3af',
-                textTransform: 'uppercase' as const
-            },
-            '& p': {
-                margin: 0,
-                fontSize: '14px',
-                lineHeight: '1.6',
-                color: '#e5e7eb'
-            }
-        },
-        '& .badges': {
-            display: 'flex',
-            gap: '12px',
-            marginTop: '12px',
-            flexWrap: 'wrap' as const,
-            '& .badge': {
-                padding: '6px 12px',
-                borderRadius: '6px',
-                fontSize: '12px',
-                fontWeight: '600',
-                backgroundColor: '#1e3a8a',
                 color: '#60a5fa',
-                '@keyframes fadeIn': {
-                    from: { opacity: 0, transform: 'scale(0.8)' },
-                    to: { opacity: 1, transform: 'scale(1)' }
-                },
-                animation: 'fadeIn 0.3s ease-out',
-                '&:hover': {
-                    backgroundColor: '#2563eb',
-                    transform: 'scale(1.05)',
-                    transition: 'all 0.2s ease'
-                }
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+            },
+            '& .content': {
+                color: '#e5e7eb',
+                lineHeight: 1.6
             }
         },
-        '& .payload-items': {
-            display: 'flex',
-            flexDirection: 'column' as const,
-            gap: '8px',
-            '& .payload-item': {
-                padding: '8px 12px',
-                backgroundColor: '#262626',
-                borderRadius: '6px',
-                fontSize: '13px',
+        '& .payload-item': {
+            padding: '12px',
+            marginBottom: '8px',
+            backgroundColor: '#333333',
+            borderRadius: '6px',
+            position: 'relative' as const,
+            paddingLeft: '20px',
+            '&::before': {
+                content: '""',
+                position: 'absolute' as const,
+                left: '8px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                width: '4px',
+                height: '4px',
+                backgroundColor: '#60a5fa',
+                borderRadius: '50%'
+            },
+            '& .name': {
+                fontSize: '14px',
+                fontWeight: '600',
+                color: '#fff',
+                marginBottom: '4px'
+            },
+            '& .type': {
+                fontSize: '12px',
+                color: '#9ca3af',
+                marginBottom: '4px'
+            },
+            '& .attributive': {
+                fontSize: '12px',
+                color: '#fbbf24',
+                marginTop: '4px',
+                fontStyle: 'italic'
+            },
+            '& .badges': {
                 display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                '& .item-name': {
-                    color: '#e5e7eb',
-                    fontWeight: '500'
-                },
-                '& .item-meta': {
-                    display: 'flex',
-                    gap: '8px',
-                    '& .tag': {
-                        padding: '2px 6px',
-                        borderRadius: '4px',
-                        fontSize: '11px',
-                        fontWeight: '600',
-                        '&.required': {
-                            backgroundColor: '#7c2d12',
-                            color: '#fca5a5'
-                        },
-                        '&.optional': {
-                            backgroundColor: '#1e3a8a',
-                            color: '#93c5fd'
-                        },
-                        '&.collection': {
-                            backgroundColor: '#4c1d95',
-                            color: '#c4b5fd'
-                        },
-                        '&.reference': {
-                            backgroundColor: '#064e3b',
-                            color: '#6ee7b7'
-                        }
+                gap: '6px',
+                flexWrap: 'wrap' as const,
+                marginTop: '8px',
+                '& .badge': {
+                    fontSize: '10px',
+                    padding: '2px 6px',
+                    borderRadius: '4px',
+                    fontWeight: '600',
+                    '&.required': {
+                        backgroundColor: 'rgba(239, 68, 68, 0.2)',
+                        color: '#f87171'
+                    },
+                    '&.optional': {
+                        backgroundColor: 'rgba(34, 197, 94, 0.2)',
+                        color: '#4ade80'
+                    },
+                    '&.collection': {
+                        backgroundColor: 'rgba(168, 85, 247, 0.2)',
+                        color: '#c084fc'
+                    },
+                    '&.reference': {
+                        backgroundColor: 'rgba(251, 191, 36, 0.2)',
+                        color: '#fbbf24'
                     }
                 }
             }
         },
         '& .code-block': {
-            backgroundColor: '#0a0a0a',
+            backgroundColor: '#0f0f0f',
             padding: '16px',
-            borderRadius: '8px',
-            fontSize: '12px',
-            fontFamily: 'monospace',
-            lineHeight: '1.6',
-            color: '#e5e7eb',
-            overflowX: 'auto' as const
-        }
-    };
-
-    const emptyStateStyle = {
-        display: 'flex',
-        flexDirection: 'column' as const,
-        alignItems: 'center',
-        justifyContent: 'center',
-        height: '100%',
-        color: '#6b7280',
-        gap: '16px',
-        '& .icon': {
-            fontSize: '48px',
-            opacity: 0.5,
-            '@keyframes pulse': {
-                '0%, 100%': { opacity: 0.5 },
-                '50%': { opacity: 0.8 }
-            },
-            animation: 'pulse 2s ease-in-out infinite'
-        },
-        '& h3': {
-            margin: 0,
-            fontSize: '20px',
-            fontWeight: '600'
-        },
-        '& p': {
-            margin: 0,
-            fontSize: '14px'
-        }
-    };
-
-    // Computed action label with styling
-    const actionBadgeStyle = computed(() => {
-        if (!interaction) return {};
-        
-        const colors = {
-            create: { bg: '#065f46', color: '#34d399' },
-            createStyle: { bg: '#065f46', color: '#34d399' },
-            update: { bg: '#1e3a8a', color: '#60a5fa' },
-            updateStyle: { bg: '#1e3a8a', color: '#60a5fa' },
-            delete: { bg: '#7c2d12', color: '#f87171' },
-            deleteStyle: { bg: '#7c2d12', color: '#f87171' },
-            publish: { bg: '#5b21b6', color: '#a78bfa' },
-            publishStyle: { bg: '#5b21b6', color: '#a78bfa' },
-            get: { bg: '#0f766e', color: '#2dd4bf' },
-            list: { bg: '#0f766e', color: '#2dd4bf' },
-            upload: { bg: '#7c3aed', color: '#c4b5fd' }
-        };
-        
-        const actionKey = interaction()?.action as keyof typeof colors;
-        const style = colors[actionKey] || colors[interaction()?._instance?.action?.name as keyof typeof colors] || { bg: '#374151', color: '#9ca3af' };
-        
-        return {
-            display: 'inline-block',
-            padding: '4px 12px',
             borderRadius: '6px',
+            fontFamily: 'monospace',
             fontSize: '12px',
-            fontWeight: '600',
-            backgroundColor: style.bg,
-            color: style.color,
-            textTransform: 'uppercase' as const
-        };
-    });
-
-    // Render payload items details
-    const renderPayloadItems = () => {
-        if (!interaction()?._instance?.payload?.items) return null;
-        
-        return interaction()?._instance?.payload?.items.map((item, index) => (
-            <div key={index} className="payload-item">
-                <span className="item-name">{item.name}</span>
-                <div className="item-meta">
-                    {item.required && <span className="tag required">Required</span>}
-                    {!item.required && <span className="tag optional">Optional</span>}
-                    {item.isCollection && <span className="tag collection">Array</span>}
-                    {item.isRef && <span className="tag reference">Reference</span>}
-                    {item.base && <span className="tag reference">{item.base.name}</span>}
-                </div>
-            </div>
-        ));
+            overflowX: 'auto' as const,
+            border: '1px solid #333333'
+        }
     };
 
-    // Render attributives information
-    const renderAttributives = () => {
-        const instance = interaction()?._instance;
-        if (!instance) return null;
-        
-        const attrs = [];
-        
-        if (instance.userAttributives) {
-            attrs.push(
-                <div key="user" className="section">
-                    <h4>User Permissions</h4>
-                    <p>{formatAttributive(instance.userAttributives)}</p>
-                </div>
-            );
-        }
-        
-        // Check payload attributives
-        if (instance.payload?.items) {
-            const payloadAttrs = instance.payload.items.filter(item => item.attributives);
-            if (payloadAttrs.length > 0) {
-                attrs.push(
-                    <div key="payload" className="section">
-                        <h4>Payload Validations</h4>
-                        {payloadAttrs.map((item, index) => (
-                            <p key={index}>
-                                <strong>{item.name}:</strong> {formatAttributive(item.attributives)}
-                            </p>
-                        ))}
-                    </div>
-                );
-            }
-        }
-        
-        return attrs.length > 0 ? attrs : null;
-    };
-
-    // Format attributive for display
-    const formatAttributive = (attr: any): string => {
-        if (!attr) return 'None';
-        if (attr.name) return attr.name;
-        if (attr.content && attr.content.name) return attr.content.name;
-        return 'Custom validation';
+    const formatCode = (code: string) => {
+        return code.replace(/\n/g, '<br/>').replace(/  /g, '&nbsp;&nbsp;');
     };
 
     return (
         <div style={detailStyle}>
-            {() => interaction() ? (
-                <div>
-                    <h3>{interaction.name}</h3>
-                    
-                    <div className="section">
-                        <h4>Description</h4>
-                        <p>{interaction()?.description}</p>
-                    </div>
-
-                    <div className="section">
-                        <h4>Action Type</h4>
-                        <div style={actionBadgeStyle()}>{interaction()?.action}</div>
-                    </div>
-
-                    <div className="section">
-                        <h4>Features</h4>
-                        <div className="badges">
-                            {interaction()?.hasPermissions && (
-                                <div className="badge">User Permissions</div>
-                            )}
-                            {interaction()?.hasPayload && (
-                                <div className="badge">Payload Required</div>
-                            )}
-                            {interaction()?._instance?.query && (
-                                <div className="badge">Query Support</div>
-                            )}
-                            {interaction()?._instance?.sideEffects && (
-                                <div className="badge">Side Effects</div>
-                            )}
+            {() => {
+                const current = interaction();
+                if (!current) {
+                    return (
+                        <div className="empty-state">
+                            <div className="icon">📋</div>
+                            <div className="message">Select an interaction to view details</div>
                         </div>
-                    </div>
+                    );
+                }
 
-                    {/* Payload Details */}
-                    {interaction()?._instance?.payload?.items && interaction()?._instance?.payload?.items?.length && (
+                // Generate usage example
+                const generateUsageExample = () => {
+                    const params = [''];
+                    if (current.payload?.items && current.payload.items.length > 0) {
+                        const examplePayload: any = {};
+                        current.payload.items.forEach(item => {
+                            if (item.base?.name === 'string') {
+                                examplePayload[item.name] = item.isCollection ? '["value1", "value2"]' : '"example"';
+                            } else if (item.base?.name === 'number') {
+                                examplePayload[item.name] = item.isCollection ? '[1, 2, 3]' : '123';
+                            } else if (item.base?.name === 'boolean') {
+                                examplePayload[item.name] = 'true';
+                            } else if (item.base?.name === 'object' && item.isRef) {
+                                examplePayload[item.name] = '{ id: "existing-id" }';
+                            }
+                        });
+                        params.push(`  payload: ${JSON.stringify(examplePayload, null, 2).replace(/"/g, '')}`);
+                    }
+                    if (current.userAttributives) {
+                        params.push('  user: { id: "user-id", role: "admin" }');
+                    }
+                    return `await controller.callInteraction('${current.name}', {${params.join(',\n')}
+});`;
+                };
+
+                return (
+                    <Fragment>
+                        <h2>
+                            {current.name}
+                            <span className="action-badge">{current.action?.name || 'Action'}</span>
+                        </h2>
+
+                        {current.action ? (
+                            <div className="section">
+                                <h3>🎯 Action</h3>
+                                <div className="content">
+                                    <strong>Type:</strong> {current.action.name}
+                                </div>
+                            </div>
+                        ) : null}
+
+                        {current.payload?.items && current.payload.items.length > 0 ? (
+                            <div className="section">
+                                <h3>📦 Payload</h3>
+                                <div className="content">
+                                    {current.payload.items.map((item: any) => (
+                                        <div key={item.name} className="payload-item">
+                                            <div className="name">{item.name}</div>
+                                            <div className="type">Type: {item.base?.name || 'unknown'}</div>
+                                            <div className="badges">
+                                                {item.required === false ? <span className="badge optional">Optional</span> : null}
+                                                {item.required === true ? <span className="badge required">Required</span> : null}
+                                                {item.isCollection ? <span className="badge collection">Collection</span> : null}
+                                                {item.isRef ? <span className="badge reference">Reference</span> : null}
+                                            </div>
+                                            {item.attributives ? (
+                                                <div className="attributive">
+                                                    Validation: {
+                                                        (item.attributives as any).name ? 
+                                                        (item.attributives as any).name : 
+                                                        'Custom validation'
+                                                    }
+                                                </div>
+                                            ) : null}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        ) : null}
+
+                        {current.userAttributives ? (
+                            <div className="section">
+                                <h3>🔒 User Permissions</h3>
+                                <div className="content">
+                                    This interaction requires user authentication and permissions.
+                                    <div className="payload-item" style={{ marginTop: '12px' }}>
+                                        <div className="name">User</div>
+                                        <div className="type">Required user object with role</div>
+                                        {current.userAttributives ? (
+                                            (current.userAttributives as any).name ? (
+                                                <div className="attributive">
+                                                    Permission: {(current.userAttributives as any).name}
+                                                </div>
+                                            ) : (
+                                                <div className="attributive">
+                                                    Permission: Custom permission rules
+                                                </div>
+                                            )
+                                        ) : null}
+                                    </div>
+                                </div>
+                            </div>
+                        ) : null}
+
                         <div className="section">
-                            <h4>Payload Items</h4>
-                            <div className="payload-items">
-                                {renderPayloadItems()}
+                            <h3>💻 Usage Example</h3>
+                            <div className="content">
+                                <div className="code-block" dangerouslySetInnerHTML={formatCode(generateUsageExample()) } />
                             </div>
                         </div>
-                    )}
-
-                    {/* Permissions Details */}
-                    {renderAttributives()}
-
-                    {/* Code Example */}
-                    <div className="section">
-                        <h4>Usage Example</h4>
-                        <div className="code-block">
-                            {`await controller.callInteraction('${interaction()?.name}', {
-  user: currentUser,
-  payload: {${interaction()?._instance?.payload?.items?.map(item => 
-    `\n    ${item.name}: ${item.isRef ? `{ id: '${item.name}-id' }` : item.isCollection ? '[]' : `'value'`}`
-  ).join(',') || ''}
-  }
-});`}
-                        </div>
-                    </div>
-                </div>
-            ) : (
-                <div style={emptyStateStyle}>
-                    <div className="icon">⚡</div>
-                    <h3>Select an Interaction</h3>
-                    <p>Choose an interaction from the list to view details</p>
-                </div>
-            )}
+                    </Fragment>
+                );
+            }}
         </div>
     );
 } 
