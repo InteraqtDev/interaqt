@@ -1,0 +1,12 @@
+The reactive data structures in Axii include the following types:
+
+- atom: Atomic data that is treated as a whole.
+- RxList/RxMap/RxSet: Reactive collection data structures that emit signals when the collection changes, but changes within the collection objects are not deeply reactive.
+- RxTime: A special reactive data structure for handling time.
+
+We can pass an atom to any DOM attribute, and when the atom's value changes, the DOM attribute will automatically update.
+We can also map an RxList to a DOM array, and when the RxList's value changes, the DOM array will automatically update.
+
+Even if you're using RxMap/RxSet, they have corresponding toList methods that can convert them to RxList, allowing you to map them to DOM arrays.
+
+For more dynamic requirements, you can directly pass a function to represent the DOM structure that needs to be generated.

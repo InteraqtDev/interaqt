@@ -1,0 +1,52 @@
+# アクション管理
+
+Axiiは、非同期操作の状態とフローを管理するためのaction0ライブラリを提供しています。単一の非同期操作、直列操作、並列操作を処理するのに役立ち、完全な状態管理を提供します。
+
+## 単一操作
+
+`SingleAction`クラスを使用して、単一の非同期操作を管理します：
+
+```jsx
+const action = new SingleAction(async () => {
+    await wait(1000)
+    return 'success'
+})
+
+// 操作を開始
+action.start()
+
+// 操作のステータスを取得
+const status = action.status()
+```
+
+## 直列操作
+
+`SerialActions`クラスを使用して、順番に実行する必要がある複数の非同期操作を管理します：
+
+```jsx
+const actions = new SerialActions([
+    async () => { await wait(1000); return 'step 1' },
+    async () => { await wait(1000); return 'step 2' },
+    async () => { await wait(1000); return 'step 3' }
+])
+
+// すべての操作を開始
+actions.start()
+```
+
+## 並列操作
+
+`ParallelActions`クラスを使用して、同時に実行できる複数の非同期操作を管理します：
+
+```jsx
+const actions = new ParallelActions([
+    async () => { await wait(1000); return 'task 1' },
+    async () => { await wait(2000); return 'task 2' },
+    async () => { await wait(3000); return 'task 3' }
+])
+
+// すべての操作を開始
+actions.start()
+```
+
+action0ライブラリは、非同期操作の状態管理をシンプルで直感的にし、特に複雑な非同期フローの処理に適しています。 

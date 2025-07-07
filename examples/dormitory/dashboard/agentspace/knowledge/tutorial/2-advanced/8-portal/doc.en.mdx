@@ -1,0 +1,51 @@
+Axii supports rendering components to different root nodes, commonly used in scenarios such as popups and modal dialogs.
+
+## Creating a Portal
+
+Use the `createPortal` function to create a portal:
+
+```jsx
+const portalNode = createPortal(() => {
+    const containerStyle = {
+        position: 'fixed',
+        top: 0,
+        bottom: 0,
+        left: 0,
+        right: 0,
+        background: 'black',
+        color: 'white',
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+    }
+    return (
+        <div style={containerStyle} onClick={() => portalVisible(false)}>
+            <div>content</div>
+        </div>
+    )
+}, document.body)
+```
+
+The `createPortal` function accepts two parameters:
+- The first parameter is a function that returns JSX, defining the content to be rendered
+- The second parameter is the target DOM node, specifying where the content should be rendered
+
+## Using a Portal
+
+After creating a portal, you can use it in conditional rendering:
+
+```jsx
+const portalVisible = atom(false)
+
+return <div>
+    <button onClick={() => portalVisible(true)}>open portal</button>
+    {() => portalVisible() ? portalNode : null}
+</div>
+```
+
+Portals are particularly useful in the following scenarios:
+- Modal dialogs and popups
+- Tooltips and dropdown menus
+- Scenarios where you need to break out of a parent component's CSS constraints
+
+Using portals allows you to render components anywhere in the DOM tree while keeping the component's logic and state management in the original component.

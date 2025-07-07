@@ -1,0 +1,6 @@
+Reactive data is a core concept in axii.
+There are three ways to create reactive data:
+
+- Using the APIs of RxList/RxMap/RxSet to create reactive data. Most calculations in APIs are incremental, which means when dependencies change, it won't recalculate everything but only make minimal incremental changes. Using APIs should be the first consideration.
+- Using the constructors of RxList/RxMap/RxSet to create reactive data. When passing computation logic as parameters to the constructor, any change in dependencies within the computation logic will trigger a recalculation.
+- Using computed to create atom-type reactive data. Any change in dependencies will trigger a recalculation.
