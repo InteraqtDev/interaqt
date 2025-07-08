@@ -6,6 +6,7 @@ import { ComputationResult, DataDep, GlobalBoundState, RecordBoundState, Records
 import { DataBasedComputation } from "./Computation.js";
 import { EtityMutationEvent } from "../ComputationSourceMap.js";
 import { MatchExp, AttributeQueryData } from "@storage";
+import { assert } from "../util.js";
 
 
 export class GlobalAnyHandle implements DataBasedComputation {
@@ -90,6 +91,7 @@ export class PropertyAnyHandle implements DataBasedComputation {
         const relation = args.record as RelationInstance
         this.relation = relation
         this.isSource = args.direction ? args.direction === 'source' :relation.source.name === dataContext.host.name
+        assert(this.isSource ? this.relation.source === dataContext.host : this.relation.target === dataContext.host, 'count computation relation direction error')
         this.relationAttr = this.isSource ? relation.sourceProperty : relation.targetProperty
         this.relatedRecordName = this.isSource ? relation.target.name! : relation.source.name!
         this.relationAttributeQuery = args.attributeQuery || []

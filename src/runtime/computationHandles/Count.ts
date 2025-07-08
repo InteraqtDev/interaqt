@@ -5,6 +5,7 @@ import { CountInstance, EntityInstance, RelationInstance } from "@shared";
 import { ComputationResult, DataBasedComputation, DataDep, GlobalBoundState, RecordBoundState, RecordsDataDep } from "./Computation.js";
 import { EtityMutationEvent } from "../Scheduler.js";
 import { MatchExp } from "@storage";
+import { assert } from "../util.js";
 
 export class GlobalCountHandle implements DataBasedComputation {
     callback?: (this: Controller, item: any, dataDeps?: {[key: string]: any}) => boolean
@@ -122,6 +123,7 @@ export class PropertyCountHandle implements DataBasedComputation {
         // We assume in PropertyCountHandle, the records array's first element is a Relation
         this.relation = args.record as RelationInstance
         this.isSource = args.direction ? args.direction === 'source' : this.relation.source.name === dataContext.host.name
+        assert(this.isSource ? this.relation.source === dataContext.host : this.relation.target === dataContext.host, 'count computation relation direction error')
         this.relationAttr = this.isSource ? this.relation.sourceProperty : this.relation.targetProperty
         this.relatedRecordName = this.isSource ? this.relation.target.name! : this.relation.source.name!
         

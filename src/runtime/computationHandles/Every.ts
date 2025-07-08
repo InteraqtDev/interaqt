@@ -100,6 +100,7 @@ export class PropertyEveryHandle implements DataBasedComputation {
         assert(relation.source.name === dataContext.host.name || relation.target.name === dataContext.host.name, 'relation source or target must be the same as the host')
         this.relation = relation
         this.isSource = args.direction ? args.direction === 'source' :relation.source.name === dataContext.host.name
+        assert(this.isSource ? this.relation.source === dataContext.host : this.relation.target === dataContext.host, 'every computation relation direction error')
         this.relationAttr = this.isSource ? relation.sourceProperty : relation.targetProperty
         this.relatedRecordName = this.isSource ? relation.target.name! : relation.source.name!
 

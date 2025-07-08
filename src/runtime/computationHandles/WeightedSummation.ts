@@ -6,6 +6,7 @@ import { ComputationResult, DataDep, RecordsDataDep, RecordBoundState } from "./
 import { DataBasedComputation } from "./Computation.js";
 import { EtityMutationEvent } from "../Scheduler.js";
 import { AttributeQueryData, MatchExp } from "@storage";
+import { assert } from "../util.js";
 
 export class GlobalWeightedSummationHandle implements DataBasedComputation {
     matchRecordToWeight: (this: Controller, item: any) => { weight: number; value: number }
@@ -98,6 +99,7 @@ export class PropertyWeightedSummationHandle implements DataBasedComputation {
         this.relation = args.record as RelationInstance
         this.relationAttr = this.relation.source.name === dataContext.host.name ? this.relation.sourceProperty : this.relation.targetProperty
         this.isSource = this.relation.source.name === dataContext.host.name
+        assert(this.isSource ? this.relation.source === dataContext.host : this.relation.target === dataContext.host, 'weighted summation computation relation direction error')
         this.relatedRecordName = this.isSource ? this.relation.target.name! : this.relation.source.name!
         this.relationAttributeQuery = args.attributeQuery || []
         

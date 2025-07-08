@@ -159,6 +159,8 @@ export const KickoutRequest = Entity.create({
           createdAt: Math.floor(Date.now() / 1000)
         };
       }
+      // Note: ProcessKickoutRequest updates are handled via manual storage update
+      // since Transform.create cannot update existing entities by ID
       return null;
     }
   })

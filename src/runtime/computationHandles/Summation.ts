@@ -109,6 +109,7 @@ export class PropertySumHandle implements DataBasedComputation {
         // We assume in PropertySumHandle, the records array's first element is a Relation
         this.relation = args.record as RelationInstance
         this.isSource = args.direction ? args.direction === 'source' : this.relation.source.name === dataContext.host.name
+        assert(this.isSource ? this.relation.source === dataContext.host : this.relation.target === dataContext.host, 'summation computation relation direction error')
         this.relationAttr = this.isSource ? this.relation.sourceProperty : this.relation.targetProperty
         this.relatedRecordName = this.isSource ? this.relation.target.name! : this.relation.source.name!
         

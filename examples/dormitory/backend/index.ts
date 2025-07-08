@@ -17,6 +17,8 @@ import {
   KickoutRequestProcessorRelation
 } from './relations.js';
 
+// import './computations.js'  // Disabled to avoid conflicts with inline computations
+
 export const entities = [
   User,
   Dormitory,
