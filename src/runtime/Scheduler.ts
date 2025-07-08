@@ -1,19 +1,19 @@
+import { MatchExp } from "@storage";
+import { Entity, Property, Relation, EntityInstance, RelationInstance, PropertyInstance, IInstance } from "@shared";
 import { type EtityMutationEvent } from "./ComputationSourceMap.js";
 import { Controller } from "./Controller.js";
-import { DataContext, ComputationHandle, PropertyDataContext, EntityDataContext, RelationDataContext } from "./computationHandles/ComputationHandle.js";
-export { EtityMutationEvent };
-import { EntityInstance, RelationInstance, PropertyInstance, IInstance } from "@shared";
-import { Entity, Property, Relation } from "@shared";
+import { DataContext, ComputationHandle, PropertyDataContext, EntityDataContext, RelationDataContext } from "./computations/ComputationHandle.js";
 import { assert } from "./util.js";
-import { Computation, ComputationClass, ComputationResult, ComputationResultAsync, ComputationResultFullRecompute, ComputationResultResolved, ComputationResultSkip, DataBasedComputation, EventBasedComputation, GlobalBoundState, RecordBoundState, RecordsDataDep } from "./computationHandles/Computation.js";
+import { Computation, ComputationClass, ComputationResult, ComputationResultAsync, ComputationResultFullRecompute, ComputationResultResolved, ComputationResultSkip, DataBasedComputation, EventBasedComputation, GlobalBoundState, RecordBoundState, RecordsDataDep } from "./computations/Computation.js";
 import { DICTIONARY_RECORD, RecordMutationEvent, SYSTEM_RECORD } from "./System.js";
-import { MatchExp } from "@storage";
 import {
     EntityEventSourceMap,
     DataSourceMapTree,
     ComputationSourceMapManager,
     EntityCreateEventsSourceMap
 } from "./ComputationSourceMap.js";
+
+export { EtityMutationEvent };
 
 export const ASYNC_TASK_RECORD = '_ASYNC_TASK_'
 

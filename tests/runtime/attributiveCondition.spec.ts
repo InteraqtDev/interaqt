@@ -1,22 +1,17 @@
-import {beforeEach, describe, expect, test} from "vitest";
+import { beforeEach, describe, expect, test } from "vitest";
 import {
-    Controller, 
-    MonoSystem, 
-    BoolExp, 
-    Interaction, 
-    KlassByName, 
+    Controller,
+    MonoSystem,
+    BoolExp,
+    Interaction,
+    KlassByName,
     removeAllInstance,
     Action,
     Attributive,
     Condition,
     PayloadItem,
     Entity,
-    Property,
-    Relation,
-    Payload,
-    Attributives,
-    Conditions,
-    boolExpToAttributives,
+    Property, Payload, boolExpToAttributives,
     boolExpToConditions
 } from 'interaqt';
 

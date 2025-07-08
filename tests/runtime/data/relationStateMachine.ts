@@ -1,7 +1,7 @@
-import { Entity, Action, Attributives, BoolExp, boolExpToAttributives, createUserRoleAttributive, Interaction, Payload, PayloadItem, Property, Relation, StateMachine, StateNode, StateTransfer } from "@shared";
+import { Entity, Action, BoolExp, boolExpToAttributives, createUserRoleAttributive, Interaction, Payload, PayloadItem, Property, Relation, StateMachine, StateNode, StateTransfer } from "interaqt";
 import { OtherAttr } from "./roles";
-import { RecordStateMachineHandle } from "@runtime";
-import { MatchExp } from "@storage";
+import { RecordStateMachineHandle } from "interaqt";
+import { MatchExp } from "interaqt";
 
 export function createData() {
     const UserEntity = Entity.create({

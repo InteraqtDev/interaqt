@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { Controller, MonoSystem, DICTIONARY_RECORD } from '@runtime';
+import { Controller, MonoSystem, DICTIONARY_RECORD } from 'interaqt';
 import { createData as createPropertyStateMachineData } from "./data/propertyStateMachine.js";
 import { createData as createGlobalStateMachineData } from "./data/globalStateMachine.js";
 import { createData as createRelationStateMachineData } from "./data/relationStateMachine.js";

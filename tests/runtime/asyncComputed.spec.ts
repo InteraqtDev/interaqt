@@ -1,4 +1,4 @@
-import { Controller, Entity, MonoSystem, Property, ComputationHandle, MatchExp, DataDep, PropertyDataContext, PGLiteDB, DataBasedComputation, ComputationResult } from "@";
+import { Controller, Entity, MonoSystem, Property, ComputationHandle, MatchExp, DataDep, PropertyDataContext, PGLiteDB, DataBasedComputation, ComputationResult } from "interaqt";
 import { expect, test, describe } from "vitest";
 
 // TestCrawlerComputed as a standard ES6 class

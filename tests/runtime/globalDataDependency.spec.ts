@@ -6,16 +6,10 @@ import {
   Property,
   ComputationHandle,
   DataDep,
-  PropertyDataContext,
-  GlobalDataContext,
-  PGLiteDB,
-  DataBasedComputation,
-  ComputationResult,
-  Dictionary,
-  Count,
-  BoolExp,
+  PropertyDataContext, PGLiteDB,
+  DataBasedComputation, Dictionary, BoolExp,
   DICTIONARY_RECORD
-} from "@";
+} from "interaqt";
 
 // GlobalDependentComputed as a standard ES6 class
 interface GlobalDependentComputedInstance {

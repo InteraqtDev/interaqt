@@ -9,12 +9,8 @@ import {
   DataDep,
   EntityDataContext,
   PGLiteDB,
-  DataBasedComputation,
-  ComputationResult,
-  ComputationResultAsync,
-  ComputationResultResolved,
-  Relation
-} from "@";
+  DataBasedComputation, ComputationResultAsync
+} from "interaqt";
 
 // EntityRecommendationComputed as a standard ES6 class
 interface EntityRecommendationComputedInstance {

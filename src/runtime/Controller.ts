@@ -2,11 +2,11 @@ import { DICTIONARY_RECORD, RecordMutationEvent, System, SystemCallback, SystemL
 import {
     BoolExp, IInstance, EntityInstance, RelationInstance, ActivityInstance, InteractionInstance, DictionaryInstance
 } from "@shared";
-import './computationHandles/index.js';
+import './computations/index.js';
 import { InteractionCallResponse } from "./InteractionCall.js";
 import { InteractionEventArgs } from "./InteractionCall.js";
-import { DataContext, EntityDataContext, PropertyDataContext, RelationDataContext } from "./computationHandles/ComputationHandle.js";
-import { ComputationResult, ComputationResultSkip, ComputationResultPatch } from "./computationHandles/Computation.js";
+import { DataContext, EntityDataContext, PropertyDataContext, RelationDataContext } from "./computations/ComputationHandle.js";
+import { ComputationResult, ComputationResultSkip, ComputationResultPatch } from "./computations/Computation.js";
 import { Scheduler } from "./Scheduler.js";
 import { MatchExp } from "@storage";
 import { ActivityManager } from "./ActivityManager.js";

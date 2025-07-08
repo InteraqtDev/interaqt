@@ -6,7 +6,7 @@ import {
     StateTransfer,
     StateMachine,
     Dictionary
-} from '@shared';
+} from 'interaqt';
 
 
 export function createData() {

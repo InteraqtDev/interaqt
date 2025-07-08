@@ -8,7 +8,7 @@ import {
     StateNode,
     StateTransfer,
     StateMachine
-} from '@shared';
+} from 'interaqt';
 
 
 export function createData() {

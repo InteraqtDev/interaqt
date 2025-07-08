@@ -19,7 +19,6 @@
     "types": ["node"],
     "downlevelIteration": true,
     "paths": {
-        "@": ["src"],
         "interaqt": ["src"],
         "@runtime": ["src/runtime/index.ts"],
         "@shared": ["src/shared/index.ts"],

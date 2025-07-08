@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { Expression, Equation, Inequality } from '../../src/runtime/computationHandles/MathResolver';
+import { Expression } from 'interaqt';
 
 describe('MathResolver', () => {
   describe('Expression', () => {

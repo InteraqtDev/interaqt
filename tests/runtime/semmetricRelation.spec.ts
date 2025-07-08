@@ -1,14 +1,4 @@
 import { describe, expect, test } from "vitest";
-import {
-  BoolExp,
-  Controller,
-  Entity,
-  KlassByName,
-  MonoSystem,
-  Property,
-  Relation,
-  Count
-} from 'interaqt';
 
 describe('symmetric relation computation cycle bug', () => {
   

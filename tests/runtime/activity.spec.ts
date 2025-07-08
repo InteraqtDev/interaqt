@@ -1,8 +1,7 @@
 import { beforeEach, describe, expect, test } from "vitest";
 import {
     KlassByName, Controller, EntityIdRef, RecordMutationEvent,
-    ActivityCall, ActivityGroupNode,
-    MonoSystem,
+    ActivityCall, MonoSystem,
     RelationInstance
 } from 'interaqt';
 import { createData } from './data/activity/index.js';

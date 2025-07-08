@@ -1,8 +1,8 @@
 import { createClass, Entity, Property } from "@shared";
-import { GlobalBoundState } from "./computationHandles/Computation.js";
-import { RecordBoundState } from "./computationHandles/Computation.js";
+import { GlobalBoundState } from "./computations/Computation.js";
+import { RecordBoundState } from "./computations/Computation.js";
 import { EntityInstance, RelationInstance } from "@shared";
-import { DataContext } from "./computationHandles/ComputationHandle.js";
+import { DataContext } from "./computations/ComputationHandle.js";
 import { InteractionEvent } from "./InteractionCall.js";
 export type SystemCallback =  (...arg: any[]) => any
 export type RecordMutationCallback = (mutationEvents:RecordMutationEvent[]) => Promise<{ events?: RecordMutationEvent[] } |undefined|void>

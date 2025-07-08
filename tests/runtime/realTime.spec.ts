@@ -1,6 +1,6 @@
 import { describe, expect, test, beforeAll } from "vitest";
 import { Controller, MonoSystem, Property, Entity, RealTime, Dictionary, BoolExp, DICTIONARY_RECORD } from 'interaqt';
-import { Expression } from '../../src/runtime/computationHandles/MathResolver';
+import { Expression } from 'interaqt';
 
 describe('RealTime computed handle', () => {
   

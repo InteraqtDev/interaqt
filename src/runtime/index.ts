@@ -15,7 +15,8 @@ export {
   someAsync, 
   everyWithErrorAsync 
 } from './util.js'
-export * from './computationHandles/index.js'
+export * from './computations/index.js'
 export * from './ActivityCall.js'
 export * from './InteractionCall.js'
 export * from './ActivityManager.js'
+export * from './computations/MathResolver.js'

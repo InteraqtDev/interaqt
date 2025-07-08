@@ -14,7 +14,7 @@ import {
   ComputationResultAsync,
   ComputationResultResolved,
   Relation
-} from "@";
+} from "interaqt";
 
 // RelationScoreComputed as a standard ES6 class
 interface RelationScoreComputedInstance {

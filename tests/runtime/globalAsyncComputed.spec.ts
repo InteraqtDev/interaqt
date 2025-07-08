@@ -13,7 +13,7 @@ import {
   ComputationResult,
   Dictionary,
   DICTIONARY_RECORD
-} from "@";
+} from "interaqt";
 
 // GlobalWeatherComputed as a standard ES6 class
 interface GlobalWeatherComputedInstance {
