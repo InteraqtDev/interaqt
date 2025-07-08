@@ -15,10 +15,10 @@ import {
     InteractionInstanceType,
     DataAttributives
 } from "@shared";
-import { RecordMutationEvent, System } from "./System.js";
-import { assert, everyWithErrorAsync, someAsync } from "./util.js";
+import { RecordMutationEvent, System } from "../System.js";
+import { assert, everyWithErrorAsync, someAsync } from "../util.js";
 import { ActivityCall } from "./ActivityCall.js";
-import { Controller, InteractionContext } from "./Controller.js";
+import { Controller, InteractionContext } from "../Controller.js";
 
 export type EventQuery = {
     match?: BoolExp<EntityInstance>,

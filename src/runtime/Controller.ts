@@ -3,13 +3,12 @@ import {
     BoolExp, IInstance, EntityInstance, RelationInstance, ActivityInstance, InteractionInstance, DictionaryInstance
 } from "@shared";
 import './computations/index.js';
-import { InteractionCallResponse } from "./InteractionCall.js";
-import { InteractionEventArgs } from "./InteractionCall.js";
+import { InteractionCallResponse, InteractionEventArgs } from "./activity/InteractionCall.js";
 import { DataContext, EntityDataContext, PropertyDataContext, RelationDataContext } from "./computations/ComputationHandle.js";
 import { ComputationResult, ComputationResultSkip, ComputationResultPatch } from "./computations/Computation.js";
 import { Scheduler } from "./Scheduler.js";
 import { MatchExp } from "@storage";
-import { ActivityManager } from "./ActivityManager.js";
+import { ActivityManager } from "./activity/ActivityManager.js";
 
 export const USER_ENTITY = 'User'
 

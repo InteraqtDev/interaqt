@@ -3,7 +3,7 @@ import { GlobalBoundState } from "./computations/Computation.js";
 import { RecordBoundState } from "./computations/Computation.js";
 import { EntityInstance, RelationInstance } from "@shared";
 import { DataContext } from "./computations/ComputationHandle.js";
-import { InteractionEvent } from "./InteractionCall.js";
+import { InteractionEvent } from "./activity/InteractionCall.js";
 export type SystemCallback =  (...arg: any[]) => any
 export type RecordMutationCallback = (mutationEvents:RecordMutationEvent[]) => Promise<{ events?: RecordMutationEvent[] } |undefined|void>
 export const SYSTEM_RECORD = '_System_'

@@ -1,5 +1,5 @@
 import { ActivityInstance, InteractionInstance, IInstance } from "@shared";
-import { RecordMutationEvent, SystemLogger } from "./System.js";
+import { RecordMutationEvent, SystemLogger } from "../System.js";
 import {
     Entity, Property,
     Relation
@@ -7,10 +7,10 @@ import {
 import { ActivityCall } from "./ActivityCall.js";
 import { InteractionCall, InteractionCallResponse, InteractionEvent } from "./InteractionCall.js";
 import { InteractionEventArgs } from "./InteractionCall.js";
-import { assert } from "./util.js";
-import { asyncInteractionContext } from "./asyncInteractionContext.js";
-import { Controller, InteractionContext, RecordMutationSideEffect } from "./Controller.js";
-import { MatchExpressionData } from "../storage/index.js";
+import { assert } from "../util.js";
+import { asyncInteractionContext } from "../asyncInteractionContext.js";
+import { Controller, InteractionContext, RecordMutationSideEffect } from "../Controller.js";
+import { MatchExpressionData } from "../../storage/index.js";
 
 
 export const INTERACTION_RECORD = '_Interaction_'

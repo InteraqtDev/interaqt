@@ -9,12 +9,11 @@ import {
     InteractionInstance as InteractionInstanceType,
     TransferInstance as TransferInstanceType
 } from "@shared";
-import { assert } from "./util.js";
-import { System } from "./System.js";
-import { InteractionCall, InteractionCallResponse } from "./InteractionCall.js";
-import { EventUser, InteractionEventArgs } from "./InteractionCall.js";
+import { assert } from "../util.js";
+import { System } from "../System.js";
+import { InteractionCall, InteractionCallResponse, EventUser, InteractionEventArgs } from "./InteractionCall.js";
 import { MatchExp } from "@storage";
-import { Controller } from "./Controller.js";
+import { Controller } from "../Controller.js";
 
 
 export type Seq = {
