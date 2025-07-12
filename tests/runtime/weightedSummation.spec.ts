@@ -49,7 +49,14 @@ describe('WeightedSummation computed handle', () => {
     // 设置系统和控制器
     const system = new MonoSystem();
     system.conceptClass = KlassByName;
-    const controller = new Controller(system, entities, [], [], [], dictionary, []);
+    const controller = new Controller({
+        system: system,
+        entities: entities,
+        dict: dictionary,
+        relations: [],
+        activities: [],
+        interactions: []
+    });
     await controller.setup(true);
     
     // 初始值应为 0
@@ -143,7 +150,13 @@ describe('WeightedSummation computed handle', () => {
     // 设置系统和控制器
     const system = new MonoSystem();
     system.conceptClass = KlassByName;
-    const controller = new Controller(system, entities, relations, [], [], [], []);
+    const controller = new Controller({
+        system: system,
+        entities: entities,
+        relations: relations,
+        activities: [],
+        interactions: []
+    });
     await controller.setup(true);
     
     // 创建用户和产品
@@ -207,7 +220,14 @@ describe('WeightedSummation computed handle', () => {
     // 设置系统和控制器
     const system = new MonoSystem();
     system.conceptClass = KlassByName;
-    const controller = new Controller(system, entities, [], [], [], dictionary, []);
+    const controller = new Controller({
+        system: system,
+        entities: entities,
+        dict: dictionary,
+        relations: [],
+        activities: [],
+        interactions: []
+    });
     await controller.setup(true);
     
     // 创建价格为0的产品
@@ -258,7 +278,14 @@ describe('WeightedSummation computed handle', () => {
     // 设置系统和控制器
     const system = new MonoSystem();
     system.conceptClass = KlassByName;
-    const controller = new Controller(system, entities, [], [], [], dictionary, []);
+    const controller = new Controller({
+        system: system,
+        entities: entities,
+        dict: dictionary,
+        relations: [],
+        activities: [],
+        interactions: []
+    });
     await controller.setup(true);
     
     // 创建账户

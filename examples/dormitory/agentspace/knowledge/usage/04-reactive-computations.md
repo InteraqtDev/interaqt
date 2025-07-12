@@ -15,7 +15,23 @@ const UserCreationTransform = Transform.create({...})
 const computations = [UserCreationTransform, ...]
 
 // Wrong: Passing to Controller
-const controller = new Controller(system, entities, relations, [], interactions, computations, [])
+const controller = new Controller({
+
+  system: system,
+
+  entities: entities,
+
+  relations: relations,
+
+  activities: [],
+
+  interactions: interactions,
+
+  dict: computations,
+
+  recordMutationSideEffects: []
+
+});
 ```
 
 ✅ **CORRECT**: Using computations in the computation field

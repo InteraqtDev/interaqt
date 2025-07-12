@@ -1,3 +1,0 @@
-接下来完善 Entity 组件的显示效果，你来依次完成洗面的任务。完成一个就标记完成，然后等待我的反馈。
-1. [x] Interaction 的 Entity/Relation/Property 这三个概念都已一个 computation 属性，是用来表达当前的数据"是什么"的。我们需要把这个信息展示出来。你阅读 `examples/cms/agentspace/knowledge` 下的文档，先了解 computation 的具体数据结构。然后在 Entity 组件上，在有 computation 属性的 Entity 卡片名称后面，增加显示使用的 computation 的名字。在computation 属性的 Property 名称后面，增加显示使用的 computation 的名字。
-2. [x] 在 Entity 卡片的名字下面展示出所有基于当前 Entity 生成的 Filtered Entity 类型名称。

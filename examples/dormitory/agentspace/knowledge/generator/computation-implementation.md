@@ -9,7 +9,21 @@ Computations are the reactive core of interaqt, connecting interactions to entit
 ```typescript
 // ❌ WRONG: Declaring computations separately
 const UserCreationTransform = Transform.create({...})
-const controller = new Controller(system, entities, relations, [], interactions, computations)
+const controller = new Controller({
+
+  system: system,
+
+  entities: entities,
+
+  relations: relations,
+
+  activities: [],
+
+  interactions: interactions,
+
+  dict: computations
+
+});
 
 // ✅ CORRECT: Using in computation field
 Property.create({

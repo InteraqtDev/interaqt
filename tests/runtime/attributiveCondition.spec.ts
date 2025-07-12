@@ -52,14 +52,13 @@ describe('attributive and condition checks', () => {
                 userAttributives: isAdmin
             })
 
-            controller = new Controller(
-                system,
-                [User],
-                [],
-                [],
-                [DeletePost],
-                []
-            )
+            controller = new Controller({
+                system: system,
+                entities: [User],
+                relations: [],
+                activities: [],
+                interactions: [DeletePost]
+            })
             await controller.setup(true)
 
             // Create test users
@@ -115,14 +114,13 @@ describe('attributive and condition checks', () => {
                 )
             })
 
-            controller = new Controller(
-                system,
-                [User],
-                [],
-                [],
-                [ModerateContent],
-                []
-            )
+            controller = new Controller({
+                system: system,
+                entities: [User],
+                relations: [],
+                activities: [],
+                interactions: [ModerateContent]
+            })
             await controller.setup(true)
 
             // Create test users
@@ -193,14 +191,13 @@ describe('attributive and condition checks', () => {
                 })
             })
 
-            controller = new Controller(
-                system,
-                [User, Post],
-                [],
-                [],
-                [SharePost],
-                []
-            )
+            controller = new Controller({
+                system: system,
+                entities: [User, Post],
+                relations: [],
+                activities: [],
+                interactions: [SharePost]
+            })
             await controller.setup(true)
 
             // Create test data
@@ -279,14 +276,13 @@ describe('attributive and condition checks', () => {
                 })
             })
 
-            controller = new Controller(
-                system,
-                [User, Tag],
-                [],
-                [],
-                [CreatePost],
-                []
-            )
+            controller = new Controller({
+                system: system,
+                entities: [User, Tag],
+                relations: [],
+                activities: [],
+                interactions: [CreatePost]
+            })
             await controller.setup(true)
 
             // Create test data
@@ -364,14 +360,13 @@ describe('attributive and condition checks', () => {
                 conditions: hasEnoughCredits
             })
 
-            controller = new Controller(
-                system,
-                [User, Post],
-                [],
-                [],
-                [ViewPost],
-                []
-            )
+            controller = new Controller({
+                system: system,
+                entities: [User, Post],
+                relations: [],
+                activities: [],
+                interactions: [ViewPost]
+            })
             await controller.setup(true)
 
             // Create test data
@@ -460,14 +455,13 @@ describe('attributive and condition checks', () => {
                 )
             })
 
-            controller = new Controller(
-                system,
-                [User, System],
-                [],
-                [],
-                [PublishContent],
-                []
-            )
+            controller = new Controller({
+                system: system,
+                entities: [User, System],
+                relations: [],
+                activities: [],
+                interactions: [PublishContent]
+            })
             await controller.setup(true)
 
             // Create system state
@@ -523,14 +517,13 @@ describe('attributive and condition checks', () => {
                 userAttributives: buggyAttributive
             })
 
-            controller = new Controller(
-                system,
-                [User],
-                [],
-                [],
-                [BuggyInteraction],
-                []
-            )
+            controller = new Controller({
+                system: system,
+                entities: [User],
+                relations: [],
+                activities: [],
+                interactions: [BuggyInteraction]
+            })
             await controller.setup(true)
 
             const user = await system.storage.create('User', { name: 'TestUser' })
@@ -566,14 +559,13 @@ describe('attributive and condition checks', () => {
                 userAttributives: incompleteAttributive
             })
 
-            controller = new Controller(
-                system,
-                [User],
-                [],
-                [],
-                [IncompleteInteraction],
-                []
-            )
+            controller = new Controller({
+                system: system,
+                entities: [User],
+                relations: [],
+                activities: [],
+                interactions: [IncompleteInteraction]
+            })
             await controller.setup(true)
 
             const user = await system.storage.create('User', { name: 'TestUser' })

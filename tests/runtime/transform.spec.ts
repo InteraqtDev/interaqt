@@ -51,7 +51,13 @@ describe('Transform computed handle', () => {
     // Setup system and controller
     const system = new MonoSystem();
     system.conceptClass = KlassByName;
-    const controller = new Controller(system, entities, [], [], [], [], []);
+    const controller = new Controller({
+        system: system,
+        entities: entities,
+        relations: [],
+        activities: [],
+        interactions: []
+    });
     await controller.setup(true);
     
     // Initial transformation should return empty array
@@ -147,7 +153,13 @@ describe('Transform computed handle', () => {
     // Setup system and controller
     const system = new MonoSystem();
     system.conceptClass = KlassByName;
-    const controller = new Controller(system, entities, relations, [], [], [], []);
+    const controller = new Controller({
+        system: system,
+        entities: entities,
+        relations: relations,
+        activities: [],
+        interactions: []
+    });
     await controller.setup(true);
     
     // Create user

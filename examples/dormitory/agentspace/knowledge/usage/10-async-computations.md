@@ -147,15 +147,15 @@ const weatherDictionary = Dictionary.create({
 });
 
 // Register in system
-const controller = new Controller(
-  system, 
-  entities, 
-  relations, 
-  [], 
-  [], 
-  [weatherDictionary], // Dictionary array
-  []
-);
+const controller = new Controller({
+  system: system,
+  entities: entities,
+  relations: relations,
+  activities: [],
+  interactions: [],
+  dict: [weatherDictionary],, // Dictionary array
+  recordMutationSideEffects: []
+});
 ```
 
 ### Handling Async Tasks

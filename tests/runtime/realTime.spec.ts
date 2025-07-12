@@ -37,7 +37,14 @@ describe('RealTime computed handle', () => {
     
     const entities = [configEntity];
     const system = new MonoSystem();
-    const controller = new Controller(system, entities, [], [], [], dictionary, []);
+    const controller = new Controller({
+        system: system,
+        entities: entities,
+        dict: dictionary,
+        relations: [],
+        activities: [],
+        interactions: []
+    });
     await controller.setup(true);
     
     // Create a config record to trigger the computation
@@ -109,7 +116,14 @@ describe('RealTime computed handle', () => {
     
     const entities = [configEntity];
     const system = new MonoSystem();
-    const controller = new Controller(system, entities, [], [], [], dictionary, []);
+    const controller = new Controller({
+        system: system,
+        entities: entities,
+        dict: dictionary,
+        relations: [],
+        activities: [],
+        interactions: []
+    });
     await controller.setup(true);
     
     // Create a config record to trigger the computation
@@ -179,7 +193,14 @@ describe('RealTime computed handle', () => {
     
     const entities = [configEntity];
     const system = new MonoSystem();
-    const controller = new Controller(system, entities, [], [], [], dictionary, []);
+    const controller = new Controller({
+        system: system,
+        entities: entities,
+        dict: dictionary,
+        relations: [],
+        activities: [],
+        interactions: []
+    });
     await controller.setup(true);
     
     // Create a config record to trigger the computation
@@ -245,7 +266,13 @@ describe('RealTime computed handle', () => {
     
     const entities = [userEntity];
     const system = new MonoSystem();
-    const controller = new Controller(system, entities, [], [], [], [], []);
+    const controller = new Controller({
+        system: system,
+        entities: entities,
+        relations: [],
+        activities: [],
+        interactions: []
+    });
     await controller.setup(true);
     
     // Create a user with triggerField to trigger the computation
@@ -329,7 +356,14 @@ describe('RealTime computed handle', () => {
     
     const entities = [configEntity];
     const system = new MonoSystem();
-    const controller = new Controller(system, entities, [], [], [], dictionary, []);
+    const controller = new Controller({
+        system: system,
+        entities: entities,
+        dict: dictionary,
+        relations: [],
+        activities: [],
+        interactions: []
+    });
     await controller.setup(true);
     
     // Create a config record to trigger the computation
@@ -402,7 +436,14 @@ describe('RealTime computed handle', () => {
     
     const entities = [configEntity];
     const system = new MonoSystem();
-    const controller = new Controller(system, entities, [], [], [], dictionary, []);
+    const controller = new Controller({
+        system: system,
+        entities: entities,
+        dict: dictionary,
+        relations: [],
+        activities: [],
+        interactions: []
+    });
     await controller.setup(true);
     
     // Create a config with multiplier to trigger the computation
@@ -482,7 +523,14 @@ describe('RealTime computed handle', () => {
     
     const entities = [configEntity];
     const system = new MonoSystem();
-    const controller = new Controller(system, entities, [], [], [], dictionary, []);
+    const controller = new Controller({
+        system: system,
+        entities: entities,
+        dict: dictionary,
+        relations: [],
+        activities: [],
+        interactions: []
+    });
     await controller.setup(true);
     
     // Create a config record to trigger the computation
@@ -554,7 +602,13 @@ describe('RealTime computed handle', () => {
     
     const entities = [userEntity];
     const system = new MonoSystem();
-    const controller = new Controller(system, entities, [], [], [], [], []);
+    const controller = new Controller({
+        system: system,
+        entities: entities,
+        relations: [],
+        activities: [],
+        interactions: []
+    });
     await controller.setup(true);
     
     // Create users with different login times to trigger the computation
@@ -651,7 +705,14 @@ describe('RealTime computed handle', () => {
     
     const entities = [configEntity];
     const system = new MonoSystem();
-    const controller = new Controller(system, entities, [], [], [], dictionary, []);
+    const controller = new Controller({
+        system: system,
+        entities: entities,
+        dict: dictionary,
+        relations: [],
+        activities: [],
+        interactions: []
+    });
     await controller.setup(true);
     
     // Get the computation instance to verify state is being managed

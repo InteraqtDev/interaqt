@@ -28,7 +28,14 @@ describe('Every and Any computed handle', () => {
         })
     ]
     const system = new MonoSystem()
-    const controller = new Controller(system,entities,[],[],[],dictionary,[])
+    const controller = new Controller({
+        system: system,
+        entities: entities,
+        relations: [],
+        activities: [],
+        interactions: [],
+        dict: dictionary
+    })
     await controller.setup(true)
 
 
@@ -90,7 +97,14 @@ describe('Every and Any computed handle', () => {
         })
     ]
     const system = new MonoSystem()
-    const controller = new Controller(system,entities,[],[],[],dictionary,[])
+    const controller = new Controller({
+        system: system,
+        entities: entities,
+        relations: [],
+        activities: [],
+        interactions: [],
+        dict: dictionary
+    })
     await controller.setup(true)
     // 获取 dictionary 的值
     const anyRequestHandled0 = await system.storage.get(DICTIONARY_RECORD,'anyRequestHandled')
@@ -166,7 +180,13 @@ describe('Every and Any computed handle', () => {
     }))
 
     const system = new MonoSystem()
-    const controller = new Controller(system,entities,relations,[],[],[],[])
+    const controller = new Controller({
+        system: system,
+        entities: entities,
+        relations: relations,
+        activities: [],
+        interactions: []
+    })
     await controller.setup(true)
 
     // 创建 1 个 user 和 2 个 request
@@ -252,7 +272,13 @@ describe('Every and Any computed handle', () => {
     }))
 
     const system = new MonoSystem() 
-    const controller = new Controller(system,entities,relations,[],[],[],[])
+    const controller = new Controller({
+        system: system,
+        entities: entities,
+        relations: relations,
+        activities: [],
+        interactions: []
+    })
     await controller.setup(true)
 
     // 创建 1 个 user 和 2 个 request
@@ -353,7 +379,13 @@ describe('Every and Any computed handle', () => {
     }))
 
     const system = new MonoSystem() 
-    const controller = new Controller(system,entities,relations,[],[],[],[])
+    const controller = new Controller({
+        system: system,
+        entities: entities,
+        relations: relations,
+        activities: [],
+        interactions: []
+    })
     await controller.setup(true)
 
     // 创建 1 个 user 和 2 个 request
@@ -418,7 +450,14 @@ describe('Every and Any computed handle', () => {
 
     const entities = [userEntity]
     const system = new MonoSystem()
-    const controller = new Controller(system,entities,[],[],[],[ageLimit, ageLimitComputed],[])
+    const controller = new Controller({
+        system: system,
+        entities: entities,
+        relations: [],
+        activities: [],
+        interactions: [],
+        dict: [ageLimit, ageLimitComputed]
+    })
     await controller.setup(true)
 
     // set ageLimit to 19
@@ -480,7 +519,14 @@ describe('Every and Any computed handle', () => {
 
     const entities = [userEntity]
     const system = new MonoSystem()
-    const controller = new Controller(system,entities,[],[],[],[ageLimit, ageLimitComputed],[])
+    const controller = new Controller({
+        system: system,
+        entities: entities,
+        relations: [],
+        activities: [],
+        interactions: [],
+        dict: [ageLimit, ageLimitComputed]
+    })
     await controller.setup(true)
 
     // set ageLimit to 19   

@@ -158,7 +158,14 @@ describe('Global data dependency', () => {
     ];
     
     const system = new MonoSystem(new PGLiteDB());
-    const controller = new Controller(system, entities, [], [], [], dictionary, []);
+    const controller = new Controller({
+        system: system,
+        entities: entities,
+        dict: dictionary,
+        relations: [],
+        activities: [],
+        interactions: []
+    });
     await controller.setup(true);
     
     // 设置初始全局值
@@ -335,7 +342,14 @@ describe('Global data dependency', () => {
     ];
     
     const system = new MonoSystem(new PGLiteDB());
-    const controller = new Controller(system, entities, [], [], [], dictionary, []);
+    const controller = new Controller({
+        system: system,
+        entities: entities,
+        dict: dictionary,
+        relations: [],
+        activities: [],
+        interactions: []
+    });
     await controller.setup(true);
     
     // 设置初始全局值

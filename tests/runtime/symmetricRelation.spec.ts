@@ -54,7 +54,13 @@ describe('Symmetric relation computation', () => {
     // Setup system and controller
     const system = new MonoSystem();
     system.conceptClass = KlassByName;
-    const controller = new Controller(system, entities, relations, [], [], [], []);
+    const controller = new Controller({
+        system: system,
+        entities: entities,
+        relations: relations,
+        activities: [],
+        interactions: []
+    });
     await controller.setup(true);
     
     // Create just two users
@@ -136,7 +142,13 @@ describe('Symmetric relation computation', () => {
     // Setup system and controller
     const system = new MonoSystem();
     system.conceptClass = KlassByName;
-    const controller = new Controller(system, entities, relations, [], [], [], []);
+    const controller = new Controller({
+        system: system,
+        entities: entities,
+        relations: relations,
+        activities: [],
+        interactions: []
+    });
     await controller.setup(true);
     
     // Create users
@@ -232,7 +244,13 @@ describe('Symmetric relation computation', () => {
     // Setup system and controller
     const system = new MonoSystem();
     system.conceptClass = KlassByName;
-    const controller = new Controller(system, entities, relations, [], [], [], []);
+    const controller = new Controller({
+        system: system,
+        entities: entities,
+        relations: relations,
+        activities: [],
+        interactions: []
+    });
     await controller.setup(true);
     
     // Create users

@@ -43,7 +43,14 @@ describe('Average computed handle', () => {
     // Setup system and controller
     const system = new MonoSystem();
     system.conceptClass = KlassByName;
-    const controller = new Controller(system, entities, [], [], [], dictionary, []);
+    const controller = new Controller({
+        system: system,
+        entities: entities,
+        dict: dictionary,
+        relations: [],
+        activities: [],
+        interactions: []
+    });
     await controller.setup(true);
     
     // Initially, the average should be 0 (no records)
@@ -111,7 +118,14 @@ describe('Average computed handle', () => {
     // Setup system and controller
     const system = new MonoSystem();
     system.conceptClass = KlassByName;
-    const controller = new Controller(system, entities, [], [], [], dictionary, []);
+    const controller = new Controller({
+        system: system,
+        entities: entities,
+        dict: dictionary,
+        relations: [],
+        activities: [],
+        interactions: []
+    });
     await controller.setup(true);
     
     // Add valid values
@@ -154,7 +168,14 @@ describe('Average computed handle', () => {
     // Setup system and controller
     const system = new MonoSystem();
     system.conceptClass = KlassByName;
-    const controller = new Controller(system, entities, [], [], [], dictionary, []);
+    const controller = new Controller({
+        system: system,
+        entities: entities,
+        dict: dictionary,
+        relations: [],
+        activities: [],
+        interactions: []
+    });
     await controller.setup(true);
     
     // Initially empty, average should be 0
@@ -200,7 +221,14 @@ describe('Average computed handle', () => {
     // Setup system and controller
     const system = new MonoSystem();
     system.conceptClass = KlassByName;
-    const controller = new Controller(system, entities, [], [], [], dictionary, []);
+    const controller = new Controller({
+        system: system,
+        entities: entities,
+        dict: dictionary,
+        relations: [],
+        activities: [],
+        interactions: []
+    });
     await controller.setup(true);
     
     // Create employees with different departments
@@ -285,7 +313,13 @@ describe('Average computed handle', () => {
     // Setup system and controller
     const system = new MonoSystem();
     system.conceptClass = KlassByName;
-    const controller = new Controller(system, entities, relations, [], [], [], []);
+    const controller = new Controller({
+        system: system,
+        entities: entities,
+        relations: relations,
+        activities: [],
+        interactions: []
+    });
     await controller.setup(true);
     
     // Create students
@@ -388,7 +422,14 @@ describe('Average computed handle', () => {
     // Setup system and controller
     const system = new MonoSystem();
     system.conceptClass = KlassByName;
-    const controller = new Controller(system, entities, [], [], [], dictionary, []);
+    const controller = new Controller({
+        system: system,
+        entities: entities,
+        dict: dictionary,
+        relations: [],
+        activities: [],
+        interactions: []
+    });
     await controller.setup(true);
     
     // Create measurements

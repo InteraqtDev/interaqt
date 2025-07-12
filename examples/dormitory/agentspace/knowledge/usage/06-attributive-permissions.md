@@ -690,15 +690,14 @@ describe('Attributive Permission Tests', () => {
     system = new MonoSystem(new PGLiteDB());
     system.conceptClass = KlassByName;
     
-    controller = new Controller(
+    controller = new Controller({
       system,
       entities,
       relations,
       activities,
       interactions,
-      [],
-      []
-    );
+      dict: []
+    });
     
     await controller.setup(true);
   });

@@ -40,14 +40,13 @@ describe('map interaction', () => {
         system = new MonoSystem(db)
         system.conceptClass = KlassByName
 
-        controller = new Controller(
+        controller = new Controller({
             system,
             entities,
             relations,
-            [],
-            interactions,
-            []
-        )
+            activities: [],
+            interactions
+        })
         await controller.setup(true)
         sendRequestName = 'sendRequest'
         approveRequestName = 'approve'

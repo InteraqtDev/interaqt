@@ -43,7 +43,14 @@ describe('Sum computed handle', () => {
     // Setup system and controller
     const system = new MonoSystem();
     system.conceptClass = KlassByName;
-    const controller = new Controller(system, entities, [], [], [], dictionary, []);
+    const controller = new Controller({
+        system: system,
+        entities: entities,
+        dict: dictionary,
+        relations: [],
+        activities: [],
+        interactions: []
+    });
     await controller.setup(true);
     
     // Initially, the sum should be 0
@@ -111,7 +118,14 @@ describe('Sum computed handle', () => {
     // Setup system and controller
     const system = new MonoSystem();
     system.conceptClass = KlassByName;
-    const controller = new Controller(system, entities, [], [], [], dictionary, []);
+    const controller = new Controller({
+        system: system,
+        entities: entities,
+        dict: dictionary,
+        relations: [],
+        activities: [],
+        interactions: []
+    });
     await controller.setup(true);
     
     // Add valid scores
@@ -152,7 +166,14 @@ describe('Sum computed handle', () => {
     // Setup system and controller
     const system = new MonoSystem();
     system.conceptClass = KlassByName;
-    const controller = new Controller(system, entities, [], [], [], dictionary, []);
+    const controller = new Controller({
+        system: system,
+        entities: entities,
+        dict: dictionary,
+        relations: [],
+        activities: [],
+        interactions: []
+    });
     await controller.setup(true);
     
     // Initially empty, sum should be 0
@@ -186,7 +207,14 @@ describe('Sum computed handle', () => {
     // Setup system and controller
     const system = new MonoSystem();
     system.conceptClass = KlassByName;
-    const controller = new Controller(system, entities, [], [], [], dictionary, []);
+    const controller = new Controller({
+        system: system,
+        entities: entities,
+        dict: dictionary,
+        relations: [],
+        activities: [],
+        interactions: []
+    });
     await controller.setup(true);
     
     // Create records with and without values
@@ -226,7 +254,14 @@ describe('Sum computed handle', () => {
     // Setup system and controller
     const system = new MonoSystem();
     system.conceptClass = KlassByName;
-    const controller = new Controller(system, entities, [], [], [], dictionary, []);
+    const controller = new Controller({
+        system: system,
+        entities: entities,
+        dict: dictionary,
+        relations: [],
+        activities: [],
+        interactions: []
+    });
     await controller.setup(true);
     
     // Create accounts
@@ -291,7 +326,14 @@ describe('Sum computed handle', () => {
     // Setup system and controller
     const system = new MonoSystem();
     system.conceptClass = KlassByName;
-    const controller = new Controller(system, entities, [], [], [], dictionary, []);
+    const controller = new Controller({
+        system: system,
+        entities: entities,
+        dict: dictionary,
+        relations: [],
+        activities: [],
+        interactions: []
+    });
     await controller.setup(true);
     
     // Create orders with different statuses
@@ -371,7 +413,13 @@ describe('Sum computed handle', () => {
     // Setup system and controller
     const system = new MonoSystem();
     system.conceptClass = KlassByName;
-    const controller = new Controller(system, entities, relations, [], [], [], []);
+    const controller = new Controller({
+        system: system,
+        entities: entities,
+        relations: relations,
+        activities: [],
+        interactions: []
+    });
     await controller.setup(true);
     
     // Create customers

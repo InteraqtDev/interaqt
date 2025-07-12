@@ -798,15 +798,15 @@ const activeUsers = Dictionary.create({
 Dictionaries are passed as the 6th parameter to Controller:
 
 ```typescript
-const controller = new Controller(
-    system,
-    entities,
-    relations,
-    activities,
-    interactions,
-    [userCountDict, systemConfig, currentTime, activeUsers], // Dictionaries
-    []
-);
+const controller = new Controller({
+  system: system,
+  entities: entities,
+  relations: relations,
+  activities: activities,
+  interactions: interactions,
+  dict: [userCountDict, systemConfig, currentTime, activeUsers],, // Dictionaries
+  recordMutationSideEffects: []
+});
 ```
 
 ### StateNode.create()
@@ -1187,7 +1187,7 @@ System controller that coordinates the work of various components.
 
 **Constructor**
 ```typescript
-new Controller(
+new Controller({
     system: System,
     entities: KlassInstance<typeof Entity>[],
     relations: KlassInstance<typeof Relation>[],
@@ -1195,7 +1195,7 @@ new Controller(
     interactions: KlassInstance<typeof Interaction>[],
     dict?: KlassInstance<typeof Property>[],  // Note: This is for global dictionaries, NOT computations
     recordMutationSideEffects?: RecordMutationSideEffect[]
-)
+})
 ```
 
 ⚠️ **IMPORTANT**: Controller does NOT accept a computations parameter. All computations should be defined within the `computation` field of Entity/Relation/Property definitions. The 6th parameter `dict` is for global dictionary definitions (Dictionary.create), not for computation definitions.
@@ -1586,13 +1586,13 @@ const LikePostInteraction = Interaction.create({
 })
 
 // 4. Create controller and initialize system
-const controller = new Controller(
+const controller = new Controller({
     system, // System implementation
-    [User, Post], // Entities
-    [UserPostRelation, PostLikeRelation], // Relations
-    [], // Activities
-    [CreatePostInteraction, LikePostInteraction] // Interactions
-)
+    entities: [User, Post], // Entities
+    relations: [UserPostRelation, PostLikeRelation], // Relations
+    activities: [], // Activities
+    interactions: [CreatePostInteraction, LikePostInteraction] // Interactions
+})
 
 await controller.setup(true)
 

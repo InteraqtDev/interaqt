@@ -278,15 +278,15 @@ UserEntity.properties.push(
 
 ```typescript
 const system = new MonoSystem();
-const controller = new Controller(
+const controller = new Controller({
   system,
-  [UserEntity], // 实体列表
-  [friendRelation], // 关系列表
-  [], // 活动列表
-  [addFriendInteraction], // 交互列表
-  [], // 字典列表
-  [] // 状态列表
-);
+  entities: [UserEntity], // 实体列表
+  relations: [friendRelation], // 关系列表
+  activities: [], // 活动列表
+  interactions: [addFriendInteraction], // 交互列表
+  dict: [], // 字典列表
+  recordMutationSideEffects: [] // 状态列表
+});
 
 await controller.setup(true);
 ```

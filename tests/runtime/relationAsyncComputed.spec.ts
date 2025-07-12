@@ -189,7 +189,13 @@ describe('Relation async computed', () => {
     
     // 设置系统和控制器
     const system = new MonoSystem(new PGLiteDB());
-    const controller = new Controller(system, entities, relations, [], [], [], []);
+    const controller = new Controller({
+        system: system,
+        entities: entities,
+        relations: relations,
+        activities: [],
+        interactions: []
+    });
     await controller.setup(true);
     
     // 获取关系计算实例

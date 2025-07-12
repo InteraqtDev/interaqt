@@ -223,15 +223,15 @@ const activeUsers = Dictionary.create({
 });
 
 // Usage example
-const controller = new Controller(
+const controller = new Controller({
   system,
-  [userEntity],           // Entities
-  [],                     // Relations
-  [],                     // Activities (第四个参数)
-  [],                     // Interactions (第五个参数)
-  [totalUsers, activeUsers], // Dictionaries
-  []                      // recordMutationSideEffects
-);
+  entities: [userEntity],           // Entities
+  relations: [],                    // Relations
+  activities: [],                   // Activities
+  interactions: [],                 // Interactions
+  dict: [totalUsers, activeUsers],  // Dictionaries
+  recordMutationSideEffects: []     // recordMutationSideEffects
+});
 
 await controller.setup(true);
 

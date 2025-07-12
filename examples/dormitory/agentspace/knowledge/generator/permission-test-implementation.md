@@ -126,15 +126,14 @@ describe('Role-based permissions', () => {
   beforeEach(async () => {
     // Setup system with interactions that have attributives
     system = new MonoSystem(new PGLiteDB())
-    controller = new Controller(
+    controller = new Controller({
       system,
       entities,
       relations,
-      [],
-      [DeleteStyle, UpdateStyle, CreateStyle], // Interactions with attributives
-      [],
-      []
-    )
+      activities: [],
+      interactions: [DeleteStyle, UpdateStyle, CreateStyle], // Interactions with attributives
+      dict: []
+    })
     await controller.setup(true)
 
     // Create users with different roles

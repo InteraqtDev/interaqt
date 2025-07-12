@@ -164,7 +164,13 @@ describe('Entity async computed', () => {
     
     // 设置系统和控制器
     const system = new MonoSystem(new PGLiteDB());
-    const controller = new Controller(system, entities, relations, [], [], [], []);
+    const controller = new Controller({
+        system: system,
+        entities: entities,
+        relations: relations,
+        activities: [],
+        interactions: []
+    });
     await controller.setup(true);
     
     // 获取实体计算实例

@@ -274,7 +274,14 @@ describe('Global async computed', () => {
     ];
     
     const system = new MonoSystem(new PGLiteDB());
-    const controller = new Controller(system, entities, [], [], [], dictionary, []);
+    const controller = new Controller({
+        system: system,
+        entities: entities,
+        dict: dictionary,
+        relations: [],
+        activities: [],
+        interactions: []
+    });
     await controller.setup(true);
     
     // 获取统计计算的异步任务

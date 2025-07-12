@@ -13,7 +13,13 @@ describe('StateMachineRunner', () => {
         const withdrawInteraction = interactions.withdrawInteraction
         
         const system = new MonoSystem();
-        const controller = new Controller(system, entities, [], [], Object.values(interactions), [], []);
+        const controller = new Controller({
+            system: system,
+            entities: entities,
+            relations: [],
+            activities: [],
+            interactions: Object.values(interactions)
+        });
         await controller.setup(true);
         const user1 = await controller.system.storage.create('User', {
             name: 'user1',
@@ -90,7 +96,14 @@ describe('StateMachineRunner', () => {
         const disableInteraction = interactions.disableInteraction
 
         const system = new MonoSystem();
-        const controller = new Controller(system, entities, [], [], Object.values(interactions), dicts, []);
+        const controller = new Controller({
+            system: system,
+            entities: entities,
+            relations: [],
+            activities: [],
+            interactions: Object.values(interactions),
+            dict: dicts
+        });
         await controller.setup(true);
 
         const user1 = await controller.system.storage.create('User', {
@@ -120,7 +133,13 @@ describe('StateMachineRunner', () => {
         const transferReviewersInteraction = interactions.transferReviewersInteraction
         
         const system = new MonoSystem();
-        const controller = new Controller(system, entities, relations, [], Object.values(interactions), [], []);
+        const controller = new Controller({
+            system: system,
+            entities: entities,
+            relations: relations,
+            activities: [],
+            interactions: Object.values(interactions)
+        });
         await controller.setup(true);
 
         const user1 = await controller.system.storage.create('User', {
@@ -301,15 +320,13 @@ describe('StateMachineRunner', () => {
 
         // 设置测试环境
         const system = new MonoSystem()
-        const controller = new Controller(
-            system, 
-            [User, Counter], 
-            [], 
-            [], 
-            [IncrementInteraction, ResetInteraction], 
-            [], 
-            []
-        )
+        const controller = new Controller({
+            system: system,
+            entities: [User, Counter],
+            relations: [],
+            activities: [],
+            interactions: [IncrementInteraction, ResetInteraction]
+        })
         await controller.setup(true)
 
         // 创建用户和计数器
@@ -414,15 +431,13 @@ describe('StateMachineRunner', () => {
 
         // 设置测试环境
         const system = new MonoSystem()
-        const controller = new Controller(
-            system, 
-            [TimeLogger], 
-            [], 
-            [], 
-            [LogTimeInteraction], 
-            [], 
-            []
-        )
+        const controller = new Controller({
+            system: system,
+            entities: [TimeLogger],
+            relations: [],
+            activities: [],
+            interactions: [LogTimeInteraction]
+        })
         await controller.setup(true)
 
         // 创建 TimeLogger 实例

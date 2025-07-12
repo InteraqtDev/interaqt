@@ -121,7 +121,13 @@ describe('async computed', () => {
         })
 
         const system = new MonoSystem(new PGLiteDB())
-        const controller = new Controller(system, [URLEntity], [], [], [], [], [])
+        const controller = new Controller({
+            system: system,
+            entities: [URLEntity],
+            relations: [],
+            activities: [],
+            interactions: []
+        })
         await controller.setup(true)
         const crawlerComputation = Array.from(controller.scheduler.computations.values()).find(
             computation => computation.dataContext.type === 'property' && computation.dataContext.host === URLEntity && computation.dataContext.id.name === 'content'

@@ -1,5 +1,0 @@
-export const entities = []
-export const relations = []
-export const interactions = []
-export const activities = []
-export const dicts = []

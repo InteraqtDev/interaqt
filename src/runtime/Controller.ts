@@ -43,6 +43,16 @@ export type InteractionContext = {
 
 export type ComputationType = 'global' | 'entity' | 'relation' | 'property'
 
+export interface ControllerOptions {
+    system: System
+    entities?: EntityInstance[]
+    relations?: RelationInstance[]
+    activities?: ActivityInstance[]
+    interactions?: InteractionInstance[]
+    dict?: DictionaryInstance[]
+    recordMutationSideEffects?: RecordMutationSideEffect[]
+}
+
 export class Controller {
     // 因为很多 function 都会bind controller 作为 this，所以我们也把 controller 的 globals 作为注入全局工具的入口。
     public recordNameToSideEffects = new Map<string, Set<IInstance | RecordMutationSideEffect>>()
@@ -52,21 +62,27 @@ export class Controller {
     }
     public scheduler: Scheduler
     public activityManager: ActivityManager
+    public system: System
     public entities: EntityInstance[]
     public relations: RelationInstance[]
     public activities: ActivityInstance[]
     public interactions: InteractionInstance[]
     public dict: DictionaryInstance[] = []
     public recordMutationSideEffects: RecordMutationSideEffect[] = []
-    constructor(
-        public system: System,
-        entities: EntityInstance[],
-        relations: RelationInstance[],
-        activities: ActivityInstance[],
-        interactions: InteractionInstance[],
-        dict: DictionaryInstance[] = [],
-        recordMutationSideEffects: RecordMutationSideEffect[] = []
-    ) {
+    constructor(options: ControllerOptions) {
+        const {
+            system,
+            entities = [],
+            relations = [],
+            activities = [],
+            interactions = [],
+            dict = [],
+            recordMutationSideEffects = []
+        } = options
+        
+        // 首先初始化 system
+        this.system = system
+        
         // 因为我们会对 entities 数组进行补充。如果外部复用了传入的数组对象，就会发生混乱，例如在测试用例中复用。
         this.entities = [...entities]
         this.relations = [...relations]
@@ -74,8 +90,6 @@ export class Controller {
         this.interactions = [...interactions]
         this.dict = [...dict]
         this.recordMutationSideEffects = [...recordMutationSideEffects]
-        // CAUTION 因为 public 里面的会在 constructor 后面才初始化，所以ActivityCall 里面读不到 this.system
-        this.system = system
 
         // Initialize ActivityManager
         this.activityManager = new ActivityManager(this, activities, interactions)

@@ -144,15 +144,23 @@ import {
 
 const system = new MonoSystem(new PGLiteDB());
 system.conceptClass = KlassByName;
-const controller = new Controller(
-  system,
-  entities,
-  relations,
-  activities,
-  interactions,
-  dictionaries,
-  []
-);
+const controller = new Controller({
+
+  system: system,
+
+  entities: entities,
+
+  relations: relations,
+
+  activities: activities,
+
+  interactions: interactions,
+
+  dict: dictionaries,
+
+  recordMutationSideEffects: []
+
+});
 ```
 
 ## Important Notes

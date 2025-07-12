@@ -41,15 +41,14 @@ describe("activity state", () => {
 
 
 
-        controller = new Controller(
+        controller = new Controller({
             system,
             entities,
             relations,
             activities,
             interactions,
-            dicts,
-            []
-        )
+            dict: dicts
+        })
         await controller.setup(true)
 
         // CAUTION 这里 controller 没什么用，只是作为 globals 注入的点。interaction  的各种 check 里面需要 controller 的 globals。

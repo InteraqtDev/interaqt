@@ -49,15 +49,15 @@ describe('Feature Tests', () => {
     // Create fresh system for each test
     system = new MonoSystem(new PGLiteDB())
     
-    controller = new Controller(
+    controller = new Controller({
       system,
       entities,
       relations,
-      [],           // activities (4th parameter)
-      interactions, // interactions (5th parameter)
-      [],           // global dictionaries (6th parameter)
-      []            // side effects (7th parameter)
-    )
+      activities: [],           // activities
+      interactions,             // interactions
+      dict: [],                 // global dictionaries
+      recordMutationSideEffects: []  // side effects
+    })
 
     await controller.setup(true)
   })

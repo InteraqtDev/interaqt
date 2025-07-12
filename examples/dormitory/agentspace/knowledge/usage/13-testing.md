@@ -46,15 +46,15 @@ describe('Feature Tests', () => {
     // - User + Post → UserPost
     // - Post + Comment → PostComment
     
-    controller = new Controller(
+    controller = new Controller({
       system,
       entities,
       relations,       // Relations with auto-generated names
-      activities,      // 4th parameter
-      interactions,    // 5th parameter
-      [],             // 6th parameter: global dictionaries (NOT computations)
-      []              // 7th parameter: side effects
-    )
+      activities,      // Activities
+      interactions,    // Interactions
+      dict: [],        // Global dictionaries (NOT computations)
+      recordMutationSideEffects: []  // Side effects
+    })
 
     await controller.setup(true)
   })
@@ -314,15 +314,31 @@ describe('Count Computation', () => {
       })
     });
     
-    const controller = new Controller(
-      system,
-      [userEntity],
-      [],
-      [],
-      [],
-      [totalUsersDict, activeUsersDict],
-      []
-    );
+    const controller = new Controller({
+
+    
+      system: system,
+
+    
+      entities: [userEntity],
+
+    
+      relations: [],
+
+    
+      activities: [],
+
+    
+      interactions: [],
+
+    
+      dict: [totalUsersDict, activeUsersDict],
+
+    
+      recordMutationSideEffects: []
+
+    
+    });
     await controller.setup(true);
     
     // Check initial state
@@ -409,15 +425,31 @@ describe('Transform Computation', () => {
       })
     });
     
-    const controller = new Controller(
-      system,
-      [userEntity],
-      [],
-      [],
-      [],
-      [userStatsDict],
-      []
-    );
+    const controller = new Controller({
+
+    
+      system: system,
+
+    
+      entities: [userEntity],
+
+    
+      relations: [],
+
+    
+      activities: [],
+
+    
+      interactions: [],
+
+    
+      dict: [userStatsDict],
+
+    
+      recordMutationSideEffects: []
+
+    
+    });
     await controller.setup(true);
     
     // Create test users
@@ -482,15 +514,14 @@ describe('User Interactions', () => {
       })
     });
     
-    const controller = new Controller(
+    const controller = new Controller({
       system,
-      [userEntity],
-      [],
-      [],  // activities (第四个参数)
-      [registerInteraction],  // interactions (第五个参数)
-      [],
-      []
-    );
+      entities: [userEntity],
+      relations: [],
+      activities: [],  // activities
+      interactions: [registerInteraction],  // interactions
+      dict: []
+    });
     await controller.setup(true);
     
     // Execute registration interaction
@@ -590,15 +621,14 @@ describe('Approval Process Activity', () => {
       defaultState: submittedState
     });
     
-    const controller = new Controller(
+    const controller = new Controller({
       system,
-      [requestEntity],
-      [],
-      [approvalActivity],  // activities (第四个参数)
-      [submitInteraction, approveInteraction, rejectInteraction],  // interactions (第五个参数)
-      [],
-      []
-    );
+      entities: [requestEntity],
+      relations: [],
+      activities: [approvalActivity],  // activities
+      interactions: [submitInteraction, approveInteraction, rejectInteraction],  // interactions
+      dict: []
+    });
     await controller.setup(true);
     
     // Create request
@@ -686,15 +716,14 @@ describe('Permission Testing', () => {
     system = new MonoSystem(new PGLiteDB());
     system.conceptClass = KlassByName;
     
-    controller = new Controller(
+    controller = new Controller({
       system,
       entities,
       relations,
       activities,
       interactions,
-      [],
-      []
-    );
+      dict: []
+    });
     
     await controller.setup(true);
   });
