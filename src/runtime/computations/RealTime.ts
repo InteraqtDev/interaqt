@@ -2,7 +2,7 @@ import { RealTime } from "@shared";
 import { Controller } from "../Controller";
 import { ComputationResultPatch, ComputationResult, DataBasedComputation, RecordBoundState, GlobalBoundState } from "./Computation";
 import { RealTimeInstance, PropertyInstance } from "@shared";
-import { DataContext } from "./ComputationHandle";
+import { DataContext } from "./Computation.js";
 import { Equation, Expression, Inequality } from "./MathResolver";
 
 export class GlobalRealTimeComputation implements DataBasedComputation {

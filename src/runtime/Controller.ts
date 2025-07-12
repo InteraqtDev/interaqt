@@ -4,7 +4,7 @@ import {
 } from "@shared";
 import './computations/index.js';
 import { InteractionCallResponse, InteractionEventArgs } from "./activity/InteractionCall.js";
-import { DataContext, EntityDataContext, PropertyDataContext, RelationDataContext } from "./computations/ComputationHandle.js";
+import { DataContext, EntityDataContext, PropertyDataContext, RelationDataContext } from "./computations/Computation.js";
 import { Computation } from "./computations/Computation.js";
 import { ComputationResult, ComputationResultSkip, ComputationResultPatch } from "./computations/Computation.js";
 import { Scheduler } from "./Scheduler.js";

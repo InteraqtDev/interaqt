@@ -1,9 +1,9 @@
-import { PropertyDataContext } from "./ComputationHandle.js";
+import { PropertyDataContext } from "./Computation.js";
 import { Every } from "@shared";
 import { ComputationResult, DataBasedComputation, DataDep, GlobalBoundState, RecordBoundState, RecordsDataDep } from "./Computation.js";
 import { EveryInstance, RelationInstance } from "@shared";
 import { Controller } from "../Controller.js";
-import { DataContext } from "./ComputationHandle.js";
+import { DataContext } from "./Computation.js";
 import { EtityMutationEvent } from "../Scheduler.js";
 import { AttributeQueryData, MatchExp } from "@storage";
 import { assert } from "../util.js";

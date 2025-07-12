@@ -1,4 +1,4 @@
-import { DataContext, EntityDataContext } from "./ComputationHandle.js";
+import { DataContext, EntityDataContext } from "./Computation.js";
 import { Transform, TransformInstance, EntityInstance, RelationInstance, ActivityInstance, InteractionInstance } from "@shared";
 import { Controller } from "../Controller.js";
 import { BoolExp } from "@shared";

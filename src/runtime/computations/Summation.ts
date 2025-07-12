@@ -1,4 +1,4 @@
-import { DataContext, PropertyDataContext } from "./ComputationHandle.js";
+import { DataContext, PropertyDataContext } from "./Computation.js";
 import { Summation } from "@shared";
 import { Controller } from "../Controller.js";
 import { SummationInstance, EntityInstance, RelationInstance } from "@shared";

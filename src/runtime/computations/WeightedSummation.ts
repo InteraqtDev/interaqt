@@ -1,4 +1,4 @@
-import { DataContext, PropertyDataContext } from "./ComputationHandle.js";
+import { DataContext, PropertyDataContext } from "./Computation.js";
 import { WeightedSummation } from "@shared";
 import { Controller } from "../Controller.js";
 import { WeightedSummationInstance, EntityInstance, RelationInstance } from "@shared";

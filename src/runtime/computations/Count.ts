@@ -1,4 +1,4 @@
-import { DataContext, PropertyDataContext } from "./ComputationHandle.js";
+import { DataContext, PropertyDataContext } from "./Computation.js";
 import { Count } from "@shared";
 import { Controller } from "../Controller.js";
 import { CountInstance, EntityInstance, RelationInstance } from "@shared";

@@ -8,7 +8,7 @@ export * from './RealTime.js'
 export * from './Summation.js'
 export * from './Average.js'
 export * from './Computation.js'
-export * from './ComputationHandle.js'
+
 
 // Export all computation handles
 export { CountHandles } from './Count.js'

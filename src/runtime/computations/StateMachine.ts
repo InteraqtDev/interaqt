@@ -2,7 +2,7 @@ import { StateMachine, StateMachineInstance, StateNodeInstance } from "@shared";
 import { Controller } from "../Controller.js";
 import { EntityIdRef, RecordMutationEvent } from '../System.js';
 import { INTERACTION_RECORD } from "../activity/ActivityManager.js";
-import { DataContext, EntityDataContext } from "./ComputationHandle.js";
+import { DataContext, EntityDataContext } from "./Computation.js";
 import { ComputationResult, ComputationResultPatch, EventBasedComputation, EventDep, GlobalBoundState, RecordBoundState } from "./Computation.js";
 import { EtityMutationEvent } from "../Scheduler.js";
 import { TransitionFinder } from "./TransitionFinder.js";

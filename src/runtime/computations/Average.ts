@@ -1,4 +1,4 @@
-import { DataContext, PropertyDataContext } from "./ComputationHandle.js";
+import { DataContext, PropertyDataContext } from "./Computation.js";
 import { Average, AverageInstance, RelationInstance, EntityInstance } from "@shared";
 import { Controller } from "../Controller.js";
 import { ComputationResult, DataBasedComputation, DataDep, RecordBoundState, GlobalBoundState, RecordsDataDep } from "./Computation.js";
