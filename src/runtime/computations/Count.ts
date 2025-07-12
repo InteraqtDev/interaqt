@@ -1,4 +1,4 @@
-import { ComputationHandle, DataContext, PropertyDataContext } from "./ComputationHandle.js";
+import { DataContext, PropertyDataContext } from "./ComputationHandle.js";
 import { Count } from "@shared";
 import { Controller } from "../Controller.js";
 import { CountInstance, EntityInstance, RelationInstance } from "@shared";
@@ -8,6 +8,8 @@ import { MatchExp } from "@storage";
 import { assert } from "../util.js";
 
 export class GlobalCountHandle implements DataBasedComputation {
+    static computationType = Count
+    static contextType = 'global' as const
     callback?: (this: Controller, item: any, dataDeps?: {[key: string]: any}) => boolean
     state!: ReturnType<typeof this.createState>
     useLastValue: boolean = true
@@ -107,6 +109,8 @@ export class GlobalCountHandle implements DataBasedComputation {
 type StateWithCallback = {[k:string]: RecordBoundState<boolean>}
 
 export class PropertyCountHandle implements DataBasedComputation {
+    static computationType = Count
+    static contextType = 'property' as const
     callback?: (this: Controller, item: any, dataDeps?: {[key: string]: any}) => boolean
     state!: ReturnType<typeof this.createState>
     useLastValue: boolean = true
@@ -241,7 +245,5 @@ export class PropertyCountHandle implements DataBasedComputation {
     }
 }
 
-ComputationHandle.Handles.set(Count as any, {
-    global: GlobalCountHandle,
-    property: PropertyCountHandle
-});
+// Export Count computation handles
+export const CountHandles = [GlobalCountHandle, PropertyCountHandle];

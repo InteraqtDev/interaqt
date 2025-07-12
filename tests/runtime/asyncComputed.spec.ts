@@ -1,4 +1,4 @@
-import { Controller, Entity, MonoSystem, Property, ComputationHandle, MatchExp, DataDep, PropertyDataContext, PGLiteDB, DataBasedComputation, ComputationResult } from "interaqt";
+import { Controller, Entity, MonoSystem, Property, MatchExp, DataDep, PropertyDataContext, PGLiteDB, DataBasedComputation, ComputationResult } from "interaqt";
 import { expect, test, describe } from "vitest";
 
 // TestCrawlerComputed as a standard ES6 class
@@ -76,6 +76,8 @@ class TestCrawlerComputed implements TestCrawlerComputedInstance {
 }
 
 class TestCrawlerComputation implements DataBasedComputation {
+    static computationType = TestCrawlerComputed
+    static contextType = 'property' as const
     state = {}
     dataDeps: {[key: string]: DataDep} = {}
     constructor(public controller: Controller, public args: TestCrawlerComputedInstance, public dataContext: PropertyDataContext) {
@@ -98,11 +100,8 @@ class TestCrawlerComputation implements DataBasedComputation {
     }
 }
 
-// 全局注册可用了
-ComputationHandle.Handles.set(TestCrawlerComputed as any, {
-    // global: TestCrawlerComputation,
-    property: TestCrawlerComputation
-})
+// Export custom computation handle
+const TestCrawlerHandles = [TestCrawlerComputation];
 
 
 describe('async computed', () => {
@@ -126,7 +125,8 @@ describe('async computed', () => {
             entities: [URLEntity],
             relations: [],
             activities: [],
-            interactions: []
+            interactions: [],
+            computations: TestCrawlerHandles
         })
         await controller.setup(true)
         const crawlerComputation = Array.from(controller.scheduler.computations.values()).find(

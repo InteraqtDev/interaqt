@@ -37,7 +37,3 @@ type HandlesForType = {
     relation?: { new(...args: any[]): Computation },
     property?: { new(...args: any[]): Computation },
 }
-
-export class ComputationHandle {
-    public static  Handles: Map<any,  HandlesForType> = new Map()
-}

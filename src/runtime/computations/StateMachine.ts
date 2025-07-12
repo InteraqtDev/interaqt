@@ -2,7 +2,7 @@ import { StateMachine, StateMachineInstance, StateNodeInstance } from "@shared";
 import { Controller } from "../Controller.js";
 import { EntityIdRef, RecordMutationEvent } from '../System.js';
 import { INTERACTION_RECORD } from "../activity/ActivityManager.js";
-import { ComputationHandle, DataContext, EntityDataContext } from "./ComputationHandle.js";
+import { DataContext, EntityDataContext } from "./ComputationHandle.js";
 import { ComputationResult, ComputationResultPatch, EventBasedComputation, EventDep, GlobalBoundState, RecordBoundState } from "./Computation.js";
 import { EtityMutationEvent } from "../Scheduler.js";
 import { TransitionFinder } from "./TransitionFinder.js";
@@ -13,6 +13,8 @@ type EntityTargetResult = EntityIdRef|EntityIdRef[]|undefined
 type ComputeSourceResult = ComputeRelationTargetResult| EntityTargetResult
 
 export class GlobalStateMachineHandle implements EventBasedComputation {
+    static computationType = StateMachine
+    static contextType = 'global' as const
     transitionFinder: TransitionFinder
     state!: {[key: string]: GlobalBoundState<any>}
     useLastValue: boolean = true
@@ -59,6 +61,8 @@ export class GlobalStateMachineHandle implements EventBasedComputation {
 
 
 export class PropertyStateMachineHandle implements EventBasedComputation {
+    static computationType = StateMachine
+    static contextType = 'property' as const
     transitionFinder: TransitionFinder
     state!: {[key: string]: RecordBoundState<any>|GlobalBoundState<any>}
     useLastValue: boolean = true
@@ -116,6 +120,8 @@ export class PropertyStateMachineHandle implements EventBasedComputation {
 
 
 export class RecordStateMachineHandle implements EventBasedComputation {
+    static computationType = StateMachine
+    static contextType = ['entity', 'relation'] as const
     transitionFinder: TransitionFinder
     state!: {[key: string]: RecordBoundState<any>|GlobalBoundState<any>}
     useLastValue: boolean = false
@@ -201,8 +207,5 @@ export class RecordStateMachineHandle implements EventBasedComputation {
 
 
     
-ComputationHandle.Handles.set(StateMachine as any, {
-    global: GlobalStateMachineHandle,
-    property: PropertyStateMachineHandle,
-    relation: RecordStateMachineHandle,
-})
+// Export StateMachine computation handles
+export const StateMachineHandles = [GlobalStateMachineHandle, PropertyStateMachineHandle, RecordStateMachineHandle];

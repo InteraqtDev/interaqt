@@ -1,4 +1,4 @@
-import { ComputationHandle, DataContext, PropertyDataContext } from "./ComputationHandle.js";
+import { DataContext, PropertyDataContext } from "./ComputationHandle.js";
 import { WeightedSummation } from "@shared";
 import { Controller } from "../Controller.js";
 import { WeightedSummationInstance, EntityInstance, RelationInstance } from "@shared";
@@ -9,6 +9,8 @@ import { AttributeQueryData, MatchExp } from "@storage";
 import { assert } from "../util.js";
 
 export class GlobalWeightedSummationHandle implements DataBasedComputation {
+    static computationType = WeightedSummation
+    static contextType = 'global' as const
     matchRecordToWeight: (this: Controller, item: any) => { weight: number; value: number }
     state!: ReturnType<typeof this.createState>
     useLastValue: boolean = true
@@ -82,6 +84,8 @@ export class GlobalWeightedSummationHandle implements DataBasedComputation {
 }
 
 export class PropertyWeightedSummationHandle implements DataBasedComputation {
+    static computationType = WeightedSummation
+    static contextType = 'property' as const
     matchRecordToWeight: (this: Controller, item: any) => { weight: number; value: number }
     state!: ReturnType<typeof this.createState>
     useLastValue: boolean = true
@@ -191,7 +195,5 @@ export class PropertyWeightedSummationHandle implements DataBasedComputation {
     }
 }
 
-ComputationHandle.Handles.set(WeightedSummation as any, {
-    global: GlobalWeightedSummationHandle,
-    property: PropertyWeightedSummationHandle
-});
+// Export WeightedSummation computation handles
+export const WeightedSummationHandles = [GlobalWeightedSummationHandle, PropertyWeightedSummationHandle];

@@ -3,9 +3,7 @@ import {
   Controller,
   Entity,
   MonoSystem,
-  Property,
-  ComputationHandle,
-  MatchExp,
+  Property, MatchExp,
   DataDep,
   GlobalDataContext,
   PGLiteDB,
@@ -91,6 +89,8 @@ class GlobalWeatherComputed implements GlobalWeatherComputedInstance {
 
 // 实现全局异步计算
 class GlobalWeatherComputation implements DataBasedComputation {
+  static computationType = GlobalWeatherComputed
+  static contextType = 'global' as const
   state = {}
   dataDeps: {[key: string]: DataDep} = {}
   
@@ -122,10 +122,8 @@ class GlobalWeatherComputation implements DataBasedComputation {
   }
 }
 
-// 注册全局计算处理器
-ComputationHandle.Handles.set(GlobalWeatherComputed as any, {
-  global: GlobalWeatherComputation
-})
+// Export custom computation handle
+const GlobalWeatherHandles = [GlobalWeatherComputation];
 
 describe('Global async computed', () => {
   test('should handle global async computation with entity dependencies', async () => {
@@ -213,6 +211,8 @@ describe('Global async computed', () => {
     });
     
     class GlobalStatsComputation implements DataBasedComputation {
+      static computationType = GlobalStatsComputed
+      static contextType = 'global' as const
       state = {}
       dataDeps: {[key: string]: DataDep} = {}
       
@@ -255,9 +255,8 @@ describe('Global async computed', () => {
       }
     }
     
-    ComputationHandle.Handles.set(GlobalStatsComputed as any, {
-      global: GlobalStatsComputation
-    });
+    // Export custom computation handle
+    const GlobalStatsHandles = [GlobalStatsComputation];
     
     const entities = [productEntity];
     
@@ -280,7 +279,8 @@ describe('Global async computed', () => {
         dict: dictionary,
         relations: [],
         activities: [],
-        interactions: []
+        interactions: [],
+        computations: GlobalStatsHandles
     });
     await controller.setup(true);
     

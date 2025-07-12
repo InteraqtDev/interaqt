@@ -1,4 +1,4 @@
-import { ComputationHandle, PropertyDataContext } from "./ComputationHandle.js";
+import { PropertyDataContext } from "./ComputationHandle.js";
 import { Every } from "@shared";
 import { ComputationResult, DataBasedComputation, DataDep, GlobalBoundState, RecordBoundState, RecordsDataDep } from "./Computation.js";
 import { EveryInstance, RelationInstance } from "@shared";
@@ -10,6 +10,8 @@ import { assert } from "../util.js";
 
 
 export class GlobalEveryHandle implements DataBasedComputation {
+    static computationType = Every
+    static contextType = 'global' as const
     callback: (this: Controller, item: any, dataDeps?: {[key: string]: any}) => boolean
     state!: ReturnType<typeof this.createState>
     useLastValue: boolean = true
@@ -84,6 +86,8 @@ export class GlobalEveryHandle implements DataBasedComputation {
 
 
 export class PropertyEveryHandle implements DataBasedComputation {
+    static computationType = Every
+    static contextType = 'property' as const
     callback: (this: Controller, item: any, dataDeps?: {[key: string]: any}) => boolean
     state!: ReturnType<typeof this.createState>
     useLastValue: boolean = true
@@ -221,7 +225,5 @@ export class PropertyEveryHandle implements DataBasedComputation {
 
 
 
-ComputationHandle.Handles.set(Every as any, {
-    global: GlobalEveryHandle,
-    property: PropertyEveryHandle
-})
+// Export Every computation handles
+export const EveryHandles = [GlobalEveryHandle, PropertyEveryHandle];

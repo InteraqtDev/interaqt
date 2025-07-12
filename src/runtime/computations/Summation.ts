@@ -1,4 +1,4 @@
-import { ComputationHandle, DataContext, PropertyDataContext } from "./ComputationHandle.js";
+import { DataContext, PropertyDataContext } from "./ComputationHandle.js";
 import { Summation } from "@shared";
 import { Controller } from "../Controller.js";
 import { SummationInstance, EntityInstance, RelationInstance } from "@shared";
@@ -8,6 +8,8 @@ import { MatchExp, AttributeQueryData } from "@storage";
 import { assert } from "../util.js";
 
 export class GlobalSumHandle implements DataBasedComputation {
+    static computationType = Summation
+    static contextType = 'global' as const
     state!: ReturnType<typeof this.createState>
     useLastValue: boolean = true
     dataDeps: {[key: string]: DataDep} = {}
@@ -95,6 +97,8 @@ export class GlobalSumHandle implements DataBasedComputation {
 }
 
 export class PropertySumHandle implements DataBasedComputation {
+    static computationType = Summation
+    static contextType = 'property' as const
     state!: ReturnType<typeof this.createState>
     useLastValue: boolean = true
     dataDeps: {[key: string]: DataDep} = {}
@@ -226,7 +230,5 @@ export class PropertySumHandle implements DataBasedComputation {
     }
 }
 
-ComputationHandle.Handles.set(Summation as any, {
-    global: GlobalSumHandle,
-    property: PropertySumHandle
-});
+// Export Summation computation handles
+export const SummationHandles = [GlobalSumHandle, PropertySumHandle];

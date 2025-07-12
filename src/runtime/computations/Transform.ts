@@ -1,4 +1,4 @@
-import { ComputationHandle, DataContext, EntityDataContext } from "./ComputationHandle.js";
+import { DataContext, EntityDataContext } from "./ComputationHandle.js";
 import { Transform, TransformInstance, EntityInstance, RelationInstance, ActivityInstance, InteractionInstance } from "@shared";
 import { Controller } from "../Controller.js";
 import { BoolExp } from "@shared";
@@ -7,6 +7,8 @@ import { DataBasedComputation } from "./Computation.js";
 import { EtityMutationEvent } from "../ComputationSourceMap.js";
 
 export class RecordsTransformHandle implements DataBasedComputation {
+    static computationType = Transform
+    static contextType = ['entity', 'relation'] as const
     transformCallback: (this: Controller, item: any) => any
     state!: ReturnType<typeof this.createState>
     useLastValue: boolean = true
@@ -110,8 +112,5 @@ export class RecordsTransformHandle implements DataBasedComputation {
 }
 
 
-// Register the Transform with ComputationHandle
-ComputationHandle.Handles.set(Transform as any, {
-    entity: RecordsTransformHandle,
-    relation: RecordsTransformHandle
-});
+// Export Transform computation handles
+export const TransformHandles = [RecordsTransformHandle];

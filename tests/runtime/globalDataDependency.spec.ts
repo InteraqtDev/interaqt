@@ -3,9 +3,7 @@ import {
   Controller,
   Entity,
   MonoSystem,
-  Property,
-  ComputationHandle,
-  DataDep,
+  Property, DataDep,
   PropertyDataContext, PGLiteDB,
   DataBasedComputation, Dictionary, BoolExp,
   DICTIONARY_RECORD
@@ -95,6 +93,8 @@ class GlobalDependentComputed implements GlobalDependentComputedInstance {
 
 // 实现依赖全局数据的计算
 class GlobalDependentComputation implements DataBasedComputation {
+  static computationType = GlobalDependentComputed
+  static contextType = 'property' as const
   state = {}
   dataDeps: {[key: string]: DataDep} = {}
   
@@ -123,10 +123,8 @@ class GlobalDependentComputation implements DataBasedComputation {
   }
 }
 
-// 注册计算处理器
-ComputationHandle.Handles.set(GlobalDependentComputed as any, {
-  property: GlobalDependentComputation
-})
+// Export custom computation handle
+const GlobalDependentHandles = [GlobalDependentComputation];
 
 describe('Global data dependency', () => {
   test('should trigger computation when global data changes', async () => {
@@ -164,7 +162,8 @@ describe('Global data dependency', () => {
         dict: dictionary,
         relations: [],
         activities: [],
-        interactions: []
+        interactions: [],
+        computations: GlobalDependentHandles
     });
     await controller.setup(true);
     
@@ -268,6 +267,8 @@ describe('Global data dependency', () => {
     }
     
     class MultiGlobalComputation implements DataBasedComputation {
+      static computationType = MultiGlobalComputed
+      static contextType = 'property' as const
       state = {}
       dataDeps: {[key: string]: DataDep} = {}
       
@@ -307,9 +308,8 @@ describe('Global data dependency', () => {
       }
     }
     
-    ComputationHandle.Handles.set(MultiGlobalComputed as any, {
-      property: MultiGlobalComputation
-    });
+    // Export custom computation handle
+    const MultiGlobalHandles = [MultiGlobalComputation];
     
     // 创建产品实体
     const productEntity = Entity.create({
@@ -348,7 +348,8 @@ describe('Global data dependency', () => {
         dict: dictionary,
         relations: [],
         activities: [],
-        interactions: []
+        interactions: [],
+        computations: MultiGlobalHandles
     });
     await controller.setup(true);
     

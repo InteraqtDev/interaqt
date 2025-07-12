@@ -158,14 +158,46 @@ async incrementalCompute(lastValue: number, mutationEvent: ERRecordMutationEvent
 }
 ```
 
-### 7. 注册计算处理器
+### 7. 声明支持的计算类型
 
-最后，需要将实现的处理类注册到 ComputationHandle 中：
+每个处理类需要声明它所支持的计算类型和数据上下文类型：
 
 ```typescript
-ComputationHandle.Handles.set(XXX, {
-    global: GlobalXXXHandle,
-    property: PropertyXXXHandle
+export class GlobalXXXHandle implements DataBasedComputation {
+    static computationType = XXX
+    static contextType = 'global' as const
+    // ... 其他实现
+}
+
+export class PropertyXXXHandle implements DataBasedComputation {
+    static computationType = XXX  
+    static contextType = 'property' as const
+    // ... 其他实现
+}
+
+// 如果一个处理类支持多种上下文类型
+export class MultiContextHandle implements DataBasedComputation {
+    static computationType = XXX
+    static contextType = ['entity', 'relation'] as const
+    // ... 其他实现
+}
+
+// 导出计算处理器数组
+export const XXXHandles = [GlobalXXXHandle, PropertyXXXHandle];
+```
+
+### 8. 使用自定义计算
+
+在创建 Controller 时，将自定义计算处理器传入：
+
+```typescript
+const controller = new Controller({
+    system: system,
+    entities: entities,
+    relations: relations,
+    activities: [],
+    interactions: [],
+    computations: [...XXXHandles] // 传入自定义计算处理器
 });
 ```
 

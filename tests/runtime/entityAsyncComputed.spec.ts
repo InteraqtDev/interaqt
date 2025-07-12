@@ -3,9 +3,7 @@ import {
   Controller,
   Entity,
   MonoSystem,
-  Property,
-  ComputationHandle,
-  MatchExp,
+  Property, MatchExp,
   DataDep,
   EntityDataContext,
   PGLiteDB,
@@ -88,6 +86,8 @@ class EntityRecommendationComputed implements EntityRecommendationComputedInstan
 
 // 实现实体级别异步计算
 class EntityRecommendationComputation implements DataBasedComputation {
+  static computationType = EntityRecommendationComputed
+  static contextType = 'entity' as const
   state = {}
   dataDeps: {[key: string]: DataDep} = {}
   
@@ -129,10 +129,8 @@ class EntityRecommendationComputation implements DataBasedComputation {
   }
 }
 
-// 注册计算处理器
-ComputationHandle.Handles.set(EntityRecommendationComputed as any, {
-  entity: EntityRecommendationComputation
-})
+// Export custom computation handle
+const EntityRecommendationHandles = [EntityRecommendationComputation];
 
 describe('Entity async computed', () => {
   test('should handle entity async computation correctly', async () => {
@@ -169,7 +167,8 @@ describe('Entity async computed', () => {
         entities: entities,
         relations: relations,
         activities: [],
-        interactions: []
+        interactions: [],
+        computations: EntityRecommendationHandles
     });
     await controller.setup(true);
     

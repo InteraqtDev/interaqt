@@ -3,17 +3,11 @@ import {
   Controller,
   Entity,
   MonoSystem,
-  Property,
-  ComputationHandle,
-  MatchExp,
+  Property, MatchExp,
   DataDep,
   RelationDataContext,
   PGLiteDB,
-  DataBasedComputation,
-  ComputationResult,
-  ComputationResultAsync,
-  ComputationResultResolved,
-  Relation
+  DataBasedComputation, ComputationResultAsync, Relation
 } from "interaqt";
 
 // RelationScoreComputed as a standard ES6 class
@@ -92,6 +86,8 @@ class RelationScoreComputed implements RelationScoreComputedInstance {
 
 // 实现关系级别异步计算
 class RelationScoreComputation implements DataBasedComputation {
+  static computationType = RelationScoreComputed
+  static contextType = 'relation' as const
   state = {}
   dataDeps: {[key: string]: DataDep} = {}
   
@@ -139,10 +135,8 @@ class RelationScoreComputation implements DataBasedComputation {
   }
 }
 
-// 注册计算处理器
-ComputationHandle.Handles.set(RelationScoreComputed as any, {
-  relation: RelationScoreComputation
-})
+// Export custom computation handle
+const RelationScoreHandles = [RelationScoreComputation];
 
 describe('Relation async computed', () => {
   test('should handle relation async computation correctly', async () => {
@@ -194,7 +188,8 @@ describe('Relation async computed', () => {
         entities: entities,
         relations: relations,
         activities: [],
-        interactions: []
+        interactions: [],
+        computations: RelationScoreHandles
     });
     await controller.setup(true);
     

@@ -513,6 +513,8 @@ const UserScoreComputed = createClass({
 });
 
 class UserScoreComputation implements DataBasedComputation {
+  static computationType = UserScoreComputed
+  static contextType = 'property' as const
   state = {}
   dataDeps: {[key: string]: DataDep} = {}
   
@@ -546,10 +548,8 @@ class UserScoreComputation implements DataBasedComputation {
   }
 }
 
-// Register computation handler
-ComputationHandle.Handles.set(UserScoreComputed, {
-  property: UserScoreComputation
-});
+// Export computation handler
+export const UserScoreHandles = [UserScoreComputation];
 
 // Use in user entity
 userEntity.properties.push(

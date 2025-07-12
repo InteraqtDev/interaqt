@@ -5,10 +5,20 @@ import {
 import './computations/index.js';
 import { InteractionCallResponse, InteractionEventArgs } from "./activity/InteractionCall.js";
 import { DataContext, EntityDataContext, PropertyDataContext, RelationDataContext } from "./computations/ComputationHandle.js";
+import { Computation } from "./computations/Computation.js";
 import { ComputationResult, ComputationResultSkip, ComputationResultPatch } from "./computations/Computation.js";
 import { Scheduler } from "./Scheduler.js";
 import { MatchExp } from "@storage";
 import { ActivityManager } from "./activity/ActivityManager.js";
+import { CountHandles } from "./computations/Count.js";
+import { TransformHandles } from "./computations/Transform.js";
+import { AnyHandles } from "./computations/Any.js";
+import { EveryHandles } from "./computations/Every.js";
+import { WeightedSummationHandles } from "./computations/WeightedSummation.js";
+import { SummationHandles } from "./computations/Summation.js";
+import { AverageHandles } from "./computations/Average.js";
+import { RealTimeHandles } from "./computations/RealTime.js";
+import { StateMachineHandles } from "./computations/StateMachine.js";
 
 export const USER_ENTITY = 'User'
 
@@ -51,6 +61,7 @@ export interface ControllerOptions {
     interactions?: InteractionInstance[]
     dict?: DictionaryInstance[]
     recordMutationSideEffects?: RecordMutationSideEffect[]
+    computations?: (new (...args: any[]) => Computation)[]
 }
 
 export class Controller {
@@ -77,7 +88,8 @@ export class Controller {
             activities = [],
             interactions = [],
             dict = [],
-            recordMutationSideEffects = []
+            recordMutationSideEffects = [],
+            computations = []
         } = options
         
         // 首先初始化 system
@@ -94,7 +106,21 @@ export class Controller {
         // Initialize ActivityManager
         this.activityManager = new ActivityManager(this, activities, interactions)
 
-        this.scheduler = new Scheduler(this, this.entities, this.relations, this.dict)
+        // Import default computation handles
+        const allComputationHandles = [
+            ...CountHandles,
+            ...TransformHandles,
+            ...AnyHandles,
+            ...EveryHandles,
+            ...WeightedSummationHandles,
+            ...SummationHandles,
+            ...AverageHandles,
+            ...RealTimeHandles,
+            ...StateMachineHandles,
+            ...computations
+        ]
+        
+        this.scheduler = new Scheduler(this, this.entities, this.relations, this.dict, allComputationHandles)
 
         recordMutationSideEffects.forEach(sideEffect => {
           let sideEffects = this.recordNameToSideEffects.get(sideEffect.record.name)

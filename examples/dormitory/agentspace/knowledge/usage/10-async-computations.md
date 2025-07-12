@@ -78,6 +78,8 @@ const GlobalWeatherComputed = createClass({
 
 // Implement global weather computation
 class GlobalWeatherComputation implements DataBasedComputation {
+  static computationType = GlobalWeatherComputed
+  static contextType = 'global' as const
   state = {}
   dataDeps: {[key: string]: DataDep} = {}
   
@@ -124,12 +126,8 @@ class GlobalWeatherComputation implements DataBasedComputation {
 ### Registering Computation Handlers
 
 ```typescript
-import { ComputationHandle } from 'interaqt';
-
-// Register global computation handler
-ComputationHandle.Handles.set(GlobalWeatherComputed, {
-  global: GlobalWeatherComputation
-});
+// Export computation handlers
+export const GlobalWeatherHandles = [GlobalWeatherComputation];
 ```
 
 ### Using in Dictionary
@@ -153,8 +151,8 @@ const controller = new Controller({
   relations: relations,
   activities: [],
   interactions: [],
-  dict: [weatherDictionary],, // Dictionary array
-  recordMutationSideEffects: []
+  dict: [weatherDictionary], // Dictionary array
+  computations: GlobalWeatherHandles // Pass custom computation handlers
 });
 ```
 
@@ -237,6 +235,8 @@ const ProductRecommendationComputed = createClass({
 
 // Implement product recommendation computation
 class ProductRecommendationComputation implements DataBasedComputation {
+  static computationType = ProductRecommendationComputed
+  static contextType = 'entity' as const
   state = {}
   dataDeps: {[key: string]: DataDep} = {}
   
@@ -294,10 +294,8 @@ class ProductRecommendationComputation implements DataBasedComputation {
   }
 }
 
-// Register entity computation handler
-ComputationHandle.Handles.set(ProductRecommendationComputed, {
-  entity: ProductRecommendationComputation
-});
+// Export entity computation handler
+export const ProductRecommendationHandles = [ProductRecommendationComputation];
 ```
 
 ### Using in Entities
@@ -359,6 +357,8 @@ const RelationSimilarityComputed = createClass({
 
 // Implement relation similarity computation
 class RelationSimilarityComputation implements DataBasedComputation {
+  static computationType = RelationSimilarityComputed
+  static contextType = 'relation' as const
   state = {}
   dataDeps: {[key: string]: DataDep} = {}
   
@@ -408,10 +408,8 @@ class RelationSimilarityComputation implements DataBasedComputation {
   }
 }
 
-// Register relation computation handler
-ComputationHandle.Handles.set(RelationSimilarityComputed, {
-  relation: RelationSimilarityComputation
-});
+// Export relation computation handler
+export const RelationSimilarityHandles = [RelationSimilarityComputation];
 ```
 
 ## Best Practices for Async Computations

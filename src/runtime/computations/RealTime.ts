@@ -2,10 +2,12 @@ import { RealTime } from "@shared";
 import { Controller } from "../Controller";
 import { ComputationResultPatch, ComputationResult, DataBasedComputation, RecordBoundState, GlobalBoundState } from "./Computation";
 import { RealTimeInstance, PropertyInstance } from "@shared";
-import { ComputationHandle, DataContext } from "./ComputationHandle";
+import { DataContext } from "./ComputationHandle";
 import { Equation, Expression, Inequality } from "./MathResolver";
 
 export class GlobalRealTimeComputation implements DataBasedComputation {
+    static computationType = RealTime
+    static contextType = 'global' as const
     state!: ReturnType<typeof this.createState>
     incrementalCompute?: (...args: any[]) => Promise<ComputationResult|any>;
     incrementalPatchCompute?: (...args: any[]) => Promise<ComputationResult|ComputationResultPatch|ComputationResultPatch[]|undefined>;
@@ -61,6 +63,8 @@ export class GlobalRealTimeComputation implements DataBasedComputation {
 }
 
 export class PropertyRealTimeComputation implements DataBasedComputation {
+    static computationType = RealTime
+    static contextType = 'property' as const
     state!: ReturnType<typeof this.createState>
     incrementalCompute?: (...args: any[]) => Promise<ComputationResult|any>;
     incrementalPatchCompute?: (...args: any[]) => Promise<ComputationResult|ComputationResultPatch|ComputationResultPatch[]|undefined>;
@@ -122,7 +126,5 @@ export class PropertyRealTimeComputation implements DataBasedComputation {
     }
 }
 
-ComputationHandle.Handles.set(RealTime as any, {
-    global: GlobalRealTimeComputation,
-    property: PropertyRealTimeComputation
-})  
+// Export RealTime computation handles
+export const RealTimeHandles = [GlobalRealTimeComputation, PropertyRealTimeComputation];  

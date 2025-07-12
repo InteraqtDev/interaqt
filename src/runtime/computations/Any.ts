@@ -1,4 +1,4 @@
-import { ComputationHandle, DataContext, PropertyDataContext } from "./ComputationHandle.js";
+import { DataContext, PropertyDataContext } from "./ComputationHandle.js";
 import { Any } from "@shared";
 import { Controller } from "../Controller.js";
 import { AnyInstance, RelationInstance } from "@shared";
@@ -10,6 +10,8 @@ import { assert } from "../util.js";
 
 
 export class GlobalAnyHandle implements DataBasedComputation {
+    static computationType = Any
+    static contextType = 'global' as const
     callback: (this: Controller, item: any, dataDeps?: {[key: string]: any}) => boolean
     state!: ReturnType<typeof this.createState>
     useLastValue: boolean = true
@@ -76,6 +78,8 @@ export class GlobalAnyHandle implements DataBasedComputation {
 
 
 export class PropertyAnyHandle implements DataBasedComputation {
+    static computationType = Any
+    static contextType = 'property' as const
     callback: (this: Controller, item: any, dataDeps?: {[key: string]: any}) => boolean
     state!: ReturnType<typeof this.createState>
     useLastValue: boolean = true
@@ -186,7 +190,5 @@ export class PropertyAnyHandle implements DataBasedComputation {
 }
 
 
-ComputationHandle.Handles.set(Any as any, {
-    global: GlobalAnyHandle,
-    property: PropertyAnyHandle
-})
+// Export Any computation handles
+export const AnyHandles = [GlobalAnyHandle, PropertyAnyHandle];

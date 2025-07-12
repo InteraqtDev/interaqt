@@ -1,4 +1,4 @@
-import { ComputationHandle, DataContext, PropertyDataContext } from "./ComputationHandle.js";
+import { DataContext, PropertyDataContext } from "./ComputationHandle.js";
 import { Average, AverageInstance, RelationInstance, EntityInstance } from "@shared";
 import { Controller } from "../Controller.js";
 import { ComputationResult, DataBasedComputation, DataDep, RecordBoundState, GlobalBoundState, RecordsDataDep } from "./Computation.js";
@@ -7,6 +7,8 @@ import { MatchExp, AttributeQueryData } from "@storage";
 import { assert } from "../util.js";
 
 export class GlobalAverageHandle implements DataBasedComputation {
+    static computationType = Average
+    static contextType = 'global' as const
     state!: ReturnType<typeof this.createState>
     useLastValue: boolean = true
     dataDeps: {[key: string]: DataDep} = {}
@@ -135,6 +137,8 @@ export class GlobalAverageHandle implements DataBasedComputation {
 }
 
 export class PropertyAverageHandle implements DataBasedComputation {
+    static computationType = Average
+    static contextType = 'property' as const
     state!: ReturnType<typeof this.createState>
     useLastValue: boolean = true
     dataDeps: {[key: string]: DataDep} = {}
@@ -290,7 +294,5 @@ export class PropertyAverageHandle implements DataBasedComputation {
     }
 }
 
-ComputationHandle.Handles.set(Average as any, {
-    global: GlobalAverageHandle,
-    property: PropertyAverageHandle
-}); 
+// Export Average computation handles
+export const AverageHandles = [GlobalAverageHandle, PropertyAverageHandle]; 

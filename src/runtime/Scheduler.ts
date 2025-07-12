@@ -2,7 +2,7 @@ import { MatchExp } from "@storage";
 import { Entity, Property, Relation, EntityInstance, RelationInstance, PropertyInstance, IInstance } from "@shared";
 import { type EtityMutationEvent } from "./ComputationSourceMap.js";
 import { Controller } from "./Controller.js";
-import { DataContext, ComputationHandle, PropertyDataContext, EntityDataContext, RelationDataContext } from "./computations/ComputationHandle.js";
+import { DataContext, PropertyDataContext, EntityDataContext, RelationDataContext } from "./computations/ComputationHandle.js";
 import { assert } from "./util.js";
 import { Computation, ComputationClass, ComputationResult, ComputationResultAsync, ComputationResultFullRecompute, ComputationResultResolved, ComputationResultSkip, DataBasedComputation, EventBasedComputation, GlobalBoundState, RecordBoundState, RecordsDataDep } from "./computations/Computation.js";
 import { DICTIONARY_RECORD, RecordMutationEvent, SYSTEM_RECORD } from "./System.js";
@@ -17,12 +17,22 @@ export { EtityMutationEvent };
 
 export const ASYNC_TASK_RECORD = '_ASYNC_TASK_'
 
+type ComputationContextType = 'global' | 'entity' | 'relation' | 'property'
+
 export class Scheduler {
     computations = new Set<Computation>()
     private sourceMapManager: ComputationSourceMapManager
+    private computationHandleMap: Map<any, { [key in ComputationContextType]?: { new(...args: any[]): Computation } }> = new Map()
     
-    constructor(public controller: Controller, entities: EntityInstance[], relations: RelationInstance[], dict: PropertyInstance[]) {
+    constructor(
+        public controller: Controller, 
+        entities: EntityInstance[], 
+        relations: RelationInstance[], 
+        dict: PropertyInstance[],
+        computationHandles: Array<{ new(...args: any[]): Computation }>
+    ) {
         this.sourceMapManager = new ComputationSourceMapManager(this.controller)
+        this.buildComputationHandleMap(computationHandles)
         const computationInputs: {dataContext: DataContext, args: IInstance}[] = []
         entities.forEach(entity => {
                     if (entity.computation) {
@@ -63,9 +73,10 @@ export class Scheduler {
         for(const computationInput of computationInputs) {
             const dataContext = computationInput.dataContext
             const args = computationInput.args as { constructor: { displayName?: string; name?: string } }
-            const handles = ComputationHandle.Handles
-            const ComputationCtor = handles.get(args.constructor)![dataContext.type]! as ComputationClass
-            assert(!!ComputationCtor, `cannot find Computation handle for ${args.constructor.displayName || args.constructor.name}`)
+            const contextMap = this.computationHandleMap.get(args.constructor)
+            assert(!!contextMap, `cannot find Computation handle map for ${args.constructor.displayName || args.constructor.name}`)
+            const ComputationCtor = contextMap![dataContext.type] as ComputationClass
+            assert(!!ComputationCtor, `cannot find Computation handle for ${args.constructor.displayName || args.constructor.name} with context type ${dataContext.type}`)
             const computation = new ComputationCtor(this.controller, args, dataContext)
             this.computations.add(computation)
 
@@ -177,6 +188,28 @@ export class Scheduler {
             }
         }
     }
+    
+    private buildComputationHandleMap(computationHandles: Array<{ new(...args: any[]): Computation }>) {
+        for (const handle of computationHandles) {
+            const handleClass = handle as any
+            if (handleClass.computationType && handleClass.contextType) {
+                if (!this.computationHandleMap.has(handleClass.computationType)) {
+                    this.computationHandleMap.set(handleClass.computationType, {})
+                }
+                const contextMap = this.computationHandleMap.get(handleClass.computationType)!
+                
+                if (Array.isArray(handleClass.contextType)) {
+                    for (const contextType of handleClass.contextType) {
+                        assert(!contextMap[contextType as ComputationContextType], `${contextType} for ${handleClass.computationType.name} is already registered.`)
+                        contextMap[contextType as ComputationContextType] = handle
+                    }
+                } else {
+                    contextMap[handleClass.contextType as ComputationContextType] = handle
+                }
+            }
+        }
+    }
+    
     getBoundStateName(dataContext: DataContext, stateName: string, stateItem: RecordBoundState<any>|GlobalBoundState<any>) {
 
         const stateDataContextKey = dataContext.type === 'property' ? 
