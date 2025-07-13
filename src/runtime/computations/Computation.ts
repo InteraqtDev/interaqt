@@ -153,6 +153,7 @@ export type DataDep = RecordsDataDep|PropertyDataDep|GlobalDataDep|DictionaryDat
 
 export interface DataBasedComputation {
     dataContext: DataContext
+    args: any
     state: {[key: string]: RecordBoundState<any>|GlobalBoundState<any>}
     // 全量计算
     compute: (...args: any[]) => Promise<ComputationResult|any>
@@ -184,6 +185,7 @@ export type EventDep = InteractionEventDep|DataEventDep
 
 export interface EventBasedComputation {
     dataContext: DataContext
+    args: any
     state: {[key: string]: RecordBoundState<any>|GlobalBoundState<any>}
     incrementalCompute?: (...args: any[]) => Promise<ComputationResult|any>
     incrementalPatchCompute?: (...args: any[]) => Promise<ComputationResult|ComputationResultPatch|ComputationResultPatch[]|undefined>

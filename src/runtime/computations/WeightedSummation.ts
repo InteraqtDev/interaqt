@@ -17,18 +17,18 @@ export class GlobalWeightedSummationHandle implements DataBasedComputation {
     dataDeps: {[key: string]: DataDep} = {}
     record: (EntityInstance|RelationInstance)
 
-    constructor(public controller: Controller, args: WeightedSummationInstance, public dataContext: DataContext) {
-        this.matchRecordToWeight = args.callback.bind(this)
-        this.record = args.record
+    constructor(public controller: Controller, public args: WeightedSummationInstance, public dataContext: DataContext) {
+        this.matchRecordToWeight = this.args.callback.bind(this)
+        this.record = this.args.record
         
         
         this.dataDeps = {
             main: {
                 type: 'records',
                 source: this.record,
-                attributeQuery: args.attributeQuery
+                attributeQuery: this.args.attributeQuery
             },
-            ...(args.dataDeps || {})
+            ...(this.args.dataDeps || {})
         }
     }
 
@@ -97,22 +97,22 @@ export class PropertyWeightedSummationHandle implements DataBasedComputation {
     relationAttributeQuery: AttributeQueryData
 
     constructor(public controller: Controller, public args: WeightedSummationInstance, public dataContext: PropertyDataContext) {
-        this.matchRecordToWeight = args.callback.bind(this)
+        this.matchRecordToWeight = this.args.callback.bind(this)
 
         // 我们假设在PropertyWeightedSummationHandle中，records数组的第一个元素是一个Relation
-        this.relation = args.record as RelationInstance
+        this.relation = this.args.record as RelationInstance
         this.relationAttr = this.relation.source.name === dataContext.host.name ? this.relation.sourceProperty : this.relation.targetProperty
         this.isSource = this.relation.source.name === dataContext.host.name
         assert(this.isSource ? this.relation.source === dataContext.host : this.relation.target === dataContext.host, 'weighted summation computation relation direction error')
         this.relatedRecordName = this.isSource ? this.relation.target.name! : this.relation.source.name!
-        this.relationAttributeQuery = args.attributeQuery || []
+        this.relationAttributeQuery = this.args.attributeQuery || []
         
         this.dataDeps = {
             _current: {
                 type: 'property',
                 attributeQuery: [[this.relationAttr, {attributeQuery: [['&', {attributeQuery: this.relationAttributeQuery}]]}]]
             },
-            ...(args.dataDeps || {})
+            ...(this.args.dataDeps || {})
         }
     }
 

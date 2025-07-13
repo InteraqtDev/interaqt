@@ -16,10 +16,10 @@ export class GlobalAverageHandle implements DataBasedComputation {
     avgFieldPath: string[]
     
     constructor(public controller: Controller, public args: AverageInstance, public dataContext: DataContext) {
-        this.record = args.record
+        this.record = this.args.record
         
         // 获取 attributeQuery 的第一个字段作为平均值计算字段
-        if (!args.attributeQuery || args.attributeQuery.length === 0) {
+        if (!this.args.attributeQuery || this.args.attributeQuery.length === 0) {
             throw new Error('Average computation requires attributeQuery with at least one field')
         }
 
@@ -34,7 +34,7 @@ export class GlobalAverageHandle implements DataBasedComputation {
             main: {
                 type: 'records',
                 source: this.record,
-                attributeQuery: args.attributeQuery
+                attributeQuery: this.args.attributeQuery
             }
         }
     }
@@ -151,16 +151,16 @@ export class PropertyAverageHandle implements DataBasedComputation {
 
     constructor(public controller: Controller, public args: AverageInstance, public dataContext: PropertyDataContext) {
         // We assume in PropertyAverageHandle, the records array's first element is a Relation
-        this.relation = args.record as RelationInstance
-        this.isSource = args.direction ? args.direction === 'source' : this.relation.source.name === dataContext.host.name
+        this.relation = this.args.record as RelationInstance
+        this.isSource = this.args.direction ? this.args.direction === 'source' : this.relation.source.name === dataContext.host.name
         assert(this.isSource ? this.relation.source === dataContext.host : this.relation.target === dataContext.host, 'average computation relation direction error')
         this.relationAttr = this.isSource ? this.relation.sourceProperty : this.relation.targetProperty
         this.relatedRecordName = this.isSource ? this.relation.target.name! : this.relation.source.name!
         
-        this.relationAttributeQuery = args.attributeQuery || []
+        this.relationAttributeQuery = this.args.attributeQuery || []
         
         // 解析 attributeQuery 获取平均值计算字段
-        if (!args.attributeQuery || args.attributeQuery.length === 0) {
+        if (!this.args.attributeQuery || this.args.attributeQuery.length === 0) {
             throw new Error('Average computation requires attributeQuery with at least one field')
         }
         

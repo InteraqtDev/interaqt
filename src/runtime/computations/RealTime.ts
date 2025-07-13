@@ -18,13 +18,13 @@ export class GlobalRealTimeComputation implements DataBasedComputation {
     nextRecomputeTime?: (now: number, dataDeps: {[key: string]: any}) => number
 
     constructor(public controller: Controller, public args: RealTimeInstance, public dataContext: DataContext) {
-        this.dataDeps = args.dataDeps ?? {};
+        this.dataDeps = this.args.dataDeps ?? {};
         this.callback = (now: Expression, dataDeps: {[key: string]: any}) => {
-            return (args.callback as any).call(this.controller, now, dataDeps);
+            return (this.args.callback as any).call(this.controller, now, dataDeps);
         };
-        this.nextRecomputeTime = args.nextRecomputeTime ? 
+        this.nextRecomputeTime = this.args.nextRecomputeTime ? 
             (now: number, dataDeps: {[key: string]: any}) => {
-                return (args.nextRecomputeTime as any).call(this.controller, now, dataDeps);
+                return (this.args.nextRecomputeTime as any).call(this.controller, now, dataDeps);
             } : undefined;
     }
     createState() {
@@ -80,15 +80,15 @@ export class PropertyRealTimeComputation implements DataBasedComputation {
                 type: 'property',
                 attributeQuery: this.args.attributeQuery
             },
-            ...(args.dataDeps || {})
+            ...(this.args.dataDeps || {})
         }
         this.isResultNumber = (this.dataContext.id as PropertyInstance).type === 'number'
         this.callback = (now: Expression, dataDeps: {[key: string]: any}) => {
-            return (args.callback as any).call(this.controller, now, dataDeps);
+            return (this.args.callback as any).call(this.controller, now, dataDeps);
         };
-        this.nextRecomputeTime = args.nextRecomputeTime ? 
+        this.nextRecomputeTime = this.args.nextRecomputeTime ? 
             (now: number, dataDeps: {[key: string]: any}) => {
-                return (args.nextRecomputeTime as any).call(this.controller, now, dataDeps);
+                return (this.args.nextRecomputeTime as any).call(this.controller, now, dataDeps);
             } : undefined;
     }
     createState() {

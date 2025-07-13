@@ -14,14 +14,14 @@ export class RecordsTransformHandle implements DataBasedComputation {
     useLastValue: boolean = true
     dataDeps: {[key: string]: DataDep} = {}
     
-    constructor(public controller: Controller, args: TransformInstance, public dataContext: DataContext) {
-        this.transformCallback = args.callback.bind(this)
+    constructor(public controller: Controller, public args: TransformInstance, public dataContext: DataContext) {
+        this.transformCallback = this.args.callback.bind(this)
         
         this.dataDeps = {
             main: {
                 type: 'records',
-                source: args.record as EntityInstance|RelationInstance|ActivityInstance|InteractionInstance,
-                attributeQuery: args.attributeQuery || ['*']
+                source: this.args.record as EntityInstance|RelationInstance|ActivityInstance|InteractionInstance,
+                attributeQuery: this.args.attributeQuery || ['*']
             }
         }
     }

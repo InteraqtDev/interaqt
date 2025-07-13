@@ -19,6 +19,9 @@ import { SummationHandles } from "./computations/Summation.js";
 import { AverageHandles } from "./computations/Average.js";
 import { RealTimeHandles } from "./computations/RealTime.js";
 import { StateMachineHandles } from "./computations/StateMachine.js";
+import {
+    InteractionExecutionError
+} from "./errors/index.js";
 
 export const USER_ENTITY = 'User'
 
@@ -217,10 +220,33 @@ export class Controller {
     callbacks: Map<any, Set<SystemCallback>> = new Map()
 
     async callInteraction(interactionName:string, interactionEventArgs: InteractionEventArgs) {
-        return this.activityManager.callInteraction(interactionName, interactionEventArgs)
+        try {
+            return await this.activityManager.callInteraction(interactionName, interactionEventArgs)
+        } catch (e) {
+            const error = new InteractionExecutionError('Failed to call interaction', {
+                interactionName,
+                userId: interactionEventArgs.user?.id,
+                payload: interactionEventArgs.payload,
+                executionPhase: 'callInteraction',
+                causedBy: e instanceof Error ? e : new Error(String(e))
+            })
+            throw error
+        }
     }
     async callActivityInteraction(activityName:string, interactionName:string, activityId: string|undefined, interactionEventArgs: InteractionEventArgs) {
-        return this.activityManager.callActivityInteraction(activityName, interactionName, activityId, interactionEventArgs)
+        try {
+            return await this.activityManager.callActivityInteraction(activityName, interactionName, activityId, interactionEventArgs)
+        } catch (e) {
+            const error = new InteractionExecutionError('Failed to call activity interaction', {
+                interactionName,
+                userId: interactionEventArgs.user?.id,
+                payload: interactionEventArgs.payload,
+                executionPhase: 'callActivityInteraction',
+                context: { activityName, activityId },
+                causedBy: e instanceof Error ? e : new Error(String(e))
+            })
+            throw error
+        }
     }
     async runRecordChangeSideEffects(result: InteractionCallResponse, logger: SystemLogger) {
         const mutationEvents = result.effects as RecordMutationEvent[]

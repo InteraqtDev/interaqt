@@ -11,6 +11,12 @@ import { assert } from "../util.js";
 import { asyncInteractionContext } from "../asyncInteractionContext.js";
 import { Controller, InteractionContext, RecordMutationSideEffect } from "../Controller.js";
 import { MatchExpressionData } from "../../storage/index.js";
+import {
+    ActivityError,
+    ActivityStateError,
+    InteractionExecutionError,
+    ErrorUtils
+} from "../errors/index.js";
 
 
 export const INTERACTION_RECORD = '_Interaction_'
@@ -125,65 +131,127 @@ export class ActivityManager {
         const context = asyncInteractionContext.getStore() as InteractionContext
         const logger = this.controller.system.logger.child(context?.logContext || {})
 
-        const interactionCall = this.interactionCallsByName.get(interactionName)!
-        assert(!!interactionCall, `cannot find interaction for ${interactionName}`)
-
-        logger.info({label: "interaction", message: interactionCall.interaction.name})
-        await this.controller.system.storage.beginTransaction(interactionCall.interaction.name)
-        let unknownError: any
-        let result: InteractionCallResponse
         try {
-            result = await interactionCall.call(interactionEventArgs)
-        } catch(e) {
-            unknownError = e
-            result = {
-                error: e,
-                effects: [],
-                sideEffects: {},
-                data: undefined,
-                event: undefined,
+            const interactionCall = this.interactionCallsByName.get(interactionName)
+            if (!interactionCall) {
+                const error = new InteractionExecutionError(`Cannot find interaction for ${interactionName}`, {
+                    interactionName,
+                    userId: interactionEventArgs.user?.id,
+                    payload: interactionEventArgs.payload,
+                    executionPhase: 'interaction-lookup'
+                })
+                throw error
             }
-        } finally {
-            if (unknownError||result!.error) {
-                if (unknownError) {
-                    console.error(unknownError)
-                    logger.error({label: "systemError", message: 'unknownError', error: unknownError})
-                }
-                logger.error({label: "interaction", message: interactionCall.interaction.name, error: result!.error})
-                await this.controller.system.storage.rollbackTransaction(interactionCall.interaction.name)
-            } else {
-                await this.controller.system.storage.commitTransaction(interactionCall.interaction.name)
-                await this.runRecordChangeSideEffects(result!, logger)
-            }
-        }
 
-        return result
+            logger.info({label: "interaction", message: interactionCall.interaction.name})
+            await this.controller.system.storage.beginTransaction(interactionCall.interaction.name)
+            let unknownError: any
+            let result: InteractionCallResponse
+            try {
+                result = await interactionCall.call(interactionEventArgs)
+            } catch(e) {
+                unknownError = e
+                // Create structured error with context
+                const contextualError = new InteractionExecutionError('Interaction execution failed', {
+                    interactionName,
+                    userId: interactionEventArgs.user?.id,
+                    payload: interactionEventArgs.payload,
+                    executionPhase: 'interaction-execution',
+                    causedBy: e instanceof Error ? e : new Error(String(e))
+                })
+                
+                result = {
+                    error: contextualError,
+                    effects: [],
+                    sideEffects: {},
+                    data: undefined,
+                    event: undefined,
+                }
+            } finally {
+                if (unknownError||result!.error) {
+                    if (unknownError) {
+                        console.error(unknownError)
+                        logger.error({label: "systemError", message: 'unknownError', error: unknownError})
+                    }
+                    logger.error({label: "interaction", message: interactionCall.interaction.name, error: result!.error})
+                    await this.controller.system.storage.rollbackTransaction(interactionCall.interaction.name)
+                } else {
+                    await this.controller.system.storage.commitTransaction(interactionCall.interaction.name)
+                    await this.runRecordChangeSideEffects(result!, logger)
+                }
+            }
+
+            return result
+        } catch (e) {
+            // Top-level error handling for unexpected errors
+            const error = new InteractionExecutionError('Unexpected error during interaction call', {
+                interactionName,
+                userId: interactionEventArgs.user?.id,
+                payload: interactionEventArgs.payload,
+                executionPhase: 'top-level',
+                causedBy: e instanceof Error ? e : new Error(String(e))
+            })
+            throw error
+        }
     }
 
     async callActivityInteraction(activityName: string, interactionName: string, activityId: string | undefined, interactionEventArgs: InteractionEventArgs): Promise<InteractionCallResponse> {
         const context = asyncInteractionContext.getStore() as InteractionContext
         const logger = this.controller.system.logger.child(context?.logContext || {})
 
-        const activityCall = this.activityCallsByName.get(activityName)!
-        assert(!!activityCall, `cannot find activity for ${activityName}`)
+        try {
+            const activityCall = this.activityCallsByName.get(activityName)
+            if (!activityCall) {
+                const error = new ActivityError(`Cannot find activity for ${activityName}`, {
+                    activityName,
+                    context: {
+                        interactionName,
+                        activityId,
+                        userId: interactionEventArgs.user?.id
+                    }
+                })
+                throw error
+            }
 
-        logger.info({label: "activity", message: activityCall.activity.name})
-        await this.controller.system.storage.beginTransaction(activityCall.activity.name)
-        
-        // 获取 interaction UUID 通过名称
-        const interactionCall = activityCall.interactionCallByName.get(interactionName)
-        assert(!!interactionCall, `cannot find interaction ${interactionName} in activity ${activityName}`)
-        
-        const result = await activityCall.callInteraction(activityId, interactionCall!.interaction.uuid, interactionEventArgs)
-        if (result.error) {
-            logger.error({label: "activity", message: activityCall.activity.name})
-            await this.controller.system.storage.rollbackTransaction(activityCall.activity.name)
-        } else {
-            await this.controller.system.storage.commitTransaction(activityCall.activity.name)
-            await this.runRecordChangeSideEffects(result, logger)
+            logger.info({label: "activity", message: activityCall.activity.name})
+            await this.controller.system.storage.beginTransaction(activityCall.activity.name)
+            
+            // 获取 interaction UUID 通过名称
+            const interactionCall = activityCall.interactionCallByName.get(interactionName)
+            if (!interactionCall) {
+                const error = new InteractionExecutionError(`Cannot find interaction ${interactionName} in activity ${activityName}`, {
+                    interactionName,
+                    userId: interactionEventArgs.user?.id,
+                    payload: interactionEventArgs.payload,
+                    executionPhase: 'activity-interaction-lookup',
+                    context: { activityName, activityId }
+                })
+                await this.controller.system.storage.rollbackTransaction(activityCall.activity.name)
+                throw error
+            }
+            
+            const result = await activityCall.callInteraction(activityId, interactionCall.interaction.uuid, interactionEventArgs)
+            if (result.error) {
+                logger.error({label: "activity", message: activityCall.activity.name})
+                await this.controller.system.storage.rollbackTransaction(activityCall.activity.name)
+            } else {
+                await this.controller.system.storage.commitTransaction(activityCall.activity.name)
+                await this.runRecordChangeSideEffects(result, logger)
+            }
+
+            return result
+        } catch (e) {
+            const error = new ActivityError('Unexpected error during activity interaction call', {
+                activityName,
+                context: {
+                    interactionName,
+                    activityId,
+                    userId: interactionEventArgs.user?.id
+                },
+                causedBy: e instanceof Error ? e : new Error(String(e))
+            })
+            throw error
         }
-
-        return result
     }
 
     private async runRecordChangeSideEffects(result: InteractionCallResponse, logger: SystemLogger) {

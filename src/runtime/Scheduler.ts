@@ -4,6 +4,11 @@ import { type EtityMutationEvent } from "./ComputationSourceMap.js";
 import { Controller } from "./Controller.js";
 import { DataContext, PropertyDataContext, EntityDataContext, RelationDataContext } from "./computations/Computation.js";
 import { assert } from "./util.js";
+import {
+    SchedulerError,
+    ComputationError, ComputationStateError,
+    ComputationDataDepError
+} from "./errors/index.js";
 import { Computation, ComputationClass, ComputationResult, ComputationResultAsync, ComputationResultFullRecompute, ComputationResultResolved, ComputationResultSkip, DataBasedComputation, EventBasedComputation, GlobalBoundState, RecordBoundState, RecordsDataDep } from "./computations/Computation.js";
 import { DICTIONARY_RECORD, RecordMutationEvent, SYSTEM_RECORD } from "./System.js";
 import {
@@ -429,19 +434,57 @@ export class Scheduler {
         return (computation as DataBasedComputation).compute !== undefined
     }
     async runDirtyRecordsComputation(source: EntityEventSourceMap, mutationEvent: RecordMutationEvent) {
-        if ((source as EntityCreateEventsSourceMap).isInitial) {
-            await this.runComputation(source.computation, mutationEvent, mutationEvent.record, true)
-        } else {
-            let dirtyRecordsAndEvents: [any, EtityMutationEvent][] = []
-            if (this.isDataBasedComputation(source.computation)) {
-                dirtyRecordsAndEvents = await this.computeDataBasedDirtyRecordsAndEvents(source, mutationEvent)
+        try {
+            if ((source as EntityCreateEventsSourceMap).isInitial) {
+                await this.runComputation(source.computation, mutationEvent, mutationEvent.record, true)
             } else {
-                dirtyRecordsAndEvents = await this.computeEventBasedDirtyRecordsAndEvents(source, mutationEvent)
+                let dirtyRecordsAndEvents: [any, EtityMutationEvent][] = []
+                
+                try {
+                    if (this.isDataBasedComputation(source.computation)) {
+                        dirtyRecordsAndEvents = await this.computeDataBasedDirtyRecordsAndEvents(source, mutationEvent)
+                    } else {
+                        dirtyRecordsAndEvents = await this.computeEventBasedDirtyRecordsAndEvents(source, mutationEvent)
+                    }
+                } catch (e) {
+                    const error = new ComputationError('Failed to compute dirty records and events', {
+                        handleName: source.computation.constructor.name,
+                        computationName: source.computation.args.constructor.displayName,
+                        dataContext: source.computation.dataContext,
+                        computationPhase: 'dirty-records-computation',
+                        causedBy: e instanceof Error ? e : new Error(String(e))
+                    })
+                    throw error
+                }
+        
+                for(const [record, erRecordMutationEvent] of dirtyRecordsAndEvents) {
+                    try {
+                        await this.runComputation(source.computation, erRecordMutationEvent, record)
+                    } catch (e) {
+                        // Log the error but continue with other records to avoid blocking the entire batch
+                        const error = new ComputationError('Failed to run computation for dirty record', {
+                            handleName: source.computation.constructor.name,
+                            computationName: source.computation.args.constructor.displayName,
+                            dataContext: source.computation.dataContext,
+                            computationPhase: 'batch-computation',
+                            context: { recordId: record?.id },
+                            causedBy: e instanceof Error ? e : new Error(String(e))
+                        })
+                        // For now, re-throw to maintain existing behavior, but in production you might want to log and continue
+                        throw error
+                    }
+                }
             }
-    
-            for(const [record, erRecordMutationEvent] of dirtyRecordsAndEvents) {
-                await this.runComputation(source.computation, erRecordMutationEvent, record)
+        } catch (e) {
+            if (e instanceof ComputationError) {
+                throw e
             }
+            const error = new SchedulerError('Unexpected error in dirty records computation', {
+                schedulingPhase: 'dirty-records-processing',
+                failedComputations: [source.computation.args.constructor.displayName],
+                causedBy: e instanceof Error ? e : new Error(String(e))
+            })
+            throw error
         }
     }
     getAsyncTaskRecordKey(computation: Computation) {
@@ -531,74 +574,221 @@ export class Scheduler {
         return (computation as DataBasedComputation).asyncReturn !== undefined
     }
 
+
     async runComputation(computation: Computation, erRecordMutationEvent: RecordMutationEvent, record?: any, forceFullCompute: boolean = false) {
-        let computationResult: ComputationResult|any
+        try {
+            let computationResult: ComputationResult|any
 
-        const dataDeps = (computation as DataBasedComputation).dataDeps ? await this.resolveDataDeps(computation as DataBasedComputation, record) : {}
-
-        if (forceFullCompute || (!computation.incrementalCompute && !computation.incrementalPatchCompute)) {
-            // 全量计算。forceFullCompute 用在了初始化时，或者要修正数据时。
-            const databasedComputation = computation as DataBasedComputation
-            computationResult = await databasedComputation.compute(dataDeps, record)
-        } else {
-            if (computation.incrementalCompute) {
-                // 1.增量计算，返回全量结果
-                let lastValue = undefined
-                if (computation.useLastValue) {
-                    lastValue = await this.controller.retrieveLastValue(computation.dataContext, record)
-                }
-                
-                computationResult = await computation.incrementalCompute(lastValue, erRecordMutationEvent, record, dataDeps)
-                
-            } else if(computation.incrementalPatchCompute){
-                // 2.增量计算，返回增量结果
-                let lastValue = undefined
-                if (computation.useLastValue) {
-                    lastValue = await this.controller.retrieveLastValue(computation.dataContext, record)
-                }
-    
-                computationResult = await computation.incrementalPatchCompute(lastValue, erRecordMutationEvent, record, dataDeps)
-            } else {
-                throw new Error(`Unknown computation type: ${computation.constructor.name}`)
+            // 1. 依赖解析阶段的错误处理
+            let dataDeps: any = {}
+            try {
+                dataDeps = (computation as DataBasedComputation).dataDeps ? await this.resolveDataDeps(computation as DataBasedComputation, record) : {}
+            } catch (e) {
+                const error = new ComputationDataDepError('Failed to resolve computation data dependencies', {
+                    handleName: computation.constructor.name,
+                    computationName: computation.args.constructor.displayName,
+                    dataContext: computation.dataContext,
+                    causedBy: e instanceof Error ? e : new Error(String(e))
+                })
+                throw error
             }
 
-            if (computationResult instanceof ComputationResultFullRecompute) {
-                // 如果计算结果为 false ，说明不能增量计算，要全量计算。
-                const databasedComputation = computation as DataBasedComputation
-                assert(databasedComputation.compute !== undefined, 'compute must be defined for computation incrementalCompute returns false')
-                computationResult = await databasedComputation.compute(dataDeps, record)
-            }   
-        }
+            // 2. 计算执行阶段的错误处理
+            try {
+                if (forceFullCompute || (!computation.incrementalCompute && !computation.incrementalPatchCompute)) {
+                    // 全量计算。forceFullCompute 用在了初始化时，或者要修正数据时。
+                    const databasedComputation = computation as DataBasedComputation
+                    computationResult = await databasedComputation.compute(dataDeps, record)
+                } else {
+                    if (computation.incrementalCompute) {
+                        // 1.增量计算，返回全量结果
+                        let lastValue = undefined
+                        if (computation.useLastValue) {
+                            try {
+                                lastValue = await this.controller.retrieveLastValue(computation.dataContext, record)
+                            } catch (e) {
+                                const error = new ComputationStateError('Failed to retrieve last value for incremental computation', {
+                                    handleName: computation.constructor.name,
+                                    computationName: computation.args.constructor.displayName,
+                                    dataContext: computation.dataContext,
+                                    causedBy: e instanceof Error ? e : new Error(String(e))
+                                })
+                                throw error
+                            }
+                        }
+                        
+                        computationResult = await computation.incrementalCompute(lastValue, erRecordMutationEvent, record, dataDeps)
+                        
+                    } else if(computation.incrementalPatchCompute){
+                        // 2.增量计算，返回增量结果
+                        let lastValue = undefined
+                        if (computation.useLastValue) {
+                            try {
+                                lastValue = await this.controller.retrieveLastValue(computation.dataContext, record)
+                            } catch (e) {
+                                const error = new ComputationStateError('Failed to retrieve last value for incremental patch computation', {
+                                    handleName: computation.constructor.name,
+                                    computationName: computation.args.constructor.displayName,
+                                    dataContext: computation.dataContext,
+                                    causedBy: e instanceof Error ? e : new Error(String(e))
+                                })
+                                throw error
+                            }
+                        }
+            
+                        computationResult = await computation.incrementalPatchCompute(lastValue, erRecordMutationEvent, record, dataDeps)
+                    } else {
+                        const error = new ComputationError(`Unknown computation type: ${computation.constructor.name}`, {
+                            handleName: computation.constructor.name,
+                            computationName: computation.args.constructor.displayName,
+                            dataContext: computation.dataContext,
+                            computationPhase: 'type-validation'
+                        })
+                        throw error
+                    }
 
-        if (computationResult instanceof ComputationResultSkip) {
-            return
-        }
-        if (computationResult instanceof ComputationResultAsync) {
-            return await this.createAsyncTask(computation, computationResult.args, record)
-        } 
+                    if (computationResult instanceof ComputationResultFullRecompute) {
+                        // 如果计算结果为 false ，说明不能增量计算，要全量计算。
+                        const databasedComputation = computation as DataBasedComputation
+                        if (!databasedComputation.compute) {
+                            const error = new ComputationError('compute must be defined for computation when incrementalCompute returns ComputationResultFullRecompute', {
+                                handleName: computation.constructor.name,
+                                computationName: computation.args.constructor.displayName,
+                                dataContext: computation.dataContext,
+                                computationPhase: 'fallback-compute'
+                            })
+                            throw error
+                        }
+                        computationResult = await databasedComputation.compute(dataDeps, record)
+                    }   
+                }
+            } catch (e) {
+                if (e instanceof ComputationError) {
+                    throw e // Re-throw our custom errors
+                }
+                const error = new ComputationError('Computation execution failed', {
+                    handleName: computation.constructor.name,
+                    computationName: computation.args.constructor.displayName,
+                    dataContext: computation.dataContext,
+                    computationPhase: 'execution',
+                    causedBy: e instanceof Error ? e : new Error(String(e))
+                })
+                throw error
+            }
 
-        // 剩下的都是要直接处理结果的
-        const result = computationResult instanceof ComputationResultResolved ? await computation.asyncReturn!(computationResult.result, computationResult.args) : computationResult
-        
-        if (computation.incrementalPatchCompute) {
-            await this.controller.applyResultPatch(computation.dataContext, result, record)
-        } else {
-            await this.controller.applyResult(computation.dataContext, result, record)
+            if (computationResult instanceof ComputationResultSkip) {
+                return
+            }
+            if (computationResult instanceof ComputationResultAsync) {
+                try {
+                    return await this.createAsyncTask(computation, computationResult.args, record)
+                } catch (e) {
+                    const error = new ComputationError('Failed to create async task', {
+                        handleName: computation.constructor.name,
+                        computationName: computation.args.constructor.displayName,
+                        dataContext: computation.dataContext,
+                        computationPhase: 'async-task-creation',
+                        causedBy: e instanceof Error ? e : new Error(String(e))
+                    })
+                    throw error
+                }
+            } 
+
+            // 3. 结果处理阶段的错误处理
+            try {
+                const result = computationResult instanceof ComputationResultResolved ? await computation.asyncReturn!(computationResult.result, computationResult.args) : computationResult
+                
+                if (computation.incrementalPatchCompute) {
+                    await this.controller.applyResultPatch(computation.dataContext, result, record)
+                } else {
+                    await this.controller.applyResult(computation.dataContext, result, record)
+                }
+            } catch (e) {
+                const error = new ComputationError('Failed to apply computation result', {
+                    handleName: computation.constructor.name,
+                    computationName: computation.args.constructor.displayName,
+                    dataContext: computation.dataContext,
+                    computationPhase: 'result-application',
+                    causedBy: e instanceof Error ? e : new Error(String(e))
+                })
+                throw error
+            }
+        } catch (e) {
+            if (e instanceof ComputationError) {
+                throw e // Re-throw our custom errors
+            }
+            // Top-level unexpected error handling
+            const error = new ComputationError('Unexpected error during computation execution', {
+                handleName: computation.constructor.name,
+                computationName: computation.args.constructor.displayName,
+                dataContext: computation.dataContext,
+                computationPhase: 'top-level',
+                causedBy: e instanceof Error ? e : new Error(String(e))
+            })
+            throw error
         }
     }
     async resolveDataDeps(computation: DataBasedComputation, record?: any) {
         if (computation.dataDeps) {
-
-            const values: any[] = await Promise.all(Object.values(computation.dataDeps).map(async dataDep => {
-                if (dataDep.type === 'records') {
-                    return await this.controller.system.storage.find(dataDep.source.name!, undefined, {}, dataDep.attributeQuery)
-                } else if (dataDep.type === 'property') {
-                    return this.controller.system.storage.findOne((computation.dataContext as PropertyDataContext).host.name!, MatchExp.atom({key: 'id', value: ['=', record.id]}), {}, dataDep.attributeQuery)
-                } else if (dataDep.type === 'global') {
-                    return await this.controller.system.storage.get(DICTIONARY_RECORD, dataDep.source.name!)
+            try {
+                const values: any[] = await Promise.all(Object.entries(computation.dataDeps).map(async ([dataDepName, dataDep]) => {
+                    try {
+                        if (dataDep.type === 'records') {
+                            return await this.controller.system.storage.find(dataDep.source.name!, undefined, {}, dataDep.attributeQuery)
+                        } else if (dataDep.type === 'property') {
+                            if (!record?.id) {
+                                const error = new ComputationDataDepError('Record ID is required for property data dependency', {
+                                    depName: dataDepName,
+                                    depType: dataDep.type,
+                                    missingData: true,
+                                    handleName: computation.constructor.name,
+                                    computationName: computation.args.constructor.displayName,
+                                    dataContext: computation.dataContext
+                                })
+                                throw error
+                            }
+                            return this.controller.system.storage.findOne((computation.dataContext as PropertyDataContext).host.name!, MatchExp.atom({key: 'id', value: ['=', record.id]}), {}, dataDep.attributeQuery)
+                        } else if (dataDep.type === 'global') {
+                            return await this.controller.system.storage.get(DICTIONARY_RECORD, dataDep.source.name!)
+                        } else {
+                            const error = new ComputationDataDepError(`Unknown data dependency type: ${(dataDep as any).type}`, {
+                                depName: dataDepName,
+                                depType: (dataDep as any).type,
+                                invalidData: true,
+                                handleName: computation.constructor.name,
+                                computationName: computation.args.constructor.displayName,
+                                dataContext: computation.dataContext
+                            })
+                            throw error
+                        }
+                    } catch (e) {
+                        if (e instanceof ComputationDataDepError) {
+                            throw e
+                        }
+                        const error = new ComputationDataDepError(`Failed to resolve data dependency '${dataDepName}'`, {
+                            depName: dataDepName,
+                            depType: dataDep.type,
+                            handleName: computation.constructor.name,
+                            computationName: computation.args.constructor.displayName,
+                            dataContext: computation.dataContext,
+                            causedBy: e instanceof Error ? e : new Error(String(e))
+                        })
+                        throw error
+                    }
+                }))
+                return Object.fromEntries(Object.entries(computation.dataDeps).map(([dataDepName], index) => [dataDepName, values[index]]))
+            } catch (e) {
+                if (e instanceof ComputationDataDepError) {
+                    throw e
                 }
-            }))
-            return Object.fromEntries(Object.entries(computation.dataDeps).map(([dataDepName, dataDep], index) => [dataDepName, values[index]]))
+                const error = new ComputationDataDepError('Failed to resolve computation data dependencies', {
+                    handleName: computation.constructor.name,
+                    computationName: computation.args.constructor.displayName,
+                    dataContext: computation.dataContext,
+                    causedBy: e instanceof Error ? e : new Error(String(e))
+                })
+                throw error
+            }
         } else {
             return {}
         }
@@ -611,15 +801,61 @@ export class Scheduler {
     }
     
     async setup() {
-        // entity/relation/dict 是 computation 时的 defaultValue.
-        await this.setupDefaultValues()
-        // entity/relation/dict 中的 computation 内部的 state 的 default value.
-        await this.setupStateDefaultValues()
-        // 设置 computation 对 mutation 事件 的监听
-        await this.setupMutationListeners()
-        // 可能需要的 computation 初始化行为。
-        // 为什么放在这里，因为 global dict 的赋值行为可能触发初始化的其他 computation.
-        await this.setupGlobalDict()
+        try {
+            // entity/relation/dict 是 computation 时的 defaultValue.
+            try {
+                await this.setupDefaultValues()
+            } catch (e) {
+                const error = new SchedulerError('Failed to setup computation default values', {
+                    schedulingPhase: 'default-values-setup',
+                    causedBy: e instanceof Error ? e : new Error(String(e))
+                })
+                throw error
+            }
+
+            // entity/relation/dict 中的 computation 内部的 state 的 default value.
+            try {
+                await this.setupStateDefaultValues()
+            } catch (e) {
+                const error = new SchedulerError('Failed to setup computation state default values', {
+                    schedulingPhase: 'state-default-values-setup',
+                    causedBy: e instanceof Error ? e : new Error(String(e))
+                })
+                throw error
+            }
+
+            // 设置 computation 对 mutation 事件 的监听
+            try {
+                await this.setupMutationListeners()
+            } catch (e) {
+                const error = new SchedulerError('Failed to setup mutation listeners for computations', {
+                    schedulingPhase: 'mutation-listeners-setup',
+                    causedBy: e instanceof Error ? e : new Error(String(e))
+                })
+                throw error
+            }
+
+            // 可能需要的 computation 初始化行为。
+            // 为什么放在这里，因为 global dict 的赋值行为可能触发初始化的其他 computation.
+            try {
+                await this.setupGlobalDict()
+            } catch (e) {
+                const error = new SchedulerError('Failed to setup global dictionary', {
+                    schedulingPhase: 'global-dict-setup',
+                    causedBy: e instanceof Error ? e : new Error(String(e))
+                })
+                throw error
+            }
+        } catch (e) {
+            if (e instanceof SchedulerError) {
+                throw e
+            }
+            const error = new SchedulerError('Unexpected error during scheduler setup', {
+                schedulingPhase: 'top-level-setup',
+                causedBy: e instanceof Error ? e : new Error(String(e))
+            })
+            throw error
+        }
     }
 }
 

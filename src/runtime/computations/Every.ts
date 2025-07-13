@@ -18,16 +18,16 @@ export class GlobalEveryHandle implements DataBasedComputation {
     dataDeps: {[key: string]: DataDep} = {}
     defaultValue: boolean
     constructor(public controller: Controller,  public args: EveryInstance,  public dataContext: DataContext, ) {
-        this.callback = args.callback.bind(this)
+        this.callback = this.args.callback.bind(this)
         this.dataDeps = {
             main: {
                 type: 'records',
-                source: args.record,
-                attributeQuery: args.attributeQuery
+                source: this.args.record,
+                attributeQuery: this.args.attributeQuery
             },
-            ...(args.dataDeps || {})
+            ...(this.args.dataDeps || {})
         }
-        this.defaultValue = !args.notEmpty
+        this.defaultValue = !this.args.notEmpty
     }
 
     createState() {
@@ -98,17 +98,17 @@ export class PropertyEveryHandle implements DataBasedComputation {
     isSource: boolean   
     relationAttributeQuery: AttributeQueryData
     constructor(public controller: Controller,  public args: EveryInstance,  public dataContext: PropertyDataContext ) {
-        this.callback = args.callback.bind(this)
+        this.callback = this.args.callback.bind(this)
 
-        const relation = args.record as RelationInstance
+        const relation = this.args.record as RelationInstance
         assert(relation.source.name === dataContext.host.name || relation.target.name === dataContext.host.name, 'relation source or target must be the same as the host')
         this.relation = relation
-        this.isSource = args.direction ? args.direction === 'source' :relation.source.name === dataContext.host.name
+        this.isSource = this.args.direction ? this.args.direction === 'source' :relation.source.name === dataContext.host.name
         assert(this.isSource ? this.relation.source === dataContext.host : this.relation.target === dataContext.host, 'every computation relation direction error')
         this.relationAttr = this.isSource ? relation.sourceProperty : relation.targetProperty
         this.relatedRecordName = this.isSource ? relation.target.name! : relation.source.name!
 
-        this.relationAttributeQuery = args.attributeQuery || []
+        this.relationAttributeQuery = this.args.attributeQuery || []
 
         this.dataDeps = {
             _current: {
@@ -116,7 +116,7 @@ export class PropertyEveryHandle implements DataBasedComputation {
                 // CAUTION 这里注册的依赖是从当前的 record 出发的。
                 attributeQuery: [[this.relationAttr, {attributeQuery: [['&', {attributeQuery: this.relationAttributeQuery}]]}]]
             },
-            ...(args.dataDeps || {})
+            ...(this.args.dataDeps || {})
         }
     }
 

@@ -16,17 +16,17 @@ export class GlobalCountHandle implements DataBasedComputation {
     dataDeps: {[key: string]: DataDep} = {}
     record: (EntityInstance|RelationInstance)
 
-    constructor(public controller: Controller, args: CountInstance, public dataContext: DataContext) {
-        this.record = args.record
-        this.callback = args.callback?.bind(this)
+    constructor(public controller: Controller, public args: CountInstance, public dataContext: DataContext) {
+        this.record = this.args.record
+        this.callback = this.args.callback?.bind(this)
         
         this.dataDeps = {
             main: {
                 type: 'records',
                 source: this.record,
-                attributeQuery: args.attributeQuery
+                attributeQuery: this.args.attributeQuery
             },
-            ...(args.dataDeps || {})
+            ...(this.args.dataDeps || {})
         }
     }
     
@@ -122,16 +122,16 @@ export class PropertyCountHandle implements DataBasedComputation {
     relationAttributeQuery: any
 
     constructor(public controller: Controller, public args: CountInstance, public dataContext: PropertyDataContext) {
-        this.callback = args.callback?.bind(this)
+        this.callback = this.args.callback?.bind(this)
         
         // We assume in PropertyCountHandle, the records array's first element is a Relation
-        this.relation = args.record as RelationInstance
-        this.isSource = args.direction ? args.direction === 'source' : this.relation.source.name === dataContext.host.name
+        this.relation = this.args.record as RelationInstance
+        this.isSource = this.args.direction ? this.args.direction === 'source' : this.relation.source.name === dataContext.host.name
         assert(this.isSource ? this.relation.source === dataContext.host : this.relation.target === dataContext.host, 'count computation relation direction error')
         this.relationAttr = this.isSource ? this.relation.sourceProperty : this.relation.targetProperty
         this.relatedRecordName = this.isSource ? this.relation.target.name! : this.relation.source.name!
         
-        this.relationAttributeQuery = args.attributeQuery || []
+        this.relationAttributeQuery = this.args.attributeQuery || []
         
         this.dataDeps = {
             _current: {
@@ -140,7 +140,7 @@ export class PropertyCountHandle implements DataBasedComputation {
                     [[this.relationAttr, {attributeQuery: [['&', {attributeQuery: this.relationAttributeQuery}]]}]] : 
                     [[this.relationAttr, {attributeQuery: ['id']}]]
             },
-            ...(args.dataDeps || {})
+            ...(this.args.dataDeps || {})
         }
     }
 

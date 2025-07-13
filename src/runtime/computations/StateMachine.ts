@@ -21,8 +21,8 @@ export class GlobalStateMachineHandle implements EventBasedComputation {
     eventDeps: {[key: string]: EventDep} = {}
     defaultState: StateNodeInstance
     constructor(public controller: Controller, public args: StateMachineInstance, public dataContext: DataContext) {
-        this.transitionFinder = new TransitionFinder(args)
-        this.defaultState = args.defaultState
+        this.transitionFinder = new TransitionFinder(this.args)
+        this.defaultState = this.args.defaultState
     }
     createState() {
         return {
@@ -68,9 +68,9 @@ export class PropertyStateMachineHandle implements EventBasedComputation {
     useLastValue: boolean = true
     eventDeps: {[key: string]: EventDep} = {}
     defaultState: StateNodeInstance
-    constructor(public controller: Controller, args: StateMachineInstance, public dataContext: DataContext) {
-        this.transitionFinder = new TransitionFinder(args)
-        this.defaultState = args.defaultState
+    constructor(public controller: Controller, public args: StateMachineInstance, public dataContext: DataContext) {
+        this.transitionFinder = new TransitionFinder(this.args)
+        this.defaultState = this.args.defaultState
 
         
     }
@@ -128,9 +128,9 @@ export class RecordStateMachineHandle implements EventBasedComputation {
     eventDeps: {[key: string]: EventDep} = {}
     defaultState: StateNodeInstance
     dataContext: EntityDataContext
-    constructor(public controller: Controller, args: StateMachineInstance, dataContext: DataContext) {
-        this.transitionFinder = new TransitionFinder(args)
-        this.defaultState = args.defaultState
+    constructor(public controller: Controller, public args: StateMachineInstance, dataContext: DataContext) {
+        this.transitionFinder = new TransitionFinder(this.args)
+        this.defaultState = this.args.defaultState
         this.dataContext = dataContext as EntityDataContext
     }
     createState() {

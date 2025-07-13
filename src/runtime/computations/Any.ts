@@ -16,15 +16,15 @@ export class GlobalAnyHandle implements DataBasedComputation {
     state!: ReturnType<typeof this.createState>
     useLastValue: boolean = true
     dataDeps: {[key: string]: DataDep} = {}
-    constructor(public controller: Controller,  args: AnyInstance,  public dataContext: DataContext, ) {
-        this.callback = args.callback.bind(this)
+    constructor(public controller: Controller,  public args: AnyInstance,  public dataContext: DataContext, ) {
+        this.callback = this.args.callback.bind(this)
         this.dataDeps = {
             main: {
                 type: 'records',
-                source:args.record,
-                attributeQuery: args.attributeQuery
+                source:this.args.record,
+                attributeQuery: this.args.attributeQuery
             },
-            ...(args.dataDeps || {})
+            ...(this.args.dataDeps || {})
         }
     }
 
@@ -89,22 +89,22 @@ export class PropertyAnyHandle implements DataBasedComputation {
     isSource: boolean
     relation: RelationInstance
     relationAttributeQuery: AttributeQueryData
-    constructor(public controller: Controller,  args: AnyInstance,  public dataContext: PropertyDataContext ) {
-        this.callback = args.callback.bind(this)
+    constructor(public controller: Controller,  public args: AnyInstance,  public dataContext: PropertyDataContext ) {
+        this.callback = this.args.callback.bind(this)
 
-        const relation = args.record as RelationInstance
+        const relation = this.args.record as RelationInstance
         this.relation = relation
-        this.isSource = args.direction ? args.direction === 'source' :relation.source.name === dataContext.host.name
+        this.isSource = this.args.direction ? this.args.direction === 'source' :relation.source.name === dataContext.host.name
         assert(this.isSource ? this.relation.source === dataContext.host : this.relation.target === dataContext.host, 'count computation relation direction error')
         this.relationAttr = this.isSource ? relation.sourceProperty : relation.targetProperty
         this.relatedRecordName = this.isSource ? relation.target.name! : relation.source.name!
-        this.relationAttributeQuery = args.attributeQuery || []
+        this.relationAttributeQuery = this.args.attributeQuery || []
         this.dataDeps = {
             _current: {
                 type: 'property',
                 attributeQuery: [[this.relationAttr, {attributeQuery: [['&', {attributeQuery: this.relationAttributeQuery}]]}]]
             },
-            ...(args.dataDeps || {})
+            ...(this.args.dataDeps || {})
         }
     }
 
