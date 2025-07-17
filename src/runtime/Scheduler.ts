@@ -40,8 +40,8 @@ export class Scheduler {
         this.buildComputationHandleMap(computationHandles)
         const computationInputs: {dataContext: DataContext, args: IInstance}[] = []
         entities.forEach(entity => {
-                    if (entity.computation) {
-            computationInputs.push({dataContext: {type: 'entity',id: entity},args: entity.computation})
+            if (entity.computation) {
+                computationInputs.push({dataContext: {type: 'entity',id: entity},args: entity.computation})
             }
 
             // property 的
