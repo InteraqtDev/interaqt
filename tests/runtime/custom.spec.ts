@@ -50,7 +50,7 @@ describe('Custom computation', () => {
               attributeQuery: ['price']
             }
           },
-          compute: async function(this: Controller, dataContext: any, args: any, state: any, dataDeps: any) {
+          compute: async function(this: Controller, dataDeps: any) {
             console.log('Compute called!');
             computeExecuted++;
             console.log('Compute executed count:', computeExecuted);
@@ -141,14 +141,14 @@ describe('Custom computation', () => {
             attributeQuery: ['value']
           }
         },
-        compute: async function(this: Controller, dataContext: any, args: any, state: any, dataDeps: any) {
+        compute: async function(this: Controller, dataDeps: any) {
           console.log('compute called with dataDeps:', dataDeps);
           computeCount++;
           const counters = dataDeps.counters || [];
           const total = counters.reduce((sum: number, c: any) => sum + (c.value || 0), 0);
           return total * 2;
         },
-        incrementalCompute: async function(this: Controller, dataContext: any, args: any, state: any, lastValue: any, mutationEvent: any, record: any, dataDeps: any) {
+        incrementalCompute: async function(this: Controller, lastValue: any, mutationEvent: any, record: any, dataDeps: any) {
           console.log('incrementalCompute called with:', { lastValue, mutationEvent });
           incrementalCount++;
           
@@ -241,26 +241,26 @@ describe('Custom computation', () => {
         getDefaultValue: function() {
           return { value: 0 };
         },
-        compute: async function(this: Controller, dataContext: any, args: any, state: any, dataDeps: any) {
-          console.log('compute called with state:', state);
+        compute: async function(this: any, dataDeps: any) {
+          console.log('compute called with state:', this.state);
           console.log('compute called with dataDeps:', dataDeps);
           
-          if (!state || !state.myState) {
+          if (!this.state || !this.state.myState) {
             return { value: 0, error: 'no state' };
           }
           
           // 读取当前状态
-          const current = await state.myState.get() || { count: 0 };
+          const current = await this.state.myState.get() || { count: 0 };
           console.log('Current state:', current);
           
           // 基于触发器值更新状态
           const increment = dataDeps.trigger || 0;
           const newState = { count: current.count + increment };
-          await state.myState.set(newState);
+          await this.state.myState.set(newState);
           console.log('New state set:', newState);
           
           // 验证状态是否真的被保存了
-          const verifyState = await state.myState.get();
+          const verifyState = await this.state.myState.get();
           console.log('Verified state:', verifyState);
           
           return { 
@@ -324,10 +324,10 @@ describe('Custom computation', () => {
           type: 'string',
           computation: Custom.create({
             name: 'AsyncFetcher',
-            compute: async function(this: Controller, dataContext: any, args: any, state: any, dataDeps: any, record: any) {
+            compute: async function(this: any, dataDeps: any, record: any) {
               return ComputationResult.async({ taskId: 'test-task' });
             },
-            asyncReturn: async function(this: Controller, dataContext: any, args: any, state: any, asyncResult: any) {
+            asyncReturn: async function(this: any, asyncResult: any, dataDeps: any, record: any) {
               // Simulate async operation completion
               if (asyncResult.status === 'success') {
                 return 'Async result: ' + asyncResult.data;
@@ -381,7 +381,7 @@ describe('Custom computation', () => {
             })
           }
         },
-        compute: async function(this: Controller, dataContext: any, args: any, state: any, dataDeps: any) {
+        compute: async function(this: any, dataDeps: any) {
           console.log('Global compute called with dataDeps:', dataDeps);
           const settings = dataDeps.settings || { prefix: 'Default' };
           return { 
@@ -467,7 +467,7 @@ describe('Custom computation', () => {
             attributeQuery: ['source', 'target']
           }
         },
-        compute: async function(this: Controller, dataContext: any, args: any, state: any, dataDeps: any) {
+        compute: async function(this: any, dataDeps: any) {
           console.log('Compute called with dataDeps:', JSON.stringify(dataDeps, null, 2));
           const posts = dataDeps.posts || [];
           const relations = dataDeps.relations || [];

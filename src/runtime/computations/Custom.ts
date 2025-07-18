@@ -18,12 +18,12 @@ abstract class BaseCustomComputationHandle implements DataBasedComputation {
   useLastValue: boolean
   dataDeps: {[key: string]: DataDep} = {}
   
-  computeCallback?: (this: Controller, ...args: any[]) => Promise<ComputationResult|any>
-  incrementalComputeCallback?: (this: Controller, ...args: any[]) => Promise<ComputationResult|any>
-  incrementalPatchComputeCallback?: (this: Controller, ...args: any[]) => Promise<ComputationResult|ComputationResultPatch|ComputationResultPatch[]|undefined>
-  createStateCallback?: (this: Controller, ...args: any[]) => {[key: string]: RecordBoundState<any>|GlobalBoundState<any>}
-  getDefaultValueCallback?: (this: Controller, ...args: any[]) => any
-  asyncReturnCallback?: (this: Controller, ...args: any[]) => Promise<ComputationResult|any>
+  computeCallback?: Function
+  incrementalComputeCallback?: Function
+  incrementalPatchComputeCallback?: Function
+  createStateCallback?: Function
+  getDefaultValueCallback?: Function
+  asyncReturnCallback?: Function
   
   constructor(public controller: Controller, public args: CustomInstance, public dataContext: DataContext) {
     // 设置 useLastValue
@@ -34,29 +34,29 @@ abstract class BaseCustomComputationHandle implements DataBasedComputation {
       this.dataDeps = args.dataDeps;
     }
     
-    // 绑定所有回调函数到 controller 上下文
+    // 保存回调函数引用
     if (args.compute) {
-      this.computeCallback = args.compute.bind(this.controller);
+      this.computeCallback = args.compute;
     }
     if (args.incrementalCompute) {
-      this.incrementalComputeCallback = args.incrementalCompute.bind(this.controller);
+      this.incrementalComputeCallback = args.incrementalCompute;
     }
     if (args.incrementalPatchCompute) {
-      this.incrementalPatchComputeCallback = args.incrementalPatchCompute.bind(this.controller);
+      this.incrementalPatchComputeCallback = args.incrementalPatchCompute;
     }
     if (args.createState) {
-      this.createStateCallback = args.createState.bind(this.controller);
+      this.createStateCallback = args.createState;
     }
     if (args.getDefaultValue) {
-      this.getDefaultValueCallback = args.getDefaultValue.bind(this.controller);
+      this.getDefaultValueCallback = args.getDefaultValue;
     }
     if (args.asyncReturn) {
-      this.asyncReturnCallback = args.asyncReturn.bind(this.controller);
+      this.asyncReturnCallback = args.asyncReturn;
     }
     
     // 如果提供了 createState，调用它来初始化 state
     if (this.createStateCallback) {
-      this.state = this.createStateCallback.call(this.controller, this.dataContext, this.args);
+      this.state = this.createStateCallback.call(this.controller);
       // 绑定 state 到 controller
       Object.entries(this.state).forEach(([key, state]) => {
         state.key = key;
@@ -65,22 +65,22 @@ abstract class BaseCustomComputationHandle implements DataBasedComputation {
     }
   }
   
-  createState(...args: any[]) {
+  createState() {
     if (this.createStateCallback) {
-      const states = this.createStateCallback.call(this.controller, this.dataContext, this.args, ...args);
+      const states = this.createStateCallback.call(this.controller);
       // 绑定 state 到 controller
       Object.entries(states).forEach(([key, state]) => {
-        state.key = key;
-        state.controller = this.controller;
+        (state as any).key = key;
+        (state as any).controller = this.controller;
       });
       return states;
     }
     return {};
   }
   
-  getDefaultValue(...args: any[]) {
+  getDefaultValue() {
     if (this.getDefaultValueCallback) {
-      return this.getDefaultValueCallback.call(this.controller, this.dataContext, this.args, this.state, ...args);
+      return this.getDefaultValueCallback.call(this.controller);
     }
     return undefined;
   }
@@ -89,7 +89,13 @@ abstract class BaseCustomComputationHandle implements DataBasedComputation {
     if (this.computeCallback) {
       // 传递 dataDeps 和 record（对于 property computation）
       const [dataDeps, record] = args;
-      return await this.computeCallback.call(this.controller, this.dataContext, this.args, this.state, dataDeps, record);
+      // 创建一个包含 state 的上下文对象
+      const context = {
+        controller: this.controller,
+        state: this.state,
+        getState: (key: string) => this.state[key]
+      };
+      return await this.computeCallback.call(context, dataDeps, record);
     }
     return ComputationResult.skip();
   }
@@ -98,7 +104,12 @@ abstract class BaseCustomComputationHandle implements DataBasedComputation {
     if (this.incrementalComputeCallback) {
       // 传递 lastValue, mutationEvent 等参数
       const [lastValue, mutationEvent, record, dataDeps] = args;
-      return await this.incrementalComputeCallback.call(this.controller, this.dataContext, this.args, this.state, lastValue, mutationEvent, record, dataDeps);
+      const context = {
+        controller: this.controller,
+        state: this.state,
+        getState: (key: string) => this.state[key]
+      };
+      return await this.incrementalComputeCallback.call(context, lastValue, mutationEvent, record, dataDeps);
     }
     // 如果没有定义增量计算，回退到全量计算
     return ComputationResult.fullRecompute('No incrementalCompute defined');
@@ -107,15 +118,25 @@ abstract class BaseCustomComputationHandle implements DataBasedComputation {
   async incrementalPatchCompute(...args: any[]): Promise<ComputationResult|ComputationResultPatch|ComputationResultPatch[]|undefined> {
     if (this.incrementalPatchComputeCallback) {
       const [lastValue, mutationEvent, record, dataDeps] = args;
-      return await this.incrementalPatchComputeCallback.call(this.controller, this.dataContext, this.args, this.state, lastValue, mutationEvent, record, dataDeps);
+      const context = {
+        controller: this.controller,
+        state: this.state,
+        getState: (key: string) => this.state[key]
+      };
+      return await this.incrementalPatchComputeCallback.call(context, lastValue, mutationEvent, record, dataDeps);
     }
     return undefined;
   }
   
   async asyncReturn(...args: any[]): Promise<ComputationResult|any> {
     if (this.asyncReturnCallback) {
-      const [asyncResult] = args;
-      return await this.asyncReturnCallback.call(this.controller, this.dataContext, this.args, this.state, asyncResult);
+      const [asyncResult, dataDeps, record] = args;
+      const context = {
+        controller: this.controller,
+        state: this.state,
+        getState: (key: string) => this.state[key]
+      };
+      return await this.asyncReturnCallback.call(context, asyncResult, dataDeps, record);
     }
     return ComputationResult.skip();
   }

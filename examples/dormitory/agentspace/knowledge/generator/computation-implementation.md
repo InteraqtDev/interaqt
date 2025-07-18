@@ -577,6 +577,258 @@ const ProjectTaskRelation = Relation.create({
 });
 ```
 
+### 6. Custom - Complete User Control (USE WITH CAUTION!)
+
+```typescript
+import { Custom, Controller, GlobalBoundState } from 'interaqt';
+```
+
+**🔴 WARNING: Custom should be your LAST RESORT!**
+
+Before using Custom computation, ask yourself:
+1. Can I use Transform for entity/relation creation? → Use Transform
+2. Can I use StateMachine for updates? → Use StateMachine
+3. Can I use Count/Summation/Every/Any for aggregations? → Use those
+4. Can I use computed/getValue for simple calculations? → Use those
+5. Can I combine existing computations? → Combine them
+
+**Only use Custom when:**
+- You need complex business logic that doesn't fit ANY existing computation type
+- You need external API integration (but consider if this belongs in the interaction layer)
+- You need complex async operations that can't be handled by other computations
+- You need stateful calculations with custom persistence logic
+- You need advanced data transformations that require full control
+
+**Examples of MISUSE (DON'T do this):**
+```typescript
+// ❌ WRONG: Using Custom for simple count
+Property.create({
+  name: 'postCount',
+  type: 'number',
+  defaultValue: () => 0,
+  computation: Custom.create({
+    name: 'SimplePostCount',
+    dataDeps: {
+      posts: { type: 'relations', source: UserPostRelation }
+    },
+    compute: async function(dataDeps) {
+      return dataDeps.posts.length;  // Just use Count!
+    }
+  })
+})
+
+// ❌ WRONG: Using Custom for entity creation
+Entity.create({
+  name: 'Post',
+  computation: Custom.create({
+    name: 'PostCreator',
+    dataDeps: {
+      events: { type: 'records', source: InteractionEventEntity }
+    },
+    compute: async function(dataDeps) {
+      // This won't even work! Just use Transform!
+      if (dataDeps.events.some(e => e.interactionName === 'CreatePost')) {
+        // Custom can't create entities like this
+      }
+    }
+  })
+})
+
+// ❌ WRONG: Using Custom for status updates  
+Property.create({
+  name: 'status',
+  type: 'string',
+  defaultValue: () => 'active',
+  computation: Custom.create({
+    name: 'StatusUpdater',
+    dataDeps: {
+      deleteEvents: { type: 'records', source: InteractionEventEntity }
+    },
+    compute: async function(dataDeps, record) {
+      // This approach doesn't work! Just use StateMachine!
+      const hasDelete = dataDeps.deleteEvents.some(e => 
+        e.interactionName === 'DeleteItem' && e.payload.id === record?.id
+      );
+      return hasDelete ? 'deleted' : 'active';
+    }
+  })
+})
+```
+
+**Examples of PROPER use:**
+```typescript
+// ✅ CORRECT: Complex scoring algorithm with state
+const complexScoring = Dictionary.create({
+  name: 'userEngagementScore',
+  type: 'object',
+  defaultValue: () => ({}),
+  computation: Custom.create({
+    name: 'EngagementScorer',
+    dataDeps: {
+      users: { type: 'records', source: User, attributeQuery: ['id', 'name'] },
+      userPosts: { type: 'relations', source: UserPostRelation, attributeQuery: [
+        ['source', { attributeQuery: ['id'] }],
+        ['target', { attributeQuery: ['id', 'createdAt', 'content'] }]
+      ]},
+      postComments: { type: 'relations', source: PostCommentRelation, attributeQuery: [
+        ['source', { attributeQuery: ['id'] }],
+        ['target', { attributeQuery: ['id', 'content', 'author'] }]
+      ]},
+      userLikes: { type: 'relations', source: UserPostLikeRelation, attributeQuery: [
+        ['source', { attributeQuery: ['id'] }],
+        ['target', { attributeQuery: ['id'] }]
+      ]}
+    },
+    createState: function() {
+      return { scoreCache: new GlobalBoundState({}) };
+    },
+    compute: async function(dataDeps) {
+      // Complex multi-factor scoring that doesn't fit other computations
+      const scores = {};
+      
+      for (const user of dataDeps.users) {
+        // Get user's posts through relations
+        const userPostRelations = dataDeps.userPosts.filter(rel => rel.source.id === user.id);
+        
+        // Calculate post score with time decay
+        const postScore = userPostRelations.reduce((acc, rel) => {
+          const post = rel.target;
+          const age = Date.now() - post.createdAt;
+          const decay = Math.exp(-age / (30 * 24 * 60 * 60 * 1000)); // 30-day half-life
+          
+          // Count comments on this post
+          const commentCount = dataDeps.postComments.filter(c => c.source.id === post.id).length;
+          
+          // Use content length as a proxy for quality
+          const qualityFactor = post.content ? Math.min(post.content.length / 500, 2) : 1;
+          
+          return acc + (1 + commentCount * 0.5) * qualityFactor * decay;
+        }, 0);
+        
+        // Count user's likes given
+        const likeCount = dataDeps.userLikes.filter(rel => rel.source.id === user.id).length;
+        
+        // Calculate engagement score with logarithmic scaling
+        const engagementScore = Math.log(1 + postScore * 2 + likeCount * 0.3);
+        
+        scores[user.id] = {
+          userId: user.id,
+          userName: user.name,
+          score: engagementScore,
+          breakdown: { 
+            postCount: userPostRelations.length, 
+            postScore: Math.round(postScore * 100) / 100, 
+            likeCount 
+          }
+        };
+      }
+      
+      // Cache results for future use
+      if (this.state && this.state.scoreCache) {
+        await this.state.scoreCache.set(scores);
+      }
+      
+      return scores;
+    },
+    getDefaultValue: function() {
+      return {};
+    }
+  })
+});
+
+// ✅ CORRECT: Complex calculation requiring multiple data sources and custom logic
+const riskScoreCalculation = Dictionary.create({
+  name: 'entityRiskScores',
+  type: 'object',
+  defaultValue: () => ({}),
+  computation: Custom.create({
+    name: 'RiskScoreCalculator',
+    dataDeps: {
+      entities: { type: 'records', source: BusinessEntity, attributeQuery: ['id', 'name', 'type', 'createdAt'] },
+      transactions: { type: 'relations', source: EntityTransactionRelation, attributeQuery: [
+        ['source', { attributeQuery: ['id'] }],
+        ['target', { attributeQuery: ['id', 'amount', 'status', 'createdAt'] }]
+      ]},
+      compliance: { type: 'records', source: ComplianceCheck, attributeQuery: ['entityId', 'checkType', 'result', 'severity'] }
+    },
+    createState: function() {
+      return {
+        riskThresholds: new GlobalBoundState({
+          low: 0,
+          medium: 30,
+          high: 70,
+          critical: 90
+        })
+      };
+    },
+    compute: async function(dataDeps) {
+      // Complex risk calculation that combines multiple factors
+      const riskScores = {};
+      const thresholds = this.state ? await this.state.riskThresholds.get() : {
+        low: 0,
+        medium: 30,
+        high: 70,
+        critical: 90
+      };
+      
+      for (const entity of dataDeps.entities) {
+        // Factor 1: Transaction patterns
+        const entityTransactions = dataDeps.transactions.filter(rel => rel.source.id === entity.id);
+        const failedTransactions = entityTransactions.filter(rel => rel.target.status === 'failed');
+        const transactionRisk = (failedTransactions.length / Math.max(entityTransactions.length, 1)) * 40;
+        
+        // Factor 2: Compliance issues
+        const entityCompliance = dataDeps.compliance.filter(c => c.entityId === entity.id);
+        const criticalIssues = entityCompliance.filter(c => c.severity === 'critical').length;
+        const majorIssues = entityCompliance.filter(c => c.severity === 'major').length;
+        const complianceRisk = (criticalIssues * 10 + majorIssues * 5);
+        
+        // Factor 3: Entity age (newer entities are riskier)
+        const ageInDays = (Date.now() - entity.createdAt) / (24 * 60 * 60 * 1000);
+        const ageRisk = ageInDays < 30 ? 20 : (ageInDays < 90 ? 10 : 0);
+        
+        // Calculate final risk score with weighted factors
+        const totalRisk = Math.min(100, transactionRisk + complianceRisk + ageRisk);
+        
+        // Determine risk level
+        let riskLevel = 'low';
+        if (totalRisk >= thresholds.critical) riskLevel = 'critical';
+        else if (totalRisk >= thresholds.high) riskLevel = 'high';
+        else if (totalRisk >= thresholds.medium) riskLevel = 'medium';
+        
+        riskScores[entity.id] = {
+          entityId: entity.id,
+          entityName: entity.name,
+          score: totalRisk,
+          level: riskLevel,
+          factors: {
+            transactionRisk,
+            complianceRisk,
+            ageRisk
+          },
+          calculatedAt: Date.now()
+        };
+      }
+      
+      return riskScores;
+    },
+    getDefaultValue: function() {
+      return {};
+    }
+  })
+});
+```
+
+**Custom Computation Best Practices:**
+1. **Document WHY** you need Custom instead of other computations
+2. **Minimize dependencies** - only include data you absolutely need
+3. **Handle errors gracefully** - Custom computations can fail
+4. **Consider performance** - Custom computations can be expensive
+5. **Test thoroughly** - Custom logic is more prone to bugs
+6. **Cache strategically** - Use state management to avoid redundant calculations
+
+**Remember:** The power of interaqt comes from its declarative computations. Custom computation breaks this paradigm and should only be used when absolutely necessary. Always try to express your logic using the standard computation types first!
+
 ## Implementation Steps
 
 ### Step 1: Entity Creation Pattern
@@ -726,6 +978,7 @@ Property.create({
 | Summation/WeightedSummation | Property computation | Sum values |
 | Every/Any | Property computation | Boolean checks |
 | computed/getValue | Property definition | Simple derived values |
+| Custom (⚠️ Last Resort) | Dictionary/Property computation | Complex logic that doesn't fit other types |
 
 ## Common Patterns
 

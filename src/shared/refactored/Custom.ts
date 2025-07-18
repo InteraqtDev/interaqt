@@ -5,12 +5,12 @@ import type { ComputationRecord, AttributeQueryData } from './types.js';
 export interface CustomInstance extends IInstance {
   name: string;
   dataDeps?: { [key: string]: any };
-  compute?: Function;
-  incrementalCompute?: Function;
-  incrementalPatchCompute?: Function;
-  createState?: Function;
-  getDefaultValue?: Function;
-  asyncReturn?: Function;
+  compute?: Function; // (dataDeps: any, record?: any) => any
+  incrementalCompute?: Function; // (lastValue: any, mutationEvent: any, record: any, dataDeps: any) => any
+  incrementalPatchCompute?: Function; // (lastValue: any, mutationEvent: any, record: any, dataDeps: any) => any
+  createState?: Function; // () => { [key: string]: BoundState }
+  getDefaultValue?: Function; // () => any
+  asyncReturn?: Function; // (asyncResult: any, dataDeps: any, record?: any) => any
   useLastValue?: boolean;
 }
 

@@ -720,6 +720,327 @@ const lastRecomputeTime = await system.storage.get(DICTIONARY_RECORD, lastRecomp
 const nextRecomputeTime = await system.storage.get(DICTIONARY_RECORD, nextRecomputeTimeKey);
 ```
 
+### Custom.create()
+
+Create custom computation with completely user-defined calculation logic.
+
+Custom computation provides maximum flexibility, allowing developers to implement any business logic that doesn't fit into other computation types. It supports custom compute functions, incremental computation, state management, and flexible data dependencies.
+
+**Syntax**
+```typescript
+Custom.create(config: CustomConfig): CustomInstance
+```
+
+**Parameters**
+- `config.name` (string, required): Computation name for identification
+- `config.compute` (function, required): Main computation function with signature:
+  ```typescript
+  // For Dictionary/Global context:
+  async function(
+    this: { controller: Controller, state: any }, 
+    dataDeps: any
+  ): Promise<any>
+  
+  // For Property context:
+  async function(
+    this: { controller: Controller, state: any }, 
+    dataDeps: any,
+    record: any
+  ): Promise<any>
+  ```
+- `config.incrementalCompute` (function, optional): Incremental computation function for optimized updates:
+  ```typescript
+  async function(
+    this: { controller: Controller, state: any },
+    lastValue: any,
+    mutationEvent: any,
+    record: any,
+    dataDeps: any
+  ): Promise<any>
+  ```
+- `config.incrementalPatchCompute` (function, optional): Patch-based incremental computation:
+  ```typescript
+  async function(
+    this: { controller: Controller, state: any },
+    lastValue: any,
+    mutationEvent: any,
+    record: any,
+    dataDeps: any
+  ): Promise<ComputationResultPatch[]>
+  ```
+- `config.createState` (function, optional): Create custom state for the computation:
+  ```typescript
+  function(): any
+  ```
+- `config.getDefaultValue` (function, optional): Provide default value when computation hasn't run:
+  ```typescript
+  function(): any
+  ```
+- `config.asyncReturn` (function, optional): Handle async task results:
+  ```typescript
+  async function(
+    this: { controller: Controller, state: any },
+    asyncResult: any,
+    dataDeps: any,
+    record?: any
+  ): Promise<any>
+  ```
+- `config.dataDeps` (object, optional): Data dependency configuration, format: `{[key: string]: DataDep}`
+- `config.useLastValue` (boolean, optional): Whether to use last computed value in incremental computation
+- `config.attributeQuery` (AttributeQueryData, optional): Attribute query configuration
+
+**Examples**
+
+```typescript
+// Basic custom computation for global dictionary
+const userStats = Dictionary.create({
+    name: 'userStats',
+    type: 'object',
+    collection: false,
+    computation: Custom.create({
+        name: 'UserStatsCalculator',
+        dataDeps: {
+            users: {
+                type: 'records',
+                source: User,
+                attributeQuery: ['id', 'status', 'createdAt']
+            },
+            posts: {
+                type: 'records',
+                source: Post,
+                attributeQuery: ['id', 'authorId', 'status']
+            }
+        },
+        compute: async function(this: Controller, dataContext, args, state, dataDeps) {
+            const activeUsers = dataDeps.users.filter(u => u.status === 'active');
+            const publishedPosts = dataDeps.posts.filter(p => p.status === 'published');
+            
+            return {
+                totalUsers: dataDeps.users.length,
+                activeUsers: activeUsers.length,
+                totalPosts: dataDeps.posts.length,
+                publishedPosts: publishedPosts.length,
+                avgPostsPerUser: dataDeps.posts.length / dataDeps.users.length || 0
+            };
+        },
+        getDefaultValue: function() {
+            return {
+                totalUsers: 0,
+                activeUsers: 0,
+                totalPosts: 0,
+                publishedPosts: 0,
+                avgPostsPerUser: 0
+            };
+        }
+    })
+});
+
+// Incremental computation with state management
+const counterDict = Dictionary.create({
+    name: 'globalCounter',
+    type: 'object',
+    collection: false,
+    computation: Custom.create({
+        name: 'IncrementalCounter',
+        useLastValue: true,
+        dataDeps: {
+            counters: {
+                type: 'records',
+                source: Counter,
+                attributeQuery: ['value']
+            }
+        },
+        compute: async function(dataDeps) {
+            const total = dataDeps.counters.reduce((sum, c) => sum + (c.value || 0), 0);
+            return { total, count: dataDeps.counters.length };
+        },
+        incrementalCompute: async function(lastValue, mutationEvent, record, dataDeps) {
+            console.log('Previous value:', lastValue);
+            const total = dataDeps.counters.reduce((sum, c) => sum + (c.value || 0), 0);
+            const diff = total - (lastValue?.total || 0);
+            
+            return {
+                total,
+                count: dataDeps.counters.length,
+                lastChange: diff,
+                timestamp: Date.now()
+            };
+        },
+        getDefaultValue: function() {
+            return { total: 0, count: 0, lastChange: 0 };
+        }
+    })
+});
+
+// Custom computation with persistent state
+const stateManager = Dictionary.create({
+    name: 'stateManager',
+    type: 'object',
+    defaultValue: () => ({ value: 0 }),
+    computation: Custom.create({
+        name: 'StateManager',
+        dataDeps: {
+            trigger: {
+                type: 'global',
+                source: triggerDict
+            }
+        },
+        createState: function() {
+            return {
+                persistentCounter: new GlobalBoundState({ count: 0 })
+            };
+        },
+        compute: async function(dataDeps) {
+            if (!this.state || !this.state.persistentCounter) {
+                return { value: 0, error: 'no state' };
+            }
+            
+            // Read current state
+            const current = await this.state.persistentCounter.get() || { count: 0 };
+            
+            // Update state based on trigger
+            const increment = dataDeps.trigger || 0;
+            const newState = { count: current.count + increment };
+            await this.state.persistentCounter.set(newState);
+            
+            return { 
+                value: newState.count,
+                triggerValue: dataDeps.trigger 
+            };
+        }
+    })
+});
+
+// Async custom computation
+const apiDataProcessor = Dictionary.create({
+    name: 'apiData',
+    type: 'object',
+    collection: false,
+    computation: Custom.create({
+        name: 'APIDataProcessor',
+        asyncReturn: true,
+        dataDeps: {
+            endpoints: {
+                type: 'records',
+                source: APIEndpoint,
+                attributeQuery: ['url', 'method', 'headers']
+            }
+        },
+        compute: async function(dataDeps) {
+            // Return async task definition
+            return {
+                taskType: 'fetchAPI',
+                endpoints: dataDeps.endpoints,
+                processAt: Date.now()
+            };
+        },
+        getDefaultValue: function() {
+            return { status: 'pending', data: null };
+        }
+    })
+});
+
+// Complex relation-based computation
+const relationAnalyzer = Dictionary.create({
+    name: 'relationStats',
+    type: 'object',
+    collection: true,
+    computation: Custom.create({
+        name: 'RelationAnalyzer',
+        dataDeps: {
+            posts: {
+                type: 'records',
+                source: Post,
+                attributeQuery: ['id', 'title']
+            },
+            relations: {
+                type: 'relation',
+                source: PostAuthorRelation,
+                attributeQuery: ['source', 'target']
+            }
+        },
+        compute: async function(dataDeps) {
+            const result: any = {};
+            
+            for (const post of dataDeps.posts || []) {
+                const authorCount = (dataDeps.relations || []).filter(r => 
+                    r.source && r.source.id === post.id
+                ).length;
+                
+                result[post.id] = {
+                    title: post.title,
+                    authorCount: authorCount
+                };
+            }
+            
+            return result;
+        }
+    })
+});
+
+// Property-level custom computation (requires global data dependency to trigger)
+const User = Entity.create({
+    name: 'User',
+    properties: [
+        Property.create({ name: 'score', type: 'number' }),
+        Property.create({
+            name: 'level',
+            type: 'string',
+            defaultValue: () => 'beginner',
+            computation: Custom.create({
+                name: 'UserLevelCalculator',
+                dataDeps: {
+                    _current: {
+                        type: 'property',
+                        attributeQuery: ['score']
+                    },
+                    levelConfig: {
+                        type: 'global',
+                        source: levelConfigDict  // Global trigger required
+                    }
+                },
+                compute: async function(dataDeps, record) {
+                    const score = dataDeps._current?.score || 0;
+                    const config = dataDeps.levelConfig || { 
+                        beginner: 0, 
+                        intermediate: 100, 
+                        expert: 500 
+                    };
+                    
+                    if (score >= config.expert) return 'expert';
+                    if (score >= config.intermediate) return 'intermediate';
+                    return 'beginner';
+                }
+            })
+        })
+    ]
+});
+```
+
+**Advanced Features**
+
+1. **State Management**: Use `createState()` to create persistent state that survives across computation cycles. State can be stored using `GlobalBoundState`, `EntityBoundState`, or `RelationBoundState`.
+
+2. **Incremental Computation**: Implement `incrementalCompute` for optimized updates that can access the previous computed value.
+
+3. **Patch-based Updates**: Use `incrementalPatchCompute` for fine-grained updates that return specific changes rather than full recomputation.
+
+4. **Flexible Data Dependencies**: Configure complex data dependencies including:
+   - `type: 'records'`: Fetch entity/relation records
+   - `type: 'property'`: Access current property value
+   - `type: 'global'`: Access global dictionary values
+   - `type: 'relation'`: Access relation data
+
+5. **Async Support**: Set `asyncReturn: true` to return async task definitions that will be processed by the system's task queue.
+
+**Best Practices**
+
+1. **Always provide `getDefaultValue`**: This ensures the computation has a valid initial value
+2. **Use appropriate context type**: Global computations for system-wide values, property computations for entity-specific values
+3. **Handle missing data gracefully**: Check for null/undefined in dataDeps
+4. **Optimize with incremental computation**: Use `incrementalCompute` for expensive calculations
+5. **Property computations need triggers**: Property-level computations require global data dependencies to trigger on entity creation
+
 ### Dictionary.create()
 
 Create global dictionary for storing system-wide state and values.
