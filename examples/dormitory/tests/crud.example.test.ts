@@ -318,15 +318,12 @@ describe('Simple CRUD Example', () => {
     // Create fresh system and controller for each test
     system = new MonoSystem(new PGLiteDB())
     
-    controller = new Controller(
+    controller = new Controller({
       system,
       entities,
       relations,
-      [],  // activities
       interactions,
-      [],  // dictionaries
-      []   // side effects
-    )
+    })
 
     await controller.setup(true)
   })
