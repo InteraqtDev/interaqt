@@ -156,11 +156,11 @@ describe('StateMachineRunner', () => {
             user: user1,
             payload: {
                 to: user2,
-                request: {
-                    title: 'request1',
-                }
+                title: 'request1',
             }
         })
+
+        expect(error).toBeUndefined()
 
         const request = await controller.system.storage.find('Request', undefined, undefined, ['title', ['to', {attributeQuery:['*']}]])
         expect(request[0].title).toBe('request1')

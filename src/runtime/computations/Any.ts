@@ -17,7 +17,7 @@ export class GlobalAnyHandle implements DataBasedComputation {
     useLastValue: boolean = true
     dataDeps: {[key: string]: DataDep} = {}
     constructor(public controller: Controller,  public args: AnyInstance,  public dataContext: DataContext, ) {
-        this.callback = this.args.callback.bind(this)
+        this.callback = this.args.callback.bind(this.controller)
         this.dataDeps = {
             main: {
                 type: 'records',
@@ -90,7 +90,7 @@ export class PropertyAnyHandle implements DataBasedComputation {
     relation: RelationInstance
     relationAttributeQuery: AttributeQueryData
     constructor(public controller: Controller,  public args: AnyInstance,  public dataContext: PropertyDataContext ) {
-        this.callback = this.args.callback.bind(this)
+        this.callback = this.args.callback.bind(this.controller)
 
         const relation = this.args.record as RelationInstance
         this.relation = relation

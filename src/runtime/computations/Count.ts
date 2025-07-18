@@ -122,7 +122,7 @@ export class PropertyCountHandle implements DataBasedComputation {
     relationAttributeQuery: any
 
     constructor(public controller: Controller, public args: CountInstance, public dataContext: PropertyDataContext) {
-        this.callback = this.args.callback?.bind(this)
+        this.callback = this.args.callback?.bind(this.controller)
         
         // We assume in PropertyCountHandle, the records array's first element is a Relation
         this.relation = this.args.record as RelationInstance

@@ -1,17 +1,14 @@
 import {
     Action,
     Any,
-    Attributive,
-    Attributives,
-    BoolExp,
+    Attributive, BoolExp,
     boolExpToAttributives,
     Controller,
     createUserRoleAttributive,
     Entity,
     Every,
     Interaction,
-    InteractionEventEntity,
-    Payload,
+    InteractionEventEntity, Payload,
     PayloadItem,
     Property,
     PropertyTypes,
@@ -30,14 +27,6 @@ UserEntity.properties.push(nameProperty)
  const globalUserRole = createUserRoleAttributive({name: 'user'}  )
 const userRefA = createUserRoleAttributive({name: 'A', isRef: true})
 
-const RequestEntity= Entity.create({
-    name: 'Request',
-    properties: [Property.create({
-        name: 'reason',
-        type:'string',
-        collection: false,
-    })]
-})
 
 
  const sendInteraction = Interaction.create({
@@ -52,11 +41,44 @@ const RequestEntity= Entity.create({
                 isRef: true,
             }),
             PayloadItem.create({
-                name: 'request',
-                base: RequestEntity,
+                name: 'reason',
             })
         ]
     })
+})
+
+
+const RequestEntity= Entity.create({
+    name: 'Request',
+    properties: [Property.create({
+        name: 'reason',
+        type:'string',
+        collection: false,
+    })],
+    computation: Transform.create({
+        record: InteractionEventEntity,
+        callback: function map(event: any){
+            if (event.interactionName === sendInteraction.name) {
+                return {
+                    reason: event.payload.reason,
+                    interaction: {
+                        id: event.id,
+                    }
+                }
+            } else {
+                return null
+            }
+        }
+    })
+})
+
+
+const requestInteractionRelation = Relation.create({
+    source: RequestEntity,
+    sourceProperty: 'interaction',
+    target: InteractionEventEntity,
+    targetProperty: 'request',
+    type: '1:1',
 })
 
 
@@ -68,10 +90,16 @@ const sendRequestRelation = Relation.create({
     type: 'n:1',
     computation:  
     Transform.create({
-        callback: function map(event: any){
+        callback: async function map(this: Controller,event: any){
+            const MatchExp = this.globals.MatchExp
             if (event.interactionName === sendInteraction.name) {
+                const request = await this.system.storage.findOne('Request', MatchExp.atom({
+                    key: 'interaction.id',
+                    value: ['=', event.id]
+                }), undefined, ['id'] )
+
                 return {
-                    source: event.payload.request,
+                    source: request,
                     target: event.user,
                 }
             } else {
@@ -89,8 +117,8 @@ const MyAttr = Attributive.create({
     name: 'Mine',
     content:
     async function Mine(this: Controller, request: any, {user}: {user: any}) {
-        const {BoolExp}  = this.globals
-        const match = BoolExp.atom({
+        const {MatchExp}  = this.globals
+        const match = MatchExp.atom({
             key: 'id', 
             value: ['=', request.id]
         })
@@ -197,11 +225,15 @@ const sendRequestTransfer = StateTransfer.create({
     trigger: sendInteraction,
     current: notReviewerState,
     next: isReviewerState,
-    computeTarget: async function(eventArgs: any) {
-        
+    computeTarget: async function(this: Controller, event: any) {
+        const MatchExp = this.globals.MatchExp
+        const request = await this.system.storage.findOne('Request', MatchExp.atom({
+            key: 'interaction.id',
+            value: ['=', event.id]
+        }), undefined, ['id'] )
         return {
-            source: eventArgs.payload.request,
-            target: eventArgs.payload.to
+            source: request,
+            target: event.payload.to
         }
     }
 })
@@ -210,10 +242,10 @@ const addReviewerTransfer = StateTransfer.create({
     trigger: addReviewersInteraction,
     current: isReviewerState,
     next: notReviewerState,
-    computeTarget: async function(eventArgs: any) {
-        return eventArgs.payload.reviewer.map((reviewer: any) => {
+    computeTarget: async function(event: any) {
+        return event.payload.reviewer.map((reviewer: any) => {
             return {
-                source: eventArgs.payload.request,
+                source: event.payload.request,
                 target: reviewer
             }
         })
@@ -349,6 +381,6 @@ RequestEntity.properties.push(
     return {
         entities: [UserEntity, RequestEntity],
         interactions: [sendInteraction, approveInteraction, rejectInteraction, addReviewersInteraction, transferReviewersInteraction],
-        relations: [sendRequestRelation, reviewerRelation]
+        relations: [requestInteractionRelation, sendRequestRelation, reviewerRelation]
     }
 }

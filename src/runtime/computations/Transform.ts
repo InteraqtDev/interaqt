@@ -1,7 +1,7 @@
 import { DataContext, EntityDataContext } from "./Computation.js";
 import { Transform, TransformInstance, EntityInstance, RelationInstance, ActivityInstance, InteractionInstance } from "@shared";
 import { Controller } from "../Controller.js";
-import { BoolExp } from "@shared";
+import { MatchExp } from "@storage";
 import { ComputationResultPatch, DataDep, RecordBoundState, RecordsDataDep } from "./Computation.js";
 import { DataBasedComputation } from "./Computation.js";
 import { EtityMutationEvent } from "../ComputationSourceMap.js";
@@ -15,7 +15,7 @@ export class RecordsTransformHandle implements DataBasedComputation {
     dataDeps: {[key: string]: DataDep} = {}
     
     constructor(public controller: Controller, public args: TransformInstance, public dataContext: DataContext) {
-        this.transformCallback = this.args.callback.bind(this)
+        this.transformCallback = this.args.callback.bind(this.controller)
         
         this.dataDeps = {
             main: {
@@ -37,24 +37,22 @@ export class RecordsTransformHandle implements DataBasedComputation {
     }
 
     async compute({main: records}: {main: any[]}): Promise<any[]> {
-        const transformedRecords = [];
-        
-        return records.map((record) => {
+        return Promise.all(records.map(async (record) => {
             return {
-                ...this.transformCallback.call(this.controller, record),
+                ...await this.transformCallback.call(this.controller, record),
                 [this.state.sourceRecordId.key]: record.id
             }
-        });
+        }));
     }
 
     async incrementalPatchCompute(lastValue: any[], mutationEvent: EtityMutationEvent): Promise<ComputationResultPatch | ComputationResultPatch[]|undefined> {
         const dataContext = this.dataContext as EntityDataContext
         
         if (mutationEvent.type === 'create') {
-            const matchSourceRecord = BoolExp.atom({key: 'id', value: ['=', mutationEvent.record!.id]})
+            const matchSourceRecord = MatchExp.atom({key: 'id', value: ['=', mutationEvent.record!.id]})
             const souceDataDep = this.dataDeps.main as RecordsDataDep
             const sourceRecord = await this.controller.system.storage.findOne(souceDataDep.source.name!, matchSourceRecord, undefined, souceDataDep.attributeQuery)
-            const transformedRecord = this.transformCallback.call(this.controller, sourceRecord)
+            const transformedRecord = await this.transformCallback.call(this.controller, sourceRecord)
             // 允许返回 Null，表示不插入
             if(transformedRecord) {
                 return {
@@ -67,7 +65,7 @@ export class RecordsTransformHandle implements DataBasedComputation {
             }
         } else if (mutationEvent.type === 'update'||mutationEvent.type === 'delete') {
             const sourceRecordId = mutationEvent.oldRecord?.id ?? mutationEvent.record!.id
-            const match = BoolExp.atom({key: this.state.sourceRecordId.key, value: ['=', sourceRecordId]})
+            const match = MatchExp.atom({key: this.state.sourceRecordId.key, value: ['=', sourceRecordId]})
             const mappedRecord = await this.controller.system.storage.findOne(dataContext.id.name!, match, undefined, ['*'])
             if (mutationEvent.type === 'delete') {
                 if (mappedRecord) {
@@ -77,9 +75,9 @@ export class RecordsTransformHandle implements DataBasedComputation {
                     }
                 }
             } else {
-                const matchSourceRecord = BoolExp.atom({key: 'id', value: ['=', sourceRecordId]})
+                const matchSourceRecord = MatchExp.atom({key: 'id', value: ['=', sourceRecordId]})
                 const sourceRecord = await this.controller.system.storage.findOne((this.dataDeps.main as RecordsDataDep).source.name!, matchSourceRecord, undefined, (this.dataDeps.main as RecordsDataDep).attributeQuery)
-                const transformedRecord = this.transformCallback.call(this.controller, sourceRecord)
+                const transformedRecord = await this.transformCallback.call(this.controller, sourceRecord)
                 if (transformedRecord) {
                     const data = {
                         ...transformedRecord,

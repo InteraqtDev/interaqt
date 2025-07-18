@@ -90,9 +90,7 @@ describe('map interaction', () => {
         // 3. a 发起 sendFriendRequest
         const payload = {
             to: userB,
-            request:{
-                reason: 'let use make friend'
-            }
+            reason: 'let use make friend'
         }
         const res1 = await controller.callInteraction(sendRequestName,  {user: userA, payload})
         expect(res1.error).toBeUndefined()

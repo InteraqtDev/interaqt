@@ -1,7 +1,5 @@
-import { Entity, Action, BoolExp, boolExpToAttributives, createUserRoleAttributive, Interaction, Payload, PayloadItem, Property, Relation, StateMachine, StateNode, StateTransfer } from "interaqt";
+import { Entity, Action, BoolExp, boolExpToAttributives, createUserRoleAttributive, Interaction, Payload, PayloadItem, Property, Relation, StateMachine, StateNode, StateTransfer, Transform, InteractionEventEntity, Controller } from "interaqt";
 import { OtherAttr } from "./roles";
-import { RecordStateMachineHandle } from "interaqt";
-import { MatchExp } from "interaqt";
 
 export function createData() {
     const UserEntity = Entity.create({
@@ -9,12 +7,7 @@ export function createData() {
         properties: [Property.create({name: 'name', type: 'string'})]
     })
     
-    const RequestEntity = Entity.create({
-        name: 'Request',
-        properties: [
-            Property.create({name: 'title', type: 'string'})
-        ]
-    })
+    
 
     const sendInteraction = Interaction.create({
         name: 'sendRequest',
@@ -28,11 +21,40 @@ export function createData() {
                     isRef: true,
                 }),
                 PayloadItem.create({
-                    name: 'request',
-                    base: RequestEntity,
+                    name: 'title',
                 })
             ]
         })
+    })
+
+    const RequestEntity = Entity.create({
+        name: 'Request',
+        properties: [
+            Property.create({name: 'title', type: 'string'})
+        ],
+        computation: Transform.create({
+            record: InteractionEventEntity,
+            callback: async function(this: Controller, event: any) {
+                if (event.interactionName === sendInteraction.name) {
+                    return {
+                        title: event.payload.title,
+                        interaction: {
+                            id: event.id
+                        }
+                    }
+                } else {
+                    return null
+                }
+            }
+        })
+    })
+
+    const requestInteractionRelation = Relation.create({
+        source: RequestEntity,
+        sourceProperty: 'interaction',
+        target: InteractionEventEntity,
+        targetProperty: 'request',
+        type: '1:1',
     })
 
     // 转移
@@ -72,10 +94,14 @@ export function createData() {
         trigger: sendInteraction,
         current: notReviewerState,
         next: isReviewerState,
-        computeTarget: async function(this: RecordStateMachineHandle, eventArgs: any) {
-            // FIXME 它应该新建，它没有影响任何，这里应该如何表达？
+        computeTarget: async function(this: Controller, eventArgs: any) {
+            const MatchExp = this.globals.MatchExp
+            const request = await this.system.storage.findOne(RequestEntity.name, MatchExp.atom({
+                key: 'interaction.id',
+                value: ['=', eventArgs.id]
+            }), undefined, ['id'])
             return {
-                source: eventArgs.payload.request,
+                source: request,
                 target: eventArgs.payload.to
             }
         }
@@ -86,8 +112,9 @@ export function createData() {
         trigger: transferReviewersInteraction,
         current: isReviewerState,
         next: notReviewerState,
-        computeTarget: async function(this: RecordStateMachineHandle,eventArgs: any) {
-            const originRelation = await this.controller.system.storage.findOne(this.dataContext.id.name,
+        computeTarget: async function(this: Controller,eventArgs: any) {
+            const MatchExp = this.globals.MatchExp
+            const originRelation = await this.system.storage.findOne(reviewerRelation.name!,
                 MatchExp.atom({
                     key:'source.id',
                     value: ['=', eventArgs.payload.request.id]
@@ -103,7 +130,7 @@ export function createData() {
         trigger: transferReviewersInteraction,
         current: notReviewerState,
         next: isReviewerState,
-        computeTarget: async function(this: RecordStateMachineHandle,eventArgs: any) {
+        computeTarget: async function(this: Controller,eventArgs: any) {
             return {
                 source: eventArgs.payload.request,
                 target: eventArgs.payload.reviewer
@@ -136,7 +163,7 @@ export function createData() {
         
 
     return {
-        relations: [reviewerRelation],
+        relations: [requestInteractionRelation, reviewerRelation],
         entities: [RequestEntity, UserEntity],
         interactions: {sendInteraction, transferReviewersInteraction}
     }

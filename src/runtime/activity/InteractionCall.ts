@@ -443,34 +443,6 @@ export class InteractionCall {
         // 为 payload 里面的新数据保存起来
         return await this.controller.activityManager.saveEvent(interactionEvent, effects)
     }
-    async savePayload(payload: InteractionEventArgs["payload"], effects: any[]){
-        const payloadDefs = this.interaction.payload?.items || []
-        const savedPayload: InteractionEventArgs["payload"] = {}
-        for(let payloadDef of payloadDefs) {
-            // Only create records for payload items that have a base entity but are not references
-            if (!payloadDef.isRef && payloadDef.base) {
-                const payloadItem = payload![payloadDef.name!]
-                if (payloadItem) {
-                    const recordName = (payloadDef.base as EntityInstance).name
-                    if (payloadDef.isCollection) {
-                        savedPayload[payloadDef.name!] = await Promise.all((payloadItem as any[]).map(async (item) => {
-                            const events: RecordMutationEvent[] =[]
-                            const result = await this.system.storage.create(recordName, item, events)
-                            effects.push(...events)
-                            return result
-                        }))
-                    } else {
-                        const events: RecordMutationEvent[] =[]
-                        savedPayload[payloadDef.name!] = await this.system.storage.create(recordName, payloadItem, events)
-                        effects.push(...events)
-                    }
-                }
-            }
-        }
-
-
-        return savedPayload
-    }
     async retrieveData(interactionEvent: InteractionEventArgs) {
         const matchFn = this.interaction.dataAttributives ?
             (DataAttributives.is(this.interaction.dataAttributives) ?
@@ -529,24 +501,13 @@ export class InteractionCall {
         response.error  = await this.check(interactionEventArgs, activityId, checkUserRef, context)
 
         if (!response.error) {
-            const savedPayload = await this.savePayload(interactionEventArgs.payload, response.effects!)
             const event = {
                 interactionName: this.interaction.name,
                 interactionId: this.interaction.uuid,
                 user: interactionEventArgs.user,
                 query: interactionEventArgs.query || {},
-                payload: {
-                    ...interactionEventArgs.payload,
-                    ...savedPayload
-                },
-
-                args: {
-                    ...interactionEventArgs,
-                    payload: {
-                        ...interactionEventArgs.payload,
-                        ...savedPayload
-                    },
-                },
+                payload: interactionEventArgs.payload||{},
+                args: interactionEventArgs,
                 activity: {
                     id: activityId,
                 }

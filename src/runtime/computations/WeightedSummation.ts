@@ -18,7 +18,7 @@ export class GlobalWeightedSummationHandle implements DataBasedComputation {
     record: (EntityInstance|RelationInstance)
 
     constructor(public controller: Controller, public args: WeightedSummationInstance, public dataContext: DataContext) {
-        this.matchRecordToWeight = this.args.callback.bind(this)
+        this.matchRecordToWeight = this.args.callback.bind(this.controller)
         this.record = this.args.record
         
         
@@ -97,7 +97,7 @@ export class PropertyWeightedSummationHandle implements DataBasedComputation {
     relationAttributeQuery: AttributeQueryData
 
     constructor(public controller: Controller, public args: WeightedSummationInstance, public dataContext: PropertyDataContext) {
-        this.matchRecordToWeight = this.args.callback.bind(this)
+        this.matchRecordToWeight = this.args.callback.bind(this.controller)
 
         // 我们假设在PropertyWeightedSummationHandle中，records数组的第一个元素是一个Relation
         this.relation = this.args.record as RelationInstance

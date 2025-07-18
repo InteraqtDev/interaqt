@@ -5,16 +5,14 @@ import {
     StateNode,
     StateTransfer,
     StateMachine,
-    Any, Count, Every, Dictionary, 
+    Any, Count, Every, Dictionary,
     Transfer,
     Attributive,
     createUserRoleAttributive,
     boolExpToAttributives,
     BoolExp,
     Controller,
-    Action, Activity, Interaction, Payload, PayloadItem, USER_ENTITY,
-    PropertyStateMachineHandle, RecordStateMachineHandle, 
-    ActivityGroup
+    Action, Activity, Interaction, Payload, PayloadItem, USER_ENTITY, ActivityGroup
 } from 'interaqt';
 import { MatchExp } from "@storage";
 
@@ -198,7 +196,7 @@ export function createData() {
         trigger: approveInteraction,
         current: notFriendState,
         next: isFriendState,
-        computeTarget: async function (this: RecordStateMachineHandle, eventArgs: any) {
+        computeTarget: async function (this: Controller, eventArgs: any) {
             const match = MatchExp.atom({
                 key: 'interactionName',
                 value: ['=', sendInteraction.name]
@@ -207,7 +205,7 @@ export function createData() {
                 value: ['=', eventArgs.activity.id]
             })
             // FIXME 这里是不是应该直接能从 eventArgs 获取？？？
-            const sendEvent = await this.controller.system.storage.findOne(InteractionEventEntity.name, match, undefined, ['*'])
+            const sendEvent = await this.system.storage.findOne(InteractionEventEntity.name, match, undefined, ['*'])
             return {
                 source: sendEvent.user,
                 target: sendEvent.payload!.to
@@ -269,8 +267,8 @@ export function createData() {
         trigger: approveInteraction,
         current: resultPendingState,
         next: resultApprovedState,
-        computeTarget: async function (this: PropertyStateMachineHandle, eventArgs: any) {
-            const request= await this.controller.system.storage.findOne('Request', MatchExp.atom({
+        computeTarget: async function (this: Controller, eventArgs: any) {
+            const request= await this.system.storage.findOne('Request', MatchExp.atom({
                 key: 'activityId',
                 value: ['=', eventArgs.activity.id]
             }))
@@ -281,8 +279,8 @@ export function createData() {
         trigger: rejectInteraction,
         current: resultPendingState,
         next: resultRejectedState,
-        computeTarget: async function (this: PropertyStateMachineHandle, eventArgs: any) {
-            return this.controller.system.storage.findOne('Request', MatchExp.atom({
+        computeTarget: async function (this: Controller, eventArgs: any) {
+            return this.system.storage.findOne('Request', MatchExp.atom({
                 key: 'activityId',
                 value: ['=', eventArgs.activity.id]
             }))
@@ -305,7 +303,7 @@ export function createData() {
                     return {
                         from: interactionEvent.user,
                         to: interactionEvent.payload.to,
-                        message: interactionEvent.payload.menssage,
+                        message: interactionEvent.payload.message,
                         activityId: interactionEvent.activity.id
                     }
                 }

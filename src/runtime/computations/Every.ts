@@ -18,7 +18,7 @@ export class GlobalEveryHandle implements DataBasedComputation {
     dataDeps: {[key: string]: DataDep} = {}
     defaultValue: boolean
     constructor(public controller: Controller,  public args: EveryInstance,  public dataContext: DataContext, ) {
-        this.callback = this.args.callback.bind(this)
+        this.callback = this.args.callback.bind(this.controller)
         this.dataDeps = {
             main: {
                 type: 'records',
@@ -98,7 +98,7 @@ export class PropertyEveryHandle implements DataBasedComputation {
     isSource: boolean   
     relationAttributeQuery: AttributeQueryData
     constructor(public controller: Controller,  public args: EveryInstance,  public dataContext: PropertyDataContext ) {
-        this.callback = this.args.callback.bind(this)
+        this.callback = this.args.callback.bind(this.controller)
 
         const relation = this.args.record as RelationInstance
         assert(relation.source.name === dataContext.host.name || relation.target.name === dataContext.host.name, 'relation source or target must be the same as the host')
