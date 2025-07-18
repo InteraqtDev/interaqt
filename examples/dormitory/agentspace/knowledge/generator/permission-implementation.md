@@ -28,54 +28,42 @@ const CreateArticle = Interaction.create({
 ### Use MatchExp in Conditions, Not BoolExp
 ```typescript
 // ❌ WRONG: Using BoolExp for queries
-const post = await this.system.storage.findOne('Post',
-  BoolExp.atom({ key: 'id', value: ['=', postId] })  // Wrong!
-);
+const CheckMyPost = Condition.create({
+  content: async function(this: Controller, event) {
+    // BoolExp is for logic, not queries!
+    return BoolExp.atom({ author: event.user })  
+  }
+})
 
 // ✅ CORRECT: Use MatchExp for queries
-const post = await this.system.storage.findOne('Post',
-  MatchExp.atom({ key: 'id', value: ['=', postId] })  // Correct!
-);
-```
-
-### Use boolExpToConditions for BoolExp Combinations
-```typescript
-// ❌ WRONG: Using BoolExp directly in conditions
-conditions: BoolExp.atom(AdminRole).and(ActiveUser)
-
-// ✅ CORRECT: Convert BoolExp to Conditions
-import { boolExpToConditions } from 'interaqt';
-
-conditions: boolExpToConditions(
-  BoolExp.atom(AdminRole).and(ActiveUser)
-)
-```
-
-## Key Concepts
-
-### Condition Structure
-```typescript
-const MyCondition = Condition.create({
-  name: 'MyCondition',
+const CheckMyPost = Condition.create({
   content: async function(this: Controller, event) {
-    // event: Contains user, payload, query info
-    // this: Controller instance (access system, storage)
-    
-    // Return true for permission granted, false for denied
-    return true;
+    const post = await this.system.storage.findOne('Post',
+      MatchExp.atom({ key: 'author', value: ['=', event.user] })
+    )
+    return !!post;
   }
-});
+})
 ```
 
-### Condition Usage
-- **conditions**: Checks permissions and requirements BEFORE interaction execution
-- Conditions can check user permissions, data state, system state, etc.
+### Use Conditions.create for BoolExp Combinations
+Remember to wrap BoolExp combinations with Conditions.create:
 
-## Basic Permission Patterns
-
-### 1. Role-Based Access
 ```typescript
-// Simple role check
+import { Conditions } from 'interaqt';
+
+conditions: Conditions.create({
+  content: BoolExp.atom(isAdmin).and(isActive)
+})
+```
+
+## Basic Role-Based Permissions
+
+### 1. Define Role Conditions
+```typescript
+import { Condition, BoolExp, Conditions, Interaction, Action, Payload, PayloadItem, MatchExp } from 'interaqt';
+
+// Define role conditions
 export const AdminRole = Condition.create({
   name: 'AdminRole',
   content: async function(this: Controller, event) {
@@ -83,16 +71,33 @@ export const AdminRole = Condition.create({
   }
 });
 
-// Multiple roles
-export const OperatorOrAdminRole = Condition.create({
-  name: 'OperatorOrAdminRole',
+export const OperatorRole = Condition.create({
+  name: 'OperatorRole',
+  content: async function(this: Controller, event) {
+    return event.user?.role === 'operator';
+  }
+});
+
+export const ViewerRole = Condition.create({
+  name: 'ViewerRole',
+  content: async function(this: Controller, event) {
+    return event.user?.role === 'viewer';
+  }
+});
+
+// Combined permission
+export const OperatorOrAdmin = Condition.create({
+  name: 'OperatorOrAdmin',
   content: async function(this: Controller, event) {
     const role = event.user?.role;
     return role === 'admin' || role === 'operator';
   }
 });
+```
 
-// Apply to interaction
+### 2. Apply to Interactions
+```typescript
+// Admin-only action
 export const DeleteStyle = Interaction.create({
   name: 'DeleteStyle',
   action: Action.create({ name: 'deleteStyle' }),
@@ -101,96 +106,109 @@ export const DeleteStyle = Interaction.create({
       PayloadItem.create({ 
         name: 'style',
         base: Style,
-        isRef: true,
-        required: true 
+        isRef: true  
       })
     ]
   }),
-  conditions: AdminRole  // Only admin can delete
-});
-```
-
-### 2. Data-Based Permissions
-```typescript
-// Check data state
-export const StyleNotOffline = Condition.create({
-  name: 'StyleNotOffline',
-  content: async function(this: Controller, event) {
-    const styleId = event.payload.style?.id || event.payload.style;
-    
-    const style = await this.system.storage.findOne('Style',
-      MatchExp.atom({ key: 'id', value: ['=', styleId] }),
-      undefined,
-      ['status']
-    );
-    
-    return style && style.status !== 'offline';
-  }
+  conditions: AdminRole  // Direct condition
 });
 
-// Style must be draft to publish
-export const StyleIsDraft = Condition.create({
-  name: 'StyleIsDraft',
-  content: async function(this: Controller, event) {
-    const styleId = event.payload.style?.id || event.payload.style;
-    
-    const style = await this.system.storage.findOne('Style',
-      MatchExp.atom({ key: 'id', value: ['=', styleId] }),
-      undefined,
-      ['status']
-    );
-    
-    return style && style.status === 'draft';
-  }
-});
-```
-
-### 3. Combining Permissions with BoolExp
-```typescript
-import { BoolExp, boolExpToConditions } from 'interaqt';
-
-// Combine multiple conditions
+// Multiple roles allowed
 export const UpdateStyle = Interaction.create({
   name: 'UpdateStyle',
   action: Action.create({ name: 'updateStyle' }),
-  payload: Payload.create({
-    items: [
-      PayloadItem.create({ 
-        name: 'style',
-        base: Style,
-        isRef: true,
-        required: true 
-      }),
-      PayloadItem.create({ name: 'label' }),
-      PayloadItem.create({ name: 'description' })
-    ]
-  }),
-  // Must be admin/operator AND style not offline
-  conditions: boolExpToConditions(
-    BoolExp.atom(OperatorOrAdminRole)
-      .and(BoolExp.atom(StyleNotOffline))
-  )
+  conditions: OperatorOrAdmin  // Combined condition
+});
+```
+
+## Advanced Permission Patterns
+
+### 1. Resource Ownership
+```typescript
+// Check if user owns the resource
+export const OwnerOnly = Condition.create({
+  name: 'OwnerOnly',
+  content: async function(this: Controller, event) {
+    const styleId = event.payload?.style?.id;
+    if (!styleId) return false;
+    
+    const style = await this.system.storage.findOne('Style',
+      MatchExp.atom({ key: 'id', value: ['=', styleId] }),
+      undefined,
+      ['creator']  // Must include creator field
+    );
+    
+    return style?.creator?.id === event.user?.id;
+  }
 });
 
-// OR logic
-export const ViewStyle = Interaction.create({
-  name: 'ViewStyle',
-  action: Action.create({ name: 'viewStyle' }),
+// Combine with role check
+import { BoolExp, Conditions } from 'interaqt';
+
+export const DeleteOwnStyle = Interaction.create({
+  name: 'DeleteOwnStyle',
+  action: Action.create({ name: 'deleteOwnStyle' }),
   payload: Payload.create({
     items: [
       PayloadItem.create({ 
         name: 'style',
         base: Style,
-        isRef: true,
-        required: true 
+        isRef: true
       })
     ]
   }),
-  conditions: boolExpToConditions(
-    BoolExp.atom(AdminRole)
-      .or(BoolExp.atom(OperatorRole))
-      .or(BoolExp.atom(ViewerRole))
-  )
+  conditions: Conditions.create({
+    content: BoolExp.atom(OwnerOnly).or(BoolExp.atom(AdminRole))
+  })
+});
+```
+
+### 2. Context-Based Permissions
+```typescript
+// Check resource state
+export const PublishedOnly = Condition.create({
+  name: 'PublishedOnly',
+  content: async function(this: Controller, event) {
+    const styleId = event.payload?.style?.id;
+    if (!styleId) return false;
+    
+    const style = await this.system.storage.findOne('Style',
+      MatchExp.atom({ key: 'id', value: ['=', styleId] }),
+      undefined,  
+      ['status']  // Include status field
+    );
+    
+    return style?.status === 'published';
+  }
+});
+
+// Apply to interaction
+export const ShareStyle = Interaction.create({
+  name: 'ShareStyle',
+  action: Action.create({ name: 'shareStyle' }),
+  conditions: Conditions.create({
+    content: BoolExp.atom(PublishedOnly).and(BoolExp.atom(OperatorOrAdmin))
+  })
+});
+```
+
+### 3. Dynamic Permissions
+```typescript
+// Permission based on user's department
+export const SameDepartment = Condition.create({
+  name: 'SameDepartment',
+  content: async function(this: Controller, event) {
+    const targetUserId = event.payload?.targetUser?.id;
+    if (!targetUserId || !event.user?.department) return false;
+    
+    const targetUser = await this.system.storage.findOne('User',
+      MatchExp.atom({ key: 'id', value: ['=', targetUserId] }),
+      undefined,
+      ['department']
+    );
+    
+    return targetUser?.department === event.user.department;
+  }
 });
 ```
 
@@ -220,19 +238,31 @@ export const CreateStyle = Interaction.create({
       })
     ]
   }),
-  conditions: boolExpToConditions(
-    BoolExp.atom(OperatorOrAdminRole)
-      .and(BoolExp.atom(ValidateStyleType))  // Validate payload in conditions
-  )
+  conditions: Conditions.create({
+    content: BoolExp.atom(OperatorOrAdminRole).and(BoolExp.atom(ValidateStyleType))
+  })
 });
 ```
 
-## Complete Example
-
+## Real-World Example
 ```typescript
-import { Condition, BoolExp, boolExpToConditions, Interaction, Action, Payload, PayloadItem, MatchExp } from 'interaqt';
+import { Condition, BoolExp, Conditions, Interaction, Action, Payload, PayloadItem, MatchExp } from 'interaqt';
 
-// Define role conditions
+// Basic conditions
+export const AuthenticatedUser = Condition.create({
+  name: 'AuthenticatedUser',
+  content: async function(this: Controller, event) {
+    return !!event.user && !!event.user.id;
+  }
+});
+
+export const ActiveUser = Condition.create({
+  name: 'ActiveUser',
+  content: async function(this: Controller, event) {
+    return event.user?.status === 'active';
+  }
+});
+
 export const AdminRole = Condition.create({
   name: 'AdminRole',
   content: async function(this: Controller, event) {
@@ -240,34 +270,28 @@ export const AdminRole = Condition.create({
   }
 });
 
-export const OperatorRole = Condition.create({
-  name: 'OperatorRole',
+// Resource conditions
+export const StyleExists = Condition.create({
+  name: 'StyleExists',
   content: async function(this: Controller, event) {
-    return event.user?.role === 'operator';
+    const styleId = event.payload?.style?.id;
+    if (!styleId) return false;
+    
+    const style = await this.system.storage.findOne('Style',
+      MatchExp.atom({ key: 'id', value: ['=', styleId] }),
+      undefined,
+      ['id']
+    );
+    
+    return !!style;
   }
 });
 
-export const ViewerRole = Condition.create({
-  name: 'ViewerRole',
-  content: async function(this: Controller, event) {
-    return event.user?.role === 'viewer';
-  }
-});
-
-// Combined permission
-export const OperatorOrAdminRole = Condition.create({
-  name: 'OperatorOrAdminRole',
-  content: async function(this: Controller, event) {
-    const role = event.user?.role;
-    return role === 'admin' || role === 'operator';
-  }
-});
-
-// Data state conditions
 export const StyleNotOffline = Condition.create({
   name: 'StyleNotOffline',
   content: async function(this: Controller, event) {
-    const styleId = event.payload.style?.id || event.payload.style;
+    const styleId = event.payload?.style?.id;
+    if (!styleId) return false;
     
     const style = await this.system.storage.findOne('Style',
       MatchExp.atom({ key: 'id', value: ['=', styleId] }),
@@ -275,140 +299,51 @@ export const StyleNotOffline = Condition.create({
       ['status']
     );
     
-    return style && style.status !== 'offline';
+    return style?.status !== 'offline';
   }
 });
 
-export const StyleIsDraft = Condition.create({
-  name: 'StyleIsDraft',
-  content: async function(this: Controller, event) {
-    const styleId = event.payload.style?.id || event.payload.style;
-    
-    const style = await this.system.storage.findOne('Style',
-      MatchExp.atom({ key: 'id', value: ['=', styleId] }),
-      undefined,
-      ['status']
-    );
-    
-    return style && style.status === 'draft';
-  }
-});
-
-// Apply to interactions
-export const CreateStyle = Interaction.create({
-  name: 'CreateStyle',
-  action: Action.create({ name: 'createStyle' }),
-  payload: Payload.create({
-    items: [
-      PayloadItem.create({ name: 'label', required: true }),
-      PayloadItem.create({ name: 'slug', required: true }),
-      PayloadItem.create({ name: 'description' }),
-      PayloadItem.create({ name: 'type', required: true })
-    ]
-  }),
-  conditions: OperatorOrAdminRole
-});
-
-export const UpdateStyle = Interaction.create({
-  name: 'UpdateStyle',
-  action: Action.create({ name: 'updateStyle' }),
-  payload: Payload.create({
-    items: [
-      PayloadItem.create({ 
-        name: 'style',
-        base: Style,
-        isRef: true,
-        required: true 
-      }),
-      PayloadItem.create({ name: 'label' }),
-      PayloadItem.create({ name: 'description' })
-    ]
-  }),
-  conditions: boolExpToConditions(
-    BoolExp.atom(OperatorOrAdminRole)
-      .and(BoolExp.atom(StyleNotOffline))
-  )
-});
-
-export const DeleteStyle = Interaction.create({
-  name: 'DeleteStyle',
-  action: Action.create({ name: 'deleteStyle' }),
-  payload: Payload.create({
-    items: [
-      PayloadItem.create({ 
-        name: 'style',
-        base: Style,
-        isRef: true,
-        required: true 
-      })
-    ]
-  }),
-  conditions: AdminRole  // Admin only
-});
-
+// Complex interaction with multiple conditions
 export const PublishStyle = Interaction.create({
   name: 'PublishStyle',
-  action: Action.create({ name: 'publishStyle' }),
+  action: Action.create({ name: 'publish' }),
   payload: Payload.create({
     items: [
       PayloadItem.create({ 
         name: 'style',
         base: Style,
-        isRef: true,
-        required: true 
+        isRef: true
       })
     ]
   }),
-  conditions: boolExpToConditions(
-    BoolExp.atom(OperatorOrAdminRole)
-      .and(BoolExp.atom(StyleIsDraft))
-  )
-});
-
-// Query interactions (all roles can read)
-export const GetStyles = Interaction.create({
-  name: 'GetStyles',
-  action: Action.create({ name: 'getStyles' }),
-  payload: Payload.create({
-    items: [
-      PayloadItem.create({ name: 'type' }),
-      PayloadItem.create({ name: 'status' })
-    ]
+  conditions: Conditions.create({
+    content: BoolExp.atom(AuthenticatedUser)
+      .and(BoolExp.atom(ActiveUser))
+      .and(BoolExp.atom(AdminRole))
+      .and(BoolExp.atom(StyleExists))
+      .and(BoolExp.atom(StyleNotOffline))
   })
-  // No conditions = all users can access
 });
-```
 
-## MatchExp Usage in Conditions
+// Alternative: Define combined condition
+export const CanPublishStyle = Conditions.create({
+  content: BoolExp.atom(AuthenticatedUser)
+    .and(BoolExp.atom(ActiveUser))
+    .and(BoolExp.atom(AdminRole))
+    .and(BoolExp.atom(StyleExists))
+    .and(BoolExp.atom(StyleNotOffline))
+});
 
-### Query Operators
-```typescript
-// Equality
-MatchExp.atom({ key: 'status', value: ['=', 'active'] })
-
-// Inequality
-MatchExp.atom({ key: 'status', value: ['!=', 'deleted'] })
-
-// Comparison
-MatchExp.atom({ key: 'age', value: ['>', 18] })
-MatchExp.atom({ key: 'price', value: ['<', 100] })
-MatchExp.atom({ key: 'score', value: ['>=', 60] })
-
-// IN operator
-MatchExp.atom({ key: 'role', value: ['in', ['admin', 'moderator']] })
-
-// AND conditions
-MatchExp.atom({ key: 'status', value: ['=', 'active'] })
-  .and({ key: 'role', value: ['=', 'admin'] })
-
-// OR conditions
-MatchExp.atom({ key: 'role', value: ['=', 'admin'] })
-  .or({ key: 'role', value: ['=', 'moderator'] })
+export const PublishStyleAlt = Interaction.create({
+  name: 'PublishStyle',
+  action: Action.create({ name: 'publish' }),
+  conditions: CanPublishStyle  // Reusable condition
+});
 ```
 
 ## Best Practices
 
-### 1. Performance Optimization
+### 1. Condition Efficiency
 ```typescript
 // ✅ Check simple conditions first
 const EfficientCheck = Condition.create({
@@ -449,7 +384,7 @@ const WithContext = Condition.create({
 
 ### 3. Reusable Conditions
 ```typescript
-// ✅ Generic role checker
+// ✅ Create generic, reusable conditions
 export const RequireRole = (role: string) => Condition.create({
   name: `Require${role}Role`,
   content: async function(this: Controller, event) {
@@ -457,57 +392,30 @@ export const RequireRole = (role: string) => Condition.create({
   }
 });
 
-// Use in interactions
-conditions: RequireRole('admin')
+// Use in multiple places
+const AdminOnly = RequireRole('admin');
+const OperatorOnly = RequireRole('operator');
 ```
 
-## Important Notes on BoolExp Usage
-
-### When to Use boolExpToConditions
+### When to Use Conditions.create
 ```typescript
-// ✅ CORRECT: When combining multiple Conditions with BoolExp
-conditions: boolExpToConditions(
-  BoolExp.atom(AdminRole)
-    .and(BoolExp.atom(ActiveUser))
-    .or(BoolExp.atom(OwnerRole))
-)
+// Use when combining multiple conditions with BoolExp
+conditions: Conditions.create({
+  content: BoolExp.atom(condition1)
+    .and(BoolExp.atom(condition2))
+    .or(BoolExp.atom(condition3))
+})
 
-// ✅ CORRECT: For simple single Condition
+// Single condition can be used directly
 conditions: AdminRole
-
-// ❌ WRONG: BoolExp without conversion
-conditions: BoolExp.atom(AdminRole)
 ```
 
-### BoolExp vs MatchExp
-- **BoolExp**: Used ONLY for combining Conditions
-- **MatchExp**: Used for database queries inside Condition content functions
-
-```typescript
-const MyCondition = Condition.create({
-  name: 'MyCondition',
-  content: async function(event) {
-    // ✅ Use MatchExp for queries
-    const result = await this.system.storage.findOne('Entity',
-      MatchExp.atom({ key: 'id', value: ['=', id] })
-    );
-    
-    // ❌ DON'T use BoolExp for queries
-    // const result = await this.system.storage.findOne('Entity',
-    //   BoolExp.atom({ key: 'id', value: ['=', id] })
-    // );
-    
-    return !!result;
-  }
-});
-```
-
-## Validation Checklist
-- [ ] All interactions have appropriate conditions
-- [ ] Data validation uses conditions where needed
-- [ ] MatchExp (not BoolExp) used for database queries
-- [ ] BoolExp combinations wrapped with boolExpToConditions
-- [ ] No permission logic in computations
-- [ ] Clear error messages for permission failures
-- [ ] Performance optimized (simple checks first)
-- [ ] Entity references in payload use isRef: true with base 
+## Security Checklist
+- [ ] Authentication check (user exists)
+- [ ] Authorization check (user has permission)
+- [ ] Resource existence validation
+- [ ] Resource state validation
+- [ ] Payload data validation
+- [ ] BoolExp combinations wrapped with Conditions.create
+- [ ] Efficient condition ordering (simple checks first)
+- [ ] Clear error messages for debugging 

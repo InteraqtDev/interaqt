@@ -25,19 +25,17 @@ expect(result.error.type).toBe('condition check failed')
 ```
 
 ### Common Error Types
-- `'condition check failed'`: condition returned false or threw error
+- `'no permission'` → Never used (legacy)
+- `'condition check failed'` → What you'll actually see
 
-## Complete Setup: Defining Permissions
+## Testing Permission Patterns
 
-### 🔴 CRITICAL: Permissions Must Be Explicitly Defined
+### 1. Role-Based Permission Test
 
-Permissions are NOT built-in! You must:
-1. Define Conditions
-2. Apply them to Interactions
-3. Then test they work correctly
+Define permissions:
 
 ```typescript
-import { Condition, BoolExp, boolExpToConditions, Interaction, Action, Payload, PayloadItem, MatchExp } from 'interaqt'
+import { Condition, BoolExp, Conditions, Interaction, Action, Payload, PayloadItem, MatchExp } from 'interaqt'
 
 // Step 1: Define Conditions
 export const AdminRole = Condition.create({
@@ -66,11 +64,11 @@ export const StyleNotOffline = Condition.create({
       ['status']
     )
     
-    return style && style.status !== 'offline'
+    return style?.status !== 'offline'
   }
 })
 
-// Step 2: Apply to Interactions
+// Step 2: Create Interaction with Permissions
 export const DeleteStyle = Interaction.create({
   name: 'DeleteStyle',
   action: Action.create({ name: 'deleteStyle' }),
@@ -79,14 +77,69 @@ export const DeleteStyle = Interaction.create({
       PayloadItem.create({ 
         name: 'style',
         base: Style,
-        isRef: true,
-        required: true 
+        isRef: true
       })
     ]
   }),
   conditions: AdminRole  // Only admin can delete
 })
+```
 
+Test implementation:
+
+```typescript
+test('role-based permission', async () => {
+  // Step 1: Create test users
+  const admin = await system.storage.create('User', {
+    name: 'Admin',
+    role: 'admin'
+  })
+  
+  const operator = await system.storage.create('User', {
+    name: 'Operator',
+    role: 'operator'
+  })
+  
+  const viewer = await system.storage.create('User', {
+    name: 'Viewer',
+    role: 'viewer'
+  })
+  
+  // Step 2: Create test data
+  const style = await system.storage.create('Style', {
+    label: 'Test Style',
+    status: 'published'
+  })
+  
+  // Step 3: Test admin (allowed)
+  const adminResult = await controller.callInteraction('DeleteStyle', {
+    user: admin,
+    payload: { style: { id: style.id } }
+  })
+  expect(adminResult.error).toBeUndefined()
+  
+  // Step 4: Test operator (denied)
+  const operatorResult = await controller.callInteraction('DeleteStyle', {
+    user: operator,
+    payload: { style: { id: style.id } }
+  })
+  expect(operatorResult.error).toBeDefined()
+  expect(operatorResult.error.type).toBe('condition check failed')
+  
+  // Step 5: Test viewer (denied)
+  const viewerResult = await controller.callInteraction('DeleteStyle', {
+    user: viewer,
+    payload: { style: { id: style.id } }
+  })
+  expect(viewerResult.error).toBeDefined()
+  expect(viewerResult.error.type).toBe('condition check failed')
+})
+```
+
+### 2. Combined Permission Test
+
+```typescript
+// Define combined permission
 export const UpdateStyle = Interaction.create({
   name: 'UpdateStyle',
   action: Action.create({ name: 'updateStyle' }),
@@ -95,134 +148,85 @@ export const UpdateStyle = Interaction.create({
       PayloadItem.create({ 
         name: 'style',
         base: Style,
-        isRef: true,
-        required: true 
-      }),
-      PayloadItem.create({ name: 'label' }),
-      PayloadItem.create({ name: 'description' })
+        isRef: true
+      })
     ]
   }),
-  // Multiple conditions
-  conditions: boolExpToConditions(
-    BoolExp.atom(OperatorRole)
-      .or(BoolExp.atom(AdminRole))
+  // Admin OR Operator AND style not offline
+  conditions: Conditions.create({
+    content: BoolExp.atom(AdminRole)
+      .or(BoolExp.atom(OperatorRole))
       .and(BoolExp.atom(StyleNotOffline))
-  )
+  })
 })
 
-// Step 3: Now you can test these permissions
-```
-
-## Permission Test Patterns
-
-### 1. Role-Based Permission Test
-```typescript
-describe('Role-based permissions', () => {
-  let admin: any, operator: any, viewer: any
-
-  beforeEach(async () => {
-    // Setup system with interactions that have conditions
-    system = new MonoSystem(new PGLiteDB())
-    controller = new Controller({
-      system,
-      entities,
-      relations,
-      activities: [],
-      interactions: [DeleteStyle, UpdateStyle, CreateStyle], // Interactions with conditions
-      dict: []
-    })
-    await controller.setup(true)
-
-    // Create users with different roles
-    admin = await system.storage.create('User', {
-      name: 'Admin',
-      email: 'admin@test.com',
-      role: 'admin'
-    })
-    
-    operator = await system.storage.create('User', {
-      name: 'Operator',
-      email: 'operator@test.com',
-      role: 'operator'
-    })
-    
-    viewer = await system.storage.create('User', {
-      name: 'Viewer',
-      email: 'viewer@test.com',
-      role: 'viewer'
-    })
+// Test implementation
+test('combined permissions with BoolExp', async () => {
+  // Create users
+  const admin = await system.storage.create('User', {
+    name: 'Admin',
+    role: 'admin'
   })
-
-  test('admin can delete styles', async () => {
-    // Setup: Create a style
-    const style = await createTestStyle(operator)
-
-    // Act: Admin deletes
-    const result = await controller.callInteraction('DeleteStyle', {
-      user: admin,
-      payload: { style: { id: style.id } }
-    })
-
-    // Assert: Should succeed
-    expect(result.error).toBeUndefined()
-    
-    const deleted = await system.storage.findOne('Style',
-      MatchExp.atom({ key: 'id', value: ['=', style.id] }),
-      undefined,
-      ['status']
-    )
-    expect(deleted.status).toBe('offline')
+  
+  const operator = await system.storage.create('User', {
+    name: 'Operator', 
+    role: 'operator'
   })
-
-  test('operator cannot delete styles', async () => {
-    // Setup: Create a style
-    const style = await createTestStyle(operator)
-
-    // Act: Operator tries to delete
-    const result = await controller.callInteraction('DeleteStyle', {
-      user: operator,
-      payload: { style: { id: style.id } }
-    })
-
-    // Assert: Should fail with permission error
-    expect(result.error).toBeDefined()
-    expect(result.error.type).toBe('condition check failed')
-    
-    // Verify style not deleted
-    const current = await system.storage.findOne('Style',
-      MatchExp.atom({ key: 'id', value: ['=', style.id] }),
-      undefined,
-      ['status']
-    )
-    expect(current.status).toBe('draft')
+  
+  const viewer = await system.storage.create('User', {
+    name: 'Viewer',
+    role: 'viewer'
   })
-
-  test('viewer cannot create styles', async () => {
-    // Act: Viewer tries to create
-    const result = await controller.callInteraction('CreateStyle', {
-      user: viewer,
-      payload: {
-        label: 'Test',
-        slug: 'test',
-        type: 'animation'
-      }
-    })
-
-    // Assert: Should fail
-    expect(result.error).toBeDefined()
-    expect(result.error.type).toBe('condition check failed')
+  
+  // Create styles
+  const publishedStyle = await system.storage.create('Style', {
+    label: 'Published Style',
+    status: 'published'
   })
+  
+  const offlineStyle = await system.storage.create('Style', {
+    label: 'Offline Style',
+    status: 'offline'
+  })
+  
+  // Test admin with published style (allowed)
+  const result1 = await controller.callInteraction('UpdateStyle', {
+    user: admin,
+    payload: { style: { id: publishedStyle.id } }
+  })
+  expect(result1.error).toBeUndefined()
+  
+  // Test operator with published style (allowed)
+  const result2 = await controller.callInteraction('UpdateStyle', {
+    user: operator,
+    payload: { style: { id: publishedStyle.id } }
+  })
+  expect(result2.error).toBeUndefined()
+  
+  // Test viewer with published style (denied)
+  const result3 = await controller.callInteraction('UpdateStyle', {
+    user: viewer,
+    payload: { style: { id: publishedStyle.id } }
+  })
+  expect(result3.error).toBeDefined()
+  expect(result3.error.type).toBe('condition check failed')
+  
+  // Test admin with offline style (denied - even admin can't update offline)
+  const result4 = await controller.callInteraction('UpdateStyle', {
+    user: admin,
+    payload: { style: { id: offlineStyle.id } }
+  })
+  expect(result4.error).toBeDefined()
+  expect(result4.error.type).toBe('condition check failed')
 })
 ```
 
-### 2. Data State Permission Test
-
-First define the data state conditions:
+### 3. Resource-Based Permission Test
 
 ```typescript
-// Define condition that checks style status
-export const StyleIsDraft = Condition.create({
-  name: 'StyleIsDraft',
+// Define owner check
+export const OwnerOnly = Condition.create({
+  name: 'OwnerOnly',
   content: async function(this: Controller, event) {
     const styleId = event.payload?.style?.id
     if (!styleId) return false
@@ -230,163 +234,76 @@ export const StyleIsDraft = Condition.create({
     const style = await this.system.storage.findOne('Style',
       MatchExp.atom({ key: 'id', value: ['=', styleId] }),
       undefined,
-      ['status']
+      ['creator']  // Must specify attributeQuery!
     )
     
-    return style && style.status === 'draft'
+    return style?.creator?.id === event.user?.id
   }
 })
 
-// Apply to publish interaction
-export const PublishStyle = Interaction.create({
-  name: 'PublishStyle',
-  action: Action.create({ name: 'publishStyle' }),
+// Interaction that allows owner or admin
+export const DeleteOwnStyle = Interaction.create({
+  name: 'DeleteOwnStyle',
+  action: Action.create({ name: 'deleteOwnStyle' }),
   payload: Payload.create({
     items: [
       PayloadItem.create({ 
         name: 'style',
         base: Style,
-        isRef: true,
-        required: true 
+        isRef: true
       })
     ]
   }),
-  conditions: boolExpToConditions(
-    BoolExp.atom(OperatorRole)
-      .or(BoolExp.atom(AdminRole))
-      .and(BoolExp.atom(StyleIsDraft))  // Must be draft
-  )
-})
-```
-
-Then test it:
-
-```typescript
-describe('Data state permissions', () => {
-  test('cannot update offline style', async () => {
-    const operator = await system.storage.create('User', { role: 'operator' })
-    
-    // Setup: Create and delete style
-    const createResult = await controller.callInteraction('CreateStyle', {
-      user: operator,
-      payload: { label: 'Test', slug: 'test', type: 'animation' }
-    })
-    
-    const style = await system.storage.findOne('Style',
-      MatchExp.atom({ key: 'slug', value: ['=', 'test'] }),
-      undefined,
-      ['id']
-    )
-
-    // Admin deletes it
-    const admin = await system.storage.create('User', { role: 'admin' })
-    await controller.callInteraction('DeleteStyle', {
-      user: admin,
-      payload: { style: { id: style.id } }
-    })
-
-    // Act: Try to update offline style
-    const updateResult = await controller.callInteraction('UpdateStyle', {
-      user: operator,
-      payload: {
-        style: { id: style.id },
-        label: 'Updated'
-      }
-    })
-
-    // Assert: Should fail
-    expect(updateResult.error).toBeDefined()
-    expect(updateResult.error.message).toContain('cannot update offline')
-  })
-
-  test('can only publish draft styles', async () => {
-    const operator = await system.storage.create('User', { role: 'operator' })
-    
-    // Create and publish style
-    await controller.callInteraction('CreateStyle', {
-      user: operator,
-      payload: { label: 'Test', slug: 'test', type: 'animation' }
-    })
-    
-    const style = await system.storage.findOne('Style',
-      MatchExp.atom({ key: 'slug', value: ['=', 'test'] }),
-      undefined,
-      ['id']
-    )
-
-    // First publish should succeed
-    const firstPublish = await controller.callInteraction('PublishStyle', {
-      user: operator,
-      payload: { style: { id: style.id } }
-    })
-    expect(firstPublish.error).toBeUndefined()
-
-    // Act: Try to publish already published style
-    const secondPublish = await controller.callInteraction('PublishStyle', {
-      user: operator,
-      payload: { style: { id: style.id } }
-    })
-
-    // Assert: Should fail
-    expect(secondPublish.error).toBeDefined()
-    expect(secondPublish.error.message).toContain('already published')
+  conditions: Conditions.create({
+    content: BoolExp.atom(OwnerOnly).or(BoolExp.atom(AdminRole))
   })
 })
-```
 
-### 3. Complex Permission Logic Test
-
-Define complex permission logic:
-
-```typescript
-// Owner or admin can modify
-export const OwnerOrAdmin = Condition.create({
-  name: 'OwnerOrAdmin',
-  content: async function(this: Controller, event) {
-    // Admin always can
-    if (event.user?.role === 'admin') return true
-    
-    // Check if user is owner
-    const resourceId = event.payload?.resource?.id
-    if (!resourceId) return false
-    
-    const resource = await this.system.storage.findOne('Resource',
-      MatchExp.atom({ key: 'id', value: ['=', resourceId] }),
-      undefined,
-      ['ownerId']
-    )
-    
-    return resource && resource.ownerId === event.user.id
-  }
-})
-
-// Active user check
-export const ActiveUser = Condition.create({
-  name: 'ActiveUser',
-  content: async function(this: Controller, event) {
-    return event.user?.status === 'active'
-  }
-})
-
-// Apply complex logic
-export const UpdateResource = Interaction.create({
-  name: 'UpdateResource',
-  action: Action.create({ name: 'updateResource' }),
-  payload: Payload.create({
-    items: [
-      PayloadItem.create({ 
-        name: 'resource',
-        base: Resource,
-        isRef: true,
-        required: true 
-      }),
-      PayloadItem.create({ name: 'data' })
-    ]
-  }),
-  conditions: boolExpToConditions(
-    BoolExp.atom(ActiveUser)
-      .and(BoolExp.atom(OwnerOrAdmin))
-  )
+// Test
+test('resource ownership permission', async () => {
+  // Create users
+  const owner = await system.storage.create('User', {
+    name: 'Owner',
+    role: 'user'
+  })
+  
+  const otherUser = await system.storage.create('User', {
+    name: 'Other User',
+    role: 'user'
+  })
+  
+  const admin = await system.storage.create('User', {
+    name: 'Admin',
+    role: 'admin'
+  })
+  
+  // Create style with owner
+  const style = await system.storage.create('Style', {
+    label: 'My Style',
+    creator: { id: owner.id }
+  })
+  
+  // Owner can delete (allowed)
+  const ownerResult = await controller.callInteraction('DeleteOwnStyle', {
+    user: owner,
+    payload: { style: { id: style.id } }
+  })
+  expect(ownerResult.error).toBeUndefined()
+  
+  // Other user cannot delete (denied)
+  const otherResult = await controller.callInteraction('DeleteOwnStyle', {
+    user: otherUser,
+    payload: { style: { id: style.id } }
+  })
+  expect(otherResult.error).toBeDefined()
+  expect(otherResult.error.type).toBe('condition check failed')
+  
+  // Admin can delete any style (allowed)
+  const adminResult = await controller.callInteraction('DeleteOwnStyle', {
+    user: admin,
+    payload: { style: { id: style.id } }
+  })
+  expect(adminResult.error).toBeUndefined()
 })
 ```
 
@@ -421,346 +338,350 @@ export const ShareStyle = Interaction.create({
       PayloadItem.create({ 
         name: 'style',
         base: Style,
-        isRef: true,
-        required: true
+        isRef: true
       })
     ]
   }),
-  conditions: CheckPublishedStyle  // Check style is published
-})
-```
-
-Test payload conditions:
-
-```typescript
-describe('Payload condition permissions', () => {
-  test('can only share published styles', async () => {
-    const user = await system.storage.create('User', { role: 'operator' })
-    
-    // Create draft style
-    await controller.callInteraction('CreateStyle', {
-      user: user,
-      payload: { label: 'Draft', slug: 'draft', type: 'animation' }
-    })
-    
-    const draftStyle = await system.storage.findOne('Style',
-      MatchExp.atom({ key: 'slug', value: ['=', 'draft'] }),
-      undefined,
-      ['id', 'status']
-    )
-
-    // Try to share draft style
-    const shareDraft = await controller.callInteraction('ShareStyle', {
-      user: user,
-      payload: { style: { id: draftStyle.id } }
-    })
-    
-    // Should fail
-    expect(shareDraft.error).toBeDefined()
-    expect(shareDraft.error.type).toBe('condition check failed')
-
-    // Publish the style
-    await controller.callInteraction('PublishStyle', {
-      user: user,
-      payload: { style: { id: draftStyle.id } }
-    })
-
-    // Now sharing should work
-    const sharePublished = await controller.callInteraction('ShareStyle', {
-      user: user,
-      payload: { style: { id: draftStyle.id } }
-    })
-    
-    expect(sharePublished.error).toBeUndefined()
-  })
-
-  test('collection payload conditions check all items', async () => {
-    const user = await system.storage.create('User', { role: 'admin' })
-    
-    // Define active tag check
-    const CheckAllTagsActive = Condition.create({
-      name: 'CheckAllTagsActive',
-      content: async function(this: Controller, event) {
-        const tags = event.payload?.tags
-        if (!tags || !Array.isArray(tags)) return false
-        
-        // Check all tags are active
-        for (const tagRef of tags) {
-          const tag = await this.system.storage.findOne('Tag',
-            MatchExp.atom({ key: 'id', value: ['=', tagRef.id] }),
-            undefined,
-            ['isActive']
-          )
-          if (!tag || !tag.isActive) return false
-        }
-        return true
-      }
-    })
-
-    // Define interaction with collection condition
-    const TagItems = Interaction.create({
-      name: 'TagItems',
-      action: Action.create({ name: 'tagItems' }),
-      payload: Payload.create({
-        items: [
-          PayloadItem.create({ 
-            name: 'tags',
-            base: Tag,
-            isRef: true,
-            isCollection: true
-          })
-        ]
-      }),
-      conditions: CheckAllTagsActive  // All tags must be active
-    })
-
-    // Create tags
-    const activeTag1 = await system.storage.create('Tag', {
-      name: 'Active1',
-      isActive: true
-    })
-    const activeTag2 = await system.storage.create('Tag', {
-      name: 'Active2',
-      isActive: true
-    })
-    const inactiveTag = await system.storage.create('Tag', {
-      name: 'Inactive',
-      isActive: false
-    })
-
-    // Try with all active tags - should pass
-    const withActive = await controller.callInteraction('TagItems', {
-      user: user,
-      payload: {
-        tags: [
-          { id: activeTag1.id },
-          { id: activeTag2.id }
-        ]
-      }
-    })
-    expect(withActive.error).toBeUndefined()
-
-    // Try with inactive tag - should fail
-    const withInactive = await controller.callInteraction('TagItems', {
-      user: user,
-      payload: {
-        tags: [
-          { id: activeTag1.id },
-          { id: inactiveTag.id }  // This will fail
-        ]
-      }
-    })
-    expect(withInactive.error).toBeDefined()
-    expect(withInactive.error.type).toBe('condition check failed')
+  conditions: Conditions.create({
+    content: BoolExp.atom(CheckPublishedStyle).and(BoolExp.atom(OperatorRole))
   })
 })
-```
 
-### 5. Edge Case Permission Test
-```typescript
-describe('Permission edge cases', () => {
-  test('missing user results in permission denied', async () => {
-    // Act: Call without user
-    const result = await controller.callInteraction('CreateStyle', {
-      user: null,  // No user
-      payload: {
-        label: 'Test',
-        slug: 'test',
-        type: 'animation'
-      }
-    })
-
-    // Assert
-    expect(result.error).toBeDefined()
-    expect(result.error.type).toBe('condition check failed')
+// Test payload validation
+test('payload validation in conditions', async () => {
+  const operator = await system.storage.create('User', {
+    name: 'Operator',
+    role: 'operator'
   })
-
-  test('user with undefined role fails permission check', async () => {
-    // Create user without role
-    const userNoRole = await system.storage.create('User', {
-      name: 'No Role User',
-      email: 'noRole@test.com'
-      // role is undefined
-    })
-
-    // Act
-    const result = await controller.callInteraction('CreateStyle', {
-      user: userNoRole,
-      payload: {
-        label: 'Test',
-        slug: 'test',
-        type: 'animation'
-      }
-    })
-
-    // Assert
-    expect(result.error).toBeDefined()
-    expect(result.error.type).toBe('condition check failed')
-  })
-
-  test('deleted user cannot perform actions', async () => {
-    // Define active user check
-    const ActiveUser = Condition.create({
-      name: 'ActiveUser',
-      content: async function(this: Controller, event) {
-        return !event.user?.isDeleted
-      }
-    })
-
-    // Apply to interaction
-    const CreateWithActiveCheck = Interaction.create({
-      name: 'CreateStyle',
-      action: Action.create({ name: 'createStyle' }),
-      payload: CreateStyle.payload,  // Reuse payload definition
-      conditions: boolExpToConditions(
-        BoolExp.atom(ActiveUser)
-          .and(BoolExp.atom(OperatorRole))
-      )
-    })
-
-    // Create and soft-delete user
-    const user = await system.storage.create('User', {
-      name: 'Deleted User',
-      role: 'operator',
-      isDeleted: true
-    })
-
-    // Act
-    const result = await controller.callInteraction('CreateStyle', {
-      user: user,
-      payload: {
-        label: 'Test',
-        slug: 'test',
-        type: 'animation'
-      }
-    })
-
-    // Assert: Depends on your ActiveUser condition
-    expect(result.error).toBeDefined()
-    expect(result.error.type).toBe('condition check failed')
-  })
-})
-```
-
-## Testing Permission Combinations
-
-### BoolExp AND Combinations
-```typescript
-// Define business hours check
-const BusinessHours = Condition.create({
-  name: 'BusinessHours',
-  content: async function(this: Controller, event) {
-    const hour = new Date().getHours()
-    return hour >= 9 && hour < 17
-  }
-})
-
-// System maintenance requires admin AND business hours
-const SystemMaintenance = Interaction.create({
-  name: 'SystemMaintenance',
-  action: Action.create({ name: 'maintenance' }),
-  payload: Payload.create({
-    items: [
-      PayloadItem.create({ name: 'action', required: true })
-    ]
-  }),
-  conditions: boolExpToConditions(
-    BoolExp.atom(AdminRole)
-      .and(BoolExp.atom(BusinessHours))
-  )
-})
-
-test('must satisfy all conditions in AND', async () => {
-  // Setup: Need admin AND business hours
-  const admin = await system.storage.create('User', { role: 'admin' })
   
-  // Mock business hours check
-  const isBusinessHours = new Date().getHours() >= 9 && 
-                         new Date().getHours() < 17
-
-  const result = await controller.callInteraction('SystemMaintenance', {
-    user: admin,
-    payload: { action: 'restart' }
+  const publishedStyle = await system.storage.create('Style', {
+    label: 'Published',
+    status: 'published'
   })
+  
+  const draftStyle = await system.storage.create('Style', {
+    label: 'Draft',
+    status: 'draft'
+  })
+  
+  // Published style can be shared (allowed)
+  const result1 = await controller.callInteraction('ShareStyle', {
+    user: operator,
+    payload: { style: { id: publishedStyle.id } }
+  })
+  expect(result1.error).toBeUndefined()
+  
+  // Draft style cannot be shared (denied)
+  const result2 = await controller.callInteraction('ShareStyle', {
+    user: operator,
+    payload: { style: { id: draftStyle.id } }
+  })
+  expect(result2.error).toBeDefined()
+  expect(result2.error.type).toBe('condition check failed')
+})
+```
 
-  if (isBusinessHours) {
-    expect(result.error).toBeUndefined()
-  } else {
-    expect(result.error).toBeDefined()
-    expect(result.error.type).toBe('condition check failed')
+## Best Practices for Permission Testing
+
+### 1. Test All Branches
+```typescript
+test('comprehensive permission coverage', async () => {
+  // Test all roles
+  const roles = ['admin', 'operator', 'viewer', 'user']
+  
+  for (const role of roles) {
+    const user = await system.storage.create('User', {
+      name: `${role} user`,
+      role: role
+    })
+    
+    const result = await controller.callInteraction('AdminOnlyAction', {
+      user: user
+    })
+    
+    if (role === 'admin') {
+      expect(result.error).toBeUndefined()
+    } else {
+      expect(result.error).toBeDefined()
+      expect(result.error.type).toBe('condition check failed')
+    }
   }
 })
 ```
 
-### BoolExp OR Combinations
+### 2. Test Edge Cases
 ```typescript
-// Content moderation allows admin OR moderator
-const ModerateContent = Interaction.create({
-  name: 'ModerateContent',
-  action: Action.create({ name: 'moderate' }),
-  payload: Payload.create({
-    items: [
-      PayloadItem.create({ name: 'contentId', required: true })
-    ]
-  }),
-  conditions: boolExpToConditions(
-    BoolExp.atom(AdminRole)
-      .or(BoolExp.atom(ModeratorRole))
-  )
-})
-
-test('can satisfy any condition in OR', async () => {
-  const admin = await system.storage.create('User', { role: 'admin' })
-  const moderator = await system.storage.create('User', { role: 'moderator' })
-  const viewer = await system.storage.create('User', { role: 'viewer' })
-
-  // Admin should pass
-  const adminResult = await controller.callInteraction('ModerateContent', {
-    user: admin,
-    payload: { contentId: 'test-123' }
+test('edge cases in permissions', async () => {
+  // Test with null user
+  const result1 = await controller.callInteraction('RequireAuth', {
+    user: null
   })
-  expect(adminResult.error).toBeUndefined()
-
-  // Moderator should pass
-  const modResult = await controller.callInteraction('ModerateContent', {
-    user: moderator,
-    payload: { contentId: 'test-123' }
+  expect(result1.error).toBeDefined()
+  
+  // Test with missing payload data
+  const user = await system.storage.create('User', { role: 'admin' })
+  const result2 = await controller.callInteraction('UpdateStyle', {
+    user: user,
+    payload: {} // Missing style
   })
-  expect(modResult.error).toBeUndefined()
-
-  // Viewer should fail
-  const viewerResult = await controller.callInteraction('ModerateContent', {
-    user: viewer,
-    payload: { contentId: 'test-123' }
+  expect(result2.error).toBeDefined()
+  
+  // Test with non-existent resource
+  const result3 = await controller.callInteraction('UpdateStyle', {
+    user: user,
+    payload: { style: { id: 'non-existent-id' } }
   })
-  expect(viewerResult.error).toBeDefined()
+  expect(result3.error).toBeDefined()
 })
 ```
 
-## Best Practices
+### 3. Test Complex Conditions
+```typescript
+test('complex permission logic', async () => {
+  // Define time-based condition
+  const BusinessHours = Condition.create({
+    name: 'BusinessHours',
+    content: async function(this: Controller, event) {
+      const hour = new Date().getHours()
+      return hour >= 9 && hour < 17
+    }
+  })
+  
+  // Active user check
+  const ActiveUser = Condition.create({
+    name: 'ActiveUser',
+    content: async function(this: Controller, event) {
+      return event.user?.status === 'active'
+    }
+  })
+  
+  // Complex interaction
+  const SensitiveAction = Interaction.create({
+    name: 'SensitiveAction',
+    action: Action.create({ name: 'sensitive' }),
+    conditions: Conditions.create({
+      content: BoolExp.atom(AdminRole)
+        .and(BoolExp.atom(ActiveUser))
+        .and(BoolExp.atom(BusinessHours))
+    })
+  })
+  
+  // Test all combinations
+  const activeAdmin = await system.storage.create('User', {
+    role: 'admin',
+    status: 'active'
+  })
+  
+  const inactiveAdmin = await system.storage.create('User', {
+    role: 'admin',
+    status: 'inactive'
+  })
+  
+  // Mock time if needed for consistent tests
+  // ... test logic
+})
+```
 
-### DO
-- Always define conditions explicitly before testing
-- Test both success and failure paths for each permission
-- Use descriptive test names explaining the permission scenario
-- Create helper functions for common setup
-- Test edge cases like missing/null users
-- Verify error types match expected permission failures
+### 4. Verify Error Messages
+```typescript
+test('meaningful error messages', async () => {
+  // Define condition with custom error
+  const CustomError = Condition.create({
+    name: 'CustomError',
+    content: async function(this: Controller, event) {
+      if (!event.user) {
+        event.error = 'User authentication required'
+        return false
+      }
+      if (event.user.credits < 10) {
+        event.error = 'Insufficient credits (minimum: 10)'
+        return false
+      }
+      return true
+    }
+  })
+  
+  // Test error messages
+  const poorUser = await system.storage.create('User', {
+    credits: 5
+  })
+  
+  const result = await controller.callInteraction('PremiumAction', {
+    user: poorUser
+  })
+  
+  expect(result.error).toBeDefined()
+  expect(result.error.message).toContain('Insufficient credits')
+})
+```
 
-### DON'T
-- Don't assume permissions are built-in to the framework
-- Don't use try-catch for permission errors
-- Don't test framework internals, only your permission logic
-- Don't forget to test collection payload conditions
-- Don't assume permission checks are synchronous
+### 5. Test State-Dependent Permissions
+```typescript
+test('state-dependent permissions', async () => {
+  // User must have verified email
+  const VerifiedEmail = Condition.create({
+    name: 'VerifiedEmail',
+    content: async function(this: Controller, event) {
+      return event.user?.emailVerified === true
+    }
+  })
+  
+  // User must not be banned
+  const NotBanned = Condition.create({
+    name: 'NotBanned',
+    content: async function(this: Controller, event) {
+      return event.user?.banned !== true
+    }
+  })
+  
+  // Apply multiple state checks
+  const PostComment = Interaction.create({
+    name: 'PostComment',
+    action: Action.create({ name: 'postComment' }),
+    conditions: Conditions.create({
+      content: BoolExp.atom(VerifiedEmail).and(BoolExp.atom(NotBanned))
+    })
+  })
+  
+  // Test various user states
+  const verifiedUser = await system.storage.create('User', {
+    emailVerified: true,
+    banned: false
+  })
+  
+  const unverifiedUser = await system.storage.create('User', {
+    emailVerified: false,
+    banned: false
+  })
+  
+  const bannedUser = await system.storage.create('User', {
+    emailVerified: true,
+    banned: true
+  })
+  
+  // Only verified, non-banned user can post
+  const result1 = await controller.callInteraction('PostComment', {
+    user: verifiedUser
+  })
+  expect(result1.error).toBeUndefined()
+  
+  const result2 = await controller.callInteraction('PostComment', {
+    user: unverifiedUser
+  })
+  expect(result2.error).toBeDefined()
+  
+  const result3 = await controller.callInteraction('PostComment', {
+    user: bannedUser
+  })
+  expect(result3.error).toBeDefined()
+})
+```
 
-## Validation Checklist
-- [ ] All conditions are explicitly defined
-- [ ] Conditions are applied to interactions
-- [ ] Test all user roles for each interaction
-- [ ] Test data state permissions (draft/published/offline)
-- [ ] Test payload conditions with valid/invalid data
-- [ ] Test permission combinations (AND/OR)
-- [ ] Test edge cases (null user, missing roles)
-- [ ] Verify correct error types for each failure
-- [ ] Use result.error pattern, not try-catch
+### 6. Test Conditional Updates
+```typescript
+test('conditional state updates', async () => {
+  // User can only delete if not deleted
+  const NotDeleted = Condition.create({
+    name: 'NotDeleted',
+    content: async function(this: Controller, event) {
+      const styleId = event.payload?.style?.id
+      if (!styleId) return false
+      
+      const style = await this.system.storage.findOne('Style',
+        MatchExp.atom({ key: 'id', value: ['=', styleId] }),
+        undefined,
+        ['isDeleted']
+      )
+      
+      return style && !style.isDeleted
+    }
+  })
+  
+  const DeleteStyle = Interaction.create({
+    name: 'DeleteStyle',
+    action: Action.create({ name: 'deleteStyle' }),
+    conditions: Conditions.create({
+      content: BoolExp.atom(AdminRole).and(BoolExp.atom(NotDeleted))
+    })
+  })
+  
+  const admin = await system.storage.create('User', { role: 'admin' })
+  const style = await system.storage.create('Style', {
+    label: 'Test',
+    isDeleted: false
+  })
+  
+  // First delete succeeds
+  const result1 = await controller.callInteraction('DeleteStyle', {
+    user: admin,
+    payload: { style: { id: style.id } }
+  })
+  expect(result1.error).toBeUndefined()
+  
+  // Update style to deleted
+  await system.storage.update('Style', style.id, { isDeleted: true })
+  
+  // Second delete fails
+  const result2 = await controller.callInteraction('DeleteStyle', {
+    user: admin,
+    payload: { style: { id: style.id } }
+  })
+  expect(result2.error).toBeDefined()
+})
+```
+
+## Testing Checklist
+- [ ] Test all user roles (admin, operator, viewer, etc.)
+- [ ] Test allowed and denied scenarios
+- [ ] Test with missing/invalid payload data
+- [ ] Test resource state conditions
+- [ ] Test combined permissions (AND/OR logic)
+- [ ] Test edge cases (null user, non-existent resources)
+- [ ] Verify error types are 'condition check failed'
+- [ ] Test custom error messages if used
+- [ ] Cover all branches in condition logic
+- [ ] Test time/state dependent conditions
+
+## Common Testing Mistakes
+
+### 1. Missing attributeQuery
+```typescript
+// ❌ WRONG: Without attributeQuery, only returns { id }
+const style = await system.storage.findOne('Style',
+  MatchExp.atom({ key: 'id', value: ['=', styleId] })
+)
+// style.creator is undefined!
+
+// ✅ CORRECT: Specify needed fields
+const style = await system.storage.findOne('Style',
+  MatchExp.atom({ key: 'id', value: ['=', styleId] }),
+  undefined,
+  ['id', 'creator', 'status']  // Include all needed fields
+)
+```
+
+### 2. Wrong Error Expectations
+```typescript
+// ❌ WRONG: Expecting wrong error type
+expect(result.error.type).toBe('no permission')
+
+// ✅ CORRECT: Use actual error type
+expect(result.error.type).toBe('condition check failed')
+```
+
+### 3. Incomplete Test Coverage
+```typescript
+// ❌ WRONG: Only testing happy path
+test('admin can delete', async () => {
+  // Only tests admin success
+})
+
+// ✅ CORRECT: Test all scenarios
+test('delete permissions', async () => {
+  // Test admin: allowed
+  // Test operator: denied
+  // Test viewer: denied
+  // Test null user: denied
+  // Test with deleted style: denied
+})
+```

@@ -1,13 +1,33 @@
 import { IInstance, SerializedData, generateUUID } from './interfaces.js';
 import { stringifyAttribute } from './utils.js';
-import { BoolAtomDataInstance, BoolExpressionDataInstance } from './BoolExp.js';
+import { BoolAtomDataInstance, BoolExpressionDataInstance, BoolExp, BoolAtomData, BoolExpressionData } from './BoolExp.js';
 
 export interface ConditionsInstance extends IInstance {
   content?: BoolExpressionDataInstance | BoolAtomDataInstance;
 }
 
 export interface ConditionsCreateArgs {
-  content?: BoolExpressionDataInstance | BoolAtomDataInstance;
+  content?: BoolExpressionDataInstance | BoolAtomDataInstance | BoolExp<any>;
+}
+
+// 内部转换函数
+function convertBoolExpToData(obj?: BoolExp<any>): BoolAtomData | BoolExpressionData | undefined {
+  if (!obj) return undefined;
+
+  if (obj.raw.type === 'atom') {
+    return BoolAtomData.create({
+      type: 'atom',
+      data: obj.raw.data as unknown as { content?: Function; [key: string]: unknown }
+    });
+  }
+
+  const expData = obj.raw as any;
+  return BoolExpressionData.create({
+    type: 'expression',
+    operator: expData.operator,
+    left: convertBoolExpToData(obj.left) as BoolAtomData | BoolExpressionData,
+    right: convertBoolExpToData(obj.right) as BoolAtomData | BoolExpressionData | undefined,
+  });
 }
 
 export class Conditions implements ConditionsInstance {
@@ -19,7 +39,12 @@ export class Conditions implements ConditionsInstance {
   constructor(args: ConditionsCreateArgs, options?: { uuid?: string }) {
     this._options = options;
     this.uuid = generateUUID(options);
-    this.content = args.content;
+    // 如果 content 是 BoolExp，转换为正确的格式
+    if (args.content && args.content instanceof BoolExp) {
+      this.content = convertBoolExpToData(args.content);
+    } else {
+      this.content = args.content as BoolExpressionDataInstance | BoolAtomDataInstance | undefined;
+    }
   }
   
   // 静态属性和方法

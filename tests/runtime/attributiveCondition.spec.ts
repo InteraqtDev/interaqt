@@ -11,8 +11,10 @@ import {
     Condition,
     PayloadItem,
     Entity,
-    Property, Payload, boolExpToAttributives,
-    boolExpToConditions
+    Property,
+    Payload,
+    boolExpToAttributives,
+    Conditions
 } from 'interaqt';
 
 describe('attributive and condition checks', () => {
@@ -450,9 +452,9 @@ describe('attributive and condition checks', () => {
             const PublishContent = Interaction.create({
                 name: 'publishContent',
                 action: Action.create({ name: 'publish' }),
-                conditions: boolExpToConditions(
-                    BoolExp.atom(systemNotInMaintenance).and(BoolExp.atom(userIsVerified))
-                )
+                conditions: Conditions.create({
+                    content: BoolExp.atom(systemNotInMaintenance).and(BoolExp.atom(userIsVerified))
+                })
             })
 
             controller = new Controller({

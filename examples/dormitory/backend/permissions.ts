@@ -1,4 +1,4 @@
-import { Condition, BoolExp, boolExpToConditions, MatchExp } from 'interaqt';
+import { Condition, BoolExp, Conditions, MatchExp } from 'interaqt';
 import type { Controller } from 'interaqt';
 
 // Role-based conditions
@@ -255,44 +255,44 @@ export const TargetUserInLeadersDormitory = Condition.create({
 });
 
 // Complex combined conditions for specific operations
-export const CanReportViolation = boolExpToConditions(
-  BoolExp.atom(AuthenticatedUser)
+export const CanReportViolation = Conditions.create({
+  content: BoolExp.atom(AuthenticatedUser)
     .and(BoolExp.atom(ActiveUser))
     .and(BoolExp.atom(AdminOrLeaderRole))
     .and(BoolExp.atom(ValidViolationType))
     .and(BoolExp.atom(UserExists))
     .and(BoolExp.atom(TargetUserInLeadersDormitory))
-);
+});
 
-export const CanSubmitKickoutRequest = boolExpToConditions(
-  BoolExp.atom(AuthenticatedUser)
+export const CanSubmitKickoutRequest = Conditions.create({
+  content: BoolExp.atom(AuthenticatedUser)
     .and(BoolExp.atom(ActiveUser))
     .and(BoolExp.atom(AdminOrLeaderRole))
     .and(BoolExp.atom(UserExists))
     .and(BoolExp.atom(TargetUserInLeadersDormitory))
-);
+});
 
-export const CanAssignUserToBed = boolExpToConditions(
-  BoolExp.atom(AuthenticatedUser)
+export const CanAssignUserToBed = Conditions.create({
+  content: BoolExp.atom(AuthenticatedUser)
     .and(BoolExp.atom(ActiveUser))
     .and(BoolExp.atom(AdminRole))
     .and(BoolExp.atom(UserExists))
     .and(BoolExp.atom(BedSpaceExists))
     .and(BoolExp.atom(BedSpaceAvailable))
     .and(BoolExp.atom(UserNotAlreadyAssigned))
-);
+});
 
-export const CanCreateDormitory = boolExpToConditions(
-  BoolExp.atom(AuthenticatedUser)
+export const CanCreateDormitory = Conditions.create({
+  content: BoolExp.atom(AuthenticatedUser)
     .and(BoolExp.atom(ActiveUser))
     .and(BoolExp.atom(AdminRole))
     .and(BoolExp.atom(ValidDormitoryCapacity))
-);
+});
 
-export const CanApproveKickoutRequest = boolExpToConditions(
-  BoolExp.atom(AuthenticatedUser)
+export const CanApproveKickoutRequest = Conditions.create({
+  content: BoolExp.atom(AuthenticatedUser)
     .and(BoolExp.atom(ActiveUser))
     .and(BoolExp.atom(AdminRole))
     .and(BoolExp.atom(KickoutRequestExists))
     .and(BoolExp.atom(ValidKickoutDecision))
-);
+});

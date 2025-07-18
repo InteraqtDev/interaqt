@@ -1223,67 +1223,66 @@ const ViewContent = Interaction.create({
 })
 ```
 
-**Combining Multiple Conditions**
+**Error Handling**
+- Conditions that return `false` trigger a `'condition check failed'` error
+- Throwing an error in the content function also results in permission denial
+- Use `event.error` to provide custom error messages
 
-Use `boolExpToConditions()` to combine multiple conditions with AND/OR logic:
+**Combining Conditions**
+Use `Conditions.create()` to combine multiple conditions with AND/OR logic:
 
 ```typescript
-import { boolExpToConditions, BoolExp } from 'interaqt'
+import { Conditions, BoolExp } from 'interaqt'
 
-// Define individual conditions
-const userIsVerified = Condition.create({
-    name: 'userIsVerified',
-    content: async function(this: Controller, event: any) {
-        const user = await this.system.storage.findOne('User',
-            MatchExp.atom({ key: 'id', value: ['=', event.user.id] }),
-            undefined,
-            ['isVerified']
-        )
-        return user?.isVerified === true
+const condition1 = Condition.create({
+    name: 'hasCredits',
+    content: async function(this: Controller, event) {
+        return event.user.credits > 0
     }
 })
 
-const hasPublishPermission = Condition.create({
-    name: 'hasPublishPermission',
-    content: async function(this: Controller, event: any) {
-        const user = await this.system.storage.findOne('User',
-            MatchExp.atom({ key: 'id', value: ['=', event.user.id] }),
-            undefined,
-            ['role', 'permissions']
-        )
-        return user.role === 'admin' || user.permissions?.includes('publish')
+const condition2 = Condition.create({
+    name: 'isVerified',
+    content: async function(this: Controller, event) {
+        return event.user.isVerified === true
     }
 })
 
-// AND combination - all conditions must pass
-const PublishArticle = Interaction.create({
-    name: 'publishArticle',
-    action: Action.create({ name: 'publish' }),
-    conditions: boolExpToConditions(
-        BoolExp.atom(systemNotInMaintenance)
-            .and(BoolExp.atom(userIsVerified))
-            .and(BoolExp.atom(hasPublishPermission))
-    )
+// Combine with BoolExp
+const combinedConditions = Conditions.create({
+    content: BoolExp.atom(condition1).and(BoolExp.atom(condition2))
 })
 
-// OR combination - at least one condition must pass
-const ModerateContent = Interaction.create({
-    name: 'moderateContent',
-    action: Action.create({ name: 'moderate' }),
-    conditions: boolExpToConditions(
-        BoolExp.atom(isAdmin).or(BoolExp.atom(isModerator))
-    )
+// Use in Interaction
+const PremiumAction = Interaction.create({
+    name: 'premiumAction',
+    action: Action.create({ name: 'premium' }),
+    conditions: combinedConditions
+})
+```
+
+**Usage Patterns**
+```typescript
+// Single condition - can be used directly
+conditions: AdminRole
+
+// Combined conditions with AND
+conditions: Conditions.create({
+    content: BoolExp.atom(AdminRole).and(BoolExp.atom(ActiveUser))
 })
 
-// Complex combination - (A AND B) OR C
-const SpecialAccess = Interaction.create({
-    name: 'specialAccess',
-    action: Action.create({ name: 'access' }),
-    conditions: boolExpToConditions(
-        BoolExp.atom(userIsVerified)
-            .and(BoolExp.atom(hasSubscription))
-            .or(BoolExp.atom(isAdmin))
-    )
+// Combined conditions with OR
+conditions: Conditions.create({
+    content: BoolExp.atom(AdminRole).or(BoolExp.atom(ModeratorRole))
+})
+
+// Complex combinations
+conditions: Conditions.create({
+    content: BoolExp.atom(AuthenticatedUser)
+        .and(BoolExp.atom(ActiveUser))
+        .and(
+            BoolExp.atom(AdminRole).or(BoolExp.atom(ModeratorRole))
+        )
 })
 ```
 
@@ -1786,21 +1785,23 @@ const expr2 = BoolExp.atom({ condition: 'isAdmin' })
 const combined = expr1.and(expr2).or({ condition: 'isOwner' })
 ```
 
-### boolExpToConditions()
+## 13.5 Query APIs
 
-Convert BoolExp expression of Conditions to Conditions instance for use in Interaction conditions.
+### Conditions
+
+Conditions are used to determine whether an interaction can be executed based on dynamic runtime checks.
 
 **Syntax**
 ```typescript
-boolExpToConditions(expression: BoolExp<ConditionInstance>): ConditionsInstance
+Conditions.create(config: ConditionsConfig): ConditionsInstance
 ```
 
 **Parameters**
-- `expression`: A BoolExp expression containing Condition instances combined with AND/OR logic
+- `config.content` (BoolExp, required): Boolean expression containing conditions combined with AND/OR logic
 
 **Examples**
 ```typescript
-import { boolExpToConditions, BoolExp, Condition } from 'interaqt'
+import { Conditions, BoolExp } from 'interaqt'
 
 const condition1 = Condition.create({
     name: 'hasCredits',
@@ -1816,16 +1817,31 @@ const condition2 = Condition.create({
     }
 })
 
-// Convert to Conditions for Interaction
-const combinedConditions = boolExpToConditions(
-    BoolExp.atom(condition1).and(BoolExp.atom(condition2))
-)
+// Combine with BoolExp
+const combinedConditions = Conditions.create({
+    content: BoolExp.atom(condition1).and(BoolExp.atom(condition2))
+})
 
 const MyInteraction = Interaction.create({
     name: 'myInteraction',
     action: Action.create({ name: 'execute' }),
     conditions: combinedConditions
 })
+```
+
+### BoolExp
+
+Boolean expression builder for constructing complex logical expressions.
+
+#### BoolExp.atom(data: T)
+Create atomic expression.
+
+```typescript
+const expr1 = BoolExp.atom({ condition: 'isActive' })
+const expr2 = BoolExp.atom({ condition: 'isAdmin' })
+
+// Combined expression
+const combined = expr1.and(expr2).or({ condition: 'isOwner' })
 ```
 
 ## Type Definitions
