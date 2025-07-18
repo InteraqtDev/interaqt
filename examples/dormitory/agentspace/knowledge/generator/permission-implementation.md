@@ -1,7 +1,7 @@
 # Permission Implementation Guide
 
 ## Overview
-Permissions in interaqt are implemented through userAttributive and dataAttributive in interactions. These control who can perform actions and on what data.
+Permissions in interaqt are implemented through conditions in interactions. These control who can perform actions and under what circumstances.
 
 ## 🔴 CRITICAL: Common Mistakes
 
@@ -18,14 +18,14 @@ Transform.create({
   }
 })
 
-// ✅ CORRECT: Use Attributives in Interaction
+// ✅ CORRECT: Use Conditions in Interaction
 const CreateArticle = Interaction.create({
   name: 'CreateArticle',
-  userAttributives: AdminRole  // Check here!
+  conditions: AdminRole  // Check here!
 });
 ```
 
-### Use MatchExp in Attributives, Not BoolExp
+### Use MatchExp in Conditions, Not BoolExp
 ```typescript
 // ❌ WRONG: Using BoolExp for queries
 const post = await this.system.storage.findOne('Post',
@@ -38,29 +38,28 @@ const post = await this.system.storage.findOne('Post',
 );
 ```
 
-### Use boolExpToAttributives for BoolExp Combinations
+### Use boolExpToConditions for BoolExp Combinations
 ```typescript
-// ❌ WRONG: Using BoolExp directly in userAttributives
-userAttributives: BoolExp.atom(AdminRole).and(ActiveUser)
+// ❌ WRONG: Using BoolExp directly in conditions
+conditions: BoolExp.atom(AdminRole).and(ActiveUser)
 
-// ✅ CORRECT: Convert BoolExp to Attributives
-import { boolExpToAttributives } from 'interaqt';
+// ✅ CORRECT: Convert BoolExp to Conditions
+import { boolExpToConditions } from 'interaqt';
 
-userAttributives: boolExpToAttributives(
+conditions: boolExpToConditions(
   BoolExp.atom(AdminRole).and(ActiveUser)
 )
 ```
 
 ## Key Concepts
 
-### Attributive Structure
+### Condition Structure
 ```typescript
-const MyAttributive = Attributive.create({
-  name: 'MyAttributive',
-  content: function(targetUser, eventArgs) {
-    // targetUser: Current user (in userAttributives)
-    // eventArgs: Contains user, payload, query info
-    // this: Controller instance (access system, globals)
+const MyCondition = Condition.create({
+  name: 'MyCondition',
+  content: async function(this: Controller, event) {
+    // event: Contains user, payload, query info
+    // this: Controller instance (access system, storage)
     
     // Return true for permission granted, false for denied
     return true;
@@ -68,27 +67,27 @@ const MyAttributive = Attributive.create({
 });
 ```
 
-### userAttributive vs dataAttributive
-- **userAttributive**: Checks user permissions BEFORE interaction execution
-- **dataAttributive**: Validates data constraints during interaction
+### Condition Usage
+- **conditions**: Checks permissions and requirements BEFORE interaction execution
+- Conditions can check user permissions, data state, system state, etc.
 
 ## Basic Permission Patterns
 
 ### 1. Role-Based Access
 ```typescript
 // Simple role check
-export const AdminRole = Attributive.create({
+export const AdminRole = Condition.create({
   name: 'AdminRole',
-  content: function(targetUser, eventArgs) {
-    return eventArgs.user?.role === 'admin';
+  content: async function(this: Controller, event) {
+    return event.user?.role === 'admin';
   }
 });
 
 // Multiple roles
-export const OperatorOrAdminRole = Attributive.create({
+export const OperatorOrAdminRole = Condition.create({
   name: 'OperatorOrAdminRole',
-  content: function(targetUser, eventArgs) {
-    const role = eventArgs.user?.role;
+  content: async function(this: Controller, event) {
+    const role = event.user?.role;
     return role === 'admin' || role === 'operator';
   }
 });
@@ -107,18 +106,17 @@ export const DeleteStyle = Interaction.create({
       })
     ]
   }),
-  userAttributives: AdminRole  // Only admin can delete
+  conditions: AdminRole  // Only admin can delete
 });
 ```
 
 ### 2. Data-Based Permissions
 ```typescript
 // Check data state
-export const StyleNotOffline = Attributive.create({
+export const StyleNotOffline = Condition.create({
   name: 'StyleNotOffline',
-  content: async function(targetUser, eventArgs) {
-    const styleId = eventArgs.payload.style?.id || eventArgs.payload.style;
-    const { MatchExp } = this.globals;
+  content: async function(this: Controller, event) {
+    const styleId = event.payload.style?.id || event.payload.style;
     
     const style = await this.system.storage.findOne('Style',
       MatchExp.atom({ key: 'id', value: ['=', styleId] }),
@@ -131,11 +129,10 @@ export const StyleNotOffline = Attributive.create({
 });
 
 // Style must be draft to publish
-export const StyleIsDraft = Attributive.create({
+export const StyleIsDraft = Condition.create({
   name: 'StyleIsDraft',
-  content: async function(targetUser, eventArgs) {
-    const styleId = eventArgs.payload.style?.id || eventArgs.payload.style;
-    const { MatchExp } = this.globals;
+  content: async function(this: Controller, event) {
+    const styleId = event.payload.style?.id || event.payload.style;
     
     const style = await this.system.storage.findOne('Style',
       MatchExp.atom({ key: 'id', value: ['=', styleId] }),
@@ -150,7 +147,7 @@ export const StyleIsDraft = Attributive.create({
 
 ### 3. Combining Permissions with BoolExp
 ```typescript
-import { BoolExp, boolExpToAttributives } from 'interaqt';
+import { BoolExp, boolExpToConditions } from 'interaqt';
 
 // Combine multiple conditions
 export const UpdateStyle = Interaction.create({
@@ -169,7 +166,7 @@ export const UpdateStyle = Interaction.create({
     ]
   }),
   // Must be admin/operator AND style not offline
-  userAttributives: boolExpToAttributives(
+  conditions: boolExpToConditions(
     BoolExp.atom(OperatorOrAdminRole)
       .and(BoolExp.atom(StyleNotOffline))
   )
@@ -189,7 +186,7 @@ export const ViewStyle = Interaction.create({
       })
     ]
   }),
-  userAttributives: boolExpToAttributives(
+  conditions: boolExpToConditions(
     BoolExp.atom(AdminRole)
       .or(BoolExp.atom(OperatorRole))
       .or(BoolExp.atom(ViewerRole))
@@ -197,19 +194,21 @@ export const ViewStyle = Interaction.create({
 });
 ```
 
-### 4. Payload Attributives
+### 4. Payload Validation in Conditions
 ```typescript
-// Validate payload data
-export const ValidStyleType = Attributive.create({
-  name: 'ValidStyleType',
-  content: function(styleData, eventArgs) {
-    // styleData is the payload item value
+// Validate payload data within conditions
+export const ValidateStyleType = Condition.create({
+  name: 'ValidateStyleType',
+  content: async function(this: Controller, event) {
+    const styleData = event.payload?.styleData;
+    if (!styleData) return false;
+    
     const validTypes = ['theme', 'component', 'template'];
     return validTypes.includes(styleData.type);
   }
 });
 
-// Apply to payload item
+// Combine with user permission check
 export const CreateStyle = Interaction.create({
   name: 'CreateStyle',
   action: Action.create({ name: 'createStyle' }),
@@ -217,57 +216,58 @@ export const CreateStyle = Interaction.create({
     items: [
       PayloadItem.create({ 
         name: 'styleData',
-        base: Style,
-        attributives: ValidStyleType  // Validate payload
+        base: Style
       })
     ]
   }),
-  userAttributives: OperatorOrAdminRole
+  conditions: boolExpToConditions(
+    BoolExp.atom(OperatorOrAdminRole)
+      .and(BoolExp.atom(ValidateStyleType))  // Validate payload in conditions
+  )
 });
 ```
 
 ## Complete Example
 
 ```typescript
-import { Attributive, BoolExp, boolExpToAttributives, Interaction, Action, Payload, PayloadItem } from 'interaqt';
+import { Condition, BoolExp, boolExpToConditions, Interaction, Action, Payload, PayloadItem, MatchExp } from 'interaqt';
 
-// Define role attributives
-export const AdminRole = Attributive.create({
+// Define role conditions
+export const AdminRole = Condition.create({
   name: 'AdminRole',
-  content: function(targetUser, eventArgs) {
-    return eventArgs.user?.role === 'admin';
+  content: async function(this: Controller, event) {
+    return event.user?.role === 'admin';
   }
 });
 
-export const OperatorRole = Attributive.create({
+export const OperatorRole = Condition.create({
   name: 'OperatorRole',
-  content: function(targetUser, eventArgs) {
-    return eventArgs.user?.role === 'operator';
+  content: async function(this: Controller, event) {
+    return event.user?.role === 'operator';
   }
 });
 
-export const ViewerRole = Attributive.create({
+export const ViewerRole = Condition.create({
   name: 'ViewerRole',
-  content: function(targetUser, eventArgs) {
-    return eventArgs.user?.role === 'viewer';
+  content: async function(this: Controller, event) {
+    return event.user?.role === 'viewer';
   }
 });
 
 // Combined permission
-export const OperatorOrAdminRole = Attributive.create({
+export const OperatorOrAdminRole = Condition.create({
   name: 'OperatorOrAdminRole',
-  content: function(targetUser, eventArgs) {
-    const role = eventArgs.user?.role;
+  content: async function(this: Controller, event) {
+    const role = event.user?.role;
     return role === 'admin' || role === 'operator';
   }
 });
 
-// Data state attributives
-export const StyleNotOffline = Attributive.create({
+// Data state conditions
+export const StyleNotOffline = Condition.create({
   name: 'StyleNotOffline',
-  content: async function(targetUser, eventArgs) {
-    const styleId = eventArgs.payload.style?.id || eventArgs.payload.style;
-    const { MatchExp } = this.globals;
+  content: async function(this: Controller, event) {
+    const styleId = event.payload.style?.id || event.payload.style;
     
     const style = await this.system.storage.findOne('Style',
       MatchExp.atom({ key: 'id', value: ['=', styleId] }),
@@ -279,11 +279,10 @@ export const StyleNotOffline = Attributive.create({
   }
 });
 
-export const StyleIsDraft = Attributive.create({
+export const StyleIsDraft = Condition.create({
   name: 'StyleIsDraft',
-  content: async function(targetUser, eventArgs) {
-    const styleId = eventArgs.payload.style?.id || eventArgs.payload.style;
-    const { MatchExp } = this.globals;
+  content: async function(this: Controller, event) {
+    const styleId = event.payload.style?.id || event.payload.style;
     
     const style = await this.system.storage.findOne('Style',
       MatchExp.atom({ key: 'id', value: ['=', styleId] }),
@@ -307,7 +306,7 @@ export const CreateStyle = Interaction.create({
       PayloadItem.create({ name: 'type', required: true })
     ]
   }),
-  userAttributives: OperatorOrAdminRole
+  conditions: OperatorOrAdminRole
 });
 
 export const UpdateStyle = Interaction.create({
@@ -325,7 +324,7 @@ export const UpdateStyle = Interaction.create({
       PayloadItem.create({ name: 'description' })
     ]
   }),
-  userAttributives: boolExpToAttributives(
+  conditions: boolExpToConditions(
     BoolExp.atom(OperatorOrAdminRole)
       .and(BoolExp.atom(StyleNotOffline))
   )
@@ -344,7 +343,7 @@ export const DeleteStyle = Interaction.create({
       })
     ]
   }),
-  userAttributives: AdminRole  // Admin only
+  conditions: AdminRole  // Admin only
 });
 
 export const PublishStyle = Interaction.create({
@@ -360,7 +359,7 @@ export const PublishStyle = Interaction.create({
       })
     ]
   }),
-  userAttributives: boolExpToAttributives(
+  conditions: boolExpToConditions(
     BoolExp.atom(OperatorOrAdminRole)
       .and(BoolExp.atom(StyleIsDraft))
   )
@@ -376,11 +375,11 @@ export const GetStyles = Interaction.create({
       PayloadItem.create({ name: 'status' })
     ]
   })
-  // No userAttributives = all users can access
+  // No conditions = all users can access
 });
 ```
 
-## MatchExp Usage in Attributives
+## MatchExp Usage in Conditions
 
 ### Query Operators
 ```typescript
@@ -412,16 +411,15 @@ MatchExp.atom({ key: 'role', value: ['=', 'admin'] })
 ### 1. Performance Optimization
 ```typescript
 // ✅ Check simple conditions first
-const EfficientCheck = Attributive.create({
+const EfficientCheck = Condition.create({
   name: 'EfficientCheck',
-  content: async function(targetUser, eventArgs) {
+  content: async function(this: Controller, event) {
     // Simple check first
-    if (eventArgs.user.role === 'admin') {
+    if (event.user.role === 'admin') {
       return true;
     }
     
     // Then database query
-    const { MatchExp } = this.globals;
     const result = await this.system.storage.findOne(...);
     return !!result;
   }
@@ -431,16 +429,16 @@ const EfficientCheck = Attributive.create({
 ### 2. Clear Error Context
 ```typescript
 // ✅ Provide meaningful error context
-const WithContext = Attributive.create({
+const WithContext = Condition.create({
   name: 'WithContext',
-  content: function(targetUser, eventArgs) {
-    if (!eventArgs.user) {
-      eventArgs.error = 'User not authenticated';
+  content: async function(this: Controller, event) {
+    if (!event.user) {
+      event.error = 'User not authenticated';
       return false;
     }
     
-    if (eventArgs.user.role !== 'admin') {
-      eventArgs.error = 'Admin role required';
+    if (event.user.role !== 'admin') {
+      event.error = 'Admin role required';
       return false;
     }
     
@@ -449,46 +447,46 @@ const WithContext = Attributive.create({
 });
 ```
 
-### 3. Reusable Attributives
+### 3. Reusable Conditions
 ```typescript
 // ✅ Generic role checker
-export const RequireRole = (role: string) => Attributive.create({
+export const RequireRole = (role: string) => Condition.create({
   name: `Require${role}Role`,
-  content: function(targetUser, eventArgs) {
-    return eventArgs.user?.role === role;
+  content: async function(this: Controller, event) {
+    return event.user?.role === role;
   }
 });
 
 // Use in interactions
-userAttributives: RequireRole('admin')
+conditions: RequireRole('admin')
 ```
 
 ## Important Notes on BoolExp Usage
 
-### When to Use boolExpToAttributives
+### When to Use boolExpToConditions
 ```typescript
-// ✅ CORRECT: When combining multiple Attributives with BoolExp
-userAttributives: boolExpToAttributives(
+// ✅ CORRECT: When combining multiple Conditions with BoolExp
+conditions: boolExpToConditions(
   BoolExp.atom(AdminRole)
     .and(BoolExp.atom(ActiveUser))
     .or(BoolExp.atom(OwnerRole))
 )
 
-// ✅ CORRECT: For simple single Attributive
-userAttributives: AdminRole
+// ✅ CORRECT: For simple single Condition
+conditions: AdminRole
 
 // ❌ WRONG: BoolExp without conversion
-userAttributives: BoolExp.atom(AdminRole)
+conditions: BoolExp.atom(AdminRole)
 ```
 
 ### BoolExp vs MatchExp
-- **BoolExp**: Used ONLY for combining Attributives
-- **MatchExp**: Used for database queries inside Attributive content functions
+- **BoolExp**: Used ONLY for combining Conditions
+- **MatchExp**: Used for database queries inside Condition content functions
 
 ```typescript
-const MyAttributive = Attributive.create({
-  name: 'MyAttributive',
-  content: async function(targetUser, eventArgs) {
+const MyCondition = Condition.create({
+  name: 'MyCondition',
+  content: async function(event) {
     // ✅ Use MatchExp for queries
     const result = await this.system.storage.findOne('Entity',
       MatchExp.atom({ key: 'id', value: ['=', id] })
@@ -505,10 +503,10 @@ const MyAttributive = Attributive.create({
 ```
 
 ## Validation Checklist
-- [ ] All interactions have appropriate userAttributives
-- [ ] Data validation uses dataAttributives where needed
+- [ ] All interactions have appropriate conditions
+- [ ] Data validation uses conditions where needed
 - [ ] MatchExp (not BoolExp) used for database queries
-- [ ] BoolExp combinations wrapped with boolExpToAttributives
+- [ ] BoolExp combinations wrapped with boolExpToConditions
 - [ ] No permission logic in computations
 - [ ] Clear error messages for permission failures
 - [ ] Performance optimized (simple checks first)

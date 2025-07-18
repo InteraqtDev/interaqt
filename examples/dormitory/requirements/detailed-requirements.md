@@ -1,194 +1,139 @@
-# 宿舍管理系统详细需求分析
+# Dormitory Management System - Detailed Requirements
 
-## 1. 业务概述
+## Business Requirements Analysis
 
-本系统是一个宿舍管理系统，用于管理宿舍分配、用户管理、纪律管理等功能。系统包含管理员、宿舍长、普通用户三个角色，支持宿舍创建、用户分配、纪律扣分、踢出申请等核心功能。
+### Core Entities
 
-## 2. 实体分析
+1. **User**: System participants including administrators, dorm leaders, and residents
+2. **Dormitory**: Physical dormitory units with multiple bed spaces
+3. **BedSpace**: Individual bed positions within dormitories
+4. **Assignment**: Allocation of users to specific bed spaces
+5. **Violation**: Rule infractions that result in score deductions
+6. **KickoutRequest**: Formal requests to remove users from dormitories
 
-### 2.1 用户实体 (User)
-- **属性**：
-  - id: 用户唯一标识
-  - name: 用户姓名
-  - email: 邮箱
-  - phone: 电话
-  - role: 角色类型 (admin/dormLeader/student)
-  - score: 当前积分 (默认100分)
-  - createdAt: 创建时间
-  - updatedAt: 更新时间
+### Detailed Entity Properties
 
-### 2.2 宿舍实体 (Dormitory)
-- **属性**：
-  - id: 宿舍唯一标识
-  - name: 宿舍名称
-  - building: 楼栋
-  - floor: 楼层
-  - capacity: 床位数量 (4-6)
-  - currentCount: 当前入住人数
-  - createdAt: 创建时间
-  - updatedAt: 更新时间
+#### User Entity
+- `id`: Unique identifier
+- `username`: Display name
+- `role`: User role (admin, leader, resident)
+- `email`: Contact email
+- `score`: Current behavioral score (default: 100)
+- `isActive`: Account status
 
-### 2.3 床位实体 (Bed)
-- **属性**：
-  - id: 床位唯一标识
-  - number: 床位编号
-  - isOccupied: 是否被占用
-  - createdAt: 创建时间
-  - updatedAt: 更新时间
+#### Dormitory Entity
+- `id`: Unique identifier
+- `name`: Dormitory name/number
+- `capacity`: Maximum number of beds (4-6)
+- `leaderId`: Assigned dorm leader
+- `isActive`: Operational status
 
-### 2.4 扣分记录实体 (ScoreRecord)
-- **属性**：
-  - id: 记录唯一标识
-  - reason: 扣分原因
-  - score: 扣分数值
-  - recordedAt: 记录时间
-  - recordedBy: 记录人
+#### BedSpace Entity
+- `id`: Unique identifier
+- `dormitoryId`: Parent dormitory
+- `bedNumber`: Position number within dormitory
+- `isOccupied`: Occupancy status
 
-### 2.5 踢出申请实体 (KickoutRequest)
-- **属性**：
-  - id: 申请唯一标识
-  - reason: 申请原因
-  - status: 申请状态 (pending/approved/rejected)
-  - createdAt: 申请时间
-  - processedAt: 处理时间
+#### Assignment Entity
+- `id`: Unique identifier
+- `userId`: Assigned user
+- `bedSpaceId`: Assigned bed
+- `assignedAt`: Assignment timestamp
+- `isActive`: Current assignment status
 
-## 3. 关系分析
+#### Violation Entity
+- `id`: Unique identifier
+- `userId`: User who violated rules
+- `type`: Violation category
+- `description`: Violation details
+- `scoreDeduction`: Points deducted
+- `reportedAt`: When violation occurred
+- `reportedById`: Who reported the violation
 
-### 3.1 用户-宿舍关系 (UserDormitory)
-- **类型**: 一对一关系
-- **属性**：
-  - assignedAt: 分配时间
-  - assignedBy: 分配人
-- **约束**: 每个用户只能分配到一个宿舍
+#### KickoutRequest Entity
+- `id`: Unique identifier
+- `requesterId`: Dorm leader making request
+- `targetUserId`: User to be removed
+- `reason`: Justification for removal
+- `status`: Request status (pending, approved, rejected)
+- `requestedAt`: Request timestamp
+- `reviewedAt`: Admin review timestamp
+- `reviewedById`: Admin who processed request
 
-### 3.2 用户-床位关系 (UserBed)
-- **类型**: 一对一关系
-- **属性**：
-  - assignedAt: 分配时间
-- **约束**: 每个用户只能分配到一个床位
+### Business Rules
 
-### 3.3 宿舍-床位关系 (DormitoryBed)
-- **类型**: 一对多关系
-- **属性**: 无
-- **约束**: 每个宿舍包含4-6个床位
+1. **Role Management**
+   - Only admin can assign dorm leader roles
+   - Each dormitory has exactly one leader
+   - Leaders can only manage their assigned dormitory
 
-### 3.4 宿舍-宿舍长关系 (DormitoryLeader)
-- **类型**: 一对一关系
-- **属性**：
-  - appointedAt: 任命时间
-  - appointedBy: 任命人
-- **约束**: 每个宿舍只有一个宿舍长
+2. **Dormitory Management**
+   - Admin creates dormitories with 4-6 bed capacity
+   - Each bed space can hold maximum one user
+   - Users can only be assigned to one bed space at a time
 
-### 3.5 用户-扣分记录关系 (UserScoreRecord)
-- **类型**: 一对多关系
-- **属性**: 无
-- **约束**: 每个用户可以有多条扣分记录
+3. **Score System**
+   - Users start with 100 points
+   - Various violations deduct points
+   - Score thresholds trigger kickout eligibility
 
-### 3.6 踢出申请-相关用户关系 (KickoutRequestUser)
-- **类型**: 多对一关系
-- **属性**: 无
-- **约束**: 每个踢出申请涉及一个被踢出用户和一个申请人
+4. **Kickout Process**
+   - Leaders can request user removal when score falls below threshold
+   - Admin must approve all kickout requests
+   - Approved requests result in user removal from dormitory
 
-## 4. 交互分析
+### Violation Types and Penalties
 
-### 4.1 管理员交互
-- **AppointDormLeader**: 任命宿舍长
-- **CreateDormitory**: 创建宿舍
-- **AssignUserToDormitory**: 分配用户到宿舍
-- **ProcessKickoutRequest**: 处理踢出申请
-- **ViewAllDormitories**: 查看所有宿舍
-- **ViewAllUsers**: 查看所有用户
+- **Noise Violation**: -10 points
+- **Cleanliness Issue**: -15 points
+- **Damage to Property**: -25 points
+- **Unauthorized Guests**: -20 points
+- **Curfew Violation**: -10 points
 
-### 4.2 宿舍长交互
-- **RecordScoreDeduction**: 记录扣分
-- **CreateKickoutRequest**: 创建踢出申请
-- **ViewDormitoryMembers**: 查看宿舍成员
-- **ViewScoreRecords**: 查看扣分记录
+### Permission Matrix
 
-### 4.3 普通用户交互
-- **ViewMyDormitory**: 查看我的宿舍
-- **ViewMyScore**: 查看我的积分
-- **ViewMyScoreRecords**: 查看我的扣分记录
+| Role | Create Dorm | Assign Users | Report Violations | Request Kickout | Approve Kickout |
+|------|-------------|--------------|-------------------|-----------------|-----------------|
+| Admin | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Leader | ✗ | ✗ | ✓ | ✓ (own dorm) | ✗ |
+| Resident | ✗ | ✗ | ✗ | ✗ | ✗ |
 
-## 5. 权限分析
+### Key Business Processes
 
-### 5.1 角色权限
-- **管理员 (admin)**：
-  - 所有系统操作权限
-  - 可以任命宿舍长
-  - 可以创建宿舍
-  - 可以分配用户
-  - 可以处理踢出申请
+1. **Dormitory Setup**
+   - Admin creates dormitory with specified capacity
+   - System automatically creates bed spaces
+   - Admin assigns dorm leader
 
-- **宿舍长 (dormLeader)**：
-  - 管理所在宿舍权限
-  - 可以记录扣分
-  - 可以申请踢出
-  - 可以查看宿舍成员信息
+2. **User Assignment**
+   - Admin assigns users to available bed spaces
+   - System validates capacity and availability
+   - Assignment becomes active immediately
 
-- **普通用户 (student)**：
-  - 只能查看自己的信息
-  - 可以查看所在宿舍的基本信息
+3. **Violation Reporting**
+   - Leaders/admin report violations against users
+   - Score automatically deducted
+   - Violation history maintained
 
-### 5.2 数据权限
-- 用户只能查看和操作自己相关的数据
-- 宿舍长只能操作所在宿舍的数据
-- 管理员可以操作所有数据
+4. **Kickout Process**
+   - Leader identifies problematic user
+   - Leader submits kickout request with justification
+   - Admin reviews and approves/rejects request
+   - If approved, user is removed from dormitory
 
-## 6. 业务流程
+### Data Relationships
 
-### 6.1 用户分配流程
-1. 管理员创建宿舍
-2. 系统自动创建对应床位
-3. 管理员分配用户到宿舍的指定床位
-4. 更新宿舍当前人数
-5. 建立用户与宿舍、床位的关系
+- User 1:n Assignment (one user can have multiple assignments over time)
+- Dormitory 1:n BedSpace (dormitory contains multiple beds)
+- BedSpace 1:n Assignment (bed can be assigned to different users over time)
+- User 1:n Violation (user can have multiple violations)
+- User 1:n KickoutRequest (as both requester and target)
+- Dormitory 1:1 User (leader assignment)
 
-### 6.2 宿舍长任命流程
-1. 管理员选择宿舍和目标用户
-2. 系统验证用户是否在该宿舍
-3. 更新用户角色为宿舍长
-4. 建立宿舍长关系
+### System Constraints
 
-### 6.3 扣分流程
-1. 宿舍长记录扣分原因和分数
-2. 系统更新用户积分
-3. 创建扣分记录
-4. 如果积分低于阈值，触发踢出提醒
-
-### 6.4 踢出申请流程
-1. 宿舍长创建踢出申请
-2. 管理员审核申请
-3. 如果批准，移除用户的宿舍和床位分配
-4. 更新床位状态和宿舍人数
-5. 更新申请状态
-
-## 7. 约束条件
-
-### 7.1 数据约束
-- 宿舍容量：4-6人
-- 用户积分：不能低于0
-- 踢出阈值：积分低于20分可申请踢出
-- 每个用户只能分配到一个宿舍一个床位
-
-### 7.2 业务约束
-- 只有管理员可以创建宿舍和分配用户
-- 只有宿舍长可以记录扣分和申请踢出
-- 踢出申请需要管理员批准
-- 宿舍长必须是该宿舍的成员
-
-## 8. 错误处理
-
-### 8.1 常见错误场景
-- 重复分配用户到宿舍
-- 分配用户到已满的宿舍
-- 非宿舍长用户尝试记录扣分
-- 对不存在的用户进行操作
-- 权限不足的操作
-
-### 8.2 错误处理策略
-- 参数验证
-- 权限检查
-- 业务规则验证
-- 友好的错误提示
-- 详细的错误日志
+1. **Capacity Limits**: Dormitories cannot exceed 4-6 bed capacity
+2. **Unique Assignments**: One user per bed space at any time
+3. **Role Restrictions**: Leaders can only manage their assigned dormitory
+4. **Score Validation**: Scores cannot go below 0
+5. **Request Status**: Kickout requests must be processed by admin

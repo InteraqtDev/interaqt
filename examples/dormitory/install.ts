@@ -6,15 +6,15 @@ async function main() {
   const system = new MonoSystem(new PGLiteDB());
 
   console.log('create controller...');
-  const controller = new Controller(
-    system, 
-    entities, 
-    relations, 
-    [],  // activities
-    interactions,
-    [],  // dicts
-    []   // side effects
-  );
+  const controller = new Controller({
+    system: system,
+    entities: entities,
+    relations: relations,
+    activities: [],
+    interactions: interactions,
+    dict: [],
+    recordMutationSideEffects: []
+  });
 
   console.log('set up...');
   await controller.setup(true);

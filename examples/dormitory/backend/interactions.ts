@@ -1,191 +1,356 @@
 import { Interaction, Action, Payload, PayloadItem } from 'interaqt';
-import { User, Dormitory, Bed, ScoreRecord, KickoutRequest } from './entities.js';
+import { User, Dormitory, BedSpace, Assignment, Violation, KickoutRequest } from './entities';
 import {
   AdminRole,
-  DormLeaderRole,
-  StudentRole
-} from './permissions-simple.js';
+  LeaderRole,
+  AdminOrLeaderRole,
+  AuthenticatedUser,
+  ActiveUser,
+  CanCreateDormitory,
+  CanAssignUserToBed,
+  CanReportViolation,
+  CanSubmitKickoutRequest,
+  CanApproveKickoutRequest,
+  ValidDormitoryCapacity,
+  UserExists,
+  DormitoryExists,
+  BedSpaceExists
+} from './permissions';
 
-// 管理员交互
-
-// 创建宿舍
+// Dormitory Management Interactions
 export const CreateDormitory = Interaction.create({
   name: 'CreateDormitory',
   action: Action.create({ name: 'createDormitory' }),
   payload: Payload.create({
     items: [
-      PayloadItem.create({ name: 'name', required: true }),      // 宿舍名称
-      PayloadItem.create({ name: 'building', required: true }),  // 楼栋
-      PayloadItem.create({ name: 'floor', required: true }),     // 楼层
-      PayloadItem.create({ name: 'capacity', required: true })   // 床位数量
+      PayloadItem.create({ name: 'name', required: true }),
+      PayloadItem.create({ name: 'capacity', required: true })
     ]
   }),
-  userAttributives: AdminRole  // 只有管理员可以创建宿舍
+  conditions: CanCreateDormitory
 });
 
-// 任命宿舍长
-export const AppointDormLeader = Interaction.create({
-  name: 'AppointDormLeader',
-  action: Action.create({ name: 'appointDormLeader' }),
+export const CreateBedSpace = Interaction.create({
+  name: 'CreateBedSpace',
+  action: Action.create({ name: 'createBedSpace' }),
   payload: Payload.create({
     items: [
-      PayloadItem.create({ 
-        name: 'dormitory',
-        base: Dormitory,
-        isRef: true,
-        required: true 
-      }),
-      PayloadItem.create({ 
-        name: 'user',
-        base: User,
-        isRef: true,
-        required: true 
-      })
+      PayloadItem.create({ name: 'dormitoryId', required: true }),
+      PayloadItem.create({ name: 'bedNumber', required: true })
     ]
   }),
-  userAttributives: AdminRole  // 只有管理员可以任命宿舍长
+  conditions: AdminRole
 });
 
-// 分配用户到宿舍
-export const AssignUserToDormitory = Interaction.create({
-  name: 'AssignUserToDormitory',
-  action: Action.create({ name: 'assignUserToDormitory' }),
+export const UpdateDormitory = Interaction.create({
+  name: 'UpdateDormitory', 
+  action: Action.create({ name: 'updateDormitory' }),
   payload: Payload.create({
     items: [
-      PayloadItem.create({ 
-        name: 'user',
-        base: User,
-        isRef: true,
-        required: true 
-      }),
-      PayloadItem.create({ 
-        name: 'dormitory',
-        base: Dormitory,
-        isRef: true,
-        required: true 
-      }),
-      PayloadItem.create({ name: 'bedNumber', required: true })  // 床位编号
+      PayloadItem.create({ name: 'dormitoryId', required: true }),
+      PayloadItem.create({ name: 'name' }),
+      PayloadItem.create({ name: 'capacity' })
     ]
   }),
-  userAttributives: AdminRole  // 只有管理员可以分配用户
+  conditions: AdminRole
 });
 
-// 处理踢出申请
-export const ProcessKickoutRequest = Interaction.create({
-  name: 'ProcessKickoutRequest',
-  action: Action.create({ name: 'processKickoutRequest' }),
+export const AssignDormLeader = Interaction.create({
+  name: 'AssignDormLeader',
+  action: Action.create({ name: 'assignDormLeader' }),
   payload: Payload.create({
     items: [
-      PayloadItem.create({ 
-        name: 'request',
-        base: KickoutRequest,
-        isRef: true,
-        required: true 
-      }),
-      PayloadItem.create({ name: 'decision', required: true }),  // approved, rejected
-      PayloadItem.create({ name: 'comment' })                   // 处理备注
+      PayloadItem.create({ name: 'dormitoryId', required: true }),
+      PayloadItem.create({ name: 'leaderId', required: true })
     ]
   }),
-  userAttributives: AdminRole  // 管理员处理踢出申请
+  conditions: AdminRole
 });
 
-// 查看所有宿舍
-export const ViewAllDormitories = Interaction.create({
-  name: 'ViewAllDormitories',
-  action: Action.create({ name: 'viewAllDormitories' }),
-  payload: Payload.create({
-    items: []
-  }),
-  userAttributives: AdminRole  // 只有管理员可以查看所有宿舍
-});
-
-// 查看所有用户
-export const ViewAllUsers = Interaction.create({
-  name: 'ViewAllUsers',
-  action: Action.create({ name: 'viewAllUsers' }),
-  payload: Payload.create({
-    items: []
-  }),
-  userAttributives: AdminRole  // 只有管理员可以查看所有用户
-});
-
-// 宿舍长交互
-
-// 记录扣分
-export const RecordScoreDeduction = Interaction.create({
-  name: 'RecordScoreDeduction',
-  action: Action.create({ name: 'recordScoreDeduction' }),
+// User Assignment Interactions
+export const AssignUserToBed = Interaction.create({
+  name: 'AssignUserToBed',
+  action: Action.create({ name: 'assignUserToBed' }),
   payload: Payload.create({
     items: [
-      PayloadItem.create({ 
-        name: 'user',
-        base: User,
-        isRef: true,
-        required: true 
-      }),
-      PayloadItem.create({ name: 'reason', required: true }),  // 扣分原因
-      PayloadItem.create({ name: 'score', required: true })   // 扣分数值
+      PayloadItem.create({ name: 'userId', required: true }),
+      PayloadItem.create({ name: 'bedSpaceId', required: true })
     ]
   }),
-  userAttributives: DormLeaderRole  // 宿舍长可以记录用户扣分
+  conditions: CanAssignUserToBed
 });
 
-// 创建踢出申请
-export const CreateKickoutRequest = Interaction.create({
-  name: 'CreateKickoutRequest',
-  action: Action.create({ name: 'createKickoutRequest' }),
+export const TransferUser = Interaction.create({
+  name: 'TransferUser',
+  action: Action.create({ name: 'transferUser' }),
   payload: Payload.create({
     items: [
-      PayloadItem.create({ 
-        name: 'user',
-        base: User,
-        isRef: true,
-        required: true 
-      }),
-      PayloadItem.create({ name: 'reason', required: true })  // 踢出原因
+      PayloadItem.create({ name: 'userId', required: true }),
+      PayloadItem.create({ name: 'newBedSpaceId', required: true })
     ]
   }),
-  userAttributives: DormLeaderRole  // 宿舍长可以踢出用户
+  conditions: AdminRole
 });
 
-// 查看宿舍成员
-export const ViewDormitoryMembers = Interaction.create({
-  name: 'ViewDormitoryMembers',
-  action: Action.create({ name: 'viewDormitoryMembers' }),
+export const RemoveUserFromDormitory = Interaction.create({
+  name: 'RemoveUserFromDormitory',
+  action: Action.create({ name: 'removeUserFromDormitory' }),
   payload: Payload.create({
-    items: []
+    items: [
+      PayloadItem.create({ name: 'userId', required: true })
+    ]
   }),
-  userAttributives: DormLeaderRole  // 宿舍长可以查看成员
+  conditions: AdminRole
 });
 
-// 普通用户交互
-
-// 查看我的宿舍
-export const ViewMyDormitory = Interaction.create({
-  name: 'ViewMyDormitory',
-  action: Action.create({ name: 'viewMyDormitory' }),
+// Violation Management Interactions
+export const ReportViolation = Interaction.create({
+  name: 'ReportViolation',
+  action: Action.create({ name: 'reportViolation' }),
   payload: Payload.create({
-    items: []
+    items: [
+      PayloadItem.create({ name: 'targetUserId', required: true }),
+      PayloadItem.create({ name: 'type', required: true }),
+      PayloadItem.create({ name: 'description', required: true })
+    ]
   }),
-  userAttributives: StudentRole  // 学生可以查看自己的宿舍
+  conditions: CanReportViolation
 });
 
-// 查看我的积分
-export const ViewMyScore = Interaction.create({
-  name: 'ViewMyScore',
-  action: Action.create({ name: 'viewMyScore' }),
+export const UpdateViolation = Interaction.create({
+  name: 'UpdateViolation',
+  action: Action.create({ name: 'updateViolation' }),
   payload: Payload.create({
-    items: []
+    items: [
+      PayloadItem.create({ name: 'violationId', required: true }),
+      PayloadItem.create({ name: 'description' }),
+      PayloadItem.create({ name: 'scoreDeduction' })
+    ]
   }),
-  userAttributives: StudentRole  // 学生可以查看自己的积分
+  conditions: AdminRole
 });
 
-// 查看我的扣分记录
-export const ViewMyScoreRecords = Interaction.create({
-  name: 'ViewMyScoreRecords',
-  action: Action.create({ name: 'viewMyScoreRecords' }),
+export const DeleteViolation = Interaction.create({
+  name: 'DeleteViolation',
+  action: Action.create({ name: 'deleteViolation' }),
   payload: Payload.create({
-    items: []
+    items: [
+      PayloadItem.create({ name: 'violationId', required: true })
+    ]
   }),
-  userAttributives: StudentRole  // 学生可以查看自己的扣分记录
+  conditions: AdminRole
 });
+
+// Kickout Request Interactions
+export const SubmitKickoutRequest = Interaction.create({
+  name: 'SubmitKickoutRequest',
+  action: Action.create({ name: 'submitKickoutRequest' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({ name: 'targetUserId', required: true }),
+      PayloadItem.create({ name: 'reason', required: true })
+    ]
+  }),
+  conditions: CanSubmitKickoutRequest
+});
+
+export const ApproveKickoutRequest = Interaction.create({
+  name: 'ApproveKickoutRequest',
+  action: Action.create({ name: 'approveKickoutRequest' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({ name: 'requestId', required: true }),
+      PayloadItem.create({ name: 'decision', required: true })
+    ]
+  }),
+  conditions: CanApproveKickoutRequest
+});
+
+export const UpdateKickoutRequest = Interaction.create({
+  name: 'UpdateKickoutRequest',
+  action: Action.create({ name: 'updateKickoutRequest' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({ name: 'requestId', required: true }),
+      PayloadItem.create({ name: 'reason' })
+    ]
+  }),
+  conditions: AdminOrLeaderRole
+});
+
+export const CancelKickoutRequest = Interaction.create({
+  name: 'CancelKickoutRequest',
+  action: Action.create({ name: 'cancelKickoutRequest' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({ name: 'requestId', required: true })
+    ]
+  }),
+  conditions: AdminOrLeaderRole
+});
+
+// User Management Interactions
+export const CreateUser = Interaction.create({
+  name: 'CreateUser',
+  action: Action.create({ name: 'createUser' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({ name: 'username', required: true }),
+      PayloadItem.create({ name: 'email', required: true }),
+      PayloadItem.create({ name: 'role' })
+    ]
+  }),
+  conditions: AdminRole
+});
+
+export const UpdateUser = Interaction.create({
+  name: 'UpdateUser',
+  action: Action.create({ name: 'updateUser' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({ name: 'userId', required: true }),
+      PayloadItem.create({ name: 'username' }),
+      PayloadItem.create({ name: 'email' }),
+      PayloadItem.create({ name: 'role' })
+    ]
+  }),
+  conditions: AdminRole
+});
+
+export const DeactivateUser = Interaction.create({
+  name: 'DeactivateUser',
+  action: Action.create({ name: 'deactivateUser' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({ name: 'userId', required: true })
+    ]
+  }),
+  conditions: AdminRole
+});
+
+export const ReactivateUser = Interaction.create({
+  name: 'ReactivateUser',
+  action: Action.create({ name: 'reactivateUser' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({ name: 'userId', required: true })
+    ]
+  }),
+  conditions: AdminRole
+});
+
+// Query Interactions
+export const GetDormitoryDetails = Interaction.create({
+  name: 'GetDormitoryDetails',
+  action: Action.create({ name: 'getDormitoryDetails' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({ name: 'dormitoryId', required: true })
+    ]
+  })
+});
+
+export const GetAllDormitories = Interaction.create({
+  name: 'GetAllDormitories',
+  action: Action.create({ name: 'getAllDormitories' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({ name: 'includeInactive' })
+    ]
+  })
+});
+
+export const GetUserDetails = Interaction.create({
+  name: 'GetUserDetails',
+  action: Action.create({ name: 'getUserDetails' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({ name: 'userId', required: true })
+    ]
+  })
+});
+
+export const GetUserViolations = Interaction.create({
+  name: 'GetUserViolations',
+  action: Action.create({ name: 'getUserViolations' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({ name: 'userId', required: true }),
+      PayloadItem.create({ name: 'limit' }),
+      PayloadItem.create({ name: 'offset' })
+    ]
+  })
+});
+
+export const GetPendingKickoutRequests = Interaction.create({
+  name: 'GetPendingKickoutRequests',
+  action: Action.create({ name: 'getPendingKickoutRequests' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({ name: 'dormitoryId' }),
+      PayloadItem.create({ name: 'limit' }),
+      PayloadItem.create({ name: 'offset' })
+    ]
+  })
+});
+
+export const GetDormitoryResidents = Interaction.create({
+  name: 'GetDormitoryResidents',
+  action: Action.create({ name: 'getDormitoryResidents' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({ name: 'dormitoryId', required: true }),
+      PayloadItem.create({ name: 'includeInactive' })
+    ]
+  })
+});
+
+export const GetAvailableBeds = Interaction.create({
+  name: 'GetAvailableBeds',
+  action: Action.create({ name: 'getAvailableBeds' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({ name: 'dormitoryId' })
+    ]
+  })
+});
+
+export const GetUserAssignmentHistory = Interaction.create({
+  name: 'GetUserAssignmentHistory',
+  action: Action.create({ name: 'getUserAssignmentHistory' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({ name: 'userId', required: true })
+    ]
+  })
+});
+
+// Export all interactions
+export const interactions = [
+  CreateDormitory,
+  CreateBedSpace,
+  UpdateDormitory,
+  AssignDormLeader,
+  AssignUserToBed,
+  TransferUser,
+  RemoveUserFromDormitory,
+  ReportViolation,
+  UpdateViolation,
+  DeleteViolation,
+  SubmitKickoutRequest,
+  ApproveKickoutRequest,
+  UpdateKickoutRequest,
+  CancelKickoutRequest,
+  CreateUser,
+  UpdateUser,
+  DeactivateUser,
+  ReactivateUser,
+  GetDormitoryDetails,
+  GetAllDormitories,
+  GetUserDetails,
+  GetUserViolations,
+  GetPendingKickoutRequests,
+  GetDormitoryResidents,
+  GetAvailableBeds,
+  GetUserAssignmentHistory
+];

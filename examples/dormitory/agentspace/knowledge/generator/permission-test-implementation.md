@@ -1,7 +1,7 @@
 # Permission Test Implementation Guide
 
 ## Overview
-Permission testing verifies that userAttributives and dataAttributives correctly control access to interactions. Tests should cover both allowed and denied scenarios for different user roles and data states.
+Permission testing verifies that conditions correctly control access to interactions. Tests should cover both allowed and denied scenarios for different user roles and data states.
 
 ## 🔴 CRITICAL: Permission Testing Principles
 
@@ -21,48 +21,45 @@ const result = await controller.callInteraction('DeleteStyle', {
   payload: { style: { id: styleId } }
 })
 expect(result.error).toBeDefined()
-expect(result.error.type).toBe('permission denied')
+expect(result.error.type).toBe('condition check failed')
 ```
 
 ### Common Error Types
-- `'permission denied'`: userAttributive returned false
-- `'check user failed'`: userAttributive check failed
-- `'[field] not match attributive'`: payload attributive failed
+- `'condition check failed'`: condition returned false or threw error
 
 ## Complete Setup: Defining Permissions
 
 ### 🔴 CRITICAL: Permissions Must Be Explicitly Defined
 
 Permissions are NOT built-in! You must:
-1. Define Attributives
+1. Define Conditions
 2. Apply them to Interactions
 3. Then test they work correctly
 
 ```typescript
-import { Attributive, BoolExp, boolExpToAttributives, Interaction, Action, Payload, PayloadItem } from 'interaqt'
+import { Condition, BoolExp, boolExpToConditions, Interaction, Action, Payload, PayloadItem, MatchExp } from 'interaqt'
 
-// Step 1: Define Attributives
-export const AdminRole = Attributive.create({
+// Step 1: Define Conditions
+export const AdminRole = Condition.create({
   name: 'AdminRole',
-  content: function(targetUser, eventArgs) {
-    return eventArgs.user?.role === 'admin'
+  content: async function(this: Controller, event) {
+    return event.user?.role === 'admin'
   }
 })
 
-export const OperatorRole = Attributive.create({
+export const OperatorRole = Condition.create({
   name: 'OperatorRole',
-  content: function(targetUser, eventArgs) {
-    return eventArgs.user?.role === 'operator'
+  content: async function(this: Controller, event) {
+    return event.user?.role === 'operator'
   }
 })
 
-export const StyleNotOffline = Attributive.create({
+export const StyleNotOffline = Condition.create({
   name: 'StyleNotOffline',
-  content: async function(targetUser, eventArgs) {
-    const styleId = eventArgs.payload.style?.id
+  content: async function(this: Controller, event) {
+    const styleId = event.payload?.style?.id
     if (!styleId) return false
     
-    const { MatchExp } = this.globals
     const style = await this.system.storage.findOne('Style',
       MatchExp.atom({ key: 'id', value: ['=', styleId] }),
       undefined,
@@ -87,7 +84,7 @@ export const DeleteStyle = Interaction.create({
       })
     ]
   }),
-  userAttributives: AdminRole  // Only admin can delete
+  conditions: AdminRole  // Only admin can delete
 })
 
 export const UpdateStyle = Interaction.create({
@@ -106,7 +103,7 @@ export const UpdateStyle = Interaction.create({
     ]
   }),
   // Multiple conditions
-  userAttributives: boolExpToAttributives(
+  conditions: boolExpToConditions(
     BoolExp.atom(OperatorRole)
       .or(BoolExp.atom(AdminRole))
       .and(BoolExp.atom(StyleNotOffline))
@@ -124,14 +121,14 @@ describe('Role-based permissions', () => {
   let admin: any, operator: any, viewer: any
 
   beforeEach(async () => {
-    // Setup system with interactions that have attributives
+    // Setup system with interactions that have conditions
     system = new MonoSystem(new PGLiteDB())
     controller = new Controller({
       system,
       entities,
       relations,
       activities: [],
-      interactions: [DeleteStyle, UpdateStyle, CreateStyle], // Interactions with attributives
+      interactions: [DeleteStyle, UpdateStyle, CreateStyle], // Interactions with conditions
       dict: []
     })
     await controller.setup(true)
@@ -189,7 +186,7 @@ describe('Role-based permissions', () => {
 
     // Assert: Should fail with permission error
     expect(result.error).toBeDefined()
-    expect(result.error.type).toBe('permission denied')
+    expect(result.error.type).toBe('condition check failed')
     
     // Verify style not deleted
     const current = await system.storage.findOne('Style',
@@ -213,24 +210,23 @@ describe('Role-based permissions', () => {
 
     // Assert: Should fail
     expect(result.error).toBeDefined()
-    expect(result.error.type).toBe('permission denied')
+    expect(result.error.type).toBe('condition check failed')
   })
 })
 ```
 
 ### 2. Data State Permission Test
 
-First define the data state attributives:
+First define the data state conditions:
 
 ```typescript
-// Define attributive that checks style status
-export const StyleIsDraft = Attributive.create({
+// Define condition that checks style status
+export const StyleIsDraft = Condition.create({
   name: 'StyleIsDraft',
-  content: async function(targetUser, eventArgs) {
-    const styleId = eventArgs.payload.style?.id
+  content: async function(this: Controller, event) {
+    const styleId = event.payload?.style?.id
     if (!styleId) return false
     
-    const { MatchExp } = this.globals
     const style = await this.system.storage.findOne('Style',
       MatchExp.atom({ key: 'id', value: ['=', styleId] }),
       undefined,
@@ -255,7 +251,7 @@ export const PublishStyle = Interaction.create({
       })
     ]
   }),
-  userAttributives: boolExpToAttributives(
+  conditions: boolExpToConditions(
     BoolExp.atom(OperatorRole)
       .or(BoolExp.atom(AdminRole))
       .and(BoolExp.atom(StyleIsDraft))  // Must be draft
@@ -344,32 +340,31 @@ Define complex permission logic:
 
 ```typescript
 // Owner or admin can modify
-export const OwnerOrAdmin = Attributive.create({
+export const OwnerOrAdmin = Condition.create({
   name: 'OwnerOrAdmin',
-  content: async function(targetUser, eventArgs) {
+  content: async function(this: Controller, event) {
     // Admin always can
-    if (eventArgs.user?.role === 'admin') return true
+    if (event.user?.role === 'admin') return true
     
     // Check if user is owner
-    const resourceId = eventArgs.payload.resource?.id
+    const resourceId = event.payload?.resource?.id
     if (!resourceId) return false
     
-    const { MatchExp } = this.globals
     const resource = await this.system.storage.findOne('Resource',
       MatchExp.atom({ key: 'id', value: ['=', resourceId] }),
       undefined,
       ['ownerId']
     )
     
-    return resource && resource.ownerId === eventArgs.user.id
+    return resource && resource.ownerId === event.user.id
   }
 })
 
 // Active user check
-export const ActiveUser = Attributive.create({
+export const ActiveUser = Condition.create({
   name: 'ActiveUser',
-  content: function(targetUser, eventArgs) {
-    return eventArgs.user?.status === 'active'
+  content: async function(this: Controller, event) {
+    return event.user?.status === 'active'
   }
 })
 
@@ -388,26 +383,25 @@ export const UpdateResource = Interaction.create({
       PayloadItem.create({ name: 'data' })
     ]
   }),
-  userAttributives: boolExpToAttributives(
+  conditions: boolExpToConditions(
     BoolExp.atom(ActiveUser)
       .and(BoolExp.atom(OwnerOrAdmin))
   )
 })
 ```
 
-### 4. Payload Attributive Test
+### 4. Payload Condition Test
 
-Define payload attributives:
+Define payload conditions:
 
 ```typescript
 // Check if style is published
-export const PublishedStyle = Attributive.create({
-  name: 'PublishedStyle',
-  content: async function(stylePayload, eventArgs) {
-    const styleId = stylePayload?.id
+export const CheckPublishedStyle = Condition.create({
+  name: 'CheckPublishedStyle',
+  content: async function(this: Controller, event) {
+    const styleId = event.payload?.style?.id
     if (!styleId) return false
     
-    const { MatchExp } = this.globals
     const style = await this.system.storage.findOne('Style',
       MatchExp.atom({ key: 'id', value: ['=', styleId] }),
       undefined,
@@ -428,18 +422,18 @@ export const ShareStyle = Interaction.create({
         name: 'style',
         base: Style,
         isRef: true,
-        required: true,
-        attributives: PublishedStyle  // Payload must be published
+        required: true
       })
     ]
-  })
+  }),
+  conditions: CheckPublishedStyle  // Check style is published
 })
 ```
 
-Test payload attributives:
+Test payload conditions:
 
 ```typescript
-describe('Payload attributive permissions', () => {
+describe('Payload condition permissions', () => {
   test('can only share published styles', async () => {
     const user = await system.storage.create('User', { role: 'operator' })
     
@@ -463,7 +457,7 @@ describe('Payload attributive permissions', () => {
     
     // Should fail
     expect(shareDraft.error).toBeDefined()
-    expect(shareDraft.error.type).toBe('style not match attributive')
+    expect(shareDraft.error.type).toBe('condition check failed')
 
     // Publish the style
     await controller.callInteraction('PublishStyle', {
@@ -480,18 +474,30 @@ describe('Payload attributive permissions', () => {
     expect(sharePublished.error).toBeUndefined()
   })
 
-  test('collection payload attributives check all items', async () => {
+  test('collection payload conditions check all items', async () => {
     const user = await system.storage.create('User', { role: 'admin' })
     
     // Define active tag check
-    const ActiveTag = Attributive.create({
-      name: 'ActiveTag',
-      content: function(tag, eventArgs) {
-        return tag.isActive === true
+    const CheckAllTagsActive = Condition.create({
+      name: 'CheckAllTagsActive',
+      content: async function(this: Controller, event) {
+        const tags = event.payload?.tags
+        if (!tags || !Array.isArray(tags)) return false
+        
+        // Check all tags are active
+        for (const tagRef of tags) {
+          const tag = await this.system.storage.findOne('Tag',
+            MatchExp.atom({ key: 'id', value: ['=', tagRef.id] }),
+            undefined,
+            ['isActive']
+          )
+          if (!tag || !tag.isActive) return false
+        }
+        return true
       }
     })
 
-    // Define interaction with collection attributive
+    // Define interaction with collection condition
     const TagItems = Interaction.create({
       name: 'TagItems',
       action: Action.create({ name: 'tagItems' }),
@@ -501,11 +507,11 @@ describe('Payload attributive permissions', () => {
             name: 'tags',
             base: Tag,
             isRef: true,
-            isCollection: true,
-            attributives: ActiveTag  // All tags must be active
+            isCollection: true
           })
         ]
-      })
+      }),
+      conditions: CheckAllTagsActive  // All tags must be active
     })
 
     // Create tags
@@ -545,7 +551,7 @@ describe('Payload attributive permissions', () => {
       }
     })
     expect(withInactive.error).toBeDefined()
-    expect(withInactive.error.type).toBe('tags not every item match attribute')
+    expect(withInactive.error.type).toBe('condition check failed')
   })
 })
 ```
@@ -566,7 +572,7 @@ describe('Permission edge cases', () => {
 
     // Assert
     expect(result.error).toBeDefined()
-    expect(result.error.type).toBe('permission denied')
+    expect(result.error.type).toBe('condition check failed')
   })
 
   test('user with undefined role fails permission check', async () => {
@@ -589,15 +595,15 @@ describe('Permission edge cases', () => {
 
     // Assert
     expect(result.error).toBeDefined()
-    expect(result.error.type).toBe('permission denied')
+    expect(result.error.type).toBe('condition check failed')
   })
 
   test('deleted user cannot perform actions', async () => {
     // Define active user check
-    const ActiveUser = Attributive.create({
+    const ActiveUser = Condition.create({
       name: 'ActiveUser',
-      content: function(targetUser, eventArgs) {
-        return !eventArgs.user?.isDeleted
+      content: async function(this: Controller, event) {
+        return !event.user?.isDeleted
       }
     })
 
@@ -606,7 +612,7 @@ describe('Permission edge cases', () => {
       name: 'CreateStyle',
       action: Action.create({ name: 'createStyle' }),
       payload: CreateStyle.payload,  // Reuse payload definition
-      userAttributives: boolExpToAttributives(
+      conditions: boolExpToConditions(
         BoolExp.atom(ActiveUser)
           .and(BoolExp.atom(OperatorRole))
       )
@@ -629,9 +635,9 @@ describe('Permission edge cases', () => {
       }
     })
 
-    // Assert: Depends on your ActiveUser attributive
+    // Assert: Depends on your ActiveUser condition
     expect(result.error).toBeDefined()
-    expect(result.error.type).toBe('permission denied')
+    expect(result.error.type).toBe('condition check failed')
   })
 })
 ```
@@ -641,9 +647,9 @@ describe('Permission edge cases', () => {
 ### BoolExp AND Combinations
 ```typescript
 // Define business hours check
-const BusinessHours = Attributive.create({
+const BusinessHours = Condition.create({
   name: 'BusinessHours',
-  content: function(targetUser, eventArgs) {
+  content: async function(this: Controller, event) {
     const hour = new Date().getHours()
     return hour >= 9 && hour < 17
   }
@@ -658,7 +664,7 @@ const SystemMaintenance = Interaction.create({
       PayloadItem.create({ name: 'action', required: true })
     ]
   }),
-  userAttributives: boolExpToAttributives(
+  conditions: boolExpToConditions(
     BoolExp.atom(AdminRole)
       .and(BoolExp.atom(BusinessHours))
   )
@@ -681,7 +687,7 @@ test('must satisfy all conditions in AND', async () => {
     expect(result.error).toBeUndefined()
   } else {
     expect(result.error).toBeDefined()
-    expect(result.error.type).toBe('permission denied')
+    expect(result.error.type).toBe('condition check failed')
   }
 })
 ```
@@ -697,7 +703,7 @@ const ModerateContent = Interaction.create({
       PayloadItem.create({ name: 'contentId', required: true })
     ]
   }),
-  userAttributives: boolExpToAttributives(
+  conditions: boolExpToConditions(
     BoolExp.atom(AdminRole)
       .or(BoolExp.atom(ModeratorRole))
   )
@@ -734,7 +740,7 @@ test('can satisfy any condition in OR', async () => {
 ## Best Practices
 
 ### DO
-- Always define attributives explicitly before testing
+- Always define conditions explicitly before testing
 - Test both success and failure paths for each permission
 - Use descriptive test names explaining the permission scenario
 - Create helper functions for common setup
@@ -745,15 +751,15 @@ test('can satisfy any condition in OR', async () => {
 - Don't assume permissions are built-in to the framework
 - Don't use try-catch for permission errors
 - Don't test framework internals, only your permission logic
-- Don't forget to test collection payload attributives
+- Don't forget to test collection payload conditions
 - Don't assume permission checks are synchronous
 
 ## Validation Checklist
-- [ ] All attributives are explicitly defined
-- [ ] Attributives are applied to interactions
+- [ ] All conditions are explicitly defined
+- [ ] Conditions are applied to interactions
 - [ ] Test all user roles for each interaction
 - [ ] Test data state permissions (draft/published/offline)
-- [ ] Test payload attributives with valid/invalid data
+- [ ] Test payload conditions with valid/invalid data
 - [ ] Test permission combinations (AND/OR)
 - [ ] Test edge cases (null user, missing roles)
 - [ ] Verify correct error types for each failure

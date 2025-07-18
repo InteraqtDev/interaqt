@@ -896,11 +896,9 @@ Interaction.create(config: InteractionConfig): InteractionInstance
 - `config.name` (string, required): Interaction name
 - `config.action` (Action, required): Interaction action
 - `config.payload` (Payload, optional): Interaction parameters
-- `config.userAttributives` (Attributive|Attributives, optional): User permission attributives
 - `config.conditions` (Condition|Conditions, optional): Execution conditions
 - `config.sideEffects` (SideEffect[], optional): Side effect handlers
 - `config.data` (Entity|Relation, optional): Associated data entity
-- `config.dataAttributives` (DataAttributive|DataAttributives, optional): Data permission attributives
 - `config.query` (Query, optional): Query definition for data fetching
 
 **Examples**
@@ -918,10 +916,10 @@ const CreatePostInteraction = Interaction.create({
             })
         ]
     }),
-    userAttributives: Attributive.create({
+    conditions: Condition.create({
         name: 'AuthenticatedUser',
-        content: function(target, { user }) {
-            return user.id !== undefined
+        content: async function(event) {
+            return event.user.id !== undefined
         }
     })
 })
@@ -1015,12 +1013,10 @@ const CreateUserPayload = Payload.create({
     items: [
         PayloadItem.create({
             name: 'userData',
-            base: User,
             required: true
         }),
         PayloadItem.create({
             name: 'profileData',
-            base: Profile,
             required: false
         })
     ]
@@ -1038,11 +1034,8 @@ PayloadItem.create(config: PayloadItemConfig): PayloadItemInstance
 
 **Parameters**
 - `config.name` (string, required): Parameter name
-- `config.base` (Entity, optional): Parameter entity type, only needed when isRef is true
-- `config.isRef` (boolean, optional): Whether it's a reference type, defaults to false
 - `config.required` (boolean, optional): Whether it's required, defaults to false
 - `config.isCollection` (boolean, optional): Whether it's a collection type, defaults to false
-- `config.attributives` (Attributive|Attributives, optional): Parameter permission attributives
 - `config.itemRef` (Attributive|Entity, optional): Used to reference entities defined in other interactions within Activity
 
 **Examples**
@@ -1050,41 +1043,24 @@ PayloadItem.create(config: PayloadItemConfig): PayloadItemInstance
 // Reference existing user
 const userRef = PayloadItem.create({
     name: 'user',
-    base: User,
-    isRef: true,
     required: true
 })
 
 // Create new post data
 const postData = PayloadItem.create({
     name: 'postData',
-    base: Post,
-    required: true,
-    attributives: Attributive.create({
-        name: 'ValidPost',
-        content: function(post) {
-            return post.title && post.content
-        }
-    })
+    required: true
 })
 
 // Collection type reference
 const reviewersItem = PayloadItem.create({
     name: 'reviewers',
-    base: User,
-    isRef: true,
-    isCollection: true,
-    attributives: Attributives.create({
-        content: BoolAtomData.create({data: ReviewerAttr, type: 'atom'})
-    })
+    isCollection: true
 })
 
 // Activity item reference
 const activityItem = PayloadItem.create({
     name: 'to',
-    base: User,
-    isRef: true,
-    attributives: boolExpToAttributives(BoolExp.atom(OtherAttr)),
     itemRef: userRefB
 })
 ```
@@ -1158,7 +1134,7 @@ const ApprovalTransfer = Transfer.create({
 
 ### Condition.create()
 
-Create activity execution condition.
+Create interaction execution condition. Conditions are used to determine whether an interaction can be executed based on dynamic runtime checks.
 
 **Syntax**
 ```typescript
@@ -1166,17 +1142,170 @@ Condition.create(config: ConditionConfig): ConditionInstance
 ```
 
 **Parameters**
-- `config.name` (string, required): Condition name
-- `config.content` (function, required): Condition judgment function
+- `config.name` (string, optional): Condition name for debugging and error messages
+- `config.content` (function, required): Async condition check function with signature:
+  ```typescript
+  async function(this: Controller, event: InteractionEventArgs): Promise<boolean>
+  ```
+
+**Function Context**
+The `content` function is called with:
+- `this`: The Controller instance, providing access to system storage and other services
+- `event`: The interaction event containing:
+  - `event.user`: The user executing the interaction
+  - `event.payload`: The interaction payload data
+  - Other event properties based on the interaction context
+
+**Return Values**
+- `true`: Condition passes, interaction can proceed
+- `false`: Condition fails, interaction is rejected with "condition check failed" error
+- `undefined`: Treated as `true` with a warning (condition might not be implemented)
+- Thrown error: Caught and treated as `false`
 
 **Examples**
+
 ```typescript
-const OrderValueCondition = Condition.create({
-    name: 'highValueOrder',
-    content: function(order) {
-        return order.totalAmount > 1000
+// Basic condition - check user has enough credits
+const hasEnoughCredits = Condition.create({
+    name: 'hasEnoughCredits',
+    content: async function(this: Controller, event: any) {
+        const user = await this.system.storage.findOne('User', 
+            MatchExp.atom({ key: 'id', value: ['=', event.user.id] }),
+            undefined,
+            ['id', 'credits']
+        )
+        return user.credits >= 10
     }
 })
+
+// Complex condition - check based on payload data
+const canAccessPremiumContent = Condition.create({
+    name: 'canAccessPremiumContent',
+    content: async function(this: Controller, event: any) {
+        const user = await this.system.storage.findOne('User', 
+            MatchExp.atom({ key: 'id', value: ['=', event.user.id] }),
+            undefined,
+            ['id', 'credits', 'subscriptionLevel']
+        )
+        const content = event.payload?.content
+        
+        // Regular content is always accessible
+        if (!content?.isPremium) return true
+        
+        // Premium content requires subscription or credits
+        return user.subscriptionLevel === 'premium' || user.credits >= content.creditCost
+    }
+})
+
+// System state condition
+const systemNotInMaintenance = Condition.create({
+    name: 'systemNotInMaintenance',
+    content: async function(this: Controller, event: any) {
+        const system = await this.system.storage.findOne('System', 
+            undefined, 
+            undefined, 
+            ['maintenanceMode']
+        )
+        return !system?.maintenanceMode
+    }
+})
+
+// Using condition in interaction
+const ViewContent = Interaction.create({
+    name: 'viewContent',
+    action: Action.create({ name: 'view' }),
+    payload: Payload.create({
+        items: [
+            PayloadItem.create({ name: 'content', base: Content })
+        ]
+    }),
+    conditions: canAccessPremiumContent  // Single condition
+})
+```
+
+**Combining Multiple Conditions**
+
+Use `boolExpToConditions()` to combine multiple conditions with AND/OR logic:
+
+```typescript
+import { boolExpToConditions, BoolExp } from 'interaqt'
+
+// Define individual conditions
+const userIsVerified = Condition.create({
+    name: 'userIsVerified',
+    content: async function(this: Controller, event: any) {
+        const user = await this.system.storage.findOne('User',
+            MatchExp.atom({ key: 'id', value: ['=', event.user.id] }),
+            undefined,
+            ['isVerified']
+        )
+        return user?.isVerified === true
+    }
+})
+
+const hasPublishPermission = Condition.create({
+    name: 'hasPublishPermission',
+    content: async function(this: Controller, event: any) {
+        const user = await this.system.storage.findOne('User',
+            MatchExp.atom({ key: 'id', value: ['=', event.user.id] }),
+            undefined,
+            ['role', 'permissions']
+        )
+        return user.role === 'admin' || user.permissions?.includes('publish')
+    }
+})
+
+// AND combination - all conditions must pass
+const PublishArticle = Interaction.create({
+    name: 'publishArticle',
+    action: Action.create({ name: 'publish' }),
+    conditions: boolExpToConditions(
+        BoolExp.atom(systemNotInMaintenance)
+            .and(BoolExp.atom(userIsVerified))
+            .and(BoolExp.atom(hasPublishPermission))
+    )
+})
+
+// OR combination - at least one condition must pass
+const ModerateContent = Interaction.create({
+    name: 'moderateContent',
+    action: Action.create({ name: 'moderate' }),
+    conditions: boolExpToConditions(
+        BoolExp.atom(isAdmin).or(BoolExp.atom(isModerator))
+    )
+})
+
+// Complex combination - (A AND B) OR C
+const SpecialAccess = Interaction.create({
+    name: 'specialAccess',
+    action: Action.create({ name: 'access' }),
+    conditions: boolExpToConditions(
+        BoolExp.atom(userIsVerified)
+            .and(BoolExp.atom(hasSubscription))
+            .or(BoolExp.atom(isAdmin))
+    )
+})
+```
+
+**Best Practices**
+
+1. **Always handle async operations properly**: Use await for all storage queries
+2. **Return explicit boolean values**: Avoid implicit conversions
+3. **Provide meaningful condition names**: Helps with debugging when conditions fail
+4. **Handle missing data gracefully**: Check for null/undefined before accessing properties
+5. **Keep conditions focused**: Each condition should check one specific rule
+6. **Use storage attributeQuery**: Only fetch the fields you need for performance
+
+**Error Handling**
+
+When a condition fails or throws an error, the interaction call returns:
+```typescript
+{
+    error: {
+        type: 'condition check failed',
+        message: 'condition check failed'
+    }
+}
 ```
 
 ## 13.5 System-Related APIs
@@ -1642,44 +1771,6 @@ const condition = MatchExp.fromObject({
 // Equivalent to: status='active' AND age=25 AND city='Beijing'
 ```
 
-### Attributive.create()
-
-Create permission attributive for access control.
-
-**Syntax**
-```typescript
-Attributive.create(config: AttributiveConfig): AttributiveInstance
-```
-
-**Parameters**
-- `config.name` (string, optional): Attributive name
-- `config.content` (function, required): Permission judgment function
-- `config.isRef` (boolean, optional): Whether it's a reference
-
-**Examples**
-```typescript
-// Admin permission
-const AdminAttributive = Attributive.create({
-    name: 'Admin',
-    content: function(target, { user }) {
-        return user.role === 'admin'
-    }
-})
-
-// Resource owner permission
-const OwnerAttributive = Attributive.create({
-    name: 'Owner',
-    content: function(target, { user }) {
-        return target.userId === user.id
-    }
-})
-
-// Combined permissions (using BoolExp)
-const AdminOrOwnerAttributives = boolExpToAttributives(
-    BoolExp.atom(AdminAttributive).or(OwnerAttributive)
-)
-```
-
 ### BoolExp
 
 Boolean expression builder for constructing complex logical expressions.
@@ -1693,6 +1784,48 @@ const expr2 = BoolExp.atom({ condition: 'isAdmin' })
 
 // Combined expression
 const combined = expr1.and(expr2).or({ condition: 'isOwner' })
+```
+
+### boolExpToConditions()
+
+Convert BoolExp expression of Conditions to Conditions instance for use in Interaction conditions.
+
+**Syntax**
+```typescript
+boolExpToConditions(expression: BoolExp<ConditionInstance>): ConditionsInstance
+```
+
+**Parameters**
+- `expression`: A BoolExp expression containing Condition instances combined with AND/OR logic
+
+**Examples**
+```typescript
+import { boolExpToConditions, BoolExp, Condition } from 'interaqt'
+
+const condition1 = Condition.create({
+    name: 'hasCredits',
+    content: async function(this: Controller, event) {
+        return event.user.credits > 0
+    }
+})
+
+const condition2 = Condition.create({
+    name: 'isVerified',
+    content: async function(this: Controller, event) {
+        return event.user.isVerified === true
+    }
+})
+
+// Convert to Conditions for Interaction
+const combinedConditions = boolExpToConditions(
+    BoolExp.atom(condition1).and(BoolExp.atom(condition2))
+)
+
+const MyInteraction = Interaction.create({
+    name: 'myInteraction',
+    action: Action.create({ name: 'execute' }),
+    conditions: combinedConditions
+})
 ```
 
 ## Type Definitions
@@ -1816,10 +1949,10 @@ const CreatePostInteraction = Interaction.create({
             })
         ]
     }),
-    userAttributives: Attributive.create({
+    conditions: Condition.create({
         name: 'AuthenticatedUser',
-        content: function(target, { user }) {
-            return user.id !== undefined
+        content: async function(event) {
+            return event.user.id !== undefined
         }
     })
 })
@@ -1831,8 +1964,6 @@ const LikePostInteraction = Interaction.create({
         items: [
             PayloadItem.create({
                 name: 'post',
-                base: Post,
-                isRef: true,
                 required: true
             })
         ]

@@ -1,240 +1,298 @@
-import { Attributive, BoolExp, boolExpToAttributives } from 'interaqt';
+import { Condition, BoolExp, boolExpToConditions, MatchExp } from 'interaqt';
+import type { Controller } from 'interaqt';
 
-// 基础角色权限检查
-export const AdminRole = Attributive.create({
+// Role-based conditions
+export const AdminRole = Condition.create({
   name: 'AdminRole',
-  content: function(targetUser, eventArgs) {
-    return eventArgs.user?.role === 'admin';
+  content: async function(this: Controller, event) {
+    return event.user?.role === 'admin';
   }
 });
 
-export const DormLeaderRole = Attributive.create({
-  name: 'DormLeaderRole',
-  content: function(targetUser, eventArgs) {
-    return eventArgs.user?.role === 'dormLeader';
+export const LeaderRole = Condition.create({
+  name: 'LeaderRole',
+  content: async function(this: Controller, event) {
+    return event.user?.role === 'leader';
   }
 });
 
-export const StudentRole = Attributive.create({
-  name: 'StudentRole',
-  content: function(targetUser, eventArgs) {
-    return eventArgs.user?.role === 'student';
+export const ResidentRole = Condition.create({
+  name: 'ResidentRole',
+  content: async function(this: Controller, event) {
+    return event.user?.role === 'resident';
   }
 });
 
-// 已分配宿舍的用户
-export const AssignedToAnyDormitory = Attributive.create({
-  name: 'AssignedToAnyDormitory',
-  content: async function(targetUser, eventArgs) {
-    const { MatchExp } = this.globals;
-    
-    // 查找用户是否有宿舍分配
-    const { UserDormitoryRelation } = await import('./relations.js');
-    const assignment = await this.system.storage.findOneRelationByName(
-      UserDormitoryRelation.name,
-      MatchExp.atom({ key: 'source.id', value: ['=', eventArgs.user.id] }),
-      undefined,
-      ['id']
-    );
-    
-    return !!assignment;
+// Combined role permissions
+export const AdminOrLeaderRole = Condition.create({
+  name: 'AdminOrLeaderRole',
+  content: async function(this: Controller, event) {
+    const role = event.user?.role;
+    return role === 'admin' || role === 'leader';
   }
 });
 
-// 用户积分足够低可以被踢出 (积分低于20)
-export const LowScoreForKickout = Attributive.create({
-  name: 'LowScoreForKickout',
-  content: async function(targetUser, eventArgs) {
-    const targetUserId = eventArgs.payload.user?.id;
-    if (!targetUserId) return false;
+// User authentication check
+export const AuthenticatedUser = Condition.create({
+  name: 'AuthenticatedUser',
+  content: async function(this: Controller, event) {
+    return event.user && event.user.id && event.user.role;
+  }
+});
+
+// Active user check
+export const ActiveUser = Condition.create({
+  name: 'ActiveUser',
+  content: async function(this: Controller, event) {
+    if (!event.user?.id) return false;
     
-    const { MatchExp } = this.globals;
-    
-    // 查找目标用户当前积分
     const user = await this.system.storage.findOne('User',
-      MatchExp.atom({ key: 'id', value: ['=', targetUserId] }),
+      MatchExp.atom({ key: 'id', value: ['=', event.user.id] }),
       undefined,
-      ['score']
+      ['isActive']
     );
     
-    return user && user.score < 20;
+    return user && user.isActive;
   }
 });
 
-// 宿舍长只能操作同一宿舍的用户
-export const SameDormitoryAsUser = Attributive.create({
-  name: 'SameDormitoryAsUser',
-  content: async function(targetUser, eventArgs) {
-    const { MatchExp } = this.globals;
-    const { UserDormitoryRelation } = await import('./relations.js');
+// Dormitory-specific permissions
+export const LeaderOfTargetUsersDormitory = Condition.create({
+  name: 'LeaderOfTargetUsersDormitory',
+  content: async function(this: Controller, event) {
+    // Only applies to leaders
+    if (event.user?.role !== 'leader') return false;
     
-    // 获取宿舍长的宿舍
-    const leaderAssignment = await this.system.storage.findOneRelationByName(
-      UserDormitoryRelation.name,
-      MatchExp.atom({ key: 'source.id', value: ['=', eventArgs.user.id] }),
-      undefined,
-      ['target']
-    );
-    
-    if (!leaderAssignment) return false;
-    
-    // 获取目标用户的宿舍
-    const targetUserId = eventArgs.payload.user?.id;
+    const targetUserId = event.payload?.targetUserId;
     if (!targetUserId) return false;
     
-    const targetAssignment = await this.system.storage.findOneRelationByName(
-      UserDormitoryRelation.name,
-      MatchExp.atom({ key: 'source.id', value: ['=', targetUserId] }),
+    // Get target user's current assignment
+    const assignment = await this.system.storage.findOne('Assignment',
+      MatchExp.atom({ key: 'userId', value: ['=', targetUserId] })
+        .and({ key: 'isActive', value: ['=', true] }),
       undefined,
-      ['target']
+      ['bedSpaceId']
     );
     
-    if (!targetAssignment) return false;
+    if (!assignment) return false;
     
-    // 检查是否在同一宿舍
-    return leaderAssignment.target.id === targetAssignment.target.id;
+    // Get the dormitory from bed space
+    const bedSpace = await this.system.storage.findOne('BedSpace',
+      MatchExp.atom({ key: 'id', value: ['=', assignment.bedSpaceId] }),
+      undefined,
+      ['dormitoryId']
+    );
+    
+    if (!bedSpace) return false;
+    
+    // Check if current user is leader of this dormitory
+    const dormitory = await this.system.storage.findOne('Dormitory',
+      MatchExp.atom({ key: 'id', value: ['=', bedSpace.dormitoryId] }),
+      undefined,
+      ['leaderId']
+    );
+    
+    return dormitory && dormitory.leaderId === event.user.id;
   }
 });
 
-// 宿舍是否已满员
-export const DormitoryNotFull = Attributive.create({
-  name: 'DormitoryNotFull',
-  content: async function(targetUser, eventArgs) {
-    const dormitoryId = eventArgs.payload.dormitory?.id;
-    if (!dormitoryId) return false;
+export const LeaderOfOwnDormitory = Condition.create({
+  name: 'LeaderOfOwnDormitory',
+  content: async function(this: Controller, event) {
+    if (event.user?.role !== 'leader') return false;
     
-    const { MatchExp } = this.globals;
+    // Check if user is assigned as leader of any dormitory
+    const dormitory = await this.system.storage.findOne('Dormitory',
+      MatchExp.atom({ key: 'leaderId', value: ['=', event.user.id] }),
+      undefined,
+      ['id', 'isActive']
+    );
+    
+    return dormitory && dormitory.isActive;
+  }
+});
+
+// Payload validation conditions
+export const ValidDormitoryCapacity = Condition.create({
+  name: 'ValidDormitoryCapacity',
+  content: async function(this: Controller, event) {
+    const capacity = event.payload?.capacity;
+    if (typeof capacity !== 'number') return false;
+    
+    return capacity >= 4 && capacity <= 6;
+  }
+});
+
+export const ValidViolationType = Condition.create({
+  name: 'ValidViolationType',
+  content: async function(this: Controller, event) {
+    const violationType = event.payload?.type;
+    const validTypes = [
+      'NOISE_VIOLATION',
+      'CLEANLINESS_ISSUE', 
+      'DAMAGE_TO_PROPERTY',
+      'UNAUTHORIZED_GUESTS',
+      'CURFEW_VIOLATION'
+    ];
+    
+    return validTypes.includes(violationType);
+  }
+});
+
+export const ValidKickoutDecision = Condition.create({
+  name: 'ValidKickoutDecision',
+  content: async function(this: Controller, event) {
+    const decision = event.payload?.decision;
+    return decision === 'approved' || decision === 'rejected';
+  }
+});
+
+// Data state conditions
+export const UserExists = Condition.create({
+  name: 'UserExists',
+  content: async function(this: Controller, event) {
+    const userId = event.payload?.userId || event.payload?.targetUserId;
+    if (!userId) return false;
+    
+    const user = await this.system.storage.findOne('User',
+      MatchExp.atom({ key: 'id', value: ['=', userId] }),
+      undefined,
+      ['id', 'isActive']
+    );
+    
+    return user && user.isActive;
+  }
+});
+
+export const DormitoryExists = Condition.create({
+  name: 'DormitoryExists',
+  content: async function(this: Controller, event) {
+    const dormitoryId = event.payload?.dormitoryId;
+    if (!dormitoryId) return false;
     
     const dormitory = await this.system.storage.findOne('Dormitory',
       MatchExp.atom({ key: 'id', value: ['=', dormitoryId] }),
       undefined,
-      ['capacity', 'currentCount']
+      ['id', 'isActive']
     );
     
-    return dormitory && dormitory.currentCount < dormitory.capacity;
+    return dormitory && dormitory.isActive;
   }
 });
 
-// 床位是否可用
-export const BedAvailable = Attributive.create({
-  name: 'BedAvailable',
-  content: async function(targetUser, eventArgs) {
-    const dormitoryId = eventArgs.payload.dormitory?.id;
-    const bedNumber = eventArgs.payload.bedNumber;
+export const BedSpaceExists = Condition.create({
+  name: 'BedSpaceExists',
+  content: async function(this: Controller, event) {
+    const bedSpaceId = event.payload?.bedSpaceId || event.payload?.newBedSpaceId;
+    if (!bedSpaceId) return false;
     
-    if (!dormitoryId || !bedNumber) return false;
-    
-    const { MatchExp } = this.globals;
-    const { DormitoryBedRelation } = await import('./relations.js');
-    
-    // 查找指定床位
-    const bedRelation = await this.system.storage.findOneRelationByName(
-      DormitoryBedRelation.name,
-      MatchExp.atom({ key: 'source.id', value: ['=', dormitoryId] })
-        .and({ key: 'target.number', value: ['=', bedNumber] }),
+    const bedSpace = await this.system.storage.findOne('BedSpace',
+      MatchExp.atom({ key: 'id', value: ['=', bedSpaceId] }),
       undefined,
-      [['target', { attributeQuery: ['isOccupied'] }]]
+      ['id', 'isOccupied']
     );
     
-    return bedRelation && !bedRelation.target.isOccupied;
+    return !!bedSpace;
   }
 });
 
-// 用户未被分配到任何宿舍
-export const UserNotAssigned = Attributive.create({
-  name: 'UserNotAssigned',
-  content: async function(targetUser, eventArgs) {
-    const targetUserId = eventArgs.payload.user?.id;
-    if (!targetUserId) return false;
+export const BedSpaceAvailable = Condition.create({
+  name: 'BedSpaceAvailable',
+  content: async function(this: Controller, event) {
+    const bedSpaceId = event.payload?.bedSpaceId || event.payload?.newBedSpaceId;
+    if (!bedSpaceId) return false;
     
-    const { MatchExp } = this.globals;
-    const { UserDormitoryRelation } = await import('./relations.js');
-    
-    const assignment = await this.system.storage.findOneRelationByName(
-      UserDormitoryRelation.name,
-      MatchExp.atom({ key: 'source.id', value: ['=', targetUserId] }),
+    const bedSpace = await this.system.storage.findOne('BedSpace',
+      MatchExp.atom({ key: 'id', value: ['=', bedSpaceId] }),
       undefined,
-      ['id']
+      ['id', 'isOccupied']
     );
     
-    return !assignment;
+    return bedSpace && !bedSpace.isOccupied;
   }
 });
 
-// 用户在指定宿舍内
-export const UserInDormitory = Attributive.create({
-  name: 'UserInDormitory',
-  content: async function(targetUser, eventArgs) {
-    const targetUserId = eventArgs.payload.user?.id;
-    const dormitoryId = eventArgs.payload.dormitory?.id;
+export const UserNotAlreadyAssigned = Condition.create({
+  name: 'UserNotAlreadyAssigned',
+  content: async function(this: Controller, event) {
+    const userId = event.payload?.userId;
+    if (!userId) return false;
     
-    if (!targetUserId || !dormitoryId) return false;
-    
-    const { MatchExp } = this.globals;
-    const { UserDormitoryRelation } = await import('./relations.js');
-    
-    const assignment = await this.system.storage.findOneRelationByName(
-      UserDormitoryRelation.name,
-      MatchExp.atom({ key: 'source.id', value: ['=', targetUserId] })
-        .and({ key: 'target.id', value: ['=', dormitoryId] }),
+    const existingAssignment = await this.system.storage.findOne('Assignment',
+      MatchExp.atom({ key: 'userId', value: ['=', userId] })
+        .and({ key: 'isActive', value: ['=', true] }),
       undefined,
       ['id']
     );
     
-    return !!assignment;
+    return !existingAssignment;
   }
 });
 
-// 踢出申请状态为pending
-export const KickoutRequestPending = Attributive.create({
-  name: 'KickoutRequestPending',
-  content: async function(targetUser, eventArgs) {
-    const requestId = eventArgs.payload.request?.id;
+export const KickoutRequestExists = Condition.create({
+  name: 'KickoutRequestExists',
+  content: async function(this: Controller, event) {
+    const requestId = event.payload?.requestId;
     if (!requestId) return false;
-    
-    const { MatchExp } = this.globals;
     
     const request = await this.system.storage.findOne('KickoutRequest',
       MatchExp.atom({ key: 'id', value: ['=', requestId] }),
       undefined,
-      ['status']
+      ['id', 'status']
     );
     
     return request && request.status === 'pending';
   }
 });
 
-// 组合权限
-export const AdminOrDormLeader = boolExpToAttributives(
-  BoolExp.atom(AdminRole).or(DormLeaderRole)
+export const TargetUserInLeadersDormitory = Condition.create({
+  name: 'TargetUserInLeadersDormitory',
+  content: async function(this: Controller, event) {
+    if (event.user?.role !== 'leader') return true; // Only applies to leaders
+    
+    return await LeaderOfTargetUsersDormitory.content.call(this, event);
+  }
+});
+
+// Complex combined conditions for specific operations
+export const CanReportViolation = boolExpToConditions(
+  BoolExp.atom(AuthenticatedUser)
+    .and(BoolExp.atom(ActiveUser))
+    .and(BoolExp.atom(AdminOrLeaderRole))
+    .and(BoolExp.atom(ValidViolationType))
+    .and(BoolExp.atom(UserExists))
+    .and(BoolExp.atom(TargetUserInLeadersDormitory))
 );
 
-export const DormLeaderWithSameDormitory = boolExpToAttributives(
-  BoolExp.atom(DormLeaderRole).and(SameDormitoryAsUser)
+export const CanSubmitKickoutRequest = boolExpToConditions(
+  BoolExp.atom(AuthenticatedUser)
+    .and(BoolExp.atom(ActiveUser))
+    .and(BoolExp.atom(AdminOrLeaderRole))
+    .and(BoolExp.atom(UserExists))
+    .and(BoolExp.atom(TargetUserInLeadersDormitory))
 );
 
-export const StudentWithDormitory = boolExpToAttributives(
-  BoolExp.atom(StudentRole).and(AssignedToAnyDormitory)
+export const CanAssignUserToBed = boolExpToConditions(
+  BoolExp.atom(AuthenticatedUser)
+    .and(BoolExp.atom(ActiveUser))
+    .and(BoolExp.atom(AdminRole))
+    .and(BoolExp.atom(UserExists))
+    .and(BoolExp.atom(BedSpaceExists))
+    .and(BoolExp.atom(BedSpaceAvailable))
+    .and(BoolExp.atom(UserNotAlreadyAssigned))
 );
 
-export const AdminForAssignment = boolExpToAttributives(
-  BoolExp.atom(AdminRole)
-    .and(DormitoryNotFull)
-    .and(BedAvailable)
-    .and(UserNotAssigned)
-    .and(UserInDormitory)
+export const CanCreateDormitory = boolExpToConditions(
+  BoolExp.atom(AuthenticatedUser)
+    .and(BoolExp.atom(ActiveUser))
+    .and(BoolExp.atom(AdminRole))
+    .and(BoolExp.atom(ValidDormitoryCapacity))
 );
 
-export const DormLeaderForScoring = boolExpToAttributives(
-  BoolExp.atom(DormLeaderRole).and(SameDormitoryAsUser)
-);
-
-export const DormLeaderForKickout = boolExpToAttributives(
-  BoolExp.atom(DormLeaderRole)
-    .and(SameDormitoryAsUser)
-    .and(LowScoreForKickout)
-);
-
-export const AdminForKickoutProcessing = boolExpToAttributives(
-  BoolExp.atom(AdminRole).and(KickoutRequestPending)
+export const CanApproveKickoutRequest = boolExpToConditions(
+  BoolExp.atom(AuthenticatedUser)
+    .and(BoolExp.atom(ActiveUser))
+    .and(BoolExp.atom(AdminRole))
+    .and(BoolExp.atom(KickoutRequestExists))
+    .and(BoolExp.atom(ValidKickoutDecision))
 );

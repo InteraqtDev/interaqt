@@ -1,7 +1,7 @@
 # Basic Interaction Generation Guide
 
 ## Overview
-This guide covers generating basic interactions without permissions (userAttributive/dataAttributive).
+This guide covers generating basic interactions without permissions (conditions).
 
 ## 🔴 CRITICAL: Common Mistakes to Avoid
 
@@ -96,7 +96,7 @@ export const CreateStyle = Interaction.create({
       })
     ]
   })
-  // NO userAttributive or dataAttributive in basic version
+  // NO conditions in basic version
 });
 ```
 
@@ -349,8 +349,7 @@ export const GetVersionHistory = Interaction.create({
 ## Important Notes
 
 ### DO NOT Include in Basic Interactions
-- userAttributive (permissions)
-- dataAttributive (data constraints)
+- conditions (permissions and validation)
 - Complex validation logic
 - Side effects or computations
 - Operational logic in Actions
