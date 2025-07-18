@@ -201,7 +201,7 @@ describe('Simple CRUD Example', () => {
       items: [
         PayloadItem.create({ name: 'title', required: true }),
         PayloadItem.create({ name: 'content', required: true }),
-        PayloadItem.create({ name: 'authorId', base: User, isRef: true, required: true })
+        PayloadItem.create({ name: 'authorId', required: true })
       ]
     }),
     // Only authors or admins can create articles
@@ -217,8 +217,6 @@ describe('Simple CRUD Example', () => {
       items: [
         PayloadItem.create({ 
           name: 'article', 
-          base: Article, 
-          isRef: true, 
           required: true,
           // Can only publish draft articles
           attributives: boolExpToAttributives(
@@ -241,8 +239,6 @@ describe('Simple CRUD Example', () => {
       items: [
         PayloadItem.create({ 
           name: 'article', 
-          base: Article, 
-          isRef: true, 
           required: true,
           // Can only delete non-deleted articles
           attributives: boolExpToAttributives(
@@ -265,8 +261,6 @@ describe('Simple CRUD Example', () => {
       items: [
         PayloadItem.create({ 
           name: 'article', 
-          base: Article, 
-          isRef: true, 
           required: true,
           // Can only restore deleted articles
           attributives: boolExpToAttributives(

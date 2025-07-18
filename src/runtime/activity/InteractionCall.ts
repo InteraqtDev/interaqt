@@ -15,6 +15,7 @@ import {
     InteractionInstanceType,
     DataAttributives
 } from "@shared";
+import { MatchExp } from "@storage";
 import { RecordMutationEvent, System } from "../System.js";
 import { assert, everyWithErrorAsync, someAsync } from "../util.js";
 import { ActivityCall } from "./ActivityCall.js";
@@ -328,11 +329,11 @@ export class InteractionCall {
             let fullPayloadItem: unknown | unknown[] = payloadItem
             if (payloadDef.isRef) {
                 const itemMatch = payloadDef.isCollection ?
-                    BoolExp.atom({
+                    MatchExp.atom({
                         key: 'id',
                         value: ['in', ((payloadItem as unknown[]) as {id: string}[]).map((item) => item.id)]
                     }) :
-                    BoolExp.atom({
+                    MatchExp.atom({
                         key: 'id',
                         value: ['=', (payloadItem as {id: string}).id]
                     })
