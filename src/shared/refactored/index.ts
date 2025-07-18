@@ -24,6 +24,7 @@ export * from "./Every.js";
 export * from "./Any.js";
 export * from "./Transform.js";
 export * from "./RealTime.js";
+export * from "./Custom.js";
 
 // 导出实体相关对象
 export * from "./Property.js";

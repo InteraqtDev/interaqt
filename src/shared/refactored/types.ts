@@ -18,6 +18,7 @@ import type { TransformInstance } from './Transform';
 import type { StateMachineInstance } from './StateMachine';
 import type { RealTimeInstance } from './RealTime';
 import type { DictionaryInstance } from './RealDictionary';
+import { CustomInstance } from './Custom';
 
 export type {
   EntityInstance,
@@ -58,7 +59,8 @@ export type ComputationInstance =
   | AnyInstance 
   | TransformInstance 
   | StateMachineInstance 
-  | RealTimeInstance;
+  | RealTimeInstance
+  | CustomInstance;
 
 /**
  * Record type that can be used in computations

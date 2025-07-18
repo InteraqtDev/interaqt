@@ -19,6 +19,7 @@ import { SummationHandles } from "./computations/Summation.js";
 import { AverageHandles } from "./computations/Average.js";
 import { RealTimeHandles } from "./computations/RealTime.js";
 import { StateMachineHandles } from "./computations/StateMachine.js";
+import { CustomHandles } from "./computations/Custom.js";
 import {
     InteractionExecutionError
 } from "./errors/index.js";
@@ -120,6 +121,7 @@ export class Controller {
             ...AverageHandles,
             ...RealTimeHandles,
             ...StateMachineHandles,
+            ...CustomHandles,
             ...computations
         ]
         
