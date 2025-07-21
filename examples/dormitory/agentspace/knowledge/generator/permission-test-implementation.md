@@ -9,7 +9,10 @@ Permission testing verifies that conditions correctly control access to interact
 ```typescript
 // ❌ WRONG: interaqt doesn't throw exceptions
 try {
-  await controller.callInteraction('DeleteStyle', { user: viewer })
+  await controller.callInteraction('DeleteStyle', { 
+    user: viewer,
+    payload: { style: { id: styleId } }
+  })
   fail('Should have thrown')
 } catch (e) {
   // This will never execute
