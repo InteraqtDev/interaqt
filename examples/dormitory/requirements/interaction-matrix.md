@@ -1,151 +1,116 @@
-# Dormitory Management System - Interaction Matrix
+# 宿舍管理系统交互矩阵
 
-## Role-Based Interaction Access Matrix
+## 角色权限矩阵
 
-| Interaction | Admin | Dorm Leader | Resident | Notes |
-|-------------|-------|-------------|----------|-------|
-| **CreateDormitory** | ✓ | ✗ | ✗ | Only admin can create dormitories |
-| **AssignDormLeader** | ✓ | ✗ | ✗ | Only admin can assign leaders |
-| **AssignUserToBed** | ✓ | ✗ | ✗ | Only admin can assign residents |
-| **TransferUser** | ✓ | ✗ | ✗ | Only admin can transfer between beds |
-| **ReportViolation** | ✓ | ✓* | ✗ | Leader only for their dorm residents |
-| **SubmitKickoutRequest** | ✓ | ✓* | ✗ | Leader only for their dorm residents |
-| **ApproveKickoutRequest** | ✓ | ✗ | ✗ | Only admin can approve/reject |
-| **GetDormitoryDetails** | ✓ | ✓* | ✓* | Limited to own dorm for leaders/residents |
-| **GetUserViolations** | ✓ | ✓* | ✓* | Limited access based on role |
-| **GetPendingRequests** | ✓ | ✗ | ✗ | Only admin sees all pending requests |
-| **UpdateDormitory** | ✓ | ✗ | ✗ | Only admin can modify dormitory info |
-| **DeactivateUser** | ✓ | ✗ | ✗ | Only admin can deactivate accounts |
+| 交互操作 | 系统管理员 | 宿舍长 | 普通用户 | 权限控制说明 |
+|----------|------------|--------|----------|--------------|
+| **CreateDorm** | ✅ | ❌ | ❌ | 仅管理员可以创建宿舍 |
+| **AssignDormLeader** | ✅ | ❌ | ❌ | 仅管理员可以指定宿舍长 |
+| **AssignUserToDorm** | ✅ | ❌ | ❌ | 仅管理员可以分配用户到宿舍 |
+| **RemoveUserFromDorm** | ✅ | ❌ | ❌ | 仅管理员可以直接移除用户 |
+| **DeductPoints** | ✅ | ❌ | ❌ | 仅管理员可以扣分 |
+| **ProcessEvictionRequest** | ✅ | ❌ | ❌ | 仅管理员可以处理踢出申请 |
+| **ApplyForEviction** | ❌ | ✅ | ❌ | 仅宿舍长可以申请踢出用户 |
+| **ViewDormMembers** | ✅ | ✅* | ❌ | 宿舍长只能查看自己宿舍的成员 |
+| **ViewMyDorm** | ✅ | ✅ | ✅ | 所有用户都可以查看自己的宿舍 |
+| **ViewMyScore** | ✅ | ✅ | ✅ | 所有用户都可以查看自己的积分 |
 
-*\* Indicates role-specific restrictions apply*
+## 数据权限控制
 
-## Interaction-to-Entity Mapping
+### 用户权限检查 (userAttributive)
+- **CreateDorm**: 检查用户角色是否为"admin"
+- **AssignDormLeader**: 检查用户角色是否为"admin"
+- **AssignUserToDorm**: 检查用户角色是否为"admin"
+- **RemoveUserFromDorm**: 检查用户角色是否为"admin"
+- **DeductPoints**: 检查用户角色是否为"admin"
+- **ProcessEvictionRequest**: 检查用户角色是否为"admin"
+- **ApplyForEviction**: 检查用户角色是否为"dorm_leader"
+- **ViewDormMembers**: 检查用户角色是否为"dorm_leader"
 
-### CreateDormitory
-- **Creates**: Dormitory, BedSpace (multiple)
-- **Updates**: None
-- **Reads**: None required
-- **Validation**: Capacity 4-6, unique name
+### 数据权限检查 (dataAttributive)
+- **ApplyForEviction**: 检查目标用户是否与申请者在同一宿舍
+- **ViewDormMembers**: 检查查询的宿舍是否为当前宿舍长管理的宿舍
 
-### AssignDormLeader  
-- **Creates**: None
-- **Updates**: User (role), Dormitory (leaderId)
-- **Reads**: User, Dormitory
-- **Validation**: User exists, dormitory exists, user not already a leader
+## 业务规则验证
 
-### AssignUserToBed
-- **Creates**: Assignment
-- **Updates**: BedSpace (isOccupied)
-- **Reads**: User, BedSpace, existing Assignments
-- **Validation**: User exists, bed available, user not already assigned
+### 宿舍相关验证
+- **CreateDorm**: 宿舍容量必须在4-6之间
+- **AssignUserToDorm**: 
+  - 宿舍必须有空余床位
+  - 用户不能被重复分配
+  - 床位号必须在1-capacity范围内
 
-### ReportViolation
-- **Creates**: Violation
-- **Updates**: User (score deduction)
-- **Reads**: User (current score), Dormitory (for permission check)
-- **Validation**: Reporter has permission, target user exists
+### 用户相关验证
+- **AssignDormLeader**: 被指定用户必须是该宿舍的成员
+- **ApplyForEviction**: 目标用户积分必须低于-100分
+- **ApplyForEviction**: 宿舍长不能申请踢出自己
 
-### SubmitKickoutRequest
-- **Creates**: KickoutRequest
-- **Updates**: None
-- **Reads**: User, Assignment (to verify dorm association)
-- **Validation**: Requester is leader of target's dorm
+### 积分系统验证
+- **DeductPoints**: 扣分可以为负值，表示加分
+- **ApplyForEviction**: 只有在用户积分≤-100时才允许申请
 
-### ApproveKickoutRequest
-- **Creates**: None
-- **Updates**: KickoutRequest (status), Assignment (isActive), BedSpace (isOccupied)
-- **Reads**: KickoutRequest, Assignment
-- **Validation**: Request exists and pending
+## 状态管理
 
-### GetDormitoryDetails
-- **Creates**: None
-- **Updates**: None  
-- **Reads**: Dormitory, BedSpace, Assignment, User
-- **Validation**: User has permission to view dormitory
+### 宿舍状态
+- **正常**: 宿舍正常运营，接受新成员
+- **满员**: 宿舍达到最大容量，不再接受新成员
 
-## Permission Control Strategies
+### 用户状态
+- **正常**: 用户在宿舍中正常居住
+- **被移除**: 用户被从宿舍中移除，可以重新分配
 
-### Admin Role
-- **Full Access**: Can perform all interactions
-- **Global Scope**: Can manage any dormitory, user, or request
-- **No Restrictions**: Bypasses most business rule limitations
+### 踢出申请状态
+- **pending**: 申请等待管理员处理
+- **approved**: 申请被批准，用户被移除
+- **rejected**: 申请被拒绝，用户保留在宿舍中
 
-### Dorm Leader Role
-- **Limited Scope**: Only their assigned dormitory
-- **Management Functions**: Report violations, submit kickout requests
-- **Data Access**: View their dorm details and resident information
-- **Restrictions**: Cannot create dorms, assign users, or approve requests
+## 交互流程图
 
-### Resident Role
-- **View Only**: Limited read access to their own information
-- **Personal Data**: Can view their own violations and assignment
-- **Dorm Info**: Can view basic information about their dormitory
-- **No Management**: Cannot perform any management operations
+```
+管理员操作流程：
+CreateDorm → AssignDormLeader → AssignUserToDorm → DeductPoints → ProcessEvictionRequest
 
-## Data Attributive Patterns
+宿舍长操作流程：
+ViewDormMembers → ApplyForEviction
 
-### User-Based Restrictions
-```javascript
-// Example: Leader can only report violations for their dorm residents
-userAttributive: (user, event) => {
-  if (user.role === 'admin') return true;
-  if (user.role === 'leader') {
-    // Check if target user is in leader's dormitory
-    return checkUserInDormitory(event.payload.targetUserId, user.assignedDormitoryId);
-  }
-  return false;
+普通用户操作流程：
+ViewMyDorm → ViewMyScore
+```
+
+## 权限检查优先级
+1. **身份认证**: 用户必须已登录
+2. **角色检查**: 检查用户角色是否符合要求
+3. **数据权限**: 检查用户是否有权限操作特定数据
+4. **业务规则**: 检查是否符合业务规则
+
+## 异常处理
+- **权限不足**: 返回"permission denied"错误
+- **数据不存在**: 返回"not found"错误
+- **业务规则违反**: 返回"validation failed"错误，包含具体错误信息
+- **重复操作**: 返回"already exists"或"already assigned"错误
+
+## 权限配置示例
+
+### 管理员权限配置
+```typescript
+userAttributive: {
+  role: 'admin'
 }
 ```
 
-### Payload Data Validation
-```javascript
-// Example: Validate dormitory capacity
-dataAttributive: (payload) => {
-  const capacity = payload.dormitoryData.capacity;
-  return capacity >= 4 && capacity <= 6;
+### 宿舍长权限配置
+```typescript
+userAttributive: {
+  role: 'dorm_leader'
+},
+dataAttributive: {
+  dormId: 'current_user_dorm_id'
 }
 ```
 
-### State-Based Permissions
-```javascript
-// Example: Can only approve pending requests
-dataAttributive: (payload, context) => {
-  const request = context.getKickoutRequest(payload.requestId);
-  return request && request.status === 'pending';
+### 普通用户权限配置
+```typescript
+userAttributive: {
+  id: 'current_user_id'
 }
 ```
-
-## Interaction Flow Dependencies
-
-### Sequential Dependencies
-1. **CreateDormitory** → **AssignDormLeader** → **AssignUserToBed**
-2. **AssignUserToBed** → **ReportViolation** → **SubmitKickoutRequest** → **ApproveKickoutRequest**
-
-### Conditional Dependencies
-- **ReportViolation** triggers **SubmitKickoutRequest** when score drops below threshold
-- **ApproveKickoutRequest** triggers **Assignment deactivation** when approved
-
-### Data Consistency Requirements
-- User can only be assigned to one bed at a time
-- Dormitory can only have one active leader
-- Bed space can only be occupied by one user
-- Kickout requests must reference valid user-dormitory associations
-
-## Error Handling Patterns
-
-### Permission Errors
-- Return specific error codes for unauthorized access
-- Log security events for audit trails
-- Provide meaningful error messages without exposing sensitive data
-
-### Validation Errors  
-- Check all business rules before data modification
-- Return detailed validation failure reasons
-- Maintain data integrity across all operations
-
-### Concurrency Protection
-- Handle simultaneous bed assignments
-- Prevent duplicate leader appointments
-- Ensure atomic operations for multi-step processes
-
-This interaction matrix ensures complete coverage of all user operations with proper permission controls and clear business rule enforcement.

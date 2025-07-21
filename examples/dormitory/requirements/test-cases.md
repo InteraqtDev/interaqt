@@ -1,259 +1,192 @@
-# Dormitory Management System - Test Cases
+# 宿舍管理系统测试用例
 
-## 🔴 CRITICAL: All test cases MUST be based on Interactions, NOT on Entity/Relation operations
+## TC001: 创建宿舍 (CreateDorm Interaction)
+- Interaction: CreateDorm
+- Preconditions: 用户已登录且具有管理员权限
+- Input Data: name="A101", capacity=4
+- Expected Results:
+  1. 创建新的宿舍记录
+  2. 宿舍名称为"A101"
+  3. 宿舍容量为4
+  4. 创建时间为当前时间
+  5. 宿舍leader为空（未指定）
+- Post Validation: 宿舍出现在宿舍列表中
 
-## TC001: Create Dormitory (via CreateDormitory Interaction)
-- **Interaction**: CreateDormitory
-- **Preconditions**: User is system administrator
-- **Input Data**: 
-  - dormitoryData: { name: "Building A - Room 101", capacity: 6 }
-- **Expected Results**:
-  1. Create new dormitory record
-  2. Automatically create 6 bed spaces with bedNumbers 1-6
-  3. All bed spaces are initially unoccupied
-  4. Dormitory is active by default
-- **Post Validation**: Dormitory appears in system with correct bed count
+## TC002: 创建宿舍容量超限 (CreateDorm with Invalid Capacity)
+- Interaction: CreateDorm
+- Preconditions: 用户已登录且具有管理员权限
+- Input Data: name="A102", capacity=3
+- Expected Results:
+  1. 交互返回错误
+  2. 错误类型为"validation failed"
+  3. 错误消息包含"capacity must be between 4 and 6"
+  4. 没有宿舍记录被创建
 
-## TC002: Create Dormitory with Invalid Capacity (via CreateDormitory Interaction)
-- **Interaction**: CreateDormitory
-- **Preconditions**: User is system administrator
-- **Input Data**: 
-  - dormitoryData: { name: "Invalid Dorm", capacity: 3 }  // Below minimum
-- **Expected Results**:
-  1. Interaction returns error
-  2. Error type is "validation failed" 
-  3. No dormitory record created
-  4. No bed spaces created
-- **Note**: Do NOT test with storage.create - it bypasses validation!
+## TC003: 创建宿舍无权限 (CreateDorm without Permission)
+- Interaction: CreateDorm
+- Preconditions: 普通用户登录
+- Input Data: name="A103", capacity=4
+- Expected Results:
+  1. 交互返回错误
+  2. 错误类型为"permission denied"
+  3. 没有宿舍记录被创建
 
-## TC003: Assign Dorm Leader (via AssignDormLeader Interaction)
-- **Interaction**: AssignDormLeader
-- **Preconditions**: 
-  - User is system administrator
-  - Dormitory exists
-  - Target user exists and has no current leader role
-- **Input Data**:
-  - dormitoryId: "dorm123"
-  - leaderId: "user456"
-- **Expected Results**:
-  1. User role updated to 'leader'
-  2. Dormitory leaderId field updated
-  3. User can now manage this specific dormitory
-- **Exception Scenario**: Assigning leader to non-existent dorm should fail
+## TC004: 指定宿舍长 (AssignDormLeader Interaction)
+- Interaction: AssignDormLeader
+- Preconditions: 
+  - 管理员已登录
+  - 宿舍已存在
+  - 用户是该宿舍的成员
+- Input Data: dormId="dorm123", userId="user456"
+- Expected Results:
+  1. 宿舍的leaderId更新为指定用户ID
+  2. 用户的role更新为"dorm_leader"
+  3. 更新时间为当前时间
+- Post Validation: 用户现在具有宿舍长权限
 
-## TC004: Assign User to Bed Space (via AssignUserToBed Interaction)
-- **Interaction**: AssignUserToBed
-- **Preconditions**:
-  - User is administrator
-  - Target user exists and has no current assignment
-  - Bed space exists and is unoccupied
-- **Input Data**:
-  - userId: "user789"
-  - bedSpaceId: "bed101"
-- **Expected Results**:
-  1. Create new Assignment record
-  2. Assignment is active
-  3. Bed space isOccupied becomes true
-  4. User is linked to the dormitory
-- **Post Validation**: User appears in dormitory resident list
+## TC005: 分配用户到宿舍 (AssignUserToDorm Interaction)
+- Interaction: AssignUserToDorm
+- Preconditions:
+  - 管理员已登录
+  - 宿舍存在且有可用床位
+  - 用户未被分配到任何宿舍
+- Input Data: userId="user789", dormId="dorm123", bedNumber=1
+- Expected Results:
+  1. 创建DormAssignment记录
+  2. 用户的dormId更新为指定宿舍ID
+  3. 用户的bedNumber更新为指定床位号
+  4. 宿舍当前入住人数+1
+  5. 分配状态为"active"
 
-## TC005: Assign User to Occupied Bed (via AssignUserToBed Interaction)
-- **Interaction**: AssignUserToBed
-- **Preconditions**:
-  - User is administrator
-  - Target user exists
-  - Bed space is already occupied
-- **Input Data**:
-  - userId: "user999"
-  - bedSpaceId: "bed101"  // Already occupied
-- **Expected Results**:
-  1. Interaction returns error
-  2. Error indicates bed is already occupied
-  3. No new assignment created
-  4. Existing assignment unchanged
+## TC006: 重复分配用户到宿舍 (AssignUserToDorm Duplicate)
+- Interaction: AssignUserToDorm
+- Preconditions:
+  - 管理员已登录
+  - 用户已被分配到其他宿舍
+- Input Data: userId="user789", dormId="dorm124", bedNumber=2
+- Expected Results:
+  1. 交互返回错误
+  2. 错误类型为"validation failed"
+  3. 错误消息包含"user already assigned to a dorm"
+  4. 原分配关系保持不变
 
-## TC006: Report Violation (via ReportViolation Interaction)
-- **Interaction**: ReportViolation
-- **Preconditions**:
-  - User is dorm leader or administrator
-  - Target user is assigned to leader's dormitory (if leader)
-  - Violation type is valid
-- **Input Data**:
-  - targetUserId: "user789"
-  - violationType: "NOISE_VIOLATION"
-  - description: "Loud music after 10 PM"
-- **Expected Results**:
-  1. Create new Violation record
-  2. User's score automatically reduced by 10 points
-  3. Violation timestamp recorded
-  4. Reporter ID stored
-- **Post Validation**: User's new score reflects deduction
+## TC007: 分配用户到满员宿舍 (AssignUserToDorm Full)
+- Interaction: AssignUserToDorm
+- Preconditions:
+  - 管理员已登录
+  - 宿舍已满员
+- Input Data: userId="user999", dormId="dorm123", bedNumber=5
+- Expected Results:
+  1. 交互返回错误
+  2. 错误类型为"validation failed"
+  3. 错误消息包含"dorm is full"
+  4. 没有新的分配记录创建
 
-## TC007: Report Violation by Unauthorized User (via ReportViolation Interaction)
-- **Interaction**: ReportViolation
-- **Preconditions**:
-  - User is regular resident (not leader or admin)
-- **Input Data**:
-  - targetUserId: "user789"
-  - violationType: "NOISE_VIOLATION"
-  - description: "Loud music"
-- **Expected Results**:
-  1. Interaction returns permission error
-  2. No violation record created
-  3. Target user's score unchanged
+## TC008: 给用户扣分 (DeductPoints Interaction)
+- Interaction: DeductPoints
+- Preconditions:
+  - 管理员已登录
+  - 用户存在
+- Input Data: userId="user123", points=10, reason="late return"
+- Expected Results:
+  1. 创建ScoreRecord记录
+  2. 用户的score减少10分
+  3. 扣分记录包含原因和操作人员
+  4. 返回更新后的用户积分
 
-## TC008: Submit Kickout Request (via SubmitKickoutRequest Interaction)
-- **Interaction**: SubmitKickoutRequest
-- **Preconditions**:
-  - User is dorm leader
-  - Target user is assigned to leader's dormitory
-  - Target user has low score (eligibility for kickout)
-- **Input Data**:
-  - targetUserId: "user789"
-  - reason: "Multiple violations, score below threshold"
-- **Expected Results**:
-  1. Create new KickoutRequest record
-  2. Request status is 'pending'
-  3. Request timestamp recorded
-  4. Requester ID stored
-- **Post Validation**: Request appears in admin review queue
+## TC009: 宿舍长申请踢出用户 (ApplyForEviction Interaction)
+- Interaction: ApplyForEviction
+- Preconditions:
+  - 宿舍长已登录
+  - 目标用户是其宿舍成员
+  - 用户积分低于阈值(-100分)
+- Input Data: targetUserId="user456", reason="repeated violations"
+- Expected Results:
+  1. 创建EvictionRequest记录
+  2. 申请状态为"pending"
+  3. 申请者为当前宿舍长
+  4. 返回申请成功信息
 
-## TC009: Submit Invalid Kickout Request (via SubmitKickoutRequest Interaction)
-- **Interaction**: SubmitKickoutRequest
-- **Preconditions**:
-  - User is dorm leader
-  - Target user is NOT in leader's dormitory
-- **Input Data**:
-  - targetUserId: "user999"  // Different dorm
-  - reason: "Not my responsibility"
-- **Expected Results**:
-  1. Interaction returns permission error
-  2. No kickout request created
-  3. Leader can only request for their own dorm residents
+## TC010: 宿舍长申请踢出积分不足用户 (ApplyForEviction Not Eligible)
+- Interaction: ApplyForEviction
+- Preconditions:
+  - 宿舍长已登录
+  - 目标用户积分高于阈值
+- Input Data: targetUserId="user456", reason="minor issue"
+- Expected Results:
+  1. 交互返回错误
+  2. 错误类型为"validation failed"
+  3. 错误消息包含"user score is not low enough"
+  4. 没有创建申请记录
 
-## TC010: Approve Kickout Request (via ApproveKickoutRequest Interaction)
-- **Interaction**: ApproveKickoutRequest
-- **Preconditions**:
-  - User is system administrator
-  - Kickout request exists with 'pending' status
-- **Input Data**:
-  - requestId: "request123"
-  - decision: "approved"
-- **Expected Results**:
-  1. Request status updated to 'approved'
-  2. Target user's assignment becomes inactive
-  3. Bed space becomes available (isOccupied = false)
-  4. Review timestamp and reviewer ID recorded
-- **Post Validation**: User is no longer in dormitory resident list
+## TC011: 处理踢出申请 (ProcessEvictionRequest Interaction)
+- Interaction: ProcessEvictionRequest
+- Preconditions:
+  - 管理员已登录
+  - 踢出申请存在且状态为"pending"
+- Input Data: requestId="req123", action="approve"
+- Expected Results:
+  1. EvictionRequest状态更新为"approved"
+  2. 用户的宿舍分配被移除
+  3. 用户的dormId和bedNumber清空
+  4. 宿舍空余床位+1
+  5. 用户的role更新为"student"
 
-## TC011: Reject Kickout Request (via ApproveKickoutRequest Interaction)
-- **Interaction**: ApproveKickoutRequest
-- **Preconditions**:
-  - User is system administrator
-  - Kickout request exists with 'pending' status
-- **Input Data**:
-  - requestId: "request123"
-  - decision: "rejected"
-- **Expected Results**:
-  1. Request status updated to 'rejected'
-  2. Target user's assignment remains active
-  3. User stays in dormitory
-  4. Review details recorded
+## TC012: 拒绝踢出申请 (ProcessEvictionRequest Reject)
+- Interaction: ProcessEvictionRequest
+- Preconditions:
+  - 管理员已登录
+  - 踢出申请存在且状态为"pending"
+- Input Data: requestId="req123", action="reject"
+- Expected Results:
+  1. EvictionRequest状态更新为"rejected"
+  2. 用户宿舍分配保持不变
+  3. 返回拒绝信息
 
-## TC012: Get Dormitory Details (via GetDormitoryDetails Interaction)
-- **Interaction**: GetDormitoryDetails
-- **Preconditions**: 
-  - User has appropriate permissions
-  - Dormitory exists
-- **Input Data**:
-  - dormitoryId: "dorm123"
-- **Expected Results**:
-  1. Return dormitory information
-  2. Include bed space details
-  3. Include current resident list
-  4. Include leader information
-- **Post Validation**: Data matches actual dormitory state
+## TC013: 查看宿舍成员 (ViewDormMembers Interaction)
+- Interaction: ViewDormMembers
+- Preconditions:
+  - 宿舍长已登录
+- Input Data: dormId="dorm123"
+- Expected Results:
+  1. 返回宿舍所有成员列表
+  2. 包含每个成员的详细信息
+  3. 只返回当前宿舍的成员
 
-## TC013: Get User Violations History (via GetUserViolations Interaction)
-- **Interaction**: GetUserViolations
-- **Preconditions**:
-  - User is admin or dorm leader checking their residents
-  - Target user exists
-- **Input Data**:
-  - userId: "user789"
-- **Expected Results**:
-  1. Return list of user's violations
-  2. Include violation details and timestamps
-  3. Show score impact of each violation
-  4. Ordered by most recent first
-- **Permission Check**: Leader can only view violations for their dorm residents
+## TC014: 查看我的宿舍 (ViewMyDorm Interaction)
+- Interaction: ViewMyDorm
+- Preconditions:
+  - 普通用户已登录
+  - 用户已被分配到宿舍
+- Expected Results:
+  1. 返回用户所在宿舍的详细信息
+  2. 包含宿舍名称、容量、成员列表
+  3. 包含用户的床位信息
 
-## TC014: Transfer User Between Beds (via TransferUser Interaction)
-- **Interaction**: TransferUser
-- **Preconditions**:
-  - User is administrator
-  - Source and target bed spaces exist
-  - Target bed is unoccupied
-  - User has current assignment
-- **Input Data**:
-  - userId: "user789"
-  - newBedSpaceId: "bed102"
-- **Expected Results**:
-  1. Current assignment becomes inactive
-  2. New assignment created for target bed
-  3. Source bed becomes available
-  4. Target bed becomes occupied
-- **Post Validation**: User appears at new bed location
+## TC015: 查看我的积分 (ViewMyScore Interaction)
+- Interaction: ViewMyScore
+- Preconditions:
+  - 普通用户已登录
+- Expected Results:
+  1. 返回当前用户的积分信息
+  2. 包含历史扣分记录
+  3. 按时间倒序排列扣分记录
 
-## TC015: Multiple Violations Score Impact (via ReportViolation Interaction)
-- **Interaction**: ReportViolation (multiple calls)
-- **Preconditions**: User assigned to dormitory
-- **Test Sequence**:
-  1. Report NOISE_VIOLATION (-10 points)
-  2. Report CLEANLINESS_ISSUE (-15 points)  
-  3. Report DAMAGE_TO_PROPERTY (-25 points)
-- **Expected Results**:
-  1. Each violation creates separate record
-  2. Score decreases incrementally: 100 → 90 → 75 → 50
-  3. All violations linked to user
-  4. Score never goes below 0
-- **Post Validation**: Final score is 50, user eligible for kickout
+## TC016: 移除用户从宿舍 (RemoveUserFromDorm Interaction)
+- Interaction: RemoveUserFromDorm
+- Preconditions:
+  - 管理员已登录
+  - 用户当前在宿舍中
+- Input Data: userId="user123"
+- Expected Results:
+  1. 用户的宿舍分配状态更新为"removed"
+  2. 用户的dormId和bedNumber清空
+  3. 用户的role更新为"student"
+  4. 宿舍空余床位+1
 
-## Edge Cases and Error Scenarios
-
-### EC001: Capacity Validation
-- Test dormitory creation with capacity 0, 1, 10 (all should fail)
-- Only 4-6 capacity should succeed
-
-### EC002: Concurrent Assignment Protection
-- Two admins try to assign different users to same bed simultaneously
-- Only one should succeed
-
-### EC003: Score Boundary Testing
-- User with score 5 receives -10 violation
-- Score should become 0, not negative
-
-### EC004: Dormitory Leader Limits
-- User assigned as leader to multiple dormitories
-- Should fail - one leader per dormitory, one dormitory per leader
-
-### EC005: Self-Violation Prevention
-- Leader tries to report violation against themselves
-- Should be prevented by business logic
-
-## Test Data Setup Requirements
-
-### Users
-- admin1: System administrator
-- leader1: Dorm leader for Building A
-- leader2: Dorm leader for Building B  
-- resident1, resident2, resident3: Regular residents
-
-### Dormitories
-- dorm1: Building A Room 101 (capacity 6, leader: leader1)
-- dorm2: Building B Room 201 (capacity 4, leader: leader2)
-
-### Initial State
-- All users start with score 100
-- Some beds occupied, some available
-- No pending kickout requests
+## 测试数据约束
+- 宿舍容量：4-6人
+- 踢出积分阈值：-100分
+- 角色限制：宿舍长必须是宿舍成员
+- 床位分配：1到capacity之间的整数
+- 唯一性：用户只能在一个宿舍的一个床位上

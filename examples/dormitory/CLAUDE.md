@@ -16,6 +16,11 @@ Create `requirements/test-cases.md` document with complete test cases:
 
 **🔴 CRITICAL: All test cases MUST be based on Interactions, NOT on Entity/Relation operations**
 
+**Test cases should be organized in phases:**
+1. **Core Business Logic Tests** (implement first)
+2. **Permission Tests** (implement after core logic works)
+3. **Business Rule Tests** (implement after core logic works)
+
 ```markdown
 ## TC001: Create Article (via CreateArticle Interaction)
 - Interaction: CreateArticle
@@ -49,16 +54,45 @@ Create `requirements/test-cases.md` document with complete test cases:
   2. Article's like count automatically +1
   3. User's like list includes this article
 - Exception Scenario: Duplicate like should fail at Interaction level
+
+## TC004: Request Leave - Business Rule Test (via RequestLeave Interaction)
+- Interaction: RequestLeave
+- Test Phase: Business Rules (implement after core logic)
+- Preconditions: User has already requested 3 leaves this month
+- Input Data: reason="Family matter", days=2
+- Expected Results:
+  1. Interaction returns error
+  2. Error message indicates monthly limit exceeded
+  3. No new leave request created
+  4. User's leave count remains at 3
+- Note: This tests business rule validation, not core functionality
 ```
 
 ### 1.3 Interaction Matrix
 Create `requirements/interaction-matrix.md` to ensure:
 - Every user role has corresponding Interactions for all operations
-- Every Interaction has clear permission controls
+- Every Interaction has clear permission controls or business rule constraints
 - Every Interaction has corresponding test cases
+- Document both access control requirements AND business logic validations
 
 
 ## Phase 2: Code Generation
+
+### 🔴 Progressive Implementation Approach
+**CRITICAL: Follow a progressive implementation strategy:**
+
+1. **Stage 1 - Core Business Logic Only**
+   - Implement basic CRUD operations
+   - Focus on entity relationships and computations
+   - No permissions or business rules
+   - Get all basic functionality working first
+
+2. **Stage 2 - Add Access Control and Business Rules**
+   - Add condition for permission checks
+   - Add condition for business rule validations
+   - Implement complex validations and constraints
+   - Only after Stage 1 is fully working
+
 
 ### 🔴 CRITICAL: Framework Has Complete CRUD Capabilities
 **The interaqt framework has COMPLETE capability for all CRUD operations (Create, Read, Update, Delete).**
@@ -134,7 +168,11 @@ Common issues that can be avoided by reading the API reference:
 ⚠️ **DO NOT proceed without reading the above reference document completely!**
 
 - [ ] Generate all interactions from use cases
-- [ ] Start with simple payload-only interactions. No userAttributive or dataAttributive initially
+- [ ] Start with simple payload-only interactions. No condition initially
+- [ ] **IMPORTANT**: Focus ONLY on core business logic, DO NOT implement:
+  - Permission checks (role-based access control)
+  - Business rule validations (e.g., quantity limits, state checks, time restrictions)
+  - Complex data validations beyond basic field requirements
 - [ ] Ensure TypeScript type checking passes by using `npm run check`
 
 ### 2.3 Computation Implementation
@@ -152,28 +190,62 @@ Common issues that can be avoided by reading the API reference:
 ⚠️ **DO NOT proceed without reading the above reference document completely!**
 
 - [ ] Create test cases for all interactions
-- [ ] Verify basic functionality without permissions
+- [ ] Verify basic functionality without permissions and business rules
+- [ ] **Focus on core business logic only**:
+  - Basic CRUD operations work correctly
+  - Entity relationships are properly established
+  - Computed properties calculate correctly
+  - State transitions work as expected
+- [ ] **DO NOT test at this stage**:
+  - Permission denials
+  - Business rule violations
+  - Complex validation scenarios
 - [ ] Ensure all tests pass
 
-### 2.5 Permission Implementation
+### 2.5 Permission and Business Rules Implementation
 **📖 MUST READ: `./agentspace/knowledge/generator/permission-implementation.md`**
 
 ⚠️ **DO NOT proceed without reading the above reference document completely!**
 
-- [ ] Add userAttributive to interactions
-- [ ] Add dataAttributive where needed
-- [ ] Implement role-based access control
+**After core business logic is working correctly, add access control and business rules:**
+
+#### Permission Implementation
+- [ ] Add condition to interactions for role-based access control
+- [ ] Implement permission checks based on user roles
+- [ ] Control who can perform which operations
+
+#### Business Rules Implementation
+- [ ] Add condition for business rule validations
+- [ ] Implement common business rules:
+  - **Quantity limits**: e.g., "Cannot request leave more than 3 times per month"
+  - **State checks**: e.g., "Cannot edit published articles"
+  - **Time restrictions**: e.g., "Cannot book rooms more than 7 days in advance"
+  - **Relationship constraints**: e.g., "Cannot delete user with active orders"
+  - **Balance checks**: e.g., "Cannot withdraw more than account balance"
 - [ ] Ensure TypeScript type checking passes
 
-### 2.6 Permission Test Implementation
+### 2.6 Permission and Business Rules Test Implementation
 **📖 MUST READ: `./agentspace/knowledge/generator/permission-test-implementation.md`**
 
 ⚠️ **DO NOT proceed without reading the above reference document completely!**
 
+#### Permission Tests
 - [ ] Add permission test cases
 - [ ] Test permission access scenarios
 - [ ] Test permission denial cases
+
+#### Business Rules Tests
+- [ ] Test business rule validations
+- [ ] Test boundary conditions (e.g., exactly at limit)
+- [ ] Test rule violations with appropriate error messages
+- [ ] Test complex scenarios with multiple rules
 - [ ] Ensure all tests pass
+
+**Note on Error Messages:**
+Since permissions and business rules are now unified in the `condition` API, the framework will return a generic error when the condition fails. Consider:
+- Structuring your BoolExpression atoms with descriptive keys that indicate the type of failure
+- Testing both permission failures and business rule violations to ensure proper error handling
+- Documenting expected error scenarios for each Interaction
 
 ### 2.7 Complete CRUD Test Example
 **📖 Reference: `./tests/crud.example.test.ts`**
@@ -187,8 +259,8 @@ For a comprehensive example of CRUD operations with the interaqt framework, refe
 - **Interactions**: Complete CRUD operations (Create, Publish, Delete, Restore)
 - **Permission System**: 
   - Role-based access control (admin, author, user)
-  - User attributives for role checking
-  - Data attributives for payload validation
+  - Condition for role checking
+  - Condition for payload validation
   - Complex permission logic with OR conditions
 - **Comprehensive Tests**:
   - Basic CRUD operations

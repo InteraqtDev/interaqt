@@ -3,7 +3,7 @@ import {
   Entity, Property, Relation, Interaction, Action, Payload, PayloadItem,
   Transform, StateMachine, StateNode, StateTransfer, Count, MatchExp,
   InteractionEventEntity, Controller, MonoSystem, PGLiteDB,
-  Attributive, BoolExp, boolExpToAttributives
+  Condition, Conditions, BoolExp
 } from 'interaqt'
 
 describe('Simple CRUD Example', () => {
@@ -102,31 +102,29 @@ describe('Simple CRUD Example', () => {
     })
   )
 
-  // === Attributives ===
+  // === Conditions ===
   
-  // Admin role attributive
-  const AdminAttributive = Attributive.create({
+  // Admin role condition
+  const AdminAttributive = Condition.create({
     name: 'Admin',
-    content: function Admin(targetUser, eventArgs) {
-      return eventArgs.user.role === 'admin'
+    content: async function Admin(this: Controller, event) {
+      return event.user?.role === 'admin'
     }
   })
 
   // Author role attributive - basic author role
-  const AuthorAttributive = Attributive.create({
+  const AuthorAttributive = Condition.create({
     name: 'Author',
-    content: function Author(targetUser, eventArgs) {
-      return eventArgs.user.role === 'author' || eventArgs.user.role === 'admin'
+    content: async function Author(this: Controller, event) {
+      return event.user?.role === 'author' || event.user?.role === 'admin'
     }
   })
 
   // Article author attributive - check if user is the author of the article
-  const ArticleAuthorAttributive = Attributive.create({
+  const ArticleAuthorAttributive = Condition.create({
     name: 'ArticleAuthor',
-    content: async function ArticleAuthor(targetUser, eventArgs) {
-      // this is bound to controller instance
-      const { MatchExp } = this.globals
-      const articleId = eventArgs.payload.article?.id
+    content: async function ArticleAuthor(this: Controller, event) {
+      const articleId = event.payload?.article?.id
       
       if (!articleId) return false
       
@@ -136,19 +134,17 @@ describe('Simple CRUD Example', () => {
         [['author', { attributeQuery: ['id'] }]]
       )
       
-      return article && article.author.id === eventArgs.user.id
+      return article && article.author.id === event.user.id
     }
   })
 
   // Draft article attributive - payload constraint to only allow draft articles
-  const DraftArticleAttributive = Attributive.create({
+  const DraftArticleAttributive = Condition.create({
     name: 'DraftArticle',
-    content: async function DraftArticle(article, eventArgs) {
-      // article is the payload item value
+    content: async function DraftArticle(this: Controller, event) {
+      const article = event.payload?.article
       if (!article?.id) return false
       
-      // this is bound to controller instance
-      const { MatchExp } = this.globals
       const articleData = await this.system.storage.findOne('Article',
         MatchExp.atom({ key: 'id', value: ['=', article.id] }),
         undefined,
@@ -160,12 +156,12 @@ describe('Simple CRUD Example', () => {
   })
 
   // Not deleted article attributive - payload constraint
-  const NotDeletedArticleAttributive = Attributive.create({
+  const NotDeletedArticleAttributive = Condition.create({
     name: 'NotDeletedArticle', 
-    content: async function NotDeletedArticle(article, eventArgs) {
+    content: async function NotDeletedArticle(this: Controller, event) {
+      const article = event.payload?.article
       if (!article?.id) return false
       
-      const { MatchExp } = this.globals
       const articleData = await this.system.storage.findOne('Article',
         MatchExp.atom({ key: 'id', value: ['=', article.id] }),
         undefined,
@@ -177,12 +173,12 @@ describe('Simple CRUD Example', () => {
   })
 
   // Deleted article attributive - payload constraint for restore
-  const DeletedArticleAttributive = Attributive.create({
+  const DeletedArticleAttributive = Condition.create({
     name: 'DeletedArticle',
-    content: async function DeletedArticle(article, eventArgs) {
+    content: async function DeletedArticle(this: Controller, event) {
+      const article = event.payload?.article
       if (!article?.id) return false
       
-      const { MatchExp } = this.globals
       const articleData = await this.system.storage.findOne('Article',
         MatchExp.atom({ key: 'id', value: ['=', article.id] }),
         undefined,
@@ -205,9 +201,16 @@ describe('Simple CRUD Example', () => {
       ]
     }),
     // Only authors or admins can create articles
-    userAttributives: boolExpToAttributives(
-      BoolExp.atom(AuthorAttributive)
-    )
+    conditions: AuthorAttributive
+  })
+
+  // Combined condition for publish article
+  const CanPublishArticle = Conditions.create({
+    content: BoolExp.atom(DraftArticleAttributive)
+      .and(
+        BoolExp.atom(ArticleAuthorAttributive)
+          .or(BoolExp.atom(AdminAttributive))
+      )
   })
 
   const PublishArticle = Interaction.create({
@@ -217,19 +220,21 @@ describe('Simple CRUD Example', () => {
       items: [
         PayloadItem.create({ 
           name: 'article', 
-          required: true,
-          // Can only publish draft articles
-          attributives: boolExpToAttributives(
-            BoolExp.atom(DraftArticleAttributive)
-          )
+          required: true
         })
       ]
     }),
-    // Only article author or admin can publish
-    userAttributives: boolExpToAttributives(
-      BoolExp.atom(ArticleAuthorAttributive)
-        .or(BoolExp.atom(AdminAttributive))
-    )
+    // Only article author or admin can publish, and article must be draft
+    conditions: CanPublishArticle
+  })
+
+  // Combined condition for delete article
+  const CanDeleteArticle = Conditions.create({
+    content: BoolExp.atom(NotDeletedArticleAttributive)
+      .and(
+        BoolExp.atom(ArticleAuthorAttributive)
+          .or(BoolExp.atom(AdminAttributive))
+      )
   })
 
   const DeleteArticle = Interaction.create({
@@ -239,19 +244,18 @@ describe('Simple CRUD Example', () => {
       items: [
         PayloadItem.create({ 
           name: 'article', 
-          required: true,
-          // Can only delete non-deleted articles
-          attributives: boolExpToAttributives(
-            BoolExp.atom(NotDeletedArticleAttributive)
-          )
+          required: true
         })
       ]
     }),
-    // Only article author or admin can delete
-    userAttributives: boolExpToAttributives(
-      BoolExp.atom(ArticleAuthorAttributive)
-        .or(BoolExp.atom(AdminAttributive))
-    )
+    // Only article author or admin can delete, and article must not be deleted
+    conditions: CanDeleteArticle
+  })
+
+  // Combined condition for restore article  
+  const CanRestoreArticle = Conditions.create({
+    content: BoolExp.atom(DeletedArticleAttributive)
+      .and(BoolExp.atom(AdminAttributive))
   })
 
   const RestoreArticle = Interaction.create({
@@ -261,18 +265,12 @@ describe('Simple CRUD Example', () => {
       items: [
         PayloadItem.create({ 
           name: 'article', 
-          required: true,
-          // Can only restore deleted articles
-          attributives: boolExpToAttributives(
-            BoolExp.atom(DeletedArticleAttributive)
-          )
+          required: true
         })
       ]
     }),
     // Only admins can restore deleted articles
-    userAttributives: boolExpToAttributives(
-      BoolExp.atom(AdminAttributive)
-    )
+    conditions: CanRestoreArticle
   })
 
   // Now add transfers to the state machine
@@ -691,7 +689,7 @@ describe('Simple CRUD Example', () => {
 
     // Assert: Should fail with permission error
     expect(result.error).toBeTruthy()
-    expect((result.error as any).type).toBe('check user failed')
+    expect((result.error as any).type).toBe('condition check failed')
   })
 
   test('should deny non-authors from publishing other users articles', async () => {
@@ -734,7 +732,7 @@ describe('Simple CRUD Example', () => {
 
     // Assert: Should fail with permission error
     expect(publishResult.error).toBeTruthy()
-    expect((publishResult.error as any).type).toBe('check user failed')
+    expect((publishResult.error as any).type).toBe('condition check failed')
   })
 
   test('should allow admins to operate on any article', async () => {
@@ -825,7 +823,7 @@ describe('Simple CRUD Example', () => {
 
     // Assert: Should fail because article is not in draft status
     expect(republishResult.error).toBeTruthy()
-    expect((republishResult.error as any).type).toBe('article not match attributive')
+    expect((republishResult.error as any).type).toBe('condition check failed')
 
     // Act 2: Delete the article
     await controller.callInteraction('DeleteArticle', {
@@ -841,7 +839,7 @@ describe('Simple CRUD Example', () => {
 
     // Assert: Should fail because article is already deleted
     expect(redeleteResult.error).toBeTruthy()
-    expect((redeleteResult.error as any).type).toBe('article not match attributive')
+    expect((redeleteResult.error as any).type).toBe('condition check failed')
 
     // Act 3: Try to restore a non-deleted article (create a new one first)
     await controller.callInteraction('CreateArticle', {
@@ -866,7 +864,7 @@ describe('Simple CRUD Example', () => {
 
     // Assert: Should fail because article is not deleted
     expect(restoreActiveResult.error).toBeTruthy()
-    expect((restoreActiveResult.error as any).type).toBe('article not match attributive')
+    expect((restoreActiveResult.error as any).type).toBe('condition check failed')
   })
 
   test('should allow multiple attributives with OR logic', async () => {
@@ -945,6 +943,6 @@ describe('Simple CRUD Example', () => {
       payload: { article: { id: article.id } }
     })
     expect(regularPublishResult.error).toBeTruthy()
-    expect((regularPublishResult.error as any).type).toBe('check user failed')
+    expect((regularPublishResult.error as any).type).toBe('condition check failed')
   })
 }) 
