@@ -1,141 +1,160 @@
-# 宿舍管理系统详细需求分析
+# 宿舍管理系统详细需求
 
-## 1. 业务背景
-宿舍管理系统用于管理学生宿舍的分配、日常管理和行为管理。系统需要支持管理员、宿舍长和普通学生三种角色的不同操作权限。
+## 系统概述
+构建一个全面的宿舍管理系统，支持宿舍管理员对宿舍和用户进行管理，以及宿舍长对宿舍内学生进行管理和行为监督。
 
-## 2. 数据分析
+## 用户角色分析
 
-### 2.1 实体（Entities）
-1. **User（用户）**
-   - id: 唯一标识
-   - name: 姓名
-   - email: 邮箱（唯一）
-   - role: 角色（admin/dormHead/student）
-   - status: 状态（active/removed）
-   - score: 积分（默认100分）
-   - joinedAt: 加入时间
+### 1. 全局宿舍管理员 (Admin)
+- **权限**: 系统最高权限
+- **职责**: 
+  - 创建和管理宿舍
+  - 指定宿舍长
+  - 分配学生到宿舍
+  - 审批踢出申请
 
-2. **Dormitory（宿舍）**
-   - id: 唯一标识
-   - name: 宿舍名称（如"东区3栋201"）
-   - capacity: 容量（4-6人）
-   - currentOccupancy: 当前入住人数（计算属性）
-   - createdAt: 创建时间
+### 2. 宿舍长 (DormHead)
+- **权限**: 宿舍内管理权限
+- **职责**:
+  - 监督宿舍内学生行为
+  - 记录违规行为并扣分
+  - 申请踢出问题学生
 
-3. **Bed（床位）**
-   - id: 唯一标识
-   - bedNumber: 床位号（1-6）
-   - status: 状态（available/occupied）
+### 3. 学生 (Student)
+- **权限**: 基本用户权限
+- **职责**:
+  - 遵守宿舍规章制度
+  - 接受宿舍长管理
 
-4. **DeductionRule（扣分规则）**
-   - id: 唯一标识
-   - name: 规则名称
-   - description: 规则描述
-   - points: 扣分值
-   - isActive: 是否生效
+## 实体分析
 
-5. **DeductionRecord（扣分记录）**
-   - id: 唯一标识
-   - reason: 扣分原因
-   - points: 扣分值
-   - createdAt: 扣分时间
+### 1. User (用户)
+**属性**:
+- id: 用户唯一标识
+- name: 用户姓名
+- email: 用户邮箱
+- role: 用户角色 ('admin', 'dormHead', 'student')
+- score: 用户行为分数 (初始100分)
+- isActive: 用户是否活跃状态
 
-6. **RemovalRequest（踢出申请）**
-   - id: 唯一标识
-   - reason: 申请原因
-   - status: 状态（pending/approved/rejected）
-   - createdAt: 申请时间
-   - processedAt: 处理时间
+### 2. Dormitory (宿舍)
+**属性**:
+- id: 宿舍唯一标识
+- name: 宿舍名称
+- capacity: 床位数量 (4-6之间)
+- currentOccupancy: 当前入住人数
+- createdAt: 创建时间
 
-### 2.2 关系（Relations）
-1. **UserDormitoryRelation**（用户-宿舍关系）
-   - 类型：n:1（多个用户属于一个宿舍）
-   - source: User
-   - target: Dormitory
+### 3. DormitoryAssignment (宿舍分配)
+**属性**:
+- id: 分配记录唯一标识
+- userId: 用户ID
+- dormitoryId: 宿舍ID
+- bedNumber: 床位号 (1-6)
+- assignedAt: 分配时间
+- assignedBy: 分配者ID (管理员)
 
-2. **UserBedRelation**（用户-床位关系）
-   - 类型：1:1（一个用户占用一个床位）
-   - source: User
-   - target: Bed
+### 4. ViolationRecord (违规记录)
+**属性**:
+- id: 违规记录唯一标识
+- userId: 违规用户ID
+- dormitoryId: 所在宿舍ID
+- violationType: 违规类型
+- description: 违规描述
+- scoreDeduction: 扣分数量
+- recordedBy: 记录者ID (宿舍长)
+- recordedAt: 记录时间
 
-3. **DormitoryBedRelation**（宿舍-床位关系）
-   - 类型：1:n（一个宿舍有多个床位）
-   - source: Dormitory
-   - target: Bed
+### 5. KickoutRequest (踢出申请)
+**属性**:
+- id: 申请唯一标识
+- targetUserId: 被申请踢出的用户ID
+- applicantId: 申请人ID (宿舍长)
+- dormitoryId: 宿舍ID
+- reason: 踢出理由
+- status: 申请状态 ('pending', 'approved', 'rejected')
+- requestedAt: 申请时间
+- processedAt: 处理时间
+- processedBy: 处理者ID (管理员)
 
-4. **DormitoryDormHeadRelation**（宿舍-宿舍长关系）
-   - 类型：1:1（一个宿舍有一个宿舍长）
-   - source: Dormitory
-   - target: User
+## 关系分析
 
-5. **UserDeductionRecordRelation**（用户-扣分记录关系）
-   - 类型：1:n（一个用户有多个扣分记录）
-   - source: User
-   - target: DeductionRecord
+### 1. User-Dormitory 关系
+- 一个用户最多只能被分配到一个宿舍的一个床位
+- 一个宿舍可以有多个用户（受capacity限制）
+- 通过DormitoryAssignment表维护关系
 
-6. **DeductionRuleDeductionRecordRelation**（扣分规则-扣分记录关系）
-   - 类型：1:n（一个规则对应多个记录）
-   - source: DeductionRule
-   - target: DeductionRecord
+### 2. User-ViolationRecord 关系
+- 一个用户可以有多个违规记录
+- 违规记录由宿舍长记录
 
-7. **RemovalRequestUserRelation**（踢出申请-用户关系）
-   - 类型：n:1（多个申请针对一个用户）
-   - source: RemovalRequest
-   - target: User
+### 3. DormHead-Dormitory 关系
+- 一个宿舍长负责一个宿舍
+- 通过用户角色和宿舍分配确定关系
 
-8. **RemovalRequestDormHeadRelation**（踢出申请-宿舍长关系）
-   - 类型：n:1（多个申请由一个宿舍长发起）
-   - source: RemovalRequest
-   - target: User（as dormHead）
+## 业务流程分析
 
-## 3. 交互分析
+### 1. 宿舍管理流程
+1. **创建宿舍**: 管理员创建宿舍，指定容量
+2. **指定宿舍长**: 管理员将某个用户指定为宿舍长并分配到宿舍
+3. **分配学生**: 管理员将学生分配到宿舍的空床位
 
-### 3.1 管理员（Admin）交互
+### 2. 违规处理流程
+1. **记录违规**: 宿舍长发现学生违规，记录违规行为并扣分
+2. **分数计算**: 系统自动更新用户分数
+3. **申请踢出**: 当学生分数过低时，宿舍长可申请踢出
+4. **审批处理**: 管理员审批踢出申请
+5. **执行踢出**: 管理员同意后，学生被移出宿舍
+
+## 业务规则
+
+### 1. 宿舍管理规则
+- 每个宿舍床位数量必须在4-6之间
+- 每个宿舍必须有且仅有一个宿舍长
+- 学生只能被分配到有空床位的宿舍
+- 每个用户最多只能被分配到一个宿舍
+
+### 2. 违规扣分规则
+- 用户初始分数为100分
+- 常见违规行为及扣分：
+  - 晚归: 扣5分
+  - 宿舍卫生不达标: 扣10分
+  - 噪音扰民: 扣15分
+  - 违规用电: 扣20分
+  - 破坏公物: 扣25分
+
+### 3. 踢出申请规则
+- 只有宿舍长可以申请踢出同宿舍的学生
+- 被申请踢出的用户分数必须低于30分
+- 每个用户同时只能有一个pending状态的踢出申请
+- 只有管理员可以审批踢出申请
+
+## 权限控制
+
+### 1. 管理员权限
+- 创建、修改、删除宿舍
+- 指定和更换宿舍长
+- 分配和调整用户宿舍
+- 审批踢出申请
+- 查看所有数据
+
+### 2. 宿舍长权限
+- 记录违规行为
+- 申请踢出问题学生
+- 查看本宿舍相关数据
+
+### 3. 学生权限
+- 查看自己的基本信息和分数
+- 查看自己的违规记录
+
+## 系统交互概述
+
+### 核心交互列表
 1. **CreateDormitory**: 创建宿舍
-2. **AssignDormHead**: 指定宿舍长
-3. **AssignUserToDormitory**: 分配用户到宿舍
-4. **CreateDeductionRule**: 创建扣分规则
-5. **ProcessRemovalRequest**: 处理踢出申请（批准/拒绝）
+2. **AssignUserToDormitory**: 分配用户到宿舍
+3. **PromoteToDormHead**: 提升用户为宿舍长
+4. **RecordViolation**: 记录违规行为
+5. **RequestKickout**: 申请踢出用户
+6. **ProcessKickoutRequest**: 处理踢出申请
 
-### 3.2 宿舍长（DormHead）交互
-1. **DeductPoints**: 对宿舍成员扣分
-2. **RequestUserRemoval**: 申请踢出用户
-
-### 3.3 学生（Student）交互
-1. **ViewDormitoryInfo**: 查看宿舍信息
-2. **ViewMyScore**: 查看个人积分
-
-### 3.4 系统自动交互
-1. **CheckScoreThreshold**: 检查积分阈值（当用户积分低于60分时，宿舍长可以申请踢出）
-
-## 4. 业务规则
-
-### 4.1 权限规则
-- 只有管理员可以创建宿舍和指定宿舍长
-- 只有管理员可以分配用户到宿舍
-- 宿舍长只能管理自己宿舍的成员
-- 学生只能查看自己的信息
-
-### 4.2 业务逻辑规则
-- 每个宿舍容量为4-6人
-- 每个用户只能被分配到一个宿舍的一个床位
-- 用户初始积分为100分
-- 扣分后积分不能为负数
-- 积分低于60分时，宿舍长可以申请踢出
-- 被踢出的用户状态变为removed，床位释放
-
-### 4.3 状态流转
-- 床位状态：available → occupied → available（用户被踢出后）
-- 用户状态：active → removed（被踢出后）
-- 踢出申请状态：pending → approved/rejected
-
-## 5. 计算属性
-1. **Dormitory.currentOccupancy**: 统计当前宿舍的入住人数
-2. **User.score**: 基于扣分记录动态计算当前积分
-3. **User.canBeRemoved**: 判断用户是否可以被踢出（积分<60）
-
-## 6. 响应式行为
-1. 当用户被分配到宿舍时，自动分配空闲床位
-2. 当用户被踢出时，自动释放床位
-3. 当扣分记录创建时，自动更新用户积分
-4. 当踢出申请被批准时，自动更新用户状态 
+每个交互都将根据用户角色进行权限验证，确保只有有权限的用户才能执行相应操作。

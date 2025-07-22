@@ -1,592 +1,522 @@
-import { describe, test, expect, beforeEach, beforeAll } from 'vitest'
-import { MonoSystem, Controller, MatchExp } from 'interaqt'
-import { entities, relations, interactions } from '../backend/index.js'
+import { beforeAll, afterAll, beforeEach, describe, test, expect } from 'vitest'
+import { Controller } from 'interaqt'
+import { MonoSystem } from '../../../src/runtime/MonoSystem.js'
+import { entities, relations, interactions, activities, dicts } from '../backend/index.js'
+import { MatchExp } from 'interaqt'
 
-describe('Dormitory Management System - Stage 2: Permissions and Business Rules', () => {
-  let system: MonoSystem
-  let controller: Controller
+let controller: Controller
+let system: MonoSystem
+
+beforeAll(async () => {
+  system = new MonoSystem()
   
-  beforeEach(async () => {
-    system = new MonoSystem()
-    controller = new Controller({
-      system,
-      entities,
-      relations,
-      activities: [],
-      interactions,
-      dict: []
-    })
-    await controller.setup(true)
+  controller = new Controller({
+    system,
+    entities,
+    relations, 
+    activities,
+    interactions,
+    dict: dicts,
+    recordMutationSideEffects: []
   })
+
+  await controller.setup(true)
+})
+
+afterAll(async () => {
+  // MonoSystem doesn't have terminate method
+  // Cleanup is handled automatically
+})
+
+beforeEach(async () => {
+  // Clean up data before each test - delete all records
+  await system.storage.delete('User', MatchExp.atom({ key: 'id', value: ['!=', null] }))
+  await system.storage.delete('Dormitory', MatchExp.atom({ key: 'id', value: ['!=', null] }))
+  await system.storage.delete('DormitoryAssignment', MatchExp.atom({ key: 'id', value: ['!=', null] }))
+  await system.storage.delete('ViolationRecord', MatchExp.atom({ key: 'id', value: ['!=', null] }))
+  await system.storage.delete('KickoutRequest', MatchExp.atom({ key: 'id', value: ['!=', null] }))
+})
+
+describe('Stage 2: Permission and Business Rule Tests', () => {
   
   describe('Permission Tests', () => {
-    test('TC011: Non-admin Create Dormitory Fails', async () => {
-      // Create a student user
-      const student = await system.storage.create('User', {
-        name: 'Student User',
-        email: 'student@example.com',
-        role: 'student'
-      })
-      
-      // Try to create dormitory as student
-      const result = await controller.callInteraction('CreateDormitory', {
-        user: student, // Pass full user object instead of { id: student.id }
-        payload: {
-          name: '西区2栋101',
-          capacity: 4
-        }
-      })
-      
-      expect(result.error).toBeDefined()
-      // The framework returns errors as objects, check the type field
-      expect(result.error).toBeDefined()
-      expect((result.error as any).type).toBe('condition check failed')
-      
-      // Verify no dormitory was created
-      const dormitories = await system.storage.find('Dormitory')
-      expect(dormitories).toHaveLength(0)
-    })
     
-    test('TC014: Dorm Head Can Only Deduct Points from Same Dormitory', async () => {
-      // Create two dormitories
-      const admin = await system.storage.create('User', {
-        name: 'Admin',
-        email: 'admin@example.com',
-        role: 'admin'
-      })
-      
-      const dorm1Result = await controller.callInteraction('CreateDormitory', {
-        user: admin,
-        payload: { name: '东区3栋201', capacity: 4 }
-      })
-      
-      // Check if dormitory creation succeeded
-      if (dorm1Result.error) {
-        throw new Error(`Failed to create dorm1: ${JSON.stringify(dorm1Result.error)}`)
-      }
-      
-      // Get the created dormitory from storage
-      const dorm1 = await system.storage.findOne(
-        'Dormitory',
-        MatchExp.atom({ key: 'name', value: ['=', '东区3栋201'] }),
-        undefined,
-        ['id']
-      )
-      
-      const dorm2Result = await controller.callInteraction('CreateDormitory', {
-        user: admin,
-        payload: { name: '西区2栋101', capacity: 4 }
-      })
-      
-      // Check if dormitory creation succeeded
-      if (dorm2Result.error) {
-        throw new Error(`Failed to create dorm2: ${JSON.stringify(dorm2Result.error)}`)
-      }
-      
-      // Get the created dormitory from storage
-      const dorm2 = await system.storage.findOne(
-        'Dormitory',
-        MatchExp.atom({ key: 'name', value: ['=', '西区2栋101'] }),
-        undefined,
-        ['id']
-      )
-      
-      // Create dorm head for dorm1
-      const dormHead1 = await system.storage.create('User', {
-        name: '张三',
-        email: 'zhangsan@example.com',
-        role: 'dormHead'
-      })
-      
-      await controller.callInteraction('AssignUserToDormitory', {
-        user: admin,
-        payload: {
-          userId: dormHead1.id,
-          dormitoryId: dorm1.id
-        }
-      })
-      
-      // Create student in dorm2
-      const student2 = await system.storage.create('User', {
-        name: '赵六',
-        email: 'zhaoliu@example.com',
-        role: 'student'
-      })
-      
-      await controller.callInteraction('AssignUserToDormitory', {
-        user: admin,
-        payload: {
-          userId: student2.id,
-          dormitoryId: dorm2.id
-        }
-      })
-      
-      // Create deduction rule
-      const ruleResult = await controller.callInteraction('CreateDeductionRule', {
-        user: admin,
-        payload: {
-          name: '晚归',
-          description: '晚上11点后回宿舍',
-          points: 5
-        }
-      })
-      
-      // Get the created rule from storage
-      const rule = await system.storage.findOne(
-        'DeductionRule',
-        MatchExp.atom({ key: 'name', value: ['=', '晚归'] }),
-        undefined,
-        ['id']
-      )
-      
-      // Try to deduct points from student in different dormitory
-      const result = await controller.callInteraction('DeductPoints', {
-        user: dormHead1,
-        payload: {
-          userId: student2.id,
-          ruleId: rule.id,
-          reason: '晚归'
-        }
-      })
-      
-      expect(result.error).toBeDefined()
-      expect((result.error as any).type).toBe('condition check failed')
-    })
-  })
-  
-  describe('Business Rule Tests', () => {
-    test('TC012: Create Dormitory with Invalid Capacity Fails', async () => {
-      const admin = await system.storage.create('User', {
-        name: 'Admin',
-        email: 'admin@example.com',
-        role: 'admin'
-      })
-      
-      // Try to create dormitory with capacity > 6
-      const result = await controller.callInteraction('CreateDormitory', {
-        user: admin,
-        payload: {
-          name: '北区1栋301',
-          capacity: 8
-        }
-      })
-      
-      expect(result.error).toBeDefined()
-      expect((result.error as any).type).toBe('condition check failed')
-      
-      // Verify no dormitory was created
-      const dormitories = await system.storage.find('Dormitory')
-      expect(dormitories).toHaveLength(0)
-    })
-    
-    test('TC013: Duplicate User Assignment to Dormitory Fails', async () => {
-      const admin = await system.storage.create('User', {
-        name: 'Admin',
-        email: 'admin@example.com',
-        role: 'admin'
-      })
-      
-      // Create two dormitories
-      const dorm1Result = await controller.callInteraction('CreateDormitory', {
-        user: admin,
-        payload: { name: '东区3栋201', capacity: 4 }
-      })
-      
-      const dorm1 = await system.storage.findOne(
-        'Dormitory',
-        MatchExp.atom({ key: 'name', value: ['=', '东区3栋201'] }),
-        undefined,
-        ['id']
-      )
-      
-      const dorm2Result = await controller.callInteraction('CreateDormitory', {
-        user: admin,
-        payload: { name: '西区2栋101', capacity: 4 }
-      })
-      
-      const dorm2 = await system.storage.findOne(
-        'Dormitory',
-        MatchExp.atom({ key: 'name', value: ['=', '西区2栋101'] }),
-        undefined,
-        ['id']
-      )
-      
-      // Create and assign user to first dormitory
-      const student = await system.storage.create('User', {
-        name: '王五',
-        email: 'wangwu@example.com',
-        role: 'student'
-      })
-      
-      await controller.callInteraction('AssignUserToDormitory', {
-        user: admin,
-        payload: {
-          userId: student.id,
-          dormitoryId: dorm1.id
-        }
-      })
-      
-      // Try to assign same user to second dormitory
-      const result = await controller.callInteraction('AssignUserToDormitory', {
-        user: admin,
-        payload: {
-          userId: student.id,
-          dormitoryId: dorm2.id
-        }
-      })
-      
-      expect(result.error).toBeDefined()
-      expect((result.error as any).type).toBe('condition check failed')
-    })
-    
-    test('TC015: Deduct Points Cannot Result in Negative Score', async () => {
-      const admin = await system.storage.create('User', {
-        name: 'Admin',
-        email: 'admin@example.com',
-        role: 'admin'
-      })
-      
-      const dormResult = await controller.callInteraction('CreateDormitory', {
-        user: admin,
-        payload: { name: '东区3栋201', capacity: 4 }
-      })
-      
-      const dorm = await system.storage.findOne(
-        'Dormitory',
-        MatchExp.atom({ key: 'name', value: ['=', '东区3栋201'] }),
-        undefined,
-        ['id']
-      )
-      
-      // Create dorm head
-      const dormHead = await system.storage.create('User', {
-        name: '张三',
-        email: 'zhangsan@example.com',
-        role: 'dormHead'
-      })
-      
-      await controller.callInteraction('AssignUserToDormitory', {
-        user: admin,
-        payload: {
-          userId: dormHead.id,
-          dormitoryId: dorm.id
-        }
-      })
-      
-      // Create student with low score
-      const student = await system.storage.create('User', {
-        name: '李四',
-        email: 'lisi@example.com',
-        role: 'student'
-        // Score will be 100 by default
-      })
-      
-      await controller.callInteraction('AssignUserToDormitory', {
-        user: admin,
-        payload: {
-          userId: student.id,
-          dormitoryId: dorm.id
-        }
-      })
-      
-      // First, create a rule for regular deductions to bring score down
-      const regularRuleResult = await controller.callInteraction('CreateDeductionRule', {
-        user: admin,
-        payload: {
-          name: '日常违规',
-          description: '一般违规行为',
-          points: 19
-        }
-      })
-      
-      const regularRule = await system.storage.findOne(
-        'DeductionRule',
-        MatchExp.atom({ key: 'name', value: ['=', '日常违规'] }),
-        undefined,
-        ['id']
-      )
-      
-      // Deduct points 5 times (19 * 5 = 95) to bring score to 5
-      for (let i = 0; i < 5; i++) {
-        await controller.callInteraction('DeductPoints', {
-          user: dormHead,
-          payload: {
-            userId: student.id,
-            ruleId: regularRule.id,
-            reason: `违规行为${i + 1}`
-          }
-        })
-      }
-      
-      // Create high-point deduction rule
-      const ruleResult = await controller.callInteraction('CreateDeductionRule', {
-        user: admin,
-        payload: {
-          name: '严重违规',
-          description: '严重违反宿舍规定',
-          points: 10
-        }
-      })
-      
-      const rule = await system.storage.findOne(
-        'DeductionRule',
-        MatchExp.atom({ key: 'name', value: ['=', '严重违规'] }),
-        undefined,
-        ['id']
-      )
-      
-      // Deduct points that would result in negative
-      const result = await controller.callInteraction('DeductPoints', {
-        user: dormHead,
-        payload: {
-          userId: student.id,
-          ruleId: rule.id,
-          reason: '严重违规行为'
-        }
-      })
-      
-      expect(result.error).toBeUndefined()
-      
-      // Check that score is 0, not negative
-      const updatedStudent = await system.storage.findOne(
-        'User',
-        MatchExp.atom({ key: 'id', value: ['=', student.id] }),
-        undefined,
-        ['id', 'score', ['deductionRecords', { attributeQuery: ['points'] }]]
-      )
-      
-      expect(updatedStudent.score).toBe(0)
-    })
-    
-    test('TC016: Cannot Request Removal for User with High Score', async () => {
-      const admin = await system.storage.create('User', {
-        name: 'Admin',
-        email: 'admin@example.com',
-        role: 'admin'
-      })
-      
-      const dormResult = await controller.callInteraction('CreateDormitory', {
-        user: admin,
-        payload: { name: '东区3栋201', capacity: 4 }
-      })
-      
-      const dorm = await system.storage.findOne(
-        'Dormitory',
-        MatchExp.atom({ key: 'name', value: ['=', '东区3栋201'] }),
-        undefined,
-        ['id']
-      )
-      
-      // Create dorm head
-      const dormHead = await system.storage.create('User', {
-        name: '张三',
-        email: 'zhangsan@example.com',
-        role: 'dormHead'
-      })
-      
-      await controller.callInteraction('AssignUserToDormitory', {
-        user: admin,
-        payload: {
-          userId: dormHead.id,
-          dormitoryId: dorm.id
-        }
-      })
-      
-      // Create student with high score
-      const student = await system.storage.create('User', {
-        name: '王五',
-        email: 'wangwu@example.com',
-        role: 'student',
-        score: 75 // Above 60
-      })
-      
-      await controller.callInteraction('AssignUserToDormitory', {
-        user: admin,
-        payload: {
-          userId: student.id,
-          dormitoryId: dorm.id
-        }
-      })
-      
-      // Try to request removal
-      const result = await controller.callInteraction('RequestUserRemoval', {
-        user: dormHead,
-        payload: {
-          userId: student.id,
-          reason: '想踢出'
-        }
-      })
-      
-      expect(result.error).toBeDefined()
-      expect((result.error as any).type).toBe('condition check failed')
-    })
-    
-    test('TC017: Cannot Assign User to Full Dormitory', async () => {
-      const admin = await system.storage.create('User', {
-        name: 'Admin',
-        email: 'admin@example.com',
-        role: 'admin'
-      })
-      
-      // Create small dormitory
-      const dormResult = await controller.callInteraction('CreateDormitory', {
-        user: admin,
-        payload: { name: '东区3栋201', capacity: 4 }
-      })
-      
-      const dorm = await system.storage.findOne(
-        'Dormitory',
-        MatchExp.atom({ key: 'name', value: ['=', '东区3栋201'] }),
-        undefined,
-        ['id']
-      )
-      
-      // Fill the dormitory
-      for (let i = 1; i <= 4; i++) {
+    describe('TC101: 非管理员创建宿舍权限测试', () => {
+      test('should deny non-admin user from creating dormitory', async () => {
+        // Create non-admin user
         const student = await system.storage.create('User', {
-          name: `学生${i}`,
-          email: `student${i}@example.com`,
+          name: 'Student',
+          email: 'student@example.com',
           role: 'student'
         })
+
+        // Attempt to create dormitory as student
+        const result = await controller.callInteraction('CreateDormitory', {
+          user: student,
+          payload: { name: '宿舍B', capacity: 4 }
+        })
+
+        // Should return permission error
+        expect(result.error).toBeDefined()
+        expect(result.error.type).toBe('condition check failed')
+
+        // Verify no dormitory was created
+        const dormitories = await system.storage.find('Dormitory', 
+          undefined, 
+          undefined, 
+          ['id', 'name']
+        )
         
+        expect(dormitories).toHaveLength(0)
+      })
+    })
+
+    describe('TC102: 非宿舍长记录违规权限测试', () => {
+      test('should deny non-dormHead user from recording violations', async () => {
+        // Create student user (not dormHead or admin)
+        const student = await system.storage.create('User', {
+          name: 'Student',
+          email: 'student@example.com',
+          role: 'student'
+        })
+
+        const anotherStudent = await system.storage.create('User', {
+          name: 'AnotherStudent',
+          email: 'another@example.com',
+          role: 'student'
+        })
+
+        // Create dormitory first (by admin)
+        const admin = await system.storage.create('User', {
+          name: 'Admin',
+          email: 'admin@example.com',
+          role: 'admin'
+        })
+
+        const dormitoryResult = await controller.callInteraction('CreateDormitory', {
+          user: admin,
+          payload: { name: '宿舍A', capacity: 4 }
+        })
+        const dormitoryId = dormitoryResult.effects?.[0]?.record?.id
+
+        // Attempt to record violation as student
+        const result = await controller.callInteraction('RecordViolation', {
+          user: student,
+          payload: {
+            targetUserId: anotherStudent.id,
+            dormitoryId: dormitoryId,
+            violationType: '晚归',
+            scoreDeduction: 5
+          }
+        })
+
+        // Should return permission error
+        expect(result.error).toBeDefined()
+        expect(result.error.type).toBe('condition check failed')
+
+        // Verify no violation record was created
+        const violations = await system.storage.find('ViolationRecord',
+          undefined,
+          undefined,
+          ['id']
+        )
+        
+        expect(violations).toHaveLength(0)
+      })
+    })
+
+    describe('TC103: 非管理员处理踢出申请权限测试', () => {
+      test('should deny non-admin user from processing kickout requests', async () => {
+        // Setup: Create admin, dormHead, and student
+        const admin = await system.storage.create('User', {
+          name: 'Admin',
+          email: 'admin@example.com',
+          role: 'admin'
+        })
+
+        const dormHead = await system.storage.create('User', {
+          name: 'DormHead',
+          email: 'dormhead@example.com',
+          role: 'dormHead'
+        })
+
+        const student = await system.storage.create('User', {
+          name: 'Student',
+          email: 'student@example.com',
+          role: 'student'
+        })
+
+        // Create dormitory and kickout request
+        const dormitoryResult = await controller.callInteraction('CreateDormitory', {
+          user: admin,
+          payload: { name: '宿舍A', capacity: 4 }
+        })
+        const dormitoryId = dormitoryResult.effects?.[0]?.record?.id
+
+        const requestResult = await controller.callInteraction('RequestKickout', {
+          user: dormHead,
+          payload: {
+            targetUserId: student.id,
+            dormitoryId: dormitoryId,
+            reason: '多次违规'
+          }
+        })
+        const requestId = requestResult.effects?.[0]?.record?.id
+
+        // Attempt to process request as dormHead (not admin)
+        const result = await controller.callInteraction('ProcessKickoutRequest', {
+          user: dormHead,
+          payload: {
+            requestId: requestId,
+            decision: 'approved'
+          }
+        })
+
+        // Should return permission error
+        expect(result.error).toBeDefined()
+        expect(result.error.type).toBe('condition check failed')
+
+        // Verify request status remains pending
+        const kickoutRequest = await system.storage.findOne('KickoutRequest',
+          MatchExp.atom({ key: 'id', value: ['=', requestId] }),
+          undefined,
+          ['status']
+        )
+        
+        expect(kickoutRequest).toBeDefined()
+        expect(kickoutRequest.status).toBe('pending')
+      })
+    })
+  })
+
+  describe('Business Rule Tests', () => {
+    
+    describe('TC201: 宿舍容量限制测试', () => {
+      test('should deny creating dormitory with invalid capacity', async () => {
+        // Create admin user
+        const admin = await system.storage.create('User', {
+          name: 'Admin',
+          email: 'admin@example.com',
+          role: 'admin'
+        })
+
+        // Attempt to create dormitory with capacity > 6
+        const result = await controller.callInteraction('CreateDormitory', {
+          user: admin,
+          payload: { name: '无效宿舍', capacity: 8 }
+        })
+
+        // Should return business rule violation error
+        expect(result.error).toBeDefined()
+        expect(result.error.type).toBe('condition check failed')
+
+        // Verify no dormitory with this name was created
+        const invalidDormitories = await system.storage.find('Dormitory',
+          MatchExp.atom({ key: 'name', value: ['=', '无效宿舍'] }),
+          undefined,
+          ['id', 'capacity']
+        )
+        
+        expect(invalidDormitories).toHaveLength(0)
+      })
+
+      test('should deny creating dormitory with capacity < 4', async () => {
+        // Create admin user
+        const admin = await system.storage.create('User', {
+          name: 'Admin',
+          email: 'admin@example.com',
+          role: 'admin'
+        })
+
+        // Attempt to create dormitory with capacity < 4
+        const result = await controller.callInteraction('CreateDormitory', {
+          user: admin,
+          payload: { name: '无效宿舍', capacity: 2 }
+        })
+
+        // Should return business rule violation error
+        expect(result.error).toBeDefined()
+        expect(result.error.type).toBe('condition check failed')
+
+        // Verify no dormitory with this name was created
+        const invalidDormitories = await system.storage.find('Dormitory',
+          MatchExp.atom({ key: 'name', value: ['=', '无效宿舍'] }),
+          undefined,
+          ['id', 'capacity']
+        )
+        
+        expect(invalidDormitories).toHaveLength(0)
+      })
+    })
+
+    describe('TC202: 重复床位分配测试', () => {
+      test('should deny assigning user to occupied bed', async () => {
+        // Setup: Create admin, dormitory, and students
+        const admin = await system.storage.create('User', {
+          name: 'Admin',
+          email: 'admin@example.com',
+          role: 'admin'
+        })
+
+        const dormitoryResult = await controller.callInteraction('CreateDormitory', {
+          user: admin,
+          payload: { name: '宿舍A', capacity: 4 }
+        })
+        const dormitoryId = dormitoryResult.effects?.[0]?.record?.id
+
+        const student1 = await system.storage.create('User', {
+          name: 'Student1',
+          email: 'student1@example.com',
+          role: 'student'
+        })
+
+        const student2 = await system.storage.create('User', {
+          name: 'Student2',
+          email: 'student2@example.com',
+          role: 'student'
+        })
+
+        // Assign first student to bed 1
+        const firstAssignResult = await controller.callInteraction('AssignUserToDormitory', {
+          user: admin,
+          payload: {
+            userId: student1.id,
+            dormitoryId: dormitoryId,
+            bedNumber: 1
+          }
+        })
+        
+        // Verify first assignment succeeded
+        expect(firstAssignResult.error).toBeUndefined()
+
+        // Attempt to assign second student to same bed 1
+        const result = await controller.callInteraction('AssignUserToDormitory', {
+          user: admin,
+          payload: {
+            userId: student2.id,
+            dormitoryId: dormitoryId,
+            bedNumber: 1
+          }
+        })
+
+        // Should return business rule violation error
+        expect(result.error).toBeDefined()
+        expect(result.error.type).toBe('condition check failed')
+
+        // Verify only one assignment exists
+        const assignments = await system.storage.find('DormitoryAssignment',
+          undefined,
+          undefined,
+          ['id', 'userId', 'bedNumber']
+        )
+        
+        expect(assignments).toHaveLength(1)
+        expect(Number(assignments[0].userId)).toBe(Number(student1.id))
+        expect(assignments[0].bedNumber).toBe(1)
+      })
+    })
+
+    describe('TC203: 超出宿舍容量分配测试', () => {
+      test('should deny assignment when dormitory is full', async () => {
+        // Setup: Create admin and dormitory with capacity 4
+        const admin = await system.storage.create('User', {
+          name: 'Admin',
+          email: 'admin@example.com',
+          role: 'admin'
+        })
+
+        const dormitoryResult = await controller.callInteraction('CreateDormitory', {
+          user: admin,
+          payload: { name: '宿舍A', capacity: 4 }
+        })
+        const dormitoryId = dormitoryResult.effects?.[0]?.record?.id
+
+        // Create 5 students
+        const students = []
+        for (let i = 1; i <= 5; i++) {
+          const student = await system.storage.create('User', {
+            name: `Student${i}`,
+            email: `student${i}@example.com`,
+            role: 'student'
+          })
+          students.push(student)
+        }
+
+        // Assign first 4 students to fill dormitory
+        for (let i = 0; i < 4; i++) {
+          const assignResult = await controller.callInteraction('AssignUserToDormitory', {
+            user: admin,
+            payload: {
+              userId: students[i].id,
+              dormitoryId: dormitoryId,
+              bedNumber: i + 1
+            }
+          })
+          expect(assignResult.error).toBeUndefined()
+        }
+
+        // Attempt to assign 5th student (should fail - dormitory full)
+        const result = await controller.callInteraction('AssignUserToDormitory', {
+          user: admin,
+          payload: {
+            userId: students[4].id,
+            dormitoryId: dormitoryId,
+            bedNumber: 5
+          }
+        })
+
+        // Should return business rule violation error
+        expect(result.error).toBeDefined()
+        expect(result.error.type).toBe('condition check failed')
+
+        // Verify only 4 assignments exist
+        const assignments = await system.storage.find('DormitoryAssignment',
+          undefined,
+          undefined,
+          ['id']
+        )
+        
+        expect(assignments).toHaveLength(4)
+      })
+    })
+
+    describe('TC204: 用户重复分配测试', () => {
+      test('should deny assigning user who is already assigned to another dormitory', async () => {
+        // Setup: Create admin and two dormitories
+        const admin = await system.storage.create('User', {
+          name: 'Admin',
+          email: 'admin@example.com',
+          role: 'admin'
+        })
+
+        const dormitory1Result = await controller.callInteraction('CreateDormitory', {
+          user: admin,
+          payload: { name: '宿舍A', capacity: 4 }
+        })
+        const dormitory1Id = dormitory1Result.effects?.[0]?.record?.id
+
+        const dormitory2Result = await controller.callInteraction('CreateDormitory', {
+          user: admin,
+          payload: { name: '宿舍B', capacity: 4 }
+        })
+        const dormitory2Id = dormitory2Result.effects?.[0]?.record?.id
+
+        const student = await system.storage.create('User', {
+          name: 'Student',
+          email: 'student@example.com',
+          role: 'student'
+        })
+
+        // Assign student to first dormitory
         await controller.callInteraction('AssignUserToDormitory', {
           user: admin,
           payload: {
             userId: student.id,
-            dormitoryId: dorm.id
+            dormitoryId: dormitory1Id,
+            bedNumber: 1
           }
         })
-      }
-      
-      // Try to add one more student
-      const extraStudent = await system.storage.create('User', {
-        name: '钱七',
-        email: 'qianqi@example.com',
-        role: 'student'
+
+        // Attempt to assign same student to second dormitory
+        const result = await controller.callInteraction('AssignUserToDormitory', {
+          user: admin,
+          payload: {
+            userId: student.id,
+            dormitoryId: dormitory2Id,
+            bedNumber: 1
+          }
+        })
+
+        // Should return business rule violation error
+        expect(result.error).toBeDefined()
+        expect(result.error.type).toBe('condition check failed')
+
+        // Verify only one assignment exists
+        const assignments = await system.storage.find('DormitoryAssignment',
+          undefined,
+          undefined,
+          ['id', 'dormitoryId']
+        )
+        
+        expect(assignments).toHaveLength(1)
+        expect(Number(assignments[0].dormitoryId)).toBe(Number(dormitory1Id))
       })
-      
-      const result = await controller.callInteraction('AssignUserToDormitory', {
-        user: admin,
-        payload: {
-          userId: extraStudent.id,
-          dormitoryId: dorm.id
-        }
-      })
-      
-      expect(result.error).toBeDefined()
-      expect((result.error as any).type).toBe('condition check failed')
     })
-    
-    test('TC018: Cannot Process Already Processed Removal Request', async () => {
+  })
+
+  describe('Valid Operations Tests', () => {
+    test('should allow admin to create dormitory with valid capacity', async () => {
       const admin = await system.storage.create('User', {
         name: 'Admin',
         email: 'admin@example.com',
         role: 'admin'
       })
-      
-      const dormResult = await controller.callInteraction('CreateDormitory', {
+
+      const result = await controller.callInteraction('CreateDormitory', {
         user: admin,
-        payload: { name: '东区3栋201', capacity: 4 }
+        payload: { name: '有效宿舍', capacity: 5 }
       })
+
+      expect(result.error).toBeUndefined()
       
-      const dorm = await system.storage.findOne(
-        'Dormitory',
-        MatchExp.atom({ key: 'name', value: ['=', '东区3栋201'] }),
+      // Find only dormitories with the specific name we just created
+      const dormitories = await system.storage.find('Dormitory',
+        MatchExp.atom({ key: 'name', value: ['=', '有效宿舍'] }),
         undefined,
-        ['id']
+        ['name', 'capacity']
       )
       
-      // Create dorm head and student
+      expect(dormitories).toHaveLength(1)
+      expect(dormitories[0].name).toBe('有效宿舍')
+      expect(dormitories[0].capacity).toBe(5)
+    })
+
+    test('should allow dormHead to record violations', async () => {
+      const admin = await system.storage.create('User', {
+        name: 'Admin',
+        email: 'admin@example.com',
+        role: 'admin'
+      })
+
       const dormHead = await system.storage.create('User', {
-        name: '张三',
-        email: 'zhangsan@example.com',
+        name: 'DormHead',
+        email: 'dormhead@example.com',
         role: 'dormHead'
       })
-      
+
       const student = await system.storage.create('User', {
-        name: '李四',
-        email: 'lisi@example.com',
+        name: 'Student',
+        email: 'student@example.com',
         role: 'student'
-        // Score will be 100 by default
       })
-      
-      await controller.callInteraction('AssignUserToDormitory', {
+
+      const dormitoryResult = await controller.callInteraction('CreateDormitory', {
         user: admin,
-        payload: {
-          userId: dormHead.id,
-          dormitoryId: dorm.id
-        }
+        payload: { name: '宿舍A', capacity: 4 }
       })
-      
-      await controller.callInteraction('AssignUserToDormitory', {
-        user: admin,
-        payload: {
-          userId: student.id,
-          dormitoryId: dorm.id
-        }
-      })
-      
-      // Create a deduction rule and deduct 50 points to bring score to 50
-      const ruleResult = await controller.callInteraction('CreateDeductionRule', {
-        user: admin,
-        payload: {
-          name: '违规',
-          description: '违反宿舍规定',
-          points: 50
-        }
-      })
-      
-      const rule = await system.storage.findOne(
-        'DeductionRule',
-        MatchExp.atom({ key: 'name', value: ['=', '违规'] }),
-        undefined,
-        ['id']
-      )
-      
-      await controller.callInteraction('DeductPoints', {
+      const dormitoryId = dormitoryResult.effects?.[0]?.record?.id
+
+      const result = await controller.callInteraction('RecordViolation', {
         user: dormHead,
         payload: {
-          userId: student.id,
-          ruleId: rule.id,
-          reason: '违规扣分'
+          targetUserId: student.id,
+          dormitoryId: dormitoryId,
+          violationType: '晚归',
+          scoreDeduction: 5
         }
       })
+
+      expect(result.error).toBeUndefined()
       
-      // Create removal request
-      const requestResult = await controller.callInteraction('RequestUserRemoval', {
-        user: dormHead,
-        payload: {
-          userId: student.id,
-          reason: '积分过低'
-        }
-      })
-      
-      // Get the created request from storage
-      const request = await system.storage.findOne(
-        'RemovalRequest',
-        MatchExp.atom({ key: 'reason', value: ['=', '积分过低'] }),
+      const violations = await system.storage.find('ViolationRecord',
         undefined,
-        ['id']
+        undefined,
+        ['violationType', 'scoreDeduction']
       )
       
-      // First approval should succeed
-      await controller.callInteraction('ApproveRemovalRequest', {
-        user: admin,
-        payload: {
-          requestId: { id: request.id }
-        }
-      })
-      
-      // Second approval should fail
-      const result = await controller.callInteraction('ApproveRemovalRequest', {
-        user: admin,
-        payload: {
-          requestId: { id: request.id }
-        }
-      })
-      
-      expect(result.error).toBeDefined()
-      expect((result.error as any).type).toBe('condition check failed')
+      expect(violations).toHaveLength(1)
+      expect(violations[0].violationType).toBe('晚归')
+      expect(violations[0].scoreDeduction).toBe(5)
     })
   })
-}) 
+})

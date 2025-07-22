@@ -108,7 +108,18 @@ Create `requirements/interaction-matrix.md` to ensure:
      })
      ```
 
+   **🛑 MANDATORY CHECKPOINT: Stage 1 Completion**
+   - **DO NOT proceed to Stage 2 until ALL Stage 1 tests pass**
+   - If tests fail, iterate and fix implementation until 100% pass rate
+   - Common issues to check:
+     - Entity relationships properly established
+     - Computed properties calculating correctly
+     - State machines transitioning as expected
+     - All CRUD operations functioning
+   - **Keep iterating Stage 1 until completely stable**
+
 2. **Stage 2 - Add Access Control and Business Rules**
+   - **ONLY start after Stage 1 is 100% complete and all tests pass**
    - Add condition for permission checks
    - Add condition for business rule validations
    - Implement complex validations and constraints
