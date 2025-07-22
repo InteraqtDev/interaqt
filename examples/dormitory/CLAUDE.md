@@ -94,6 +94,22 @@ Create `requirements/interaction-matrix.md` to ensure:
    - Only after Stage 1 is fully working
 
 
+### 🔴 Recommended: Single File Approach
+**To avoid complex circular references between files, it's recommended to generate all backend code in a single file:**
+
+- ✅ Define all entities, relations, interactions, and computations in one file
+- ✅ State nodes should be defined first, before entities that use them
+- ✅ This prevents circular dependency issues between separate entity/relation/computation files
+- ✅ Makes it easier to see all dependencies and ensure proper initialization order
+- ✅ Example structure: `backend/index.ts` containing all definitions
+
+**Benefits of single file approach:**
+- No circular imports between entity and computation files
+- Clear initialization order
+- Easier to maintain consistency
+- Simpler to debug issues
+
+
 ### 🔴 CRITICAL: Framework Has Complete CRUD Capabilities
 **The interaqt framework has COMPLETE capability for all CRUD operations (Create, Read, Update, Delete).**
 
