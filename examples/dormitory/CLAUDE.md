@@ -86,12 +86,40 @@ Create `requirements/interaction-matrix.md` to ensure:
    - Focus on entity relationships and computations
    - No permissions or business rules
    - Get all basic functionality working first
+   
+   **🔴 CRITICAL for Stage 1 Test Cases:**
+   - **ALWAYS use correct user roles and valid data** in test cases
+   - Even though permissions aren't enforced yet, create users with proper roles (admin, dormHead, student, etc.)
+   - Use realistic and valid data that complies with future business rules
+   - This ensures Stage 1 tests will continue to pass after Stage 2 implementation
+   - Example:
+     ```typescript
+     // ✅ CORRECT: Use proper role even in Stage 1
+     const admin = await system.storage.create('User', {
+       name: 'Admin',
+       email: 'admin@example.com',
+       role: 'admin'  // Specify correct role from the start
+     })
+     
+     // ✅ CORRECT: Use valid data that will pass future business rules
+     const result = await controller.callInteraction('CreateDormitory', {
+       user: admin,  // Use admin user, not just any user
+       payload: { name: 'Dorm A', capacity: 4 }  // Valid capacity (4-6)
+     })
+     ```
 
 2. **Stage 2 - Add Access Control and Business Rules**
    - Add condition for permission checks
    - Add condition for business rule validations
    - Implement complex validations and constraints
    - Only after Stage 1 is fully working
+   
+   **🔴 CRITICAL for Stage 2 Implementation:**
+   - **DO NOT modify Stage 1 test cases** - they should continue to pass
+   - **Write NEW test cases** specifically for permission and business rule validations
+   - Stage 1 tests verify core functionality works with valid inputs
+   - Stage 2 tests verify invalid inputs are properly rejected
+   - **Both test files should pass** after Stage 2 implementation
 
 
 ### 🔴 Recommended: Single File Approach
