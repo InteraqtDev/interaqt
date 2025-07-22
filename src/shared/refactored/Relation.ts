@@ -167,10 +167,10 @@ export class Relation implements RelationInstance {
       targetProperty: instance.targetProperty,
       isTargetReliance: instance.isTargetReliance,
       type: instance.type,
-      properties: instance.properties
+      properties: instance.properties,
+      computation: instance.computation,
+      name: instance.name
     };
-    if (instance.name !== undefined) args.name = instance.name;
-    if (instance.computation !== undefined) args.computation = instance.computation;
     
     return this.create(args);
   }

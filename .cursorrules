@@ -1,0 +1,53 @@
+# Cursor Rules for interaqt Project
+
+## CRITICAL: Project Name Convention
+The project name is **interaqt** (all lowercase), NOT:
+- ❌ interAQT
+- ❌ InterAQT
+- ❌ InterAqt
+- ❌ Interaqt
+- ✅ **interaqt** (correct)
+
+Always use lowercase "interaqt" when referring to:
+- The framework name
+- Package imports: `import { Entity } from 'interaqt'`
+- Documentation references
+- Comments and descriptions
+
+## Import Statements
+The correct import statement is:
+```typescript
+import { Entity, Property, Relation, ... } from 'interaqt'
+```
+
+NOT:
+- ❌ `from '@interaqt/runtime'`
+- ❌ `from 'InterAQT'`
+- ❌ `from 'interAQT'`
+
+## Key Concepts
+When working with interaqt code:
+1. **Entities** - Data models with properties and computations
+2. **Relations** - Connections between entities
+3. **Interactions** - The primary way to modify data
+4. **Computations** - Reactive components (Transform, StateMachine, Count, etc.)
+
+## Code Style
+- Use TypeScript strict mode
+- Use descriptive variable names
+
+## Testing
+- Use Vitest for testing
+- Test through Interactions, not direct storage operations
+- Always specify attributeQuery in storage.find/findOne operations
+- Use PGLiteDB for test database
+
+## Common Pitfalls to Avoid
+1. Don't manually specify entity IDs - let the framework generate them
+2. Transform can only create new entities/relations, not update existing ones
+3. Use StateMachine for property updates in response to interactions
+4. Always define state nodes before using them in StateMachine
+
+## Documentation References
+Key documentation files:
+- `/agentspace/knowledge/generator/` - Code generation guides

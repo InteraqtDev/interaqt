@@ -101,11 +101,11 @@ export class Entity implements EntityInstance {
   static stringify(instance: EntityInstance): string {
     const args: EntityCreateArgs = {
       name: instance.name,
-      properties: instance.properties
+      properties: instance.properties,
+      computation: instance.computation,
+      sourceEntity: instance.sourceEntity,
+      filterCondition: instance.filterCondition
     };
-    if (instance.computation !== undefined) args.computation = instance.computation;
-    if (instance.sourceEntity !== undefined) args.sourceEntity = instance.sourceEntity;
-    if (instance.filterCondition !== undefined) args.filterCondition = instance.filterCondition;
     
     const data: SerializedData<EntityCreateArgs> = {
       type: 'Entity',
@@ -119,11 +119,11 @@ export class Entity implements EntityInstance {
   static clone(instance: EntityInstance, deep: boolean): EntityInstance {
     const args: EntityCreateArgs = {
       name: instance.name,
-      properties: instance.properties
+      properties: [...instance.properties],
+      computation: instance.computation,
+      sourceEntity: instance.sourceEntity,
+      filterCondition: instance.filterCondition
     };
-    if (instance.computation !== undefined) args.computation = instance.computation;
-    if (instance.sourceEntity !== undefined) args.sourceEntity = instance.sourceEntity;
-    if (instance.filterCondition !== undefined) args.filterCondition = instance.filterCondition;
     
     return this.create(args);
   }

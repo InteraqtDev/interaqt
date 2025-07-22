@@ -11,7 +11,7 @@ import {
     SystemLogger,
     SystemLogType
 } from "./System.js";
-import { createClass, Property, EntityInstance, RelationInstance } from "@shared";
+import { createClass, Property, EntityInstance, RelationInstance, Entity, Relation } from "@shared";
 import {
     DBSetup,
     EntityQueryHandle,
@@ -179,7 +179,35 @@ export class MonoSystem implements System {
         this.storage = new MonoStorage(db)
     }
     
-    setup(entities: EntityInstance[], relations: RelationInstance[], states: ComputationState[], install = false){
+    setup(originalEntities: EntityInstance[], originalRelations: RelationInstance[], states: ComputationState[], install = false){
+        const originalEntityToClonedEntity = new Map<EntityInstance, EntityInstance>()
+        const entities = originalEntities.map(entity => {
+            const clonedEntity = Entity.clone(entity, true)
+            originalEntityToClonedEntity.set(entity, clonedEntity)
+            return clonedEntity
+        })
+        const originalRelationToClonedRelation = new Map<RelationInstance, RelationInstance>()
+        const relations = originalRelations.map(relation => {
+            const clonedRelation = Relation.clone(relation, true)
+            originalRelationToClonedRelation.set(relation, clonedRelation)
+            return clonedRelation
+        })
+        
+        // FIXME 如果后续增加 filtered relation，那么也要修正。
+        for(let entity of entities) {
+            if (entity.sourceEntity) {
+                entity.sourceEntity = originalEntityToClonedEntity.get(entity.sourceEntity as EntityInstance)!
+            }
+        }
+        for(let relation of relations) {
+            if (relation.source) {
+                relation.source = originalEntityToClonedEntity.get(relation.source as EntityInstance) || originalRelationToClonedRelation.get(relation.source as RelationInstance)!
+            }
+            if (relation.target) {
+                relation.target = originalEntityToClonedEntity.get(relation.target as EntityInstance) || originalRelationToClonedRelation.get(relation.target as RelationInstance)!
+            }
+        }
+        
         states.forEach(({dataContext, state}) => {
             Object.entries(state).forEach(([stateName, stateItem]) => {
                 if (stateItem instanceof RecordBoundState) { 
@@ -202,6 +230,7 @@ export class MonoSystem implements System {
                 }
             })
         })
+
         
         // Pass the prepared entities to storage.setup
         return this.storage.setup(
