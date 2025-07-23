@@ -84,17 +84,24 @@ const DormitoryNotFull = Condition.create({
     const { dormitoryId } = event.payload;
     if (!dormitoryId) return false;
     
+    // Get dormitory capacity
     const dormitory = await this.system.storage.findOne('Dormitory',
       MatchExp.atom({ key: 'id', value: ['=', dormitoryId] }),
       undefined,
-      ['capacity', 'currentOccupancy']
+      ['capacity']
     );
     
     if (!dormitory) return false;
     
-    // Handle case where currentOccupancy might be undefined/null (treat as 0)
-    const occupancy = dormitory.currentOccupancy || 0;
-    return occupancy < dormitory.capacity;
+    // Count current assignments directly from DormitoryAssignment table
+    const assignments = await this.system.storage.find('DormitoryAssignment',
+      MatchExp.atom({ key: 'dormitoryId', value: ['=', dormitoryId] }),
+      undefined,
+      ['id']
+    );
+    
+    const currentOccupancy = assignments.length;
+    return currentOccupancy < dormitory.capacity;
   }
 });
 
@@ -313,7 +320,8 @@ Dormitory.properties.push(
     type: 'number',
     defaultValue: () => 0,
     computation: Count.create({
-      record: UserDormitoryRelation
+      record: UserDormitoryRelation,
+      direction: 'target'
     })
   })
 );

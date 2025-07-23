@@ -221,5 +221,135 @@ describe('Transform computed handle', () => {
     expect(summaries4[0].product).toBe('Product B');
   });
   
+  test('should transform one record to multiple records', async () => {
+    // Create source entity
+    const productEntity = Entity.create({
+      name: 'Product',
+      properties: [
+        Property.create({name: 'name', type: 'string'}),
+        Property.create({name: 'basePrice', type: 'number'}),
+        Property.create({name: 'category', type: 'string'})
+      ]
+    });
+    
+    // Create target entity for price tiers
+    const priceTierEntity = Entity.create({
+      name: 'PriceTier',
+      properties: [
+        Property.create({name: 'productName', type: 'string'}),
+        Property.create({name: 'tierName', type: 'string'}),
+        Property.create({name: 'price', type: 'number'}),
+        Property.create({name: 'description', type: 'string'})
+      ],
+      computation: Transform.create({
+        record: productEntity,
+        attributeQuery: ['name', 'basePrice', 'category'],
+        callback: (product: any) => {
+          // Transform one product into multiple price tiers
+          return [
+            {
+              productName: product.name,
+              tierName: 'Budget',
+              price: product.basePrice * 0.8,
+              description: `Budget tier for ${product.name}`
+            },
+            {
+              productName: product.name,
+              tierName: 'Standard',
+              price: product.basePrice,
+              description: `Standard tier for ${product.name}`
+            },
+            {
+              productName: product.name,
+              tierName: 'Premium',
+              price: product.basePrice * 1.5,
+              description: `Premium tier for ${product.name}`
+            }
+          ];
+        }
+      })
+    });
+    
+    const entities = [productEntity, priceTierEntity];
+    
+    // Setup system and controller
+    const system = new MonoSystem();
+    system.conceptClass = KlassByName;
+    const controller = new Controller({
+        system: system,
+        entities: entities,
+        relations: [],
+        activities: [],
+        interactions: []
+    });
+    await controller.setup(true);
+    
+    // Initial check - should be empty
+    const initialTiers = await system.storage.find('PriceTier');
+    expect(initialTiers).toEqual([]);
+    
+    // Create a product
+    const product1 = await system.storage.create('Product', {
+      name: 'Laptop Pro',
+      basePrice: 1000,
+      category: 'Electronics'
+    });
+    
+    // Check price tiers - should have 3 tiers for the product
+    const tiers1 = await system.storage.find('PriceTier', undefined, undefined, ['*']);
+    expect(tiers1).toHaveLength(3);
+    
+    // Verify each tier
+    const budgetTier = tiers1.find((tier: any) => tier.tierName === 'Budget');
+    expect(budgetTier).toBeDefined();
+    expect(budgetTier.productName).toBe('Laptop Pro');
+    expect(budgetTier.price).toBe(800); // 1000 * 0.8
+    expect(budgetTier.description).toBe('Budget tier for Laptop Pro');
+    
+    const standardTier = tiers1.find((tier: any) => tier.tierName === 'Standard');
+    expect(standardTier).toBeDefined();
+    expect(standardTier.price).toBe(1000);
+    
+    const premiumTier = tiers1.find((tier: any) => tier.tierName === 'Premium');
+    expect(premiumTier).toBeDefined();
+    expect(premiumTier.price).toBe(1500); // 1000 * 1.5
+    
+    // Create another product
+    const product2 = await system.storage.create('Product', {
+      name: 'Mouse',
+      basePrice: 50,
+      category: 'Accessories'
+    });
+    
+    // Check price tiers - should now have 6 tiers total (3 per product)
+    const tiers2 = await system.storage.find('PriceTier', undefined, undefined, ['*']);
+    expect(tiers2).toHaveLength(6);
+    
+    // Verify mouse tiers exist
+    const mouseTiers = tiers2.filter((tier: any) => tier.productName === 'Mouse');
+    expect(mouseTiers).toHaveLength(3);
+    expect(mouseTiers.some((tier: any) => tier.tierName === 'Budget' && tier.price === 40)).toBe(true);
+    expect(mouseTiers.some((tier: any) => tier.tierName === 'Standard' && tier.price === 50)).toBe(true);
+    expect(mouseTiers.some((tier: any) => tier.tierName === 'Premium' && tier.price === 75)).toBe(true);
+    
+    // Update product price
+    await system.storage.update('Product', BoolExp.atom({key: 'id', value: ['=', product1.id]}), {basePrice: 1200});
+    
+    // Check that tiers are updated
+    const tiers3 = await system.storage.find('PriceTier', undefined, undefined, ['*']);
+    const updatedLaptopTiers = tiers3.filter((tier: any) => tier.productName === 'Laptop Pro');
+    expect(updatedLaptopTiers.find((tier: any) => tier.tierName === 'Budget').price).toBe(960); // 1200 * 0.8
+    expect(updatedLaptopTiers.find((tier: any) => tier.tierName === 'Standard').price).toBe(1200);
+    expect(updatedLaptopTiers.find((tier: any) => tier.tierName === 'Premium').price).toBe(1800); // 1200 * 1.5
+    
+    // Delete a product
+    await system.storage.delete('Product', BoolExp.atom({key: 'id', value: ['=', product2.id]}));
+    
+    // Check that related tiers are removed
+    const tiers4 = await system.storage.find('PriceTier', undefined, undefined, ['*']);
+    expect(tiers4).toHaveLength(3); // Only laptop tiers remain
+    expect(tiers4.every((tier: any) => tier.productName === 'Laptop Pro')).toBe(true);
+  });
+  
   
 }); 

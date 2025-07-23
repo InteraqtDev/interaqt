@@ -29,6 +29,7 @@ export class RecordsTransformHandle implements DataBasedComputation {
     createState() {
         return {
             sourceRecordId: new RecordBoundState<any>(''),
+            transformIndex: new RecordBoundState<number>(0)
         }
     }
     
@@ -37,75 +38,96 @@ export class RecordsTransformHandle implements DataBasedComputation {
     }
 
     async compute({main: records}: {main: any[]}): Promise<any[]> {
-        return Promise.all(records.map(async (record) => {
-            return {
-                ...await this.transformCallback.call(this.controller, record),
-                [this.state.sourceRecordId.key]: record.id
-            }
-        }));
+        const result: ComputationResultPatch[]  = []
+        for (const record of records) {
+            const returnRecord = await this.transformCallback.call(this.controller, record)
+            const transformedRecords = Array.isArray(returnRecord) ? returnRecord : [returnRecord]
+            transformedRecords.forEach((transformedRecord, index)=> {
+                result.push({
+                    ...transformedRecord,
+                    [this.state.sourceRecordId.key]: record.id,
+                    [this.state.transformIndex.key]: index
+                })
+            })
+            
+        }
+        return result
     }
 
     async incrementalPatchCompute(lastValue: any[], mutationEvent: EtityMutationEvent): Promise<ComputationResultPatch | ComputationResultPatch[]|undefined> {
         const dataContext = this.dataContext as EntityDataContext
-        
+        const results: ComputationResultPatch[] = []
         if (mutationEvent.type === 'create') {
             const matchSourceRecord = MatchExp.atom({key: 'id', value: ['=', mutationEvent.record!.id]})
             const souceDataDep = this.dataDeps.main as RecordsDataDep
             const sourceRecord = await this.controller.system.storage.findOne(souceDataDep.source.name!, matchSourceRecord, undefined, souceDataDep.attributeQuery)
-            const transformedRecord = await this.transformCallback.call(this.controller, sourceRecord)
-            // 允许返回 Null，表示不插入
-            if(transformedRecord) {
-                return {
-                    type:'insert',
-                    data: {
-                        ...transformedRecord,
-                        [this.state.sourceRecordId.key]: mutationEvent.record!.id
-                    }
+            const returnRecord = await this.transformCallback.call(this.controller, sourceRecord)
+            const transformedRecords = Array.isArray(returnRecord) ? returnRecord : [returnRecord]
+            transformedRecords.forEach((transformedRecord, index) => {
+                // 允许返回 Null，表示不插入
+                if(transformedRecord) {
+                    results.push({
+                        type:'insert',
+                        data: {
+                            ...transformedRecord,
+                            [this.state.sourceRecordId.key]: mutationEvent.record!.id,
+                            [this.state.transformIndex.key]: index
+                        }
+                    })
                 }
-            }
-        } else if (mutationEvent.type === 'update'||mutationEvent.type === 'delete') {
+            })
+        } else {
+            // update or delete
             const sourceRecordId = mutationEvent.oldRecord?.id ?? mutationEvent.record!.id
             const match = MatchExp.atom({key: this.state.sourceRecordId.key, value: ['=', sourceRecordId]})
-            const mappedRecord = await this.controller.system.storage.findOne(dataContext.id.name!, match, undefined, ['*'])
-            if (mutationEvent.type === 'delete') {
-                if (mappedRecord) {
-                    return {
-                        type:'delete',
-                        affectedId: mappedRecord.id
-                    }
-                }
-            } else {
+            const mappedRecords = await this.controller.system.storage.find(dataContext.id.name!, match, undefined, ['*'])
+            
+
+            const mappedRecordsByIndex = mappedRecords.reduce((acc, record) => {
+                acc[record[this.state.transformIndex.key]] = record
+                return acc
+            }, {} as Record<number, any>)
+            
+            let transformedRecords: any[] = []
+            if (mutationEvent.type === 'update') {
                 const matchSourceRecord = MatchExp.atom({key: 'id', value: ['=', sourceRecordId]})
                 const sourceRecord = await this.controller.system.storage.findOne((this.dataDeps.main as RecordsDataDep).source.name!, matchSourceRecord, undefined, (this.dataDeps.main as RecordsDataDep).attributeQuery)
-                const transformedRecord = await this.transformCallback.call(this.controller, sourceRecord)
+                const returnRecord = await this.transformCallback.call(this.controller, sourceRecord)
+                transformedRecords = Array.isArray(returnRecord) ? returnRecord : [returnRecord]
+            }
+            transformedRecords.forEach((transformedRecord, index) => {
                 if (transformedRecord) {
-                    const data = {
-                        ...transformedRecord,
-                        [this.state.sourceRecordId.key]: sourceRecordId
-                    }
-                    if (mappedRecord) {
-                        return {
+                    if(mappedRecordsByIndex[index]) {
+                        results.push({
                             type:'update',
-                            data,
-                            affectedId: mappedRecord.id     
-                        }
+                            data: {
+                                ...transformedRecord,
+                                [this.state.sourceRecordId.key]: sourceRecordId,
+                                [this.state.transformIndex.key]: index
+                            },
+                            affectedId: mappedRecordsByIndex[index].id
+                        })
+                        delete mappedRecordsByIndex[index]
                     } else {
-                        return {
+                        results.push({
                             type:'insert',
-                            data,
-                        }
-                    }
-                } else {
-                    if( mappedRecord) {
-                        return {
-                            type:'delete',
-                            affectedId: mappedRecord.id
-                        }
+                            data: {
+                                ...transformedRecord,
+                                [this.state.sourceRecordId.key]: sourceRecordId,
+                                [this.state.transformIndex.key]: index
+                            }
+                        })
                     }
                 }
-            }
+            })      
+            Object.values(mappedRecordsByIndex).forEach((mappedRecord: any  ) => {
+                results.push({
+                    type:'delete',
+                    affectedId: mappedRecord.id
+                })
+            })
         }
-        
+        return results
     }
 }
 

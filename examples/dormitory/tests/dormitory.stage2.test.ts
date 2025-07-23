@@ -58,7 +58,7 @@ describe('Stage 2: Permission and Business Rule Tests', () => {
 
         // Should return permission error
         expect(result.error).toBeDefined()
-        expect(result.error.type).toBe('condition check failed')
+        expect((result.error as any).type).toBe('condition check failed')
 
         // Verify no dormitory was created
         const dormitories = await system.storage.find('Dormitory', 
@@ -112,7 +112,7 @@ describe('Stage 2: Permission and Business Rule Tests', () => {
 
         // Should return permission error
         expect(result.error).toBeDefined()
-        expect(result.error.type).toBe('condition check failed')
+        expect((result.error as any).type).toBe('condition check failed')
 
         // Verify no violation record was created
         const violations = await system.storage.find('ViolationRecord',
@@ -174,7 +174,7 @@ describe('Stage 2: Permission and Business Rule Tests', () => {
 
         // Should return permission error
         expect(result.error).toBeDefined()
-        expect(result.error.type).toBe('condition check failed')
+        expect((result.error as any).type).toBe('condition check failed')
 
         // Verify request status remains pending
         const kickoutRequest = await system.storage.findOne('KickoutRequest',
@@ -208,7 +208,7 @@ describe('Stage 2: Permission and Business Rule Tests', () => {
 
         // Should return business rule violation error
         expect(result.error).toBeDefined()
-        expect(result.error.type).toBe('condition check failed')
+        expect((result.error as any).type).toBe('condition check failed')
 
         // Verify no dormitory with this name was created
         const invalidDormitories = await system.storage.find('Dormitory',
@@ -236,7 +236,7 @@ describe('Stage 2: Permission and Business Rule Tests', () => {
 
         // Should return business rule violation error
         expect(result.error).toBeDefined()
-        expect(result.error.type).toBe('condition check failed')
+        expect((result.error as any).type).toBe('condition check failed')
 
         // Verify no dormitory with this name was created
         const invalidDormitories = await system.storage.find('Dormitory',
@@ -301,7 +301,7 @@ describe('Stage 2: Permission and Business Rule Tests', () => {
 
         // Should return business rule violation error
         expect(result.error).toBeDefined()
-        expect(result.error.type).toBe('condition check failed')
+        expect((result.error as any).type).toBe('condition check failed')
 
         // Verify only one assignment exists
         const assignments = await system.storage.find('DormitoryAssignment',
@@ -367,7 +367,7 @@ describe('Stage 2: Permission and Business Rule Tests', () => {
 
         // Should return business rule violation error
         expect(result.error).toBeDefined()
-        expect(result.error.type).toBe('condition check failed')
+        expect((result.error as any).type).toBe('condition check failed')
 
         // Verify only 4 assignments exist
         const assignments = await system.storage.find('DormitoryAssignment',
@@ -429,7 +429,7 @@ describe('Stage 2: Permission and Business Rule Tests', () => {
 
         // Should return business rule violation error
         expect(result.error).toBeDefined()
-        expect(result.error.type).toBe('condition check failed')
+        expect((result.error as any).type).toBe('condition check failed')
 
         // Verify only one assignment exists
         const assignments = await system.storage.find('DormitoryAssignment',
