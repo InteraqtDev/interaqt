@@ -231,13 +231,29 @@ Common issues that can be avoided by reading the API reference:
 - [ ] Ensure TypeScript type checking passes by using `npm run check`
 
 ### 2.3 Computation Implementation
-**📖 MUST READ: `./agentspace/knowledge/generator/computation-implementation.md`**
+**📖 PRIMARY GUIDE: `./agentspace/knowledge/generator/computation-selection-guide.md`**
+**📖 REFERENCE ONLY: `./agentspace/knowledge/generator/computation-implementation.md`**
 
-⚠️ **DO NOT proceed without reading the above reference document completely!**
+⚠️ **CRITICAL: You MUST strictly follow the systematic process in `computation-selection-guide.md`!**
 
-- [ ] Apply reactive programming concepts
-- [ ] Use interaqt Computations to describe entities, relations, and properties according to specific definitions
+**🔴 MANDATORY PROCESS:**
+1. **FIRST**: Read and understand `computation-selection-guide.md` completely
+2. **ANALYZE**: For EVERY entity and EVERY property, follow the step-by-step analysis process
+3. **DOCUMENT**: Create `docs/computation-analysis.md` documenting your analysis for each entity/property
+4. **IMPLEMENT**: Only after completing the analysis, implement computations based on your documented decisions
+5. **REFERENCE**: Use `computation-implementation.md` as a reference for syntax and examples
+
+**Key Steps from computation-selection-guide.md:**
+- [ ] Create analysis document at `docs/computation-analysis.md`
+- [ ] Analyze each entity systematically (creation source, update requirements, deletion strategy)
+- [ ] Analyze each property individually (type, purpose, data source, update frequency)
+- [ ] Select appropriate computation type based on decision trees
+- [ ] Document reasoning for each computation decision
+- [ ] Implement computations according to your analysis
+- [ ] Validate against the implementation checklist
 - [ ] Ensure TypeScript type checking passes
+
+**Remember**: The systematic analysis process ensures you select the RIGHT computation type for each use case. Don't skip the analysis phase!
 
 ### 2.4 Initial Test Implementation
 **📖 MUST READ: `./agentspace/knowledge/generator/test-implementation.md`**

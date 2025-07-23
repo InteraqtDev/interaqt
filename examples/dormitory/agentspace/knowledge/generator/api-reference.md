@@ -504,6 +504,12 @@ Create custom transformation computation.
 
 Transform is fundamentally about **transforming data from one collection to another collection**. It transforms sets of data (e.g., InteractionEventEntity → Entity/Relation, Entity → different Entity). Transform **cannot** be used for property computations within the same entity - use `getValue` for that purpose.
 
+**Important: One-to-Many Transformations**
+Transform callbacks can return either:
+- A single object → creates one record
+- An array of objects → creates multiple records from a single source
+- `null` or `undefined` → creates no records
+
 **Syntax**
 ```typescript
 Transform.create(config: TransformConfig): TransformInstance
@@ -514,6 +520,15 @@ Transform.create(config: TransformConfig): TransformInstance
 - `config.callback` (function, required): Transformation function that converts source data to target data
 - `config.attributeQuery` (AttributeQueryData, required): Attribute query configuration
 
+
+**Key Points**
+
+1. **Return Types**:
+   - Single object: Creates one target record
+   - Array of objects: Creates multiple target records from one source
+   - `null`/`undefined`: Creates no records (useful for filtering)
+
+2. **Automatic Updates**: When source records are updated or deleted, the transformed records are automatically updated or removed
 
 ### StateMachine.create()
 

@@ -90,12 +90,27 @@ Transform converts one collection (source) into another collection (target). Und
    - Source: InteractionEventEntity collection (all interaction events)
    - Target: Entity/Relation collection being created
 
-2. **Callback Returns Single Item**: The callback returns data for ONE item in the new collection
+2. **Callback Can Return One or Multiple Items**: The callback can return:
+   - A single object → creates one record
+   - An array of objects → creates multiple records from one source
+   - `null`/`undefined` → creates no records
+   
    ```typescript
    callback: function(event) {
      // event is ONE item from InteractionEventEntity collection
-     // return is ONE item for target Entity collection
+     
+     // Option 1: Return single item
      return { /* single entity data */ };
+     
+     // Option 2: Return multiple items
+     return [
+       { /* first entity data */ },
+       { /* second entity data */ },
+       { /* third entity data */ }
+     ];
+     
+     // Option 3: Return nothing (filter out)
+     return null;
    }
    ```
 
@@ -131,7 +146,7 @@ Transform converts one collection (source) into another collection (target). Und
    }
    ```
 
-Remember: Transform is a **mapping function** that converts each matching source item into a new target item. The framework handles ID generation, storage, and relationship management.
+Remember: Transform is a **mapping function** that converts each matching source item into one or more target items (or none). The framework handles ID generation, storage, and relationship management.
 
 #### 🔴 CRITICAL: InteractionEventEntity Transform Limitations
 
