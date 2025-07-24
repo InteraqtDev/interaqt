@@ -95,6 +95,280 @@ For EACH relation, determine:
 1. Is the relation created when the entity is created? → No computation needed
 2. Is the relation created later between existing entities? → Transform in Relation.computation
 
+## Step 2.5: Relation-Level Decision Tree
+
+For EACH relation in your system, you MUST analyze its complete lifecycle:
+
+### 🔴 CRITICAL: Relation Lifecycle Analysis
+
+Before deciding on computation type, answer ALL these questions:
+
+```markdown
+### Relation Analysis Template
+- **Purpose**: [What does this relation represent?]
+- **Creation**: [How/when is it created? With entity creation or separately?]
+- **Deletion Requirements**: [Can it be deleted? When? By what interactions?]
+- **Update Requirements**: [Do any properties need updates? When?]
+- **Computation Decision**: [Transform/StateMachine/None]
+- **Reasoning**: [Why this computation type?]
+```
+
+### Relation Creation Decision Tree
+
+```mermaid
+graph TD
+    A[How is relation created?] --> B{Created with entity?}
+    B -->|Yes| C{Ever needs deletion?}
+    B -->|No| D{Connects existing entities?}
+    
+    C -->|No| E[No computation needed]
+    C -->|Yes| F{Business needs soft delete?}
+    
+    D -->|Yes| G{Needs deletion/updates?}
+    G -->|No| H[Use Transform in Relation.computation]
+    G -->|Yes| I{Business needs soft delete?}
+    
+    F -->|Yes| J[Transform + status property with StateMachine]
+    F -->|No| K[No computation<br/>Hard delete handled by framework]
+    
+    I -->|Yes| L[Transform + status property with StateMachine]
+    I -->|No| M[StateMachine only]
+```
+
+### 🔴 Key Principle: Transform Can ONLY Create
+
+**Remember**: Transform with InteractionEventEntity can ONLY create new records. It CANNOT:
+- ❌ Update existing relations
+- ❌ Delete relations
+- ❌ Change relation properties
+
+If you need to delete or update relations, you have these options:
+
+**For Deletion:**
+1. **Hard Delete (Default)**: Use StateMachine to directly delete the relation record
+2. **Soft Delete (When Needed)**: Add a status property with StateMachine to mark as inactive
+
+**Choose based on business requirements:**
+- Use hard delete when you don't need audit trails or recovery
+- Use soft delete when you need to maintain history or allow restoration
+
+### Pattern 1: Relations Created with Entity (Most Common)
+
+When relations are created automatically with entity creation:
+
+```typescript
+// Entity creation automatically creates relation
+const Article = Entity.create({
+  name: 'Article',
+  computation: Transform.create({
+    record: InteractionEventEntity,
+    callback: (event) => {
+      if (event.interactionName === 'CreateArticle') {
+        return {
+          title: event.payload.title,
+          author: event.user  // ← Relation created automatically!
+        };
+      }
+    }
+  })
+});
+
+// Relation definition - usually no computation needed
+const UserArticleRelation = Relation.create({
+  source: User,
+  target: Article,
+  type: 'n:1'
+  // No computation - created with Article
+});
+```
+
+### Pattern 2: Relations Between Existing Entities
+
+When connecting already existing entities (likes, follows, assignments):
+
+```typescript
+// For relations that NEVER need deletion (rare)
+const UserFollowRelation = Relation.create({
+  source: User,
+  target: User,
+  type: 'n:n',
+  computation: Transform.create({
+    record: InteractionEventEntity,
+    callback: (event) => {
+      if (event.interactionName === 'FollowUser') {
+        return {
+          source: event.user,
+          target: { id: event.payload.targetUserId }
+        };
+      }
+    }
+  })
+});
+```
+
+### Pattern 3: Relations with Lifecycle
+
+When relations can be created AND deleted, choose between hard delete (no history) or soft delete (with audit trail):
+
+#### Option A: Hard Delete with StateMachine Only (Default Approach)
+
+Use when you don't need deletion history:
+
+```typescript
+// Example: User likes post (can like/unlike without history)
+const existsState = StateNode.create({
+  name: 'exists',
+  computeValue: () => ({}) // Relation exists
+});
+
+const deletedState = StateNode.create({
+  name: 'deleted', 
+  computeValue: () => null // Returning null deletes the relation
+});
+
+const UserPostLikeRelation = Relation.create({
+  source: User,
+  target: Post,
+  type: 'n:n',
+  properties: [
+    Property.create({
+      name: 'likedAt',
+      type: 'number',
+      defaultValue: () => Date.now()
+    })
+  ],
+  computation: StateMachine.create({
+    states: [existsState, deletedState],
+    defaultState: deletedState,
+    transfers: [
+      // Create relation
+      StateTransfer.create({
+        trigger: LikePost,
+        current: deletedState,
+        next: existsState,
+        computeTarget: (event) => ({
+          source: event.user,
+          target: { id: event.payload.postId }
+        })
+      }),
+      // Delete relation (hard delete)
+      StateTransfer.create({
+        trigger: UnlikePost,
+        current: existsState,
+        next: deletedState,
+        computeTarget: async function(this: Controller, event) {
+          // Find the existing relation to delete
+          const relation = await this.system.storage.findOne(
+            'UserPostLike',
+            MatchExp.atom({
+              key: 'source.id',
+              value: ['=', event.user.id]
+            }).and(MatchExp.atom({
+              key: 'target.id', 
+              value: ['=', event.payload.postId]
+            })),
+            undefined,
+            ['*']
+          );
+          return relation; // Return the relation to transition to deleted state
+        }
+      })
+    ]
+  })
+});
+```
+
+**Key Points for Hard Delete:**
+- Use StateMachine as the relation's computation (no Transform needed)
+- `computeValue: () => null` triggers actual deletion
+- Both creation and deletion are handled by StateTransfers
+- No status property needed
+
+#### Option B: Soft Delete with Transform + Status StateMachine (When Audit Trail Needed)
+
+Use when you need to maintain deletion history:
+
+```typescript
+// Example: User-Dormitory assignment with soft delete
+const activeState = StateNode.create({ name: 'active' });
+const inactiveState = StateNode.create({ name: 'inactive' });
+
+const UserDormitoryRelation = Relation.create({
+  source: User,
+  target: Dormitory,
+  type: 'n:1',
+  properties: [
+    Property.create({ 
+      name: 'status', 
+      type: 'string',
+      defaultValue: () => 'active',
+      computation: StateMachine.create({
+        states: [activeState, inactiveState],
+        defaultState: activeState,
+        transfers: [
+          StateTransfer.create({
+            trigger: ExpelUserInteraction,
+            current: activeState,
+            next: inactiveState,
+            computeTarget: (event) => ({
+              source: { id: event.payload.userId },
+              target: { id: event.payload.dormitoryId }
+            })
+          })
+        ]
+      })
+    }),
+    Property.create({
+      name: 'assignedAt',
+      type: 'number',
+      defaultValue: () => Date.now()
+    })
+  ],
+  computation: Transform.create({
+    record: InteractionEventEntity,
+    callback: (event) => {
+      if (event.interactionName === 'AssignUserToDormitory') {
+        return {
+          source: { id: event.payload.userId },
+          target: { id: event.payload.dormitoryId },
+          status: 'active',
+          assignedAt: Date.now()
+        };
+      }
+    }
+  })
+});
+```
+
+### Common Relation Scenarios
+
+| Scenario | Creation | Deletion | Pattern to Use |
+|----------|----------|----------|----------------|
+| Article author | With Article | Never | No computation |
+| User likes post | Via interaction | Via unlike (no history needed) | StateMachine only (hard delete) |
+| Order items | With Order | With Order | No computation |
+| Friend request | Via interaction | Via unfriend (show history) | Transform + status StateMachine |
+| User follows user | Via interaction | Via unfollow (no history) | StateMachine only (hard delete) |
+| Role assignment | Via interaction | Via role change (audit needed) | Transform + status StateMachine |
+
+### 🔴 Critical Questions for Every Relation
+
+1. **Will this relation EVER need to be deleted?**
+   - If no → Simple Transform suffices (Pattern 2)
+   - If yes → Continue to question 2
+
+2. **What business events affect this relation?**
+   - List all interactions that might change/delete it
+   - Each deletion interaction needs proper handling
+
+3. **Do you need deletion history/audit trail?**
+   - If no → Use hard delete with StateMachine only (Pattern 3A)
+   - If yes → Use soft delete with Transform + status StateMachine (Pattern 3B)
+
+4. **For soft delete only: How to handle inactive relations?**
+   - Always filter by status='active' in queries
+   - Consider creating filtered relations for active-only views
+
 ## Step 3: Property-Level Decision Tree
 
 For EACH property in EACH entity, follow this systematic analysis:
@@ -536,6 +810,10 @@ Before finalizing, answer these questions:
 4. **ALWAYS declare StateNodes before use** - Not inside transfers
 5. **ALWAYS provide defaultValue** - For all computed properties
 6. **ALWAYS document your reasoning** - Future developers need to understand
+7. **ALWAYS analyze relation lifecycle** - Consider creation, updates, AND deletion
+8. **Transform can ONLY create** - If relations need deletion, use StateMachine or status field
+9. **Think about business events** - What events might cause relation changes?
+10. **Choose deletion strategy based on needs** - Use hard delete by default, soft delete when audit trail is required
 
 ## Example Complete Analysis
 
@@ -651,8 +929,11 @@ Here's an example of what a complete analysis might look like for a task managem
 ### Relation Analysis
 - **Purpose**: Links projects to their tasks
 - **Creation**: Automatic when task created with project reference
+- **Deletion Requirements**: Hard delete when task is deleted; soft delete when task is archived
+- **Update Requirements**: No property updates needed
+- **State Management**: No explicit state needed (follows task lifecycle)
 - **Computation Decision**: None
-- **Reasoning**: Created automatically via entity reference
+- **Reasoning**: Created automatically via entity reference when Task is created; deleted when Task is deleted
 
 ## Dictionary: SystemMetrics
 
