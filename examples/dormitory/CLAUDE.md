@@ -78,6 +78,14 @@ Create `requirements/interaction-matrix.md` to ensure:
 
 ## Phase 2: Code Generation
 
+### 🔴 Document-First Approach
+**NEW: Phase 2 now follows a document-first approach:**
+1. **Steps 2.1-2.3**: Create design documents ONLY (no code)
+2. **Step 2.4**: Generate all code based on the design documents
+3. **Steps 2.5-2.8**: Test and enhance the implementation
+
+This ensures consistent design decisions across all components before any code is written.
+
 ### 🔴 Progressive Implementation Approach
 **CRITICAL: Follow a progressive implementation strategy:**
 
@@ -206,31 +214,143 @@ Common issues that can be avoided by reading the API reference:
 - Wrong property usage (e.g., `symmetric` doesn't exist in Relation.create)
 - Incorrect computation placement (e.g., Transform cannot be used in Property computation)
 
-### 2.1 Entity and Relation Generation
+### 2.1 Entity and Relation Analysis
 **📖 MUST READ: `./agentspace/knowledge/generator/entity-relation-generation.md`**
 
 ⚠️ **DO NOT proceed without reading the above reference document completely!**
 
-- [ ] Generate all entities from use cases
-- [ ] Define entity properties
-- [ ] Generate all relations from use cases
-- [ ] Define relation properties
-- [ ] Ensure TypeScript type checking passes
+**Create `docs/entity-relation-design.md` documenting:**
 
-### 2.2 Basic Interaction Generation
+- [ ] All entities identified from use cases
+- [ ] Each entity's properties with types and purposes
+- [ ] All relations between entities
+- [ ] Relation properties and cardinality (1:1, 1:n, n:n)
+- [ ] Document the business meaning of each entity and relation
+- [ ] Include data flow diagrams if helpful
+
+**🔴 CRITICAL: Entity Property Design Rules**
+- **NEVER include reference ID fields in entity properties!**
+  - ❌ WRONG: User entity with `dormitoryId` property
+  - ❌ WRONG: Article entity with `authorId` property
+  - ✅ CORRECT: Define these as Relations instead
+- **Relationships are defined through Relation definitions ONLY**
+- **The property name to access related entities is defined in the Relation**
+  - Example: `UserDormitoryRelation` might create `user.dormitory` and `dormitory.users`
+- **Entity properties should only contain:**
+  - Primitive values (string, number, boolean)
+  - Computed values based on the entity itself
+  - Embedded data structures (objects/arrays) that are part of the entity
+- **All inter-entity connections MUST use Relations**
+
+**Example structure:**
+```markdown
+# Entity and Relation Design
+
+## Entities
+
+### User
+- **Purpose**: System users with different roles
+- **Properties**:
+  - id: string (system-generated)
+  - name: string (user's display name)
+  - email: string (unique identifier)
+  - role: string (admin/dormHead/student)
+
+### Dormitory
+- **Purpose**: Dormitory buildings
+- **Properties**:
+  - id: string
+  - name: string
+  - capacity: number (4-6 beds)
+  
+❌ **Common Mistake to Avoid:**
+```typescript
+// WRONG: Don't add ID references as properties
+const User = Entity.create({
+  properties: [
+    Property.create({ name: 'dormitoryId', type: 'string' }), // ❌ NO!
+    Property.create({ name: 'supervisorId', type: 'string' })  // ❌ NO!
+  ]
+})
+
+// CORRECT: Use Relations instead
+const UserDormitoryRelation = Relation.create({
+  source: User,
+  target: Dormitory,
+  sourceProperty: 'dormitory',  // Creates user.dormitory
+  targetProperty: 'users',      // Creates dormitory.users
+  type: 'n:1'
+})
+```
+
+## Relations
+
+### UserDormitoryRelation
+- **Type**: n:1 (many users to one dormitory)
+- **Purpose**: Assigns students to dormitories
+- **Source Property**: `dormitory` (on User entity)
+- **Target Property**: `users` (on Dormitory entity)
+- **Properties**: 
+  - assignedAt: number (timestamp)
+  - status: string (active/inactive)
+
+Note: The relation creates `user.dormitory` to access the assigned dormitory and `dormitory.users` to access all users in that dormitory. No ID fields are needed in the entities.
+```
+
+### 2.2 Interaction Analysis
 **📖 MUST READ: `./agentspace/knowledge/generator/basic-interaction-generation.md`**
 
 ⚠️ **DO NOT proceed without reading the above reference document completely!**
 
-- [ ] Generate all interactions from use cases
-- [ ] Start with simple payload-only interactions. No condition initially
-- [ ] **IMPORTANT**: Focus ONLY on core business logic, DO NOT implement:
+**Create `docs/interaction-design.md` documenting:**
+
+- [ ] All interactions identified from use cases
+- [ ] For each interaction:
+  - Name and purpose
+  - Required payload fields
+  - Which entities/relations it affects
+  - Expected outcomes
+  - Permission requirements (for Stage 2)
+  - Business rules (for Stage 2)
+- [ ] **IMPORTANT**: Design interactions for core business logic first:
+  - Basic CRUD operations
+  - State transitions
+  - Relationship management
+- [ ] **Document but don't implement yet**:
   - Permission checks (role-based access control)
   - Business rule validations (e.g., quantity limits, state checks, time restrictions)
   - Complex data validations beyond basic field requirements
-- [ ] Ensure TypeScript type checking passes by using `npm run check`
 
-### 2.3 Computation Implementation
+**Example structure:**
+```markdown
+# Interaction Design
+
+## CreateDormitory
+- **Purpose**: Create a new dormitory
+- **Payload**:
+  - name: string (required)
+  - capacity: number (required, 4-6)
+- **Effects**:
+  - Creates new Dormitory entity
+  - Initializes with empty beds
+- **Stage 2 - Permissions**: Only admin can create
+- **Stage 2 - Business Rules**: Capacity must be 4-6
+
+## AssignUserToDormitory
+- **Purpose**: Assign a student to a dormitory
+- **Payload**:
+  - userId: string
+  - dormitoryId: string
+- **Effects**:
+  - Creates UserDormitoryRelation
+  - Updates dormitory occupancy count
+- **Stage 2 - Permissions**: Admin or dormHead of target dormitory
+- **Stage 2 - Business Rules**: 
+  - User must not already be assigned
+  - Dormitory must have available capacity
+```
+
+### 2.3 Computation Analysis
 **📖 PRIMARY GUIDE: `./agentspace/knowledge/generator/computation-selection-guide.md`**
 **📖 REFERENCE ONLY: `./agentspace/knowledge/generator/computation-implementation.md`**
 
@@ -238,24 +358,66 @@ Common issues that can be avoided by reading the API reference:
 
 **🔴 MANDATORY PROCESS:**
 1. **FIRST**: Read and understand `computation-selection-guide.md` completely
-2. **ANALYZE**: For EVERY entity and EVERY property, follow the step-by-step analysis process
-3. **DOCUMENT**: Create `docs/computation-analysis.md` documenting your analysis for each entity/property
-4. **IMPLEMENT**: Only after completing the analysis, implement computations based on your documented decisions
+2. **USE PREVIOUS OUTPUTS**: Base your analysis on:
+   - `docs/entity-relation-design.md` (from step 2.1)
+   - `docs/interaction-design.md` (from step 2.2)
+3. **ANALYZE**: For EVERY entity and EVERY property, follow the step-by-step analysis process
+4. **DOCUMENT**: Create `docs/computation-analysis.md` documenting your analysis for each entity/property
 5. **REFERENCE**: Use `computation-implementation.md` as a reference for syntax and examples
 
 **Key Steps from computation-selection-guide.md:**
 - [ ] Create analysis document at `docs/computation-analysis.md`
 - [ ] Analyze each entity systematically (creation source, update requirements, deletion strategy)
 - [ ] Analyze each property individually (type, purpose, data source, update frequency)
+- [ ] Analyze each relation's complete lifecycle (creation, updates, deletion)
 - [ ] Select appropriate computation type based on decision trees
 - [ ] Document reasoning for each computation decision
-- [ ] Implement computations according to your analysis
-- [ ] Validate against the implementation checklist
-- [ ] Ensure TypeScript type checking passes
+- [ ] Follow the relation decision algorithm EXACTLY for relations
 
-**Remember**: The systematic analysis process ensures you select the RIGHT computation type for each use case. Don't skip the analysis phase!
+**Remember**: The systematic analysis process ensures you select the RIGHT computation type for each use case. This analysis will guide your implementation in the next step!
 
-### 2.4 Initial Test Implementation
+### 2.4 Code Generation and Implementation
+**Based on the analysis documents created in steps 2.1-2.3, now implement the actual code.**
+
+#### 2.4.1 Entity and Relation Implementation
+- [ ] Generate all entities based on `docs/entity-relation-design.md`
+- [ ] Define entity properties with correct types
+  - **Remember: NO reference ID fields in entities!**
+  - Only primitive values and entity-specific data
+- [ ] Generate all relations with proper cardinality
+  - Relations define how entities connect
+  - Relations create the property names for accessing related entities
+- [ ] Define relation properties
+- [ ] Add placeholder computations (will be implemented next)
+
+#### 2.4.2 Interaction Implementation
+- [ ] Generate all interactions based on `docs/interaction-design.md`
+- [ ] Start with simple payload-only interactions (no conditions initially)
+- [ ] Focus ONLY on Stage 1 - core business logic
+- [ ] Ensure all payloads match the documented fields
+
+#### 2.4.3 Computation Implementation
+- [ ] Implement computations based on `docs/computation-analysis.md`
+- [ ] For each entity computation decision, implement the selected type
+- [ ] For each property computation decision, implement the selected type
+- [ ] For each relation computation decision, implement the selected type
+- [ ] Ensure StateNodes are declared before use
+- [ ] Verify no Transform is used in Property computation
+- [ ] Check for circular dependencies
+
+#### 2.4.4 TypeScript Verification
+- [ ] Run `npm run check` to ensure TypeScript compilation passes
+- [ ] Fix any type errors
+- [ ] Ensure all imports are correct
+
+**🔴 Implementation Checklist:**
+- [ ] All entities from design document are implemented
+- [ ] All relations from design document are implemented
+- [ ] All interactions from design document are implemented
+- [ ] All computations match the analysis decisions
+- [ ] Code compiles without errors
+
+### 2.5 Initial Test Implementation
 **📖 MUST READ: `./agentspace/knowledge/generator/test-implementation.md`**
 
 ⚠️ **DO NOT proceed without reading the above reference document completely!**
@@ -273,7 +435,7 @@ Common issues that can be avoided by reading the API reference:
   - Complex validation scenarios
 - [ ] Ensure all tests pass
 
-### 2.5 Permission and Business Rules Implementation
+### 2.6 Permission and Business Rules Implementation
 **📖 MUST READ: `./agentspace/knowledge/generator/permission-implementation.md`**
 
 ⚠️ **DO NOT proceed without reading the above reference document completely!**
@@ -295,7 +457,7 @@ Common issues that can be avoided by reading the API reference:
   - **Balance checks**: e.g., "Cannot withdraw more than account balance"
 - [ ] Ensure TypeScript type checking passes
 
-### 2.6 Permission and Business Rules Test Implementation
+### 2.7 Permission and Business Rules Test Implementation
 **📖 MUST READ: `./agentspace/knowledge/generator/permission-test-implementation.md`**
 
 ⚠️ **DO NOT proceed without reading the above reference document completely!**
@@ -318,7 +480,7 @@ Since permissions and business rules are now unified in the `condition` API, the
 - Testing both permission failures and business rule violations to ensure proper error handling
 - Documenting expected error scenarios for each Interaction
 
-### 2.7 Complete CRUD Test Example
+### 2.8 Complete CRUD Test Example
 **📖 Reference: `./tests/crud.example.test.ts`**
 
 For a comprehensive example of CRUD operations with the interaqt framework, refer to the complete test file `./tests/crud.example.test.ts`. This example demonstrates:

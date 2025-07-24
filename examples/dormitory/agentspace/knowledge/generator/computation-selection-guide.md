@@ -99,41 +99,43 @@ For EACH relation, determine:
 
 For EACH relation in your system, you MUST analyze its complete lifecycle:
 
-### 🔴 CRITICAL: Relation Lifecycle Analysis
+IF a relation needs deletion → Transform alone is NEVER sufficient!
+- Transform can ONLY create, NEVER delete
+- If you identify ANY deletion requirement, you CANNOT use Transform alone
+```
 
-Before deciding on computation type, answer ALL these questions:
 
+### 🚫 COMMON MISTAKE TO AVOID
+
+**WRONG Analysis:**
 ```markdown
-### Relation Analysis Template
-- **Purpose**: [What does this relation represent?]
-- **Creation**: [How/when is it created? With entity creation or separately?]
-- **Deletion Requirements**: [Can it be deleted? When? By what interactions?]
-- **Update Requirements**: [Do any properties need updates? When?]
-- **Computation Decision**: [Transform/StateMachine/None]
-- **Reasoning**: [Why this computation type?]
+- **Deletion Requirements**: Can be deleted when user is expelled
+- **Computation Decision**: Transform ❌ WRONG!
+- **Reasoning**: Relations created via interaction between existing entities
 ```
 
-### Relation Creation Decision Tree
+**Why This Is Wrong:**
+- You identified deletion is needed: "Can be deleted when user is expelled"
+- But you chose Transform, which CANNOT delete!
+- The reasoning ignored the deletion requirement completely
 
-```mermaid
-graph TD
-    A[How is relation created?] --> B{Created with entity?}
-    B -->|Yes| C{Ever needs deletion?}
-    B -->|No| D{Connects existing entities?}
-    
-    C -->|No| E[No computation needed]
-    C -->|Yes| F{Business needs soft delete?}
-    
-    D -->|Yes| G{Needs deletion/updates?}
-    G -->|No| H[Use Transform in Relation.computation]
-    G -->|Yes| I{Business needs soft delete?}
-    
-    F -->|Yes| J[Transform + status property with StateMachine]
-    F -->|No| K[No computation<br/>Hard delete handled by framework]
-    
-    I -->|Yes| L[Transform + status property with StateMachine]
-    I -->|No| M[StateMachine only]
+**CORRECT Analysis:**
+```markdown
+- **Deletion Requirements**: Can be deleted when user is expelled
+- **Computation Decision**: StateMachine only (or Transform + status if audit needed)
+- **Reasoning**: Relations need deletion capability, Transform alone cannot delete
 ```
+
+### 📋 Quick Reference Examples
+
+| Deletion Requirements | Computation Decision | Why |
+|----------------------|---------------------|------|
+| "Never deleted" | Transform (if created via interaction) | Transform can handle creation-only scenarios |
+| "Can be deleted when..." | StateMachine only | Need deletion capability |
+| "Deleted when user expelled" | StateMachine only | Need deletion capability |
+| "Removed on reassignment" | StateMachine only | Need deletion capability |
+| "Deleted (audit trail needed)" | Transform + status StateMachine | Soft delete pattern |
+
 
 ### 🔴 Key Principle: Transform Can ONLY Create
 
