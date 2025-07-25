@@ -55,6 +55,8 @@ Before implementing ANY computations, create a document at `docs/computation-ana
 - **Update Frequency**: [Never/On specific interactions/Real-time]
 - **Computation Decision**: [Selected computation type]
 - **Reasoning**: [Why this computation was chosen]
+- **Dependencies**: [If computation needed: List all required data - entities, relations, properties, interactions]
+- **Calculation Method**: [If computation needed: Brief description of how the value is calculated]
 
 [Repeat for each property]
 
@@ -62,8 +64,25 @@ Before implementing ANY computations, create a document at `docs/computation-ana
 - **Type**: [Transform/None]
 - **Source**: [InteractionEventEntity/Other entity/etc]
 - **Reasoning**: [Why this computation was chosen]
+- **Dependencies**: [If computation needed: List trigger events and required data]
+- **Calculation Method**: [If computation needed: When and how entities are created]
 
 [Repeat for each entity]
+
+## Relation: [RelationName]
+
+### Relation Analysis
+- **Purpose**: [What this relation represents]
+- **Creation**: [When/how the relation is created]
+- **Deletion Requirements**: [Never/Hard delete when.../Soft delete when...]
+- **Update Requirements**: [What properties might need updates]
+- **State Management**: [If status field needed, describe states]
+- **Computation Decision**: [Transform/StateMachine/None]
+- **Reasoning**: [Why this computation was chosen]
+- **Dependencies**: [If computation needed: Interactions, entities, existing records]
+- **Calculation Method**: [If computation needed: When created, how state changes]
+
+[Repeat for each relation]
 ```
 
 ## Step 2: Entity-Level Decision Tree
@@ -737,6 +756,8 @@ For EACH entity, document your analysis:
 - **Update Frequency**: On specific interactions (PayOrder, ShipOrder, DeliverOrder, CancelOrder)
 - **Computation Decision**: StateMachine
 - **Reasoning**: Has defined states (pending, paid, shipped, delivered, cancelled) with clear transitions
+- **Dependencies**: Interactions: PayOrder, ShipOrder, DeliverOrder, CancelOrder; Current status value
+- **Calculation Method**: State transitions triggered by interactions - pending→paid (PayOrder), paid→shipped (ShipOrder), shipped→delivered (DeliverOrder), any→cancelled (CancelOrder)
 
 #### Property: totalAmount
 - **Type**: number
@@ -745,6 +766,8 @@ For EACH entity, document your analysis:
 - **Update Frequency**: When items added/removed/updated
 - **Computation Decision**: WeightedSummation
 - **Reasoning**: Need to calculate quantity × price for each item
+- **Dependencies**: OrderItemRelation (direction: source), Item entity (price, quantity properties)
+- **Calculation Method**: Sum of (item.price × item.quantity) for all related OrderItems
 
 #### Property: itemCount
 - **Type**: number
@@ -753,6 +776,8 @@ For EACH entity, document your analysis:
 - **Update Frequency**: Automatic when items added/removed
 - **Computation Decision**: Count
 - **Reasoning**: Direct count of related OrderItem entities
+- **Dependencies**: OrderItemRelation (direction: source)
+- **Calculation Method**: Count all OrderItemRelation records where this Order is the source
 
 #### Property: updatedAt
 - **Type**: number
@@ -761,11 +786,41 @@ For EACH entity, document your analysis:
 - **Update Frequency**: On any change
 - **Computation Decision**: StateMachine with computeValue
 - **Reasoning**: Updates to current timestamp on any state change
+- **Dependencies**: All order-modifying interactions (UpdateOrder, PayOrder, ShipOrder, etc.)
+- **Calculation Method**: Set to Date.now() whenever any state transition occurs
 
 ### Entity Computation Decision
 - **Type**: Transform
 - **Source**: InteractionEventEntity
 - **Reasoning**: Orders are created via CreateOrder interaction
+- **Dependencies**: CreateOrder interaction event, user context, payload data
+- **Calculation Method**: When CreateOrder interaction fires, create new Order entity with data from event.payload
+
+## Relation: UserOrderRelation
+
+### Relation Analysis
+- **Purpose**: Links users to their orders (order history)
+- **Creation**: Created automatically when Order is created
+- **Deletion Requirements**: Never deleted (maintain order history)
+- **Update Requirements**: No property updates needed
+- **State Management**: No status needed
+- **Computation Decision**: None
+- **Reasoning**: Created as part of Order creation via entity reference
+- **Dependencies**: N/A (created with Order entity)
+- **Calculation Method**: N/A (automatic with Order creation)
+
+## Relation: OrderFavoriteRelation
+
+### Relation Analysis
+- **Purpose**: Users can favorite orders for quick reorder
+- **Creation**: Via user interaction on existing orders
+- **Deletion Requirements**: Hard delete when user unfavorites
+- **Update Requirements**: No property updates
+- **State Management**: No status (existence = favorited)
+- **Computation Decision**: StateMachine
+- **Reasoning**: Need both creation and deletion capability
+- **Dependencies**: FavoriteOrder and UnfavoriteOrder interactions, existing User and Order entities
+- **Calculation Method**: Create relation on FavoriteOrder interaction, delete (hard) on UnfavoriteOrder interaction
 
 ## Dictionary: DailyOrderStats
 
@@ -776,6 +831,8 @@ For EACH entity, document your analysis:
 - **Update Frequency**: Real-time as orders change
 - **Computation Decision**: Custom
 - **Reasoning**: Complex aggregation requiring multiple calculations (count by status, total revenue, average order value)
+- **Dependencies**: All Order entities, Order status property, Order totalAmount property
+- **Calculation Method**: Aggregate all orders - group by status for counts, sum totalAmount for revenue, calculate average order value as revenue/count
 ```
 
 ## Step 6: Implementation Checklist
@@ -786,6 +843,8 @@ After analysis, implement computations following this checklist:
 - [ ] All properties analyzed and documented
 - [ ] Entity-level Transforms defined where needed
 - [ ] Property computations implemented according to analysis
+- [ ] Dependencies documented for all computations
+- [ ] Calculation methods documented for all computations
 - [ ] StateNode variables declared before use
 - [ ] No Transform used in Property computation
 - [ ] No circular dependencies
@@ -799,10 +858,11 @@ Before finalizing, answer these questions:
 1. **Have you analyzed EVERY property of EVERY entity?**
 2. **Is your reasoning documented for EACH computation choice?**
 3. **Did you consider simpler computations before Complex/Custom?**
-4. **Are all StateNodes declared before use?**
-5. **Are all Transforms in Entity/Relation computation only?**
-6. **Have you avoided circular dependencies?**
-7. **Is the analysis document complete and saved?**
+4. **Are all dependencies clearly listed for each computation?**
+5. **Are calculation methods described for each computation?**
+6. **Are all StateNodes declared before use?**
+7. **Are all Transforms in Entity/Relation computation only?**
+9. **Is the analysis document complete and saved?**
 
 ## 🔴 CRITICAL REMINDERS
 
@@ -812,10 +872,12 @@ Before finalizing, answer these questions:
 4. **ALWAYS declare StateNodes before use** - Not inside transfers
 5. **ALWAYS provide defaultValue** - For all computed properties
 6. **ALWAYS document your reasoning** - Future developers need to understand
-7. **ALWAYS analyze relation lifecycle** - Consider creation, updates, AND deletion
-8. **Transform can ONLY create** - If relations need deletion, use StateMachine or status field
-9. **Think about business events** - What events might cause relation changes?
-10. **Choose deletion strategy based on needs** - Use hard delete by default, soft delete when audit trail is required
+7. **ALWAYS document dependencies** - List all data sources each computation needs
+8. **ALWAYS describe calculation methods** - Explain how values are computed
+9. **ALWAYS analyze relation lifecycle** - Consider creation, updates, AND deletion
+10. **Transform can ONLY create** - If relations need deletion, use StateMachine or status field
+11. **Think about business events** - What events might cause relation changes?
+12. **Choose deletion strategy based on needs** - Use hard delete by default, soft delete when audit trail is required
 
 ## Example Complete Analysis
 
@@ -849,6 +911,8 @@ Here's an example of what a complete analysis might look like for a task managem
 - **Update Frequency**: Automatic when tasks created/deleted
 - **Computation Decision**: Count
 - **Reasoning**: Direct count of relations
+- **Dependencies**: ProjectTaskRelation (direction: source)
+- **Calculation Method**: Count all ProjectTaskRelation records where this Project is the source
 
 #### Property: completionRate
 - **Type**: number
@@ -857,6 +921,8 @@ Here's an example of what a complete analysis might look like for a task managem
 - **Update Frequency**: When any task status changes
 - **Computation Decision**: Custom
 - **Reasoning**: Requires percentage calculation (completed/total), not a simple count
+- **Dependencies**: ProjectTaskRelation, Task entities (status property)
+- **Calculation Method**: (Count of tasks with status='completed' / Total task count) × 100
 
 #### Property: isCompleted
 - **Type**: boolean
@@ -865,11 +931,15 @@ Here's an example of what a complete analysis might look like for a task managem
 - **Update Frequency**: When any task status changes
 - **Computation Decision**: Every
 - **Reasoning**: Returns true only if every task is completed
+- **Dependencies**: ProjectTaskRelation, Task entities (status property)
+- **Calculation Method**: Check if every related Task has status === 'completed'
 
 ### Entity Computation Decision
 - **Type**: Transform
 - **Source**: InteractionEventEntity
 - **Reasoning**: Projects created via CreateProject interaction
+- **Dependencies**: CreateProject interaction event, payload data
+- **Calculation Method**: When CreateProject fires, create new Project with name and description from payload
 
 ## Entity: Task
 
@@ -888,6 +958,8 @@ Here's an example of what a complete analysis might look like for a task managem
 - **Update Frequency**: Via UpdateTaskStatus interaction
 - **Computation Decision**: StateMachine
 - **Reasoning**: Has defined states (todo, in_progress, review, completed)
+- **Dependencies**: UpdateTaskStatus interaction, current status value
+- **Calculation Method**: State transitions: todo→in_progress→review→completed, with possible back-transitions
 
 #### Property: timeSpent
 - **Type**: number
@@ -896,6 +968,8 @@ Here's an example of what a complete analysis might look like for a task managem
 - **Update Frequency**: When time entries added
 - **Computation Decision**: Summation
 - **Reasoning**: Simple sum of TimeEntry durations
+- **Dependencies**: TaskTimeEntryRelation (direction: source), TimeEntry entity (duration property)
+- **Calculation Method**: Sum of all related TimeEntry.duration values
 
 #### Property: isOverdue
 - **Type**: boolean
@@ -904,6 +978,8 @@ Here's an example of what a complete analysis might look like for a task managem
 - **Update Frequency**: Time-based check
 - **Computation Decision**: RealTime
 - **Reasoning**: Depends on current time, needs periodic recomputation
+- **Dependencies**: Current task deadline property, system time
+- **Calculation Method**: Compare current time (now) with task deadline, return now > deadline
 - **Implementation Note**: Uses RealTime with Inequality return type:
   ```typescript
   computation: RealTime.create({
@@ -925,6 +1001,8 @@ Here's an example of what a complete analysis might look like for a task managem
 - **Type**: Transform
 - **Source**: InteractionEventEntity
 - **Reasoning**: Tasks created via CreateTask interaction
+- **Dependencies**: CreateTask interaction event, project reference, payload data
+- **Calculation Method**: When CreateTask fires, create new Task with project reference and initial status='todo'
 
 ## Relation: ProjectTaskRelation
 
@@ -936,6 +1014,8 @@ Here's an example of what a complete analysis might look like for a task managem
 - **State Management**: No explicit state needed (follows task lifecycle)
 - **Computation Decision**: None
 - **Reasoning**: Created automatically via entity reference when Task is created; deleted when Task is deleted
+- **Dependencies**: N/A (no computation needed)
+- **Calculation Method**: N/A (no computation needed)
 
 ## Dictionary: SystemMetrics
 
@@ -945,6 +1025,8 @@ Here's an example of what a complete analysis might look like for a task managem
 - **Update Frequency**: Real-time as tasks change
 - **Computation Decision**: Custom
 - **Reasoning**: Complex aggregations (avg completion time, tasks by status, overdue count)
+- **Dependencies**: All Task entities (status, createdAt, completedAt properties), current time
+- **Calculation Method**: Aggregate all tasks - group by status, calculate average (completedAt - createdAt) for completed tasks, count tasks where deadline < now
 ```
 
 ## Example Analysis Output

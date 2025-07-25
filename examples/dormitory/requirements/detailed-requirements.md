@@ -1,202 +1,200 @@
-# Detailed Requirements Analysis - Dormitory Management System
+# 宿舍管理系统详细需求分析
 
-## Overview
-This document provides a comprehensive analysis of the dormitory management system requirements from both data and interaction perspectives.
+## 1. 需求背景分析
+本系统是一个宿舍管理系统，主要用于管理宿舍的分配、用户行为监督和违规处理流程。
 
-## Data Perspective Analysis
+## 2. 数据视角分析
 
-### Entities
+### 2.1 实体识别
+1. **User（用户）**
+   - 目的：系统中的所有用户，包含管理员、宿舍长、普通学生
+   - 属性：
+     - id: string（系统生成的唯一标识）
+     - name: string（用户姓名）
+     - email: string（邮箱，用于唯一标识）
+     - role: string（角色类型：admin、dormHead、student）
+     - score: number（当前扣分值，默认0）
 
-#### 1. User
-- **Purpose**: Represents all system users including admins, dormitory heads, and regular students
-- **Properties**:
-  - id: string (system-generated)
-  - name: string (user's display name)
-  - email: string (unique identifier for login)
-  - role: string ('admin' | 'dormHead' | 'student')
-  - points: number (behavior points, default: 100)
-  - status: string ('active' | 'kickedOut', default: 'active')
+2. **Dormitory（宿舍）**
+   - 目的：宿舍信息管理
+   - 属性：
+     - id: string（宿舍唯一标识）
+     - name: string（宿舍名称，如"1号楼101"）
+     - capacity: number（床位容量，4-6个）
+     - currentOccupancy: number（当前入住人数，计算属性）
 
-#### 2. Dormitory
-- **Purpose**: Represents dormitory buildings/rooms
-- **Properties**:
-  - id: string (system-generated)
-  - name: string (dormitory name/number)
-  - capacity: number (4-6 beds)
-  - floor: number (optional, for better organization)
-  - building: string (optional, building name)
+3. **Bed（床位）**
+   - 目的：宿舍内具体床位管理
+   - 属性：
+     - id: string（床位唯一标识）
+     - bedNumber: string（床位号，如"A1"）
+     - status: string（床位状态：available、occupied、maintenance）
 
-#### 3. Bed
-- **Purpose**: Represents individual bed assignments within a dormitory
-- **Properties**:
-  - id: string (system-generated)
-  - bedNumber: number (1 to capacity)
-  - status: string ('available' | 'occupied')
+4. **ViolationRecord（违规记录）**
+   - 目的：记录用户违规行为和扣分情况
+   - 属性：
+     - id: string（记录唯一标识）
+     - violationType: string（违规类型）
+     - description: string（违规描述）
+     - scoreDeducted: number（扣除分数）
+     - recordedAt: number（记录时间戳）
+     - recordedBy: string（记录人ID）
 
-#### 4. PointDeduction
-- **Purpose**: Records of point deductions for user behaviors
-- **Properties**:
-  - id: string (system-generated)
-  - reason: string (description of the violation)
-  - points: number (points deducted, positive number)
-  - timestamp: number (when the deduction occurred)
-  - recordedBy: string (who recorded this deduction)
+5. **KickoutRequest（踢出申请）**
+   - 目的：宿舍长申请踢出用户的流程管理
+   - 属性：
+     - id: string（申请唯一标识）
+     - reason: string（申请理由）
+     - status: string（申请状态：pending、approved、rejected）
+     - requestedAt: number（申请时间戳）
+     - processedAt: number（处理时间戳，可选）
+     - processedBy: string（处理人ID，可选）
 
-#### 5. KickOutApplication
-- **Purpose**: Applications from dormitory heads to kick out users
-- **Properties**:
-  - id: string (system-generated)
-  - reason: string (detailed reason for kick-out request)
-  - status: string ('pending' | 'approved' | 'rejected')
-  - applicationTime: number (timestamp)
-  - processedTime: number (timestamp, optional)
-  - processedBy: string (admin who processed, optional)
+### 2.2 关系识别
+1. **UserDormitoryRelation（用户-宿舍关系）**
+   - 类型：n:1（多个用户对应一个宿舍）
+   - 目的：记录用户被分配到哪个宿舍
+   - 属性：
+     - assignedAt: number（分配时间戳）
+     - status: string（分配状态：active、inactive）
 
-### Relations
+2. **UserBedRelation（用户-床位关系）**
+   - 类型：1:1（一个用户对应一个床位）
+   - 目的：记录用户具体占用的床位
+   - 属性：
+     - assignedAt: number（分配时间戳）
+     - status: string（分配状态：active、inactive）
 
-#### 1. UserDormHeadRelation
-- **Type**: n:1 (many dormitories can have one head, but typically one head manages one dormitory)
-- **Source**: Dormitory
-- **Target**: User (with role='dormHead')
-- **Source Property**: dormHead
-- **Target Property**: managedDormitories
+3. **DormitoryBedRelation（宿舍-床位关系）**
+   - 类型：1:n（一个宿舍包含多个床位）
+   - 目的：记录宿舍包含的所有床位
 
-#### 2. UserBedRelation
-- **Type**: 1:1 (one user to one bed)
-- **Source**: User
-- **Target**: Bed
-- **Source Property**: bed
-- **Target Property**: occupant
-- **Properties**:
-  - assignedAt: number (timestamp)
-  - assignedBy: string (admin who made the assignment)
+4. **DormitoryHeadRelation（宿舍长关系）**
+   - 类型：1:1（一个宿舍有一个宿舍长）
+   - 目的：记录宿舍长职责分配
+   - 属性：
+     - appointedAt: number（任命时间戳）
+     - status: string（任命状态：active、inactive）
 
-#### 3. DormitoryBedRelation
-- **Type**: 1:n (one dormitory has many beds)
-- **Source**: Dormitory
-- **Target**: Bed
-- **Source Property**: beds
-- **Target Property**: dormitory
+5. **UserViolationRelation（用户-违规记录关系）**
+   - 类型：1:n（一个用户可有多个违规记录）
+   - 目的：关联用户和其违规记录
 
-#### 4. UserPointDeductionRelation
-- **Type**: 1:n (one user can have many deductions)
-- **Source**: User
-- **Target**: PointDeduction
-- **Source Property**: pointDeductions
-- **Target Property**: user
+6. **KickoutRequestRelation（踢出申请关系）**
+   - 类型：多个相关关系
+   - UserKickoutRequestRelation：申请人和申请（1:n）
+   - TargetUserKickoutRequestRelation：被申请踢出的用户和申请（1:n）
+   - ProcessorKickoutRequestRelation：处理人和申请（1:n）
 
-#### 5. KickOutApplicationUserRelation
-- **Type**: n:1 (many applications can target one user)
-- **Source**: KickOutApplication
-- **Target**: User (the user to be kicked out)
-- **Source Property**: targetUser
-- **Target Property**: kickOutApplications
+## 3. 交互视角分析
 
-#### 6. KickOutApplicationApplicantRelation
-- **Type**: n:1 (many applications from one dormitory head)
-- **Source**: KickOutApplication
-- **Target**: User (the dormitory head applying)
-- **Source Property**: applicant
-- **Target Property**: submittedApplications
+### 3.1 管理员操作
+1. **CreateDormitory（创建宿舍）**
+   - 输入：宿舍名称、床位容量
+   - 权限：仅管理员
+   - 业务规则：容量必须在4-6之间
 
-### Computed Properties
+2. **AssignUserToDormitory（分配用户到宿舍）**
+   - 输入：用户ID、宿舍ID、床位ID
+   - 权限：仅管理员
+   - 业务规则：
+     - 用户未被分配过宿舍
+     - 宿舍有空余床位
+     - 床位状态为可用
 
-#### User Entity Computations:
-1. **totalDeductions**: Sum of all point deductions
-2. **currentPoints**: 100 - totalDeductions
-3. **dormitory**: Derived from bed.dormitory relation
-4. **isDormHead**: Computed based on managedDormitories.length > 0
+3. **AppointDormHead（任命宿舍长）**
+   - 输入：用户ID、宿舍ID
+   - 权限：仅管理员
+   - 业务规则：
+     - 用户已被分配到该宿舍
+     - 该宿舍当前无宿舍长
 
-#### Dormitory Entity Computations:
-1. **occupiedBeds**: Count of beds with status='occupied'
-2. **availableBeds**: capacity - occupiedBeds
-3. **occupancyRate**: (occupiedBeds / capacity) * 100
-4. **residents**: Users who have beds in this dormitory
+4. **ProcessKickoutRequest（处理踢出申请）**
+   - 输入：申请ID、决定（同意/拒绝）
+   - 权限：仅管理员
+   - 业务规则：申请状态为pending
 
-## Interaction Perspective Analysis
+### 3.2 宿舍长操作
+1. **RecordViolation（记录违规）**
+   - 输入：用户ID、违规类型、描述、扣分
+   - 权限：宿舍长（仅对本宿舍成员）
+   - 业务规则：目标用户必须在同一宿舍
 
-### User Operations by Role
+2. **CreateKickoutRequest（创建踢出申请）**
+   - 输入：用户ID、理由
+   - 权限：宿舍长（仅对本宿舍成员）
+   - 业务规则：
+     - 目标用户必须在同一宿舍
+     - 目标用户扣分达到一定程度（如≥10分）
+     - 同一用户无未处理的踢出申请
 
-#### Admin Operations:
-1. **CreateDormitory**: Create new dormitories with specified capacity
-2. **AssignDormHead**: Assign a user as dormitory head
-3. **RemoveDormHead**: Remove dormitory head assignment
-4. **AssignUserToBed**: Assign a student to a specific bed
-5. **RemoveUserFromBed**: Remove a student from their bed
-6. **ProcessKickOutApplication**: Approve or reject kick-out applications
-7. **ViewAllDormitories**: View all dormitories and their status
-8. **ViewAllUsers**: View all users and their assignments
+### 3.3 系统自动操作
+1. **UpdateUserScore（更新用户分数）**
+   - 触发：记录违规时自动执行
+   - 逻辑：累加用户的总扣分
 
-#### Dormitory Head Operations:
-1. **RecordPointDeduction**: Record behavior violations and deduct points
-2. **SubmitKickOutApplication**: Apply to kick out a user when points are low
-3. **ViewDormitoryResidents**: View all residents in managed dormitory
-4. **ViewUserPoints**: View point status of residents
+2. **UpdateDormitoryOccupancy（更新宿舍入住率）**
+   - 触发：用户分配/移除时自动执行
+   - 逻辑：计算宿舍当前入住人数
 
-#### Student Operations:
-1. **ViewMyDormitory**: View assigned dormitory and bed
-2. **ViewMyPoints**: View current points and deduction history
-3. **ViewMyRoommates**: View other residents in the same dormitory
+## 4. 业务流程分析
 
-### Business Rules
+### 4.1 用户分配流程
+1. 管理员创建宿舍和床位
+2. 管理员分配用户到特定宿舍的特定床位
+3. 系统更新宿舍入住率
+4. 管理员可任命该宿舍的用户为宿舍长
 
-1. **Dormitory Capacity**: Must be between 4-6 beds
-2. **Bed Assignment**: 
-   - User can only be assigned to one bed
-   - Bed can only have one occupant
-   - Cannot assign to occupied bed
-3. **Point System**:
-   - Users start with 100 points
-   - Points cannot go below 0
-   - Only dormitory heads can deduct points from their residents
-4. **Kick-Out Process**:
-   - Only dormitory head can submit application
-   - Can only submit for residents in their dormitory
-   - Typically when user points < 30 (configurable threshold)
-   - Only admin can approve/reject
-   - Once approved, user status changes to 'kickedOut' and bed becomes available
-5. **Role Hierarchy**:
-   - Admin has all permissions
-   - Dormitory head can only manage their assigned dormitory
-   - Students can only view their own information
+### 4.2 违规处理流程
+1. 宿舍长发现同宿舍用户违规
+2. 宿舍长记录违规行为和扣分
+3. 系统自动更新用户总扣分
+4. 当用户扣分达到阈值时，宿舍长可申请踢出
+5. 管理员审核踢出申请
+6. 管理员同意后，用户被移出宿舍
 
-### State Transitions
+### 4.3 踢出申请流程
+1. 宿舍长创建踢出申请（需满足扣分条件）
+2. 申请状态设为pending
+3. 管理员查看并处理申请
+4. 管理员同意：用户被踢出，床位释放
+5. 管理员拒绝：申请状态更新为rejected
 
-#### User Status:
-- active → kickedOut (when kick-out application approved)
+## 5. 权限系统设计
 
-#### Bed Status:
-- available → occupied (when user assigned)
-- occupied → available (when user removed or kicked out)
+### 5.1 角色定义
+- **admin（管理员）**：系统管理权限，可以创建宿舍、分配用户、任命宿舍长、处理申请
+- **dormHead（宿舍长）**：宿舍管理权限，可以记录违规、申请踢出同宿舍用户
+- **student（学生）**：基础权限，可以查看自己的信息和违规记录
 
-#### KickOutApplication Status:
-- pending → approved (by admin)
-- pending → rejected (by admin)
+### 5.2 权限矩阵
+| 操作 | admin | dormHead | student |
+|------|-------|----------|---------|
+| 创建宿舍 | ✓ | ✗ | ✗ |
+| 分配用户 | ✓ | ✗ | ✗ |
+| 任命宿舍长 | ✓ | ✗ | ✗ |
+| 记录违规 | ✓ | ✓(同宿舍) | ✗ |
+| 申请踢出 | ✓ | ✓(同宿舍) | ✗ |
+| 处理申请 | ✓ | ✗ | ✗ |
+| 查看信息 | ✓ | ✓(同宿舍) | ✓(自己) |
 
-## Security and Permission Requirements
+## 6. 业务规则总结
 
-### Authentication:
-- System assumes users are already authenticated (external auth system)
-- Users are identified by their email
+### 6.1 数据约束
+- 宿舍容量：4-6个床位
+- 用户分配：每个用户只能分配到一个宿舍的一个床位
+- 宿舍长：每个宿舍最多一个宿舍长，必须是本宿舍成员
 
-### Authorization Matrix:
-| Operation | Admin | Dorm Head | Student |
-|-----------|-------|-----------|---------|
-| Create Dormitory | ✓ | ✗ | ✗ |
-| Assign Dorm Head | ✓ | ✗ | ✗ |
-| Assign User to Bed | ✓ | ✗ | ✗ |
-| Record Point Deduction | ✗ | ✓ (own dorm) | ✗ |
-| Submit Kick-Out Application | ✗ | ✓ (own dorm) | ✗ |
-| Process Kick-Out Application | ✓ | ✗ | ✗ |
-| View All Dormitories | ✓ | ✗ | ✗ |
-| View Dormitory Residents | ✓ | ✓ (own dorm) | ✓ (own dorm) |
-| View User Points | ✓ | ✓ (own dorm residents) | ✓ (self) |
+### 6.2 业务逻辑约束
+- 踢出申请前提：用户扣分≥10分
+- 重复申请限制：同一用户不能有多个pending状态的踢出申请
+- 分配限制：用户只能被分配到有空余床位的宿舍
+- 权限限制：宿舍长只能管理同宿舍的用户
 
-## Data Validation Requirements
+### 6.3 状态管理
+- 床位状态：available → occupied → available
+- 申请状态：pending → approved/rejected
+- 用户分配状态：active → inactive
+- 宿舍长状态：active → inactive
 
-1. **Email**: Must be valid email format
-2. **Name**: Non-empty string
-3. **Capacity**: Integer between 4 and 6
-4. **Points Deduction**: Positive number
-5. **Bed Number**: Between 1 and dormitory capacity
-6. **Reasons**: Non-empty strings for deductions and applications 
+这个详细需求分析为后续的系统设计和实现提供了完整的业务逻辑基础。

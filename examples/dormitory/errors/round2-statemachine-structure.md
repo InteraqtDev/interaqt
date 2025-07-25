@@ -1,50 +1,49 @@
-# Round 2: StateMachine Structure Errors
+# Round 2: 测试API错误和StateMachine结构问题
 
-## Error Summary
+## 错误概述
 
-1. **TC001 (Create Dormitory)**: ✅ PASSING! Fixed by removing non-existent attributes from queries
-2. **TC002, TC009**: "Cannot read properties of undefined (reading 'call')" in StateMachine computation
-3. **TC003-TC008**: "column 'Bed.bedNumber' does not exist" - database query issue
+第二轮测试运行时发现多个问题：
 
-## Error Details
-
-### Error 1: StateMachine Transfer Modification Error
-
-**Location**: User role StateMachine transfers
-
-**Error Message**:
-```
-TypeError: Cannot read properties of undefined (reading 'call')
-```
-
-**Root Cause**: 
-Modifying the transfers array after StateMachine creation is causing internal state issues. The StateMachine expects transfers to be defined during creation, not modified afterward.
-
-**Current Problematic Code**:
+### 1. 系统初始化API错误
+**错误信息**: `system.register is not a function`
+**原因**: 使用了错误的API，应该使用Controller构造函数和setup方法
+**正确方式**:
 ```typescript
-// This approach is causing issues:
-const roleStateMachine = User.properties.find(p => p.name === 'role')!.computation as StateMachine
-roleStateMachine.transfers.push(
-  StateTransfer.create({...})
-)
+system = new MonoSystem(new PGLiteDB())
+controller = new Controller({
+  system,
+  entities,
+  relations,
+  interactions,
+})
+await controller.setup(true)
 ```
 
-### Error 2: Database Column Reference
+### 2. StateMachine结构问题
+**潜在问题**: 当前代码中很多StateMachine的transfers数组为空，这可能导致状态转换无法正常工作
 
-**Error Message**:
-```
-error: column "Bed.bedNumber" does not exist
-```
+### 3. 床位创建逻辑问题
+**问题**: 在CreateDormitory交互中，床位的创建和与宿舍的关系建立可能存在问题，因为需要床位创建后才能建立DormitoryBedRelation
 
-**Root Cause**:
-Tests are using dot notation in queries which doesn't work with the database column naming convention.
+## 修复策略
 
-## Fix Strategy
+### 1. 修正测试初始化
+- 使用正确的Controller API
+- 确保entities、relations、interactions正确导出
 
-### Fix 1: Define State Transfers During Creation
+### 2. 简化StateMachine实现
+- 暂时移除所有StateTransfer，专注于基础CRUD功能
+- 在后续阶段再添加状态转换
 
-Instead of modifying transfers after creation, we need to define all state transfers when creating the StateMachine. This requires reorganizing the code to ensure all interactions are defined before the entities that reference them.
+### 3. 修正床位创建逻辑
+- 确保CreateDormitory时床位正确创建
+- 修正DormitoryBedRelation的建立逻辑
 
-### Fix 2: Use Proper Column Names in Queries
+## 实施计划
 
-The framework uses underscore notation for column names (e.g., `Bed_bedNumber`), not dot notation. 
+1. 修正测试文件的系统初始化
+2. 简化backend/index.ts中的StateMachine，移除transfers
+3. 修正床位创建和关系建立逻辑
+4. 重新运行测试验证基础功能
+
+这些问题表明需要更深入理解interaqt框架的API使用模式和StateMachine的工作机制。

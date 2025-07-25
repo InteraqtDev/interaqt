@@ -1,47 +1,50 @@
-# Round 3: Remaining StateMachine Errors
+# Round 3: 数据库列名冲突和关系定义错误
 
-## Summary
+## 错误概述
 
-After fixing most issues, we have 7/9 tests passing. The remaining 2 tests fail with the same StateMachine error.
+第三轮测试运行时发现数据库列名冲突问题：
 
-## Passing Tests ✅
-1. TC001: Create Dormitory
-2. TC002: Assign Dormitory Head  
-3. TC003: Assign User to Bed
-4. TC004: Record Point Deduction
-5. TC005: Submit Kick-Out Application
-6. TC006: Approve Kick-Out Application
-7. TC007: Reject Kick-Out Application
+### 主要错误
+**错误信息**: `column "User_dormitory_users_Dormitory__User_dormitory_users_Dormitory_" specified more than once`
 
-## Failing Tests ❌
+**分析**:
+1. 列名过长，可能由于关系名称生成规则导致
+2. 可能存在重复的关系定义
+3. 关系的sourceProperty和targetProperty命名可能冲突
 
-### TC008: Remove User from Bed
-**Error**: 
-```
-TypeError: Cannot read properties of undefined (reading 'call')
-```
-**Context**: Bed status StateMachine trying to transition from 'occupied' to 'available'
+### 可能原因
 
-### TC009: Remove Dormitory Head
-**Error**:
-```
-TypeError: Cannot read properties of undefined (reading 'call')
-```
-**Context**: User role StateMachine trying to transition from 'dormHead' to 'student'
+1. **关系命名冲突**: 多个关系使用了相同的sourceProperty或targetProperty名称
+2. **关系定义重复**: 同样的关系被定义了多次
+3. **属性名称过长**: 生成的数据库列名超过了限制
 
-## Pattern Analysis
+### 具体问题定位
 
-Both failing tests:
-1. Are "removal" interactions (RemoveUserFromBed, RemoveDormHead)
-2. Involve state transitions going "backwards" (occupied→available, dormHead→student)
-3. Have the same error in StateMachine computation
+从错误信息看，问题出现在User实体的dormitory相关关系上。可能是：
+- UserDormitoryRelation的sourceProperty和targetProperty定义有问题
+- 与其他关系产生了命名冲突
 
-## Possible Causes
+## 修复策略
 
-1. **State Matching Issue**: The framework might have trouble finding the current state when transitioning
-2. **Trigger Context**: Something about how these removal interactions are triggered might be different
-3. **Computation Order**: The order in which computations run might affect these specific transitions
+### 1. 简化关系定义
+- 检查所有关系的sourceProperty和targetProperty
+- 确保没有重复或冲突的属性名称
+- 简化属性名称，避免过长
 
-## Next Steps
+### 2. 移除重复关系
+- 检查是否有重复定义的关系
+- 特别是User相关的多个关系
 
-Since we're at iteration 3 of 7, we have made significant progress. The core functionality is working for most cases. The remaining issues appear to be edge cases related to specific state transitions. 
+### 3. 暂时简化关系结构
+- 先实现最基本的关系
+- 逐步添加复杂关系
+- 确保每个关系都能正常工作
+
+## 实施计划
+
+1. 重新审查backend/index.ts中的所有关系定义
+2. 简化关系名称和属性名称
+3. 一次只添加一个关系进行测试
+4. 确保数据库表结构正确生成
+
+这个问题表明关系定义的复杂性超过了当前的理解水平，需要更仔细地设计关系结构。

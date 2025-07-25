@@ -1,201 +1,491 @@
-# Interaction Design
+# 宿舍管理系统交互设计
 
-## Overview
-This document defines all interactions for the dormitory management system, organized by user role and purpose. For Stage 1, we focus on core business logic without permissions or business rules.
+## 设计原则
 
-## Admin Interactions
+基于 `requirements/detailed-requirements.md` 和 `docs/entity-relation-design.md` 的分析，遵循以下原则：
 
-### CreateDormitory
-- **Purpose**: Create a new dormitory with specified capacity
-- **Action**: createDormitory
-- **Payload**:
-  - name: string (required) - dormitory name/number
-  - capacity: number (required) - number of beds (4-6)
-  - floor: number - floor number
-  - building: string - building name
-- **Effects**:
-  - Creates new Dormitory entity
-  - Automatically creates Bed entities (1 to capacity)
-  - All beds initialized with status='available'
-- **Stage 2 - Permissions**: Only admin can create
-- **Stage 2 - Business Rules**: Capacity must be between 4-6
+- **Action仅作为标识符**，不包含执行逻辑
+- **用户在执行时传递**，不是交互的属性
+- **实体引用使用 isRef 和 base**，而不是简单的id字段
+- **Stage 1专注核心业务逻辑**，不包含权限和业务规则
+- **Stage 2将添加conditions**，用于权限检查和业务规则验证
 
-### AssignDormHead
-- **Purpose**: Assign a user as dormitory head
-- **Action**: assignDormHead
-- **Payload**:
-  - userId: string (required) - user to assign as head
-  - dormitoryId: string (required) - dormitory to manage
-- **Effects**:
-  - Updates user's role to 'dormHead'
-  - Creates UserDormHeadRelation
-- **Stage 2 - Permissions**: Only admin can assign
-- **Stage 2 - Business Rules**: None initially
+---
 
-### RemoveDormHead
-- **Purpose**: Remove dormitory head assignment
-- **Action**: removeDormHead
-- **Payload**:
-  - userId: string (required) - user to remove as head
-- **Effects**:
-  - Updates user's role back to 'student'
-  - Removes UserDormHeadRelation
-- **Stage 2 - Permissions**: Only admin can remove
-- **Stage 2 - Business Rules**: User must currently be a dormHead
+## 核心业务逻辑交互（Stage 1）
 
-### AssignUserToBed
-- **Purpose**: Assign a student to a specific bed
-- **Action**: assignUserToBed
-- **Payload**:
-  - userId: string (required) - user to assign
-  - bedId: string (required) - bed to assign to
-- **Effects**:
-  - Creates UserBedRelation
-  - Updates bed status to 'occupied'
-  - Relation includes assignedAt timestamp and assignedBy
-- **Stage 2 - Permissions**: Only admin can assign
-- **Stage 2 - Business Rules**: 
-  - Bed must be available
-  - User cannot already have a bed
+### 1. CreateDormitory（创建宿舍）
+**目的**: 创建新的宿舍及其床位
+**权限**: Stage 2 - 仅管理员
+**业务规则**: Stage 2 - 容量必须4-6
 
-### RemoveUserFromBed
-- **Purpose**: Remove a student from their bed
-- **Action**: removeUserFromBed
-- **Payload**:
-  - userId: string (required) - user to remove
-- **Effects**:
-  - Removes UserBedRelation
-  - Updates bed status to 'available'
-- **Stage 2 - Permissions**: Only admin can remove
-- **Stage 2 - Business Rules**: User must have a bed assignment
+```typescript
+export const CreateDormitory = Interaction.create({
+  name: 'CreateDormitory',
+  action: Action.create({ name: 'createDormitory' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({ 
+        name: 'name', 
+        required: true 
+      }), // 宿舍名称
+      PayloadItem.create({ 
+        name: 'capacity', 
+        required: true 
+      }) // 床位容量
+    ]
+  })
+});
+```
 
-### ProcessKickOutApplication
-- **Purpose**: Approve or reject a kick-out application
-- **Action**: processKickOutApplication
-- **Payload**:
-  - applicationId: string (required) - application to process
-  - decision: string (required) - 'approved' or 'rejected'
-- **Effects**:
-  - Updates application status to decision
-  - Sets processedTime and processedBy
-  - If approved:
-    - Updates user status to 'kickedOut'
-    - Removes UserBedRelation
-    - Updates bed status to 'available'
-- **Stage 2 - Permissions**: Only admin can process
-- **Stage 2 - Business Rules**: Application must be 'pending'
+**Effects（通过Computation实现）**:
+- 创建新的Dormitory实体
+- 根据capacity自动创建对应数量的Bed实体
+- 建立DormitoryBedRelation关系
+- 初始化床位编号（A1, A2, A3, A4...）
 
-## Dormitory Head Interactions
+### 2. CreateUser（创建用户）
+**目的**: 创建系统用户
+**权限**: Stage 2 - 仅管理员
 
-### RecordPointDeduction
-- **Purpose**: Record behavior violations and deduct points
-- **Action**: recordPointDeduction
-- **Payload**:
-  - userId: string (required) - user to deduct points from
-  - reason: string (required) - description of violation
-  - points: number (required) - points to deduct
-- **Effects**:
-  - Creates PointDeduction entity
-  - Creates UserPointDeductionRelation
-  - Records timestamp and recordedBy
-- **Stage 2 - Permissions**: Only dormHead can record, only for residents in their dormitory
-- **Stage 2 - Business Rules**: Points must be positive
+```typescript
+export const CreateUser = Interaction.create({
+  name: 'CreateUser',
+  action: Action.create({ name: 'createUser' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({ 
+        name: 'name', 
+        required: true 
+      }),
+      PayloadItem.create({ 
+        name: 'email', 
+        required: true 
+      }),
+      PayloadItem.create({ 
+        name: 'role', 
+        required: true 
+      }) // admin/dormHead/student
+    ]
+  })
+});
+```
 
-### SubmitKickOutApplication
-- **Purpose**: Apply to kick out a user with low points
-- **Action**: submitKickOutApplication
-- **Payload**:
-  - userId: string (required) - user to kick out
-  - reason: string (required) - detailed reason
-- **Effects**:
-  - Creates KickOutApplication entity with status='pending'
-  - Creates KickOutApplicationUserRelation (target)
-  - Creates KickOutApplicationApplicantRelation (applicant)
-  - Records applicationTime
-- **Stage 2 - Permissions**: Only dormHead can submit, only for residents in their dormitory
-- **Stage 2 - Business Rules**: User must be in applicant's dormitory
+**Effects**:
+- 创建新的User实体
+- 设置初始扣分为0
+- 设置状态为active
 
-## Query Interactions (All Roles)
+### 3. AssignUserToDormitory（分配用户到宿舍）
+**目的**: 将用户分配到指定宿舍的指定床位
+**权限**: Stage 2 - 仅管理员
+**业务规则**: Stage 2 - 用户未分配、宿舍有空余、床位可用
 
-### GetDormitoryInfo
-- **Purpose**: Get information about a specific dormitory
-- **Action**: getDormitoryInfo
-- **Payload**:
-  - dormitoryId: string (required)
-- **Effects**: Read-only query
-- **Stage 2 - Permissions**: 
-  - Admin: can view any dormitory
-  - DormHead: can view managed dormitory
-  - Student: can view assigned dormitory
+```typescript
+export const AssignUserToDormitory = Interaction.create({
+  name: 'AssignUserToDormitory',
+  action: Action.create({ name: 'assignUserToDormitory' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({ 
+        name: 'user',
+        base: User,
+        isRef: true,
+        required: true 
+      }),
+      PayloadItem.create({ 
+        name: 'dormitory',
+        base: Dormitory,
+        isRef: true,
+        required: true 
+      }),
+      PayloadItem.create({ 
+        name: 'bed',
+        base: Bed,
+        isRef: true,
+        required: true 
+      })
+    ]
+  })
+});
+```
 
-### GetUserInfo
-- **Purpose**: Get information about a specific user
-- **Action**: getUserInfo
-- **Payload**:
-  - userId: string (required)
-- **Effects**: Read-only query
-- **Stage 2 - Permissions**:
-  - Admin: can view any user
-  - DormHead: can view residents in their dormitory
-  - Student: can view self only
+**Effects**:
+- 创建UserDormitoryRelation关系
+- 创建UserBedRelation关系
+- 更新床位状态为occupied
+- 更新宿舍当前入住人数
 
-### GetAvailableBeds
-- **Purpose**: List available beds in a dormitory
-- **Action**: getAvailableBeds
-- **Payload**:
-  - dormitoryId: string (optional) - filter by dormitory
-- **Effects**: Read-only query
-- **Stage 2 - Permissions**: Admin only
+### 4. AppointDormHead（任命宿舍长）
+**目的**: 任命宿舍内用户为宿舍长
+**权限**: Stage 2 - 仅管理员
+**业务规则**: Stage 2 - 用户在该宿舍、宿舍无现任宿舍长
 
-### GetPendingApplications
-- **Purpose**: List pending kick-out applications
-- **Action**: getPendingApplications
-- **Payload**: None
-- **Effects**: Read-only query
-- **Stage 2 - Permissions**: Admin only
+```typescript
+export const AppointDormHead = Interaction.create({
+  name: 'AppointDormHead',
+  action: Action.create({ name: 'appointDormHead' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({ 
+        name: 'user',
+        base: User,
+        isRef: true,
+        required: true 
+      }),
+      PayloadItem.create({ 
+        name: 'dormitory',
+        base: Dormitory,
+        isRef: true,
+        required: true 
+      })
+    ]
+  })
+});
+```
 
-### GetPointDeductionHistory
-- **Purpose**: Get point deduction history for a user
-- **Action**: getPointDeductionHistory
-- **Payload**:
-  - userId: string (required)
-- **Effects**: Read-only query
-- **Stage 2 - Permissions**:
-  - Admin: can view any user
-  - DormHead: can view residents in their dormitory
-  - Student: can view self only
+**Effects**:
+- 创建DormitoryHeadRelation关系
+- 用户获得宿舍长职责（不改变role）
+- 记录任命时间戳
 
-## Data Flow Summary
+### 5. RecordViolation（记录违规）
+**目的**: 记录用户违规行为和扣分
+**权限**: Stage 2 - 管理员全局、宿舍长限同宿舍
+**业务规则**: Stage 2 - 目标用户在管辖范围内
 
-### Core Business Flows
+```typescript
+export const RecordViolation = Interaction.create({
+  name: 'RecordViolation',
+  action: Action.create({ name: 'recordViolation' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({ 
+        name: 'violator',
+        base: User,
+        isRef: true,
+        required: true 
+      }),
+      PayloadItem.create({ 
+        name: 'violationType', 
+        required: true 
+      }),
+      PayloadItem.create({ 
+        name: 'description', 
+        required: true 
+      }),
+      PayloadItem.create({ 
+        name: 'scoreDeducted', 
+        required: true 
+      })
+    ]
+  })
+});
+```
 
-1. **Dormitory Setup Flow**:
-   - CreateDormitory → Dormitory + Beds created
-   - AssignDormHead → User role updated + relation created
+**Effects**:
+- 创建ViolationRecord实体
+- 创建UserViolationRecordRelation（违规用户）
+- 创建RecorderViolationRecordRelation（记录人）
+- 自动更新用户总扣分
 
-2. **User Assignment Flow**:
-   - AssignUserToBed → UserBedRelation created + bed occupied
-   - User can now access dormitory via bed.dormitory
+### 6. CreateKickoutRequest（创建踢出申请）
+**目的**: 宿舍长申请踢出扣分过多的用户
+**权限**: Stage 2 - 管理员全局、宿舍长限同宿舍
+**业务规则**: Stage 2 - 目标用户扣分≥10、无pending申请
 
-3. **Point Management Flow**:
-   - RecordPointDeduction → PointDeduction created
-   - User's totalDeductions and currentPoints auto-computed
+```typescript
+export const CreateKickoutRequest = Interaction.create({
+  name: 'CreateKickoutRequest',
+  action: Action.create({ name: 'createKickoutRequest' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({ 
+        name: 'targetUser',
+        base: User,
+        isRef: true,
+        required: true 
+      }),
+      PayloadItem.create({ 
+        name: 'reason', 
+        required: true 
+      })
+    ]
+  })
+});
+```
 
-4. **Kick-Out Process Flow**:
-   - SubmitKickOutApplication → Application created (pending)
-   - ProcessKickOutApplication → Application processed
-   - If approved → User kicked out + bed freed
+**Effects**:
+- 创建KickoutRequest实体（状态为pending）
+- 创建RequestorKickoutRequestRelation（申请人）
+- 创建TargetUserKickoutRequestRelation（目标用户）
+- 记录申请时间戳
 
-## Implementation Notes
+### 7. ProcessKickoutRequest（处理踢出申请）
+**目的**: 管理员审核处理踢出申请
+**权限**: Stage 2 - 仅管理员
+**业务规则**: Stage 2 - 申请状态为pending
 
-1. **Stage 1 Focus**: Implement all interactions without conditions - focus on making the basic operations work correctly.
+```typescript
+export const ProcessKickoutRequest = Interaction.create({
+  name: 'ProcessKickoutRequest',
+  action: Action.create({ name: 'processKickoutRequest' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({ 
+        name: 'request',
+        base: KickoutRequest,
+        isRef: true,
+        required: true 
+      }),
+      PayloadItem.create({ 
+        name: 'decision', 
+        required: true 
+      }) // 'approved' 或 'rejected'
+    ]
+  })
+});
+```
 
-2. **ID References**: For Stage 1, use simple string IDs in payloads. The computations will handle entity lookups.
+**Effects（同意时）**:
+- 更新申请状态为approved
+- 创建ProcessorKickoutRequestRelation（处理人）
+- 更新UserDormitoryRelation状态为inactive
+- 更新UserBedRelation状态为inactive
+- 更新床位状态为available
+- 记录处理时间戳
 
-3. **Timestamps**: Use Date.now() for all timestamp fields in the implementation.
+**Effects（拒绝时）**:
+- 更新申请状态为rejected
+- 创建ProcessorKickoutRequestRelation（处理人）
+- 记录处理时间戳
+- 用户分配关系保持不变
 
-4. **Status Fields**: Ensure proper status values are used ('active'/'kickedOut' for users, 'available'/'occupied' for beds, 'pending'/'approved'/'rejected' for applications).
+---
 
-5. **Query Interactions**: While defined here for completeness, focus implementation on the modification interactions first.
+## 查询交互
 
-6. **No Validation**: Stage 1 should not include any validation beyond basic required field checks. All business rule validations come in Stage 2. 
+### 8. GetDormitoryInfo（获取宿舍信息）
+**目的**: 查询宿舍详细信息
+**权限**: Stage 2 - 分级查看权限
+
+```typescript
+export const GetDormitoryInfo = Interaction.create({
+  name: 'GetDormitoryInfo',
+  action: Action.create({ name: 'getDormitoryInfo' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({ 
+        name: 'dormitory',
+        base: Dormitory,
+        isRef: true,
+        required: true 
+      })
+    ]
+  })
+});
+```
+
+### 9. GetUserInfo（获取用户信息）
+**目的**: 查询用户详细信息
+**权限**: Stage 2 - 分级查看权限
+
+```typescript
+export const GetUserInfo = Interaction.create({
+  name: 'GetUserInfo',
+  action: Action.create({ name: 'getUserInfo' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({ 
+        name: 'user',
+        base: User,
+        isRef: true,
+        required: true 
+      })
+    ]
+  })
+});
+```
+
+### 10. GetViolationRecords（获取违规记录）
+**目的**: 查询违规记录列表
+**权限**: Stage 2 - 分级查看权限
+
+```typescript
+export const GetViolationRecords = Interaction.create({
+  name: 'GetViolationRecords',
+  action: Action.create({ name: 'getViolationRecords' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({ 
+        name: 'user',
+        base: User,
+        isRef: true
+      }), // 可选，指定用户
+      PayloadItem.create({ 
+        name: 'dormitory',
+        base: Dormitory,
+        isRef: true
+      }), // 可选，指定宿舍
+      PayloadItem.create({ name: 'limit' }),
+      PayloadItem.create({ name: 'offset' })
+    ]
+  })
+});
+```
+
+### 11. GetKickoutRequests（获取踢出申请列表）
+**目的**: 查询踢出申请列表
+**权限**: Stage 2 - 仅管理员可查看全部
+
+```typescript
+export const GetKickoutRequests = Interaction.create({
+  name: 'GetKickoutRequests',
+  action: Action.create({ name: 'getKickoutRequests' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({ name: 'status' }), // pending/approved/rejected
+      PayloadItem.create({ 
+        name: 'dormitory',
+        base: Dormitory,
+        isRef: true
+      }), // 可选，按宿舍筛选
+      PayloadItem.create({ name: 'limit' }),
+      PayloadItem.create({ name: 'offset' })
+    ]
+  })
+});
+```
+
+---
+
+## 管理交互
+
+### 12. UpdateDormitoryInfo（更新宿舍信息）
+**目的**: 更新宿舍基本信息
+**权限**: Stage 2 - 仅管理员
+
+```typescript
+export const UpdateDormitoryInfo = Interaction.create({
+  name: 'UpdateDormitoryInfo',
+  action: Action.create({ name: 'updateDormitoryInfo' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({ 
+        name: 'dormitory',
+        base: Dormitory,
+        isRef: true,
+        required: true 
+      }),
+      PayloadItem.create({ name: 'name' }), // 可选更新
+      PayloadItem.create({ name: 'status' }) // active/inactive
+    ]
+  })
+});
+```
+
+### 13. UpdateUserInfo（更新用户信息）
+**目的**: 更新用户基本信息
+**权限**: Stage 2 - 管理员可更新全部，用户可更新自己部分信息
+
+```typescript
+export const UpdateUserInfo = Interaction.create({
+  name: 'UpdateUserInfo',
+  action: Action.create({ name: 'updateUserInfo' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({ 
+        name: 'user',
+        base: User,
+        isRef: true,
+        required: true 
+      }),
+      PayloadItem.create({ name: 'name' }), // 可选更新
+      PayloadItem.create({ name: 'email' }), // 可选更新
+      PayloadItem.create({ name: 'status' }) // active/inactive，仅管理员
+    ]
+  })
+});
+```
+
+### 14. RemoveDormHead（撤销宿舍长）
+**目的**: 撤销用户的宿舍长职务
+**权限**: Stage 2 - 仅管理员
+
+```typescript
+export const RemoveDormHead = Interaction.create({
+  name: 'RemoveDormHead',
+  action: Action.create({ name: 'removeDormHead' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({ 
+        name: 'dormitory',
+        base: Dormitory,
+        isRef: true,
+        required: true 
+      })
+    ]
+  })
+});
+```
+
+---
+
+## 交互业务流程
+
+### 用户入住完整流程
+1. **CreateUser** → 创建用户账户
+2. **CreateDormitory** → 创建宿舍和床位（如果不存在）
+3. **AssignUserToDormitory** → 分配用户到宿舍床位
+4. **AppointDormHead** → 任命其中一人为宿舍长
+
+### 违规处理完整流程
+1. **RecordViolation** → 记录用户违规行为
+2. **GetViolationRecords** → 查看累计违规情况
+3. **CreateKickoutRequest** → 扣分达标后申请踢出
+4. **GetKickoutRequests** → 管理员查看待处理申请
+5. **ProcessKickoutRequest** → 管理员审核处理申请
+
+### 权限管理流程
+1. **CreateUser** (role: student) → 创建普通学生
+2. **AssignUserToDormitory** → 分配到宿舍
+3. **AppointDormHead** → 任命为宿舍长获得管理权限
+4. **RemoveDormHead** → 撤销宿舍长职务
+
+---
+
+## Stage 2 权限和业务规则（后续实现）
+
+### 权限控制策略
+- **管理员（admin）**: 所有操作的全局权限
+- **宿舍长（dormHead）**: 仅对所管理宿舍内用户的管理权限
+- **学生（student）**: 基础权限，主要是查看自己的信息
+
+### 业务规则验证
+- **容量限制**: 宿舍容量4-6床位
+- **分配约束**: 用户只能分配一个宿舍一个床位
+- **扣分阈值**: 扣分≥10才能申请踢出
+- **状态检查**: 申请必须是pending状态才能处理
+- **重复申请**: 同一用户不能有多个pending申请
+
+### 错误处理模式
+- **权限错误**: 角色不匹配时返回权限不足
+- **业务规则错误**: 违反约束时返回具体错误信息
+- **数据验证错误**: 输入格式错误时返回验证失败详情
+
+---
+
+## 验证清单
+
+- [x] 所有用户操作都有对应的交互
+- [x] Action仅包含name（无逻辑）
+- [x] Payload项目有适当的required标记
+- [x] 集合使用isCollection: true
+- [x] 实体引用使用isRef和base
+- [x] 不包含权限或约束（Stage 1）
+- [x] 交互名称清晰明确
+- [x] 一个用户操作对应一个交互
+- [x] 完整的payload定义
+- [x] 正确的数据类型
+
+这个交互设计为宿舍管理系统提供了完整的用户操作接口，支持所有核心业务流程和后续的权限控制。
