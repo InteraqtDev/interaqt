@@ -91,10 +91,53 @@ export abstract class FrameworkError extends Error {
     }
 
     /**
+     * Get formatted error for console output (concise version)
+     */
+    private getFormattedError(): string {
+        const chain = this.getErrorChain();
+        let output = `[${this.errorType}] ${this.message}`;
+        
+        // Add important context
+        const importantContext = ['entityName', 'propertyName', 'interactionName', 'computationName', 'handleName', 'depName']
+            .filter(key => this.context[key])
+            .map(key => `${key}: ${this.context[key]}`)
+            .join(', ');
+        
+        if (importantContext) {
+            output += ` (${importantContext})`;
+        }
+        
+        // Add error chain
+        if (chain.length > 1) {
+            output += '\n\nCaused by:';
+            for (let i = 1; i < chain.length; i++) {
+                const err = chain[i];
+                output += `\n  ${'  '.repeat(i-1)}→ ${err.constructor.name}: ${err.message}`;
+            }
+        }
+        
+        // Add root cause stack (first 5 lines)
+        const rootCause = chain[chain.length - 1];
+        if (rootCause.stack) {
+            output += '\n\nStack trace:';
+            const stackLines = rootCause.stack.split('\n').slice(0, 6);
+            stackLines.forEach(line => {
+                output += '\n  ' + line;
+            });
+            if (rootCause.stack.split('\n').length > 6) {
+                output += '\n  ... (truncated)';
+            }
+        }
+        
+        return output;
+    }
+
+    /**
      * Convert to string with detailed information
      */
     public toString(): string {
-        return this.getDetailedMessage()
+        // Use the formatted error for consistency across all output methods
+        return this.getFormattedError();
     }
 
     /**
@@ -102,6 +145,21 @@ export abstract class FrameworkError extends Error {
      */
     public [Symbol.toStringTag](): string {
         return JSON.stringify(this.toJSON(), null, 2)
+    }
+
+    /**
+     * Custom inspect method for Node.js console.log/error
+     * This method is automatically called when the error is logged
+     */
+    public [Symbol.for('nodejs.util.inspect.custom')](): string {
+        return this.getFormattedError();
+    }
+
+    /**
+     * For browser compatibility - valueOf is called when converting to primitive
+     */
+    public valueOf(): string {
+        return this.getFormattedError();
     }
 
     /**

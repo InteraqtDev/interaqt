@@ -58,6 +58,17 @@ Filtered Entity 是 interaqt 框架中的一个高级特性，它允许从已有
 
 **适合阅读对象**：需要编写测试用例的开发者、QA工程师
 
+### 5. [关联字段过滤实现方案](./filtered-entity-relation-fields-guide.md)
+
+扩展 Filtered Entity 支持关联实体字段过滤的完整方案：
+- 需求场景和技术挑战
+- 详细的实现方案
+- 性能优化策略
+- 使用示例和测试计划
+- 实现步骤和注意事项
+
+**适合阅读对象**：框架贡献者、需要扩展功能的开发者
+
 ## 快速开始
 
 如果你是第一次接触 Filtered Entity，建议按以下顺序阅读：
@@ -92,7 +103,7 @@ Filtered Entity 是 interaqt 框架中的一个高级特性，它允许从已有
 - 主要限制：
   - 不支持嵌套 filtered entity
   - 过滤条件在定义时确定，不支持动态修改
-  - 不支持跨实体的过滤条件
+  - 不支持跨实体的过滤条件（参见[关联字段过滤实现方案](./filtered-entity-relation-fields-guide.md)了解扩展方案）
 
 ## 反馈和贡献
 
