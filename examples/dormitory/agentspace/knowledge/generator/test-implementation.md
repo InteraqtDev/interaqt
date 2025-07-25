@@ -353,6 +353,28 @@ test('should handle all error cases', async () => {
 })
 ```
 
+### Debugging Tips
+
+When an interaction fails unexpectedly, use `console.log` to inspect the full error object:
+
+```typescript
+const result = await controller.callInteraction('CreateStyle', {...})
+if (result.error) {
+  // Print full error details for debugging
+  console.log('Interaction error:', result.error)
+  
+  // The error object often contains helpful details:
+  // - type: Error type (e.g., 'check user failed', 'payload validation failed')
+  // - message: Detailed error message
+  // - context: Additional context about what failed
+}
+```
+
+This is especially useful when:
+- Writing new tests and encountering unexpected failures
+- Debugging permission/condition check failures  
+- Understanding payload validation errors
+
 
 ## 🔴 CRITICAL: User Authentication Handling
 **interaqt does NOT handle user authentication**. This is a fundamental principle:
@@ -401,7 +423,12 @@ const LoginInteraction = Interaction.create({  // DON'T DO THIS
   name: 'Login',
   // ...
 })
+```
 
+### User-related Interaction Guidelines
+- **DO NOT generate** CreateUser/DeleteUser interactions - user creation/deletion is handled by external user systems
+- **DO generate** UpdateUserProfile, UpdateUserSettings etc. if explicitly required by business requirements
+- User entity exists for reference and relation purposes, not for authentication management
 
 ## 🔴 CRITICAL: Always Specify attributeQuery
 

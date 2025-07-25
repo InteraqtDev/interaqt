@@ -20,11 +20,10 @@ interaqt 是一个全新的响应式的后端框架。现在你来帮助我重�
 - 需求分析和设计测试用例，需要产出各种文档。具体参考之前写的 `./CLAUDE.bak.md` 中需求相关的内容。
 - 代码生成，在下面的每一步做完时，都要保证typescript类型校验和新增的测试用例通过。
   - 从用例中数据的角度生成所有用例中需要的实体和实体上的属性、关系和关系上的属性。
-  - 从用例中交互动作的角度生成所有的 interaction，一开始只需要最简单的包含 payload 的形式，不需要 userAttributive 和 dataAttributive。
+  - 从用例中交互动作的角度生成所有的 interaction，一开始只需要最简单的包含 payload 的形式。
   - 基于 interaqt 的响应式知识，用各种 Computation 来描述实体、关系、以及上面的属性。Computation 理论上会把所有实体和 Intraction 或者实体和实体关联起来。一切数据最终源头应该都是来自于 Interaction。
   - 开始创建 interaction 的测试用例代码，保证测试用例通过。
-  - 给 interaction 怎加上必要的 userAttributive 和 dataAttributive，完成权限控制。
-  - 增加 interaction 中关于权限测试的用例。保证通过。
+  - 增加 interaction 中的测试用例，保证通过。
 
 ### [x] 任务二: 生成 CLAUDE.md 中phase2所需要的文档目录
 你根据 CLAUDE.md 中 phase 2 的每一节内容，来在 `./agentspace/knowledge/generator` 下创建每一节内容需要的独立的文档，并将文档路径更新到 phase 2 中的每一个小节开头。

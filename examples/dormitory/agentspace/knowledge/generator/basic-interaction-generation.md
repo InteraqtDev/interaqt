@@ -77,6 +77,11 @@ const UpdateStyle = Interaction.create({
 - Contains: name, action (identifier), payload (parameters)
 - NO operational logic - that's handled by Computations
 
+### User-related Interactions
+- **Skip**: CreateUser, DeleteUser, Login, Register, Logout (handled by external systems)
+- **Generate**: UpdateUserProfile, UpdateUserSettings (only if explicitly required)
+- User entity is for data relationships, not authentication
+
 ### Basic Structure
 ```typescript
 import { Interaction, Action, Payload, PayloadItem } from 'interaqt';

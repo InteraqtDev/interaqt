@@ -896,11 +896,9 @@ Interaction.create(config: InteractionConfig): KlassInstance<typeof Interaction>
 - `config.name` (string, required): Interaction name
 - `config.action` (Action, required): Interaction action
 - `config.payload` (Payload, optional): Interaction parameters
-- `config.userAttributives` (Attributive|Attributives, optional): User permission attributives
 - `config.conditions` (Condition|Conditions, optional): Execution conditions
 - `config.sideEffects` (SideEffect[], optional): Side effect handlers
 - `config.data` (Entity|Relation, optional): Associated data entity
-- `config.dataAttributives` (DataAttributive|DataAttributives, optional): Data permission attributives
 - `config.query` (Query, optional): Query definition for data fetching
 
 **Examples**
@@ -917,12 +915,6 @@ const CreatePostInteraction = Interaction.create({
                 required: true
             })
         ]
-    }),
-    userAttributives: Attributive.create({
-        name: 'AuthenticatedUser',
-        content: function(target, { user }) {
-            return user.id !== undefined
-        }
     })
 })
 ```
@@ -1561,12 +1553,6 @@ const CreatePostInteraction = Interaction.create({
                 required: true
             })
         ]
-    }),
-    userAttributives: Attributive.create({
-        name: 'AuthenticatedUser',
-        content: function(target, { user }) {
-            return user.id !== undefined
-        }
     })
 })
 
