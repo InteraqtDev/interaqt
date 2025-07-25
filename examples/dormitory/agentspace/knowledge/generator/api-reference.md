@@ -532,7 +532,7 @@ Transform.create(config: TransformConfig): TransformInstance
 
 ### StateMachine.create()
 
-Create state machine computation.
+Create state machine computation that manages state transitions and computes values based on those transitions. Can be used for entity properties, relation properties, or global dictionaries.
 
 **Syntax**
 ```typescript
@@ -552,7 +552,6 @@ const confirmedState = StateNode.create({ name: 'confirmed' });
 const shippedState = StateNode.create({ name: 'shipped' });
 const deliveredState = StateNode.create({ name: 'delivered' });
 
-// Order state machine
 const OrderStateMachine = StateMachine.create({
     states: [pendingState, confirmedState, shippedState, deliveredState],
     transfers: [
@@ -563,6 +562,72 @@ const OrderStateMachine = StateMachine.create({
         })
     ],
     defaultState: pendingState
+});
+
+// Relation State Machine Example
+const relationNotExistsState = StateNode.create({ 
+    name: 'notExists',
+    computeValue: () => null  // Return null means no relation
+});
+
+const relationExistsState = StateNode.create({ 
+    name: 'exists',
+    computeValue: () => ({
+        establishedAt: new Date().toISOString(),
+        status: 'active'
+    })
+});
+
+const RelationStateMachine = StateMachine.create({
+    states: [relationNotExistsState, relationExistsState],
+    transfers: [
+        StateTransfer.create({
+            trigger: CreateRelationInteraction,
+            current: relationNotExistsState,
+            next: relationExistsState,
+            computeTarget: (event) => ({
+                source: event.user,
+                target: event.payload.targetEntity
+            })
+        }),
+        StateTransfer.create({
+            trigger: RemoveRelationInteraction,
+            current: relationExistsState,
+            next: relationNotExistsState,
+            computeTarget: async function(this: Controller, event) {
+                // Find existing relation to remove
+                const relation = await this.system.storage.findOneRelationByName('UserTargetRelation',
+                    this.globals.MatchExp.atom({
+                        key: 'source.id',
+                        value: ['=', event.user.id]
+                    }).and({
+                        key: 'target.id',
+                        value: ['=', event.payload.targetId]
+                    }),
+                    undefined,
+                    ['id']
+                );
+                return relation;
+            }
+        })
+    ],
+    defaultState: relationNotExistsState
+});
+
+// Apply to relation definition
+const UserTargetRelation = Relation.create({
+    source: User,
+    sourceProperty: 'targets',
+    target: TargetEntity,
+    targetProperty: 'users',
+    type: 'n:n',
+    properties: [
+        Property.create({
+            name: 'relationState',
+            type: 'object',
+            computation: RelationStateMachine
+        })
+    ]
 })
 ```
 
@@ -1156,23 +1221,150 @@ StateNode.create(config: StateNodeConfig): StateNodeInstance
 
 **Parameters**
 - `config.name` (string, required): State name identifier
-- `config.computeValue` (function, optional): Function to compute value for this state
+- `config.computeValue` (function, optional): Function to compute the value when transitioning to this state
+
+**computeValue Function**
+
+The `computeValue` function determines what value should be stored when the state machine transitions to this state:
+
+- **Function Signature**: 
+  - Sync: `(lastValue?: any) => any`
+  - Async: `async (lastValue?: any) => Promise<any>`
+  - `lastValue`: The previous value before the state transition (may be undefined for initial state)
+  - Returns: The new value to be stored (can be a Promise)
+- **Context**: Called with `this` bound to the Controller instance
+- **Async Support**: Yes, `computeValue` can be an async function
+- **Purpose**: 
+  - Store state-specific data (e.g., timestamps, user IDs)
+  - Transform or calculate values based on the previous state
+  - Return complex objects with multiple properties
+  - Return `null` to indicate deletion (for entity/relation state machines)
+  - Perform async operations like database queries or API calls
 
 **Examples**
 ```typescript
-// Simple state node
+// Simple state node (no value computation)
 const pendingState = StateNode.create({ name: 'pending' });
 
-// State node with computed value
+// Store timestamp when entering state
+const processedState = StateNode.create({
+    name: 'processed',
+    computeValue: () => new Date().toISOString()
+});
+
+// Store complex object
 const activeState = StateNode.create({
     name: 'active',
-    computeValue: (context) => {
-        // Compute state-specific value
+    computeValue: () => ({
+        activatedAt: Date.now(),
+        status: 'active',
+        metadata: { source: 'manual' }
+    })
+});
+
+// Increment value based on previous state
+const incrementingState = StateNode.create({
+    name: 'incrementing',
+    computeValue: (lastValue) => {
+        const baseValue = typeof lastValue === 'number' ? lastValue : 0;
+        return baseValue + 1;
+    }
+});
+
+// Preserve previous value
+const idleState = StateNode.create({
+    name: 'idle',
+    computeValue: (lastValue) => {
+        return typeof lastValue === 'number' ? lastValue : 0;
+    }
+});
+
+// Return null to delete (for entity/relation state machines)
+const deletedState = StateNode.create({
+    name: 'deleted',
+    computeValue: () => null
+});
+
+// Async computeValue - fetch data from database
+const enrichedState = StateNode.create({
+    name: 'enriched',
+    computeValue: async function(lastValue) {
+        // Access controller to query database
+        const relatedData = await this.system.storage.findOne('RelatedEntity',
+            this.globals.MatchExp.atom({ key: 'id', value: ['=', lastValue.relatedId] }),
+            undefined,
+            ['name', 'metadata']
+        );
+        
         return {
-            activatedAt: Date.now(),
-            priority: context.priority || 'normal'
+            ...lastValue,
+            enrichedAt: new Date().toISOString(),
+            relatedInfo: relatedData
         };
     }
+});
+
+// Async computeValue - external API call
+const verifiedState = StateNode.create({
+    name: 'verified',
+    computeValue: async (lastValue) => {
+        // Simulate external verification
+        const verificationResult = await someExternalAPI.verify(lastValue.data);
+        
+        return {
+            status: 'verified',
+            verifiedAt: new Date().toISOString(),
+            verificationId: verificationResult.id,
+            confidence: verificationResult.confidence
+        };
+    }
+});
+```
+
+**Usage in StateMachine**
+
+StateNodes with `computeValue` are used in StateMachine to compute property values or entity states:
+
+```typescript
+// Counter that increments on interaction
+const CounterStateMachine = StateMachine.create({
+    states: [
+        StateNode.create({ 
+            name: 'idle', 
+            computeValue: (lastValue) => lastValue || 0 
+        }),
+        StateNode.create({ 
+            name: 'incrementing', 
+            computeValue: (lastValue) => (lastValue || 0) + 1 
+        })
+    ],
+    transfers: [/* ... */],
+    defaultState: idleState
+});
+
+// Timestamp tracking
+const ProcessingStateMachine = StateMachine.create({
+    states: [
+        StateNode.create({ name: 'pending' }),
+        StateNode.create({ 
+            name: 'processed', 
+            computeValue: () => new Date().toISOString() 
+        })
+    ],
+    transfers: [/* ... */],
+    defaultState: pendingState
+});
+
+// Apply to property
+const SomeEntity = Entity.create({
+    name: 'SomeEntity',
+    properties: [
+        Property.create({
+            name: 'processedAt',
+            type: 'string',
+            computation: ProcessingStateMachine
+        })
+    ]
 });
 ```
 
@@ -1189,30 +1381,110 @@ StateTransfer.create(config: StateTransferConfig): StateTransferInstance
 - `config.trigger` (any, required): Trigger for the state transfer (usually an Interaction)
 - `config.current` (StateNode, required): Current state node
 - `config.next` (StateNode, required): Next state node
-- `config.computeTarget` (function, optional): Function to dynamically compute the target state
+- `config.computeTarget` (function, optional): Function to compute which records should undergo this state transition. Returns the target record(s) that should be affected by this state change.
+
+**computeTarget Function**
+
+The `computeTarget` function determines which specific records should transition states when the trigger occurs:
+
+- **For Entity StateMachines**: Return entity record(s) with `id` field: `{id: string}` or array of such objects
+- **For Relation StateMachines**: 
+  - Return new relation specification: `{source: EntityRef, target: EntityRef}` where EntityRef can be:
+    - An object with `id`: `{id: string}`
+    - A full entity record: `{id: string, ...otherFields}`
+    - The source/target can also be arrays for batch operations
+  - Or return existing relation record(s) with `id`
+- **Function Signature**: 
+  - Sync: `(event: InteractionEvent) => TargetRecord`
+  - Async: `async function(this: Controller, event: InteractionEvent) => TargetRecord`
+- **Event Parameter**: Contains interaction details including `event.payload` with the interaction's payload data
 
 **Examples**
 ```typescript
-// Simple state transfer
+// Simple state transfer (no computeTarget needed for global state)
 const approveTransfer = StateTransfer.create({
     trigger: ApproveInteraction,
     current: pendingState,
     next: approvedState
 });
 
-// State transfer with dynamic target computation
-const conditionalTransfer = StateTransfer.create({
-    trigger: ProcessInteraction,
+// Entity state transfer - specify which entity to update
+const incrementTransfer = StateTransfer.create({
+    trigger: IncrementInteraction,
+    current: idleState,
+    next: incrementingState,
+    computeTarget: (event) => {
+        // Return the counter entity that should transition states
+        return { id: event.payload.counter.id };
+    }
+});
+
+// Relation state transfer - create new relation
+const assignReviewerTransfer = StateTransfer.create({
+    trigger: AssignReviewerInteraction,
+    current: unassignedState,
+    next: assignedState,
+    computeTarget: async function(this: Controller, event) {
+        // Find the request entity
+        const request = await this.system.storage.findOne('Request', 
+            this.globals.MatchExp.atom({
+                key: 'id',
+                value: ['=', event.payload.requestId]
+            }),
+            undefined,
+            ['id']
+        );
+        
+        // Return source and target to create/update relation
+        return {
+            source: request,  // Can be {id: '...'} or full entity
+            target: event.payload.reviewer  // From payload
+        };
+    }
+});
+
+// Relation state transfer - simple source/target
+const createFriendshipTransfer = StateTransfer.create({
+    trigger: AddFriendInteraction,
+    current: notFriendsState,
+    next: friendsState,
+    computeTarget: (event) => ({
+        source: event.user,  // The user initiating the friendship
+        target: { id: event.payload.friendId }  // The friend being added
+    })
+});
+
+// Relation state transfer - existing relation
+const updateRelationTransfer = StateTransfer.create({
+    trigger: UpdateStatusInteraction,
+    current: activeState,
+    next: updatedState,
+    computeTarget: async function(this: Controller, event) {
+        // Find existing relation
+        const relation = await this.system.storage.findOneRelationByName('UserProjectRelation',
+            this.globals.MatchExp.atom({
+                key: 'source.id',
+                value: ['=', event.user.id]
+            }).and({
+                key: 'target.id', 
+                value: ['=', event.payload.projectId]
+            }),
+            undefined,
+            ['id']
+        );
+        
+        return relation;  // Return existing relation by id
+    }
+});
+
+// Multiple targets - return array
+const bulkApproveTransfer = StateTransfer.create({
+    trigger: BulkApproveInteraction,
     current: pendingState,
-    next: approvedState, // Default next state
-    computeTarget: (context) => {
-        // Dynamically determine next state based on context
-        if (context.autoApprove) {
-            return approvedState;
-        } else if (context.requiresReview) {
-            return reviewState;
-        }
-        return rejectedState;
+    next: approvedState,
+    computeTarget: (event) => {
+        // Return multiple entities to transition
+        return event.payload.items.map(item => ({ id: item.id }));
     }
 });
 ```
