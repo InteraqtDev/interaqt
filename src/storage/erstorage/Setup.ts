@@ -1,8 +1,8 @@
 import { LinkMapItem, MapData, RecordAttribute, RecordMapItem, ValueAttribute } from "./EntityToTableMap.js";
 import { assert } from "../utils.js";
 import { EntityInstance, RelationInstance, PropertyInstance } from "@shared";
-import { isRelation } from "./util.js";
 import { ID_ATTR, ROW_ID_ATTR, Database } from "@runtime";
+import { isRelation } from "./util.js";
 
 // Define the types we need
 
@@ -27,6 +27,9 @@ export type MergeLinks = string[]
 
 
 export class DBSetup {
+    private fieldNameMap: Map<string, string> = new Map()
+    private usedFieldNames: Set<string> = new Set()
+    private fieldCounter: number = 1
     public recordToTableMap = new Map<string,string>()
     public tableToRecordsMap = new Map<string, Set<string>>()
     public mergeLog: any[] = []
@@ -413,7 +416,7 @@ export class DBSetup {
             Object.entries(record.attributes).forEach(([attributeName, attributeData]) => {
                 if ((attributeData as RecordAttribute).isRecord) return
                 const valueAttributeData = attributeData as ValueAttribute
-                valueAttributeData.field = `${recordName}_${attributeName}`
+                valueAttributeData.field = this.generateShortFieldName(`${recordName}_${attributeName}`)
                 valueAttributeData.fieldType = this.database!.mapToDBFieldType(valueAttributeData.type, valueAttributeData.collection)
             })
         })
@@ -432,18 +435,18 @@ export class DBSetup {
             const sourceAttribute = record.attributes.source as ValueAttribute
             const targetAttribute = record.attributes.target as ValueAttribute
             if (!link.mergedTo ) {
-                sourceAttribute.field = `${recordName}_source`
+                sourceAttribute.field = this.generateShortFieldName(`${recordName}_source`)
                 sourceAttribute.fieldType = this.database!.mapToDBFieldType(sourceAttribute.type, false)
 
-                targetAttribute.field = `${recordName}_target`
+                targetAttribute.field = this.generateShortFieldName(`${recordName}_target`)
                 targetAttribute.fieldType = this.database!.mapToDBFieldType(targetAttribute.type, false)
             } else if (link.mergedTo === 'source') {
                 // field 名字以 sourceRecord 里面的称呼为主
-                targetAttribute.field = `${link.sourceRecord}_${link.sourceProperty}`
+                targetAttribute.field = this.generateShortFieldName(`${link.sourceRecord}_${link.sourceProperty}`)
                 targetAttribute.fieldType = this.database!.mapToDBFieldType(targetAttribute.type, false)
 
             } else if (link.mergedTo === 'target') {
-                sourceAttribute.field = `${link.targetRecord}_${link.targetProperty}`
+                sourceAttribute.field = this.generateShortFieldName(`${link.targetRecord}_${link.targetProperty}`)
                 sourceAttribute.fieldType = this.database!.mapToDBFieldType(sourceAttribute.type, false)
 
             } else {
@@ -550,6 +553,39 @@ ${Object.values(this.tables[tableName].columns).map(column => {
         return Promise.all(this.createTableSQL().map(sql => {
             return this.database!.scheme(sql)
         }))
+    }
+
+    /**
+     * Generate a shortened field name using auto-increment number
+     * @param originalName The original long field name
+     * @returns A shortened field name that is unique
+     */
+    private generateShortFieldName(originalName: string): string {
+        // If already shortened, return the existing one
+        if (this.fieldNameMap.has(originalName)) {
+            return this.fieldNameMap.get(originalName)!
+        }
+
+        // Extract meaningful prefix from the original name
+        const parts = originalName.split('_')
+        let prefix = ''
+        
+        // Try to create a meaningful prefix from the first parts
+        if (parts.length >= 2) {
+            // Take first few characters from each part
+            prefix = parts.slice(0, 2).map(p => p.substring(0, 3).toLowerCase()).join('_')
+        } else {
+            prefix = originalName.substring(0, 6).toLowerCase()
+        }
+
+        // Generate field name with auto-increment number
+        const shortName = `${prefix}_${this.fieldCounter}`
+        this.fieldCounter++
+
+        this.fieldNameMap.set(originalName, shortName)
+        this.usedFieldNames.add(shortName)
+        
+        return shortName
     }
 }
 
