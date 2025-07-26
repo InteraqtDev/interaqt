@@ -1,341 +1,347 @@
-# 宿舍管理系统测试用例
+# Dormitory Management System - Test Cases
 
-## 测试用例设计原则
+## Overview
+This document contains comprehensive test cases for the dormitory management system, organized by phases as per the progressive implementation approach.
 
-**🔴 重要：所有测试用例必须基于交互（Interactions），而不是实体/关系操作**
+## Stage 1: Core Business Logic Tests
 
-测试用例分为三个阶段：
-1. **核心业务逻辑测试**（优先实现）
-2. **权限测试**（核心逻辑完成后实现）
-3. **业务规则测试**（核心逻辑完成后实现）
+### TC001: Create Dormitory (via CreateDormitory Interaction)
+- **Interaction**: CreateDormitory
+- **Preconditions**: Admin user exists in system
+- **Input Data**: 
+  - user: admin (role='admin')
+  - payload: { name: "Building A", capacity: 4 }
+- **Expected Results**:
+  1. New dormitory entity created
+  2. Dormitory name is "Building A"
+  3. Dormitory capacity is 4
+  4. Dormitory status is "active"
+  5. Occupancy count is 0
+  6. 4 bed entities are created and linked to dormitory
+- **Post Validation**: Dormitory appears in system dormitory list
 
----
+### TC002: Create Dormitory with Maximum Capacity (via CreateDormitory Interaction)
+- **Interaction**: CreateDormitory
+- **Preconditions**: Admin user exists in system
+- **Input Data**:
+  - user: admin (role='admin')
+  - payload: { name: "Building B", capacity: 6 }
+- **Expected Results**:
+  1. New dormitory entity created
+  2. Dormitory capacity is 6
+  3. 6 bed entities are created
+  4. All beds have status "vacant"
 
-## 第一阶段：核心业务逻辑测试
+### TC003: Assign User to Bed (via AssignUserToBed Interaction)
+- **Interaction**: AssignUserToBed
+- **Preconditions**: 
+  - Admin user exists
+  - Student user exists (role='student')
+  - Dormitory with vacant beds exists
+- **Input Data**:
+  - user: admin
+  - payload: { userId: "student1", bedId: "bed1" }
+- **Expected Results**:
+  1. UserBedRelation created
+  2. Bed status changes to "occupied"
+  3. User's currentBed property points to assigned bed
+  4. Dormitory occupancy count increases by 1
+  5. Assignment timestamp is recorded
 
-### TC001: 创建宿舍（通过CreateDormitory交互）
-- **交互**: CreateDormitory
-- **前置条件**: 管理员用户已创建
-- **输入数据**: 
-  ```json
-  {
-    "name": "1号楼101",
-    "capacity": 4
-  }
-  ```
-- **预期结果**:
-  1. 创建新的宿舍记录
-  2. 宿舍容量设置为4
-  3. 当前入住人数为0
-  4. 自动创建4个床位（bedNumber: "A1", "A2", "A3", "A4"）
-  5. 所有床位状态为available
-- **后置验证**: 宿舍出现在系统中，可通过查询获得
+### TC004: Assign Dorm Head (via AssignDormHead Interaction)
+- **Interaction**: AssignDormHead
+- **Preconditions**:
+  - Admin user exists
+  - Regular user exists
+  - Dormitory exists
+- **Input Data**:
+  - user: admin
+  - payload: { userId: "user1", dormitoryId: "dorm1" }
+- **Expected Results**:
+  1. User role changes to "dormHead"
+  2. DormitoryDormHeadRelation created
+  3. Dormitory's dormHead property points to user
+  4. User's managedDormitory property points to dormitory
 
-### TC002: 创建用户（通过CreateUser交互）
-- **交互**: CreateUser
-- **前置条件**: 系统初始化完成
-- **输入数据**: 
-  ```json
-  {
-    "name": "张三",
-    "email": "zhangsan@example.com",
-    "role": "student"
-  }
-  ```
-- **预期结果**:
-  1. 创建新的用户记录
-  2. 用户角色设置为student
-  3. 初始扣分为0
-  4. 用户状态为active
-- **后置验证**: 用户出现在系统中，可通过查询获得
+### TC005: Record Violation (via RecordViolation Interaction)
+- **Interaction**: RecordViolation
+- **Preconditions**:
+  - Dorm head exists and manages a dormitory
+  - Student is assigned to a bed in that dormitory
+  - Violation rule exists (e.g., "Noise Violation", 10 points)
+- **Input Data**:
+  - user: dormHead
+  - payload: { 
+      targetUserId: "student1",
+      violationRuleId: "rule1",
+      description: "Loud music after 10 PM"
+    }
+- **Expected Results**:
+  1. ViolationRecord created
+  2. Record linked to user and violation rule
+  3. User's totalViolationPoints increases by 10
+  4. Violation timestamp recorded
+  5. Record status is "active"
 
-### TC003: 分配用户到宿舍（通过AssignUserToDormitory交互）
-- **交互**: AssignUserToDormitory
-- **前置条件**: 
-  - 宿舍"1号楼101"已创建（容量4）
-  - 用户"张三"已创建（role: student）
-  - 管理员用户已创建（role: admin）
-- **输入数据**:
-  ```json
-  {
-    "userId": "zhang_san_id",
-    "dormitoryId": "dorm_101_id",
-    "bedId": "bed_a1_id"
-  }
-  ```
-- **预期结果**:
-  1. 创建用户-宿舍关系
-  2. 创建用户-床位关系
-  3. 床位状态变更为occupied
-  4. 宿舍当前入住人数+1
-  5. 分配状态为active
-  6. 记录分配时间戳
-- **后置验证**: 用户.dormitory指向该宿舍，宿舍.users包含该用户
+### TC006: Request Kickout (via RequestKickout Interaction)
+- **Interaction**: RequestKickout
+- **Preconditions**:
+  - Dorm head manages dormitory
+  - Student in dormitory has violations
+- **Input Data**:
+  - user: dormHead
+  - payload: {
+      targetUserId: "student1",
+      reason: "Multiple violations, total 120 points"
+    }
+- **Expected Results**:
+  1. KickoutRequest entity created
+  2. Request status is "pending"
+  3. Request linked to dorm head, target user, and dormitory
+  4. Request timestamp recorded
 
-### TC004: 任命宿舍长（通过AppointDormHead交互）
-- **交互**: AppointDormHead
-- **前置条件**: 
-  - 用户"张三"已分配到宿舍"1号楼101"
-  - 管理员用户已创建
-- **输入数据**:
-  ```json
-  {
-    "userId": "zhang_san_id",
-    "dormitoryId": "dorm_101_id"
-  }
-  ```
-- **预期结果**:
-  1. 创建宿舍长关系
-  2. 用户角色保持为student（不改变）
-  3. 宿舍长状态为active
-  4. 记录任命时间戳
-- **后置验证**: 宿舍.dormHead指向该用户，用户拥有宿舍长职责
+### TC007: Approve Kickout Request (via ApproveKickoutRequest Interaction)
+- **Interaction**: ApproveKickoutRequest
+- **Preconditions**:
+  - Admin user exists
+  - Pending kickout request exists
+  - Target user is assigned to a bed
+- **Input Data**:
+  - user: admin
+  - payload: {
+      requestId: "request1",
+      decision: "approved",
+      comments: "Approved due to repeated violations"
+    }
+- **Expected Results**:
+  1. KickoutRequest status changes to "approved"
+  2. User status changes to "kickedOut"
+  3. UserBedRelation is removed
+  4. Bed status changes back to "vacant"
+  5. Dormitory occupancy count decreases by 1
+  6. Admin comments recorded
 
-### TC005: 记录违规行为（通过RecordViolation交互）
-- **交互**: RecordViolation
-- **前置条件**: 
-  - 用户"张三"已分配到宿舍，并被任命为宿舍长
-  - 用户"李四"已分配到同一宿舍
-- **输入数据**:
-  ```json
-  {
-    "violatorId": "li_si_id",
-    "violationType": "晚归",
-    "description": "23:30后归宿",
-    "scoreDeducted": 2
-  }
-  ```
-- **预期结果**:
-  1. 创建违规记录
-  2. 李四的总扣分+2
-  3. 记录创建时间戳
-  4. 记录人为张三
-- **后置验证**: 李四的score字段更新，违规记录可查询到
+### TC008: Transfer User Between Beds (via TransferUser Interaction)
+- **Interaction**: TransferUser
+- **Preconditions**:
+  - Admin user exists
+  - User assigned to bed1
+  - bed2 is vacant in different dormitory
+- **Input Data**:
+  - user: admin
+  - payload: {
+      userId: "student1",
+      newBedId: "bed2"
+    }
+- **Expected Results**:
+  1. Old UserBedRelation removed
+  2. New UserBedRelation created
+  3. Old bed status changes to "vacant"
+  4. New bed status changes to "occupied"
+  5. Both dormitory occupancy counts updated correctly
 
-### TC006: 创建踢出申请（通过CreateKickoutRequest交互）
-- **交互**: CreateKickoutRequest
-- **前置条件**: 
-  - 宿舍长"张三"已任命
-  - 用户"李四"在同一宿舍且扣分≥10
-- **输入数据**:
-  ```json
-  {
-    "targetUserId": "li_si_id",
-    "reason": "多次违规，累计扣分超标"
-  }
-  ```
-- **预期结果**:
-  1. 创建踢出申请记录
-  2. 申请状态为pending
-  3. 记录申请时间戳
-  4. 申请人为张三
-  5. 目标用户为李四
-- **后置验证**: 申请出现在待处理列表中
+### TC009: Multiple Violation Accumulation (via RecordViolation Interaction)
+- **Interaction**: RecordViolation (multiple calls)
+- **Preconditions**:
+  - Student assigned to dormitory
+  - Multiple violation rules exist
+- **Test Flow**:
+  1. Record "Noise Violation" (10 points)
+  2. Record "Hygiene Violation" (15 points)
+  3. Record "Safety Violation" (30 points)
+- **Expected Results**:
+  1. Three ViolationRecord entities created
+  2. User's totalViolationPoints is 55 (10+15+30)
+  3. All records linked to correct user and rules
 
-### TC007: 处理踢出申请-同意（通过ProcessKickoutRequest交互）
-- **交互**: ProcessKickoutRequest
-- **前置条件**: 
-  - 踢出申请已创建，状态为pending
-  - 管理员用户存在
-- **输入数据**:
-  ```json
-  {
-    "requestId": "kickout_request_id",
-    "decision": "approved"
-  }
-  ```
-- **预期结果**:
-  1. 申请状态更新为approved
-  2. 用户-宿舍关系状态变为inactive
-  3. 用户-床位关系状态变为inactive
-  4. 床位状态变回available
-  5. 宿舍当前入住人数-1
-  6. 记录处理时间戳和处理人
-- **后置验证**: 用户不再分配到该宿舍，床位可重新分配
+### TC010: Create Violation Rule (via CreateViolationRule Interaction)
+- **Interaction**: CreateViolationRule
+- **Preconditions**: Admin user exists
+- **Input Data**:
+  - user: admin
+  - payload: {
+      name: "Curfew Violation",
+      description: "Returning after 11 PM",
+      points: 20,
+      category: "discipline"
+    }
+- **Expected Results**:
+  1. ViolationRule entity created
+  2. All properties correctly set
+  3. Rule available for use in RecordViolation
 
-### TC008: 处理踢出申请-拒绝（通过ProcessKickoutRequest交互）
-- **交互**: ProcessKickoutRequest
-- **前置条件**: 
-  - 踢出申请已创建，状态为pending
-  - 管理员用户存在
-- **输入数据**:
-  ```json
-  {
-    "requestId": "kickout_request_id",
-    "decision": "rejected"
-  }
-  ```
-- **预期结果**:
-  1. 申请状态更新为rejected
-  2. 用户分配关系保持不变
-  3. 记录处理时间戳和处理人
-- **后置验证**: 用户仍在原宿舍，申请状态为rejected
+## Stage 2: Permission and Business Rule Tests
 
----
+### TC011: Non-Admin Cannot Create Dormitory (via CreateDormitory Interaction)
+- **Interaction**: CreateDormitory
+- **Preconditions**: Student user exists (role='student')
+- **Input Data**:
+  - user: student
+  - payload: { name: "Building X", capacity: 4 }
+- **Expected Results**:
+  1. Interaction returns error
+  2. Error indicates permission denied
+  3. No dormitory created
+  4. No beds created
 
-## 第二阶段：权限测试
+### TC012: Create Dormitory with Invalid Capacity (via CreateDormitory Interaction)
+- **Interaction**: CreateDormitory
+- **Preconditions**: Admin user exists
+- **Input Data**:
+  - user: admin
+  - payload: { name: "Building Y", capacity: 8 }
+- **Expected Results**:
+  1. Interaction returns error
+  2. Error indicates capacity must be 4-6
+  3. No dormitory created
 
-### TC101: 非管理员创建宿舍被拒绝（通过CreateDormitory交互）
-- **交互**: CreateDormitory
-- **测试阶段**: 权限测试（核心逻辑完成后实现）
-- **前置条件**: 普通学生用户已创建（role: student）
-- **输入数据**: 
-  ```json
-  {
-    "name": "2号楼201",
-    "capacity": 4
-  }
-  ```
-- **预期结果**:
-  1. 交互返回错误
-  2. 错误类型为"权限不足"
-  3. 没有创建宿舍记录
-- **注意**: 不要用storage.create测试 - 它会绕过验证！
+### TC013: Assign User to Occupied Bed (via AssignUserToBed Interaction)
+- **Interaction**: AssignUserToBed
+- **Preconditions**:
+  - Admin exists
+  - Bed already occupied by another user
+- **Input Data**:
+  - user: admin
+  - payload: { userId: "student2", bedId: "occupiedBed1" }
+- **Expected Results**:
+  1. Interaction returns error
+  2. Error indicates bed is already occupied
+  3. No new assignment created
+  4. Original occupant remains unchanged
 
-### TC102: 非管理员分配用户被拒绝（通过AssignUserToDormitory交互）
-- **交互**: AssignUserToDormitory
-- **测试阶段**: 权限测试
-- **前置条件**: 宿舍长用户尝试分配其他用户
-- **输入数据**: 用户分配数据
-- **预期结果**:
-  1. 交互返回错误
-  2. 错误类型为"权限不足"
-  3. 没有创建分配关系
+### TC014: Dorm Head Cannot Record Violation for Non-Resident (via RecordViolation Interaction)
+- **Interaction**: RecordViolation
+- **Preconditions**:
+  - Dorm head manages Building A
+  - Student assigned to Building B
+- **Input Data**:
+  - user: dormHeadA
+  - payload: { targetUserId: "studentInBuildingB", violationRuleId: "rule1" }
+- **Expected Results**:
+  1. Interaction returns error
+  2. Error indicates user not in managed dormitory
+  3. No violation record created
 
-### TC103: 宿舍长记录非同宿舍用户违规被拒绝（通过RecordViolation交互）
-- **交互**: RecordViolation
-- **测试阶段**: 权限测试
-- **前置条件**: 
-  - 宿舍长A管理宿舍1
-  - 用户B在宿舍2
-- **输入数据**: A尝试记录B的违规
-- **预期结果**:
-  1. 交互返回错误
-  2. 错误类型为"权限不足"
-  3. 没有创建违规记录
+### TC015: Cannot Assign Already Assigned User (via AssignUserToBed Interaction)
+- **Interaction**: AssignUserToBed
+- **Preconditions**:
+  - User already assigned to a bed
+  - Another vacant bed exists
+- **Input Data**:
+  - user: admin
+  - payload: { userId: "assignedStudent", bedId: "vacantBed" }
+- **Expected Results**:
+  1. Interaction returns error
+  2. Error indicates user already assigned
+  3. User remains in original bed
+  4. Target bed remains vacant
 
-### TC104: 普通学生记录违规被拒绝（通过RecordViolation交互）
-- **交互**: RecordViolation
-- **测试阶段**: 权限测试
-- **前置条件**: 普通学生用户（非宿舍长）
-- **输入数据**: 违规记录数据
-- **预期结果**:
-  1. 交互返回错误
-  2. 错误类型为"权限不足"
-  3. 没有创建违规记录
+### TC016: Cannot Approve Already Processed Request (via ApproveKickoutRequest Interaction)
+- **Interaction**: ApproveKickoutRequest
+- **Preconditions**:
+  - Kickout request already approved
+- **Input Data**:
+  - user: admin
+  - payload: { requestId: "approvedRequest", decision: "approved" }
+- **Expected Results**:
+  1. Interaction returns error
+  2. Error indicates request already processed
+  3. Request status remains unchanged
 
----
+### TC017: Dorm Head Cannot Record Violation for Self (via RecordViolation Interaction)
+- **Interaction**: RecordViolation
+- **Preconditions**:
+  - Dorm head assigned to a bed in their managed dormitory
+- **Input Data**:
+  - user: dormHead
+  - payload: { targetUserId: "dormHead", violationRuleId: "rule1" }
+- **Expected Results**:
+  1. Interaction returns error
+  2. Error indicates cannot record violation for self
+  3. No violation record created
 
-## 第三阶段：业务规则测试
+### TC018: Cannot Assign Kicked Out User (via AssignUserToBed Interaction)
+- **Interaction**: AssignUserToBed
+- **Preconditions**:
+  - User has status "kickedOut"
+  - Vacant bed exists
+- **Input Data**:
+  - user: admin
+  - payload: { userId: "kickedOutUser", bedId: "vacantBed" }
+- **Expected Results**:
+  1. Interaction returns error
+  2. Error indicates user is kicked out
+  3. No assignment created
+  4. Bed remains vacant
 
-### TC201: 创建宿舍容量超限被拒绝（通过CreateDormitory交互）
-- **交互**: CreateDormitory
-- **测试阶段**: 业务规则测试（核心逻辑完成后实现）
-- **前置条件**: 管理员用户已创建
-- **输入数据**: 
-  ```json
-  {
-    "name": "3号楼301",
-    "capacity": 8
-  }
-  ```
-- **预期结果**:
-  1. 交互返回错误
-  2. 错误信息指示容量必须在4-6之间
-  3. 没有创建宿舍记录
-- **注意**: 这测试业务规则验证，不是核心功能
+### TC019: Student Cannot View Other Dormitory Status (via ViewDormitoryStatus Interaction)
+- **Interaction**: ViewDormitoryStatus
+- **Preconditions**:
+  - Student assigned to Building A
+  - Trying to view Building B status
+- **Input Data**:
+  - user: student
+  - payload: { dormitoryId: "buildingB" }
+- **Expected Results**:
+  1. Interaction returns error
+  2. Error indicates permission denied
+  3. No dormitory information returned
 
-### TC202: 重复分配用户被拒绝（通过AssignUserToDormitory交互）
-- **交互**: AssignUserToDormitory
-- **测试阶段**: 业务规则测试
-- **前置条件**: 
-  - 用户"张三"已分配到宿舍A
-  - 尝试将其分配到宿舍B
-- **输入数据**: 重复分配数据
-- **预期结果**:
-  1. 交互返回错误
-  2. 错误信息指示用户已被分配
-  3. 原分配关系保持不变
+### TC020: Reject Kickout Request (via ApproveKickoutRequest Interaction)
+- **Interaction**: ApproveKickoutRequest
+- **Preconditions**:
+  - Admin exists
+  - Pending kickout request exists
+- **Input Data**:
+  - user: admin
+  - payload: {
+      requestId: "request2",
+      decision: "rejected",
+      comments: "First offense, warning issued instead"
+    }
+- **Expected Results**:
+  1. Request status changes to "rejected"
+  2. Target user remains in assigned bed
+  3. User status remains "active"
+  4. Admin comments recorded
 
-### TC203: 分配到已满宿舍被拒绝（通过AssignUserToDormitory交互）
-- **交互**: AssignUserToDormitory
-- **测试阶段**: 业务规则测试
-- **前置条件**: 
-  - 宿舍容量4，已分配4个用户
-  - 尝试分配第5个用户
-- **输入数据**: 第5个用户的分配数据
-- **预期结果**:
-  1. 交互返回错误
-  2. 错误信息指示宿舍已满
-  3. 没有创建新的分配关系
+## Edge Cases and Complex Scenarios
 
-### TC204: 分配到已占用床位被拒绝（通过AssignUserToDormitory交互）
-- **交互**: AssignUserToDormitory
-- **测试阶段**: 业务规则测试
-- **前置条件**: 
-  - 床位A1已被用户张三占用
-  - 尝试将用户李四分配到同一床位
-- **输入数据**: 李四分配到A1床位的数据
-- **预期结果**:
-  1. 交互返回错误
-  2. 错误信息指示床位已占用
-  3. 没有创建新的分配关系
+### TC021: Full Dormitory Assignment Check
+- **Scenario**: Attempt to view available beds when dormitory is full
+- **Expected**: Query returns empty list of available beds, isFull computed property is true
 
-### TC205: 扣分不足时申请踢出被拒绝（通过CreateKickoutRequest交互）
-- **交互**: CreateKickoutRequest
-- **测试阶段**: 业务规则测试
-- **前置条件**: 
-  - 宿舍长"张三"已任命
-  - 用户"李四"在同一宿舍但扣分<10
-- **输入数据**: 踢出申请数据
-- **预期结果**:
-  1. 交互返回错误
-  2. 错误信息指示扣分不足以申请踢出
-  3. 没有创建踢出申请
+### TC022: Concurrent Assignment Prevention
+- **Scenario**: Two admins try to assign different users to same bed
+- **Expected**: First assignment succeeds, second fails with "bed occupied" error
 
-### TC206: 重复申请踢出被拒绝（通过CreateKickoutRequest交互）
-- **交互**: CreateKickoutRequest
-- **测试阶段**: 业务规则测试
-- **前置条件**: 
-  - 已存在pending状态的踢出申请针对用户"李四"
-  - 尝试创建另一个踢出申请
-- **输入数据**: 重复踢出申请数据
-- **预期结果**:
-  1. 交互返回错误
-  2. 错误信息指示已存在待处理申请
-  3. 没有创建新的踢出申请
+### TC023: Kickout Request for User with No Violations
+- **Scenario**: Dorm head requests kickout for user with 0 violation points
+- **Expected**: Request created successfully (business logic allows it, admin decides)
 
-### TC207: 处理非pending状态申请被拒绝（通过ProcessKickoutRequest交互）
-- **交互**: ProcessKickoutRequest
-- **测试阶段**: 业务规则测试
-- **前置条件**: 踢出申请状态已为approved或rejected
-- **输入数据**: 处理决定数据
-- **预期结果**:
-  1. 交互返回错误
-  2. 错误信息指示申请已被处理
-  3. 申请状态保持不变
+### TC024: State Transition Validation
+- **Scenario**: Various state transitions for beds and users
+- **Expected**: Only valid transitions allowed (vacant→occupied, active→kickedOut, etc.)
 
----
+## Test Data Setup
 
-## 测试实现注意事项
+### Users
+- admin1: { name: "System Admin", email: "admin@dorm.com", role: "admin" }
+- dormHead1: { name: "John Doe", email: "john@dorm.com", role: "dormHead" }
+- student1: { name: "Alice Smith", email: "alice@dorm.com", role: "student" }
+- student2: { name: "Bob Jones", email: "bob@dorm.com", role: "student" }
 
-### Stage 1测试实现要点：
-- ✅ **始终使用正确的用户角色和有效数据**，即使权限尚未执行
-- ✅ 创建具有适当角色的用户（admin、dormHead、student等）
-- ✅ 使用符合未来业务规则的现实有效数据
-- ✅ 这确保Stage 1测试在Stage 2实现后继续通过
+### Dormitories
+- buildingA: { name: "Building A", capacity: 4 }
+- buildingB: { name: "Building B", capacity: 6 }
 
-### Stage 2测试实现要点：
-- ✅ **不要修改Stage 1测试用例** - 它们应该继续通过
-- ✅ **编写新的测试用例**专门用于权限和业务规则验证
-- ✅ Stage 1测试验证核心功能与有效输入一起工作
-- ✅ Stage 2测试验证无效输入被正确拒绝
-- ✅ **两个测试文件**在Stage 2实现后都应该通过
+### Violation Rules
+- rule1: { name: "Noise Violation", points: 10, category: "discipline" }
+- rule2: { name: "Hygiene Violation", points: 15, category: "hygiene" }
+- rule3: { name: "Safety Violation", points: 30, category: "safety" }
 
-### 框架能力说明：
-- ✅ interaqt框架具有完整的CRUD功能（创建、读取、更新、删除）
-- ✅ 如果更新/删除操作不工作，说明实现不正确，需要查看文档
-- ✅ 不要假设框架"不支持字段更新"或写通过降低期望的测试
-- ✅ 测试应该验证实际功能，不是绕过它
-
-这些测试用例涵盖了宿舍管理系统的所有核心功能、权限控制和业务规则验证。
+## Success Criteria
+- All Stage 1 tests pass before implementing Stage 2
+- All Stage 2 tests pass while Stage 1 tests continue to pass
+- No regression in functionality between stages
+- Clear error messages for all failure scenarios

@@ -1,440 +1,172 @@
-# 宿舍管理系统实体关系设计
+# Entity and Relation Design
 
-## 设计原则
+## Entities
 
-基于 `requirements/detailed-requirements.md` 的需求分析，遵循以下关键原则：
+### User
+- **Purpose**: System users with different roles (admin, dormHead, student)
+- **Properties**:
+  - id: string (system-generated)
+  - name: string (user's display name)
+  - email: string (unique identifier for login)
+  - phone: string (contact information)
+  - role: string (admin/dormHead/student)
+  - violationScore: number (total accumulated violation points, computed)
+  - status: string (active/suspended/kickedOut)
 
-- **🔴 关键**: 实体属性中不包含引用ID字段
-- **所有关系通过Relation定义实现**
-- **属性仅包含原始值、计算值或嵌入数据结构**
-- **实体间连接必须使用Relations**
+### Dormitory
+- **Purpose**: Physical dormitory buildings that house students
+- **Properties**:
+  - id: string (system-generated)
+  - name: string (building name/number)
+  - capacity: number (total bed capacity, 4-6)
+  - occupancyCount: number (current number of occupied beds, computed)
+  - status: string (active/full/inactive)
 
----
+### Bed
+- **Purpose**: Individual bed units within dormitories
+- **Properties**:
+  - id: string (system-generated)
+  - number: string (bed identifier within dormitory)
+  - status: string (vacant/occupied)
 
-## 实体定义
+### ViolationRule
+- **Purpose**: Predefined rules with associated penalty points
+- **Properties**:
+  - id: string (system-generated)
+  - name: string (rule name)
+  - description: string (detailed description)
+  - points: number (penalty points)
+  - category: string (hygiene/noise/safety/discipline)
 
-### 1. User（用户）
-**业务目的**: 系统中的所有用户，包含管理员、宿舍长、普通学生
+### ViolationRecord
+- **Purpose**: Actual violations recorded against users
+- **Properties**:
+  - id: string (system-generated)
+  - description: string (specific incident description)
+  - points: number (points deducted)
+  - recordedAt: number (timestamp)
+  - status: string (active/appealed/revoked)
 
-```typescript
-const User = Entity.create({
-  name: 'User',
-  properties: [
-    Property.create({ name: 'name', type: 'string' }),
-    Property.create({ name: 'email', type: 'string' }),
-    Property.create({ name: 'role', type: 'string' }), // admin/dormHead/student
-    Property.create({ 
-      name: 'score', 
-      type: 'number', 
-      defaultValue: () => 0 
-    }), // 当前扣分值
-    Property.create({ 
-      name: 'createdAt', 
-      type: 'bigint', 
-      defaultValue: () => Date.now() 
-    }),
-    Property.create({ 
-      name: 'status', 
-      type: 'string', 
-      defaultValue: () => 'active' 
-    }) // active/inactive
-  ]
-});
+### KickoutRequest
+- **Purpose**: Formal requests from dorm heads to remove residents
+- **Properties**:
+  - id: string (system-generated)
+  - reason: string (justification for removal)
+  - requestDate: number (timestamp)
+  - status: string (pending/approved/rejected)
+  - adminComments: string (admin's decision notes)
+
+## Relations
+
+### BedDormitoryRelation
+- **Type**: n:1 (many beds to one dormitory)
+- **Purpose**: Links beds to their parent dormitory
+- **Source**: Bed
+- **Target**: Dormitory
+- **Source Property**: `dormitory` (on Bed entity - bed.dormitory)
+- **Target Property**: `beds` (on Dormitory entity - dormitory.beds)
+- **Properties**: None
+
+### UserBedRelation
+- **Type**: 1:1 (one user to one bed at a time)
+- **Purpose**: Assigns users to specific beds
+- **Source**: User
+- **Target**: Bed
+- **Source Property**: `currentBed` (on User entity - user.currentBed)
+- **Target Property**: `occupant` (on Bed entity - bed.occupant)
+- **Properties**: 
+  - assignedAt: number (timestamp of assignment)
+
+### DormitoryDormHeadRelation
+- **Type**: 1:1 (one dorm head per dormitory)
+- **Purpose**: Designates management responsibility
+- **Source**: Dormitory
+- **Target**: User (with dormHead role)
+- **Source Property**: `dormHead` (on Dormitory entity - dormitory.dormHead)
+- **Target Property**: `managedDormitory` (on User entity - user.managedDormitory)
+- **Properties**:
+  - assignedAt: number (timestamp)
+
+### UserViolationRelation
+- **Type**: 1:n (one user can have many violations)
+- **Purpose**: Links violation records to users
+- **Source**: User
+- **Target**: ViolationRecord
+- **Source Property**: `violations` (on User entity - user.violations)
+- **Target Property**: `user` (on ViolationRecord entity - violationRecord.user)
+- **Properties**: None
+
+### ViolationRuleRecordRelation
+- **Type**: 1:n (one rule can be used in many records)
+- **Purpose**: Links violation records to their rules
+- **Source**: ViolationRule
+- **Target**: ViolationRecord
+- **Source Property**: `records` (on ViolationRule entity - rule.records)
+- **Target Property**: `rule` (on ViolationRecord entity - record.rule)
+- **Properties**: None
+
+### RecorderViolationRelation
+- **Type**: 1:n (one dorm head can record many violations)
+- **Purpose**: Tracks who recorded each violation
+- **Source**: User (dormHead)
+- **Target**: ViolationRecord
+- **Source Property**: `recordedViolations` (on User entity)
+- **Target Property**: `recordedBy` (on ViolationRecord entity)
+- **Properties**: None
+
+### KickoutRequestUserRelation
+- **Type**: n:1 (many requests can target one user)
+- **Purpose**: Links kickout requests to target users
+- **Source**: KickoutRequest
+- **Target**: User
+- **Source Property**: `targetUser` (on KickoutRequest entity)
+- **Target Property**: `kickoutRequests` (on User entity)
+- **Properties**: None
+
+### KickoutRequestInitiatorRelation
+- **Type**: n:1 (one dorm head can initiate many requests)
+- **Purpose**: Tracks who initiated each request
+- **Source**: KickoutRequest
+- **Target**: User (dormHead)
+- **Source Property**: `initiator` (on KickoutRequest entity)
+- **Target Property**: `initiatedRequests` (on User entity)
+- **Properties**: None
+
+### KickoutRequestDormitoryRelation
+- **Type**: n:1 (many requests can be for one dormitory)
+- **Purpose**: Links requests to the relevant dormitory
+- **Source**: KickoutRequest
+- **Target**: Dormitory
+- **Source Property**: `dormitory` (on KickoutRequest entity)
+- **Target Property**: `kickoutRequests` (on Dormitory entity)
+- **Properties**: None
+
+## Data Flow Diagram
+
+```
+User (Student) ←→ Bed ←→ Dormitory
+       ↓                      ↑
+       ↓                      ↓
+ViolationRecord          DormHead (User)
+       ↓                      ↓
+       ↓                      ↓
+   KickoutRequest ←───────────┘
 ```
 
-**说明**:
-- `score` 为违规累计扣分，通过计算属性从违规记录累加
-- `role` 决定用户权限：admin（管理员）、dormHead（宿舍长）、student（学生）
-- 不包含 `dormitoryId` 等引用字段，通过Relation访问
+## Key Design Decisions
 
-### 2. Dormitory（宿舍）
-**业务目的**: 宿舍信息管理
+1. **No ID References in Entities**: All relationships are managed through Relation definitions, not through ID properties in entities.
 
-```typescript
-const Dormitory = Entity.create({
-  name: 'Dormitory',
-  properties: [
-    Property.create({ name: 'name', type: 'string' }), // 宿舍名称
-    Property.create({ name: 'capacity', type: 'number' }), // 床位容量（4-6）
-    Property.create({ 
-      name: 'createdAt', 
-      type: 'bigint', 
-      defaultValue: () => Date.now() 
-    }),
-    Property.create({ 
-      name: 'status', 
-      type: 'string', 
-      defaultValue: () => 'active' 
-    }) // active/inactive
-  ]
-});
-```
+2. **Computed Properties**: 
+   - User.violationScore is computed from all active ViolationRecords
+   - Dormitory.occupancyCount is computed from occupied beds
 
-**说明**:
-- `capacity` 限制为4-6个床位，通过业务规则验证
-- 当前入住人数通过计算属性从关系中统计
-- 不包含 `dormHeadId` 等引用字段
+3. **State Management**:
+   - User states: active → suspended → kickedOut
+   - Bed states: vacant ↔ occupied
+   - KickoutRequest states: pending → approved/rejected
 
-### 3. Bed（床位）
-**业务目的**: 宿舍内具体床位管理
-
-```typescript
-const Bed = Entity.create({
-  name: 'Bed',
-  properties: [
-    Property.create({ name: 'bedNumber', type: 'string' }), // 床位号如"A1"
-    Property.create({ 
-      name: 'status', 
-      type: 'string', 
-      defaultValue: () => 'available' 
-    }), // available/occupied/maintenance
-    Property.create({ 
-      name: 'createdAt', 
-      type: 'bigint', 
-      defaultValue: () => Date.now() 
-    })
-  ]
-});
-```
-
-**说明**:
-- 床位状态管理生命周期：available → occupied → available
-- 通过关系连接到宿舍和用户
-
-### 4. ViolationRecord（违规记录）
-**业务目的**: 记录用户违规行为和扣分情况
-
-```typescript
-const ViolationRecord = Entity.create({
-  name: 'ViolationRecord',
-  properties: [
-    Property.create({ name: 'violationType', type: 'string' }), // 违规类型
-    Property.create({ name: 'description', type: 'string' }), // 违规描述
-    Property.create({ name: 'scoreDeducted', type: 'number' }), // 扣除分数
-    Property.create({ 
-      name: 'recordedAt', 
-      type: 'bigint', 
-      defaultValue: () => Date.now() 
-    })
-  ]
-});
-```
-
-**说明**:
-- 记录具体违规信息和扣分数量
-- 记录人和违规人通过关系连接
-- 用于计算用户总扣分
-
-### 5. KickoutRequest（踢出申请）
-**业务目的**: 宿舍长申请踢出用户的流程管理
-
-```typescript
-const KickoutRequest = Entity.create({
-  name: 'KickoutRequest',
-  properties: [
-    Property.create({ name: 'reason', type: 'string' }), // 申请理由
-    Property.create({ 
-      name: 'status', 
-      type: 'string', 
-      defaultValue: () => 'pending' 
-    }), // pending/approved/rejected
-    Property.create({ 
-      name: 'requestedAt', 
-      type: 'bigint', 
-      defaultValue: () => Date.now() 
-    }),
-    Property.create({ name: 'processedAt', type: 'bigint' }), // 可选
-    Property.create({ name: 'decision', type: 'string' }) // approved/rejected
-  ]
-});
-```
-
-**说明**:
-- 申请状态流转：pending → approved/rejected
-- 申请人、目标用户、处理人通过关系连接
-
----
-
-## 关系定义
-
-### 1. UserDormitoryRelation（用户-宿舍关系）
-**类型**: n:1（多个用户对应一个宿舍）
-**业务目的**: 记录用户被分配到哪个宿舍
-
-```typescript
-const UserDormitoryRelation = Relation.create({
-  source: User,
-  target: Dormitory,
-  type: 'n:1',
-  sourceProperty: 'dormitory', // user.dormitory
-  targetProperty: 'users', // dormitory.users
-  properties: [
-    Property.create({ 
-      name: 'assignedAt', 
-      type: 'bigint', 
-      defaultValue: () => Date.now() 
-    }),
-    Property.create({ 
-      name: 'status', 
-      type: 'string', 
-      defaultValue: () => 'active' 
-    }) // active/inactive
-  ]
-});
-```
-
-### 2. UserBedRelation（用户-床位关系）
-**类型**: 1:1（一个用户对应一个床位）
-**业务目的**: 记录用户具体占用的床位
-
-```typescript
-const UserBedRelation = Relation.create({
-  source: User,
-  target: Bed,
-  type: '1:1',
-  sourceProperty: 'bed', // user.bed
-  targetProperty: 'user', // bed.user
-  properties: [
-    Property.create({ 
-      name: 'assignedAt', 
-      type: 'bigint', 
-      defaultValue: () => Date.now() 
-    }),
-    Property.create({ 
-      name: 'status', 
-      type: 'string', 
-      defaultValue: () => 'active' 
-    }) // active/inactive
-  ]
-});
-```
-
-### 3. DormitoryBedRelation（宿舍-床位关系）
-**类型**: 1:n（一个宿舍包含多个床位）
-**业务目的**: 记录宿舍包含的所有床位
-
-```typescript
-const DormitoryBedRelation = Relation.create({
-  source: Dormitory,
-  target: Bed,
-  type: '1:n',
-  sourceProperty: 'beds', // dormitory.beds
-  targetProperty: 'dormitory', // bed.dormitory
-  properties: [
-    Property.create({ 
-      name: 'createdAt', 
-      type: 'bigint', 
-      defaultValue: () => Date.now() 
-    })
-  ]
-});
-```
-
-### 4. DormitoryHeadRelation（宿舍长关系）
-**类型**: 1:1（一个宿舍有一个宿舍长）
-**业务目的**: 记录宿舍长职责分配
-
-```typescript
-const DormitoryHeadRelation = Relation.create({
-  source: Dormitory,
-  target: User,
-  type: '1:1',
-  sourceProperty: 'dormHead', // dormitory.dormHead
-  targetProperty: 'managedDormitory', // user.managedDormitory
-  properties: [
-    Property.create({ 
-      name: 'appointedAt', 
-      type: 'bigint', 
-      defaultValue: () => Date.now() 
-    }),
-    Property.create({ 
-      name: 'status', 
-      type: 'string', 
-      defaultValue: () => 'active' 
-    }) // active/inactive
-  ]
-});
-```
-
-### 5. UserViolationRecordRelation（用户-违规记录关系）
-**类型**: 1:n（一个用户可有多个违规记录）
-**业务目的**: 关联违规用户和其违规记录
-
-```typescript
-const UserViolationRecordRelation = Relation.create({
-  source: User,
-  target: ViolationRecord,
-  type: '1:n',
-  sourceProperty: 'violationRecords', // user.violationRecords
-  targetProperty: 'violator', // violationRecord.violator
-  properties: []
-});
-```
-
-### 6. RecorderViolationRecordRelation（记录人-违规记录关系）
-**类型**: 1:n（一个记录人可记录多个违规）
-**业务目的**: 关联记录人和违规记录
-
-```typescript
-const RecorderViolationRecordRelation = Relation.create({
-  source: User,
-  target: ViolationRecord,
-  type: '1:n',
-  sourceProperty: 'recordedViolations', // user.recordedViolations
-  targetProperty: 'recorder', // violationRecord.recorder
-  properties: []
-});
-```
-
-### 7. KickoutRequest 相关关系
-
-#### RequestorKickoutRequestRelation（申请人-踢出申请）
-```typescript
-const RequestorKickoutRequestRelation = Relation.create({
-  source: User,
-  target: KickoutRequest,
-  type: '1:n',
-  sourceProperty: 'kickoutRequests', // user.kickoutRequests
-  targetProperty: 'requestor', // kickoutRequest.requestor
-  properties: []
-});
-```
-
-#### TargetUserKickoutRequestRelation（目标用户-踢出申请）
-```typescript
-const TargetUserKickoutRequestRelation = Relation.create({
-  source: User,
-  target: KickoutRequest,
-  type: '1:n',
-  sourceProperty: 'kickoutRequestsAgainst', // user.kickoutRequestsAgainst
-  targetProperty: 'targetUser', // kickoutRequest.targetUser
-  properties: []
-});
-```
-
-#### ProcessorKickoutRequestRelation（处理人-踢出申请）
-```typescript
-const ProcessorKickoutRequestRelation = Relation.create({
-  source: User,
-  target: KickoutRequest,
-  type: '1:n',
-  sourceProperty: 'processedKickoutRequests', // user.processedKickoutRequests
-  targetProperty: 'processor', // kickoutRequest.processor
-  properties: []
-});
-```
-
----
-
-## 计算属性设计
-
-### User实体计算属性
-1. **totalScore**: 从用户的所有违规记录累加扣分
-2. **isEligibleForKickout**: 判断扣分是否≥10，可被申请踢出
-
-### Dormitory实体计算属性
-1. **currentOccupancy**: 当前入住人数（active状态的用户关系数量）
-2. **availableBeds**: 可用床位数量（available状态的床位）
-3. **occupancyRate**: 入住率（currentOccupancy / capacity）
-
-### Bed实体计算属性
-1. **isAvailable**: 床位是否可分配（status === 'available'）
-
----
-
-## 过滤实体设计
-
-### ActiveUser（活跃用户）
-```typescript
-const ActiveUser = Entity.create({
-  name: 'ActiveUser',
-  sourceEntity: User,
-  filterCondition: MatchExp.atom({
-    key: 'status',
-    value: ['=', 'active']
-  })
-});
-```
-
-### AvailableBed（可用床位）
-```typescript
-const AvailableBed = Entity.create({
-  name: 'AvailableBed',
-  sourceEntity: Bed,
-  filterCondition: MatchExp.atom({
-    key: 'status',
-    value: ['=', 'available']
-  })
-});
-```
-
-### PendingKickoutRequest（待处理踢出申请）
-```typescript
-const PendingKickoutRequest = Entity.create({
-  name: 'PendingKickoutRequest',
-  sourceEntity: KickoutRequest,
-  filterCondition: MatchExp.atom({
-    key: 'status',
-    value: ['=', 'pending']
-  })
-});
-```
-
----
-
-## 数据流图
-
-### 用户分配流程
-```
-CreateDormitory → Dormitory + Beds
-CreateUser → User
-AssignUserToDormitory → UserDormitoryRelation + UserBedRelation
-AppointDormHead → DormitoryHeadRelation
-```
-
-### 违规处理流程
-```
-RecordViolation → ViolationRecord + UserViolationRecordRelation + RecorderViolationRecordRelation
-CreateKickoutRequest → KickoutRequest + RequestorKickoutRequestRelation + TargetUserKickoutRequestRelation
-ProcessKickoutRequest → Update KickoutRequest + ProcessorKickoutRequestRelation
-```
-
----
-
-## 关系访问示例
-
-```typescript
-// 用户访问其宿舍
-const userDormitory = user.dormitory; // UserDormitoryRelation
-
-// 宿舍访问所有用户
-const dormitoryUsers = dormitory.users; // UserDormitoryRelation
-
-// 用户访问其床位
-const userBed = user.bed; // UserBedRelation
-
-// 宿舍访问宿舍长
-const dormHead = dormitory.dormHead; // DormitoryHeadRelation
-
-// 用户访问违规记录
-const violations = user.violationRecords; // UserViolationRecordRelation
-
-// 用户访问针对其的踢出申请
-const kickoutRequests = user.kickoutRequestsAgainst; // TargetUserKickoutRequestRelation
-```
-
----
-
-## 验证清单
-
-- [x] 所有实体名称采用PascalCase和单数形式
-- [x] 所有属性具有正确类型
-- [x] 所有defaultValue都是函数，不是静态值
-- [x] 没有关系具有name属性（自动生成）
-- [x] 关系类型使用正确格式（'1:1'、'n:1'等）
-- [x] 没有从interaqt包导入实体
-- [x] 过滤实体具有有效的sourceEntity和filterCondition
-- [x] 实体属性中不包含引用ID字段
-- [x] 所有实体间连接使用Relations定义
-
-这个设计为宿舍管理系统提供了完整的数据模型基础，支持所有业务需求和权限控制。
+4. **Cardinality Choices**:
+   - User to Bed is 1:1 (at any given time)
+   - Dormitory to DormHead is 1:1
+   - All violation-related relations are 1:n

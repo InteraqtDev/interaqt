@@ -192,28 +192,6 @@ test('Update Style', async () => {
 })
 ```
 
-### 🔴 CRITICAL: Read Complete API Reference First
-**Before generating ANY code, you MUST thoroughly read `./agentspace/knowledge/generator/api-reference.md`**
-
-This document contains:
-- Complete and accurate API syntax and parameters
-- Common mistakes and correct usage patterns
-- Type definitions and constraints
-- Real working examples
-
-**Important Guidelines:**
-- ✅ Always refer to the API reference for correct syntax
-- ✅ When tests fail, FIRST check the API reference for correct usage
-- ✅ Follow the exact parameter names and types shown in the API reference
-- ❌ Do NOT rely on memory or assumptions about API usage
-- ❌ Do NOT guess parameter names or syntax
-
-Common issues that can be avoided by reading the API reference:
-- Incorrect parameter names (e.g., `from/to` vs `current/next` in StateTransfer)
-- Missing required parameters (e.g., `attributeQuery` in storage operations)
-- Wrong property usage (e.g., `symmetric` doesn't exist in Relation.create)
-- Incorrect computation placement (e.g., Transform cannot be used in Property computation)
-
 ### 2.1 Entity and Relation Analysis
 **📖 MUST READ: `./agentspace/knowledge/generator/entity-relation-generation.md`**
 
@@ -379,7 +357,31 @@ Note: The relation creates `user.dormitory` to access the assigned dormitory and
 ### 2.4 Code Generation and Implementation
 **Based on the analysis documents created in steps 2.1-2.3, now implement the actual code.**
 
-#### 2.4.1 Entity and Relation Implementation
+
+#### 2.4.1 🔴 CRITICAL: Read Complete API Reference First
+**Before generating ANY code, you MUST thoroughly read `./agentspace/knowledge/generator/api-reference.md`**
+
+This document contains:
+- Complete and accurate API syntax and parameters
+- Common mistakes and correct usage patterns
+- Type definitions and constraints
+- Real working examples
+
+**Important Guidelines:**
+- ✅ Always refer to the API reference for correct syntax
+- ✅ When tests fail, FIRST check the API reference for correct usage
+- ✅ Follow the exact parameter names and types shown in the API reference
+- ❌ Do NOT rely on memory or assumptions about API usage
+- ❌ Do NOT guess parameter names or syntax
+
+Common issues that can be avoided by reading the API reference:
+- Incorrect parameter names (e.g., `from/to` vs `current/next` in StateTransfer)
+- Missing required parameters (e.g., `attributeQuery` in storage operations)
+- Wrong property usage (e.g., `symmetric` doesn't exist in Relation.create)
+- Incorrect computation placement (e.g., Transform cannot be used in Property computation)
+
+
+#### 2.4.2 Entity and Relation Implementation
 - [ ] Generate all entities based on `docs/entity-relation-design.md`
 - [ ] Define entity properties with correct types
   - **Remember: NO reference ID fields in entities!**
@@ -390,13 +392,13 @@ Note: The relation creates `user.dormitory` to access the assigned dormitory and
 - [ ] Define relation properties
 - [ ] Add placeholder computations (will be implemented next)
 
-#### 2.4.2 Interaction Implementation
+#### 2.4.3 Interaction Implementation
 - [ ] Generate all interactions based on `docs/interaction-design.md`
 - [ ] Start with simple payload-only interactions (no conditions initially)
 - [ ] Focus ONLY on Stage 1 - core business logic
 - [ ] Ensure all payloads match the documented fields
 
-#### 2.4.3 Computation Implementation
+#### 2.4.4 Computation Implementation
 - [ ] Implement computations based on `docs/computation-analysis.md`
 - [ ] For each entity computation decision, implement the selected type
 - [ ] For each property computation decision, implement the selected type
@@ -405,7 +407,7 @@ Note: The relation creates `user.dormitory` to access the assigned dormitory and
 - [ ] Verify no Transform is used in Property computation
 - [ ] Check for circular dependencies
 
-#### 2.4.4 TypeScript Verification
+#### 2.4.5 TypeScript Verification
 - [ ] Run `npm run check` to ensure TypeScript compilation passes
 - [ ] Fix any type errors
 - [ ] Ensure all imports are correct

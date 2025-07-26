@@ -1,7 +1,8 @@
 import {
-  Entity, Property, Relation, 
+  Entity, Property, Relation, Count, Summation, 
   Transform, Controller, InteractionEventEntity,
-  Interaction, Action, Payload, PayloadItem
+  Interaction, Action, Payload, PayloadItem,
+  MatchExp
 } from 'interaqt';
 
 // ================ Entities ================
@@ -116,7 +117,29 @@ const ViolationRecord = Entity.create({
     Property.create({ name: 'points', type: 'number' }),
     Property.create({ name: 'recordedAt', type: 'string' }),
     Property.create({ name: 'status', type: 'string', defaultValue: () => 'active' })
-  ]
+  ],
+  computation: Transform.create({
+    record: InteractionEventEntity,
+    callback: async function(this: Controller, event) {
+      if (event.interactionName === 'RecordViolation') {
+        const rule = await this.system.storage.get('ViolationRule', event.payload.violationRuleId, 
+          ['points']);
+        const targetUser = await this.system.storage.get('User', event.payload.targetUserId);
+        
+        if (!rule || !targetUser) return null;
+        
+        return {
+          description: event.payload.description,
+          points: rule.points,
+          recordedAt: new Date().toISOString(),
+          user: targetUser,
+          rule: rule,
+          recordedBy: event.user
+        };
+      }
+      return null;
+    }
+  })
 });
 
 const KickoutRequest = Entity.create({
@@ -134,7 +157,78 @@ const KickoutRequest = Entity.create({
       type: 'string',
       defaultValue: () => ''
     })
-  ]
+  ],
+  computation: Transform.create({
+    record: InteractionEventEntity,
+    callback: async function(this: Controller, event) {
+      if (event.interactionName === 'RequestKickout') {
+        const targetUser = await this.system.storage.get('User', event.payload.targetUserId);
+        
+        // For Stage 1, we'll simplify and just create the request
+        // In Stage 2, we'll add proper dormitory lookups
+        return {
+          reason: event.payload.reason,
+          requestDate: new Date().toISOString(),
+          targetUser: targetUser,
+          initiator: event.user
+        };
+      }
+      return null;
+    }
+  })
+});
+
+// Add UserBedRelation entity
+const UserBedRelation = Entity.create({
+  name: 'UserBedRelation',
+  properties: [
+    Property.create({ name: 'assignedAt', type: 'string' })
+  ],
+  computation: Transform.create({
+    record: InteractionEventEntity,
+    callback: async function(this: Controller, event) {
+      if (event.interactionName === 'AssignUserToBed') {
+        const user = await this.system.storage.get('User', event.payload.userId);
+        const bed = await this.system.storage.get('Bed', event.payload.bedId);
+        
+        return {
+          user: user,
+          bed: bed,
+          assignedAt: new Date().toISOString()
+        };
+      }
+      return null;
+    }
+  })
+});
+
+// ================ Transform Computations for State Updates ================
+
+// Update bed status when UserBedRelation is created/deleted
+const BedStatusUpdate = Transform.create({
+  entity: Bed,
+  field: 'status',
+  record: UserBedRelation,
+  callback: function(relation) {
+    if (relation && relation.bed) {
+      return 'occupied';
+    }
+    return undefined;
+  }
+});
+
+// Update user role when assigned as dorm head
+const UserRoleUpdate = Transform.create({
+  entity: User, 
+  field: 'role',
+  record: InteractionEventEntity,
+  callback: async function(this: Controller, event) {
+    if (event.interactionName === 'AssignDormHead' && 
+        event.payload.userId === event.user?.id) {
+      return 'dormHead';
+    }
+    return undefined;
+  }
 });
 
 // ================ Relations ================
@@ -148,16 +242,22 @@ const BedDormitoryRelation = Relation.create({
   type: 'n:1'
 });
 
-const UserBedRelation = Relation.create({
-  name: 'UserBedRelation',
-  source: User,
+const UserBedRelationUser = Relation.create({
+  name: 'UserBedRelationUser',
+  source: UserBedRelation,
+  target: User,
+  sourceProperty: 'user',
+  targetProperty: 'currentBedRelation',
+  type: 'n:1'
+});
+
+const UserBedRelationBed = Relation.create({
+  name: 'UserBedRelationBed',
+  source: UserBedRelation,
   target: Bed,
-  sourceProperty: 'currentBed',
-  targetProperty: 'occupant',
-  type: '1:1',
-  properties: [
-    Property.create({ name: 'assignedAt', type: 'string' })
-  ]
+  sourceProperty: 'bed',
+  targetProperty: 'occupantRelation',
+  type: 'n:1'
 });
 
 const UserViolationRelation = Relation.create({
@@ -205,15 +305,6 @@ const KickoutRequestInitiatorRelation = Relation.create({
   type: 'n:1'
 });
 
-const DormitoryDormHeadRelation = Relation.create({
-  name: 'DormitoryDormHeadRelation',
-  source: Dormitory,
-  target: User,
-  sourceProperty: 'dormHead',
-  targetProperty: 'managedDormitory',
-  type: '1:1'
-});
-
 // ================ Interactions ================
 
 const CreateDormitory = Interaction.create({
@@ -229,31 +320,7 @@ const CreateDormitory = Interaction.create({
 
 const AssignUserToBed = Interaction.create({
   name: 'AssignUserToBed',
-  action: Action.create({ 
-    name: 'AssignUserToBed',
-    effect: async function(this: Controller, event) {
-      const { userId, bedId } = event.payload;
-      
-      // Update bed status
-      await this.system.storage.update('Bed', bedId, { status: 'occupied' });
-      
-      // Create relation
-      const user = await this.system.storage.get('User', userId);
-      const bed = await this.system.storage.get('Bed', bedId, ['dormitory']);
-      
-      await this.system.storage.create('UserBedRelation', {
-        source: user,
-        target: bed,
-        assignedAt: new Date().toISOString()
-      });
-      
-      // Update dormitory occupancy count
-      const dormitory = await this.system.storage.get('Dormitory', bed.dormitory.id, ['occupancyCount']);
-      await this.system.storage.update('Dormitory', dormitory.id, {
-        occupancyCount: (dormitory.occupancyCount || 0) + 1
-      });
-    }
-  }),
+  action: Action.create({ name: 'AssignUserToBed' }),
   payload: Payload.create({
     items: [
       PayloadItem.create({ name: 'userId', required: true }),
@@ -264,34 +331,7 @@ const AssignUserToBed = Interaction.create({
 
 const RemoveUserFromBed = Interaction.create({
   name: 'RemoveUserFromBed',
-  action: Action.create({ 
-    name: 'RemoveUserFromBed',
-    effect: async function(this: Controller, event) {
-      const { userId } = event.payload;
-      
-      // Find user's bed relation
-      const relations = await this.system.storage.find('UserBedRelation', {
-        source: { id: userId }
-      });
-      
-      if (relations.length > 0) {
-        const relation = relations[0];
-        const bed = await this.system.storage.get('Bed', relation.target.id, ['dormitory']);
-        
-        // Delete relation
-        await this.system.storage.delete('UserBedRelation', relation.id);
-        
-        // Update bed status
-        await this.system.storage.update('Bed', bed.id, { status: 'vacant' });
-        
-        // Update dormitory occupancy count
-        const dormitory = await this.system.storage.get('Dormitory', bed.dormitory.id, ['occupancyCount']);
-        await this.system.storage.update('Dormitory', dormitory.id, {
-          occupancyCount: Math.max(0, (dormitory.occupancyCount || 0) - 1)
-        });
-      }
-    }
-  }),
+  action: Action.create({ name: 'RemoveUserFromBed' }),
   payload: Payload.create({
     items: [
       PayloadItem.create({ name: 'userId', required: true })
@@ -301,18 +341,7 @@ const RemoveUserFromBed = Interaction.create({
 
 const TransferUser = Interaction.create({
   name: 'TransferUser',
-  action: Action.create({ 
-    name: 'TransferUser',
-    effect: async function(this: Controller, event) {
-      const { userId, newBedId } = event.payload;
-      
-      // First remove from current bed
-      await RemoveUserFromBed.action.effect!.call(this, { ...event, payload: { userId } });
-      
-      // Then assign to new bed
-      await AssignUserToBed.action.effect!.call(this, { ...event, payload: { userId, bedId: newBedId } });
-    }
-  }),
+  action: Action.create({ name: 'TransferUser' }),
   payload: Payload.create({
     items: [
       PayloadItem.create({ name: 'userId', required: true }),
@@ -323,24 +352,7 @@ const TransferUser = Interaction.create({
 
 const AssignDormHead = Interaction.create({
   name: 'AssignDormHead',
-  action: Action.create({ 
-    name: 'AssignDormHead',
-    effect: async function(this: Controller, event) {
-      const { userId, dormitoryId } = event.payload;
-      
-      // Update user role
-      await this.system.storage.update('User', userId, { role: 'dormHead' });
-      
-      // Create relation
-      const user = await this.system.storage.get('User', userId);
-      const dormitory = await this.system.storage.get('Dormitory', dormitoryId);
-      
-      await this.system.storage.create('DormitoryDormHeadRelation', {
-        source: dormitory,
-        target: user
-      });
-    }
-  }),
+  action: Action.create({ name: 'AssignDormHead' }),
   payload: Payload.create({
     items: [
       PayloadItem.create({ name: 'userId', required: true }),
@@ -364,31 +376,7 @@ const CreateViolationRule = Interaction.create({
 
 const RecordViolation = Interaction.create({
   name: 'RecordViolation',
-  action: Action.create({ 
-    name: 'RecordViolation',
-    effect: async function(this: Controller, event) {
-      const { targetUserId, violationRuleId, description } = event.payload;
-      
-      const rule = await this.system.storage.get('ViolationRule', violationRuleId, ['points']);
-      const targetUser = await this.system.storage.get('User', targetUserId, ['violationScore']);
-      const recordedBy = event.user;
-      
-      // Create violation record
-      await this.system.storage.create('ViolationRecord', {
-        description: description,
-        points: rule.points,
-        recordedAt: new Date().toISOString(),
-        user: targetUser,
-        rule: rule,
-        recordedBy: recordedBy
-      });
-      
-      // Update user's violation score
-      await this.system.storage.update('User', targetUserId, {
-        violationScore: (targetUser.violationScore || 0) + rule.points
-      });
-    }
-  }),
+  action: Action.create({ name: 'RecordViolation' }),
   payload: Payload.create({
     items: [
       PayloadItem.create({ name: 'targetUserId', required: true }),
@@ -400,22 +388,7 @@ const RecordViolation = Interaction.create({
 
 const RequestKickout = Interaction.create({
   name: 'RequestKickout',
-  action: Action.create({ 
-    name: 'RequestKickout',
-    effect: async function(this: Controller, event) {
-      const { targetUserId, reason } = event.payload;
-      
-      const targetUser = await this.system.storage.get('User', targetUserId);
-      const initiator = event.user;
-      
-      await this.system.storage.create('KickoutRequest', {
-        reason: reason,
-        requestDate: new Date().toISOString(),
-        targetUser: targetUser,
-        initiator: initiator
-      });
-    }
-  }),
+  action: Action.create({ name: 'RequestKickout' }),
   payload: Payload.create({
     items: [
       PayloadItem.create({ name: 'targetUserId', required: true }),
@@ -426,29 +399,7 @@ const RequestKickout = Interaction.create({
 
 const ApproveKickoutRequest = Interaction.create({
   name: 'ApproveKickoutRequest',
-  action: Action.create({ 
-    name: 'ApproveKickoutRequest',
-    effect: async function(this: Controller, event) {
-      const { requestId, comments } = event.payload;
-      
-      const request = await this.system.storage.get('KickoutRequest', requestId, ['targetUser']);
-      
-      // Update request status
-      await this.system.storage.update('KickoutRequest', requestId, {
-        status: 'approved',
-        adminComments: comments || ''
-      });
-      
-      // Update user status
-      await this.system.storage.update('User', request.targetUser.id, { status: 'kickedOut' });
-      
-      // Remove user from bed
-      await RemoveUserFromBed.action.effect!.call(this, { 
-        ...event, 
-        payload: { userId: request.targetUser.id } 
-      });
-    }
-  }),
+  action: Action.create({ name: 'ApproveKickoutRequest' }),
   payload: Payload.create({
     items: [
       PayloadItem.create({ name: 'requestId', required: true }),
@@ -459,17 +410,7 @@ const ApproveKickoutRequest = Interaction.create({
 
 const RejectKickoutRequest = Interaction.create({
   name: 'RejectKickoutRequest',
-  action: Action.create({ 
-    name: 'RejectKickoutRequest',
-    effect: async function(this: Controller, event) {
-      const { requestId, comments } = event.payload;
-      
-      await this.system.storage.update('KickoutRequest', requestId, {
-        status: 'rejected',
-        adminComments: comments || ''
-      });
-    }
-  }),
+  action: Action.create({ name: 'RejectKickoutRequest' }),
   payload: Payload.create({
     items: [
       PayloadItem.create({ name: 'requestId', required: true }),
@@ -478,11 +419,33 @@ const RejectKickoutRequest = Interaction.create({
   })
 });
 
+// ================ Add computations after relations are defined ================
+
+// Add violationScore computation to User
+User.properties.find(p => p.name === 'violationScore')!.computation = Summation.create({
+  record: UserViolationRelation,
+  direction: 'target',
+  attributeQuery: [['source', { 
+    attributeQuery: ['points'],
+    where: MatchExp.atom({ key: 'status', value: ['=', 'active'] })
+  }]]
+});
+
+// Add occupancyCount computation to Dormitory
+Dormitory.properties.find(p => p.name === 'occupancyCount')!.computation = Count.create({
+  record: UserBedRelationBed,
+  direction: 'target',
+  attributeQuery: [['source', { 
+    attributeQuery: ['bed'],
+    where: MatchExp.atom({ key: 'bed.dormitory.id', value: ['=', '$self.id'] })
+  }]]
+});
+
 // ================ Exports ================
 
-export const entities = [User, Dormitory, Bed, ViolationRule, ViolationRecord, KickoutRequest];
+export const entities = [User, Dormitory, Bed, ViolationRule, ViolationRecord, KickoutRequest, UserBedRelation];
 export const relations = [
-  BedDormitoryRelation, UserBedRelation, DormitoryDormHeadRelation,
+  BedDormitoryRelation, UserBedRelationUser, UserBedRelationBed,
   UserViolationRelation, ViolationRuleRecordRelation, RecorderViolationRelation,
   KickoutRequestUserRelation, KickoutRequestInitiatorRelation
 ];
