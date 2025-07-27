@@ -419,7 +419,7 @@ graph TD
 For EVERY property, answer ALL these questions:
 
 1. **Is this a timestamp?**
-   - Created timestamp? → Use `defaultValue: () => Date.now()`
+   - Created timestamp? → Use `defaultValue: () => Math.floor(Date.now()/1000)`
    - Updated timestamp? → Use StateMachine with computeValue
    
 2. **Is this a status/state field?**
@@ -482,13 +482,13 @@ const Article = Entity.create({
 const initialState = StateNode.create({ name: 'initial' });
 const updatedState = StateNode.create({ 
   name: 'updated',
-  computeValue: () => Date.now()
+  computeValue: () => Math.floor(Date.now()/1000)
 });
 
 Property.create({
   name: 'updatedAt',
-  type: 'number',
-  defaultValue: () => Date.now(),
+  type: 'timestamp',
+  defaultValue: () => Math.floor(Date.now()/1000),
   computation: StateMachine.create({
     states: [initialState, updatedState],
     defaultState: initialState,

@@ -38,7 +38,7 @@ describe('Simple CRUD Example', () => {
     properties: [
       Property.create({ name: 'title', type: 'string' }),
       Property.create({ name: 'content', type: 'string' }),
-      Property.create({ name: 'createdAt', type: 'string' }),
+      Property.create({ name: 'createdAt', type: 'timestamp' }),
       Property.create({
         name: 'status',
         type: 'string',
@@ -60,7 +60,7 @@ describe('Simple CRUD Example', () => {
           return {
             title: event.payload.title,
             content: event.payload.content,
-            createdAt: new Date().toISOString(),
+            createdAt: Math.floor(Date.now()/1000),
             author: event.payload.authorId  // authorId is already { id: xxx }
           }
         }

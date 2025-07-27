@@ -183,7 +183,7 @@ When using `InteractionEventEntity` as the Transform input source, understand th
    // ✅ CORRECT: Use StateMachine for updates
    Property.create({
      name: 'updatedAt',
-     type: 'number',
+     type: 'timestamp',
      computation: StateMachine.create({
        states: [updatedState],
        transfers: [
@@ -249,8 +249,8 @@ export const Style = Entity.create({
     Property.create({ name: 'thumbKey', type: 'string' }),
     Property.create({ name: 'priority', type: 'number', defaultValue: () => 0 }),
     Property.create({ name: 'status', type: 'string', defaultValue: () => 'draft' }),
-    Property.create({ name: 'createdAt', type: 'bigint', defaultValue: () => Date.now() }),
-    Property.create({ name: 'updatedAt', type: 'bigint', defaultValue: () => Date.now() })
+    Property.create({ name: 'createdAt', type: 'timestamp', defaultValue: () => Math.floor(Date.now()/1000) }),
+    Property.create({ name: 'updatedAt', type: 'timestamp', defaultValue: () => Math.floor(Date.now()/1000) })
   ],
   // Transform in Entity's computation property
   computation: Transform.create({
@@ -265,8 +265,8 @@ export const Style = Entity.create({
           thumbKey: event.payload.thumbKey || '',
           priority: event.payload.priority || 0,
           status: 'draft',
-          createdAt: Date.now(),
-          updatedAt: Date.now(),
+          createdAt: Math.floor(Date.now()/1000),
+          updatedAt: Math.floor(Date.now()/1000),
           lastModifiedBy: event.user  // Creates relation automatically
         };
       }
@@ -439,13 +439,13 @@ const UpdateStyle = Interaction.create({
 // Define state node with computeValue
 const updatedState = StateNode.create({
   name: 'updated',
-  computeValue: () => Date.now()  // Returns timestamp when state is entered
+  computeValue: () => Math.floor(Date.now()/1000)  // Returns timestamp in seconds when state is entered
 });
 
 Property.create({
   name: 'updatedAt',
-  type: 'bigint',
-  defaultValue: () => Date.now(),
+  type: 'timestamp',
+  defaultValue: () => Math.floor(Date.now()/1000),
   computation: StateMachine.create({
     name: 'UpdatedAt',
     states: [updatedState],
@@ -708,8 +708,8 @@ const complexScoring = Dictionary.create({
         // Calculate post score with time decay
         const postScore = userPostRelations.reduce((acc, rel) => {
           const post = rel.target;
-          const age = Date.now() - post.createdAt;
-          const decay = Math.exp(-age / (30 * 24 * 60 * 60 * 1000)); // 30-day half-life
+          const age = Math.floor(Date.now()/1000) - post.createdAt;
+          const decay = Math.exp(-age / (30 * 24 * 60 * 60)); // 30-day half-life in seconds
           
           // Count comments on this post
           const commentCount = dataDeps.postComments.filter(c => c.source.id === post.id).length;
@@ -799,7 +799,7 @@ const riskScoreCalculation = Dictionary.create({
         const complianceRisk = (criticalIssues * 10 + majorIssues * 5);
         
         // Factor 3: Entity age (newer entities are riskier)
-        const ageInDays = (Date.now() - entity.createdAt) / (24 * 60 * 60 * 1000);
+        const ageInDays = (Math.floor(Date.now()/1000) - entity.createdAt) / (24 * 60 * 60);
         const ageRisk = ageInDays < 30 ? 20 : (ageInDays < 90 ? 10 : 0);
         
         // Calculate final risk score with weighted factors
@@ -880,7 +880,7 @@ export const Style = Entity.create({
           label: event.payload.label,
           slug: event.payload.slug,
           status: 'draft',
-          createdAt: Date.now()
+          createdAt: Math.floor(Date.now()/1000)
         };
       }
       return null;
@@ -907,13 +907,13 @@ export const UpdateStyle = Interaction.create({
 // Property with update tracking
 const updatedState = StateNode.create({
   name: 'updated',
-  computeValue: () => Date.now()
+  computeValue: () => Math.floor(Date.now()/1000)
 });
 
 Property.create({
   name: 'updatedAt',
-  type: 'bigint',
-  defaultValue: () => Date.now(),
+  type: 'timestamp',
+  defaultValue: () => Math.floor(Date.now()/1000),
   computation: StateMachine.create({
     states: [updatedState],
     defaultState: updatedState,
@@ -1002,20 +1002,20 @@ Property.create({
 // Created at - set once
 Property.create({
   name: 'createdAt',
-  type: 'bigint',
-  defaultValue: () => Date.now()
+  type: 'timestamp',
+  defaultValue: () => Math.floor(Date.now()/1000)
 })
 
 // Updated at - updates on changes
 const updatedState = StateNode.create({
   name: 'updated',
-  computeValue: () => Date.now()
+  computeValue: () => Math.floor(Date.now()/1000)
 });
 
 Property.create({
   name: 'updatedAt',
-  type: 'bigint',
-  defaultValue: () => Date.now(),
+  type: 'timestamp',
+  defaultValue: () => Math.floor(Date.now()/1000),
   computation: StateMachine.create({
     states: [updatedState],
     defaultState: updatedState,

@@ -70,8 +70,8 @@ const username = Property.create({
 // Property with default value
 const createdAt = Property.create({
     name: 'createdAt',
-    type: 'string',
-    defaultValue: () => new Date().toISOString()
+    type: 'timestamp',
+    defaultValue: () => Math.floor(Date.now()/1000)
 })
 
 // Computed property
@@ -713,7 +713,7 @@ const isExactHour = Dictionary.create({
 const userEntity = Entity.create({
     name: 'User',
     properties: [
-        Property.create({ name: 'lastLoginAt', type: 'number' }),
+        Property.create({ name: 'lastLoginAt', type: 'timestamp' }),
         Property.create({
             name: 'isRecentlyActive',
             type: 'boolean',

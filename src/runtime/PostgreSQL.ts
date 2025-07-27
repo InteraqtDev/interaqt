@@ -160,7 +160,7 @@ export class PostgreSQLDB implements Database{
         } else if (type === 'string') {
             return 'TEXT'
         } else if (type === 'boolean') {
-            return 'INT(2)'
+            return 'BOOLEAN'
         } else if(type === 'number'){
             return "INT"
         }else if(type === 'timestamp'){

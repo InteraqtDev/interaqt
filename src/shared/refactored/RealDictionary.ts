@@ -5,6 +5,7 @@ export enum PropertyTypes {
   String = 'string',
   Number = 'number',
   Boolean = 'boolean',
+  Timestamp = 'timestamp',
 }
 
 const validNameFormatExp = /^[a-zA-Z0-9_]+$/;
