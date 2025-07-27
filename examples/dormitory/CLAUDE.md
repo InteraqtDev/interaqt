@@ -422,6 +422,32 @@ Common issues that can be avoided by reading the API reference:
 ### 2.5 Initial Test Implementation
 **📖 MUST READ: `./agentspace/knowledge/generator/test-implementation.md`**
 
+#### 2.5.1 Complete CRUD Test Example
+**📖 Reference: `./tests/crud.example.test.ts`**
+
+For a comprehensive example of CRUD operations with the interaqt framework, refer to the complete test file `./tests/crud.example.test.ts`. This example demonstrates:
+
+- **Entity Definition**: User and Article entities with properties and computations
+- **State Management**: Article lifecycle using StateMachine (draft → published → deleted)
+- **Relations**: User-Article relationship with automatic article count
+- **Filtered Entities**: ActiveArticle entity that excludes deleted articles
+- **Interactions**: Complete CRUD operations (Create, Publish, Delete, Restore)
+- **Permission System**: 
+  - Role-based access control (admin, author, user)
+  - Condition for role checking
+  - Condition for payload validation
+  - Complex permission logic with OR conditions
+- **Comprehensive Tests**:
+  - Basic CRUD operations
+  - State transitions
+  - Permission enforcement
+  - Edge cases and error handling
+  - Complex workflows
+
+This example serves as a practical reference for implementing and testing CRUD functionality in your own interaqt projects.
+
+#### 2.5.2 Test Implementation
+
 ⚠️ **DO NOT proceed without reading the above reference document completely!**
 
 - [ ] Create test cases for all interactions
@@ -482,29 +508,6 @@ Since permissions and business rules are now unified in the `condition` API, the
 - Testing both permission failures and business rule violations to ensure proper error handling
 - Documenting expected error scenarios for each Interaction
 
-### 2.8 Complete CRUD Test Example
-**📖 Reference: `./tests/crud.example.test.ts`**
-
-For a comprehensive example of CRUD operations with the interaqt framework, refer to the complete test file `./tests/crud.example.test.ts`. This example demonstrates:
-
-- **Entity Definition**: User and Article entities with properties and computations
-- **State Management**: Article lifecycle using StateMachine (draft → published → deleted)
-- **Relations**: User-Article relationship with automatic article count
-- **Filtered Entities**: ActiveArticle entity that excludes deleted articles
-- **Interactions**: Complete CRUD operations (Create, Publish, Delete, Restore)
-- **Permission System**: 
-  - Role-based access control (admin, author, user)
-  - Condition for role checking
-  - Condition for payload validation
-  - Complex permission logic with OR conditions
-- **Comprehensive Tests**:
-  - Basic CRUD operations
-  - State transitions
-  - Permission enforcement
-  - Edge cases and error handling
-  - Complex workflows
-
-This example serves as a practical reference for implementing and testing CRUD functionality in your own interaqt projects.
 
 ## Phase 3: Quality Assurance
 

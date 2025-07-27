@@ -7,6 +7,7 @@ import { LINK_SYMBOL } from "./RecordQuery.js";
 export type RawEntityData = { [k: string]: any }
 
 export type FieldAndValue = {
+    name: string,
     field: string,
     value: any,
     fieldType?: string
@@ -144,12 +145,18 @@ export class NewRecordData {
 
         const newRecord = {...oldRecord, ...this.rawData}
 
-        const result: FieldAndValue[] = this.valueAttributes.map((info) => {
-            const value = info.isComputed ? info.computed!({...this.rawData, ...oldRecord}) : this.rawData[info.attributeName]
-            return {
+        const result: FieldAndValue[] =[]
+        const updatedComputedFields = new Set<string>()
+        this.valueAttributes.forEach((info) => {
+            const value = info.isComputed ? info.computed!(newRecord) : this.rawData[info.attributeName]
+            result.push({
+                name: info.attributeName,
                 field: info.field!,
                 value,
                 fieldType: info.fieldType!
+            })
+            if (info.isComputed) {
+                updatedComputedFields.add(info.attributeName)
             }
         })
 
@@ -157,10 +164,11 @@ export class NewRecordData {
         // CAUTION 只有更新自己的字段和递归更新三表合一的字段是需要岛上 oldRecord 的。因为我们只允许递归更新三表合一的 record。
         const recordInfo = this.map.getRecordInfo(this.recordName)
         recordInfo.valueAttributes.forEach(info => {
-            if (info.isComputed) {
+            if (info.isComputed && !updatedComputedFields.has(info.attributeName)) {
                 const newValue = info.computed!(newRecord)
                 if (newValue !== oldRecord[info.attributeName]) {
                     result.push({
+                        name: info.attributeName,
                         field: info.field!,
                         value: newValue,
                         fieldType: info.fieldType!
@@ -172,6 +180,7 @@ export class NewRecordData {
         // source/target 里面记录的 id
         this.entityIdAttributes.forEach(info => {
             result.push({
+                name: info.attributeName,
                 field:info.linkField!,
                 value: this.rawData[info.attributeName].id,
             })
@@ -180,6 +189,7 @@ export class NewRecordData {
         // 往自己合表的关系上的 id 以及关系数据
         this.mergedLinkTargetRecordIdRefs.forEach(recordData => {
             result.push({
+                name: recordData.info?.attributeName!,
                 field: recordData.info?.linkField!,
                 value: recordData.getRef().id,
             })
