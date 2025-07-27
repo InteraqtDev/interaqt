@@ -6,6 +6,7 @@ import { DataContext, EntityDataContext } from "./Computation.js";
 import { ComputationResult, ComputationResultPatch, EventBasedComputation, EventDep, GlobalBoundState, RecordBoundState } from "./Computation.js";
 import { EtityMutationEvent } from "../Scheduler.js";
 import { TransitionFinder } from "./TransitionFinder.js";
+import { assert } from "../util.js";
 
 type SourceTargetPair = [EntityIdRef, EntityIdRef][]
 type ComputeRelationTargetResult = SourceTargetPair | {source: EntityIdRef[] | EntityIdRef, target: EntityIdRef[]|EntityIdRef} | undefined
@@ -46,6 +47,8 @@ export class GlobalStateMachineHandle implements EventBasedComputation {
         }
     }
     async incrementalCompute(lastValue: string, mutationEvent: EtityMutationEvent, dirtyRecord: any) {
+        assert(mutationEvent.recordName === INTERACTION_RECORD, 'Record StateMachine only supports interaction record')
+
         const currentStateName = await this.state.currentState.get()
         const trigger = this.mutationEventToTrigger(mutationEvent)
         const nextState = this.transitionFinder?.findNextState(currentStateName, trigger)
@@ -106,6 +109,8 @@ export class PropertyStateMachineHandle implements EventBasedComputation {
     }
     
     async incrementalCompute(lastValue: string, mutationEvent: RecordMutationEvent, dirtyRecord: any) {
+        assert(mutationEvent.recordName === INTERACTION_RECORD, 'Record StateMachine only supports interaction record')
+
         const currentStateName = await this.state.currentState.get(dirtyRecord)
         const trigger = this.mutationEventToTrigger(mutationEvent)
         const nextState = this.transitionFinder?.findNextState(currentStateName, trigger)
@@ -165,12 +170,13 @@ export class RecordStateMachineHandle implements EventBasedComputation {
     }
     
     async incrementalPatchCompute(lastValue: string, mutationEvent: RecordMutationEvent, dirtyRecord: any): Promise<ComputationResult|ComputationResultPatch|undefined> {
+        assert(mutationEvent.recordName === INTERACTION_RECORD, 'Record StateMachine only supports interaction record')
+
         const currentStateName = dirtyRecord.id ? (await this.state.currentState.get(dirtyRecord)) : this.defaultState.name
         const trigger = this.mutationEventToTrigger(mutationEvent)
         const nextState = this.transitionFinder?.findNextState(currentStateName, trigger)
         if (!nextState) return ComputationResult.skip()
 
-        
 
         const nextValue = nextState.computeValue? (await nextState.computeValue.call(this.controller, lastValue)) : nextState.name
         if (dirtyRecord.id) {
