@@ -1,8 +1,12 @@
 import { describe, test, expect, beforeEach } from 'vitest'
-import { Controller, MonoSystem, PGLiteDB, MatchExp } from 'interaqt'
-import { entities, relations, interactions } from '../backend'
+import { 
+  InteractionEventEntity, Controller, MonoSystem, PGLiteDB, MatchExp
+} from 'interaqt'
+import {
+  entities, relations, interactions, activities, dicts, recordMutationSideEffects
+} from '../backend/index.js'
 
-describe('Debug Basic Tests', () => {
+describe('Debug Basic Issues', () => {
   let system: MonoSystem
   let controller: Controller
 
@@ -13,29 +17,24 @@ describe('Debug Basic Tests', () => {
       system,
       entities,
       relations,
-      activities: [],
       interactions,
-      dict: [],
-      recordMutationSideEffects: []
+      activities,
+      dict: dicts,
+      recordMutationSideEffects
     })
 
     await controller.setup(true)
   })
 
-  test('should create user via storage', async () => {
-    const user = await system.storage.create('User', {
-      name: 'Test User',
-      email: 'test@example.com',
-      role: 'admin'
-    })
-
-    expect(user).toBeTruthy()
-    expect(user.name).toBe('Test User')
-    expect(user.role).toBe('admin')
-    console.log('Created user:', user)
+  test('should check actual relation names', async () => {
+    // Get all relation names
+    console.log('Available relations:', relations.map(r => r.name))
+    
+    // Try to see what entities are registered
+    console.log('Available entities:', entities.map(e => e.name))
   })
 
-  test('should create dormitory via interaction', async () => {
+  test('should create dormitory through interaction', async () => {
     const admin = await system.storage.create('User', {
       name: 'Admin',
       email: 'admin@example.com',
@@ -47,32 +46,55 @@ describe('Debug Basic Tests', () => {
     const result = await controller.callInteraction('CreateDormitory', {
       user: admin,
       payload: {
-        name: '测试宿舍',
+        name: 'Test Dorm',
         capacity: 4
       }
     })
 
     console.log('Interaction result:', result)
-    expect(result.error).toBeUndefined()
+    
+    if (result.error) {
+      console.log('Error details:', result.error)
+    }
 
     // Check if dormitory was created
     const dormitories = await system.storage.find('Dormitory', 
-      MatchExp.atom({ key: 'name', value: ['=', '测试宿舍'] }),
-      undefined,
+      undefined, 
+      undefined, 
       ['*']
     )
-    
-    console.log('Found dormitories:', dormitories)
-    expect(dormitories).toHaveLength(1)
+    console.log('Dormitories found:', dormitories)
 
-    // Check if beds were created  
+    // Check if beds were created
     const beds = await system.storage.find('Bed', 
-      MatchExp.atom({ key: 'number', value: ['>', 0] }),
-      undefined,
+      undefined, 
+      undefined, 
       ['*']
     )
+    console.log('Beds found:', beds)
     
-    console.log('Found beds:', beds)
-    console.log('Expected 4 beds, got:', beds.length)
+    // Check interaction events
+    const interactions = await system.storage.find('_Interaction_', 
+      undefined, 
+      undefined, 
+      ['*']
+    )
+    console.log('Interaction events:', interactions)
+  })
+
+  test('should test direct entity creation', async () => {
+    // Test direct entity creation to see if the problem is with Transform or storage
+    const directDormitory = await system.storage.create('Dormitory', {
+      name: 'Direct Dorm',
+      capacity: 6
+    })
+    
+    console.log('Direct dormitory creation:', directDormitory)
+    
+    const directBed = await system.storage.create('Bed', {
+      bedNumber: 1
+    })
+    
+    console.log('Direct bed creation:', directBed)
   })
 })

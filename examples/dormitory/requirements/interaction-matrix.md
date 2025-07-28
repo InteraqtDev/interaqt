@@ -1,172 +1,223 @@
 # 宿舍管理系统交互矩阵
 
-## 用户角色与交互对应关系
+## 交互矩阵概述
 
-### 管理员 (Admin) 权限交互
-| 交互名称 | 描述 | 权限控制 | 业务规则验证 | 对应测试用例 |
-|---------|------|----------|-------------|-------------|
-| CreateDormitory | 创建宿舍 | 仅管理员 | 容量4-6床位 | TC001, TC101, TC201 |
-| AssignDormHead | 指定宿舍长 | 仅管理员 | 目标用户为学生角色 | TC002 |
-| AssignUserToBed | 分配用户到床位 | 仅管理员 | 床位可用，用户未分配 | TC003, TC202, TC203 |
-| ProcessKickoutRequest | 处理踢出申请 | 仅管理员 | 申请状态为pending | TC006, TC104 |
-| GetAllDormitories | 查看所有宿舍 | 仅管理员 | 无 | - |
-| GetAllUsers | 查看所有用户 | 仅管理员 | 无 | - |
-| GetKickoutRequests | 查看踢出申请 | 仅管理员 | 无 | - |
+本文档确保：
+- 每个用户角色都有对应的Interactions完成所有操作
+- 每个Interaction都有清晰的权限控制或业务规则约束
+- 每个Interaction都有对应的测试用例
+- 记录访问控制要求和业务逻辑验证
 
-### 宿舍长 (DormHead) 权限交互
-| 交互名称 | 描述 | 权限控制 | 业务规则验证 | 对应测试用例 |
-|---------|------|----------|-------------|-------------|
-| RecordScore | 记录扣分 | 仅管理本宿舍学生 | 扣分为正数，不能给自己扣分 | TC004, TC102, TC103, TC206 |
-| RequestKickout | 申请踢出用户 | 仅针对本宿舍学生 | 扣分达到阈值，无重复申请 | TC005, TC204, TC205 |
-| GetDormitoryInfo | 查看宿舍信息 | 仅查看管理的宿舍 | 无 | TC007 |
-| GetDormitoryMembers | 查看宿舍成员 | 仅查看管理的宿舍 | 无 | - |
-| GetUserScoreHistory | 查看扣分记录 | 仅查看本宿舍学生 | 无 | TC008 |
+## 用户角色定义
 
-### 学生 (Student) 权限交互
-| 交互名称 | 描述 | 权限控制 | 业务规则验证 | 对应测试用例 |
-|---------|------|----------|-------------|-------------|
-| GetMyDormitoryInfo | 查看我的宿舍信息 | 仅查看自己宿舍 | 无 | - |
-| GetMyScoreHistory | 查看我的扣分记录 | 仅查看自己记录 | 无 | - |
+### 1. 系统管理员 (admin)
+- 系统最高权限用户
+- 负责系统配置和用户管理
+- 可以执行所有管理操作
 
-## 交互详细设计
+### 2. 宿舍长 (dormHead)
+- 管理特定宿舍的用户
+- 负责本宿舍的日常管理
+- 有权对本宿舍成员进行管理操作
 
-### 1. CreateDormitory (创建宿舍)
-- **触发角色**: 管理员
-- **Payload字段**:
-  - name: string (必需) - 宿舍名称
-  - capacity: number (必需) - 床位数量
-- **权限验证**: 
-  - 用户角色必须为admin
-- **业务规则验证**:
-  - capacity必须在4-6之间
-  - 宿舍名称不能重复
-- **执行效果**:
-  - 创建Dormitory实体
-  - 自动创建对应数量的Bed实体
-  - 初始化occupiedBeds为0
+### 3. 普通学生 (student)
+- 系统的基础用户
+- 主要进行查看和自我管理操作
+- 权限最为受限
 
-### 2. AssignDormHead (指定宿舍长)
-- **触发角色**: 管理员
-- **Payload字段**:
-  - userId: string (必需) - 目标用户ID
-  - dormitoryId: string (必需) - 宿舍ID
-- **权限验证**:
-  - 用户角色必须为admin
-- **业务规则验证**:
-  - 目标用户当前角色为student
-  - 宿舍不能已有宿舍长
-- **执行效果**:
-  - 创建DormitoryHeadRelation关系
-  - 更新用户角色为dormHead
+## 核心业务交互矩阵
 
-### 3. AssignUserToBed (分配用户到床位)
-- **触发角色**: 管理员
-- **Payload字段**:
-  - userId: string (必需) - 目标用户ID
-  - dormitoryId: string (必需) - 宿舍ID
-  - bedNumber: number (必需) - 床位编号
-- **权限验证**:
-  - 用户角色必须为admin
-- **业务规则验证**:
-  - 用户未被分配到其他宿舍
-  - 目标床位状态为available
-  - 宿舍有剩余容量
-- **执行效果**:
-  - 创建UserBedRelation关系
-  - 创建UserDormitoryRelation关系
-  - 更新床位状态为occupied
-  - 增加宿舍occupiedBeds数量
+| 交互名称 | admin | dormHead | student | 权限控制要求 | 业务规则验证 | 对应测试用例 |
+|---------|--------|----------|---------|-------------|-------------|-------------|
+| **宿舍管理** |
+| CreateDormitory | ✅ | ❌ | ❌ | 仅管理员 | 容量4-6，名称唯一 | TC001, TC002, TC101, TC201 |
+| UpdateDormitory | ✅ | ❌ | ❌ | 仅管理员 | 容量限制，不能减少已占用床位 | - |
+| DeleteDormitory | ✅ | ❌ | ❌ | 仅管理员 | 必须为空宿舍 | - |
+| ViewDormitory | ✅ | ✅* | ✅* | 管理员看全部，其他看相关 | - | - |
+| **用户管理** |
+| AssignDormHead | ✅ | ❌ | ❌ | 仅管理员 | 目标用户必须为student角色 | TC003 |
+| RemoveDormHead | ✅ | ❌ | ❌ | 仅管理员 | 处理已有管理关系 | - |
+| AssignUserToDormitory | ✅ | ❌ | ❌ | 仅管理员 | 宿舍有空床位，用户未分配 | TC004, TC202, TC204 |
+| RemoveUserFromDormitory | ✅ | ❌ | ❌ | 仅管理员 | 处理相关关系和床位 | - |
+| **扣分管理** |
+| CreateScoreRecord | ✅ | ✅* | ❌ | 管理员全部，宿舍长限本宿舍 | 不能给自己扣分，扣分必须>0 | TC005, TC102, TC205 |
+| RevokeScoreRecord | ✅ | ✅* | ❌ | 原操作者或管理员 | 记录必须为active状态 | TC008 |
+| ViewScoreRecord | ✅ | ✅* | ✅* | 管理员全部，其他限相关 | - | - |
+| **踢出管理** |
+| CreateKickRequest | ❌ | ✅* | ❌ | 仅宿舍长 | 目标用户扣分≥10，在本宿舍 | TC006, TC103, TC203 |
+| ProcessKickRequest | ✅ | ❌ | ❌ | 仅管理员 | 申请状态为pending | TC007 |
+| ViewKickRequest | ✅ | ✅* | ✅* | 管理员全部，其他限相关 | - | - |
+| **规则管理** |
+| CreateScoreRule | ✅ | ❌ | ❌ | 仅管理员 | 扣分值>0，规则名称唯一 | - |
+| UpdateScoreRule | ✅ | ❌ | ❌ | 仅管理员 | 不影响已有记录 | - |
+| ViewScoreRule | ✅ | ✅ | ✅ | 所有用户 | - | - |
 
-### 4. RecordScore (记录扣分)
-- **触发角色**: 宿舍长
-- **Payload字段**:
-  - targetUserId: string (必需) - 被扣分用户ID
-  - reason: string (必需) - 扣分原因
-  - points: number (必需) - 扣分数
-- **权限验证**:
-  - 当前用户角色必须为dormHead
-  - 目标用户必须在当前用户管理的宿舍中
-  - 不能给自己扣分
-- **业务规则验证**:
-  - points必须为正数
-  - reason不能为空
-- **执行效果**:
-  - 创建ScoreRecord实体
-  - 自动更新用户总扣分
+**注释**：
+- ✅ = 完全访问权限
+- ✅* = 有条件访问权限
+- ❌ = 无访问权限
 
-### 5. RequestKickout (申请踢出用户)
-- **触发角色**: 宿舍长
-- **Payload字段**:
-  - targetUserId: string (必需) - 被申请踢出用户ID
-  - reason: string (必需) - 申请原因
-- **权限验证**:
-  - 当前用户角色必须为dormHead
-  - 目标用户必须在当前用户管理的宿舍中
-- **业务规则验证**:
-  - 目标用户总扣分达到100分阈值
+## 详细权限控制规则
+
+### 1. 宿舍管理权限
+```markdown
+CreateDormitory:
+- 权限检查: user.role === 'admin'
+- 业务规则: 
+  - payload.capacity >= 4 && payload.capacity <= 6
+  - 宿舍名称在系统中唯一
+  - payload.name.trim().length > 0
+```
+
+### 2. 用户分配权限
+```markdown
+AssignDormHead:
+- 权限检查: user.role === 'admin'
+- 业务规则:
+  - 目标用户当前role === 'student'
+  - 目标宿舍当前没有宿舍长
+  - 目标用户未管理其他宿舍
+
+AssignUserToDormitory:
+- 权限检查: user.role === 'admin'
+- 业务规则:
+  - 目标宿舍有可用床位
+  - 用户当前未分配到任何宿舍
+  - 指定床位未被占用
+```
+
+### 3. 扣分管理权限
+```markdown
+CreateScoreRecord:
+- 权限检查: 
+  - user.role === 'admin' OR 
+  - (user.role === 'dormHead' AND targetUser.dormitory === user.managedDormitory)
+- 业务规则:
+  - targetUser !== user (不能给自己扣分)
+  - payload.score > 0
+  - 扣分规则存在且启用
+  - 目标用户状态为active
+```
+
+### 4. 踢出申请权限
+```markdown
+CreateKickRequest:
+- 权限检查: 
+  - user.role === 'dormHead' AND 
+  - targetUser.dormitory === user.managedDormitory
+- 业务规则:
+  - targetUser.totalScore >= 10
+  - targetUser.status === 'active'
   - 目标用户没有pending状态的踢出申请
-- **执行效果**:
-  - 创建KickoutRequest实体
-  - 状态设置为pending
 
-### 6. ProcessKickoutRequest (处理踢出申请)
-- **触发角色**: 管理员
-- **Payload字段**:
-  - requestId: string (必需) - 申请ID
-  - decision: string (必需) - 决定 (approved/rejected)
-  - note: string (可选) - 处理备注
-- **权限验证**:
-  - 用户角色必须为admin
-- **业务规则验证**:
-  - 申请状态必须为pending
-  - decision必须为approved或rejected
-- **执行效果**:
-  - 更新申请状态和处理时间
-  - 如果approved，执行踢出操作：
-    - 删除UserBedRelation和UserDormitoryRelation
-    - 更新床位状态为available
-    - 减少宿舍occupiedBeds数量
+ProcessKickRequest:
+- 权限检查: user.role === 'admin'
+- 业务规则:
+  - kickRequest.status === 'pending'
+  - 申请未超过30天有效期
+```
 
-### 7. GetDormitoryInfo (查看宿舍信息)
-- **触发角色**: 管理员、宿舍长
-- **Payload字段**:
-  - dormitoryId: string (必需) - 宿舍ID
-- **权限验证**:
-  - 管理员可查看任意宿舍
-  - 宿舍长只能查看管理的宿舍
-- **业务规则验证**: 无
-- **返回内容**:
-  - 宿舍基本信息
-  - 床位占用情况
-  - 宿舍成员列表
-  - 宿舍长信息
+## 条件访问权限详细说明
 
-### 8. GetUserScoreHistory (查看扣分记录)
-- **触发角色**: 管理员、宿舍长、学生本人
-- **Payload字段**:
-  - userId: string (必需) - 用户ID
-- **权限验证**:
-  - 管理员可查看任意用户
-  - 宿舍长只能查看本宿舍学生
-  - 学生只能查看自己
-- **业务规则验证**: 无
-- **返回内容**:
-  - 扣分记录列表(按时间倒序)
-  - 总扣分统计
+### 1. 查看权限的条件访问
+```markdown
+ViewDormitory:
+- admin: 查看所有宿舍
+- dormHead: 仅查看自己管理的宿舍
+- student: 仅查看自己所在的宿舍
 
-## 权限控制总结
+ViewScoreRecord:
+- admin: 查看所有扣分记录
+- dormHead: 查看本宿舍成员的扣分记录
+- student: 仅查看自己的扣分记录
 
-### 权限层级
-1. **管理员** - 最高权限，可执行所有管理操作
-2. **宿舍长** - 中级权限，可管理分配的宿舍
-3. **学生** - 基础权限，只能查看自己相关信息
+ViewKickRequest:
+- admin: 查看所有踢出申请
+- dormHead: 查看自己发起的申请
+- student: 查看针对自己的申请
+```
 
-### 数据访问范围
-- **管理员**: 全局访问所有数据
-- **宿舍长**: 仅访问管理宿舍的相关数据
-- **学生**: 仅访问自己的相关数据
+## 业务逻辑验证规则
 
-### 操作权限分离
-- **创建权限**: 仅管理员可创建宿舍和分配用户
-- **管理权限**: 宿舍长可管理本宿舍学生
-- **查看权限**: 基于角色和数据归属关系控制
+### 1. 数据完整性验证
+- 所有必填字段检查
+- 数据类型和格式验证
+- 引用完整性检查
+- 唯一性约束验证
+
+### 2. 业务状态验证
+- 用户状态一致性检查
+- 宿舍容量限制检查
+- 关系状态有效性检查
+- 时间序列逻辑检查
+
+### 3. 权限边界验证
+- 跨宿舍操作限制
+- 角色权限边界检查
+- 自我操作限制检查
+- 状态转换权限检查
+
+## 交互依赖关系图
+
+```
+CreateDormitory → AssignDormHead → AssignUserToDormitory
+     ↓               ↓                    ↓
+ 自动创建床位    建立管理关系         建立入住关系
+     ↓               ↓                    ↓
+ 床位可分配      可进行管理操作      可进行扣分记录
+                     ↓                    ↓
+              CreateScoreRecord → CreateKickRequest
+                     ↓                    ↓
+              累积扣分计算         触发踢出条件
+                                         ↓
+                               ProcessKickRequest
+                                         ↓
+                               解除宿舍关系
+```
+
+## 错误处理矩阵
+
+| 错误类型 | 错误代码 | 触发条件 | 返回信息 |
+|---------|---------|---------|---------|
+| 权限错误 | PERMISSION_DENIED | 用户角色不匹配 | "权限不足，无法执行此操作" |
+| 业务规则错误 | BUSINESS_RULE_VIOLATION | 违反业务约束 | 具体规则说明 |
+| 数据验证错误 | VALIDATION_FAILED | 输入数据无效 | 字段验证失败详情 |
+| 资源冲突错误 | RESOURCE_CONFLICT | 资源状态冲突 | 冲突资源状态说明 |
+| 资源不存在错误 | RESOURCE_NOT_FOUND | 引用资源不存在 | 资源标识和类型 |
+
+## Stage实现策略
+
+### Stage 1: 核心业务逻辑
+- 实现所有Interaction的基本功能
+- 不加入权限检查和业务规则验证
+- 使用有效数据和正确角色进行测试
+- 确保所有基础操作正常工作
+
+### Stage 2: 权限和业务规则
+- 在Interaction中添加condition检查
+- 实现权限控制逻辑
+- 实现业务规则验证
+- 添加错误处理和返回
+
+### 测试覆盖策略
+- 每个交互至少有1个正常流程测试
+- 每个权限规则至少有1个拒绝测试
+- 每个业务规则至少有1个违反测试
+- 边界条件和异常情况覆盖
+
+## 后续扩展考虑
+
+### 1. 通知系统交互
+- SendKickNotification: 踢出申请通知
+- SendScoreNotification: 扣分通知
+- SendAssignmentNotification: 分配通知
+
+### 2. 统计报表交互
+- GenerateDormitoryReport: 宿舍统计报表
+- GenerateScoreReport: 扣分统计报表
+- GenerateOccupancyReport: 入住率报表
+
+### 3. 审计日志交互
+- LogUserAction: 用户操作日志
+- ViewAuditLog: 审计日志查看
+- ExportAuditLog: 审计日志导出

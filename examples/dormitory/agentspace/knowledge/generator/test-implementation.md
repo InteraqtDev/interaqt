@@ -441,7 +441,14 @@ const user = await system.storage.findOne('User',
 )
 console.log(user.name)  // undefined!
 
-// ✅ CORRECT: Returns all specified fields
+// ❌ WRONG: Don't use '*' - it's not supported
+const user = await system.storage.findOne('User',
+  MatchExp.atom({ key: 'email', value: ['=', 'test@example.com'] }),
+  undefined,
+  ['*']  // WRONG! Should not use star selector in tests.
+)
+
+// ✅ CORRECT: Explicitly list all needed fields
 const user = await system.storage.findOne('User',
   MatchExp.atom({ key: 'email', value: ['=', 'test@example.com'] }),
   undefined,  // modifier
@@ -449,6 +456,59 @@ const user = await system.storage.findOne('User',
 )
 console.log(user.name)  // 'Test User' ✓
 ```
+
+### Querying Relations with attributeQuery
+
+When querying entities with relations, you can specify related entity fields using nested arrays:
+
+```typescript
+// ✅ CORRECT: Query style with author information
+const style = await system.storage.findOne('Style',
+  MatchExp.atom({ key: 'slug', value: ['=', 'modern-style'] }),
+  undefined,
+  [
+    'id', 
+    'label', 
+    'status',
+    ['author', { 
+      attributeQuery: ['id', 'name', 'email', 'role'] 
+    }]
+  ]
+)
+console.log(style.author.name)  // 'John Doe' ✓
+
+// ✅ CORRECT: Query with multiple relations
+const post = await system.storage.findOne('Post',
+  MatchExp.atom({ key: 'id', value: ['=', postId] }),
+  undefined,
+  [
+    'id',
+    'title',
+    'content',
+    'publishedAt',
+    ['author', { 
+      attributeQuery: ['id', 'name', 'avatar'] 
+    }],
+    ['category', { 
+      attributeQuery: ['id', 'name', 'slug'] 
+    }]
+  ]
+)
+
+// ❌ WRONG: Don't use '*' for relations either
+const style = await system.storage.findOne('Style',
+  MatchExp.atom({ key: 'id', value: ['=', styleId] }),
+  undefined,
+  [
+    '*',  // WRONG!
+    ['author', { attributeQuery: ['*'] }]  // WRONG!
+  ]
+)
+```
+
+### Important Notes
+- **Always explicitly list fields**: This ensures predictable results.
+- **Only requested fields are returned**: Any field not in attributeQuery will be undefined
 
 ## 🔴 CRITICAL: Accessing Relation Names
 
