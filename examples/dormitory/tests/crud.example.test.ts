@@ -38,7 +38,7 @@ describe('Simple CRUD Example', () => {
     properties: [
       Property.create({ name: 'title', type: 'string' }),
       Property.create({ name: 'content', type: 'string' }),
-      Property.create({ name: 'createdAt', type: 'timestamp' }),
+      Property.create({ name: 'createdAt', type: 'number' }),
       Property.create({
         name: 'status',
         type: 'string',

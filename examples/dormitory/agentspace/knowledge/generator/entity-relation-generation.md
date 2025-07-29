@@ -95,7 +95,7 @@ Property.create({
 // Dynamic defaults
 Property.create({ 
   name: 'createdAt', 
-  type: 'timestamp',
+  type: 'number',
   defaultValue: () => Math.floor(Date.now()/1000)
 });
 ```
@@ -129,7 +129,7 @@ const UserStyleRelation = Relation.create({
   properties: [
     Property.create({ 
       name: 'createdAt', 
-      type: 'timestamp',
+      type: 'number',
       defaultValue: () => Math.floor(Date.now()/1000)
     })
   ]
@@ -179,8 +179,8 @@ export const Style = Entity.create({
     Property.create({ name: 'thumbKey', type: 'string' }),
     Property.create({ name: 'priority', type: 'number', defaultValue: () => 0 }),
     Property.create({ name: 'status', type: 'string', defaultValue: () => 'draft' }),
-    Property.create({ name: 'createdAt', type: 'timestamp', defaultValue: () => Math.floor(Date.now()/1000) }),
-    Property.create({ name: 'updatedAt', type: 'timestamp', defaultValue: () => Math.floor(Date.now()/1000) })
+    Property.create({ name: 'createdAt', type: 'number', defaultValue: () => Math.floor(Date.now()/1000) }),
+    Property.create({ name: 'updatedAt', type: 'number', defaultValue: () => Math.floor(Date.now()/1000) })
   ]
 });
 
@@ -207,7 +207,7 @@ export const StyleVersionRelation = Relation.create({
   properties: [
     Property.create({ 
       name: 'createdAt', 
-      type: 'timestamp',
+      type: 'number',
       defaultValue: () => Math.floor(Date.now()/1000)
     })
   ]

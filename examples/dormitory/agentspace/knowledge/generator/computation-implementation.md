@@ -181,10 +181,10 @@ When using `InteractionEventEntity` as the Transform input source, understand th
    })
    
    // ✅ CORRECT: Use StateMachine for updates
-   Property.create({
-     name: 'updatedAt',
-     type: 'timestamp',
-     computation: StateMachine.create({
+         Property.create({
+        name: 'updatedAt',
+        type: 'number',
+        computation: StateMachine.create({
        states: [updatedState],
        transfers: [
          StateTransfer.create({
@@ -249,8 +249,8 @@ export const Style = Entity.create({
     Property.create({ name: 'thumbKey', type: 'string' }),
     Property.create({ name: 'priority', type: 'number', defaultValue: () => 0 }),
     Property.create({ name: 'status', type: 'string', defaultValue: () => 'draft' }),
-    Property.create({ name: 'createdAt', type: 'timestamp', defaultValue: () => Math.floor(Date.now()/1000) }),
-    Property.create({ name: 'updatedAt', type: 'timestamp', defaultValue: () => Math.floor(Date.now()/1000) })
+    Property.create({ name: 'createdAt', type: 'number', defaultValue: () => Math.floor(Date.now()/1000) }),
+    Property.create({ name: 'updatedAt', type: 'number', defaultValue: () => Math.floor(Date.now()/1000) })
   ],
   // Transform in Entity's computation property
   computation: Transform.create({
@@ -273,6 +273,58 @@ export const Style = Entity.create({
       return null;
     }
   })
+});
+```
+
+#### Transform from Other Entities (Non-InteractionEventEntity)
+
+Transform can also use other entities as source, not just InteractionEventEntity. This is useful for creating derived entities based on existing data.
+
+**🔴 IMPORTANT: Establishing Relations**
+When transforming from one entity to another, if you want to establish a relation between the transformed entity and the source entity, you MUST explicitly include the source entity reference in the callback return value.
+
+```typescript
+import { Transform, Entity, Property, Relation } from 'interaqt';
+
+// Create snapshot entity from Style entity
+export const StyleSnapshot = Entity.create({
+  name: 'StyleSnapshot',
+  properties: [
+    Property.create({ name: 'label', type: 'string' }),
+    Property.create({ name: 'slug', type: 'string' }),
+    Property.create({ name: 'description', type: 'string' }),
+    Property.create({ name: 'snapshotTakenAt', type: 'number', defaultValue: () => Math.floor(Date.now()/1000) }),
+    Property.create({ name: 'version', type: 'number' })
+  ],
+  // Transform from Style entity (not InteractionEventEntity)
+  computation: Transform.create({
+    record: Style,  // ← Source is Style entity, not InteractionEventEntity
+    attributeQuery: ['id', 'label', 'slug', 'description', 'status'],
+    callback: function(style) {
+      // Only create snapshots for active styles
+      if (style.status === 'active') {
+        return {
+          label: style.label,
+          slug: style.slug,
+          description: style.description || '',
+          snapshotTakenAt: Math.floor(Date.now()/1000),
+          version: Date.now(),  // Simple version number
+          // 🔴 CRITICAL: Must explicitly reference source entity to create relation
+          originalStyle: style  // ← This creates the relation to source Style
+        };
+      }
+      return null;  // Don't create snapshot for non-active styles
+    }
+  })
+});
+
+// Define the relation between Style and StyleSnapshot
+export const StyleSnapshotRelation = Relation.create({
+  source: Style,
+  sourceProperty: 'snapshots',
+  target: StyleSnapshot,
+  targetProperty: 'originalStyle',
+  type: '1:n'  // One style can have many snapshots
 });
 ```
 
@@ -444,7 +496,7 @@ const updatedState = StateNode.create({
 
 Property.create({
   name: 'updatedAt',
-  type: 'timestamp',
+  type: 'number',
   defaultValue: () => Math.floor(Date.now()/1000),
   computation: StateMachine.create({
     name: 'UpdatedAt',
@@ -912,7 +964,7 @@ const updatedState = StateNode.create({
 
 Property.create({
   name: 'updatedAt',
-  type: 'timestamp',
+  type: 'number',
   defaultValue: () => Math.floor(Date.now()/1000),
   computation: StateMachine.create({
     states: [updatedState],
@@ -1002,7 +1054,7 @@ Property.create({
 // Created at - set once
 Property.create({
   name: 'createdAt',
-  type: 'timestamp',
+  type: 'number',
   defaultValue: () => Math.floor(Date.now()/1000)
 })
 
@@ -1014,7 +1066,7 @@ const updatedState = StateNode.create({
 
 Property.create({
   name: 'updatedAt',
-  type: 'timestamp',
+  type: 'number',
   defaultValue: () => Math.floor(Date.now()/1000),
   computation: StateMachine.create({
     states: [updatedState],

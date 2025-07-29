@@ -487,7 +487,7 @@ const updatedState = StateNode.create({
 
 Property.create({
   name: 'updatedAt',
-  type: 'timestamp',
+  type: 'number',
   defaultValue: () => Math.floor(Date.now()/1000),
   computation: StateMachine.create({
     states: [initialState, updatedState],
