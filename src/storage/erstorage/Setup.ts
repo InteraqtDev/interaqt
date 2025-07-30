@@ -1,8 +1,9 @@
 import { LinkMapItem, MapData, RecordAttribute, RecordMapItem, ValueAttribute } from "./EntityToTableMap.js";
 import { assert } from "../utils.js";
-import { EntityInstance, RelationInstance, PropertyInstance } from "@shared";
+import { EntityInstance, RelationInstance, PropertyInstance, BoolExp } from "@shared";
 import { ID_ATTR, ROW_ID_ATTR, Database } from "@runtime";
 import { isRelation } from "./util.js";
+import { MatchExpressionData, MatchAtom } from "./MatchExp.js";
 
 // Define the types we need
 
@@ -129,6 +130,85 @@ export class DBSetup {
         return { sourceEntity, filterCondition }
     }
 
+    /**
+     * 验证 filtered entity 的过滤条件中的路径不包含 x:n 关系
+     */
+    private validateFilteredEntityPaths(entityName: string, filterCondition: MatchExpressionData) {
+        const paths = this.extractPathsFromFilterCondition(filterCondition);
+        
+        for (const path of paths) {
+            this.validateSinglePath(entityName, path);
+        }
+    }
+    
+    /**
+     * 从过滤条件中提取所有路径
+     */
+    private extractPathsFromFilterCondition(expression: MatchExpressionData): string[][] {
+        const paths: string[][] = [];
+        
+        // MatchExpressionData 是 BoolExp<MatchAtom> 的别名
+        const boolExp = expression instanceof BoolExp ? expression : BoolExp.fromValue(expression);
+        
+        if (boolExp.isExpression()) {
+            if (boolExp.left) {
+                paths.push(...this.extractPathsFromFilterCondition(boolExp.left.raw as MatchExpressionData));
+            }
+            if (boolExp.right) {
+                paths.push(...this.extractPathsFromFilterCondition(boolExp.right.raw as MatchExpressionData));
+            }
+        } else if (boolExp.isAtom()) {
+            const matchAtom = boolExp.data as MatchAtom;
+            const key = matchAtom.key;
+            const pathParts = key.split('.');
+            
+            // 如果路径包含多个部分（即有关联查询），需要验证
+            if (pathParts.length > 1) {
+                paths.push(pathParts);
+            }
+        }
+        
+        return paths;
+    }
+    
+    /**
+     * 验证单个路径不包含 x:n 关系
+     */
+    private validateSinglePath(entityName: string, pathParts: string[]) {
+        let currentEntity = entityName;
+        
+        // 遍历路径的每个部分（除了最后一个，最后一个是属性）
+        for (let i = 0; i < pathParts.length - 1; i++) {
+            const attribute = pathParts[i];
+            
+            // 获取这个属性的信息
+            const entityData = this.map.records[currentEntity];
+            if (!entityData) {
+                throw new Error(`Entity ${currentEntity} not found in map`);
+            }
+            
+            const attributeData = entityData.attributes[attribute];
+            if (!attributeData || !(attributeData as any).isRecord) {
+                throw new Error(`Attribute ${attribute} is not a relation in entity ${currentEntity}`);
+            }
+            
+            // 检查关系类型
+            const relType = (attributeData as any).relType;
+            if (relType && (relType[1] === 'n')) {
+                throw new Error(
+                    `Filtered entity '${this.currentFilteredEntityName}' contains an invalid path: ` +
+                    `'${pathParts.join('.')}'. The relation '${currentEntity}.${attribute}' is a ${relType[0]}:${relType[1]} relation. ` +
+                    `Filtered entities do not support paths with 'x:n' relationships for performance reasons.`
+                );
+            }
+            
+            // 移动到下一个实体
+            currentEntity = (attributeData as any).recordName;
+        }
+    }
+    
+    private currentFilteredEntityName?: string;
+
     createRecord(entity: EntityInstance | RelationInstance, isRelation? :boolean) {
         
         const entityWithProps = entity
@@ -168,11 +248,17 @@ export class DBSetup {
             attributes['__filtered_entities'] = {
                 name: '__filtered_entities',
                 type: 'json',
-                fieldType: this.database!.mapToDBFieldType('json') || 'JSON'
+                fieldType: this.database!.mapToDBFieldType('json') || 'JSON',
+                collection: false,
+                computed: undefined,
+                defaultValue: () => JSON.stringify({})
             };
         }
 
         const { sourceEntity, filterCondition } = (entityWithProps as any) || {}
+        
+        // Remove the validation from here - it will be done in buildMap
+        
         // CAUTION 暂时不支持跨 record 的 Filter。如果要支持，需要有类似 runtime computation 中的级联计算法
 
         return {
@@ -283,6 +369,19 @@ export class DBSetup {
                 } as RecordAttribute
             }
         })
+
+        // 4. 验证所有 filtered entity 的路径
+        this.entities.forEach(entity => {
+            const entityWithProps = entity as any;
+            if (entityWithProps.sourceEntity && entityWithProps.filterCondition) {
+                this.currentFilteredEntityName = entityWithProps.name;
+                try {
+                    this.validateFilteredEntityPaths(entityWithProps.sourceEntity.name, entityWithProps.filterCondition);
+                } finally {
+                    this.currentFilteredEntityName = undefined;
+                }
+            }
+        });
 
         this.mergeRecords()
         this.assignTableAndField()
@@ -535,7 +634,8 @@ export class DBSetup {
     }
 
     createTableSQL() {
-        return Object.keys(this.tables).map(tableName => (
+        return Object.keys(this.tables).map(tableName => {
+            const sql = (
             `
 CREATE TABLE "${tableName}" (
 ${Object.values(this.tables[tableName].columns).map(column => {
@@ -555,8 +655,9 @@ ${Object.values(this.tables[tableName].columns).map(column => {
     return sql;
 }).join(',')}
 )
-`
-        ))
+`)
+            return sql
+        })
     }
     createTables() {
         return Promise.all(this.createTableSQL().map(sql => {

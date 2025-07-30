@@ -8,6 +8,8 @@ import { AttributeQuery, AttributeQueryData, AttributeQueryDataRecordItem } from
 import { LINK_SYMBOL, RecordQuery, RecordQueryTree } from "./RecordQuery.js";
 import { NewRecordData, RawEntityData } from "./NewRecordData.js";
 import { Modifier } from "./Modifier.js";
+import { FilteredEntityDependencyManager } from "./FilteredEntityDependencyManager.js";
+import { CascadeEventManager } from "./CascadeEventManager.js";
 
 
 export type JoinTables = {
@@ -92,8 +94,39 @@ export type PlaceholderGen = (name?: string) => string
 
 export class RecordQueryAgent {
     getPlaceholder: () => PlaceholderGen
+    private dependencyManager: FilteredEntityDependencyManager
+    private cascadeEventManager: CascadeEventManager
+    
     constructor(public map: EntityToTableMap, public database: Database) {
         this.getPlaceholder = database.getPlaceholder || (() => (name?:string) => `?`)
+        this.dependencyManager = new FilteredEntityDependencyManager(map)
+        this.cascadeEventManager = new CascadeEventManager(map, this, this.dependencyManager)
+        this.initializeFilteredEntityDependencies()
+    }
+    
+    /**
+     * 初始化所有 filtered entity 的依赖关系
+     */
+    private initializeFilteredEntityDependencies() {
+        const records = this.map.data.records
+        
+        for (const [recordName, recordData] of Object.entries(records)) {
+            if (recordData.sourceRecordName && recordData.filterCondition) {
+                // filterCondition 可能是 BoolExp 或 MatchExp 实例
+                // BoolExp 就是 MatchExpressionData 的实例
+                const filterConditionData = recordData.filterCondition instanceof BoolExp 
+                    ? recordData.filterCondition 
+                    : recordData.filterCondition.data
+                
+                if (filterConditionData) {
+                    this.dependencyManager.analyzeDependencies(
+                        recordName,
+                        recordData.sourceRecordName,
+                        filterConditionData
+                    )
+                }
+            }
+        }
     }
 
     // 有 prefix 说明是比人的子查询
@@ -1224,7 +1257,9 @@ WHERE "${entityInfo.idField}" = (${p()})
 
             // 处理 filtered entity - 检查更新后的记录是否属于任何 filtered entity
             // 传递原始的 matchedEntity，它包含更新前的 __filtered_entities 状态
-            await this.updateFilteredEntityFlags(entityName, matchedEntity.id, events, matchedEntity)
+            // 以及实际更改的字段
+            const changedFields = Object.keys(newEntityData.getData())
+            await this.updateFilteredEntityFlags(entityName, matchedEntity.id, events, matchedEntity, false, changedFields)
 
             result.push({...newEntityData.getData(), ...newEntityDataWithIdsWithFlashOutRecords.getData(), ...relianceUpdatedResult})
         }
@@ -1552,13 +1587,31 @@ WHERE "${recordInfo.idField}" = ${p()}
     /**
      * 更新记录的 filtered entity 标记
      */
-    async updateFilteredEntityFlags(entityName: string, recordId: string, events?: RecordMutationEvent[], originalRecord?: Record, isCreation?: boolean) {
+    async updateFilteredEntityFlags(entityName: string, recordId: string, events?: RecordMutationEvent[], originalRecord?: any, isCreation?: boolean, changedFields?: string[]) {
+        // 处理直接的 filtered entity（基于源实体自身的过滤条件）
         const filteredEntities = this.getFilteredEntitiesForSource(entityName);
         
-        if (filteredEntities.length === 0) return;
+        if (filteredEntities.length === 0) {
+            // 即使没有直接的 filtered entity，也需要处理级联事件
+            const changedAttributes = changedFields || (isCreation && originalRecord ? Object.keys(originalRecord) : []);
+            await this.cascadeEventManager.processCascadeEvents(
+                entityName,
+                recordId,
+                changedAttributes,
+                originalRecord,
+                events || []
+            );
+            return;
+        }
 
         // 获取原始记录的 __filtered_entities 状态
-        const originalFlags = originalRecord?.__filtered_entities || {};
+        // Parse JSON string to object if needed
+        let originalFlags: { [key: string]: boolean } = {};
+        if (originalRecord?.__filtered_entities) {
+            originalFlags = typeof originalRecord.__filtered_entities === 'string'
+                ? JSON.parse(originalRecord.__filtered_entities)
+                : originalRecord.__filtered_entities;
+        }
 
         // 获取更新后的记录以检查当前过滤条件
         const idMatch = MatchExp.atom({ key: 'id', value: ['=', recordId] });
@@ -1571,7 +1624,7 @@ WHERE "${recordInfo.idField}" = ${p()}
         const updatedRecord = updatedRecords[0];
 
         // 检查每个 filtered entity 条件
-        const isNewRecord = !originalRecord?.__filtered_entities;
+        const isNewRecord = !originalRecord || Object.keys(originalFlags).length === 0;
         const newFlags = { ...originalFlags };
         
         for (const filteredEntity of filteredEntities) {
@@ -1632,6 +1685,17 @@ WHERE "${recordInfo.idField}" = ${p()}
                 ]);
             }
         }
+        
+        // 处理跨实体的级联事件
+        // 如果有传入 changedFields，使用它；否则在创建时使用所有字段
+        const changedAttributes = changedFields || (isCreation && originalRecord ? Object.keys(originalRecord) : []);
+        await this.cascadeEventManager.processCascadeEvents(
+            entityName,
+            recordId,
+            changedAttributes,
+            originalRecord,
+            events || []
+        );
     }
 
 }
