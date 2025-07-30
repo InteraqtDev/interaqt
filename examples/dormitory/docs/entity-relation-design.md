@@ -1,369 +1,244 @@
-# 实体和关系设计文档
-
-## 概述
-基于需求分析和测试用例，设计宿舍管理系统的实体和关系结构。
-
----
+# 宿舍管理系统实体关系设计
 
 ## 实体设计
 
-### 1. User 实体
-**目的**: 系统中的所有用户（管理员、宿舍长、学生）
+### User (用户)
+- **目的**: 系统中的所有用户，包括管理员、宿舍长和学生
+- **业务含义**: 代表使用系统的人员，具有不同的角色和权限
+- **属性**:
+  - `id`: string (系统生成的唯一标识)
+  - `name`: string (用户姓名)
+  - `email`: string (唯一邮箱标识，用于登录)
+  - `role`: string (角色: 'admin' | 'dormHead' | 'student')
+  - `score`: number (行为积分，初始值为100，用于违规管理)
+  - `status`: string (状态: 'active' | 'kicked'，用于标识是否被踢出)
+  - `createdAt`: number (创建时间戳)
+  - `updatedAt`: number (更新时间戳)
 
-**属性**:
-- `id`: string (系统生成的唯一标识符)  
-- `name`: string (用户姓名)
-- `email`: string (邮箱地址，唯一标识)
-- `role`: string (用户角色: 'admin'/'dormHead'/'student')
-- `status`: string (用户状态: 'active'/'kicked', 默认'active')
-- `createdAt`: number (创建时间戳)
+### Dormitory (宿舍)
+- **目的**: 宿舍楼栋或房间实体
+- **业务含义**: 表示具体的宿舍单元，有固定的床位容量
+- **属性**:
+  - `id`: string (唯一标识)
+  - `name`: string (宿舍名称，如"A栋101")
+  - `capacity`: number (床位数量，4-6个)
+  - `currentOccupancy`: number (当前入住人数，计算属性)
+  - `availableBeds`: number (可用床位数，计算属性)
+  - `createdAt`: number (创建时间戳)
+  - `updatedAt`: number (更新时间戳)
 
-**业务含义**: 
-- 所有用户共用一个实体，通过role字段区分权限
-- status字段用于管理被踢出的学生状态
-- email作为唯一标识，用于登录验证
+### ScoreRule (扣分规则)
+- **目的**: 定义各种违规行为对应的扣分规则
+- **业务含义**: 标准化的违规行为定义和对应的处罚标准
+- **属性**:
+  - `id`: string (唯一标识)
+  - `name`: string (规则名称，如"晚归"、"不整理内务")
+  - `description`: string (规则详细描述)
+  - `scoreDeduction`: number (扣分数值，必须为正数)
+  - `isActive`: boolean (规则是否启用，默认为true)
+  - `createdAt`: number (创建时间戳)
+  - `updatedAt`: number (更新时间戳)
 
-### 2. Dormitory 实体  
-**目的**: 宿舍建筑的基本信息
+### ViolationRecord (违规记录)
+- **目的**: 记录用户的具体违规行为实例
+- **业务含义**: 用户违规的历史记录，用于积分扣除和统计分析
+- **属性**:
+  - `id`: string (唯一标识)
+  - `description`: string (违规具体描述)
+  - `recordedAt`: number (记录时间戳)
+  - `scoreDeducted`: number (本次扣除的分数)
+  - `status`: string (记录状态: 'active' | 'revoked'，用于撤销错误记录)
 
-**属性**:
-- `id`: string (宿舍唯一标识符)
-- `name`: string (宿舍名称，如"A栋101")
-- `capacity`: number (床位总数，限制4-6)
-- `createdAt`: number (创建时间戳)
-
-**业务含义**:
-- 每个宿舍有固定数量的床位
-- capacity用于业务规则验证
-- 宿舍的实际使用情况通过关系和计算属性获得
-
-### 3. Bed 实体
-**目的**: 宿舍内的具体床位
-
-**属性**:
-- `id`: string (床位唯一标识符)
-- `number`: number (床位号，1-6)
-- `createdAt`: number (创建时间戳)
-
-**业务含义**:
-- 每个床位在宿舍内有唯一编号
-- 床位的占用状态通过关系确定
-- 支持精确的床位分配管理
-
-### 4. DeductionRule 实体
-**目的**: 扣分规则的定义
-
-**属性**:
-- `id`: string (规则唯一标识符)
-- `name`: string (规则名称，如"晚归")
-- `description`: string (规则详细描述)
-- `points`: number (扣分数，必须>0)
-- `isActive`: boolean (规则是否启用，默认true)
-- `createdAt`: number (创建时间戳)
-
-**业务含义**:
-- 管理员预定义的扣分标准
-- isActive控制规则的有效性
-- points用于自动计算总扣分
-
-### 5. DeductionRecord 实体
-**目的**: 具体的扣分记录
-
-**属性**:
-- `id`: string (记录唯一标识符)
-- `reason`: string (具体扣分原因)
-- `points`: number (扣分数，从规则继承)
-- `status`: string (记录状态: 'active'/'cancelled', 默认'active')
-- `createdAt`: number (记录创建时间戳)
-
-**业务含义**:
-- 每次扣分的详细记录
-- status支持扣分撤销功能
-- reason记录具体违规情况
-
-### 6. KickoutRequest 实体
-**目的**: 踢出学生的申请
-
-**属性**:
-- `id`: string (申请唯一标识符)
-- `reason`: string (申请理由)
-- `status`: string (申请状态: 'pending'/'approved'/'rejected', 默认'pending')
-- `createdAt`: number (申请创建时间戳)
-- `processedAt`: number (处理时间戳，可选)
-
-**业务含义**:
-- 宿舍长发起的踢出申请
-- 管理员处理后更新状态
-- processedAt记录处理时间
-
----
+### KickoutRequest (踢出申请)
+- **目的**: 宿舍长申请踢出违规用户的正式申请
+- **业务含义**: 用于管理违规用户移除流程的审批记录
+- **属性**:
+  - `id`: string (唯一标识)
+  - `reason`: string (申请理由)
+  - `requestedAt`: number (申请提交时间)
+  - `status`: string (申请状态: 'pending' | 'approved' | 'rejected')
+  - `processedAt`: number (处理时间，可选)
+  - `adminComment`: string (管理员处理意见，可选)
 
 ## 关系设计
 
-### 1. UserDormitoryRelation (用户-宿舍关系)
-**类型**: n:1 (多个用户对应一个宿舍)
-**目的**: 用户分配到宿舍
+### UserDormitoryRelation (用户-宿舍关系)
+- **类型**: n:1 (多个用户对应一个宿舍)
+- **业务含义**: 学生被分配到特定宿舍的特定床位
+- **源属性**: `dormitory` (在User实体上，用户可通过user.dormitory访问所在宿舍)
+- **目标属性**: `residents` (在Dormitory实体上，宿舍可通过dormitory.residents访问所有住户)
+- **关系属性**:
+  - `assignedAt`: number (分配时间戳)
+  - `bedNumber`: number (床位号，1-6)
+  - `status`: string (分配状态: 'active' | 'inactive')
 
-**源实体**: User
-**目标实体**: Dormitory
-**源属性名**: `dormitory` (在User上创建dormitory属性)
-**目标属性名**: `users` (在Dormitory上创建users属性)
+**为什么是n:1**: 
+- 一个用户只能被分配到一个宿舍
+- 一个宿舍可以有多个用户（4-6个）
 
-**关系属性**:
-- `assignedAt`: number (分配时间戳)
-- `status`: string (分配状态: 'active'/'inactive', 默认'active')
+### DormitoryHeadRelation (宿舍长关系)
+- **类型**: 1:1 (一个宿舍对应一个宿舍长)
+- **业务含义**: 指定宿舍的负责管理人员
+- **源属性**: `managedDormitory` (在User实体上，宿舍长可通过user.managedDormitory访问管理的宿舍)
+- **目标属性**: `dormHead` (在Dormitory实体上，宿舍可通过dormitory.dormHead访问宿舍长)
+- **关系属性**:
+  - `appointedAt`: number (任命时间戳)
+  - `isActive`: boolean (任命是否有效，默认true)
 
-**业务含义**:
-- 通过user.dormitory访问用户所在宿舍
-- 通过dormitory.users访问宿舍所有成员
-- status支持用户离开宿舍的历史记录
+**为什么是1:1**:
+- 一个宿舍只能有一个宿舍长
+- 一个宿舍长只能管理一个宿舍
 
-### 2. UserBedRelation (用户-床位关系)
-**类型**: 1:1 (一个用户对应一个床位)
-**目的**: 用户分配到具体床位
+### UserViolationRelation (用户-违规记录关系)
+- **类型**: 1:n (一个用户对应多个违规记录)
+- **业务含义**: 用户的违规行为历史记录
+- **源属性**: `violationRecords` (在User实体上，用户可通过user.violationRecords访问所有违规记录)
+- **目标属性**: `user` (在ViolationRecord实体上，违规记录通过violationRecord.user访问对应用户)
 
-**源实体**: User  
-**目标实体**: Bed
-**源属性名**: `bed` (在User上创建bed属性)
-**目标属性名**: `user` (在Bed上创建user属性)
+**为什么是1:n**:
+- 一个用户可能有多个违规记录
+- 一个违规记录只属于一个特定用户
 
-**关系属性**:
-- `assignedAt`: number (分配时间戳)
-- `status`: string (分配状态: 'active'/'inactive', 默认'active')
+### ViolationRuleRelation (违规记录-规则关系)
+- **类型**: n:1 (多个违规记录对应一个规则)
+- **业务含义**: 违规记录基于的扣分规则
+- **源属性**: `rule` (在ViolationRecord实体上，违规记录通过violationRecord.rule访问适用规则)
+- **目标属性**: `violations` (在ScoreRule实体上，规则通过scoreRule.violations访问所有基于该规则的违规记录)
 
-**业务含义**:
-- 通过user.bed访问用户的床位
-- 通过bed.user访问床位的使用者
-- 支持床位历史分配记录
+**为什么是n:1**:
+- 多个违规记录可能基于同一个规则（如多次晚归）
+- 一个违规记录只基于一个特定规则
 
-### 3. DormitoryBedRelation (宿舍-床位关系)
-**类型**: 1:n (一个宿舍对应多个床位)
-**目的**: 床位归属于特定宿舍
+### KickoutRequesterRelation (踢出申请-申请人关系)
+- **类型**: n:1 (多个申请对应一个申请人)
+- **业务含义**: 记录谁发起了踢出申请
+- **源属性**: `requester` (在KickoutRequest实体上，申请通过kickoutRequest.requester访问申请人)
+- **目标属性**: `kickoutRequests` (在User实体上，用户通过user.kickoutRequests访问发起的申请)
 
-**源实体**: Dormitory
-**目标实体**: Bed  
-**源属性名**: `beds` (在Dormitory上创建beds属性)
-**目标属性名**: `dormitory` (在Bed上创建dormitory属性)
+### KickoutTargetRelation (踢出申请-目标用户关系)
+- **类型**: n:1 (多个申请对应一个目标用户)
+- **业务含义**: 记录申请踢出的目标用户
+- **源属性**: `targetUser` (在KickoutRequest实体上，申请通过kickoutRequest.targetUser访问目标用户)
+- **目标属性**: `kickoutRequestsAgainst` (在User实体上，用户通过user.kickoutRequestsAgainst访问针对自己的申请)
 
-**关系属性**:
-- 无额外属性
-
-**业务含义**:
-- 通过dormitory.beds访问宿舍所有床位
-- 通过bed.dormitory访问床位所属宿舍
-- 建立宿舍和床位的归属关系
-
-### 4. DormitoryHeadRelation (宿舍-宿舍长关系)
-**类型**: 1:1 (一个宿舍对应一个宿舍长)
-**目的**: 指定宿舍的管理者
-
-**源实体**: Dormitory
-**目标实体**: User
-**源属性名**: `dormHead` (在Dormitory上创建dormHead属性)
-**目标属性名**: `managedDormitory` (在User上创建managedDormitory属性)
-
-**关系属性**:
-- `appointedAt`: number (任命时间戳)
-- `status`: string (任职状态: 'active'/'inactive', 默认'active')
-
-**业务含义**:
-- 通过dormitory.dormHead访问宿舍长
-- 通过user.managedDormitory访问用户管理的宿舍
-- 支持宿舍长更换的历史记录
-
-### 5. UserDeductionRecordRelation (用户-扣分记录关系)
-**类型**: 1:n (一个用户对应多个扣分记录)
-**目的**: 扣分记录归属于特定用户
-
-**源实体**: User
-**目标实体**: DeductionRecord
-**源属性名**: `deductionRecords` (在User上创建deductionRecords属性)
-**目标属性名**: `user` (在DeductionRecord上创建user属性)
-
-**关系属性**:
-- 无额外属性
-
-**业务含义**:
-- 通过user.deductionRecords访问用户所有扣分记录
-- 通过deductionRecord.user访问被扣分的用户
-- 用于计算用户总扣分
-
-### 6. DeductionRuleRecordRelation (扣分规则-扣分记录关系)
-**类型**: 1:n (一个规则对应多个记录)
-**目的**: 记录基于哪个规则进行扣分
-
-**源实体**: DeductionRule
-**目标实体**: DeductionRecord
-**源属性名**: `records` (在DeductionRule上创建records属性)
-**目标属性名**: `rule` (在DeductionRecord上创建rule属性)
-
-**关系属性**:
-- 无额外属性
-
-**业务含义**:
-- 通过rule.records访问基于该规则的所有扣分记录
-- 通过record.rule访问扣分记录对应的规则
-- 确保扣分的规则依据
-
-### 7. RecorderDeductionRelation (记录者-扣分记录关系)
-**类型**: 1:n (一个宿舍长记录多个扣分)
-**目的**: 记录是谁进行的扣分操作
-
-**源实体**: User (记录者，通常是宿舍长)
-**目标实体**: DeductionRecord
-**源属性名**: `recordedDeductions` (在User上创建recordedDeductions属性)
-**目标属性名**: `recorder` (在DeductionRecord上创建recorder属性)
-
-**关系属性**:
-- 无额外属性
-
-**业务含义**:
-- 通过user.recordedDeductions访问宿舍长记录的所有扣分
-- 通过record.recorder访问记录扣分的宿舍长
-- 用于权限控制和扣分撤销
-
-### 8. KickoutRequestRelations (踢出申请相关关系)
-
-#### 8.1 ApplicantKickoutRelation (申请人-踢出申请关系)
-**类型**: 1:n (一个宿舍长发起多个申请)
-**源实体**: User (申请人)
-**目标实体**: KickoutRequest
-**源属性名**: `kickoutRequests` (在User上创建kickoutRequests属性)
-**目标属性名**: `applicant` (在KickoutRequest上创建applicant属性)
-
-#### 8.2 TargetKickoutRelation (被申请人-踢出申请关系)
-**类型**: 1:n (一个学生可能被多次申请)
-**源实体**: User (被申请人)
-**目标实体**: KickoutRequest
-**源属性名**: `kickoutRequestsAgainst` (在User上创建kickoutRequestsAgainst属性)
-**目标属性名**: `target` (在KickoutRequest上创建target属性)
-
-#### 8.3 ProcessorKickoutRelation (处理人-踢出申请关系)
-**类型**: 1:n (一个管理员处理多个申请)
-**源实体**: User (处理人)
-**目标实体**: KickoutRequest
-**源属性名**: `processedKickoutRequests` (在User上创建processedKickoutRequests属性)
-**目标属性名**: `processor` (在KickoutRequest上创建processor属性)
-
-**关系属性**:
-- 所有踢出申请关系都无额外属性
-
-**业务含义**:
-- 完整记录踢出申请的参与者
-- 支持复杂的查询和权限控制
-- 便于生成申请历史和统计信息
-
----
+### KickoutProcessorRelation (踢出申请-处理人关系)
+- **类型**: n:1 (多个申请对应一个处理人)
+- **业务含义**: 记录管理员处理申请的关系（可选，仅在申请被处理时建立）
+- **源属性**: `processor` (在KickoutRequest实体上，申请通过kickoutRequest.processor访问处理人)
+- **目标属性**: `processedKickoutRequests` (在User实体上，管理员通过user.processedKickoutRequests访问处理的申请)
 
 ## 计算属性设计
 
-### User 实体计算属性
-- `totalScore`: number - 所有有效扣分记录的总分
-- `currentOccupancy`: number - 用户当前床位占用状态(0或1)
+### Dormitory 计算属性
+1. **currentOccupancy** (当前入住人数):
+   - 计算逻辑: 统计与该宿舍有活跃UserDormitoryRelation的用户数量
+   - 更新时机: 用户分配或移除时自动更新
 
-### Dormitory 实体计算属性  
-- `currentOccupancy`: number - 当前入住人数
-- `availableBeds`: number - 可用床位数 (capacity - currentOccupancy)
-- `occupancyRate`: number - 入住率百分比
+2. **availableBeds** (可用床位数):
+   - 计算逻辑: capacity - currentOccupancy
+   - 更新时机: 入住人数变化时自动更新
 
-### Bed 实体计算属性
-- `isOccupied`: boolean - 床位是否被占用
+### User 计算属性
+1. **totalViolations** (违规次数):
+   - 计算逻辑: 统计用户的活跃违规记录数量
+   - 更新时机: 添加违规记录时自动更新
 
-### DeductionRule 实体计算属性
-- `usageCount`: number - 基于该规则的记录总数
-- `totalPointsDeducted`: number - 基于该规则的总扣分
-
----
+2. **canBeKickedOut** (是否可被踢出):
+   - 计算逻辑: score < 60 && status === 'active'
+   - 更新时机: 积分或状态变化时自动更新
 
 ## 数据流图
 
 ```
-用户分配流程:
-User → UserDormitoryRelation → Dormitory
-  ↓
-User → UserBedRelation → Bed → DormitoryBedRelation → Dormitory
-
-扣分流程:
-User(宿舍长) → RecorderDeductionRelation → DeductionRecord
-                                              ↓
-User(学生) ← UserDeductionRecordRelation ← DeductionRecord
-                                              ↑
-DeductionRule ← DeductionRuleRecordRelation ←
-
-踢出申请流程:
-User(宿舍长) → ApplicantKickoutRelation → KickoutRequest
-                                             ↓
-User(学生) ← TargetKickoutRelation ← KickoutRequest
-                                             ↓
-User(管理员) ← ProcessorKickoutRelation ← KickoutRequest
+用户创建 → 角色分配 → 宿舍分配 → 日常管理 → 违规处理 → 踢出处理
+    ↓         ↓         ↓         ↓         ↓         ↓
+  User     DormHead   UserDorm   Violation  Request   Status
+  实体      关系       关系       记录       申请      更新
+    ↓         ↓         ↓         ↓         ↓         ↓
+ 创建用户   指定管理    建立居住    扣分累积   申请审批   移除关系
 ```
 
----
+## 实体关系总览
 
-## 重要设计原则
+```
+User
+├── UserDormitoryRelation (n:1) → Dormitory
+├── DormitoryHeadRelation (1:1) → Dormitory (仅宿舍长)
+├── UserViolationRelation (1:n) → ViolationRecord
+├── KickoutRequesterRelation (1:n) → KickoutRequest (作为申请人)
+├── KickoutTargetRelation (1:n) → KickoutRequest (作为目标)
+└── KickoutProcessorRelation (1:n) → KickoutRequest (作为处理人)
 
-### 1. 无ID引用规则
-**✅ 正确**:
-```typescript
-// 通过关系访问相关实体
-const user = await storage.get('User', userId);
-const dormitory = user.dormitory; // 通过关系获取
-const bedNumber = user.bed?.number; // 通过关系获取床位号
+Dormitory
+├── UserDormitoryRelation (1:n) → User (residents)
+└── DormitoryHeadRelation (1:1) → User (dormHead)
+
+ScoreRule
+└── ViolationRuleRelation (1:n) → ViolationRecord
+
+ViolationRecord
+├── UserViolationRelation (n:1) → User
+└── ViolationRuleRelation (n:1) → ScoreRule
+
+KickoutRequest
+├── KickoutRequesterRelation (n:1) → User (requester)
+├── KickoutTargetRelation (n:1) → User (targetUser)
+└── KickoutProcessorRelation (n:1) → User (processor, optional)
 ```
 
-**❌ 错误**:
-```typescript
-// 不要在实体中存储ID引用
-const User = Entity.create({
-  properties: [
-    Property.create({ name: 'dormitoryId', type: 'string' }), // 错误!
-    Property.create({ name: 'bedId', type: 'string' })        // 错误!
-  ]
-});
-```
+## 关键约束和验证
 
-### 2. 关系属性命名
-- 通过`sourceProperty`和`targetProperty`定义访问名称
-- 命名应该反映业务关系的语义
-- 避免使用ID后缀，使用业务含义的名称
+### 数据完整性约束
+1. **唯一性约束**:
+   - User.email 必须唯一
+   - Dormitory.name 必须唯一
+   - 同一宿舍内 UserDormitoryRelation.bedNumber 必须唯一
 
-### 3. 状态管理
-- 使用`status`字段管理实体状态
-- 支持软删除和历史记录
-- 状态值使用字符串枚举
+2. **引用完整性约束**:
+   - 所有关系的源和目标实体必须存在
+   - 删除实体前必须处理相关的关系
 
-### 4. 时间戳管理
-- 所有实体都有`createdAt`字段
-- 关系根据需要添加时间戳属性
-- 使用数字类型存储Unix时间戳
+### 业务逻辑约束
+1. **容量约束**:
+   - Dormitory.capacity 必须在 4-6 之间
+   - UserDormitoryRelation.bedNumber 不能超过对应宿舍的容量
+   - 宿舍的 currentOccupancy 不能超过 capacity
 
-### 5. 计算属性原则
-- 基于关系和其他属性动态计算
-- 避免存储可计算的冗余数据
-- 保证数据一致性
+2. **状态约束**:
+   - 被踢出的用户 (status='kicked') 不能建立新的 UserDormitoryRelation
+   - 同一用户只能有一个活跃的 UserDormitoryRelation
+   - 同一宿舍只能有一个活跃的 DormitoryHeadRelation
 
----
+3. **积分约束**:
+   - User.score 不能为负数
+   - ScoreRule.scoreDeduction 必须为正数
+   - ViolationRecord.scoreDeducted 必须与对应规则的 scoreDeduction 一致
 
-## 验证清单
+### 时间约束
+1. **时序约束**:
+   - 所有 recordedAt、requestedAt、processedAt 时间戳必须合理
+   - processedAt 必须晚于 requestedAt
+   - assignedAt 必须晚于宿舍创建时间
 
-### 实体验证
-- [ ] 所有实体名称为PascalCase单数形式
-- [ ] 所有属性都有正确的类型定义
-- [ ] 所有defaultValue都是函数而非静态值
-- [ ] 没有ID引用字段在实体属性中
-- [ ] 时间戳字段使用number类型
+## 设计决策说明
 
-### 关系验证
-- [ ] 所有关系都没有name属性（自动生成）
-- [ ] 关系类型格式正确('1:1', '1:n', 'n:1', 'n:n')
-- [ ] sourceProperty和targetProperty命名有意义
-- [ ] 关系属性按需定义
-- [ ] 循环依赖已避免
+### 为什么分离 User 和角色
+- 用户的角色可能会变化（学生可能被提升为宿舍长）
+- 便于权限管理和业务逻辑处理
+- 支持未来可能的多角色需求
 
-### 业务逻辑验证
-- [ ] 支持所有需求场景
-- [ ] 计算属性覆盖所有需要的派生数据
-- [ ] 状态管理支持完整的业务流程
-- [ ] 权限控制有足够的数据支持
+### 为什么独立设计 ScoreRule
+- 扣分规则可能会变化或增加
+- 便于管理员统一管理违规标准
+- 支持规则的启用/禁用功能
+- 便于统计和分析违规类型
 
-这个设计确保了系统的完整性、一致性和可扩展性，为后续的交互设计和实现提供了坚实的基础。
+### 为什么使用多个关系表示 KickoutRequest
+- 清晰地表示申请人、目标用户、处理人的不同角色
+- 支持复杂的查询需求（如查询某用户发起的申请、针对某用户的申请等）
+- 便于扩展更复杂的审批流程
+
+### 为什么使用计算属性
+- 避免数据冗余和不一致
+- 自动保持数据的实时性
+- 简化业务逻辑实现

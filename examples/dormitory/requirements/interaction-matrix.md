@@ -1,263 +1,208 @@
-# 交互矩阵 (Interaction Matrix)
+# 宿舍管理系统交互矩阵
 
-## 概述
-此文档确保每个用户角色都有对应的交互来执行所需操作，每个交互都有明确的权限控制和业务规则约束。
+## 用户角色定义
 
----
+### Admin (系统管理员)
+- **权限级别**: 最高
+- **职责**: 系统全局管理，宿舍创建，角色分配
+- **管理范围**: 整个系统
 
-## 角色权限矩阵
+### DormHead (宿舍长)
+- **权限级别**: 中等
+- **职责**: 宿舍日常管理，违规处理
+- **管理范围**: 仅限自己负责的宿舍
 
-| 交互 | 管理员(Admin) | 宿舍长(DormHead) | 学生(Student) | 权限控制 | 业务规则 |
-|------|---------------|------------------|---------------|----------|----------|
-| **宿舍管理** |
-| CreateDormitory | ✅ | ❌ | ❌ | 仅管理员 | 容量4-6床位 |
-| UpdateDormitory | ✅ | ❌ | ❌ | 仅管理员 | 不能减少已占用床位 |
+### Student (学生)
+- **权限级别**: 最低
+- **职责**: 查看个人信息，遵守宿舍规定
+- **管理范围**: 仅限个人相关信息
+
+## 交互权限矩阵
+
+| 交互名称 | Admin | DormHead | Student | 权限控制 | 业务规则 |
+|---------|--------|----------|---------|----------|----------|
+| **宿舍管理** |  |  |  |  |  |
+| CreateDormitory | ✅ | ❌ | ❌ | 仅管理员 | 名称唯一，容量4-6 |
+| UpdateDormitory | ✅ | ❌ | ❌ | 仅管理员 | 不能减少已分配床位 |
 | DeleteDormitory | ✅ | ❌ | ❌ | 仅管理员 | 必须为空宿舍 |
-| GetDormitoryInfo | ✅ | ✅(自己管理的) | ✅(自己所在的) | 基于关系 | - |
-| GetDormitoryList | ✅ | ✅(自己管理的) | ❌ | 角色+关系 | - |
-| **用户管理** |
-| AssignDormHead | ✅ | ❌ | ❌ | 仅管理员 | 目标用户必须在该宿舍 |
-| RemoveDormHead | ✅ | ❌ | ❌ | 仅管理员 | - |
-| AssignUserToDormitory | ✅ | ❌ | ❌ | 仅管理员 | 用户未分配+床位可用+宿舍未满 |
-| RemoveUserFromDormitory | ✅ | ❌ | ❌ | 仅管理员 | - |
-| GetUserInfo | ✅ | ✅(本宿舍学生) | ✅(自己) | 基于关系 | - |
-| **扣分管理** |
-| CreateDeductionRule | ✅ | ❌ | ❌ | 仅管理员 | 扣分>0 |
-| UpdateDeductionRule | ✅ | ❌ | ❌ | 仅管理员 | - |
-| DisableDeductionRule | ✅ | ❌ | ❌ | 仅管理员 | - |
-| GetDeductionRules | ✅ | ✅ | ❌ | 管理员+宿舍长 | - |
-| RecordDeduction | ❌ | ✅(本宿舍学生) | ❌ | 宿舍长+同宿舍 | 规则必须启用 |
-| CancelDeduction | ✅ | ✅(自己记录的) | ❌ | 管理员或记录者 | 记录必须为active |
-| GetDeductionHistory | ✅ | ✅(本宿舍学生) | ✅(自己) | 基于关系 | - |
-| **踢出申请管理** |
-| CreateKickoutRequest | ❌ | ✅(本宿舍学生) | ❌ | 宿舍长+同宿舍 | 目标学生扣分≥30+无pending申请 |
-| ApproveKickoutRequest | ✅ | ❌ | ❌ | 仅管理员 | 申请状态为pending |
-| RejectKickoutRequest | ✅ | ❌ | ❌ | 仅管理员 | 申请状态为pending |
-| GetKickoutRequests | ✅ | ✅(自己发起的) | ❌ | 管理员或申请者 | - |
-| **查询统计** |
-| GetUserDeductionSummary | ✅ | ✅(本宿舍学生) | ✅(自己) | 基于关系 | - |
-| GetDormitoryStatistics | ✅ | ✅(自己管理的) | ❌ | 基于关系 | - |
-| GetSystemStatistics | ✅ | ❌ | ❌ | 仅管理员 | - |
+| ViewDormitoryList | ✅ | ✅ | ✅ | 无限制 | - |
+| ViewDormitoryDetails | ✅ | ✅(自己的) | ✅(自己的) | 基于角色和关系 | - |
+| **用户管理** |  |  |  |  |  |
+| AssignDormHead | ✅ | ❌ | ❌ | 仅管理员 | 目标用户必须为student |
+| RemoveDormHead | ✅ | ❌ | ❌ | 仅管理员 | 宿舍长无待处理申请 |
+| AssignUserToDormitory | ✅ | ❌ | ❌ | 仅管理员 | 床位不超容量，用户未分配 |
+| RemoveUserFromDormitory | ✅ | ❌ | ❌ | 仅管理员 | 用户当前在宿舍中 |
+| ViewUserProfile | ✅ | ✅(宿舍成员) | ✅(自己) | 基于角色和关系 | - |
+| **违规管理** |  |  |  |  |  |
+| CreateScoreRule | ✅ | ❌ | ❌ | 仅管理员 | 扣分值>0 |
+| UpdateScoreRule | ✅ | ❌ | ❌ | 仅管理员 | 扣分值>0 |
+| DeleteScoreRule | ✅ | ❌ | ❌ | 仅管理员 | 无关联违规记录 |
+| ViewScoreRules | ✅ | ✅ | ✅ | 无限制 | 仅显示激活规则 |
+| RecordViolation | ✅ | ✅(宿舍成员) | ❌ | 管理员或对应宿舍长 | 目标用户在宿舍中 |
+| ViewViolationHistory | ✅ | ✅(宿舍成员) | ✅(自己) | 基于角色和关系 | - |
+| **踢出管理** |  |  |  |  |  |
+| RequestKickout | ✅ | ✅(宿舍成员) | ❌ | 管理员或对应宿舍长 | 用户积分<60，无待处理申请 |
+| ProcessKickoutRequest | ✅ | ❌ | ❌ | 仅管理员 | 申请状态为pending |
+| ViewKickoutRequests | ✅ | ✅(自己发起的) | ❌ | 基于角色和关系 | - |
+| **查询统计** |  |  |  |  |  |
+| ViewSystemOverview | ✅ | ❌ | ❌ | 仅管理员 | - |
+| ViewDormitoryStats | ✅ | ✅(自己的) | ❌ | 管理员或对应宿舍长 | - |
+| ViewMyViolations | ❌ | ❌ | ✅ | 仅本人 | - |
+| ViewMyDormitoryInfo | ❌ | ❌ | ✅ | 仅本人 | 用户已分配宿舍 |
 
----
+## 详细权限控制规则
 
-## 权限控制设计
+### 1. 宿舍管理权限
 
-### 1. 角色基础权限
-```typescript
-// 基础角色权限检查
-const hasAdminRole = user.role === 'admin'
-const isDormHead = user.role === 'dormHead'
-const isStudent = user.role === 'student'
+#### CreateDormitory
+- **权限**: 仅 Admin 可执行
+- **验证**: `user.role === 'admin'`
+- **业务规则**: 
+  - 宿舍名称不能重复
+  - 容量必须在4-6之间
+
+#### ViewDormitoryDetails
+- **权限**: 分层访问控制
+  - Admin: 可查看所有宿舍
+  - DormHead: 仅可查看自己管理的宿舍
+  - Student: 仅可查看自己所在的宿舍
+- **验证逻辑**:
+  ```
+  user.role === 'admin' OR 
+  (user.role === 'dormHead' AND user.managedDormitory.id === dormitoryId) OR
+  (user.role === 'student' AND user.dormitory.id === dormitoryId)
+  ```
+
+### 2. 用户分配权限
+
+#### AssignUserToDormitory
+- **权限**: 仅 Admin 可执行
+- **验证**: `user.role === 'admin'`
+- **业务规则**:
+  - 目标用户当前未分配宿舍
+  - 目标宿舍有可用床位
+  - 床位号在容量范围内
+  - 目标用户状态不为 'kicked'
+
+#### AssignDormHead
+- **权限**: 仅 Admin 可执行
+- **验证**: `user.role === 'admin'`
+- **业务规则**:
+  - 目标用户角色为 'student'
+  - 目标宿舍当前无宿舍长
+
+### 3. 违规处理权限
+
+#### RecordViolation
+- **权限**: Admin 或对应宿舍的宿舍长
+- **验证逻辑**:
+  ```
+  user.role === 'admin' OR 
+  (user.role === 'dormHead' AND user.managedDormitory.residents.include(targetUser))
+  ```
+- **业务规则**:
+  - 目标用户必须在宿舍中
+  - 扣分规则必须处于激活状态
+  - 扣分后积分不能为负数
+
+#### RequestKickout
+- **权限**: Admin 或对应宿舍的宿舍长
+- **验证逻辑**: 同 RecordViolation
+- **业务规则**:
+  - 目标用户积分必须低于60分
+  - 目标用户不能有待处理的踢出申请
+  - 申请人不能是目标用户本人
+
+### 4. 申请处理权限
+
+#### ProcessKickoutRequest
+- **权限**: 仅 Admin 可执行
+- **验证**: `user.role === 'admin'`
+- **业务规则**:
+  - 申请状态必须为 'pending'
+  - 不能处理自己发起的申请(如果管理员也可以发起申请)
+
+## 交互依赖关系
+
+### 前置依赖
+- **AssignDormHead** 依赖 **CreateDormitory**
+- **AssignUserToDormitory** 依赖 **CreateDormitory**
+- **RecordViolation** 依赖 **CreateScoreRule** 和 **AssignUserToDormitory**
+- **RequestKickout** 依赖 **RecordViolation** (需要积分降低)
+- **ProcessKickoutRequest** 依赖 **RequestKickout**
+
+### 数据流依赖
 ```
-
-### 2. 关系基础权限
-```typescript
-// 宿舍长管理权限
-const canManageDormitory = (user, dormitoryId) => {
-  return user.role === 'admin' || 
-         (user.role === 'dormHead' && user.managedDormitory?.id === dormitoryId)
-}
-
-// 同宿舍权限
-const isInSameDormitory = (user, targetUserId) => {
-  return user.dormitory?.id === targetUser.dormitory?.id
-}
-
-// 自己信息权限
-const canAccessUserInfo = (user, targetUserId) => {
-  return user.role === 'admin' || 
-         user.id === targetUserId ||
-         isInSameDormitory(user, targetUserId)
-}
+CreateDormitory → AssignDormHead → AssignUserToDormitory
+                                        ↓
+CreateScoreRule → RecordViolation → RequestKickout → ProcessKickoutRequest
 ```
-
-### 3. 复合权限逻辑
-```typescript
-// 扣分权限：宿舍长且目标学生在同一宿舍
-const canRecordDeduction = (user, targetUserId) => {
-  return user.role === 'dormHead' && 
-         isInSameDormitory(user, targetUserId)
-}
-
-// 踢出申请权限：宿舍长且目标学生在同一宿舍
-const canCreateKickoutRequest = (user, targetUserId) => {
-  return user.role === 'dormHead' && 
-         isInSameDormitory(user, targetUserId)
-}
-```
-
----
 
 ## 业务规则约束
 
-### 1. 宿舍容量约束
-- **规则**: 宿舍床位数必须在4-6之间
-- **影响交互**: CreateDormitory, UpdateDormitory
-- **验证时机**: 创建和更新时
+### 数据完整性约束
+1. **唯一性约束**:
+   - 用户邮箱唯一
+   - 宿舍名称唯一
+   - 同一宿舍内床位号唯一
 
-### 2. 用户分配约束
-- **规则**: 每个用户只能分配到一个宿舍的一个床位
-- **影响交互**: AssignUserToDormitory
-- **验证逻辑**: 检查用户当前分配状态
+2. **引用完整性约束**:
+   - 违规记录必须关联有效用户和规则
+   - 踢出申请必须关联有效用户和申请人
+   - 宿舍分配必须关联有效用户和宿舍
 
-### 3. 床位占用约束
-- **规则**: 床位不能重复分配
-- **影响交互**: AssignUserToDormitory
-- **验证逻辑**: 检查床位当前占用状态
+### 业务逻辑约束
+1. **状态约束**:
+   - 已踢出用户(status='kicked')不能重新分配宿舍
+   - 已分配用户不能重复分配到其他宿舍
+   - 待处理申请不能重复提交
 
-### 4. 扣分阈值约束
-- **规则**: 总扣分≥30分才能申请踢出
-- **影响交互**: CreateKickoutRequest
-- **验证逻辑**: 计算目标用户有效扣分总数
+2. **数量约束**:
+   - 宿舍入住人数不能超过容量
+   - 用户积分不能为负数
+   - 扣分规则的扣分值必须为正数
 
-### 5. 踢出申请唯一性约束
-- **规则**: 每个学生同时只能有一个pending状态的踢出申请
-- **影响交互**: CreateKickoutRequest
-- **验证逻辑**: 检查现有pending申请
+3. **时间约束**:
+   - 踢出申请处理时间必须晚于申请时间
+   - 用户分配时间必须晚于宿舍创建时间
 
-### 6. 宿舍长身份约束
-- **规则**: 宿舍长必须是该宿舍的成员
-- **影响交互**: AssignDormHead
-- **验证逻辑**: 检查目标用户的宿舍分配
+## 错误处理策略
 
-### 7. 扣分规则状态约束
-- **规则**: 只能使用启用状态的扣分规则
-- **影响交互**: RecordDeduction
-- **验证逻辑**: 检查规则isActive状态
+### 权限错误
+- **错误类型**: `PERMISSION_DENIED`
+- **返回信息**: 不透露具体权限信息，统一返回"权限不足"
+- **日志记录**: 记录权限违规尝试
 
----
+### 业务规则错误
+- **错误类型**: `BUSINESS_RULE_VIOLATION`
+- **返回信息**: 具体的规则违反说明
+- **常见错误**:
+  - `DORMITORY_FULL`: 宿舍床位已满
+  - `USER_ALREADY_ASSIGNED`: 用户已分配宿舍
+  - `INSUFFICIENT_SCORE`: 用户积分不足以踢出
+  - `DUPLICATE_REQUEST`: 重复申请
 
-## 交互对应测试用例映射
+### 数据验证错误
+- **错误类型**: `VALIDATION_ERROR`
+- **返回信息**: 具体的字段验证失败信息
+- **常见错误**:
+  - `REQUIRED_FIELD_MISSING`: 必填字段缺失
+  - `INVALID_FIELD_VALUE`: 字段值无效
+  - `FIELD_LENGTH_EXCEEDED`: 字段长度超限
 
-### 核心业务逻辑测试
-| 交互 | 对应测试用例 |
-|------|-------------|
-| CreateDormitory | TC001 |
-| AssignDormHead | TC002 |
-| AssignUserToDormitory | TC003 |
-| CreateDeductionRule | TC004 |
-| RecordDeduction | TC005 |
-| CreateKickoutRequest | TC006 |
-| ApproveKickoutRequest | TC007 |
-| RejectKickoutRequest | TC008 |
-| CancelDeduction | TC009 |
-| GetDormitoryInfo | TC010 |
+## 测试覆盖要求
 
-### 权限测试
-| 权限场景 | 对应测试用例 |
-|----------|-------------|
-| 非管理员创建宿舍 | TC101 |
-| 非宿舍长记录扣分 | TC102 |
-| 跨宿舍管理限制 | TC103 |
+### 权限测试覆盖
+- ✅ 每个交互的所有角色权限验证
+- ✅ 跨宿舍权限边界测试
+- ✅ 无权限用户的拒绝访问测试
 
-### 业务规则测试
-| 业务规则 | 对应测试用例 |
-|----------|-------------|
-| 宿舍容量限制 | TC201 |
-| 重复分配限制 | TC202 |
-| 床位占用限制 | TC203 |
-| 扣分阈值限制 | TC204 |
-| 重复申请限制 | TC205 |
-| 宿舍满员限制 | TC206 |
-| 边界条件测试 | TC207 |
+### 业务规则测试覆盖
+- ✅ 所有约束条件的边界测试
+- ✅ 规则违反的错误处理测试
+- ✅ 复合规则的组合测试
 
----
-
-## 缺失交互识别
-
-### 可能需要补充的交互
-
-1. **GetMyDormitoryInfo** - 学生查看自己宿舍信息
-   - 角色：Student
-   - 权限：自己所在宿舍
-   - 用途：学生查看宿舍基本信息和室友
-
-2. **GetMyDeductionSummary** - 学生查看自己扣分汇总
-   - 角色：Student  
-   - 权限：仅自己信息
-   - 用途：学生了解自己的扣分情况
-
-3. **UpdateUserProfile** - 用户更新个人信息
-   - 角色：All
-   - 权限：仅自己信息
-   - 用途：更新姓名、联系方式等基本信息
-
-4. **GetDormitoryMembers** - 查看宿舍成员列表
-   - 角色：Admin, DormHead, Student(自己宿舍)
-   - 权限：基于关系
-   - 用途：查看宿舍成员详细信息
-
-### 管理功能补充
-
-5. **BatchAssignUsers** - 批量分配用户
-   - 角色：Admin
-   - 权限：仅管理员
-   - 用途：提高分配效率
-
-6. **TransferUser** - 转移用户到其他宿舍
-   - 角色：Admin
-   - 权限：仅管理员
-   - 用途：调整宿舍分配
-
-7. **GetUserHistory** - 查看用户历史记录
-   - 角色：Admin
-   - 权限：仅管理员
-   - 用途：了解用户完整历史
-
----
-
-## 验证清单
-
-### 完整性检查
-- [ ] 每个用户角色都有相应的交互来完成其职责
-- [ ] 每个交互都有明确的权限控制
-- [ ] 每个交互都有对应的业务规则约束
-- [ ] 每个交互都有相应的测试用例
-
-### 安全性检查  
-- [ ] 没有权限绕过漏洞
-- [ ] 敏感操作都有适当的权限控制
-- [ ] 跨宿舍操作都有正确限制
-- [ ] 角色提升操作都有管理员权限要求
-
-### 业务逻辑检查
-- [ ] 所有业务约束都在交互层面实现
-- [ ] 数据一致性得到保证
-- [ ] 状态转换逻辑完整
-- [ ] 边界条件都有处理
-
-### 测试覆盖检查
-- [ ] 所有核心交互都有基础功能测试
-- [ ] 所有权限控制都有对应测试
-- [ ] 所有业务规则都有违规测试
-- [ ] 边界条件和异常情况都有测试
-
----
-
-## 实现优先级
-
-### 高优先级 (Phase 1 - 核心功能)
-1. CreateDormitory
-2. AssignUserToDormitory  
-3. AssignDormHead
-4. CreateDeductionRule
-5. RecordDeduction
-6. CreateKickoutRequest
-7. ApproveKickoutRequest
-
-### 中优先级 (Phase 2 - 管理功能)
-1. GetDormitoryInfo
-2. GetDeductionHistory
-3. CancelDeduction
-4. RejectKickoutRequest
-5. RemoveUserFromDormitory
-
-### 低优先级 (Phase 3 - 增强功能)
-1. UpdateDormitory
-2. DeleteDormitory
-3. UpdateDeductionRule
-4. GetSystemStatistics
-5. BatchAssignUsers
-
-这个矩阵确保了系统的完整性和安全性，为后续的设计和实现提供了清晰的指导。
+### 数据完整性测试覆盖
+- ✅ 唯一性约束违反测试
+- ✅ 引用完整性约束测试
+- ✅ 并发操作的数据一致性测试
