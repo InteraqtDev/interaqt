@@ -155,7 +155,6 @@ export function createData() {
     })
 
     statusProperty.computation = stateMachine
-    statusProperty.defaultValue = () =>stateMachine.defaultState.name
 
     return {
         entities: [postEntity, userEntity],

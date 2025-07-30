@@ -123,7 +123,6 @@ describe('Count computed handle', () => {
       Property.create({
         name: 'taskCount',
         type: 'number',
-        defaultValue: () => 0,
         computation: Count.create({
           record: ownsTaskRelation
         })
@@ -208,7 +207,6 @@ describe('Count computed handle', () => {
       Property.create({
         name: 'taskCount',
         type: 'number',
-        defaultValue: () => 0,
         computation: Count.create({
           record: ownsTaskRelation
         })
@@ -304,7 +302,6 @@ describe('Count computed handle', () => {
       Property.create({
         name: 'groupCount',
         type: 'number',
-        defaultValue: () => 0,
         computation: Count.create({
           record: userGroupRelation
         })
@@ -316,7 +313,6 @@ describe('Count computed handle', () => {
       Property.create({
         name: 'memberCount',
         type: 'number',
-        defaultValue: () => 0,
         computation: Count.create({
           record: userGroupRelation
         })
@@ -417,7 +413,6 @@ describe('Count computed handle', () => {
       Property.create({
         name: 'bookCount',
         type: 'number',
-        defaultValue: () => 0,
         computation: Count.create({
           record: authorBookRelation
         })
@@ -428,7 +423,6 @@ describe('Count computed handle', () => {
       Property.create({
         name: 'authorCount',
         type: 'number',
-        defaultValue: () => 0,
         computation: Count.create({
           record: authorBookRelation
         })
@@ -594,7 +588,6 @@ describe('Count computed handle', () => {
       Property.create({
         name: 'highPriorityIssueCount',
         type: 'number',
-        defaultValue: () => 0,
         computation: Count.create({
           record: projectIssueRelation,
           attributeQuery: [['target', {attributeQuery: ['priority']}]],
@@ -690,7 +683,6 @@ describe('Count computed handle', () => {
       Property.create({
         name: 'vipPurchaseCount',
         type: 'number',
-        defaultValue: () => 0,
         computation: Count.create({
           record: customerPurchaseRelation,
           attributeQuery: [['target', {attributeQuery: ['amount']}]],
@@ -843,7 +835,6 @@ describe('Count computed handle', () => {
       Property.create({
         name: 'followerCount',
         type: 'number',
-        defaultValue: () => 0,
         computation: Count.create({
           record: followRelation,
           direction: 'target' // Count as target (being followed)
@@ -852,7 +843,6 @@ describe('Count computed handle', () => {
       Property.create({
         name: 'followingCount',
         type: 'number',
-        defaultValue: () => 0,
         computation: Count.create({
           record: followRelation,
           direction: 'source' // Count as source (following others)

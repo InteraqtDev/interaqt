@@ -299,7 +299,6 @@ describe('Average computed handle', () => {
       Property.create({
         name: 'averageScore',
         type: 'number',
-        defaultValue: () => 0,
         computation: Average.create({
           record: studentExamRelation,
           attributeQuery: [['target', {attributeQuery: ['score']}]]

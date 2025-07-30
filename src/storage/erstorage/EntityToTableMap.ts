@@ -7,6 +7,7 @@ import { MatchExp } from "./MatchExp.js";
 
 
 export type ValueAttribute = {
+    name: string,
     //entityType
     type: string,
     collection?: boolean,

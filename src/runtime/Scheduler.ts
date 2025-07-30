@@ -256,18 +256,31 @@ export class Scheduler {
 
     async setupDefaultValues() {
         for(const computation of this.computations) {
-            // 0. 创建 defaultValue
-            // property 的默认值在 setup 的时候已经创建了。
+            // CAUTION 非 property 的 computation 的 defaultValue 直接 applyResult 即可。
+            
             if(computation.getDefaultValue) {
-                if (computation.dataContext.type!=='property') {
+                if (computation.dataContext.type==='global' || computation.dataContext.type==='entity' || computation.dataContext.type==='relation') {
                     const defaultValue = await computation.getDefaultValue()
                     await this.controller.applyResult(computation.dataContext, defaultValue)
                 } else {
-                    // property computation 也能提供 defaultValue 的能力？
-                    const property = computation.dataContext.id
-                    if (!property.defaultValue) {
-                        property.defaultValue = await computation.getDefaultValue()
-                    }
+                    // property 的默认值需要在 scheduler 监听 property 的 record 创建事件，来设置默认值。
+                    // 监听 record 的创建事件，来设置默认值。
+                    const propertyDataContext = computation.dataContext as PropertyDataContext
+
+                    // assertion: 有 computation 的 property 就不能有原本的 defaultValue 了，因为会被 computation 的 getDefaultValue 覆盖。
+                    assert(!propertyDataContext.id.defaultValue, `${propertyDataContext.host.name}.${propertyDataContext.id.name} property shuold not has a defaultValue, because it will be overridden by computation`)
+
+                    // TODO 未来合成一个 listener ?
+                    this.controller.system.storage.listen(async (mutationEvents) => {
+                        for(let mutationEvent of mutationEvents){
+                            if (mutationEvent.type === 'create' && mutationEvent.recordName === propertyDataContext.host.name) {
+                                const defaultValue = await computation.getDefaultValue?.(mutationEvent.record)
+                                if (defaultValue !== undefined) {
+                                    await this.controller.applyResult(propertyDataContext, defaultValue, mutationEvent.record)
+                                }
+                            }
+                        }
+                    })
                 }
             }
         }

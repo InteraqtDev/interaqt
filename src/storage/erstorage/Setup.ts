@@ -13,6 +13,7 @@ type ColumnData = {
     collection?:boolean,
     notNull?: boolean,
     defaultValue?: () =>any
+    attribute?: ValueAttribute
 }
 
 
@@ -136,6 +137,7 @@ export class DBSetup {
             return [
                 prop.name,
                 {
+                    name: prop.name,
                     type: prop.type,
                     computed: prop.computed as ((record: any) => any) | undefined,
                     collection: prop.collection,
@@ -152,6 +154,7 @@ export class DBSetup {
 
         // 自动补充
         attributes[ID_ATTR] = {
+            name: ID_ATTR,
             type: 'id',
             fieldType: this.database!.mapToDBFieldType('pk')
         }
@@ -163,6 +166,7 @@ export class DBSetup {
         
         if (filteredBy.length) {
             attributes['__filtered_entities'] = {
+                name: '__filtered_entities',
                 type: 'json',
                 fieldType: this.database!.mapToDBFieldType('json') || 'JSON'
             };
@@ -477,11 +481,13 @@ export class DBSetup {
                 if(!(attribute as ValueAttribute).fieldType) {
                     throw new Error(`fieldType not found for ${(attribute as ValueAttribute).field} ${(attribute as ValueAttribute).type}`)
                 }
-                this.tables[record.table].columns[attribute.field] = {
-                    name: (attribute as ValueAttribute).field,
-                    type: (attribute as ValueAttribute).type,
-                    fieldType: (attribute as ValueAttribute).fieldType,
-                    defaultValue: (attribute as ValueAttribute).defaultValue
+                const valueAttribute = attribute as ValueAttribute
+                this.tables[record.table].columns[valueAttribute.field] = {
+                    name: valueAttribute.field,
+                    type: valueAttribute.type,
+                    fieldType: valueAttribute.fieldType,
+                    defaultValue: valueAttribute.defaultValue,
+                    attribute: valueAttribute,
                 }
             })
         })
@@ -535,6 +541,9 @@ CREATE TABLE "${tableName}" (
 ${Object.values(this.tables[tableName].columns).map(column => {
     let sql = `    "${column.name}" ${column.fieldType}`;
     if (column.defaultValue) {
+        if (typeof column.defaultValue !== 'function') {
+            debugger
+        }
         const defaultVal = column.defaultValue();
         if (defaultVal !== undefined) {
             const formattedDefault = this.formatDefaultValue(defaultVal);

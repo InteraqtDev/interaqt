@@ -205,12 +205,10 @@ describe('StateMachineRunner', () => {
                 Property.create({
                     name: 'count',
                     type: 'number',
-                    defaultValue: () => 0
                 }),
                 Property.create({
                     name: 'state',
                     type: 'string',
-                    defaultValue: () => 'idle'
                 })
             ]
         })
@@ -380,7 +378,6 @@ describe('StateMachineRunner', () => {
                 Property.create({
                     name: 'lastTimestamp',
                     type: 'number',
-                    defaultValue: () => 0
                 })
             ]
         })
@@ -441,12 +438,14 @@ describe('StateMachineRunner', () => {
         await controller.setup(true)
 
         // 创建 TimeLogger 实例
+        const beforeCreate = Date.now()
         const logger = await controller.system.storage.create('TimeLogger', {})
-
+        const afterCreate = Date.now()
         // 验证初始状态
         let loggerData = await controller.system.storage.findOne('TimeLogger', undefined, undefined, ['*'])
         const initialTimestamp = loggerData.lastTimestamp
-        expect(initialTimestamp).toBe(0)
+        expect(initialTimestamp).toBeGreaterThanOrEqual(beforeCreate)
+        expect(initialTimestamp).toBeLessThanOrEqual(afterCreate)
 
         // 第一次触发 - 记录时间戳
         const beforeFirst = Date.now()
