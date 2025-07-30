@@ -263,6 +263,138 @@ export class FilteredEntityManager {
     // ============ 级联事件处理功能 ============
     
     /**
+     * 获取基于指定源实体的所有 filtered entities
+     */
+    getFilteredEntitiesForSource(sourceEntityName: string): Array<{ name: string, filterCondition: any }> {
+        return this.map.getRecordInfo(sourceEntityName).filteredBy?.map(recordInfo => ({
+            name: recordInfo.name,
+            filterCondition: recordInfo.filterCondition
+        })) || []
+    }
+    
+    /**
+     * 更新记录的 filtered entity 标记（主入口方法）
+     */
+    async updateFilteredEntityFlags(
+        entityName: string, 
+        recordId: string, 
+        events?: RecordMutationEvent[], 
+        originalRecord?: any, 
+        isCreation?: boolean, 
+        changedFields?: string[]
+    ): Promise<void> {
+        // 处理直接的 filtered entity（基于源实体自身的过滤条件）
+        const filteredEntities = this.getFilteredEntitiesForSource(entityName);
+        
+        if (filteredEntities.length === 0) {
+            // 即使没有直接的 filtered entity，也需要处理级联事件
+            const changedAttributes = changedFields || (isCreation && originalRecord ? Object.keys(originalRecord) : []);
+            await this.processCascadeEvents(
+                entityName,
+                recordId,
+                changedAttributes,
+                originalRecord,
+                events || []
+            );
+            return;
+        }
+
+        // 获取原始记录的 __filtered_entities 状态
+        // Parse JSON string to object if needed
+        let originalFlags: { [key: string]: boolean } = {};
+        if (originalRecord?.__filtered_entities) {
+            originalFlags = typeof originalRecord.__filtered_entities === 'string'
+                ? JSON.parse(originalRecord.__filtered_entities)
+                : originalRecord.__filtered_entities;
+        }
+
+        // 获取更新后的记录以检查当前过滤条件
+        const idMatch = MatchExp.atom({ key: 'id', value: ['=', recordId] });
+        const updatedRecords = await this.queryAgent.findRecords(
+            RecordQuery.create(entityName, this.map, { matchExpression: idMatch, attributeQuery: ['*'] }),
+            `find updated record for filtered entity check ${entityName}:${recordId}`
+        );
+        
+        if (updatedRecords.length === 0) return;
+        const updatedRecord = updatedRecords[0];
+
+        // 检查每个 filtered entity 条件
+        const isNewRecord = !originalRecord || Object.keys(originalFlags).length === 0;
+        const newFlags = { ...originalFlags };
+        
+        for (const filteredEntity of filteredEntities) {
+            // 检查记录是否满足过滤条件 - 直接使用过滤条件查询
+            const matchingRecords = await this.queryAgent.findRecords(
+                RecordQuery.create(entityName, this.map, { 
+                    matchExpression: filteredEntity.filterCondition.and({
+                        key: 'id',
+                        value: ['=', recordId]
+                    }),
+                    modifier: {
+                        limit: 1
+                    }
+                }),
+                `check filtered entity condition ${filteredEntity.name} for ${entityName}`
+            );
+            
+            // 检查当前记录是否在匹配的记录中
+            const belongsToFilteredEntity = matchingRecords.length > 0;
+            const previouslyBelonged = originalFlags[filteredEntity.name] === true;
+            
+            newFlags[filteredEntity.name] = belongsToFilteredEntity;
+            
+            // 生成相应的事件
+            // 对于新创建的记录，如果满足条件就生成 create 事件
+            // 对于已存在的记录，只在状态变化时生成事件
+            if (belongsToFilteredEntity && (isNewRecord || !previouslyBelonged)) {
+                // 记录现在属于这个 filtered entity
+                events?.push({
+                    type: 'create',
+                    recordName: filteredEntity.name,
+                    record: { ...updatedRecord }
+                });
+            } else if (!belongsToFilteredEntity && previouslyBelonged && !isNewRecord) {
+                // 记录不再属于这个 filtered entity
+                events?.push({
+                    type: 'delete',
+                    recordName: filteredEntity.name,
+                    record: { ...updatedRecord }
+                });
+            }
+        }
+
+        // 更新 __filtered_entities 字段（这是内部操作，不生成事件）
+        if (JSON.stringify(originalFlags) !== JSON.stringify(newFlags)) {
+            // 获取 __filtered_entities 字段的实际数据库字段名
+            const recordInfo = this.map.getRecordInfo(entityName);
+            const filteredEntitiesAttribute = recordInfo.data.attributes['__filtered_entities'];
+            
+            if (filteredEntitiesAttribute && (filteredEntitiesAttribute as any).field) {
+                const fieldName = (filteredEntitiesAttribute as any).field;
+                const fieldType = (filteredEntitiesAttribute as any).fieldType;
+                
+                await this.queryAgent.updateRecordDataById(entityName, { id: recordId }, [
+                    { 
+                        field: fieldName, 
+                        value: this.queryAgent.prepareFieldValue(newFlags, fieldType) 
+                    }
+                ]);
+            }
+        }
+        
+        // 处理跨实体的级联事件
+        // 如果有传入 changedFields，使用它；否则在创建时使用所有字段
+        const changedAttributes = changedFields || (isCreation && originalRecord ? Object.keys(originalRecord) : []);
+        await this.processCascadeEvents(
+            entityName,
+            recordId,
+            changedAttributes,
+            originalRecord,
+            events || []
+        );
+    }
+    
+    /**
      * 处理实体变更时的级联事件
      */
     async processCascadeEvents(
@@ -313,7 +445,7 @@ export class FilteredEntityManager {
         
         // 更新每个受影响的源记录的 filtered entity 标记
         for (const sourceRecord of affectedSourceRecords) {
-            await this.updateFilteredEntityFlags(
+            await this.updateSingleFilteredEntityFlag(
                 dependency,
                 sourceRecord.id,
                 events
@@ -322,9 +454,9 @@ export class FilteredEntityManager {
     }
     
     /**
-     * 更新单个记录的 filtered entity 标记
+     * 更新单个依赖关系的 filtered entity 标记
      */
-    private async updateFilteredEntityFlags(
+    private async updateSingleFilteredEntityFlag(
         dependency: FilteredEntityDependency,
         recordId: string,
         events: RecordMutationEvent[]
