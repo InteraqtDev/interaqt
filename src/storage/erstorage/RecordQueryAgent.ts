@@ -8,8 +8,8 @@ import { AttributeQuery, AttributeQueryData, AttributeQueryDataRecordItem } from
 import { LINK_SYMBOL, RecordQuery, RecordQueryTree } from "./RecordQuery.js";
 import { NewRecordData, RawEntityData } from "./NewRecordData.js";
 import { Modifier } from "./Modifier.js";
-import { FilteredEntityDependencyManager } from "./FilteredEntityDependencyManager.js";
-import { CascadeEventManager } from "./CascadeEventManager.js";
+
+import { FilteredEntityManager } from "./FilteredEntityManager.js";
 
 
 export type JoinTables = {
@@ -18,6 +18,7 @@ export type JoinTables = {
     joinIdField: [string, string]
     joinTarget: [string, string]
 }[]
+
 
 
 
@@ -94,13 +95,11 @@ export type PlaceholderGen = (name?: string) => string
 
 export class RecordQueryAgent {
     getPlaceholder: () => PlaceholderGen
-    private dependencyManager: FilteredEntityDependencyManager
-    private cascadeEventManager: CascadeEventManager
+    private filteredEntityManager: FilteredEntityManager
     
     constructor(public map: EntityToTableMap, public database: Database) {
         this.getPlaceholder = database.getPlaceholder || (() => (name?:string) => `?`)
-        this.dependencyManager = new FilteredEntityDependencyManager(map)
-        this.cascadeEventManager = new CascadeEventManager(map, this, this.dependencyManager)
+        this.filteredEntityManager = new FilteredEntityManager(map, this)
         this.initializeFilteredEntityDependencies()
     }
     
@@ -119,7 +118,7 @@ export class RecordQueryAgent {
                     : recordData.filterCondition.data
                 
                 if (filterConditionData) {
-                    this.dependencyManager.analyzeDependencies(
+                    this.filteredEntityManager.analyzeDependencies(
                         recordName,
                         recordData.sourceRecordName,
                         filterConditionData
@@ -1594,7 +1593,7 @@ WHERE "${recordInfo.idField}" = ${p()}
         if (filteredEntities.length === 0) {
             // 即使没有直接的 filtered entity，也需要处理级联事件
             const changedAttributes = changedFields || (isCreation && originalRecord ? Object.keys(originalRecord) : []);
-            await this.cascadeEventManager.processCascadeEvents(
+            await this.filteredEntityManager.processCascadeEvents(
                 entityName,
                 recordId,
                 changedAttributes,
@@ -1689,7 +1688,7 @@ WHERE "${recordInfo.idField}" = ${p()}
         // 处理跨实体的级联事件
         // 如果有传入 changedFields，使用它；否则在创建时使用所有字段
         const changedAttributes = changedFields || (isCreation && originalRecord ? Object.keys(originalRecord) : []);
-        await this.cascadeEventManager.processCascadeEvents(
+        await this.filteredEntityManager.processCascadeEvents(
             entityName,
             recordId,
             changedAttributes,

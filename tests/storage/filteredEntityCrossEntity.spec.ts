@@ -255,6 +255,34 @@ describe('filtered entity with cross-entity queries', () => {
         const activeUsersInTech = await entityQueryHandle.find('ActiveUsersInTechTeam', undefined, undefined, ['name', 'isActive', 'role']);
         expect(activeUsersInTech).toHaveLength(1);
         expect(activeUsersInTech[0].name).toBe('Alice');
+
+        // 测试 source entity update - 将 Alice 设为 inactive
+        const events: any[] = [];
+        await entityQueryHandle.update('User',
+            MatchExp.atom({ key: 'id', value: ['=', user1.id] }),
+            { isActive: false },
+            events
+        );
+
+        // 验证 Alice 不再在 ActiveUsersInTechTeam 中
+        const afterUpdate = await entityQueryHandle.find('ActiveUsersInTechTeam', undefined, undefined, ['name']);
+        expect(afterUpdate).toHaveLength(0);
+
+        // 验证删除事件
+        const deleteEvents = events.filter(e => e.type === 'delete' && e.recordName === 'ActiveUsersInTechTeam');
+        expect(deleteEvents).toHaveLength(1);
+
+        // 测试 source entity delete - 删除 Charlie
+        events.length = 0;
+        await entityQueryHandle.delete('User',
+            MatchExp.atom({ key: 'id', value: ['=', user3.id] }),
+            events
+        );
+
+        // 查询 AdminUsersInTechTeam，确认 Charlie 被删除
+        const adminUsers = await entityQueryHandle.find('AdminUsersInTechTeam', undefined, undefined, ['name']);
+        const charlieInAdmins = adminUsers.find(u => u.name === 'Charlie');
+        expect(charlieInAdmins).toBeUndefined();
     });
 
     test('should update filtered entity when related entity changes', async () => {
@@ -299,9 +327,6 @@ describe('filtered entity with cross-entity queries', () => {
     });
 
     test('should handle multi-level relationship filtering', async () => {
-        // This test is removed because it tested UsersInActiveProjects which uses x:n relation
-        // Instead, let's test a valid scenario
-        
         // Create a valid filtered entity that doesn't use x:n relations
         const techTeam = await entityQueryHandle.create('Team', {
             name: 'Tech Team',
@@ -344,6 +369,35 @@ describe('filtered entity with cross-entity queries', () => {
         const activeUsersInTech = await entityQueryHandle.find('ActiveUsersInTechTeam', undefined, undefined, ['name']);
         expect(activeUsersInTech).toHaveLength(2);
         expect(activeUsersInTech.map(u => u.name).sort()).toEqual(['Alice', 'Bob']);
+
+        // 测试 source entity update - 将 Bob 的角色改为 admin
+        const events: any[] = [];
+        await entityQueryHandle.update('User',
+            MatchExp.atom({ key: 'id', value: ['=', bob.id] }),
+            { role: 'admin' },
+            events
+        );
+
+        // 现在 AdminUsersInTechTeam 应该有两个用户
+        const updatedAdminUsers = await entityQueryHandle.find('AdminUsersInTechTeam', undefined, undefined, ['name']);
+        expect(updatedAdminUsers).toHaveLength(2);
+        expect(updatedAdminUsers.map(u => u.name).sort()).toEqual(['Alice', 'Bob']);
+
+        // 测试 source entity delete - 删除 Alice
+        events.length = 0;
+        await entityQueryHandle.delete('User',
+            MatchExp.atom({ key: 'id', value: ['=', alice.id] }),
+            events
+        );
+
+        // 验证 filtered entities 都被更新
+        const afterDelete = await entityQueryHandle.find('ActiveUsersInTechTeam', undefined, undefined, ['name']);
+        expect(afterDelete).toHaveLength(1);
+        expect(afterDelete[0].name).toBe('Bob');
+
+        const adminAfterDelete = await entityQueryHandle.find('AdminUsersInTechTeam', undefined, undefined, ['name']);
+        expect(adminAfterDelete).toHaveLength(1);
+        expect(adminAfterDelete[0].name).toBe('Bob');
     });
 
     test('should handle complex filter conditions with multiple cross-entity checks', async () => {
@@ -498,6 +552,47 @@ describe('filtered entity with cross-entity queries', () => {
         const usersInAsia = await entityQueryHandle.find('UsersInAsianRegion', undefined, undefined, ['name']);
         expect(usersInAsia).toHaveLength(1);
         expect(usersInAsia[0].name).toBe('Alice');
+
+        // 测试 source entity update - 将 Bob 转到 dev team
+        const events: any[] = [];
+        await entityQueryHandle.update('User',
+            MatchExp.atom({ key: 'id', value: ['=', bob.id] }),
+            { team: devTeam },
+            events
+        );
+
+        // 现在两个用户都应该在高预算部门和亚洲区域
+        const updatedHighBudget = await entityQueryHandle.find('UsersInHighBudgetDepartments', undefined, undefined, ['name']);
+        expect(updatedHighBudget).toHaveLength(2);
+        expect(updatedHighBudget.map(u => u.name).sort()).toEqual(['Alice', 'Bob']);
+
+        const updatedAsia = await entityQueryHandle.find('UsersInAsianRegion', undefined, undefined, ['name']);
+        expect(updatedAsia).toHaveLength(2);
+        expect(updatedAsia.map(u => u.name).sort()).toEqual(['Alice', 'Bob']);
+
+        // 测试相关实体 update - 降低工程部门预算
+        events.length = 0;
+        await entityQueryHandle.update('Department',
+            MatchExp.atom({ key: 'id', value: ['=', engineeringDept.id] }),
+            { budget: 800000 },
+            events
+        );
+
+        // 现在没有用户在高预算部门
+        const afterBudgetCut = await entityQueryHandle.find('UsersInHighBudgetDepartments', undefined, undefined, ['name']);
+        expect(afterBudgetCut).toHaveLength(0);
+
+        // 测试 source entity delete - 删除 Alice
+        events.length = 0;
+        await entityQueryHandle.delete('User',
+            MatchExp.atom({ key: 'id', value: ['=', alice.id] }),
+            events
+        );
+
+        // 验证 Alice 从所有 filtered entities 中移除
+        const afterDelete = await entityQueryHandle.find('UsersInAsianRegion', undefined, undefined, ['name']);
+        expect(afterDelete).toHaveLength(1);
+        expect(afterDelete[0].name).toBe('Bob');
     });
 
     test('should filter entities based on three-level x:1 relationships', async () => {
@@ -559,6 +654,46 @@ describe('filtered entity with cross-entity queries', () => {
         const usersInLargeDivisions = await entityQueryHandle.find('UsersInLargeDivisions', undefined, undefined, ['name']);
         expect(usersInLargeDivisions).toHaveLength(1);
         expect(usersInLargeDivisions[0].name).toBe('Alice');
+
+        // 测试 source entity update - 将 Bob 转到 dev team
+        const events: any[] = [];
+        await entityQueryHandle.update('User',
+            MatchExp.atom({ key: 'id', value: ['=', bob.id] }),
+            { team: devTeam },
+            events
+        );
+
+        // 现在两个用户都在大型部门
+        const updated = await entityQueryHandle.find('UsersInLargeDivisions', undefined, undefined, ['name']);
+        expect(updated).toHaveLength(2);
+        expect(updated.map(u => u.name).sort()).toEqual(['Alice', 'Bob']);
+
+        // 测试相关实体 update - 减少 tech division 的人数
+        events.length = 0;
+        await entityQueryHandle.update('Division',
+            MatchExp.atom({ key: 'id', value: ['=', techDivision.id] }),
+            { headcount: 400 },
+            events
+        );
+
+        // 现在没有用户在大型部门
+        const afterReduction = await entityQueryHandle.find('UsersInLargeDivisions', undefined, undefined, ['name']);
+        expect(afterReduction).toHaveLength(0);
+
+        // 测试 source entity delete - 删除所有用户
+        events.length = 0;
+        await entityQueryHandle.delete('User',
+            MatchExp.atom({ key: 'id', value: ['=', alice.id] }),
+            events
+        );
+        await entityQueryHandle.delete('User',
+            MatchExp.atom({ key: 'id', value: ['=', bob.id] }),
+            events
+        );
+
+        // 验证没有用户在 filtered entity 中
+        const afterDelete = await entityQueryHandle.find('UsersInLargeDivisions', undefined, undefined, ['name']);
+        expect(afterDelete).toHaveLength(0);
     });
 
     test('should filter entities based on four-level x:1 relationships', async () => {
@@ -648,6 +783,59 @@ describe('filtered entity with cross-entity queries', () => {
         expect(activeUsersInPublic).toHaveLength(1);
         expect(activeUsersInPublic[0].name).toBe('Alice');
         expect(activeUsersInPublic[0].isActive).toBe(true);
+
+        // 测试 source entity update - 激活 Bob
+        const events: any[] = [];
+        await entityQueryHandle.update('User',
+            MatchExp.atom({ key: 'id', value: ['=', bob.id] }),
+            { isActive: true },
+            events
+        );
+
+        // Bob 仍然不在上市公司中（因为 FinanceCorp 不是上市公司）
+        const afterBobActive = await entityQueryHandle.find('ActiveUsersInPublicCompanies', undefined, undefined, ['name']);
+        expect(afterBobActive).toHaveLength(1);
+        expect(afterBobActive[0].name).toBe('Alice');
+
+        // 测试相关实体 update - 将 FinanceCorp 改为科技行业
+        events.length = 0;
+        await entityQueryHandle.update('Company',
+            MatchExp.atom({ key: 'id', value: ['=', financeCompany.id] }),
+            { industry: 'Technology' },
+            events
+        );
+
+        // 现在 Bob 和 Charlie 也在科技公司用户中
+        const techAfterUpdate = await entityQueryHandle.find('UsersInTechCompanies', undefined, undefined, ['name']);
+        expect(techAfterUpdate).toHaveLength(3);
+        expect(techAfterUpdate.map(u => u.name).sort()).toEqual(['Alice', 'Bob', 'Charlie']);
+
+        // 测试 source entity delete - 删除 Alice
+        events.length = 0;
+        await entityQueryHandle.delete('User',
+            MatchExp.atom({ key: 'id', value: ['=', alice.id] }),
+            events
+        );
+
+        // 验证 Alice 从所有 filtered entities 中移除
+        const techAfterDelete = await entityQueryHandle.find('UsersInTechCompanies', undefined, undefined, ['name']);
+        expect(techAfterDelete).toHaveLength(2);
+        expect(techAfterDelete.map(u => u.name).sort()).toEqual(['Bob', 'Charlie']);
+
+        const publicAfterDelete = await entityQueryHandle.find('ActiveUsersInPublicCompanies', undefined, undefined, ['name']);
+        expect(publicAfterDelete).toHaveLength(0);
+
+        // 测试多个 source entity delete
+        await entityQueryHandle.delete('User',
+            MatchExp.atom({ key: 'id', value: ['=', bob.id] })
+        );
+        await entityQueryHandle.delete('User',
+            MatchExp.atom({ key: 'id', value: ['=', charlie.id] })
+        );
+
+        // 验证所有 filtered entities 都为空
+        const finalTech = await entityQueryHandle.find('UsersInTechCompanies', undefined, undefined, ['name']);
+        expect(finalTech).toHaveLength(0);
     });
 
     test('should update filtered entities when multi-level related entities change', async () => {
