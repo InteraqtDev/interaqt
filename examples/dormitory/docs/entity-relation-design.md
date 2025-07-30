@@ -1,513 +1,369 @@
-# 宿舍管理系统实体和关系设计
+# 实体和关系设计文档
 
 ## 概述
+基于需求分析和测试用例，设计宿舍管理系统的实体和关系结构。
 
-本文档定义了宿舍管理系统中的所有实体和关系，基于详细需求分析，确保数据模型的完整性和一致性。
+---
 
-## 核心实体定义
+## 实体设计
 
-### 1. 用户实体 (User)
+### 1. User 实体
+**目的**: 系统中的所有用户（管理员、宿舍长、学生）
 
-**目的**: 系统中的用户，包含不同角色
-**业务含义**: 代表系统的使用者，包括管理员、宿舍长和学生
+**属性**:
+- `id`: string (系统生成的唯一标识符)  
+- `name`: string (用户姓名)
+- `email`: string (邮箱地址，唯一标识)
+- `role`: string (用户角色: 'admin'/'dormHead'/'student')
+- `status`: string (用户状态: 'active'/'kicked', 默认'active')
+- `createdAt`: number (创建时间戳)
 
-```typescript
-export const User = Entity.create({
-  name: 'User',
-  properties: [
-    Property.create({ name: 'name', type: 'string' }),
-    Property.create({ name: 'email', type: 'string' }),
-    Property.create({ 
-      name: 'role', 
-      type: 'string'  // 'admin' | 'dormHead' | 'student'
-    }),
-    Property.create({ 
-      name: 'score', 
-      type: 'number',
-      defaultValue: () => 100  // 初始分数100分
-    }),
-    Property.create({ 
-      name: 'status', 
-      type: 'string',
-      defaultValue: () => 'active'  // 'active' | 'expelled'
-    }),
-    Property.create({ 
-      name: 'createdAt', 
-      type: 'number',
-      defaultValue: () => Math.floor(Date.now()/1000)
-    })
-  ]
-});
-```
+**业务含义**: 
+- 所有用户共用一个实体，通过role字段区分权限
+- status字段用于管理被踢出的学生状态
+- email作为唯一标识，用于登录验证
 
-**属性说明**:
-- `name`: 用户姓名
-- `email`: 邮箱，作为唯一标识
-- `role`: 用户角色，控制权限
-- `score`: 行为评分，影响踢人申请
-- `status`: 用户状态，expelled用户无法正常使用系统
-- `createdAt`: 创建时间戳
+### 2. Dormitory 实体  
+**目的**: 宿舍建筑的基本信息
 
-### 2. 宿舍实体 (Dormitory)
+**属性**:
+- `id`: string (宿舍唯一标识符)
+- `name`: string (宿舍名称，如"A栋101")
+- `capacity`: number (床位总数，限制4-6)
+- `createdAt`: number (创建时间戳)
 
-**目的**: 宿舍建筑物，包含多个床位
-**业务含义**: 学生居住的宿舍单元，由管理员创建和管理
+**业务含义**:
+- 每个宿舍有固定数量的床位
+- capacity用于业务规则验证
+- 宿舍的实际使用情况通过关系和计算属性获得
 
-```typescript
-export const Dormitory = Entity.create({
-  name: 'Dormitory',
-  properties: [
-    Property.create({ name: 'name', type: 'string' }),
-    Property.create({ 
-      name: 'capacity', 
-      type: 'number'  // 4-6个床位
-    }),
-    Property.create({ 
-      name: 'createdAt', 
-      type: 'number',
-      defaultValue: () => Math.floor(Date.now()/1000)
-    })
-    // 注意: occupiedCount和availableCount将通过计算属性实现
-  ]
-});
-```
+### 3. Bed 实体
+**目的**: 宿舍内的具体床位
 
-**属性说明**:
-- `name`: 宿舍名称，如"1号楼101"
-- `capacity`: 床位总数，必须在4-6之间
-- `createdAt`: 宿舍创建时间
-- 占用统计(`occupiedCount`, `availableCount`)将通过计算属性动态生成
+**属性**:
+- `id`: string (床位唯一标识符)
+- `number`: number (床位号，1-6)
+- `createdAt`: number (创建时间戳)
 
-### 3. 床位实体 (Bed)
+**业务含义**:
+- 每个床位在宿舍内有唯一编号
+- 床位的占用状态通过关系确定
+- 支持精确的床位分配管理
 
-**目的**: 宿舍中的具体床位
-**业务含义**: 用户分配的具体睡眠位置，确保精确的床位管理
+### 4. DeductionRule 实体
+**目的**: 扣分规则的定义
 
-```typescript
-export const Bed = Entity.create({
-  name: 'Bed',
-  properties: [
-    Property.create({ 
-      name: 'bedNumber', 
-      type: 'number'  // 床位号1-6
-    }),
-    Property.create({ 
-      name: 'status', 
-      type: 'string',
-      defaultValue: () => 'available'  // 'available' | 'occupied'
-    }),
-    Property.create({ 
-      name: 'createdAt', 
-      type: 'number',
-      defaultValue: () => Math.floor(Date.now()/1000)
-    })
-  ]
-});
-```
+**属性**:
+- `id`: string (规则唯一标识符)
+- `name`: string (规则名称，如"晚归")
+- `description`: string (规则详细描述)
+- `points`: number (扣分数，必须>0)
+- `isActive`: boolean (规则是否启用，默认true)
+- `createdAt`: number (创建时间戳)
 
-**属性说明**:
-- `bedNumber`: 床位编号，在宿舍内唯一
-- `status`: 床位状态，影响分配逻辑
-- `createdAt`: 床位创建时间（宿舍创建时自动生成）
+**业务含义**:
+- 管理员预定义的扣分标准
+- isActive控制规则的有效性
+- points用于自动计算总扣分
 
-### 4. 扣分记录实体 (ScoreRecord)
+### 5. DeductionRecord 实体
+**目的**: 具体的扣分记录
 
-**目的**: 记录用户的扣分行为和原因
-**业务含义**: 用户违规行为的记录，用于分数统计和历史追踪
+**属性**:
+- `id`: string (记录唯一标识符)
+- `reason`: string (具体扣分原因)
+- `points`: number (扣分数，从规则继承)
+- `status`: string (记录状态: 'active'/'cancelled', 默认'active')
+- `createdAt`: number (记录创建时间戳)
 
-```typescript
-export const ScoreRecord = Entity.create({
-  name: 'ScoreRecord',
-  properties: [
-    Property.create({ name: 'reason', type: 'string' }),
-    Property.create({ name: 'points', type: 'number' }),
-    Property.create({ 
-      name: 'createdAt', 
-      type: 'number',
-      defaultValue: () => Math.floor(Date.now()/1000)
-    })
-  ]
-});
-```
+**业务含义**:
+- 每次扣分的详细记录
+- status支持扣分撤销功能
+- reason记录具体违规情况
 
-**属性说明**:
-- `reason`: 扣分原因，如"晚归"、"卫生不达标"
-- `points`: 扣分数值，必须为正数
-- `createdAt`: 扣分时间
+### 6. KickoutRequest 实体
+**目的**: 踢出学生的申请
 
-### 5. 踢人申请实体 (ExpelRequest)
+**属性**:
+- `id`: string (申请唯一标识符)
+- `reason`: string (申请理由)
+- `status`: string (申请状态: 'pending'/'approved'/'rejected', 默认'pending')
+- `createdAt`: number (申请创建时间戳)
+- `processedAt`: number (处理时间戳，可选)
 
-**目的**: 宿舍长申请踢出用户的记录
-**业务含义**: 踢人流程的核心记录，包含申请、审批状态
+**业务含义**:
+- 宿舍长发起的踢出申请
+- 管理员处理后更新状态
+- processedAt记录处理时间
 
-```typescript
-export const ExpelRequest = Entity.create({
-  name: 'ExpelRequest',
-  properties: [
-    Property.create({ name: 'reason', type: 'string' }),
-    Property.create({ 
-      name: 'status', 
-      type: 'string',
-      defaultValue: () => 'pending'  // 'pending' | 'approved' | 'rejected'
-    }),
-    Property.create({ 
-      name: 'createdAt', 
-      type: 'number',
-      defaultValue: () => Math.floor(Date.now()/1000)
-    }),
-    Property.create({ 
-      name: 'processedAt', 
-      type: 'number'  // 处理时间，可选
-    }),
-    Property.create({ name: 'comment', type: 'string' })  // 管理员处理意见
-  ]
-});
-```
+---
 
-**属性说明**:
-- `reason`: 申请踢出的原因
-- `status`: 申请状态，控制处理流程
-- `createdAt`: 申请提交时间
-- `processedAt`: 管理员处理时间
-- `comment`: 管理员处理意见
+## 关系设计
 
-## 关系定义
-
-### 1. 用户-宿舍关系 (UserDormitoryRelation)
-
+### 1. UserDormitoryRelation (用户-宿舍关系)
 **类型**: n:1 (多个用户对应一个宿舍)
-**目的**: 记录用户被分配到哪个宿舍
-**业务含义**: 建立用户和宿舍的居住关系
+**目的**: 用户分配到宿舍
 
-```typescript
-export const UserDormitoryRelation = Relation.create({
-  source: User,
-  target: Dormitory,
-  type: 'n:1',
-  properties: [
-    Property.create({ 
-      name: 'assignedAt', 
-      type: 'number',
-      defaultValue: () => Math.floor(Date.now()/1000)
-    }),
-    Property.create({ 
-      name: 'status', 
-      type: 'string',
-      defaultValue: () => 'active'  // 'active' | 'inactive'
-    })
-  ]
-});
-```
+**源实体**: User
+**目标实体**: Dormitory
+**源属性名**: `dormitory` (在User上创建dormitory属性)
+**目标属性名**: `users` (在Dormitory上创建users属性)
 
-**访问属性**:
-- 用户端: `user.dormitory` - 访问用户所在宿舍
-- 宿舍端: `dormitory.residents` - 访问宿舍内所有用户
+**关系属性**:
+- `assignedAt`: number (分配时间戳)
+- `status`: string (分配状态: 'active'/'inactive', 默认'active')
 
-### 2. 用户-床位关系 (UserBedRelation)
+**业务含义**:
+- 通过user.dormitory访问用户所在宿舍
+- 通过dormitory.users访问宿舍所有成员
+- status支持用户离开宿舍的历史记录
 
+### 2. UserBedRelation (用户-床位关系)
 **类型**: 1:1 (一个用户对应一个床位)
-**目的**: 记录用户占用的具体床位
-**业务含义**: 精确的床位分配关系
+**目的**: 用户分配到具体床位
 
-```typescript
-export const UserBedRelation = Relation.create({
-  source: User,
-  target: Bed,
-  type: '1:1',
-  properties: [
-    Property.create({ 
-      name: 'assignedAt', 
-      type: 'number',
-      defaultValue: () => Math.floor(Date.now()/1000)
-    })
-  ]
-});
-```
+**源实体**: User  
+**目标实体**: Bed
+**源属性名**: `bed` (在User上创建bed属性)
+**目标属性名**: `user` (在Bed上创建user属性)
 
-**访问属性**:
-- 用户端: `user.bed` - 访问用户的床位
-- 床位端: `bed.occupant` - 访问床位的占用者
+**关系属性**:
+- `assignedAt`: number (分配时间戳)
+- `status`: string (分配状态: 'active'/'inactive', 默认'active')
 
-### 3. 宿舍-床位关系 (DormitoryBedRelation)
+**业务含义**:
+- 通过user.bed访问用户的床位
+- 通过bed.user访问床位的使用者
+- 支持床位历史分配记录
 
+### 3. DormitoryBedRelation (宿舍-床位关系)
 **类型**: 1:n (一个宿舍对应多个床位)
-**目的**: 床位属于哪个宿舍
-**业务含义**: 床位的归属关系
+**目的**: 床位归属于特定宿舍
 
-```typescript
-export const DormitoryBedRelation = Relation.create({
-  source: Bed,
-  target: Dormitory,
-  type: 'n:1'
-});
-```
+**源实体**: Dormitory
+**目标实体**: Bed  
+**源属性名**: `beds` (在Dormitory上创建beds属性)
+**目标属性名**: `dormitory` (在Bed上创建dormitory属性)
 
-**访问属性**:
-- 床位端: `bed.dormitory` - 访问床位所属宿舍
-- 宿舍端: `dormitory.beds` - 访问宿舍内所有床位
+**关系属性**:
+- 无额外属性
 
-### 4. 宿舍-宿舍长关系 (DormitoryHeadRelation)
+**业务含义**:
+- 通过dormitory.beds访问宿舍所有床位
+- 通过bed.dormitory访问床位所属宿舍
+- 建立宿舍和床位的归属关系
 
+### 4. DormitoryHeadRelation (宿舍-宿舍长关系)
 **类型**: 1:1 (一个宿舍对应一个宿舍长)
-**目的**: 指定宿舍的管理员
-**业务含义**: 宿舍的管理权分配
+**目的**: 指定宿舍的管理者
 
-```typescript
-export const DormitoryHeadRelation = Relation.create({
-  source: User,
-  target: Dormitory,
-  type: '1:1',
-  properties: [
-    Property.create({ 
-      name: 'appointedAt', 
-      type: 'number',
-      defaultValue: () => Math.floor(Date.now()/1000)
-    })
-  ]
-});
-```
+**源实体**: Dormitory
+**目标实体**: User
+**源属性名**: `dormHead` (在Dormitory上创建dormHead属性)
+**目标属性名**: `managedDormitory` (在User上创建managedDormitory属性)
 
-**访问属性**:
-- 用户端: `user.managedDormitory` - 访问用户管理的宿舍
-- 宿舍端: `dormitory.head` - 访问宿舍的宿舍长
+**关系属性**:
+- `appointedAt`: number (任命时间戳)
+- `status`: string (任职状态: 'active'/'inactive', 默认'active')
 
-### 5. 用户-扣分记录关系 (UserScoreRecordRelation)
+**业务含义**:
+- 通过dormitory.dormHead访问宿舍长
+- 通过user.managedDormitory访问用户管理的宿舍
+- 支持宿舍长更换的历史记录
 
+### 5. UserDeductionRecordRelation (用户-扣分记录关系)
 **类型**: 1:n (一个用户对应多个扣分记录)
-**目的**: 记录用户的所有扣分历史
-**业务含义**: 用户行为记录的关联
+**目的**: 扣分记录归属于特定用户
 
+**源实体**: User
+**目标实体**: DeductionRecord
+**源属性名**: `deductionRecords` (在User上创建deductionRecords属性)
+**目标属性名**: `user` (在DeductionRecord上创建user属性)
+
+**关系属性**:
+- 无额外属性
+
+**业务含义**:
+- 通过user.deductionRecords访问用户所有扣分记录
+- 通过deductionRecord.user访问被扣分的用户
+- 用于计算用户总扣分
+
+### 6. DeductionRuleRecordRelation (扣分规则-扣分记录关系)
+**类型**: 1:n (一个规则对应多个记录)
+**目的**: 记录基于哪个规则进行扣分
+
+**源实体**: DeductionRule
+**目标实体**: DeductionRecord
+**源属性名**: `records` (在DeductionRule上创建records属性)
+**目标属性名**: `rule` (在DeductionRecord上创建rule属性)
+
+**关系属性**:
+- 无额外属性
+
+**业务含义**:
+- 通过rule.records访问基于该规则的所有扣分记录
+- 通过record.rule访问扣分记录对应的规则
+- 确保扣分的规则依据
+
+### 7. RecorderDeductionRelation (记录者-扣分记录关系)
+**类型**: 1:n (一个宿舍长记录多个扣分)
+**目的**: 记录是谁进行的扣分操作
+
+**源实体**: User (记录者，通常是宿舍长)
+**目标实体**: DeductionRecord
+**源属性名**: `recordedDeductions` (在User上创建recordedDeductions属性)
+**目标属性名**: `recorder` (在DeductionRecord上创建recorder属性)
+
+**关系属性**:
+- 无额外属性
+
+**业务含义**:
+- 通过user.recordedDeductions访问宿舍长记录的所有扣分
+- 通过record.recorder访问记录扣分的宿舍长
+- 用于权限控制和扣分撤销
+
+### 8. KickoutRequestRelations (踢出申请相关关系)
+
+#### 8.1 ApplicantKickoutRelation (申请人-踢出申请关系)
+**类型**: 1:n (一个宿舍长发起多个申请)
+**源实体**: User (申请人)
+**目标实体**: KickoutRequest
+**源属性名**: `kickoutRequests` (在User上创建kickoutRequests属性)
+**目标属性名**: `applicant` (在KickoutRequest上创建applicant属性)
+
+#### 8.2 TargetKickoutRelation (被申请人-踢出申请关系)
+**类型**: 1:n (一个学生可能被多次申请)
+**源实体**: User (被申请人)
+**目标实体**: KickoutRequest
+**源属性名**: `kickoutRequestsAgainst` (在User上创建kickoutRequestsAgainst属性)
+**目标属性名**: `target` (在KickoutRequest上创建target属性)
+
+#### 8.3 ProcessorKickoutRelation (处理人-踢出申请关系)
+**类型**: 1:n (一个管理员处理多个申请)
+**源实体**: User (处理人)
+**目标实体**: KickoutRequest
+**源属性名**: `processedKickoutRequests` (在User上创建processedKickoutRequests属性)
+**目标属性名**: `processor` (在KickoutRequest上创建processor属性)
+
+**关系属性**:
+- 所有踢出申请关系都无额外属性
+
+**业务含义**:
+- 完整记录踢出申请的参与者
+- 支持复杂的查询和权限控制
+- 便于生成申请历史和统计信息
+
+---
+
+## 计算属性设计
+
+### User 实体计算属性
+- `totalScore`: number - 所有有效扣分记录的总分
+- `currentOccupancy`: number - 用户当前床位占用状态(0或1)
+
+### Dormitory 实体计算属性  
+- `currentOccupancy`: number - 当前入住人数
+- `availableBeds`: number - 可用床位数 (capacity - currentOccupancy)
+- `occupancyRate`: number - 入住率百分比
+
+### Bed 实体计算属性
+- `isOccupied`: boolean - 床位是否被占用
+
+### DeductionRule 实体计算属性
+- `usageCount`: number - 基于该规则的记录总数
+- `totalPointsDeducted`: number - 基于该规则的总扣分
+
+---
+
+## 数据流图
+
+```
+用户分配流程:
+User → UserDormitoryRelation → Dormitory
+  ↓
+User → UserBedRelation → Bed → DormitoryBedRelation → Dormitory
+
+扣分流程:
+User(宿舍长) → RecorderDeductionRelation → DeductionRecord
+                                              ↓
+User(学生) ← UserDeductionRecordRelation ← DeductionRecord
+                                              ↑
+DeductionRule ← DeductionRuleRecordRelation ←
+
+踢出申请流程:
+User(宿舍长) → ApplicantKickoutRelation → KickoutRequest
+                                             ↓
+User(学生) ← TargetKickoutRelation ← KickoutRequest
+                                             ↓
+User(管理员) ← ProcessorKickoutRelation ← KickoutRequest
+```
+
+---
+
+## 重要设计原则
+
+### 1. 无ID引用规则
+**✅ 正确**:
 ```typescript
-export const UserScoreRecordRelation = Relation.create({
-  source: ScoreRecord,
-  target: User,
-  type: 'n:1'
-});
+// 通过关系访问相关实体
+const user = await storage.get('User', userId);
+const dormitory = user.dormitory; // 通过关系获取
+const bedNumber = user.bed?.number; // 通过关系获取床位号
 ```
 
-**访问属性**:
-- 扣分记录端: `scoreRecord.user` - 访问被扣分的用户
-- 用户端: `user.scoreRecords` - 访问用户的所有扣分记录
-
-### 6. 扣分记录-扣分执行人关系 (ScoreRecordDeductorRelation)
-
-**类型**: n:1 (多个扣分记录对应一个执行人)
-**目的**: 记录谁执行了扣分操作
-**业务含义**: 扣分操作的责任追踪
-
+**❌ 错误**:
 ```typescript
-export const ScoreRecordDeductorRelation = Relation.create({
-  source: ScoreRecord,
-  target: User,
-  type: 'n:1'
-});
-```
-
-**访问属性**:
-- 扣分记录端: `scoreRecord.deductor` - 访问执行扣分的用户
-- 用户端: `user.deductedScoreRecords` - 访问用户执行的扣分记录
-
-### 7. 踢人申请相关关系
-
-#### 申请人-踢人申请关系 (ApplicantExpelRequestRelation)
-```typescript
-export const ApplicantExpelRequestRelation = Relation.create({
-  source: ExpelRequest,
-  target: User,
-  type: 'n:1'
-});
-```
-
-**访问属性**:
-- 申请端: `expelRequest.applicant` - 申请人
-- 用户端: `user.submittedExpelRequests` - 用户提交的申请
-
-#### 被申请人-踢人申请关系 (TargetExpelRequestRelation)
-```typescript
-export const TargetExpelRequestRelation = Relation.create({
-  source: ExpelRequest,
-  target: User,
-  type: 'n:1'
-});
-```
-
-**访问属性**:
-- 申请端: `expelRequest.targetUser` - 被申请踢出的用户
-- 用户端: `user.receivedExpelRequests` - 用户收到的踢人申请
-
-#### 处理人-踢人申请关系 (ProcessorExpelRequestRelation)
-```typescript
-export const ProcessorExpelRequestRelation = Relation.create({
-  source: ExpelRequest,
-  target: User,
-  type: 'n:1'
-});
-```
-
-**访问属性**:
-- 申请端: `expelRequest.processor` - 处理申请的管理员
-- 用户端: `user.processedExpelRequests` - 用户处理的申请
-
-## 过滤实体
-
-### 1. 活跃用户 (ActiveUser)
-
-**目的**: 过滤出状态为active的用户
-**业务含义**: 可正常使用系统的用户，排除被踢出的用户
-
-```typescript
-export const ActiveUser = Entity.create({
-  name: 'ActiveUser',
-  sourceEntity: User,
-  filterCondition: MatchExp.atom({
-    key: 'status',
-    value: ['=', 'active']
-  })
-});
-```
-
-### 2. 可用床位 (AvailableBed)
-
-**目的**: 过滤出状态为available的床位
-**业务含义**: 可分配给用户的空闲床位
-
-```typescript
-export const AvailableBed = Entity.create({
-  name: 'AvailableBed',
-  sourceEntity: Bed,
-  filterCondition: MatchExp.atom({
-    key: 'status',
-    value: ['=', 'available']
-  })
-});
-```
-
-### 3. 待处理踢人申请 (PendingExpelRequest)
-
-**目的**: 过滤出状态为pending的踢人申请
-**业务含义**: 需要管理员处理的申请
-
-```typescript
-export const PendingExpelRequest = Entity.create({
-  name: 'PendingExpelRequest',
-  sourceEntity: ExpelRequest,
-  filterCondition: MatchExp.atom({
-    key: 'status',
-    value: ['=', 'pending']
-  })
-});
-```
-
-### 4. 低分用户 (LowScoreUser)
-
-**目的**: 过滤出分数低于60分的用户
-**业务含义**: 可能被踢出的用户，用于宿舍长决策
-
-```typescript
-export const LowScoreUser = Entity.create({
-  name: 'LowScoreUser',
-  sourceEntity: User,
-  filterCondition: MatchExp.atom({
-    key: 'score',
-    value: ['<', 60]
-  }).and({
-    key: 'status',
-    value: ['=', 'active']
-  })
-});
-```
-
-## 数据流程图
-
-```
-创建用户 → 创建宿舍(含床位) → 分配用户到床位 → 指定宿舍长
-                                    ↓
-扣分记录 ← 宿舍长扣分 ← 违规行为发生 ← 日常管理
-   ↓
-分数计算 → 低于阈值 → 宿舍长申请踢人 → 管理员审批 → 释放床位
-```
-
-## 关键约束
-
-### 1. 实体属性约束
-- **用户邮箱唯一性**: 每个用户必须有唯一邮箱
-- **宿舍容量限制**: 每个宿舍容量必须在4-6之间
-- **床位编号唯一性**: 同一宿舍内床位编号不能重复
-- **扣分数值正数**: 扣分必须为正数
-
-### 2. 关系约束
-- **用户唯一宿舍**: 一个用户只能分配到一个宿舍
-- **床位唯一占用**: 一个床位只能被一个用户占用
-- **宿舍唯一宿舍长**: 一个宿舍只能有一个宿舍长
-- **宿舍长必须是住户**: 宿舍长必须居住在管理的宿舍内
-
-### 3. 业务规则约束
-- **踢人申请条件**: 只有分数<60的用户才能被申请踢出
-- **宿舍长权限范围**: 宿舍长只能管理自己宿舍内的用户
-- **床位分配条件**: 只能分配到available状态的床位
-- **申请状态管理**: 已处理的踢人申请不能重复处理
-
-## 实现注意事项
-
-### ❌ 常见错误
-```typescript
-// 错误: 在实体中包含关系ID字段
+// 不要在实体中存储ID引用
 const User = Entity.create({
   properties: [
-    Property.create({ name: 'dormitoryId', type: 'string' }),  // ❌ 不要这样做
-    Property.create({ name: 'bedId', type: 'string' })         // ❌ 不要这样做
+    Property.create({ name: 'dormitoryId', type: 'string' }), // 错误!
+    Property.create({ name: 'bedId', type: 'string' })        // 错误!
   ]
 });
-
-// 错误: 为关系指定name属性
-const UserDormitoryRelation = Relation.create({
-  name: 'UserDormitory',  // ❌ 名称会自动生成
-  source: User,
-  target: Dormitory,
-  type: 'n:1'
-});
-
-// 错误: 静态默认值
-Property.create({ 
-  name: 'status', 
-  type: 'string',
-  defaultValue: 'active'  // ❌ 必须是函数
-});
 ```
 
-### ✅ 正确实现
-```typescript
-// 正确: 通过关系连接实体
-const UserDormitoryRelation = Relation.create({
-  source: User,
-  target: Dormitory,
-  type: 'n:1'  // 自动创建user.dormitory和dormitory.residents访问器
-});
+### 2. 关系属性命名
+- 通过`sourceProperty`和`targetProperty`定义访问名称
+- 命名应该反映业务关系的语义
+- 避免使用ID后缀，使用业务含义的名称
 
-// 正确: 函数形式的默认值
-Property.create({ 
-  name: 'status', 
-  type: 'string',
-  defaultValue: () => 'active'
-});
+### 3. 状态管理
+- 使用`status`字段管理实体状态
+- 支持软删除和历史记录
+- 状态值使用字符串枚举
 
-// 正确: 通过关系访问相关数据
-// user.dormitory 访问用户宿舍
-// dormitory.residents 访问宿舍用户列表
-// bed.occupant 访问床位占用者
-```
+### 4. 时间戳管理
+- 所有实体都有`createdAt`字段
+- 关系根据需要添加时间戳属性
+- 使用数字类型存储Unix时间戳
+
+### 5. 计算属性原则
+- 基于关系和其他属性动态计算
+- 避免存储可计算的冗余数据
+- 保证数据一致性
+
+---
 
 ## 验证清单
 
-- [ ] 所有实体名称为单数PascalCase格式
-- [ ] 所有属性类型正确指定
-- [ ] 所有defaultValue都是函数形式
-- [ ] 所有关系没有name属性
-- [ ] 关系类型格式正确('1:1', '1:n', 'n:1', 'n:n')
-- [ ] 没有从interaqt导入实体
-- [ ] 过滤实体有有效的sourceEntity和filterCondition
-- [ ] 实体属性中没有关系ID字段
-- [ ] 所有关系的业务含义清晰
-- [ ] TypeScript编译通过
+### 实体验证
+- [ ] 所有实体名称为PascalCase单数形式
+- [ ] 所有属性都有正确的类型定义
+- [ ] 所有defaultValue都是函数而非静态值
+- [ ] 没有ID引用字段在实体属性中
+- [ ] 时间戳字段使用number类型
 
-此设计文档确保了数据模型的完整性，为后续的交互和计算实现提供了坚实的基础。
+### 关系验证
+- [ ] 所有关系都没有name属性（自动生成）
+- [ ] 关系类型格式正确('1:1', '1:n', 'n:1', 'n:n')
+- [ ] sourceProperty和targetProperty命名有意义
+- [ ] 关系属性按需定义
+- [ ] 循环依赖已避免
+
+### 业务逻辑验证
+- [ ] 支持所有需求场景
+- [ ] 计算属性覆盖所有需要的派生数据
+- [ ] 状态管理支持完整的业务流程
+- [ ] 权限控制有足够的数据支持
+
+这个设计确保了系统的完整性、一致性和可扩展性，为后续的交互设计和实现提供了坚实的基础。

@@ -1,631 +1,613 @@
 # 宿舍管理系统计算分析
 
-## 计算分析概述
-
-本文档按照系统方法分析了宿舍管理系统中的每个实体和每个属性，以选择合适的计算类型。分析遵循步骤化过程，确保每个决策都有明确的理由和依赖关系。
-
-## 实体分析
-
-### Entity: User
-
-#### 实体层级分析
-- **目的**: 系统用户，包含不同角色的人员
-- **创建来源**: 通过CreateUser交互创建
-- **更新需求**: 分数更新(通过扣分)，状态更新(踢出时)，角色更新(指定宿舍长时)
-- **删除策略**: 软删除，状态改为'expelled'
-
-#### 属性分析
-
-##### 属性: id
-- **类型**: string
-- **目的**: 用户唯一标识符
-- **数据来源**: 系统生成
-- **更新频率**: 从不
-- **计算决策**: 无(系统处理)
-- **理由**: ID由框架自动生成
-
-##### 属性: name
-- **类型**: string
-- **目的**: 用户姓名
-- **数据来源**: CreateUser交互载荷
-- **更新频率**: 从不(本系统中姓名不变)
-- **计算决策**: 无
-- **理由**: 创建时设置，后续不更改
-
-##### 属性: email
-- **类型**: string
-- **目的**: 用户邮箱，作为唯一标识
-- **数据来源**: CreateUser交互载荷
-- **更新频率**: 从不(本系统中邮箱不变)
-- **计算决策**: 无
-- **理由**: 创建时设置，后续不更改
-
-##### 属性: role
-- **类型**: string
-- **目的**: 用户角色(admin/dormHead/student)
-- **数据来源**: CreateUser交互载荷，AssignDormitoryHead交互修改
-- **更新频率**: 当指定或取消宿舍长时
-- **计算决策**: StateMachine
-- **理由**: 有明确的状态转换(student↔dormHead)，通过交互触发
-- **依赖关系**: AssignDormitoryHead交互，当前角色值
-- **计算方法**: 状态转换 - student→dormHead(指定宿舍长时)，dormHead→student(取消宿舍长时)
-
-##### 属性: score
-- **类型**: number
-- **目的**: 用户行为评分
-- **数据来源**: 初始值100，通过扣分记录计算
-- **更新频率**: 当有新的扣分记录时自动更新
-- **计算决策**: StateMachine with computeValue
-- **理由**: 需要根据扣分交互动态计算新分数
-- **依赖关系**: DeductUserScore交互，ScoreRecord实体，当前分数值
-- **计算方法**: 当DeductUserScore触发时，currentScore - deductedPoints
-
-##### 属性: status
-- **类型**: string
-- **目的**: 用户状态(active/expelled)
-- **数据来源**: 状态转换
-- **更新频率**: 当踢人申请被批准时
-- **计算决策**: StateMachine
-- **理由**: 明确的状态转换(active→expelled)
-- **依赖关系**: ProcessExpelRequest交互(批准决定)，当前状态值
-- **计算方法**: 状态转换 - active→expelled(踢人申请批准时)
-
-##### 属性: createdAt
-- **类型**: number
-- **目的**: 用户创建时间戳
-- **数据来源**: 创建时的当前时间
-- **更新频率**: 从不
-- **计算决策**: defaultValue函数
-- **理由**: 创建时设置时间戳，后续不变
-- **计算方法**: () => Math.floor(Date.now()/1000)
-
-#### 实体计算决策
-- **类型**: Transform
-- **来源**: InteractionEventEntity
-- **理由**: 用户通过CreateUser交互创建
-- **依赖关系**: CreateUser交互事件，载荷数据
-- **计算方法**: 当CreateUser交互触发时，从event.payload创建新用户实体
+基于实体关系设计和交互设计，对所有实体、属性、关系进行系统化的计算类型分析。
 
 ---
 
-### Entity: Dormitory
+## Entity: User
 
-#### 实体层级分析
-- **目的**: 宿舍建筑，包含多个床位
-- **创建来源**: 通过CreateDormitory交互创建
-- **更新需求**: 占用统计(自动计算)
-- **删除策略**: 一般不删除(物理建筑)
+### Entity-Level Analysis
+- **Purpose**: 系统中的所有用户（管理员、宿舍长、学生）
+- **Creation Source**: 用户创建不在当前系统范围内（外部系统处理）
+- **Update Requirements**: 角色变更（student↔dormHead）、状态变更（active↔kicked）
+- **Deletion Strategy**: 软删除使用status字段（active/kicked）
 
-#### 属性分析
+### Property Analysis
 
-##### 属性: id
-- **类型**: string
-- **目的**: 宿舍唯一标识符
-- **数据来源**: 系统生成
-- **更新频率**: 从不
-- **计算决策**: 无(系统处理)
-- **理由**: ID由框架自动生成
+#### Property: id
+- **Type**: string
+- **Purpose**: 用户唯一标识符
+- **Data Source**: 系统生成
+- **Update Frequency**: Never
+- **Computation Decision**: None (系统处理)
+- **Reasoning**: 框架自动生成的ID字段
 
-##### 属性: name
-- **类型**: string
-- **目的**: 宿舍名称
-- **数据来源**: CreateDormitory交互载荷
-- **更新频率**: 从不
-- **计算决策**: 无
-- **理由**: 创建时设置，后续不更改
+#### Property: name
+- **Type**: string
+- **Purpose**: 用户姓名
+- **Data Source**: 外部创建或更新
+- **Update Frequency**: 通过UpdateUserProfile交互（低优先级）
+- **Computation Decision**: None
+- **Reasoning**: 简单字段，直接设置和更新
 
-##### 属性: capacity
-- **类型**: number
-- **目的**: 宿舍床位总数
-- **数据来源**: CreateDormitory交互载荷
-- **更新频率**: 从不
-- **计算决策**: 无
-- **理由**: 物理容量固定，创建时设置
+#### Property: email
+- **Type**: string
+- **Purpose**: 邮箱地址，唯一标识
+- **Data Source**: 外部创建
+- **Update Frequency**: Never（业务规则：邮箱不可变更）
+- **Computation Decision**: None
+- **Reasoning**: 创建后不可变更的标识字段
 
-##### 属性: occupiedCount
-- **类型**: number
-- **目的**: 已占用床位数量
-- **数据来源**: 统计已占用床位
-- **更新频率**: 当床位分配/释放时自动更新
-- **计算决策**: Count
-- **理由**: 直接计数相关的占用床位数量
-- **依赖关系**: DormitoryBedRelation(direction: source)，Bed实体(status属性)
-- **计算方法**: 计算status='occupied'的相关床位数量
+#### Property: role
+- **Type**: string
+- **Purpose**: 用户角色（admin/dormHead/student）
+- **Data Source**: 角色转换交互
+- **Update Frequency**: AssignDormHead、RemoveDormHead交互
+- **Computation Decision**: StateMachine
+- **Reasoning**: 有明确的状态转换（student ↔ dormHead），角色变更有业务逻辑
+- **Dependencies**: AssignDormHead交互、RemoveDormHead交互、当前role值
+- **Calculation Method**: student→dormHead (AssignDormHead), dormHead→student (RemoveDormHead), admin角色保持不变
 
-##### 属性: availableCount
-- **类型**: number
-- **目的**: 可用床位数量
-- **数据来源**: capacity - occupiedCount
-- **数据来源**: 基于当前记录计算
-- **更新频率**: 当occupiedCount变化时
-- **计算决策**: computed函数
-- **理由**: 简单的当前记录内计算，无外部依赖
-- **计算方法**: this.capacity - this.occupiedCount
+#### Property: status
+- **Type**: string
+- **Purpose**: 用户状态（active/kicked）
+- **Data Source**: 踢出申请处理结果
+- **Update Frequency**: ApproveKickoutRequest交互
+- **Computation Decision**: StateMachine
+- **Reasoning**: 有明确的状态转换（active→kicked），状态变更触发相关业务逻辑
+- **Dependencies**: ApproveKickoutRequest交互、当前status值
+- **Calculation Method**: active→kicked (ApproveKickoutRequest批准时)
 
-##### 属性: createdAt
-- **类型**: number
-- **目的**: 宿舍创建时间戳
-- **数据来源**: 创建时的当前时间
-- **更新频率**: 从不
-- **计算决策**: defaultValue函数
-- **理由**: 创建时设置时间戳，后续不变
-- **计算方法**: () => Math.floor(Date.now()/1000)
+#### Property: totalScore
+- **Type**: number
+- **Purpose**: 用户总扣分数
+- **Data Source**: 所有有效扣分记录的总和
+- **Update Frequency**: 扣分记录创建或取消时自动更新
+- **Computation Decision**: Summation
+- **Reasoning**: 需要对相关扣分记录求和，但只计算status='active'的记录
+- **Dependencies**: UserDeductionRecordRelation (direction: source), DeductionRecord实体 (points属性, status属性)
+- **Calculation Method**: Sum of DeductionRecord.points for all related records where DeductionRecord.status = 'active'
 
-#### 实体计算决策
-- **类型**: Transform
-- **来源**: InteractionEventEntity
-- **理由**: 宿舍通过CreateDormitory交互创建
-- **依赖关系**: CreateDormitory交互事件，载荷数据
-- **计算方法**: 当CreateDormitory触发时，创建宿舍实体并自动生成床位
+#### Property: createdAt
+- **Type**: number
+- **Purpose**: 用户创建时间戳
+- **Data Source**: 创建时系统时间
+- **Update Frequency**: Never
+- **Computation Decision**: None
+- **Reasoning**: 创建时设置的时间戳，不需要计算
 
----
-
-### Entity: Bed
-
-#### 实体层级分析
-- **目的**: 宿舍内的具体床位
-- **创建来源**: 宿舍创建时自动生成
-- **更新需求**: 状态更新(可用/占用)
-- **删除策略**: 随宿舍一起删除
-
-#### 属性分析
-
-##### 属性: id
-- **类型**: string
-- **目的**: 床位唯一标识符
-- **数据来源**: 系统生成
-- **更新频率**: 从不
-- **计算决策**: 无(系统处理)
-- **理由**: ID由框架自动生成
-
-##### 属性: bedNumber
-- **类型**: number
-- **目的**: 床位编号(1-6)
-- **数据来源**: 创建时指定
-- **更新频率**: 从不
-- **计算决策**: 无
-- **理由**: 物理床位号固定
-
-##### 属性: status
-- **类型**: string
-- **目的**: 床位状态(available/occupied)
-- **数据来源**: 状态转换
-- **更新频率**: 当用户分配/释放床位时
-- **计算决策**: StateMachine
-- **理由**: 明确的状态转换(available↔occupied)
-- **依赖关系**: AssignUserToDormitory交互，ProcessExpelRequest交互(批准时)
-- **计算方法**: available→occupied(用户分配时)，occupied→available(用户释放时)
-
-##### 属性: createdAt
-- **类型**: number
-- **目的**: 床位创建时间戳
-- **数据来源**: 创建时的当前时间
-- **更新频率**: 从不
-- **计算决策**: defaultValue函数
-- **理由**: 创建时设置时间戳，后续不变
-- **计算方法**: () => Math.floor(Date.now()/1000)
-
-#### 实体计算决策
-- **类型**: Transform
-- **来源**: Dormitory实体
-- **理由**: 床位随宿舍创建时自动生成
-- **依赖关系**: Dormitory实体创建事件，capacity属性
-- **计算方法**: 当Dormitory创建时，根据capacity创建对应数量的床位(bedNumber: 1到capacity)
+### Entity Computation Decision
+- **Type**: None
+- **Source**: N/A
+- **Reasoning**: 用户创建由外部系统处理，当前系统只处理角色和状态变更
+- **Dependencies**: N/A
+- **Calculation Method**: N/A
 
 ---
 
-### Entity: ScoreRecord
+## Entity: Dormitory
 
-#### 实体层级分析
-- **目的**: 用户扣分记录
-- **创建来源**: 通过DeductUserScore交互创建
-- **更新需求**: 创建后不需要更新
-- **删除策略**: 一般不删除(保留历史记录)
+### Entity-Level Analysis
+- **Purpose**: 宿舍建筑的基本信息
+- **Creation Source**: CreateDormitory交互
+- **Update Requirements**: 名称和容量更新
+- **Deletion Strategy**: 硬删除（当宿舍为空时）
 
-#### 属性分析
+### Property Analysis
 
-##### 属性: id
-- **类型**: string
-- **目的**: 扣分记录唯一标识符
-- **数据来源**: 系统生成
-- **更新频率**: 从不
-- **计算决策**: 无(系统处理)
-- **理由**: ID由框架自动生成
+#### Property: id
+- **Type**: string
+- **Purpose**: 宿舍唯一标识符
+- **Data Source**: 系统生成
+- **Update Frequency**: Never
+- **Computation Decision**: None (系统处理)
+- **Reasoning**: 框架自动生成的ID字段
 
-##### 属性: reason
-- **类型**: string
-- **目的**: 扣分原因
-- **数据来源**: DeductUserScore交互载荷
-- **更新频率**: 从不
-- **计算决策**: 无
-- **理由**: 创建时设置，后续不更改
+#### Property: name
+- **Type**: string
+- **Purpose**: 宿舍名称
+- **Data Source**: CreateDormitory或UpdateDormitory交互
+- **Update Frequency**: UpdateDormitory交互
+- **Computation Decision**: None
+- **Reasoning**: 简单字段，直接设置和更新
 
-##### 属性: points
-- **类型**: number
-- **目的**: 扣分数值
-- **数据来源**: DeductUserScore交互载荷
-- **更新频率**: 从不
-- **计算决策**: 无
-- **理由**: 创建时设置，后续不更改
+#### Property: capacity
+- **Type**: number
+- **Purpose**: 宿舍床位总数
+- **Data Source**: CreateDormitory或UpdateDormitory交互
+- **Update Frequency**: UpdateDormitory交互（有限制）
+- **Computation Decision**: None
+- **Reasoning**: 简单数值字段，通过交互设置
 
-##### 属性: createdAt
-- **类型**: number
-- **目的**: 扣分时间戳
-- **数据来源**: 创建时的当前时间
-- **更新频率**: 从不
-- **计算决策**: defaultValue函数
-- **理由**: 创建时设置时间戳，后续不变
-- **计算方法**: () => Math.floor(Date.now()/1000)
+#### Property: currentOccupancy
+- **Type**: number
+- **Purpose**: 当前入住人数
+- **Data Source**: 活跃的用户-宿舍关系计数
+- **Update Frequency**: 用户分配或移除时自动更新
+- **Computation Decision**: Count
+- **Reasoning**: 需要计算与此宿舍相关的活跃用户数量
+- **Dependencies**: UserDormitoryRelation (direction: target), relation status属性
+- **Calculation Method**: Count UserDormitoryRelation records where target=this dormitory and status='active'
 
-#### 实体计算决策
-- **类型**: Transform
-- **来源**: InteractionEventEntity
-- **理由**: 扣分记录通过DeductUserScore交互创建
-- **依赖关系**: DeductUserScore交互事件，载荷数据，用户上下文
-- **计算方法**: 当DeductUserScore触发时，创建扣分记录并关联到目标用户
+#### Property: availableBeds
+- **Type**: number
+- **Purpose**: 可用床位数
+- **Data Source**: capacity - currentOccupancy
+- **Update Frequency**: 当capacity或currentOccupancy变化时
+- **Computation Decision**: computed (计算属性)
+- **Reasoning**: 基于当前记录的简单计算，不依赖外部数据
+- **Dependencies**: 同一记录的capacity和currentOccupancy属性
+- **Calculation Method**: this.capacity - this.currentOccupancy
 
----
+#### Property: createdAt
+- **Type**: number
+- **Purpose**: 宿舍创建时间戳
+- **Data Source**: CreateDormitory交互时的系统时间
+- **Update Frequency**: Never
+- **Computation Decision**: None (defaultValue函数)
+- **Reasoning**: 创建时设置的时间戳，使用defaultValue即可
 
-### Entity: ExpelRequest
-
-#### 实体层级分析
-- **目的**: 踢人申请记录
-- **创建来源**: 通过SubmitExpelRequest交互创建
-- **更新需求**: 状态更新(pending→approved/rejected)，处理时间和意见
-- **删除策略**: 一般不删除(保留审批历史)
-
-#### 属性分析
-
-##### 属性: id
-- **类型**: string
-- **目的**: 踢人申请唯一标识符
-- **数据来源**: 系统生成
-- **更新频率**: 从不
-- **计算决策**: 无(系统处理)
-- **理由**: ID由框架自动生成
-
-##### 属性: reason
-- **类型**: string
-- **目的**: 申请踢出的原因
-- **数据来源**: SubmitExpelRequest交互载荷
-- **更新频率**: 从不
-- **计算决策**: 无
-- **理由**: 创建时设置，后续不更改
-
-##### 属性: status
-- **类型**: string
-- **目的**: 申请状态(pending/approved/rejected)
-- **数据来源**: 状态转换
-- **更新频率**: 当管理员处理申请时
-- **计算决策**: StateMachine
-- **理由**: 明确的状态转换(pending→approved/rejected)
-- **依赖关系**: ProcessExpelRequest交互，当前状态值
-- **计算方法**: pending→approved/rejected(ProcessExpelRequest时根据decision)
-
-##### 属性: createdAt
-- **类型**: number
-- **目的**: 申请提交时间戳
-- **数据来源**: 创建时的当前时间
-- **更新频率**: 从不
-- **计算决策**: defaultValue函数
-- **理由**: 创建时设置时间戳，后续不变
-- **计算方法**: () => Math.floor(Date.now()/1000)
-
-##### 属性: processedAt
-- **类型**: number
-- **目的**: 申请处理时间戳
-- **数据来源**: 处理时的当前时间
-- **更新频率**: 当申请被处理时
-- **计算决策**: StateMachine with computeValue
-- **理由**: 需要在状态转换时设置处理时间
-- **依赖关系**: ProcessExpelRequest交互
-- **计算方法**: 当status从pending转换时，设置为当前时间戳
-
-##### 属性: comment
-- **类型**: string
-- **目的**: 管理员处理意见
-- **数据来源**: ProcessExpelRequest交互载荷
-- **更新频率**: 当申请被处理时
-- **计算决策**: StateMachine with computeValue
-- **理由**: 需要在状态转换时设置处理意见
-- **依赖关系**: ProcessExpelRequest交互，载荷中的comment
-- **计算方法**: 当status转换时，从event.payload.comment设置
-
-#### 实体计算决策
-- **类型**: Transform
-- **来源**: InteractionEventEntity
-- **理由**: 踢人申请通过SubmitExpelRequest交互创建
-- **依赖关系**: SubmitExpelRequest交互事件，载荷数据，用户上下文
-- **计算方法**: 当SubmitExpelRequest触发时，创建申请记录并关联申请人和目标用户
+### Entity Computation Decision
+- **Type**: Transform
+- **Source**: InteractionEventEntity
+- **Reasoning**: 宿舍通过CreateDormitory交互创建
+- **Dependencies**: CreateDormitory交互事件、payload数据
+- **Calculation Method**: 当CreateDormitory交互触发时，创建新的Dormitory实体并从payload获取name和capacity
 
 ---
 
-## 关系分析
+## Entity: Bed
 
-### Relation: UserDormitoryRelation
+### Entity-Level Analysis
+- **Purpose**: 宿舍内的具体床位
+- **Creation Source**: 宿舍创建时自动生成对应数量的床位
+- **Update Requirements**: 基本不需要更新
+- **Deletion Strategy**: 随宿舍删除而删除
 
-#### 关系分析
-- **目的**: 连接用户和宿舍，表示居住关系
-- **创建**: 通过AssignUserToDormitory交互在现有实体间创建
-- **删除需求**: 当用户被踢出时需要删除(硬删除，不需审计)
-- **更新需求**: 分配时间属性无需更新
-- **状态管理**: 无需状态(存在即表示分配)
-- **计算决策**: StateMachine
-- **理由**: 关系需要删除能力，Transform单独无法删除
-- **依赖关系**: AssignUserToDormitory交互(创建)，ProcessExpelRequest交互(删除)，现有User和Dormitory实体
-- **计算方法**: AssignUserToDormitory时创建关系，ProcessExpelRequest批准时删除关系(硬删除)
+### Property Analysis
 
-### Relation: UserBedRelation
+#### Property: id
+- **Type**: string
+- **Purpose**: 床位唯一标识符
+- **Data Source**: 系统生成
+- **Update Frequency**: Never
+- **Computation Decision**: None (系统处理)
+- **Reasoning**: 框架自动生成的ID字段
 
-#### 关系分析
-- **目的**: 连接用户和床位，表示具体床位占用
-- **创建**: 通过AssignUserToDormitory交互在现有实体间创建
-- **删除需求**: 当用户被踢出时需要删除(硬删除，不需审计)
-- **更新需求**: 分配时间属性无需更新
-- **状态管理**: 无需状态(存在即表示占用)
-- **计算决策**: StateMachine
-- **理由**: 关系需要删除能力，Transform单独无法删除
-- **依赖关系**: AssignUserToDormitory交互(创建)，ProcessExpelRequest交互(删除)，现有User和Bed实体
-- **计算方法**: AssignUserToDormitory时创建关系，ProcessExpelRequest批准时删除关系(硬删除)
+#### Property: number
+- **Type**: number
+- **Purpose**: 床位号（1-6）
+- **Data Source**: 床位创建时分配
+- **Update Frequency**: Never
+- **Computation Decision**: None
+- **Reasoning**: 创建时设置的固定值
 
-### Relation: DormitoryBedRelation
+#### Property: isOccupied
+- **Type**: boolean
+- **Purpose**: 床位是否被占用
+- **Data Source**: 是否存在活跃的用户-床位关系
+- **Update Frequency**: 用户分配或释放床位时自动更新
+- **Computation Decision**: Any
+- **Reasoning**: 检查是否存在任何活跃的用户关系
+- **Dependencies**: UserBedRelation (direction: target), relation status属性
+- **Calculation Method**: Check if any UserBedRelation exists where target=this bed and status='active'
 
-#### 关系分析
-- **目的**: 连接宿舍和床位，表示床位归属
-- **创建**: 床位创建时自动建立关系
-- **删除需求**: 从不删除(保持宿舍-床位结构)
-- **更新需求**: 无属性需要更新
-- **状态管理**: 无需状态管理
-- **计算决策**: 无
-- **理由**: 关系随床位创建时自动建立，通过实体引用创建
-- **依赖关系**: 无(床位创建时自动建立)
-- **计算方法**: 无(自动建立)
+#### Property: createdAt
+- **Type**: number
+- **Purpose**: 床位创建时间戳
+- **Data Source**: 床位创建时系统时间
+- **Update Frequency**: Never
+- **Computation Decision**: None (defaultValue函数)
+- **Reasoning**: 创建时设置的时间戳
 
-### Relation: DormitoryHeadRelation
-
-#### 关系分析
-- **目的**: 连接宿舍和宿舍长，表示管理关系
-- **创建**: 通过AssignDormitoryHead交互在现有实体间创建
-- **删除需求**: 当取消宿舍长或宿舍长被踢出时需要删除
-- **更新需求**: 任命时间属性无需更新
-- **状态管理**: 无需状态(存在即表示管理关系)
-- **计算决策**: StateMachine
-- **理由**: 关系需要删除能力(取消宿舍长或踢出宿舍长时)
-- **依赖关系**: AssignDormitoryHead交互(创建)，ProcessExpelRequest交互(删除，如果踢出的是宿舍长)
-- **计算方法**: AssignDormitoryHead时创建关系，相关用户被踢出时删除关系
-
-### Relation: UserScoreRecordRelation
-
-#### 关系分析
-- **目的**: 连接用户和扣分记录，表示扣分历史
-- **创建**: 扣分记录创建时自动建立关系
-- **删除需求**: 从不删除(保持扣分历史)
-- **更新需求**: 无属性需要更新
-- **状态管理**: 无需状态管理
-- **计算决策**: 无
-- **理由**: 关系随扣分记录创建时自动建立，通过实体引用创建
-- **依赖关系**: 无(扣分记录创建时自动建立)
-- **计算方法**: 无(自动建立)
-
-### Relation: ScoreRecordDeductorRelation
-
-#### 关系分析
-- **目的**: 连接扣分记录和执行扣分的用户，表示操作责任
-- **创建**: 扣分记录创建时自动建立关系
-- **删除需求**: 从不删除(保持操作历史)
-- **更新需求**: 无属性需要更新
-- **状态管理**: 无需状态管理
-- **计算决策**: 无
-- **理由**: 关系随扣分记录创建时自动建立，通过实体引用(event.user)创建
-- **依赖关系**: 无(扣分记录创建时自动建立)
-- **计算方法**: 无(自动建立)
-
-### Relation: ApplicantExpelRequestRelation
-
-#### 关系分析
-- **目的**: 连接踢人申请和申请人，表示申请责任
-- **创建**: 踢人申请创建时自动建立关系
-- **删除需求**: 从不删除(保持申请历史)
-- **更新需求**: 无属性需要更新
-- **状态管理**: 无需状态管理
-- **计算决策**: 无
-- **理由**: 关系随踢人申请创建时自动建立，通过实体引用(event.user)创建
-- **依赖关系**: 无(踢人申请创建时自动建立)
-- **计算方法**: 无(自动建立)
-
-### Relation: TargetExpelRequestRelation
-
-#### 关系分析
-- **目的**: 连接踢人申请和被申请踢出的用户
-- **创建**: 踢人申请创建时自动建立关系
-- **删除需求**: 从不删除(保持申请历史)
-- **更新需求**: 无属性需要更新
-- **状态管理**: 无需状态管理
-- **计算决策**: 无
-- **理由**: 关系随踢人申请创建时自动建立，通过实体引用(payload.targetUserId)创建
-- **依赖关系**: 无(踢人申请创建时自动建立)
-- **计算方法**: 无(自动建立)
-
-### Relation: ProcessorExpelRequestRelation
-
-#### 关系分析
-- **目的**: 连接踢人申请和处理申请的管理员，表示处理责任
-- **创建**: 踢人申请被处理时建立关系
-- **删除需求**: 从不删除(保持处理历史)
-- **更新需求**: 无属性需要更新
-- **状态管理**: 无需状态管理
-- **计算决策**: StateMachine
-- **理由**: 关系需要在申请处理时创建，不是在申请创建时
-- **依赖关系**: ProcessExpelRequest交互，处理申请的用户(event.user)
-- **计算方法**: ProcessExpelRequest触发时创建关系，连接申请和处理者
+### Entity Computation Decision
+- **Type**: Transform
+- **Source**: InteractionEventEntity
+- **Reasoning**: 床位在CreateDormitory交互时自动创建多个
+- **Dependencies**: CreateDormitory交互事件、宿舍容量信息
+- **Calculation Method**: 当CreateDormitory交互触发时，根据capacity数量创建对应的Bed实体（number从1到capacity）
 
 ---
 
-## 过滤实体分析
+## Entity: DeductionRule
 
-### Entity: ActiveUser
+### Entity-Level Analysis
+- **Purpose**: 扣分规则的定义和管理
+- **Creation Source**: CreateDeductionRule交互
+- **Update Requirements**: 规则名称、描述、分数和启用状态
+- **Deletion Strategy**: 软删除使用isActive字段（保留历史规则）
 
-#### 实体层级分析
-- **目的**: 过滤出状态为active的用户
-- **来源实体**: User
-- **过滤条件**: status = 'active'
-- **计算决策**: 无(过滤实体不需要计算)
-- **理由**: 过滤实体自动跟随源实体变化
+### Property Analysis
 
-### Entity: AvailableBed
+#### Property: id
+- **Type**: string
+- **Purpose**: 规则唯一标识符
+- **Data Source**: 系统生成
+- **Update Frequency**: Never
+- **Computation Decision**: None (系统处理)
+- **Reasoning**: 框架自动生成的ID字段
 
-#### 实体层级分析
-- **目的**: 过滤出状态为available的床位
-- **来源实体**: Bed
-- **过滤条件**: status = 'available'
-- **计算决策**: 无(过滤实体不需要计算)
-- **理由**: 过滤实体自动跟随源实体变化
+#### Property: name
+- **Type**: string
+- **Purpose**: 规则名称
+- **Data Source**: CreateDeductionRule或UpdateDeductionRule交互
+- **Update Frequency**: UpdateDeductionRule交互
+- **Computation Decision**: None
+- **Reasoning**: 简单字段，直接设置和更新
 
-### Entity: PendingExpelRequest
+#### Property: description
+- **Type**: string
+- **Purpose**: 规则详细描述
+- **Data Source**: CreateDeductionRule或UpdateDeductionRule交互
+- **Update Frequency**: UpdateDeductionRule交互
+- **Computation Decision**: None
+- **Reasoning**: 简单字段，直接设置和更新
 
-#### 实体层级分析
-- **目的**: 过滤出状态为pending的踢人申请
-- **来源实体**: ExpelRequest
-- **过滤条件**: status = 'pending'
-- **计算决策**: 无(过滤实体不需要计算)
-- **理由**: 过滤实体自动跟随源实体变化
+#### Property: points
+- **Type**: number
+- **Purpose**: 扣分数值
+- **Data Source**: CreateDeductionRule或UpdateDeductionRule交互
+- **Update Frequency**: UpdateDeductionRule交互
+- **Computation Decision**: None
+- **Reasoning**: 简单数值字段，通过交互设置
 
-### Entity: LowScoreUser
+#### Property: isActive
+- **Type**: boolean
+- **Purpose**: 规则是否启用
+- **Data Source**: 规则状态管理
+- **Update Frequency**: DisableDeductionRule交互
+- **Computation Decision**: StateMachine
+- **Reasoning**: 有明确的状态转换（active→inactive），状态变更影响规则使用
+- **Dependencies**: DisableDeductionRule交互、当前isActive值
+- **Calculation Method**: true→false (DisableDeductionRule触发时)
 
-#### 实体层级分析
-- **目的**: 过滤出分数低于60分的活跃用户
-- **来源实体**: User
-- **过滤条件**: score < 60 AND status = 'active'
-- **计算决策**: 无(过滤实体不需要计算)
-- **理由**: 过滤实体自动跟随源实体变化
+#### Property: usageCount
+- **Type**: number
+- **Purpose**: 基于此规则的扣分记录总数
+- **Data Source**: 相关扣分记录计数
+- **Update Frequency**: 扣分记录创建时自动更新
+- **Computation Decision**: Count
+- **Reasoning**: 需要计算使用此规则的扣分记录数量
+- **Dependencies**: DeductionRuleRecordRelation (direction: source)
+- **Calculation Method**: Count DeductionRuleRecordRelation records where source=this rule
+
+#### Property: totalPointsDeducted
+- **Type**: number
+- **Purpose**: 基于此规则的总扣分数
+- **Data Source**: 相关有效扣分记录的分数总和
+- **Update Frequency**: 扣分记录创建或取消时自动更新
+- **Computation Decision**: Summation
+- **Reasoning**: 需要对基于此规则的有效扣分求和
+- **Dependencies**: DeductionRuleRecordRelation (direction: source), DeductionRecord实体 (points属性, status属性)
+- **Calculation Method**: Sum of DeductionRecord.points for related records where DeductionRecord.status='active'
+
+#### Property: createdAt
+- **Type**: number
+- **Purpose**: 规则创建时间戳
+- **Data Source**: CreateDeductionRule交互时系统时间
+- **Update Frequency**: Never
+- **Computation Decision**: None (defaultValue函数)
+- **Reasoning**: 创建时设置的时间戳
+
+### Entity Computation Decision
+- **Type**: Transform
+- **Source**: InteractionEventEntity
+- **Reasoning**: 扣分规则通过CreateDeductionRule交互创建
+- **Dependencies**: CreateDeductionRule交互事件、payload数据
+- **Calculation Method**: 当CreateDeductionRule交互触发时，创建新的DeductionRule实体并从payload获取规则信息
 
 ---
 
-## 状态节点声明清单
+## Entity: DeductionRecord
 
-### User实体所需状态节点
+### Entity-Level Analysis
+- **Purpose**: 具体的扣分记录
+- **Creation Source**: RecordDeduction交互
+- **Update Requirements**: 状态变更（active↔cancelled）
+- **Deletion Strategy**: 软删除使用status字段（保留扣分历史）
+
+### Property Analysis
+
+#### Property: id
+- **Type**: string
+- **Purpose**: 记录唯一标识符
+- **Data Source**: 系统生成
+- **Update Frequency**: Never
+- **Computation Decision**: None (系统处理)
+- **Reasoning**: 框架自动生成的ID字段
+
+#### Property: reason
+- **Type**: string
+- **Purpose**: 具体扣分原因
+- **Data Source**: RecordDeduction交互payload
+- **Update Frequency**: Never（扣分原因不可修改）
+- **Computation Decision**: None
+- **Reasoning**: 创建时设置的不可变字段
+
+#### Property: points
+- **Type**: number
+- **Purpose**: 扣分数值
+- **Data Source**: 从关联的扣分规则继承
+- **Update Frequency**: Never（从规则继承后不变）
+- **Computation Decision**: Transform中设置
+- **Reasoning**: 创建时从DeductionRule获取points值
+
+#### Property: status
+- **Type**: string
+- **Purpose**: 记录状态（active/cancelled）
+- **Data Source**: 扣分记录状态管理
+- **Update Frequency**: CancelDeduction交互
+- **Computation Decision**: StateMachine
+- **Reasoning**: 有明确的状态转换（active→cancelled），状态变更影响总扣分计算
+- **Dependencies**: CancelDeduction交互、当前status值
+- **Calculation Method**: active→cancelled (CancelDeduction触发时)
+
+#### Property: createdAt
+- **Type**: number
+- **Purpose**: 记录创建时间戳
+- **Data Source**: RecordDeduction交互时系统时间
+- **Update Frequency**: Never
+- **Computation Decision**: None (defaultValue函数)
+- **Reasoning**: 创建时设置的时间戳
+
+### Entity Computation Decision
+- **Type**: Transform
+- **Source**: InteractionEventEntity
+- **Reasoning**: 扣分记录通过RecordDeduction交互创建
+- **Dependencies**: RecordDeduction交互事件、payload数据、相关的DeductionRule实体
+- **Calculation Method**: 当RecordDeduction交互触发时，创建新的DeductionRecord实体，从payload获取reason，从相关规则获取points
+
+---
+
+## Entity: KickoutRequest
+
+### Entity-Level Analysis
+- **Purpose**: 踢出学生的申请记录
+- **Creation Source**: CreateKickoutRequest交互
+- **Update Requirements**: 状态变更和处理时间更新
+- **Deletion Strategy**: 不删除（保留完整申请历史）
+
+### Property Analysis
+
+#### Property: id
+- **Type**: string
+- **Purpose**: 申请唯一标识符
+- **Data Source**: 系统生成
+- **Update Frequency**: Never
+- **Computation Decision**: None (系统处理)
+- **Reasoning**: 框架自动生成的ID字段
+
+#### Property: reason
+- **Type**: string
+- **Purpose**: 申请理由
+- **Data Source**: CreateKickoutRequest交互payload
+- **Update Frequency**: Never（申请理由不可修改）
+- **Computation Decision**: None
+- **Reasoning**: 创建时设置的不可变字段
+
+#### Property: status
+- **Type**: string
+- **Purpose**: 申请状态（pending/approved/rejected）
+- **Data Source**: 申请处理结果
+- **Update Frequency**: ApproveKickoutRequest、RejectKickoutRequest交互
+- **Computation Decision**: StateMachine
+- **Reasoning**: 有明确的状态转换（pending→approved/rejected），状态变更触发不同业务逻辑
+- **Dependencies**: ApproveKickoutRequest交互、RejectKickoutRequest交互、当前status值
+- **Calculation Method**: pending→approved (ApproveKickoutRequest), pending→rejected (RejectKickoutRequest)
+
+#### Property: createdAt
+- **Type**: number
+- **Purpose**: 申请创建时间戳
+- **Data Source**: CreateKickoutRequest交互时系统时间
+- **Update Frequency**: Never
+- **Computation Decision**: None (defaultValue函数)
+- **Reasoning**: 创建时设置的时间戳
+
+#### Property: processedAt
+- **Type**: number
+- **Purpose**: 申请处理时间戳
+- **Data Source**: 申请处理时系统时间
+- **Update Frequency**: ApproveKickoutRequest、RejectKickoutRequest交互
+- **Computation Decision**: StateMachine with computeValue
+- **Reasoning**: 状态变更时需要记录处理时间
+- **Dependencies**: ApproveKickoutRequest交互、RejectKickoutRequest交互
+- **Calculation Method**: 设置为Date.now()当任何处理状态转换发生时
+
+### Entity Computation Decision
+- **Type**: Transform
+- **Source**: InteractionEventEntity
+- **Reasoning**: 踢出申请通过CreateKickoutRequest交互创建
+- **Dependencies**: CreateKickoutRequest交互事件、payload数据
+- **Calculation Method**: 当CreateKickoutRequest交互触发时，创建新的KickoutRequest实体并从payload获取reason
+
+---
+
+## Relation: UserDormitoryRelation
+
+### Relation Analysis
+- **Purpose**: 用户分配到宿舍的关系
+- **Creation**: AssignUserToDormitory交互创建
+- **Deletion Requirements**: 软删除当用户被踢出或重新分配时
+- **Update Requirements**: 状态变更（active↔inactive）
+- **State Management**: 使用status字段管理状态（保留分配历史）
+- **Computation Decision**: Transform + status StateMachine
+- **Reasoning**: 需要创建关系并支持软删除以保留审计跟踪
+- **Dependencies**: AssignUserToDormitory交互（创建）, ApproveKickoutRequest交互（状态变更）, RemoveUserFromDormitory交互（状态变更）
+- **Calculation Method**: 通过AssignUserToDormitory创建，通过踢出或移除操作将status设为inactive
+
+---
+
+## Relation: UserBedRelation
+
+### Relation Analysis
+- **Purpose**: 用户分配到具体床位的关系
+- **Creation**: AssignUserToDormitory交互同时创建
+- **Deletion Requirements**: 软删除当用户被踢出或重新分配时
+- **Update Requirements**: 状态变更（active↔inactive）
+- **State Management**: 使用status字段管理状态（保留床位历史）
+- **Computation Decision**: Transform + status StateMachine
+- **Reasoning**: 需要创建关系并支持软删除以保留床位使用历史
+- **Dependencies**: AssignUserToDormitory交互（创建）, ApproveKickoutRequest交互（状态变更）, RemoveUserFromDormitory交互（状态变更）
+- **Calculation Method**: 通过AssignUserToDormitory创建，通过踢出或移除操作将status设为inactive
+
+---
+
+## Relation: DormitoryBedRelation
+
+### Relation Analysis
+- **Purpose**: 床位归属于特定宿舍
+- **Creation**: 宿舍和床位创建时自动建立
+- **Deletion Requirements**: 随宿舍删除而删除
+- **Update Requirements**: 无
+- **State Management**: 无需状态管理
+- **Computation Decision**: None
+- **Reasoning**: 关系在实体创建时自动建立，无需额外计算
+- **Dependencies**: N/A（实体引用自动创建）
+- **Calculation Method**: N/A（实体引用自动创建）
+
+---
+
+## Relation: DormitoryHeadRelation
+
+### Relation Analysis
+- **Purpose**: 宿舍长与宿舍的管理关系
+- **Creation**: AssignDormHead交互创建
+- **Deletion Requirements**: 软删除当宿舍长被撤职时
+- **Update Requirements**: 状态变更和任命时间记录
+- **State Management**: 使用status字段管理状态（保留任职历史）
+- **Computation Decision**: Transform + status StateMachine
+- **Reasoning**: 需要创建关系并支持软删除以保留任职历史
+- **Dependencies**: AssignDormHead交互（创建）, RemoveDormHead交互（状态变更）
+- **Calculation Method**: 通过AssignDormHead创建，通过RemoveDormHead将status设为inactive
+
+---
+
+## Relation: UserDeductionRecordRelation
+
+### Relation Analysis
+- **Purpose**: 扣分记录归属于特定用户
+- **Creation**: RecordDeduction交互时自动创建
+- **Deletion Requirements**: 不删除（保留完整扣分历史）
+- **Update Requirements**: 无
+- **State Management**: 无需状态管理
+- **Computation Decision**: None
+- **Reasoning**: 关系在扣分记录创建时自动建立
+- **Dependencies**: N/A（实体引用自动创建）
+- **Calculation Method**: N/A（实体引用自动创建）
+
+---
+
+## Relation: DeductionRuleRecordRelation
+
+### Relation Analysis
+- **Purpose**: 扣分记录基于特定规则
+- **Creation**: RecordDeduction交互时自动创建
+- **Deletion Requirements**: 不删除（保留规则应用历史）
+- **Update Requirements**: 无
+- **State Management**: 无需状态管理
+- **Computation Decision**: None
+- **Reasoning**: 关系在扣分记录创建时自动建立
+- **Dependencies**: N/A（实体引用自动创建）
+- **Calculation Method**: N/A（实体引用自动创建）
+
+---
+
+## Relation: RecorderDeductionRelation
+
+### Relation Analysis
+- **Purpose**: 记录谁进行了扣分操作
+- **Creation**: RecordDeduction交互时自动创建
+- **Deletion Requirements**: 不删除（保留操作历史）
+- **Update Requirements**: 无
+- **State Management**: 无需状态管理
+- **Computation Decision**: None
+- **Reasoning**: 关系在扣分记录创建时自动建立
+- **Dependencies**: N/A（实体引用自动创建）
+- **Calculation Method**: N/A（实体引用自动创建）
+
+---
+
+## Relation: ApplicantKickoutRelation
+
+### Relation Analysis
+- **Purpose**: 踢出申请的申请人
+- **Creation**: CreateKickoutRequest交互时自动创建
+- **Deletion Requirements**: 不删除（保留申请历史）
+- **Update Requirements**: 无
+- **State Management**: 无需状态管理
+- **Computation Decision**: None
+- **Reasoning**: 关系在踢出申请创建时自动建立
+- **Dependencies**: N/A（实体引用自动创建）
+- **Calculation Method**: N/A（实体引用自动创建）
+
+---
+
+## Relation: TargetKickoutRelation
+
+### Relation Analysis
+- **Purpose**: 踢出申请的目标用户
+- **Creation**: CreateKickoutRequest交互时自动创建
+- **Deletion Requirements**: 不删除（保留申请历史）
+- **Update Requirements**: 无
+- **State Management**: 无需状态管理
+- **Computation Decision**: None
+- **Reasoning**: 关系在踢出申请创建时自动建立
+- **Dependencies**: N/A（实体引用自动创建）
+- **Calculation Method**: N/A（实体引用自动创建）
+
+---
+
+## Relation: ProcessorKickoutRelation
+
+### Relation Analysis
+- **Purpose**: 踢出申请的处理人
+- **Creation**: ApproveKickoutRequest或RejectKickoutRequest交互时创建
+- **Deletion Requirements**: 不删除（保留处理历史）
+- **Update Requirements**: 无
+- **State Management**: 无需状态管理
+- **Computation Decision**: Transform
+- **Reasoning**: 关系在申请处理时创建，建立处理人与申请的关联
+- **Dependencies**: ApproveKickoutRequest交互、RejectKickoutRequest交互、申请实体
+- **Calculation Method**: 当申请处理交互触发时，创建处理人与申请的关系
+
+---
+
+## 实现注意事项
+
+### StateNode声明优先级
+在实现StateMachine计算之前，必须先声明所需的StateNode：
+
 ```typescript
-// 角色状态节点
-const studentState = StateNode.create({ name: 'student' });
-const dormHeadState = StateNode.create({ name: 'dormHead' });
-const adminState = StateNode.create({ name: 'admin' });
-
-// 用户状态节点
+// 1. 首先声明所有StateNode
 const activeUserState = StateNode.create({ name: 'active' });
-const expelledUserState = StateNode.create({ name: 'expelled' });
+const kickedUserState = StateNode.create({ name: 'kicked' });
 
-// 分数更新状态节点
-const scoreInitialState = StateNode.create({ name: 'initial' });
-const scoreUpdatedState = StateNode.create({ 
-  name: 'updated',
-  computeValue: async function(this: Controller, event) {
-    // 计算新分数 = 当前分数 - 扣分
-    const currentScore = this.getCurrentRecord()?.score || 100;
-    const deductedPoints = event.payload.points;
-    return Math.max(0, currentScore - deductedPoints);
-  }
-});
+const studentRoleState = StateNode.create({ name: 'student' });
+const dormHeadRoleState = StateNode.create({ name: 'dormHead' });
+
+const activeDeductionState = StateNode.create({ name: 'active' });
+const cancelledDeductionState = StateNode.create({ name: 'cancelled' });
+
+const pendingRequestState = StateNode.create({ name: 'pending' });
+const approvedRequestState = StateNode.create({ name: 'approved' });
+const rejectedRequestState = StateNode.create({ name: 'rejected' });
+
+// 2. 然后在实体和属性中使用这些StateNode
 ```
 
-### Bed实体所需状态节点
-```typescript
-// 床位状态节点
-const availableBedState = StateNode.create({ name: 'available' });
-const occupiedBedState = StateNode.create({ name: 'occupied' });
-```
+### 计算类型使用规则
+- **Transform**: 仅用于Entity和Relation的computation
+- **StateMachine**: 仅用于Property的computation
+- **Count/Summation/Any**: 仅用于Property的computation
+- **computed**: 仅用于Property定义时的简单计算
 
-### ExpelRequest实体所需状态节点
-```typescript
-// 申请状态节点
-const pendingState = StateNode.create({ name: 'pending' });
-const approvedState = StateNode.create({ 
-  name: 'approved',
-  computeValue: () => ({
-    processedAt: Math.floor(Date.now()/1000)
-  })
-});
-const rejectedState = StateNode.create({ 
-  name: 'rejected',
-  computeValue: () => ({
-    processedAt: Math.floor(Date.now()/1000)
-  })
-});
-```
+### 依赖关系管理
+- 确保所有计算的依赖实体和关系都已定义
+- 避免循环依赖
+- 按依赖顺序排列实体和关系定义
 
-### 关系所需状态节点
-```typescript
-// 关系存在/删除状态节点
-const relationExistsState = StateNode.create({
-  name: 'exists',
-  computeValue: () => ({}) // 关系存在
-});
+### 软删除vs硬删除选择
+- **硬删除**: 用于不需要历史记录的场景（如Bed实体）
+- **软删除**: 用于需要审计跟踪的场景（如用户分配关系）
 
-const relationDeletedState = StateNode.create({
-  name: 'deleted',
-  computeValue: () => null // 返回null删除关系
-});
-```
-
----
-
-## 计算类型依赖关系总结
-
-### Transform计算
-- **User实体**: InteractionEventEntity (CreateUser)
-- **Dormitory实体**: InteractionEventEntity (CreateDormitory)
-- **Bed实体**: Dormitory实体 (宿舍创建时)
-- **ScoreRecord实体**: InteractionEventEntity (DeductUserScore)
-- **ExpelRequest实体**: InteractionEventEntity (SubmitExpelRequest)
-
-### StateMachine计算
-- **User.role**: AssignDormitoryHead交互
-- **User.score**: DeductUserScore交互，当前分数值
-- **User.status**: ProcessExpelRequest交互
-- **Bed.status**: AssignUserToDormitory交互，ProcessExpelRequest交互
-- **ExpelRequest.status**: ProcessExpelRequest交互
-- **ExpelRequest.processedAt**: ProcessExpelRequest交互
-- **ExpelRequest.comment**: ProcessExpelRequest交互
-- **关系生命周期**: 相关的创建和删除交互
-
-### Count计算
-- **Dormitory.occupiedCount**: DormitoryBedRelation，Bed.status属性
-
-### computed函数
-- **Dormitory.availableCount**: capacity和occupiedCount属性
-
----
-
-## 实现验证清单
-
-- [x] 所有实体已分析并记录
-- [x] 所有属性已分析并记录
-- [x] 实体层级Transform在需要时定义
-- [x] 属性计算根据分析实现
-- [x] 所有计算的依赖关系已记录
-- [x] 所有计算的计算方法已记录
-- [x] StateNode变量在使用前声明
-- [x] Transform未用于属性计算
-- [x] 无循环依赖
-- [x] 所有计算属性提供默认值
-- [x] 分析文档已保存到`docs/computation-analysis.md`
-
----
-
-## 关键实现注意事项
-
-### 🔴 关键关系删除模式
-1. **UserDormitoryRelation**: 使用硬删除StateMachine - 踢出用户时不需要保留分配历史
-2. **UserBedRelation**: 使用硬删除StateMachine - 床位释放时直接删除关系
-3. **DormitoryHeadRelation**: 使用硬删除StateMachine - 宿舍长变更时直接删除旧关系
-
-### 🔴 状态机设计原则
-1. **用户分数更新**: 使用computeValue动态计算新分数，避免手动同步
-2. **床位状态联动**: 床位状态变更需要与关系创建/删除同步
-3. **申请处理**: 处理时间和意见通过computeValue设置，确保数据一致性
-
-### 🔴 计算性能优化
-1. **Count计算**: Dormitory.occupiedCount使用索引优化床位状态查询
-2. **过滤实体**: 为常用查询(活跃用户、可用床位)创建过滤实体
-3. **computed属性**: availableCount使用简单减法避免额外查询
-
-此分析确保了宿舍管理系统的所有计算需求都有明确的实现方案，为后续的代码生成提供了完整的指导。
+这个分析为后续的代码实现提供了详细的指导，确保每个计算都有明确的业务逻辑和实现方案。

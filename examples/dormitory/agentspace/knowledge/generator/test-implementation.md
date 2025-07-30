@@ -375,6 +375,7 @@ This is especially useful when:
 - Debugging permission/condition check failures  
 - Understanding payload validation errors
 
+The interaqt framework implements its own Error subclasses with a nested structure. Errors are wrapped layer by layer, with each layer adding context about where and why the error occurred. 
 
 ## 🔴 CRITICAL: User Authentication Handling
 **interaqt does NOT handle user authentication**. This is a fundamental principle:

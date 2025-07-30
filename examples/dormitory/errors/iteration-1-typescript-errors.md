@@ -1,23 +1,26 @@
-# 错误记录 - 第1轮修复
+# Iteration 1: TypeScript Compilation Errors
 
-## 问题总结
+## Error Summary
+TypeScript compilation failed with 19 errors related to using string literals instead of Interaction instances in StateTransfer trigger properties.
 
-### 错误类型
-TypeScript 编译错误：在 StateTransfer 的 trigger 中使用字符串而不是 Interaction 实例
+## Root Cause
+In StateTransfer.create(), the `trigger` parameter expects an `InteractionInstance`, but I was using string names like 'AssignDormHead' instead of the actual Interaction objects.
 
-### 根本原因
-1. StateTransfer.trigger 需要引用实际的 Interaction 实例，而不是字符串名称
-2. Transform.record 在某些地方使用了字符串而不是实体引用
-3. 循环依赖问题：在定义实体时引用还未定义的交互
+Similarly, in Count.create() and Summation.create(), the `record` parameter expects `EntityInstance | RelationInstance`, but I was using string names like 'UserDormitoryRelation'.
 
-### 具体错误
-- `backend/index.ts(101,13): error TS2322: Type 'string' is not assignable to type 'InteractionInstance'.`
-- 多个类似错误，都涉及到 trigger 属性使用字符串
+## Specific Errors
+1. **Lines 122, 128, 160**: Using string 'AssignDormHead', 'RemoveDormHead', 'ApproveKickoutRequest' instead of actual Interaction instances
+2. **Lines 185, 217, 265**: Using string 'UserDormitoryRelation', 'UserBedRelation' instead of actual Relation instances
+3. **Lines 320, 333, 342**: Similar pattern repeated in other entities
+4. **Lines 392, 448, 454, 484, 490**: More instances of string vs Interaction issues
+5. **Lines 538, 572, 631, 665, 745**: Additional StateTransfer trigger errors
 
-### 修复方法
-1. 将 StateTransfer 中的字符串 trigger 改为引用实际的 Interaction 实例
-2. 需要重新组织代码结构，确保 Interactions 在 StateMachine 使用前已定义
-3. 使用正确的实体引用而不是字符串
+## Fix Strategy
+1. Replace all string trigger names with actual Interaction instances
+2. Replace all string record names with actual Entity/Relation instances  
+3. Ensure proper forward declaration order since Interactions are defined after Entities/Relations
 
-### 状态
-需要修复
+## Next Steps
+- Need to reorganize code structure to handle forward references
+- Consider using forward declaration pattern or restructuring the file organization
+- Apply fixes systematically to all affected StateTransfer and computation instances

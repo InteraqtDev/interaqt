@@ -87,7 +87,6 @@ const fullName = Property.create({
 const postCount = Property.create({
     name: 'postCount',
     type: 'number',
-    defaultValue: () => 0,  // Must provide default value
     computation: Count.create({
         record: UserPostRelation
     })
@@ -193,7 +192,6 @@ const totalUsers = Count.create({
 const userPostCount = Property.create({
     name: 'postCount',
     type: 'number',
-    defaultValue: () => 0,  // Must provide default value
     computation: Count.create({
         record: UserPostRelation
     })
@@ -203,7 +201,6 @@ const userPostCount = Property.create({
 const publishedPostCount = Property.create({
     name: 'publishedPostCount',
     type: 'number',
-    defaultValue: () => 0,
     computation: Count.create({
         record: UserPostRelation,
         attributeQuery: [['target', {attributeQuery: ['status']}]],
@@ -222,7 +219,6 @@ const minScoreThreshold = Dictionary.create({
 const highScorePostCount = Property.create({
     name: 'highScorePostCount',
     type: 'number',
-    defaultValue: () => 0,
     computation: Count.create({
         record: UserPostRelation,
         attributeQuery: [['target', {attributeQuery: ['score']}]],
@@ -268,7 +264,6 @@ const activeUsersCount = Dictionary.create({
 const authorPostCount = Property.create({
     name: 'authoredPostCount',
     type: 'number',
-    defaultValue: () => 0,
     computation: Count.create({
         record: UserPostRelation,
         direction: 'target'  // Count related posts from user perspective
@@ -296,7 +291,6 @@ WeightedSummation.create(config: WeightedSummationConfig): WeightedSummationInst
 const userTotalScore = Property.create({
     name: 'totalScore',
     type: 'number',
-    defaultValue: () => 0,  // Must provide default value
     computation: WeightedSummation.create({
         record: UserScoreRelation,
         callback: function(scoreRecord) {
@@ -355,7 +349,6 @@ const totalRevenue = Dictionary.create({
 const userTotalSpent = Property.create({
     name: 'totalSpent',
     type: 'number',
-    defaultValue: () => 0,  // Must provide default value
     computation: Summation.create({
         record: UserOrderRelation,
         attributeQuery: [['target', {attributeQuery: ['totalAmount']}]]
@@ -366,7 +359,6 @@ const userTotalSpent = Property.create({
 const departmentBudget = Property.create({
     name: 'totalBudget',
     type: 'number',
-    defaultValue: () => 0,
     computation: Summation.create({
         record: DepartmentProjectRelation,
         attributeQuery: [['target', {
@@ -381,7 +373,6 @@ const departmentBudget = Property.create({
 const totalShippingCost = Property.create({
     name: 'totalShippingCost',
     type: 'number',
-    defaultValue: () => 0,
     computation: Summation.create({
         record: OrderShipmentRelation,
         attributeQuery: ['shippingFee']  // Relation's own property
@@ -428,7 +419,6 @@ const OrderItem = Entity.create({
 const orderTotal = Property.create({
     name: 'total',
     type: 'number',
-    defaultValue: () => 0,
     computation: Summation.create({
         record: OrderItemRelation,
         attributeQuery: [['target', {attributeQuery: ['finalPrice']}]]
@@ -457,7 +447,6 @@ Every.create(config: EveryConfig): EveryInstance
 const completedAllRequired = Property.create({
     name: 'completedAllRequired',
     type: 'boolean',
-    defaultValue: () => false,  // Must provide default value
     computation: Every.create({
         record: UserCourseRelation,
         callback: function(courseRelation) {
@@ -488,7 +477,6 @@ Any.create(config: AnyConfig): AnyInstance
 const hasPendingTasks = Property.create({
     name: 'hasPendingTasks',
     type: 'boolean',
-    defaultValue: () => false,  // Must provide default value
     computation: Any.create({
         record: UserTaskRelation,
         callback: function(taskRelation) {
@@ -1145,7 +1133,6 @@ const userCountDict = Dictionary.create({
     name: 'userCount',
     type: 'number',
     collection: false,
-    defaultValue: () => 0,
     computation: Count.create({
         record: User
     })
@@ -1180,7 +1167,6 @@ const activeUsers = Dictionary.create({
     name: 'activeUsers',
     type: 'string',
     collection: true,
-    defaultValue: () => [],
     computation: Transform.create({
         record: User,
         attributeQuery: ['id', 'lastLoginTime'],
@@ -1432,7 +1418,7 @@ StateTransfer.create(config: StateTransferConfig): StateTransferInstance
 ```
 
 **Parameters**
-- `config.trigger` (any, required): Trigger for the state transfer (usually an Interaction)
+- `config.trigger` (Interaction, required): The Interaction instance that triggers this state transfer. Must be a reference to an Interaction created with `Interaction.create()`
 - `config.current` (StateNode, required): Current state node
 - `config.next` (StateNode, required): Next state node
 - `config.computeTarget` (function, optional): Function to compute which records should undergo this state transition. Returns the target record(s) that should be affected by this state change.

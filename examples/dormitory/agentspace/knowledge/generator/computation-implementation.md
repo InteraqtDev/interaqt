@@ -25,12 +25,39 @@ const controller = new Controller({
 
 });
 
-// ✅ CORRECT: Using in computation field
+// ✅ CORRECT: Using in computation field (note: no defaultValue!)
 Property.create({
   name: 'userCount',
   type: 'number',
-  defaultValue: () => 0,
   computation: Count.create({ record: User })
+})
+```
+
+### 🔴 CRITICAL: defaultValue vs computation - MUTUALLY EXCLUSIVE!
+
+**A property can have EITHER `defaultValue` OR `computation`, but NEVER both!**
+
+```typescript
+// ❌ WRONG: Having both defaultValue and computation
+Property.create({
+  name: 'userCount',
+  type: 'number',
+  defaultValue: () => 0,  // ERROR! Remove this!
+  computation: Count.create({ record: User })
+})
+
+// ✅ CORRECT: Only computation (computation controls the value completely)
+Property.create({
+  name: 'userCount',
+  type: 'number',
+  computation: Count.create({ record: User })
+})
+
+// ✅ CORRECT: Only defaultValue (for static properties)
+Property.create({
+  name: 'status',
+  type: 'string',
+  defaultValue: () => 'draft'
 })
 ```
 
@@ -69,7 +96,6 @@ function updateLikeCount(postId) {
 Property.create({
   name: 'likeCount',
   type: 'number',
-  defaultValue: () => 0,
   computation: Count.create({
     record: LikeRelation  // Like count IS the count of relations
   })
@@ -201,9 +227,9 @@ When using `InteractionEventEntity` as the Transform input source, understand th
    Property.create({
      name: 'status',
      type: 'string',
-     defaultValue: () => 'active',
      computation: StateMachine.create({
        states: [activeState, deletedState],
+       defaultState: activeState,  // StateMachine controls initial value
        transfers: [
          StateTransfer.create({
            trigger: DeleteStyleInteraction,
@@ -416,6 +442,26 @@ export const StyleSnapshotRelation = Relation.create({
 
 Used for status changes and field updates.
 
+**🔴 IMPORTANT: StateTransfer Trigger Parameter**
+
+The `trigger` parameter in `StateTransfer.create()` must ALWAYS be an Interaction instance reference, NOT a string!
+
+```typescript
+// ❌ WRONG: Using string as trigger
+StateTransfer.create({
+  trigger: 'PublishStyle',  // ERROR! Don't use string!
+  current: draftState,
+  next: activeState
+})
+
+// ✅ CORRECT: Using Interaction instance reference
+StateTransfer.create({
+  trigger: PublishStyle,  // Correct! Reference to Interaction instance
+  current: draftState,
+  next: activeState
+})
+```
+
 #### Basic StateMachine
 ```typescript
 import { StateMachine, StateNode, StateTransfer } from 'interaqt';
@@ -450,11 +496,10 @@ const DeleteStyle = Interaction.create({
 Property.create({
   name: 'status',
   type: 'string',
-  defaultValue: () => 'draft',
   computation: StateMachine.create({
     name: 'StyleStatus',
     states: [draftState, activeState, offlineState],
-    defaultState: draftState,
+    defaultState: draftState,  // defaultState determines initial value
     transfers: [
       StateTransfer.create({
         current: draftState,
@@ -497,11 +542,10 @@ const updatedState = StateNode.create({
 Property.create({
   name: 'updatedAt',
   type: 'number',
-  defaultValue: () => Math.floor(Date.now()/1000),
   computation: StateMachine.create({
     name: 'UpdatedAt',
     states: [updatedState],
-    defaultState: updatedState,
+    defaultState: updatedState,  // computeValue in updatedState provides initial value
     transfers: [
       StateTransfer.create({
         current: updatedState,
@@ -561,11 +605,10 @@ const modifiedState = StateNode.create({
 Property.create({
   name: 'modificationInfo',
   type: 'object',
-  defaultValue: () => ({ previousModifications: [] }),
   computation: StateMachine.create({
     name: 'ModificationTracker',
     states: [modifiedState],
-    defaultState: modifiedState,
+    defaultState: modifiedState,  // computeValue in modifiedState handles initial value
     transfers: [
       StateTransfer.create({
         current: modifiedState,
@@ -634,7 +677,6 @@ const User = Entity.create({
     Property.create({
       name: 'styleCount',
       type: 'number',
-      defaultValue: () => 0,
       computation: Count.create({
         record: UserStyleRelation,
         direction: 'target'  // Count from user to styles
@@ -644,7 +686,6 @@ const User = Entity.create({
     Property.create({
       name: 'activeStyleCount',
       type: 'number',
-      defaultValue: () => 0,
       computation: Count.create({
         record: UserStyleRelation,
         direction: 'target',
@@ -685,7 +726,6 @@ const Order = Entity.create({
     Property.create({
       name: 'totalAmount',
       type: 'number',
-      defaultValue: () => 0,
       computation: WeightedSummation.create({
         record: OrderItemRelation,
         attributeQuery: [['target', { attributeQuery: ['quantity', 'price'] }]],
@@ -726,7 +766,6 @@ const Project = Entity.create({
     Property.create({
       name: 'isCompleted',
       type: 'boolean',
-      defaultValue: () => false,
       computation: Every.create({
         record: ProjectTaskRelation,
         callback: (relation) => relation.target.isCompleted === true
@@ -735,7 +774,6 @@ const Project = Entity.create({
     Property.create({
       name: 'hasCompletedTasks',
       type: 'boolean',
-      defaultValue: () => false,
       computation: Any.create({
         record: ProjectTaskRelation,
         callback: (relation) => relation.target.isCompleted === true
@@ -781,7 +819,6 @@ Before using Custom computation, ask yourself:
 Property.create({
   name: 'postCount',
   type: 'number',
-  defaultValue: () => 0,
   computation: Custom.create({
     name: 'SimplePostCount',
     dataDeps: {
@@ -814,7 +851,6 @@ Entity.create({
 Property.create({
   name: 'status',
   type: 'string',
-  defaultValue: () => 'active',
   computation: Custom.create({
     name: 'StatusUpdater',
     dataDeps: {
@@ -837,7 +873,6 @@ Property.create({
 const complexScoring = Dictionary.create({
   name: 'userEngagementScore',
   type: 'object',
-  defaultValue: () => ({}),
   computation: Custom.create({
     name: 'EngagementScorer',
     dataDeps: {
@@ -916,7 +951,6 @@ const complexScoring = Dictionary.create({
 const riskScoreCalculation = Dictionary.create({
   name: 'entityRiskScores',
   type: 'object',
-  defaultValue: () => ({}),
   computation: Custom.create({
     name: 'RiskScoreCalculator',
     dataDeps: {
@@ -1074,7 +1108,6 @@ const updatedState = StateNode.create({
 Property.create({
   name: 'updatedAt',
   type: 'number',
-  defaultValue: () => Math.floor(Date.now()/1000),
   computation: StateMachine.create({
     states: [updatedState],
     defaultState: updatedState,
@@ -1111,7 +1144,6 @@ const offlineState = StateNode.create({ name: 'offline' });
 Property.create({
   name: 'status',
   type: 'string',
-  defaultValue: () => 'active',
   computation: StateMachine.create({
     states: [activeState, offlineState],
     defaultState: activeState,
@@ -1135,14 +1167,17 @@ Property.create({
 - Use computed/getValue for simple property calculations
 - Keep computations pure and side-effect free
 - Declare StateNode variables before using them in StateMachine
+- Use Interaction instance references (not strings) as trigger in StateTransfer
 
 ### ❌ DON'T
 - Never use Transform in Property computation
+- **Don't use both defaultValue and computation on the same property** - they are mutually exclusive!
 - Don't create circular dependencies
 - Don't perform side effects in computations
 - Don't access external services in computations
 - Don't manually update computed values
 - Don't create StateNode inside StateTransfer
+- **Don't use strings as trigger in StateTransfer** - always use Interaction instance references
 
 ## What to Use Where
 
@@ -1176,7 +1211,6 @@ const updatedState = StateNode.create({
 Property.create({
   name: 'updatedAt',
   type: 'number',
-  defaultValue: () => Math.floor(Date.now()/1000),
   computation: StateMachine.create({
     states: [updatedState],
     defaultState: updatedState,

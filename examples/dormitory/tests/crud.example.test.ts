@@ -42,8 +42,7 @@ describe('Simple CRUD Example', () => {
       Property.create({
         name: 'status',
         type: 'string',
-        computation: ArticleLifecycleStateMachine,
-        defaultValue: () => 'draft'
+        computation: ArticleLifecycleStateMachine
       }),
       Property.create({
         name: 'isDeleted',
@@ -93,7 +92,6 @@ describe('Simple CRUD Example', () => {
     Property.create({
       name: 'articleCount',
       type: 'number',
-      defaultValue: () => 0,
       computation: Count.create({
         record: UserArticleRelation,
         direction: 'target'

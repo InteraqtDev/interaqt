@@ -547,7 +547,6 @@ Property.create({
 Property.create({
   name: 'totalRevenue',
   type: 'number',
-  defaultValue: () => 0,
   computation: Summation.create({
     record: OrderItemRelation,
     direction: 'source',  // Sum items for this order
@@ -559,7 +558,6 @@ Property.create({
 Property.create({
   name: 'totalAmount',
   type: 'number',
-  defaultValue: () => 0,
   computation: WeightedSummation.create({
     record: OrderItemRelation,
     direction: 'source',
@@ -600,7 +598,6 @@ import { Expression } from 'interaqt';
 Property.create({
   name: 'isRecentlyActive',
   type: 'boolean',
-  defaultValue: () => false,
   computation: RealTime.create({
     dataDeps: {
       _current: {
@@ -622,7 +619,6 @@ const currentTimestamp = Dictionary.create({
   name: 'currentTimestamp',
   type: 'number',
   collection: false,
-  defaultValue: () => 0,
   computation: RealTime.create({
     nextRecomputeTime: (now: number, dataDeps: any) => 1000, // Update every second
     callback: async (now: Expression, dataDeps: any) => {
@@ -637,7 +633,6 @@ const isAfterDeadline = Dictionary.create({
   name: 'isAfterDeadline',
   type: 'boolean',
   collection: false,
-  defaultValue: () => false,
   computation: RealTime.create({
     dataDeps: {
       config: {
@@ -659,7 +654,6 @@ const isExactMinute = Dictionary.create({
   name: 'isExactMinute',
   type: 'boolean',
   collection: false,
-  defaultValue: () => false,
   computation: RealTime.create({
     callback: async (now: Expression, dataDeps: any) => {
       const msPerMinute = 60000;
@@ -680,7 +674,6 @@ const totalUsersDict = Dictionary.create({
   name: 'totalUsers',
   type: 'number',
   collection: false,
-  defaultValue: () => 0,
   computation: Count.create({
     record: User
   })
@@ -704,7 +697,6 @@ const activeUserIds = Dictionary.create({
   name: 'activeUserIds',
   type: 'string',
   collection: true,
-  defaultValue: () => [],
   computation: Transform.create({
     record: User,
     attributeQuery: ['id', 'lastActivityTime'],
