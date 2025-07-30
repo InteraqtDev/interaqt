@@ -421,6 +421,7 @@ For EVERY property, answer ALL these questions:
 1. **Is this a timestamp?**
    - Created timestamp? → Use `defaultValue: () => Math.floor(Date.now()/1000)`
    - Updated timestamp? → Use StateMachine with computeValue
+   - Need to track WHO updated? → Use computeValue with event parameter: `(lastValue, event) => ({ timestamp: Date.now(), updatedBy: event?.user?.name })`
    
 2. **Is this a status/state field?**
    - Has defined states? → Use StateMachine

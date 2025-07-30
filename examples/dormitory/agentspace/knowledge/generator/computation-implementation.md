@@ -514,6 +514,115 @@ Property.create({
 })
 ```
 
+#### StateMachine with Event Context in computeValue
+
+The `computeValue` function can access the interaction event as a second parameter, allowing you to use interaction context (user, payload) in value computation:
+
+```typescript
+// Track who made changes and what was changed
+const UpdateArticle = Interaction.create({
+  name: 'UpdateArticle',
+  action: Action.create({ name: 'updateArticle' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({ name: 'id', base: Article, isRef: true, required: true }),
+      PayloadItem.create({ name: 'title' }),
+      PayloadItem.create({ name: 'content' }),
+      PayloadItem.create({ name: 'updateReason' })
+    ]
+  })
+});
+
+// State node that captures user and payload information
+const modifiedState = StateNode.create({
+  name: 'modified',
+  // computeValue receives (lastValue, event) parameters
+  computeValue: (lastValue, event) => {
+    // Access user who triggered the update
+    const modifier = event?.user?.name || event?.user?.id || 'anonymous';
+    
+    // Access payload to see what was changed
+    const changes = [];
+    if (event?.payload?.title) changes.push('title');
+    if (event?.payload?.content) changes.push('content');
+    
+    return {
+      modifiedAt: Math.floor(Date.now()/1000),
+      modifiedBy: modifier,
+      changedFields: changes,
+      updateReason: event?.payload?.updateReason || 'No reason provided',
+      // Preserve previous modification history
+      previousModifications: lastValue?.previousModifications || []
+    };
+  }
+});
+
+// Apply to property
+Property.create({
+  name: 'modificationInfo',
+  type: 'object',
+  defaultValue: () => ({ previousModifications: [] }),
+  computation: StateMachine.create({
+    name: 'ModificationTracker',
+    states: [modifiedState],
+    defaultState: modifiedState,
+    transfers: [
+      StateTransfer.create({
+        current: modifiedState,
+        next: modifiedState,
+        trigger: UpdateArticle,
+        computeTarget: (event) => ({ id: event.payload.id })
+      })
+    ]
+  })
+})
+
+// Another example: Approval workflow with approver tracking
+const ApproveRequest = Interaction.create({
+  name: 'ApproveRequest',
+  action: Action.create({ name: 'approveRequest' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({ name: 'requestId', base: Request, isRef: true, required: true }),
+      PayloadItem.create({ name: 'comments' })
+    ]
+  })
+});
+
+const approvedState = StateNode.create({
+  name: 'approved',
+  computeValue: (lastValue, event) => {
+    // Capture complete approval context from event
+    return {
+      status: 'approved',
+      approvedAt: Math.floor(Date.now()/1000),
+      approvedBy: {
+        id: event?.user?.id,
+        name: event?.user?.name,
+        role: event?.user?.role
+      },
+      approvalComments: event?.payload?.comments,
+      // Keep approval history
+      approvalHistory: [
+        ...(lastValue?.approvalHistory || []),
+        {
+          action: 'approved',
+          timestamp: Math.floor(Date.now()/1000),
+          user: event?.user?.name || 'unknown',
+          comments: event?.payload?.comments
+        }
+      ]
+    };
+  }
+});
+```
+
+**Key Points about Event Parameter:**
+- The `event` parameter is optional and may be `undefined` during initial state setup
+- Contains the full interaction context: `user`, `payload`, `interactionName`, etc.
+- Useful for audit trails, tracking who made changes, and capturing interaction-specific data
+- Always use optional chaining (`?.`) when accessing event properties as it may be undefined
+
 ### 3. Count - Counts Relations/Entities
 
 ```typescript

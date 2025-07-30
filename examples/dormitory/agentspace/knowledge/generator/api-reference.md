@@ -1228,15 +1228,20 @@ StateNode.create(config: StateNodeConfig): StateNodeInstance
 The `computeValue` function determines what value should be stored when the state machine transitions to this state:
 
 - **Function Signature**: 
-  - Sync: `(lastValue?: any) => any`
-  - Async: `async (lastValue?: any) => Promise<any>`
+  - Sync: `(lastValue?: any, event?: InteractionEvent) => any`
+  - Async: `async (lastValue?: any, event?: InteractionEvent) => Promise<any>`
   - `lastValue`: The previous value before the state transition (may be undefined for initial state)
+  - `event`: The interaction event that triggered the state transition (optional)
+    - Contains `user`, `payload`, `interactionName`, and other interaction metadata
+    - Only available when state transition is triggered by an interaction
+    - May be undefined for default state initialization
   - Returns: The new value to be stored (can be a Promise)
 - **Context**: Called with `this` bound to the Controller instance
 - **Async Support**: Yes, `computeValue` can be an async function
 - **Purpose**: 
   - Store state-specific data (e.g., timestamps, user IDs)
   - Transform or calculate values based on the previous state
+  - Access interaction context (user, payload) during state transitions
   - Return complex objects with multiple properties
   - Return `null` to indicate deletion (for entity/relation state machines)
   - Perform async operations like database queries or API calls
@@ -1317,6 +1322,55 @@ const verifiedState = StateNode.create({
             verificationId: verificationResult.id,
             confidence: verificationResult.confidence
         };
+    }
+});
+
+// Using event parameter - access user information
+const approvedState = StateNode.create({
+    name: 'approved',
+    computeValue: (lastValue, event) => {
+        // Access user who triggered the approval
+        const approver = event?.user?.name || 'system';
+        return {
+            status: 'approved',
+            approvedAt: Date.now(),
+            approvedBy: approver
+        };
+    }
+});
+
+// Using event parameter - access payload data
+const updatedState = StateNode.create({
+    name: 'updated',
+    computeValue: (lastValue, event) => {
+        // Merge payload data with existing value
+        if (event?.payload) {
+            return {
+                ...lastValue,
+                ...event.payload.updates,
+                lastModifiedAt: Date.now(),
+                lastModifiedBy: event.user?.id
+            };
+        }
+        return lastValue;
+    }
+});
+
+// Using event parameter - conditional logic based on interaction
+const reviewedState = StateNode.create({
+    name: 'reviewed',
+    computeValue: (lastValue, event) => {
+        // Different behavior based on which interaction triggered the transition
+        if (event?.interactionName === 'approve') {
+            return { status: 'approved', reviewedAt: Date.now() };
+        } else if (event?.interactionName === 'reject') {
+            return { 
+                status: 'rejected', 
+                reviewedAt: Date.now(),
+                reason: event.payload?.reason || 'No reason provided'
+            };
+        }
+        return { status: 'pending_review' };
     }
 });
 ```

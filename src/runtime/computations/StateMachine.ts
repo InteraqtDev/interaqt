@@ -31,8 +31,8 @@ export class GlobalStateMachineHandle implements EventBasedComputation {
         }
     }
     // 这里的 defaultValue 不能是 async 的模式。因为是直接创建时填入的。
-    getDefaultValue() {
-        return this.defaultState.computeValue ? this.defaultState.computeValue.call(this.controller) : this.defaultState.name
+    getDefaultValue(event:any) {
+        return this.defaultState.computeValue ? this.defaultState.computeValue.call(this.controller, undefined, event) : this.defaultState.name
     }
     mutationEventToTrigger(mutationEvent: RecordMutationEvent) {
         if (mutationEvent.recordName === INTERACTION_RECORD) {
@@ -56,7 +56,8 @@ export class GlobalStateMachineHandle implements EventBasedComputation {
 
         await this.state.currentState.set(nextState.name)
 
-        return nextState.computeValue? (await nextState.computeValue.call(this.controller, lastValue)) : nextState.name
+        const interactionEvent = mutationEvent.record!
+        return nextState.computeValue? (await nextState.computeValue.call(this.controller, lastValue, interactionEvent)) : nextState.name
     }
 }
 
@@ -74,8 +75,6 @@ export class PropertyStateMachineHandle implements EventBasedComputation {
     constructor(public controller: Controller, public args: StateMachineInstance, public dataContext: DataContext) {
         this.transitionFinder = new TransitionFinder(this.args)
         this.defaultState = this.args.defaultState
-
-        
     }
     createState() {
         return {
@@ -83,8 +82,8 @@ export class PropertyStateMachineHandle implements EventBasedComputation {
         }
     }
     // 这里的 defaultValue 不能是 async 的模式。因为是直接创建时填入的。
-    getDefaultValue() {
-        return this.defaultState.computeValue ? this.defaultState.computeValue.call(this.controller) : this.defaultState.name
+    getDefaultValue(event:any) {
+        return this.defaultState.computeValue ? this.defaultState.computeValue.call(this.controller, undefined, event) : this.defaultState.name
     }
     mutationEventToTrigger(mutationEvent: RecordMutationEvent) {
         // FIXME 支持 data mutation
@@ -118,7 +117,8 @@ export class PropertyStateMachineHandle implements EventBasedComputation {
 
         await this.state.currentState.set(dirtyRecord, nextState.name)
 
-        return nextState.computeValue? (await nextState.computeValue.call(this.controller, lastValue)) : nextState.name
+        const interactionEvent = mutationEvent.record!
+        return nextState.computeValue? (await nextState.computeValue.call(this.controller, lastValue, interactionEvent)) : nextState.name
     }
 }
 
@@ -144,8 +144,8 @@ export class RecordStateMachineHandle implements EventBasedComputation {
         }
     }
     // 这里的 defaultValue 不能是 async 的模式。因为是直接创建时填入的。
-    getDefaultValue() {
-        return this.defaultState.computeValue ? this.defaultState.computeValue.call(this.controller ) : this.defaultState.name
+    getDefaultValue(event:any) {
+        return this.defaultState.computeValue ? this.defaultState.computeValue.call(this.controller, undefined, event) : this.defaultState.name
     }
     mutationEventToTrigger(mutationEvent: RecordMutationEvent) {
         // FIXME 支持 data mutation
@@ -177,8 +177,8 @@ export class RecordStateMachineHandle implements EventBasedComputation {
         const nextState = this.transitionFinder?.findNextState(currentStateName, trigger)
         if (!nextState) return ComputationResult.skip()
 
-
-        const nextValue = nextState.computeValue? (await nextState.computeValue.call(this.controller, lastValue)) : nextState.name
+        const interactionEvent = mutationEvent.record!
+        const nextValue = nextState.computeValue? (await nextState.computeValue.call(this.controller, lastValue, interactionEvent)) : nextState.name
         if (dirtyRecord.id) {
             if (nextValue === null) {
                 return {

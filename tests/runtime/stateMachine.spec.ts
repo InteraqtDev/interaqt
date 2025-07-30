@@ -494,4 +494,179 @@ describe('StateMachineRunner', () => {
         expect(thirdTimestamp).toBeGreaterThanOrEqual(beforeThird)
         expect(thirdTimestamp).toBeLessThanOrEqual(afterThird)
     })
+
+    test('state machine with computeValue using event parameter', async () => {
+        // 测试 computeValue 的第二个参数 event - 可以访问触发转换的交互记录
+        const { Entity, Property, Interaction, Action, Payload, PayloadItem, StateMachine, StateNode, StateTransfer } = await import('@shared')
+        
+        // 创建消息实体
+        const Message = Entity.create({
+            name: 'Message',
+            properties: [
+                Property.create({
+                    name: 'content',
+                    type: 'string',
+                }),
+                Property.create({
+                    name: 'lastUpdatedBy',
+                    type: 'string',
+                }),
+                Property.create({
+                    name: 'updateCount',
+                    type: 'number'
+                })
+            ]
+        })
+
+        // 创建用户实体
+        const User = Entity.create({
+            name: 'User',
+            properties: [
+                Property.create({
+                    name: 'name',
+                    type: 'string',
+                })
+            ]
+        })
+
+        // 创建更新消息的交互
+        const UpdateMessageInteraction = Interaction.create({
+            name: 'updateMessage',
+            action: Action.create({ name: 'updateMessage' }),
+            payload: Payload.create({
+                items: [
+                    PayloadItem.create({
+                        name: 'message',
+                        isRef: true,
+                        base: Message
+                    }),
+                    PayloadItem.create({
+                        name: 'newContent'
+                    })
+                ]
+            })
+        })
+
+        // 创建状态节点 - 使用 event 参数获取用户信息
+        const UpdatedState = StateNode.create({
+            name: 'updated',
+            // computeValue 接收两个参数：lastValue 和 event
+            computeValue: ((lastValue: any, event: any) => {
+                // 从 event 中获取用户名
+                if (event && event.user && event.user.name) {
+                    return event.user.name
+                }
+                return 'unknown'
+            }) as any
+        })
+
+        // 创建计数状态节点 - 使用 event 参数访问 payload
+        const CountingState = StateNode.create({
+            name: 'counting',
+            computeValue: ((lastValue: any, event: any) => {
+                const currentCount = typeof lastValue === 'number' ? lastValue : 0
+                // 从 event.payload 中获取新内容的长度作为增量
+                if (event && event.payload && event.payload.newContent) {
+                    return currentCount + event.payload.newContent.length
+                }
+                // 没有 event 时（初始化时）返回当前值
+                return currentCount
+            })
+        })
+
+        // 创建状态机 - 用于 lastUpdatedBy
+        const UpdaterStateMachine = StateMachine.create({
+            states: [UpdatedState],
+            transfers: [
+                StateTransfer.create({
+                    trigger: UpdateMessageInteraction,
+                    current: UpdatedState,
+                    next: UpdatedState,
+                    computeTarget: (event: any) => ({ id: event.payload!.message.id })
+                })
+            ],
+            defaultState: UpdatedState
+        })
+
+        // 创建状态机 - 用于 updateCount
+        const CountStateMachine = StateMachine.create({
+            states: [CountingState],
+            transfers: [
+                StateTransfer.create({
+                    trigger: UpdateMessageInteraction,
+                    current: CountingState,
+                    next: CountingState,
+                    computeTarget: (event: any) => ({ id: event.payload!.message.id })
+                })
+            ],
+            defaultState: CountingState
+        })
+
+        // 将状态机附加到属性
+        const updaterProperty = Message.properties.find(p => p.name === 'lastUpdatedBy')!
+        updaterProperty.computation = UpdaterStateMachine
+        
+        const countProperty = Message.properties.find(p => p.name === 'updateCount')!
+        countProperty.computation = CountStateMachine
+
+        // 设置测试环境
+        const system = new MonoSystem()
+        const controller = new Controller({
+            system: system,
+            entities: [User, Message],
+            relations: [],
+            activities: [],
+            interactions: [UpdateMessageInteraction]
+        })
+        await controller.setup(true)
+
+        // 创建用户和消息
+        const alice = await controller.system.storage.create('User', { name: 'Alice' })
+        const bob = await controller.system.storage.create('User', { name: 'Bob' })
+        const message = await controller.system.storage.create('Message', { content: 'Hello' })
+
+        // 验证初始状态
+        let messageData = await controller.system.storage.findOne('Message', undefined, undefined, ['*'])
+        expect(messageData.lastUpdatedBy).toBe('unknown')
+        expect(messageData.updateCount).toBe(0)
+
+        // Alice 更新消息 - computeValue 应该从 event 中获取用户名
+        await controller.callInteraction('updateMessage', {
+            user: alice,
+            payload: { 
+                message: { id: message.id },
+                newContent: 'Hello World!'  // 12 个字符
+            }
+        })
+
+        messageData = await controller.system.storage.findOne('Message', undefined, undefined, ['*'])
+        expect(messageData.lastUpdatedBy).toBe('Alice')
+        expect(messageData.updateCount).toBe(12)  // 新内容的长度
+
+        // Bob 更新消息 - 应该更新为 Bob
+        await controller.callInteraction('updateMessage', {
+            user: bob,
+            payload: { 
+                message: { id: message.id },
+                newContent: 'Hi!'  // 3 个字符
+            }
+        })
+
+        messageData = await controller.system.storage.findOne('Message', undefined, undefined, ['*'])
+        expect(messageData.lastUpdatedBy).toBe('Bob')
+        expect(messageData.updateCount).toBe(15)  // 12 + 3
+
+        // 测试没有用户名的情况
+        await controller.callInteraction('updateMessage', {
+            user: { id: 'anonymous' } as any,
+            payload: { 
+                message: { id: message.id },
+                newContent: 'Test'  // 4 个字符
+            }
+        })
+
+        messageData = await controller.system.storage.findOne('Message', undefined, undefined, ['*'])
+        expect(messageData.lastUpdatedBy).toBe('unknown')  // 没有用户时返回 'unknown'
+        expect(messageData.updateCount).toBe(19)  // 15 + 4
+    })
 });     
