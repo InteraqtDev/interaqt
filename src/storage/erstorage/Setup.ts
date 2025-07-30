@@ -3,7 +3,7 @@ import { assert } from "../utils.js";
 import { EntityInstance, RelationInstance, PropertyInstance, BoolExp } from "@shared";
 import { ID_ATTR, ROW_ID_ATTR, Database } from "@runtime";
 import { isRelation } from "./util.js";
-import { MatchExpressionData, MatchAtom } from "./MatchExp.js";
+import { MatchExpressionData, MatchAtom, MatchExp } from "./MatchExp.js";
 
 // Define the types we need
 
@@ -134,41 +134,11 @@ export class DBSetup {
      * 验证 filtered entity 的过滤条件中的路径不包含 x:n 关系
      */
     private validateFilteredEntityPaths(entityName: string, filterCondition: MatchExpressionData) {
-        const paths = this.extractPathsFromFilterCondition(filterCondition);
+        const paths = MatchExp.extractPaths(filterCondition);
         
         for (const path of paths) {
             this.validateSinglePath(entityName, path);
         }
-    }
-    
-    /**
-     * 从过滤条件中提取所有路径
-     */
-    private extractPathsFromFilterCondition(expression: MatchExpressionData): string[][] {
-        const paths: string[][] = [];
-        
-        // MatchExpressionData 是 BoolExp<MatchAtom> 的别名
-        const boolExp = expression instanceof BoolExp ? expression : BoolExp.fromValue(expression);
-        
-        if (boolExp.isExpression()) {
-            if (boolExp.left) {
-                paths.push(...this.extractPathsFromFilterCondition(boolExp.left.raw as MatchExpressionData));
-            }
-            if (boolExp.right) {
-                paths.push(...this.extractPathsFromFilterCondition(boolExp.right.raw as MatchExpressionData));
-            }
-        } else if (boolExp.isAtom()) {
-            const matchAtom = boolExp.data as MatchAtom;
-            const key = matchAtom.key;
-            const pathParts = key.split('.');
-            
-            // 如果路径包含多个部分（即有关联查询），需要验证
-            if (pathParts.length > 1) {
-                paths.push(pathParts);
-            }
-        }
-        
-        return paths;
     }
     
     /**

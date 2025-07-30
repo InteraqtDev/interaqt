@@ -1,9 +1,9 @@
-import {assert} from "../utils.js";
-import {AttributeInfo} from "./AttributeInfo.js";
-import {RecordInfo} from "./RecordInfo.js";
-import {LinkInfo} from "./LinkInfo.js";
-import {LINK_SYMBOL} from "./RecordQuery.js";
-import { MatchExp } from "./MatchExp.js";
+import { assert } from "../utils.js";
+import { AttributeInfo } from "./AttributeInfo.js";
+import { RecordInfo } from "./RecordInfo.js";
+import { LinkInfo } from "./LinkInfo.js";
+import { LINK_SYMBOL } from "./RecordQuery.js";
+import { MatchExpressionData } from "./MatchExp.js";
 
 
 export type ValueAttribute = {
@@ -47,9 +47,9 @@ export type RecordMapItem = {
     }
     isRelation? :boolean,
     sourceRecordName? : string,
-    filterCondition?: MatchExp,
+    filterCondition?: MatchExpressionData,
     resolvedSourceRecordName?: string,
-    resolvedFilterCondition?: MatchExp,
+    resolvedFilterCondition?: MatchExpressionData,
     filteredBy? : string[],
 }
 

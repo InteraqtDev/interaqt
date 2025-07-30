@@ -111,19 +111,11 @@ export class RecordQueryAgent {
         
         for (const [recordName, recordData] of Object.entries(records)) {
             if (recordData.sourceRecordName && recordData.filterCondition) {
-                // filterCondition 可能是 BoolExp 或 MatchExp 实例
-                // BoolExp 就是 MatchExpressionData 的实例
-                const filterConditionData = recordData.filterCondition instanceof BoolExp 
-                    ? recordData.filterCondition 
-                    : recordData.filterCondition.data
-                
-                if (filterConditionData) {
-                    this.filteredEntityManager.analyzeDependencies(
-                        recordName,
-                        recordData.sourceRecordName,
-                        filterConditionData
-                    )
-                }
+                this.filteredEntityManager.analyzeDependencies(
+                    recordName,
+                    recordData.sourceRecordName,
+                    recordData.filterCondition
+                )
             }
         }
     }
