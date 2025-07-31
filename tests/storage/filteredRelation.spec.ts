@@ -114,6 +114,64 @@ describe('filtered relation', () => {
         
         expect(allRelations.length).toBe(3) // All 3 relations exist
         expect(filteredRelations.length).toBeLessThan(allRelations.length) // Filtered has fewer
+        
+        // Test update: Change isActive from false to true
+        const inactiveRelation = allRelations.find(r => !r.isActive)
+        expect(inactiveRelation).toBeDefined()
+        
+        await handle.update(
+            UserPostRelation.name!,
+            MatchExp.atom({ key: 'id', value: ['=', inactiveRelation!.id] }),
+            { isActive: true }
+        )
+        
+        // Re-query filtered relation - should now have 3 active relationships
+        const filteredAfterUpdate = await handle.find(
+            ActiveUserPostRelation.name!,
+            undefined,
+            undefined,
+            ['source', 'target', 'isActive']
+        )
+        
+        expect(filteredAfterUpdate.length).toBe(3)
+        
+        // Test update: Change isActive from true to false for user1's relations
+        const user1Relations = allRelations.filter((r: any) => r.source.id === user1.id)
+        for (const rel of user1Relations) {
+            await handle.update(
+                UserPostRelation.name!,
+                MatchExp.atom({ key: 'id', value: ['=', rel.id] }),
+                { isActive: false }
+            )
+        }
+        
+        // Re-query filtered relation - should now have only 1 active relationship
+        const filteredAfterSecondUpdate = await handle.find(
+            ActiveUserPostRelation.name!,
+            undefined,
+            undefined,
+            ['source', 'target', 'isActive']
+        )
+        
+        expect(filteredAfterSecondUpdate.length).toBe(1)
+        expect(filteredAfterSecondUpdate[0].source.id).toBe(user2.id)
+        
+        // Test delete: Remove one relation
+        const user2Relation = filteredAfterSecondUpdate[0]
+        await handle.delete(
+            UserPostRelation.name!,
+            MatchExp.atom({ key: 'id', value: ['=', user2Relation.id] })
+        )
+        
+        // Re-query filtered relation - should now have 0 active relationships
+        const filteredAfterDelete = await handle.find(
+            ActiveUserPostRelation.name!,
+            undefined,
+            undefined,
+            ['source', 'target', 'isActive']
+        )
+        
+        expect(filteredAfterDelete.length).toBe(0)
     })
 
     test('nested filtered relation', async () => {
@@ -270,6 +328,101 @@ describe('filtered relation', () => {
 
         expect(dept1FullTime.length).toBe(1)
         expect(dept1FullTime[0].target.id).toBe(emp1.id)
+        
+        // Test update: Change relationStatus from inactive to active
+        const inactiveDeptRelations = await handle.find(
+            CompanyDepartmentRelation.name!,
+            MatchExp.atom({ key: 'relationStatus', value: ['=', 'inactive'] }),
+            undefined,
+            ['id', 'source', 'target', 'relationStatus']
+        )
+        expect(inactiveDeptRelations.length).toBe(1)
+        
+        await handle.update(
+            CompanyDepartmentRelation.name!,
+            MatchExp.atom({ key: 'id', value: ['=', inactiveDeptRelations[0].id] }),
+            { relationStatus: 'active' }
+        )
+        
+        // Re-query active departments - should now have 2
+        const activeDeptsAfterUpdate = await handle.find(
+            ActiveCompanyDepartmentRelation.name!,
+            undefined,
+            undefined,
+            ['source', 'target', 'relationStatus']
+        )
+        
+        expect(activeDeptsAfterUpdate.length).toBe(2)
+        
+        // Test update: Change employmentType from part-time to full-time
+        const partTimeRelations = await handle.find(
+            DepartmentEmployeeRelation.name!,
+            MatchExp.atom({ key: 'employmentType', value: ['=', 'part-time'] }),
+            undefined,
+            ['id', 'source', 'target', 'employmentType']
+        )
+        expect(partTimeRelations.length).toBe(1)
+        
+        await handle.update(
+            DepartmentEmployeeRelation.name!,
+            MatchExp.atom({ key: 'id', value: ['=', partTimeRelations[0].id] }),
+            { employmentType: 'full-time' }
+        )
+        
+        // Re-query full-time employees - should now have 3
+        const fullTimeEmpsAfterUpdate = await handle.find(
+            FullTimeEmployeeRelation.name!,
+            undefined,
+            undefined,
+            ['source', 'target', 'employmentType']
+        )
+        
+        expect(fullTimeEmpsAfterUpdate.length).toBe(3)
+        
+        // Test delete: Remove an active department relation
+        const dept1Relations = activeDeptsAfterUpdate.filter((r: any) => r.target.id === dept1.id)
+        expect(dept1Relations.length).toBe(1)
+        
+        await handle.delete(
+            CompanyDepartmentRelation.name!,
+            MatchExp.atom({ key: 'id', value: ['=', dept1Relations[0].id] })
+        )
+        
+        // Re-query active departments - should now have 1
+        const activeDeptsAfterDelete = await handle.find(
+            ActiveCompanyDepartmentRelation.name!,
+            undefined,
+            undefined,
+            ['source', 'target', 'relationStatus']
+        )
+        
+        expect(activeDeptsAfterDelete.length).toBe(1)
+        expect(activeDeptsAfterDelete[0].target.id).toBe(dept2.id)
+        
+        // Test delete: Remove a full-time employee relation from dept2
+        const dept2EmpRelations = await handle.find(
+            DepartmentEmployeeRelation.name!,
+            MatchExp.atom({ key: 'source.id', value: ['=', dept2.id] })
+                .and({ key: 'employmentType', value: ['=', 'full-time'] }),
+            undefined,
+            ['id', 'source', 'target', 'employmentType']
+        )
+        expect(dept2EmpRelations.length).toBeGreaterThan(0)
+        
+        await handle.delete(
+            DepartmentEmployeeRelation.name!,
+            MatchExp.atom({ key: 'id', value: ['=', dept2EmpRelations[0].id] })
+        )
+        
+        // Re-query full-time employees - should now have 2
+        const fullTimeEmpsAfterDelete = await handle.find(
+            FullTimeEmployeeRelation.name!,
+            undefined,
+            undefined,
+            ['source', 'target', 'employmentType']
+        )
+        
+        expect(fullTimeEmpsAfterDelete.length).toBe(2)
     })
 
     test('filtered relation with properties', async () => {
@@ -375,6 +528,100 @@ describe('filtered relation', () => {
         
         expect(allRelations.length).toBe(3)
         expect(filteredRelations.length).toBeLessThan(allRelations.length)
+        
+        // Test update: Change order status from pending to completed
+        // First, find the pending order
+        const pendingOrderRelations = await handle.find(
+            OrderProductRelation.name!,
+            MatchExp.atom({ key: 'source.status', value: ['=', 'pending'] }),
+            undefined,
+            ['id', 'source', 'target', 'price']
+        )
+        
+        // Update the order entity directly
+        await handle.update(
+            'Order',
+            MatchExp.atom({ key: 'id', value: ['=', order2.id] }),
+            { status: 'completed' }
+        )
+        
+        // Re-query filtered relation - should now have 2 high-value completed orders
+        const filteredAfterOrderUpdate = await handle.find(
+            CompletedHighValueOrderRelation.name!,
+            undefined,
+            undefined,
+            ['source', 'target', 'price']
+        )
+        
+        expect(filteredAfterOrderUpdate.length).toBe(2)
+        
+        // Test update: Change price from low to high
+        const lowPriceRelations = await handle.find(
+            OrderProductRelation.name!,
+            MatchExp.atom({ key: 'price', value: ['<=', 100] }),
+            undefined,
+            ['id', 'source', 'target', 'price']
+        )
+        
+        for (const rel of lowPriceRelations) {
+            await handle.update(
+                OrderProductRelation.name!,
+                MatchExp.atom({ key: 'id', value: ['=', rel.id] }),
+                { price: 200 }
+            )
+        }
+        
+        // Re-query filtered relation - should now have 3 high-value completed orders
+        const filteredAfterPriceUpdate = await handle.find(
+            CompletedHighValueOrderRelation.name!,
+            undefined,
+            undefined,
+            ['source', 'target', 'price']
+        )
+        
+        expect(filteredAfterPriceUpdate.length).toBe(3)
+        
+        // Test update: Change order status from completed to cancelled
+        await handle.update(
+            'Order',
+            MatchExp.atom({ key: 'id', value: ['=', order1.id] }),
+            { status: 'cancelled' }
+        )
+        
+        // Re-query filtered relation - should now have 2 high-value completed orders
+        const filteredAfterCancelUpdate = await handle.find(
+            CompletedHighValueOrderRelation.name!,
+            undefined,
+            undefined,
+            ['source', 'target', 'price']
+        )
+        
+        expect(filteredAfterCancelUpdate.length).toBe(1)
+        
+        // Test delete: Remove order-product relations for order2
+        const order2Relations = await handle.find(
+            OrderProductRelation.name!,
+            MatchExp.atom({ key: 'source.id', value: ['=', order2.id] }),
+            undefined,
+            ['id']
+        )
+        
+        for (const rel of order2Relations) {
+            await handle.delete(
+                OrderProductRelation.name!,
+                MatchExp.atom({ key: 'id', value: ['=', rel.id] })
+            )
+        }
+        
+        // Re-query filtered relation - should now have 0 relations (as we deleted both relations for order2)
+        const filteredAfterDelete = await handle.find(
+            CompletedHighValueOrderRelation.name!,
+            undefined,
+            undefined,
+            ['source', 'target', 'price']
+        )
+        
+        expect(filteredAfterDelete.length).toBe(0)
     })
 
     test('filtered relation with cross-entity filtering attempts', async () => {
@@ -500,6 +747,87 @@ describe('filtered relation', () => {
         )
         expect(publishedBookRelations.length).toBe(2)
         expect(publishedBookRelations.every((r: any) => r.target.id === publishedBook.id)).toBe(true)
+        
+        // Test update: Change author from unverified to verified
+        await handle.update(
+            'Author',
+            MatchExp.atom({ key: 'id', value: ['=', unverifiedAuthor.id] }),
+            { verified: true }
+        )
+        
+        // Re-query verified author relations - should now have 4
+        const verifiedAfterAuthorUpdate = await handle.find(
+            'VerifiedAuthorRelation',
+            undefined,
+            undefined,
+            ['id', 'role', 'source', 'target']
+        )
+        expect(verifiedAfterAuthorUpdate.length).toBe(4)
+        
+        // Test update: Change book from unpublished to published
+        await handle.update(
+            'Book',
+            MatchExp.atom({ key: 'id', value: ['=', unpublishedBook.id] }),
+            { published: true }
+        )
+        
+        // Re-query published book relations - should now have 4
+        const publishedAfterBookUpdate = await handle.find(
+            'PublishedBookRelation',
+            undefined,
+            undefined,
+            ['id', 'role', 'source', 'target']
+        )
+        expect(publishedAfterBookUpdate.length).toBe(4)
+        
+        // Test update: Change author back to unverified
+        await handle.update(
+            'Author',
+            MatchExp.atom({ key: 'id', value: ['=', verifiedAuthor.id] }),
+            { verified: false }
+        )
+        
+        // Re-query verified author relations - should now have 2
+        const verifiedAfterSecondUpdate = await handle.find(
+            'VerifiedAuthorRelation',
+            undefined,
+            undefined,
+            ['id', 'role', 'source', 'target']
+        )
+        expect(verifiedAfterSecondUpdate.length).toBe(2)
+        expect(verifiedAfterSecondUpdate.every((r: any) => r.source.id === unverifiedAuthor.id)).toBe(true)
+        
+        // Test delete: Remove all relations for unverified author
+        const unverifiedAuthorRelations = await handle.find(
+            'authorBook',
+            MatchExp.atom({ key: 'source.id', value: ['=', unverifiedAuthor.id] }),
+            undefined,
+            ['id']
+        )
+        
+        for (const rel of unverifiedAuthorRelations) {
+            await handle.delete(
+                'authorBook',
+                MatchExp.atom({ key: 'id', value: ['=', rel.id] })
+            )
+        }
+        
+        // Re-query both filtered relations
+        const verifiedAfterDelete = await handle.find(
+            'VerifiedAuthorRelation',
+            undefined,
+            undefined,
+            ['id', 'role', 'source', 'target']
+        )
+        const publishedAfterDelete = await handle.find(
+            'PublishedBookRelation',
+            undefined,
+            undefined,
+            ['id', 'role', 'source', 'target']
+        )
+        
+        expect(verifiedAfterDelete.length).toBe(0)
+        expect(publishedAfterDelete.length).toBe(2)
     })
 
     test('multi-level filtered relations', async () => {
@@ -721,6 +1049,111 @@ describe('filtered relation', () => {
         )
         expect(usaCapitals.length).toBe(1)
         expect(usaCapitals[0].target.id).toBe(washington.id)
+        
+        // Test update: Change a city from non-capital to capital
+        const newyorkRelations = await handle.find(
+            CountryCityRelation.name!,
+            MatchExp.atom({ key: 'target.id', value: ['=', newyork.id] }),
+            undefined,
+            ['id', 'source', 'target', 'isCapital']
+        )
+        expect(newyorkRelations.length).toBe(1)
+        
+        await handle.update(
+            CountryCityRelation.name!,
+            MatchExp.atom({ key: 'id', value: ['=', newyorkRelations[0].id] }),
+            { isCapital: true }
+        )
+        
+        // Re-query capital cities - should now have 3
+        const capitalCitiesAfterUpdate = await handle.find(
+            CapitalCityRelation.name!,
+            undefined,
+            undefined,
+            ['source', 'target', 'isCapital']
+        )
+        expect(capitalCitiesAfterUpdate.length).toBe(3)
+        
+        // Test update: Change store type from regular to flagship
+        const regularStores = await handle.find(
+            CityStoreRelation.name!,
+            MatchExp.atom({ key: 'storeType', value: ['=', 'regular'] }),
+            undefined,
+            ['id', 'source', 'target', 'storeType']
+        )
+        expect(regularStores.length).toBeGreaterThan(0)
+        
+        await handle.update(
+            CityStoreRelation.name!,
+            MatchExp.atom({ key: 'id', value: ['=', regularStores[0].id] }),
+            { storeType: 'flagship' }
+        )
+        
+        // Re-query flagship stores - should now have 3
+        const flagshipStoresAfterUpdate = await handle.find(
+            FlagshipStoreRelation.name!,
+            undefined,
+            undefined,
+            ['source', 'target', 'storeType']
+        )
+        expect(flagshipStoresAfterUpdate.length).toBe(3)
+        
+        // Test update: Change year established to old year
+        const store4Relations = await handle.find(
+            CityStoreRelation.name!,
+            MatchExp.atom({ key: 'target.id', value: ['=', store4.id] }),
+            undefined,
+            ['id', 'source', 'target', 'yearEstablished']
+        )
+        expect(store4Relations.length).toBe(1)
+        
+        await handle.update(
+            CityStoreRelation.name!,
+            MatchExp.atom({ key: 'id', value: ['=', store4Relations[0].id] }),
+            { yearEstablished: 2010 }
+        )
+        
+        // Re-query new stores - should now have 1
+        const newStoresAfterUpdate = await handle.find(
+            NewStoreRelation.name!,
+            undefined,
+            undefined,
+            ['source', 'target', 'yearEstablished']
+        )
+        expect(newStoresAfterUpdate.length).toBe(1)
+        
+        // Test delete: Remove capital city relations
+        const capitalRelations = await handle.find(
+            CountryCityRelation.name!,
+            MatchExp.atom({ key: 'isCapital', value: ['=', true] }),
+            undefined,
+            ['id']
+        )
+        
+        for (const rel of capitalRelations) {
+            await handle.delete(
+                CountryCityRelation.name!,
+                MatchExp.atom({ key: 'id', value: ['=', rel.id] })
+            )
+        }
+        
+        // Re-query capital cities - should now have 0
+        const capitalCitiesAfterDelete = await handle.find(
+            CapitalCityRelation.name!,
+            undefined,
+            undefined,
+            ['source', 'target', 'isCapital']
+        )
+        expect(capitalCitiesAfterDelete.length).toBe(0)
+        
+        // Re-query tier 1 cities - should still have some (as not all tier 1 cities were capitals)
+        const tier1CitiesAfterDelete = await handle.find(
+            Tier1CityRelation.name!,
+            undefined,
+            undefined,
+            ['source', 'target', 'tier']
+        )
+        expect(tier1CitiesAfterDelete.length).toBeGreaterThan(0)
     })
 
     test('filtered relation with complex boolean expressions', async () => {
@@ -856,6 +1289,119 @@ describe('filtered relation', () => {
         expect(highValuePartTime.length).toBe(1)
         expect(highValuePartTime[0].rate).toBeGreaterThanOrEqual(150)
         expect(highValuePartTime[0].hoursPerWeek).toBeLessThanOrEqual(20)
+        
+        // Test update: Change role from junior to senior
+        const juniorDevRelations = await handle.find(
+            ProjectDeveloperRelation.name!,
+            MatchExp.atom({ key: 'role', value: ['=', 'junior'] }),
+            undefined,
+            ['id', 'source', 'target', 'role', 'hoursPerWeek']
+        )
+        expect(juniorDevRelations.length).toBeGreaterThan(0)
+        
+        await handle.update(
+            ProjectDeveloperRelation.name!,
+            MatchExp.atom({ key: 'id', value: ['=', juniorDevRelations[0].id] }),
+            { role: 'senior', hoursPerWeek: 30 }
+        )
+        
+        // Re-query senior active developers - should now have 2
+        const seniorActiveAfterUpdate = await handle.find(
+            SeniorActiveRelation.name!,
+            undefined,
+            undefined,
+            ['source', 'target', 'role', 'hoursPerWeek']
+        )
+        expect(seniorActiveAfterUpdate.length).toBe(2)
+        
+        // Test update: Change hours and rate for consultant
+        const consultantRelations = await handle.find(
+            ProjectDeveloperRelation.name!,
+            MatchExp.atom({ key: 'role', value: ['=', 'consultant'] }),
+            undefined,
+            ['id', 'source', 'target', 'role', 'hoursPerWeek', 'rate']
+        )
+        expect(consultantRelations.length).toBeGreaterThan(0)
+        
+        await handle.update(
+            ProjectDeveloperRelation.name!,
+            MatchExp.atom({ key: 'id', value: ['=', consultantRelations[0].id] }),
+            { hoursPerWeek: 15, rate: 160 }
+        )
+        
+        // Re-query high-value part-time - should now have 2
+        const highValuePartTimeAfterUpdate = await handle.find(
+            HighValuePartTimeRelation.name!,
+            undefined,
+            undefined,
+            ['source', 'target', 'rate', 'hoursPerWeek']
+        )
+        expect(highValuePartTimeAfterUpdate.length).toBe(1)
+        
+        // Test update: Change lead developer to part-time hours
+        const leadDevRelations = await handle.find(
+            ProjectDeveloperRelation.name!,
+            MatchExp.atom({ key: 'role', value: ['=', 'lead'] }),
+            undefined,
+            ['id', 'source', 'target', 'role', 'hoursPerWeek']
+        )
+        expect(leadDevRelations.length).toBeGreaterThan(0)
+        
+        await handle.update(
+            ProjectDeveloperRelation.name!,
+            MatchExp.atom({ key: 'id', value: ['=', leadDevRelations[0].id] }),
+            { hoursPerWeek: 20 }
+        )
+        
+        // Re-query senior active developers - should now have 1
+        const seniorActiveAfterSecondUpdate = await handle.find(
+            SeniorActiveRelation.name!,
+            undefined,
+            undefined,
+            ['source', 'target', 'role', 'hoursPerWeek']
+        )
+        expect(seniorActiveAfterSecondUpdate.length).toBe(1)
+        
+        // Re-query high-value part-time - lead should now appear here too
+        const highValuePartTimeAfterSecondUpdate = await handle.find(
+            HighValuePartTimeRelation.name!,
+            undefined,
+            undefined,
+            ['source', 'target', 'rate', 'hoursPerWeek']
+        )
+        expect(highValuePartTimeAfterSecondUpdate.length).toBe(1) // Only consultant meets the criteria (rate >= 150)
+        
+        // Test delete: Remove all senior developers
+        const seniorAndLeadRelations = await handle.find(
+            ProjectDeveloperRelation.name!,
+            MatchExp.atom({ key: 'role', value: ['in', ['senior', 'lead']] }),
+            undefined,
+            ['id']
+        )
+        
+        for (const rel of seniorAndLeadRelations) {
+            await handle.delete(
+                ProjectDeveloperRelation.name!,
+                MatchExp.atom({ key: 'id', value: ['=', rel.id] })
+            )
+        }
+        
+        // Re-query both filtered relations - should be significantly reduced
+        const seniorActiveAfterDelete = await handle.find(
+            SeniorActiveRelation.name!,
+            undefined,
+            undefined,
+            ['source', 'target', 'role', 'hoursPerWeek']
+        )
+        const highValuePartTimeAfterDelete = await handle.find(
+            HighValuePartTimeRelation.name!,
+            undefined,
+            undefined,
+            ['source', 'target', 'rate', 'hoursPerWeek']
+        )
+        
+        expect(seniorActiveAfterDelete.length).toBe(0)
+        expect(highValuePartTimeAfterDelete.length).toBe(1) // Only consultant remains
     })
 
     test('filtered relation with deep cross-entity filtering (3+ levels)', async () => {
@@ -1171,5 +1717,102 @@ describe('filtered relation', () => {
         )
         expect(allMemberProjects.length).toBe(4) // Total of 4 member-project relations
         expect(premiumOrgProjects.length).toBeLessThan(allMemberProjects.length)
+        
+        // Test update: Change organization tier from standard to premium
+        await handle.update(
+            'Organization',
+            MatchExp.atom({ key: 'id', value: ['=', standardOrg.id] }),
+            { tier: 'premium' }
+        )
+        
+        // Re-query premium org projects - should now include Charlie's project
+        const premiumOrgProjectsAfterOrgUpdate = await handle.find(
+            PremiumOrgProjectRelation.name!,
+            undefined,
+            undefined,
+            ['source', 'target']
+        )
+        expect(premiumOrgProjectsAfterOrgUpdate.length).toBe(3) // Now includes Charlie's project
+        
+        // Test update: Change project priority from normal to high
+        await handle.update(
+            'Project',
+            MatchExp.atom({ key: 'id', value: ['=', normalProject.id] }),
+            { priority: 'high' }
+        )
+        
+        // Re-query premium org projects - should now include the updated project
+        const premiumOrgProjectsAfterProjectUpdate = await handle.find(
+            PremiumOrgProjectRelation.name!,
+            undefined,
+            undefined,
+            ['source', 'target']
+        )
+        expect(premiumOrgProjectsAfterProjectUpdate.length).toBe(4) // All projects are now included
+        
+        // Test update: Change team size to small
+        await handle.update(
+            'Team',
+            MatchExp.atom({ key: 'id', value: ['=', devTeam.id] }),
+            { size: 3 }
+        )
+        
+        // Re-query large team projects - should now have 0
+        const largeTeamProjectsAfterTeamUpdate = await handle.find(
+            LargeTeamHighBudgetProjectRelation.name!,
+            undefined,
+            undefined,
+            ['source', 'target']
+        )
+        expect(largeTeamProjectsAfterTeamUpdate.length).toBe(0)
+        
+        // Test update: Deactivate organization
+        await handle.update(
+            'Organization',
+            MatchExp.atom({ key: 'id', value: ['=', premiumOrg.id] }),
+            { isActive: false }
+        )
+        
+        // Re-query premium org projects - should exclude projects from inactive org
+        const premiumOrgProjectsAfterDeactivate = await handle.find(
+            PremiumOrgProjectRelation.name!,
+            undefined,
+            undefined,
+            ['source', 'target']
+        )
+        expect(premiumOrgProjectsAfterDeactivate.length).toBe(1) // Only Charlie's project remains
+        expect(premiumOrgProjectsAfterDeactivate[0].source.id).toBe(charlie.id)
+        
+        // Test delete: Remove member-project relations
+        const aliceRelations = await handle.find(
+            'MemberProject',
+            MatchExp.atom({ key: 'source.id', value: ['=', alice.id] }),
+            undefined,
+            ['id']
+        )
+        
+        for (const rel of aliceRelations) {
+            await handle.delete(
+                'MemberProject',
+                MatchExp.atom({ key: 'id', value: ['=', rel.id] })
+            )
+        }
+        
+        // Re-query all filtered relations
+        const premiumOrgProjectsAfterDelete = await handle.find(
+            PremiumOrgProjectRelation.name!,
+            undefined,
+            undefined,
+            ['source', 'target']
+        )
+        const largeTeamProjectsAfterDelete = await handle.find(
+            LargeTeamHighBudgetProjectRelation.name!,
+            undefined,
+            undefined,
+            ['source', 'target']
+        )
+        
+        expect(premiumOrgProjectsAfterDelete.length).toBe(1) // Only Charlie's project
+        expect(largeTeamProjectsAfterDelete.length).toBe(0) // No relations left
     })
 }) 
