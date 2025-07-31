@@ -345,7 +345,7 @@ describe('Count computed handle', () => {
     
     // Create relationship between user1 and group1
     // This should trigger computation on both sides
-    await system.storage.addRelationByNameById('User_groups_members_Group', user1.id, group1.id, {});
+    await system.storage.addRelationByNameById('userGroup', user1.id, group1.id, {});
     
     // Check if counts are updated correctly
     const updatedUser1 = await system.storage.findOne('User', BoolExp.atom({key: 'id', value: ['=', user1.id]}), undefined, ['*']);
@@ -355,8 +355,8 @@ describe('Count computed handle', () => {
     expect(updatedGroup1.memberCount).toBe(1);
     
     // Add more relationships
-    await system.storage.addRelationByNameById('User_groups_members_Group', user1.id, group2.id, {});
-    await system.storage.addRelationByNameById('User_groups_members_Group', user2.id, group1.id, {});
+    await system.storage.addRelationByNameById('userGroup', user1.id, group2.id, {});
+    await system.storage.addRelationByNameById('userGroup', user2.id, group1.id, {});
     
     // Check final counts
     const finalUser1 = await system.storage.findOne('User', BoolExp.atom({key: 'id', value: ['=', user1.id]}), undefined, ['*']);
@@ -448,9 +448,9 @@ describe('Count computed handle', () => {
     const book2 = await system.storage.create('Book', {title: 'Book 2'});
     
     // Create relationships
-    const rel1 = await system.storage.addRelationByNameById('Author_books_authors_Book', author1.id, book1.id, {});
-    const rel2 = await system.storage.addRelationByNameById('Author_books_authors_Book', author1.id, book2.id, {});
-    const rel3 = await system.storage.addRelationByNameById('Author_books_authors_Book', author2.id, book1.id, {});
+    const rel1 = await system.storage.addRelationByNameById('authorBook', author1.id, book1.id, {});
+    const rel2 = await system.storage.addRelationByNameById('authorBook', author1.id, book2.id, {});
+    const rel3 = await system.storage.addRelationByNameById('authorBook', author2.id, book1.id, {});
     
     // Check counts before deletion
     const beforeAuthor1 = await system.storage.findOne('Author', BoolExp.atom({key: 'id', value: ['=', author1.id]}), undefined, ['*']);
@@ -460,7 +460,7 @@ describe('Count computed handle', () => {
     expect(beforeBook1.authorCount).toBe(2);
     
     // Delete a relationship
-    await system.storage.removeRelationByName('Author_books_authors_Book', BoolExp.atom({key: 'id', value: ['=', rel1.id]}));
+    await system.storage.removeRelationByName('authorBook', BoolExp.atom({key: 'id', value: ['=', rel1.id]}));
     
     // Check counts after deletion
     const afterAuthor1 = await system.storage.findOne('Author', BoolExp.atom({key: 'id', value: ['=', author1.id]}), undefined, ['*']);
@@ -873,7 +873,7 @@ describe('Count computed handle', () => {
     expect(initialUser1.followingCount).toBe(0);
     
     // User1 follows User2
-    await system.storage.addRelationByNameById('User_following_followers_User', user1.id, user2.id, {});
+    await system.storage.addRelationByNameById('follows', user1.id, user2.id, {});
     
     // User1 should have 1 following, User2 should have 1 follower
     const updatedUser1 = await system.storage.findOne('User', BoolExp.atom({key: 'id', value: ['=', user1.id]}), undefined, ['*']);
@@ -885,8 +885,8 @@ describe('Count computed handle', () => {
     expect(updatedUser2.followerCount).toBe(1);
     
     // User3 follows User1, User1 follows User3 (mutual)
-    await system.storage.addRelationByNameById('User_following_followers_User', user3.id, user1.id, {});
-    await system.storage.addRelationByNameById('User_following_followers_User', user1.id, user3.id, {});
+    await system.storage.addRelationByNameById('follows', user3.id, user1.id, {});
+    await system.storage.addRelationByNameById('follows', user1.id, user3.id, {});
     
     // Check final counts
     const finalUser1 = await system.storage.findOne('User', BoolExp.atom({key: 'id', value: ['=', user1.id]}), undefined, ['*']);

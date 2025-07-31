@@ -210,8 +210,8 @@ export class DBSetup {
         }
 
         // 添加 __filtered_entities 字段到需要的实体或关系
-        const filteredBy = this.entities.filter(e => 
-            (e as any).sourceEntity === entityWithProps
+        const filteredBy = [...this.entities, ...this.relations].filter(e => 
+            (e as any).sourceEntity === entityWithProps || (e as any).sourceRelation === entityWithProps
         );
         
         if (filteredBy.length) {
@@ -225,7 +225,7 @@ export class DBSetup {
             };
         }
 
-        const { sourceEntity, matchExpression } = (entityWithProps as any) || {}
+        const { sourceEntity, matchExpression, sourceRelation } = (entityWithProps as any) || {}
         
         // Remove the validation from here - it will be done in buildMap
         
@@ -235,8 +235,8 @@ export class DBSetup {
             table: entityWithProps.name,
             attributes,
             isRelation,
-            sourceRecordName: sourceEntity?.name,
-            matchExpression: matchExpression,
+            sourceRecordName: sourceEntity?.name || sourceRelation?.name,
+            matchExpression: matchExpression || (sourceRelation && (entityWithProps as any).matchExpression),
             filteredBy: filteredBy.length ? filteredBy.map(e => e.name) : undefined,
         } as RecordMapItem
     }

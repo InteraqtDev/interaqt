@@ -198,7 +198,7 @@ describe("Entity System Refactored - compatibility test", () => {
         targetProperty: "as"
       });
 
-      expect(relation.name).toBe("A_bs_as_B");
+      expect(relation.name).toBe("CustomRelation");
     });
 
     test("should create relation with properties", () => {

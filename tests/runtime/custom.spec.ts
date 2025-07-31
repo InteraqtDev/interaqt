@@ -513,8 +513,8 @@ describe('Custom computation', () => {
     await new Promise(resolve => setTimeout(resolve, 300));
     
     // Create relations using proper method
-    await system.storage.addRelationByNameById('Post_authors_posts_User', post.id, user1.id, {});
-    await system.storage.addRelationByNameById('Post_authors_posts_User', post.id, user2.id, {});
+    await system.storage.addRelationByNameById('AuthorRelation', post.id, user1.id, {});
+    await system.storage.addRelationByNameById('AuthorRelation', post.id, user2.id, {});
     
     // 等待计算完成
     await new Promise(resolve => setTimeout(resolve, 300));

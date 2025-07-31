@@ -170,7 +170,7 @@ describe("Core Domain Classes Refactored", () => {
         type: "1:n"
       });
 
-      expect(relation.name).toBe("User_posts_author_Post");
+      expect(relation.name).toBe("UserPostRelation");
     });
 
     test("should create relation with properties", () => {

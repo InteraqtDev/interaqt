@@ -206,6 +206,11 @@ export class FilteredEntityManager {
             throw new Error('QueryAgent not set in FilteredEntityManager')
         }
         
+        // Ensure matchExpression is a BoolExp instance
+        if (!(matchExpression instanceof BoolExp)) {
+            matchExpression = BoolExp.fromValue(matchExpression)
+        }
+        
         const query = RecordQuery.create(entityName, this.map, {
             matchExpression: matchExpression.and({
                 key: 'id',

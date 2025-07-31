@@ -201,7 +201,7 @@ describe('Relation async computed', () => {
     
     const relationComputation = Array.from(controller.scheduler.computations).find(
       computation => computation.dataContext.type === 'relation' && 
-                    (computation.dataContext as RelationDataContext).id.name === 'User_items_users_Item'
+                    (computation.dataContext as RelationDataContext).id.name === 'UserItem'
     ) as DataBasedComputation;
     
     if (!relationComputation) {
@@ -226,7 +226,7 @@ describe('Relation async computed', () => {
     });
     
     // 创建一个关系来触发计算
-    const userItem1 = await system.storage.create('User_items_users_Item', {
+    const userItem1 = await system.storage.create('UserItem', {
       source: user1.id,
       target: item1.id,
       userId: user1.id,
@@ -258,7 +258,7 @@ describe('Relation async computed', () => {
     await controller.scheduler.handleAsyncReturn(relationComputation, {id: task.id});
     
     // 检查关系是否被正确更新
-    const userItemRelations = await system.storage.find('User_items_users_Item', undefined, undefined, ['*']);
+    const userItemRelations = await system.storage.find('UserItem', undefined, undefined, ['*']);
     console.log('UserItem relations after computation:', userItemRelations);
     
     // 应该有 10 个关系：完全替换，只有计算生成的关系

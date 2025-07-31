@@ -359,7 +359,7 @@ describe('Every and Any computed handle', () => {
         sourceProperty: 'items',
         target: itemsEntity,
         targetProperty: 'request',
-        name: 'items',
+        name: 'requestItems',
         type: 'n:n'
     })  
     const relations = [requestRelation, itemsRelation]

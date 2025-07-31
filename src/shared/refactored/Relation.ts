@@ -1,5 +1,5 @@
 import { IInstance, SerializedData, generateUUID } from './interfaces.js';
-import { PropertyInstance } from './Property.js';
+import { PropertyInstance, Property } from './Property.js';
 import { EntityInstance } from './Entity.js';
 import type { ComputationInstance } from './types.js';
 
@@ -13,25 +13,29 @@ export interface RelationInstance extends IInstance {
   type: string; // '1:1', '1:n', 'n:1', 'n:n'
   computation?: ComputationInstance;
   properties: PropertyInstance[];
+  sourceRelation?: RelationInstance; // for Filtered Relation
+  matchExpression?: object; // for Filtered Relation
 }
 
 export interface RelationCreateArgs {
   name?: string;
-  source: EntityInstance | RelationInstance;
-  sourceProperty: string;
-  target: EntityInstance | RelationInstance;
-  targetProperty: string;
+  source?: EntityInstance | RelationInstance;
+  sourceProperty?: string;
+  target?: EntityInstance | RelationInstance;
+  targetProperty?: string;
   isTargetReliance?: boolean;
-  type: string;
+  type?: string;
   computation?: ComputationInstance;
   properties?: PropertyInstance[];
+  sourceRelation?: RelationInstance;
+  matchExpression?: object;
 }
 
 export class Relation implements RelationInstance {
   public uuid: string;
   public _type = 'Relation';
   public _options?: { uuid?: string };
-  public name?: string;
+  private _name?: string;
   public source: EntityInstance | RelationInstance;
   public sourceProperty: string;
   public target: EntityInstance | RelationInstance;
@@ -40,21 +44,62 @@ export class Relation implements RelationInstance {
   public type: string;
   public computation?: ComputationInstance;
   public properties: PropertyInstance[];
+  public sourceRelation?: RelationInstance;
+  public matchExpression?: object;
+  
+  // Getter for name that returns computed name if _name is undefined
+  get name(): string | undefined {
+    if (this._name !== undefined) {
+      return this._name;
+    }
+    // Use computed name if available
+    return Relation.public.name.computed ? Relation.public.name.computed(this) : undefined;
+  }
+  
+  // Setter for name
+  set name(value: string | undefined) {
+    this._name = value;
+  }
   
   constructor(args: RelationCreateArgs, options?: { uuid?: string }) {
     this._options = options;
     this.uuid = generateUUID(options);
-    this.source = args.source;
-    this.sourceProperty = args.sourceProperty;
-    this.target = args.target;
-    this.targetProperty = args.targetProperty;
+    
+    // For filtered relation, inherit from sourceRelation
+    if (args.sourceRelation) {
+      // Filtered relation must have a unique name
+      if (!args.name) {
+        throw new Error('Filtered relation must be named');
+      }
+      
+      this.sourceRelation = args.sourceRelation;
+      this.matchExpression = args.matchExpression;
+      this.source = args.sourceRelation.source;
+      this.sourceProperty = args.sourceRelation.sourceProperty;
+      this.target = args.sourceRelation.target;
+      this.targetProperty = args.sourceRelation.targetProperty;
+      this.isTargetReliance = args.sourceRelation.isTargetReliance;
+      this.type = args.sourceRelation.type;
+      this._name = args.name;
+    } else {
+      // Normal relation, require all fields
+      if (!args.source || !args.sourceProperty || !args.target || !args.targetProperty || !args.type) {
+        throw new Error('Relation requires source, sourceProperty, target, targetProperty, and type');
+      }
+      
+      this.source = args.source;
+      this.sourceProperty = args.sourceProperty;
+      this.target = args.target;
+      this.targetProperty = args.targetProperty;
+      this.type = args.type;
+      // Use provided name or leave undefined (will use computed name)
+      this._name = args.name;
+    }
+    
+    // Common fields
     this.isTargetReliance = args.isTargetReliance ?? false;
-    this.type = args.type;
     this.computation = args.computation;
     this.properties = args.properties || [];
-    
-    // 始终使用计算出的完整名称
-    this.name = `${args.source.name}_${args.sourceProperty}_${args.targetProperty}_${args.target.name}`;
   }
   
   // 静态属性和方法
@@ -121,6 +166,16 @@ export class Relation implements RelationInstance {
         }
       },
       defaultValue: () => []
+    },
+    sourceRelation: {
+      type: 'Relation' as const,
+      collection: false as const,
+      required: false as const,
+    },
+    matchExpression: {
+      type: 'object' as const,
+      collection: false as const,
+      required: false as const,
     }
   };
   
@@ -147,8 +202,14 @@ export class Relation implements RelationInstance {
       type: instance.type,
       properties: instance.properties
     };
-    if (instance.name !== undefined) args.name = instance.name;
+    
+    // Use the private _name field if the instance is a Relation class instance
+    const name = (instance as any)._name ?? instance.name;
+    if (name !== undefined) args.name = name;
+    
     if (instance.computation !== undefined) args.computation = instance.computation;
+    if (instance.sourceRelation !== undefined) args.sourceRelation = instance.sourceRelation;
+    if (instance.matchExpression !== undefined) args.matchExpression = instance.matchExpression;
     
     const data: SerializedData<RelationCreateArgs> = {
       type: 'Relation',
@@ -156,10 +217,11 @@ export class Relation implements RelationInstance {
       uuid: instance.uuid,
       public: args
     };
+    
     return JSON.stringify(data);
   }
   
-  static clone(instance: RelationInstance, deep: boolean): RelationInstance {
+  static clone(instance: RelationInstance): RelationInstance {
     const args: RelationCreateArgs = {
       source: instance.source,
       sourceProperty: instance.sourceProperty,
@@ -167,12 +229,18 @@ export class Relation implements RelationInstance {
       targetProperty: instance.targetProperty,
       isTargetReliance: instance.isTargetReliance,
       type: instance.type,
-      properties: instance.properties,
-      computation: instance.computation,
-      name: instance.name
+      properties: instance.properties?.map(p => Property.clone(p, false))
     };
     
-    return this.create(args);
+    // Use the private _name field if the instance is a Relation class instance
+    const name = (instance as any)._name ?? instance.name;
+    if (name !== undefined) args.name = name;
+    
+    if (instance.computation !== undefined) args.computation = instance.computation; // Note: This is a reference, not a deep clone
+    if (instance.sourceRelation !== undefined) args.sourceRelation = instance.sourceRelation;
+    if (instance.matchExpression !== undefined) args.matchExpression = instance.matchExpression;
+    
+    return new Relation(args, instance._options);
   }
   
   static is(obj: unknown): obj is RelationInstance {
