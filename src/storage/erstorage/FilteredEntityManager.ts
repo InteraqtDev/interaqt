@@ -156,10 +156,6 @@ export class FilteredEntityManager {
         changedRecordId: string,
         changedAttributes: string[]
     ): Promise<{ id: string }[]> {
-        if (!this.queryAgent) {
-            throw new Error('QueryAgent not set in FilteredEntityManager')
-        }
-        
         // 找到这个实体在依赖中的定义
         const depInfo = dependency.dependencies.find(d => d.entityName === changedEntityName)
         if (!depInfo) {
@@ -178,58 +174,24 @@ export class FilteredEntityManager {
         }
         
         // 构建反向查询，从变更的实体查找到源实体
-        // 例如：如果依赖路径是 ['teams']，那么需要查找所有 teams 包含这个记录的源实体
-        return this.buildReverseQuery(
-            dependency.sourceEntityName,
-            changedEntityName,
-            changedRecordId,
-            depInfo.path
-        )
-    }
-    
-    /**
-     * 构建反向查询，从目标实体找回源实体
-     */
-    private async buildReverseQuery(
-        sourceEntityName: string,
-        targetEntityName: string,
-        targetRecordId: string,
-        path: string[]
-    ): Promise<{ id: string }[]> {
-        if (!this.queryAgent) {
-            throw new Error('QueryAgent not set in FilteredEntityManager')
-        }
-        
-        // 如果路径为空，说明是直接匹配
-        if (path.length === 0) {
-            const query = RecordQuery.create(sourceEntityName, this.map, {
-                matchExpression: MatchExp.atom({
-                    key: 'id',
-                    value: ['=', targetRecordId]
-                }),
-                attributeQuery: ['id']
-            })
-            return this.queryAgent.findRecords(query, `find affected source records for ${sourceEntityName}`)
-        }
-        
         // path 已经是从源实体到目标实体的关系路径
         // 例如：对于 User 依赖 Team.type，path = ['team']
         // 我们需要查找所有 team.id = targetRecordId 的 User
         
         // 构建查询条件：path.id = targetRecordId
-        const matchKey = path.concat('id').join('.')
+        const matchKey = depInfo.path.concat('id').join('.')
         const matchCondition = MatchExp.atom({
             key: matchKey,
-            value: ['=', targetRecordId]
+            value: ['=', changedRecordId]
         })
         
         // 执行查询
-        const query = RecordQuery.create(sourceEntityName, this.map, {
+        const query = RecordQuery.create(dependency.sourceEntityName, this.map, {
             matchExpression: matchCondition,
             attributeQuery: ['id']
         })
         
-        return this.queryAgent.findRecords(query, `find affected source records for ${sourceEntityName}`)
+        return this.queryAgent.findRecords(query, `find affected source records for ${dependency.sourceEntityName}`)
     }
     
     /**
@@ -278,131 +240,10 @@ export class FilteredEntityManager {
     async updateFilteredEntityFlags(
         entityName: string, 
         recordId: string, 
-        events?: RecordMutationEvent[], 
+        events: RecordMutationEvent[] = [], 
         originalRecord?: any, 
         isCreation?: boolean, 
         changedFields?: string[]
-    ): Promise<void> {
-        // 处理直接的 filtered entity（基于源实体自身的过滤条件）
-        const filteredEntities = this.getFilteredEntitiesForSource(entityName);
-        
-        if (filteredEntities.length === 0) {
-            // 即使没有直接的 filtered entity，也需要处理级联事件
-            const changedAttributes = changedFields || (isCreation && originalRecord ? Object.keys(originalRecord) : []);
-            await this.processCascadeEvents(
-                entityName,
-                recordId,
-                changedAttributes,
-                originalRecord,
-                events || []
-            );
-            return;
-        }
-
-        // 获取原始记录的 __filtered_entities 状态
-        // Parse JSON string to object if needed
-        let originalFlags: { [key: string]: boolean } = {};
-        if (originalRecord?.__filtered_entities) {
-            originalFlags = typeof originalRecord.__filtered_entities === 'string'
-                ? JSON.parse(originalRecord.__filtered_entities)
-                : originalRecord.__filtered_entities;
-        }
-
-        // 获取更新后的记录以检查当前过滤条件
-        const idMatch = MatchExp.atom({ key: 'id', value: ['=', recordId] });
-        const updatedRecords = await this.queryAgent.findRecords(
-            RecordQuery.create(entityName, this.map, { matchExpression: idMatch, attributeQuery: ['*'] }),
-            `find updated record for filtered entity check ${entityName}:${recordId}`
-        );
-        
-        if (updatedRecords.length === 0) return;
-        const updatedRecord = updatedRecords[0];
-
-        // 检查每个 filtered entity 条件
-        const isNewRecord = !originalRecord || Object.keys(originalFlags).length === 0;
-        const newFlags = { ...originalFlags };
-        
-        for (const filteredEntity of filteredEntities) {
-            // 检查记录是否满足过滤条件 - 直接使用过滤条件查询
-            const matchingRecords = await this.queryAgent.findRecords(
-                RecordQuery.create(entityName, this.map, { 
-                    matchExpression: filteredEntity.matchExpression.and({
-                        key: 'id',
-                        value: ['=', recordId]
-                    }),
-                    modifier: {
-                        limit: 1
-                    }
-                }),
-                `check filtered entity condition ${filteredEntity.name} for ${entityName}`
-            );
-            
-            // 检查当前记录是否在匹配的记录中
-            const belongsToFilteredEntity = matchingRecords.length > 0;
-            const previouslyBelonged = originalFlags[filteredEntity.name] === true;
-            
-            newFlags[filteredEntity.name] = belongsToFilteredEntity;
-            
-            // 生成相应的事件
-            // 对于新创建的记录，如果满足条件就生成 create 事件
-            // 对于已存在的记录，只在状态变化时生成事件
-            if (belongsToFilteredEntity && (isNewRecord || !previouslyBelonged)) {
-                // 记录现在属于这个 filtered entity
-                events?.push({
-                    type: 'create',
-                    recordName: filteredEntity.name,
-                    record: { ...updatedRecord }
-                });
-            } else if (!belongsToFilteredEntity && previouslyBelonged && !isNewRecord) {
-                // 记录不再属于这个 filtered entity
-                events?.push({
-                    type: 'delete',
-                    recordName: filteredEntity.name,
-                    record: { ...updatedRecord }
-                });
-            }
-        }
-
-        // 更新 __filtered_entities 字段（这是内部操作，不生成事件）
-        if (JSON.stringify(originalFlags) !== JSON.stringify(newFlags)) {
-            // 获取 __filtered_entities 字段的实际数据库字段名
-            const recordInfo = this.map.getRecordInfo(entityName);
-            const filteredEntitiesAttribute = recordInfo.data.attributes['__filtered_entities'];
-            
-            if (filteredEntitiesAttribute && (filteredEntitiesAttribute as any).field) {
-                const fieldName = (filteredEntitiesAttribute as any).field;
-                const fieldType = (filteredEntitiesAttribute as any).fieldType;
-                
-                await this.queryAgent.updateRecordDataById(entityName, { id: recordId }, [
-                    { 
-                        field: fieldName, 
-                        value: this.queryAgent.prepareFieldValue(newFlags, fieldType) 
-                    }
-                ]);
-            }
-        }
-        
-        // 处理跨实体的级联事件
-        // 如果有传入 changedFields，使用它；否则在创建时使用所有字段
-        const changedAttributes = changedFields || (isCreation && originalRecord ? Object.keys(originalRecord) : []);
-        await this.processCascadeEvents(
-            entityName,
-            recordId,
-            changedAttributes,
-            originalRecord,
-            events || []
-        );
-    }
-    
-    /**
-     * 处理实体变更时的级联事件
-     */
-    async processCascadeEvents(
-        entityName: string,
-        recordId: string,
-        changedAttributes: string[],
-        originalRecord: any,
-        events: RecordMutationEvent[]
     ): Promise<void> {
         // 获取所有依赖于这个实体的 filtered entity
         const dependencies = this.getAffectedFilteredEntities(entityName)
@@ -410,47 +251,33 @@ export class FilteredEntityManager {
         if (dependencies.length === 0) {
             return
         }
+        const changedAttributes = changedFields || (isCreation && originalRecord ? Object.keys(originalRecord) : []);
         
         // 处理每个受影响的 filtered entity
         for (const dependency of dependencies) {
-            await this.processDependency(
+            // 找到所有受影响的源记录
+            const affectedSourceRecords = await this.findAffectedSourceRecords(
                 dependency,
                 entityName,
                 recordId,
-                changedAttributes,
-                originalRecord,
-                events
+                changedAttributes
             )
+            
+            // 更新每个受影响的源记录的 filtered entity 标记
+            for (const sourceRecord of affectedSourceRecords) {
+                await this.updateSingleFilteredEntityFlag(
+                    dependency,
+                    sourceRecord.id,
+                    events
+                )
+            }
         }
     }
-    
-    /**
-     * 处理单个依赖关系
-     */
-    private async processDependency(
-        dependency: FilteredEntityDependency,
-        changedEntityName: string,
-        changedRecordId: string,
-        changedAttributes: string[],
-        originalRecord: any,
-        events: RecordMutationEvent[]
-    ): Promise<void> {
-        // 找到所有受影响的源记录
-        const affectedSourceRecords = await this.findAffectedSourceRecords(
-            dependency,
-            changedEntityName,
-            changedRecordId,
-            changedAttributes
-        )
-        
-        // 更新每个受影响的源记录的 filtered entity 标记
-        for (const sourceRecord of affectedSourceRecords) {
-            await this.updateSingleFilteredEntityFlag(
-                dependency,
-                sourceRecord.id,
-                events
-            )
-        }
+    isFlagEqual(flag1: { [key: string]: boolean }, flag2: { [key: string]: boolean }): boolean {
+        // 只检验 key 为 true 的是否完全相同。为 false 或者 undefined 的 key 不参与比较
+        const keys1 = Object.keys(flag1).filter(key => flag1[key] === true);
+        const keys2 = Object.keys(flag2).filter(key => flag2[key] === true);
+        return keys1.length === keys2.length && keys1.every(key => flag2[key] === true);
     }
     
     /**
@@ -461,15 +288,11 @@ export class FilteredEntityManager {
         recordId: string,
         events: RecordMutationEvent[]
     ): Promise<void> {
-        if (!this.queryAgent) {
-            throw new Error('QueryAgent not set in FilteredEntityManager')
-        }
-        
         // 获取记录当前的 __filtered_entities 状态
         const currentRecord = await this.queryAgent.findRecords(
             RecordQuery.create(dependency.sourceEntityName, this.map, {
                 matchExpression: MatchExp.atom({ key: 'id', value: ['=', recordId] }),
-                attributeQuery: ['id', '__filtered_entities']
+                attributeQuery: ['*']
             }),
             `get current filtered entity flags for ${dependency.sourceEntityName}:${recordId}`
         )
@@ -480,7 +303,8 @@ export class FilteredEntityManager {
         
         const record = currentRecord[0]
         // Parse JSON string to object, or use empty object if not present
-        let currentFlags: { [key: string]: boolean } = {};
+        // FIXME 为什么会有 string 的情况？
+        let currentFlags: { [key: string]: boolean } = record.__filtered_entities;;
         if (record.__filtered_entities) {
             currentFlags = typeof record.__filtered_entities === 'string'
                 ? JSON.parse(record.__filtered_entities)

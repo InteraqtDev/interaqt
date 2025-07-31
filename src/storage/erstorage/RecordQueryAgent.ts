@@ -1518,7 +1518,7 @@ WHERE "${recordInfo.idField}" = ${p()}
 
     }
 
-    // 查找树形结构的两个数据见的 path
+    // 查找树形结构的两个数据间的 path
     async findPath(recordName: string, attributePathStr: string, startRecordId: string, endRecordId: string, limitLength?: number): Promise<Record[] | undefined> {
         const attributePathAndLast = attributePathStr.split('.')
         const endAttribute = attributePathAndLast.at(-1)!
