@@ -149,7 +149,7 @@ describe("Simple Objects Refactored - compatibility test", () => {
       
       expect(node.name).toBe("processing");
       expect(node.computeValue).toBeDefined();
-      expect(typeof node.computeValue!()).toBe("number");
+      expect(typeof node.computeValue!(undefined)).toBe("number");
     });
   });
 

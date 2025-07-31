@@ -221,7 +221,7 @@ export class Relation implements RelationInstance {
     return JSON.stringify(data);
   }
   
-  static clone(instance: RelationInstance): RelationInstance {
+  static clone(instance: RelationInstance, deep = false): RelationInstance {
     const args: RelationCreateArgs = {
       source: instance.source,
       sourceProperty: instance.sourceProperty,
@@ -229,7 +229,7 @@ export class Relation implements RelationInstance {
       targetProperty: instance.targetProperty,
       isTargetReliance: instance.isTargetReliance,
       type: instance.type,
-      properties: instance.properties?.map(p => Property.clone(p, false))
+      properties: instance.properties?.map(p => Property.clone(p, deep))
     };
     
     // Use the private _name field if the instance is a Relation class instance
