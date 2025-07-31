@@ -110,7 +110,7 @@ describe('filtered entity with cross-entity queries', () => {
         const activeUsersEntity = Entity.create({
             name: 'ActiveUsersInTechTeam',
             sourceEntity: userEntity,
-            filterCondition: MatchExp.atom({
+            matchExpression: MatchExp.atom({
                 key: 'isActive',
                 value: ['=', true]
             }).and({
@@ -123,7 +123,7 @@ describe('filtered entity with cross-entity queries', () => {
         // const usersInActiveProjectsEntity = Entity.create({
         //     name: 'UsersInActiveProjects',
         //     sourceEntity: userEntity,
-        //     filterCondition: MatchExp.atom({
+        //     matchExpression: MatchExp.atom({
         //         key: 'team.projects.status',
         //         value: ['=', 'active']
         //     })
@@ -132,7 +132,7 @@ describe('filtered entity with cross-entity queries', () => {
         const adminUsersInTechTeamEntity = Entity.create({
             name: 'AdminUsersInTechTeam',
             sourceEntity: userEntity,
-            filterCondition: MatchExp.atom({
+            matchExpression: MatchExp.atom({
                 key: 'role',
                 value: ['=', 'admin']
             }).and({
@@ -145,7 +145,7 @@ describe('filtered entity with cross-entity queries', () => {
         const usersInHighBudgetDepartmentsEntity = Entity.create({
             name: 'UsersInHighBudgetDepartments',
             sourceEntity: userEntity,
-            filterCondition: MatchExp.atom({
+            matchExpression: MatchExp.atom({
                 key: 'team.department.budget',
                 value: ['>', 1000000]
             })
@@ -154,7 +154,7 @@ describe('filtered entity with cross-entity queries', () => {
         const usersInAsianRegionEntity = Entity.create({
             name: 'UsersInAsianRegion',
             sourceEntity: userEntity,
-            filterCondition: MatchExp.atom({
+            matchExpression: MatchExp.atom({
                 key: 'team.department.region',
                 value: ['=', 'Asia']
             })
@@ -163,7 +163,7 @@ describe('filtered entity with cross-entity queries', () => {
         const usersInLargeDivisionsEntity = Entity.create({
             name: 'UsersInLargeDivisions',
             sourceEntity: userEntity,
-            filterCondition: MatchExp.atom({
+            matchExpression: MatchExp.atom({
                 key: 'team.department.division.headcount',
                 value: ['>', 500]
             })
@@ -172,7 +172,7 @@ describe('filtered entity with cross-entity queries', () => {
         const usersInTechCompaniesEntity = Entity.create({
             name: 'UsersInTechCompanies',
             sourceEntity: userEntity,
-            filterCondition: MatchExp.atom({
+            matchExpression: MatchExp.atom({
                 key: 'team.department.division.company.industry',
                 value: ['=', 'Technology']
             })
@@ -181,7 +181,7 @@ describe('filtered entity with cross-entity queries', () => {
         const activeUsersInPublicCompaniesEntity = Entity.create({
             name: 'ActiveUsersInPublicCompanies',
             sourceEntity: userEntity,
-            filterCondition: MatchExp.atom({
+            matchExpression: MatchExp.atom({
                 key: 'isActive',
                 value: ['=', true]
             }).and({
@@ -971,7 +971,7 @@ describe('filtered entity validation', () => {
         const invalidFilteredEntity = Entity.create({
             name: 'InvalidFilteredEntity',
             sourceEntity: userEntity,
-            filterCondition: MatchExp.atom({
+            matchExpression: MatchExp.atom({
                 key: 'team.projects.status',  // This path contains 1:n relation
                 value: ['=', 'active']
             })
@@ -1030,7 +1030,7 @@ describe('filtered entity validation', () => {
         const validFilteredEntity = Entity.create({
             name: 'UsersInHighBudgetDepartments',
             sourceEntity: userEntity,
-            filterCondition: MatchExp.atom({
+            matchExpression: MatchExp.atom({
                 key: 'team.department.budget',
                 value: ['>', 100000]
             })

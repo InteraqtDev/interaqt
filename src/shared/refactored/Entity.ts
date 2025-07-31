@@ -10,7 +10,7 @@ export interface EntityInstance extends IInstance {
   properties: PropertyInstance[];
   computation?: ComputationInstance;
   sourceEntity?: EntityInstance | RelationInstance; // for Filtered Entity
-  filterCondition?: object; // for Filtered Entity
+  matchExpression?: object; // for Filtered Entity
 }
 
 export interface EntityCreateArgs {
@@ -18,7 +18,7 @@ export interface EntityCreateArgs {
   properties?: PropertyInstance[];
   computation?: ComputationInstance;
   sourceEntity?: EntityInstance | RelationInstance;
-  filterCondition?: object;
+  matchExpression?: object;
 }
 
 export class Entity implements EntityInstance {
@@ -29,7 +29,7 @@ export class Entity implements EntityInstance {
   public properties: PropertyInstance[];
   public computation?: ComputationInstance;
   public sourceEntity?: EntityInstance | RelationInstance;
-  public filterCondition?: object;
+  public matchExpression?: object;
   
   constructor(args: EntityCreateArgs, options?: { uuid?: string }) {
     this._options = options;
@@ -38,7 +38,7 @@ export class Entity implements EntityInstance {
     this.properties = args.properties || [];
     this.computation = args.computation;
     this.sourceEntity = args.sourceEntity;
-    this.filterCondition = args.filterCondition;
+    this.matchExpression = args.matchExpression;
   }
   
   // 静态属性和方法
@@ -78,7 +78,7 @@ export class Entity implements EntityInstance {
       collection: false as const,
       required: false as const,
     },
-    filterCondition: {
+    matchExpression: {
       type: 'object' as const,
       collection: false as const,
       required: false as const,
@@ -104,7 +104,7 @@ export class Entity implements EntityInstance {
       properties: instance.properties,
       computation: instance.computation,
       sourceEntity: instance.sourceEntity,
-      filterCondition: instance.filterCondition
+      matchExpression: instance.matchExpression
     };
     
     const data: SerializedData<EntityCreateArgs> = {
@@ -122,7 +122,7 @@ export class Entity implements EntityInstance {
       properties: [...instance.properties],
       computation: instance.computation,
       sourceEntity: instance.sourceEntity,
-      filterCondition: instance.filterCondition
+      matchExpression: instance.matchExpression
     };
     
     return this.create(args);

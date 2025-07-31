@@ -117,12 +117,12 @@ describe("Entity System Refactored - compatibility test", () => {
       const filteredEntity = Entity.create({
         name: "ActiveUser",
         sourceEntity: sourceEntity,
-        filterCondition: { status: "active" }
+        matchExpression: { status: "active" }
       });
 
       expect(filteredEntity.name).toBe("ActiveUser");
       expect(filteredEntity.sourceEntity).toBe(sourceEntity);
-      expect(filteredEntity.filterCondition).toEqual({ status: "active" });
+      expect(filteredEntity.matchExpression).toEqual({ status: "active" });
     });
 
     test("should stringify and parse entity", () => {

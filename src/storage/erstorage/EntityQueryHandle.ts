@@ -34,7 +34,7 @@ export class EntityQueryHandle {
             }
 
             // 构造查询条件：过滤条件 + 额外的匹配条件（如果有）
-            let combinedMatch = config.filterCondition;
+            let combinedMatch = config.matchExpression;
             
             if (matchExpressionData) {
                 combinedMatch = new MatchExp(config.sourceRecordName, this.map, combinedMatch)
@@ -76,9 +76,9 @@ export class EntityQueryHandle {
             }
 
             // 构造查询条件：过滤条件 + 原有的匹配条件
-            let combinedMatch = config.filterCondition;
+            let combinedMatch = config.matchExpression;
             if (matchExpressionData) {
-                combinedMatch = new MatchExp(config.sourceRecordName, this.map, config.filterCondition)
+                combinedMatch = new MatchExp(config.sourceRecordName, this.map, config.matchExpression)
                     .and(new MatchExp(config.sourceRecordName, this.map, matchExpressionData))
                     .data;
             }
@@ -101,7 +101,7 @@ export class EntityQueryHandle {
             }
 
             // 构造查询条件：过滤条件 + 原有的匹配条件
-            const combinedMatchExp = new MatchExp(config.sourceRecordName, this.map, config.filterCondition)
+            const combinedMatchExp = new MatchExp(config.sourceRecordName, this.map, config.matchExpression)
                 .and(new MatchExp(config.sourceRecordName, this.map, matchExpressionData));
             
             // 确保 combinedMatch 有值
@@ -175,12 +175,12 @@ export class EntityQueryHandle {
     /**
      * 获取 filtered entity 的配置
      */
-    getFilteredEntityConfig(entityName: string): { sourceRecordName: string, filterCondition: any } | null {
+    getFilteredEntityConfig(entityName: string): { sourceRecordName: string, matchExpression: any } | null {
         const recordInfo = this.map.getRecordInfo(entityName)
         if (recordInfo.sourceRecordName) {
             return {
                 sourceRecordName: recordInfo.sourceRecordName!,
-                filterCondition: recordInfo.filterCondition!
+                matchExpression: recordInfo.matchExpression!
             };
         }
         return null;
@@ -189,10 +189,10 @@ export class EntityQueryHandle {
     /**
      * 获取基于指定源实体的所有 filtered entities
      */
-    getFilteredEntitiesForSource(sourceEntityName: string): Array<{ name: string, filterCondition: any }> {
+    getFilteredEntitiesForSource(sourceEntityName: string): Array<{ name: string, matchExpression: any }> {
         return this.map.getRecordInfo(sourceEntityName).filteredBy?.map(recordInfo => ({
             name: recordInfo.name,
-            filterCondition: recordInfo.filterCondition
+            matchExpression: recordInfo.matchExpression
         })) || []
     }
 

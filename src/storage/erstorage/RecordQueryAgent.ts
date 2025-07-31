@@ -110,11 +110,11 @@ export class RecordQueryAgent {
         const records = this.map.data.records
         
         for (const [recordName, recordData] of Object.entries(records)) {
-            if (recordData.sourceRecordName && recordData.filterCondition) {
+            if (recordData.sourceRecordName && recordData.matchExpression) {
                 this.filteredEntityManager.analyzeDependencies(
                     recordName,
                     recordData.sourceRecordName,
-                    recordData.filterCondition
+                    recordData.matchExpression
                 )
             }
         }

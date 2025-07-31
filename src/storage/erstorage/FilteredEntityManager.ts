@@ -8,7 +8,7 @@ import { RecordMutationEvent } from "@runtime"
 export interface FilteredEntityDependency {
     filteredEntityName: string
     sourceEntityName: string
-    filterCondition: MatchExpressionData
+    matchExpression: MatchExpressionData
     dependencies: {
         entityName: string
         path: string[]  // 从 source entity 到依赖 entity 的路径
@@ -29,14 +29,14 @@ export class FilteredEntityManager {
     /**
      * 分析 filtered entity 的过滤条件，提取所有依赖的实体和路径
      */
-    analyzeDependencies(filteredEntityName: string, sourceEntityName: string, filterCondition: MatchExpressionData): FilteredEntityDependency {
+    analyzeDependencies(filteredEntityName: string, sourceEntityName: string, matchExpression: MatchExpressionData): FilteredEntityDependency {
         const dependencies: FilteredEntityDependency['dependencies'] = []
-        this.extractDependenciesFromExpression(sourceEntityName, filterCondition, dependencies)
+        this.extractDependenciesFromExpression(sourceEntityName, matchExpression, dependencies)
         
         const dependency: FilteredEntityDependency = {
             filteredEntityName,
             sourceEntityName,
-            filterCondition,
+            matchExpression,
             dependencies
         }
         
@@ -238,14 +238,14 @@ export class FilteredEntityManager {
     async checkRecordMatchesFilter(
         recordId: string,
         entityName: string,
-        filterCondition: MatchExpressionData
+        matchExpression: MatchExpressionData
     ): Promise<boolean> {
         if (!this.queryAgent) {
             throw new Error('QueryAgent not set in FilteredEntityManager')
         }
         
         const query = RecordQuery.create(entityName, this.map, {
-            matchExpression: filterCondition.and({
+            matchExpression: matchExpression.and({
                 key: 'id',
                 value: ['=', recordId]
             }),
@@ -265,10 +265,10 @@ export class FilteredEntityManager {
     /**
      * 获取基于指定源实体的所有 filtered entities
      */
-    getFilteredEntitiesForSource(sourceEntityName: string): Array<{ name: string, filterCondition: any }> {
+    getFilteredEntitiesForSource(sourceEntityName: string): Array<{ name: string, matchExpression: any }> {
         return this.map.getRecordInfo(sourceEntityName).filteredBy?.map(recordInfo => ({
             name: recordInfo.name,
-            filterCondition: recordInfo.filterCondition
+            matchExpression: recordInfo.matchExpression
         })) || []
     }
     
@@ -326,7 +326,7 @@ export class FilteredEntityManager {
             // 检查记录是否满足过滤条件 - 直接使用过滤条件查询
             const matchingRecords = await this.queryAgent.findRecords(
                 RecordQuery.create(entityName, this.map, { 
-                    matchExpression: filteredEntity.filterCondition.and({
+                    matchExpression: filteredEntity.matchExpression.and({
                         key: 'id',
                         value: ['=', recordId]
                     }),
@@ -491,7 +491,7 @@ export class FilteredEntityManager {
         const matchesFilter = await this.checkRecordMatchesFilter(
             recordId,
             dependency.sourceEntityName,
-            dependency.filterCondition
+            dependency.matchExpression
         )
         
         const previouslyBelonged = currentFlags[dependency.filteredEntityName] === true

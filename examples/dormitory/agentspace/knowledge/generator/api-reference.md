@@ -18,7 +18,7 @@ Entity.create(config: EntityConfig): EntityInstance
 - `config.properties` (Property[], required): Entity property list, defaults to empty array
 - `config.computation` (Computation[], optional): Entity-level computed data
 - `config.sourceEntity` (Entity|Relation, optional): Source entity for filtered entity (used to create filtered entities)
-- `config.filterCondition` (MatchExp, optional): Filter condition (used to create filtered entities)
+- `config.matchExpression` (MatchExp, optional): Match expression (used to create filtered entities)
 
 **Examples**
 ```typescript
@@ -35,7 +35,7 @@ const User = Entity.create({
 const ActiveUser = Entity.create({
     name: 'ActiveUser',
     sourceEntity: User,
-    filterCondition: MatchExp.atom({
+    matchExpression: MatchExp.atom({
         key: 'status',
         value: ['=', 'active']
     })

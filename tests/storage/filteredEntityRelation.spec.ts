@@ -65,7 +65,7 @@ describe('Filtered Entity with Relation as Source', () => {
     // const ActiveMemberships = Entity.create({
     //     name: 'ActiveMemberships',
     //     sourceEntity: UserTeamRelation,
-    //     filterCondition: MatchExp.atom({
+    //     matchExpression: MatchExp.atom({
     //         key: 'source.isActive',
     //         value: ['=', true]
     //     })
@@ -74,7 +74,7 @@ describe('Filtered Entity with Relation as Source', () => {
     const AdminMemberships = Entity.create({
         name: 'AdminMemberships',
         sourceEntity: UserTeamRelation,
-        filterCondition: MatchExp.atom({
+        matchExpression: MatchExp.atom({
             key: 'role',
             value: ['=', 'admin']
         })
@@ -83,7 +83,7 @@ describe('Filtered Entity with Relation as Source', () => {
     const ProjectLeads = Entity.create({
         name: 'ProjectLeads',
         sourceEntity: UserProjectRelation,
-        filterCondition: MatchExp.atom({
+        matchExpression: MatchExp.atom({
             key: 'role',
             value: ['=', 'lead']
         })
@@ -92,7 +92,7 @@ describe('Filtered Entity with Relation as Source', () => {
     const SeniorAdminMemberships = Entity.create({
         name: 'SeniorAdminMemberships',
         sourceEntity: UserTeamRelation,
-        filterCondition: MatchExp.atom({
+        matchExpression: MatchExp.atom({
             key: 'role',
             value: ['=', 'admin']
         }).and({

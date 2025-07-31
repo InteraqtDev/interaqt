@@ -197,7 +197,7 @@ describe('Average computed handle', () => {
     const engineerEntity = Entity.create({
       name: 'Engineer',
       sourceEntity: employeeEntity,
-      filterCondition: MatchExp.atom({
+                  matchExpression: MatchExp.atom({
         key: 'department',
         value: ['=', 'engineering']
       })

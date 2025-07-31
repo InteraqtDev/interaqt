@@ -47,9 +47,9 @@ export type RecordMapItem = {
     }
     isRelation? :boolean,
     sourceRecordName? : string,
-    filterCondition?: MatchExpressionData,
+    matchExpression?: MatchExpressionData,
     resolvedSourceRecordName?: string,
-    resolvedFilterCondition?: MatchExpressionData,
+    resolvedMatchExpression?: MatchExpressionData,
     filteredBy? : string[],
 }
 

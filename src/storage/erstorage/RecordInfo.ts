@@ -16,8 +16,8 @@ export class RecordInfo {
         return this.data.sourceRecordName
     }
 
-    get filterCondition() {
-        return this.data.filterCondition
+    get matchExpression() {
+        return this.data.matchExpression
     }
 
     get filteredBy() {

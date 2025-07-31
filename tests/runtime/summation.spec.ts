@@ -302,7 +302,7 @@ describe('Sum computed handle', () => {
     const completedOrderEntity = Entity.create({
       name: 'CompletedOrder',
       sourceEntity: orderEntity,
-      filterCondition: MatchExp.atom({
+                  matchExpression: MatchExp.atom({
         key: 'status',
         value: ['=', 'completed']
       })

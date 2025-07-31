@@ -118,23 +118,23 @@ export class DBSetup {
     resolveBaseSourceEntityAndFilter(entity: EntityInstance) {
         const entityWithProps = entity
         let sourceEntity = (entityWithProps as any).sourceEntity
-        let filterCondition = (entityWithProps as any).filterCondition
-        assert((sourceEntity && filterCondition) || (!sourceEntity && !filterCondition), `filterCondition is required for ${entityWithProps.name}`)
-        if (!(sourceEntity && filterCondition)) return
+        let matchExpression = (entityWithProps as any).matchExpression
+        assert((sourceEntity && matchExpression) || (!sourceEntity && !matchExpression), `matchExpression is required for ${entityWithProps.name}`)
+        if (!(sourceEntity && matchExpression)) return
 
         while(sourceEntity.sourceEntity) {
             sourceEntity = sourceEntity.sourceEntity
-            filterCondition = filterCondition.and(sourceEntity.filter)
+            matchExpression = matchExpression.and(sourceEntity.filter)
         }
 
-        return { sourceEntity, filterCondition }
+        return { sourceEntity, matchExpression }
     }
 
     /**
      * 验证 filtered entity 的过滤条件中的路径不包含 x:n 关系
      */
-    private validateFilteredEntityPaths(entityName: string, filterCondition: MatchExpressionData) {
-        const paths = MatchExp.extractPaths(filterCondition);
+    private validateFilteredEntityPaths(entityName: string, matchExpression: MatchExpressionData) {
+        const paths = MatchExp.extractPaths(matchExpression);
         
         for (const path of paths) {
             this.validateSinglePath(entityName, path);
@@ -225,7 +225,7 @@ export class DBSetup {
             };
         }
 
-        const { sourceEntity, filterCondition } = (entityWithProps as any) || {}
+        const { sourceEntity, matchExpression } = (entityWithProps as any) || {}
         
         // Remove the validation from here - it will be done in buildMap
         
@@ -236,7 +236,7 @@ export class DBSetup {
             attributes,
             isRelation,
             sourceRecordName: sourceEntity?.name,
-            filterCondition: filterCondition,
+            matchExpression: matchExpression,
             filteredBy: filteredBy.length ? filteredBy.map(e => e.name) : undefined,
         } as RecordMapItem
     }
@@ -343,10 +343,10 @@ export class DBSetup {
         // 4. 验证所有 filtered entity 的路径
         this.entities.forEach(entity => {
             const entityWithProps = entity as any;
-            if (entityWithProps.sourceEntity && entityWithProps.filterCondition) {
+            if (entityWithProps.sourceEntity && entityWithProps.matchExpression) {
                 this.currentFilteredEntityName = entityWithProps.name;
                 try {
-                    this.validateFilteredEntityPaths(entityWithProps.sourceEntity.name, entityWithProps.filterCondition);
+                    this.validateFilteredEntityPaths(entityWithProps.sourceEntity.name, entityWithProps.matchExpression);
                 } finally {
                     this.currentFilteredEntityName = undefined;
                 }

@@ -236,33 +236,33 @@ Filtered entities are derived entities that automatically filter records from a 
 const PublishedStyle = Entity.create({
   name: 'PublishedStyle',
   sourceEntity: Style,  // The entity to filter from
-  filterCondition: MatchExp.atom({
+  matchExpression: MatchExp.atom({
     key: 'status',
     value: ['=', 'published']
   })
 });
 ```
 
-### FilterCondition Property Type
+### MatchExpression Property Type
 
-The `filterCondition` uses `MatchExp` expressions to define filtering criteria:
+The `matchExpression` uses `MatchExp` expressions to define filtering criteria:
 
 #### Basic Conditions
 ```typescript
 // Single condition
-filterCondition: MatchExp.atom({
+matchExpression: MatchExp.atom({
   key: 'status',
   value: ['=', 'active']
 })
 
 // Numeric comparison
-filterCondition: MatchExp.atom({
+matchExpression: MatchExp.atom({
   key: 'priority',
   value: ['>', 5]
 })
 
 // Pattern matching
-filterCondition: MatchExp.atom({
+matchExpression: MatchExp.atom({
   key: 'email',
   value: ['like', '%@admin.com']
 })
@@ -271,7 +271,7 @@ filterCondition: MatchExp.atom({
 #### Complex Conditions
 ```typescript
 // AND conditions
-filterCondition: MatchExp.atom({
+matchExpression: MatchExp.atom({
   key: 'status',
   value: ['=', 'published']
 }).and({
@@ -280,7 +280,7 @@ filterCondition: MatchExp.atom({
 })
 
 // OR conditions
-filterCondition: MatchExp.atom({
+matchExpression: MatchExp.atom({
   key: 'type',
   value: ['=', 'premium']
 }).or({
@@ -289,7 +289,7 @@ filterCondition: MatchExp.atom({
 })
 
 // Combined AND/OR
-filterCondition: MatchExp.atom({
+matchExpression: MatchExp.atom({
   key: 'status',
   value: ['=', 'active']
 }).and({
@@ -320,7 +320,7 @@ filterCondition: MatchExp.atom({
 const ActiveUser = Entity.create({
   name: 'ActiveUser',
   sourceEntity: User,
-  filterCondition: MatchExp.atom({
+  matchExpression: MatchExp.atom({
     key: 'status',
     value: ['=', 'active']
   }).and({
@@ -335,7 +335,7 @@ const ActiveUser = Entity.create({
 const HighPriorityStyle = Entity.create({
   name: 'HighPriorityStyle',
   sourceEntity: Style,
-  filterCondition: MatchExp.atom({
+  matchExpression: MatchExp.atom({
     key: 'priority',
     value: ['>=', 8]
   }).and({
@@ -350,7 +350,7 @@ const HighPriorityStyle = Entity.create({
 const FeaturedContent = Entity.create({
   name: 'FeaturedContent',
   sourceEntity: Article,
-  filterCondition: MatchExp.atom({
+  matchExpression: MatchExp.atom({
     key: 'type',
     value: ['=', 'premium']
   }).or({
@@ -370,7 +370,7 @@ You can also create filtered entities from relations:
 const RecentUserPost = Entity.create({
   name: 'RecentUserPost',
   sourceEntity: UserPostRelation,
-  filterCondition: MatchExp.atom({
+  matchExpression: MatchExp.atom({
     key: 'createdAt',
     value: ['>', Math.floor(Date.now()/1000) - 30 * 24 * 60 * 60]  // Last 30 days in seconds
   })
@@ -391,5 +391,5 @@ const RecentUserPost = Entity.create({
 - [ ] No relation has a name property (auto-generated)
 - [ ] Relation types use correct format ('1:1', 'n:1', etc.)
 - [ ] No entities are imported from interaqt package
-- [ ] Filtered entities have valid sourceEntity and filterCondition
+- [ ] Filtered entities have valid sourceEntity and matchExpression
 - [ ] TypeScript compilation passes 

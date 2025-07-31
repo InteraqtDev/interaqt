@@ -26,7 +26,7 @@ describe('filtered entity test', () => {
         const activeUsersEntity = Entity.create({
             name: 'ActiveUsers',
             sourceEntity: userEntity,
-            filterCondition: MatchExp.atom({
+            matchExpression: MatchExp.atom({
                 key: 'isActive',
                 value: ['=', true]
             })
@@ -36,7 +36,7 @@ describe('filtered entity test', () => {
         const youngUsersEntity = Entity.create({
             name: 'YoungUsers',
             sourceEntity: userEntity,
-            filterCondition: MatchExp.atom({
+            matchExpression: MatchExp.atom({
                 key: 'age',
                 value: ['<', 25]
             })
@@ -46,7 +46,7 @@ describe('filtered entity test', () => {
         const techYoungUsersEntity = Entity.create({
             name: 'TechYoungUsers',
             sourceEntity: userEntity,
-            filterCondition: MatchExp.atom({
+            matchExpression: MatchExp.atom({
                 key: 'age',
                 value: ['<', 30]
             }).and({
@@ -83,7 +83,7 @@ describe('filtered entity test', () => {
     test('should get filtered entity config correctly', () => {
         const activeUsersConfig = entityQueryHandle.getFilteredEntityConfig('ActiveUsers');
         expect(activeUsersConfig?.sourceRecordName).toBe('User');
-        expect(activeUsersConfig?.filterCondition).toBeDefined();
+        expect(activeUsersConfig?.matchExpression).toBeDefined();
 
         const userConfig = entityQueryHandle.getFilteredEntityConfig('User');
         expect(userConfig).toBe(null);
