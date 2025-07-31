@@ -40,7 +40,7 @@ export class RecordInfo {
 
     get JSONFields() {
         return Object.entries(this.data.attributes).filter(([, attribute]) => {
-            return !(attribute as RecordAttribute).isRecord && ((attribute as ValueAttribute ).collection || (attribute as ValueAttribute).type === 'object')
+            return !(attribute as RecordAttribute).isRecord && ((attribute as ValueAttribute ).collection || (attribute as ValueAttribute).type === 'object' || (attribute as ValueAttribute).type === 'json')
         }).map(([attributeName]) => attributeName)
     }
 

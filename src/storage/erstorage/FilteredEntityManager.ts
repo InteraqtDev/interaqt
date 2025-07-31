@@ -302,14 +302,7 @@ export class FilteredEntityManager {
         }
         
         const record = currentRecord[0]
-        // Parse JSON string to object, or use empty object if not present
-        // FIXME 为什么会有 string 的情况？
-        let currentFlags: { [key: string]: boolean } = record.__filtered_entities;;
-        if (record.__filtered_entities) {
-            currentFlags = typeof record.__filtered_entities === 'string'
-                ? JSON.parse(record.__filtered_entities)
-                : record.__filtered_entities;
-        }
+        const currentFlags: { [key: string]: boolean } = record.__filtered_entities;
         
         // 检查记录是否满足 filtered entity 的条件
         const matchesFilter = await this.checkRecordMatchesFilter(
