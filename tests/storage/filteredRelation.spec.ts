@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import { DBSetup, EntityToTableMap, MatchExp, EntityQueryHandle } from '@storage'
-import { Entity, Property, Relation, BoolExp } from '@shared'
+import { Entity, Property, Relation } from '@shared'
 import { SQLiteDB } from '@runtime'
 
 describe('filtered relation', () => {
@@ -53,10 +53,10 @@ describe('filtered relation', () => {
         const ActiveUserPostRelation = Relation.create({
             name: 'ActiveUserPostRelation',
             sourceRelation: UserPostRelation,
-            matchExpression: BoolExp.atom({
+            matchExpression: MatchExp.atom({
                 key: 'isActive',
                 value: ['=', true]
-            }).raw
+            })
         })
 
         // Setup database
@@ -307,13 +307,13 @@ describe('filtered relation', () => {
         const CompletedHighValueOrderRelation = Relation.create({
             name: 'CompletedHighValueOrderRelation',
             sourceRelation: OrderProductRelation,
-            matchExpression: BoolExp.atom({
+            matchExpression: MatchExp.atom({
                 key: 'source.status',
                 value: ['=', 'completed']
-            }).and(BoolExp.atom({
+            }).and({
                 key: 'price',
                 value: ['>', 100]
-            })).raw
+            })
         })
 
         // Setup database
@@ -413,20 +413,20 @@ describe('filtered relation', () => {
         const VerifiedAuthorRelation = Relation.create({
             name: 'VerifiedAuthorRelation',
             sourceRelation: AuthorBookRelation,
-            matchExpression: BoolExp.atom({
+            matchExpression: MatchExp.atom({
                 key: 'source.verified',
                 value: ['=', true]
-            }).raw
+            })
         })
 
         // 2. 基于目标实体属性的筛选 - 只有已出版的书
         const PublishedBookRelation = Relation.create({
             name: 'PublishedBookRelation',
             sourceRelation: AuthorBookRelation,
-            matchExpression: BoolExp.atom({
+            matchExpression: MatchExp.atom({
                 key: 'target.published',
                 value: ['=', true]
-            }).raw
+            })
         })
 
         // Setup database
@@ -557,40 +557,40 @@ describe('filtered relation', () => {
         const CapitalCityRelation = Relation.create({
             name: 'CapitalCityRelation',
             sourceRelation: CountryCityRelation,
-            matchExpression: BoolExp.atom({
+            matchExpression: MatchExp.atom({
                 key: 'isCapital',
                 value: ['=', true]
-            }).raw
+            })
         })
 
         // Filtered relations - 层级1：一线城市
         const Tier1CityRelation = Relation.create({
             name: 'Tier1CityRelation',
             sourceRelation: CountryCityRelation,
-            matchExpression: BoolExp.atom({
+            matchExpression: MatchExp.atom({
                 key: 'tier',
                 value: ['=', 1]
-            }).raw
+            })
         })
 
         // Filtered relations - 层级2：旗舰店
         const FlagshipStoreRelation = Relation.create({
             name: 'FlagshipStoreRelation',
             sourceRelation: CityStoreRelation,
-            matchExpression: BoolExp.atom({
+            matchExpression: MatchExp.atom({
                 key: 'storeType',
                 value: ['=', 'flagship']
-            }).raw
+            })
         })
 
         // Filtered relations - 层级2：新店（2020年后）
         const NewStoreRelation = Relation.create({
             name: 'NewStoreRelation',
             sourceRelation: CityStoreRelation,
-            matchExpression: BoolExp.atom({
+            matchExpression: MatchExp.atom({
                 key: 'yearEstablished',
                 value: ['>=', 2020]
-            }).raw
+            })
         })
 
         // Setup database
@@ -759,26 +759,26 @@ describe('filtered relation', () => {
         const SeniorActiveRelation = Relation.create({
             name: 'SeniorActiveRelation',
             sourceRelation: ProjectDeveloperRelation,
-            matchExpression: BoolExp.atom({
+            matchExpression: MatchExp.atom({
                 key: 'role',
                 value: ['in', ['lead', 'senior']]
-            }).and(BoolExp.atom({
+            }).and({
                 key: 'hoursPerWeek',
                 value: ['>', 20]
-            })).raw
+            })
         })
 
         // 复杂过滤：高薪兼职（时薪高但工时少）
         const HighValuePartTimeRelation = Relation.create({
             name: 'HighValuePartTimeRelation',
             sourceRelation: ProjectDeveloperRelation,
-            matchExpression: BoolExp.atom({
+            matchExpression: MatchExp.atom({
                 key: 'rate',
                 value: ['>=', 150]
-            }).and(BoolExp.atom({
+            }).and({
                 key: 'hoursPerWeek',
                 value: ['<=', 20]
-            })).raw
+            })
         })
 
         // Setup database
@@ -950,29 +950,29 @@ describe('filtered relation', () => {
         const PremiumOrgProjectRelation = Relation.create({
             name: 'PremiumOrgProjectRelation',
             sourceRelation: MemberProjectRelation,
-            matchExpression: BoolExp.atom({
+            matchExpression: MatchExp.atom({
                 key: 'source.team.division.organization.tier',
                 value: ['=', 'premium']
-            }).and(BoolExp.atom({
+            }).and({
                 key: 'source.team.division.organization.isActive',
                 value: ['=', true]
-            })).and(BoolExp.atom({
+            }).and({
                 key: 'target.priority',
                 value: ['=', 'high']
-            })).raw
+            })
         })
 
         // Another filtered relation: Projects from members in large teams (size > 5) with high budget divisions
         const LargeTeamHighBudgetProjectRelation = Relation.create({
             name: 'LargeTeamHighBudgetProjectRelation',
             sourceRelation: MemberProjectRelation,
-            matchExpression: BoolExp.atom({
+            matchExpression: MatchExp.atom({
                 key: 'source.team.size',
                 value: ['>', 5]
-            }).and(BoolExp.atom({
+            }).and({
                 key: 'source.team.division.budget',
                 value: ['>=', 1000000]
-            })).raw
+            })
         })
 
         // Setup database

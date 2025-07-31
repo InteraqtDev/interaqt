@@ -2,7 +2,6 @@ import { EntityIdRef, Database, RecordMutationEvent } from "@runtime";
 import { BoolExp } from "@shared";
 import { EntityToTableMap } from "./EntityToTableMap.js";
 import { assert, setByPath } from "../utils.js";
-import { } from './EntityQueryHandle.js';
 import { FieldMatchAtom, MatchAtom, MatchExp, MatchExpressionData } from "./MatchExp.js";
 import { AttributeQuery, AttributeQueryData, AttributeQueryDataRecordItem } from "./AttributeQuery.js";
 import { LINK_SYMBOL, RecordQuery, RecordQueryTree } from "./RecordQuery.js";
@@ -671,11 +670,11 @@ ${modifierClause}
             const parentAttributeNamePath = exp.data.namePath!.slice(1, -1)
 
             const existEntityQuery = RecordQuery.create(info.recordName, this.map, {
-                    matchExpression: BoolExp.atom({
+                    matchExpression: MatchExp.atom({
                         key: `${reverseAttributeName}.id`,
                         value: ['=', parentAttributeNamePath.concat('id').join('.')],
                         isReferenceValue: true
-                    } as MatchAtom).and(exp.data.value[1] instanceof BoolExp ? exp.data.value[1] : MatchExp.atom(exp.data.value[1]))
+                    }).and(exp.data.value[1])
                 },
                 // 如果上层还有，就继承上层的，如果没有， context 就只这一层。这个变量是用来给 matchExpression 里面的 value 来引用上层的值的。
                 //  例如查询用户，要求他存在一个朋友的父母的年龄是小于这个用户。对朋友的父母的年龄匹配中，就需要引用最上层的 alias。

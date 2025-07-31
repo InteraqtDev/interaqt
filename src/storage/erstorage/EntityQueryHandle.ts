@@ -8,7 +8,6 @@ import { NewRecordData, RawEntityData } from "./NewRecordData.js";
 import { RecordQueryAgent } from "./RecordQueryAgent.js";
 import { EntityIdRef, Database, RecordMutationEvent, ID_ATTR } from "@runtime";
 import { Record } from "./RecordQueryAgent.js";
-import { BoolExp } from "@shared";
 
 export class EntityQueryHandle {
     agent: RecordQueryAgent
@@ -182,15 +181,9 @@ export class EntityQueryHandle {
             return null
         }
         
-        // Convert raw matchExpression to BoolExp instance if needed
-        let matchExpression = recordInfo.matchExpression
-        if (matchExpression && !(matchExpression instanceof BoolExp)) {
-            matchExpression = BoolExp.fromValue(matchExpression)
-        }
-        
         return {
             sourceRecordName: recordInfo.sourceRecordName,
-            matchExpression
+            matchExpression: recordInfo.matchExpression
         }
     }
 

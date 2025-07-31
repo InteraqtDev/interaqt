@@ -1,9 +1,9 @@
 import { LinkMapItem, MapData, RecordAttribute, RecordMapItem, ValueAttribute } from "./EntityToTableMap.js";
 import { assert } from "../utils.js";
-import { EntityInstance, RelationInstance, PropertyInstance, BoolExp } from "@shared";
+import { EntityInstance, RelationInstance, PropertyInstance } from "@shared";
 import { ID_ATTR, ROW_ID_ATTR, Database } from "@runtime";
 import { isRelation } from "./util.js";
-import { MatchExpressionData, MatchAtom, MatchExp } from "./MatchExp.js";
+import { MatchExpressionData, MatchExp } from "./MatchExp.js";
 
 // Define the types we need
 
