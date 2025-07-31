@@ -1,194 +1,180 @@
 # 宿舍管理系统详细需求分析
 
-## 系统概述
-构建一个宿舍管理系统，支持管理员、宿舍长和学生三种角色，实现宿舍分配、用户管理和违规处理功能。
+## 1. 系统角色分析
 
-## 数据视角分析
+### 1.1 用户角色
+- **系统管理员 (admin)**: 拥有最高权限，可以管理整个系统
+- **宿舍长 (dormHead)**: 由管理员指定，管理特定宿舍的日常事务
+- **学生 (student)**: 普通用户，可以被分配到宿舍
 
-### 核心实体识别
+### 1.2 角色权限矩阵
+| 操作 | 系统管理员 | 宿舍长 | 学生 |
+|------|-----------|--------|------|
+| 创建宿舍 | ✓ | ✗ | ✗ |
+| 指定宿舍长 | ✓ | ✗ | ✗ |
+| 分配用户到宿舍 | ✓ | ✗ | ✗ |
+| 创建扣分规则 | ✓ | ✗ | ✗ |
+| 对用户扣分 | ✓ | ✓ | ✗ |
+| 申请踢出用户 | ✗ | ✓ | ✗ |
+| 批准踢出申请 | ✓ | ✗ | ✗ |
+| 查看宿舍信息 | ✓ | ✓(自己管理的) | ✓(自己所在的) |
 
-#### User (用户)
-- **目的**: 系统中的所有用户，包括管理员、宿舍长、学生
-- **属性**:
-  - id: string (系统生成的唯一标识)
-  - name: string (用户姓名)
-  - email: string (唯一邮箱标识)
-  - role: string (角色: 'admin' | 'dormHead' | 'student')
-  - score: number (行为积分，初始值为100)
-  - status: string (状态: 'active' | 'kicked')
+## 2. 数据实体分析
 
-#### Dormitory (宿舍)
-- **目的**: 宿舍楼栋或房间
-- **属性**:
-  - id: string (唯一标识)
-  - name: string (宿舍名称)
-  - capacity: number (床位数量，4-6个)
-  - currentOccupancy: number (当前入住人数，计算属性)
-  - availableBeds: number (可用床位，计算属性)
+### 2.1 用户 (User)
+**用途**: 系统中的所有人员
+**属性**:
+- id: string (系统生成)
+- name: string (姓名)
+- email: string (邮箱，唯一标识)
+- role: string (角色: admin/dormHead/student)
+- totalScore: number (当前总分数，默认100)
+- status: string (状态: active/kicked/suspended)
 
-#### ScoreRule (扣分规则)
-- **目的**: 定义各种违规行为对应的扣分规则
-- **属性**:
-  - id: string
-  - name: string (规则名称，如"晚归"、"不整理内务")
-  - description: string (规则描述)
-  - scoreDeduction: number (扣分数值)
-  - isActive: boolean (规则是否启用)
+### 2.2 宿舍 (Dormitory)
+**用途**: 宿舍建筑单位
+**属性**:
+- id: string (系统生成)
+- name: string (宿舍名称，如"A栋101")
+- capacity: number (床位数量，4-6床)
+- currentOccupancy: number (当前入住人数)
+- status: string (状态: active/inactive/maintenance)
 
-#### ViolationRecord (违规记录)
-- **目的**: 记录用户的违规行为
-- **属性**:
-  - id: string
-  - description: string (违规描述)
-  - recordedAt: number (记录时间戳)
-  - scoreDeducted: number (扣除分数)
+### 2.3 扣分规则 (ScoreRule)
+**用途**: 定义各种违规行为的扣分标准
+**属性**:
+- id: string (系统生成)
+- name: string (规则名称，如"晚归")
+- description: string (规则描述)
+- scoreDeduction: number (扣分数值)
+- isActive: boolean (规则是否生效)
 
-#### KickoutRequest (踢出申请)
-- **目的**: 宿舍长申请踢出违规用户
-- **属性**:
-  - id: string
-  - reason: string (申请理由)
-  - requestedAt: number (申请时间)
-  - status: string ('pending' | 'approved' | 'rejected')
-  - processedAt: number (处理时间)
-  - adminComment: string (管理员备注)
+### 2.4 扣分记录 (ScoreRecord)
+**用途**: 记录用户的具体扣分情况
+**属性**:
+- id: string (系统生成)
+- reason: string (扣分原因)
+- score: number (扣分数值)
+- createdAt: number (扣分时间戳)
+- operatorNotes: string (操作员备注)
 
-### 关系分析
+### 2.5 踢出申请 (KickRequest)
+**用途**: 宿舍长申请踢出某用户的记录
+**属性**:
+- id: string (系统生成)
+- reason: string (申请理由)
+- status: string (申请状态: pending/approved/rejected)
+- createdAt: number (申请时间)
+- processedAt: number (处理时间)
+- adminNotes: string (管理员处理备注)
 
-#### UserDormitoryRelation (用户-宿舍关系)
+## 3. 实体关系分析
+
+### 3.1 用户-宿舍关系 (UserDormitoryRelation)
 - **类型**: n:1 (多个用户对应一个宿舍)
-- **目的**: 分配学生到宿舍床位
+- **用途**: 记录用户的宿舍分配
 - **源属性**: `dormitory` (在User实体上)
 - **目标属性**: `residents` (在Dormitory实体上)
 - **关系属性**:
   - assignedAt: number (分配时间)
-  - bedNumber: number (床位号)
-  - status: string ('active' | 'inactive')
+  - bedNumber: number (床位号 1-6)
+  - status: string (分配状态: active/inactive)
 
-#### DormitoryHeadRelation (宿舍长关系)
-- **类型**: 1:1 (一个宿舍对应一个宿舍长)
-- **目的**: 指定宿舍的管理者
+### 3.2 宿舍长-宿舍关系 (DormHeadDormitoryRelation)
+- **类型**: 1:1 (一个宿舍长对应一个宿舍)
+- **用途**: 记录宿舍长的管理权限
 - **源属性**: `managedDormitory` (在User实体上)
 - **目标属性**: `dormHead` (在Dormitory实体上)
 - **关系属性**:
   - appointedAt: number (任命时间)
-  - isActive: boolean (是否活跃)
+  - status: string (任命状态: active/inactive)
 
-#### UserViolationRelation (用户-违规记录关系)
-- **类型**: 1:n (一个用户对应多个违规记录)
-- **目的**: 关联用户和其违规行为
-- **源属性**: `violationRecords` (在User实体上)
-- **目标属性**: `user` (在ViolationRecord实体上)
+### 3.3 用户-扣分记录关系 (UserScoreRecordRelation)
+- **类型**: 1:n (一个用户对应多个扣分记录)
+- **源属性**: `scoreRecords` (在User实体上)
+- **目标属性**: `user` (在ScoreRecord实体上)
 
-#### ViolationRuleRelation (违规记录-规则关系)
-- **类型**: n:1 (多个违规记录对应一个规则)
-- **目的**: 关联违规记录和对应的扣分规则
-- **源属性**: `rule` (在ViolationRecord实体上)
-- **目标属性**: `violations` (在ScoreRule实体上)
+### 3.4 扣分规则-扣分记录关系 (ScoreRuleRecordRelation)
+- **类型**: 1:n (一个规则对应多个记录)
+- **源属性**: `records` (在ScoreRule实体上)
+- **目标属性**: `rule` (在ScoreRecord实体上)
 
-#### KickoutRequestRelation (踢出申请关系)
-- **类型**: 涉及多个实体的复合关系
-- **申请人关系**: 1:n (一个宿舍长可以发起多个申请)
-- **被申请人关系**: 1:n (一个用户可能被多次申请踢出)
-- **处理人关系**: 1:n (一个管理员可以处理多个申请)
+### 3.5 踢出申请相关关系
+- **申请人-踢出申请**: 1:n (宿舍长可以发起多个申请)
+- **被申请人-踢出申请**: 1:n (用户可能被多次申请踢出)
+- **宿舍-踢出申请**: 1:n (一个宿舍可能有多个踢出申请)
 
-## 交互视角分析
+## 4. 业务流程分析
 
-### 用户操作识别
-
-#### 管理员操作
-1. **创建宿舍** - CreateDormitory
-2. **指定宿舍长** - AssignDormHead
-3. **分配用户到宿舍** - AssignUserToDormitory
-4. **创建/管理扣分规则** - CreateScoreRule, UpdateScoreRule
-5. **处理踢出申请** - ProcessKickoutRequest
-6. **查看系统概况** - ViewSystemOverview
-
-#### 宿舍长操作
-1. **记录违规行为** - RecordViolation
-2. **申请踢出用户** - RequestKickout
-3. **查看宿舍成员** - ViewDormitoryMembers
-4. **查看违规统计** - ViewViolationStats
-
-#### 学生操作
-1. **查看个人信息** - ViewProfile
-2. **查看违规记录** - ViewMyViolations
-3. **查看宿舍信息** - ViewDormitoryInfo
-
-### 权限控制需求
-- **管理员**: 拥有所有操作权限
-- **宿舍长**: 只能管理自己负责的宿舍
-- **学生**: 只能查看与自己相关的信息
-
-### 业务流程分析
-
-#### 用户分配流程
+### 4.1 宿舍分配流程
 1. 管理员创建宿舍
 2. 管理员指定宿舍长
-3. 管理员将学生分配到宿舍床位
+3. 管理员分配学生到宿舍的具体床位
+4. 系统自动更新宿舍入住人数
 
-#### 违规处理流程
-1. 宿舍长发现违规行为
-2. 宿舍长记录违规，系统自动扣分
-3. 如果用户分数过低，宿舍长可申请踢出
-4. 管理员审核踢出申请
-5. 如果批准，用户被踢出宿舍
+### 4.2 扣分管理流程
+1. 管理员创建扣分规则
+2. 宿舍长或管理员发现违规行为
+3. 根据规则对用户扣分
+4. 系统自动更新用户总分
 
-## 业务规则定义
+### 4.3 踢出申请流程
+1. 宿舍长发现用户扣分达到阈值
+2. 宿舍长提交踢出申请
+3. 管理员审核申请
+4. 如果批准：用户被踢出，释放床位
+5. 如果拒绝：申请被驳回，用户继续住宿
 
-### 床位管理规则
-- 每个宿舍床位数量为4-6个
-- 每个用户只能被分配到一个宿舍的一个床位
-- 床位分配不能超过宿舍容量
+## 5. 业务规则分析
 
-### 积分管理规则
-- 新用户初始积分为100分
-- 积分低于60分时，宿舍长可以申请踢出
-- 积分扣除按照预定义规则执行
+### 5.1 宿舍管理规则
+- 每个宿舍容量限制：4-6床位
+- 每个用户只能分配到一个宿舍的一个床位
+- 用户被踢出后，其床位自动释放
+- 宿舍长必须是该宿舍的住户之一
 
-### 权限控制规则
+### 5.2 扣分规则
+- 用户初始分数：100分
+- 扣分后不能低于0分
+- 分数低于20分时，允许宿舍长申请踢出
+- 被踢出的用户不能再被分配到任何宿舍
+
+### 5.3 权限规则
 - 只有管理员可以创建宿舍和指定宿舍长
+- 只有管理员可以分配用户到宿舍
 - 宿舍长只能管理自己负责的宿舍
-- 用户被踢出后状态变为'kicked'，不能再被分配宿舍
+- 宿舍长只能对自己宿舍的住户扣分
+- 只有管理员可以批准踢出申请
 
-### 申请处理规则
-- 同一用户在同一时间只能有一个待处理的踢出申请
-- 踢出申请需要管理员审核批准
-- 申请批准后，用户立即从宿舍移除
+## 6. 技术约束
 
-## 数据流图
-
-```
-用户创建 → 角色分配 → 宿舍分配 → 日常管理 → 违规处理 → 踢出处理
-    ↓         ↓         ↓         ↓         ↓         ↓
-  User    DormHead   UserDorm   Violation  Request  Status
-  实体     关系       关系       记录       申请      更新
-```
-
-## 系统约束
-
-### 数据约束
+### 6.1 数据约束
 - 用户邮箱必须唯一
 - 宿舍名称必须唯一
 - 床位号在同一宿舍内必须唯一
-- 积分不能为负数
+- 分数不能为负数
+- 宿舍容量必须在4-6之间
 
-### 业务约束
+### 6.2 业务约束
+- 用户只能有一个角色
 - 一个宿舍只能有一个宿舍长
-- 用户只能被分配到一个宿舍
-- 已被踢出的用户不能再被分配宿舍
-- 扣分规则的分数必须为正数
+- 用户被踢出后状态不可逆转
+- 扣分记录不可删除，只能查看
 
-## 扩展需求考虑
+## 7. 异常情况处理
 
-### 可能的未来功能
-- 违规行为统计报表
-- 宿舍评分排名
-- 积分恢复机制
-- 批量操作功能
-- 消息通知系统
+### 7.1 数据异常
+- 宿舍满员时尝试分配新用户
+- 用户已有宿舍时尝试重新分配
+- 对不存在的用户进行操作
+- 非宿舍长尝试申请踢出用户
 
-### 性能考虑
-- 支持多个宿舍并发管理
-- 快速查询用户分配状态
-- 高效的积分计算和更新
+### 7.2 权限异常
+- 越权操作拒绝
+- 未登录用户拒绝访问
+- 已被踢出用户尝试操作
+
+### 7.3 业务逻辑异常
+- 宿舍长尝试踢出自己
+- 对分数充足的用户申请踢出
+- 重复申请踢出同一用户

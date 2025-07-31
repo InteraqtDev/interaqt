@@ -6,16 +6,65 @@ import {
   Action, 
   Payload, 
   PayloadItem,
-  Transform,
-  Count,
-  InteractionEventEntity,
-  Dictionary,
-  MatchExp
+  Count, 
+  Summation, 
+  WeightedSummation, 
+  Every, 
+  Any, 
+  Transform, 
+  StateMachine, 
+  StateNode, 
+  StateTransfer, 
+  RealTime, 
+  Expression, 
+  Dictionary, 
+  Custom,
+  MatchExp,
+  InteractionEventEntity
 } from 'interaqt';
 
-// ===========================
+// ============================================================================
+// STATE NODES - Must be declared before use
+// ============================================================================
+
+// User role states
+const studentRoleState = StateNode.create({ name: 'student' });
+const dormHeadRoleState = StateNode.create({ name: 'dormHead' });
+const adminRoleState = StateNode.create({ name: 'admin' });
+
+// User status states
+const activeUserState = StateNode.create({ name: 'active' });
+const kickedUserState = StateNode.create({ name: 'kicked' });
+const suspendedUserState = StateNode.create({ name: 'suspended' });
+
+// Dormitory status states
+const activeDormState = StateNode.create({ name: 'active' });
+const inactiveDormState = StateNode.create({ name: 'inactive' });
+const maintenanceDormState = StateNode.create({ name: 'maintenance' });
+
+// Score rule states
+const activeRuleState = StateNode.create({ name: 'active', computeValue: () => true });
+const inactiveRuleState = StateNode.create({ name: 'inactive', computeValue: () => false });
+
+// Kick request states
+const pendingRequestState = StateNode.create({ name: 'pending' });
+const approvedRequestState = StateNode.create({ name: 'approved' });
+const rejectedRequestState = StateNode.create({ name: 'rejected' });
+
+// Relation status states
+const activeRelationState = StateNode.create({ name: 'active' });
+const inactiveRelationState = StateNode.create({ name: 'inactive' });
+
+// Generic update states for timestamps
+const initialState = StateNode.create({ name: 'initial' });
+const updatedState = StateNode.create({ 
+  name: 'updated',
+  computeValue: () => Math.floor(Date.now()/1000)
+});
+
+// ============================================================================
 // ENTITIES
-// ===========================
+// ============================================================================
 
 export const User = Entity.create({
   name: 'User',
@@ -28,35 +77,52 @@ export const User = Entity.create({
       name: 'email', 
       type: 'string' 
     }),
-    Property.create({ 
-      name: 'role', 
+    Property.create({
+      name: 'role',
       type: 'string',
-      defaultValue: () => 'student'
+      defaultValue: () => 'student',
+      computation: StateMachine.create({
+        states: [studentRoleState, dormHeadRoleState, adminRoleState],
+        defaultState: studentRoleState,
+        transfers: [
+          // Note: State transfers will be added in Stage 2 with actual interactions
+        ]
+      })
     }),
-    Property.create({ 
-      name: 'score', 
+    Property.create({
+      name: 'totalScore',
       type: 'number',
       defaultValue: () => 100
+      // Note: Computation will be added after relations are defined
     }),
-    Property.create({ 
-      name: 'status', 
+    Property.create({
+      name: 'status',
       type: 'string',
-      defaultValue: () => 'active'
+      defaultValue: () => 'active',
+      computation: StateMachine.create({
+        states: [activeUserState, kickedUserState, suspendedUserState],
+        defaultState: activeUserState,
+        transfers: [
+          // Note: State transfers will be added in Stage 2 with actual interactions
+        ]
+      })
     }),
-    Property.create({ 
-      name: 'createdAt', 
-      type: 'number',
-      defaultValue: () => Math.floor(Date.now()/1000)
-    }),
-    Property.create({ 
-      name: 'updatedAt', 
+    Property.create({
+      name: 'createdAt',
       type: 'number',
       defaultValue: () => Math.floor(Date.now()/1000)
     }),
     Property.create({
-      name: 'canBeKickedOut',
-      type: 'boolean',
-      defaultValue: () => false
+      name: 'updatedAt',
+      type: 'number',
+      defaultValue: () => Math.floor(Date.now()/1000),
+      computation: StateMachine.create({
+        states: [initialState, updatedState],
+        defaultState: initialState,
+        transfers: [
+          // Note: State transfers will be added in Stage 2 with actual interactions
+        ]
+      })
     })
   ]
 });
@@ -73,19 +139,39 @@ export const Dormitory = Entity.create({
       type: 'number' 
     }),
     Property.create({
-      name: 'availableBeds',
+      name: 'currentOccupancy',
       type: 'number',
       defaultValue: () => 0
+      // Note: Computation will be added after relations are defined
     }),
-    Property.create({ 
-      name: 'createdAt', 
+    Property.create({
+      name: 'status',
+      type: 'string',
+      defaultValue: () => 'active',
+      computation: StateMachine.create({
+        states: [activeDormState, inactiveDormState, maintenanceDormState],
+        defaultState: activeDormState,
+        transfers: [
+          // Note: State transfers will be added in Stage 2 with actual interactions
+        ]
+      })
+    }),
+    Property.create({
+      name: 'createdAt',
       type: 'number',
       defaultValue: () => Math.floor(Date.now()/1000)
     }),
-    Property.create({ 
-      name: 'updatedAt', 
+    Property.create({
+      name: 'updatedAt',
       type: 'number',
-      defaultValue: () => Math.floor(Date.now()/1000)
+      defaultValue: () => Math.floor(Date.now()/1000),
+      computation: StateMachine.create({
+        states: [initialState, updatedState],
+        defaultState: initialState,
+        transfers: [
+          // Note: State transfers will be added in Stage 2 with actual interactions
+        ]
+      })
     })
   ],
   computation: Transform.create({
@@ -95,6 +181,8 @@ export const Dormitory = Entity.create({
         return {
           name: event.payload.name,
           capacity: event.payload.capacity,
+          currentOccupancy: 0,
+          status: 'active',
           createdAt: Math.floor(Date.now()/1000),
           updatedAt: Math.floor(Date.now()/1000)
         };
@@ -119,20 +207,34 @@ export const ScoreRule = Entity.create({
       name: 'scoreDeduction', 
       type: 'number' 
     }),
-    Property.create({ 
-      name: 'isActive', 
+    Property.create({
+      name: 'isActive',
       type: 'boolean',
-      defaultValue: () => true
+      defaultValue: () => true,
+      computation: StateMachine.create({
+        states: [activeRuleState, inactiveRuleState],
+        defaultState: activeRuleState,
+        transfers: [
+          // Note: State transfers will be added in Stage 2 with actual interactions
+        ]
+      })
     }),
-    Property.create({ 
-      name: 'createdAt', 
+    Property.create({
+      name: 'createdAt',
       type: 'number',
       defaultValue: () => Math.floor(Date.now()/1000)
     }),
-    Property.create({ 
-      name: 'updatedAt', 
+    Property.create({
+      name: 'updatedAt',
       type: 'number',
-      defaultValue: () => Math.floor(Date.now()/1000)
+      defaultValue: () => Math.floor(Date.now()/1000),
+      computation: StateMachine.create({
+        states: [initialState, updatedState],
+        defaultState: initialState,
+        transfers: [
+          // Note: State transfers will be added in Stage 2 with actual interactions
+        ]
+      })
     })
   ],
   computation: Transform.create({
@@ -153,83 +255,37 @@ export const ScoreRule = Entity.create({
   })
 });
 
-export const ViolationRecord = Entity.create({
-  name: 'ViolationRecord',
-  properties: [
-    Property.create({ 
-      name: 'description', 
-      type: 'string' 
-    }),
-    Property.create({ 
-      name: 'recordedAt', 
-      type: 'number',
-      defaultValue: () => Math.floor(Date.now()/1000)
-    }),
-    Property.create({ 
-      name: 'scoreDeducted', 
-      type: 'number',
-      defaultValue: () => 0
-    }),
-    Property.create({ 
-      name: 'status', 
-      type: 'string',
-      defaultValue: () => 'active'
-    })
-  ],
-  computation: Transform.create({
-    record: InteractionEventEntity,
-    callback: (event) => {
-      if (event.interactionName === 'RecordViolation') {
-        return {
-          description: event.payload.description,
-          recordedAt: Math.floor(Date.now()/1000),
-          scoreDeducted: event.payload.scoreDeduction || 0,
-          status: 'active',
-          user: { id: event.payload.userId },
-          rule: { id: event.payload.ruleId }
-        };
-      }
-      return null;
-    }
-  })
-});
-
-export const KickoutRequest = Entity.create({
-  name: 'KickoutRequest',
+export const ScoreRecord = Entity.create({
+  name: 'ScoreRecord',
   properties: [
     Property.create({ 
       name: 'reason', 
       type: 'string' 
     }),
     Property.create({ 
-      name: 'requestedAt', 
+      name: 'score', 
+      type: 'number' 
+    }),
+    Property.create({
+      name: 'createdAt',
       type: 'number',
       defaultValue: () => Math.floor(Date.now()/1000)
     }),
     Property.create({ 
-      name: 'status', 
-      type: 'string',
-      defaultValue: () => 'pending'
-    }),
-    Property.create({ 
-      name: 'processedAt', 
-      type: 'number'
-    }),
-    Property.create({ 
-      name: 'adminComment', 
-      type: 'string'
+      name: 'operatorNotes', 
+      type: 'string' 
     })
   ],
   computation: Transform.create({
     record: InteractionEventEntity,
     callback: (event) => {
-      if (event.interactionName === 'RequestKickout') {
+      if (event.interactionName === 'DeductUserScore') {
+        // Note: In Stage 2, we'll need to fetch the ScoreRule to get the actual score value
         return {
           reason: event.payload.reason,
-          requestedAt: Math.floor(Date.now()/1000),
-          status: 'pending',
-          requester: event.user,
-          targetUser: { id: event.payload.targetUserId }
+          score: 10, // Placeholder - will be computed from ScoreRule in Stage 2
+          operatorNotes: event.payload.operatorNotes || '',
+          createdAt: Math.floor(Date.now()/1000)
         };
       }
       return null;
@@ -237,9 +293,126 @@ export const KickoutRequest = Entity.create({
   })
 });
 
-// ===========================
+export const KickRequest = Entity.create({
+  name: 'KickRequest',
+  properties: [
+    Property.create({ 
+      name: 'reason', 
+      type: 'string' 
+    }),
+    Property.create({
+      name: 'status',
+      type: 'string',
+      defaultValue: () => 'pending',
+      computation: StateMachine.create({
+        states: [pendingRequestState, approvedRequestState, rejectedRequestState],
+        defaultState: pendingRequestState,
+        transfers: [
+          // Note: State transfers will be added in Stage 2 with actual interactions
+        ]
+      })
+    }),
+    Property.create({
+      name: 'createdAt',
+      type: 'number',
+      defaultValue: () => Math.floor(Date.now()/1000)
+    }),
+    Property.create({
+      name: 'processedAt',
+      type: 'number',
+      computation: StateMachine.create({
+        states: [initialState, updatedState],
+        defaultState: initialState,
+        transfers: [
+          // Note: State transfers will be added in Stage 2 with actual interactions
+        ]
+      })
+    }),
+    Property.create({
+      name: 'adminNotes',
+      type: 'string',
+      computation: StateMachine.create({
+        states: [initialState, StateNode.create({ 
+          name: 'updated',
+          computeValue: (lastValue, event) => event?.payload?.adminNotes || ''
+        })],
+        defaultState: initialState,
+        transfers: [
+          // Note: State transfers will be added in Stage 2 with actual interactions
+        ]
+      })
+    })
+  ],
+  computation: Transform.create({
+    record: InteractionEventEntity,
+    callback: (event) => {
+      if (event.interactionName === 'RequestKickUser') {
+        return {
+          reason: event.payload.reason,
+          status: 'pending',
+          createdAt: Math.floor(Date.now()/1000)
+        };
+      }
+      return null;
+    }
+  })
+});
+
+// ============================================================================
+// FILTERED ENTITIES
+// ============================================================================
+
+export const ActiveUser = Entity.create({
+  name: 'ActiveUser',
+  sourceEntity: User,
+  filterCondition: MatchExp.atom({
+    key: 'status',
+    value: ['=', 'active']
+  })
+});
+
+export const ActiveDormitory = Entity.create({
+  name: 'ActiveDormitory',
+  sourceEntity: Dormitory,
+  filterCondition: MatchExp.atom({
+    key: 'status',
+    value: ['=', 'active']
+  })
+});
+
+export const ActiveScoreRule = Entity.create({
+  name: 'ActiveScoreRule',
+  sourceEntity: ScoreRule,
+  filterCondition: MatchExp.atom({
+    key: 'isActive',
+    value: ['=', true]
+  })
+});
+
+export const PendingKickRequest = Entity.create({
+  name: 'PendingKickRequest',
+  sourceEntity: KickRequest,
+  filterCondition: MatchExp.atom({
+    key: 'status',
+    value: ['=', 'pending']
+  })
+});
+
+export const LowScoreUser = Entity.create({
+  name: 'LowScoreUser',
+  sourceEntity: User,
+  filterCondition: MatchExp.atom({
+    key: 'totalScore',
+    value: ['<', 20]
+  }).and({
+    key: 'status',
+    value: ['=', 'active']
+  })
+});
+
+// ============================================================================
 // RELATIONS
-// ===========================
+// ============================================================================
 
 export const UserDormitoryRelation = Relation.create({
   source: User,
@@ -248,19 +421,26 @@ export const UserDormitoryRelation = Relation.create({
   targetProperty: 'residents',
   type: 'n:1',
   properties: [
-    Property.create({ 
-      name: 'assignedAt', 
+    Property.create({
+      name: 'assignedAt',
       type: 'number',
       defaultValue: () => Math.floor(Date.now()/1000)
     }),
-    Property.create({ 
-      name: 'bedNumber', 
-      type: 'number' 
+    Property.create({
+      name: 'bedNumber',
+      type: 'number'
     }),
-    Property.create({ 
-      name: 'status', 
+    Property.create({
+      name: 'status',
       type: 'string',
-      defaultValue: () => 'active'
+      defaultValue: () => 'active',
+      computation: StateMachine.create({
+        states: [activeRelationState, inactiveRelationState],
+        defaultState: activeRelationState,
+        transfers: [
+          // Note: State transfers will be added in Stage 2 with actual interactions
+        ]
+      })
     })
   ],
   computation: Transform.create({
@@ -270,9 +450,9 @@ export const UserDormitoryRelation = Relation.create({
         return {
           source: { id: event.payload.userId },
           target: { id: event.payload.dormitoryId },
-          assignedAt: Math.floor(Date.now()/1000),
           bedNumber: event.payload.bedNumber,
-          status: 'active'
+          status: 'active',
+          assignedAt: Math.floor(Date.now()/1000)
         };
       }
       return null;
@@ -280,22 +460,29 @@ export const UserDormitoryRelation = Relation.create({
   })
 });
 
-export const DormitoryHeadRelation = Relation.create({
+export const DormHeadDormitoryRelation = Relation.create({
   source: User,
   sourceProperty: 'managedDormitory',
   target: Dormitory,
   targetProperty: 'dormHead',
   type: '1:1',
   properties: [
-    Property.create({ 
-      name: 'appointedAt', 
+    Property.create({
+      name: 'appointedAt',
       type: 'number',
       defaultValue: () => Math.floor(Date.now()/1000)
     }),
-    Property.create({ 
-      name: 'isActive', 
-      type: 'boolean',
-      defaultValue: () => true
+    Property.create({
+      name: 'status',
+      type: 'string',
+      defaultValue: () => 'active',
+      computation: StateMachine.create({
+        states: [activeRelationState, inactiveRelationState],
+        defaultState: activeRelationState,
+        transfers: [
+          // Note: State transfers will be added in Stage 2 with actual interactions
+        ]
+      })
     })
   ],
   computation: Transform.create({
@@ -305,8 +492,8 @@ export const DormitoryHeadRelation = Relation.create({
         return {
           source: { id: event.payload.userId },
           target: { id: event.payload.dormitoryId },
-          appointedAt: Math.floor(Date.now()/1000),
-          isActive: true
+          status: 'active',
+          appointedAt: Math.floor(Date.now()/1000)
         };
       }
       return null;
@@ -314,65 +501,100 @@ export const DormitoryHeadRelation = Relation.create({
   })
 });
 
-export const UserViolationRelation = Relation.create({
+export const UserScoreRecordRelation = Relation.create({
   source: User,
-  sourceProperty: 'violationRecords',
-  target: ViolationRecord,
+  sourceProperty: 'scoreRecords',
+  target: ScoreRecord,
   targetProperty: 'user',
   type: '1:n'
+  // No computation needed - created via entity reference when ScoreRecord is created
 });
 
-export const ViolationRuleRelation = Relation.create({
+export const ScoreRuleRecordRelation = Relation.create({
   source: ScoreRule,
-  sourceProperty: 'violations',
-  target: ViolationRecord,
+  sourceProperty: 'records',
+  target: ScoreRecord,
   targetProperty: 'rule',
   type: '1:n'
+  // No computation needed - created via entity reference when ScoreRecord is created
 });
 
-export const KickoutRequesterRelation = Relation.create({
+export const RequestorKickRequestRelation = Relation.create({
   source: User,
-  sourceProperty: 'kickoutRequests',
-  target: KickoutRequest,
-  targetProperty: 'requester',
+  sourceProperty: 'kickRequestsInitiated',
+  target: KickRequest,
+  targetProperty: 'requestor',
   type: '1:n'
+  // No computation needed - created via entity reference when KickRequest is created
 });
 
-export const KickoutTargetRelation = Relation.create({
+export const TargetUserKickRequestRelation = Relation.create({
   source: User,
-  sourceProperty: 'kickoutRequestsAgainst',
-  target: KickoutRequest,
+  sourceProperty: 'kickRequestsReceived',
+  target: KickRequest,
   targetProperty: 'targetUser',
   type: '1:n'
+  // No computation needed - created via entity reference when KickRequest is created
 });
 
-export const KickoutProcessorRelation = Relation.create({
+export const DormitoryKickRequestRelation = Relation.create({
+  source: Dormitory,
+  sourceProperty: 'kickRequests',
+  target: KickRequest,
+  targetProperty: 'dormitory',
+  type: '1:n'
+  // No computation needed - created via entity reference when KickRequest is created
+});
+
+export const OperatorScoreRecordRelation = Relation.create({
   source: User,
-  sourceProperty: 'processedKickoutRequests',
-  target: KickoutRequest,
-  targetProperty: 'processor',
-  type: '1:n',
-  computation: Transform.create({
-    record: InteractionEventEntity,
-    callback: (event) => {
-      if (event.interactionName === 'ProcessKickoutRequest') {
-        return {
-          source: event.user,
-          target: { id: event.payload.requestId }
-        };
-      }
-      return null;
-    }
-  })
+  sourceProperty: 'scoreRecordsOperated',
+  target: ScoreRecord,
+  targetProperty: 'operator',
+  type: '1:n'
+  // No computation needed - created via entity reference when ScoreRecord is created
 });
 
-// Stage 1: Simple implementation without complex computations
-// Count computations will be added in Stage 2
+// ============================================================================
+// POST-RELATION COMPUTATIONS - Fix forward reference issues
+// ============================================================================
 
-// ===========================
-// INTERACTIONS
-// ===========================
+// Add the totalScore computation to User entity
+User.properties.find(p => p.name === 'totalScore').computation = Custom.create({
+  name: 'UserTotalScoreCalculator',
+  dataDeps: {
+    scoreRecords: {
+      type: 'relation',
+      source: UserScoreRecordRelation,
+      attributeQuery: [['target', { attributeQuery: ['score'] }]]
+    }
+  },
+  compute: async function(dataDeps, record) {
+    const userScoreRecords = (dataDeps.scoreRecords || []).filter(rel => 
+      rel.source && rel.source.id === record.id
+    );
+    const totalDeductions = userScoreRecords.reduce((sum, rel) => 
+      sum + (rel.target?.score || 0), 0
+    );
+    return Math.max(0, 100 - totalDeductions);
+  }
+});
 
+// Add the currentOccupancy computation to Dormitory entity
+Dormitory.properties.find(p => p.name === 'currentOccupancy').computation = Count.create({
+  record: UserDormitoryRelation,
+  direction: 'target',
+  attributeQuery: ['status'],
+  callback: function(relation) {
+    return relation.status === 'active';
+  }
+});
+
+// ============================================================================
+// INTERACTIONS - Stage 1: Core Business Logic Only
+// ============================================================================
+
+// Dormitory Management Interactions
 export const CreateDormitory = Interaction.create({
   name: 'CreateDormitory',
   action: Action.create({ name: 'createDormitory' }),
@@ -391,14 +613,15 @@ export const UpdateDormitory = Interaction.create({
     items: [
       PayloadItem.create({ name: 'dormitoryId', required: true }),
       PayloadItem.create({ name: 'name' }),
-      PayloadItem.create({ name: 'capacity' })
+      PayloadItem.create({ name: 'capacity' }),
+      PayloadItem.create({ name: 'status' })
     ]
   })
 });
 
-export const DeleteDormitory = Interaction.create({
-  name: 'DeleteDormitory',
-  action: Action.create({ name: 'deleteDormitory' }),
+export const GetDormitoryInfo = Interaction.create({
+  name: 'GetDormitoryInfo',
+  action: Action.create({ name: 'getDormitoryInfo' }),
   payload: Payload.create({
     items: [
       PayloadItem.create({ name: 'dormitoryId', required: true })
@@ -406,27 +629,19 @@ export const DeleteDormitory = Interaction.create({
   })
 });
 
-export const AssignDormHead = Interaction.create({
-  name: 'AssignDormHead',
-  action: Action.create({ name: 'assignDormHead' }),
+export const GetAllDormitories = Interaction.create({
+  name: 'GetAllDormitories',
+  action: Action.create({ name: 'getAllDormitories' }),
   payload: Payload.create({
     items: [
-      PayloadItem.create({ name: 'userId', required: true }),
-      PayloadItem.create({ name: 'dormitoryId', required: true })
+      PayloadItem.create({ name: 'status' }),
+      PayloadItem.create({ name: 'limit' }),
+      PayloadItem.create({ name: 'offset' })
     ]
   })
 });
 
-export const RemoveDormHead = Interaction.create({
-  name: 'RemoveDormHead',
-  action: Action.create({ name: 'removeDormHead' }),
-  payload: Payload.create({
-    items: [
-      PayloadItem.create({ name: 'userId', required: true })
-    ]
-  })
-});
-
+// User Assignment Management Interactions
 export const AssignUserToDormitory = Interaction.create({
   name: 'AssignUserToDormitory',
   action: Action.create({ name: 'assignUserToDormitory' }),
@@ -449,6 +664,41 @@ export const RemoveUserFromDormitory = Interaction.create({
   })
 });
 
+export const TransferUserDormitory = Interaction.create({
+  name: 'TransferUserDormitory',
+  action: Action.create({ name: 'transferUserDormitory' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({ name: 'userId', required: true }),
+      PayloadItem.create({ name: 'newDormitoryId', required: true }),
+      PayloadItem.create({ name: 'newBedNumber', required: true })
+    ]
+  })
+});
+
+// Dorm Head Management Interactions
+export const AssignDormHead = Interaction.create({
+  name: 'AssignDormHead',
+  action: Action.create({ name: 'assignDormHead' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({ name: 'userId', required: true }),
+      PayloadItem.create({ name: 'dormitoryId', required: true })
+    ]
+  })
+});
+
+export const RemoveDormHead = Interaction.create({
+  name: 'RemoveDormHead',
+  action: Action.create({ name: 'removeDormHead' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({ name: 'dormitoryId', required: true })
+    ]
+  })
+});
+
+// Score Rule Management Interactions
 export const CreateScoreRule = Interaction.create({
   name: 'CreateScoreRule',
   action: Action.create({ name: 'createScoreRule' }),
@@ -469,15 +719,14 @@ export const UpdateScoreRule = Interaction.create({
       PayloadItem.create({ name: 'ruleId', required: true }),
       PayloadItem.create({ name: 'name' }),
       PayloadItem.create({ name: 'description' }),
-      PayloadItem.create({ name: 'scoreDeduction' }),
-      PayloadItem.create({ name: 'isActive' })
+      PayloadItem.create({ name: 'scoreDeduction' })
     ]
   })
 });
 
-export const DeleteScoreRule = Interaction.create({
-  name: 'DeleteScoreRule',
-  action: Action.create({ name: 'deleteScoreRule' }),
+export const DeactivateScoreRule = Interaction.create({
+  name: 'DeactivateScoreRule',
+  action: Action.create({ name: 'deactivateScoreRule' }),
   payload: Payload.create({
     items: [
       PayloadItem.create({ name: 'ruleId', required: true })
@@ -485,92 +734,33 @@ export const DeleteScoreRule = Interaction.create({
   })
 });
 
-export const RecordViolation = Interaction.create({
-  name: 'RecordViolation',
-  action: Action.create({ name: 'recordViolation' }),
+export const GetScoreRules = Interaction.create({
+  name: 'GetScoreRules',
+  action: Action.create({ name: 'getScoreRules' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({ name: 'isActive' })
+    ]
+  })
+});
+
+// Score Operation Interactions
+export const DeductUserScore = Interaction.create({
+  name: 'DeductUserScore',
+  action: Action.create({ name: 'deductUserScore' }),
   payload: Payload.create({
     items: [
       PayloadItem.create({ name: 'userId', required: true }),
       PayloadItem.create({ name: 'ruleId', required: true }),
-      PayloadItem.create({ name: 'description', required: true })
+      PayloadItem.create({ name: 'reason', required: true }),
+      PayloadItem.create({ name: 'operatorNotes' })
     ]
   })
 });
 
-export const RevokeViolation = Interaction.create({
-  name: 'RevokeViolation',
-  action: Action.create({ name: 'revokeViolation' }),
-  payload: Payload.create({
-    items: [
-      PayloadItem.create({ name: 'violationId', required: true }),
-      PayloadItem.create({ name: 'reason', required: true })
-    ]
-  })
-});
-
-export const RequestKickout = Interaction.create({
-  name: 'RequestKickout',
-  action: Action.create({ name: 'requestKickout' }),
-  payload: Payload.create({
-    items: [
-      PayloadItem.create({ name: 'targetUserId', required: true }),
-      PayloadItem.create({ name: 'reason', required: true })
-    ]
-  })
-});
-
-export const ProcessKickoutRequest = Interaction.create({
-  name: 'ProcessKickoutRequest',
-  action: Action.create({ name: 'processKickoutRequest' }),
-  payload: Payload.create({
-    items: [
-      PayloadItem.create({ name: 'requestId', required: true }),
-      PayloadItem.create({ name: 'decision', required: true }),
-      PayloadItem.create({ name: 'adminComment' })
-    ]
-  })
-});
-
-// Query Interactions
-export const ViewSystemOverview = Interaction.create({
-  name: 'ViewSystemOverview',
-  action: Action.create({ name: 'viewSystemOverview' }),
-  payload: Payload.create({ items: [] })
-});
-
-export const ViewDormitoryList = Interaction.create({
-  name: 'ViewDormitoryList',
-  action: Action.create({ name: 'viewDormitoryList' }),
-  payload: Payload.create({
-    items: [
-      PayloadItem.create({ name: 'status' })
-    ]
-  })
-});
-
-export const ViewDormitoryDetails = Interaction.create({
-  name: 'ViewDormitoryDetails',
-  action: Action.create({ name: 'viewDormitoryDetails' }),
-  payload: Payload.create({
-    items: [
-      PayloadItem.create({ name: 'dormitoryId', required: true })
-    ]
-  })
-});
-
-export const ViewUserProfile = Interaction.create({
-  name: 'ViewUserProfile',
-  action: Action.create({ name: 'viewUserProfile' }),
-  payload: Payload.create({
-    items: [
-      PayloadItem.create({ name: 'userId', required: true })
-    ]
-  })
-});
-
-export const ViewViolationHistory = Interaction.create({
-  name: 'ViewViolationHistory',
-  action: Action.create({ name: 'viewViolationHistory' }),
+export const GetUserScoreRecords = Interaction.create({
+  name: 'GetUserScoreRecords',
+  action: Action.create({ name: 'getUserScoreRecords' }),
   payload: Payload.create({
     items: [
       PayloadItem.create({ name: 'userId', required: true }),
@@ -580,124 +770,177 @@ export const ViewViolationHistory = Interaction.create({
   })
 });
 
-export const ViewKickoutRequests = Interaction.create({
-  name: 'ViewKickoutRequests',
-  action: Action.create({ name: 'viewKickoutRequests' }),
+// Kick Request Management Interactions
+export const RequestKickUser = Interaction.create({
+  name: 'RequestKickUser',
+  action: Action.create({ name: 'requestKickUser' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({ name: 'userId', required: true }),
+      PayloadItem.create({ name: 'reason', required: true })
+    ]
+  })
+});
+
+export const ApproveKickRequest = Interaction.create({
+  name: 'ApproveKickRequest',
+  action: Action.create({ name: 'approveKickRequest' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({ name: 'requestId', required: true }),
+      PayloadItem.create({ name: 'adminNotes' })
+    ]
+  })
+});
+
+export const RejectKickRequest = Interaction.create({
+  name: 'RejectKickRequest',
+  action: Action.create({ name: 'rejectKickRequest' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({ name: 'requestId', required: true }),
+      PayloadItem.create({ name: 'adminNotes' })
+    ]
+  })
+});
+
+export const GetKickRequests = Interaction.create({
+  name: 'GetKickRequests',
+  action: Action.create({ name: 'getKickRequests' }),
   payload: Payload.create({
     items: [
       PayloadItem.create({ name: 'status' }),
-      PayloadItem.create({ name: 'requesterId' })
+      PayloadItem.create({ name: 'dormitoryId' }),
+      PayloadItem.create({ name: 'limit' }),
+      PayloadItem.create({ name: 'offset' })
     ]
   })
 });
 
-export const ViewScoreRules = Interaction.create({
-  name: 'ViewScoreRules',
-  action: Action.create({ name: 'viewScoreRules' }),
+// User Query Interactions
+export const GetUserInfo = Interaction.create({
+  name: 'GetUserInfo',
+  action: Action.create({ name: 'getUserInfo' }),
   payload: Payload.create({
     items: [
-      PayloadItem.create({ name: 'isActive' })
+      PayloadItem.create({ name: 'userId', required: true })
     ]
   })
 });
 
-// ===========================
-// FILTERED ENTITIES
-// ===========================
-
-export const ActiveUser = Entity.create({
-  name: 'ActiveUser',
-  sourceEntity: User,
-  filterCondition: MatchExp.atom({
-    key: 'status',
-    value: ['=', 'active']
+export const GetDormitoryUsers = Interaction.create({
+  name: 'GetDormitoryUsers',
+  action: Action.create({ name: 'getDormitoryUsers' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({ name: 'dormitoryId', required: true })
+    ]
   })
 });
 
-export const ActiveDormitoryAssignments = Entity.create({
-  name: 'ActiveDormitoryAssignments',
-  sourceEntity: UserDormitoryRelation,
-  filterCondition: MatchExp.atom({
-    key: 'status',
-    value: ['=', 'active']
-  })
-});
-
-// ===========================
-// GLOBAL DICTIONARIES
-// ===========================
+// ============================================================================
+// DICTIONARIES
+// ============================================================================
 
 export const SystemStats = Dictionary.create({
   name: 'SystemStats',
   type: 'object',
   collection: false,
-  defaultValue: () => ({
-    totalUsers: 0,
-    totalDormitories: 0,
-    totalActiveAssignments: 0,
-    pendingKickoutRequests: 0
+  computation: Custom.create({
+    name: 'SystemStatsCalculator',
+    dataDeps: {
+      users: {
+        type: 'records',
+        source: User,
+        attributeQuery: ['id', 'status']
+      },
+      dormitories: {
+        type: 'records',
+        source: Dormitory,
+        attributeQuery: ['id', 'status', 'capacity', 'currentOccupancy']
+      }
+    },
+    compute: async function(dataDeps) {
+      const users = dataDeps.users || [];
+      const dormitories = dataDeps.dormitories || [];
+      
+      const totalUsers = users.length;
+      const activeUsers = users.filter(u => u.status === 'active').length;
+      const totalDormitories = dormitories.length;
+      const activeDormitories = dormitories.filter(d => d.status === 'active');
+      
+      const totalCapacity = activeDormitories.reduce((sum, dorm) => sum + (dorm.capacity || 0), 0);
+      const totalOccupancy = activeDormitories.reduce((sum, dorm) => sum + (dorm.currentOccupancy || 0), 0);
+      const averageOccupancyRate = totalCapacity > 0 ? (totalOccupancy / totalCapacity) * 100 : 0;
+      
+      return {
+        totalUsers,
+        activeUsers,
+        kickedUsers: totalUsers - activeUsers,
+        totalDormitories,
+        activeDormitories: activeDormitories.length,
+        totalCapacity,
+        totalOccupancy,
+        averageOccupancyRate: Math.round(averageOccupancyRate * 100) / 100
+      };
+    }
   })
 });
 
-// ===========================
+// ============================================================================
 // EXPORTS
-// ===========================
+// ============================================================================
 
 export const entities = [
-  User, 
-  Dormitory, 
-  ScoreRule, 
-  ViolationRecord, 
-  KickoutRequest,
+  User,
+  Dormitory,
+  ScoreRule,
+  ScoreRecord,
+  KickRequest,
   ActiveUser,
-  ActiveDormitoryAssignments
+  ActiveDormitory,
+  ActiveScoreRule,
+  PendingKickRequest,
+  LowScoreUser
 ];
 
 export const relations = [
   UserDormitoryRelation,
-  DormitoryHeadRelation,
-  UserViolationRelation,
-  ViolationRuleRelation,
-  KickoutRequesterRelation,
-  KickoutTargetRelation,
-  KickoutProcessorRelation
+  DormHeadDormitoryRelation,
+  UserScoreRecordRelation,
+  ScoreRuleRecordRelation,
+  RequestorKickRequestRelation,
+  TargetUserKickRequestRelation,
+  DormitoryKickRequestRelation,
+  OperatorScoreRecordRelation
 ];
 
 export const interactions = [
-  // Dormitory Management
   CreateDormitory,
   UpdateDormitory,
-  DeleteDormitory,
-  
-  // User Role Management
-  AssignDormHead,
-  RemoveDormHead,
+  GetDormitoryInfo,
+  GetAllDormitories,
   AssignUserToDormitory,
   RemoveUserFromDormitory,
-  
-  // Score Rule Management
+  TransferUserDormitory,
+  AssignDormHead,
+  RemoveDormHead,
   CreateScoreRule,
   UpdateScoreRule,
-  DeleteScoreRule,
-  
-  // Violation Management
-  RecordViolation,
-  RevokeViolation,
-  
-  // Kickout Management
-  RequestKickout,
-  ProcessKickoutRequest,
-  
-  // Query Interactions
-  ViewSystemOverview,
-  ViewDormitoryList,
-  ViewDormitoryDetails,
-  ViewUserProfile,
-  ViewViolationHistory,
-  ViewKickoutRequests,
-  ViewScoreRules
+  DeactivateScoreRule,
+  GetScoreRules,
+  DeductUserScore,
+  GetUserScoreRecords,
+  RequestKickUser,
+  ApproveKickRequest,
+  RejectKickRequest,
+  GetKickRequests,
+  GetUserInfo,
+  GetDormitoryUsers
+];
+
+export const dicts = [
+  SystemStats
 ];
 
 export const activities = [];
-
-export const dicts = [SystemStats];

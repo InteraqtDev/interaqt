@@ -67,7 +67,7 @@ export class FilteredEntityManager {
     ) {
         // MatchExpressionData 是 BoolExp<MatchAtom> 的别名
         // 使用 BoolExp.fromValue 来获取正确的实例
-        const boolExp = expression instanceof BoolExp ? expression : BoolExp.fromValue(expression)
+        const boolExp = BoolExp.fromValue(expression as any)
         
         if (boolExp.isExpression()) {
             if (boolExp.left) {
