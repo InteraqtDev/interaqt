@@ -606,7 +606,9 @@ ${modifierClause}
     }
 
     buildFromClause(entityName: string, prefix = '') {
-        return `"${this.map.getRecordTable(entityName)}" AS "${this.withPrefix(prefix)}${entityName}"`
+        // 获取实际的表名（处理 filtered relation/entity 的情况）
+        const actualTableName = this.map.getRecordTable(entityName);
+        return `"${actualTableName}" AS "${this.withPrefix(prefix)}${entityName}"`
     }
 
     buildJoinClause(joinTables: JoinTables, prefix = '') {

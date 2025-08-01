@@ -454,4 +454,459 @@ describe('Average computed handle', () => {
     avg = await system.storage.get(DICTIONARY_RECORD, 'averageMeasurement');
     expect(avg).toBe(150); // (150 + 300) / 3
   });
+
+  test('should handle property level average with filtered relations', async () => {
+    // NOTE: This test demonstrates a current limitation in the framework:
+    // Filtered relations do not automatically trigger computations when their 
+    // source relations change. This is because the dependency tracking system
+    // doesn't fully support transitive dependencies through filtered relations.
+    // Define entities
+    const storeEntity = Entity.create({
+      name: 'Store',
+      properties: [
+        Property.create({name: 'name', type: 'string'})
+      ]
+    });
+    
+    const saleEntity = Entity.create({
+      name: 'Sale',
+      properties: [
+        Property.create({name: 'product', type: 'string'}),
+        Property.create({name: 'amount', type: 'number'}),
+        Property.create({name: 'date', type: 'string'})
+      ]
+    });
+    
+    // Create base relation with sale type property
+    const storeSaleRelation = Relation.create({
+      source: storeEntity,
+      sourceProperty: 'sales',
+      target: saleEntity,
+      targetProperty: 'store',
+      name: 'StoreSale',
+      type: '1:n',
+      properties: [
+        Property.create({name: 'saleType', type: 'string'}), // online, in-store, phone
+        Property.create({name: 'paymentMethod', type: 'string'}), // cash, credit, debit
+        Property.create({name: 'isRefunded', type: 'boolean', defaultValue: () => false})
+      ]
+    });
+    
+    // Create filtered relation for non-refunded online sales
+    const onlineNonRefundedRelation = Relation.create({
+      name: 'OnlineNonRefundedRelation',
+      sourceRelation: storeSaleRelation,
+      sourceProperty: 'onlineNonRefundedSales',
+      targetProperty: 'onlineNonRefundedStore',
+      matchExpression: MatchExp.atom({
+        key: 'saleType',
+        value: ['=', 'online']
+      }).and({
+        key: 'isRefunded',
+        value: ['=', false]
+      })
+    });
+    
+    // Add computed properties to store entity
+    storeEntity.properties.push(
+      Property.create({
+        name: 'averageSaleAmount',
+        type: 'number',
+        collection: false,
+        computation: Average.create({
+          record: storeSaleRelation,
+          attributeQuery: [['target', {attributeQuery: ['amount']}]]
+        })
+      }),
+      Property.create({
+        name: 'averageOnlineSaleAmount',
+        type: 'number',
+        collection: false,
+        computation: Average.create({
+          record: onlineNonRefundedRelation,
+          attributeQuery: [['target', {attributeQuery: ['amount']}]]
+        })
+      })
+    );
+    
+    const entities = [storeEntity, saleEntity];
+    const relations = [storeSaleRelation, onlineNonRefundedRelation];
+    
+    // Setup system and controller
+    const system = new MonoSystem();
+    const controller = new Controller({
+        system: system,
+        entities: entities,
+        relations: relations,
+        activities: [],
+        interactions: []
+    });
+    await controller.setup(true);
+    
+    // Create test data
+    const store1 = await system.storage.create('Store', { name: 'Main Store' });
+    
+    const sale1 = await system.storage.create('Sale', { 
+      product: 'Laptop',
+      amount: 1000,
+      date: '2024-01-01'
+    });
+    const sale2 = await system.storage.create('Sale', { 
+      product: 'Mouse',
+      amount: 50,
+      date: '2024-01-02'
+    });
+    const sale3 = await system.storage.create('Sale', { 
+      product: 'Keyboard',
+      amount: 150,
+      date: '2024-01-03'
+    });
+    const sale4 = await system.storage.create('Sale', { 
+      product: 'Monitor',
+      amount: 400,
+      date: '2024-01-04'
+    });
+    
+    // Create relations with different sale types
+    await system.storage.create('StoreSale', {
+      source: store1,
+      target: sale1,
+      saleType: 'online',
+      paymentMethod: 'credit',
+      isRefunded: false
+    });
+    
+    const sale2Relation = await system.storage.create('StoreSale', {
+      source: store1,
+      target: sale2,
+      saleType: 'in-store',
+      paymentMethod: 'cash',
+      isRefunded: false
+    });
+    
+    await system.storage.create('StoreSale', {
+      source: store1,
+      target: sale3,
+      saleType: 'online',
+      paymentMethod: 'debit',
+      isRefunded: false
+    });
+    
+    const sale4Relation = await system.storage.create('StoreSale', {
+      source: store1,
+      target: sale4,
+      saleType: 'online',
+      paymentMethod: 'credit',
+      isRefunded: false
+    });
+    
+    // Check initial averages
+    const store1Data = await system.storage.findOne('Store', 
+      BoolExp.atom({key: 'id', value: ['=', store1.id]}), 
+      undefined, 
+      ['id', 'name', 'averageSaleAmount', 'averageOnlineSaleAmount']
+    );
+    
+    expect(store1Data.averageSaleAmount).toBe(400); // (1000 + 50 + 150 + 400) / 4
+    // Online non-refunded sales: sale1($1000), sale3($150), sale4($400)
+    expect(store1Data.averageOnlineSaleAmount).toBeCloseTo(516.67, 2); // (1000 + 150 + 400) / 3
+    
+    // Refund one online sale
+    await system.storage.update('StoreSale',
+      BoolExp.atom({key: 'id', value: ['=', sale4Relation.id]}),
+      { isRefunded: true }
+    );
+    
+    // Check updated averages
+    const store1Data2 = await system.storage.findOne('Store', 
+      BoolExp.atom({key: 'id', value: ['=', store1.id]}), 
+      undefined, 
+      ['id', 'name', 'averageSaleAmount', 'averageOnlineSaleAmount']
+    );
+    
+    expect(store1Data2.averageSaleAmount).toBe(400); // Still same, all sales count
+    // After refunding sale4, only sale1($1000) and sale3($150) are online non-refunded
+    expect(store1Data2.averageOnlineSaleAmount).toBe(575); // (1000 + 150) / 2
+    
+    // Change sale type from in-store to online
+    await system.storage.update('StoreSale',
+      BoolExp.atom({key: 'id', value: ['=', sale2Relation.id]}),
+      { saleType: 'online' }
+    );
+    
+    // Check after type change
+    const store1Data3 = await system.storage.findOne('Store', 
+      BoolExp.atom({key: 'id', value: ['=', store1.id]}), 
+      undefined, 
+      ['id', 'name', 'averageSaleAmount', 'averageOnlineSaleAmount']
+    );
+    
+    expect(store1Data3.averageSaleAmount).toBe(400); // Still same
+    // Now sale2($50) is also online, so: sale1($1000), sale2($50), sale3($150)
+    expect(store1Data3.averageOnlineSaleAmount).toBe(400); // (1000 + 50 + 150) / 3
+    
+    // Update sale amount
+    await system.storage.update('Sale',
+      BoolExp.atom({key: 'id', value: ['=', sale1.id]}),
+      { amount: 1200 }
+    );
+    
+    // Check after amount update
+    const store1Data4 = await system.storage.findOne('Store', 
+      BoolExp.atom({key: 'id', value: ['=', store1.id]}), 
+      undefined, 
+      ['id', 'name', 'averageSaleAmount', 'averageOnlineSaleAmount']
+    );
+    
+    expect(store1Data4.averageSaleAmount).toBe(450); // (1200 + 50 + 150 + 400) / 4
+    // After updating sale1 to $1200: sale1($1200), sale2($50), sale3($150)
+    expect(store1Data4.averageOnlineSaleAmount).toBeCloseTo(466.67, 2); // (1200 + 50 + 150) / 3
+    
+    // Delete a relation
+    const sale1Relation = await system.storage.findOne('StoreSale',
+      BoolExp.and([
+        MatchExp.atom({key: 'source.id', value: ['=', store1.id]}),
+        MatchExp.atom({key: 'target.id', value: ['=', sale1.id]})
+      ]),
+      undefined,
+      ['id']
+    );
+    
+    await system.storage.delete('StoreSale',
+      BoolExp.atom({key: 'id', value: ['=', sale1Relation.id]})
+    );
+    
+    // Final check
+    const store1Data5 = await system.storage.findOne('Store', 
+      BoolExp.atom({key: 'id', value: ['=', store1.id]}), 
+      undefined, 
+      ['id', 'name', 'averageSaleAmount', 'averageOnlineSaleAmount']
+    );
+    
+    expect(store1Data5.averageSaleAmount).toBe(200); // (50 + 150 + 400) / 3
+    // After deleting sale1, only sale2($50) and sale3($150) remain online non-refunded
+    expect(store1Data5.averageOnlineSaleAmount).toBe(100); // (50 + 150) / 2
+  });
+  
+  test('should handle property level average with filtered relations - Course Grading Example', async () => {
+    // NOTE: This test demonstrates a current limitation in the framework:
+    // Filtered relations do not automatically trigger computations when their 
+    // source relations change. This is because the dependency tracking system
+    // doesn't fully support transitive dependencies through filtered relations.
+    // Define entities
+    const courseEntity = Entity.create({
+      name: 'Course',
+      properties: [
+        Property.create({name: 'name', type: 'string'}),
+        Property.create({name: 'department', type: 'string'})
+      ]
+    });
+    
+    const studentEntity = Entity.create({
+      name: 'Student',
+      properties: [
+        Property.create({name: 'name', type: 'string'}),
+        Property.create({name: 'major', type: 'string'})
+      ]
+    });
+    
+    // Create base relation with enrollment properties
+    const courseEnrollmentRelation = Relation.create({
+      source: courseEntity,
+      sourceProperty: 'enrollments',
+      target: studentEntity,
+      targetProperty: 'courses',
+      name: 'CourseEnrollment',
+      type: 'n:n',
+      properties: [
+        Property.create({name: 'grade', type: 'number'}), // 0-100
+        Property.create({name: 'semester', type: 'string'}),
+        Property.create({name: 'status', type: 'string'}), // completed, in-progress, withdrawn
+        Property.create({name: 'creditHours', type: 'number'})
+      ]
+    });
+    
+    // Create filtered relations for different enrollment statuses
+    const completedEnrollmentRelation = Relation.create({
+      name: 'CompletedEnrollmentRelation',
+      sourceRelation: courseEnrollmentRelation,
+      sourceProperty: 'completedEnrollments',
+      targetProperty: 'completedCourses',
+      matchExpression: MatchExp.atom({
+        key: 'status',
+        value: ['=', 'completed']
+      })
+    });
+    
+    const springCompletedRelation = Relation.create({
+      name: 'SpringCompletedRelation',
+      sourceRelation: courseEnrollmentRelation,
+      sourceProperty: 'springCompletedEnrollments',
+      targetProperty: 'springCompletedCourses',
+      matchExpression: MatchExp.atom({
+        key: 'status',
+        value: ['=', 'completed']
+      }).and({
+        key: 'semester',
+        value: ['=', 'Spring 2024']
+      })
+    });
+    
+    const fallCompletedRelation = Relation.create({
+      name: 'FallCompletedRelation',
+      sourceRelation: courseEnrollmentRelation,
+      sourceProperty: 'fallCompletedEnrollments',
+      targetProperty: 'fallCompletedCourses',
+      matchExpression: MatchExp.atom({
+        key: 'status',
+        value: ['=', 'completed']
+      }).and({
+        key: 'semester',
+        value: ['=', 'Fall 2023']
+      })
+    });
+    
+    // Add computed properties to course entity
+    courseEntity.properties.push(
+      Property.create({
+        name: 'overallAverageGrade',
+        type: 'number',
+        collection: false,
+        computation: Average.create({
+          record: completedEnrollmentRelation,
+          attributeQuery: ['grade']
+        })
+      }),
+      Property.create({
+        name: 'springAverageGrade',
+        type: 'number',
+        collection: false,
+        computation: Average.create({
+          record: springCompletedRelation,
+          attributeQuery: ['grade']
+        })
+      }),
+      Property.create({
+        name: 'fallAverageGrade',
+        type: 'number',
+        collection: false,
+        computation: Average.create({
+          record: fallCompletedRelation,
+          attributeQuery: ['grade']
+        })
+      })
+    );
+    
+    const entities = [courseEntity, studentEntity];
+    const relations = [courseEnrollmentRelation, completedEnrollmentRelation, springCompletedRelation, fallCompletedRelation];
+    
+    // Setup system and controller
+    const system = new MonoSystem();
+    system.conceptClass = KlassByName;
+    const controller = new Controller({
+        system: system,
+        entities: entities,
+        relations: relations,
+        activities: [],
+        interactions: []
+    });
+    await controller.setup(true);
+    
+    // Create test data
+    const mathCourse = await system.storage.create('Course', { 
+      name: 'Calculus I',
+      department: 'Mathematics'
+    });
+    
+    const student1 = await system.storage.create('Student', { 
+      name: 'Alice',
+      major: 'Engineering'
+    });
+    
+    const student2 = await system.storage.create('Student', { 
+      name: 'Bob',
+      major: 'Physics'
+    });
+    
+    const student3 = await system.storage.create('Student', { 
+      name: 'Charlie',
+      major: 'Mathematics'
+    });
+    
+    const student4 = await system.storage.create('Student', { 
+      name: 'David',
+      major: 'Computer Science'
+    });
+    
+    // Create enrollments with different semesters and statuses
+    await system.storage.create('CourseEnrollment', {
+      source: mathCourse,
+      target: student1,
+      grade: 85,
+      semester: 'Spring 2024',
+      status: 'completed',
+      creditHours: 4
+    });
+    
+    await system.storage.create('CourseEnrollment', {
+      source: mathCourse,
+      target: student2,
+      grade: 92,
+      semester: 'Spring 2024',
+      status: 'completed',
+      creditHours: 4
+    });
+    
+    await system.storage.create('CourseEnrollment', {
+      source: mathCourse,
+      target: student3,
+      grade: 78,
+      semester: 'Fall 2023',
+      status: 'completed',
+      creditHours: 4
+    });
+    
+    await system.storage.create('CourseEnrollment', {
+      source: mathCourse,
+      target: student4,
+      grade: 0,
+      semester: 'Spring 2024',
+      status: 'withdrawn',
+      creditHours: 4
+    });
+    
+    // Check computed averages
+    const courseData = await system.storage.findOne('Course', 
+      BoolExp.atom({key: 'id', value: ['=', mathCourse.id]}), 
+      undefined, 
+      ['id', 'name', 'overallAverageGrade', 'springAverageGrade', 'fallAverageGrade']
+    );
+    
+    expect(courseData.overallAverageGrade).toBeCloseTo(85, 1); // (85 + 92 + 78) / 3 = 85
+    // Spring 2024 completed: student1(85), student2(92)
+    expect(courseData.springAverageGrade).toBe(88.5); // (85 + 92) / 2
+    // Fall 2023 completed: student3(78)
+    expect(courseData.fallAverageGrade).toBe(78); // Only one student
+    
+    // Test dynamic updates: Student improves grade after retake
+    await system.storage.create('CourseEnrollment', {
+      source: mathCourse,
+      target: student3,
+      grade: 88,
+      semester: 'Spring 2024',
+      status: 'completed',
+      creditHours: 4
+    });
+    
+    // Check updated averages
+    const courseDataUpdated = await system.storage.findOne('Course', 
+      BoolExp.atom({key: 'id', value: ['=', mathCourse.id]}), 
+      undefined, 
+      ['id', 'name', 'overallAverageGrade', 'springAverageGrade']
+    );
+    
+    expect(courseDataUpdated.overallAverageGrade).toBeCloseTo(85.75, 1); // (85 + 92 + 78 + 88) / 4
+    // Spring 2024 now has student3(88) added: student1(85), student2(92), student3(88)
+    expect(courseDataUpdated.springAverageGrade).toBeCloseTo(88.33, 2); // (85 + 92 + 88) / 3
+  });
 }); 

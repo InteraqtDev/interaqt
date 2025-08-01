@@ -67,20 +67,20 @@ export class Relation implements RelationInstance {
     
     // For filtered relation, inherit from sourceRelation
     if (args.sourceRelation) {
-      // Filtered relation must have a unique name
-      if (!args.name) {
-        throw new Error('Filtered relation must be named');
+      // Filtered relation must have sourceProperty and targetProperty
+      if (!args.sourceProperty || !args.targetProperty) {
+        throw new Error('Filtered relation must have sourceProperty and targetProperty');
       }
       
       this.sourceRelation = args.sourceRelation;
       this.matchExpression = args.matchExpression;
       this.source = args.sourceRelation.source;
-      this.sourceProperty = args.sourceRelation.sourceProperty;
+      this.sourceProperty = args.sourceProperty;
       this.target = args.sourceRelation.target;
-      this.targetProperty = args.sourceRelation.targetProperty;
+      this.targetProperty = args.targetProperty;
       this.isTargetReliance = args.sourceRelation.isTargetReliance;
       this.type = args.sourceRelation.type;
-      this._name = args.name;
+      this._name = args.name; // name is optional for filtered relation
     } else {
       // Normal relation, require all fields
       if (!args.source || !args.sourceProperty || !args.target || !args.targetProperty || !args.type) {

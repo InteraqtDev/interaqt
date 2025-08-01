@@ -320,7 +320,6 @@ export class Scheduler {
             }
         })
 
-        // TODO dataContext 为 property 的还要监听自身 record 的创建事件，创建的时候就要跑一边 computation 来设置初始值啊。
         // TODO 未来也许要监听 MutationEvent，让开发者能观测系统的变化。
     }
     async computeDirtyDataDepRecords(source: EntityEventSourceMap, mutationEvent: RecordMutationEvent): Promise<any[]> {

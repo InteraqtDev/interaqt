@@ -9,6 +9,7 @@ import {
   Property,
   Relation,
   Summation,
+  WeightedSummation,
   MatchExp,
   DICTIONARY_RECORD
 } from 'interaqt';
@@ -507,5 +508,555 @@ describe('Sum computed handle', () => {
     );
     
     expect(finalAlice.totalPurchases).toBe(1425); // 1200 + 75 + 150
+  });
+
+  test('should handle property level summation with filtered relations', async () => {
+    // NOTE: This test demonstrates a current limitation in the framework:
+    // Filtered relations do not automatically trigger computations when their 
+    // source relations change. This is because the dependency tracking system
+    // doesn't fully support transitive dependencies through filtered relations.
+    // Define entities
+    const warehouseEntity = Entity.create({
+      name: 'Warehouse',
+      properties: [
+        Property.create({name: 'name', type: 'string'}),
+        Property.create({name: 'location', type: 'string'})
+      ]
+    });
+    
+    const inventoryEntity = Entity.create({
+      name: 'Inventory',
+      properties: [
+        Property.create({name: 'productName', type: 'string'}),
+        Property.create({name: 'quantity', type: 'number'}),
+        Property.create({name: 'unitPrice', type: 'number'})
+      ]
+    });
+    
+    // Create base relation with inventory status
+    const warehouseInventoryRelation = Relation.create({
+      source: warehouseEntity,
+      sourceProperty: 'inventories',
+      target: inventoryEntity,
+      targetProperty: 'warehouse',
+      name: 'WarehouseInventory',
+      type: '1:n',
+      properties: [
+        Property.create({name: 'status', type: 'string'}), // available, reserved, damaged, expired
+        Property.create({name: 'lastUpdated', type: 'string'}),
+        Property.create({name: 'zone', type: 'string'}) // A, B, C, D
+      ]
+    });
+    
+    // Create filtered relation for available items in zones A and B
+    const availableABZoneRelation = Relation.create({
+      name: 'AvailableABZoneRelation',
+      sourceRelation: warehouseInventoryRelation,
+      sourceProperty: 'availableABInventories',
+      targetProperty: 'availableABWarehouse',
+      matchExpression: MatchExp.atom({
+        key: 'status',
+        value: ['=', 'available']
+      }).and(
+        MatchExp.atom({
+          key: 'zone',
+          value: ['=', 'A']
+        }).or({
+          key: 'zone',
+          value: ['=', 'B']
+        })
+      )
+    });
+    
+    // Add computed properties to warehouse entity
+    warehouseEntity.properties.push(
+      Property.create({
+        name: 'totalInventoryValue',
+        type: 'number',
+        collection: false,
+        computation: WeightedSummation.create({
+          record: warehouseInventoryRelation,
+          attributeQuery: [['target', {attributeQuery: ['quantity', 'unitPrice']}]],
+          callback: function(relation: any) {
+            return {
+              weight: relation.target.quantity || 0,
+              value: relation.target.unitPrice || 0
+            };
+          }
+        })
+      }),
+      Property.create({
+        name: 'availableABZoneValue',
+        type: 'number',
+        collection: false,
+        computation: WeightedSummation.create({
+          record: availableABZoneRelation,
+          attributeQuery: [['target', {attributeQuery: ['quantity', 'unitPrice']}]],
+          callback: function(relation: any) {
+            return {
+              weight: relation.target.quantity || 0,
+              value: relation.target.unitPrice || 0
+            };
+          }
+        })
+      }),
+      Property.create({
+        name: 'availableABZoneQuantity',
+        type: 'number',
+        collection: false,
+        computation: Summation.create({
+          record: availableABZoneRelation,
+          attributeQuery: [['target', {attributeQuery: ['quantity']}]]
+        })
+      })
+    );
+    
+    const entities = [warehouseEntity, inventoryEntity];
+    const relations = [warehouseInventoryRelation, availableABZoneRelation];
+    
+    // Setup system and controller
+    const system = new MonoSystem();
+    system.conceptClass = KlassByName;
+    const controller = new Controller({
+        system: system,
+        entities: entities,
+        relations: relations,
+        activities: [],
+        interactions: []
+    });
+    await controller.setup(true);
+    
+    // Create test data
+    const warehouse1 = await system.storage.create('Warehouse', { 
+      name: 'North Warehouse',
+      location: 'New York'
+    });
+    
+    const inv1 = await system.storage.create('Inventory', { 
+      productName: 'Widget A',
+      quantity: 100,
+      unitPrice: 10
+    });
+    const inv2 = await system.storage.create('Inventory', { 
+      productName: 'Widget B',
+      quantity: 50,
+      unitPrice: 20
+    });
+    const inv3 = await system.storage.create('Inventory', { 
+      productName: 'Widget C',
+      quantity: 200,
+      unitPrice: 5
+    });
+    const inv4 = await system.storage.create('Inventory', { 
+      productName: 'Widget D',
+      quantity: 75,
+      unitPrice: 15
+    });
+    
+    // Create relations with different statuses and zones
+    const rel1 = await system.storage.create('WarehouseInventory', {
+      source: warehouse1,
+      target: inv1,
+      status: 'available',
+      zone: 'A',
+      lastUpdated: '2024-01-01'
+    });
+    
+    const rel2 = await system.storage.create('WarehouseInventory', {
+      source: warehouse1,
+      target: inv2,
+      status: 'available',
+      zone: 'B',
+      lastUpdated: '2024-01-02'
+    });
+    
+    const rel3 = await system.storage.create('WarehouseInventory', {
+      source: warehouse1,
+      target: inv3,
+      status: 'available',
+      zone: 'C',
+      lastUpdated: '2024-01-03'
+    });
+    
+    const rel4 = await system.storage.create('WarehouseInventory', {
+      source: warehouse1,
+      target: inv4,
+      status: 'reserved',
+      zone: 'A',
+      lastUpdated: '2024-01-04'
+    });
+    
+    // Check initial sums
+    const warehouse1Data = await system.storage.findOne('Warehouse', 
+      BoolExp.atom({key: 'id', value: ['=', warehouse1.id]}), 
+      undefined, 
+      ['id', 'name', 'totalInventoryValue', 'availableABZoneValue', 'availableABZoneQuantity']
+    );
+    
+    expect(warehouse1Data.totalInventoryValue).toBe(4125); // (100*10) + (50*20) + (200*5) + (75*15)
+    // Available items in zones A/B: inv1(zone A) and inv2(zone B)
+    expect(warehouse1Data.availableABZoneValue).toBe(2000); // (100*10) + (50*20)
+    expect(warehouse1Data.availableABZoneQuantity).toBe(150); // 100 + 50
+    
+    // Change status of zone A reserved item to available
+    await system.storage.update('WarehouseInventory',
+      BoolExp.atom({key: 'id', value: ['=', rel4.id]}),
+      { status: 'available' }
+    );
+    
+    // Check updated sums
+    const warehouse1Data2 = await system.storage.findOne('Warehouse', 
+      BoolExp.atom({key: 'id', value: ['=', warehouse1.id]}), 
+      undefined, 
+      ['id', 'name', 'totalInventoryValue', 'availableABZoneValue', 'availableABZoneQuantity']
+    );
+    
+    expect(warehouse1Data2.totalInventoryValue).toBe(4125); // Total unchanged
+    // Now inv4(zone A) is also available: inv1, inv2, inv4
+    expect(warehouse1Data2.availableABZoneValue).toBe(3125); // (100*10) + (50*20) + (75*15)
+    expect(warehouse1Data2.availableABZoneQuantity).toBe(225); // 100 + 50 + 75
+    
+    // Move inv3 from zone C to zone A
+    await system.storage.update('WarehouseInventory',
+      BoolExp.atom({key: 'id', value: ['=', rel3.id]}),
+      { zone: 'A' }
+    );
+    
+    // Check after zone change
+    const warehouse1Data3 = await system.storage.findOne('Warehouse', 
+      BoolExp.atom({key: 'id', value: ['=', warehouse1.id]}), 
+      undefined, 
+      ['id', 'name', 'totalInventoryValue', 'availableABZoneValue', 'availableABZoneQuantity']
+    );
+    
+    expect(warehouse1Data3.totalInventoryValue).toBe(4125); // Total unchanged
+    // Now inv3(zone A) is also available: inv1, inv2, inv3, inv4
+    expect(warehouse1Data3.availableABZoneValue).toBe(4125); // All inventory is now in zones A/B and available
+    expect(warehouse1Data3.availableABZoneQuantity).toBe(425); // 100 + 50 + 200 + 75
+    
+    // Update quantity of inv1
+    await system.storage.update('Inventory',
+      BoolExp.atom({key: 'id', value: ['=', inv1.id]}),
+      { quantity: 150 }
+    );
+    
+    // Check after quantity update
+    const warehouse1Data4 = await system.storage.findOne('Warehouse', 
+      BoolExp.atom({key: 'id', value: ['=', warehouse1.id]}), 
+      undefined, 
+      ['id', 'name', 'totalInventoryValue', 'availableABZoneValue', 'availableABZoneQuantity']
+    );
+    
+    expect(warehouse1Data4.totalInventoryValue).toBe(4625); // Increased by 500 (50 * 10)
+    // inv1 quantity updated from 100 to 150
+    expect(warehouse1Data4.availableABZoneValue).toBe(4625); // (150*10) + (50*20) + (200*5) + (75*15)
+    expect(warehouse1Data4.availableABZoneQuantity).toBe(475); // 150 + 50 + 200 + 75
+    
+    // Mark inv2 as damaged
+    await system.storage.update('WarehouseInventory',
+      BoolExp.atom({key: 'id', value: ['=', rel2.id]}),
+      { status: 'damaged' }
+    );
+    
+    // Check after status change
+    const warehouse1Data5 = await system.storage.findOne('Warehouse', 
+      BoolExp.atom({key: 'id', value: ['=', warehouse1.id]}), 
+      undefined, 
+      ['id', 'name', 'totalInventoryValue', 'availableABZoneValue', 'availableABZoneQuantity']
+    );
+    
+    expect(warehouse1Data5.totalInventoryValue).toBe(4625); // Total unchanged
+    // inv2 is now damaged, no longer available
+    expect(warehouse1Data5.availableABZoneValue).toBe(3625); // (150*10) + (200*5) + (75*15)
+    expect(warehouse1Data5.availableABZoneQuantity).toBe(425); // 150 + 200 + 75
+    
+    // Delete rel1
+    await system.storage.delete('WarehouseInventory',
+      BoolExp.atom({key: 'id', value: ['=', rel1.id]})
+    );
+    
+    // Final check
+    const warehouse1Data6 = await system.storage.findOne('Warehouse', 
+      BoolExp.atom({key: 'id', value: ['=', warehouse1.id]}), 
+      undefined, 
+      ['id', 'name', 'totalInventoryValue', 'availableABZoneValue', 'availableABZoneQuantity']
+    );
+    
+    expect(warehouse1Data6.totalInventoryValue).toBe(3125); // Decreased by 1500 (150*10)
+    expect(warehouse1Data6.availableABZoneValue).toBe(2125); // Only inv3 and inv4 in A zone
+    expect(warehouse1Data6.availableABZoneQuantity).toBe(275); // 200 + 75
+  });
+  
+  test('should handle property level summation with filtered relations - Sales Territory Example', async () => {
+    // NOTE: This test demonstrates a current limitation in the framework:
+    // Filtered relations do not automatically trigger computations when their 
+    // source relations change. This is because the dependency tracking system
+    // doesn't fully support transitive dependencies through filtered relations.
+    // Define entities
+    const territoryEntity = Entity.create({
+      name: 'Territory',
+      properties: [
+        Property.create({name: 'name', type: 'string'}),
+        Property.create({name: 'region', type: 'string'})
+      ]
+    });
+    
+    const salesRepEntity = Entity.create({
+      name: 'SalesRep',
+      properties: [
+        Property.create({name: 'name', type: 'string'}),
+        Property.create({name: 'department', type: 'string'})
+      ]
+    });
+    
+    // Create base relation with sales properties
+    const territorySalesRelation = Relation.create({
+      source: territoryEntity,
+      sourceProperty: 'sales',
+      target: salesRepEntity,
+      targetProperty: 'territories',
+      name: 'TerritorySales',
+      type: 'n:n',
+      properties: [
+        Property.create({name: 'revenue', type: 'number'}),
+        Property.create({name: 'quarter', type: 'string'}),
+        Property.create({name: 'productLine', type: 'string'}), // hardware, software, services
+        Property.create({name: 'dealType', type: 'string'}), // new, renewal, expansion
+      ]
+    });
+    
+    // Create filtered relations for different quarters and product lines
+    const q1SalesRelation = Relation.create({
+      name: 'Q1SalesRelation',
+      sourceRelation: territorySalesRelation,
+      sourceProperty: 'q1Sales',
+      targetProperty: 'q1Territories',
+      matchExpression: MatchExp.atom({
+        key: 'quarter',
+        value: ['=', 'Q1-2024']
+      })
+    });
+    
+    const q2SalesRelation = Relation.create({
+      name: 'Q2SalesRelation',
+      sourceRelation: territorySalesRelation,
+      sourceProperty: 'q2Sales',
+      targetProperty: 'q2Territories',
+      matchExpression: MatchExp.atom({
+        key: 'quarter',
+        value: ['=', 'Q2-2024']
+      })
+    });
+    
+    const softwareSalesRelation = Relation.create({
+      name: 'SoftwareSalesRelation',
+      sourceRelation: territorySalesRelation,
+      sourceProperty: 'softwareSales',
+      targetProperty: 'softwareTerritories',
+      matchExpression: MatchExp.atom({
+        key: 'productLine',
+        value: ['=', 'software']
+      })
+    });
+    
+    const newDealRelation = Relation.create({
+      name: 'NewDealRelation',
+      sourceRelation: territorySalesRelation,
+      sourceProperty: 'newDealSales',
+      targetProperty: 'newDealTerritories',
+      matchExpression: MatchExp.atom({
+        key: 'dealType',
+        value: ['=', 'new']
+      })
+    });
+    
+    // Combined filter: Q1 software sales
+    const q1SoftwareRelation = Relation.create({
+      name: 'Q1SoftwareRelation',
+      sourceRelation: territorySalesRelation,
+      sourceProperty: 'q1SoftwareSales',
+      targetProperty: 'q1SoftwareTerritories',
+      matchExpression: MatchExp.atom({
+        key: 'quarter',
+        value: ['=', 'Q1-2024']
+      }).and({
+        key: 'productLine',
+        value: ['=', 'software']
+      })
+    });
+    
+    // Add computed properties to territory entity
+    territoryEntity.properties.push(
+      Property.create({
+        name: 'totalRevenue',
+        type: 'number',
+        collection: false,
+        computation: Summation.create({
+          record: territorySalesRelation,
+          attributeQuery: ['revenue']
+        })
+      }),
+      Property.create({
+        name: 'q1Revenue',
+        type: 'number',
+        collection: false,
+        computation: Summation.create({
+          record: q1SalesRelation,
+          attributeQuery: ['revenue']
+        })
+      }),
+      Property.create({
+        name: 'q2Revenue',
+        type: 'number',
+        collection: false,
+        computation: Summation.create({
+          record: q2SalesRelation,
+          attributeQuery: ['revenue']
+        })
+      }),
+      Property.create({
+        name: 'softwareRevenue',
+        type: 'number',
+        collection: false,
+        computation: Summation.create({
+          record: softwareSalesRelation,
+          attributeQuery: ['revenue']
+        })
+      }),
+      Property.create({
+        name: 'newBusinessRevenue',
+        type: 'number',
+        collection: false,
+        computation: Summation.create({
+          record: newDealRelation,
+          attributeQuery: ['revenue']
+        })
+      }),
+      Property.create({
+        name: 'q1SoftwareRevenue',
+        type: 'number',
+        collection: false,
+        computation: Summation.create({
+          record: q1SoftwareRelation,
+          attributeQuery: ['revenue']
+        })
+      })
+    );
+    
+    const entities = [territoryEntity, salesRepEntity];
+    const relations = [territorySalesRelation, q1SalesRelation, q2SalesRelation, 
+                      softwareSalesRelation, newDealRelation, q1SoftwareRelation];
+    
+    // Setup system and controller
+    const system = new MonoSystem();
+    system.conceptClass = KlassByName;
+    const controller = new Controller({
+        system: system,
+        entities: entities,
+        relations: relations,
+        activities: [],
+        interactions: []
+    });
+    await controller.setup(true);
+    
+    // Create test data
+    const westCoast = await system.storage.create('Territory', { 
+      name: 'West Coast',
+      region: 'Pacific'
+    });
+    
+    const rep1 = await system.storage.create('SalesRep', { 
+      name: 'Alice Johnson',
+      department: 'Enterprise'
+    });
+    
+    const rep2 = await system.storage.create('SalesRep', { 
+      name: 'Bob Smith',
+      department: 'SMB'
+    });
+    
+    // Create sales records with different combinations
+    await system.storage.create('TerritorySales', {
+      source: westCoast,
+      target: rep1,
+      revenue: 50000,
+      quarter: 'Q1-2024',
+      productLine: 'software',
+      dealType: 'new'
+    });
+    
+    await system.storage.create('TerritorySales', {
+      source: westCoast,
+      target: rep1,
+      revenue: 30000,
+      quarter: 'Q1-2024',
+      productLine: 'hardware',
+      dealType: 'new'
+    });
+    
+    await system.storage.create('TerritorySales', {
+      source: westCoast,
+      target: rep2,
+      revenue: 25000,
+      quarter: 'Q1-2024',
+      productLine: 'software',
+      dealType: 'renewal'
+    });
+    
+    await system.storage.create('TerritorySales', {
+      source: westCoast,
+      target: rep1,
+      revenue: 60000,
+      quarter: 'Q2-2024',
+      productLine: 'software',
+      dealType: 'expansion'
+    });
+    
+    await system.storage.create('TerritorySales', {
+      source: westCoast,
+      target: rep2,
+      revenue: 40000,
+      quarter: 'Q2-2024',
+      productLine: 'services',
+      dealType: 'new'
+    });
+    
+    // Check computed sums
+    const territoryData = await system.storage.findOne('Territory', 
+      BoolExp.atom({key: 'id', value: ['=', westCoast.id]}), 
+      undefined, 
+      ['id', 'name', 'totalRevenue', 'q1Revenue', 'q2Revenue', 
+       'softwareRevenue', 'newBusinessRevenue', 'q1SoftwareRevenue']
+    );
+    
+    expect(territoryData.totalRevenue).toBe(205000); // Sum of all sales
+    // Now filtered relations work correctly
+    expect(territoryData.q1Revenue).toBe(105000); // 50k + 30k + 25k
+    expect(territoryData.q2Revenue).toBe(100000); // 60k + 40k
+    expect(territoryData.softwareRevenue).toBe(135000); // 50k + 25k + 60k
+    expect(territoryData.newBusinessRevenue).toBe(120000); // 50k + 30k + 40k
+    expect(territoryData.q1SoftwareRevenue).toBe(50000); // Only the Q1 software new deal
+    
+    // Test dynamic updates: Add a new Q3 sale
+    await system.storage.create('TerritorySales', {
+      source: westCoast,
+      target: rep1,
+      revenue: 70000,
+      quarter: 'Q3-2024',
+      productLine: 'software',
+      dealType: 'new'
+    });
+    
+    // Check updated totals
+    const territoryDataUpdated = await system.storage.findOne('Territory', 
+      BoolExp.atom({key: 'id', value: ['=', westCoast.id]}), 
+      undefined, 
+      ['id', 'totalRevenue', 'softwareRevenue', 'newBusinessRevenue']
+    );
+    
+    expect(territoryDataUpdated.totalRevenue).toBe(275000); // Previous + 70000
+    // The new Q3 software new deal adds to both software and new business
+    expect(territoryDataUpdated.softwareRevenue).toBe(205000); // 135k + 70k
+    expect(territoryDataUpdated.newBusinessRevenue).toBe(190000); // 120k + 70k
   });
 }); 

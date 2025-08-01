@@ -238,7 +238,10 @@ export class DBSetup {
             sourceRecordName: sourceEntity?.name || sourceRelation?.name,
             matchExpression: matchExpression || (sourceRelation && (entityWithProps as any).matchExpression),
             filteredBy: filteredBy.length ? filteredBy.map(e => e.name) : undefined,
-        } as RecordMapItem
+            // 添加 filtered relation 的标记
+            isFilteredRelation: !!sourceRelation,
+            sourceRelation: sourceRelation ? this.getRecordName(sourceRelation) : undefined
+        } as any as RecordMapItem
     }
     createLink(relationName: string, relation: RelationInstance) {
         const relationWithProps = relation
@@ -314,6 +317,11 @@ export class DBSetup {
         Object.entries(this.map.links).forEach(([relation, relationData]) => {
             assert(!relationData.isSourceRelation || (relationData.sourceProperty === 'source' || relationData.sourceProperty === 'target'), 'virtual relation sourceProperty should only be source/target')
             if (!this.map.records[relationData.sourceRecord]) debugger
+            
+            // 检查是否是 filtered relation
+            const relationRecord = this.map.records[relation.split('_source')[0].split('_target')[0]]
+            const isFilteredRelation = relationRecord && relationRecord.isFilteredRelation
+            
             this.map.records[relationData.sourceRecord].attributes[relationData.sourceProperty] = {
                 type: 'id',
                 isRecord:true,
@@ -322,7 +330,9 @@ export class DBSetup {
                 linkName: relation,
                 isSource: true,
                 // CAUTION 这里是表示这个 target 是 reliance
-                isReliance: relationData.isTargetReliance
+                isReliance: relationData.isTargetReliance,
+                // 标记这是一个 filtered relation
+                isFilteredRelation: isFilteredRelation
             } as RecordAttribute
 
             // CAUTION 关联查询时，不可能出现从实体来获取一个关系的情况，语义不正确。
@@ -336,6 +346,8 @@ export class DBSetup {
                     recordName: relationData.sourceRecord,
                     linkName: relation,
                     isSource:false,
+                    // 标记这是一个 filtered relation
+                    isFilteredRelation: isFilteredRelation
                 } as RecordAttribute
             }
         })

@@ -53,6 +53,8 @@ describe('filtered relation', () => {
         const ActiveUserPostRelation = Relation.create({
             name: 'ActiveUserPostRelation',
             sourceRelation: UserPostRelation,
+            sourceProperty: 'activePosts',
+            targetProperty: 'activeAuthor',
             matchExpression: MatchExp.atom({
                 key: 'isActive',
                 value: ['=', true]
@@ -226,6 +228,8 @@ describe('filtered relation', () => {
         const ActiveCompanyDepartmentRelation = Relation.create({
             name: 'ActiveCompanyDepartmentRelation',
             sourceRelation: CompanyDepartmentRelation,
+            sourceProperty: 'activeDepartments',
+            targetProperty: 'activeCompany',
             matchExpression: MatchExp.atom({
                 key: 'relationStatus',
                 value: ['=', 'active']
@@ -236,6 +240,8 @@ describe('filtered relation', () => {
         const FullTimeEmployeeRelation = Relation.create({
             name: 'FullTimeEmployeeRelation',
             sourceRelation: DepartmentEmployeeRelation,
+            sourceProperty: 'fullTimeEmployees',
+            targetProperty: 'fullTimeDepartment',
             matchExpression: MatchExp.atom({
                 key: 'employmentType',
                 value: ['=', 'full-time']
@@ -460,6 +466,8 @@ describe('filtered relation', () => {
         const CompletedHighValueOrderRelation = Relation.create({
             name: 'CompletedHighValueOrderRelation',
             sourceRelation: OrderProductRelation,
+            sourceProperty: 'highValueProducts',
+            targetProperty: 'completedOrders',
             matchExpression: MatchExp.atom({
                 key: 'source.status',
                 value: ['=', 'completed']
@@ -660,6 +668,8 @@ describe('filtered relation', () => {
         const VerifiedAuthorRelation = Relation.create({
             name: 'VerifiedAuthorRelation',
             sourceRelation: AuthorBookRelation,
+            sourceProperty: 'verifiedBooks',
+            targetProperty: 'verifiedAuthors',
             matchExpression: MatchExp.atom({
                 key: 'source.verified',
                 value: ['=', true]
@@ -670,6 +680,8 @@ describe('filtered relation', () => {
         const PublishedBookRelation = Relation.create({
             name: 'PublishedBookRelation',
             sourceRelation: AuthorBookRelation,
+            sourceProperty: 'publishedBooks',
+            targetProperty: 'publishedAuthors',
             matchExpression: MatchExp.atom({
                 key: 'target.published',
                 value: ['=', true]
@@ -885,6 +897,8 @@ describe('filtered relation', () => {
         const CapitalCityRelation = Relation.create({
             name: 'CapitalCityRelation',
             sourceRelation: CountryCityRelation,
+            sourceProperty: 'capitalCities',
+            targetProperty: 'capitalCountry',
             matchExpression: MatchExp.atom({
                 key: 'isCapital',
                 value: ['=', true]
@@ -895,6 +909,8 @@ describe('filtered relation', () => {
         const Tier1CityRelation = Relation.create({
             name: 'Tier1CityRelation',
             sourceRelation: CountryCityRelation,
+            sourceProperty: 'tier1Cities',
+            targetProperty: 'tier1Country',
             matchExpression: MatchExp.atom({
                 key: 'tier',
                 value: ['=', 1]
@@ -905,6 +921,8 @@ describe('filtered relation', () => {
         const FlagshipStoreRelation = Relation.create({
             name: 'FlagshipStoreRelation',
             sourceRelation: CityStoreRelation,
+            sourceProperty: 'flagshipStores',
+            targetProperty: 'flagshipCity',
             matchExpression: MatchExp.atom({
                 key: 'storeType',
                 value: ['=', 'flagship']
@@ -915,6 +933,8 @@ describe('filtered relation', () => {
         const NewStoreRelation = Relation.create({
             name: 'NewStoreRelation',
             sourceRelation: CityStoreRelation,
+            sourceProperty: 'newStores',
+            targetProperty: 'newStoreCity',
             matchExpression: MatchExp.atom({
                 key: 'yearEstablished',
                 value: ['>=', 2020]
@@ -1192,6 +1212,8 @@ describe('filtered relation', () => {
         const SeniorActiveRelation = Relation.create({
             name: 'SeniorActiveRelation',
             sourceRelation: ProjectDeveloperRelation,
+            sourceProperty: 'seniorActiveDevelopers',
+            targetProperty: 'seniorActiveProjects',
             matchExpression: MatchExp.atom({
                 key: 'role',
                 value: ['in', ['lead', 'senior']]
@@ -1205,6 +1227,8 @@ describe('filtered relation', () => {
         const HighValuePartTimeRelation = Relation.create({
             name: 'HighValuePartTimeRelation',
             sourceRelation: ProjectDeveloperRelation,
+            sourceProperty: 'highValuePartTimeDevelopers',
+            targetProperty: 'highValuePartTimeProjects',
             matchExpression: MatchExp.atom({
                 key: 'rate',
                 value: ['>=', 150]
@@ -1496,6 +1520,8 @@ describe('filtered relation', () => {
         const PremiumOrgProjectRelation = Relation.create({
             name: 'PremiumOrgProjectRelation',
             sourceRelation: MemberProjectRelation,
+            sourceProperty: 'premiumOrgProjects',
+            targetProperty: 'premiumOrgMembers',
             matchExpression: MatchExp.atom({
                 key: 'source.team.division.organization.tier',
                 value: ['=', 'premium']
@@ -1512,6 +1538,8 @@ describe('filtered relation', () => {
         const LargeTeamHighBudgetProjectRelation = Relation.create({
             name: 'LargeTeamHighBudgetProjectRelation',
             sourceRelation: MemberProjectRelation,
+            sourceProperty: 'largeTeamHighBudgetProjects',
+            targetProperty: 'largeTeamHighBudgetMembers',
             matchExpression: MatchExp.atom({
                 key: 'source.team.size',
                 value: ['>', 5]
@@ -1814,5 +1842,394 @@ describe('filtered relation', () => {
         
         expect(premiumOrgProjectsAfterDelete.length).toBe(1) // Only Charlie's project
         expect(largeTeamProjectsAfterDelete.length).toBe(0) // No relations left
+    })
+
+    test('filtered relation sourceProperty/targetProperty queries', async () => {
+        // Define entities
+        const User = Entity.create({
+            name: 'User',
+            properties: [
+                Property.create({ name: 'name', type: 'string' }),
+                Property.create({ name: 'isActive', type: 'boolean', defaultValue: () => true })
+            ]
+        })
+
+        const Post = Entity.create({
+            name: 'Post', 
+            properties: [
+                Property.create({ name: 'title', type: 'string' }),
+                Property.create({ name: 'content', type: 'string' })
+            ]
+        })
+
+        // Base relation
+        const UserPostRelation = Relation.create({
+            source: User,
+            sourceProperty: 'posts',
+            target: Post,
+            targetProperty: 'author',
+            type: '1:n',
+            properties: [
+                Property.create({ name: 'status', type: 'string', defaultValue: () => 'draft' }),
+                Property.create({ name: 'publishedAt', type: 'string' })
+            ]
+        })
+
+        // Filtered relation - only published posts
+        const PublishedPostRelation = Relation.create({
+            name: 'PublishedPostRelation',
+            sourceRelation: UserPostRelation,
+            sourceProperty: 'publishedPosts',
+            targetProperty: 'publishedAuthor',
+            matchExpression: MatchExp.atom({
+                key: 'status',
+                value: ['=', 'published']
+            })
+        })
+
+        // Setup database
+        setup = new DBSetup([User, Post], [UserPostRelation, PublishedPostRelation], db)
+        await setup.createTables()
+        handle = new EntityQueryHandle(new EntityToTableMap(setup.map), db)
+
+        // Create test data
+        const user1 = await handle.create('User', { name: 'Alice', isActive: true })
+        const user2 = await handle.create('User', { name: 'Bob', isActive: false })
+
+        const post1 = await handle.create('Post', { title: 'Post 1', content: 'Content 1' })
+        const post2 = await handle.create('Post', { title: 'Post 2', content: 'Content 2' })
+        const post3 = await handle.create('Post', { title: 'Post 3', content: 'Content 3' })
+
+        // Create relations
+        await handle.create(UserPostRelation.name!, {
+            source: { id: user1.id },
+            target: { id: post1.id },
+            status: 'published',
+            publishedAt: '2024-01-01'
+        })
+        await handle.create(UserPostRelation.name!, {
+            source: { id: user1.id },
+            target: { id: post2.id },
+            status: 'draft'
+        })
+        await handle.create(UserPostRelation.name!, {
+            source: { id: user2.id },
+            target: { id: post3.id },
+            status: 'published',
+            publishedAt: '2024-01-02'
+        })
+
+        // Test 1: Query user with publishedPosts through sourceProperty
+        const userWithPublishedPosts = await handle.findOne(
+            'User',
+            MatchExp.atom({ key: 'id', value: ['=', user1.id] }),
+            undefined,
+            [
+                'id',
+                'name',
+                ['publishedPosts', {
+                    attributeQuery: ['id', 'title', 'content']
+                }]
+            ]
+        )
+
+        console.log('userWithPublishedPosts:', JSON.stringify(userWithPublishedPosts, null, 2))
+
+        expect(userWithPublishedPosts).toBeDefined()
+        expect(userWithPublishedPosts!.name).toBe('Alice')
+        expect(userWithPublishedPosts!.publishedPosts).toBeDefined()
+        expect(userWithPublishedPosts!.publishedPosts.length).toBe(1)
+        expect(userWithPublishedPosts!.publishedPosts[0].title).toBe('Post 1')
+
+        // Test 2: Query post with publishedAuthor through targetProperty
+        const postWithPublishedAuthor = await handle.findOne(
+            'Post',
+            MatchExp.atom({ key: 'id', value: ['=', post1.id] }),
+            undefined,
+            [
+                'id',
+                'title',
+                ['publishedAuthor', {
+                    attributeQuery: ['id', 'name']
+                }]
+            ]
+        )
+
+        expect(postWithPublishedAuthor).toBeDefined()
+        expect(postWithPublishedAuthor!.title).toBe('Post 1')
+        expect(postWithPublishedAuthor!.publishedAuthor).toBeDefined()
+        expect(postWithPublishedAuthor!.publishedAuthor.name).toBe('Alice')
+
+        // Test 3: Query all users with their published posts
+        const allUsersWithPublishedPosts = await handle.find(
+            'User',
+            undefined,
+            undefined,
+            [
+                'id',
+                'name',
+                ['publishedPosts', {
+                    attributeQuery: ['id', 'title']
+                }]
+            ]
+        )
+
+        expect(allUsersWithPublishedPosts.length).toBe(2)
+        const alice = allUsersWithPublishedPosts.find(u => u.name === 'Alice')
+        const bob = allUsersWithPublishedPosts.find(u => u.name === 'Bob')
+        
+        expect(alice!.publishedPosts.length).toBe(1)
+        expect(bob!.publishedPosts.length).toBe(1)
+
+        // Test 4: Update relation status and verify filtered query
+        await handle.update(
+            UserPostRelation.name!,
+            MatchExp.atom({ 
+                key: 'source.id', 
+                value: ['=', user1.id] 
+            }).and({
+                key: 'target.id',
+                value: ['=', post2.id]
+            }),
+            { status: 'published', publishedAt: '2024-01-03' }
+        )
+
+        // Re-query user's published posts
+        const userAfterUpdate = await handle.findOne(
+            'User',
+            MatchExp.atom({ key: 'id', value: ['=', user1.id] }),
+            undefined,
+            [
+                'id',
+                'name',
+                ['publishedPosts', {
+                    attributeQuery: ['id', 'title']
+                }]
+            ]
+        )
+
+        expect(userAfterUpdate!.publishedPosts.length).toBe(2)
+        expect(userAfterUpdate!.publishedPosts.map((p: any) => p.title).sort()).toEqual(['Post 1', 'Post 2'])
+
+        // Test 5: Create new post with relation through sourceProperty
+        const newPost = await handle.create('Post', { 
+            title: 'New Post',
+            content: 'New Content'
+        })
+
+        await handle.create(UserPostRelation.name!, {
+            source: { id: user1.id },
+            target: { id: newPost.id },
+            status: 'published',
+            publishedAt: '2024-01-04'
+        })
+
+        // Query to verify
+        const userWithNewPost = await handle.findOne(
+            'User',
+            MatchExp.atom({ key: 'id', value: ['=', user1.id] }),
+            undefined,
+            [
+                'id',
+                ['publishedPosts', {
+                    attributeQuery: ['id', 'title']
+                }]
+            ]
+        )
+
+        expect(userWithNewPost!.publishedPosts.length).toBe(3)
+        expect(userWithNewPost!.publishedPosts.find((p: any) => p.title === 'New Post')).toBeDefined()
+
+        // Test 6: Delete relation and verify filtered query
+        await handle.delete(
+            UserPostRelation.name!,
+            MatchExp.atom({
+                key: 'source.id',
+                value: ['=', user1.id]
+            }).and({
+                key: 'target.id', 
+                value: ['=', post1.id]
+            })
+        )
+
+        // Re-query
+        const userAfterDelete = await handle.findOne(
+            'User',
+            MatchExp.atom({ key: 'id', value: ['=', user1.id] }),
+            undefined,
+            [
+                'id',
+                ['publishedPosts', {
+                    attributeQuery: ['id', 'title']
+                }]
+            ]
+        )
+
+        expect(userAfterDelete!.publishedPosts.length).toBe(2)
+        expect(userAfterDelete!.publishedPosts.find((p: any) => p.title === 'Post 1')).toBeUndefined()
+    })
+
+    test('nested filtered relation sourceProperty/targetProperty queries', async () => {
+        // Define entities
+        const Company = Entity.create({
+            name: 'Company',
+            properties: [
+                Property.create({ name: 'name', type: 'string' }),
+                Property.create({ name: 'type', type: 'string' })
+            ]
+        })
+
+        const Department = Entity.create({
+            name: 'Department',
+            properties: [
+                Property.create({ name: 'name', type: 'string' }),
+                Property.create({ name: 'budget', type: 'number' })
+            ]
+        })
+
+        const Employee = Entity.create({
+            name: 'Employee',
+            properties: [
+                Property.create({ name: 'name', type: 'string' }),
+                Property.create({ name: 'salary', type: 'number' })
+            ]
+        })
+
+        // Relations
+        const CompanyDepartmentRelation = Relation.create({
+            source: Company,
+            sourceProperty: 'departments',
+            target: Department,
+            targetProperty: 'company',
+            type: '1:n'
+        })
+
+        const DepartmentEmployeeRelation = Relation.create({
+            source: Department,
+            sourceProperty: 'employees',
+            target: Employee,
+            targetProperty: 'department',
+            type: '1:n',
+            properties: [
+                Property.create({ name: 'role', type: 'string' }),
+                Property.create({ name: 'isActive', type: 'boolean', defaultValue: () => true })
+            ]
+        })
+
+        // Filtered relation - only active employees
+        const ActiveEmployeeRelation = Relation.create({
+            name: 'ActiveEmployeeRelation',
+            sourceRelation: DepartmentEmployeeRelation,
+            sourceProperty: 'activeEmployees',
+            targetProperty: 'activeDepartment',
+            matchExpression: MatchExp.atom({
+                key: 'isActive',
+                value: ['=', true]
+            })
+        })
+
+        // Setup database
+        setup = new DBSetup(
+            [Company, Department, Employee],
+            [CompanyDepartmentRelation, DepartmentEmployeeRelation, ActiveEmployeeRelation],
+            db
+        )
+        await setup.createTables()
+        handle = new EntityQueryHandle(new EntityToTableMap(setup.map), db)
+
+        // Create test data
+        const company = await handle.create('Company', { name: 'Tech Corp', type: 'technology' })
+        const dept1 = await handle.create('Department', { name: 'Engineering', budget: 1000000 })
+        const dept2 = await handle.create('Department', { name: 'Sales', budget: 500000 })
+        
+        const emp1 = await handle.create('Employee', { name: 'Alice', salary: 100000 })
+        const emp2 = await handle.create('Employee', { name: 'Bob', salary: 80000 })
+        const emp3 = await handle.create('Employee', { name: 'Charlie', salary: 90000 })
+
+        // Create relations
+        await handle.create(CompanyDepartmentRelation.name!, {
+            source: { id: company.id },
+            target: { id: dept1.id }
+        })
+        await handle.create(CompanyDepartmentRelation.name!, {
+            source: { id: company.id },
+            target: { id: dept2.id }
+        })
+
+        await handle.create(DepartmentEmployeeRelation.name!, {
+            source: { id: dept1.id },
+            target: { id: emp1.id },
+            role: 'engineer',
+            isActive: true
+        })
+        await handle.create(DepartmentEmployeeRelation.name!, {
+            source: { id: dept1.id },
+            target: { id: emp2.id },
+            role: 'engineer',
+            isActive: false
+        })
+        await handle.create(DepartmentEmployeeRelation.name!, {
+            source: { id: dept2.id },
+            target: { id: emp3.id },
+            role: 'sales',
+            isActive: true
+        })
+
+        // Test nested query with filtered relation
+        const companyWithActiveEmployees = await handle.findOne(
+            'Company',
+            MatchExp.atom({ key: 'id', value: ['=', company.id] }),
+            undefined,
+            [
+                'id',
+                'name',
+                ['departments', {
+                    attributeQuery: [
+                        'id',
+                        'name',
+                        ['activeEmployees', {
+                            attributeQuery: ['id', 'name', 'salary']
+                        }]
+                    ]
+                }]
+            ]
+        )
+
+        expect(companyWithActiveEmployees).toBeDefined()
+        expect(companyWithActiveEmployees!.departments.length).toBe(2)
+        
+        const engineering = companyWithActiveEmployees!.departments.find((d: any) => d.name === 'Engineering')
+        const sales = companyWithActiveEmployees!.departments.find((d: any) => d.name === 'Sales')
+        
+        expect(engineering!.activeEmployees.length).toBe(1)
+        expect(engineering!.activeEmployees[0].name).toBe('Alice')
+        
+        expect(sales!.activeEmployees.length).toBe(1)
+        expect(sales!.activeEmployees[0].name).toBe('Charlie')
+
+        // Test reverse query
+        const employeeWithActiveDepartment = await handle.findOne(
+            'Employee',
+            MatchExp.atom({ key: 'id', value: ['=', emp1.id] }),
+            undefined,
+            [
+                'id',
+                'name',
+                ['activeDepartment', {
+                    attributeQuery: [
+                        'id',
+                        'name',
+                        ['company', {
+                            attributeQuery: ['id', 'name']
+                        }]
+                    ]
+                }]
+            ]
+        )
+
+        expect(employeeWithActiveDepartment).toBeDefined()
+        expect(employeeWithActiveDepartment!.activeDepartment).toBeDefined()
+        expect(employeeWithActiveDepartment!.activeDepartment.name).toBe('Engineering')
+        expect(employeeWithActiveDepartment!.activeDepartment.company.name).toBe('Tech Corp')
     })
 }) 

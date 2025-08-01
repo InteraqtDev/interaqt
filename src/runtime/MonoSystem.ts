@@ -193,7 +193,7 @@ export class MonoSystem implements System {
             return clonedRelation
         })
         
-        // FIXME 如果后续增加 filtered relation，那么也要修正。
+        // 处理 filtered entity 和 filtered relation
         for(let entity of entities) {
             if (entity.sourceEntity) {
                 entity.sourceEntity = originalEntityToClonedEntity.get(entity.sourceEntity as EntityInstance)!
@@ -206,6 +206,10 @@ export class MonoSystem implements System {
             if (relation.target) {
                 relation.target = originalEntityToClonedEntity.get(relation.target as EntityInstance) || originalRelationToClonedRelation.get(relation.target as RelationInstance)!
             }
+            // 处理 filtered relation 的 sourceRelation
+            if ((relation as any).sourceRelation) {
+                (relation as any).sourceRelation = originalRelationToClonedRelation.get((relation as any).sourceRelation as RelationInstance)!
+            }
         }
         
         states.forEach(({dataContext, state}) => {
@@ -214,7 +218,7 @@ export class MonoSystem implements System {
                     const entity = entities.find(entity => entity.name === stateItem.record)! || relations.find(entity => entity.name === stateItem.record)!
 
                     if (stateItem.defaultValue instanceof Property) {
-                        // TODO 特别注意这里改了 name
+                        // CAUTION 特别注意这里改了 name
                         stateItem.defaultValue.name = stateItem.key
                         entity.properties.push(stateItem.defaultValue)
                     } else {

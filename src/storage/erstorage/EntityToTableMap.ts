@@ -37,6 +37,9 @@ export type RecordAttribute = {
     field? : string
     // 当attribute是 target，并且关系上有 targetIsReliance 时为 true
     isReliance? : boolean
+    // filtered relation 相关
+    isFilteredRelation?: boolean,
+    matchExpression?: any
 }
 
 export type RecordMapItem = {
@@ -51,6 +54,9 @@ export type RecordMapItem = {
     resolvedSourceRecordName?: string,
     resolvedMatchExpression?: MatchExpressionData,
     filteredBy? : string[],
+    // filtered relation 相关
+    isFilteredRelation?: boolean,
+    sourceRelation?: string
 }
 
 type RecordMap = {
@@ -76,6 +82,9 @@ export type LinkMapItem = {
     targetField?: string,
     // 连接两个生命周期依赖的实体的，只能 target 依赖 source。
     isTargetReliance?: boolean
+    // filtered relation 相关
+    isFilteredRelation?: boolean,
+    matchExpression?: any
 }
 
 type LinkMap = {
@@ -100,8 +109,13 @@ type TableAndAliasStack = {
 
 export class EntityToTableMap {
     constructor(public data: MapData) {}
-    getRecordTable(entityName: string) {
-        return this.data.records[entityName].table
+    getRecordTable(entityName: string) : string {
+        const record = this.data.records[entityName];
+        // 如果是 filtered relation/entity，返回源记录的表名
+        if (record.sourceRecordName) {
+            return this.getRecordTable(record.sourceRecordName);
+        }
+        return record.table;
     }
     getRecord(recordName:string) {
         return this.data.records[recordName]

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { Controller, MonoSystem, Property, Entity, Every, Dictionary, BoolExp, Any, Relation, MatchExp, DICTIONARY_RECORD } from 'interaqt';
+import { Controller, MonoSystem, Property, Entity, Every, Dictionary, BoolExp, Any, Relation, MatchExp, DICTIONARY_RECORD, KlassByName } from 'interaqt';
 
 // 创建简单测试环境，直接测试 EveryHandle 的具体方法
 describe('Every and Any computed handle', () => {
@@ -563,4 +563,717 @@ describe('Every and Any computed handle', () => {
     expect(isAnyUserAgeGreaterThanAgeLimit5).toBeFalsy()
 
   })
+
+  test('should handle property level Every with filtered relations', async () => {
+    // NOTE: This test demonstrates a current limitation in the framework:
+    // Filtered relations do not automatically trigger computations when their 
+    // source relations change. This is because the dependency tracking system
+    // doesn't fully support transitive dependencies through filtered relations.
+    // Define entities
+    const teamEntity = Entity.create({
+      name: 'Team',
+      properties: [
+        Property.create({name: 'name', type: 'string'})
+      ]
+    });
+    
+    const playerEntity = Entity.create({
+      name: 'Player',
+      properties: [
+        Property.create({name: 'name', type: 'string'}),
+        Property.create({name: 'isEligible', type: 'boolean'}),
+        Property.create({name: 'age', type: 'number'})
+      ]
+    });
+    
+    // Create base relation with player role property
+    const teamPlayerRelation = Relation.create({
+      source: teamEntity,
+      sourceProperty: 'players',
+      target: playerEntity,
+      targetProperty: 'team',
+      name: 'TeamPlayer',
+      type: '1:n',
+      properties: [
+        Property.create({name: 'role', type: 'string'}), // starter, substitute, reserve
+        Property.create({name: 'isActive', type: 'boolean', defaultValue: () => true}),
+        Property.create({name: 'jerseyNumber', type: 'number'})
+      ]
+    });
+    
+    // Create filtered relation for active starters only
+    const activeStarterRelation = Relation.create({
+      name: 'ActiveStarterRelation',
+      sourceRelation: teamPlayerRelation,
+      sourceProperty: 'activeStarters',
+      targetProperty: 'activeStarterTeams',
+      matchExpression: MatchExp.atom({
+        key: 'role',
+        value: ['=', 'starter']
+      }).and({
+        key: 'isActive',
+        value: ['=', true]
+      })
+    });
+    
+    // Add computed properties to team entity
+    teamEntity.properties.push(
+      Property.create({
+        name: 'allPlayersEligible',
+        type: 'boolean',
+        collection: false,
+        computation: Every.create({
+          record: teamPlayerRelation,
+          attributeQuery: [['target', {attributeQuery: ['isEligible']}]],
+          callback: function(relation: any) {
+            return relation.target.isEligible;
+          },
+          notEmpty: true
+        })
+      }),
+      Property.create({
+        name: 'allStartersEligible',
+        type: 'boolean',
+        collection: false,
+        computation: Every.create({
+          record: activeStarterRelation,
+          attributeQuery: [['target', {attributeQuery: ['isEligible']}]],
+          callback: function(relation: any) {
+            return relation.target.isEligible;
+          },
+          notEmpty: true
+        })
+      })
+    );
+    
+    const entities = [teamEntity, playerEntity];
+    const relations = [teamPlayerRelation, activeStarterRelation];
+    
+    // Setup system and controller
+    const system = new MonoSystem();
+    const controller = new Controller({
+        system: system,
+        entities: entities,
+        relations: relations,
+        activities: [],
+        interactions: []
+    });
+    await controller.setup(true);
+    
+    // Create test data
+    const team1 = await system.storage.create('Team', { name: 'Team Alpha' });
+    
+    const player1 = await system.storage.create('Player', { 
+      name: 'John',
+      isEligible: true,
+      age: 25
+    });
+    const player2 = await system.storage.create('Player', { 
+      name: 'Mike',
+      isEligible: true,
+      age: 23
+    });
+    const player3 = await system.storage.create('Player', { 
+      name: 'Tom',
+      isEligible: false,
+      age: 22
+    });
+    
+    // Create relations
+    await system.storage.create('TeamPlayer', {
+      source: team1,
+      target: player1,
+      role: 'starter',
+      isActive: true,
+      jerseyNumber: 10
+    });
+    
+    const mikeRelation = await system.storage.create('TeamPlayer', {
+      source: team1,
+      target: player2,
+      role: 'starter',
+      isActive: true,
+      jerseyNumber: 7
+    });
+    
+    await system.storage.create('TeamPlayer', {
+      source: team1,
+      target: player3,
+      role: 'substitute',
+      isActive: true,
+      jerseyNumber: 15
+    });
+    
+    // Check initial state
+    const team1Data = await system.storage.findOne('Team', 
+      BoolExp.atom({key: 'id', value: ['=', team1.id]}), 
+      undefined, 
+      ['id', 'name', 'allPlayersEligible', 'allStartersEligible']
+    );
+    
+    // Every returns 0 when false, 1 when true
+    expect(team1Data.allPlayersEligible).toBe(0); // Tom is not eligible
+    // Active starters: John and Mike, both eligible
+    expect(team1Data.allStartersEligible).toBe(1); // All active starters are eligible
+    
+    // Make Tom a starter
+    const tomRelation = await system.storage.findOne('TeamPlayer',
+      BoolExp.and([
+        MatchExp.atom({key: 'source.id', value: ['=', team1.id]}),
+        MatchExp.atom({key: 'target.id', value: ['=', player3.id]})
+      ]),
+      undefined,
+      ['id']
+    );
+    
+    await system.storage.update('TeamPlayer',
+      BoolExp.atom({key: 'id', value: ['=', tomRelation.id]}),
+      { role: 'starter' }
+    );
+    
+    // Check after role change
+    const team1Data2 = await system.storage.findOne('Team', 
+      BoolExp.atom({key: 'id', value: ['=', team1.id]}), 
+      undefined, 
+      ['id', 'name', 'allPlayersEligible', 'allStartersEligible']
+    );
+    
+    // Every returns 0 when false
+    expect(team1Data2.allPlayersEligible).toBe(0); // Tom is still not eligible
+    // Active starters now: John, Mike, and Tom - but Tom is not eligible
+    expect(team1Data2.allStartersEligible).toBe(0); // Not all active starters are eligible
+    
+    // Make Tom eligible
+    await system.storage.update('Player',
+      BoolExp.atom({key: 'id', value: ['=', player3.id]}),
+      { isEligible: true }
+    );
+    
+    // Check after eligibility change
+    const team1Data3 = await system.storage.findOne('Team', 
+      BoolExp.atom({key: 'id', value: ['=', team1.id]}), 
+      undefined, 
+      ['id', 'name', 'allPlayersEligible', 'allStartersEligible']
+    );
+    
+    // Every returns 1 when true
+    expect(team1Data3.allPlayersEligible).toBe(1); // All players are now eligible
+    // All active starters (John, Mike, Tom) are now eligible
+    expect(team1Data3.allStartersEligible).toBe(1); // All active starters are eligible
+    
+    // Deactivate Mike
+    await system.storage.update('TeamPlayer',
+      BoolExp.atom({key: 'id', value: ['=', mikeRelation.id]}),
+      { isActive: false }
+    );
+    
+    // Check after deactivation
+    const team1Data4 = await system.storage.findOne('Team', 
+      BoolExp.atom({key: 'id', value: ['=', team1.id]}), 
+      undefined, 
+      ['id', 'name', 'allPlayersEligible', 'allStartersEligible']
+    );
+    
+    // Every returns 1 when true
+    expect(team1Data4.allPlayersEligible).toBe(1); // Still all players eligible
+    // Active starters are now John and Tom (Mike is inactive), both eligible
+    expect(team1Data4.allStartersEligible).toBe(1); // All remaining active starters are eligible
+  });
+
+  test('should handle property level Any with filtered relations', async () => {
+    // NOTE: This test demonstrates a current limitation in the framework:
+    // Filtered relations do not automatically trigger computations when their 
+    // source relations change. This is because the dependency tracking system
+    // doesn't fully support transitive dependencies through filtered relations.
+    // Define entities
+    const projectEntity = Entity.create({
+      name: 'Project',
+      properties: [
+        Property.create({name: 'name', type: 'string'})
+      ]
+    });
+    
+    const taskEntity = Entity.create({
+      name: 'Task',
+      properties: [
+        Property.create({name: 'title', type: 'string'}),
+        Property.create({name: 'status', type: 'string'}), // pending, in-progress, completed, blocked
+        Property.create({name: 'isOverdue', type: 'boolean'})
+      ]
+    });
+    
+    // Create base relation with task priority
+    const projectTaskRelation = Relation.create({
+      source: projectEntity,
+      sourceProperty: 'tasks',
+      target: taskEntity,
+      targetProperty: 'project',
+      name: 'ProjectTask',
+      type: '1:n',
+      properties: [
+        Property.create({name: 'priority', type: 'string'}), // high, medium, low
+        Property.create({name: 'assignedDate', type: 'string'}),
+        Property.create({name: 'isArchived', type: 'boolean', defaultValue: () => false})
+      ]
+    });
+    
+    // Create filtered relation for active high-priority tasks
+    const activeHighPriorityRelation = Relation.create({
+      name: 'ActiveHighPriorityRelation',
+      sourceRelation: projectTaskRelation,
+      sourceProperty: 'activeHighPriorityTasks',
+      targetProperty: 'activeHighPriorityProjects',
+      matchExpression: MatchExp.atom({
+        key: 'priority',
+        value: ['=', 'high']
+      }).and({
+        key: 'isArchived',
+        value: ['=', false]
+      })
+    });
+    
+    // Add computed properties to project entity
+    projectEntity.properties.push(
+      Property.create({
+        name: 'hasAnyBlockedTask',
+        type: 'boolean',
+        collection: false,
+        computation: Any.create({
+          record: projectTaskRelation,
+          attributeQuery: [['target', {attributeQuery: ['status']}]],
+          callback: function(relation: any) {
+            return relation.target.status === 'blocked';
+          }
+        })
+      }),
+      Property.create({
+        name: 'hasHighPriorityOverdue',
+        type: 'boolean',
+        collection: false,
+        computation: Any.create({
+          record: activeHighPriorityRelation,
+          attributeQuery: [['target', {attributeQuery: ['isOverdue']}]],
+          callback: function(relation: any) {
+            return relation.target.isOverdue;
+          }
+        })
+      })
+    );
+    
+    const entities = [projectEntity, taskEntity];
+    const relations = [projectTaskRelation, activeHighPriorityRelation];
+    
+    // Setup system and controller
+    const system = new MonoSystem();
+    const controller = new Controller({
+        system: system,
+        entities: entities,
+        relations: relations,
+        activities: [],
+        interactions: []
+    });
+    await controller.setup(true);
+    
+    // Create test data
+    const project1 = await system.storage.create('Project', { name: 'Project X' });
+    
+    const task1 = await system.storage.create('Task', { 
+      title: 'Critical Task',
+      status: 'in-progress',
+      isOverdue: false
+    });
+    const task2 = await system.storage.create('Task', { 
+      title: 'Important Task',
+      status: 'pending',
+      isOverdue: true
+    });
+    const task3 = await system.storage.create('Task', { 
+      title: 'Regular Task',
+      status: 'blocked',
+      isOverdue: false
+    });
+    
+    // Create relations
+    await system.storage.create('ProjectTask', {
+      source: project1,
+      target: task1,
+      priority: 'high',
+      assignedDate: '2024-01-01',
+      isArchived: false
+    });
+    
+    const task2Relation = await system.storage.create('ProjectTask', {
+      source: project1,
+      target: task2,
+      priority: 'high',
+      assignedDate: '2024-01-02',
+      isArchived: false
+    });
+    
+    await system.storage.create('ProjectTask', {
+      source: project1,
+      target: task3,
+      priority: 'medium',
+      assignedDate: '2024-01-03',
+      isArchived: false
+    });
+    
+    // Check initial state
+    const project1Data = await system.storage.findOne('Project', 
+      BoolExp.atom({key: 'id', value: ['=', project1.id]}), 
+      undefined, 
+      ['id', 'name', 'hasAnyBlockedTask', 'hasHighPriorityOverdue']
+    );
+    
+    // Any returns 1 when there's a match, 0 when no match
+    expect(project1Data.hasAnyBlockedTask).toBe(1); // task3 is blocked
+    // task2 is high priority, active (not archived), and overdue
+    expect(project1Data.hasHighPriorityOverdue).toBe(1); // task2 matches
+    
+    // Archive the overdue high-priority task
+    await system.storage.update('ProjectTask',
+      BoolExp.atom({key: 'id', value: ['=', task2Relation.id]}),
+      { isArchived: true }
+    );
+    
+    // Check after archiving
+    const project1Data2 = await system.storage.findOne('Project', 
+      BoolExp.atom({key: 'id', value: ['=', project1.id]}), 
+      undefined, 
+      ['id', 'name', 'hasAnyBlockedTask', 'hasHighPriorityOverdue']
+    );
+    
+    // Any returns 1 when there's a match
+    expect(project1Data2.hasAnyBlockedTask).toBe(1); // task3 is still blocked
+    // task2 is now archived, no active high priority overdue tasks
+    expect(project1Data2.hasHighPriorityOverdue).toBe(0); // No matches after archiving
+    
+    // Unblock task3
+    await system.storage.update('Task',
+      BoolExp.atom({key: 'id', value: ['=', task3.id]}),
+      { status: 'completed' }
+    );
+    
+    // Check after unblocking
+    const project1Data3 = await system.storage.findOne('Project', 
+      BoolExp.atom({key: 'id', value: ['=', project1.id]}), 
+      undefined, 
+      ['id', 'name', 'hasAnyBlockedTask', 'hasHighPriorityOverdue']
+    );
+    
+    // Any returns 0 when there's no match
+    expect(project1Data3.hasAnyBlockedTask).toBe(0); // No blocked tasks
+    // Still no active high priority overdue tasks
+    expect(project1Data3.hasHighPriorityOverdue).toBe(0); // No matches
+    
+    // Make task1 overdue
+    await system.storage.update('Task',
+      BoolExp.atom({key: 'id', value: ['=', task1.id]}),
+      { isOverdue: true }
+    );
+    
+    // Check after making task1 overdue
+    const project1Data4 = await system.storage.findOne('Project', 
+      BoolExp.atom({key: 'id', value: ['=', project1.id]}), 
+      undefined, 
+      ['id', 'name', 'hasAnyBlockedTask', 'hasHighPriorityOverdue']
+    );
+    
+    // Any returns 0 when there's no match, 1 when there's a match
+    expect(project1Data4.hasAnyBlockedTask).toBe(0); // Still no blocked tasks
+    // task1 is now overdue, high priority, and active
+    expect(project1Data4.hasHighPriorityOverdue).toBe(1); // task1 now matches
+  });
 }); 
+
+  test('should handle property level every with filtered relations - Quality Control Example', async () => {
+    // NOTE: This test demonstrates a current limitation in the framework:
+    // Filtered relations do not automatically trigger computations when their 
+    // source relations change. This is because the dependency tracking system
+    // doesn't fully support transitive dependencies through filtered relations.
+    // Define entities
+    const factoryEntity = Entity.create({
+      name: 'Factory',
+      properties: [
+        Property.create({name: 'name', type: 'string'}),
+        Property.create({name: 'location', type: 'string'})
+      ]
+    });
+    
+    const productBatchEntity = Entity.create({
+      name: 'ProductBatch',
+      properties: [
+        Property.create({name: 'batchNumber', type: 'string'}),
+        Property.create({name: 'productType', type: 'string'}),
+        Property.create({name: 'manufactureDate', type: 'string'})
+      ]
+    });
+    
+    // Create base relation with quality check properties
+    const factoryBatchRelation = Relation.create({
+      source: factoryEntity,
+      sourceProperty: 'batches',
+      target: productBatchEntity,
+      targetProperty: 'factory',
+      name: 'FactoryBatch',
+      type: '1:n',
+      properties: [
+        Property.create({name: 'qualityScore', type: 'number'}), // 0-100
+        Property.create({name: 'passedQC', type: 'boolean'}),
+        Property.create({name: 'inspectionLevel', type: 'string'}), // basic, standard, comprehensive
+        Property.create({name: 'shift', type: 'string'}), // morning, afternoon, night
+        Property.create({name: 'inspector', type: 'string'})
+      ]
+    });
+    
+    // Create filtered relations for different shifts and inspection levels
+    const morningShiftRelation = Relation.create({
+      name: 'MorningShiftRelation',
+      sourceRelation: factoryBatchRelation,
+      sourceProperty: 'morningShiftBatches',
+      targetProperty: 'morningShiftFactories',
+      matchExpression: MatchExp.atom({
+        key: 'shift',
+        value: ['=', 'morning']
+      })
+    });
+    
+    const comprehensiveInspectionRelation = Relation.create({
+      name: 'ComprehensiveInspectionRelation',
+      sourceRelation: factoryBatchRelation,
+      sourceProperty: 'comprehensiveInspectionBatches',
+      targetProperty: 'comprehensiveInspectionFactories',
+      matchExpression: MatchExp.atom({
+        key: 'inspectionLevel',
+        value: ['=', 'comprehensive']
+      })
+    });
+    
+    const highScoreRelation = Relation.create({
+      name: 'HighScoreRelation',
+      sourceRelation: factoryBatchRelation,
+      sourceProperty: 'highScoreBatches',
+      targetProperty: 'highScoreFactories',
+      matchExpression: MatchExp.atom({
+        key: 'qualityScore',
+        value: ['>=', 90]
+      })
+    });
+    
+    const morningComprehensiveRelation = Relation.create({
+      name: 'MorningComprehensiveRelation',
+      sourceRelation: factoryBatchRelation,
+      sourceProperty: 'morningComprehensiveBatches',
+      targetProperty: 'morningComprehensiveFactories',
+      matchExpression: MatchExp.atom({
+        key: 'shift',
+        value: ['=', 'morning']
+      }).and({
+        key: 'inspectionLevel',
+        value: ['=', 'comprehensive']
+      })
+    });
+    
+    // Add computed properties to factory entity
+    factoryEntity.properties.push(
+      Property.create({
+        name: 'allBatchesPassedQC',
+        type: 'boolean',
+        collection: false,
+        computation: Every.create({
+          record: factoryBatchRelation,
+          attributeQuery: ['passedQC'],
+          callback: (relation: any) => relation.passedQC === true
+        })
+      }),
+      Property.create({
+        name: 'allMorningShiftPassed',
+        type: 'boolean',
+        collection: false,
+        computation: Every.create({
+          record: morningShiftRelation,
+          attributeQuery: ['passedQC'],
+          callback: (relation: any) => relation.passedQC === true
+        })
+      }),
+      Property.create({
+        name: 'allComprehensiveInspectionsPassed',
+        type: 'boolean',
+        collection: false,
+        computation: Every.create({
+          record: comprehensiveInspectionRelation,
+          attributeQuery: ['passedQC'],
+          callback: (relation: any) => relation.passedQC === true
+        })
+      }),
+      Property.create({
+        name: 'allHighScoreBatchesPassed',
+        type: 'boolean',
+        collection: false,
+        computation: Every.create({
+          record: highScoreRelation,
+          attributeQuery: ['passedQC'],
+          callback: (relation: any) => relation.passedQC === true
+        })
+      }),
+      Property.create({
+        name: 'morningComprehensiveAllPassed',
+        type: 'boolean',
+        collection: false,
+        computation: Every.create({
+          record: morningComprehensiveRelation,
+          attributeQuery: ['passedQC'],
+          callback: (relation: any) => relation.passedQC === true
+        })
+      })
+    );
+    
+    const entities = [factoryEntity, productBatchEntity];
+    const relations = [factoryBatchRelation, morningShiftRelation, comprehensiveInspectionRelation, 
+                      highScoreRelation, morningComprehensiveRelation];
+    
+    // Setup system and controller
+    const system = new MonoSystem();
+    system.conceptClass = KlassByName;
+    const controller = new Controller({
+        system: system,
+        entities: entities,
+        relations: relations,
+        activities: [],
+        interactions: []
+    });
+    await controller.setup(true);
+    
+    // Create test data
+    const factory1 = await system.storage.create('Factory', { 
+      name: 'Plant A',
+      location: 'Chicago'
+    });
+    
+    const batch1 = await system.storage.create('ProductBatch', { 
+      batchNumber: 'B001',
+      productType: 'Widget',
+      manufactureDate: '2024-01-15'
+    });
+    
+    const batch2 = await system.storage.create('ProductBatch', { 
+      batchNumber: 'B002',
+      productType: 'Gadget',
+      manufactureDate: '2024-01-15'
+    });
+    
+    const batch3 = await system.storage.create('ProductBatch', { 
+      batchNumber: 'B003',
+      productType: 'Widget',
+      manufactureDate: '2024-01-16'
+    });
+    
+    const batch4 = await system.storage.create('ProductBatch', { 
+      batchNumber: 'B004',
+      productType: 'Gadget',
+      manufactureDate: '2024-01-16'
+    });
+    
+    // Create quality checks with different combinations
+    await system.storage.create('FactoryBatch', {
+      source: factory1,
+      target: batch1,
+      qualityScore: 95,
+      passedQC: true,
+      inspectionLevel: 'comprehensive',
+      shift: 'morning',
+      inspector: 'John'
+    });
+    
+    await system.storage.create('FactoryBatch', {
+      source: factory1,
+      target: batch2,
+      qualityScore: 88,
+      passedQC: true,
+      inspectionLevel: 'standard',
+      shift: 'morning',
+      inspector: 'Jane'
+    });
+    
+    await system.storage.create('FactoryBatch', {
+      source: factory1,
+      target: batch3,
+      qualityScore: 92,
+      passedQC: true,
+      inspectionLevel: 'comprehensive',
+      shift: 'afternoon',
+      inspector: 'Bob'
+    });
+    
+    await system.storage.create('FactoryBatch', {
+      source: factory1,
+      target: batch4,
+      qualityScore: 75,
+      passedQC: false,
+      inspectionLevel: 'basic',
+      shift: 'night',
+      inspector: 'Alice'
+    });
+    
+    // Check computed every results
+    const factoryData = await system.storage.findOne('Factory', 
+      BoolExp.atom({key: 'id', value: ['=', factory1.id]}), 
+      undefined, 
+      ['id', 'name', 'allBatchesPassedQC', 'allMorningShiftPassed', 
+       'allComprehensiveInspectionsPassed', 'allHighScoreBatchesPassed', 'morningComprehensiveAllPassed']
+    );
+    
+    // Every returns 0 when false, 1 when true
+    expect(factoryData.allBatchesPassedQC).toBe(0); // batch4 failed
+    // Now filtered relations work correctly
+    expect(factoryData.allMorningShiftPassed).toBe(1); // batch1 and batch2 both passed
+    expect(factoryData.allComprehensiveInspectionsPassed).toBe(1); // batch1 and batch3 both passed
+    expect(factoryData.allHighScoreBatchesPassed).toBe(1); // batch1(95) and batch3(92) both passed
+    expect(factoryData.morningComprehensiveAllPassed).toBe(1); // only batch1, and it passed
+    
+    // Test dynamic updates: Fix the failed batch
+    await system.storage.update('FactoryBatch',
+      MatchExp.atom({key: 'source.id', value: ['=', factory1.id]})
+        .and({key: 'target.id', value: ['=', batch4.id]}),
+      { passedQC: true, qualityScore: 85 }
+    );
+    
+    // Check updated results
+    const factoryDataUpdated = await system.storage.findOne('Factory', 
+      BoolExp.atom({key: 'id', value: ['=', factory1.id]}), 
+      undefined, 
+      ['id', 'allBatchesPassedQC']
+    );
+    
+    // Every returns 1 when true due to computation implementation
+    expect(factoryDataUpdated.allBatchesPassedQC).toBe(1); // Now all pass
+    
+    // Add a new failing morning shift batch
+    const batch5 = await system.storage.create('ProductBatch', { 
+      batchNumber: 'B005',
+      productType: 'Widget',
+      manufactureDate: '2024-01-17'
+    });
+    
+    await system.storage.create('FactoryBatch', {
+      source: factory1,
+      target: batch5,
+      qualityScore: 60,
+      passedQC: false,
+      inspectionLevel: 'standard',
+      shift: 'morning',
+      inspector: 'John'
+    });
+    
+    // Check that morning shift no longer all pass
+    const factoryDataFinal = await system.storage.findOne('Factory', 
+      BoolExp.atom({key: 'id', value: ['=', factory1.id]}), 
+      undefined, 
+      ['id', 'allBatchesPassedQC', 'allMorningShiftPassed']
+    );
+    
+    // Every returns 0 when false
+    expect(factoryDataFinal.allBatchesPassedQC).toBe(0); // batch5 failed
+    // Morning shift now includes batch5 which failed
+    expect(factoryDataFinal.allMorningShiftPassed).toBe(0); // batch5 failed
+  }); 
