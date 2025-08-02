@@ -72,31 +72,7 @@ describe('filtered entity test', () => {
     afterEach(async () => {
         await db.close();
     });
-
-    test('should identify filtered entities correctly', () => {
-        expect(entityQueryHandle.isFilteredEntity('User')).toBe(false);
-        expect(entityQueryHandle.isFilteredEntity('ActiveUsers')).toBe(true);
-        expect(entityQueryHandle.isFilteredEntity('YoungUsers')).toBe(true);
-        expect(entityQueryHandle.isFilteredEntity('TechYoungUsers')).toBe(true);
-    });
-
-    test('should get filtered entity config correctly', () => {
-        const activeUsersConfig = entityQueryHandle.getFilteredEntityConfig('ActiveUsers');
-        expect(activeUsersConfig?.sourceRecordName).toBe('User');
-        expect(activeUsersConfig?.matchExpression).toBeDefined();
-
-        const userConfig = entityQueryHandle.getFilteredEntityConfig('User');
-        expect(userConfig).toBe(null);
-    });
-
-    test('should get filtered entities for source correctly', () => {
-        const filteredEntities = entityQueryHandle.getFilteredEntitiesForSource('User');
-        expect(filteredEntities).toHaveLength(3);
-        expect(filteredEntities.map(e => e.name)).toContain('ActiveUsers');
-        expect(filteredEntities.map(e => e.name)).toContain('YoungUsers');
-        expect(filteredEntities.map(e => e.name)).toContain('TechYoungUsers');
-    });
-
+   
     test('basic filtered entity functionality', async () => {
         // 创建测试用户
         const user1 = await entityQueryHandle.create('User', {

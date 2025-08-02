@@ -28,18 +28,26 @@ export class RecordQuery {
         allowNull = false,
         alias?: string
     ) {
+        const recordInfo = map.getRecordInfo(recordName)
+        const isFiltered = recordInfo.isFilteredEntity || recordInfo.isFilteredRelation
+        let baseRecordName = isFiltered ? (recordInfo.isFilteredEntity ? recordInfo.sourceRecordName! : recordInfo.sourceRelationName!) : recordName
+
+        
         // CAUTION 因为合表后可能用关联数据匹配到行。
-        const inputMatch = new MatchExp(recordName, map, data.matchExpression, contextRootEntity)
+        const inputMatch = new MatchExp(baseRecordName, map, data.matchExpression, contextRootEntity)
         const matchExpression = allowNull ? inputMatch: inputMatch.and({
             key: 'id',
             value: ['not', null]
         })
+
+        const resolvedMatchExpression = isFiltered ? matchExpression.and(new MatchExp(baseRecordName, map, recordInfo.matchExpression)) : matchExpression
+
         return new RecordQuery(
-            recordName,
+            baseRecordName,
             map,
-            matchExpression,
-            new AttributeQuery(recordName, map, data.attributeQuery || [], parentRecord, attributeName),
-            new Modifier(recordName, map, data.modifier!),
+            resolvedMatchExpression,
+            new AttributeQuery(baseRecordName, map, data.attributeQuery || [], parentRecord, attributeName),
+            new Modifier(baseRecordName, map, data.modifier!),
             contextRootEntity,
             parentRecord,
             attributeName,

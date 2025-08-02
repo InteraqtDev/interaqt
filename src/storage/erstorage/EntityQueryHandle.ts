@@ -27,26 +27,6 @@ export class EntityQueryHandle {
     }
 
     async find(entityName: string, matchExpressionData?: MatchExpressionData, modifierData?: ModifierData, attributeQueryData: AttributeQueryData = []): Promise<Record[]> {
-        // 检查是否是 filtered entity
-        if (this.isFilteredEntity(entityName)) {
-            const config = this.getFilteredEntityConfig(entityName);
-            if (!config) {
-                throw new Error(`${entityName} is not a filtered entity`);
-            }
-
-            // 构造查询条件：过滤条件 + 额外的匹配条件（如果有）
-            let combinedMatch = config.matchExpression;
-            
-            if (matchExpressionData) {
-                combinedMatch = new MatchExp(config.sourceRecordName!, this.map, combinedMatch)
-                    .and(new MatchExp(config.sourceRecordName!, this.map, matchExpressionData))
-                    .data;
-            }
-
-            // 直接在源实体上查询，使用过滤条件
-            return this.find(config.sourceRecordName!, combinedMatch, modifierData, attributeQueryData);
-        }
-
         assert(this.map.getRecord(entityName), `cannot find entity ${entityName}`)
         const entityQuery = RecordQuery.create(
             entityName,
@@ -69,51 +49,11 @@ export class EntityQueryHandle {
 
     // CAUTION 不能递归更新 relate entity 的 value，如果传入了 related entity 的值，说明是建立新的联系。
     async update(entity: string, matchExpressionData: MatchExpressionData, rawData: RawEntityData, events?: RecordMutationEvent[]) {
-        // 检查是否是 filtered entity
-        if (this.isFilteredEntity(entity)) {
-            const config = this.getFilteredEntityConfig(entity);
-            if (!config) {
-                throw new Error(`${entity} is not a filtered entity`);
-            }
-
-            // 构造查询条件：过滤条件 + 原有的匹配条件
-            let combinedMatch = config.matchExpression;
-            if (matchExpressionData) {
-                combinedMatch = new MatchExp(config.sourceRecordName!, this.map, config.matchExpression)
-                    .and(new MatchExp(config.sourceRecordName!, this.map, matchExpressionData))
-                    .data;
-            }
-
-            // 在源实体上执行更新操作
-            const newEntityData = new NewRecordData(this.map, config.sourceRecordName!, rawData)
-            return this.agent.updateRecord(config.sourceRecordName!, combinedMatch!, newEntityData, events)
-        }
-
         const newEntityData = new NewRecordData(this.map, entity, rawData)
         return this.agent.updateRecord(entity, matchExpressionData, newEntityData, events)
     }
 
     async delete(entityName: string, matchExpressionData: MatchExpressionData,events?: RecordMutationEvent[]) {
-        // 检查是否是 filtered entity
-        if (this.isFilteredEntity(entityName)) {
-            const config = this.getFilteredEntityConfig(entityName);
-            if (!config) {
-                throw new Error(`${entityName} is not a filtered entity`);
-            }
-
-            // 构造查询条件：过滤条件 + 原有的匹配条件
-            const combinedMatchExp = new MatchExp(config.sourceRecordName!, this.map, config.matchExpression)
-                .and(new MatchExp(config.sourceRecordName!, this.map, matchExpressionData));
-            
-            // 确保 combinedMatch 有值
-            if (!combinedMatchExp.data) {
-                throw new Error('Failed to construct combined match expression');
-            }
-
-            // 在源实体上执行删除操作
-            return this.agent.deleteRecord(config.sourceRecordName!, combinedMatchExp.data, events)
-        }
-
         return this.agent.deleteRecord(entityName, matchExpressionData, events)
     }
 
@@ -162,38 +102,4 @@ export class EntityQueryHandle {
         const info = this.map.getInfo(entity, attribute)
         return info.recordName
     }
-
-    // === Filtered Entity 相关方法 ===
-
-    /**
-     * 检查给定的 entity 是否是 filtered entity
-     */
-    isFilteredEntity(entityName: string): boolean {
-        const recordInfo = this.map.getRecordInfo(entityName)
-        return !!recordInfo.sourceRecordName
-    }
-
-    /**
-     * 获取 filtered entity 的配置
-     */
-    getFilteredEntityConfig(entityName: string): RecordInfo | null {
-        const recordInfo = this.map.getRecordInfo(entityName)
-        if (!recordInfo.sourceRecordName) {
-            return null
-        }
-        
-        return recordInfo
-    }
-
-    /**
-     * 获取基于指定源实体的所有 filtered entities
-     */
-    getFilteredEntitiesForSource(sourceEntityName: string): Array<{ name: string, matchExpression: any }> {
-        return this.map.getRecordInfo(sourceEntityName).filteredBy?.map(recordInfo => ({
-            name: recordInfo.name,
-            matchExpression: recordInfo.matchExpression
-        })) || []
-    }
-
-
 }

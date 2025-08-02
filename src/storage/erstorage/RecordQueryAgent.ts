@@ -1231,25 +1231,28 @@ WHERE "${entityInfo.idField}" = (${p()})
     async updateRecord(entityName: string, matchExpressionData: MatchExpressionData, newEntityData: NewRecordData, events?: RecordMutationEvent[]) {
         // 现在支持在 update 字段的同时，使用 null 来删除关系
         // FIXME update 的 attributeQuery 应该按需查询，现在查询的记录太多
-        const matchedEntities = await this.findRecords(RecordQuery.create(entityName, this.map, {
+
+        const updateRecordQuery = RecordQuery.create(entityName, this.map, {
             matchExpression: matchExpressionData,
             attributeQuery: AttributeQuery.getAttributeQueryDataForRecord(entityName, this.map, true, true, true, true)
-        }), `find record for updating ${entityName}`, undefined)
-
+        })
+        
+        const matchedEntities = await this.findRecords(updateRecordQuery, `find record for updating ${entityName}`, undefined)
+        // 注意下面使用的都是 updateRecordQuery 的 recordName，而不是 entityName，因为 RecordQuery 会根据 recordName 来判断是否是 filtered entity。
         const result: Record[] = []
         for (let matchedEntity of matchedEntities) {
             // 1. 创建我依赖的
             const newEntityDataWithDep = await this.createRecordDependency(newEntityData, events)
             // 2. 把同表的实体移出去，为新同表 Record 建立 id；可能有要删除的 reliance
-            const newEntityDataWithIdsWithFlashOutRecords = await this.updateSameRowData(entityName, matchedEntity, newEntityDataWithDep, events)
+            const newEntityDataWithIdsWithFlashOutRecords = await this.updateSameRowData(updateRecordQuery.recordName, matchedEntity, newEntityDataWithDep, events)
             // 3. 更新依赖我的和关系表独立的
-            const relianceUpdatedResult = await this.handleUpdateReliance(entityName, matchedEntity, newEntityData, events)
+            const relianceUpdatedResult = await this.handleUpdateReliance(updateRecordQuery.recordName, matchedEntity, newEntityData, events)
 
             // 处理 filtered entity - 检查更新后的记录是否属于任何 filtered entity
             // 传递原始的 matchedEntity，它包含更新前的 __filtered_entities 状态
             // 以及实际更改的字段
             const changedFields = Object.keys(newEntityData.getData())
-            await this.filteredEntityManager.updateFilteredEntityFlags(entityName, matchedEntity.id, events, matchedEntity, false, changedFields)
+            await this.filteredEntityManager.updateFilteredEntityFlags(updateRecordQuery.recordName, matchedEntity.id, events, matchedEntity, false, changedFields)
 
             result.push({...newEntityData.getData(), ...newEntityDataWithIdsWithFlashOutRecords.getData(), ...relianceUpdatedResult})
         }
@@ -1270,17 +1273,18 @@ WHERE "${entityInfo.idField}" = (${p()})
         })
         const records = await this.findRecords(deleteQuery, `find record for deleting ${recordName}`, undefined)
 
+        // 注意下面使用的都是 deleteQuery 的 recordName，而不是 entityName，因为 RecordQuery 会根据 recordName 来判断是否是 filtered entity。
         // CAUTION 我们应该先删除关系，再删除关联实体。按照下面的顺序就能保证事件顺序的正确。
         if (records.length) {
             // 删除关系数据（独立表或者关系在另一边的关系数据）
-            await this.deleteNotReliantSeparateLinkRecords(recordName, records, events)
+            await this.deleteNotReliantSeparateLinkRecords(deleteQuery.recordName, records, events)
             // 删除依赖我的实体（其他表中的）。注意, reliance 只可能是 1:x，不可能多个 n 个 record 被1个 reliace 依赖。
             //  为什么这里要单独计算 events, 是因为 1:1 并且刚好关系数据分配到了当前 record 上 时，关系事件顺序会不正确了。
             const relianceEvents: RecordMutationEvent[] = []
-            await this.deleteDifferentTableReliance(recordName, records, relianceEvents)
+            await this.deleteDifferentTableReliance(deleteQuery.recordName, records, relianceEvents)
             // 删除自身、有生命周期依赖的合表 record、合表到当前 record 的关系数据。
             const sameRowRecordEvents: RecordMutationEvent[] = []
-            await this.deleteRecordSameRowData(recordName, records, sameRowRecordEvents, inSameRowDataOp)
+            await this.deleteRecordSameRowData(deleteQuery.recordName, records, sameRowRecordEvents, inSameRowDataOp)
 
             // 1. recordEvents 除了最后一个外全都是关系删除事件。
             // 2. relianceEvents 中都是 reliance 删除事件，可能包含关系删除事件。

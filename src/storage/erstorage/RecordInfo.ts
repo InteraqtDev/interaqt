@@ -12,18 +12,6 @@ export class RecordInfo {
         return this.data.isRelation
     }
 
-    get sourceRecordName() {
-        return this.data.sourceRecordName
-    }
-
-    get matchExpression() {
-        return this.data.matchExpression
-    }
-
-    get filteredBy() {
-        return this.data.filteredBy?.map(name => new RecordInfo(name, this.map))
-    }
-
     get combinedRecords() {
         return this.strictRecordAttributes.filter(info => {
             return info.isMergedWithParent()
@@ -140,5 +128,29 @@ export class RecordInfo {
 
     getAttributeInfo(attribute: string) {
         return new AttributeInfo(this.name, attribute, this.map)
+    }
+
+    get sourceRecordName() {
+        return this.data.sourceRecordName
+    }
+
+    get matchExpression() {
+        return this.data.matchExpression
+    }
+
+    get filteredBy() {
+        return this.data.filteredBy?.map(name => new RecordInfo(name, this.map))
+    }
+
+    get isFilteredEntity() {
+        return this.data.isFilteredEntity
+    }
+
+    get isFilteredRelation() {
+        return this.data.isFilteredRelation
+    }
+
+    get sourceRelationName() {
+        return this.data.sourceRelationName
     }
 }

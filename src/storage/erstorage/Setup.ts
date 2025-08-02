@@ -238,7 +238,7 @@ export class DBSetup {
             filteredBy: filteredBy.length ? filteredBy.map(e => e.name) : undefined,
             // 添加 filtered relation 的标记
             isFilteredRelation:!!sourceRelation,
-            sourceRelationName: sourceRelation ? this.getRecordName(sourceRelation) : undefined
+            sourceRelationName: sourceRelation ? sourceRelation.name : undefined
         } as RecordMapItem
     }
     createFilteredEntityRecord(entity: EntityInstance) {
@@ -270,9 +270,9 @@ export class DBSetup {
         return {
             table: relationName,
             relType: relationWithProps.type.split(':'),
-            sourceRecord: this.getRecordName(relationWithProps.source),
+            sourceRecord: relationWithProps.source.name,
             sourceProperty: relationWithProps.sourceProperty,
-            targetRecord: this.getRecordName(relationWithProps.target),
+            targetRecord: relationWithProps.target.name,
             targetProperty: relationWithProps.targetProperty,
             recordName: relationName,
             isTargetReliance: relationWithProps.isTargetReliance,
@@ -282,15 +282,6 @@ export class DBSetup {
             sourceLinkName: relationWithProps.sourceRelation?.name
         } as LinkMapItem
     }
-    getRecordName(rawRecord: EntityInstance | RelationInstance): string {
-        if (isRelation(rawRecord)) {
-            const record = rawRecord as RelationInstance
-            return `${record.source.name}_${record.sourceProperty}_${record.targetProperty}_${record.target.name}`
-        } else {
-            const record = rawRecord as EntityInstance
-            return record.name
-        }
-    }
     //虚拟 link
     createLinkOfRelationAndEntity(relationEntityName: string, relationName: string, relation: RelationInstance, isSource: boolean) {
         const relationWithProps = relation 
@@ -299,7 +290,7 @@ export class DBSetup {
             table: undefined, // 虚拟 link 没有表
             sourceRecord: relationEntityName,
             sourceProperty: isSource ? 'source' : 'target',
-            targetRecord: isSource ? this.getRecordName(relationWithProps.source): this.getRecordName(relationWithProps.target),
+            targetRecord: isSource ? relationWithProps.source.name: relationWithProps.target.name,
             // targetRecord: isSource ? relation.source.name: relation.target.name,
             targetProperty: undefined, // 不能从 entity 来获取关系表
             relType: [isSource ? targetRelType : sourceRelType,'1'],
@@ -326,8 +317,8 @@ export class DBSetup {
 
         // 2. 生成 relation record 以及所有的 link
         this.relations.forEach(relation => {
-            const sourceName = this.getRecordName(relation.source)
-            const targetName = this.getRecordName(relation.target)
+            const sourceName = relation.source.name
+            const targetName = relation.target.name
             const relationName = relation.name || `${sourceName}_${relation.sourceProperty}_${relation.targetProperty}_${targetName}`
             assert(!this.map.records[relationName], `relation name ${relationName} is duplicated`)
             // this.map.records[relationName] = relation.sourceRelation ? this.createFilteredRelationRecord(relation) : this.createRecord(relation, true)

@@ -41,11 +41,13 @@ export class NewRecordData {
     // 不包括虚拟 link
     public relatedEntitiesData: NewRecordData[] = []
     public valueAttributes: AttributeInfo[] = []
-
+    public recordName: string
     // 和当前合表并且是  id 的。说明我们的需要的 row 已经有了，只要update 相应 column 就行了
     public sameRowEntityIdRefs: NewRecordData[] = []
     // recordName 是自己的 recordName，  info 是自己作为父亲的 attribute 的 info.
-    constructor(public map: EntityToTableMap, public recordName: string, public rawData: RawEntityData, public info?: AttributeInfo, ) {
+    constructor(public map: EntityToTableMap, recordName: string, public rawData: RawEntityData, public info?: AttributeInfo, ) {
+        const recordInfo = this.map.getRecordInfo(recordName)
+        this.recordName = recordInfo.isFilteredEntity ? recordInfo.sourceRecordName! : (recordInfo.isFilteredRelation ? recordInfo.sourceRelationName! : recordName)
         const [valueAttributesInfo, entityAttributesInfo, entityIdAttributes] = this.map.groupAttributes(recordName, rawData ? Object.keys(rawData) : [])
         this.relatedEntitiesData = flatten(entityAttributesInfo.map(info =>
             Array.isArray(rawData[info.attributeName]) ?
