@@ -27,6 +27,7 @@ export type RecordAttribute = {
     type: 'id',
     isRecord: true,
     linkName: string,
+    attributeName: string,
     // 下面三个是为了方便读取的缓存字段
     isSource? : boolean,
     relType: ['1'|'n', '1'|'n'],
@@ -40,6 +41,7 @@ export type RecordAttribute = {
     // filtered relation 相关
     isFilteredRelation?: boolean,
     matchExpression?: any
+    sourceRelationAttributeName?: string
 }
 
 export type RecordMapItem = {
@@ -49,6 +51,8 @@ export type RecordMapItem = {
         [k:string]: ValueAttribute|RecordAttribute
     }
     isRelation? :boolean,
+    // filtered entity 相关
+    isFilteredEntity?: boolean,
     sourceRecordName? : string,
     matchExpression?: MatchExpressionData,
     resolvedSourceRecordName?: string,
@@ -56,7 +60,7 @@ export type RecordMapItem = {
     filteredBy? : string[],
     // filtered relation 相关
     isFilteredRelation?: boolean,
-    sourceRelation?: string
+    sourceRelationName?: string
 }
 
 type RecordMap = {
@@ -85,6 +89,7 @@ export type LinkMapItem = {
     // filtered relation 相关
     isFilteredRelation?: boolean,
     matchExpression?: any
+    sourceLinkName?: string
 }
 
 type LinkMap = {
@@ -139,9 +144,9 @@ export class EntityToTableMap {
     }
     getLinkInfo(recordName: string, rawAttribute: string) {
         const attribute = this.getAttributeAndSymmetricDirection(rawAttribute)[0]
-        const linkName = (this.data.records[recordName].attributes[attribute] as RecordAttribute).linkName
+        const {linkName, isSource} = (this.data.records[recordName].attributes[attribute] as RecordAttribute)
         assert(!!linkName, `cannot find relation ${recordName} ${attribute}`)
-        return new LinkInfo(linkName, this.data.links[linkName], this)
+        return new LinkInfo(linkName, this.data.links[linkName], this, !!isSource)
     }
     getLinkInfoByName(linkName: string) {
         assert(!!this.data.links[linkName], `cannot find link ${linkName}`)
@@ -174,7 +179,12 @@ export class EntityToTableMap {
                 currentEntity = (attributeData! as RecordAttribute).linkName
                 attributeData = undefined
             } else {
-                const data = this.data.records[currentEntity]
+                let data = this.data.records[currentEntity]
+                if (data.isFilteredRelation) {
+                    data = this.data.records[data.sourceRelationName!]
+                } else if (data.isFilteredEntity) {
+                    data = this.data.records[data.sourceRecordName!]
+                }
                 attributeData = data!.attributes[currentAttribute!] as RecordAttribute
                 assert(!!attributeData, `attribute ${currentAttribute} not found in ${currentEntity}. namePath: ${namePath.join('.')}`)
                 parentEntity = currentEntity
@@ -348,16 +358,28 @@ export class EntityToTableMap {
 
     getReverseAttribute(entityName: string, attribute: string) : string {
         assert(this.data.records[entityName], `entity ${entityName} not found`)
-        const relationName = (this.data.records[entityName].attributes[attribute] as RecordAttribute).linkName
-        const relationData = this.data.links[relationName]
-        if (relationData.sourceRecord === entityName && relationData.sourceProperty === attribute) {
-            return relationData.targetProperty!
-        } else if (relationData.targetRecord === entityName && relationData.targetProperty === attribute) {
-            return relationData.sourceProperty
+        const record = this.data.records[entityName]
+        if (record.isRelation) {
+            assert(attribute ==='source' || attribute ==='target', `wrong attribute ${attribute} for relation ${entityName}`)
+            const linkData = this.data.links[entityName]
+            if (attribute === 'source') {
+                return `${linkData.sourceProperty!}.&`
+            } else {
+                return `${linkData.targetProperty!}.&`
+            }
         } else {
-            assert(false, `wrong relation data ${entityName}.${attribute}`)
-            return ''
+            const relationName = (this.data.records[entityName].attributes[attribute] as RecordAttribute).linkName
+            const relationData = this.data.links[relationName]
+            if (relationData.sourceRecord === entityName && relationData.sourceProperty === attribute) {
+                return relationData.targetProperty!
+            } else if (relationData.targetRecord === entityName && relationData.targetProperty === attribute) {
+                return relationData.sourceProperty
+            } else {
+                assert(false, `wrong relation data ${entityName}.${attribute}`)
+                return ''
+            }
         }
+        
     }
     groupAttributes(entityName: string, attributeNames: string[]) : [AttributeInfo[], AttributeInfo[], AttributeInfo[]]{
         assert(this.data.records[entityName], `entity ${entityName} not found`)
@@ -382,5 +404,100 @@ export class EntityToTableMap {
         })
 
         return [valueAttributes, entityAttributes, entityIdAttributes]
+    }
+    // 获取压缩后的路径
+    getShrinkedAttribute(entityName:string, attributeName: string):string {
+        // 将路径分割成数组
+        const pathParts = attributeName.split('.');
+        const result: string[] = [];
+        let currentEntity = entityName;
+        let previousEntity = entityName; // 保存前一个实体名称
+        let i = 0;
+        
+        while (i < pathParts.length) {
+            const part = pathParts[i];
+            
+            // 如果当前部分是 & 符号
+            if (part === LINK_SYMBOL && i > 0 && i < pathParts.length - 1) {
+                const previousAttr = result[result.length - 1];
+                const nextPart = pathParts[i + 1];
+                
+                // 如果下一个部分是 source 或 target
+                if (nextPart === 'source' || nextPart === 'target') {
+                    try {
+                        // 使用前一个实体来获取关系信息
+                        const relationInfo = this.getInfo(previousEntity, previousAttr);
+                        
+                        if (relationInfo.isRecord) {
+                            // 获取关系的详细信息
+                            const linkInfo = relationInfo.getLinkInfo().data;
+                            
+                            // 确定关系属性指向的实体
+                            let relationPointsTo: string;
+                            if (relationInfo.isRecordSource()) {
+                                // 如果是 source，则指向关系的 target
+                                relationPointsTo = linkInfo.targetRecord;
+                            } else {
+                                // 如果不是 source，则指向关系的 source
+                                relationPointsTo = linkInfo.sourceRecord;
+                            }
+                            
+                            // 确定 source/target 指向的实体
+                            let sourceTargetPointsTo: string;
+                            if (nextPart === 'source') {
+                                sourceTargetPointsTo = linkInfo.sourceRecord;
+                            } else {
+                                sourceTargetPointsTo = linkInfo.targetRecord;
+                            }
+                            
+                            // 如果两者指向相同的实体，可以压缩
+                            if (relationPointsTo === sourceTargetPointsTo) {
+                                // 跳过 & 和 source/target
+                                i += 2;
+                                // currentEntity 保持为 relationPointsTo
+                                // previousEntity 不变，因为我们没有添加新的属性到结果
+                                continue;
+                            } else {
+                                // 如果不能压缩，更新 currentEntity 为 source/target 指向的实体
+                                currentEntity = sourceTargetPointsTo;
+                                previousEntity = currentEntity; // 更新 previousEntity
+                                result.push(part);
+                                result.push(nextPart);
+                                i += 2;
+                                continue;
+                            }
+                        }
+                    } catch (e) {
+                        // 如果获取信息失败，保持原路径
+                    }
+                }
+                
+                // 如果不能压缩，保留 & 符号
+                result.push(part);
+                i++;
+            } else if (part !== LINK_SYMBOL) {
+                // 保存当前实体作为前一个实体
+                previousEntity = currentEntity;
+                
+                // 更新当前实体
+                try {
+                    const info = this.getInfo(currentEntity, part);
+                    if (info.isRecord) {
+                        currentEntity = info.recordName;
+                    }
+                } catch (e) {
+                    // 忽略错误
+                }
+                
+                result.push(part);
+                i++;
+            } else {
+                // 其他情况（比如 & 在开头或结尾）
+                result.push(part);
+                i++;
+            }
+        }
+        
+        return result.join('.');
     }
 }

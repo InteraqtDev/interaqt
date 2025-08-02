@@ -1,4 +1,4 @@
-import { EntityToTableMap } from "./EntityToTableMap.js";
+import { EntityToTableMap, RecordMapItem } from "./EntityToTableMap.js";
 import { MatchExp, MatchExpressionData } from "./MatchExp.js";
 import { ModifierData } from "./Modifier.js";
 import { AttributeQueryData } from "./AttributeQuery.js";
@@ -8,6 +8,7 @@ import { NewRecordData, RawEntityData } from "./NewRecordData.js";
 import { RecordQueryAgent } from "./RecordQueryAgent.js";
 import { EntityIdRef, Database, RecordMutationEvent, ID_ATTR } from "@runtime";
 import { Record } from "./RecordQueryAgent.js";
+import { RecordInfo } from "./RecordInfo.js";
 
 export class EntityQueryHandle {
     agent: RecordQueryAgent
@@ -37,13 +38,13 @@ export class EntityQueryHandle {
             let combinedMatch = config.matchExpression;
             
             if (matchExpressionData) {
-                combinedMatch = new MatchExp(config.sourceRecordName, this.map, combinedMatch)
-                    .and(new MatchExp(config.sourceRecordName, this.map, matchExpressionData))
+                combinedMatch = new MatchExp(config.sourceRecordName!, this.map, combinedMatch)
+                    .and(new MatchExp(config.sourceRecordName!, this.map, matchExpressionData))
                     .data;
             }
 
             // 直接在源实体上查询，使用过滤条件
-            return this.find(config.sourceRecordName, combinedMatch, modifierData, attributeQueryData);
+            return this.find(config.sourceRecordName!, combinedMatch, modifierData, attributeQueryData);
         }
 
         assert(this.map.getRecord(entityName), `cannot find entity ${entityName}`)
@@ -78,14 +79,14 @@ export class EntityQueryHandle {
             // 构造查询条件：过滤条件 + 原有的匹配条件
             let combinedMatch = config.matchExpression;
             if (matchExpressionData) {
-                combinedMatch = new MatchExp(config.sourceRecordName, this.map, config.matchExpression)
-                    .and(new MatchExp(config.sourceRecordName, this.map, matchExpressionData))
+                combinedMatch = new MatchExp(config.sourceRecordName!, this.map, config.matchExpression)
+                    .and(new MatchExp(config.sourceRecordName!, this.map, matchExpressionData))
                     .data;
             }
 
             // 在源实体上执行更新操作
-            const newEntityData = new NewRecordData(this.map, config.sourceRecordName, rawData)
-            return this.agent.updateRecord(config.sourceRecordName, combinedMatch, newEntityData, events)
+            const newEntityData = new NewRecordData(this.map, config.sourceRecordName!, rawData)
+            return this.agent.updateRecord(config.sourceRecordName!, combinedMatch!, newEntityData, events)
         }
 
         const newEntityData = new NewRecordData(this.map, entity, rawData)
@@ -101,8 +102,8 @@ export class EntityQueryHandle {
             }
 
             // 构造查询条件：过滤条件 + 原有的匹配条件
-            const combinedMatchExp = new MatchExp(config.sourceRecordName, this.map, config.matchExpression)
-                .and(new MatchExp(config.sourceRecordName, this.map, matchExpressionData));
+            const combinedMatchExp = new MatchExp(config.sourceRecordName!, this.map, config.matchExpression)
+                .and(new MatchExp(config.sourceRecordName!, this.map, matchExpressionData));
             
             // 确保 combinedMatch 有值
             if (!combinedMatchExp.data) {
@@ -110,7 +111,7 @@ export class EntityQueryHandle {
             }
 
             // 在源实体上执行删除操作
-            return this.agent.deleteRecord(config.sourceRecordName, combinedMatchExp.data, events)
+            return this.agent.deleteRecord(config.sourceRecordName!, combinedMatchExp.data, events)
         }
 
         return this.agent.deleteRecord(entityName, matchExpressionData, events)
@@ -175,16 +176,13 @@ export class EntityQueryHandle {
     /**
      * 获取 filtered entity 的配置
      */
-    getFilteredEntityConfig(entityName: string): { sourceRecordName: string, matchExpression: any } | null {
+    getFilteredEntityConfig(entityName: string): RecordInfo | null {
         const recordInfo = this.map.getRecordInfo(entityName)
         if (!recordInfo.sourceRecordName) {
             return null
         }
         
-        return {
-            sourceRecordName: recordInfo.sourceRecordName,
-            matchExpression: recordInfo.matchExpression
-        }
+        return recordInfo
     }
 
     /**

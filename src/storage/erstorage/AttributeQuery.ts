@@ -2,6 +2,7 @@ import {EntityToTableMap} from "./EntityToTableMap.js";
 import {assert} from "../utils.js";
 
 import {ALL_ATTR_SYMBOL, LINK_SYMBOL, RecordQuery, RecordQueryData, RecordQueryTree} from "./RecordQuery.js";
+import { MatchExp, MatchExpressionData } from "./MatchExp.js";
 
 export type AttributeQueryDataRecordItem = [string, RecordQueryData, boolean?]
 export type AttributeQueryDataItem = string | AttributeQueryDataRecordItem
@@ -128,7 +129,26 @@ export class AttributeQuery {
             const attributeInfo = this.map.getInfo(this.recordName, attributeName)
             if (attributeInfo.isRecord) {
 
-                const relatedEntity = RecordQuery.create(attributeInfo.recordName, this.map, subQueryData as RecordQueryData, undefined, this.recordName, attributeName, onlyRelationData)
+                let relatedAttributeName = attributeName
+                let relatedSubQueryData = subQueryData as RecordQueryData
+
+
+                // 在这里判断 filtered relation
+                if(attributeInfo.isLinkFiltered()) {
+                    // filtered relation 的 attribute。这里需要重新构建 subQueryData，要加上基于关系的 MatchExp。
+                    relatedAttributeName = attributeInfo.getSourceAttributeInfo().attributeName
+                    const subMatchExp = (subQueryData as RecordQueryData).matchExpression
+                    const linkInfo = attributeInfo.getLinkInfo().getSourceLinkInfo()
+                    const filteredRelationMatchExp = new MatchExp(linkInfo.name, this.map, attributeInfo.getMatchExpression())
+                    const rebasedMatchExp = filteredRelationMatchExp.rebase(attributeInfo.isRecordSource() ? 'target' : 'source')!
+                    const mergedMatchExp = subMatchExp ? rebasedMatchExp.and(subMatchExp.data) : rebasedMatchExp
+                    relatedSubQueryData = {
+                        ...subQueryData,
+                        matchExpression: mergedMatchExp.data
+                    }
+                }
+
+                const relatedEntity = RecordQuery.create(attributeInfo.recordName, this.map, relatedSubQueryData, undefined, this.recordName, relatedAttributeName, onlyRelationData, false, attributeName)
 
                 this.relatedRecords.push(relatedEntity)
                 if (attributeInfo.isXToMany) {
@@ -143,46 +163,51 @@ export class AttributeQuery {
         })
 
         this.valueAttributes = Array.from(valueAttributesSet)
-        // this.xToOneQueryTree = this.buildXToOneQueryTree()
         this.fullQueryTree = this.buildFullQueryTree()
 
     }
 
-    getValueAndXToOneRecordFields(nameContext = [this.recordName]): { tableAliasAndField: [string, string], nameContext: string[], attribute: string }[] {
+    getValueAndXToOneRecordFields(fieldPath = [this.recordName], nameContext = [this.recordName]): { tableAliasAndField: [string, string], nameContext: string[], attribute: string }[] {
         const queryAttributes = this.valueAttributes.includes('id') ? this.valueAttributes : ['id'].concat(this.valueAttributes)
         const queryFields = queryAttributes.map(attributeName => {
             return {
-                tableAliasAndField: this.map.getTableAliasAndFieldName(nameContext, attributeName).slice(0, 2) as [string, string],
+                tableAliasAndField: this.map.getTableAliasAndFieldName(fieldPath, attributeName).slice(0, 2) as [string, string],
                 nameContext,
                 attribute: attributeName
             }
         })
 
         this.xToOneRecords.forEach((recordQuery) => {
-            const namePath = nameContext.concat(recordQuery.attributeName!)
+            const nextFieldPath = fieldPath.concat(recordQuery.attributeName!)
+            const nextNameContext = nameContext.concat(recordQuery.alias || recordQuery.attributeName!)
             queryFields.push(
-                ...recordQuery.attributeQuery!.getValueAndXToOneRecordFields(namePath)
+                ...recordQuery.attributeQuery!.getValueAndXToOneRecordFields(nextFieldPath, nextNameContext)
             )
 
+            const nextLinkFieldPath = nextFieldPath.concat(LINK_SYMBOL)
+            const nextLinkNameContext = nextNameContext.concat(LINK_SYMBOL)
             if (recordQuery.attributeQuery.parentLinkRecordQuery!) {
                 queryFields.push(
-                    ...recordQuery.attributeQuery.parentLinkRecordQuery!.attributeQuery!.getValueAndXToOneRecordFields(namePath.concat(LINK_SYMBOL))
+                    ...recordQuery.attributeQuery.parentLinkRecordQuery!.attributeQuery!.getValueAndXToOneRecordFields(nextLinkFieldPath, nextLinkNameContext)
                 )
             }
         })
 
         if (this.shouldQueryParentLinkData && this.parentLinkRecordQuery) {
             const reverseAttribute = this.map.getInfo(this.parentRecord!, this.attributeName!).getReverseInfo()?.attributeName!
-            const namePath = nameContext.concat(reverseAttribute!, LINK_SYMBOL)
-            const symmetricLinkPaths = this.map.spawnManyToManySymmetricPath(namePath)
+            const nextFieldPath = fieldPath.concat(reverseAttribute!, LINK_SYMBOL)
+            const nextNameContext = nameContext.concat(reverseAttribute!, LINK_SYMBOL)
+            const symmetricLinkPaths = this.map.spawnManyToManySymmetricPath(nextFieldPath)
+            const nextSymmetricLinkNameContext = this.map.spawnManyToManySymmetricPath(nextNameContext)
+
             if (!symmetricLinkPaths) {
                 queryFields.push(
-                    ...this.parentLinkRecordQuery!.attributeQuery!.getValueAndXToOneRecordFields(namePath)
+                    ...this.parentLinkRecordQuery!.attributeQuery!.getValueAndXToOneRecordFields(nextFieldPath, nextNameContext)
                 )
             } else {
                 queryFields.push(
-                    ...this.parentLinkRecordQuery!.attributeQuery!.getValueAndXToOneRecordFields(symmetricLinkPaths[0]),
-                    ...this.parentLinkRecordQuery!.attributeQuery!.getValueAndXToOneRecordFields(symmetricLinkPaths[1])
+                    ...this.parentLinkRecordQuery!.attributeQuery!.getValueAndXToOneRecordFields(symmetricLinkPaths[0], nextSymmetricLinkNameContext![0]),
+                    ...this.parentLinkRecordQuery!.attributeQuery!.getValueAndXToOneRecordFields(symmetricLinkPaths[1], nextSymmetricLinkNameContext![1])
                 )
             }
 

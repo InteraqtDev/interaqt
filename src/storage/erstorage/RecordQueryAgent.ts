@@ -270,7 +270,7 @@ ${modifierClause}
                     })
 
                     const nextContext = entityQuery.label ? nextRecursiveContext.concat(record) : nextRecursiveContext
-                    record[subEntityQuery.attributeName!] = await this.findRecords(subGotoQueryWithParentMatch, queryName, recordQueryRef, nextContext)
+                    record[subEntityQuery.alias || subEntityQuery.attributeName!] = await this.findRecords(subGotoQueryWithParentMatch, queryName, recordQueryRef, nextContext)
                 }
             }
         }
@@ -301,7 +301,7 @@ ${modifierClause}
 
                         setByPath(
                             record,
-                            [subEntityQuery.attributeName!, LINK_SYMBOL, subEntityQueryOfSubLink.attributeName!],
+                            [subEntityQuery.alias || subEntityQuery.attributeName!, LINK_SYMBOL, subEntityQueryOfSubLink.attributeName!],
                             await this.findRecords(
                                 queryOfThisRecord,
                                 `finding relation data: ${entityQuery.recordName}.${subEntityQuery.attributeName}.&.${subEntityQueryOfSubLink.attributeName}`,
@@ -320,7 +320,7 @@ ${modifierClause}
             if (!subEntityQuery.onlyRelationData) {
                 for (let record of records) {
                     const nextContext = entityQuery.label ? nextRecursiveContext.concat(record) : nextRecursiveContext
-                    record[subEntityQuery.attributeName!] = await this.findXToManyRelatedRecords(
+                    record[subEntityQuery.alias || subEntityQuery.attributeName!] = await this.findXToManyRelatedRecords(
                         entityQuery.recordName,
                         subEntityQuery.attributeName!,
                         record.id,
@@ -606,9 +606,7 @@ ${modifierClause}
     }
 
     buildFromClause(entityName: string, prefix = '') {
-        // 获取实际的表名（处理 filtered relation/entity 的情况）
-        const actualTableName = this.map.getRecordTable(entityName);
-        return `"${actualTableName}" AS "${this.withPrefix(prefix)}${entityName}"`
+        return `"${this.map.getRecordTable(entityName)}" AS "${this.withPrefix(prefix)}${entityName}"`
     }
 
     buildJoinClause(joinTables: JoinTables, prefix = '') {

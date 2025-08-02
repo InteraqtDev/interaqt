@@ -3,7 +3,7 @@ import {assert} from "../utils.js";
 import {EntityToTableMap, LinkMapItem, RecordMapItem} from "./EntityToTableMap.js";
 
 export class LinkInfo {
-    constructor(public name: string, public data: LinkMapItem, public map: EntityToTableMap) {
+    constructor(public name: string, public data: LinkMapItem, public map: EntityToTableMap, public isFromSource: boolean = true) {
     }
 
     get isManyToOne() {
@@ -103,10 +103,26 @@ export class LinkInfo {
         return this.data.sourceRecord === recordName && this.data.sourceProperty === attribute
     }
 
-
-
     getAttributeName(recordName: string, attribute: string) {
         assert(!!recordName && !!attribute, `${recordName}, ${attribute} cannot be empty`)
         return this.isRelationSource(recordName, attribute) ? ['source', 'target'] : ['target', 'source']
+    }
+
+    isFilteredRelation() {
+        return this.data.isFilteredRelation
+    }
+
+    getSourceLinkInfo() {
+        assert(this.isFilteredRelation(), `only filtered relation can get source link info`)
+        const sourceLinkName = this.data.sourceLinkName!
+        return new LinkInfo(sourceLinkName, this.map.data.links[sourceLinkName], this.map)
+    }
+    
+    getMatchExpression() {
+        if (this.isFilteredRelation()) {
+            return this.data.matchExpression
+        } else {
+            throw new Error(`${this.name} is not a filtered relation`)
+        }
     }
 }

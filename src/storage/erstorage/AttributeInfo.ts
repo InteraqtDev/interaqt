@@ -112,6 +112,8 @@ export class AttributeInfo {
         return (this.data as RecordAttribute).linkName
     }
 
+    
+
     isMergedWithParent() {
         return this.getLinkInfo().isCombined()
     }
@@ -155,6 +157,21 @@ export class AttributeInfo {
         assert(this.isRecord, `only record attribute can get linkInfo`)
         return this.map.getLinkInfo(this.parentEntityName, this.attributeName)
     }
+
+    isLinkFiltered() {
+        return (this.data as RecordAttribute).isFilteredRelation
+    }
+
+    getMatchExpression() {
+        assert(this.isLinkFiltered(), `only filtered relation can get match expression`)
+        return (this.data as RecordAttribute).matchExpression
+    }
+
+    getSourceAttributeInfo() {
+        assert(this.isLinkFiltered(), `only filtered relation can get source attribute info`)
+        return new AttributeInfo(this.parentEntityName, (this.data as RecordAttribute).sourceRelationAttributeName!, this.map, this.symmetricDirection)
+    }
+    
 
     getRecordInfo() {
         assert(this.isRecord, `only record attribute can get linkInfo`)

@@ -25,7 +25,8 @@ export class RecordQuery {
         parentRecord?:string,
         attributeName?:string,
         onlyRelationData?: boolean,
-        allowNull = false
+        allowNull = false,
+        alias?: string
     ) {
         // CAUTION 因为合表后可能用关联数据匹配到行。
         const inputMatch = new MatchExp(recordName, map, data.matchExpression, contextRootEntity)
@@ -46,7 +47,8 @@ export class RecordQuery {
             allowNull,
             data.label,
             data.goto,
-            data.exit
+            data.exit,
+            alias
         )
     }
 
@@ -63,7 +65,9 @@ export class RecordQuery {
         public allowNull = false,
         public label?: string,
         public goto?: string,
-        public exit? : (context: RecursiveContext) => Promise<boolean>
+        public exit? : (context: RecursiveContext) => Promise<boolean>,
+        // 返回时在父节点中的名字，这是针对使用 filtered relation 名称查询时需要的。
+        public alias?: string
     ) {}
     getData(): RecordQueryData {
         return {

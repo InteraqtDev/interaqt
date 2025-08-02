@@ -90,7 +90,7 @@ export class RecordInfo {
         return Object.keys(this.data.attributes).filter(attribute => {
             const attributeData = this.data.attributes[attribute] as  RecordAttribute
             // CAUTION linkRecord 中有 field 就不能算了。比如 source/target
-            return attributeData.isRecord && !attributeData.field
+            return attributeData.isRecord && !attributeData.field && !attributeData.isFilteredRelation
         }).map(attribute => {
             return new AttributeInfo(this.name, attribute, this.map)
         })

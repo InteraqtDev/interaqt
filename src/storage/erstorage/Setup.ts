@@ -180,9 +180,7 @@ export class DBSetup {
     private currentFilteredEntityName?: string;
 
     createRecord(entity: EntityInstance | RelationInstance, isRelation? :boolean) {
-        
-        const entityWithProps = entity
-        const attributes: {[k:string]: Omit<ValueAttribute, 'field'>} = Object.fromEntries(entityWithProps.properties.map((property:PropertyInstance) => {
+        const attributes: {[k:string]: Omit<ValueAttribute, 'field'>} = Object.fromEntries(entity.properties.map((property:PropertyInstance) => {
             const prop = property
             return [
                 prop.name,
@@ -211,7 +209,7 @@ export class DBSetup {
 
         // 添加 __filtered_entities 字段到需要的实体或关系
         const filteredBy = [...this.entities, ...this.relations].filter(e => 
-            (e as any).sourceEntity === entityWithProps || (e as any).sourceRelation === entityWithProps
+            (e as any).sourceEntity === entity || (e as any).sourceRelation === entity
         );
         
         if (filteredBy.length) {
@@ -225,27 +223,50 @@ export class DBSetup {
             };
         }
 
-        const { sourceEntity, matchExpression, sourceRelation } = (entityWithProps as any) || {}
-        
-        // Remove the validation from here - it will be done in buildMap
-        
-        // CAUTION 暂时不支持跨 record 的 Filter。如果要支持，需要有类似 runtime computation 中的级联计算法
+        const { sourceEntity, matchExpression, sourceRelation } = (entity as any) || {}
 
+
+        // const sourceRecord = (sourceEntity||sourceRelation) ? this.map.records[sourceEntity?.name || sourceRelation!.name!]! : undefined
+        // const finalAttributes = sourceRecord ? {...sourceRecord.attributes, ...attributes} : attributes
         return {
-            table: entityWithProps.name,
+            table: entity.name,
             attributes,
             isRelation,
+            isFilteredEntity: !!sourceEntity,
             sourceRecordName: sourceEntity?.name || sourceRelation?.name,
-            matchExpression: matchExpression || (sourceRelation && (entityWithProps as any).matchExpression),
+            matchExpression: matchExpression || (sourceRelation && (entity as any).matchExpression),
             filteredBy: filteredBy.length ? filteredBy.map(e => e.name) : undefined,
             // 添加 filtered relation 的标记
-            isFilteredRelation: !!sourceRelation,
-            sourceRelation: sourceRelation ? this.getRecordName(sourceRelation) : undefined
-        } as any as RecordMapItem
+            isFilteredRelation:!!sourceRelation,
+            sourceRelationName: sourceRelation ? this.getRecordName(sourceRelation) : undefined
+        } as RecordMapItem
+    }
+    createFilteredEntityRecord(entity: EntityInstance) {
+        const sourceRecord = this.map.records[entity.sourceEntity!.name!]!
+        return {
+            table: sourceRecord.table,
+            attributes: {...sourceRecord.attributes},
+            isFilteredEntity: true,
+            sourceRecordName: entity.sourceEntity!.name!,
+            matchExpression: entity.matchExpression,
+            filteredBy: undefined,
+        } as RecordMapItem
+    }
+    createFilteredRelationRecord(relation: RelationInstance) {
+        const sourceRecord = this.map.records[relation.sourceRelation!.name!]!
+        return {
+            table: sourceRecord.table,
+            attributes: {...sourceRecord.attributes},
+            isRelation: true,
+            isFilteredRelation: true,
+            filteredBy: undefined,
+            sourceRecordName: relation.sourceRelation!.name!,
+            sourceRelationName: relation.sourceRelation!.name!,
+            matchExpression: relation.matchExpression,
+        } as RecordMapItem
     }
     createLink(relationName: string, relation: RelationInstance) {
         const relationWithProps = relation
-        if (!relationWithProps.type) debugger
         return {
             table: relationName,
             relType: relationWithProps.type.split(':'),
@@ -254,7 +275,11 @@ export class DBSetup {
             targetRecord: this.getRecordName(relationWithProps.target),
             targetProperty: relationWithProps.targetProperty,
             recordName: relationName,
-            isTargetReliance: relationWithProps.isTargetReliance
+            isTargetReliance: relationWithProps.isTargetReliance,
+            isFilteredRelation: !!relationWithProps.sourceRelation,
+            // FIXME 这里咩有考虑多次 filtered 的情况
+            matchExpression: relationWithProps.matchExpression,
+            sourceLinkName: relationWithProps.sourceRelation?.name
         } as LinkMapItem
     }
     getRecordName(rawRecord: EntityInstance | RelationInstance): string {
@@ -279,7 +304,9 @@ export class DBSetup {
             targetProperty: undefined, // 不能从 entity 来获取关系表
             relType: [isSource ? targetRelType : sourceRelType,'1'],
             isSourceRelation: true,
-            mergedTo: 'combined'
+            mergedTo: 'combined',
+            // filtered relation 就会有这个
+            matchExpression: relationWithProps.matchExpression
         } as LinkMapItem
     }
     getRelationNameOfRelationAndEntity(relationName: string, isSource: boolean) {
@@ -289,11 +316,12 @@ export class DBSetup {
     buildMap() {
         // 1. 按照范式生成基础 entity record
         this.entities.forEach(entity => {
-            const entityWithProps = entity 
-            assert(!this.map.records[entityWithProps.name], `entity name ${entityWithProps.name} is duplicated`)
-            this.map.records[entityWithProps.name] = this.createRecord(entity)
+            assert(!this.map.records[entity.name], `entity name ${entity.name} is duplicated`)
+            // this.map.records[entity.name] = entity.sourceEntity ? this.createFilteredEntityRecord(entity) : this.createRecord(entity)
+            this.map.records[entity.name] = this.createRecord(entity)
+
             // 记录一下 entity 和 表的关系。后面用于合并的时候做计算。
-            this.createRecordToTable(entityWithProps.name, entityWithProps.name)
+            this.createRecordToTable(entity.name, entity.name)
         })
 
         // 2. 生成 relation record 以及所有的 link
@@ -302,6 +330,7 @@ export class DBSetup {
             const targetName = this.getRecordName(relation.target)
             const relationName = relation.name || `${sourceName}_${relation.sourceProperty}_${relation.targetProperty}_${targetName}`
             assert(!this.map.records[relationName], `relation name ${relationName} is duplicated`)
+            // this.map.records[relationName] = relation.sourceRelation ? this.createFilteredRelationRecord(relation) : this.createRecord(relation, true)
             this.map.records[relationName] = this.createRecord(relation, true)
             this.createRecordToTable(relationName, relationName)
             // 记录 relation 里面的  Entity 和 Entity 的关系
@@ -316,23 +345,27 @@ export class DBSetup {
         // 3. 根据 Link 补充 record attribute 到 record 里面。方便之后的查询。
         Object.entries(this.map.links).forEach(([relation, relationData]) => {
             assert(!relationData.isSourceRelation || (relationData.sourceProperty === 'source' || relationData.sourceProperty === 'target'), 'virtual relation sourceProperty should only be source/target')
-            if (!this.map.records[relationData.sourceRecord]) debugger
             
             // 检查是否是 filtered relation
             const relationRecord = this.map.records[relation.split('_source')[0].split('_target')[0]]
-            const isFilteredRelation = relationRecord && relationRecord.isFilteredRelation
+            const isFilteredRelation = relationRecord && !!relationRecord.sourceRelationName
+            const sourceLink = isFilteredRelation ? this.map.links[relationRecord.sourceRelationName!]! : undefined
             
+
             this.map.records[relationData.sourceRecord].attributes[relationData.sourceProperty] = {
                 type: 'id',
                 isRecord:true,
                 relType: relationData.relType,
                 recordName: relationData.targetRecord,
                 linkName: relation,
+                attributeName: relationData.sourceProperty,
                 isSource: true,
                 // CAUTION 这里是表示这个 target 是 reliance
                 isReliance: relationData.isTargetReliance,
                 // 标记这是一个 filtered relation
-                isFilteredRelation: isFilteredRelation
+                isFilteredRelation: isFilteredRelation,
+                matchExpression: isFilteredRelation?relationData.matchExpression: undefined,
+                sourceRelationAttributeName: isFilteredRelation? sourceLink?.sourceProperty: undefined
             } as RecordAttribute
 
             // CAUTION 关联查询时，不可能出现从实体来获取一个关系的情况，语义不正确。
@@ -345,9 +378,12 @@ export class DBSetup {
                     relType: [relationData.relType[1], relationData.relType[0]],
                     recordName: relationData.sourceRecord,
                     linkName: relation,
+                    attributeName: relationData.targetProperty,
                     isSource:false,
                     // 标记这是一个 filtered relation
-                    isFilteredRelation: isFilteredRelation
+                    isFilteredRelation: isFilteredRelation,
+                    matchExpression: isFilteredRelation?relationData.matchExpression: undefined,
+                    sourceRelationAttributeName: isFilteredRelation? sourceLink?.targetProperty: undefined
                 } as RecordAttribute
             }
         })
