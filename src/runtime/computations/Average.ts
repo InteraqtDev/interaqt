@@ -136,6 +136,16 @@ export class GlobalAverageHandle implements DataBasedComputation {
     }
 }
 
+
+function setByPath(record: any, path: string[], value: any) {
+    let base:any = record
+    for(let attr of path.slice(0, -1)) {
+        base = base[attr]
+    }
+    base[path.at(-1)!] = value
+}
+
+
 export class PropertyAverageHandle implements DataBasedComputation {
     static computationType = Average
     static contextType = 'property' as const
@@ -240,9 +250,9 @@ export class PropertyAverageHandle implements DataBasedComputation {
         let count = await this.state.count.get(mutationEvent.record) || 0;
         let sum = (lastValue || 0) * count
 
-
+        // 关联关系的新建
         if (relatedMutationEvent.type === 'create' && relatedMutationEvent.recordName === this.relation.name!) {
-            // 关联关系的新建
+            
             const relationRecord = relatedMutationEvent.record!;
             const newRelationWithEntity = await this.controller.system.storage.findOne(
                 this.relation.name!, 
@@ -269,9 +279,13 @@ export class PropertyAverageHandle implements DataBasedComputation {
             );
             const newValue = this.resolveAvgField(newRelationWithEntity)
 
-            assert(!mutationEvent.relatedAttribute || mutationEvent.relatedAttribute.every((r: any, index: number) => r===this.avgFieldPath[index]), 'related update event should not trigger this average.')
-            const oldRecord = mutationEvent.relatedMutationEvent!.oldRecord 
-            const oldValue = this.resolveAvgField(oldRecord, this.avgFieldPath.slice(mutationEvent.relatedAttribute!.length, Infinity));
+            // FIXME 守卫条件有问题。
+            // assert(!mutationEvent.relatedAttribute || mutationEvent.relatedAttribute.every((r: any, index: number) => r===this.avgFieldPath[index]), 'related update event should not trigger this average.')
+            // 因为这里的事件有可能是关联关系，也可能是关联实体。
+
+            const oldRecord = structuredClone(newRelationWithEntity)
+            setByPath(oldRecord, mutationEvent.relatedAttribute.slice(2), relatedMutationEvent.oldRecord)
+            const oldValue = this.resolveAvgField(oldRecord);
             
             // 更新 sum 和 count
             if (oldValue !== null && newValue !== null) {

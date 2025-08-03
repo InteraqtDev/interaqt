@@ -381,6 +381,29 @@ export class EntityToTableMap {
         }
         
     }
+    getReversePath(namePath: string[]): string[] {
+        const namePaths = new Array(namePath.length-1).fill(0).map((_, i) => namePath.slice(0, i+2))
+        const attributeInfos = namePaths.map(p => this.getInfoByPath(p)).reverse()
+
+        assert(attributeInfos[0]?.isRecord, `last attribute in path is not a record ${namePath.join('.')}`)
+        // 考虑了路径上有 & 的问题
+        const result:string[] = [attributeInfos[0]!.recordName!]
+        let linkSymbolOccur = false
+        for (const info of attributeInfos) {
+            if (linkSymbolOccur) {
+                result.push(info!.isRecordSource() ? 'source' : 'target')
+                linkSymbolOccur = false
+            } else {
+                if (info) {
+                    result.push(info!.getReverseInfo()!.attributeName)
+                } else {
+                    // FIXME 这里判断非常不严谨。目前只有 & 出现的时候，才会出现 undefined。
+                    linkSymbolOccur = true
+                }
+            }
+        }
+        return result
+    }
     groupAttributes(entityName: string, attributeNames: string[]) : [AttributeInfo[], AttributeInfo[], AttributeInfo[]]{
         assert(this.data.records[entityName], `entity ${entityName} not found`)
         const valueAttributes: AttributeInfo[] = []

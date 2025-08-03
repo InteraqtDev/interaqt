@@ -1027,26 +1027,11 @@ describe('Count computed handle', () => {
     expect(engDept1.totalEmployeeCount).toBe(3); // All 3 employees in engineering
     expect(engDept1.activeFullTimeCount).toBe(1); // Only emp1 is active full-time
     
-    // // Debug: Check if relations exist
-    // const allRelations = await system.storage.find('DepartmentEmployee', 
-    //   undefined, 
-    //   undefined, 
-    //   ['source', 'target', 'employmentType', 'isActive']
-    // );
-    // console.log('All DepartmentEmployee relations:', allRelations);
-    
-    // const activeFullTimeRelations = await system.storage.find('ActiveFullTimeRelation',
-    //   undefined,
-    //   undefined,
-    //   ['source', 'target', 'employmentType', 'isActive']
-    // );
-    // console.log('ActiveFullTimeRelation relations:', activeFullTimeRelations);
-    
    
     
     // Check HR department counts
     const hrDept = await system.storage.findOne('Department', 
-      BoolExp.atom({key: 'id', value: ['=', hr.id]}), 
+      MatchExp.atom({key: 'id', value: ['=', hr.id]}), 
       undefined, 
       ['id', 'name', 'totalEmployeeCount', 'activeFullTimeCount']
     );
@@ -1056,22 +1041,19 @@ describe('Count computed handle', () => {
     
     // Update Bob to full-time
     const bobRelation = await system.storage.findOne('DepartmentEmployee',
-      BoolExp.and([
-        MatchExp.atom({key: 'source.id', value: ['=', engineering.id]}),
-        MatchExp.atom({key: 'target.id', value: ['=', emp2.id]})
-      ]),
+      MatchExp.atom({key: 'source.id', value: ['=', engineering.id]}).and({key: 'target.id', value: ['=', emp2.id]}),
       undefined,
       ['id']
     );
     
     await system.storage.update('DepartmentEmployee',
-      BoolExp.atom({key: 'id', value: ['=', bobRelation.id]}),
+      MatchExp.atom({key: 'id', value: ['=', bobRelation.id]}),
       { employmentType: 'full-time' }
     );
     
     // Check updated counts
     const engDept2 = await system.storage.findOne('Department', 
-      BoolExp.atom({key: 'id', value: ['=', engineering.id]}), 
+      MatchExp.atom({key: 'id', value: ['=', engineering.id]}), 
       undefined, 
       ['id', 'name', 'totalEmployeeCount', 'activeFullTimeCount']
     );
@@ -1081,22 +1063,19 @@ describe('Count computed handle', () => {
     
     // Deactivate Alice's employment
     const aliceRelation = await system.storage.findOne('DepartmentEmployee',
-      BoolExp.and([
-        MatchExp.atom({key: 'source.id', value: ['=', engineering.id]}),
-        MatchExp.atom({key: 'target.id', value: ['=', emp1.id]})
-      ]),
+      MatchExp.atom({key: 'source.id', value: ['=', engineering.id]}).and({key: 'target.id', value: ['=', emp1.id]}),
       undefined,
       ['id']
     );
     
     await system.storage.update('DepartmentEmployee',
-      BoolExp.atom({key: 'id', value: ['=', aliceRelation.id]}),
+      MatchExp.atom({key: 'id', value: ['=', aliceRelation.id]}),
       { isActive: false }
     );
     
     // Check counts after deactivation
     const engDept3 = await system.storage.findOne('Department', 
-      BoolExp.atom({key: 'id', value: ['=', engineering.id]}), 
+      MatchExp.atom({key: 'id', value: ['=', engineering.id]}), 
       undefined, 
       ['id', 'name', 'totalEmployeeCount', 'activeFullTimeCount']
     );
@@ -1106,12 +1085,12 @@ describe('Count computed handle', () => {
     
     // Delete Bob's employment relation
     await system.storage.delete('DepartmentEmployee',
-      BoolExp.atom({key: 'id', value: ['=', bobRelation.id]})
+      MatchExp.atom({key: 'id', value: ['=', bobRelation.id]})
     );
     
     // Final check
     const engDept4 = await system.storage.findOne('Department', 
-      BoolExp.atom({key: 'id', value: ['=', engineering.id]}), 
+      MatchExp.atom({key: 'id', value: ['=', engineering.id]}), 
       undefined, 
       ['id', 'name', 'totalEmployeeCount', 'activeFullTimeCount']
     );

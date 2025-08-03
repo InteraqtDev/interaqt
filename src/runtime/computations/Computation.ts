@@ -5,7 +5,7 @@ import {
 } from "@shared";
 import { BoolExp } from "@shared";
 import { Controller } from "../Controller";
-import { AttributeQueryData, MatchExpressionData, ModifierData } from "@storage";
+import { AttributeQueryData, MatchExp, MatchExpressionData, ModifierData } from "@storage";
 import { DICTIONARY_RECORD } from "../System";
 
 // Types from ComputationHandle.ts
@@ -89,13 +89,13 @@ export class RecordBoundState<T> {
 
     }
     async set(record:any, value: any): Promise<T> {
-        await this.controller.system.storage.update(this.record!, BoolExp.atom({key: 'id', value: ['=', record.id]}), {[this.key]: value})
+        await this.controller.system.storage.update(this.record!, MatchExp.atom({key: 'id', value: ['=', record.id]}), {[this.key]: value})
         return value
     }
     async get(record:any):Promise<T> {
         // TODO 如果 record 上不存在就重新查询
         if (record[this.key] === undefined) {
-            const fullRecord = await this.controller.system.storage.findOne(this.record!, BoolExp.atom({key: 'id', value: ['=', record.id]}), undefined, [this.key])
+            const fullRecord = await this.controller.system.storage.findOne(this.record!, MatchExp.atom({key: 'id', value: ['=', record.id]}), undefined, [this.key])
             return fullRecord[this.key] as T
         }
         return record[this.key] as T

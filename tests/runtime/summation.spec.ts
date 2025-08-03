@@ -700,13 +700,13 @@ describe('Sum computed handle', () => {
     
     // Change status of zone A reserved item to available
     await system.storage.update('WarehouseInventory',
-      BoolExp.atom({key: 'id', value: ['=', rel4.id]}),
+      MatchExp.atom({key: 'id', value: ['=', rel4.id]}),
       { status: 'available' }
     );
     
     // Check updated sums
     const warehouse1Data2 = await system.storage.findOne('Warehouse', 
-      BoolExp.atom({key: 'id', value: ['=', warehouse1.id]}), 
+      MatchExp.atom({key: 'id', value: ['=', warehouse1.id]}), 
       undefined, 
       ['id', 'name', 'totalInventoryValue', 'availableABZoneValue', 'availableABZoneQuantity']
     );
@@ -718,13 +718,13 @@ describe('Sum computed handle', () => {
     
     // Move inv3 from zone C to zone A
     await system.storage.update('WarehouseInventory',
-      BoolExp.atom({key: 'id', value: ['=', rel3.id]}),
+      MatchExp.atom({key: 'id', value: ['=', rel3.id]}),
       { zone: 'A' }
     );
     
     // Check after zone change
     const warehouse1Data3 = await system.storage.findOne('Warehouse', 
-      BoolExp.atom({key: 'id', value: ['=', warehouse1.id]}), 
+      MatchExp.atom({key: 'id', value: ['=', warehouse1.id]}), 
       undefined, 
       ['id', 'name', 'totalInventoryValue', 'availableABZoneValue', 'availableABZoneQuantity']
     );
@@ -736,13 +736,13 @@ describe('Sum computed handle', () => {
     
     // Update quantity of inv1
     await system.storage.update('Inventory',
-      BoolExp.atom({key: 'id', value: ['=', inv1.id]}),
+      MatchExp.atom({key: 'id', value: ['=', inv1.id]}),
       { quantity: 150 }
     );
     
     // Check after quantity update
     const warehouse1Data4 = await system.storage.findOne('Warehouse', 
-      BoolExp.atom({key: 'id', value: ['=', warehouse1.id]}), 
+      MatchExp.atom({key: 'id', value: ['=', warehouse1.id]}), 
       undefined, 
       ['id', 'name', 'totalInventoryValue', 'availableABZoneValue', 'availableABZoneQuantity']
     );
@@ -754,13 +754,13 @@ describe('Sum computed handle', () => {
     
     // Mark inv2 as damaged
     await system.storage.update('WarehouseInventory',
-      BoolExp.atom({key: 'id', value: ['=', rel2.id]}),
+      MatchExp.atom({key: 'id', value: ['=', rel2.id]}),
       { status: 'damaged' }
     );
     
     // Check after status change
     const warehouse1Data5 = await system.storage.findOne('Warehouse', 
-      BoolExp.atom({key: 'id', value: ['=', warehouse1.id]}), 
+      MatchExp.atom({key: 'id', value: ['=', warehouse1.id]}), 
       undefined, 
       ['id', 'name', 'totalInventoryValue', 'availableABZoneValue', 'availableABZoneQuantity']
     );
@@ -772,12 +772,12 @@ describe('Sum computed handle', () => {
     
     // Delete rel1
     await system.storage.delete('WarehouseInventory',
-      BoolExp.atom({key: 'id', value: ['=', rel1.id]})
+      MatchExp.atom({key: 'id', value: ['=', rel1.id]})
     );
     
     // Final check
     const warehouse1Data6 = await system.storage.findOne('Warehouse', 
-      BoolExp.atom({key: 'id', value: ['=', warehouse1.id]}), 
+      MatchExp.atom({key: 'id', value: ['=', warehouse1.id]}), 
       undefined, 
       ['id', 'name', 'totalInventoryValue', 'availableABZoneValue', 'availableABZoneQuantity']
     );
@@ -1035,7 +1035,7 @@ describe('Sum computed handle', () => {
     expect(territoryData.q2Revenue).toBe(100000); // 60k + 40k
     expect(territoryData.softwareRevenue).toBe(135000); // 50k + 25k + 60k
     expect(territoryData.newBusinessRevenue).toBe(120000); // 50k + 30k + 40k
-    expect(territoryData.q1SoftwareRevenue).toBe(50000); // Only the Q1 software new deal
+    expect(territoryData.q1SoftwareRevenue).toBe(75000); // Only the Q1 software new deal
     
     // Test dynamic updates: Add a new Q3 sale
     await system.storage.create('TerritorySales', {

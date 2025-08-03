@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { Controller, MonoSystem, Property, Entity, Every, Dictionary, BoolExp, Any, Relation, MatchExp, DICTIONARY_RECORD, KlassByName } from 'interaqt';
+import { Controller, MonoSystem, Property, Entity, Every, Dictionary, BoolExp, Any, Relation, MatchExp, DICTIONARY_RECORD, KlassByName, PGLiteDB } from 'interaqt';
 
 // 创建简单测试环境，直接测试 EveryHandle 的具体方法
 describe('Every and Any computed handle', () => {
@@ -706,7 +706,7 @@ describe('Every and Any computed handle', () => {
     
     // Check initial state
     const team1Data = await system.storage.findOne('Team', 
-      BoolExp.atom({key: 'id', value: ['=', team1.id]}), 
+      MatchExp.atom({key: 'id', value: ['=', team1.id]}), 
       undefined, 
       ['id', 'name', 'allPlayersEligible', 'allStartersEligible']
     );
@@ -718,22 +718,19 @@ describe('Every and Any computed handle', () => {
     
     // Make Tom a starter
     const tomRelation = await system.storage.findOne('TeamPlayer',
-      BoolExp.and([
-        MatchExp.atom({key: 'source.id', value: ['=', team1.id]}),
-        MatchExp.atom({key: 'target.id', value: ['=', player3.id]})
-      ]),
+      MatchExp.atom({key: 'source.id', value: ['=', team1.id]}).and({key: 'target.id', value: ['=', player3.id]}),
       undefined,
       ['id']
     );
     
     await system.storage.update('TeamPlayer',
-      BoolExp.atom({key: 'id', value: ['=', tomRelation.id]}),
+      MatchExp.atom({key: 'id', value: ['=', tomRelation.id]}),
       { role: 'starter' }
     );
     
     // Check after role change
     const team1Data2 = await system.storage.findOne('Team', 
-      BoolExp.atom({key: 'id', value: ['=', team1.id]}), 
+      MatchExp.atom({key: 'id', value: ['=', team1.id]}), 
       undefined, 
       ['id', 'name', 'allPlayersEligible', 'allStartersEligible']
     );
@@ -745,13 +742,13 @@ describe('Every and Any computed handle', () => {
     
     // Make Tom eligible
     await system.storage.update('Player',
-      BoolExp.atom({key: 'id', value: ['=', player3.id]}),
+      MatchExp.atom({key: 'id', value: ['=', player3.id]}),
       { isEligible: true }
     );
     
     // Check after eligibility change
     const team1Data3 = await system.storage.findOne('Team', 
-      BoolExp.atom({key: 'id', value: ['=', team1.id]}), 
+      MatchExp.atom({key: 'id', value: ['=', team1.id]}), 
       undefined, 
       ['id', 'name', 'allPlayersEligible', 'allStartersEligible']
     );
@@ -763,13 +760,13 @@ describe('Every and Any computed handle', () => {
     
     // Deactivate Mike
     await system.storage.update('TeamPlayer',
-      BoolExp.atom({key: 'id', value: ['=', mikeRelation.id]}),
+      MatchExp.atom({key: 'id', value: ['=', mikeRelation.id]}),
       { isActive: false }
     );
     
     // Check after deactivation
     const team1Data4 = await system.storage.findOne('Team', 
-      BoolExp.atom({key: 'id', value: ['=', team1.id]}), 
+      MatchExp.atom({key: 'id', value: ['=', team1.id]}), 
       undefined, 
       ['id', 'name', 'allPlayersEligible', 'allStartersEligible']
     );
@@ -1133,7 +1130,7 @@ describe('Every and Any computed handle', () => {
                       highScoreRelation, morningComprehensiveRelation];
     
     // Setup system and controller
-    const system = new MonoSystem();
+    const system = new MonoSystem(new PGLiteDB());
     system.conceptClass = KlassByName;
     const controller = new Controller({
         system: system,
@@ -1224,12 +1221,12 @@ describe('Every and Any computed handle', () => {
     );
     
     // Every returns 0 when false, 1 when true
-    expect(factoryData.allBatchesPassedQC).toBe(0); // batch4 failed
+    expect(factoryData.allBatchesPassedQC).toBe(false); // batch4 failed
     // Now filtered relations work correctly
-    expect(factoryData.allMorningShiftPassed).toBe(1); // batch1 and batch2 both passed
-    expect(factoryData.allComprehensiveInspectionsPassed).toBe(1); // batch1 and batch3 both passed
-    expect(factoryData.allHighScoreBatchesPassed).toBe(1); // batch1(95) and batch3(92) both passed
-    expect(factoryData.morningComprehensiveAllPassed).toBe(1); // only batch1, and it passed
+    expect(factoryData.allMorningShiftPassed).toBe(true); // batch1 and batch2 both passed
+    expect(factoryData.allComprehensiveInspectionsPassed).toBe(true); // batch1 and batch3 both passed
+    expect(factoryData.allHighScoreBatchesPassed).toBe(true); // batch1(95) and batch3(92) both passed
+    expect(factoryData.morningComprehensiveAllPassed).toBe(true); // only batch1, and it passed
     
     // Test dynamic updates: Fix the failed batch
     await system.storage.update('FactoryBatch',
@@ -1246,7 +1243,7 @@ describe('Every and Any computed handle', () => {
     );
     
     // Every returns 1 when true due to computation implementation
-    expect(factoryDataUpdated.allBatchesPassedQC).toBe(1); // Now all pass
+    expect(factoryDataUpdated.allBatchesPassedQC).toBe(true); // Now all pass
     
     // Add a new failing morning shift batch
     const batch5 = await system.storage.create('ProductBatch', { 
@@ -1273,7 +1270,7 @@ describe('Every and Any computed handle', () => {
     );
     
     // Every returns 0 when false
-    expect(factoryDataFinal.allBatchesPassedQC).toBe(0); // batch5 failed
+    expect(factoryDataFinal.allBatchesPassedQC).toBe(false); // batch5 failed
     // Morning shift now includes batch5 which failed
-    expect(factoryDataFinal.allMorningShiftPassed).toBe(0); // batch5 failed
+    expect(factoryDataFinal.allMorningShiftPassed).toBe(false); // batch5 failed
   }); 

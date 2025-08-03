@@ -288,7 +288,6 @@ export class Scheduler {
     async setupStateDefaultValues() {
         for(const computation of this.computations) {
             const computationHandle = computation as Computation
-            // TODO 这里 createState 要放到 setup 前面，因为可能会修改 entity、relation ???
             // 1. 创建计算所需要的 state
             if (computationHandle.state) {
                 for(const state of Object.values(computationHandle.state)) {

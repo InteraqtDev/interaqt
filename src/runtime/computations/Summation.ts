@@ -162,7 +162,7 @@ export class PropertySumHandle implements DataBasedComputation {
         
         for (const relationItem of relations) {
             // 根据 attributeQuery 的结构获取值
-            let value = this.resolveSumField(relationItem, this.sumFieldPath)
+            let value = this.resolveSumField(relationItem['&'], this.sumFieldPath)
             sum += value;
         }
         

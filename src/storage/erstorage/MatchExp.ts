@@ -4,6 +4,7 @@ import {assert} from "../utils.js";
 import {RecordQueryTree} from "./RecordQuery.js";
 import {Database} from "@runtime";
 import {PlaceholderGen} from "./RecordQueryAgent.js";
+import { AttributeInfo } from "./AttributeInfo.js";
 
 export type MatchAtom = { key: string, value: [string, any], isReferenceValue?: boolean }
 export type MatchExpressionData = BoolExp<MatchAtom>
@@ -71,12 +72,20 @@ export class MatchExp {
     }
 
     public xToOneQueryTree: RecordQueryTree
-
-    constructor(public entityName: string, public map: EntityToTableMap, public data?: MatchExpressionData, public contextRootEntity?: string, public fromRelation?: boolean) {
+    public data?: MatchExpressionData
+    public entityName: string
+    constructor(entityName: string, public map: EntityToTableMap, data?: MatchExpressionData, public contextRootEntity?: string, public fromRelation?: boolean) {
+        assert(!data || data instanceof BoolExp, `match data is not a BoolExpression instance, you passed: ${this.data}`)
+        const recordInfo = this.map.getRecordInfo(entityName)
+        this.entityName = recordInfo.isFilteredEntity || recordInfo.isFilteredRelation ? recordInfo.sourceRecordName! : entityName
+        const isFiltered = recordInfo.isFilteredEntity || recordInfo.isFilteredRelation
         this.xToOneQueryTree = new RecordQueryTree(this.entityName, this.map)
-        if (this.data) {
-            assert(this.data instanceof BoolExp, `match data is not a BoolExpression instance, you passed: ${this.data}`)
-            this.data = this.convertFilteredRelation(this.data)
+        let combinedData = data
+        if (isFiltered) {
+            combinedData = data ? recordInfo.matchExpression!.and(data) : recordInfo.matchExpression
+        }
+        if (combinedData) {
+            this.data = this.convertFilteredRelation(combinedData)
             this.buildQueryTree(this.data, this.xToOneQueryTree)
         }
     }
@@ -95,29 +104,44 @@ export class MatchExp {
             // variable
             const matchAttributePath = (matchData.data.key as string).split('.')
             const namePath = [this.entityName].concat(matchAttributePath)
-            const attributeInfo = this.map.getInfoByPath(namePath)!
-            if (!attributeInfo.isRecord) {
+
+            // 这里整条路径上都要检测有没有 filtered relation 的属性。
+            const namePaths = new Array(namePath.length-1).fill(0).map((_, i) => namePath.slice(0, i+2))
+            const attributeInfoAndPaths: {info: AttributeInfo|undefined, path: string[], resolvedPath: string[]}[] = namePaths.map(p => ({info: this.map.getInfoByPath(p), path: p, resolvedPath: []}))
+            attributeInfoAndPaths.forEach((item, i) => {
+                const {info, path} = item
+                item.resolvedPath = [
+                    ...attributeInfoAndPaths.at(i-1)!.resolvedPath,
+                    info?.isLinkFiltered() ? info.getSourceAttributeInfo().attributeName : path.at(-1)!
+                ]
+            })
+
+
+            if (attributeInfoAndPaths.every(({info}) => !info?.isLinkFiltered())) {
                 return matchData
             }
 
-            const linkInfo = attributeInfo.getLinkInfo()
-            if (!attributeInfo.isLinkFiltered()) {
-                return matchData
+            // 先处理本来的条件作为 baseMatchExpAtom，再一个一个处理 filtered relation 的属性。
+            const resolvedNamePath = [
+                ...attributeInfoAndPaths.at(-1)!.resolvedPath
+            ]
+
+            let baseMatchExpAtom = MatchExp.atom({key:resolvedNamePath.join('.'), value: matchData.data.value})
+
+            for (const {info, path, resolvedPath} of attributeInfoAndPaths) {
+                if (info?.isLinkFiltered()) {
+                    const linkInfo = info.getLinkInfo()
+                    const linkMatchExp = new MatchExp(linkInfo.name, this.map, linkInfo.getMatchExpression())
+                    // 需要完全反转 rebase。
+                    const reversePath = this.map.getReversePath([this.entityName, ...resolvedPath])
+                    const rebasePathStart = info.isRecordSource() ? 'source' : 'target'
+                    // 注意 reversePath 第一个是 entityName，不需要了。第二个是指向的具体 record，也不要了，等同于 target/source 指向的对象。
+                    const rebasePath = [rebasePathStart, ...reversePath.slice(2)]
+                    const rebasedLinkMatch = linkMatchExp.rebase(rebasePath.join('.'))
+                    baseMatchExpAtom = baseMatchExpAtom.and(rebasedLinkMatch.data)
+                }
             }
-
-            // filtered relation 的情况
-            const sourceAttributeInfo = attributeInfo.getSourceAttributeInfo()
-            // 1. 条件中的 attribute 要替换成 原本的名称。
-
-            const baseNamePath = [this.entityName].concat(matchAttributePath.slice(0, -1), sourceAttributeInfo.attributeName)
-            const baseMatchExpAtom = MatchExp.atom({key:baseNamePath.join('.'), value: matchData.data.value})
-            // 2. 条件要和 inkMatchExpression 合并
-            const linkMatchExpression = attributeInfo.getMatchExpression()
-            const linkMatchExp = new MatchExp(linkInfo.name, this.map, linkMatchExpression)
-            // FIXME 还要不要递归地处理有多个 filtered relation 的情况？linkMatchExp 里面也有可能存在 filtered relation。
-            const rebasedMatchExp = linkMatchExp.rebase(linkInfo.isFromSource ? 'source' : 'target')
-
-            return baseMatchExpAtom.and(rebasedMatchExp.data)
+            return baseMatchExpAtom
         }
     }
     buildQueryTree(matchData: MatchExpressionData, recordQueryTree: RecordQueryTree) {

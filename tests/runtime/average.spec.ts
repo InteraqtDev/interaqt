@@ -664,10 +664,7 @@ describe('Average computed handle', () => {
     
     // Delete a relation
     const sale1Relation = await system.storage.findOne('StoreSale',
-      BoolExp.and([
-        MatchExp.atom({key: 'source.id', value: ['=', store1.id]}),
-        MatchExp.atom({key: 'target.id', value: ['=', sale1.id]})
-      ]),
+      MatchExp.atom({key: 'source.id', value: ['=', store1.id]}).and({key: 'target.id', value: ['=', sale1.id]}),
       undefined,
       ['id']
     );

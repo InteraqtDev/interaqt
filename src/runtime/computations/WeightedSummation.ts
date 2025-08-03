@@ -187,7 +187,7 @@ export class PropertyWeightedSummationHandle implements DataBasedComputation {
             const oldResult = await this.state!.itemResult.get(relatedMutationEvent.oldRecord);
             const newValueAndWeight = this.matchRecordToWeight.call(this.controller, newRelationRecord);
             const newResult = newValueAndWeight.weight * newValueAndWeight.value;
-                
+            await this.state!.itemResult.set(newRelationRecord, newResult);
             summation = summation - oldResult + newResult;
         }
 

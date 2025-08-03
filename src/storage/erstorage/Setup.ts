@@ -296,8 +296,6 @@ export class DBSetup {
             relType: [isSource ? targetRelType : sourceRelType,'1'],
             isSourceRelation: true,
             mergedTo: 'combined',
-            // filtered relation 就会有这个
-            matchExpression: relationWithProps.matchExpression
         } as LinkMapItem
     }
     getRelationNameOfRelationAndEntity(relationName: string, isSource: boolean) {
@@ -338,7 +336,7 @@ export class DBSetup {
             assert(!relationData.isSourceRelation || (relationData.sourceProperty === 'source' || relationData.sourceProperty === 'target'), 'virtual relation sourceProperty should only be source/target')
             
             // 检查是否是 filtered relation
-            const relationRecord = this.map.records[relation.split('_source')[0].split('_target')[0]]
+            const relationRecord = this.map.records[relation]
             const isFilteredRelation = relationRecord && !!relationRecord.sourceRelationName
             const sourceLink = isFilteredRelation ? this.map.links[relationRecord.sourceRelationName!]! : undefined
             

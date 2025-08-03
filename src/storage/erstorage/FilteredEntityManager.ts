@@ -289,11 +289,14 @@ export class FilteredEntityManager {
         recordId: string,
         events: RecordMutationEvent[]
     ): Promise<void> {
+        const recordInfo = this.map.getRecordInfo(dependency.sourceEntityName)
         // 获取记录当前的 __filtered_entities 状态
         const currentRecord = await this.queryAgent.findRecords(
             RecordQuery.create(dependency.sourceEntityName, this.map, {
                 matchExpression: MatchExp.atom({ key: 'id', value: ['=', recordId] }),
-                attributeQuery: ['*']
+                attributeQuery: recordInfo.isRelation ? 
+                    ['*', ['target', {attributeQuery: ['*']}], ['source', {attributeQuery: ['*']}]] : 
+                    ['*']
             }),
             `get current filtered entity flags for ${dependency.sourceEntityName}:${recordId}`
         )
