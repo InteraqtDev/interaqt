@@ -215,22 +215,21 @@ export class MonoSystem implements System {
         states.forEach(({dataContext, state}) => {
             Object.entries(state).forEach(([stateName, stateItem]) => {
                 if (stateItem instanceof RecordBoundState) { 
-                    // FIXME没有考虑到绑定在 filtered entity 和 filtered relation 上的 state
                     // FIXME 因为一个 entity 可以有多个 filtered entity，所以未来还要考虑 state key 重名问题。
-                    let entity: EntityInstance|RelationInstance = entities.find(entity => entity.name === stateItem.record)! || relations.find(entity => entity.name === stateItem.record)!
+                    let rootEntity: EntityInstance|RelationInstance = entities.find(entity => entity.name === stateItem.record)! || relations.find(entity => entity.name === stateItem.record)!
 
-                    // FIXME 没有考虑递归的问题。
-                    if (entity.sourceEntity || (entity as RelationInstance).sourceRelation) {
-                        entity = entity.sourceEntity || (entity as RelationInstance).sourceRelation!
+                    // 考虑 filtered entity 和 filtered relation 的级联问题，这里要找到根
+                    while ((rootEntity as EntityInstance).sourceEntity || (rootEntity as RelationInstance).sourceRelation) {
+                        rootEntity = (rootEntity as EntityInstance).sourceEntity || (rootEntity as RelationInstance).sourceRelation!
                     }
 
                     if (stateItem.defaultValue instanceof Property) {
                         // CAUTION 特别注意这里改了 name
                         stateItem.defaultValue.name = stateItem.key
-                        entity.properties.push(stateItem.defaultValue)
+                        rootEntity.properties.push(stateItem.defaultValue)
                     } else {
                         const defaultValuetype = typeof stateItem.defaultValue
-                        entity.properties.push(Property.create({
+                        rootEntity.properties.push(Property.create({
                             name: stateItem.key,
                             type: defaultValuetype,
                             // 应该系统定义
