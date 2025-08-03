@@ -180,10 +180,13 @@ export class EntityToTableMap {
                 attributeData = undefined
             } else {
                 let data = this.data.records[currentEntity]
-                if (data.isFilteredRelation) {
-                    data = this.data.records[data.sourceRelationName!]
-                } else if (data.isFilteredEntity) {
-                    data = this.data.records[data.sourceRecordName!]
+                // 递归查找根源实体
+                while (data.isFilteredRelation || data.isFilteredEntity) {
+                    if (data.isFilteredRelation) {
+                        data = this.data.records[data.sourceRelationName!]
+                    } else if (data.isFilteredEntity) {
+                        data = this.data.records[data.sourceRecordName!]
+                    }
                 }
                 attributeData = data!.attributes[currentAttribute!] as RecordAttribute
                 assert(!!attributeData, `attribute ${currentAttribute} not found in ${currentEntity}. namePath: ${namePath.join('.')}`)

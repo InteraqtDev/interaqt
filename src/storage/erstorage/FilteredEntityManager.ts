@@ -226,13 +226,41 @@ export class FilteredEntityManager {
     // ============ 级联事件处理功能 ============
     
     /**
-     * 获取基于指定源实体的所有 filtered entities
+     * 获取基于指定源实体的所有 filtered entities（包括级联的）
      */
     getFilteredEntitiesForSource(sourceEntityName: string): Array<{ name: string, matchExpression: any }> {
-        return this.map.getRecordInfo(sourceEntityName).filteredBy?.map(recordInfo => ({
-            name: recordInfo.name,
-            matchExpression: recordInfo.matchExpression
-        })) || []
+        const result: Array<{ name: string, matchExpression: any }> = [];
+        const resultSet = new Set<string>();
+        const visited = new Set<string>();
+        
+        const collectFiltered = (entityName: string) => {
+            if (visited.has(entityName)) return;
+            visited.add(entityName);
+            
+            const recordInfo = this.map.getRecordInfo(entityName);
+            const directFiltered = recordInfo.filteredBy || [];
+            
+            for (const filtered of directFiltered) {
+                // 避免重复添加
+                if (!resultSet.has(filtered.name)) {
+                    resultSet.add(filtered.name);
+                    
+                    // 使用预计算的值
+                    const filteredRecordInfo = this.map.getRecordInfo(filtered.name);
+                    const combinedExpression = filteredRecordInfo.data.resolvedMatchExpression;
+                    
+                    result.push({
+                        name: filtered.name,
+                        matchExpression: combinedExpression
+                    });
+                }
+                // 递归收集基于这个 filtered entity 的其他 filtered entities
+                collectFiltered(filtered.name);
+            }
+        };
+        
+        collectFiltered(sourceEntityName);
+        return result;
     }
     
     /**
@@ -246,6 +274,50 @@ export class FilteredEntityManager {
         isCreation?: boolean, 
         changedFields?: string[]
     ): Promise<void> {
+        // 对于创建操作，直接检查所有 filtered entities
+        if (isCreation && originalRecord) {
+            const filteredEntities = this.getFilteredEntitiesForSource(entityName);
+            const flags: { [key: string]: boolean } = {};
+            
+            for (const filteredEntity of filteredEntities) {
+                const matchesFilter = await this.checkRecordMatchesFilter(
+                    recordId,
+                    entityName,
+                    filteredEntity.matchExpression
+                );
+                
+                if (matchesFilter) {
+                    flags[filteredEntity.name] = true;
+                    events.push({
+                        type: 'create',
+                        recordName: filteredEntity.name,
+                        record: { ...originalRecord, id: recordId }
+                    });
+                }
+            }
+            
+            // 更新 __filtered_entities 字段
+            if (Object.keys(flags).length > 0) {
+                const recordInfo = this.map.getRecordInfo(entityName);
+                const filteredEntitiesAttribute = recordInfo.data.attributes['__filtered_entities'];
+                
+                if (filteredEntitiesAttribute && (filteredEntitiesAttribute as any).field) {
+                    const fieldName = (filteredEntitiesAttribute as any).field;
+                    
+                    await this.queryAgent.updateRecordDataById(
+                        entityName,
+                        { id: recordId },
+                        [{
+                            field: fieldName,
+                            value: JSON.stringify(flags)
+                        }]
+                    );
+                }
+            }
+            
+            return;
+        }
+        
         // 获取所有依赖于这个实体的 filtered entity
         const dependencies = this.getAffectedFilteredEntities(entityName)
         

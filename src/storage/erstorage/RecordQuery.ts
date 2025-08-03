@@ -30,17 +30,26 @@ export class RecordQuery {
     ) {
         const recordInfo = map.getRecordInfo(recordName)
         const isFiltered = recordInfo.isFilteredEntity || recordInfo.isFilteredRelation
-        let baseRecordName = isFiltered ? (recordInfo.isFilteredEntity ? recordInfo.sourceRecordName! : recordInfo.sourceRelationName!) : recordName
+        
+        // 使用预计算的值
+        let baseRecordName = recordName;
+        if (isFiltered ) {
+            baseRecordName = recordInfo.data.resolvedSourceRecordName!;
+        } 
 
         
         // CAUTION 因为合表后可能用关联数据匹配到行。
         const inputMatch = new MatchExp(baseRecordName, map, data.matchExpression, contextRootEntity)
-        const matchExpression = allowNull ? inputMatch: inputMatch.and({
+        let matchExpression = allowNull ? inputMatch: inputMatch.and({
             key: 'id',
             value: ['not', null]
         })
 
-        const resolvedMatchExpression = isFiltered ? matchExpression.and(new MatchExp(baseRecordName, map, recordInfo.matchExpression)) : matchExpression
+        // 使用预计算的合并后的 matchExpression
+        let resolvedMatchExpression = matchExpression;
+        if (isFiltered) {
+            resolvedMatchExpression = matchExpression.and(new MatchExp(baseRecordName, map, recordInfo.data.resolvedMatchExpression));
+        }
 
         return new RecordQuery(
             baseRecordName,

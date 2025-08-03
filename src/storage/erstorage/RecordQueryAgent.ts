@@ -110,10 +110,14 @@ export class RecordQueryAgent {
         
         for (const [recordName, recordData] of Object.entries(records)) {
             if (recordData.sourceRecordName && recordData.matchExpression) {
+                // 使用预计算的值
+                const rootEntityName = recordData.resolvedSourceRecordName || recordData.sourceRecordName;
+                const combinedExpression = recordData.resolvedMatchExpression || recordData.matchExpression;
+                
                 this.filteredEntityManager.analyzeDependencies(
                     recordName,
-                    recordData.sourceRecordName,
-                    recordData.matchExpression
+                    rootEntityName,
+                    combinedExpression
                 )
             }
         }

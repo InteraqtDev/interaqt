@@ -178,7 +178,23 @@ export class DBSetup {
     }
     
     private currentFilteredEntityName?: string;
-
+    /**
+     * 递归收集所有依赖于给定实体的 filtered entities（包括级联的）
+     */
+    private collectAllFilteredEntities(entity: EntityInstance | RelationInstance): (EntityInstance | RelationInstance)[] {
+        const directFiltered = [...this.entities, ...this.relations].filter(e => 
+            (e as any).sourceEntity === entity || (e as any).sourceRelation === entity
+        );
+        
+        const allFiltered: (EntityInstance | RelationInstance)[] = [...directFiltered];
+        
+        // 递归查找基于 filtered entity 的其他 filtered entities
+        for (const filtered of directFiltered) {
+            allFiltered.push(...this.collectAllFilteredEntities(filtered));
+        }
+        
+        return allFiltered;
+    }
     createRecord(entity: EntityInstance | RelationInstance, isRelation? :boolean) {
         const attributes: {[k:string]: Omit<ValueAttribute, 'field'>} = Object.fromEntries(entity.properties.map((property:PropertyInstance) => {
             const prop = property
@@ -207,10 +223,8 @@ export class DBSetup {
             fieldType: this.database!.mapToDBFieldType('pk')
         }
 
-        // 添加 __filtered_entities 字段到需要的实体或关系
-        const filteredBy = [...this.entities, ...this.relations].filter(e => 
-            (e as any).sourceEntity === entity || (e as any).sourceRelation === entity
-        );
+        // 使用递归方法收集所有依赖的 filtered entities
+        const filteredBy = this.collectAllFilteredEntities(entity);
         
         if (filteredBy.length) {
             attributes['__filtered_entities'] = {
@@ -225,6 +239,35 @@ export class DBSetup {
 
         const { sourceEntity, matchExpression, sourceRelation } = (entity as any) || {}
 
+        // 计算 resolved 字段
+        let resolvedSourceRecordName: string | undefined;
+        let resolvedMatchExpression: MatchExpressionData | undefined;
+        
+        if (sourceEntity || sourceRelation) {
+            // 递归查找最底层的源实体/关系
+            let currentEntity = sourceEntity || sourceRelation;
+            let currentMatchExpression = matchExpression || (entity as any).matchExpression;
+            const matchExpressions: MatchExpressionData[] = [currentMatchExpression];
+            
+            while ((currentEntity as any).sourceEntity || (currentEntity as any).sourceRelation) {
+                const nextEntity = (currentEntity as any).sourceEntity || (currentEntity as any).sourceRelation;
+                const nextMatchExpression = (currentEntity as any).matchExpression;
+                if (nextMatchExpression) {
+                    matchExpressions.push(nextMatchExpression);
+                }
+                currentEntity = nextEntity;
+            }
+            
+            resolvedSourceRecordName = currentEntity.name;
+            
+            // 合并所有 matchExpression
+            if (matchExpressions.length > 0) {
+                resolvedMatchExpression = matchExpressions[0];
+                for (let i = 1; i < matchExpressions.length; i++) {
+                    resolvedMatchExpression = resolvedMatchExpression.and(matchExpressions[i]);
+                }
+            }
+        }
 
         // const sourceRecord = (sourceEntity||sourceRelation) ? this.map.records[sourceEntity?.name || sourceRelation!.name!]! : undefined
         // const finalAttributes = sourceRecord ? {...sourceRecord.attributes, ...attributes} : attributes
@@ -235,6 +278,8 @@ export class DBSetup {
             isFilteredEntity: !!sourceEntity,
             sourceRecordName: sourceEntity?.name || sourceRelation?.name,
             matchExpression: matchExpression || (sourceRelation && (entity as any).matchExpression),
+            resolvedSourceRecordName,
+            resolvedMatchExpression,
             filteredBy: filteredBy.length ? filteredBy.map(e => e.name) : undefined,
             // 添加 filtered relation 的标记
             isFilteredRelation:!!sourceRelation,
