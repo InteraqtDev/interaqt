@@ -274,7 +274,7 @@ describe('Any computed handle', () => {
     // Create filtered relation for active high-priority tasks
     const activeHighPriorityRelation = Relation.create({
       name: 'ActiveHighPriorityRelation',
-      sourceRelation: projectTaskRelation,
+      baseRelation: projectTaskRelation,
       sourceProperty: 'activeHighPriorityTasks',
       targetProperty: 'activeHighPriorityProjects',
       matchExpression: MatchExp.atom({

@@ -34,7 +34,7 @@ export class RecordQuery {
         // 使用预计算的值
         let baseRecordName = recordName;
         if (isFiltered ) {
-            baseRecordName = recordInfo.data.resolvedSourceRecordName!;
+            baseRecordName = recordInfo.data.resolvedBaseRecordName!;
         } 
 
         

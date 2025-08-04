@@ -136,9 +136,9 @@ export class AttributeQuery {
                 // 在这里判断 filtered relation
                 if(attributeInfo.isLinkFiltered()) {
                     // filtered relation 的 attribute。这里需要重新构建 subQueryData，要加上基于关系的 MatchExp。
-                    relatedAttributeName = attributeInfo.getSourceAttributeInfo().attributeName
+                    relatedAttributeName = attributeInfo.getBaseAttributeInfo().attributeName
                     const subMatchExp = (subQueryData as RecordQueryData).matchExpression
-                    const linkInfo = attributeInfo.getLinkInfo().getSourceLinkInfo()
+                    const linkInfo = attributeInfo.getLinkInfo().getBaseLinkInfo()
                     const filteredRelationMatchExp = new MatchExp(linkInfo.name, this.map, attributeInfo.getMatchExpression())
                     const rebasedMatchExp = filteredRelationMatchExp.rebase(attributeInfo.isRecordSource() ? 'target' : 'source')!
                     const mergedMatchExp = subMatchExp ? rebasedMatchExp.and(subMatchExp.data) : rebasedMatchExp

@@ -109,9 +109,9 @@ export class RecordQueryAgent {
         const records = this.map.data.records
         
         for (const [recordName, recordData] of Object.entries(records)) {
-            if (recordData.sourceRecordName && recordData.matchExpression) {
+            if (recordData.baseRecordName && recordData.matchExpression) {
                 // 使用预计算的值
-                const rootEntityName = recordData.resolvedSourceRecordName || recordData.sourceRecordName;
+                const rootEntityName = recordData.resolvedBaseRecordName || recordData.baseRecordName;
                 const combinedExpression = recordData.resolvedMatchExpression || recordData.matchExpression;
                 
                 this.filteredEntityManager.analyzeDependencies(
@@ -1382,7 +1382,7 @@ WHERE "${recordInfo.idField}" = ${p()}
         
         // 处理 filtered entity 的删除事件
         for (let record of records) {
-            const filteredEntities = this.filteredEntityManager.getFilteredEntitiesForSource(recordName);
+            const filteredEntities = this.filteredEntityManager.getFilteredEntitiesForBase(recordName);
             if (filteredEntities.length > 0 && record.__filtered_entities) {
                 // __filtered_entities 可能已经被解析为对象
                 const currentFlags = typeof record.__filtered_entities === 'string' 

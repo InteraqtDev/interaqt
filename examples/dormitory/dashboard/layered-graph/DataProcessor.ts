@@ -140,7 +140,7 @@ export class EntityManager {
   static getRelationConnections(relations: RelationInstance[]): RelationConnection[] {
     return relations.map(relation => ({
       id: `${(relation.source as EntityInstance).name}-${(relation.target as EntityInstance).name}`,
-      sourceEntity: (relation.source as EntityInstance).name,
+      baseEntity: (relation.source as EntityInstance).name,
       sourceProperty: relation.sourceProperty,
       targetEntity: (relation.target as EntityInstance).name,
       targetProperty: relation.targetProperty,
@@ -153,7 +153,7 @@ export class EntityManager {
 // 关系连接信息接口（用于绘制连线）
 export interface RelationConnection {
   id: string;
-  sourceEntity: string;
+  baseEntity: string;
   sourceProperty: string;
   targetEntity: string;
   targetProperty: string;

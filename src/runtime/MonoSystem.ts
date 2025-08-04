@@ -195,8 +195,8 @@ export class MonoSystem implements System {
         
         // 处理 filtered entity 和 filtered relation
         for(let entity of entities) {
-            if (entity.sourceEntity) {
-                entity.sourceEntity = originalEntityToClonedEntity.get(entity.sourceEntity as EntityInstance)!
+            if (entity.baseEntity) {
+                entity.baseEntity = originalEntityToClonedEntity.get(entity.baseEntity as EntityInstance)!
             }
         }
         for(let relation of relations) {
@@ -206,9 +206,9 @@ export class MonoSystem implements System {
             if (relation.target) {
                 relation.target = originalEntityToClonedEntity.get(relation.target as EntityInstance) || originalRelationToClonedRelation.get(relation.target as RelationInstance)!
             }
-            // 处理 filtered relation 的 sourceRelation
-            if ((relation as any).sourceRelation) {
-                (relation as any).sourceRelation = originalRelationToClonedRelation.get((relation as any).sourceRelation as RelationInstance)!
+            // 处理 filtered relation 的 baseRelation
+            if ((relation as any).baseRelation) {
+                (relation as any).baseRelation = originalRelationToClonedRelation.get((relation as any).baseRelation as RelationInstance)!
             }
         }
         
@@ -219,8 +219,8 @@ export class MonoSystem implements System {
                     let rootEntity: EntityInstance|RelationInstance = entities.find(entity => entity.name === stateItem.record)! || relations.find(entity => entity.name === stateItem.record)!
 
                     // 考虑 filtered entity 和 filtered relation 的级联问题，这里要找到根
-                    while ((rootEntity as EntityInstance).sourceEntity || (rootEntity as RelationInstance).sourceRelation) {
-                        rootEntity = (rootEntity as EntityInstance).sourceEntity || (rootEntity as RelationInstance).sourceRelation!
+                    while ((rootEntity as EntityInstance).baseEntity || (rootEntity as RelationInstance).baseRelation) {
+                        rootEntity = (rootEntity as EntityInstance).baseEntity || (rootEntity as RelationInstance).baseRelation!
                     }
 
                     if (stateItem.defaultValue instanceof Property) {

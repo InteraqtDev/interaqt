@@ -13,7 +13,7 @@ export interface RelationInstance extends IInstance {
   type: string; // '1:1', '1:n', 'n:1', 'n:n'
   computation?: ComputationInstance;
   properties: PropertyInstance[];
-  sourceRelation?: RelationInstance; // for Filtered Relation
+  baseRelation?: RelationInstance; // for Filtered Relation
   matchExpression?: object; // for Filtered Relation
 }
 
@@ -27,7 +27,7 @@ export interface RelationCreateArgs {
   type?: string;
   computation?: ComputationInstance;
   properties?: PropertyInstance[];
-  sourceRelation?: RelationInstance;
+  baseRelation?: RelationInstance;
   matchExpression?: object;
 }
 
@@ -44,7 +44,7 @@ export class Relation implements RelationInstance {
   public type: string;
   public computation?: ComputationInstance;
   public properties: PropertyInstance[];
-  public sourceRelation?: RelationInstance;
+  public baseRelation?: RelationInstance;
   public matchExpression?: object;
   
   // Getter for name that returns computed name if _name is undefined
@@ -65,21 +65,21 @@ export class Relation implements RelationInstance {
     this._options = options;
     this.uuid = generateUUID(options);
     
-    // For filtered relation, inherit from sourceRelation
-    if (args.sourceRelation) {
+    // For filtered relation, inherit from baseRelation
+    if (args.baseRelation) {
       // Filtered relation must have sourceProperty and targetProperty
       if (!args.sourceProperty || !args.targetProperty) {
         throw new Error('Filtered relation must have sourceProperty and targetProperty');
       }
       
-      this.sourceRelation = args.sourceRelation;
+      this.baseRelation = args.baseRelation;
       this.matchExpression = args.matchExpression;
-      this.source = args.sourceRelation.source;
+      this.source = args.baseRelation.source;
       this.sourceProperty = args.sourceProperty;
-      this.target = args.sourceRelation.target;
+      this.target = args.baseRelation.target;
       this.targetProperty = args.targetProperty;
-      this.isTargetReliance = args.sourceRelation.isTargetReliance;
-      this.type = args.sourceRelation.type;
+      this.isTargetReliance = args.baseRelation.isTargetReliance;
+      this.type = args.baseRelation.type;
       this._name = args.name; // name is optional for filtered relation
     } else {
       // Normal relation, require all fields
@@ -167,7 +167,7 @@ export class Relation implements RelationInstance {
       },
       defaultValue: () => []
     },
-    sourceRelation: {
+    baseRelation: {
       type: 'Relation' as const,
       collection: false as const,
       required: false as const,
@@ -208,7 +208,7 @@ export class Relation implements RelationInstance {
     if (name !== undefined) args.name = name;
     
     if (instance.computation !== undefined) args.computation = instance.computation;
-    if (instance.sourceRelation !== undefined) args.sourceRelation = instance.sourceRelation;
+    if (instance.baseRelation !== undefined) args.baseRelation = instance.baseRelation;
     if (instance.matchExpression !== undefined) args.matchExpression = instance.matchExpression;
     
     const data: SerializedData<RelationCreateArgs> = {
@@ -237,7 +237,7 @@ export class Relation implements RelationInstance {
     if (name !== undefined) args.name = name;
     
     if (instance.computation !== undefined) args.computation = instance.computation; // Note: This is a reference, not a deep clone
-    if (instance.sourceRelation !== undefined) args.sourceRelation = instance.sourceRelation;
+    if (instance.baseRelation !== undefined) args.baseRelation = instance.baseRelation;
     if (instance.matchExpression !== undefined) args.matchExpression = instance.matchExpression;
     
     return new Relation(args, instance._options);

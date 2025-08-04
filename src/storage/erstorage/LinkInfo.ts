@@ -112,10 +112,10 @@ export class LinkInfo {
         return this.data.isFilteredRelation
     }
 
-    getSourceLinkInfo() {
-        assert(this.isFilteredRelation(), `only filtered relation can get source link info`)
-        const sourceLinkName = this.data.sourceLinkName!
-        return new LinkInfo(sourceLinkName, this.map.data.links[sourceLinkName], this.map)
+    getBaseLinkInfo() {
+        assert(this.isFilteredRelation(), `only filtered relation can get base link info`)
+        const baseLinkName = this.data.baseLinkName!
+        return new LinkInfo(baseLinkName, this.map.data.links[baseLinkName], this.map)
     }
     
     getMatchExpression() {

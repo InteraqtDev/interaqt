@@ -116,12 +116,12 @@ describe("Entity System Refactored - compatibility test", () => {
       
       const filteredEntity = Entity.create({
         name: "ActiveUser",
-        sourceEntity: sourceEntity,
+        baseEntity: sourceEntity,
         matchExpression: { status: "active" }
       });
 
       expect(filteredEntity.name).toBe("ActiveUser");
-      expect(filteredEntity.sourceEntity).toBe(sourceEntity);
+      expect(filteredEntity.baseEntity).toBe(sourceEntity);
       expect(filteredEntity.matchExpression).toEqual({ status: "active" });
     });
 

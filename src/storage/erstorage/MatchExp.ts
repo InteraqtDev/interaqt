@@ -77,7 +77,7 @@ export class MatchExp {
     constructor(entityName: string, public map: EntityToTableMap, data?: MatchExpressionData, public contextRootEntity?: string, public fromRelation?: boolean) {
         assert(!data || data instanceof BoolExp, `match data is not a BoolExpression instance, you passed: ${this.data}`)
         const recordInfo = this.map.getRecordInfo(entityName)
-        this.entityName = recordInfo.isFilteredEntity || recordInfo.isFilteredRelation ? recordInfo.sourceRecordName! : entityName
+        this.entityName = recordInfo.isFilteredEntity || recordInfo.isFilteredRelation ? recordInfo.baseRecordName! : entityName
         const isFiltered = recordInfo.isFilteredEntity || recordInfo.isFilteredRelation
         this.xToOneQueryTree = new RecordQueryTree(this.entityName, this.map)
         let combinedData = data
@@ -112,7 +112,7 @@ export class MatchExp {
                 const {info, path} = item
                 item.resolvedPath = [
                     ...attributeInfoAndPaths.at(i-1)!.resolvedPath,
-                    info?.isLinkFiltered() ? info.getSourceAttributeInfo().attributeName : path.at(-1)!
+                    info?.isLinkFiltered() ? info.getBaseAttributeInfo().attributeName : path.at(-1)!
                 ]
             })
 

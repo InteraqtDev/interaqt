@@ -25,7 +25,7 @@ describe('filtered entity test', () => {
         // 创建 filtered entity - ActiveUsers
         const activeUsersEntity = Entity.create({
             name: 'ActiveUsers',
-            sourceEntity: userEntity,
+            baseEntity: userEntity,
             matchExpression: MatchExp.atom({
                 key: 'isActive',
                 value: ['=', true]
@@ -35,7 +35,7 @@ describe('filtered entity test', () => {
         // 创建 filtered entity - YoungUsers  
         const youngUsersEntity = Entity.create({
             name: 'YoungUsers',
-            sourceEntity: userEntity,
+            baseEntity: userEntity,
             matchExpression: MatchExp.atom({
                 key: 'age',
                 value: ['<', 25]
@@ -45,7 +45,7 @@ describe('filtered entity test', () => {
         // 创建 filtered entity - TechYoungUsers (复杂条件)
         const techYoungUsersEntity = Entity.create({
             name: 'TechYoungUsers',
-            sourceEntity: userEntity,
+            baseEntity: userEntity,
             matchExpression: MatchExp.atom({
                 key: 'age',
                 value: ['<', 30]

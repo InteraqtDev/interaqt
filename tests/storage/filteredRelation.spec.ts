@@ -52,7 +52,7 @@ describe('filtered relation', () => {
         // Define filtered relation - only active relationships
         const ActiveUserPostRelation = Relation.create({
             name: 'ActiveUserPostRelation',
-            sourceRelation: UserPostRelation,
+            baseRelation: UserPostRelation,
             sourceProperty: 'activePosts',
             targetProperty: 'activeAuthor',
             matchExpression: MatchExp.atom({
@@ -227,7 +227,7 @@ describe('filtered relation', () => {
         // Filtered relation - only active company-department relationships
         const ActiveCompanyDepartmentRelation = Relation.create({
             name: 'ActiveCompanyDepartmentRelation',
-            sourceRelation: CompanyDepartmentRelation,
+            baseRelation: CompanyDepartmentRelation,
             sourceProperty: 'activeDepartments',
             targetProperty: 'activeCompany',
             matchExpression: MatchExp.atom({
@@ -239,7 +239,7 @@ describe('filtered relation', () => {
         // Filtered relation - only full-time employment relationships
         const FullTimeEmployeeRelation = Relation.create({
             name: 'FullTimeEmployeeRelation',
-            sourceRelation: DepartmentEmployeeRelation,
+            baseRelation: DepartmentEmployeeRelation,
             sourceProperty: 'fullTimeEmployees',
             targetProperty: 'fullTimeDepartment',
             matchExpression: MatchExp.atom({
@@ -465,7 +465,7 @@ describe('filtered relation', () => {
         // Filtered relation - only completed orders with high-value items
         const CompletedHighValueOrderRelation = Relation.create({
             name: 'CompletedHighValueOrderRelation',
-            sourceRelation: OrderProductRelation,
+            baseRelation: OrderProductRelation,
             sourceProperty: 'highValueProducts',
             targetProperty: 'completedOrders',
             matchExpression: MatchExp.atom({
@@ -667,7 +667,7 @@ describe('filtered relation', () => {
         // 1. 基于源实体属性的筛选 - 只有验证过的作者
         const VerifiedAuthorRelation = Relation.create({
             name: 'VerifiedAuthorRelation',
-            sourceRelation: AuthorBookRelation,
+            baseRelation: AuthorBookRelation,
             sourceProperty: 'verifiedBooks',
             targetProperty: 'verifiedAuthors',
             matchExpression: MatchExp.atom({
@@ -679,7 +679,7 @@ describe('filtered relation', () => {
         // 2. 基于目标实体属性的筛选 - 只有已出版的书
         const PublishedBookRelation = Relation.create({
             name: 'PublishedBookRelation',
-            sourceRelation: AuthorBookRelation,
+            baseRelation: AuthorBookRelation,
             sourceProperty: 'publishedBooks',
             targetProperty: 'publishedAuthors',
             matchExpression: MatchExp.atom({
@@ -896,7 +896,7 @@ describe('filtered relation', () => {
         // Filtered relations - 层级1：首都城市
         const CapitalCityRelation = Relation.create({
             name: 'CapitalCityRelation',
-            sourceRelation: CountryCityRelation,
+            baseRelation: CountryCityRelation,
             sourceProperty: 'capitalCities',
             targetProperty: 'capitalCountry',
             matchExpression: MatchExp.atom({
@@ -908,7 +908,7 @@ describe('filtered relation', () => {
         // Filtered relations - 层级1：一线城市
         const Tier1CityRelation = Relation.create({
             name: 'Tier1CityRelation',
-            sourceRelation: CountryCityRelation,
+            baseRelation: CountryCityRelation,
             sourceProperty: 'tier1Cities',
             targetProperty: 'tier1Country',
             matchExpression: MatchExp.atom({
@@ -920,7 +920,7 @@ describe('filtered relation', () => {
         // Filtered relations - 层级2：旗舰店
         const FlagshipStoreRelation = Relation.create({
             name: 'FlagshipStoreRelation',
-            sourceRelation: CityStoreRelation,
+            baseRelation: CityStoreRelation,
             sourceProperty: 'flagshipStores',
             targetProperty: 'flagshipCity',
             matchExpression: MatchExp.atom({
@@ -932,7 +932,7 @@ describe('filtered relation', () => {
         // Filtered relations - 层级2：新店（2020年后）
         const NewStoreRelation = Relation.create({
             name: 'NewStoreRelation',
-            sourceRelation: CityStoreRelation,
+            baseRelation: CityStoreRelation,
             sourceProperty: 'newStores',
             targetProperty: 'newStoreCity',
             matchExpression: MatchExp.atom({
@@ -1211,7 +1211,7 @@ describe('filtered relation', () => {
         // 复杂过滤：高级开发者且每周工作时间大于20小时
         const SeniorActiveRelation = Relation.create({
             name: 'SeniorActiveRelation',
-            sourceRelation: ProjectDeveloperRelation,
+            baseRelation: ProjectDeveloperRelation,
             sourceProperty: 'seniorActiveDevelopers',
             targetProperty: 'seniorActiveProjects',
             matchExpression: MatchExp.atom({
@@ -1226,7 +1226,7 @@ describe('filtered relation', () => {
         // 复杂过滤：高薪兼职（时薪高但工时少）
         const HighValuePartTimeRelation = Relation.create({
             name: 'HighValuePartTimeRelation',
-            sourceRelation: ProjectDeveloperRelation,
+            baseRelation: ProjectDeveloperRelation,
             sourceProperty: 'highValuePartTimeDevelopers',
             targetProperty: 'highValuePartTimeProjects',
             matchExpression: MatchExp.atom({
@@ -1519,7 +1519,7 @@ describe('filtered relation', () => {
         // This tests a 3-level deep cross-entity filter: source.team.division.organization.tier
         const PremiumOrgProjectRelation = Relation.create({
             name: 'PremiumOrgProjectRelation',
-            sourceRelation: MemberProjectRelation,
+            baseRelation: MemberProjectRelation,
             sourceProperty: 'premiumOrgProjects',
             targetProperty: 'premiumOrgMembers',
             matchExpression: MatchExp.atom({
@@ -1537,7 +1537,7 @@ describe('filtered relation', () => {
         // Another filtered relation: Projects from members in large teams (size > 5) with high budget divisions
         const LargeTeamHighBudgetProjectRelation = Relation.create({
             name: 'LargeTeamHighBudgetProjectRelation',
-            sourceRelation: MemberProjectRelation,
+            baseRelation: MemberProjectRelation,
             sourceProperty: 'largeTeamHighBudgetProjects',
             targetProperty: 'largeTeamHighBudgetMembers',
             matchExpression: MatchExp.atom({
@@ -1878,7 +1878,7 @@ describe('filtered relation', () => {
         // Filtered relation - only published posts
         const PublishedPostRelation = Relation.create({
             name: 'PublishedPostRelation',
-            sourceRelation: UserPostRelation,
+            baseRelation: UserPostRelation,
             sourceProperty: 'publishedPosts',
             targetProperty: 'publishedAuthor',
             matchExpression: MatchExp.atom({
@@ -2119,7 +2119,7 @@ describe('filtered relation', () => {
         // Filtered relation - only active employees
         const ActiveEmployeeRelation = Relation.create({
             name: 'ActiveEmployeeRelation',
-            sourceRelation: DepartmentEmployeeRelation,
+            baseRelation: DepartmentEmployeeRelation,
             sourceProperty: 'activeEmployees',
             targetProperty: 'activeDepartment',
             matchExpression: MatchExp.atom({

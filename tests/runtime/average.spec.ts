@@ -196,7 +196,7 @@ describe('Average computed handle', () => {
     // Create filtered entity for engineering department
     const engineerEntity = Entity.create({
       name: 'Engineer',
-      sourceEntity: employeeEntity,
+      baseEntity: employeeEntity,
                   matchExpression: MatchExp.atom({
         key: 'department',
         value: ['=', 'engineering']
@@ -495,7 +495,7 @@ describe('Average computed handle', () => {
     // Create filtered relation for non-refunded online sales
     const onlineNonRefundedRelation = Relation.create({
       name: 'OnlineNonRefundedRelation',
-      sourceRelation: storeSaleRelation,
+      baseRelation: storeSaleRelation,
       sourceProperty: 'onlineNonRefundedSales',
       targetProperty: 'onlineNonRefundedStore',
       matchExpression: MatchExp.atom({
@@ -726,7 +726,7 @@ describe('Average computed handle', () => {
     // Create filtered relations for different enrollment statuses
     const completedEnrollmentRelation = Relation.create({
       name: 'CompletedEnrollmentRelation',
-      sourceRelation: courseEnrollmentRelation,
+      baseRelation: courseEnrollmentRelation,
       sourceProperty: 'completedEnrollments',
       targetProperty: 'completedCourses',
       matchExpression: MatchExp.atom({
@@ -737,7 +737,7 @@ describe('Average computed handle', () => {
     
     const springCompletedRelation = Relation.create({
       name: 'SpringCompletedRelation',
-      sourceRelation: courseEnrollmentRelation,
+      baseRelation: courseEnrollmentRelation,
       sourceProperty: 'springCompletedEnrollments',
       targetProperty: 'springCompletedCourses',
       matchExpression: MatchExp.atom({
@@ -751,7 +751,7 @@ describe('Average computed handle', () => {
     
     const fallCompletedRelation = Relation.create({
       name: 'FallCompletedRelation',
-      sourceRelation: courseEnrollmentRelation,
+      baseRelation: courseEnrollmentRelation,
       sourceProperty: 'fallCompletedEnrollments',
       targetProperty: 'fallCompletedCourses',
       matchExpression: MatchExp.atom({

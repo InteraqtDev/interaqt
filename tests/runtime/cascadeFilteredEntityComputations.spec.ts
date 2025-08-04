@@ -48,7 +48,7 @@ describe('Cascade Filtered Entity Computations', () => {
     // 第一层 filtered entity - ActiveUsers
     activeUsersEntity = Entity.create({
       name: 'ActiveUsers',
-      sourceEntity: userEntity,
+      baseEntity: userEntity,
       matchExpression: MatchExp.atom({
         key: 'isActive',
         value: ['=', true]
@@ -58,7 +58,7 @@ describe('Cascade Filtered Entity Computations', () => {
     // 第二层 filtered entity - 基于 ActiveUsers 的 TechActiveUsers
     techActiveUsersEntity = Entity.create({
       name: 'TechActiveUsers',
-      sourceEntity: activeUsersEntity,
+      baseEntity: activeUsersEntity,
       matchExpression: MatchExp.atom({
         key: 'department',
         value: ['=', 'Tech']
@@ -68,7 +68,7 @@ describe('Cascade Filtered Entity Computations', () => {
     // 第三层 filtered entity - 基于 TechActiveUsers 的 SeniorTechActiveUsers
     seniorTechActiveUsersEntity = Entity.create({
       name: 'SeniorTechActiveUsers',
-      sourceEntity: techActiveUsersEntity,
+      baseEntity: techActiveUsersEntity,
       matchExpression: MatchExp.atom({
         key: 'role',
         value: ['=', 'Senior']
@@ -78,7 +78,7 @@ describe('Cascade Filtered Entity Computations', () => {
     // 另一个分支：基于 ActiveUsers 的 YoungActiveUsers
     youngActiveUsersEntity = Entity.create({
       name: 'YoungActiveUsers',
-      sourceEntity: activeUsersEntity,
+      baseEntity: activeUsersEntity,
       matchExpression: MatchExp.atom({
         key: 'age',
         value: ['<', 30]

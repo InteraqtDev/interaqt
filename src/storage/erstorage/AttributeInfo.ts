@@ -167,9 +167,9 @@ export class AttributeInfo {
         return (this.data as RecordAttribute).matchExpression
     }
 
-    getSourceAttributeInfo() {
-        assert(this.isLinkFiltered(), `only filtered relation can get source attribute info`)
-        return new AttributeInfo(this.parentEntityName, (this.data as RecordAttribute).sourceRelationAttributeName!, this.map, this.symmetricDirection)
+    getBaseAttributeInfo() {
+        assert(this.isLinkFiltered(), `only filtered relation can get base attribute info`)
+        return new AttributeInfo(this.parentEntityName, (this.data as RecordAttribute).baseRelationAttributeName!, this.map, this.symmetricDirection)
     }
     
 

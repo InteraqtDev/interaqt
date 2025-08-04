@@ -130,8 +130,8 @@ export class RecordInfo {
         return new AttributeInfo(this.name, attribute, this.map)
     }
 
-    get sourceRecordName() {
-        return this.data.sourceRecordName
+    get baseRecordName() {
+        return this.data.baseRecordName
     }
 
     get matchExpression() {
@@ -150,7 +150,7 @@ export class RecordInfo {
         return this.data.isFilteredRelation
     }
 
-    get sourceRelationName() {
-        return this.data.sourceRelationName
+    get baseRelationName() {
+        return this.data.baseRelationName
     }
 }

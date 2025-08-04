@@ -302,7 +302,7 @@ describe('Sum computed handle', () => {
     // Create filtered entity for completed orders
     const completedOrderEntity = Entity.create({
       name: 'CompletedOrder',
-      sourceEntity: orderEntity,
+      baseEntity: orderEntity,
       matchExpression: MatchExp.atom({
         key: 'status',
         value: ['=', 'completed']
@@ -551,7 +551,7 @@ describe('Sum computed handle', () => {
     // Create filtered relation for available items in zones A and B
     const availableABZoneRelation = Relation.create({
       name: 'AvailableABZoneRelation',
-      sourceRelation: warehouseInventoryRelation,
+      baseRelation: warehouseInventoryRelation,
       sourceProperty: 'availableABInventories',
       targetProperty: 'availableABWarehouse',
       matchExpression: MatchExp.atom({
@@ -828,7 +828,7 @@ describe('Sum computed handle', () => {
     // Create filtered relations for different quarters and product lines
     const q1SalesRelation = Relation.create({
       name: 'Q1SalesRelation',
-      sourceRelation: territorySalesRelation,
+      baseRelation: territorySalesRelation,
       sourceProperty: 'q1Sales',
       targetProperty: 'q1Territories',
       matchExpression: MatchExp.atom({
@@ -839,7 +839,7 @@ describe('Sum computed handle', () => {
     
     const q2SalesRelation = Relation.create({
       name: 'Q2SalesRelation',
-      sourceRelation: territorySalesRelation,
+      baseRelation: territorySalesRelation,
       sourceProperty: 'q2Sales',
       targetProperty: 'q2Territories',
       matchExpression: MatchExp.atom({
@@ -850,7 +850,7 @@ describe('Sum computed handle', () => {
     
     const softwareSalesRelation = Relation.create({
       name: 'SoftwareSalesRelation',
-      sourceRelation: territorySalesRelation,
+      baseRelation: territorySalesRelation,
       sourceProperty: 'softwareSales',
       targetProperty: 'softwareTerritories',
       matchExpression: MatchExp.atom({
@@ -861,7 +861,7 @@ describe('Sum computed handle', () => {
     
     const newDealRelation = Relation.create({
       name: 'NewDealRelation',
-      sourceRelation: territorySalesRelation,
+      baseRelation: territorySalesRelation,
       sourceProperty: 'newDealSales',
       targetProperty: 'newDealTerritories',
       matchExpression: MatchExp.atom({
@@ -873,7 +873,7 @@ describe('Sum computed handle', () => {
     // Combined filter: Q1 software sales
     const q1SoftwareRelation = Relation.create({
       name: 'Q1SoftwareRelation',
-      sourceRelation: territorySalesRelation,
+      baseRelation: territorySalesRelation,
       sourceProperty: 'q1SoftwareSales',
       targetProperty: 'q1SoftwareTerritories',
       matchExpression: MatchExp.atom({

@@ -55,7 +55,7 @@ describe('cascade filtered relation', () => {
         // First level filtered relation - only active assignments
         const ActiveUserProjectRelation = Relation.create({
             name: 'ActiveUserProjectRelation',
-            sourceRelation: UserProjectRelation,
+            baseRelation: UserProjectRelation,
             sourceProperty: 'activeProjects',
             targetProperty: 'activeUsers',
             matchExpression: MatchExp.atom({
@@ -67,7 +67,7 @@ describe('cascade filtered relation', () => {
         // Second level filtered relation - only lead roles from active assignments
         const LeadUserProjectRelation = Relation.create({
             name: 'LeadUserProjectRelation',
-            sourceRelation: ActiveUserProjectRelation,
+            baseRelation: ActiveUserProjectRelation,
             sourceProperty: 'leadProjects',
             targetProperty: 'leadUsers',
             matchExpression: MatchExp.atom({
@@ -207,7 +207,7 @@ describe('cascade filtered relation', () => {
         // First level - high priority tasks (priority > 5)
         const HighPriorityTaskRelation = Relation.create({
             name: 'HighPriorityTaskRelation',
-            sourceRelation: EmployeeTaskRelation,
+            baseRelation: EmployeeTaskRelation,
             sourceProperty: 'highPriorityTasks',
             targetProperty: 'highPriorityAssignees',
             matchExpression: MatchExp.atom({
@@ -219,7 +219,7 @@ describe('cascade filtered relation', () => {
         // Second level - senior employees (level >= 3) on high priority tasks with good performance
         const SeniorHighPriorityRelation = Relation.create({
             name: 'SeniorHighPriorityRelation',
-            sourceRelation: HighPriorityTaskRelation,
+            baseRelation: HighPriorityTaskRelation,
             sourceProperty: 'seniorHighPriorityTasks',
             targetProperty: 'seniorHighPriorityAssignees',
             matchExpression: MatchExp.atom({
@@ -336,7 +336,7 @@ describe('cascade filtered relation', () => {
         // First level - only managers
         const DepartmentManagerRelation = Relation.create({
             name: 'DepartmentManagerRelation',
-            sourceRelation: DepartmentEmployeeRelation,
+            baseRelation: DepartmentEmployeeRelation,
             sourceProperty: 'managers',
             targetProperty: 'managedDepartment',
             matchExpression: MatchExp.atom({
@@ -348,7 +348,7 @@ describe('cascade filtered relation', () => {
         // Second level - only senior managers
         const SeniorManagerRelation = Relation.create({
             name: 'SeniorManagerRelation',
-            sourceRelation: DepartmentManagerRelation,
+            baseRelation: DepartmentManagerRelation,
             sourceProperty: 'seniorManagers',
             targetProperty: 'seniorManagedDepartment',
             matchExpression: MatchExp.atom({
@@ -495,7 +495,7 @@ describe('cascade filtered relation', () => {
         // Level 1: Active contracts
         const ActiveContractRelation = Relation.create({
             name: 'ActiveContractRelation',
-            sourceRelation: CompanyContractRelation,
+            baseRelation: CompanyContractRelation,
             sourceProperty: 'activeContracts',
             targetProperty: 'activeCompanies',
             matchExpression: MatchExp.atom({
@@ -507,7 +507,7 @@ describe('cascade filtered relation', () => {
         // Level 2: High-value active contracts (> 1M)
         const HighValueActiveRelation = Relation.create({
             name: 'HighValueActiveRelation',
-            sourceRelation: ActiveContractRelation,
+            baseRelation: ActiveContractRelation,
             sourceProperty: 'highValueActiveContracts',
             targetProperty: 'highValueActiveCompanies',
             matchExpression: MatchExp.atom({
@@ -519,7 +519,7 @@ describe('cascade filtered relation', () => {
         // Level 3: High-value active tech contracts in US region
         const TechHighValueUSRelation = Relation.create({
             name: 'TechHighValueUSRelation',
-            sourceRelation: HighValueActiveRelation,
+            baseRelation: HighValueActiveRelation,
             sourceProperty: 'techHighValueUSContracts',
             targetProperty: 'techHighValueUSCompanies',
             matchExpression: MatchExp.atom({
@@ -641,7 +641,7 @@ describe('cascade filtered relation', () => {
         // Level 1: Active assignments
         const ActiveUserTaskRelation = Relation.create({
             name: 'ActiveUserTaskRelation',
-            sourceRelation: UserTaskRelation,
+            baseRelation: UserTaskRelation,
             sourceProperty: 'activeTasks',
             targetProperty: 'activeAssignees',
             matchExpression: MatchExp.atom({
@@ -653,7 +653,7 @@ describe('cascade filtered relation', () => {
         // Level 2: Active lead assignments
         const ActiveLeadRelation = Relation.create({
             name: 'ActiveLeadRelation',
-            sourceRelation: ActiveUserTaskRelation,
+            baseRelation: ActiveUserTaskRelation,
             sourceProperty: 'activeLeadTasks',
             targetProperty: 'activeLeads',
             matchExpression: MatchExp.atom({
@@ -744,7 +744,7 @@ describe('cascade filtered relation', () => {
         // Level 1: Managers
         const ManagerRelation = Relation.create({
             name: 'ManagerRelation',
-            sourceRelation: DeptEmployeeRelation,
+            baseRelation: DeptEmployeeRelation,
             sourceProperty: 'managers',
             targetProperty: 'managedDept',
             matchExpression: MatchExp.atom({
@@ -756,7 +756,7 @@ describe('cascade filtered relation', () => {
         // Level 2: Senior managers
         const SeniorManagerRelation = Relation.create({
             name: 'SeniorManagerRelation',
-            sourceRelation: ManagerRelation,
+            baseRelation: ManagerRelation,
             sourceProperty: 'seniorManagers',
             targetProperty: 'seniorManagedDept',
             matchExpression: MatchExp.atom({
@@ -861,7 +861,7 @@ describe('cascade filtered relation', () => {
         // Level 1: Active projects
         const ActiveProjectRelation = Relation.create({
             name: 'ActiveProjectRelation',
-            sourceRelation: CompanyProjectRelation,
+            baseRelation: CompanyProjectRelation,
             sourceProperty: 'activeProjects',
             targetProperty: 'activeCompany',
             matchExpression: MatchExp.atom({
@@ -873,7 +873,7 @@ describe('cascade filtered relation', () => {
         // Level 2: Active enterprise projects
         const ActiveEnterpriseRelation = Relation.create({
             name: 'ActiveEnterpriseRelation',
-            sourceRelation: ActiveProjectRelation,
+            baseRelation: ActiveProjectRelation,
             sourceProperty: 'activeEnterpriseProjects',
             targetProperty: 'activeEnterpriseCompany',
             matchExpression: MatchExp.atom({
@@ -979,7 +979,7 @@ describe('cascade filtered relation', () => {
         // Level 1: Active members
         const ActiveMemberRelation = Relation.create({
             name: 'ActiveMemberRelation',
-            sourceRelation: OrgMemberRelation,
+            baseRelation: OrgMemberRelation,
             sourceProperty: 'activeMembers',
             targetProperty: 'activeOrg',
             matchExpression: MatchExp.atom({
@@ -991,7 +991,7 @@ describe('cascade filtered relation', () => {
         // Level 2: Active admins
         const ActiveAdminRelation = Relation.create({
             name: 'ActiveAdminRelation',
-            sourceRelation: ActiveMemberRelation,
+            baseRelation: ActiveMemberRelation,
             sourceProperty: 'activeAdmins',
             targetProperty: 'activeAdminOrg',
             matchExpression: MatchExp.atom({
@@ -1003,7 +1003,7 @@ describe('cascade filtered relation', () => {
         // Level 3: Active senior tech admins
         const ActiveSeniorTechAdminRelation = Relation.create({
             name: 'ActiveSeniorTechAdminRelation',
-            sourceRelation: ActiveAdminRelation,
+            baseRelation: ActiveAdminRelation,
             sourceProperty: 'activeSeniorTechAdmins',
             targetProperty: 'activeSeniorTechAdminOrg',
             matchExpression: MatchExp.atom({

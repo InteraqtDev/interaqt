@@ -64,7 +64,7 @@ describe('Filtered Entity with Relation as Source', () => {
     // TODO 暂时不支持，后面需要增加级联机算法才能支持。
     // const ActiveMemberships = Entity.create({
     //     name: 'ActiveMemberships',
-    //     sourceEntity: UserTeamRelation,
+    //     baseEntity: UserTeamRelation,
     //     matchExpression: MatchExp.atom({
     //         key: 'source.isActive',
     //         value: ['=', true]
@@ -73,7 +73,7 @@ describe('Filtered Entity with Relation as Source', () => {
 
     const AdminMemberships = Entity.create({
         name: 'AdminMemberships',
-        sourceEntity: UserTeamRelation,
+        baseEntity: UserTeamRelation,
         matchExpression: MatchExp.atom({
             key: 'role',
             value: ['=', 'admin']
@@ -82,7 +82,7 @@ describe('Filtered Entity with Relation as Source', () => {
 
     const ProjectLeads = Entity.create({
         name: 'ProjectLeads',
-        sourceEntity: UserProjectRelation,
+        baseEntity: UserProjectRelation,
         matchExpression: MatchExp.atom({
             key: 'role',
             value: ['=', 'lead']
@@ -91,7 +91,7 @@ describe('Filtered Entity with Relation as Source', () => {
 
     const SeniorAdminMemberships = Entity.create({
         name: 'SeniorAdminMemberships',
-        sourceEntity: UserTeamRelation,
+        baseEntity: UserTeamRelation,
         matchExpression: MatchExp.atom({
             key: 'role',
             value: ['=', 'admin']

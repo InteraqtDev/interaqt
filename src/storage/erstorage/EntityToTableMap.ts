@@ -41,7 +41,7 @@ export type RecordAttribute = {
     // filtered relation 相关
     isFilteredRelation?: boolean,
     matchExpression?: any
-    sourceRelationAttributeName?: string
+    baseRelationAttributeName?: string
 }
 
 export type RecordMapItem = {
@@ -53,14 +53,14 @@ export type RecordMapItem = {
     isRelation? :boolean,
     // filtered entity 相关
     isFilteredEntity?: boolean,
-    sourceRecordName? : string,
+    baseRecordName? : string,
     matchExpression?: MatchExpressionData,
-    resolvedSourceRecordName?: string,
+    resolvedBaseRecordName?: string,
     resolvedMatchExpression?: MatchExpressionData,
     filteredBy? : string[],
     // filtered relation 相关
     isFilteredRelation?: boolean,
-    sourceRelationName?: string
+    baseRelationName?: string
 }
 
 type RecordMap = {
@@ -89,7 +89,7 @@ export type LinkMapItem = {
     // filtered relation 相关
     isFilteredRelation?: boolean,
     matchExpression?: any
-    sourceLinkName?: string
+    baseLinkName?: string
 }
 
 type LinkMap = {
@@ -117,8 +117,8 @@ export class EntityToTableMap {
     getRecordTable(entityName: string) : string {
         const record = this.data.records[entityName];
         // 如果是 filtered relation/entity，返回源记录的表名
-        if (record.sourceRecordName) {
-            return this.getRecordTable(record.sourceRecordName);
+        if (record.baseRecordName) {
+            return this.getRecordTable(record.baseRecordName);
         }
         return record.table;
     }
@@ -183,9 +183,9 @@ export class EntityToTableMap {
                 // 递归查找根源实体
                 while (data.isFilteredRelation || data.isFilteredEntity) {
                     if (data.isFilteredRelation) {
-                        data = this.data.records[data.sourceRelationName!]
+                        data = this.data.records[data.baseRelationName!]
                     } else if (data.isFilteredEntity) {
-                        data = this.data.records[data.sourceRecordName!]
+                        data = this.data.records[data.baseRecordName!]
                     }
                 }
                 attributeData = data!.attributes[currentAttribute!] as RecordAttribute

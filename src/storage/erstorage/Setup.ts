@@ -117,17 +117,17 @@ export class DBSetup {
 
     resolveBaseSourceEntityAndFilter(entity: EntityInstance) {
         const entityWithProps = entity
-        let sourceEntity = (entityWithProps as any).sourceEntity
+        let baseEntity = (entityWithProps as any).baseEntity
         let matchExpression = (entityWithProps as any).matchExpression
-        assert((sourceEntity && matchExpression) || (!sourceEntity && !matchExpression), `matchExpression is required for ${entityWithProps.name}`)
-        if (!(sourceEntity && matchExpression)) return
+        assert((baseEntity && matchExpression) || (!baseEntity && !matchExpression), `matchExpression is required for ${entityWithProps.name}`)
+        if (!(baseEntity && matchExpression)) return
 
-        while(sourceEntity.sourceEntity) {
-            sourceEntity = sourceEntity.sourceEntity
-            matchExpression = matchExpression.and(sourceEntity.filter)
+        while(baseEntity.baseEntity) {
+            baseEntity = baseEntity.baseEntity
+            matchExpression = matchExpression.and(baseEntity.filter)
         }
 
-        return { sourceEntity, matchExpression }
+        return { baseEntity, matchExpression }
     }
 
     /**
@@ -183,7 +183,7 @@ export class DBSetup {
      */
     private collectAllFilteredEntities(entity: EntityInstance | RelationInstance): (EntityInstance | RelationInstance)[] {
         const directFiltered = [...this.entities, ...this.relations].filter(e => 
-            (e as any).sourceEntity === entity || (e as any).sourceRelation === entity
+            (e as any).baseEntity === entity || (e as any).baseRelation === entity
         );
         
         const allFiltered: (EntityInstance | RelationInstance)[] = [...directFiltered];
@@ -237,20 +237,20 @@ export class DBSetup {
             };
         }
 
-        const { sourceEntity, matchExpression, sourceRelation } = (entity as any) || {}
+        const { baseEntity, matchExpression, baseRelation } = (entity as any) || {}
 
         // 计算 resolved 字段
-        let resolvedSourceRecordName: string | undefined;
+        let resolvedBaseRecordName: string | undefined;
         let resolvedMatchExpression: MatchExpressionData | undefined;
         
-        if (sourceEntity || sourceRelation) {
+        if (baseEntity || baseRelation) {
             // 递归查找最底层的源实体/关系
-            let currentEntity = sourceEntity || sourceRelation;
+            let currentEntity = baseEntity || baseRelation;
             let currentMatchExpression = matchExpression || (entity as any).matchExpression;
             const matchExpressions: MatchExpressionData[] = [currentMatchExpression];
             
-            while ((currentEntity as any).sourceEntity || (currentEntity as any).sourceRelation) {
-                const nextEntity = (currentEntity as any).sourceEntity || (currentEntity as any).sourceRelation;
+            while ((currentEntity as any).baseEntity || (currentEntity as any).baseRelation) {
+                const nextEntity = (currentEntity as any).baseEntity || (currentEntity as any).baseRelation;
                 const nextMatchExpression = (currentEntity as any).matchExpression;
                 if (nextMatchExpression) {
                     matchExpressions.push(nextMatchExpression);
@@ -258,7 +258,7 @@ export class DBSetup {
                 currentEntity = nextEntity;
             }
             
-            resolvedSourceRecordName = currentEntity.name;
+            resolvedBaseRecordName = currentEntity.name;
             
             // 合并所有 matchExpression
             if (matchExpressions.length > 0) {
@@ -269,44 +269,42 @@ export class DBSetup {
             }
         }
 
-        // const sourceRecord = (sourceEntity||sourceRelation) ? this.map.records[sourceEntity?.name || sourceRelation!.name!]! : undefined
-        // const finalAttributes = sourceRecord ? {...sourceRecord.attributes, ...attributes} : attributes
         return {
             table: entity.name,
             attributes,
             isRelation,
-            isFilteredEntity: !!sourceEntity,
-            sourceRecordName: sourceEntity?.name || sourceRelation?.name,
-            matchExpression: matchExpression || (sourceRelation && (entity as any).matchExpression),
-            resolvedSourceRecordName,
+            isFilteredEntity: !!baseEntity,
+            baseRecordName: baseEntity?.name || baseRelation?.name,
+            matchExpression: matchExpression || (baseRelation && (entity as any).matchExpression),
+            resolvedBaseRecordName,
             resolvedMatchExpression,
             filteredBy: filteredBy.length ? filteredBy.map(e => e.name) : undefined,
             // 添加 filtered relation 的标记
-            isFilteredRelation:!!sourceRelation,
-            sourceRelationName: sourceRelation ? sourceRelation.name : undefined
+            isFilteredRelation:!!baseRelation,
+            baseRelationName: baseRelation ? baseRelation.name : undefined
         } as RecordMapItem
     }
     createFilteredEntityRecord(entity: EntityInstance) {
-        const sourceRecord = this.map.records[entity.sourceEntity!.name!]!
+        const sourceRecord = this.map.records[entity.baseEntity!.name!]!
         return {
             table: sourceRecord.table,
             attributes: {...sourceRecord.attributes},
             isFilteredEntity: true,
-            sourceRecordName: entity.sourceEntity!.name!,
+            baseRecordName: entity.baseEntity!.name!,
             matchExpression: entity.matchExpression,
             filteredBy: undefined,
         } as RecordMapItem
     }
     createFilteredRelationRecord(relation: RelationInstance) {
-        const sourceRecord = this.map.records[relation.sourceRelation!.name!]!
+        const sourceRecord = this.map.records[relation.baseRelation!.name!]!
         return {
             table: sourceRecord.table,
             attributes: {...sourceRecord.attributes},
             isRelation: true,
             isFilteredRelation: true,
             filteredBy: undefined,
-            sourceRecordName: relation.sourceRelation!.name!,
-            sourceRelationName: relation.sourceRelation!.name!,
+            baseRecordName: relation.baseRelation!.name!,
+            baseRelationName: relation.baseRelation!.name!,
             matchExpression: relation.matchExpression,
         } as RecordMapItem
     }
@@ -321,10 +319,10 @@ export class DBSetup {
             targetProperty: relationWithProps.targetProperty,
             recordName: relationName,
             isTargetReliance: relationWithProps.isTargetReliance,
-            isFilteredRelation: !!relationWithProps.sourceRelation,
+            isFilteredRelation: !!relationWithProps.baseRelation,
             // FIXME 这里咩有考虑多次 filtered 的情况
             matchExpression: relationWithProps.matchExpression,
-            sourceLinkName: relationWithProps.sourceRelation?.name
+            baseLinkName: relationWithProps.baseRelation?.name
         } as LinkMapItem
     }
     //虚拟 link
@@ -382,8 +380,8 @@ export class DBSetup {
             
             // 检查是否是 filtered relation
             const relationRecord = this.map.records[relation]
-            const isFilteredRelation = relationRecord && !!relationRecord.sourceRelationName
-            const sourceLink = isFilteredRelation ? this.map.links[relationRecord.sourceRelationName!]! : undefined
+            const isFilteredRelation = relationRecord && !!relationRecord.baseRelationName
+            const sourceLink = isFilteredRelation ? this.map.links[relationRecord.baseRelationName!]! : undefined
             
 
             this.map.records[relationData.sourceRecord].attributes[relationData.sourceProperty] = {
@@ -399,7 +397,7 @@ export class DBSetup {
                 // 标记这是一个 filtered relation
                 isFilteredRelation: isFilteredRelation,
                 matchExpression: isFilteredRelation?relationData.matchExpression: undefined,
-                sourceRelationAttributeName: isFilteredRelation? sourceLink?.sourceProperty: undefined
+                baseRelationAttributeName: isFilteredRelation? sourceLink?.sourceProperty: undefined
             } as RecordAttribute
 
             // CAUTION 关联查询时，不可能出现从实体来获取一个关系的情况，语义不正确。
@@ -417,7 +415,7 @@ export class DBSetup {
                     // 标记这是一个 filtered relation
                     isFilteredRelation: isFilteredRelation,
                     matchExpression: isFilteredRelation?relationData.matchExpression: undefined,
-                    sourceRelationAttributeName: isFilteredRelation? sourceLink?.targetProperty: undefined
+                    baseRelationAttributeName: isFilteredRelation? sourceLink?.targetProperty: undefined
                 } as RecordAttribute
             }
         })
@@ -425,10 +423,10 @@ export class DBSetup {
         // 4. 验证所有 filtered entity 的路径
         this.entities.forEach(entity => {
             const entityWithProps = entity as any;
-            if (entityWithProps.sourceEntity && entityWithProps.matchExpression) {
+            if (entityWithProps.baseEntity && entityWithProps.matchExpression) {
                 this.currentFilteredEntityName = entityWithProps.name;
                 try {
-                    this.validateFilteredEntityPaths(entityWithProps.sourceEntity.name, entityWithProps.matchExpression);
+                    this.validateFilteredEntityPaths(entityWithProps.baseEntity.name, entityWithProps.matchExpression);
                 } finally {
                     this.currentFilteredEntityName = undefined;
                 }

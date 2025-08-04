@@ -940,7 +940,7 @@ describe('Count computed handle', () => {
     // Create filtered relation for active full-time employees only
     const activeFullTimeRelation = Relation.create({
       name: 'ActiveFullTimeRelation',
-      sourceRelation: departmentEmployeeRelation,
+      baseRelation: departmentEmployeeRelation,
       sourceProperty: 'activeFullTimeEmployees',
       targetProperty: 'activeFullTimeDepartment',
       matchExpression: MatchExp.atom({
@@ -1140,7 +1140,7 @@ describe('Count computed handle', () => {
     // Create filtered relations for different stock statuses
     const inStockRelation = Relation.create({
       name: 'InStockRelation',
-      sourceRelation: storeProductRelation,
+      baseRelation: storeProductRelation,
       sourceProperty: 'inStockProducts',
       targetProperty: 'inStockStores',
       matchExpression: MatchExp.atom({
@@ -1151,7 +1151,7 @@ describe('Count computed handle', () => {
     
     const lowStockRelation = Relation.create({
       name: 'LowStockRelation',
-      sourceRelation: storeProductRelation,
+      baseRelation: storeProductRelation,
       sourceProperty: 'lowStockProducts',
       targetProperty: 'lowStockStores',
       matchExpression: MatchExp.atom({
@@ -1162,7 +1162,7 @@ describe('Count computed handle', () => {
     
     const outOfStockRelation = Relation.create({
       name: 'OutOfStockRelation',
-      sourceRelation: storeProductRelation,
+      baseRelation: storeProductRelation,
       sourceProperty: 'outOfStockProducts',
       targetProperty: 'outOfStockStores',
       matchExpression: MatchExp.atom({

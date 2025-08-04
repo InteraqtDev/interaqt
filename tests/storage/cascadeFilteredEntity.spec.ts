@@ -26,7 +26,7 @@ describe('cascade filtered entity test', () => {
         // 第一层 filtered entity - ActiveUsers
         const activeUsersEntity = Entity.create({
             name: 'ActiveUsers',
-            sourceEntity: userEntity,
+            baseEntity: userEntity,
             matchExpression: MatchExp.atom({
                 key: 'isActive',
                 value: ['=', true]
@@ -36,7 +36,7 @@ describe('cascade filtered entity test', () => {
         // 第二层 filtered entity - 基于 ActiveUsers 的 TechActiveUsers
         const techActiveUsersEntity = Entity.create({
             name: 'TechActiveUsers',
-            sourceEntity: activeUsersEntity,  // 注意：这里使用 ActiveUsers 作为 sourceEntity
+            baseEntity: activeUsersEntity,  // 注意：这里使用 ActiveUsers 作为 sourceEntity
             matchExpression: MatchExp.atom({
                 key: 'department',
                 value: ['=', 'Tech']
@@ -46,7 +46,7 @@ describe('cascade filtered entity test', () => {
         // 第三层 filtered entity - 基于 TechActiveUsers 的 SeniorTechActiveUsers
         const seniorTechActiveUsersEntity = Entity.create({
             name: 'SeniorTechActiveUsers',
-            sourceEntity: techActiveUsersEntity,  // 基于 TechActiveUsers
+            baseEntity: techActiveUsersEntity,  // 基于 TechActiveUsers
             matchExpression: MatchExp.atom({
                 key: 'role',
                 value: ['=', 'senior']
@@ -56,7 +56,7 @@ describe('cascade filtered entity test', () => {
         // 另一个分支：基于 ActiveUsers 的 YoungActiveUsers
         const youngActiveUsersEntity = Entity.create({
             name: 'YoungActiveUsers',
-            sourceEntity: activeUsersEntity,
+            baseEntity: activeUsersEntity,
             matchExpression: MatchExp.atom({
                 key: 'age',
                 value: ['<', 30]

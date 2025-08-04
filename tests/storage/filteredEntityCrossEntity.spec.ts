@@ -109,7 +109,7 @@ describe('filtered entity with cross-entity queries', () => {
         // 创建 filtered entity - 基于关联实体的属性
         const activeUsersEntity = Entity.create({
             name: 'ActiveUsersInTechTeam',
-            sourceEntity: userEntity,
+            baseEntity: userEntity,
             matchExpression: MatchExp.atom({
                 key: 'isActive',
                 value: ['=', true]
@@ -122,7 +122,7 @@ describe('filtered entity with cross-entity queries', () => {
         // This entity is removed because it uses x:n relation in path
         // const usersInActiveProjectsEntity = Entity.create({
         //     name: 'UsersInActiveProjects',
-        //     sourceEntity: userEntity,
+        //     baseEntity: userEntity,
         //     matchExpression: MatchExp.atom({
         //         key: 'team.projects.status',
         //         value: ['=', 'active']
@@ -131,7 +131,7 @@ describe('filtered entity with cross-entity queries', () => {
 
         const adminUsersInTechTeamEntity = Entity.create({
             name: 'AdminUsersInTechTeam',
-            sourceEntity: userEntity,
+            baseEntity: userEntity,
             matchExpression: MatchExp.atom({
                 key: 'role',
                 value: ['=', 'admin']
@@ -144,7 +144,7 @@ describe('filtered entity with cross-entity queries', () => {
         // 新增多层 x:1 的 filtered entities
         const usersInHighBudgetDepartmentsEntity = Entity.create({
             name: 'UsersInHighBudgetDepartments',
-            sourceEntity: userEntity,
+            baseEntity: userEntity,
             matchExpression: MatchExp.atom({
                 key: 'team.department.budget',
                 value: ['>', 1000000]
@@ -153,7 +153,7 @@ describe('filtered entity with cross-entity queries', () => {
 
         const usersInAsianRegionEntity = Entity.create({
             name: 'UsersInAsianRegion',
-            sourceEntity: userEntity,
+            baseEntity: userEntity,
             matchExpression: MatchExp.atom({
                 key: 'team.department.region',
                 value: ['=', 'Asia']
@@ -162,7 +162,7 @@ describe('filtered entity with cross-entity queries', () => {
 
         const usersInLargeDivisionsEntity = Entity.create({
             name: 'UsersInLargeDivisions',
-            sourceEntity: userEntity,
+            baseEntity: userEntity,
             matchExpression: MatchExp.atom({
                 key: 'team.department.division.headcount',
                 value: ['>', 500]
@@ -171,7 +171,7 @@ describe('filtered entity with cross-entity queries', () => {
 
         const usersInTechCompaniesEntity = Entity.create({
             name: 'UsersInTechCompanies',
-            sourceEntity: userEntity,
+            baseEntity: userEntity,
             matchExpression: MatchExp.atom({
                 key: 'team.department.division.company.industry',
                 value: ['=', 'Technology']
@@ -180,7 +180,7 @@ describe('filtered entity with cross-entity queries', () => {
 
         const activeUsersInPublicCompaniesEntity = Entity.create({
             name: 'ActiveUsersInPublicCompanies',
-            sourceEntity: userEntity,
+            baseEntity: userEntity,
             matchExpression: MatchExp.atom({
                 key: 'isActive',
                 value: ['=', true]
@@ -970,7 +970,7 @@ describe('filtered entity validation', () => {
         // Try to create filtered entity with x:n relation in path
         const invalidFilteredEntity = Entity.create({
             name: 'InvalidFilteredEntity',
-            sourceEntity: userEntity,
+            baseEntity: userEntity,
             matchExpression: MatchExp.atom({
                 key: 'team.projects.status',  // This path contains 1:n relation
                 value: ['=', 'active']
@@ -1029,7 +1029,7 @@ describe('filtered entity validation', () => {
         // Create filtered entity with valid path (only x:1 relations)
         const validFilteredEntity = Entity.create({
             name: 'UsersInHighBudgetDepartments',
-            sourceEntity: userEntity,
+            baseEntity: userEntity,
             matchExpression: MatchExp.atom({
                 key: 'team.department.budget',
                 value: ['>', 100000]

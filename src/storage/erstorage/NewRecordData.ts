@@ -47,7 +47,7 @@ export class NewRecordData {
     // recordName 是自己的 recordName，  info 是自己作为父亲的 attribute 的 info.
     constructor(public map: EntityToTableMap, recordName: string, public rawData: RawEntityData, public info?: AttributeInfo, ) {
         const recordInfo = this.map.getRecordInfo(recordName)
-        this.recordName = recordInfo.isFilteredEntity ? recordInfo.sourceRecordName! : (recordInfo.isFilteredRelation ? recordInfo.sourceRelationName! : recordName)
+        this.recordName = recordInfo.isFilteredEntity ? recordInfo.baseRecordName! : (recordInfo.isFilteredRelation ? recordInfo.baseRelationName! : recordName)
         const [valueAttributesInfo, entityAttributesInfo, entityIdAttributes] = this.map.groupAttributes(recordName, rawData ? Object.keys(rawData) : [])
         this.relatedEntitiesData = flatten(entityAttributesInfo.map(info =>
             Array.isArray(rawData[info.attributeName]) ?

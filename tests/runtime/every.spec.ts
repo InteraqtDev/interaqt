@@ -367,7 +367,7 @@ describe('Every computed handle', () => {
     // Create filtered relation for active starters only
     const activeStarterRelation = Relation.create({
       name: 'ActiveStarterRelation',
-      sourceRelation: teamPlayerRelation,
+      baseRelation: teamPlayerRelation,
       sourceProperty: 'activeStarters',
       targetProperty: 'activeStarterTeams',
       matchExpression: MatchExp.atom({
@@ -583,7 +583,7 @@ describe('Every computed handle', () => {
     // Create filtered relations for different shifts and inspection levels
     const morningShiftRelation = Relation.create({
       name: 'MorningShiftRelation',
-      sourceRelation: factoryBatchRelation,
+      baseRelation: factoryBatchRelation,
       sourceProperty: 'morningShiftBatches',
       targetProperty: 'morningShiftFactories',
       matchExpression: MatchExp.atom({
@@ -594,7 +594,7 @@ describe('Every computed handle', () => {
     
     const comprehensiveInspectionRelation = Relation.create({
       name: 'ComprehensiveInspectionRelation',
-      sourceRelation: factoryBatchRelation,
+      baseRelation: factoryBatchRelation,
       sourceProperty: 'comprehensiveInspectionBatches',
       targetProperty: 'comprehensiveInspectionFactories',
       matchExpression: MatchExp.atom({
@@ -605,7 +605,7 @@ describe('Every computed handle', () => {
     
     const highScoreRelation = Relation.create({
       name: 'HighScoreRelation',
-      sourceRelation: factoryBatchRelation,
+      baseRelation: factoryBatchRelation,
       sourceProperty: 'highScoreBatches',
       targetProperty: 'highScoreFactories',
       matchExpression: MatchExp.atom({
@@ -616,7 +616,7 @@ describe('Every computed handle', () => {
     
     const morningComprehensiveRelation = Relation.create({
       name: 'MorningComprehensiveRelation',
-      sourceRelation: factoryBatchRelation,
+      baseRelation: factoryBatchRelation,
       sourceProperty: 'morningComprehensiveBatches',
       targetProperty: 'morningComprehensiveFactories',
       matchExpression: MatchExp.atom({
