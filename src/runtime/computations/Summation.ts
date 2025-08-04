@@ -1,4 +1,4 @@
-import { DataContext, PropertyDataContext } from "./Computation.js";
+import { DataContext, PropertyDataContext, RecordBoundState } from "./Computation.js";
 import { Summation } from "@shared";
 import { Controller } from "../Controller.js";
 import { SummationInstance, EntityInstance, RelationInstance } from "@shared";
@@ -141,7 +141,8 @@ export class PropertySumHandle implements DataBasedComputation {
 
     createState() {
         return {
-        }   
+            itemResult: new RecordBoundState<number>(0, this.relation.name!)
+        }    
     }
     
     getDefaultValue() {
@@ -163,6 +164,7 @@ export class PropertySumHandle implements DataBasedComputation {
         for (const relationItem of relations) {
             // 根据 attributeQuery 的结构获取值
             let value = this.resolveSumField(relationItem['&'], this.sumFieldPath)
+            await this.state.itemResult.set(relationItem['&'], value);
             sum += value;
         }
         
@@ -202,6 +204,7 @@ export class PropertySumHandle implements DataBasedComputation {
             
             // 获取字段值
             const value = this.resolveSumField(newRelationWithEntity, this.sumFieldPath)
+            await this.state.itemResult.set(newRelationWithEntity, value);
             sum += value;
         } else if (relatedMutationEvent.type === 'delete' && relatedMutationEvent.recordName === this.relation.name!) {
             // FIXME 关联关系的删除 - 无法知道原本的字段值
@@ -215,14 +218,8 @@ export class PropertySumHandle implements DataBasedComputation {
                 this.relationAttributeQuery
             );
             const newValue = this.resolveSumField(newRelationWithEntity)
-
-            // 跳过 relatedAttribute 中的前缀部分（如 ['purchases', '&', 'target']），只比较实际的字段路径
-            const relatedAttrLength = mutationEvent.relatedAttribute?.length || 0
-            const fieldPathStart = this.sumFieldPath.findIndex(p => p !== 'target' && p !== 'source')
-            const actualFieldPath = fieldPathStart >= 0 ? this.sumFieldPath.slice(fieldPathStart) : []
-            
-            const oldRecord = mutationEvent.relatedMutationEvent!.oldRecord 
-            const oldValue = this.resolveSumField(oldRecord, actualFieldPath);
+            const oldValue = await this.state.itemResult.get(newRelationWithEntity);
+            await this.state.itemResult.set(newRelationWithEntity, newValue);
             sum += newValue-oldValue 
         }
 

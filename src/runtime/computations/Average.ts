@@ -191,7 +191,8 @@ export class PropertyAverageHandle implements DataBasedComputation {
 
     createState() {
         return {
-            count: new RecordBoundState<number>(0, this.dataContext.host.name)
+            count: new RecordBoundState<number>(0, this.dataContext.host.name),
+            itemResult: new RecordBoundState<number>(0, this.relation.name!)
         }   
     }
     
@@ -221,6 +222,7 @@ export class PropertyAverageHandle implements DataBasedComputation {
                 sum += value;
                 count++;
             }
+            await this.state.itemResult.set(relatedEntity, value);
         }
         
         await this.state.count.set(_current, count);
@@ -266,6 +268,7 @@ export class PropertyAverageHandle implements DataBasedComputation {
                 sum += value;
                 count++;
             }
+            await this.state.itemResult.set(newRelationWithEntity, value);
         } else if (relatedMutationEvent.type === 'delete' && relatedMutationEvent.recordName === this.relation.name!) {
             // FIXME 关联关系的删除 - 无法知道原本的字段值
             return ComputationResult.fullRecompute('Cannot determine average value for deleted relation')
@@ -279,13 +282,8 @@ export class PropertyAverageHandle implements DataBasedComputation {
             );
             const newValue = this.resolveAvgField(newRelationWithEntity)
 
-            // FIXME 守卫条件有问题。
-            // assert(!mutationEvent.relatedAttribute || mutationEvent.relatedAttribute.every((r: any, index: number) => r===this.avgFieldPath[index]), 'related update event should not trigger this average.')
-            // 因为这里的事件有可能是关联关系，也可能是关联实体。
-
-            const oldRecord = structuredClone(newRelationWithEntity)
-            setByPath(oldRecord, mutationEvent.relatedAttribute.slice(2), relatedMutationEvent.oldRecord)
-            const oldValue = this.resolveAvgField(oldRecord);
+            const oldValue = await this.state.itemResult.get(newRelationWithEntity);
+            await this.state.itemResult.set(newRelationWithEntity, newValue);
             
             // 更新 sum 和 count
             if (oldValue !== null && newValue !== null) {
