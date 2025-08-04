@@ -103,27 +103,6 @@ export class MatchExp {
         } else {
             // variable
             const matchAttributePath = (matchData.data.key as string).split('.')
-            const namePath = [this.entityName].concat(matchAttributePath)
-
-            // 这里整条路径上都要检测有没有 filtered relation 的属性。
-            const namePaths = new Array(namePath.length-1).fill(0).map((_, i) => namePath.slice(0, i+2))
-            // const attributeInfoAndPaths: {info: AttributeInfo|undefined, path: string[], resolvedPath: string[]}[] = namePaths.map(p => ({info: this.map.getInfoByPath(p), path: p, resolvedPath: []}))
-            // attributeInfoAndPaths.forEach((item, i) => {
-            //     const {info, path} = item
-            //     item.resolvedPath = [
-            //         ...attributeInfoAndPaths.at(i-1)!.resolvedPath,
-            //         info?.isLinkFiltered() ? info.getBaseAttributeInfo().attributeName : path.at(-1)!
-            //     ]
-            // })
-            // const attributeInfoAndPaths: {info: AttributeInfo|undefined, path: string[], resolvedPath: string[]}[] = namePaths.reduce(
-            //     (result, path) => {
-            //         const info = this.map.getInfoByPath(path)
-            //         const resolvedPath = [...result.at(-1)!.resolvedPath, info?.isLinkFiltered() ? info.getBaseAttributeInfo().attributeName : path.at(-1)!]
-            //         return [...result, {info, path, resolvedPath}]
-            //     },
-            //     []
-            // )
-
             const {resolvedPath, matchExpression:matchExpressionInPath} = matchAttributePath.reduce((result, part) => {
                 const currentPath = [...result.resolvedPath, part]
                 const currentPathInfo = this.map.getInfoByPath(currentPath)
@@ -155,32 +134,6 @@ export class MatchExp {
 
             const baseMatchExpAtom = MatchExp.atom({key:resolvedPath.slice(1).join('.'), value: matchData.data.value})
             return baseMatchExpAtom.and(matchExpressionInPath.data)
-
-            // if (attributeInfoAndPaths.every(({info}) => !info?.isLinkFiltered())) {
-            //     return matchData
-            // }
-
-            // // 先处理本来的条件作为 baseMatchExpAtom，再一个一个处理 filtered relation 的属性。
-            // const resolvedNamePath = [
-            //     ...attributeInfoAndPaths.at(-1)!.resolvedPath
-            // ]
-
-            // let baseMatchExpAtom = MatchExp.atom({key:resolvedNamePath.join('.'), value: matchData.data.value})
-
-            // for (const {info, path, resolvedPath} of attributeInfoAndPaths) {
-            //     if (info?.isLinkFiltered()) {
-            //         const linkInfo = info.getLinkInfo()
-            //         const linkMatchExp = new MatchExp(linkInfo.name, this.map, linkInfo.getMatchExpression())
-            //         // 需要完全反转 rebase。
-            //         const reversePath = this.map.getReversePath([this.entityName, ...resolvedPath])
-            //         const rebasePathStart = info.isRecordSource() ? 'source' : 'target'
-            //         // 注意 reversePath 第一个是 entityName，不需要了。第二个是指向的具体 record，也不要了，等同于 target/source 指向的对象。
-            //         const rebasePath = [rebasePathStart, ...reversePath.slice(2)]
-            //         const rebasedLinkMatch = linkMatchExp.rebase(rebasePath.join('.'))
-            //         baseMatchExpAtom = baseMatchExpAtom.and(rebasedLinkMatch.data)
-            //     }
-            // }
-            // return baseMatchExpAtom
         }
     }
     buildQueryTree(matchData: MatchExpressionData, recordQueryTree: RecordQueryTree) {

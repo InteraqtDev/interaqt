@@ -81,12 +81,14 @@ export abstract class FrameworkError extends Error {
             errorId: this.errorId,
             timestamp: this.timestamp.toISOString(),
             context: this.context,
+            // 这里只展示了两层。下面 getFormattedError 展示所有层。
             causedBy: this.causedBy ? {
                 name: this.causedBy.name,
                 message: this.causedBy.message,
                 stack: this.causedBy.stack
             } : undefined,
-            stack: this.stackTrace
+            stack: this.stackTrace,
+            formattedError: this.getFormattedError()
         }
     }
 
