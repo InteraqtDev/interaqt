@@ -42,6 +42,60 @@ const ActiveUser = Entity.create({
 })
 ```
 
+**Filtered Entities**
+
+Filtered entities are views of existing entities that automatically filter records based on specified conditions. They support:
+
+1. **Cascade Filtering**: Filtered entities can be used as `sourceEntity` to create new filtered entities:
+```typescript
+// First level filter
+const ActiveUser = Entity.create({
+    name: 'ActiveUser',
+    sourceEntity: User,
+    matchExpression: MatchExp.atom({
+        key: 'isActive',
+        value: ['=', true]
+    })
+})
+
+// Second level filter - based on ActiveUser
+const TechActiveUser = Entity.create({
+    name: 'TechActiveUser',
+    sourceEntity: ActiveUser,  // Using filtered entity as source
+    matchExpression: MatchExp.atom({
+        key: 'department',
+        value: ['=', 'Tech']
+    })
+})
+
+// Third level filter - even more specific
+const SeniorTechActiveUser = Entity.create({
+    name: 'SeniorTechActiveUser',
+    sourceEntity: TechActiveUser,
+    matchExpression: MatchExp.atom({
+        key: 'role',
+        value: ['=', 'senior']
+    })
+})
+```
+
+2. **Complex Conditions**: Use boolean expressions for complex filtering:
+```typescript
+const TechYoungUser = Entity.create({
+    name: 'TechYoungUser',
+    sourceEntity: User,
+    matchExpression: MatchExp.atom({
+        key: 'age',
+        value: ['<', 30]
+    }).and({
+        key: 'department',
+        value: ['=', 'Tech']
+    })
+})
+```
+
+3. **Automatic Updates**: When source entity records are created, updated, or deleted, filtered entities automatically reflect these changes based on their match expressions.
+
 ### Property.create()
 
 Create entity property definition.
@@ -95,27 +149,35 @@ const postCount = Property.create({
 
 ### Relation.create()
 
-Create relationship definition between entities.
+Create relationship definition between entities or create filtered views of existing relations.
 
 **Syntax**
 ```typescript
 Relation.create(config: RelationConfig): RelationInstance
 ```
 
+**Two Types of Relations**
+1. **Base Relations**: Define direct relationships between entities (requires `source`, `target`, `type`)
+2. **Filtered Relations**: Create filtered views of existing relations (requires `sourceRelation`, `matchExpression`)
+
 **Important: Auto-Generated Relation Names**
 
-⚠️ **DO NOT specify a `name` property when creating relations.** The framework automatically generates the relation name based on the source and target entities. For example:
+If you did not specify a `name` property when creating relations, The framework will automatically generates the relation name based on the source and target entities. For example:
 - A relation between `User` and `Post` → automatically named `UserPost`
 - A relation between `Post` and `Comment` → automatically named `PostComment`
 
 **Parameters**
-- `config.source` (Entity|Relation, required): Source entity of the relationship
+- `config.name` (string, optional): Relation name. If not specified, will be auto-generated from source and target entity names
+- `config.source` (Entity|Relation, required for base relations): Source entity of the relationship
 - `config.sourceProperty` (string, required): Relationship property name in source entity
-- `config.target` (Entity|Relation, required): Target entity of the relationship
+- `config.target` (Entity|Relation, required for base relations): Target entity of the relationship
 - `config.targetProperty` (string, required): Relationship property name in target entity
-- `config.type` (string, required): Relationship type, options: '1:1' | '1:n' | 'n:1' | 'n:n'
+- `config.type` (string, required for base relations): Relationship type, options: '1:1' | '1:n' | 'n:1' | 'n:n'
 - `config.properties` (Property[], optional): Properties of the relationship itself
 - `config.computation` (Computation, optional): Relationship-level computed data
+- `config.sourceRelation` (Relation, required for filtered relations): Source relation to filter from
+- `config.matchExpression` (MatchExp, required for filtered relations): Filter condition for the relation records
+
 
 **Note on Symmetric Relations**: The system automatically detects symmetric relations when `source === target` AND `sourceProperty === targetProperty`. There is no need to specify a `symmetric` parameter.
 
@@ -162,6 +224,84 @@ const UserRoleRelation = Relation.create({
     ]
 })
 ```
+
+**Filtered Relations**
+
+Filtered relations are views of existing relations that automatically filter relationship records based on specified conditions. They support:
+
+1. **Basic Filtered Relations**: Create filtered views based on relation properties:
+```typescript
+// Base relation with properties
+const UserPostRelation = Relation.create({
+    source: User,
+    sourceProperty: 'posts',
+    target: Post,
+    targetProperty: 'author',
+    type: '1:n',
+    properties: [
+        Property.create({ name: 'isPublished', type: 'boolean' }),
+        Property.create({ name: 'priority', type: 'string' })
+    ]
+})
+
+// Filtered relation - only published posts
+const PublishedUserPostRelation = Relation.create({
+    name: 'PublishedUserPostRelation',
+    sourceRelation: UserPostRelation,
+    sourceProperty: 'publishedPosts',
+    targetProperty: 'publishedAuthor',
+    matchExpression: MatchExp.atom({
+        key: 'isPublished',
+        value: ['=', true]
+    })
+})
+```
+
+2. **Cascade Filtering**: Filtered relations can be used as `sourceRelation` to create new filtered relations:
+```typescript
+// First level filter - active assignments
+const ActiveUserProjectRelation = Relation.create({
+    name: 'ActiveUserProjectRelation',
+    sourceRelation: UserProjectRelation,
+    sourceProperty: 'activeProjects',
+    targetProperty: 'activeUsers',
+    matchExpression: MatchExp.atom({
+        key: 'isActive',
+        value: ['=', true]
+    })
+})
+
+// Second level filter - only lead roles from active assignments
+const LeadUserProjectRelation = Relation.create({
+    name: 'LeadUserProjectRelation',
+    sourceRelation: ActiveUserProjectRelation,  // Using filtered relation as source
+    sourceProperty: 'leadProjects',
+    targetProperty: 'leadUsers',
+    matchExpression: MatchExp.atom({
+        key: 'role',
+        value: ['=', 'lead']
+    })
+})
+```
+
+3. **Complex Filter Conditions**: Combine multiple conditions:
+```typescript
+const ImportantActiveRelation = Relation.create({
+    name: 'ImportantActiveRelation',
+    sourceRelation: UserTaskRelation,
+    sourceProperty: 'importantActiveTasks',
+    targetProperty: 'assignedToImportant',
+    matchExpression: MatchExp.atom({
+        key: 'priority',
+        value: ['=', 'high']
+    }).and({
+        key: 'status',
+        value: ['=', 'active']
+    })
+})
+```
+
+4. **Automatic Updates**: When source relation records are created, updated, or deleted, filtered relations automatically reflect these changes based on their match expressions. For example, if a relation's `isActive` property is updated from `false` to `true`, it will automatically appear in the corresponding filtered relation.
 
 ## 13.2 Computation-Related APIs
 

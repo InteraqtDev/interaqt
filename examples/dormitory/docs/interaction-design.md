@@ -1,560 +1,345 @@
 # 宿舍管理系统交互设计
 
-## 1. 交互设计原则
+## 交互概览
 
-### 1.1 基本原则
-- 每个用户操作对应一个独立的交互
-- 交互只定义名称、操作标识和载荷，不包含业务逻辑
-- Stage 1 实现：仅核心业务逻辑，无权限和业务规则约束
-- Stage 2 实现：添加权限控制和业务规则验证
+本文档详细定义了宿舍管理系统中所有交互的设计，包括输入参数、影响实体、预期结果和业务规则。
 
-### 1.2 载荷设计原则
-- 所有必需字段标记 `required: true`
-- 实体引用使用 `isRef: true` 和 `base` 属性
-- 数组类型使用 `isCollection: true`
-- 避免在基础版本中包含复杂验证逻辑
+## 第一阶段：核心业务交互
 
-## 2. 宿舍管理交互
-
-### 2.1 CreateDormitory (创建宿舍)
-**用途**: 管理员创建新宿舍
-**载荷**:
-- `name`: string (必需) - 宿舍名称
-- `capacity`: number (必需) - 床位数量 (4-6)
-
-**设计说明**:
-- 宿舍状态默认为 active
-- 当前入住人数默认为 0
-- 创建时间自动设置
-
+### 1. CreateDormitory (创建宿舍)
+**用途**: 管理员创建新的宿舍
+**Payload**:
 ```typescript
-export const CreateDormitory = Interaction.create({
-  name: 'CreateDormitory',
-  action: Action.create({ name: 'createDormitory' }),
-  payload: Payload.create({
-    items: [
-      PayloadItem.create({ name: 'name', required: true }),
-      PayloadItem.create({ name: 'capacity', required: true })
-    ]
-  })
-});
+{
+  name: string,        // 宿舍名称，必填
+  capacity: number,   // 床位数量，必填，4-6
+  headId: string       // 宿舍长ID，必填
+}
 ```
+**影响实体**:
+- 创建 Dormitory 实体
+- 创建指定数量的 Bed 实体
+- 建立 DormitoryHeadRelation
+**Stage 2 权限**: 仅 admin 可执行
+**Stage 2 业务规则**: capacity 必须在 4-6 之间
 
-### 2.2 UpdateDormitory (更新宿舍信息)
-**用途**: 管理员修改宿舍基本信息
-**载荷**:
-- `dormitoryId`: string (必需) - 宿舍ID
-- `name`: string (可选) - 新宿舍名称
-- `capacity`: number (可选) - 新床位数量
-- `status`: string (可选) - 宿舍状态
-
+### 2. AssignUserToDormitory (分配用户到宿舍)
+**用途**: 将用户分配到指定宿舍的床位
+**Payload**:
 ```typescript
-export const UpdateDormitory = Interaction.create({
-  name: 'UpdateDormitory',
-  action: Action.create({ name: 'updateDormitory' }),
-  payload: Payload.create({
-    items: [
-      PayloadItem.create({ name: 'dormitoryId', required: true }),
-      PayloadItem.create({ name: 'name' }),
-      PayloadItem.create({ name: 'capacity' }),
-      PayloadItem.create({ name: 'status' })
-    ]
-  })
-});
+{
+  userId: string,      // 用户ID，必填
+  dormitoryId: string, // 宿舍ID，必填
+  bedNumber: number    // 床位号，必填
+}
 ```
+**影响实体**:
+- 更新 UserDormitoryRelation
+- 更新 Bed.isOccupied 状态
+**Stage 2 权限**: 仅 admin 可执行
+**Stage 2 业务规则**: 
+- 用户必须未分配宿舍
+- 指定床位必须可用
+- 宿舍必须有空余床位
 
-### 2.3 GetDormitoryInfo (获取宿舍信息)
-**用途**: 查看宿舍详细信息
-**载荷**:
-- `dormitoryId`: string (必需) - 宿舍ID
-
-**Stage 2 权限**: 管理员查看所有，宿舍长查看管理的，学生查看自己的
-
-```typescript
-export const GetDormitoryInfo = Interaction.create({
-  name: 'GetDormitoryInfo',
-  action: Action.create({ name: 'getDormitoryInfo' }),
-  payload: Payload.create({
-    items: [
-      PayloadItem.create({ name: 'dormitoryId', required: true })
-    ]
-  })
-});
-```
-
-### 2.4 GetAllDormitories (获取所有宿舍)
-**用途**: 管理员查看所有宿舍列表
-**载荷**:
-- `status`: string (可选) - 过滤状态
-- `limit`: number (可选) - 分页限制
-- `offset`: number (可选) - 分页偏移
-
-**Stage 2 权限**: 只有管理员可以访问
-
-```typescript
-export const GetAllDormitories = Interaction.create({
-  name: 'GetAllDormitories',
-  action: Action.create({ name: 'getAllDormitories' }),
-  payload: Payload.create({
-    items: [
-      PayloadItem.create({ name: 'status' }),
-      PayloadItem.create({ name: 'limit' }),
-      PayloadItem.create({ name: 'offset' })
-    ]
-  })
-});
-```
-
-## 3. 用户分配管理交互
-
-### 3.1 AssignUserToDormitory (分配用户到宿舍)
-**用途**: 管理员将用户分配到宿舍的特定床位
-**载荷**:
-- `userId`: string (必需) - 用户ID
-- `dormitoryId`: string (必需) - 宿舍ID
-- `bedNumber`: number (必需) - 床位号
-
-**影响**:
-- 创建 UserDormitoryRelation
-- 自动更新宿舍入住人数
-
-**Stage 2 业务规则**:
-- 宿舍不能满员
-- 用户不能已有宿舍分配
-- 床位不能已被占用
-
-```typescript
-export const AssignUserToDormitory = Interaction.create({
-  name: 'AssignUserToDormitory',
-  action: Action.create({ name: 'assignUserToDormitory' }),
-  payload: Payload.create({
-    items: [
-      PayloadItem.create({ name: 'userId', required: true }),
-      PayloadItem.create({ name: 'dormitoryId', required: true }),
-      PayloadItem.create({ name: 'bedNumber', required: true })
-    ]
-  })
-});
-```
-
-### 3.2 RemoveUserFromDormitory (移除用户宿舍分配)
-**用途**: 管理员移除用户的宿舍分配
-**载荷**:
-- `userId`: string (必需) - 用户ID
-
-**影响**:
-- 更新 UserDormitoryRelation 状态为 inactive
-- 自动更新宿舍入住人数
-- 释放床位
-
-```typescript
-export const RemoveUserFromDormitory = Interaction.create({
-  name: 'RemoveUserFromDormitory',
-  action: Action.create({ name: 'removeUserFromDormitory' }),
-  payload: Payload.create({
-    items: [
-      PayloadItem.create({ name: 'userId', required: true })
-    ]
-  })
-});
-```
-
-### 3.3 TransferUserDormitory (转移用户宿舍)
-**用途**: 管理员将用户从一个宿舍转移到另一个宿舍
-**载荷**:
-- `userId`: string (必需) - 用户ID
-- `newDormitoryId`: string (必需) - 新宿舍ID
-- `newBedNumber`: number (必需) - 新床位号
-
-**影响**:
-- 更新原 UserDormitoryRelation 状态为 inactive
-- 创建新 UserDormitoryRelation
-- 更新两个宿舍的入住人数
-
-```typescript
-export const TransferUserDormitory = Interaction.create({
-  name: 'TransferUserDormitory',
-  action: Action.create({ name: 'transferUserDormitory' }),
-  payload: Payload.create({
-    items: [
-      PayloadItem.create({ name: 'userId', required: true }),
-      PayloadItem.create({ name: 'newDormitoryId', required: true }),
-      PayloadItem.create({ name: 'newBedNumber', required: true })
-    ]
-  })
-});
-```
-
-## 4. 宿舍长管理交互
-
-### 4.1 AssignDormHead (指定宿舍长)
+### 3. AssignDormHead (指定宿舍长)
 **用途**: 管理员指定用户为宿舍长
-**载荷**:
-- `userId`: string (必需) - 用户ID
-- `dormitoryId`: string (必需) - 宿舍ID
-
-**影响**:
-- 创建 DormHeadDormitoryRelation
-- 用户角色自动更新为 dormHead
-
-**Stage 2 业务规则**:
-- 用户必须已分配到该宿舍
-- 一个宿舍只能有一个宿舍长
-
+**Payload**:
 ```typescript
-export const AssignDormHead = Interaction.create({
-  name: 'AssignDormHead',
-  action: Action.create({ name: 'assignDormHead' }),
-  payload: Payload.create({
-    items: [
-      PayloadItem.create({ name: 'userId', required: true }),
-      PayloadItem.create({ name: 'dormitoryId', required: true })
-    ]
-  })
-});
+{
+  dormitoryId: string, // 宿舍ID，必填
+  headId: string       // 新宿舍长ID，必填
+}
 ```
+**影响实体**:
+- 更新 DormitoryHeadRelation
+- 更新 User.role 为 'dormHead'
+**Stage 2 权限**: 仅 admin 可执行
+**Stage 2 业务规则**: 
+- 宿舍必须存在
+- 用户必须是 student 角色
 
-### 4.2 RemoveDormHead (移除宿舍长)
-**用途**: 管理员移除宿舍长职务
-**载荷**:
-- `dormitoryId`: string (必需) - 宿舍ID
-
-**影响**:
-- 更新 DormHeadDormitoryRelation 状态为 inactive
-- 用户角色恢复为 student
-
+### 4. CreateBehaviorRecord (创建行为记录)
+**用途**: 记录用户的行为评分
+**Payload**:
 ```typescript
-export const RemoveDormHead = Interaction.create({
-  name: 'RemoveDormHead',
-  action: Action.create({ name: 'removeDormHead' }),
-  payload: Payload.create({
-    items: [
-      PayloadItem.create({ name: 'dormitoryId', required: true })
-    ]
-  })
-});
+{
+  userId: string,      // 被记录用户ID，必填
+  points: number,      // 分数变化，必填
+  reason: string,      // 原因描述，必填
+  recordedBy: string   // 记录者ID，必填
+}
 ```
+**影响实体**:
+- 创建 BehaviorRecord 实体
+- 更新 User.points
+**Stage 2 权限**: admin 和 dormHead 可执行
+**Stage 2 业务规则**: 
+- dormHead 只能记录本宿舍用户
+- reason 不能为空
 
-## 5. 扣分规则管理交互
-
-### 5.1 CreateScoreRule (创建扣分规则)
-**用途**: 管理员创建新的扣分规则
-**载荷**:
-- `name`: string (必需) - 规则名称
-- `description`: string (必需) - 规则描述
-- `scoreDeduction`: number (必需) - 扣分数值
-
-**影响**:
-- 创建 ScoreRule 实体
-- 规则状态默认为 active
-
+### 5. RequestEviction (申请踢出用户)
+**用途**: 宿舍长申请踢出违规用户
+**Payload**:
 ```typescript
-export const CreateScoreRule = Interaction.create({
-  name: 'CreateScoreRule',
-  action: Action.create({ name: 'createScoreRule' }),
-  payload: Payload.create({
-    items: [
-      PayloadItem.create({ name: 'name', required: true }),
-      PayloadItem.create({ name: 'description', required: true }),
-      PayloadItem.create({ name: 'scoreDeduction', required: true })
-    ]
-  })
-});
+{
+  userId: string,      // 被申请用户ID，必填
+  reason: string,      // 申请原因，必填
+  requestedBy: string  // 申请人ID，必填
+}
 ```
+**影响实体**:
+- 创建 EvictionRequest 实体
+**Stage 2 权限**: admin 和 dormHead 可执行
+**Stage 2 业务规则**: 
+- 用户积分必须 < 60
+- dormHead 只能申请本宿舍用户
 
-### 5.2 UpdateScoreRule (更新扣分规则)
-**用途**: 管理员修改扣分规则信息
-**载荷**:
-- `ruleId`: string (必需) - 规则ID
-- `name`: string (可选) - 新规则名称
-- `description`: string (可选) - 新规则描述
-- `scoreDeduction`: number (可选) - 新扣分数值
-
+### 6. ApproveEviction (审批踢出申请)
+**用途**: 管理员审批踢出申请
+**Payload**:
 ```typescript
-export const UpdateScoreRule = Interaction.create({
-  name: 'UpdateScoreRule',
-  action: Action.create({ name: 'updateScoreRule' }),
-  payload: Payload.create({
-    items: [
-      PayloadItem.create({ name: 'ruleId', required: true }),
-      PayloadItem.create({ name: 'name' }),
-      PayloadItem.create({ name: 'description' }),
-      PayloadItem.create({ name: 'scoreDeduction' })
-    ]
-  })
-});
+{
+  requestId: string,   // 申请ID，必填
+  approved: boolean,    // 是否批准，必填
+  approvedBy: string   // 审批人ID，必填
+}
 ```
+**影响实体**:
+- 更新 EvictionRequest 状态
+- 如果批准，清除用户的宿舍分配
+**Stage 2 权限**: 仅 admin 可执行
+**Stage 2 业务规则**: 
+- 申请必须是 pending 状态
+- 如果批准，用户必须仍在宿舍中
 
-### 5.3 DeactivateScoreRule (禁用扣分规则)
-**用途**: 管理员禁用扣分规则
-**载荷**:
-- `ruleId`: string (必需) - 规则ID
+## 第二阶段：查询交互
 
-**影响**:
-- 更新 ScoreRule.isActive 为 false
-- 该规则不能再用于扣分
-
+### 7. GetDormitory (获取宿舍信息)
+**用途**: 获取宿舍详细信息
+**Payload**:
 ```typescript
-export const DeactivateScoreRule = Interaction.create({
-  name: 'DeactivateScoreRule',
-  action: Action.create({ name: 'deactivateScoreRule' }),
-  payload: Payload.create({
-    items: [
-      PayloadItem.create({ name: 'ruleId', required: true })
-    ]
-  })
-});
+{
+  id: string           // 宿舍ID，必填
+}
 ```
+**返回数据**: Dormitory 实体及关联数据
+**Stage 2 权限**: 
+- admin: 可查看任何宿舍
+- dormHead: 仅可查看自己管理的宿舍
+- student: 仅可查看自己所在的宿舍
 
-### 5.4 GetScoreRules (获取扣分规则)
-**用途**: 查看扣分规则列表
-**载荷**:
-- `isActive`: boolean (可选) - 过滤激活状态
+### 8. ListDormitories (列出宿舍)
+**用途**: 获取宿舍列表
+**Payload**: 无
+**返回数据**: Dormitory 数组
+**Stage 2 权限**: 
+- admin: 查看所有宿舍
+- dormHead: 仅查看自己管理的宿舍
+- student: 仅查看自己所在的宿舍
 
-**Stage 2 权限**: 管理员和宿舍长可以查看
-
+### 9. GetUser (获取用户信息)
+**用途**: 获取用户详细信息
+**Payload**:
 ```typescript
-export const GetScoreRules = Interaction.create({
-  name: 'GetScoreRules',
-  action: Action.create({ name: 'getScoreRules' }),
-  payload: Payload.create({
-    items: [
-      PayloadItem.create({ name: 'isActive' })
-    ]
-  })
-});
+{
+  id: string           // 用户ID，必填
+}
 ```
+**返回数据**: User 实体及关联数据
+**Stage 2 权限**: 
+- admin: 可查看任何用户
+- dormHead: 仅可查看本宿舍用户
+- student: 仅可查看自己
 
-## 6. 扣分操作交互
-
-### 6.1 DeductUserScore (对用户扣分)
-**用途**: 宿舍长或管理员对用户执行扣分
-**载荷**:
-- `userId`: string (必需) - 被扣分用户ID
-- `ruleId`: string (必需) - 使用的扣分规则ID
-- `reason`: string (必需) - 具体扣分原因
-- `operatorNotes`: string (可选) - 操作员备注
-
-**影响**:
-- 创建 ScoreRecord 实体
-- 创建相关关系记录
-- 用户总分自动更新
-
-**Stage 2 权限**: 管理员可以对所有用户扣分，宿舍长只能对管理宿舍内用户扣分
-
+### 10. ListUsers (列出用户)
+**用途**: 获取用户列表
+**Payload**:
 ```typescript
-export const DeductUserScore = Interaction.create({
-  name: 'DeductUserScore',
-  action: Action.create({ name: 'deductUserScore' }),
-  payload: Payload.create({
-    items: [
-      PayloadItem.create({ name: 'userId', required: true }),
-      PayloadItem.create({ name: 'ruleId', required: true }),
-      PayloadItem.create({ name: 'reason', required: true }),
-      PayloadItem.create({ name: 'operatorNotes' })
-    ]
-  })
-});
+{
+  dormitoryId?: string, // 可选，按宿舍筛选
+  role?: string         // 可选，按角色筛选
+}
 ```
+**返回数据**: User 数组
+**Stage 2 权限**: 
+- admin: 可查看所有用户
+- dormHead: 仅可查看本宿舍用户
+- student: 仅可查看自己
 
-### 6.2 GetUserScoreRecords (获取用户扣分记录)
-**用途**: 查看用户的扣分历史记录
-**载荷**:
-- `userId`: string (必需) - 用户ID
-- `limit`: number (可选) - 分页限制
-- `offset`: number (可选) - 分页偏移
-
-**Stage 2 权限**: 管理员查看所有，宿舍长查看管理宿舍内用户，用户查看自己的
-
+### 11. GetBehaviorRecords (获取行为记录)
+**用途**: 获取行为记录列表
+**Payload**:
 ```typescript
-export const GetUserScoreRecords = Interaction.create({
-  name: 'GetUserScoreRecords',
-  action: Action.create({ name: 'getUserScoreRecords' }),
-  payload: Payload.create({
-    items: [
-      PayloadItem.create({ name: 'userId', required: true }),
-      PayloadItem.create({ name: 'limit' }),
-      PayloadItem.create({ name: 'offset' })
-    ]
-  })
-});
+{
+  userId?: string,     // 可选，按用户筛选
+  dormitoryId?: string // 可选，按宿舍筛选
+}
 ```
+**返回数据**: BehaviorRecord 数组
+**Stage 2 权限**: 
+- admin: 可查看所有记录
+- dormHead: 仅可查看本宿舍记录
+- student: 仅可查看自己的记录
 
-## 7. 踢出申请管理交互
-
-### 7.1 RequestKickUser (申请踢出用户)
-**用途**: 宿舍长申请踢出分数过低的用户
-**载荷**:
-- `userId`: string (必需) - 被申请踢出的用户ID
-- `reason`: string (必需) - 申请理由
-
-**影响**:
-- 创建 KickRequest 实体
-- 创建相关关系记录
-- 申请状态默认为 pending
-
-**Stage 2 权限**: 只有宿舍长可以申请踢出管理宿舍内的用户
-**Stage 2 业务规则**: 用户分数必须低于20分，不能申请踢出自己
-
+### 12. GetEvictionRequests (获取踢出申请)
+**用途**: 获取踢出申请列表
+**Payload**:
 ```typescript
-export const RequestKickUser = Interaction.create({
-  name: 'RequestKickUser',
-  action: Action.create({ name: 'requestKickUser' }),
-  payload: Payload.create({
-    items: [
-      PayloadItem.create({ name: 'userId', required: true }),
-      PayloadItem.create({ name: 'reason', required: true })
-    ]
-  })
-});
+{
+  status?: string,      // 可选，按状态筛选
+  userId?: string       // 可选，按用户筛选
+}
 ```
+**返回数据**: EvictionRequest 数组
+**Stage 2 权限**: 
+- admin: 可查看所有申请
+- dormHead: 仅可查看自己提交的申请
+- student: 不可查看
 
-### 7.2 ApproveKickRequest (批准踢出申请)
-**用途**: 管理员批准踢出申请
-**载荷**:
-- `requestId`: string (必需) - 申请ID
-- `adminNotes`: string (可选) - 管理员备注
-
-**影响**:
-- 更新 KickRequest.status 为 approved
-- 更新 KickRequest.processedAt
-- 用户状态变为 kicked
-- 宿舍关系状态变为 inactive
-- 释放床位
-
-**Stage 2 权限**: 只有管理员可以批准申请
-
+### 13. GetUserPoints (获取用户积分)
+**用途**: 获取用户当前积分
+**Payload**:
 ```typescript
-export const ApproveKickRequest = Interaction.create({
-  name: 'ApproveKickRequest',
-  action: Action.create({ name: 'approveKickRequest' }),
-  payload: Payload.create({
-    items: [
-      PayloadItem.create({ name: 'requestId', required: true }),
-      PayloadItem.create({ name: 'adminNotes' })
-    ]
-  })
-});
+{
+  userId: string       // 用户ID，必填
+}
 ```
+**返回数据**: 用户积分和积分历史
+**Stage 2 权限**: 
+- admin: 可查看任何用户
+- dormHead: 仅可查看本宿舍用户
+- student: 仅可查看自己
 
-### 7.3 RejectKickRequest (拒绝踢出申请)
-**用途**: 管理员拒绝踢出申请
-**载荷**:
-- `requestId`: string (必需) - 申请ID
-- `adminNotes`: string (可选) - 管理员备注
-
-**影响**:
-- 更新 KickRequest.status 为 rejected
-- 更新 KickRequest.processedAt
-
-**Stage 2 权限**: 只有管理员可以拒绝申请
-
+### 14. GetDormitoryOccupancy (获取宿舍占用情况)
+**用途**: 获取宿舍床位占用情况
+**Payload**:
 ```typescript
-export const RejectKickRequest = Interaction.create({
-  name: 'RejectKickRequest',
-  action: Action.create({ name: 'rejectKickRequest' }),
-  payload: Payload.create({
-    items: [
-      PayloadItem.create({ name: 'requestId', required: true }),
-      PayloadItem.create({ name: 'adminNotes' })
-    ]
-  })
-});
+{
+  dormitoryId: string  // 宿舍ID，必填
+}
 ```
+**返回数据**: 占用统计和床位列表
+**Stage 2 权限**: 
+- admin: 可查看任何宿舍
+- dormHead: 仅可查看自己管理的宿舍
+- student: 仅可查看自己所在宿舍
 
-### 7.4 GetKickRequests (获取踢出申请)
-**用途**: 查看踢出申请列表
-**载荷**:
-- `status`: string (可选) - 过滤申请状态
-- `dormitoryId`: string (可选) - 过滤宿舍
-- `limit`: number (可选) - 分页限制
-- `offset`: number (可选) - 分页偏移
+## 第三阶段：管理交互
 
-**Stage 2 权限**: 管理员查看所有，宿舍长查看自己发起的
-
+### 15. UpdateDormitory (更新宿舍信息)
+**用途**: 更新宿舍基本信息
+**Payload**:
 ```typescript
-export const GetKickRequests = Interaction.create({
-  name: 'GetKickRequests',
-  action: Action.create({ name: 'getKickRequests' }),
-  payload: Payload.create({
-    items: [
-      PayloadItem.create({ name: 'status' }),
-      PayloadItem.create({ name: 'dormitoryId' }),
-      PayloadItem.create({ name: 'limit' }),
-      PayloadItem.create({ name: 'offset' })
-    ]
-  })
-});
+{
+  id: string,          // 宿舍ID，必填
+  name?: string,       // 可选，新名称
+  capacity?: number,   // 可选，新容量
+  status?: string      // 可选，新状态
+}
 ```
+**影响实体**: 更新 Dormitory 实体
+**Stage 2 权限**: 仅 admin 可执行
+**Stage 2 业务规则**: 
+- capacity 必须在 4-6 之间
+- 不能减少到低于当前占用数
 
-## 8. 用户查询交互
-
-### 8.1 GetUserInfo (获取用户信息)
-**用途**: 查看用户详细信息
-**载荷**:
-- `userId`: string (必需) - 用户ID
-
-**Stage 2 权限**: 管理员查看所有，宿舍长查看管理宿舍内用户，用户查看自己的
-
+### 16. RemoveUserFromDormitory (移除用户)
+**用途**: 管理员直接移除用户（不通过申请流程）
+**Payload**:
 ```typescript
-export const GetUserInfo = Interaction.create({
-  name: 'GetUserInfo',
-  action: Action.create({ name: 'getUserInfo' }),
-  payload: Payload.create({
-    items: [
-      PayloadItem.create({ name: 'userId', required: true })
-    ]
-  })
-});
+{
+  userId: string       // 用户ID，必填
+}
 ```
+**影响实体**: 
+- 清除 UserDormitoryRelation
+- 更新 Bed.isOccupied
+**Stage 2 权限**: 仅 admin 可执行
+**Stage 2 业务规则**: 用户必须已分配宿舍
 
-### 8.2 GetDormitoryUsers (获取宿舍用户)
-**用途**: 查看宿舍内所有用户
-**载荷**:
-- `dormitoryId`: string (必需) - 宿舍ID
-
-**Stage 2 权限**: 管理员查看所有，宿舍长查看管理的宿舍，学生查看自己的宿舍
-
+### 17. UpdateUser (更新用户信息)
+**用途**: 更新用户基本信息
+**Payload**:
 ```typescript
-export const GetDormitoryUsers = Interaction.create({
-  name: 'GetDormitoryUsers',
-  action: Action.create({ name: 'getDormitoryUsers' }),
-  payload: Payload.create({
-    items: [
-      PayloadItem.create({ name: 'dormitoryId', required: true })
-    ]
-  })
-});
+{
+  id: string,          // 用户ID，必填
+  name?: string,       // 可选，新姓名
+  email?: string,      // 可选，新邮箱
+  role?: string        // 可选，新角色
+}
 ```
+**影响实体**: 更新 User 实体
+**Stage 2 权限**: 仅 admin 可执行
+**Stage 2 业务规则**: 
+- email 必须唯一
+- 不能修改自己的角色
 
-## 9. 交互分组和依赖
+### 18. DeleteDormitory (删除宿舍)
+**用途**: 删除空宿舍
+**Payload**:
+```typescript
+{
+  id: string           // 宿舍ID，必填
+}
+```
+**影响实体**: 
+- 删除 Dormitory
+- 删除关联的 Bed
+- 清除相关关系
+**Stage 2 权限**: 仅 admin 可执行
+**Stage 2 业务规则**: 宿舍必须为空
 
-### 9.1 核心业务逻辑组 (Stage 1 实现)
-1. **宿舍管理**: CreateDormitory, GetDormitoryInfo, GetAllDormitories
-2. **用户分配**: AssignUserToDormitory, RemoveUserFromDormitory
-3. **宿舍长管理**: AssignDormHead, RemoveDormHead
-4. **扣分规则**: CreateScoreRule, GetScoreRules
-5. **扣分操作**: DeductUserScore, GetUserScoreRecords
-6. **踢出申请**: RequestKickUser, ApproveKickRequest, RejectKickRequest, GetKickRequests
-7. **用户查询**: GetUserInfo, GetDormitoryUsers
+## 错误处理设计
 
-### 9.2 权限控制组 (Stage 2 实现)
-- 所有交互的权限验证
-- 基于角色的访问控制
-- 上下文相关权限检查
+### 1. 权限错误
+- 错误码: PERMISSION_DENIED
+- 返回信息: "Insufficient permissions"
+- 适用场景: 用户尝试执行无权操作
 
-### 9.3 业务规则组 (Stage 2 实现)
-- 宿舍容量验证
-- 床位冲突检查
-- 用户状态验证
-- 分数阈值检查
+### 2. 验证错误
+- 错误码: VALIDATION_FAILED
+- 返回信息: 具体验证失败原因
+- 适用场景: 输入数据不符合业务规则
 
-## 10. 验证清单
-- [x] 所有用户操作都有对应的交互
-- [x] Action 只包含名称标识，无业务逻辑
-- [x] 载荷项目正确标记必需字段
-- [x] 集合类型使用 isCollection: true
-- [x] 实体引用使用 isRef: true 和 base 属性
-- [x] 基础版本不包含权限和约束
-- [x] 交互命名清晰且一致
-- [x] 载荷设计完整且合理
+### 3. 未找到错误
+- 错误码: NOT_FOUND
+- 返回信息: "Resource not found"
+- 适用场景: 请求的实体不存在
+
+### 4. 业务规则错误
+- 错误码: BUSINESS_RULE_VIOLATION
+- 返回信息: 具体违反的规则
+- 适用场景: 操作违反业务逻辑
+
+## 状态设计
+
+### 1. 宿舍状态
+- active: 活跃，可正常使用
+- inactive: 停用，不可分配新用户
+
+### 2. 踢出申请状态
+- pending: 待审批
+- approved: 已批准
+- rejected: 已拒绝
+
+### 3. 床位状态
+- 通过 isOccupied 布尔值表示
+- true: 已占用
+- false: 可用
+
+## 实现注意事项
+
+1. **所有时间戳**: 使用 Unix 时间戳（毫秒）
+2. **ID生成**: 使用 UUID 或类似的唯一标识符
+3. **数据一致性**: 确保相关数据同时更新（如分配用户时更新床位状态）
+4. **事务处理**: 关键操作需要事务支持
+5. **审计日志**: 所有关键操作需要记录操作日志
+
+## 扩展性考虑
+
+1. **批量操作**: 未来可能需要支持批量分配用户
+2. **导入导出**: 支持批量导入用户和宿舍数据
+3. **通知系统**: 关键事件（如踢出）需要通知相关用户
+4. **报表功能**: 生成各种统计报表
+5. **API 分页**: 列表查询需要支持分页

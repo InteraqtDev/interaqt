@@ -1,706 +1,592 @@
-import { describe, test, expect, beforeEach } from 'vitest'
-import { 
-  Controller, MonoSystem, PGLiteDB, MatchExp
-} from 'interaqt'
-import { 
-  entities, relations, interactions, dicts
-} from '../backend/index'
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { Controller, MatchExp, MonoSystem } from 'interaqt';
+import { createController, entities, relations, interactions } from '../backend/index';
 
-describe('Stage 1: Core Business Logic Tests', () => {
-  let system: MonoSystem
-  let controller: Controller
-
-  beforeEach(async () => {
-    // Create fresh system and controller for each test
-    system = new MonoSystem(new PGLiteDB())
+describe('Dormitory Management System - Stage 1: Core Business Logic', () => {
+    let controller: any;
     
-    controller = new Controller({
-      system,
-      entities,
-      relations,
-      interactions,
-      dicts
-    })
-
-    await controller.setup(true)
-  })
-
-  // ============================================================================
-  // TC001: Create Dormitory (via CreateDormitory Interaction)
-  // ============================================================================
-  test('TC001: Create dormitory with valid data', async () => {
-    // Setup: Create admin user (proper role even in Stage 1)
-    const admin = await system.storage.create('User', {
-      name: 'System Admin',
-      email: 'admin@dormitory.com',
-      role: 'admin'
-    })
-
-    // Act: Create dormitory
-    const result = await controller.callInteraction('CreateDormitory', {
-      user: admin,
-      payload: {
-        name: 'A栋101',
-        capacity: 4
-      }
-    })
-
-    // Assert: Check interaction succeeded
-    expect(result.error).toBeUndefined()
-
-    // Verify dormitory was created
-    const dormitory = await system.storage.findOne('Dormitory',
-      MatchExp.atom({ key: 'name', value: ['=', 'A栋101'] }),
-      undefined,
-      ['name', 'capacity', 'currentOccupancy', 'status', 'id']
-    )
+    beforeAll(async () => {
+        // Create system
+        const system = new MonoSystem();
+        
+        // Create controller
+        controller = createController(system);
+        
+        // Setup the system
+        await controller.setup(true);
+    });
     
-    expect(dormitory).toBeTruthy()
-    expect(dormitory.name).toBe('A栋101')
-    expect(dormitory.capacity).toBe(4)
-    expect(dormitory.currentOccupancy).toBe(0)
-    expect(dormitory.status).toBe('active')
-  })
-
-  // ============================================================================
-  // TC002: Assign User to Dormitory (via AssignUserToDormitory Interaction)
-  // ============================================================================
-  test('TC002: Assign user to dormitory', async () => {
-    // Setup: Create admin, dormitory, and student
-    const admin = await system.storage.create('User', {
-      name: 'System Admin',
-      email: 'admin@dormitory.com',
-      role: 'admin'
-    })
-
-    const student = await system.storage.create('User', {
-      name: '李四',
-      email: 'li4@student.com',
-      role: 'student'
-    })
-
-    // Create dormitory first
-    await controller.callInteraction('CreateDormitory', {
-      user: admin,
-      payload: {
-        name: 'A栋101',
-        capacity: 4
-      }
-    })
-
-    const dormitory = await system.storage.findOne('Dormitory',
-      MatchExp.atom({ key: 'name', value: ['=', 'A栋101'] }),
-      undefined,
-      ['id']
-    )
-
-    // Act: Assign user to dormitory
-    const result = await controller.callInteraction('AssignUserToDormitory', {
-      user: admin,
-      payload: {
-        userId: student.id,
-        dormitoryId: dormitory.id,
-        bedNumber: 1
-      }
-    })
-
-    // Assert: Check interaction succeeded
-    expect(result.error).toBeUndefined()
-
-    // Verify user-dormitory relation was created
-    const relation = await system.storage.findOneRelationByName('UserDormitoryRelation',
-      MatchExp.atom({ key: 'source.id', value: ['=', student.id] }),
-      undefined,
-      ['bedNumber', 'status', 'source', 'target']
-    )
+    afterAll(async () => {
+        // Cleanup if needed
+    });
     
-    expect(relation).toBeTruthy()
-    expect(relation.bedNumber).toBe(1)
-    expect(relation.status).toBe('active')
-    expect(relation.source.id).toBe(student.id)
-    expect(relation.target.id).toBe(dormitory.id)
-
-    // Verify dormitory occupancy updated
-    const updatedDormitory = await system.storage.findOne('Dormitory',
-      MatchExp.atom({ key: 'id', value: ['=', dormitory.id] }),
-      undefined,
-      ['currentOccupancy']
-    )
-    expect(updatedDormitory.currentOccupancy).toBe(1)
-  })
-
-  // ============================================================================
-  // TC003: Assign Dorm Head (via AssignDormHead Interaction)
-  // ============================================================================
-  test('TC003: Assign dorm head', async () => {
-    // Setup: Create users and dormitory
-    const admin = await system.storage.create('User', {
-      name: 'System Admin',
-      email: 'admin@dormitory.com',
-      role: 'admin'
-    })
-
-    const student = await system.storage.create('User', {
-      name: '张三',
-      email: 'zhang3@student.com',
-      role: 'student'
-    })
-
-    // Create dormitory and assign user first
-    await controller.callInteraction('CreateDormitory', {
-      user: admin,
-      payload: {
-        name: 'A栋101',
-        capacity: 4
-      }
-    })
-
-    const dormitory = await system.storage.findOne('Dormitory',
-      MatchExp.atom({ key: 'name', value: ['=', 'A栋101'] }),
-      undefined,
-      ['id']
-    )
-
-    // Assign user to dormitory first
-    await controller.callInteraction('AssignUserToDormitory', {
-      user: admin,
-      payload: {
-        userId: student.id,
-        dormitoryId: dormitory.id,
-        bedNumber: 1
-      }
-    })
-
-    // Act: Assign dorm head
-    const result = await controller.callInteraction('AssignDormHead', {
-      user: admin,
-      payload: {
-        userId: student.id,
-        dormitoryId: dormitory.id
-      }
-    })
-
-    // Assert: Check interaction succeeded
-    expect(result.error).toBeUndefined()
-
-    // Verify dorm head relation was created
-    const relation = await system.storage.findOneRelationByName('DormHeadDormitoryRelation',
-      MatchExp.atom({ key: 'source.id', value: ['=', student.id] }),
-      undefined,
-      ['status', 'source', 'target']
-    )
-    
-    expect(relation).toBeTruthy()
-    expect(relation.status).toBe('active')
-    expect(relation.source.id).toBe(student.id)
-    expect(relation.target.id).toBe(dormitory.id)
-  })
-
-  // ============================================================================
-  // TC004: Create Score Rule (via CreateScoreRule Interaction)
-  // ============================================================================
-  test('TC004: Create score rule', async () => {
-    // Setup: Create admin user
-    const admin = await system.storage.create('User', {
-      name: 'System Admin',
-      email: 'admin@dormitory.com',
-      role: 'admin'
-    })
-
-    // Act: Create score rule
-    const result = await controller.callInteraction('CreateScoreRule', {
-      user: admin,
-      payload: {
-        name: '晚归',
-        description: '超过23:00回宿舍',
-        scoreDeduction: 10
-      }
-    })
-
-    // Assert: Check interaction succeeded
-    expect(result.error).toBeUndefined()
-
-    // Verify score rule was created
-    const scoreRule = await system.storage.findOne('ScoreRule',
-      MatchExp.atom({ key: 'name', value: ['=', '晚归'] }),
-      undefined,
-      ['name', 'description', 'scoreDeduction', 'isActive']
-    )
-    
-    expect(scoreRule).toBeTruthy()
-    expect(scoreRule.name).toBe('晚归')
-    expect(scoreRule.description).toBe('超过23:00回宿舍')
-    expect(scoreRule.scoreDeduction).toBe(10)
-    expect(scoreRule.isActive).toBe(true)
-  })
-
-  // ============================================================================
-  // TC005: Deduct User Score (via DeductUserScore Interaction)
-  // ============================================================================
-  test('TC005: Deduct user score', async () => {
-    // Setup: Create admin, dorm head, student, dormitory, and score rule
-    const admin = await system.storage.create('User', {
-      name: 'System Admin',
-      email: 'admin@dormitory.com',
-      role: 'admin'
-    })
-
-    const dormHead = await system.storage.create('User', {
-      name: '张三',
-      email: 'zhang3@student.com',
-      role: 'student'  // Initial role, will become dormHead
-    })
-
-    const student = await system.storage.create('User', {
-      name: '李四',
-      email: 'li4@student.com',
-      role: 'student'
-    })
-
-    // Create dormitory and score rule
-    await controller.callInteraction('CreateDormitory', {
-      user: admin,
-      payload: {
-        name: 'A栋101',
-        capacity: 4
-      }
-    })
-
-    await controller.callInteraction('CreateScoreRule', {
-      user: admin,
-      payload: {
-        name: '晚归',
-        description: '超过23:00回宿舍',
-        scoreDeduction: 10
-      }
-    })
-
-    const dormitory = await system.storage.findOne('Dormitory',
-      MatchExp.atom({ key: 'name', value: ['=', 'A栋101'] }),
-      undefined,
-      ['id']
-    )
-
-    const scoreRule = await system.storage.findOne('ScoreRule',
-      MatchExp.atom({ key: 'name', value: ['=', '晚归'] }),
-      undefined,
-      ['id']
-    )
-
-    // Assign users to dormitory and set dorm head
-    await controller.callInteraction('AssignUserToDormitory', {
-      user: admin,
-      payload: {
-        userId: dormHead.id,
-        dormitoryId: dormitory.id,
-        bedNumber: 1
-      }
-    })
-
-    await controller.callInteraction('AssignUserToDormitory', {
-      user: admin,
-      payload: {
-        userId: student.id,
-        dormitoryId: dormitory.id,
-        bedNumber: 2
-      }
-    })
-
-    await controller.callInteraction('AssignDormHead', {
-      user: admin,
-      payload: {
-        userId: dormHead.id,
-        dormitoryId: dormitory.id
-      }
-    })
-
-    // Act: Deduct score (dorm head deducting student's score)
-    const result = await controller.callInteraction('DeductUserScore', {
-      user: dormHead,
-      payload: {
-        userId: student.id,
-        ruleId: scoreRule.id,
-        reason: '23:30回宿舍',
-        operatorNotes: '宿舍管理记录'
-      }
-    })
-
-    // Assert: Check interaction succeeded
-    expect(result.error).toBeUndefined()
-
-    // Verify score record was created
-    const scoreRecord = await system.storage.findOne('ScoreRecord',
-      MatchExp.atom({ key: 'reason', value: ['=', '23:30回宿舍'] }),
-      undefined,
-      ['reason', 'score', 'operatorNotes']
-    )
-    
-    expect(scoreRecord).toBeTruthy()
-    expect(scoreRecord.reason).toBe('23:30回宿舍')
-    expect(scoreRecord.score).toBe(10)  // Placeholder value from Stage 1
-    expect(scoreRecord.operatorNotes).toBe('宿舍管理记录')
-
-    // Note: In Stage 1, totalScore computation may not work perfectly yet
-    // We'll verify this more thoroughly in Stage 2 tests
-  })
-
-  // ============================================================================
-  // TC006: Request Kick User (via RequestKickUser Interaction)
-  // ============================================================================
-  test('TC006: Request kick user', async () => {
-    // Setup: Create users and dormitory (similar to previous test)
-    const admin = await system.storage.create('User', {
-      name: 'System Admin',
-      email: 'admin@dormitory.com',
-      role: 'admin'
-    })
-
-    const dormHead = await system.storage.create('User', {
-      name: '张三',
-      email: 'zhang3@student.com',
-      role: 'student'
-    })
-
-    const student = await system.storage.create('User', {
-      name: '李四',
-      email: 'li4@student.com',
-      role: 'student'
-    })
-
-    // Create dormitory and setup relationships
-    await controller.callInteraction('CreateDormitory', {
-      user: admin,
-      payload: {
-        name: 'A栋101',
-        capacity: 4
-      }
-    })
-
-    const dormitory = await system.storage.findOne('Dormitory',
-      MatchExp.atom({ key: 'name', value: ['=', 'A栋101'] }),
-      undefined,
-      ['id']
-    )
-
-    await controller.callInteraction('AssignUserToDormitory', {
-      user: admin,
-      payload: {
-        userId: dormHead.id,
-        dormitoryId: dormitory.id,
-        bedNumber: 1
-      }
-    })
-
-    await controller.callInteraction('AssignUserToDormitory', {
-      user: admin,
-      payload: {
-        userId: student.id,
-        dormitoryId: dormitory.id,
-        bedNumber: 2
-      }
-    })
-
-    await controller.callInteraction('AssignDormHead', {
-      user: admin,
-      payload: {
-        userId: dormHead.id,
-        dormitoryId: dormitory.id
-      }
-    })
-
-    // Act: Request kick user
-    const result = await controller.callInteraction('RequestKickUser', {
-      user: dormHead,
-      payload: {
-        userId: student.id,
-        reason: '多次违规，分数过低'
-      }
-    })
-
-    // Assert: Check interaction succeeded
-    expect(result.error).toBeUndefined()
-
-    // Verify kick request was created
-    const kickRequest = await system.storage.findOne('KickRequest',
-      MatchExp.atom({ key: 'reason', value: ['=', '多次违规，分数过低'] }),
-      undefined,
-      ['reason', 'status']
-    )
-    
-    expect(kickRequest).toBeTruthy()
-    expect(kickRequest.reason).toBe('多次违规，分数过低')
-    expect(kickRequest.status).toBe('pending')
-  })
-
-  // ============================================================================
-  // TC007: Approve Kick Request (via ApproveKickRequest Interaction)
-  // ============================================================================
-  test('TC007: Approve kick request', async () => {
-    // Setup: Create kick request (reuse previous setup)
-    const admin = await system.storage.create('User', {
-      name: 'System Admin',
-      email: 'admin@dormitory.com',
-      role: 'admin'
-    })
-
-    const dormHead = await system.storage.create('User', {
-      name: '张三',
-      email: 'zhang3@student.com',
-      role: 'student'
-    })
-
-    const student = await system.storage.create('User', {
-      name: '李四',
-      email: 'li4@student.com',
-      role: 'student'
-    })
-
-    // Setup dormitory and relationships
-    await controller.callInteraction('CreateDormitory', {
-      user: admin,
-      payload: {
-        name: 'A栋101',
-        capacity: 4
-      }
-    })
-
-    const dormitory = await system.storage.findOne('Dormitory',
-      MatchExp.atom({ key: 'name', value: ['=', 'A栋101'] }),
-      undefined,
-      ['id']
-    )
-
-    await controller.callInteraction('AssignUserToDormitory', {
-      user: admin,
-      payload: {
-        userId: dormHead.id,
-        dormitoryId: dormitory.id,
-        bedNumber: 1
-      }
-    })
-
-    await controller.callInteraction('AssignUserToDormitory', {
-      user: admin,
-      payload: {
-        userId: student.id,
-        dormitoryId: dormitory.id,
-        bedNumber: 2
-      }
-    })
-
-    await controller.callInteraction('AssignDormHead', {
-      user: admin,
-      payload: {
-        userId: dormHead.id,
-        dormitoryId: dormitory.id
-      }
-    })
-
-    // Create kick request
-    await controller.callInteraction('RequestKickUser', {
-      user: dormHead,
-      payload: {
-        userId: student.id,
-        reason: '多次违规，分数过低'
-      }
-    })
-
-    const kickRequest = await system.storage.findOne('KickRequest',
-      MatchExp.atom({ key: 'reason', value: ['=', '多次违规，分数过低'] }),
-      undefined,
-      ['id']
-    )
-
-    // Act: Approve kick request
-    const result = await controller.callInteraction('ApproveKickRequest', {
-      user: admin,
-      payload: {
-        requestId: kickRequest.id,
-        adminNotes: '同意踢出，违规情况属实'
-      }
-    })
-
-    // Assert: Check interaction succeeded
-    expect(result.error).toBeUndefined()
-
-    // Note: In Stage 1, we only verify the interaction succeeds
-    // In Stage 2, we'll verify that user status changes to 'kicked' and
-    // dormitory relation status changes to 'inactive'
-  })
-
-  // ============================================================================
-  // TC008: Get Dormitory Info (via GetDormitoryInfo Interaction)
-  // ============================================================================
-  test('TC008: Get dormitory info', async () => {
-    // Setup: Create dormitory with some residents
-    const admin = await system.storage.create('User', {
-      name: 'System Admin',
-      email: 'admin@dormitory.com',
-      role: 'admin'
-    })
-
-    const student = await system.storage.create('User', {
-      name: '李四',
-      email: 'li4@student.com',
-      role: 'student'
-    })
-
-    await controller.callInteraction('CreateDormitory', {
-      user: admin,
-      payload: {
-        name: 'A栋101',
-        capacity: 4
-      }
-    })
-
-    const dormitory = await system.storage.findOne('Dormitory',
-      MatchExp.atom({ key: 'name', value: ['=', 'A栋101'] }),
-      undefined,
-      ['id']
-    )
-
-    await controller.callInteraction('AssignUserToDormitory', {
-      user: admin,
-      payload: {
-        userId: student.id,
-        dormitoryId: dormitory.id,
-        bedNumber: 1
-      }
-    })
-
-    // Act: Get dormitory info
-    const result = await controller.callInteraction('GetDormitoryInfo', {
-      user: admin,
-      payload: {
-        dormitoryId: dormitory.id
-      }
-    })
-
-    // Assert: Check interaction succeeded
-    expect(result.error).toBeUndefined()
-
-    // Note: In Stage 1, we just verify the interaction works
-    // In Stage 2, we'll implement proper data retrieval and verification
-  })
-
-  // ============================================================================
-  // TC009: Get User Score Records (via GetUserScoreRecords Interaction)
-  // ============================================================================
-  test('TC009: Get user score records', async () => {
-    // Setup: Create user with score records
-    const admin = await system.storage.create('User', {
-      name: 'System Admin',
-      email: 'admin@dormitory.com',
-      role: 'admin'
-    })
-
-    const student = await system.storage.create('User', {
-      name: '李四',
-      email: 'li4@student.com',
-      role: 'student'
-    })
-
-    // Act: Get user score records
-    const result = await controller.callInteraction('GetUserScoreRecords', {
-      user: admin,
-      payload: {
-        userId: student.id,
-        limit: 10,
-        offset: 0
-      }
-    })
-
-    // Assert: Check interaction succeeded
-    expect(result.error).toBeUndefined()
-
-    // Note: In Stage 1, we just verify the interaction works
-    // In Stage 2, we'll implement proper data retrieval and verification
-  })
-
-  // ============================================================================
-  // TC010: Multiple dormitories and users integration test
-  // ============================================================================
-  test('TC010: Multiple dormitories and users integration', async () => {
-    // Setup: Create admin
-    const admin = await system.storage.create('User', {
-      name: 'System Admin',
-      email: 'admin@dormitory.com',
-      role: 'admin'
-    })
-
-    // Create multiple users
-    const users = []
-    for (let i = 1; i <= 6; i++) {
-      const user = await system.storage.create('User', {
-        name: `学生${i}`,
-        email: `student${i}@dormitory.com`,
-        role: 'student'
-      })
-      users.push(user)
-    }
-
-    // Create multiple dormitories
-    const dormNames = ['A栋101', 'A栋102', 'B栋201']
-    const dormitories = []
-    
-    for (const name of dormNames) {
-      await controller.callInteraction('CreateDormitory', {
-        user: admin,
-        payload: {
-          name: name,
-          capacity: 4
+    // Helper function to create test users
+    async function createTestUser(userData: any) {
+        const result = await controller.callInteraction('CreateUser', {
+            user: { id: 'admin', name: 'Admin', email: 'admin@test.com', role: 'admin' },
+            payload: { userData }
+        });
+        
+        if (result.error) {
+            throw new Error(`Failed to create user: ${JSON.stringify(result.error)}`);
         }
-      })
-
-      const dormitory = await system.storage.findOne('Dormitory',
-        MatchExp.atom({ key: 'name', value: ['=', name] }),
-        undefined,
-        ['id', 'name']
-      )
-      dormitories.push(dormitory)
+        
+        return result.effects?.[0]?.record;
     }
-
-    // Assign users to dormitories
-    let dormIndex = 0
-    let bedNumber = 1
     
-    for (let i = 0; i < users.length; i++) {
-      const result = await controller.callInteraction('AssignUserToDormitory', {
-        user: admin,
-        payload: {
-          userId: users[i].id,
-          dormitoryId: dormitories[dormIndex].id,
-          bedNumber: bedNumber
+    // Helper function to create test dormitory
+    async function createTestDormitory(dormData: any) {
+        const result = await controller.callInteraction('CreateDormitory', {
+            user: { id: 'admin', name: 'Admin', email: 'admin@test.com', role: 'admin' },
+            payload: { dormitoryData: dormData }
+        });
+        
+        if (result.error) {
+            throw new Error(`Failed to create dormitory: ${JSON.stringify(result.error)}`);
         }
-      })
-
-      expect(result.error).toBeUndefined()
-
-      bedNumber++
-      if (bedNumber > 4) {  // Capacity is 4
-        dormIndex++
-        bedNumber = 1
-      }
+        
+        return result.effects?.[0]?.record;
     }
-
-    // Verify occupancy counts
-    for (let i = 0; i < dormitories.length; i++) {
-      const updated = await system.storage.findOne('Dormitory',
-        MatchExp.atom({ key: 'id', value: ['=', dormitories[i].id] }),
-        undefined,
-        ['currentOccupancy', 'name']
-      )
-
-      if (i < 2) {
-        // First two dorms should have 2 students each (6 students / 3 dorms = 2 each with 1 dorm having more)
-        expect(updated.currentOccupancy).toBeGreaterThan(0)
-      }
-    }
-
-    // Verify system stats
-    const stats = await system.storage.get('SystemStats')
-    expect(stats).toBeTruthy()
-    expect(stats.totalUsers).toBe(7)  // 6 students + 1 admin
-    expect(stats.totalDormitories).toBe(3)
-  })
-})
+    
+    describe('TC001: Create Dormitory', () => {
+        it('should create a new dormitory with correct properties', async () => {
+            // Create admin user first
+            const admin = await createTestUser({
+                name: 'Admin',
+                email: 'admin@test.com'
+            });
+            
+            // Create dormitory
+            const dorm = await createTestDormitory({
+                name: 'Dorm A',
+                capacity: 4,
+                headId: admin.id
+            });
+            
+            // Verify dormitory properties
+            expect(dorm).toMatchObject({
+                name: 'Dorm A',
+                capacity: 4,
+                status: 'active'
+            });
+            
+            // Verify beds were created automatically
+            const beds = await controller.system.storage.find('Bed',
+                MatchExp.atom({
+                    key: 'dormitory.id',
+                    value: ['=', dorm.id]
+                }),
+                undefined,
+                ['*']
+            );
+            
+            expect(beds).toHaveLength(4);
+            expect(beds[0]).toMatchObject({
+                bedNumber: 1,
+                isOccupied: false
+            });
+            
+            // Verify head is assigned
+            const headRelation = await controller.system.storage.findOneRelationByName('DormitoryHeadRelation',
+                MatchExp.atom({
+                    key: 'source.id',
+                    value: ['=', dorm.id]
+                }),
+                undefined,
+                ['*']
+            );
+            
+            expect(headRelation).toBeDefined();
+            expect(headRelation.target.id).toBe(admin.id);
+        });
+    });
+    
+    describe('TC002: Assign User to Dormitory', () => {
+        it('should assign user to dormitory and update bed status', async () => {
+            // Create test data
+            const admin = await createTestUser({
+                name: 'Admin',
+                email: 'admin@test.com'
+            });
+            
+            const dorm = await createTestDormitory({
+                name: 'Dorm B',
+                capacity: 6,
+                headId: admin.id
+            });
+            
+            const student = await createTestUser({
+                name: 'Student',
+                email: 'student@test.com'
+            });
+            
+            // Assign user to dormitory
+            const result = await controller.callInteraction('AssignUserToDormitory', {
+                user: { id: 'admin', name: 'Admin', email: 'admin@test.com', role: 'admin' },
+                payload: {
+                    userId: student.id,
+                    dormitoryId: dorm.id,
+                    bedNumber: 2
+                }
+            });
+            
+            expect(result.error).toBeUndefined();
+            
+            // Verify user-dormitory relation
+            const relation = await controller.system.storage.findOneRelationByName('UserDormitoryRelation',
+                MatchExp.atom({
+                    key: 'source.id',
+                    value: ['=', student.id]
+                }),
+                undefined,
+                ['*']
+            );
+            
+            expect(relation).toBeDefined();
+            expect(relation.target.id).toBe(dorm.id);
+            expect(relation.bedNumber).toBe(2);
+            expect(relation.status).toBe('active');
+            
+            // Verify bed is occupied
+            const bed = await controller.system.storage.findOne('Bed',
+                MatchExp.atom({
+                    key: 'dormitory.id',
+                    value: ['=', dorm.id]
+                }).and(MatchExp.atom({
+                    key: 'bedNumber',
+                    value: ['=', 2]
+                })),
+                undefined,
+                ['*']
+            );
+            
+            expect(bed.isOccupied).toBe(true);
+        });
+    });
+    
+    describe('TC003: Create Behavior Record', () => {
+        it('should create behavior record and update user points', async () => {
+            // Create test data
+            const admin = await createTestUser({
+                name: 'Admin',
+                email: 'admin@test.com'
+            });
+            
+            const dorm = await createTestDormitory({
+                name: 'Dorm C',
+                capacity: 4,
+                headId: admin.id
+            });
+            
+            const student = await createTestUser({
+                name: 'Student',
+                email: 'student@test.com'
+            });
+            
+            // Assign user to dormitory
+            await controller.callInteraction('AssignUserToDormitory', {
+                user: { id: 'admin', name: 'Admin', email: 'admin@test.com', role: 'admin' },
+                payload: {
+                    userId: student.id,
+                    dormitoryId: dorm.id,
+                    bedNumber: 1
+                }
+            });
+            
+            // Create behavior record
+            const result = await controller.callInteraction('CreateBehaviorRecord', {
+                user: { id: 'admin', name: 'Admin', email: 'admin@test.com', role: 'admin' },
+                payload: {
+                    userId: student.id,
+                    points: -5,
+                    reason: 'Late night noise'
+                }
+            });
+            
+            expect(result.error).toBeUndefined();
+            
+            // Verify behavior record was created
+            const behaviorRecord = result.effects?.[0]?.record;
+            expect(behaviorRecord).toMatchObject({
+                points: -5,
+                reason: 'Late night noise'
+            });
+            
+            // Verify user points were updated
+            const updatedUser = await controller.system.storage.findOne('User',
+                MatchExp.atom({
+                    key: 'id',
+                    value: ['=', student.id]
+                }),
+                undefined,
+                ['points']
+            );
+            
+            expect(updatedUser.points).toBe(95); // 100 - 5
+            
+            // Verify relations are properly established
+            const userRelation = await controller.system.storage.findOneRelationByName('BehaviorRecordUserRelation',
+                MatchExp.atom({
+                    key: 'source.id',
+                    value: ['=', behaviorRecord.id]
+                }),
+                undefined,
+                ['*']
+            );
+            expect(userRelation.target.id).toBe(student.id);
+            
+            const recorderRelation = await controller.system.storage.findOneRelationByName('BehaviorRecordRecorderRelation',
+                MatchExp.atom({
+                    key: 'source.id',
+                    value: ['=', behaviorRecord.id]
+                }),
+                undefined,
+                ['*']
+            );
+            expect(recorderRelation.target.id).toBe(admin.id);
+        });
+    });
+    
+    describe('TC004: Request Eviction', () => {
+        it('should create eviction request for user with low points', async () => {
+            // Create test data
+            const admin = await createTestUser({
+                name: 'Admin',
+                email: 'admin@test.com'
+            });
+            
+            const dormHead = await createTestUser({
+                name: 'Dorm Head',
+                email: 'head@test.com'
+            });
+            
+            const dorm = await createTestDormitory({
+                name: 'Dorm D',
+                capacity: 4,
+                headId: dormHead.id
+            });
+            
+            const student = await createTestUser({
+                name: 'Student',
+                email: 'student@test.com'
+            });
+            
+            // Assign user to dormitory
+            await controller.callInteraction('AssignUserToDormitory', {
+                user: { id: 'admin', name: 'Admin', email: 'admin@test.com', role: 'admin' },
+                payload: {
+                    userId: student.id,
+                    dormitoryId: dorm.id,
+                    bedNumber: 1
+                }
+            });
+            
+            // Create behavior records to reduce points below 60
+            await controller.callInteraction('CreateBehaviorRecord', {
+                user: { id: 'admin', name: 'Admin', email: 'admin@test.com', role: 'admin' },
+                payload: {
+                    userId: student.id,
+                    points: -20,
+                    reason: 'Violation 1'
+                }
+            });
+            
+            await controller.callInteraction('CreateBehaviorRecord', {
+                user: { id: 'admin', name: 'Admin', email: 'admin@test.com', role: 'admin' },
+                payload: {
+                    userId: student.id,
+                    points: -25,
+                    reason: 'Violation 2'
+                }
+            });
+            
+            // Request eviction
+            const result = await controller.callInteraction('RequestEviction', {
+                user: { id: dormHead.id, name: 'Dorm Head', email: 'head@test.com', role: 'dormHead' },
+                payload: {
+                    userId: student.id,
+                    reason: 'Consistent rule violations'
+                }
+            });
+            
+            expect(result.error).toBeUndefined();
+            
+            // Verify eviction request was created
+            const evictionRequest = result.effects?.[0]?.record;
+            expect(evictionRequest).toMatchObject({
+                reason: 'Consistent rule violations',
+                status: 'pending'
+            });
+            
+            // Verify relations are properly established
+            const userRelation = await controller.system.storage.findOneRelationByName('EvictionRequestUserRelation',
+                MatchExp.atom({
+                    key: 'source.id',
+                    value: ['=', evictionRequest.id]
+                }),
+                undefined,
+                ['*']
+            );
+            expect(userRelation.target.id).toBe(student.id);
+            
+            const requesterRelation = await controller.system.storage.findOneRelationByName('EvictionRequestRequesterRelation',
+                MatchExp.atom({
+                    key: 'source.id',
+                    value: ['=', evictionRequest.id]
+                }),
+                undefined,
+                ['*']
+            );
+            expect(requesterRelation.target.id).toBe(dormHead.id);
+        });
+    });
+    
+    describe('TC005: Approve Eviction', () => {
+        it('should approve eviction and remove user from dormitory', async () => {
+            // Create test data
+            const admin = await createTestUser({
+                name: 'Admin',
+                email: 'admin@test.com'
+            });
+            
+            const dormHead = await createTestUser({
+                name: 'Dorm Head',
+                email: 'head@test.com'
+            });
+            
+            const dorm = await createTestDormitory({
+                name: 'Dorm E',
+                capacity: 4,
+                headId: dormHead.id
+            });
+            
+            const student = await createTestUser({
+                name: 'Student',
+                email: 'student@test.com'
+            });
+            
+            // Assign user to dormitory
+            await controller.callInteraction('AssignUserToDormitory', {
+                user: { id: 'admin', name: 'Admin', email: 'admin@test.com', role: 'admin' },
+                payload: {
+                    userId: student.id,
+                    dormitoryId: dorm.id,
+                    bedNumber: 1
+                }
+            });
+            
+            // Create behavior records to reduce points
+            await controller.callInteraction('CreateBehaviorRecord', {
+                user: { id: 'admin', name: 'Admin', email: 'admin@test.com', role: 'admin' },
+                payload: {
+                    userId: student.id,
+                    points: -50,
+                    reason: 'Major violation'
+                }
+            });
+            
+            // Request eviction
+            const evictionResult = await controller.callInteraction('RequestEviction', {
+                user: { id: dormHead.id, name: 'Dorm Head', email: 'head@test.com', role: 'dormHead' },
+                payload: {
+                    userId: student.id,
+                    reason: 'Major violation'
+                }
+            });
+            
+            const evictionRequest = evictionResult.effects?.[0]?.record;
+            
+            // Approve eviction
+            const result = await controller.callInteraction('ApproveEviction', {
+                user: { id: admin.id, name: 'Admin', email: 'admin@test.com', role: 'admin' },
+                payload: {
+                    requestId: evictionRequest.id,
+                    approved: true
+                }
+            });
+            
+            expect(result.error).toBeUndefined();
+            
+            // Verify eviction request status
+            const updatedRequest = await controller.system.storage.findOne('EvictionRequest',
+                MatchExp.atom({
+                    key: 'id',
+                    value: ['=', evictionRequest.id]
+                }),
+                undefined,
+                ['*']
+            );
+            
+            expect(updatedRequest.status).toBe('approved');
+            expect(updatedRequest.approvedBy).toBe(admin.id);
+            expect(updatedRequest.approvedAt).toBeDefined();
+            
+            // Verify user is removed from dormitory
+            const userDormRelation = await controller.system.storage.findOneRelationByName('UserDormitoryRelation',
+                MatchExp.atom({
+                    key: 'source.id',
+                    value: ['=', student.id]
+                }),
+                undefined,
+                ['status']
+            );
+            
+            expect(userDormRelation.status).toBe('inactive');
+            
+            // Verify bed is available
+            const bed = await controller.system.storage.findOne('Bed',
+                MatchExp.atom({
+                    key: 'dormitory.id',
+                    value: ['=', dorm.id]
+                }).and(MatchExp.atom({
+                    key: 'bedNumber',
+                    value: ['=', 1]
+                })),
+                undefined,
+                ['isOccupied']
+            );
+            
+            expect(bed.isOccupied).toBe(false);
+        });
+    });
+    
+    describe('TC006: Assign Dorm Head', () => {
+        it('should assign user as dorm head and update role', async () => {
+            // Create test data
+            const admin = await createTestUser({
+                name: 'Admin',
+                email: 'admin@test.com'
+            });
+            
+            const dorm = await createTestDormitory({
+                name: 'Dorm F',
+                capacity: 4,
+                headId: admin.id
+            });
+            
+            const newHead = await createTestUser({
+                name: 'New Head',
+                email: 'newhead@test.com'
+            });
+            
+            // Assign new dorm head
+            const result = await controller.callInteraction('AssignDormHead', {
+                user: { id: 'admin', name: 'Admin', email: 'admin@test.com', role: 'admin' },
+                payload: {
+                    dormitoryId: dorm.id,
+                    headId: newHead.id
+                }
+            });
+            
+            expect(result.error).toBeUndefined();
+            
+            // Verify user role was updated
+            const updatedUser = await controller.system.storage.findOne('User',
+                MatchExp.atom({
+                    key: 'id',
+                    value: ['=', newHead.id]
+                }),
+                undefined,
+                ['role']
+            );
+            
+            expect(updatedUser.role).toBe('dormHead');
+            
+            // Verify dormitory head relation
+            const headRelation = await controller.system.storage.findOneRelationByName('DormitoryHeadRelation',
+                MatchExp.atom({
+                    key: 'source.id',
+                    value: ['=', dorm.id]
+                }),
+                undefined,
+                ['*']
+            );
+            
+            expect(headRelation).toBeDefined();
+            expect(headRelation.target.id).toBe(newHead.id);
+            expect(headRelation.assignedAt).toBeDefined();
+        });
+    });
+    
+    describe('Query Interactions', () => {
+        it('should get dormitory information', async () => {
+            // Create test data
+            const admin = await createTestUser({
+                name: 'Admin',
+                email: 'admin@test.com'
+            });
+            
+            const dorm = await createTestDormitory({
+                name: 'Test Dorm',
+                capacity: 5,
+                headId: admin.id
+            });
+            
+            // Get dormitory
+            const result = await controller.callInteraction('GetDormitory', {
+                user: { id: 'admin', name: 'Admin', email: 'admin@test.com', role: 'admin' },
+                payload: { id: dorm.id }
+            });
+            
+            expect(result.error).toBeUndefined();
+            expect(result.data).toMatchObject({
+                id: dorm.id,
+                name: 'Test Dorm',
+                capacity: 5
+            });
+        });
+        
+        it('should list all dormitories', async () => {
+            // List dormitories
+            const result = await controller.callInteraction('ListDormitories', {
+                user: { id: 'admin', name: 'Admin', email: 'admin@test.com', role: 'admin' }
+            });
+            
+            expect(result.error).toBeUndefined();
+            expect(Array.isArray(result.data)).toBe(true);
+            expect(result.data.length).toBeGreaterThan(0);
+        });
+        
+        it('should get user points', async () => {
+            // Create test user
+            const user = await createTestUser({
+                name: 'Test User',
+                email: 'user@test.com'
+            });
+            
+            // Get user points
+            const result = await controller.callInteraction('GetUserPoints', {
+                user: { id: 'admin', name: 'Admin', email: 'admin@test.com', role: 'admin' },
+                payload: { userId: user.id }
+            });
+            
+            expect(result.error).toBeUndefined();
+            expect(result.data).toBe(100); // Default points
+        });
+        
+        it('should get dormitory occupancy', async () => {
+            // Create test data
+            const admin = await createTestUser({
+                name: 'Admin',
+                email: 'admin@test.com'
+            });
+            
+            const dorm = await createTestDormitory({
+                name: 'Occupancy Test Dorm',
+                capacity: 4,
+                headId: admin.id
+            });
+            
+            // Get occupancy
+            const result = await controller.callInteraction('GetDormitoryOccupancy', {
+                user: { id: 'admin', name: 'Admin', email: 'admin@test.com', role: 'admin' },
+                payload: { dormitoryId: dorm.id }
+            });
+            
+            expect(result.error).toBeUndefined();
+            expect(result.data).toHaveProperty('occupancy');
+            expect(result.data).toHaveProperty('availableBeds');
+            expect(result.data).toHaveProperty('occupancyRate');
+        });
+    });
+});

@@ -1,338 +1,245 @@
 # 宿舍管理系统实体关系设计
 
-## 1. 实体设计 (Entities)
+## 实体设计
 
-### 1.1 User (用户)
-**用途**: 系统中的所有人员，包括管理员、宿舍长、学生
+### 1. User (用户)
+**用途**: 系统中的用户账户，包括管理员、宿舍长和普通学生
 **属性**:
-- `id`: string (系统自动生成)
-- `name`: string (用户姓名)
-- `email`: string (邮箱，唯一标识)
-- `role`: string (角色: admin/dormHead/student, 默认: student)
-- `totalScore`: number (当前总分数，默认: 100)
-- `status`: string (用户状态: active/kicked/suspended，默认: active)
-- `createdAt`: number (创建时间戳，默认: 当前时间)
-- `updatedAt`: number (更新时间戳，默认: 当前时间)
+- id: string (系统生成唯一标识)
+- name: string (用户姓名)
+- email: string (邮箱，唯一标识)
+- role: string (用户角色: admin/dormHead/student)
+- points: number (行为积分，默认100)
+- createdAt: number (创建时间戳)
+- updatedAt: number (更新时间戳)
 
-**设计说明**:
-- 用户角色通过 `role` 字段区分，而非独立实体
-- `totalScore` 将通过计算属性从扣分记录自动计算
-- `status` 控制用户的系统访问权限
+**注意**: User实体不包含dormitoryId或bedId等外键字段，这些通过关系定义
 
-### 1.2 Dormitory (宿舍)
-**用途**: 宿舍建筑单位，包含多个床位
+### 2. Dormitory (宿舍)
+**用途**: 宿舍基本信息，包括容量和管理者
 **属性**:
-- `id`: string (系统自动生成)
-- `name`: string (宿舍名称，如"A栋101"，必须唯一)
-- `capacity`: number (床位数量，限制4-6)
-- `currentOccupancy`: number (当前入住人数，默认: 0)
-- `status`: string (宿舍状态: active/inactive/maintenance，默认: active)
-- `createdAt`: number (创建时间戳，默认: 当前时间)
-- `updatedAt`: number (更新时间戳，默认: 当前时间)
+- id: string (系统生成唯一标识)
+- name: string (宿舍名称，唯一)
+- capacity: number (床位数量，4-6)
+- status: string (状态: active/inactive)
+- createdAt: number (创建时间戳)
+- updatedAt: number (更新时间戳)
 
-**设计说明**:
-- `currentOccupancy` 将通过计算属性从用户关系自动计算
-- `capacity` 限制在4-6之间，通过业务规则验证
+**注意**: Dormitory实体不包含headId字段，通过关系定义宿舍长
 
-### 1.3 ScoreRule (扣分规则)
-**用途**: 定义各种违规行为的扣分标准
+### 3. Bed (床位)
+**用途**: 宿舍内的具体床位信息
 **属性**:
-- `id`: string (系统自动生成)
-- `name`: string (规则名称，如"晚归")
-- `description`: string (规则详细描述)
-- `scoreDeduction`: number (扣分数值，必须 > 0)
-- `isActive`: boolean (规则是否生效，默认: true)
-- `createdAt`: number (创建时间戳，默认: 当前时间)
-- `updatedAt`: number (更新时间戳，默认: 当前时间)
+- id: string (系统生成唯一标识)
+- bedNumber: number (床位编号，从1开始)
+- isOccupied: boolean (是否被占用)
+- createdAt: number (创建时间戳)
+- updatedAt: number (更新时间戳)
 
-**设计说明**:
-- 只有 `isActive: true` 的规则才能用于扣分
-- `scoreDeduction` 为正数，实际扣分时用减法操作
-
-### 1.4 ScoreRecord (扣分记录)
-**用途**: 记录用户的具体扣分情况，不可删除
+### 4. BehaviorRecord (行为记录)
+**用途**: 记录用户的行为评分
 **属性**:
-- `id`: string (系统自动生成)
-- `reason`: string (扣分原因，操作员填写)
-- `score`: number (扣分数值，来源于规则)
-- `createdAt`: number (扣分时间戳，默认: 当前时间)
-- `operatorNotes`: string (操作员备注，可选)
+- id: string (系统生成唯一标识)
+- points: number (扣分/加分，通常为负数)
+- reason: string (原因描述)
+- createdAt: number (记录时间戳)
 
-**设计说明**:
-- 扣分记录只能创建，不能修改或删除，确保审计完整性
-- `score` 与 `ScoreRule.scoreDeduction` 相同，记录时复制值
-
-### 1.5 KickRequest (踢出申请)
-**用途**: 宿舍长申请踢出某用户的记录
+### 5. EvictionRequest (踢出申请)
+**用途**: 宿舍长申请踢出用户的记录
 **属性**:
-- `id`: string (系统自动生成)
-- `reason`: string (申请理由)
-- `status`: string (申请状态: pending/approved/rejected，默认: pending)
-- `createdAt`: number (申请时间戳，默认: 当前时间)
-- `processedAt`: number (处理时间戳，批准/拒绝时设置)
-- `adminNotes`: string (管理员处理备注，可选)
+- id: string (系统生成唯一标识)
+- reason: string (申请原因)
+- status: string (状态: pending/approved/rejected)
+- createdAt: number (申请时间戳)
+- approvedAt: number (审批时间戳，可选)
+- approvedBy: string (审批人ID，可选)
 
-**设计说明**:
-- 状态为 `pending` 时等待管理员处理
-- `processedAt` 只在状态变更为 `approved/rejected` 时设置
+## 关系设计
 
-## 2. 关系设计 (Relations)
-
-### 2.1 UserDormitoryRelation (用户-宿舍关系)
-**类型**: n:1 (多个用户对应一个宿舍)
-**用途**: 记录用户的宿舍分配和床位信息
-
-**关系配置**:
-- **Source**: User
-- **Target**: Dormitory
-- **Source Property**: `dormitory` (用户可通过 user.dormitory 访问宿舍)
-- **Target Property**: `residents` (宿舍可通过 dormitory.residents 访问所有住户)
-- **Type**: n:1
-
+### 1. UserDormitoryRelation (用户-宿舍关系)
+**类型**: n:1 (多对一)
+**源**: User
+**目标**: Dormitory
+**源属性**: dormitory (User.dormitory)
+**目标属性**: users (Dormitory.users)
 **关系属性**:
-- `assignedAt`: number (分配时间戳，默认: 当前时间)
-- `bedNumber`: number (床位号，1-capacity)
-- `status`: string (分配状态: active/inactive，默认: active)
+- assignedAt: number (分配时间)
+- bedNumber: number (分配的床位号)
 
-**设计说明**:
-- 每个用户最多有一个 active 状态的宿舍关系
-- `bedNumber` 在同一宿舍内必须唯一
-- 用户被踢出时，关系状态变为 inactive
+**用途**: 建立用户与宿舍的分配关系，一个用户只能属于一个宿舍，一个宿舍可以有多个用户
 
-### 2.2 DormHeadDormitoryRelation (宿舍长-宿舍关系)
-**类型**: 1:1 (一个宿舍长对应一个宿舍)
-**用途**: 记录宿舍长的管理权限
-
-**关系配置**:
-- **Source**: User (宿舍长)
-- **Target**: Dormitory
-- **Source Property**: `managedDormitory` (宿舍长可通过 user.managedDormitory 访问管理的宿舍)
-- **Target Property**: `dormHead` (宿舍可通过 dormitory.dormHead 访问宿舍长)
-- **Type**: 1:1
-
+### 2. DormitoryHeadRelation (宿舍长关系)
+**类型**: 1:1 (一对一)
+**源**: Dormitory
+**目标**: User
+**源属性**: head (Dormitory.head)
+**目标属性**: managedDormitory (User.managedDormitory)
 **关系属性**:
-- `appointedAt`: number (任命时间戳，默认: 当前时间)
-- `status`: string (任命状态: active/inactive，默认: active)
+- assignedAt: number (任命时间)
 
-**设计说明**:
-- 宿舍长必须同时也是该宿舍的住户 (通过 UserDormitoryRelation)
-- 每个宿舍最多有一个 active 状态的宿舍长
+**用途**: 指定宿舍的宿舍长，一个宿舍只有一个宿舍长，一个用户只能管理一个宿舍
 
-### 2.3 UserScoreRecordRelation (用户-扣分记录关系)
-**类型**: 1:n (一个用户对应多个扣分记录)
-**用途**: 连接用户与其扣分记录
+### 3. BedDormitoryRelation (床位-宿舍关系)
+**类型**: n:1 (多对一)
+**源**: Bed
+**目标**: Dormitory
+**源属性**: dormitory (Bed.dormitory)
+**目标属性**: beds (Dormitory.beds)
 
-**关系配置**:
-- **Source**: User
-- **Target**: ScoreRecord
-- **Source Property**: `scoreRecords` (用户可通过 user.scoreRecords 访问扣分记录)
-- **Target Property**: `user` (扣分记录可通过 scoreRecord.user 访问用户)
-- **Type**: 1:n
+**用途**: 定义床位属于哪个宿舍，创建宿舍时自动生成相应数量的床位
 
-**无额外关系属性** (时间信息已在 ScoreRecord 中)
+### 4. BehaviorRecordUserRelation (行为记录-用户关系)
+**类型**: n:1 (多对一)
+**源**: BehaviorRecord
+**目标**: User
+**源属性**: user (BehaviorRecord.user)
+**目标属性**: behaviorRecords (User.behaviorRecords)
 
-### 2.4 ScoreRuleRecordRelation (扣分规则-扣分记录关系)
-**类型**: 1:n (一个规则对应多个扣分记录)
-**用途**: 连接扣分规则与使用该规则的记录
+**用途**: 关联行为记录和用户，用于查询用户的所有行为记录
 
-**关系配置**:
-- **Source**: ScoreRule
-- **Target**: ScoreRecord
-- **Source Property**: `records` (规则可通过 scoreRule.records 访问使用记录)
-- **Target Property**: `rule` (扣分记录可通过 scoreRecord.rule 访问规则)
-- **Type**: 1:n
+### 5. BehaviorRecordRecorderRelation (行为记录-记录者关系)
+**类型**: n:1 (多对一)
+**源**: BehaviorRecord
+**目标**: User
+**源属性**: recordedBy (BehaviorRecord.recordedBy)
+**目标属性**: recordedBehaviors (User.recordedBehaviors)
 
-**无额外关系属性**
+**用途**: 记录是谁创建了这条行为记录（管理员或宿舍长）
 
-### 2.5 KickRequestRelations (踢出申请相关关系)
+### 6. EvictionRequestUserRelation (踢出申请-用户关系)
+**类型**: n:1 (多对一)
+**源**: EvictionRequest
+**目标**: User
+**源属性**: user (EvictionRequest.user)
+**目标属性**: evictionRequests (User.evictionRequests)
 
-#### 2.5.1 RequestorKickRequestRelation (申请人-踢出申请关系)
-**类型**: 1:n (一个宿舍长可以发起多个申请)
-- **Source**: User (宿舍长)
-- **Target**: KickRequest
-- **Source Property**: `kickRequestsInitiated` 
-- **Target Property**: `requestor`
-- **Type**: 1:n
+**用途**: 关联踢出申请和被申请的用户
 
-#### 2.5.2 TargetUserKickRequestRelation (被申请人-踢出申请关系)
-**类型**: 1:n (一个用户可能被多次申请踢出)
-- **Source**: User (被申请踢出的用户)
-- **Target**: KickRequest
-- **Source Property**: `kickRequestsReceived`
-- **Target Property**: `targetUser`
-- **Type**: 1:n
+### 7. EvictionRequestRequesterRelation (踢出申请-申请人关系)
+**类型**: n:1 (多对一)
+**源**: EvictionRequest
+**目标**: User
+**源属性**: requestedBy (EvictionRequest.requestedBy)
+**目标属性**: requestedEvictions (User.requestedEvictions)
 
-#### 2.5.3 DormitoryKickRequestRelation (宿舍-踢出申请关系)
-**类型**: 1:n (一个宿舍可能有多个踢出申请)
-- **Source**: Dormitory
-- **Target**: KickRequest
-- **Source Property**: `kickRequests`
-- **Target Property**: `dormitory`
-- **Type**: 1:n
+**用途**: 记录是谁提交了这个踢出申请（宿舍长）
 
-### 2.6 OperatorScoreRecordRelation (操作员-扣分记录关系)
-**类型**: 1:n (一个操作员可以创建多个扣分记录)
-**用途**: 记录谁执行了扣分操作
+### 8. EvictionRequestApproverRelation (踢出申请-审批人关系)
+**类型**: n:1 (多对一)
+**源**: EvictionRequest
+**目标**: User
+**源属性**: approvedBy (EvictionRequest.approvedBy)
+**目标属性**: approvedEvictions (User.approvedEvictions)
 
-**关系配置**:
-- **Source**: User (操作员：管理员或宿舍长)
-- **Target**: ScoreRecord
-- **Source Property**: `scoreRecordsOperated`
-- **Target Property**: `operator`
-- **Type**: 1:n
+**用途**: 记录是谁批准了这个踢出申请（管理员）
 
-**无额外关系属性** (时间信息已在 ScoreRecord 中)
+## 数据流图
 
-## 3. 过滤实体设计 (Filtered Entities)
+```
+User (1) ──┐
+           │
+           ├── UserDormitoryRelation ── (n) Dormitory
+           │                              │
+           │                              ├── DormitoryHeadRelation ── (1) User (宿舍长)
+           │                              │
+           │                              └── BedDormitoryRelation ── (n) Bed
+           │
+           └── BehaviorRecordUserRelation ── (n) BehaviorRecord
+                                          │
+                                          └── BehaviorRecordRecorderRelation ── (1) User (记录者)
 
-### 3.1 ActiveUser (活跃用户)
-**用途**: 过滤出状态为 active 的用户
+EvictionRequest ── EvictionRequestUserRelation ── User (被申请者)
+       │
+       ├── EvictionRequestRequesterRelation ── User (申请人)
+       │
+       └── EvictionRequestApproverRelation ── User (审批人)
+```
+
+## 实体关系约束
+
+### 1. 唯一性约束
+- User.email 必须唯一
+- Dormitory.name 必须唯一
+- Bed.bedNumber 在同一Dormitory内必须唯一
+
+### 2. 基数约束
+- 每个User最多只能有一个Dormitory (通过UserDormitoryRelation)
+- 每个Dormitory最多只能有一个head (通过DormitoryHeadRelation)
+- 每个User最多只能管理一个Dormitory (通过DormitoryHeadRelation)
+- 每个Bed必须属于一个Dormitory (通过BedDormitoryRelation)
+
+### 3. 业务约束
+- Dormitory.capacity 必须在4-6之间
+- User.points 不能为负数
+- Bed.isOccupied 必须与实际分配状态一致
+
+## 计算属性需求
+
+### 1. User 计算属性
+- totalPoints: 所有行为记录的积分总和
+- behaviorCount: 行为记录总数
+- isActiveInDormitory: 是否在宿舍中有有效分配
+
+### 2. Dormitory 计算属性
+- occupancy: 当前占用人数
+- availableBeds: 可用床位数
+- occupancyRate: 占用率 (occupancy/cacity)
+
+### 3. Bed 计算属性
+- status: 床位状态 (available/occupied)
+- occupiedBy: 占用的用户 (通过关系查询)
+
+## 索引设计建议
+
+### 1. User 实体索引
+- email (唯一索引)
+- role (普通索引)
+
+### 2. Dormitory 实体索引
+- name (唯一索引)
+- status (普通索引)
+
+### 3. BehaviorRecord 索引
+- userId (普通索引)
+- createdAt (普通索引)
+
+### 4. EvictionRequest 索引
+- userId (普通索引)
+- status (普通索引)
+- createdAt (普通索引)
+
+## 常见错误避免
+
+### ❌ 错误的设计
 ```typescript
-const ActiveUser = Entity.create({
-  name: 'ActiveUser',
-  sourceEntity: User,
-  filterCondition: MatchExp.atom({
-    key: 'status',
-    value: ['=', 'active']
-  })
-});
+// 错误：在User实体中添加外键
+const User = Entity.create({
+  properties: [
+    Property.create({ name: 'dormitoryId', type: 'string' }), // ❌ 不要这样做
+    Property.create({ name: 'bedId', type: 'string' }),       // ❌ 不要这样做
+    Property.create({ name: 'headOfDormId', type: 'string' }) // ❌ 不要这样做
+  ]
+})
 ```
 
-### 3.2 ActiveDormitory (活跃宿舍)
-**用途**: 过滤出状态为 active 的宿舍
+### ✅ 正确的设计
 ```typescript
-const ActiveDormitory = Entity.create({
-  name: 'ActiveDormitory',
-  sourceEntity: Dormitory,
-  filterCondition: MatchExp.atom({
-    key: 'status',
-    value: ['=', 'active']
-  })
-});
+// 正确：使用关系定义
+const UserDormitoryRelation = Relation.create({
+  source: User,
+  target: Dormitory,
+  sourceProperty: 'dormitory',  // 创建 user.dormitory
+  targetProperty: 'users',      // 创建 dormitory.users
+  type: 'n:1'
+})
+
+const DormitoryHeadRelation = Relation.create({
+  source: Dormitory,
+  target: User,
+  sourceProperty: 'head',      // 创建 dormitory.head
+  targetProperty: 'managedDormitory', // 创建 user.managedDormitory
+  type: '1:1'
+})
 ```
 
-### 3.3 ActiveScoreRule (活跃扣分规则)
-**用途**: 过滤出生效的扣分规则
-```typescript
-const ActiveScoreRule = Entity.create({
-  name: 'ActiveScoreRule',
-  sourceEntity: ScoreRule,
-  filterCondition: MatchExp.atom({
-    key: 'isActive',
-    value: ['=', true]
-  })
-});
-```
-
-### 3.4 PendingKickRequest (待处理踢出申请)
-**用途**: 过滤出待处理的踢出申请
-```typescript
-const PendingKickRequest = Entity.create({
-  name: 'PendingKickRequest',
-  sourceEntity: KickRequest,
-  filterCondition: MatchExp.atom({
-    key: 'status',
-    value: ['=', 'pending']
-  })
-});
-```
-
-### 3.5 LowScoreUser (低分用户)
-**用途**: 过滤出分数低于20分的用户 (可踢出阈值)
-```typescript
-const LowScoreUser = Entity.create({
-  name: 'LowScoreUser',
-  sourceEntity: User,
-  filterCondition: MatchExp.atom({
-    key: 'totalScore',
-    value: ['<', 20]
-  }).and({
-    key: 'status',
-    value: ['=', 'active']
-  })
-});
-```
-
-## 4. 数据流设计
-
-### 4.1 宿舍分配流程数据变化
-1. **CreateDormitory**: 创建 Dormitory 实体
-2. **AssignUserToDormitory**: 
-   - 创建 UserDormitoryRelation
-   - 自动更新 Dormitory.currentOccupancy (通过计算属性)
-3. **AssignDormHead**: 
-   - 创建 DormHeadDormitoryRelation
-   - 自动更新 User.role 为 'dormHead' (通过计算属性)
-
-### 4.2 扣分流程数据变化
-1. **CreateScoreRule**: 创建 ScoreRule 实体
-2. **DeductUserScore**:
-   - 创建 ScoreRecord 实体
-   - 创建 UserScoreRecordRelation
-   - 创建 ScoreRuleRecordRelation
-   - 创建 OperatorScoreRecordRelation
-   - 自动更新 User.totalScore (通过计算属性)
-
-### 4.3 踢出申请流程数据变化
-1. **RequestKickUser**:
-   - 创建 KickRequest 实体
-   - 创建相关关系 (RequestorKickRequestRelation, TargetUserKickRequestRelation, DormitoryKickRequestRelation)
-2. **ApproveKickRequest**:
-   - 更新 KickRequest.status 为 'approved'
-   - 更新 User.status 为 'kicked'
-   - 更新 UserDormitoryRelation.status 为 'inactive'
-   - 自动更新 Dormitory.currentOccupancy (通过计算属性)
-
-## 5. 业务约束在实体层面的体现
-
-### 5.1 唯一性约束
-- `User.email` 必须唯一
-- `Dormitory.name` 必须唯一
-- 同一宿舍内的 `UserDormitoryRelation.bedNumber` 必须唯一
-
-### 5.2 数值约束  
-- `Dormitory.capacity`: 4-6
-- `ScoreRule.scoreDeduction`: > 0
-- `User.totalScore`: >= 0
-- `UserDormitoryRelation.bedNumber`: 1 <= bedNumber <= capacity
-
-### 5.3 状态约束
-- 每个用户最多有一个 active 状态的 UserDormitoryRelation
-- 每个宿舍最多有一个 active 状态的 DormHeadDormitoryRelation
-- 宿舍长必须是该宿舍的住户
-
-### 5.4 业务逻辑约束
-- 分数低于20分的用户才能被申请踢出
-- 只有 active 状态的扣分规则可以使用
-- 被踢出用户不能再被分配到新宿舍
-
-## 6. 实体关系图
-```
-User ─────┐
-          │ UserDormitoryRelation (n:1)
-          ├─────── Dormitory
-          │ DormHeadDormitoryRelation (1:1)
-          │
-          │ UserScoreRecordRelation (1:n)
-          ├─────── ScoreRecord ───── ScoreRule
-          │                    ScoreRuleRecordRelation (n:1)
-          │ OperatorScoreRecordRelation (1:n)
-          │
-          │ RequestorKickRequestRelation (1:n)
-          ├─────── KickRequest
-          │ TargetUserKickRequestRelation (1:n)
-          │
-Dormitory ├─────── KickRequest
-          DormitoryKickRequestRelation (1:n)
-```
-
-## 7. 验证清单
-- [x] 所有实体名称都是PascalCase且单数形式
-- [x] 所有属性都有正确的类型定义
-- [x] 所有默认值都使用函数形式
-- [x] 关系定义中没有name属性 (自动生成)
-- [x] 关系类型使用正确格式 ('1:1', 'n:1', etc.)
-- [x] 没有从interaqt包导入实体
-- [x] 过滤实体有有效的sourceEntity和filterCondition
-- [x] 实体中没有引用ID字段 (通过关系处理)
-- [x] 所有关系都有明确的业务含义和用途
+这种设计确保了数据的完整性和一致性，所有关系都通过框架的关系机制来维护。
