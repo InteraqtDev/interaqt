@@ -158,6 +158,15 @@ export class AttributeInfo {
         return this.map.getLinkInfo(this.parentEntityName, this.attributeName)
     }
 
+    getRecordInfo() {
+        assert(this.isRecord, `only record attribute can get linkInfo`)
+        return this.map.getRecordInfo(this.recordName)
+    }
+
+    getAttribute(name:string) {
+        return this.map.getInfo(this.recordName, name)
+    }
+
     isLinkFiltered() {
         return (this.data as RecordAttribute).isFilteredRelation
     }
@@ -170,15 +179,5 @@ export class AttributeInfo {
     getBaseAttributeInfo() {
         assert(this.isLinkFiltered(), `only filtered relation can get base attribute info`)
         return new AttributeInfo(this.parentEntityName, (this.data as RecordAttribute).baseRelationAttributeName!, this.map, this.symmetricDirection)
-    }
-    
-
-    getRecordInfo() {
-        assert(this.isRecord, `only record attribute can get linkInfo`)
-        return this.map.getRecordInfo(this.recordName)
-    }
-
-    getAttribute(name:string) {
-        return this.map.getInfo(this.recordName, name)
     }
 }

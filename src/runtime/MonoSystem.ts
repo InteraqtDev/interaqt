@@ -207,8 +207,8 @@ export class MonoSystem implements System {
                 relation.target = originalEntityToClonedEntity.get(relation.target as EntityInstance) || originalRelationToClonedRelation.get(relation.target as RelationInstance)!
             }
             // 处理 filtered relation 的 baseRelation
-            if ((relation as any).baseRelation) {
-                (relation as any).baseRelation = originalRelationToClonedRelation.get((relation as any).baseRelation as RelationInstance)!
+            if (relation.baseRelation) {
+                relation.baseRelation = originalRelationToClonedRelation.get(relation.baseRelation as RelationInstance)!
             }
         }
         

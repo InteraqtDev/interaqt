@@ -44,8 +44,9 @@ describe("getShrinkedAttribute test", () => {
 
     test("should handle invalid paths gracefully", () => {
         // 测试无效路径
-        const result = entityToTableMap.getShrinkedAttribute('User', 'nonexistent.&.target.name');
-        expect(result).toBe('nonexistent.&.target.name');
+        expect(() => {
+            entityToTableMap.getShrinkedAttribute('User', 'nonexistent.&.target.name');
+        }).toThrow();
     });
 
     test("should handle paths ending with &", () => {

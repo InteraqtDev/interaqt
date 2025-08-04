@@ -41,7 +41,9 @@ export type RecordAttribute = {
     // filtered relation 相关
     isFilteredRelation?: boolean,
     matchExpression?: any
-    baseRelationAttributeName?: string
+    baseRelationAttributeName?: string,
+    resolvedMatchExpression?: MatchExpressionData,
+    resolvedBaseRecordName?: string
 }
 
 export type RecordMapItem = {
@@ -89,7 +91,9 @@ export type LinkMapItem = {
     // filtered relation 相关
     isFilteredRelation?: boolean,
     matchExpression?: any
-    baseLinkName?: string
+    baseLinkName?: string,
+    resolvedBaseRecordName?: string,
+    resolvedMatchExpression?: MatchExpressionData
 }
 
 type LinkMap = {
@@ -114,14 +118,6 @@ type TableAndAliasStack = {
 
 export class EntityToTableMap {
     constructor(public data: MapData) {}
-    getRecordTable(entityName: string) : string {
-        const record = this.data.records[entityName];
-        // 如果是 filtered relation/entity，返回源记录的表名
-        if (record.baseRecordName) {
-            return this.getRecordTable(record.baseRecordName);
-        }
-        return record.table;
-    }
     getRecord(recordName:string) {
         return this.data.records[recordName]
     }
@@ -450,7 +446,6 @@ export class EntityToTableMap {
                 
                 // 如果下一个部分是 source 或 target
                 if (nextPart === 'source' || nextPart === 'target') {
-                    try {
                         // 使用前一个实体来获取关系信息
                         const relationInfo = this.getInfo(previousEntity, previousAttr);
                         
@@ -487,15 +482,17 @@ export class EntityToTableMap {
                                 // 如果不能压缩，更新 currentEntity 为 source/target 指向的实体
                                 currentEntity = sourceTargetPointsTo;
                                 previousEntity = currentEntity; // 更新 previousEntity
+                                currentEntity = '';
+                                previousEntity = ''; // 更新 previousEntity
                                 result.push(part);
                                 result.push(nextPart);
                                 i += 2;
                                 continue;
                             }
                         }
-                    } catch (e) {
-                        // 如果获取信息失败，保持原路径
-                    }
+                } else {
+                    currentEntity = '';
+                    previousEntity = ''; 
                 }
                 
                 // 如果不能压缩，保留 & 符号
@@ -506,14 +503,20 @@ export class EntityToTableMap {
                 previousEntity = currentEntity;
                 
                 // 更新当前实体
-                try {
+                if(currentEntity) {
                     const info = this.getInfo(currentEntity, part);
                     if (info.isRecord) {
                         currentEntity = info.recordName;
                     }
-                } catch (e) {
-                    // 忽略错误
                 }
+                // try {
+                //     const info = this.getInfo(currentEntity, part);
+                //     if (info.isRecord) {
+                //         currentEntity = info.recordName;
+                //     }
+                // } catch (e) {
+                //     // 忽略错误
+                // }
                 
                 result.push(part);
                 i++;

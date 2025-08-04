@@ -19,7 +19,7 @@ export class RecordInfo {
     }
 
     get table() {
-        return this.map.getRecordTable(this.name)
+        return this.data.table
     }
 
     get idField() {
@@ -119,6 +119,9 @@ export class RecordInfo {
     }
 
     get valueAttributes() {
+        if (!this.data) {
+            debugger
+        }
         return Object.entries(this.data.attributes).filter(([, attribute]) => {
             return !(attribute as RecordAttribute).isRecord
         }).map(([attributeName]) => {
@@ -152,5 +155,13 @@ export class RecordInfo {
 
     get baseRelationName() {
         return this.data.baseRelationName
+    }
+
+    get resolvedBaseRecordName() {
+        return this.data.resolvedBaseRecordName
+    }
+
+    get resolvedMatchExpression() {
+        return this.data.resolvedMatchExpression
     }
 }

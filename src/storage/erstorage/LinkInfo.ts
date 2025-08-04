@@ -125,4 +125,14 @@ export class LinkInfo {
             throw new Error(`${this.name} is not a filtered relation`)
         }
     }
+
+    getResolvedMatchExpression() {
+        assert(this.isFilteredRelation(), `only filtered relation can get resolved match expression`)
+        return this.data.resolvedMatchExpression
+    }
+
+    getResolvedBaseRecordName() {
+        assert(this.isFilteredRelation(), `only filtered relation can get resolved record name`)
+        return this.data.resolvedBaseRecordName
+    }
 }

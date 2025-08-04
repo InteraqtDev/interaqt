@@ -24,8 +24,10 @@ export class AttributeQuery {
         includeManagedRecordAttributes = false, // link record 的 source/target 字段
         includeNotRelianceCombined: boolean = false
     ): AttributeQueryData{
-        const result: AttributeQueryData = map.getRecordInfo(recordName).valueAttributes.map(info => info.attributeName)
-        const recordInfo = map.getRecordInfo(recordName)
+        const inputRecordInfo = map.getRecordInfo(recordName)
+        const recordInfo = inputRecordInfo.resolvedBaseRecordName ? map.getRecordInfo(inputRecordInfo.resolvedBaseRecordName) : inputRecordInfo
+
+        const result: AttributeQueryData = recordInfo.valueAttributes.map(info => info.attributeName)
 
         // FIXME 再想想以下几个参数的递归查询，特别是关系上的数据。
         if(includeSameTableReliance) {

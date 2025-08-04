@@ -610,7 +610,8 @@ ${modifierClause}
     }
 
     buildFromClause(entityName: string, prefix = '') {
-        return `"${this.map.getRecordTable(entityName)}" AS "${this.withPrefix(prefix)}${entityName}"`
+        const recordInfo = this.map.getRecordInfo(entityName)
+        return `"${recordInfo.table}" AS "${this.withPrefix(prefix)}${entityName}"`
     }
 
     buildJoinClause(joinTables: JoinTables, prefix = '') {
@@ -946,8 +947,9 @@ ${innerQuerySQL}
         // 3. 插入新行。
         const sameRowNewFieldAndValue = newEntityDataWithIdsWithFlashOutRecords.getSameRowFieldAndValue()
         const p = this.getPlaceholder()
+        const recordInfo = this.map.getRecordInfo(newEntityData.recordName)
         const result = await this.database.insert(`
-INSERT INTO "${this.map.getRecordTable(newEntityData.recordName)}"
+INSERT INTO "${recordInfo.table}"
 (${sameRowNewFieldAndValue.map(f => `"${f.field}"`).join(',')})
 VALUES
 (${sameRowNewFieldAndValue.map(f => p()).join(',')}) 

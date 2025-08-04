@@ -237,100 +237,139 @@ export class DBSetup {
             };
         }
 
-        const { baseEntity, matchExpression, baseRelation } = (entity as any) || {}
-
-        // 计算 resolved 字段
-        let resolvedBaseRecordName: string | undefined;
-        let resolvedMatchExpression: MatchExpressionData | undefined;
-        
-        if (baseEntity || baseRelation) {
-            // 递归查找最底层的源实体/关系
-            let currentEntity = baseEntity || baseRelation;
-            let currentMatchExpression = matchExpression || (entity as any).matchExpression;
-            const matchExpressions: MatchExpressionData[] = [currentMatchExpression];
-            
-            while ((currentEntity as any).baseEntity || (currentEntity as any).baseRelation) {
-                const nextEntity = (currentEntity as any).baseEntity || (currentEntity as any).baseRelation;
-                const nextMatchExpression = (currentEntity as any).matchExpression;
-                if (nextMatchExpression) {
-                    matchExpressions.push(nextMatchExpression);
-                }
-                currentEntity = nextEntity;
-            }
-            
-            resolvedBaseRecordName = currentEntity.name;
-            
-            // 合并所有 matchExpression
-            if (matchExpressions.length > 0) {
-                resolvedMatchExpression = matchExpressions[0];
-                for (let i = 1; i < matchExpressions.length; i++) {
-                    resolvedMatchExpression = resolvedMatchExpression.and(matchExpressions[i]);
-                }
-            }
-        }
-
         return {
             table: entity.name,
             attributes,
             isRelation,
+            filteredBy: filteredBy.length ? filteredBy.map(e => e.name) : undefined,
+        } as RecordMapItem
+    }
+    createFilteredEntityRecord(entity: EntityInstance) {
+        // 使用递归方法收集所有依赖的 filtered entities
+        const filteredBy = this.collectAllFilteredEntities(entity);
+        const { baseEntity, matchExpression } = entity
+
+        const { resolvedBaseRecordName, resolvedMatchExpression } = this.resolveRootBaseRecordNameAndMatchExpression(entity)
+
+        return {
+            table: resolvedBaseRecordName,
             isFilteredEntity: !!baseEntity,
-            baseRecordName: baseEntity?.name || baseRelation?.name,
-            matchExpression: matchExpression || (baseRelation && (entity as any).matchExpression),
+            attributes: {},
+            baseRecordName: baseEntity?.name,
+            matchExpression: matchExpression,
+            resolvedBaseRecordName,
+            resolvedMatchExpression,
+            filteredBy: filteredBy.length ? filteredBy.map(e => e.name) : undefined,
+        } as RecordMapItem
+    }
+    createFilteredRelationRecord(relation: RelationInstance) {
+        const attributes: {[k:string]: Omit<ValueAttribute, 'field'>} = Object.fromEntries(relation.properties.map((property:PropertyInstance) => {
+            const prop = property
+            return [
+                prop.name,
+                {
+                    name: prop.name,
+                    type: prop.type,
+                    computed: prop.computed as ((record: any) => any) | undefined,
+                    collection: prop.collection,
+                    defaultValue: prop.defaultValue as (() => any) | undefined,
+                    fieldType: this.database!.mapToDBFieldType(prop.type, prop.collection)
+                }
+            ];
+        }));
+
+
+        assert(!attributes.source && !attributes.target, 'source and target is reserved name for relation attributes')
+
+        // 使用递归方法收集所有依赖的 filtered entities
+        const filteredBy = this.collectAllFilteredEntities(relation);
+        const { matchExpression, baseRelation } = relation
+        const { resolvedBaseRecordName, resolvedMatchExpression } = this.resolveRootBaseRecordNameAndMatchExpression(relation)
+
+        return {
+            table: resolvedBaseRecordName,
+            attributes,
+            baseRecordName: baseRelation!.name,
+            matchExpression: matchExpression,
             resolvedBaseRecordName,
             resolvedMatchExpression,
             filteredBy: filteredBy.length ? filteredBy.map(e => e.name) : undefined,
             // 添加 filtered relation 的标记
-            isFilteredRelation:!!baseRelation,
-            baseRelationName: baseRelation ? baseRelation.name : undefined
+            isFilteredRelation:true,
+            baseRelationName: baseRelation!.name
         } as RecordMapItem
     }
-    createFilteredEntityRecord(entity: EntityInstance) {
-        const sourceRecord = this.map.records[entity.baseEntity!.name!]!
-        return {
-            table: sourceRecord.table,
-            attributes: {...sourceRecord.attributes},
-            isFilteredEntity: true,
-            baseRecordName: entity.baseEntity!.name!,
-            matchExpression: entity.matchExpression,
-            filteredBy: undefined,
-        } as RecordMapItem
-    }
-    createFilteredRelationRecord(relation: RelationInstance) {
-        const sourceRecord = this.map.records[relation.baseRelation!.name!]!
-        return {
-            table: sourceRecord.table,
-            attributes: {...sourceRecord.attributes},
-            isRelation: true,
-            isFilteredRelation: true,
-            filteredBy: undefined,
-            baseRecordName: relation.baseRelation!.name!,
-            baseRelationName: relation.baseRelation!.name!,
-            matchExpression: relation.matchExpression,
-        } as RecordMapItem
+    resolveRootBaseRecordNameAndMatchExpression(entity: EntityInstance | RelationInstance) {
+        const { baseEntity, baseRelation, matchExpression } = entity as any
+        // 计算 resolved 字段
+        let resolvedBaseRecordName: string | undefined;
+        let resolvedMatchExpression: MatchExpressionData | undefined;
+        
+        // 递归查找最底层的源实体/关系
+        let currentEntity = baseEntity! || baseRelation!;
+        let currentMatchExpression = matchExpression || (entity as any).matchExpression;
+        const matchExpressions: MatchExpressionData[] = [currentMatchExpression];
+        
+        while ((currentEntity as any).baseEntity || (currentEntity as any).baseRelation) {
+            const nextEntity = (currentEntity as any).baseEntity || (currentEntity as any).baseRelation;
+            const nextMatchExpression = (currentEntity as any).matchExpression;
+            if (nextMatchExpression) {
+                matchExpressions.push(nextMatchExpression);
+            }
+            currentEntity = nextEntity;
+        }
+        
+        resolvedBaseRecordName = currentEntity.name;
+        
+        // 合并所有 matchExpression
+        if (matchExpressions.length > 0) {
+            resolvedMatchExpression = matchExpressions[0];
+            for (let i = 1; i < matchExpressions.length; i++) {
+                resolvedMatchExpression = resolvedMatchExpression.and(matchExpressions[i]);
+            }
+        }
+        return { resolvedBaseRecordName, resolvedMatchExpression }
     }
     createLink(relationName: string, relation: RelationInstance) {
-        const relationWithProps = relation
+
         return {
             table: relationName,
-            relType: relationWithProps.type.split(':'),
-            sourceRecord: relationWithProps.source.name,
-            sourceProperty: relationWithProps.sourceProperty,
-            targetRecord: relationWithProps.target.name,
-            targetProperty: relationWithProps.targetProperty,
+            relType: relation.type.split(':'),
+            sourceRecord: relation.source.name,
+            sourceProperty: relation.sourceProperty,
+            targetRecord: relation.target.name,
+            targetProperty: relation.targetProperty,
             recordName: relationName,
-            isTargetReliance: relationWithProps.isTargetReliance,
-            isFilteredRelation: !!relationWithProps.baseRelation,
-            // FIXME 这里咩有考虑多次 filtered 的情况
-            matchExpression: relationWithProps.matchExpression,
-            baseLinkName: relationWithProps.baseRelation?.name
+            isTargetReliance: relation.isTargetReliance,
+            matchExpression: relation.matchExpression,
         } as LinkMapItem
     }
+    createFilteredLink(relationName: string, relation: RelationInstance) {
+        const { resolvedBaseRecordName, resolvedMatchExpression } = this.resolveRootBaseRecordNameAndMatchExpression(relation)
+
+        return {
+            table: relationName,
+            relType: relation.type.split(':'),
+            sourceRecord: relation.source.name,
+            sourceProperty: relation.sourceProperty,
+            targetRecord: relation.target.name,
+            targetProperty: relation.targetProperty,
+            recordName: relationName,
+            isTargetReliance: relation.isTargetReliance,
+            isFilteredRelation: !!relation.baseRelation,
+            matchExpression: relation.matchExpression,
+            baseLinkName: relation.baseRelation?.name,
+            resolvedBaseRecordName,
+            resolvedMatchExpression
+        } as LinkMapItem
+    }   
     //虚拟 link
     createLinkOfRelationAndEntity(relationEntityName: string, relationName: string, relation: RelationInstance, isSource: boolean) {
         const relationWithProps = relation 
         const [sourceRelType, targetRelType] = relationWithProps.type.split(':');
         return {
             table: undefined, // 虚拟 link 没有表
+            attributes: {},
             sourceRecord: relationEntityName,
             sourceProperty: isSource ? 'source' : 'target',
             targetRecord: isSource ? relationWithProps.source.name: relationWithProps.target.name,
@@ -349,11 +388,11 @@ export class DBSetup {
         // 1. 按照范式生成基础 entity record
         this.entities.forEach(entity => {
             assert(!this.map.records[entity.name], `entity name ${entity.name} is duplicated`)
-            // this.map.records[entity.name] = entity.sourceEntity ? this.createFilteredEntityRecord(entity) : this.createRecord(entity)
-            this.map.records[entity.name] = this.createRecord(entity)
-
+            this.map.records[entity.name] = entity.baseEntity ? this.createFilteredEntityRecord(entity) : this.createRecord(entity)
             // 记录一下 entity 和 表的关系。后面用于合并的时候做计算。
-            this.createRecordToTable(entity.name, entity.name)
+            if(!entity.baseEntity) {
+                this.createRecordToTable(entity.name, this.map.records[entity.name].table)
+            }
         })
 
         // 2. 生成 relation record 以及所有的 link
@@ -362,16 +401,17 @@ export class DBSetup {
             const targetName = relation.target.name
             const relationName = relation.name || `${sourceName}_${relation.sourceProperty}_${relation.targetProperty}_${targetName}`
             assert(!this.map.records[relationName], `relation name ${relationName} is duplicated`)
-            // this.map.records[relationName] = relation.sourceRelation ? this.createFilteredRelationRecord(relation) : this.createRecord(relation, true)
-            this.map.records[relationName] = this.createRecord(relation, true)
-            this.createRecordToTable(relationName, relationName)
+            this.map.records[relationName] = relation.baseRelation ? this.createFilteredRelationRecord(relation) : this.createRecord(relation, true)
             // 记录 relation 里面的  Entity 和 Entity 的关系
-            this.map.links[relationName] = this.createLink(relationName, relation)
+            this.map.links[relationName] = relation.baseRelation ? this.createFilteredLink(relationName, relation) : this.createLink(relationName, relation)
             // 记录 relation 和实体之间的关系。这个关系是单向的，只能从 relation 发起。
             const virtualSourceRelationName = this.getRelationNameOfRelationAndEntity(relationName, true)
             this.map.links[virtualSourceRelationName] = this.createLinkOfRelationAndEntity(relationName, virtualSourceRelationName, relation, true)
             const virtualTargetRelationName = this.getRelationNameOfRelationAndEntity(relationName, false)
             this.map.links[virtualTargetRelationName] = this.createLinkOfRelationAndEntity(relationName, virtualTargetRelationName, relation, false)
+            if(!relation.baseRelation) {
+                this.createRecordToTable(relationName, this.map.records[relationName].table)
+            }
         })
 
         // 3. 根据 Link 补充 record attribute 到 record 里面。方便之后的查询。
@@ -397,7 +437,9 @@ export class DBSetup {
                 // 标记这是一个 filtered relation
                 isFilteredRelation: isFilteredRelation,
                 matchExpression: isFilteredRelation?relationData.matchExpression: undefined,
-                baseRelationAttributeName: isFilteredRelation? sourceLink?.sourceProperty: undefined
+                baseRelationAttributeName: isFilteredRelation? sourceLink?.sourceProperty: undefined,
+                resolvedMatchExpression: isFilteredRelation? relationRecord.resolvedMatchExpression: undefined,
+                resolvedBaseRecordName: isFilteredRelation? relationRecord?.resolvedBaseRecordName: undefined
             } as RecordAttribute
 
             // CAUTION 关联查询时，不可能出现从实体来获取一个关系的情况，语义不正确。
@@ -425,11 +467,7 @@ export class DBSetup {
             const entityWithProps = entity as any;
             if (entityWithProps.baseEntity && entityWithProps.matchExpression) {
                 this.currentFilteredEntityName = entityWithProps.name;
-                try {
-                    this.validateFilteredEntityPaths(entityWithProps.baseEntity.name, entityWithProps.matchExpression);
-                } finally {
-                    this.currentFilteredEntityName = undefined;
-                }
+                this.validateFilteredEntityPaths(entityWithProps.baseEntity.name, entityWithProps.matchExpression);
             }
         });
 
@@ -498,6 +536,7 @@ export class DBSetup {
 
         // 2. reliance 三表合一。这里有一个不能有链的检测。
         Object.values(oneToOneRelianceLinks).forEach(linkData => {
+            if(linkData.isFilteredRelation) return
             const { sourceRecord, targetRecord, recordName: linkRecord} = linkData
             // 只是尝试。有冲突就不会处理
             const conflicts = this.combineRecordTable(sourceRecord, targetRecord, linkRecord!)
@@ -520,6 +559,7 @@ export class DBSetup {
         // FIXME 还要加上 reliance 不是 1:1 的？
         // 3. 剩余的 x:1 关系只合并关系表。
         Object.values(xToOneNotRelianceLinks).forEach(linkData => {
+            if(linkData.isFilteredRelation) return
             const { relType, sourceRecord, targetRecord, recordName: linkRecord} = linkData
             const mergeWithSource = relType[1] !== 'n'
             const mergeTarget = mergeWithSource ? sourceRecord : targetRecord
@@ -535,6 +575,8 @@ export class DBSetup {
 
         // 4. 先给所有的 virtualLink 赋予默认 的 mergeTo，下一步再按照实际情况修改该
         Object.values(this.map.links).forEach(linkData => {
+            if(linkData.isFilteredRelation) return
+
             if (linkData.isSourceRelation) {
                 linkData.mergedTo = 'source'
             }
