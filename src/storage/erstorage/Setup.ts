@@ -233,7 +233,8 @@ export class DBSetup {
                 fieldType: this.database!.mapToDBFieldType('json') || 'JSON',
                 collection: false,
                 computed: undefined,
-                defaultValue: () => JSON.stringify({})
+                // JSON 字段的默认值应该返回对象，在写入数据库时会自动序列化
+                defaultValue: () => ({})
             };
         }
 
@@ -685,46 +686,6 @@ export class DBSetup {
 
     }
 
-    formatDefaultValue(value: any, fieldType?: string): string {
-        // 处理 undefined 值 - 不应该有默认值
-        if (value === undefined) {
-            return '';
-        }
-        
-        // 处理 null 值
-        if (value === null) {
-            return 'NULL';
-        }
-        
-        // 处理字符串类型
-        if (typeof value === 'string') {
-            // 对于 PostgreSQL/PGLite，字符串需要用单引号包裹
-            // 并且需要转义内部的单引号
-            return `'${value.replace(/'/g, "''")}'`;
-        }
-        
-        // 处理布尔值
-        if (typeof value === 'boolean') {
-            return value.toString();
-        }
-        
-        // 处理数字
-        if (typeof value === 'number') {
-            return value.toString();
-        }
-        
-        // 处理对象/数组（JSON类型）
-        if (typeof value === 'object' && value !== null) {
-            // 对于 JSON 类型，需要将对象序列化并用单引号包裹
-            const jsonStr = JSON.stringify(value);
-            // 转义单引号
-            return `'${jsonStr.replace(/'/g, "''")}'`;
-        }
-        
-        // 其他类型返回空字符串
-        return '';
-    }
-
     createTableSQL() {
         return Object.keys(this.tables).map(tableName => {
             const sql = (
@@ -732,18 +693,8 @@ export class DBSetup {
 CREATE TABLE "${tableName}" (
 ${Object.values(this.tables[tableName].columns).map(column => {
     let sql = `    "${column.name}" ${column.fieldType}`;
-    if (column.defaultValue) {
-        if (typeof column.defaultValue !== 'function') {
-            debugger
-        }
-        const defaultVal = column.defaultValue();
-        if (defaultVal !== undefined) {
-            const formattedDefault = this.formatDefaultValue(defaultVal);
-            if (formattedDefault) {
-                sql += ` DEFAULT ${formattedDefault}`;
-            }
-        }
-    }
+    // 移除 DEFAULT 子句生成，改为程序控制
+    // defaultValue 将在创建记录时由程序处理
     return sql;
 }).join(',')}
 )

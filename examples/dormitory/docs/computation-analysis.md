@@ -3,472 +3,491 @@
 ## Entity: User
 
 ### Entity-Level Analysis
-- **Purpose**: 系统用户，包括管理员、宿舍长和普通学生
-- **Creation Source**: CreateUser 交互
-- **Update Requirements**: 角色变更、积分更新、宿舍分配
-- **Deletion Strategy**: 软删除，通过 status 字段标记
+- **Purpose**: 系统中的所有用户，包括管理员、宿舍长和学生
+- **Creation Source**: CreateUser interaction
+- **Update Requirements**: 基本信息更新、角色变更、状态变更
+- **Deletion Strategy**: 软删除，状态变为expelled (保留历史记录)
 
 ### Property Analysis
 
 #### Property: id
 - **Type**: string
-- **Purpose**: 系统生成唯一标识
-- **Data Source**: 系统自动生成
+- **Purpose**: 用户唯一标识
+- **Data Source**: 系统生成
 - **Update Frequency**: Never
-- **Computation Decision**: None
-- **Reasoning**: ID 由框架自动生成和管理
+- **Computation Decision**: None (系统处理)
+- **Reasoning**: ID由框架自动生成
 
 #### Property: name
 - **Type**: string
 - **Purpose**: 用户姓名
 - **Data Source**: CreateUser payload
-- **Update Frequency**: 通过 UpdateUser 交互
+- **Update Frequency**: 通过UpdateUser interaction更新
 - **Computation Decision**: None
-- **Reasoning**: 基本字段，通过交互直接更新
+- **Reasoning**: 简单字段，直接更新
 
 #### Property: email
 - **Type**: string
-- **Purpose**: 邮箱，唯一标识
+- **Purpose**: 邮箱地址，作为唯一标识
 - **Data Source**: CreateUser payload
-- **Update Frequency**: 通过 UpdateUser 交互
+- **Update Frequency**: 通过UpdateUser interaction更新
 - **Computation Decision**: None
-- **Reasoning**: 基本字段，通过交互直接更新
+- **Reasoning**: 简单字段，直接更新
+
+#### Property: phone
+- **Type**: string
+- **Purpose**: 手机号码
+- **Data Source**: CreateUser payload
+- **Update Frequency**: 通过UpdateUser interaction更新
+- **Computation Decision**: None
+- **Reasoning**: 简单字段，直接更新
 
 #### Property: role
 - **Type**: string
 - **Purpose**: 用户角色 (admin/dormHead/student)
-- **Data Source**: CreateUser payload, AssignDormHead 交互
-- **Update Frequency**: 通过 AssignDormHead 或 UpdateUser 交互
+- **Data Source**: CreateUser payload 或 AssignDormHead interaction
+- **Update Frequency**: 通过AssignDormHead等interactions更新
 - **Computation Decision**: StateMachine
-- **Reasoning**: 角色有明确的转换状态，需要跟踪变更
-- **Dependencies**: AssignDormHead 交互, UpdateUser 交互
-- **Calculation Method**: 
-  - 初始状态为 'student'
-  - AssignDormHead 触发转换为 'dormHead'
-  - UpdateUser 可以更新为任意角色
+- **Reasoning**: 有定义的角色状态和转换规则
+- **Dependencies**: AssignDormHead interaction, 当前role值
+- **Calculation Method**: 状态转换 - student→dormHead (AssignDormHead), admin状态保持不变
 
-#### Property: points
-- **Type**: number
-- **Purpose**: 行为积分，默认100
-- **Data Source**: 初始值 + 行为记录累加
-- **Update Frequency**: 创建行为记录时自动更新
-- **Computation Decision**: Summation
-- **Reasoning**: 需要累加所有行为记录的积分
-- **Dependencies**: BehaviorRecordUserRelation, BehaviorRecord.points
-- **Calculation Method**: 初始值100 + 所有相关 BehaviorRecord.points 的总和
+#### Property: status
+- **Type**: string
+- **Purpose**: 用户状态 (active/suspended/expelled)
+- **Data Source**: 状态转换
+- **Update Frequency**: 通过ProcessExpulsionRequest等interactions更新
+- **Computation Decision**: StateMachine
+- **Reasoning**: 有定义的状态(active, suspended, expelled)和明确的转换
+- **Dependencies**: ProcessExpulsionRequest interaction, 当前status值
+- **Calculation Method**: 状态转换 - active→expelled (ProcessExpulsionRequest批准)
 
 #### Property: createdAt
 - **Type**: number
-- **Purpose**: 创建时间戳
-- **Data Source**: 系统生成
+- **Purpose**: 用户创建时间戳
+- **Data Source**: 用户创建时的系统时间
 - **Update Frequency**: Never
-- **Computation Decision**: None
-- **Reasoning**: 创建时设置，永不更改
+- **Computation Decision**: None (使用defaultValue)
+- **Reasoning**: 一次性设置的时间戳
+- **Implementation**: `defaultValue: () => Math.floor(Date.now()/1000)`
 
-#### Property: updatedAt
+#### Property: totalPenaltyPoints
 - **Type**: number
-- **Purpose**: 更新时间戳
-- **Data Source**: 任何更新操作
-- **Update Frequency**: 任何字段变更时
-- **Computation Decision**: StateMachine
-- **Reasoning**: 需要在任何更新时自动更新时间戳
-- **Dependencies**: 所有用户更新交互
-- **Calculation Method**: 任何状态转换时设置为 Date.now()
+- **Purpose**: 用户累计扣分
+- **Data Source**: BehaviorRecord实体的penaltyPoints字段之和
+- **Update Frequency**: 当创建新的BehaviorRecord时自动更新
+- **Computation Decision**: Summation
+- **Reasoning**: 简单求和计算
+- **Dependencies**: UserBehaviorRecordRelation (direction: source), BehaviorRecord实体 (penaltyPoints属性)
+- **Calculation Method**: 对所有相关BehaviorRecord记录的penaltyPoints字段求和
 
 ### Entity Computation Decision
 - **Type**: Transform
 - **Source**: InteractionEventEntity
-- **Reasoning**: 用户通过 CreateUser 交互创建
-- **Dependencies**: CreateUser 交互事件, payload 数据
-- **Calculation Method**: CreateUser 触发时创建新 User，使用 payload 中的 name, email，role 默认为 'student'，points 默认为 100
+- **Reasoning**: 用户通过CreateUser interaction创建
+- **Dependencies**: CreateUser interaction事件, payload数据
+- **Calculation Method**: 当CreateUser interaction触发时，从event.payload创建新User实体
 
 ## Entity: Dormitory
 
 ### Entity-Level Analysis
-- **Purpose**: 宿舍基本信息，包括容量和管理者
-- **Creation Source**: CreateDormitory 交互
-- **Update Requirements**: 名称、容量、状态更新
-- **Deletion Strategy**: 软删除，通过 status 字段标记
+- **Purpose**: 宿舍楼宇管理
+- **Creation Source**: CreateDormitory interaction
+- **Update Requirements**: 基本信息更新
+- **Deletion Strategy**: 硬删除 (实际不会删除，只是业务上不使用)
 
 ### Property Analysis
 
 #### Property: id
 - **Type**: string
-- **Purpose**: 系统生成唯一标识
-- **Data Source**: 系统自动生成
+- **Purpose**: 宿舍唯一标识
+- **Data Source**: 系统生成
 - **Update Frequency**: Never
-- **Computation Decision**: None
-- **Reasoning**: ID 由框架自动生成
+- **Computation Decision**: None (系统处理)
+- **Reasoning**: ID由框架自动生成
 
 #### Property: name
 - **Type**: string
-- **Purpose**: 宿舍名称，唯一
+- **Purpose**: 宿舍名称
 - **Data Source**: CreateDormitory payload
-- **Update Frequency**: 通过 UpdateDormitory 交互
+- **Update Frequency**: 通过UpdateDormitory interaction更新
 - **Computation Decision**: None
-- **Reasoning**: 基本字段，通过交互直接更新
+- **Reasoning**: 简单字段，直接更新
 
-#### Property: capacity
+#### Property: bedCount
 - **Type**: number
-- **Purpose**: 床位数量 (4-6)
+- **Purpose**: 床位总数
 - **Data Source**: CreateDormitory payload
-- **Update Frequency**: 通过 UpdateDormitory 交互
+- **Update Frequency**: Never (床位数创建后不变)
 - **Computation Decision**: None
-- **Reasoning**: 基本字段，通过交互直接更新
+- **Reasoning**: 一次性设置的值
 
-#### Property: status
-- **Type**: string
-- **Purpose**: 状态 (active/inactive)
-- **Data Source**: CreateDormitory 时默认 'active'
-- **Update Frequency**: 通过 UpdateDormitory 或 DeleteDormitory 交互
-- **Computation Decision**: StateMachine
-- **Reasoning**: 有明确的状态转换
-- **Dependencies**: CreateDormitory, UpdateDormitory, DeleteDormitory 交互
-- **Calculation Method**: 
-  - 初始状态 'active'
-  - UpdateDormitory 可以改变状态
-  - DeleteDormitory 转换为 'inactive'
+#### Property: availableBedCount
+- **Type**: number
+- **Purpose**: 可用床位数
+- **Data Source**: 状态为'available'的Bed实体计数
+- **Update Frequency**: 当床位状态变化时自动更新
+- **Computation Decision**: Count with callback
+- **Reasoning**: 需要条件过滤的计数
+- **Dependencies**: DormitoryBedRelation (direction: source), Bed实体 (status属性)
+- **Calculation Method**: 计算所有相关Bed记录中status='available'的数量
 
 #### Property: createdAt
 - **Type**: number
-- **Purpose**: 创建时间戳
-- **Data Source**: 系统生成
+- **Purpose**: 宿舍创建时间戳
+- **Data Source**: 宿舍创建时的系统时间
 - **Update Frequency**: Never
-- **Computation Decision**: None
-- **Reasoning**: 创建时设置，永不更改
-
-#### Property: updatedAt
-- **Type**: number
-- **Purpose**: 更新时间戳
-- **Data Source**: 任何更新操作
-- **Update Frequency**: 任何字段变更时
-- **Computation Decision**: StateMachine
-- **Reasoning**: 需要在任何更新时自动更新时间戳
-- **Dependencies**: 所有宿舍更新交互
-- **Calculation Method**: 任何状态转换时设置为 Date.now()
+- **Computation Decision**: None (使用defaultValue)
+- **Reasoning**: 一次性设置的时间戳
+- **Implementation**: `defaultValue: () => Math.floor(Date.now()/1000)`
 
 ### Entity Computation Decision
 - **Type**: Transform
 - **Source**: InteractionEventEntity
-- **Reasoning**: 宿舍通过 CreateDormitory 交互创建
-- **Dependencies**: CreateDormitory 交互事件, payload 数据
-- **Calculation Method**: CreateDormitory 触发时创建新 Dormitory，使用 payload 中的 name, capacity，自动创建相应数量的 Bed 实体
+- **Reasoning**: 宿舍通过CreateDormitory interaction创建
+- **Dependencies**: CreateDormitory interaction事件, payload数据
+- **Calculation Method**: 当CreateDormitory interaction触发时，创建新Dormitory实体，同时创建对应数量的Bed实体
 
 ## Entity: Bed
 
 ### Entity-Level Analysis
 - **Purpose**: 宿舍内的具体床位
-- **Creation Source**: 创建 Dormitory 时自动生成
-- **Update Requirements**: 占用状态更新
-- **Deletion Strategy**: 随 Dormitory 删除
+- **Creation Source**: 随Dormitory创建时自动生成
+- **Update Requirements**: 状态更新
+- **Deletion Strategy**: 硬删除 (随宿舍删除，实际不会删除)
 
 ### Property Analysis
 
 #### Property: id
 - **Type**: string
-- **Purpose**: 系统生成唯一标识
-- **Data Source**: 系统自动生成
+- **Purpose**: 床位唯一标识
+- **Data Source**: 系统生成
 - **Update Frequency**: Never
-- **Computation Decision**: None
-- **Reasoning**: ID 由框架自动生成
+- **Computation Decision**: None (系统处理)
+- **Reasoning**: ID由框架自动生成
 
 #### Property: bedNumber
-- **Type**: number
-- **Purpose**: 床位编号 (1开始)
-- **Data Source**: 创建 Dormitory 时生成
+- **Type**: string
+- **Purpose**: 床位编号
+- **Data Source**: 创建时生成 (如"床位1", "床位2")
 - **Update Frequency**: Never
 - **Computation Decision**: None
-- **Reasoning**: 创建时确定，永不更改
+- **Reasoning**: 一次性设置的标识
 
-#### Property: isOccupied
-- **Type**: boolean
-- **Purpose**: 是否被占用
-- **Data Source**: 用户分配状态
-- **Update Frequency**: 分配或移除用户时
+#### Property: status
+- **Type**: string
+- **Purpose**: 床位状态 (available/occupied/maintenance)
+- **Data Source**: 状态转换
+- **Update Frequency**: 通过AssignUserToBed, UpdateBedStatus等interactions更新
 - **Computation Decision**: StateMachine
-- **Reasoning**: 布尔状态，需要根据用户分配情况更新
-- **Dependencies**: AssignUserToDormitory, RemoveUserFromDormitory 交互
-- **Calculation Method**: 
-  - 初始 false
-  - AssignUserToDormitory 且分配到此床位时设为 true
-  - RemoveUserFromDormitory 或用户被踢出时设为 false
+- **Reasoning**: 有定义的状态和转换规则
+- **Dependencies**: AssignUserToBed, UpdateBedStatus interactions, 当前status值
+- **Calculation Method**: 状态转换 - available→occupied (AssignUserToBed), occupied→available (用户被踢出时)
 
 #### Property: createdAt
 - **Type**: number
-- **Purpose**: 创建时间戳
-- **Data Source**: 系统生成
+- **Purpose**: 床位创建时间戳
+- **Data Source**: 床位创建时的系统时间
 - **Update Frequency**: Never
-- **Computation Decision**: None
-- **Reasoning**: 创建时设置，永不更改
-
-#### Property: updatedAt
-- **Type**: number
-- **Purpose**: 更新时间戳
-- **Data Source**: 占用状态变更
-- **Update Frequency**: 占用状态变更时
-- **Computation Decision**: StateMachine
-- **Reasoning**: 需要在状态变更时更新时间戳
-- **Dependencies**: isOccupied 状态变更
-- **Calculation Method**: isOccupied 变更时设置为 Date.now()
+- **Computation Decision**: None (使用defaultValue)
+- **Reasoning**: 一次性设置的时间戳
+- **Implementation**: `defaultValue: () => Math.floor(Date.now()/1000)`
 
 ### Entity Computation Decision
 - **Type**: Transform
-- **Source**: Dormitory (创建时触发)
-- **Reasoning**: 床位在创建宿舍时自动生成
-- **Dependencies**: Dormitory 创建, capacity 属性
-- **Calculation Method**: Dormitory 创建时，生成 capacity 个 Bed，bedNumber 从 1 到 capacity
+- **Source**: InteractionEventEntity
+- **Reasoning**: 床位随宿舍创建时自动生成
+- **Dependencies**: CreateDormitory interaction事件, bedCount参数
+- **Calculation Method**: 当CreateDormitory interaction触发时，根据bedCount创建对应数量的Bed实体
+
+## Entity: UserBedAssignment
+
+### Entity-Level Analysis
+- **Purpose**: 用户与床位的分配关系记录
+- **Creation Source**: AssignUserToBed interaction
+- **Update Requirements**: 状态更新
+- **Deletion Strategy**: 软删除，状态变为inactive (保留分配历史)
+
+### Property Analysis
+
+#### Property: id
+- **Type**: string
+- **Purpose**: 分配记录唯一标识
+- **Data Source**: 系统生成
+- **Update Frequency**: Never
+- **Computation Decision**: None (系统处理)
+- **Reasoning**: ID由框架自动生成
+
+#### Property: assignedAt
+- **Type**: number
+- **Purpose**: 分配时间戳
+- **Data Source**: 分配时的系统时间
+- **Update Frequency**: Never
+- **Computation Decision**: None (使用defaultValue)
+- **Reasoning**: 一次性设置的时间戳
+- **Implementation**: `defaultValue: () => Math.floor(Date.now()/1000)`
+
+#### Property: status
+- **Type**: string
+- **Purpose**: 分配状态 (active/inactive)
+- **Data Source**: 状态转换
+- **Update Frequency**: 通过ProcessExpulsionRequest等interactions更新
+- **Computation Decision**: StateMachine
+- **Reasoning**: 有定义的状态和转换规则
+- **Dependencies**: ProcessExpulsionRequest interaction, 当前status值
+- **Calculation Method**: 状态转换 - active→inactive (用户被踢出时)
+
+### Entity Computation Decision
+- **Type**: Transform
+- **Source**: InteractionEventEntity
+- **Reasoning**: 分配记录通过AssignUserToBed interaction创建
+- **Dependencies**: AssignUserToBed interaction事件, userId和bedId参数
+- **Calculation Method**: 当AssignUserToBed interaction触发时，创建新的UserBedAssignment实体，连接指定的用户和床位
 
 ## Entity: BehaviorRecord
 
 ### Entity-Level Analysis
-- **Purpose**: 记录用户的行为评分
-- **Creation Source**: CreateBehaviorRecord 交互
-- **Update Requirements**: 永不更新
-- **Deletion Strategy**: 硬删除（需要审计时可改为软删除）
+- **Purpose**: 用户违规行为记录
+- **Creation Source**: RecordBehavior interaction
+- **Update Requirements**: 无需更新 (记录一旦创建不可修改)
+- **Deletion Strategy**: 硬删除 (实际不会删除，保留完整历史)
 
 ### Property Analysis
 
 #### Property: id
 - **Type**: string
-- **Purpose**: 系统生成唯一标识
-- **Data Source**: 系统自动生成
-- **Update Frequency**: Never
-- **Computation Decision**: None
-- **Reasoning**: ID 由框架自动生成
-
-#### Property: points
-- **Type**: number
-- **Purpose**: 分数变化
-- **Data Source**: CreateBehaviorRecord payload
-- **Update Frequency**: Never
-- **Computation Decision**: None
-- **Reasoning**: 创建时设置，永不更改
-
-#### Property: reason
-- **Type**: string
-- **Purpose**: 原因描述
-- **Data Source**: CreateBehaviorRecord payload
-- **Update Frequency**: Never
-- **Computation Decision**: None
-- **Reasoning**: 创建时设置，永不更改
-
-#### Property: createdAt
-- **Type**: number
-- **Purpose**: 记录时间戳
+- **Purpose**: 行为记录唯一标识
 - **Data Source**: 系统生成
 - **Update Frequency**: Never
+- **Computation Decision**: None (系统处理)
+- **Reasoning**: ID由框架自动生成
+
+#### Property: behaviorType
+- **Type**: string
+- **Purpose**: 违规类型
+- **Data Source**: RecordBehavior payload
+- **Update Frequency**: Never
 - **Computation Decision**: None
-- **Reasoning**: 创建时设置，永不更改
+- **Reasoning**: 一次性设置的值
+
+#### Property: description
+- **Type**: string
+- **Purpose**: 违规描述
+- **Data Source**: RecordBehavior payload
+- **Update Frequency**: Never
+- **Computation Decision**: None
+- **Reasoning**: 一次性设置的值
+
+#### Property: penaltyPoints
+- **Type**: number
+- **Purpose**: 扣分数值
+- **Data Source**: RecordBehavior payload
+- **Update Frequency**: Never
+- **Computation Decision**: None
+- **Reasoning**: 一次性设置的值
+
+#### Property: recordedAt
+- **Type**: number
+- **Purpose**: 记录时间戳
+- **Data Source**: 记录创建时的系统时间
+- **Update Frequency**: Never
+- **Computation Decision**: None (使用defaultValue)
+- **Reasoning**: 一次性设置的时间戳
+- **Implementation**: `defaultValue: () => Math.floor(Date.now()/1000)`
 
 ### Entity Computation Decision
 - **Type**: Transform
 - **Source**: InteractionEventEntity
-- **Reasoning**: 行为记录通过 CreateBehaviorRecord 交互创建
-- **Dependencies**: CreateBehaviorRecord 交互事件, payload 数据
-- **Calculation Method**: CreateBehaviorRecord 触发时创建新记录，使用 payload 中的 points, reason，自动设置 createdAt
+- **Reasoning**: 行为记录通过RecordBehavior interaction创建
+- **Dependencies**: RecordBehavior interaction事件, payload数据, user上下文
+- **Calculation Method**: 当RecordBehavior interaction触发时，创建新的BehaviorRecord实体
 
-## Entity: EvictionRequest
+## Entity: ExpulsionRequest
 
 ### Entity-Level Analysis
-- **Purpose**: 宿舍长申请踢出用户的记录
-- **Creation Source**: RequestEviction 交互
-- **Update Requirements**: 状态更新
-- **Deletion Strategy**: 保留历史记录
+- **Purpose**: 宿舍长申请踢出学生的请求
+- **Creation Source**: CreateExpulsionRequest interaction
+- **Update Requirements**: 状态更新、处理时间、管理员备注
+- **Deletion Strategy**: 硬删除 (实际不会删除，保留审批历史)
 
 ### Property Analysis
 
 #### Property: id
 - **Type**: string
-- **Purpose**: 系统生成唯一标识
-- **Data Source**: 系统自动生成
+- **Purpose**: 申请唯一标识
+- **Data Source**: 系统生成
 - **Update Frequency**: Never
-- **Computation Decision**: None
-- **Reasoning**: ID 由框架自动生成
+- **Computation Decision**: None (系统处理)
+- **Reasoning**: ID由框架自动生成
 
 #### Property: reason
 - **Type**: string
-- **Purpose**: 申请原因
-- **Data Source**: RequestEviction payload
+- **Purpose**: 申请理由
+- **Data Source**: CreateExpulsionRequest payload
 - **Update Frequency**: Never
 - **Computation Decision**: None
-- **Reasoning**: 创建时设置，永不更改
+- **Reasoning**: 一次性设置的值
 
 #### Property: status
 - **Type**: string
-- **Purpose**: 状态 (pending/approved/rejected)
-- **Data Source**: RequestEviction 时默认 'pending'
-- **Update Frequency**: ApproveEviction 交互
+- **Purpose**: 申请状态 (pending/approved/rejected)
+- **Data Source**: 状态转换
+- **Update Frequency**: 通过ProcessExpulsionRequest interaction更新
 - **Computation Decision**: StateMachine
-- **Reasoning**: 有明确的状态转换流程
-- **Dependencies**: RequestEviction, ApproveEviction 交互
-- **Calculation Method**: 
-  - 初始状态 'pending'
-  - ApproveEviction 根据 approved 参数转换为 'approved' 或 'rejected'
+- **Reasoning**: 有定义的状态和转换规则
+- **Dependencies**: ProcessExpulsionRequest interaction, 当前status值, decision参数
+- **Calculation Method**: 状态转换 - pending→approved/rejected (ProcessExpulsionRequest)
 
-#### Property: createdAt
+#### Property: requestedAt
 - **Type**: number
 - **Purpose**: 申请时间戳
-- **Data Source**: 系统生成
+- **Data Source**: 申请创建时的系统时间
 - **Update Frequency**: Never
-- **Computation Decision**: None
-- **Reasoning**: 创建时设置，永不更改
+- **Computation Decision**: None (使用defaultValue)
+- **Reasoning**: 一次性设置的时间戳
+- **Implementation**: `defaultValue: () => Math.floor(Date.now()/1000)`
 
-#### Property: approvedAt
+#### Property: processedAt
 - **Type**: number
-- **Purpose**: 审批时间戳
-- **Data Source**: ApproveEviction 交互
-- **Update Frequency**: 审批时
-- **Computation Decision**: StateMachine
-- **Reasoning**: 审批时设置的时间戳
-- **Dependencies**: ApproveEviction 交互
-- **Calculation Method**: 状态转换为 approved/rejected 时设置为 Date.now()
+- **Purpose**: 处理时间戳 (可选)
+- **Data Source**: 处理时的系统时间
+- **Update Frequency**: 通过ProcessExpulsionRequest interaction更新
+- **Computation Decision**: StateMachine with computeValue
+- **Reasoning**: 仅在状态转换时更新时间戳
+- **Dependencies**: ProcessExpulsionRequest interaction
+- **Calculation Method**: 当状态从pending转换时，设置为Date.now()
 
-#### Property: approvedBy
+#### Property: adminNotes
 - **Type**: string
-- **Purpose**: 审批人ID
-- **Data Source**: ApproveEviction payload
-- **Update Frequency**: 审批时
-- **Computation Decision**: StateMachine
-- **Reasoning**: 审批时需要记录审批人
-- **Dependencies**: ApproveEviction 交互, event.user
-- **Calculation Method**: 状态转换时从 event.user.id 获取
+- **Purpose**: 管理员备注 (可选)
+- **Data Source**: ProcessExpulsionRequest payload
+- **Update Frequency**: 通过ProcessExpulsionRequest interaction更新
+- **Computation Decision**: StateMachine with computeValue
+- **Reasoning**: 仅在处理时设置备注
+- **Dependencies**: ProcessExpulsionRequest interaction, adminNotes参数
+- **Calculation Method**: 从interaction payload获取adminNotes值
 
 ### Entity Computation Decision
 - **Type**: Transform
 - **Source**: InteractionEventEntity
-- **Reasoning**: 踢出申请通过 RequestEviction 交互创建
-- **Dependencies**: RequestEviction 交互事件, payload 数据
-- **Calculation Method**: RequestEviction 触发时创建新记录，使用 payload 中的 userId, reason，status 默认为 'pending'
+- **Reasoning**: 踢出申请通过CreateExpulsionRequest interaction创建
+- **Dependencies**: CreateExpulsionRequest interaction事件, payload数据, user上下文
+- **Calculation Method**: 当CreateExpulsionRequest interaction触发时，创建新的ExpulsionRequest实体
 
-## Relation: UserDormitoryRelation
-
-### Relation Analysis
-- **Purpose**: 建立用户与宿舍的分配关系
-- **Creation**: AssignUserToDormitory 交互
-- **Deletion Requirements**: 硬删除，当用户被移除或踢出时
-- **Update Requirements**: 床位号可能需要更新
-- **State Management**: 需要状态管理（active/inactive）
-- **Computation Decision**: StateMachine
-- **Reasoning**: 需要创建、更新和删除能力
-- **Dependencies**: AssignUserToDormitory, RemoveUserFromDormitory, ApproveEviction 交互
-- **Calculation Method**: 
-  - AssignUserToDormitory 创建关系
-  - RemoveUserFromDormitory 删除关系
-  - ApproveEviction(approved=true) 删除关系
-
-## Relation: DormitoryHeadRelation
+## Relation: UserDormitoryHeadRelation
 
 ### Relation Analysis
-- **Purpose**: 指定宿舍的宿舍长
-- **Creation**: AssignDormHead 交互
-- **Deletion Requirements**: 硬删除，当更换宿舍长或删除宿舍时
-- **Update Requirements**: 不需要更新属性
-- **State Management**: 不需要显式状态
-- **Computation Decision**: StateMachine
-- **Reasoning**: 需要创建和删除能力
-- **Dependencies**: AssignDormHead 交互
-- **Calculation Method**: 
-  - AssignDormHead 创建关系
-  - 新的 AssignDormHead 替换旧的关系
+- **Purpose**: 建立宿舍长与其管理宿舍的关系
+- **Creation**: 通过AssignDormHead interaction在现有实体间创建
+- **Deletion Requirements**: 硬删除当宿舍长角色变更时
+- **Update Requirements**: assignedAt时间戳更新
+- **State Management**: 无需状态管理
+- **Computation Decision**: StateMachine only
+- **Reasoning**: 需要创建和删除能力，Transform alone无法删除
+- **Dependencies**: AssignDormHead interaction, 现有User和Dormitory实体
+- **Calculation Method**: AssignDormHead interaction时创建关系，角色变更时删除关系
 
-## Relation: BedDormitoryRelation
+## Relation: DormitoryBedRelation
 
 ### Relation Analysis
-- **Purpose**: 定义床位属于哪个宿舍
-- **Creation**: 创建 Dormitory 时自动创建
-- **Deletion Requirements**: 随 Dormitory 删除
-- **Update Requirements**: 永不更新
-- **State Management**: 不需要状态
+- **Purpose**: 建立宿舍与其床位的关系
+- **Creation**: 随Bed创建时自动建立
+- **Deletion Requirements**: 硬删除随床位删除 (实际不会删除)
+- **Update Requirements**: 无需更新
+- **State Management**: 无需状态管理
 - **Computation Decision**: None
-- **Reasoning**: 作为 Dormitory 的一部分自动创建和删除
-- **Dependencies**: Dormitory 创建
-- **Calculation Method**: 创建 Dormitory 时自动建立关系
+- **Reasoning**: 随实体创建自动建立关系
+- **Dependencies**: N/A (随Bed实体创建自动建立)
+- **Calculation Method**: N/A (无需计算)
 
-## Relation: BehaviorRecordUserRelation
+## Relation: UserBedAssignmentRelation
 
 ### Relation Analysis
-- **Purpose**: 关联行为记录和用户
-- **Creation**: 创建 BehaviorRecord 时自动创建
-- **Deletion Requirements**: 随 BehaviorRecord 删除
-- **Update Requirements**: 永不更新
-- **State Management**: 不需要状态
+- **Purpose**: 建立用户与床位分配记录的关系
+- **Creation**: 随UserBedAssignment创建时自动建立
+- **Deletion Requirements**: 随UserBedAssignment删除
+- **Update Requirements**: 无需更新
+- **State Management**: 无需状态管理
 - **Computation Decision**: None
-- **Reasoning**: 作为 BehaviorRecord 的一部分自动创建
-- **Dependencies**: BehaviorRecord 创建
-- **Calculation Method**: 创建 BehaviorRecord 时通过实体引用自动建立
+- **Reasoning**: 随实体创建自动建立关系
+- **Dependencies**: N/A (随UserBedAssignment实体创建自动建立)
+- **Calculation Method**: N/A (无需计算)
+
+## Relation: BedAssignmentBedRelation
+
+### Relation Analysis
+- **Purpose**: 建立床位分配记录与床位的关系
+- **Creation**: 随UserBedAssignment创建时自动建立
+- **Deletion Requirements**: 随UserBedAssignment删除
+- **Update Requirements**: 无需更新
+- **State Management**: 无需状态管理
+- **Computation Decision**: None
+- **Reasoning**: 随实体创建自动建立关系
+- **Dependencies**: N/A (随UserBedAssignment实体创建自动建立)
+- **Calculation Method**: N/A (无需计算)
+
+## Relation: UserBehaviorRecordRelation
+
+### Relation Analysis
+- **Purpose**: 建立用户与其行为记录的关系
+- **Creation**: 随BehaviorRecord创建时自动建立
+- **Deletion Requirements**: Never deleted (保留完整历史)
+- **Update Requirements**: 无需更新
+- **State Management**: 无需状态管理
+- **Computation Decision**: None
+- **Reasoning**: 随实体创建自动建立关系，无需删除
+- **Dependencies**: N/A (随BehaviorRecord实体创建自动建立)
+- **Calculation Method**: N/A (无需计算)
 
 ## Relation: BehaviorRecordRecorderRelation
 
 ### Relation Analysis
-- **Purpose**: 记录是谁创建了行为记录
-- **Creation**: 创建 BehaviorRecord 时自动创建
-- **Deletion Requirements**: 随 BehaviorRecord 删除
-- **Update Requirements**: 永不更新
-- **State Management**: 不需要状态
+- **Purpose**: 建立行为记录与记录人的关系
+- **Creation**: 随BehaviorRecord创建时自动建立
+- **Deletion Requirements**: Never deleted (保留完整历史)
+- **Update Requirements**: 无需更新
+- **State Management**: 无需状态管理
 - **Computation Decision**: None
-- **Reasoning**: 作为 BehaviorRecord 的一部分自动创建
-- **Dependencies**: BehaviorRecord 创建
-- **Calculation Method**: 创建 BehaviorRecord 时通过实体引用自动建立
+- **Reasoning**: 随实体创建自动建立关系，无需删除
+- **Dependencies**: N/A (随BehaviorRecord实体创建自动建立)
+- **Calculation Method**: N/A (无需计算)
 
-## Relation: EvictionRequestUserRelation
+## Relation: ExpulsionRequestRequesterRelation
 
 ### Relation Analysis
-- **Purpose**: 关联踢出申请和被申请的用户
-- **Creation**: 创建 EvictionRequest 时自动创建
-- **Deletion Requirements**: 随 EvictionRequest 删除
-- **Update Requirements**: 永不更新
-- **State Management**: 不需要状态
+- **Purpose**: 建立踢出申请与申请人的关系
+- **Creation**: 随ExpulsionRequest创建时自动建立
+- **Deletion Requirements**: Never deleted (保留审批历史)
+- **Update Requirements**: 无需更新
+- **State Management**: 无需状态管理
 - **Computation Decision**: None
-- **Reasoning**: 作为 EvictionRequest 的一部分自动创建
-- **Dependencies**: EvictionRequest 创建
-- **Calculation Method**: 创建 EvictionRequest 时通过实体引用自动建立
+- **Reasoning**: 随实体创建自动建立关系，无需删除
+- **Dependencies**: N/A (随ExpulsionRequest实体创建自动建立)
+- **Calculation Method**: N/A (无需计算)
 
-## Relation: EvictionRequestRequesterRelation
+## Relation: ExpulsionRequestTargetRelation
 
 ### Relation Analysis
-- **Purpose**: 记录是谁提交了踢出申请
-- **Creation**: 创建 EvictionRequest 时自动创建
-- **Deletion Requirements**: 随 EvictionRequest 删除
-- **Update Requirements**: 永不更新
-- **State Management**: 不需要状态
+- **Purpose**: 建立踢出申请与目标用户的关系
+- **Creation**: 随ExpulsionRequest创建时自动建立
+- **Deletion Requirements**: Never deleted (保留审批历史)
+- **Update Requirements**: 无需更新
+- **State Management**: 无需状态管理
 - **Computation Decision**: None
-- **Reasoning**: 作为 EvictionRequest 的一部分自动创建
-- **Dependencies**: EvictionRequest 创建
-- **Calculation Method**: 创建 EvictionRequest 时通过实体引用自动建立
+- **Reasoning**: 随实体创建自动建立关系，无需删除
+- **Dependencies**: N/A (随ExpulsionRequest实体创建自动建立)
+- **Calculation Method**: N/A (无需计算)
 
-## Relation: EvictionRequestApproverRelation
+## 计算实现检查清单
 
-### Relation Analysis
-- **Purpose**: 记录是谁批准了踢出申请
-- **Creation**: 批准时创建
-- **Deletion Requirements**: 随 EvictionRequest 删除
-- **Update Requirements**: 永不更新
-- **State Management**: 不需要状态
-- **Computation Decision**: None
-- **Reasoning**: 作为 EvictionRequest 状态更新的一部分自动创建
-- **Dependencies**: ApproveEviction 交互
-- **Calculation Method**: ApproveEviction 时通过实体引用自动建立
-
-## 计算属性总结
-
-### User 计算属性
-- **totalPoints**: 通过 Summation 计算所有行为记录积分
-- **behaviorCount**: 通过 Count 计算行为记录数量
-- **isActiveInDormitory**: 通过检查 UserDormitoryRelation 状态
-
-### Dormitory 计算属性
-- **occupancy**: 通过 Count 计算 active 状态的用户数
-- **availableBeds**: capacity - occupancy
-- **occupancyRate**: occupancy / capacity
-
-### Bed 计算属性
-- **status**: 基于 isOccupied 的派生状态
-
-### 状态节点定义需求
-需要为所有 StateMachine 定义状态节点：
-- User.role 状态: student, dormHead, admin
-- Dormitory.status 状态: active, inactive
-- Bed.isOccupied 状态: false, true
-- EvictionRequest.status 状态: pending, approved, rejected
-- UserDormitoryRelation 状态: active, inactive
-- DormitoryHeadRelation 状态: exists, deleted
+- [x] 所有实体已分析并记录
+- [x] 所有属性已分析并记录
+- [x] 实体级Transform定义需求已确定
+- [x] 属性计算根据分析实现
+- [x] 所有计算的依赖项已记录
+- [x] 所有计算的计算方法已记录
+- [x] StateNode变量声明计划已确定
+- [x] 无Transform在属性计算中使用
+- [x] 无循环依赖识别
+- [x] 所有计算属性的默认值已计划
+- [x] 分析文档已保存到 `docs/computation-analysis.md`

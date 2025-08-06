@@ -1,244 +1,256 @@
 # 宿舍管理系统测试用例
 
-## 第一阶段：核心业务逻辑测试
+## 🔴 重要说明
+所有测试用例都基于Interactions，NOT基于Entity/Relation操作。测试分为三个阶段：
+1. **Core Business Logic Tests** (Stage 1 - 优先实现)
+2. **Permission Tests** (Stage 2 - 核心逻辑完成后实现)
+3. **Business Rule Tests** (Stage 2 - 核心逻辑完成后实现)
 
-### TC001: 创建宿舍 (via CreateDormitory Interaction)
-- **Interaction**: CreateDormitory
-- **Phase**: Core Business Logic
-- **Preconditions**: Admin user exists and is logged in
+---
+
+## Phase 1: Core Business Logic Tests
+
+### TC001: Create User (via CreateUser Interaction)
+- **Interaction**: CreateUser
+- **Test Phase**: Core Business Logic
+- **Preconditions**: System admin logged in
 - **Input Data**: 
-  ```typescript
+  ```json
   {
-    name: "Dormitory A",
-    capacity: 4,
-    headId: "user123"
+    "name": "张三",
+    "email": "zhangsan@example.com",
+    "phone": "13800138000",
+    "role": "student"
   }
   ```
 - **Expected Results**:
-  1. New dormitory record created
-  2. Dormitory name is "Dormitory A"
-  3. Dormitory capacity is 4
-  4. Dormitory head is assigned to user123
-  5. Dormitory status is "active"
-  6. 4 bed records are created automatically
-- **Post Validation**: Dormitory appears in dormitory list
+  1. Create new User entity
+  2. User status is 'active'
+  3. User has specified role
+  4. Creation timestamp recorded
+- **Post Validation**: User appears in system user list
 
-### TC002: 分配用户到宿舍 (via AssignUserToDormitory Interaction)
-- **Interaction**: AssignUserToDormitory
-- **Phase**: Core Business Logic
-- **Preconditions**: 
-  - Dormitory exists with available beds
-  - User exists without dormitory assignment
+### TC002: Create Dormitory (via CreateDormitory Interaction)
+- **Interaction**: CreateDormitory
+- **Test Phase**: Core Business Logic  
+- **Preconditions**: System admin logged in
 - **Input Data**:
-  ```typescript
+  ```json
   {
-    userId: "student123",
-    dormitoryId: "dorm123",
-    bedNumber: 1
+    "name": "A栋101",
+    "bedCount": 4
   }
   ```
 - **Expected Results**:
-  1. User is assigned to dormitory
-  2. Bed #1 is marked as occupied
-  3. User's dormitory reference is updated
-  4. Dormitory's occupancy count increases
-  5. Assignment timestamp is recorded
+  1. Create new Dormitory entity
+  2. Generate 4 Bed entities linked to dormitory
+  3. All beds initially have status 'available'
+  4. Dormitory available bed count = 4
+- **Post Validation**: Dormitory with 4 available beds exists
 
-### TC003: 创建行为评分记录 (via CreateBehaviorRecord Interaction)
-- **Interaction**: CreateBehaviorRecord
-- **Phase**: Core Business Logic
-- **Preconditions**:
-  - User exists and is assigned to a dormitory
-  - Dorm head user exists
-- **Input Data**:
-  ```typescript
-  {
-    userId: "student123",
-    points: -5,
-    reason: "Late night noise",
-    recordedBy: "head123"
-  }
-  ```
-- **Expected Results**:
-  1. New behavior record created
-  2. User's total points updated (decreased by 5)
-  3. Record shows correct timestamp
-  4. Reason is properly stored
-
-### TC004: 申请踢出用户 (via RequestEviction Interaction)
-- **Interaction**: RequestEviction
-- **Phase**: Core Business Logic
-- **Preconditions**:
-  - User exists with low points (< 60)
-  - Dorm head exists
-  - User is assigned to a dormitory
-- **Input Data**:
-  ```typescript
-  {
-    userId: "student123",
-    reason: "Consistent rule violations",
-    requestedBy: "head123"
-  }
-  ```
-- **Expected Results**:
-  1. New eviction request created
-  2. Request status is "pending"
-  3. Request links to user and dorm head
-  4. Timestamp is recorded
-
-### TC005: 审批踢出申请 (via ApproveEviction Interaction)
-- **Interaction**: ApproveEviction
-- **Phase**: Core Business Logic
-- **Preconditions**:
-  - Eviction request exists with "pending" status
-  - Admin user exists
-- **Input Data**:
-  ```typescript
-  {
-    requestId: "request123",
-    approved: true,
-    approvedBy: "admin123"
-  }
-  ```
-- **Expected Results**:
-  1. Request status updated to "approved"
-  2. User is removed from dormitory
-  3. Bed is marked as available
-  4. User's dormitory reference is cleared
-  5. Approval timestamp is recorded
-
-### TC006: 指定宿舍长 (via AssignDormHead Interaction)
+### TC003: Assign Dorm Head (via AssignDormHead Interaction)
 - **Interaction**: AssignDormHead
-- **Phase**: Core Business Logic
-- **Preconditions**:
-  - Dormitory exists
-  - User exists with admin role
-  - Target user exists
+- **Test Phase**: Core Business Logic
+- **Preconditions**: User and Dormitory exist
 - **Input Data**:
-  ```typescript
+  ```json
   {
-    dormitoryId: "dorm123",
-    headId: "user456"
+    "userId": "user123",
+    "dormitoryId": "dorm456"
   }
   ```
 - **Expected Results**:
-  1. Dormitory's head is updated to user456
-  2. Previous head (if any) is removed
-  3. User's role is updated to "dormHead"
-  4. Assignment timestamp is recorded
+  1. User role updated to 'dormHead'
+  2. UserDormitoryHeadRelation created
+  3. User can access dormitory management functions
+- **Post Validation**: User appears as dorm head for specified dormitory
 
-## 第二阶段：权限测试
-
-### TC101: 非管理员创建宿舍被拒绝 (via CreateDormitory Interaction)
-- **Interaction**: CreateDormitory
-- **Phase**: Permissions
-- **Preconditions**: Regular student user logged in
-- **Input Data**: Same as TC001
-- **Expected Results**:
-  1. Interaction returns error
-  2. Error indicates insufficient permissions
-  3. No dormitory is created
-
-### TC102: 非宿舍长评分被拒绝 (via CreateBehaviorRecord Interaction)
-- **Interaction**: CreateBehaviorRecord
-- **Phase**: Permissions
-- **Preconditions**: Regular student trying to record behavior
-- **Input Data**: Same as TC003
-- **Expected Results**:
-  1. Interaction returns error
-  2. Error indicates only dorm heads can record behavior
-  3. No behavior record is created
-
-### TC103: 非管理员审批踢出被拒绝 (via ApproveEviction Interaction)
-- **Interaction**: ApproveEviction
-- **Phase**: Permissions
-- **Preconditions**: Dorm head trying to approve eviction
-- **Input Data**: Same as TC005
-- **Expected Results**:
-  1. Interaction returns error
-  2. Error indicates only admins can approve evictions
-  3. Request status remains "pending"
-
-## 第三阶段：业务规则测试
-
-### TC201: 创建宿舍时床位数量超出范围 (via CreateDormitory Interaction)
-- **Interaction**: CreateDormitory
-- **Phase**: Business Rules
-- **Preconditions**: Admin user logged in
+### TC004: Assign User to Bed (via AssignUserToBed Interaction)
+- **Interaction**: AssignUserToBed
+- **Test Phase**: Core Business Logic
+- **Preconditions**: User exists, Bed is available
 - **Input Data**:
-  ```typescript
+  ```json
   {
-    name: "Invalid Dorm",
-    capacity: 10, // Invalid: > 6
-    headId: "user123"
+    "userId": "student123",
+    "bedId": "bed789"
   }
   ```
 - **Expected Results**:
-  1. Interaction returns error
-  2. Error indicates invalid capacity
-  3. No dormitory is created
+  1. Create UserBedAssignment entity
+  2. Bed status changed to 'occupied'
+  3. Dormitory available bed count decremented
+  4. Assignment status is 'active'
+- **Post Validation**: User is assigned to specified bed
 
-### TC202: 分配已分配用户到另一宿舍 (via AssignUserToDormitory Interaction)
-- **Interaction**: AssignUserToDormitory
-- **Phase**: Business Rules
-- **Preconditions**: User already assigned to a dormitory
-- **Input Data**: Same as TC002 but with different dormitory
+### TC005: Record User Behavior (via RecordBehavior Interaction)
+- **Interaction**: RecordBehavior
+- **Test Phase**: Core Business Logic
+- **Preconditions**: User exists, Dorm head logged in
+- **Input Data**:
+  ```json
+  {
+    "userId": "student123",
+    "behaviorType": "noise_violation",
+    "description": "深夜大声喧哗",
+    "penaltyPoints": 20
+  }
+  ```
 - **Expected Results**:
-  1. Interaction returns error
-  2. Error indicates user already assigned
-  3. No new assignment is created
+  1. Create BehaviorRecord entity
+  2. User's total penalty points automatically updated
+  3. Record timestamp and recorder info
+- **Post Validation**: Behavior record appears in user's history
 
-### TC203: 分配用户到已满宿舍 (via AssignUserToDormitory Interaction)
-- **Interaction**: AssignUserToDormitory
-- **Phase**: Business Rules
-- **Preconditions**: Dormitory has no available beds
-- **Input Data**: Same as TC002
+### TC006: Create Expulsion Request (via CreateExpulsionRequest Interaction)
+- **Interaction**: CreateExpulsionRequest
+- **Test Phase**: Core Business Logic
+- **Preconditions**: Dorm head user, target student in same dormitory
+- **Input Data**:
+  ```json
+  {
+    "requesterId": "dormhead123",
+    "targetUserId": "student456",
+    "reason": "累计违规扣分过多"
+  }
+  ```
 - **Expected Results**:
-  1. Interaction returns error
-  2. Error indicates dormitory is full
-  3. No assignment is created
+  1. Create ExpulsionRequest entity
+  2. Request status is 'pending'
+  3. Record request timestamp
+- **Post Validation**: Expulsion request appears in admin review queue
 
-### TC204: 高积分用户申请踢出被拒绝 (via RequestEviction Interaction)
-- **Interaction**: RequestEviction
-- **Phase**: Business Rules
-- **Preconditions**: User has high points (>= 60)
-- **Input Data**: Same as TC004
+### TC007: Process Expulsion Request - Approve (via ProcessExpulsionRequest Interaction)
+- **Interaction**: ProcessExpulsionRequest
+- **Test Phase**: Core Business Logic
+- **Preconditions**: Admin user, pending expulsion request exists
+- **Input Data**:
+  ```json
+  {
+    "requestId": "request789",
+    "decision": "approved",
+    "adminNotes": "违规严重，同意踢出"
+  }
+  ```
 - **Expected Results**:
-  1. Interaction returns error
-  2. Error indicates user points too high for eviction
-  3. No eviction request is created
+  1. ExpulsionRequest status updated to 'approved'
+  2. Target user status changed to 'expelled'
+  3. User's bed assignment status changed to 'inactive'
+  4. Bed status changed back to 'available'
+  5. Dormitory available bed count incremented
+- **Post Validation**: User no longer has active bed assignment
 
-### TC205: 重复审批已处理的申请 (via ApproveEviction Interaction)
-- **Interaction**: ApproveEviction
-- **Phase**: Business Rules
-- **Preconditions**: Request already approved
-- **Input Data**: Same as TC005
+---
+
+## Phase 2: Permission Tests
+
+### TC101: Create User - Permission Denied (via CreateUser Interaction)
+- **Interaction**: CreateUser
+- **Test Phase**: Permissions
+- **Preconditions**: Regular student user logged in (not admin)
+- **Input Data**: Valid user creation data
 - **Expected Results**:
-  1. Interaction returns error
+  1. Interaction returns permission error
+  2. No new user created
+- **Note**: Test permission enforcement, not core functionality
+
+### TC102: Assign Dorm Head - Cross Boundary (via AssignDormHead Interaction)
+- **Interaction**: AssignDormHead
+- **Test Phase**: Permissions
+- **Preconditions**: Dorm head trying to assign another dorm head
+- **Input Data**: Valid assignment data
+- **Expected Results**:
+  1. Interaction returns permission error
+  2. Only admin can assign dorm heads
+- **Note**: Test role-based access control
+
+### TC103: Record Behavior - Cross Dormitory (via RecordBehavior Interaction)
+- **Interaction**: RecordBehavior
+- **Test Phase**: Permissions
+- **Preconditions**: Dorm head trying to record behavior for student in different dormitory
+- **Input Data**: Valid behavior record data
+- **Expected Results**:
+  1. Interaction returns permission error
+  2. Dorm head can only manage own dormitory students
+- **Note**: Test boundary access control
+
+---
+
+## Phase 3: Business Rule Tests
+
+### TC201: Assign User to Bed - Bed Already Occupied (via AssignUserToBed Interaction)
+- **Interaction**: AssignUserToBed
+- **Test Phase**: Business Rules
+- **Preconditions**: Bed is already occupied by another user
+- **Input Data**: Valid assignment data for occupied bed
+- **Expected Results**:
+  1. Interaction returns business rule error
+  2. Error indicates bed is not available
+  3. No new assignment created
+- **Note**: Test business logic validation
+
+### TC202: Create Dormitory - Invalid Bed Count (via CreateDormitory Interaction)
+- **Interaction**: CreateDormitory
+- **Test Phase**: Business Rules
+- **Preconditions**: Admin logged in
+- **Input Data**:
+  ```json
+  {
+    "name": "Invalid Dorm",
+    "bedCount": 8
+  }
+  ```
+- **Expected Results**:
+  1. Interaction returns validation error
+  2. Error indicates bed count must be 4-6
+  3. No dormitory created
+- **Note**: Test business rule constraint (4-6 beds only)
+
+### TC203: Assign User to Bed - User Already Assigned (via AssignUserToBed Interaction)
+- **Interaction**: AssignUserToBed
+- **Test Phase**: Business Rules
+- **Preconditions**: User already has active bed assignment
+- **Input Data**: Assignment to different bed
+- **Expected Results**:
+  1. Interaction returns business rule error
+  2. Error indicates user already has bed assignment
+  3. No new assignment created
+- **Note**: Test one-bed-per-user constraint
+
+### TC204: Create Expulsion Request - Insufficient Points (via CreateExpulsionRequest Interaction)
+- **Interaction**: CreateExpulsionRequest
+- **Test Phase**: Business Rules
+- **Preconditions**: Target user has penalty points < 100
+- **Input Data**: Valid expulsion request data
+- **Expected Results**:
+  1. Interaction returns business rule error
+  2. Error indicates insufficient penalty points for expulsion
+  3. No expulsion request created
+- **Note**: Test penalty point threshold business rule
+
+### TC205: Process Expulsion Request - Already Processed (via ProcessExpulsionRequest Interaction)
+- **Interaction**: ProcessExpulsionRequest
+- **Test Phase**: Business Rules
+- **Preconditions**: Expulsion request already approved/rejected
+- **Input Data**: Attempt to process again
+- **Expected Results**:
+  1. Interaction returns business rule error
   2. Error indicates request already processed
-  3. No changes to request or user assignment
+  3. No state change
+- **Note**: Test idempotency business rule
 
-## 边界条件测试
+---
 
-### TC301: 床位数量边界值测试
-- **Interaction**: CreateDormitory
-- **Phase**: Business Rules
-- **Test Cases**:
-  - Capacity = 3 (should fail)
-  - Capacity = 4 (should pass)
-  - Capacity = 6 (should pass)
-  - Capacity = 7 (should fail)
+## Test Implementation Strategy
 
-### TC302: 积分阈值边界值测试
-- **Interaction**: RequestEviction
-- **Phase**: Business Rules
-- **Test Cases**:
-  - Points = 59 (should pass)
-  - Points = 60 (should fail)
-  - Points = 61 (should fail)
+### Stage 1 Implementation Notes
+- All Stage 1 tests use **proper user roles** (admin, dormHead, student)
+- All Stage 1 tests use **valid data** that will pass future business rules
+- Focus on core functionality: CRUD operations, relationships, computations
+- Ensure all basic operations work before adding constraints
 
-### TC303: 批量操作测试
-- Test creating multiple dormitories
-- Test assigning multiple users
-- Test multiple behavior records
-- Test multiple eviction requests
+### Stage 2 Implementation Notes  
+- Stage 1 tests should **continue to pass** after Stage 2 implementation
+- Stage 2 adds **new test cases** specifically for permissions and business rules
+- Test both positive cases (valid operations) and negative cases (rule violations)
+- Verify appropriate error messages and no side effects on failures

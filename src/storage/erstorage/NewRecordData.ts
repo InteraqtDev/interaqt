@@ -149,8 +149,25 @@ export class NewRecordData {
 
         const result: FieldAndValue[] =[]
         const updatedComputedFields = new Set<string>()
+        
+        // 获取记录的所有 value 属性定义，不仅仅是提供的属性
+        const recordInfo = this.map.getRecordInfo(this.recordName)
+        const allValueAttributes = new Set<string>()
+        
+        // 先处理提供的属性
         this.valueAttributes.forEach((info) => {
-            const value = info.isComputed ? info.computed!(newRecord) : this.rawData[info.attributeName]
+            allValueAttributes.add(info.attributeName)
+            // 处理默认值：如果字段值为 undefined 且有默认值函数，则调用默认值函数
+            let value = info.isComputed ? info.computed!(newRecord) : this.rawData[info.attributeName]
+            
+            // 如果值为 undefined 且有默认值函数，使用默认值
+            // 注意：null 是明确的值，不应该被默认值替换
+            // ValueAttribute 类型包含 defaultValue 属性
+            const valueAttr = info.data as import("./EntityToTableMap.js").ValueAttribute
+            if (value === undefined && valueAttr.defaultValue && typeof valueAttr.defaultValue === 'function') {
+                value = valueAttr.defaultValue()
+            }
+            
             result.push({
                 name: info.attributeName,
                 field: info.field!,
@@ -161,10 +178,27 @@ export class NewRecordData {
                 updatedComputedFields.add(info.attributeName)
             }
         })
+        
+        // 处理未提供但有默认值的属性
+        recordInfo.valueAttributes.forEach(attr => {
+            // 如果属性还未处理且有默认值
+            const valueAttr = attr.data as import("./EntityToTableMap.js").ValueAttribute
+            if (!allValueAttributes.has(attr.attributeName) && valueAttr.defaultValue && typeof valueAttr.defaultValue === 'function') {
+                // 只有当值未定义时才应用默认值（不处理 null 的情况）
+                if (this.rawData[attr.attributeName] === undefined && oldRecord[attr.attributeName] === undefined) {
+                    const defaultVal = valueAttr.defaultValue()
+                    result.push({
+                        name: attr.attributeName,
+                        field: attr.field!,
+                        value: defaultVal,
+                        fieldType: attr.fieldType!
+                    })
+                }
+            }
+        })
 
         // CAUTION 因为我们没有标记 computed 依赖于哪些字段，所以任何字段的变化这里都要把 computed attribute 重新计算一遍。
         // CAUTION 只有更新自己的字段和递归更新三表合一的字段是需要岛上 oldRecord 的。因为我们只允许递归更新三表合一的 record。
-        const recordInfo = this.map.getRecordInfo(this.recordName)
         recordInfo.valueAttributes.forEach(info => {
             if (info.isComputed && !updatedComputedFields.has(info.attributeName)) {
                 const newValue = info.computed!(newRecord)
