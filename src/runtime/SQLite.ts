@@ -100,8 +100,8 @@ export class SQLiteDB implements Database{
         })
         return this.db.prepare(sql).run()
     }
-    async close() {
-        return this.db.close()
+    async close(): Promise<void> {
+        this.db.close()
     }
     async getAutoId(recordName: string) {
         return this.idSystem.getAutoId(recordName)

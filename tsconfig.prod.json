@@ -18,7 +18,7 @@
     "esModuleInterop": true,
     "removeComments": false,
     "lib": ["esnext", "dom"],
-    "types": ["node"],
+    "types": ["node", "emscripten"],
     "paths": {
         "@runtime": ["src/runtime/index.ts"],
         "@shared": ["src/shared/index.ts"],
