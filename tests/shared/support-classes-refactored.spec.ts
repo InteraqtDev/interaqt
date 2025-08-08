@@ -1,10 +1,10 @@
 import { describe, test, expect, beforeEach } from "vitest";
-import { Condition } from "../../src/shared/refactored/Condition";
-import { SideEffect } from "../../src/shared/refactored/SideEffect";
-import { PayloadItem } from "../../src/shared/refactored/PayloadItem";
-import { Payload } from "../../src/shared/refactored/Payload";
-import { Entity } from "../../src/shared/refactored/Entity";
-import { clearAllInstances } from "../../src/shared/refactored/utils";
+import { Condition } from "../../src/shared/Condition";
+import { SideEffect } from "../../src/shared/SideEffect";
+import { PayloadItem } from "../../src/shared/PayloadItem";
+import { Payload } from "../../src/shared/Payload";
+import { Entity } from "../../src/shared/Entity";
+import { clearAllInstances } from "../../src/shared/utils";
 
 describe("Support Classes Refactored", () => {
   let userEntity: any;

@@ -1,9 +1,9 @@
 import { describe, test, expect, beforeEach } from "vitest";
-import { BoolAtomData, BoolExpressionData } from "../../src/shared/refactored/BoolExp";
-import { Attributive, Attributives } from "../../src/shared/refactored/Attributive";
-import { Conditions } from "../../src/shared/refactored/Conditions";
-import { DataAttributives } from "../../src/shared/refactored/DataAttributives";
-import { clearAllInstances } from "../../src/shared/refactored/utils";
+import { BoolAtomData, BoolExpressionData } from "../../src/shared/BoolExp";
+import { Attributive, Attributives } from "../../src/shared/Attributive";
+import { Conditions } from "../../src/shared/Conditions";
+import { DataAttributives } from "../../src/shared/DataAttributives";
+import { clearAllInstances } from "../../src/shared/utils";
 
 describe("Bool and Attributive Classes Refactored", () => {
   beforeEach(() => {

@@ -2,7 +2,7 @@ import { describe, test, expect, beforeEach } from "vitest";
 import { 
   Property, PropertyTypes, Entity, Relation,
   clearAllInstances
-} from "../../src/shared/refactored";
+} from "../../src/shared";
 
 describe("Entity System Refactored - compatibility test", () => {
   beforeEach(() => {

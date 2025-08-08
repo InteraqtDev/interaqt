@@ -1,15 +1,15 @@
 import { describe, test, expect, beforeEach } from "vitest";
-import { Count } from "../../src/shared/refactored/Count";
-import { Summation } from "../../src/shared/refactored/Summation";
-import { Average } from "../../src/shared/refactored/Average";
-import { WeightedSummation } from "../../src/shared/refactored/WeightedSummation";
-import { Transform } from "../../src/shared/refactored/Transform";
-import { Any } from "../../src/shared/refactored/Any";
-import { Every } from "../../src/shared/refactored/Every";
-import { RealTime } from "../../src/shared/refactored/RealTime";
-import { Entity } from "../../src/shared/refactored/Entity";
-import { Relation } from "../../src/shared/refactored/Relation";
-import { clearAllInstances } from "../../src/shared/refactored/utils";
+import { Count } from "../../src/shared/Count";
+import { Summation } from "../../src/shared/Summation";
+import { Average } from "../../src/shared/Average";
+import { WeightedSummation } from "../../src/shared/WeightedSummation";
+import { Transform } from "../../src/shared/Transform";
+import { Any } from "../../src/shared/Any";
+import { Every } from "../../src/shared/Every";
+import { RealTime } from "../../src/shared/RealTime";
+import { Entity } from "../../src/shared/Entity";
+import { Relation } from "../../src/shared/Relation";
+import { clearAllInstances } from "../../src/shared/utils";
 
 describe("Computation Classes Refactored", () => {
   let userEntity: any;

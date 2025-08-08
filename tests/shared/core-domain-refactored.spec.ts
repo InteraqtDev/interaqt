@@ -1,10 +1,10 @@
 import { describe, test, expect, beforeEach } from "vitest";
-import { Entity } from "../../src/shared/refactored/Entity";
-import { Property } from "../../src/shared/refactored/Property";
-import { Relation } from "../../src/shared/refactored/Relation";
-import { Interaction } from "../../src/shared/refactored/Interaction";
-import { Action } from "../../src/shared/refactored/Action";
-import { clearAllInstances } from "../../src/shared/refactored/utils";
+import { Entity } from "../../src/shared/Entity";
+import { Property } from "../../src/shared/Property";
+import { Relation } from "../../src/shared/Relation";
+import { Interaction } from "../../src/shared/Interaction";
+import { Action } from "../../src/shared/Action";
+import { clearAllInstances } from "../../src/shared/utils";
 
 describe("Core Domain Classes Refactored", () => {
   beforeEach(() => {

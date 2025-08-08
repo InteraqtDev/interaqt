@@ -1,13 +1,13 @@
 import { describe, test, expect, beforeEach } from "vitest";
-import { Gateway } from "../../src/shared/refactored/Gateway";
-import { Event } from "../../src/shared/refactored/Event";
-import { Dictionary } from "../../src/shared/refactored/RealDictionary";
-import { StateNode } from "../../src/shared/refactored/StateNode";
-import { StateTransfer } from "../../src/shared/refactored/StateTransfer";
-import { StateMachine } from "../../src/shared/refactored/StateMachine";
-import { Interaction } from "../../src/shared/refactored/Interaction";
-import { Action } from "../../src/shared/refactored/Action";
-import { clearAllInstances } from "../../src/shared/refactored/utils";
+import { Gateway } from "../../src/shared/Gateway";
+import { Event } from "../../src/shared/Event";
+import { Dictionary } from "../../src/shared/RealDictionary";
+import { StateNode } from "../../src/shared/StateNode";
+import { StateTransfer } from "../../src/shared/StateTransfer";
+import { StateMachine } from "../../src/shared/StateMachine";
+import { Interaction } from "../../src/shared/Interaction";
+import { Action } from "../../src/shared/Action";
+import { clearAllInstances } from "../../src/shared/utils";
 
 describe("Simple Objects Refactored - compatibility test", () => {
   beforeEach(() => {

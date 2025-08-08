@@ -1,11 +1,11 @@
 import { describe, test, expect, beforeEach } from "vitest";
-import { DataAttributive, QueryItem, Query } from "../../src/shared/refactored/Data";
-import { Activity, ActivityGroup, Transfer } from "../../src/shared/refactored/Activity";
-import { Interaction } from "../../src/shared/refactored/Interaction";
-import { Gateway } from "../../src/shared/refactored/Gateway";
-import { Event } from "../../src/shared/refactored/Event";
-import { Action } from "../../src/shared/refactored/Action";
-import { clearAllInstances } from "../../src/shared/refactored/utils";
+import { DataAttributive, QueryItem, Query } from "../../src/shared/Data";
+import { Activity, ActivityGroup, Transfer } from "../../src/shared/Activity";
+import { Interaction } from "../../src/shared/Interaction";
+import { Gateway } from "../../src/shared/Gateway";
+import { Event } from "../../src/shared/Event";
+import { Action } from "../../src/shared/Action";
+import { clearAllInstances } from "../../src/shared/utils";
 
 describe("Data and Activity Classes Refactored", () => {
   let testInteraction: any;

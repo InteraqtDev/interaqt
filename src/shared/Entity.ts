@@ -11,6 +11,7 @@ export interface EntityInstance extends IInstance {
   computation?: ComputationInstance;
   baseEntity?: EntityInstance | RelationInstance; // for Filtered Entity
   matchExpression?: object; // for Filtered Entity
+  inputEntities?: EntityInstance[]; // for Merged Entity
 }
 
 export interface EntityCreateArgs {
@@ -19,6 +20,7 @@ export interface EntityCreateArgs {
   computation?: ComputationInstance;
   baseEntity?: EntityInstance | RelationInstance;
   matchExpression?: object;
+  inputEntities?: EntityInstance[]; // for Merged Entity
 }
 
 export class Entity implements EntityInstance {
@@ -30,6 +32,7 @@ export class Entity implements EntityInstance {
   public computation?: ComputationInstance;
   public baseEntity?: EntityInstance | RelationInstance;
   public matchExpression?: object;
+  public inputEntities?: EntityInstance[]; // for Merged Entity
   
   constructor(args: EntityCreateArgs, options?: { uuid?: string }) {
     this._options = options;
@@ -39,6 +42,7 @@ export class Entity implements EntityInstance {
     this.computation = args.computation;
     this.baseEntity = args.baseEntity;
     this.matchExpression = args.matchExpression;
+    this.inputEntities = args.inputEntities;
   }
   
   // 静态属性和方法
@@ -82,6 +86,20 @@ export class Entity implements EntityInstance {
       type: 'object' as const,
       collection: false as const,
       required: false as const,
+    },
+    inputEntities: {
+      type: 'Entity' as const,
+      collection: true as const,
+      required: false as const,
+      constraints: {
+        mergedEntityNoProperties: ({properties, inputEntities}: {properties: PropertyInstance[], inputEntities?: EntityInstance[]}) => {
+          // Merged entity should not have any properties defined
+          if (inputEntities && inputEntities.length > 0 && properties && properties.length > 0) {
+            return false;
+          }
+          return true;
+        }
+      }
     }
   };
   
@@ -104,7 +122,8 @@ export class Entity implements EntityInstance {
       properties: instance.properties,
       computation: instance.computation,
       baseEntity: instance.baseEntity,
-      matchExpression: instance.matchExpression
+      matchExpression: instance.matchExpression,
+      inputEntities: instance.inputEntities
     };
     
     const data: SerializedData<EntityCreateArgs> = {
