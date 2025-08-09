@@ -557,10 +557,6 @@ export class DBSetup {
                 if (existingEntity) {
                     // 如果存在，替换它
                     refContainer.replaceEntity(filteredEntity, existingEntity)
-                } else {
-                    throw new Error(`filtered entity ${baseEntity.name} not found`)
-                    // 如果不存在，添加 filtered entity
-                    refContainer.addEntity(filteredEntity)
                 }
             }
         }
