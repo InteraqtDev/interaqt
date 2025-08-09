@@ -42,18 +42,17 @@ export class NewRecordData {
     public relatedEntitiesData: NewRecordData[] = []
     public valueAttributes: AttributeInfo[] = []
     public recordName: string
-    public originalRecordName: string
     // 和当前合表并且是  id 的。说明我们的需要的 row 已经有了，只要update 相应 column 就行了
     public sameRowEntityIdRefs: NewRecordData[] = []
     // recordName 是自己的 recordName，  info 是自己作为父亲的 attribute 的 info.
-    constructor(public map: EntityToTableMap, recordName: string, public rawData: RawEntityData, public info?: AttributeInfo, ) {
-        const recordInfo = this.map.getRecordInfo(recordName)
+    public defaultValues: { [k: string]: any } = {}
+    constructor(public map: EntityToTableMap, public originalRecordName: string, public rawData: RawEntityData, public info?: AttributeInfo, ) {
+        const originalRecordInfo = this.map.getRecordInfo(originalRecordName)
         
         // 保存原始传入的 recordName
-        this.originalRecordName = recordName
         
         // 如果是 filtered entity，使用 base record name 作为实际的 recordName
-        this.recordName = (recordInfo.isFilteredEntity || recordInfo.isFilteredRelation) ? recordInfo.resolvedBaseRecordName! : recordName
+        this.recordName = (originalRecordInfo.isFilteredEntity || originalRecordInfo.isFilteredRelation) ? originalRecordInfo.resolvedBaseRecordName! : originalRecordName
         
         const [valueAttributesInfo, entityAttributesInfo, entityIdAttributes] = this.map.groupAttributes(this.recordName, rawData ? Object.keys(rawData) : [])
         this.relatedEntitiesData = flatten(entityAttributesInfo.map(info =>
@@ -64,6 +63,14 @@ export class NewRecordData {
 
         this.valueAttributes = valueAttributesInfo
         this.entityIdAttributes = entityIdAttributes
+        const recordInfo = this.map.getRecordInfo(this.recordName)
+        this.defaultValues = recordInfo.valueAttributes.reduce((acc, attr) => {
+            const valueAttr = attr.data as ValueAttribute
+            if (!this.rawData?.hasOwnProperty(attr.attributeName) && valueAttr.defaultValue && typeof valueAttr.defaultValue === 'function') {
+                acc[attr.attributeName] = valueAttr.defaultValue(rawData, this.originalRecordName)
+            }
+            return acc
+        }, {} as { [k: string]: any })
 
         // TODO 要把那些独立出去的 field 排除出去。
         this.relatedEntitiesData.forEach(newRelatedEntityData => {
@@ -190,11 +197,11 @@ export class NewRecordData {
         // 处理未提供但有默认值的属性
         recordInfo.valueAttributes.forEach(attr => {
             // 如果属性还未处理且有默认值
-            const valueAttr = attr.data as import("./EntityToTableMap.js").ValueAttribute
+            const valueAttr = attr.data as ValueAttribute
             if (!allValueAttributes.has(attr.attributeName) && valueAttr.defaultValue && typeof valueAttr.defaultValue === 'function') {
                 // 只有当值未定义时才应用默认值（不处理 null 的情况）
                 if (this.rawData[attr.attributeName] === undefined && oldRecord[attr.attributeName] === undefined) {
-                    const defaultVal = valueAttr.defaultValue(this.rawData, this.originalRecordName)
+                    const defaultVal = this.defaultValues[attr.attributeName]
                     result.push({
                         name: attr.attributeName,
                         field: attr.field!,

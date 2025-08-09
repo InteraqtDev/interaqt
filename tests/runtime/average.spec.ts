@@ -906,4 +906,161 @@ describe('Average computed handle', () => {
     // Spring 2024 now has student3(88) added: student1(85), student2(92), student3(88)
     expect(courseDataUpdated.springAverageGrade).toBeCloseTo(88.33, 2); // (85 + 92 + 88) / 3
   });
+
+  test('should calculate average for merged entity correctly', async () => {
+    // Create input entities for merged entity
+    const productReviewEntity = Entity.create({
+      name: 'ProductReview',
+      properties: [
+        Property.create({name: 'productName', type: 'string'}),
+        Property.create({name: 'rating', type: 'number'}),
+        Property.create({name: 'reviewType', type: 'string', defaultValue: () => 'product'}),
+        Property.create({name: 'verified', type: 'boolean', defaultValue: () => false})
+      ]
+    });
+
+    const serviceReviewEntity = Entity.create({
+      name: 'ServiceReview',
+      properties: [
+        Property.create({name: 'serviceName', type: 'string'}),
+        Property.create({name: 'rating', type: 'number'}),
+        Property.create({name: 'reviewType', type: 'string', defaultValue: () => 'service'}),
+        Property.create({name: 'verified', type: 'boolean', defaultValue: () => true})
+      ]
+    });
+
+    const supportReviewEntity = Entity.create({
+      name: 'SupportReview',
+      properties: [
+        Property.create({name: 'ticketId', type: 'string'}),
+        Property.create({name: 'rating', type: 'number'}),
+        Property.create({name: 'reviewType', type: 'string', defaultValue: () => 'support'}),
+        Property.create({name: 'responseTime', type: 'number'})
+      ]
+    });
+
+    // Create merged entity: Review (combining all review types)
+    const reviewEntity = Entity.create({
+      name: 'Review',
+      inputEntities: [productReviewEntity, serviceReviewEntity, supportReviewEntity]
+    });
+
+    const entities = [productReviewEntity, serviceReviewEntity, supportReviewEntity, reviewEntity];
+
+    // Create dictionary items to store averages
+    const dictionary = [
+      Dictionary.create({
+        name: 'overallAverageRating',
+        type: 'number',
+        collection: false,
+        computation: Average.create({
+          record: reviewEntity,
+          attributeQuery: ['rating']
+        })
+      }),
+
+    ];
+
+    // Setup system and controller
+    const system = new MonoSystem();
+    system.conceptClass = KlassByName;
+    const controller = new Controller({
+      system: system,
+      entities: entities,
+      dict: dictionary,
+      relations: [],
+      activities: [],
+      interactions: []
+    });
+    await controller.setup(true);
+
+    // Initial averages should be 0 (no data)
+    let overallAvg = await system.storage.get(DICTIONARY_RECORD, 'overallAverageRating');
+    
+    expect(overallAvg).toBe(0);
+
+    // Create product reviews
+    await system.storage.create('ProductReview', {
+      productName: 'Laptop',
+      rating: 4.5,
+      verified: true
+    });
+
+    await system.storage.create('ProductReview', {
+      productName: 'Mouse',
+      rating: 3.5,
+      verified: false
+    });
+
+    await system.storage.create('ProductReview', {
+      productName: 'Keyboard',
+      rating: 4.0,
+      verified: true
+    });
+
+    // Create service reviews (all verified by default)
+    await system.storage.create('ServiceReview', {
+      serviceName: 'Installation',
+      rating: 5.0
+    });
+
+    await system.storage.create('ServiceReview', {
+      serviceName: 'Maintenance',
+      rating: 4.5
+    });
+
+    // Create support reviews
+    await system.storage.create('SupportReview', {
+      ticketId: 'T001',
+      rating: 3.0,
+      responseTime: 24
+    });
+
+    await system.storage.create('SupportReview', {
+      ticketId: 'T002',
+      rating: 4.0,
+      responseTime: 12
+    });
+
+    // Check the averages
+    overallAvg = await system.storage.get(DICTIONARY_RECORD, 'overallAverageRating');
+    
+    // Overall: (4.5 + 3.5 + 4.0 + 5.0 + 4.5 + 3.0 + 4.0) / 7 = 28.5 / 7 ≈ 4.07
+    expect(overallAvg).toBeCloseTo(4.07, 2);
+
+    // Update a product review rating
+    const productReviews = await system.storage.find('ProductReview',
+      BoolExp.atom({key: 'productName', value: ['=', 'Mouse']}),
+      undefined,
+      ['id']
+    );
+    
+    await system.storage.update('ProductReview',
+      MatchExp.atom({key: 'id', value: ['=', productReviews[0].id]}),
+      { rating: 4.5 }
+    );
+
+    // Check updated averages
+    overallAvg = await system.storage.get(DICTIONARY_RECORD, 'overallAverageRating');
+    
+    // Overall increased by (4.5 - 3.5) / 7 ≈ 0.14, so ~4.21
+    expect(overallAvg).toBeCloseTo(4.21, 2);
+
+    // Delete a support review
+    const supportReviews = await system.storage.find('SupportReview',
+      BoolExp.atom({key: 'rating', value: ['=', 3.0]}),
+      undefined,
+      ['id']
+    );
+    
+    await system.storage.delete('SupportReview',
+      MatchExp.atom({key: 'id', value: ['=', supportReviews[0].id]})
+    );
+
+    // Check final averages
+    overallAvg = await system.storage.get(DICTIONARY_RECORD, 'overallAverageRating');
+    
+    // Now only 6 reviews: (4.5 + 4.5 + 4.0 + 5.0 + 4.5 + 4.0) / 6 = 26.5 / 6 ≈ 4.42
+    expect(overallAvg).toBeCloseTo(4.42, 2);
+  });
 }); 

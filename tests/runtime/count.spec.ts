@@ -1319,4 +1319,124 @@ describe('Count computed handle', () => {
     expect(storeDataUpdated.lowStockCount).toBe(0);   // no products are low-stock
     expect(storeDataUpdated.outOfStockCount).toBe(1); // prod3 is still out-of-stock
   });
+
+  test('should calculate count for merged entity correctly', async () => {
+    // Create input entities for merged entity
+    const customerEntity = Entity.create({
+      name: 'Customer',
+      properties: [
+        Property.create({name: 'name', type: 'string'}),
+        Property.create({name: 'email', type: 'string'}),
+        Property.create({name: 'customerLevel', type: 'string', defaultValue: () => 'bronze'}),
+        Property.create({name: 'isActive', type: 'boolean', defaultValue: () => true})
+      ]
+    });
+
+    const vendorEntity = Entity.create({
+      name: 'Vendor',
+      properties: [
+        Property.create({name: 'name', type: 'string'}),
+        Property.create({name: 'email', type: 'string'}),
+        Property.create({name: 'vendorCode', type: 'string'}),
+        Property.create({name: 'isActive', type: 'boolean', defaultValue: () => false})
+      ]
+    });
+
+    const employeeEntity = Entity.create({
+      name: 'Employee',
+      properties: [
+        Property.create({name: 'name', type: 'string'}),
+        Property.create({name: 'email', type: 'string'}),
+        Property.create({name: 'employeeId', type: 'string'}),
+        Property.create({name: 'department', type: 'string'}),
+        Property.create({name: 'isActive', type: 'boolean', defaultValue: () => true})
+      ]
+    });
+
+    // Create merged entity: Contact (combining Customer, Vendor, and Employee)
+    const contactEntity = Entity.create({
+      name: 'Contact',
+      inputEntities: [customerEntity, vendorEntity, employeeEntity]
+    });
+
+    const entities = [customerEntity, vendorEntity, employeeEntity, contactEntity];
+
+    // Create dictionary items to store counts
+    const dictionary = [
+      Dictionary.create({
+        name: 'totalContactCount',
+        type: 'number',
+        collection: false,
+        computation: Count.create({
+          record: contactEntity
+        })
+      }),
+
+    ];
+
+    // Setup system and controller
+    const system = new MonoSystem();
+    system.conceptClass = KlassByName;
+    const controller = new Controller({
+      system: system,
+      entities: entities,
+      dict: dictionary,
+      relations: [],
+      activities: [],
+      interactions: []
+    });
+    await controller.setup(true);
+
+    // Initial counts should be 0
+    const initialTotalCount = await system.storage.get(DICTIONARY_RECORD, 'totalContactCount');
+    expect(initialTotalCount).toBe(0);
+
+    // Create records through input entities
+    const customer1 = await system.storage.create('Customer', {
+      name: 'John Doe',
+      email: 'john@example.com',
+      customerLevel: 'gold'
+    });
+
+    const vendor1 = await system.storage.create('Vendor', {
+      name: 'ABC Corp',
+      email: 'contact@abc.com',
+      vendorCode: 'V001'
+    });
+
+    const employee1 = await system.storage.create('Employee', {
+      name: 'Jane Smith',
+      email: 'jane@company.com',
+      employeeId: 'E001',
+      department: 'Engineering'
+    });
+
+    // Total count should be 3 (1 customer + 1 vendor + 1 employee)
+    const totalCount1 = await system.storage.get(DICTIONARY_RECORD, 'totalContactCount');
+    expect(totalCount1).toBe(3);
+
+    // Add more customers
+    await system.storage.create('Customer', {
+      name: 'Alice Brown',
+      email: 'alice@example.com'
+    });
+
+    await system.storage.create('Customer', {
+      name: 'Bob Wilson',
+      email: 'bob@example.com'
+    });
+
+    // Total count should be 5
+    const totalCount2 = await system.storage.get(DICTIONARY_RECORD, 'totalContactCount');
+    expect(totalCount2).toBe(5);
+
+    // Delete a customer
+    await system.storage.delete('Customer',
+      MatchExp.atom({key: 'id', value: ['=', customer1.id]})
+    );
+
+    // Total count should be 4
+    const totalCount3 = await system.storage.get(DICTIONARY_RECORD, 'totalContactCount');
+    expect(totalCount3).toBe(4);
+  });
 }); 

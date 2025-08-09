@@ -20,3 +20,16 @@
     5.1.3. 将所有 inputEntities 转化为 merged entity 的 filtered entity。如果 input entity 已经是 filtered entity，那么需要将 filtered entity 的 root base entity 转化成 merged entity 的 filtered entity。
 6. 在 `tests/storage` 下创建测试用例，测试新增的 merged entity 特性。注意，我们不支持使用 merged entity 的名称进行新增，只支持查询、更新和删除。
 7. 使用 `npm run test:stroge` 来运行测试用例，并且确保所有测试用例通过， 才说明没有破坏原有功能。
+
+
+## 任务二
+
+我们已经完全实现了 merged entity 的功能。接下来补充 merged entity 作为 各种 computations 的参数的测试用例，验证 merged entity + computations 能正常运行。
+
+### 具体步骤
+1. 阅读 `src/storage` 下所有 merged entity 相关的源码，理解 merged entity 的实现原理。
+2. 阅读 `tests/storage` 下 merged entity 相关的测试用例，掌握 merged entity 的用法。
+3. 阅读 `src/runtime` 下所有 computaion 的源码，理解各种 computation 的原理。
+4. 阅读 `tests/runtime` 下所有 computation 相关的测试用例，掌握 computation 测试用例的写法。
+5. 在 `tests/runtime` 下的各种 computation 测试文件中，新增相应的 computation 使用 merged entity 作为参数的例子。并通过 `npm run test:runtime` 运行测试用例，保证测试用例全部通过。如果没有通过，尝试对源码进行修复，直到所有测试用例通过。
+6. 使用 `npm test` 验证所有测试用例通过，才说明没有破坏原本功能。

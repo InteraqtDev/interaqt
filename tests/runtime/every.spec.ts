@@ -830,5 +830,185 @@ describe('Every computed handle', () => {
     expect(factoryDataFinal.allBatchesPassedQC).toBe(false); // batch5 failed
     // Morning shift now includes batch5 which failed
     expect(factoryDataFinal.allMorningShiftPassed).toBe(false); // batch5 failed
-  }); 
+  });
+
+  test('should calculate every for merged entity correctly - conditions on merged entities not supported', async () => {
+    // Create input entities for merged entity
+    const onlineOrderEntity = Entity.create({
+      name: 'OnlineOrder',
+      properties: [
+        Property.create({name: 'orderNumber', type: 'string'}),
+        Property.create({name: 'isDelivered', type: 'boolean', defaultValue: () => false}),
+        Property.create({name: 'isPaid', type: 'boolean', defaultValue: () => false}),
+        Property.create({name: 'orderType', type: 'string', defaultValue: () => 'online'})
+      ]
+    });
+
+    const storeOrderEntity = Entity.create({
+      name: 'StoreOrder',
+      properties: [
+        Property.create({name: 'orderNumber', type: 'string'}),
+        Property.create({name: 'isDelivered', type: 'boolean', defaultValue: () => true}),
+        Property.create({name: 'isPaid', type: 'boolean', defaultValue: () => true}),
+        Property.create({name: 'orderType', type: 'string', defaultValue: () => 'store'})
+      ]
+    });
+
+    const phoneOrderEntity = Entity.create({
+      name: 'PhoneOrder',
+      properties: [
+        Property.create({name: 'orderNumber', type: 'string'}),
+        Property.create({name: 'isDelivered', type: 'boolean', defaultValue: () => false}),
+        Property.create({name: 'isPaid', type: 'boolean', defaultValue: () => false}),
+        Property.create({name: 'orderType', type: 'string', defaultValue: () => 'phone'})
+      ]
+    });
+
+    // Create merged entity: AllOrder (combining all order types) - avoid SQL reserved word
+    const orderEntity = Entity.create({
+      name: 'AllOrder',
+      inputEntities: [onlineOrderEntity, storeOrderEntity, phoneOrderEntity]
+    });
+
+    const entities = [onlineOrderEntity, storeOrderEntity, phoneOrderEntity, orderEntity];
+
+    // Create dictionary items to check conditions
+    const dictionary = [
+      Dictionary.create({
+        name: 'allOrdersDelivered',
+        type: 'boolean',
+        collection: false,
+        computation: Every.create({
+          record: orderEntity,
+          attributeQuery: ['isDelivered'],
+          callback: (order: any) => order.isDelivered === true,
+          notEmpty: false
+        })
+      }),
+      Dictionary.create({
+        name: 'allOrdersPaid',
+        type: 'boolean',
+        collection: false,
+        computation: Every.create({
+          record: orderEntity,
+          attributeQuery: ['isPaid'],
+          callback: (order: any) => {
+            return order.isPaid === true
+          },
+          notEmpty: false
+        })
+      }),
+      Dictionary.create({
+        name: 'allOnlineOrdersDelivered',
+        type: 'boolean',
+        collection: false,
+        computation: Every.create({
+          record: orderEntity,
+          attributeQuery: ['isDelivered', 'orderType'],
+          callback: (order: any) => {
+            // 是 online 才判断 isDelivered，phone 和 store 要忽略 isDelivered
+            if (order.orderType === 'online') {
+              return order.isDelivered === true
+            }
+            return true
+          },
+          notEmpty: false
+        })
+      })
+    ];
+
+    // Setup system and controller
+    const system = new MonoSystem();
+    system.conceptClass = KlassByName;
+    const controller = new Controller({
+      system: system,
+      entities: entities,
+      dict: dictionary,
+      relations: [],
+      activities: [],
+      interactions: []
+    });
+    await controller.setup(true);
+
+    // Initially with no orders, every should return true (vacuous truth)
+    let allDelivered = await system.storage.get(DICTIONARY_RECORD, 'allOrdersDelivered');
+    let allPaid = await system.storage.get(DICTIONARY_RECORD, 'allOrdersPaid');
+    let allOnlineDelivered = await system.storage.get(DICTIONARY_RECORD, 'allOnlineOrdersDelivered');
+    
+    expect(allDelivered).toBe(true);
+    expect(allPaid).toBe(true);
+    expect(allOnlineDelivered).toBe(true);
+
+    // Create online orders
+    await system.storage.create('OnlineOrder', {
+      orderNumber: 'ON001',
+      isDelivered: true,
+      isPaid: true
+    });
+
+    await system.storage.create('OnlineOrder', {
+      orderNumber: 'ON002',
+      isDelivered: false,
+      isPaid: true
+    });
+
+    // Create store orders (delivered and paid by default)
+    await system.storage.create('StoreOrder', {
+      orderNumber: 'ST001'
+    });
+
+    await system.storage.create('StoreOrder', {
+      orderNumber: 'ST002'
+    });
+
+    // Create phone orders
+    await system.storage.create('PhoneOrder', {
+      orderNumber: 'PH001',
+      isDelivered: true,
+      isPaid: true
+    });
+
+    // Check the conditions
+    allDelivered = await system.storage.get(DICTIONARY_RECORD, 'allOrdersDelivered');
+    allPaid = await system.storage.get(DICTIONARY_RECORD, 'allOrdersPaid');
+    allOnlineDelivered = await system.storage.get(DICTIONARY_RECORD, 'allOnlineOrdersDelivered');
+    
+    expect(allDelivered).toBe(false); // ON002 is not delivered
+    expect(allPaid).toBe(true); // All orders are paid
+    expect(allOnlineDelivered).toBe(false); // ON002 is not delivered
+
+    // Update the undelivered online order
+    const undeliveredOrders = await system.storage.find('OnlineOrder',
+      BoolExp.atom({key: 'orderNumber', value: ['=', 'ON002']}),
+      undefined,
+      ['id']
+    );
+    
+    await system.storage.update('OnlineOrder',
+      MatchExp.atom({key: 'id', value: ['=', undeliveredOrders[0].id]}),
+      { isDelivered: true }
+    );
+
+    // Now all should be delivered
+    allDelivered = await system.storage.get(DICTIONARY_RECORD, 'allOrdersDelivered');
+    allOnlineDelivered = await system.storage.get(DICTIONARY_RECORD, 'allOnlineOrdersDelivered');
+    
+    expect(allDelivered).toBe(true);
+    expect(allOnlineDelivered).toBe(true);
+
+    // Add an unpaid phone order
+    await system.storage.create('PhoneOrder', {
+      orderNumber: 'PH002',
+      isDelivered: true,
+      isPaid: false
+    });
+
+    // Check that not all orders are paid now
+    allPaid = await system.storage.get(DICTIONARY_RECORD, 'allOrdersPaid');
+    expect(allPaid).toBe(false);
+    
+    // Test that the online-only check still works
+    allOnlineDelivered = await system.storage.get(DICTIONARY_RECORD, 'allOnlineOrdersDelivered');
+    expect(allOnlineDelivered).toBe(true); // All online orders are still delivered
+  });
 }); 

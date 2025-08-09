@@ -552,8 +552,16 @@ export class DBSetup {
             for (const inputEntity of entity.inputEntities!) {
                 // 创建一个指向 merged entity 的 filtered entity
                 const [filteredEntity, baseEntity] = this.createFilteredEntityFromInput(inputEntity, virtualBaseEntity!, inputTypeFieldName);
-                // 这里应该替换 root base entity
-                refContainer.replaceEntity(filteredEntity, baseEntity)
+                // 检查 baseEntity 是否在 RefContainer 中
+                const existingEntity = refContainer.getEntityByName(baseEntity.name);
+                if (existingEntity) {
+                    // 如果存在，替换它
+                    refContainer.replaceEntity(filteredEntity, existingEntity)
+                } else {
+                    throw new Error(`filtered entity ${baseEntity.name} not found`)
+                    // 如果不存在，添加 filtered entity
+                    refContainer.addEntity(filteredEntity)
+                }
             }
         }
         const {entities, relations} = refContainer.getAll()

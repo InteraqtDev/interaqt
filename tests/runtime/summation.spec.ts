@@ -1059,4 +1059,157 @@ describe('Sum computed handle', () => {
     expect(territoryDataUpdated.softwareRevenue).toBe(205000); // 135k + 70k
     expect(territoryDataUpdated.newBusinessRevenue).toBe(190000); // 120k + 70k
   });
+
+  test('should calculate summation for merged entity correctly', async () => {
+    // Create input entities for merged entity
+    const saleEntity = Entity.create({
+      name: 'Sale',
+      properties: [
+        Property.create({name: 'productName', type: 'string'}),
+        Property.create({name: 'amount', type: 'number'}),
+        Property.create({name: 'date', type: 'string'}),
+        Property.create({name: 'category', type: 'string', defaultValue: () => 'product'})
+      ]
+    });
+
+    const serviceEntity = Entity.create({
+      name: 'Service',
+      properties: [
+        Property.create({name: 'serviceName', type: 'string'}),
+        Property.create({name: 'amount', type: 'number'}),
+        Property.create({name: 'date', type: 'string'}),
+        Property.create({name: 'category', type: 'string', defaultValue: () => 'service'})
+      ]
+    });
+
+    const subscriptionEntity = Entity.create({
+      name: 'Subscription',
+      properties: [
+        Property.create({name: 'planName', type: 'string'}),
+        Property.create({name: 'amount', type: 'number'}),
+        Property.create({name: 'date', type: 'string'}),
+        Property.create({name: 'recurring', type: 'boolean', defaultValue: () => true}),
+        Property.create({name: 'category', type: 'string', defaultValue: () => 'subscription'})
+      ]
+    });
+
+    // Create merged entity: Revenue (combining Sale, Service, and Subscription)
+    const revenueEntity = Entity.create({
+      name: 'Revenue',
+      inputEntities: [saleEntity, serviceEntity, subscriptionEntity]
+    });
+
+    const entities = [saleEntity, serviceEntity, subscriptionEntity, revenueEntity];
+
+    // Create dictionary items to store sums
+    const dictionary = [
+      Dictionary.create({
+        name: 'totalRevenue',
+        type: 'number',
+        collection: false,
+        computation: Summation.create({
+          record: revenueEntity,
+          attributeQuery: ['amount']
+        })
+      }),
+
+
+    ];
+
+    // Setup system and controller
+    const system = new MonoSystem();
+    system.conceptClass = KlassByName;
+    const controller = new Controller({
+      system: system,
+      entities: entities,
+      dict: dictionary,
+      relations: [],
+      activities: [],
+      interactions: []
+    });
+    await controller.setup(true);
+
+    // Initial sums should be 0
+    let totalRevenue = await system.storage.get(DICTIONARY_RECORD, 'totalRevenue');
+    
+    expect(totalRevenue).toBe(0);
+
+    // Create sales records
+    await system.storage.create('Sale', {
+      productName: 'Laptop',
+      amount: 1500,
+      date: '2024-01-01'
+    });
+
+    await system.storage.create('Sale', {
+      productName: 'Mouse',
+      amount: 50,
+      date: '2024-01-02'
+    });
+
+    // Create service records
+    await system.storage.create('Service', {
+      serviceName: 'Consulting',
+      amount: 2000,
+      date: '2024-01-03'
+    });
+
+    await system.storage.create('Service', {
+      serviceName: 'Support',
+      amount: 500,
+      date: '2024-01-04'
+    });
+
+    // Create subscription records
+    await system.storage.create('Subscription', {
+      planName: 'Premium',
+      amount: 100,
+      date: '2024-01-05'
+    });
+
+    await system.storage.create('Subscription', {
+      planName: 'Basic',
+      amount: 50,
+      date: '2024-01-06',
+      recurring: false
+    });
+
+    // Check the sums
+    totalRevenue = await system.storage.get(DICTIONARY_RECORD, 'totalRevenue');
+    
+    expect(totalRevenue).toBe(4200); // 1500 + 50 + 2000 + 500 + 100 + 50
+
+    // Update a sale amount
+    const sales = await system.storage.find('Sale', 
+      BoolExp.atom({key: 'productName', value: ['=', 'Laptop']}),
+      undefined,
+      ['id']
+    );
+    
+    await system.storage.update('Sale',
+      MatchExp.atom({key: 'id', value: ['=', sales[0].id]}),
+      { amount: 1800 }
+    );
+
+    // Check updated sums
+    totalRevenue = await system.storage.get(DICTIONARY_RECORD, 'totalRevenue');
+    
+    expect(totalRevenue).toBe(4500); // Increased by 300
+
+    // Delete a service
+    const services = await system.storage.find('Service',
+      BoolExp.atom({key: 'serviceName', value: ['=', 'Support']}),
+      undefined,
+      ['id']
+    );
+    
+    await system.storage.delete('Service',
+      MatchExp.atom({key: 'id', value: ['=', services[0].id]})
+    );
+
+    // Check final sums
+    totalRevenue = await system.storage.get(DICTIONARY_RECORD, 'totalRevenue');
+    
+    expect(totalRevenue).toBe(4000); // Decreased by 500
+  });
 }); 

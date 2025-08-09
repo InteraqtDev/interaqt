@@ -778,7 +778,10 @@ ${innerQuerySQL}
             events?.push({
                 type: 'create',
                 recordName: newEntityData.recordName,
-                record: newRawDataWithNewIds
+                record: {
+                    ...newEntityData.defaultValues,
+                    ...newRawDataWithNewIds
+                }
             })
         } else {
             // 可能只是更新关系，所以这里一定要有自身的 value 才算是 update 自己
