@@ -26,4 +26,12 @@ export default class TestLogger implements DatabaseLogger {
     child(fixed: object): DatabaseLogger {
         return this
     }
+    error(arg: { type: string; name: string; sql: string; params?: any[]; error: string }) {
+        if (this.disabled || this.type && this.type !== arg.type) {
+            return
+        }
+        console.error(`======type: ${arg.type}, name: ${arg.name}========`)
+        console.error(arg.sql)
+        console.error(arg.error)
+    }
 }

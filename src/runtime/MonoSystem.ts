@@ -149,6 +149,9 @@ export class DBConsoleLogger implements DatabaseLogger{
     info({type, name, sql, params}: Parameters<DatabaseLogger["info"]>[0]) {
         console.log({type, name, sql, params})
     }
+    error({type, name, sql, params, error}: Parameters<DatabaseLogger["error"]>[0]) {
+        console.error({type, name, sql, params, error})
+    }
     child() {
         return new DBConsoleLogger()
     }

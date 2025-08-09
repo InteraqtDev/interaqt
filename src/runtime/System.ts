@@ -82,6 +82,7 @@ export const ROW_ID_ATTR = '_rowId'
 
 export type DatabaseLogger = {
     info: (arg: {type: string, name: string, sql: string, params?: any[]}) => any,
+    error: (arg: {type: string, name: string, sql: string, params?: any[], error: string}) => any,
     child:(fixed: object) => DatabaseLogger,
 }
 

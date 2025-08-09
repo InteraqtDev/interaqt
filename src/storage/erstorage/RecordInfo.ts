@@ -119,9 +119,6 @@ export class RecordInfo {
     }
 
     get valueAttributes() {
-        if (!this.data) {
-            debugger
-        }
         return Object.entries(this.data.attributes).filter(([, attribute]) => {
             return !(attribute as RecordAttribute).isRecord
         }).map(([attributeName]) => {

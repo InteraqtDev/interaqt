@@ -28,7 +28,8 @@ export class MatchExp {
         return BoolExp.atom<MatchAtom>(condition)
     }
     // TODO 支持更复杂的格式
-    public static fromObject(condition: Object) {
+    // object 表达批量的 and
+    public static fromObject(condition: { [key: string]: MatchAtom }) {
         let root: BoolExp<MatchAtom> | undefined
         Object.entries(condition).forEach(([key, value]) => {
               if (!root) {
@@ -38,6 +39,14 @@ export class MatchExp {
               }
         })
         return root!
+    }
+    // array 表达批量的 or
+    public static fromArray(conditions: MatchAtom[]) {
+        const base = conditions[0]
+        const rest = conditions.slice(1)
+        return rest.reduce((acc, condition) => {
+            return acc.or(condition)
+        }, MatchExp.atom(base))
     }
     
     /**

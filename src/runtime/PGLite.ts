@@ -57,7 +57,18 @@ export class PGLiteDB implements Database{
             sql,
             params
         })
-        return  (await this.db.query(sql, params)).rows as T[]
+        try {
+            return (await this.db.query(sql, params)).rows as T[]
+        } catch (error: any) {
+            logger.error({
+                type:'query',
+                name,
+                sql,
+                params,
+                error: error.message
+            })
+            throw error
+        }
     }
     async update<T extends any>(sql:string,values: any[], idField?:string, name='') {
         const context= asyncInteractionContext.getStore() as InteractionContext
@@ -73,6 +84,7 @@ export class PGLiteDB implements Database{
             params
         })
         return  (await this.db.query(sql, params)).rows as T[]
+        
     }
     async insert(sql:string, values:any[], name='')  {
         const context= asyncInteractionContext.getStore() as InteractionContext
@@ -88,7 +100,18 @@ export class PGLiteDB implements Database{
         })
 
         const finalSQL = `${sql} RETURNING "${ROW_ID_ATTR}"`
-        return (await this.db.query(finalSQL, params)).rows[0] as EntityIdRef
+        try {
+            return (await this.db.query(finalSQL, params)).rows[0] as EntityIdRef
+        } catch (error: any) {
+            logger.error({
+                type:'insert',
+                name,
+                sql: finalSQL,
+                params,
+                error: error.message
+            })
+            throw error
+        }
     }
     async delete<T extends any> (sql:string, params: any[], name='') {
         const context= asyncInteractionContext.getStore() as InteractionContext
@@ -100,6 +123,7 @@ export class PGLiteDB implements Database{
             params
         })
         return  (await this.db.query(sql, params)).rows as T[]
+        
     }
     async scheme(sql: string, name='') {
         const context= asyncInteractionContext.getStore() as InteractionContext
@@ -109,7 +133,17 @@ export class PGLiteDB implements Database{
             name,
             sql,
         })
-        return  await this.db.query(sql)
+        try {
+            return await this.db.query(sql)
+        } catch (error: any) {
+            logger.error({
+                type:'scheme',
+                name,
+                sql,
+                error: error.message
+            })
+            throw error
+        }
     }
     close() {
         return this.db.close()
@@ -118,7 +152,7 @@ export class PGLiteDB implements Database{
         return this.idSystem.getAutoId(recordName)
     }
     parseMatchExpression(key: string, value:[string, string], fieldName: string, fieldType: string, isReferenceValue: boolean, getReferenceFieldValue: (v: string) => string, p: () => string) {
-        if (fieldType === 'JSON') {
+        if (fieldType.toLowerCase() === 'json') {
             if (value[0].toLowerCase() === 'contains') {
                 const fieldNameWithQuotes = fieldName.split('.').map(x => `"${x}"`).join('.')
                 return {

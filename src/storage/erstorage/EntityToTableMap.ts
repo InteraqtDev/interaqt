@@ -18,7 +18,7 @@ export type ValueAttribute = {
     // 数据库字段类型
     fieldType?: string,
     computed?: (record: any) => any,
-    defaultValue?: () => any
+    defaultValue?: (record: any, recordName: string) => any
 }
 
 

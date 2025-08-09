@@ -30,6 +30,7 @@ export * from "./Custom.js";
 export * from "./Property.js";
 export * from "./Entity.js";
 export * from "./Relation.js";
+export * from "./RefContainer.js";
 
 // 导出活动相关对象
 export * from "./BoolExp.js";
