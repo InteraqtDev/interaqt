@@ -4,7 +4,9 @@ import { EntityInstance, RelationInstance, PropertyInstance, RefContainer } from
 import { ID_ATTR, ROW_ID_ATTR, Database } from "@runtime";
 import { isRelation } from "./util.js";
 import { MatchExpressionData, MatchExp } from "./MatchExp.js";
-import { Entity, Property } from "@shared";
+import { Entity, Property, Relation } from "@shared";
+import { BoolExp } from "@shared";
+import { MergedItemProcessor } from "./MergedItemProcessor.js";
 
 // Define the types we need
 
@@ -394,25 +396,11 @@ export class DBSetup {
         return `${relationName}_${isSource? 'source' :'target'}`
     }
 
-    buildEntityTree() {
-        const tree = new Map<string, string[]>()
-        for (const entity of this.entities) {
-            if (entity.inputEntities) {
-                tree.set(entity.name, entity.inputEntities.map(inputEntity => inputEntity.name))
-            } else if(entity.baseEntity) {
-                const leafSet = tree.get(entity.baseEntity.name!) || []
-                leafSet.push(entity.name)
-                tree.set(entity.baseEntity.name!, leafSet)
-            }
-        }
-        // TODO relation 的 tree
-        return tree
-    }
+    
 
     buildMap() {
-        // 0. 预处理：将 merged entity 转化为 filtered entity
-        const entityTree = this.buildEntityTree()
-        this.processMergedEntities(entityTree);
+        // 0. 预处理：将 merged entity 和 merged relation 转化为 filtered entity/relation
+        this.processMergedItems();
         
         // 1. 按照范式生成基础 entity record
         this.entities.forEach(entity => {
@@ -505,192 +493,18 @@ export class DBSetup {
 
     }
     /**
-     * 处理 merged entities，将它们转化为 filtered entity 的实现
+     * 统一处理 merged entities 和 merged relations
      */
-    private processMergedEntities(entityTree: Map<string, string[]>) {
-        const toMergeEntitieNames: string[] = [];
+    private processMergedItems() {
+        const result = MergedItemProcessor.processMergedItems(
+            this.entities,
+            this.relations,
+        );
         
-        // 要构建一个 子孙 entity 到 input entity 的链接。
-        // 这里 input entity 可以是 Merged entity，也可以是个具有 filtered entity 的普通 entity。
-
-        // 首先识别所有的 merged entities 和它们的 input entities
-        const leafEntityToInputEntityMap = new Map<string, string[]>()
-        for (const entity of this.entities) {
-            if (entity.inputEntities && entity.inputEntities.length > 0) {
-                toMergeEntitieNames.push(entity.name);
-                for(const inputEntity of entity.inputEntities!) {
-                    const leafSet = entityTree.get(inputEntity.name) || []
-                    const inputEntityNames = leafEntityToInputEntityMap.get(inputEntity.name) || []
-                    inputEntityNames.push(inputEntity.name)
-                    leafEntityToInputEntityMap.set(inputEntity.name, inputEntityNames)
-                    while(leafSet.length) {
-                        const leafEntity = leafSet.shift()!
-                        const leafInputEntityNames = leafEntityToInputEntityMap.get(leafEntity) || []   
-                        leafInputEntityNames.push(...inputEntityNames)
-                        leafEntityToInputEntityMap.set(leafEntity, leafInputEntityNames)
-                        const childSet = entityTree.get(leafEntity) || []
-                        leafSet.push(...childSet)
-                    }
-                }
-            }
-        }
-        
-        const refContainer = new RefContainer(this.entities, this.relations)
-
-        // 处理所有 entities
-        for (const entityName of toMergeEntitieNames) {
-            const entity = refContainer.getEntityByName(entityName)!
-            // 这是一个 merged entity
-            const inputTypeFieldName = `__${entity.name}_input_entity`
-            const [transformedEntity, virtualBaseEntity] = this.transformMergedEntity(entity, inputTypeFieldName, leafEntityToInputEntityMap);
-            refContainer.replaceEntity(transformedEntity, entity)
-            if (virtualBaseEntity !== transformedEntity) {
-                refContainer.addEntity(virtualBaseEntity)
-            }
-            
-            // 将 input entities 转化为 merged entity 的 filtered entities
-            for (const inputEntity of entity.inputEntities!) {
-                // 创建一个指向 merged entity 的 filtered entity
-                const [filteredEntity, baseEntity] = this.createFilteredEntityFromInput(inputEntity, virtualBaseEntity!, inputTypeFieldName);
-                // 检查 baseEntity 是否在 RefContainer 中
-                const existingEntity = refContainer.getEntityByName(baseEntity.name);
-                if (existingEntity) {
-                    // 如果存在，替换它
-                    refContainer.replaceEntity(filteredEntity, existingEntity)
-                }
-            }
-        }
-        const {entities, relations} = refContainer.getAll()
-        this.entities = entities
-        this.relations = relations
+        this.entities = result.entities;
+        this.relations = result.relations;
     }
-    
-    /**
-     * 将 merged entity 转化，添加必要的 properties
-     */
-    private transformMergedEntity(mergedEntity: EntityInstance, inputTypeFieldName: string, leafEntityToInputEntityMap: Map<string, string[]>): [EntityInstance, EntityInstance] {
-        const inputEntities = mergedEntity.inputEntities!;
-        
-        // 创建 __input_entity property
-        // 重要：这个字段应该记录创建记录时使用的 entity name
-        // 当通过 filtered entity（如 Customer）创建时，entityName 参数会是 'Customer'
-        // 而不是 merged entity 的名字 'Contact'
-        const inputEntityTypeProperty = Property.create({
-            name: inputTypeFieldName,
-            type: 'json',
-            defaultValue: (record: any, entityName: string) => {
-                // CAUTION 如果 input entity 是一个 merged entity，这里收到的 entityName 可能是它的子孙 input entity name。
-                const inputEntityCandidates: string[] = leafEntityToInputEntityMap.get(entityName)||[]
-                const inputEntityNames = inputEntityCandidates.filter(name => mergedEntity.inputEntities!.some(inputEntity => inputEntity.name === name))
-                if (inputEntityNames) {
-                    return inputEntityNames
-                }
-                // 使用创建时的 entity name
-                return [entityName];
-            }
-        });
-        
-        // 合并所有 input entities 的 properties
-        const mergedProperties: PropertyInstance[] = [inputEntityTypeProperty];
-        const propertyNameMap = new Map<string, {property: PropertyInstance, inputEntity: EntityInstance}[]>();
-        
-        // 收集所有同名 properties
-        for (const inputEntity of inputEntities) {
-            // 如果 input entity 是 filtered entity，需要从它的 base entity 获取 properties
-            let sourceEntity = inputEntity;
-            while (sourceEntity.baseEntity && sourceEntity.properties.length === 0) {
-                sourceEntity = sourceEntity.baseEntity as EntityInstance;
-            }
-            
-            for (const prop of sourceEntity.properties) {
-                if (!propertyNameMap.has(prop.name)) {
-                    propertyNameMap.set(prop.name, []);
-                }
-                propertyNameMap.get(prop.name)!.push({property: prop, inputEntity: sourceEntity});
-            }
-        }
-        
-        // 为每个 property 创建合并版本
-        for (const [propName, props] of propertyNameMap) {
-            const mergedProp = Property.clone(props[0].property, true);
-            if (props.length === 1) {
-                mergedProperties.push(mergedProp)
-                continue
-            }
 
-            // 检测所有的 props 的类型是否一致。不一致要报错。
-            const types = props.map(p => p.property.type)
-            assert(types.every(type => type === types[0]), `property ${propName} has different types: ${types.join(', ')}`)
-
-            // 使用第一个 property 作为基础
-            
-            // 创建新的 defaultValue，根据 __input_entity 选择正确的原始 defaultValue
-            mergedProp.defaultValue = (record: any, entityName: string) => {
-                const inputEntityType = entityName;
-                const entityProp = props.find(p => p.inputEntity.name === inputEntityType)?.property
-                if (entityProp?.defaultValue) {
-                    return entityProp.defaultValue(record, entityName);
-                }
-                
-                return undefined;
-            };
-
-            mergedProperties.push(mergedProp);
-        }
-        
-        // 创建转化后的 entity
-        const transformedEntity = Entity.create({
-            name: mergedEntity.name,
-        });
-
-        let virtualBaseEntity:undefined|EntityInstance = undefined
-        // CAUTION 如果有 filtered input entity，则需要创建一个虚拟的 base entity
-        //  mergedEntity 也是 virtual base entity 的 filterd entity。
-        if (mergedEntity.inputEntities?.some(inputEntity => inputEntity.baseEntity)) {
-            virtualBaseEntity = Entity.create({
-                name: `${mergedEntity.name}_base`,
-                properties: mergedProperties,
-            })
-            transformedEntity.baseEntity = virtualBaseEntity
-            // 任意一个 input entity 都符合
-            transformedEntity.matchExpression = MatchExp.fromArray(mergedEntity.inputEntities!.map(inputEntity => ({
-                key: inputTypeFieldName,
-                value: ['contains', inputEntity.name]
-            })));
-        } else {
-            transformedEntity.properties = mergedProperties
-        }
-        
-        return [transformedEntity, virtualBaseEntity||transformedEntity];
-    }
-    
-    /**
-     * 从 input entity 创建一个指向 merged entity 的 filtered entity
-     * 注意，如果是 filtered entity，需要找到它的 root base entity。处理的也是 root base entity
-     */
-    private createFilteredEntityFromInput(inputEntity: EntityInstance, mergedEntity: EntityInstance, inputTypeFieldName: string): [EntityInstance, EntityInstance] {
-        // 如果 input entity 已经是 filtered entity，需要找到它的 root base entity  
-        let baseEntity = inputEntity;
-        
-        if (inputEntity.baseEntity) {
-            // 递归找到 root base entity
-            while (baseEntity.baseEntity) {
-                baseEntity = baseEntity.baseEntity as EntityInstance;
-            }
-        }
-        
-        // 创建新的 filtered entity，指向 merged entity
-        // 使用原始 input entity 的名字，这样用户可以通过原始名字来访问
-        const filteredEntity = Entity.clone(baseEntity, true)
-        filteredEntity.baseEntity = mergedEntity
-        filteredEntity.matchExpression = MatchExp.atom({
-            key: inputTypeFieldName,
-            value: ['contains',inputEntity.name] // postgres 的 array 匹配
-        });
-        
-        
-        return [filteredEntity, baseEntity];
-    }
     mergeRecords() {
         // 基本合表策略:
         // 1. 从用户指定的 mergeLinks 里面开始合并三表合一

@@ -831,7 +831,7 @@ ${innerQuerySQL}
             }
         }
 
-
+        // FIXME 如果不同，才需要 merge。现在不知道为什么 relation 和 source 记录上出现了个 & 关系数据。
         const newEntityDataWithIds = newEntityData.merge(newRawDataWithNewIds)
 
         // 2. 处理需要 flashOut 的数据

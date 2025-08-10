@@ -143,22 +143,22 @@ export class RecordInfo {
     }
 
     get isFilteredEntity() {
-        return this.data.isFilteredEntity
+        return this.data?.isFilteredEntity
     }
 
     get isFilteredRelation() {
-        return this.data.isFilteredRelation
+        return this.data?.isFilteredRelation
     }
 
     get baseRelationName() {
-        return this.data.baseRelationName
+        return this.data?.baseRelationName
     }
 
     get resolvedBaseRecordName() {
-        return this.data.resolvedBaseRecordName
+        return this.data?.resolvedBaseRecordName
     }
 
     get resolvedMatchExpression() {
-        return this.data.resolvedMatchExpression
+        return this.data?.resolvedMatchExpression
     }
 }

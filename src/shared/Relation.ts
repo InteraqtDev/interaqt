@@ -15,6 +15,7 @@ export interface RelationInstance extends IInstance {
   properties: PropertyInstance[];
   baseRelation?: RelationInstance; // for Filtered Relation
   matchExpression?: object; // for Filtered Relation
+  inputRelations?: RelationInstance[]; // for Merged Relation
 }
 
 export interface RelationCreateArgs {
@@ -29,6 +30,7 @@ export interface RelationCreateArgs {
   properties?: PropertyInstance[];
   baseRelation?: RelationInstance;
   matchExpression?: object;
+  inputRelations?: RelationInstance[]; // for Merged Relation
 }
 
 export class Relation implements RelationInstance {
@@ -46,6 +48,7 @@ export class Relation implements RelationInstance {
   public properties: PropertyInstance[];
   public baseRelation?: RelationInstance;
   public matchExpression?: object;
+  public inputRelations?: RelationInstance[]; // for Merged Relation
   
   // Getter for name that returns computed name if _name is undefined
   get name(): string | undefined {
@@ -65,8 +68,46 @@ export class Relation implements RelationInstance {
     this._options = options;
     this.uuid = generateUUID(options);
     
+    // For merged relation
+    if (args.inputRelations) {
+      // Validate inputRelations
+      if (!args.inputRelations || args.inputRelations.length === 0) {
+        throw new Error('Merged relation must have at least one inputRelation');
+      }
+      
+      // Merged relation must have sourceProperty and targetProperty
+      if (!args.sourceProperty || !args.targetProperty) {
+        throw new Error('Merged relation must have sourceProperty and targetProperty');
+      }
+      
+      // Merged relation cannot specify source/target
+      if (args.source || args.target) {
+        throw new Error('Merged relation cannot specify source or target, they are inherited from inputRelations');
+      }
+      
+      // All input relations must have the same source and target
+      const firstRelation = args.inputRelations[0];
+      for (let i = 1; i < args.inputRelations.length; i++) {
+        const relation = args.inputRelations[i];
+        if (relation.source !== firstRelation.source) {
+          throw new Error('All inputRelations must have the same source');
+        }
+        if (relation.target !== firstRelation.target) {
+          throw new Error('All inputRelations must have the same target');
+        }
+      }
+      
+      this.inputRelations = args.inputRelations;
+      this.source = firstRelation.source;
+      this.target = firstRelation.target;
+      this.sourceProperty = args.sourceProperty;
+      this.targetProperty = args.targetProperty;
+      this.type = firstRelation.type; // Inherit type from first input relation
+      this.isTargetReliance = firstRelation.isTargetReliance;
+      this._name = args.name;
+    }
     // For filtered relation, inherit from baseRelation
-    if (args.baseRelation) {
+    else if (args.baseRelation) {
       // Filtered relation must have sourceProperty and targetProperty
       if (!args.sourceProperty || !args.targetProperty) {
         throw new Error('Filtered relation must have sourceProperty and targetProperty');
@@ -176,6 +217,33 @@ export class Relation implements RelationInstance {
       type: 'object' as const,
       collection: false as const,
       required: false as const,
+    },
+    inputRelations: {
+      type: 'Relation' as const,
+      collection: true as const,
+      required: false as const,
+      constraints: {
+        mergedRelationNoProperties: (thisInstance: RelationInstance) => {
+          // Merged relation should not have any properties defined
+          if (thisInstance.inputRelations && thisInstance.inputRelations.length > 0 && thisInstance.properties && thisInstance.properties.length > 0) {
+            return false;
+          }
+          return true;
+        },
+        sameSourceTarget: (thisInstance: RelationInstance) => {
+          // All input relations must have the same source and target
+          if (thisInstance.inputRelations && thisInstance.inputRelations.length > 1) {
+            const firstRelation = thisInstance.inputRelations[0];
+            for (let i = 1; i < thisInstance.inputRelations.length; i++) {
+              const relation = thisInstance.inputRelations[i];
+              if (relation.source !== firstRelation.source || relation.target !== firstRelation.target) {
+                return false;
+              }
+            }
+          }
+          return true;
+        }
+      }
     }
   };
   
@@ -194,14 +262,18 @@ export class Relation implements RelationInstance {
   
   static stringify(instance: RelationInstance): string {
     const args: RelationCreateArgs = {
-      source: instance.source,
       sourceProperty: instance.sourceProperty,
-      target: instance.target,
       targetProperty: instance.targetProperty,
       isTargetReliance: instance.isTargetReliance,
       type: instance.type,
       properties: instance.properties
     };
+    
+    // Only include source and target if not a merged relation
+    if (!instance.inputRelations) {
+      args.source = instance.source;
+      args.target = instance.target;
+    }
     
     // Use the private _name field if the instance is a Relation class instance
     const name = (instance as any)._name ?? instance.name;
@@ -210,6 +282,7 @@ export class Relation implements RelationInstance {
     if (instance.computation !== undefined) args.computation = instance.computation;
     if (instance.baseRelation !== undefined) args.baseRelation = instance.baseRelation;
     if (instance.matchExpression !== undefined) args.matchExpression = instance.matchExpression;
+    if (instance.inputRelations !== undefined) args.inputRelations = instance.inputRelations;
     
     const data: SerializedData<RelationCreateArgs> = {
       type: 'Relation',
@@ -223,14 +296,18 @@ export class Relation implements RelationInstance {
   
   static clone(instance: RelationInstance, deep = false): RelationInstance {
     const args: RelationCreateArgs = {
-      source: instance.source,
       sourceProperty: instance.sourceProperty,
-      target: instance.target,
       targetProperty: instance.targetProperty,
       isTargetReliance: instance.isTargetReliance,
       type: instance.type,
       properties: instance.properties?.map(p => Property.clone(p, deep))
     };
+    
+    // Only include source and target if not a merged relation
+    if (!instance.inputRelations) {
+      args.source = instance.source;
+      args.target = instance.target;
+    }
     
     // Use the private _name field if the instance is a Relation class instance
     const name = (instance as any)._name ?? instance.name;
@@ -239,6 +316,7 @@ export class Relation implements RelationInstance {
     if (instance.computation !== undefined) args.computation = instance.computation; // Note: This is a reference, not a deep clone
     if (instance.baseRelation !== undefined) args.baseRelation = instance.baseRelation;
     if (instance.matchExpression !== undefined) args.matchExpression = instance.matchExpression;
+    if (instance.inputRelations !== undefined) args.inputRelations = instance.inputRelations;
     
     return new Relation(args, instance._options);
   }

@@ -33,3 +33,20 @@
 4. 阅读 `tests/runtime` 下所有 computation 相关的测试用例，掌握 computation 测试用例的写法。
 5. 在 `tests/runtime` 下的各种 computation 测试文件中，新增相应的 computation 使用 merged entity 作为参数的例子。并通过 `npm run test:runtime` 运行测试用例，保证测试用例全部通过。如果没有通过，尝试对源码进行修复，直到所有测试用例通过。
 6. 使用 `npm test` 验证所有测试用例通过，才说明没有破坏原本功能。
+
+## 任务三
+我们已经完全实现了 merged entity 特性。relation 也是一种特殊的 entity，接下里你来基于 merged entity 的实现来实现 merged relation。要求：
+1. relation 可以由 inputRelations 指定的多个 relation merge 而成。所有 input relations 都要有相同的 source，相同的 target。
+2. merged relation 不能指定 source/target。一定要指定 sourceProperty/targetProperty。
+3. merged relation 可以像 relation 一样支持查询、或者为修改删除而作的匹配。不能用于创建。
+4. relation 也是一种特殊的 entity，在实现时，应该尽量复用 merged entity 的底层代码。尽量不要新建类。
+
+### 具体步骤
+1. 阅读 `src/storage` 下的源码，完全理解 merged entity 的与实现。
+2. 阅读 `tests/storage` 下的测试用例源码，理解 merged entity 的用法和测试用例写法。
+3. 阅读 `src/shared` 中 merged entity 相关的代码，理解 merged entity 的定义。
+4. 开始实现 merged relation 特性。
+  4.1. 在 `src/shared` 的 Relation 定义中，增加 `inputRelations` 参数，用于表示从哪些 relation merge 而来。在 Relation 创建时，按照要求对 inputRelations 等参数做必要的检测。
+  4.2. 在 `src/storage` 中，修改必要的代码，实现 merged relation 的特新要求。
+6. 在 `tests/storage` 下创建测试用例，测试 merged relation 的所有功能以及触发的事件都正确。
+7. 使用 `npm run test:storage` 运行测试用例并保证测试用例全部通过，才说明一切正常没有破坏原本的测试用例。

@@ -151,6 +151,13 @@ export class RefContainer {
         obj.baseRelation = replacement as RelationInstance;
       }
     }
+
+    if('inputRelations' in obj && obj.inputRelations) {
+      obj.inputRelations = obj.inputRelations.map(inputRelation => {
+        const replacement = this.findReplacement(inputRelation);
+        return (replacement || inputRelation) as RelationInstance;
+      });
+    }
   }
   
   /**
@@ -200,6 +207,13 @@ export class RefContainer {
         if (replacement) {
           cloned.baseRelation = replacement as RelationInstance;
         }
+      }
+
+      if(cloned.inputRelations) {
+        cloned.inputRelations = cloned.inputRelations.map(inputRelation => {
+          const replacement = this.findReplacement(inputRelation);
+          return (replacement || inputRelation) as RelationInstance;
+        });
       }
     }
   }
@@ -264,15 +278,6 @@ export class RefContainer {
     } else {
       // Check if oldRelation is a cloned relation
       originalKey = this.reverseRelationMap.get(oldRelation);
-      if (!originalKey) {
-        // Try to find by uuid
-        for (const [original, cloned] of this.clonedRelations) {
-          if (cloned === oldRelation || cloned.uuid === oldRelation.uuid) {
-            originalKey = original;
-            break;
-          }
-        }
-      }
     }
     
     if (!originalKey) {
@@ -283,7 +288,7 @@ export class RefContainer {
     const oldCloned = this.clonedRelations.get(originalKey);
     
     // Clone the new relation
-    const clonedNew = Relation.clone(newRelation, false);
+    const clonedNew = newRelation
     
     // Update the maps
     this.clonedRelations.set(originalKey, clonedNew);
@@ -336,6 +341,12 @@ export class RefContainer {
       if (relation.baseRelation === oldObj) {
         relation.baseRelation = newObj as RelationInstance;
       }
+
+      if(relation.inputRelations) {
+        relation.inputRelations = relation.inputRelations.map(inputRelation => 
+          inputRelation === oldObj ? (newObj as RelationInstance) : inputRelation
+        );
+      }
     }
   }
   
@@ -352,6 +363,19 @@ export class RefContainer {
   }
 
   /**
+   * Get relation by name after all replacements
+   */
+  getRelationByName(name: string): RelationInstance | undefined {
+    for (const relation of this.clonedRelations.values()) {
+      const relationName = relation.name || `${relation.source.name}_${relation.sourceProperty}_${relation.targetProperty}_${relation.target.name}`;
+      if (relationName === name) {
+        return relation;
+      }
+    }
+    return undefined;
+  }
+
+  /**
    * Get all entities and relations after replacement
    */
   getAll(): { entities: EntityInstance[], relations: RelationInstance[] } {
@@ -359,6 +383,53 @@ export class RefContainer {
       entities: Array.from(this.clonedEntities.values()),
       relations: Array.from(this.clonedRelations.values())
     };
+  }
+
+  /**
+   * Unified replace method - automatically determines if it's an entity or relation
+   */
+  replace(newItem: EntityInstance | RelationInstance, oldItem: EntityInstance | RelationInstance): void {
+    if (this.isEntity(newItem) && this.isEntity(oldItem)) {
+      this.replaceEntity(newItem as EntityInstance, oldItem as EntityInstance);
+    } else if (this.isRelation(newItem) && this.isRelation(oldItem)) {
+      this.replaceRelation(newItem as RelationInstance, oldItem as RelationInstance);
+    } else {
+      throw new Error('Type mismatch: both items must be either entities or relations');
+    }
+  }
+
+  /**
+   * Unified getByName method - searches both entities and relations
+   */
+  getByName(name: string): EntityInstance | RelationInstance | undefined {
+    const entity = this.getEntityByName(name);
+    if (entity) return entity;
+    return this.getRelationByName(name);
+  }
+
+  /**
+   * Unified add method - automatically determines if it's an entity or relation
+   */
+  add(item: EntityInstance | RelationInstance): EntityInstance | RelationInstance {
+    if (this.isEntity(item)) {
+      return this.addEntity(item as EntityInstance);
+    } else {
+      return this.addRelation(item as RelationInstance);
+    }
+  }
+
+  /**
+   * Helper method to determine if an item is an entity
+   */
+  private isEntity(item: EntityInstance | RelationInstance): boolean {
+    return !('sourceProperty' in item);
+  }
+
+  /**
+   * Helper method to determine if an item is a relation
+   */
+  private isRelation(item: EntityInstance | RelationInstance): boolean {
+    return 'sourceProperty' in item;
   }
 
   /**
