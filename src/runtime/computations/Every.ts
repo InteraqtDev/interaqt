@@ -47,7 +47,7 @@ export class GlobalEveryHandle implements DataBasedComputation {
 
         return matchCount === totalCount
     }
-
+    // FIXME 要改为记录每个 item 是否 match 才行，因为 delete 事件中的 record 可能不完整。
     async incrementalCompute(lastValue: boolean, mutationEvent: EtityMutationEvent, record: any, dataDeps: {[key: string]: any}): Promise<boolean|ComputationResult> {
         // 注意要同时检测名字和 relatedAttribute 才能确定是不是自己的更新，因为可能有自己和自己的关联关系的 dataDep。
         if (mutationEvent.recordName !== (this.dataDeps.main as RecordsDataDep).source!.name || mutationEvent.relatedAttribute?.length) {

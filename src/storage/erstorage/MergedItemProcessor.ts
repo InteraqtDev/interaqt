@@ -37,8 +37,7 @@ export class MergedItemProcessor {
                 `${relation.source.name}_${relation.sourceProperty}_${relation.targetProperty}_${relation.target.name}`;
             if (relation.inputRelations) {
                 const inputRelationNames = relation.inputRelations.map(inputRelation => {
-                    return inputRelation.name || 
-                        `${inputRelation.source.name}_${inputRelation.sourceProperty}_${inputRelation.targetProperty}_${inputRelation.target.name}`;
+                    return inputRelation.name!
                 });
                 tree.set(relationName, inputRelationNames)
             } else if(relation.baseRelation) {
@@ -100,16 +99,15 @@ export class MergedItemProcessor {
             return;
         }
         
-        // 构建 leaf to input map
-        const leafToInputMap = this.buildLeafToInputMap(items, itemTree);
+        
         
         // 处理每个 merged item
         for (const mergedItem of mergedItems) {
             this.processSingleMergedItem(
                 mergedItem,
                 refContainer,
-                leafToInputMap,
-                itemType
+                itemType,
+                itemTree
             );
         }
     }
@@ -120,22 +118,23 @@ export class MergedItemProcessor {
     private static processSingleMergedItem<T extends MergedItem>(
         mergedItem: T,
         refContainer: RefContainer,
-        leafToInputMap: Map<string, string[]>,
-        itemType: 'entity' | 'relation'
+        itemType: 'entity' | 'relation',
+        itemTree: Map<string, string[]>
     ): void {
+        // 构建 leaf to input map
+
         const isEntity = itemType === 'entity';
         const itemName = this.getItemName(mergedItem);
         const inputTypeFieldName = `__${itemName}_input_${itemType}`;
         
-        // 获取 input items（对于 entity 需要更新）
-        let inputItems = this.getInputItems(mergedItem);
+        
         const itemToTransform = isEntity? refContainer.getEntityByName(mergedItem.name!) : refContainer.getRelationByName(mergedItem.name!);
       
         // 转换 merged item
         const [transformedItem, virtualBaseItem] = this.transformMergedItem(
             itemToTransform!,
             inputTypeFieldName,
-            leafToInputMap,
+            itemTree,
             refContainer
         );
         
@@ -144,8 +143,10 @@ export class MergedItemProcessor {
         if (virtualBaseItem !== transformedItem) {
             refContainer.add(virtualBaseItem);
         }
-        
-        // 处理 input items
+
+        // 获取 input items（对于 entity 需要更新）
+        const inputItems = this.getInputItems(mergedItem);
+        // 处理 input items。让所有 input item 都是 virtual base item 的 filtered item。
         if (inputItems) {
             for (const inputItem of inputItems) {
                 this.processInputItem(
@@ -198,30 +199,28 @@ export class MergedItemProcessor {
      * 用于处理嵌套的 merged/filtered items
      */
     static buildLeafToInputMap<T extends MergedItem>(
-        items: T[],
+        item: T,
         itemTree: Map<string, string[]>
     ): Map<string, string[]> {
         const leafToInputMap = new Map<string, string[]>();
         
-        for (const item of items) {
-            const inputItems = this.getInputItems(item);
-            if (inputItems && inputItems.length > 0) {
-                for (const inputItem of inputItems) {
-                    const itemName = this.getItemName(inputItem);
-                    const leafSet = itemTree.get(itemName) || [];
-                    const inputItemNames = leafToInputMap.get(itemName) || [];
-                    inputItemNames.push(itemName);
-                    leafToInputMap.set(itemName, inputItemNames);
-                    
-                    // 递归处理所有子孙 items
-                    while (leafSet.length) {
-                        const leafItem = leafSet.shift()!;
-                        const leafInputItemNames = leafToInputMap.get(leafItem) || [];
-                        leafInputItemNames.push(...inputItemNames);
-                        leafToInputMap.set(leafItem, leafInputItemNames);
-                        const childSet = itemTree.get(leafItem) || [];
-                        leafSet.push(...childSet);
-                    }
+        const inputItems = this.getInputItems(item);
+        if (inputItems && inputItems.length > 0) {
+            for (const inputItem of inputItems) {
+                const itemName = this.getItemName(inputItem);
+                const leafSet = [...(itemTree.get(itemName) || [])];
+                const inputItemNames = leafToInputMap.get(itemName) || [];
+                inputItemNames.push(itemName);
+                leafToInputMap.set(itemName, inputItemNames);
+                
+                // 递归处理所有子孙 items
+                while (leafSet.length) {
+                    const leafItem = leafSet.shift()!;
+                    const leafInputItemNames = leafToInputMap.get(leafItem) || [];
+                    leafInputItemNames.push(...inputItemNames);
+                    leafToInputMap.set(leafItem, leafInputItemNames);
+                    const childSet = itemTree.get(leafItem) || [];
+                    leafSet.push(...childSet);
                 }
             }
         }
@@ -235,8 +234,10 @@ export class MergedItemProcessor {
     static createInputTypeProperty(
         inputFieldName: string,
         mergedItem: MergedItem,
-        leafToInputMap: Map<string, string[]>
+        itemTree: Map<string, string[]>
     ): PropertyInstance {
+        const leafToInputMap = this.buildLeafToInputMap(mergedItem, itemTree);
+        
         return Property.create({
             name: inputFieldName,
             type: 'json',
@@ -255,13 +256,28 @@ export class MergedItemProcessor {
      * 合并所有 input items 的 properties
      */
     static mergeProperties(
-        inputItems: MergedItem[],
-        inputTypeProperty: PropertyInstance,
+        mergedItem: MergedItem,
+        itemTree: Map<string, string[]>,
+        refContainer: RefContainer
     ): PropertyInstance[] {
-        const mergedProperties: PropertyInstance[] = [inputTypeProperty];
-        const propertyNameMap = new Map<string, {property: PropertyInstance, inputItem: MergedItem}[]>();
+        // 收到的 itemName 有三种：
+        // 1. 就是当前的 input item 的 name。
+        // 2. 如果当前 input item 被 filtered 了，那么可能是 filtered item 的 name。
+        // 3. 如果当前 input item 是 merged item，那么一定子 input entity 的 name。
+
+        // defaultValue 的取值情况：
+        // 1. inputEntity 是个普通 entity，那就在当前 record 上获取 defaultValue。
+        // 2. inputEntity 是个 filtered entity，那就在 root base entity 上获取 defaultValue。
+        // 3. inputEntity 是个 merged entity，那就在子孙 input entity 的 root base entity（可能就是子孙自己，取决于它是不是 filtered） 上获取 defaultValue。
+        // 4. inputEntity 如果是个 merged entity，并且 prop 是用来区分 input item 的，那 defaultValue 就是应该是 transform 时构造出来的。
         
-        // 收集所有同名 properties
+        const inputItems = this.getInputItems(mergedItem);
+        const mergedProperties: PropertyInstance[] = [];
+        const itemPropertyMap = new Map<string, {[key: string]: PropertyInstance}>();
+        const mergedPropertyMap: {[k: string]: PropertyInstance} = {};
+        
+        // 收集所有同名 properties。
+        // 如果这个 item 已经是 filtered item，那么就从 base item 获取 properties。
         for (const inputItem of inputItems) {
             let sourceItem = inputItem;
             
@@ -275,37 +291,49 @@ export class MergedItemProcessor {
                     sourceItem = (sourceItem as RelationInstance).baseRelation as RelationInstance;
                 }
             }
-            
-            for (const prop of sourceItem.properties) {
-                if (!propertyNameMap.has(prop.name)) {
-                    propertyNameMap.set(prop.name, []);
+
+            const propertyMap = Object.fromEntries(sourceItem.properties.map(prop => [prop.name, prop]));
+            itemPropertyMap.set(inputItem.name!, propertyMap);
+
+            // 合并 property map
+            Object.assign(mergedPropertyMap, propertyMap);
+
+            const isInputItemMergedItem = (inputItem as EntityInstance).inputEntities || (inputItem as RelationInstance).inputRelations;
+            // 递归处理所有子孙节点 
+            const childItemNames = [...(itemTree.get(inputItem.name!) || [])];
+            while(childItemNames.length) {
+                const childItemName = childItemNames.shift()!;
+                if (!isInputItemMergedItem) {
+                    // 如果不是 merged item， 就只有 filtered item 了，所有 filtered item 的 property map 都是继承自 source item 的。
+                    itemPropertyMap.set(childItemName, propertyMap);
+                } else {
+                    // merged item 的 sub 是自己的。
+                    const childItem = refContainer.getEntityByName(childItemName) || refContainer.getRelationByName(childItemName);
+                    const isChildInputItemMergedItem = (childItem as EntityInstance).inputEntities || (childItem as RelationInstance).inputRelations;
+                    if (!isChildInputItemMergedItem) {
+                        const childItemPropertyMap = Object.fromEntries(childItem!.properties.map(prop => [prop.name, prop]));
+                        itemPropertyMap.set(childItemName, childItemPropertyMap);
+                        // 继续合并
+                        Object.assign(mergedPropertyMap, childItemPropertyMap);
+                    }
                 }
-                propertyNameMap.get(prop.name)!.push({property: prop, inputItem: sourceItem});
+                childItemNames.push(...(itemTree.get(childItemName) || []));
             }
         }
         
         // 为每个 property 创建合并版本
-        for (const [propName, props] of propertyNameMap) {
-            if (props.length === 1) {
-                mergedProperties.push(Property.clone(props[0].property, true));
-                continue;
-            }
+        for (const propName of Object.keys(mergedPropertyMap)) {
             
-            // 检测所有的 props 的类型是否一致
-            const types = props.map(p => p.property.type);
-            assert(types.every(type => type === types[0]), 
-                `property ${propName} has different types: ${types.join(', ')}`);
-            
-            // 创建合并的 property
-            const mergedProp = Property.clone(props[0].property, true);
+            const mergedProp = Property.clone(mergedPropertyMap[propName], true);
             
             // 创建新的 defaultValue
             mergedProp.defaultValue = (record: any, itemName: string) => {
-                const inputItemType = itemName;
-                const itemProp = props.find(p => this.getItemName(p.inputItem) === inputItemType)?.property;
-                if (itemProp?.defaultValue) {
-                    return itemProp.defaultValue(record, itemName);
+                // 从 itemPropertyMap 中找 defaultValue
+                const property = itemPropertyMap.get(itemName)?.[propName];
+                if (property?.defaultValue) {
+                    return property.defaultValue(record, itemName);
                 }
+                
                 return undefined;
             };
             
@@ -321,23 +349,29 @@ export class MergedItemProcessor {
     static transformMergedItem<T extends MergedItem>(
         mergedItem: T,
         inputFieldName: string,
-        leafToInputMap: Map<string, string[]>,
+        itemTree: Map<string, string[]>,
         refContainer: RefContainer
     ): [T, T] {
-        const inputItems = this.getInputItems(mergedItem);
         
         // 创建 input type property
         const inputTypeProperty = this.createInputTypeProperty(
             inputFieldName,
             mergedItem,
-            leafToInputMap
+            itemTree
         );
         
-        // 合并 properties
-        const mergedProperties = this.mergeProperties(
-            inputItems,
+        // 合并 properties。
+        // 特别注意这里，虽然用户在创建 merged entity 或 relation 时，不能指定 properties，
+        // 但是 computation 可能有往记录上绑定 state 的需求。
+        const mergedProperties = [
+            ...this.mergeProperties(
+                mergedItem,
+                itemTree,
+                refContainer
+            ),
             inputTypeProperty,
-        );
+            ...mergedItem.properties,
+        ]
         
         if (this.isEntity(mergedItem)) {
             // Entity 的处理

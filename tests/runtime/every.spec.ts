@@ -1011,4 +1011,189 @@ describe('Every computed handle', () => {
     allOnlineDelivered = await system.storage.get(DICTIONARY_RECORD, 'allOnlineOrdersDelivered');
     expect(allOnlineDelivered).toBe(true); // All online orders are still delivered
   });
+
+  test('should work with merged relation in property level computation', async () => {
+    // Define entities
+    const projectEntity = Entity.create({
+      name: 'Project',
+      properties: [
+        Property.create({name: 'name', type: 'string'}),
+        Property.create({name: 'status', type: 'string'})
+      ]
+    });
+
+    const milestoneEntity = Entity.create({
+      name: 'Milestone',
+      properties: [
+        Property.create({name: 'title', type: 'string'}),
+        Property.create({name: 'completed', type: 'boolean'}),
+        Property.create({name: 'importance', type: 'string'})
+      ]
+    });
+
+    // Create input relations
+    const projectPrimaryMilestoneRelation = Relation.create({
+      name: 'ProjectPrimaryMilestone',
+      source: projectEntity,
+      sourceProperty: 'primaryMilestones',
+      target: milestoneEntity,
+      targetProperty: 'primaryProject',
+      type: '1:n',
+      properties: [
+        Property.create({ name: 'milestoneType', type: 'string', defaultValue: () => 'primary' }),
+        Property.create({ name: 'addedAt', type: 'string', defaultValue: () => '2024-01-01' })
+      ]
+    });
+
+    const projectSecondaryMilestoneRelation = Relation.create({
+      name: 'ProjectSecondaryMilestone',
+      source: projectEntity,
+      sourceProperty: 'secondaryMilestones',
+      target: milestoneEntity,
+      targetProperty: 'secondaryProject',
+      type: '1:n',
+      properties: [
+        Property.create({ name: 'milestoneType', type: 'string', defaultValue: () => 'secondary' }),
+        Property.create({ name: 'addedAt', type: 'string', defaultValue: () => '2024-01-01' })
+      ]
+    });
+
+    // Create merged relation
+    const projectAllMilestonesRelation = Relation.create({
+      name: 'ProjectAllMilestones',
+      sourceProperty: 'allMilestones',
+      targetProperty: 'anyProject',
+      inputRelations: [projectPrimaryMilestoneRelation, projectSecondaryMilestoneRelation]
+    });
+
+    // Add every computation to project entity
+    projectEntity.properties.push(
+      Property.create({
+        name: 'allMilestonesCompleted',
+        type: 'boolean',
+        computation: Every.create({
+          record: projectAllMilestonesRelation,
+          attributeQuery: [['target', {attributeQuery: ['completed']}]],
+          callback: (relation: any) => {
+            return relation.target.completed === true;
+          }
+        })
+      }),
+      Property.create({
+        name: 'allCriticalMilestonesCompleted',
+        type: 'boolean',
+        computation: Every.create({
+          record: projectAllMilestonesRelation,
+          attributeQuery: [['target', {attributeQuery: ['completed', 'importance']}]],
+          callback: (relation: any) => {
+            // Only check critical milestones
+            return relation.target.importance !== 'critical' || relation.target.completed === true;
+          }
+        })
+      })
+    );
+
+    const entities = [projectEntity, milestoneEntity];
+    const relations = [projectPrimaryMilestoneRelation, projectSecondaryMilestoneRelation, projectAllMilestonesRelation];
+
+    // Setup system
+    const system = new MonoSystem(new PGLiteDB());
+    system.conceptClass = KlassByName;
+    const controller = new Controller({
+      system: system,
+      entities: entities,
+      relations: relations,
+      activities: [],
+      interactions: []
+    });
+    await controller.setup(true);
+
+    // Create test data
+    const project1 = await system.storage.create('Project', {
+      name: 'Website Redesign',
+      status: 'active'
+    });
+
+    const milestone1 = await system.storage.create('Milestone', {
+      title: 'Design Complete',
+      completed: true,
+      importance: 'critical'
+    });
+
+    const milestone2 = await system.storage.create('Milestone', {
+      title: 'Backend API',
+      completed: true,
+      importance: 'critical'
+    });
+
+    const milestone3 = await system.storage.create('Milestone', {
+      title: 'Testing',
+      completed: false,
+      importance: 'normal'
+    });
+
+    // Create relations through input relations
+    await system.storage.create('ProjectPrimaryMilestone', {
+      source: { id: project1.id },
+      target: { id: milestone1.id }
+    });
+
+    await system.storage.create('ProjectPrimaryMilestone', {
+      source: { id: project1.id },
+      target: { id: milestone2.id }
+    });
+
+    await system.storage.create('ProjectSecondaryMilestone', {
+      source: { id: project1.id },
+      target: { id: milestone3.id }
+    });
+
+    // Check computations
+    let projectData = await system.storage.findOne('Project',
+      MatchExp.atom({ key: 'id', value: ['=', project1.id] }),
+      undefined,
+      ['id', 'name', 'allMilestonesCompleted', 'allCriticalMilestonesCompleted']
+    );
+
+    expect(projectData.allMilestonesCompleted).toBe(false); // milestone3 is not completed (returns 0)
+    expect(projectData.allCriticalMilestonesCompleted).toBe(true); // all critical ones are completed (returns 1)
+
+    // Complete the remaining milestone
+    await system.storage.update('Milestone',
+      MatchExp.atom({ key: 'id', value: ['=', milestone3.id] }),
+      { completed: true }
+    );
+
+    // Check updated computations
+    projectData = await system.storage.findOne('Project',
+      MatchExp.atom({ key: 'id', value: ['=', project1.id] }),
+      undefined,
+      ['id', 'name', 'allMilestonesCompleted', 'allCriticalMilestonesCompleted']
+    );
+
+    expect(projectData.allMilestonesCompleted).toBe(true); // now all are completed (returns 1)
+    expect(projectData.allCriticalMilestonesCompleted).toBe(true); // still true (returns 1)
+
+    // Add a new critical milestone that's not completed
+    const milestone4 = await system.storage.create('Milestone', {
+      title: 'Deployment',
+      completed: false,
+      importance: 'critical'
+    });
+
+    await system.storage.create('ProjectPrimaryMilestone', {
+      source: { id: project1.id },
+      target: { id: milestone4.id }
+    });
+
+    // Check updated computations
+    projectData = await system.storage.findOne('Project',
+      MatchExp.atom({ key: 'id', value: ['=', project1.id] }),
+      undefined,
+      ['id', 'name', 'allMilestonesCompleted', 'allCriticalMilestonesCompleted']
+    );
+
+    expect(projectData.allMilestonesCompleted).toBe(false); // new incomplete milestone (returns 0)
+    expect(projectData.allCriticalMilestonesCompleted).toBe(false); // new critical milestone not completed (returns 0)
+  });
 }); 

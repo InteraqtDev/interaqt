@@ -1439,4 +1439,145 @@ describe('Count computed handle', () => {
     const totalCount3 = await system.storage.get(DICTIONARY_RECORD, 'totalContactCount');
     expect(totalCount3).toBe(4);
   });
+
+  test('should work with merged relation in property level computation', async () => {
+    // Define entities
+    const userEntity = Entity.create({
+      name: 'User',
+      properties: [
+        Property.create({name: 'username', type: 'string'}),
+        Property.create({name: 'email', type: 'string'})
+      ]
+    });
+
+    const postEntity = Entity.create({
+      name: 'Post',
+      properties: [
+        Property.create({name: 'title', type: 'string'}),
+        Property.create({name: 'content', type: 'string'}),
+        Property.create({name: 'status', type: 'string'})
+      ]
+    });
+
+    // Create input relations
+    const userLikesPostRelation = Relation.create({
+      name: 'UserLikesPost',
+      source: userEntity,
+      sourceProperty: 'likedPosts',
+      target: postEntity,
+      targetProperty: 'likedBy',
+      type: 'n:n',
+      properties: [
+        Property.create({ name: 'likedAt', type: 'string', defaultValue: () => '2024-01-01' }),
+        Property.create({ name: 'rating', type: 'number', defaultValue: () => 5 })
+      ]
+    });
+
+    const userBookmarksPostRelation = Relation.create({
+      name: 'UserBookmarksPost',
+      source: userEntity,
+      sourceProperty: 'bookmarkedPosts',
+      target: postEntity,
+      targetProperty: 'bookmarkedBy',
+      type: 'n:n',
+      properties: [
+        Property.create({ name: 'bookmarkedAt', type: 'string', defaultValue: () => '2024-01-01' }),
+        Property.create({ name: 'category', type: 'string', defaultValue: () => 'general' })
+      ]
+    });
+
+    // Create merged relation
+    const userInteractsWithPostRelation = Relation.create({
+      name: 'UserInteractsWithPost',
+      sourceProperty: 'interactedPosts',
+      targetProperty: 'interactedBy',
+      inputRelations: [userLikesPostRelation, userBookmarksPostRelation]
+    });
+
+    // Add count computation to user entity
+    userEntity.properties.push(
+      Property.create({
+        name: 'totalInteractions',
+        type: 'number',
+        computation: Count.create({
+          record: userInteractsWithPostRelation,
+          direction: 'source'
+        })
+      }),
+      Property.create({
+        name: 'highRatedInteractions',
+        type: 'number',
+        computation: Count.create({
+          record: userInteractsWithPostRelation,
+          direction: 'source',
+          attributeQuery: ['rating'],
+          callback: (relation: any) => {
+            return relation.rating >= 4;
+          }
+        })
+      })
+    );
+
+    const entities = [userEntity, postEntity];
+    const relations = [userLikesPostRelation, userBookmarksPostRelation, userInteractsWithPostRelation];
+
+    // Setup system
+    const system = new MonoSystem();
+    system.conceptClass = KlassByName;
+    const controller = new Controller({
+      system: system,
+      entities: entities,
+      relations: relations,
+      activities: [],
+      interactions: []
+    });
+    await controller.setup(true);
+
+    // Create test data
+    const user1 = await system.storage.create('User', {
+      username: 'john_doe',
+      email: 'john@example.com'
+    });
+
+    const post1 = await system.storage.create('Post', {
+      title: 'First Post',
+      content: 'Content 1',
+      status: 'published'
+    });
+
+    const post2 = await system.storage.create('Post', {
+      title: 'Second Post',
+      content: 'Content 2',
+      status: 'published'
+    });
+
+    // Create relations through input relations
+    await system.storage.create('UserLikesPost', {
+      source: { id: user1.id },
+      target: { id: post1.id },
+      rating: 5
+    });
+
+    await system.storage.create('UserBookmarksPost', {
+      source: { id: user1.id },
+      target: { id: post2.id },
+      category: 'tech'
+    });
+
+    await system.storage.create('UserLikesPost', {
+      source: { id: user1.id },
+      target: { id: post2.id },
+      rating: 3
+    });
+
+    // Check counts
+    const userData = await system.storage.findOne('User',
+      MatchExp.atom({ key: 'id', value: ['=', user1.id] }),
+      undefined,
+      ['id', 'username', 'totalInteractions', 'highRatedInteractions']
+    );
+
+    expect(userData.totalInteractions).toBe(3); // 2 likes + 1 bookmark
+    expect(userData.highRatedInteractions).toBe(1); // Only 1 with rating >= 4
+  });
 }); 

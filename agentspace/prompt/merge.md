@@ -50,3 +50,22 @@
   4.2. 在 `src/storage` 中，修改必要的代码，实现 merged relation 的特新要求。
 6. 在 `tests/storage` 下创建测试用例，测试 merged relation 的所有功能以及触发的事件都正确。
 7. 使用 `npm run test:storage` 运行测试用例并保证测试用例全部通过，才说明一切正常没有破坏原本的测试用例。
+
+
+## 任务四
+
+我们已经完全实现了 merged relation 的功能，并且通过测试看到基于 merged relation 的增删改查功能已经全部正确。接下来你来补充 merged relation 作为 各种 computations 的参数的测试用例，验证 merged relation + computations 能正常运行。
+
+### 具体步骤
+1. 阅读 `src/storage` 下所有 merged entity 相关的源码，理解 merged relation 的实现原理。
+2. 阅读 `tests/storage` 下 merged relation 相关的测试用例，掌握 merged relation 的用法。
+3. 阅读 `src/runtime` 下所有 computaion 的源码，理解各种 computation 的原理。理解不同类型 computation 的差别。
+4. 阅读 `tests/runtime` 下所有 computation 相关的测试用例。
+  4.1. 掌握各种 computation 正确参数，测试用例的写法。当测试用例失败时，要检查 computation 的参数使用是否正确。
+  4.2. 掌握如何在 property level computation 中使用 relation 作为参数。
+5. 在 `tests/runtime` 下的各种 computation 测试文件中，新增相应的 computation 使用 merged relation 作为参数的例子。
+  5.1. 列举有能支持 relation 作为参数的 computation，制定新增 merged relation 作为参数的计划。
+  5.2. 查看已有的测试用例并完全掌握新增计划中相关 computation 的参数的正确使用方法。特别是当以 relation 作为参数时的测试用例。注意 relation 作为参数时，如果过有 callback，callback 的参数通常是 relation，而不是 entity。
+  5.3. 新增 merged relation 作为参数的测试用例。
+6. 通过 `npm run test:runtime` 运行测试用例，保证测试用例全部通过。如果没有通过，尝试对源码进行修复，直到所有测试用例通过。
+7. 使用 `npm test` 验证所有测试用例通过，才说明没有破坏原本功能。

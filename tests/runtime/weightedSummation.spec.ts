@@ -5,6 +5,7 @@ import {
   Dictionary,
   Entity,
   KlassByName,
+  MatchExp,
   MonoSystem,
   Property,
   Relation,
@@ -295,5 +296,181 @@ describe('WeightedSummation computed handle', () => {
     // 净余额应为 (100*1) + (50*-1) = 100 - 50 = 50
     const netBalance = await system.storage.get(DICTIONARY_RECORD, 'netBalance');
     expect(netBalance).toBe(50);
+  });
+
+  test('should work with merged relation in property level computation', async () => {
+    // Define entities
+    const storeEntity = Entity.create({
+      name: 'Store',
+      properties: [
+        Property.create({name: 'name', type: 'string'}),
+        Property.create({name: 'location', type: 'string'})
+      ]
+    });
+
+    const inventoryItemEntity = Entity.create({
+      name: 'InventoryItem',
+      properties: [
+        Property.create({name: 'productName', type: 'string'}),
+        Property.create({name: 'unitPrice', type: 'number'}),
+        Property.create({name: 'quantity', type: 'number'})
+      ]
+    });
+
+    // Create input relations
+    const storeWarehouseInventoryRelation = Relation.create({
+      name: 'StoreWarehouseInventory',
+      source: storeEntity,
+      sourceProperty: 'warehouseItems',
+      target: inventoryItemEntity,
+      targetProperty: 'warehouseStore',
+      type: '1:n',
+      properties: [
+        Property.create({ name: 'storageType', type: 'string', defaultValue: () => 'warehouse' }),
+        Property.create({ name: 'location', type: 'string', defaultValue: () => 'main_warehouse' })
+      ]
+    });
+
+    const storeShowroomInventoryRelation = Relation.create({
+      name: 'StoreShowroomInventory',
+      source: storeEntity,
+      sourceProperty: 'showroomItems',
+      target: inventoryItemEntity,
+      targetProperty: 'showroomStore',
+      type: '1:n',
+      properties: [
+        Property.create({ name: 'storageType', type: 'string', defaultValue: () => 'showroom' }),
+        Property.create({ name: 'displayArea', type: 'string', defaultValue: () => 'front' })
+      ]
+    });
+
+    // Create merged relation
+    const storeTotalInventoryRelation = Relation.create({
+      name: 'StoreTotalInventory',
+      sourceProperty: 'allInventoryItems',
+      targetProperty: 'anyStore',
+      inputRelations: [storeWarehouseInventoryRelation, storeShowroomInventoryRelation]
+    });
+
+    // Add weighted summation computation to store entity
+    storeEntity.properties.push(
+      Property.create({
+        name: 'totalInventoryValue',
+        type: 'number',
+        computation: WeightedSummation.create({
+          record: storeTotalInventoryRelation,
+          attributeQuery: [['target', {attributeQuery: ['unitPrice', 'quantity']}]],
+          callback: (relation: any) => {
+            return {
+              weight: relation.target.quantity || 0,
+              value: relation.target.unitPrice || 0
+            };
+          }
+        })
+      })
+    );
+
+    const entities = [storeEntity, inventoryItemEntity];
+    const relations = [storeWarehouseInventoryRelation, storeShowroomInventoryRelation, storeTotalInventoryRelation];
+
+    // Setup system
+    const system = new MonoSystem();
+    system.conceptClass = KlassByName;
+    const controller = new Controller({
+      system: system,
+      entities: entities,
+      relations: relations,
+      activities: [],
+      interactions: []
+    });
+    await controller.setup(true);
+
+    // Create test data
+    const store1 = await system.storage.create('Store', {
+      name: 'Main Store',
+      location: 'Downtown'
+    });
+
+    const item1 = await system.storage.create('InventoryItem', {
+      productName: 'Laptop',
+      unitPrice: 999,
+      quantity: 5
+    });
+
+    const item2 = await system.storage.create('InventoryItem', {
+      productName: 'Mouse',
+      unitPrice: 25,
+      quantity: 20
+    });
+
+    const item3 = await system.storage.create('InventoryItem', {
+      productName: 'Keyboard',
+      unitPrice: 75,
+      quantity: 10
+    });
+
+    // Create relations through input relations
+    await system.storage.create('StoreWarehouseInventory', {
+      source: { id: store1.id },
+      target: { id: item1.id }
+    });
+
+    await system.storage.create('StoreWarehouseInventory', {
+      source: { id: store1.id },
+      target: { id: item2.id }
+    });
+
+    await system.storage.create('StoreShowroomInventory', {
+      source: { id: store1.id },
+      target: { id: item3.id }
+    });
+
+    // Check total inventory value
+    let storeData = await system.storage.findOne('Store',
+      MatchExp.atom({ key: 'id', value: ['=', store1.id] }),
+      undefined,
+      ['id', 'name', 'totalInventoryValue']
+    );
+
+    // (999*5) + (25*20) + (75*10) = 4995 + 500 + 750 = 6245
+    expect(storeData.totalInventoryValue).toBe(6245);
+
+    // Update quantity of an item
+    await system.storage.update('InventoryItem',
+      MatchExp.atom({ key: 'id', value: ['=', item1.id] }),
+      { quantity: 8 }
+    );
+
+    // Check updated value
+    storeData = await system.storage.findOne('Store',
+      MatchExp.atom({ key: 'id', value: ['=', store1.id] }),
+      undefined,
+      ['id', 'name', 'totalInventoryValue']
+    );
+
+    // (999*8) + (25*20) + (75*10) = 7992 + 500 + 750 = 9242
+    expect(storeData.totalInventoryValue).toBe(9242);
+
+    // Add a new item to showroom
+    const item4 = await system.storage.create('InventoryItem', {
+      productName: 'Monitor',
+      unitPrice: 250,
+      quantity: 3
+    });
+
+    await system.storage.create('StoreShowroomInventory', {
+      source: { id: store1.id },
+      target: { id: item4.id }
+    });
+
+    // Check final value
+    storeData = await system.storage.findOne('Store',
+      MatchExp.atom({ key: 'id', value: ['=', store1.id] }),
+      undefined,
+      ['id', 'name', 'totalInventoryValue']
+    );
+
+    // 9242 + (250*3) = 9242 + 750 = 9992
+    expect(storeData.totalInventoryValue).toBe(9992);
   });
 }); 

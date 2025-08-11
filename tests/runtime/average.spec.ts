@@ -1063,4 +1063,161 @@ describe('Average computed handle', () => {
     // Now only 6 reviews: (4.5 + 4.5 + 4.0 + 5.0 + 4.5 + 4.0) / 6 = 26.5 / 6 ≈ 4.42
     expect(overallAvg).toBeCloseTo(4.42, 2);
   });
+
+  test('should work with merged relation in property level computation', async () => {
+    // Define entities  
+    const studentEntity = Entity.create({
+      name: 'Student',
+      properties: [
+        Property.create({name: 'name', type: 'string'}),
+        Property.create({name: 'grade', type: 'string'})
+      ]
+    });
+
+    const examEntity = Entity.create({
+      name: 'Exam',
+      properties: [
+        Property.create({name: 'subject', type: 'string'}),
+        Property.create({name: 'score', type: 'number'}),
+        Property.create({name: 'maxScore', type: 'number'})
+      ]
+    });
+
+    // Create input relations
+    const studentMidtermExamRelation = Relation.create({
+      name: 'StudentMidtermExam',
+      source: studentEntity,
+      sourceProperty: 'midtermExams',
+      target: examEntity,
+      targetProperty: 'midtermStudent',
+      type: '1:n',
+      properties: [
+        Property.create({ name: 'examType', type: 'string', defaultValue: () => 'midterm' }),
+        Property.create({ name: 'semester', type: 'string', defaultValue: () => 'Fall 2024' })
+      ]
+    });
+
+    const studentFinalExamRelation = Relation.create({
+      name: 'StudentFinalExam',
+      source: studentEntity,
+      sourceProperty: 'finalExams',
+      target: examEntity,
+      targetProperty: 'finalStudent',
+      type: '1:n',
+      properties: [
+        Property.create({ name: 'examType', type: 'string', defaultValue: () => 'final' }),
+        Property.create({ name: 'semester', type: 'string', defaultValue: () => 'Fall 2024' })
+      ]
+    });
+
+    // Create merged relation
+    const studentAllExamsRelation = Relation.create({
+      name: 'StudentAllExams',
+      sourceProperty: 'allExams',
+      targetProperty: 'examStudent',
+      inputRelations: [studentMidtermExamRelation, studentFinalExamRelation]
+    });
+
+    // Add average computation to student entity
+    studentEntity.properties.push(
+      Property.create({
+        name: 'overallAverageScore',
+        type: 'number',
+        computation: Average.create({
+          record: studentAllExamsRelation,
+          attributeQuery: [['target', {attributeQuery: ['score']}]]
+        })
+      })
+    );
+
+    const entities = [studentEntity, examEntity];
+    const relations = [studentMidtermExamRelation, studentFinalExamRelation, studentAllExamsRelation];
+
+    // Setup system
+    const system = new MonoSystem();
+    system.conceptClass = KlassByName;
+    const controller = new Controller({
+      system: system,
+      entities: entities,
+      relations: relations,
+      activities: [],
+      interactions: []
+    });
+    await controller.setup(true);
+
+    // Create test data
+    const student1 = await system.storage.create('Student', {
+      name: 'Bob Johnson',
+      grade: '10th'
+    });
+
+    const exam1 = await system.storage.create('Exam', {
+      subject: 'Math',
+      score: 85,
+      maxScore: 100
+    });
+
+    const exam2 = await system.storage.create('Exam', {
+      subject: 'Physics',
+      score: 90,
+      maxScore: 100
+    });
+
+    const exam3 = await system.storage.create('Exam', {
+      subject: 'Math',
+      score: 88,
+      maxScore: 100
+    });
+
+    const exam4 = await system.storage.create('Exam', {
+      subject: 'Physics',
+      score: 92,
+      maxScore: 100
+    });
+
+    // Create relations through input relations
+    await system.storage.create('StudentMidtermExam', {
+      source: { id: student1.id },
+      target: { id: exam1.id }
+    });
+
+    await system.storage.create('StudentMidtermExam', {
+      source: { id: student1.id },
+      target: { id: exam2.id }
+    });
+
+    await system.storage.create('StudentFinalExam', {
+      source: { id: student1.id },
+      target: { id: exam3.id }
+    });
+
+    await system.storage.create('StudentFinalExam', {
+      source: { id: student1.id },
+      target: { id: exam4.id }
+    });
+
+    // Check average score
+    const studentData = await system.storage.findOne('Student',
+      MatchExp.atom({ key: 'id', value: ['=', student1.id] }),
+      undefined,
+      ['id', 'name', 'overallAverageScore']
+    );
+
+    expect(studentData.overallAverageScore).toBe(88.75); // (85 + 90 + 88 + 92) / 4
+
+    // Update an exam score
+    await system.storage.update('Exam',
+      MatchExp.atom({ key: 'id', value: ['=', exam1.id] }),
+      { score: 95 }
+    );
+
+    // Check updated average
+    const studentData2 = await system.storage.findOne('Student',
+      MatchExp.atom({ key: 'id', value: ['=', student1.id] }),
+      undefined,
+      ['id', 'name', 'overallAverageScore']
+    );
+
+    expect(studentData2.overallAverageScore).toBe(91.25); // (95 + 90 + 88 + 92) / 4
+  });
 }); 

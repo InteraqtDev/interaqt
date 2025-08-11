@@ -438,4 +438,167 @@ describe('Any computed handle', () => {
     // task1 is now overdue, high priority, and active
     expect(project1Data4.hasHighPriorityOverdue).toBe(1); // task1 now matches
   });
+
+  test('should work with merged relation in property level computation', async () => {
+    // Define entities
+    const teamEntity = Entity.create({
+      name: 'Team',
+      properties: [
+        Property.create({name: 'name', type: 'string'}),
+        Property.create({name: 'department', type: 'string'})
+      ]
+    });
+
+    const taskEntity = Entity.create({
+      name: 'Task',
+      properties: [
+        Property.create({name: 'title', type: 'string'}),
+        Property.create({name: 'status', type: 'string'}),
+        Property.create({name: 'priority', type: 'string'})
+      ]
+    });
+
+    // Create input relations
+    const teamAssignedTaskRelation = Relation.create({
+      name: 'TeamAssignedTask',
+      source: teamEntity,
+      sourceProperty: 'assignedTasks',
+      target: taskEntity,
+      targetProperty: 'assignedTeam',
+      type: 'n:n',
+      properties: [
+        Property.create({ name: 'assignmentType', type: 'string', defaultValue: () => 'assigned' }),
+        Property.create({ name: 'assignedAt', type: 'string', defaultValue: () => '2024-01-01' })
+      ]
+    });
+
+    const teamReviewingTaskRelation = Relation.create({
+      name: 'TeamReviewingTask',
+      source: teamEntity,
+      sourceProperty: 'reviewingTasks',
+      target: taskEntity,
+      targetProperty: 'reviewingTeam',
+      type: 'n:n',
+      properties: [
+        Property.create({ name: 'assignmentType', type: 'string', defaultValue: () => 'reviewing' }),
+        Property.create({ name: 'reviewStarted', type: 'string', defaultValue: () => '2024-01-01' })
+      ]
+    });
+
+    // Create merged relation
+    const teamAllTasksRelation = Relation.create({
+      name: 'TeamAllTasks',
+      sourceProperty: 'allTasks',
+      targetProperty: 'anyTeam',
+      inputRelations: [teamAssignedTaskRelation, teamReviewingTaskRelation]
+    });
+
+    // Add any computation to team entity
+    teamEntity.properties.push(
+      Property.create({
+        name: 'hasUrgentTask',
+        type: 'boolean',
+        computation: Any.create({
+          record: teamAllTasksRelation,
+          attributeQuery: [['target', {attributeQuery: ['priority', 'status']}]],
+          callback: (relation: any) => {
+            return relation.target.priority === 'high' && relation.target.status !== 'completed';
+          }
+        })
+      })
+    );
+
+    const entities = [teamEntity, taskEntity];
+    const relations = [teamAssignedTaskRelation, teamReviewingTaskRelation, teamAllTasksRelation];
+
+    // Setup system
+    const system = new MonoSystem();
+    const controller = new Controller({
+      system: system,
+      entities: entities,
+      relations: relations,
+      activities: [],
+      interactions: []
+    });
+    await controller.setup(true);
+
+    // Create test data
+    const team1 = await system.storage.create('Team', {
+      name: 'Development Team',
+      department: 'Engineering'
+    });
+
+    const task1 = await system.storage.create('Task', {
+      title: 'Fix Critical Bug',
+      status: 'in_progress',
+      priority: 'high'
+    });
+
+    const task2 = await system.storage.create('Task', {
+      title: 'Code Review',
+      status: 'pending',
+      priority: 'medium'
+    });
+
+    const task3 = await system.storage.create('Task', {
+      title: 'Documentation',
+      status: 'pending',
+      priority: 'low'
+    });
+
+    // Initially no tasks assigned, should be false (0)
+    let teamData = await system.storage.findOne('Team',
+      MatchExp.atom({ key: 'id', value: ['=', team1.id] }),
+      undefined,
+      ['id', 'name', 'hasUrgentTask']
+    );
+    expect(teamData.hasUrgentTask).toBe(0);
+
+    // Assign a high priority task through assigned relation
+    await system.storage.create('TeamAssignedTask', {
+      source: { id: team1.id },
+      target: { id: task1.id }
+    });
+
+    // Should now be true (1) (has high priority, non-completed task)
+    teamData = await system.storage.findOne('Team',
+      MatchExp.atom({ key: 'id', value: ['=', team1.id] }),
+      undefined,
+      ['id', 'name', 'hasUrgentTask']
+    );
+    expect(teamData.hasUrgentTask).toBe(1);
+
+    // Add more tasks through reviewing relation
+    await system.storage.create('TeamReviewingTask', {
+      source: { id: team1.id },
+      target: { id: task2.id }
+    });
+
+    await system.storage.create('TeamReviewingTask', {
+      source: { id: team1.id },
+      target: { id: task3.id }
+    });
+
+    // Should still be true (1)
+    teamData = await system.storage.findOne('Team',
+      MatchExp.atom({ key: 'id', value: ['=', team1.id] }),
+      undefined,
+      ['id', 'name', 'hasUrgentTask']
+    );
+    expect(teamData.hasUrgentTask).toBe(1);
+
+    // Complete the high priority task
+    await system.storage.update('Task',
+      MatchExp.atom({ key: 'id', value: ['=', task1.id] }),
+      { status: 'completed' }
+    );
+
+    // Should now be false (0) (no more high priority non-completed tasks)
+    teamData = await system.storage.findOne('Team',
+      MatchExp.atom({ key: 'id', value: ['=', team1.id] }),
+      undefined,
+      ['id', 'name', 'hasUrgentTask']
+    );
+    expect(teamData.hasUrgentTask).toBe(0);
+  });
 }); 

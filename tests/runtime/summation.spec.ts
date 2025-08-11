@@ -1212,4 +1212,150 @@ describe('Sum computed handle', () => {
     
     expect(totalRevenue).toBe(4000); // Decreased by 500
   });
+
+  test('should work with merged relation in property level computation', async () => {
+    // Define entities
+    const customerEntity = Entity.create({
+      name: 'Customer',
+      properties: [
+        Property.create({name: 'name', type: 'string'}),
+        Property.create({name: 'email', type: 'string'})
+      ]
+    });
+
+    const purchaseEntity = Entity.create({
+      name: 'Purchase',
+      properties: [
+        Property.create({name: 'product', type: 'string'}),
+        Property.create({name: 'amount', type: 'number'}),
+        Property.create({name: 'date', type: 'string'})
+      ]
+    });
+
+    // Create input relations
+    const customerOnlinePurchaseRelation = Relation.create({
+      name: 'CustomerOnlinePurchase',
+      source: customerEntity,
+      sourceProperty: 'onlinePurchases',
+      target: purchaseEntity,
+      targetProperty: 'onlineCustomer',
+      type: '1:n',
+      properties: [
+        Property.create({ name: 'channel', type: 'string', defaultValue: () => 'online' }),
+        Property.create({ name: 'paymentMethod', type: 'string', defaultValue: () => 'credit' })
+      ]
+    });
+
+    const customerStorePurchaseRelation = Relation.create({
+      name: 'CustomerStorePurchase',
+      source: customerEntity,
+      sourceProperty: 'storePurchases',
+      target: purchaseEntity,
+      targetProperty: 'storeCustomer',
+      type: '1:n',
+      properties: [
+        Property.create({ name: 'channel', type: 'string', defaultValue: () => 'store' }),
+        Property.create({ name: 'storeName', type: 'string', defaultValue: () => 'Main St' })
+      ]
+    });
+
+    // Create merged relation
+    const customerAllPurchasesRelation = Relation.create({
+      name: 'CustomerAllPurchases',
+      sourceProperty: 'allPurchases',
+      targetProperty: 'anyCustomer',
+      inputRelations: [customerOnlinePurchaseRelation, customerStorePurchaseRelation]
+    });
+
+    // Add summation computation to customer entity
+    customerEntity.properties.push(
+      Property.create({
+        name: 'totalPurchaseAmount',
+        type: 'number',
+        computation: Summation.create({
+          record: customerAllPurchasesRelation,
+          attributeQuery: [['target', {attributeQuery: ['amount']}]]
+        })
+      })
+    );
+
+    const entities = [customerEntity, purchaseEntity];
+    const relations = [customerOnlinePurchaseRelation, customerStorePurchaseRelation, customerAllPurchasesRelation];
+
+    // Setup system
+    const system = new MonoSystem();
+    system.conceptClass = KlassByName;
+    const controller = new Controller({
+      system: system,
+      entities: entities,
+      relations: relations,
+      activities: [],
+      interactions: []
+    });
+    await controller.setup(true);
+
+    // Create test data
+    const customer1 = await system.storage.create('Customer', {
+      name: 'Alice Smith',
+      email: 'alice@example.com'
+    });
+
+    const purchase1 = await system.storage.create('Purchase', {
+      product: 'Laptop',
+      amount: 1200,
+      date: '2024-01-01'
+    });
+
+    const purchase2 = await system.storage.create('Purchase', {
+      product: 'Mouse',
+      amount: 50,
+      date: '2024-01-02'
+    });
+
+    const purchase3 = await system.storage.create('Purchase', {
+      product: 'Keyboard',
+      amount: 150,
+      date: '2024-01-03'
+    });
+
+    // Create relations through input relations
+    await system.storage.create('CustomerOnlinePurchase', {
+      source: { id: customer1.id },
+      target: { id: purchase1.id }
+    });
+
+    await system.storage.create('CustomerStorePurchase', {
+      source: { id: customer1.id },
+      target: { id: purchase2.id }
+    });
+
+    await system.storage.create('CustomerOnlinePurchase', {
+      source: { id: customer1.id },
+      target: { id: purchase3.id }
+    });
+
+    // Check total amount
+    const customerData = await system.storage.findOne('Customer',
+      MatchExp.atom({ key: 'id', value: ['=', customer1.id] }),
+      undefined,
+      ['id', 'name', 'totalPurchaseAmount']
+    );
+
+    expect(customerData.totalPurchaseAmount).toBe(1400); // 1200 + 50 + 150
+
+    // Update a purchase amount
+    await system.storage.update('Purchase',
+      MatchExp.atom({ key: 'id', value: ['=', purchase2.id] }),
+      { amount: 80 }
+    );
+
+    // Check updated total
+    const customerData2 = await system.storage.findOne('Customer',
+      MatchExp.atom({ key: 'id', value: ['=', customer1.id] }),
+      undefined,
+      ['id', 'name', 'totalPurchaseAmount']
+    );
+
+    expect(customerData2.totalPurchaseAmount).toBe(1430); // 1200 + 80 + 150
+  });
 }); 
