@@ -95,7 +95,8 @@ export class RecordBoundState<T> {
         // TODO 如果 record 上不存在就重新查询
         if (record[this.key] === undefined) {
             const fullRecord = await this.controller.system.storage.findOne(this.record!, MatchExp.atom({key: 'id', value: ['=', record.id]}), undefined, [this.key])
-            return fullRecord[this.key] as T
+            const value = fullRecord?.[this.key]
+            return value !== undefined ? value as T : this.defaultValue as T
         }
         return record[this.key] as T
     }

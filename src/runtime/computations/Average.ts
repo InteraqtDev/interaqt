@@ -42,7 +42,8 @@ export class GlobalAverageHandle implements DataBasedComputation {
     createState() {
         return {
             sum: new GlobalBoundState<number>(0),
-            count: new GlobalBoundState<number>(0)
+            count: new GlobalBoundState<number>(0),
+            itemValue: new RecordBoundState<number>(0, this.record.name!)
         }   
     }
     
@@ -54,9 +55,9 @@ export class GlobalAverageHandle implements DataBasedComputation {
         let base:any = record
         for(let attr of avgFieldPath) {
             base = base[attr]
-            if (base === undefined || base === null) return 0
+            if (base === undefined || base === null) return null
         }
-        return (Number.isNaN(base)||!Number.isFinite(base) ) ? 0: base
+        return (Number.isNaN(base)||!Number.isFinite(base) ) ? null: base
     }
     
     async compute({main: records}: {main: any[]}): Promise<number> {
@@ -64,13 +65,13 @@ export class GlobalAverageHandle implements DataBasedComputation {
         let count = 0;
         
         for (const record of records) {
-            const value = this.resolveAvgField(record);
-            if (value !== null) {
-                sum += value;
-                count++;
-            }
+            const value = this.resolveAvgField(record) || 0;
+            sum += value;
+            count++;
+            await this.state.itemValue.set(record, value);
         }
         
+        await this.state.sum.set(sum);
         await this.state.count.set(count);
         
         return count > 0 ? sum / count : 0;
@@ -84,7 +85,7 @@ export class GlobalAverageHandle implements DataBasedComputation {
 
         
         let count = await this.state.count.get() || 0;
-        let sum = (lastValue || 0) * count
+        let sum = await this.state.sum.get() || 0;
 
         if (mutationEvent.type === 'create') {
             const newRecord = await this.controller.system.storage.findOne(
@@ -93,14 +94,15 @@ export class GlobalAverageHandle implements DataBasedComputation {
                 undefined, 
                 this.args.attributeQuery
             )
-            const value = this.resolveAvgField(newRecord);
-            if (value !== null) {
-                sum += value;
-                count++;
-            }
+            const value = this.resolveAvgField(newRecord) || 0;
+            sum += value;
+            count++;
+            await this.state.itemValue.set(newRecord, value);
         } else if (mutationEvent.type === 'delete') {
-            // FIXME 必须同时知道删掉的关联关系，才能支持 attributeQuery 跨关系的 oldValue
-            return ComputationResult.fullRecompute('No oldRecord in delete event');
+            // Get the old value from state instead of returning fullRecompute
+            const oldValue = (await this.state.itemValue.get(mutationEvent.record)) || 0;
+            sum -= oldValue;
+            count--;
         } else if (mutationEvent.type === 'update') {
             const newRecord = await this.controller.system.storage.findOne(
                 this.record.name!, 
@@ -108,28 +110,17 @@ export class GlobalAverageHandle implements DataBasedComputation {
                 undefined, 
                 this.args.attributeQuery
             )
-            const newValue = this.resolveAvgField(newRecord);
+            const newValue = this.resolveAvgField(newRecord) || 0;
             
-            assert(!mutationEvent.relatedAttribute || mutationEvent.relatedAttribute.every((r: any, index: number) => r===this.avgFieldPath[index]), 'related update event should not trigger this average.')
-            const oldRecord = mutationEvent.relatedAttribute ? mutationEvent.relatedMutationEvent!.oldRecord : mutationEvent.oldRecord!
-            const oldValue = this.resolveAvgField(oldRecord, this.avgFieldPath.slice(mutationEvent.relatedAttribute?.length||0, Infinity));
+            // Get the old value from state
+            const oldValue = (await this.state.itemValue.get(mutationEvent.oldRecord)) || 0;
             
             // 更新 sum 和 count
-            if (oldValue !== null && newValue !== null) {
-                // 两个值都有效，只更新 sum
-                sum += newValue - oldValue;
-            } else if (oldValue === null && newValue !== null) {
-                // 旧值无效，新值有效，增加计数
-                sum += newValue;
-                count++;
-            } else if (oldValue !== null && newValue === null) {
-                // 旧值有效，新值无效，减少计数
-                sum -= oldValue;
-                count--;
-            }
-            // 如果两个值都无效，不做任何操作
+            sum += newValue - oldValue;
+            await this.state.itemValue.set(newRecord, newValue);
         }
         
+        await this.state.sum.set(sum);
         await this.state.count.set(count);
         
         return count > 0 ? sum / count : 0;

@@ -41,6 +41,7 @@ export class GlobalSumHandle implements DataBasedComputation {
     
     createState() {
         return {
+            itemValue: new RecordBoundState<number>(0, this.record.name!)
         }   
     }
     
@@ -62,6 +63,7 @@ export class GlobalSumHandle implements DataBasedComputation {
         for (const record of records) {
             const value = this.resolveSumField(record) || 0;
             sum += value;
+            await this.state.itemValue.set(record, value);
         }
         
         return sum;
@@ -79,17 +81,19 @@ export class GlobalSumHandle implements DataBasedComputation {
             const newRecord = await this.controller.system.storage.findOne(this.record.name!, MatchExp.atom({key:'id', value:['=', mutationEvent.record!.id]}), undefined, this.args.attributeQuery)
             const value = this.resolveSumField(newRecord);
             sum += value;
+            await this.state.itemValue.set(newRecord, value);
         } else if (mutationEvent.type === 'delete') {
-            // FIXME 必须同时知道删掉的关联关系，才能支持 attributeQuery 跨关系的 oldValue
-            return ComputationResult.fullRecompute('No oldRecord in delete event');
+            // Get the old value from state instead of returning fullRecompute
+            const oldValue = await this.state.itemValue.get(mutationEvent.record);
+            sum -= oldValue;
         } else if (mutationEvent.type === 'update') {
             const newRecord = await this.controller.system.storage.findOne(this.record.name!, MatchExp.atom({key:'id', value:['=', mutationEvent.record!.id]}), undefined, this.args.attributeQuery)
             const newValue = this.resolveSumField(newRecord);
             
-            assert(!mutationEvent.relatedAttribute || mutationEvent.relatedAttribute.every((r: any, index: number) => r===this.sumFieldPath[index]), 'related update event should not trigger this sum.')
-            const oldRecord = mutationEvent.relatedAttribute ? mutationEvent.relatedMutationEvent!.oldRecord : mutationEvent.oldRecord!
-            const oldValue = this.resolveSumField(oldRecord, this.sumFieldPath.slice(mutationEvent.relatedAttribute?.length||0, Infinity));
-            sum += newValue-oldValue 
+            // Get the old value from state
+            const oldValue = await this.state.itemValue.get(mutationEvent.oldRecord);
+            sum += newValue - oldValue;
+            await this.state.itemValue.set(newRecord, newValue);
         }
         
         return sum;

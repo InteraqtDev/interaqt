@@ -10,7 +10,7 @@ import { assert } from "../util.js";
 export class GlobalCountHandle implements DataBasedComputation {
     static computationType = Count
     static contextType = 'global' as const
-    callback?: (this: Controller, item: any, dataDeps?: {[key: string]: any}) => boolean
+    callback: (this: Controller, item: any, dataDeps?: {[key: string]: any}) => boolean
     state!: ReturnType<typeof this.createState>
     useLastValue: boolean = true
     dataDeps: {[key: string]: DataDep} = {}
@@ -18,7 +18,7 @@ export class GlobalCountHandle implements DataBasedComputation {
 
     constructor(public controller: Controller, public args: CountInstance, public dataContext: DataContext) {
         this.record = this.args.record
-        this.callback = this.args.callback?.bind(this)
+        this.callback = this.args.callback?.bind(this) || (() => true)
         
         this.dataDeps = {
             main: {
@@ -32,8 +32,9 @@ export class GlobalCountHandle implements DataBasedComputation {
     
     createState() {
         return {
-            count: new GlobalBoundState<number>(0)
-        }   
+            count: new GlobalBoundState<number>(0),
+            isItemMatch: new RecordBoundState<boolean>(false, this.record.name!)
+        }
     }
     
     getDefaultValue() {
@@ -41,20 +42,19 @@ export class GlobalCountHandle implements DataBasedComputation {
     }
 
     async compute({main: records, ...dataDeps}: {main: any[], [key: string]: any}): Promise<number> {
-        let count: number
+        let count: number = 0
         
-        if (this.callback) {
-            // 如果有 callback，过滤符合条件的记录
-            count = records.filter(item => this.callback!.call(this.controller, item, dataDeps)).length
-        } else {
-            // 如果没有 callback，统计所有记录
-            count = records.length
+        for (const item of records) {
+            const isMatch = this.callback!.call(this.controller, item, dataDeps)
+            if (isMatch) {
+                count++
+            }
+            await (this.state as any).isItemMatch.set(item, isMatch)
         }
         
         await this.state.count.set(count)
         return count;
     }
-    // FIXME 要改为记录每个 item 是否 match 才行，因为 delete 事件中的 record 可能不完整。
     async incrementalCompute(lastValue: number, mutationEvent: EtityMutationEvent, record: any, dataDeps: {[key: string]: any}): Promise<number|ComputationResult> {
         // 注意要同时检测名字和 relatedAttribute 才能确定是不是自己的更新，因为可能有自己和自己的关联关系的 dataDep。
         if (mutationEvent.recordName !== (this.dataDeps.main as RecordsDataDep).source!.name || mutationEvent.relatedAttribute?.length) {
@@ -64,38 +64,32 @@ export class GlobalCountHandle implements DataBasedComputation {
         let count = await this.state.count.get() || lastValue || 0;
         
         if (mutationEvent.type === 'create') {
-            if (this.callback) {
-                // 检查新创建的记录是否符合条件
-                const itemMatch = !!this.callback.call(this.controller, mutationEvent.record, dataDeps)
-                if (itemMatch) {
-                    count = count + 1;
-                }
-            } else {
+            // 检查新创建的记录是否符合条件
+            const itemMatch = !!this.callback.call(this.controller, mutationEvent.record, dataDeps)
+            if (itemMatch) {
                 count = count + 1;
             }
+            await (this.state as any).isItemMatch.set(mutationEvent.record, itemMatch)
         } else if (mutationEvent.type === 'delete') {
-            if (this.callback) {
-                // 检查被删除的记录是否符合条件
-                const itemMatch = !!this.callback.call(this.controller, mutationEvent.oldRecord, dataDeps)
-                if (itemMatch) {
-                    count = count - 1;
-                }
-            } else {
+            // Get the old match status from state instead of recalculating
+            const itemMatch = await (this.state as any).isItemMatch.get(mutationEvent.record)
+            // Convert to boolean because database may store false as 0 or true as 1
+            if (!!itemMatch) {
                 count = count - 1;
             }
         } else if (mutationEvent.type === 'update') {
-            if (this.callback) {
-                // 更新时需要检查前后状态的变化
-                const oldItemMatch = !!this.callback.call(this.controller, mutationEvent.oldRecord, dataDeps)
-                const newItemMatch = !!this.callback.call(this.controller, mutationEvent.record, dataDeps)
-                
-                if (oldItemMatch && !newItemMatch) {
-                    count = count - 1;
-                } else if (!oldItemMatch && newItemMatch) {
-                    count = count + 1;
-                }
+            // Get the old match status from state instead of recalculating
+            const oldItemMatch = await (this.state as any).isItemMatch.get(mutationEvent.oldRecord)
+            const newItemMatch = !!this.callback.call(this.controller, mutationEvent.record, dataDeps)
+            // Convert to boolean because database may store false as 0 or true as 1
+            const oldItemMatchBool = !!oldItemMatch
+            
+            if (oldItemMatchBool && !newItemMatch) {
+                count = count - 1;
+            } else if (!oldItemMatchBool && newItemMatch) {
+                count = count + 1;
             }
-            // 如果没有 callback，update 操作不影响计数
+            await (this.state as any).isItemMatch.set(mutationEvent.record, newItemMatch)
         }
         
         // 防止计数为负数

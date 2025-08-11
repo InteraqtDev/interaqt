@@ -34,6 +34,7 @@ export class GlobalEveryHandle implements DataBasedComputation {
         return {
             matchCount: new GlobalBoundState<number>(0),
             totalCount: new GlobalBoundState<number>(0),
+            isItemMatch: new RecordBoundState<boolean>(false, this.args.record.name!)
         }
     }
     
@@ -43,11 +44,20 @@ export class GlobalEveryHandle implements DataBasedComputation {
 
     async compute({main: records, ...dataDeps}: {main: any[], [key: string]: any}): Promise<boolean> {
         const totalCount = await this.state.totalCount.set(records.length)
-        const matchCount = await this.state.matchCount.set(records.filter(item => this.callback.call(this.controller, item, dataDeps)).length)
+        let matchCount = 0
+        
+        for (const item of records) {
+            const isMatch = this.callback.call(this.controller, item, dataDeps)
+            if (isMatch) {
+                matchCount++
+            }
+            await this.state.isItemMatch.set(item, isMatch)
+        }
+        
+        await this.state.matchCount.set(matchCount)
 
         return matchCount === totalCount
     }
-    // FIXME 要改为记录每个 item 是否 match 才行，因为 delete 事件中的 record 可能不完整。
     async incrementalCompute(lastValue: boolean, mutationEvent: EtityMutationEvent, record: any, dataDeps: {[key: string]: any}): Promise<boolean|ComputationResult> {
         // 注意要同时检测名字和 relatedAttribute 才能确定是不是自己的更新，因为可能有自己和自己的关联关系的 dataDep。
         if (mutationEvent.recordName !== (this.dataDeps.main as RecordsDataDep).source!.name || mutationEvent.relatedAttribute?.length) {
@@ -62,20 +72,27 @@ export class GlobalEveryHandle implements DataBasedComputation {
             if (newItemMatch === true) {
                 matchCount = await this.state!.matchCount.set(matchCount + 1)
             }
+            await this.state!.isItemMatch.set(mutationEvent.record, newItemMatch)
         } else if (mutationEvent.type === 'delete') {
             totalCount = await this.state!.totalCount.set(totalCount - 1)
-            const oldItemMatch = !!this.callback.call(this.controller, mutationEvent.oldRecord, dataDeps) 
-            if (oldItemMatch === true) {
+            // Get the old match status from state instead of recalculating
+            const oldItemMatch = await this.state!.isItemMatch.get(mutationEvent.record)
+            // Convert to boolean because database may store false as 0 or true as 1
+            if (!!oldItemMatch === true) {
                 matchCount = await this.state!.matchCount.set(matchCount - 1)
             }
         } else if (mutationEvent.type === 'update') {
-            const oldItemMatch = !!this.callback.call(this.controller, mutationEvent.oldRecord, dataDeps) 
-            const newItemMatch = !!this.callback.call(this.controller, mutationEvent.record, dataDeps) 
-            if (oldItemMatch === true && newItemMatch === false) {
+            // Get the old match status from state instead of recalculating
+            const oldItemMatch = await this.state!.isItemMatch.get(mutationEvent.oldRecord)
+            const newItemMatch = !!this.callback.call(this.controller, mutationEvent.record, dataDeps)
+            // Convert to boolean because database may store false as 0 or true as 1
+            const oldItemMatchBool = !!oldItemMatch
+            if (oldItemMatchBool === true && newItemMatch === false) {
                 matchCount = await this.state!.matchCount.set(matchCount - 1)
-            } else if (oldItemMatch === false && newItemMatch === true) {
+            } else if (oldItemMatchBool === false && newItemMatch === true) {
                 matchCount = await this.state!.matchCount.set(matchCount + 1)
             }
+            await this.state!.isItemMatch.set(mutationEvent.record, newItemMatch)
         }
 
         return matchCount === totalCount

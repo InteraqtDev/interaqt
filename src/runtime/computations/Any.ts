@@ -31,6 +31,7 @@ export class GlobalAnyHandle implements DataBasedComputation {
     createState() {
         return {
             matchCount: new GlobalBoundState<number>(0),
+            isItemMatch: new RecordBoundState<boolean>(false, this.args.record.name!)
         }
     }
     
@@ -39,8 +40,17 @@ export class GlobalAnyHandle implements DataBasedComputation {
     }
 
     async compute({main: records, ...dataDeps}: {main: any[], [key: string]: any}): Promise<boolean> {
-        // TODO deps
-        const matchCount = await this.state.matchCount.set(records.filter(item => this.callback.call(this.controller, item, dataDeps)).length)
+        let matchCount = 0
+        
+        for (const item of records) {
+            const isMatch = this.callback.call(this.controller, item, dataDeps)
+            if (isMatch) {
+                matchCount++
+            }
+            await this.state.isItemMatch.set(item, isMatch)
+        }
+        
+        await this.state.matchCount.set(matchCount)
 
         return matchCount>0
     }
@@ -51,34 +61,42 @@ export class GlobalAnyHandle implements DataBasedComputation {
             return ComputationResult.fullRecompute('mutationEvent.recordName not match')
         }
 
+
         let matchCount = await this.state!.matchCount.get()
         if (mutationEvent.type === 'create') {
             const newItemMatch = !!this.callback.call(this.controller, mutationEvent.record, dataDeps) 
             if (newItemMatch === true) {
                 matchCount = await this.state!.matchCount.set(matchCount + 1)
             }
+            await this.state!.isItemMatch.set(mutationEvent.record, newItemMatch)
         } else if (mutationEvent.type === 'delete') {
-            const oldItemMatch = !!this.callback.call(this.controller, mutationEvent.record, dataDeps) 
-            if (oldItemMatch === true) {
+            // Get the old match status from state instead of recalculating
+            const oldItemMatch = await this.state!.isItemMatch.get(mutationEvent.record)
+            // Convert to boolean because database may store false as 0 or true as 1
+            if (!!oldItemMatch === true) {
                 matchCount = await this.state!.matchCount.set(matchCount - 1)
             }
         } else if (mutationEvent.type === 'update') {
-            const oldItemMatch = !!this.callback.call(this.controller, mutationEvent.oldRecord, dataDeps) 
+            // Get the old match status from state instead of recalculating
+            const oldItemMatch = await this.state!.isItemMatch.get(mutationEvent.oldRecord)
             // 拉取全量的 new record 数据，因为可能关联关系有变化。
             const newRecord = await this.controller.system.storage.findOne(mutationEvent.recordName, MatchExp.atom({
                 key: 'id',
                 value: ['=', mutationEvent.record!.id]
             }), undefined, this.args.attributeQuery)
 
-            const newItemMatch = !!this.callback.call(this.controller, newRecord, dataDeps) 
-            if (oldItemMatch === true && newItemMatch === false) {
+            const newItemMatch = !!this.callback.call(this.controller, newRecord, dataDeps)
+            // Convert to boolean because database may store false as 0
+            const oldItemMatchBool = !!oldItemMatch
+            if (oldItemMatchBool === true && newItemMatch === false) {
                 matchCount = await this.state!.matchCount.set(matchCount - 1)
-            } else if (oldItemMatch === false && newItemMatch === true) {
+            } else if (oldItemMatchBool === false && newItemMatch === true) {
                 matchCount = await this.state!.matchCount.set(matchCount + 1)
             }
+            await this.state!.isItemMatch.set(newRecord, newItemMatch)
         }
 
-        return matchCount>0
+        return matchCount > 0
     }
 }
 

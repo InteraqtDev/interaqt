@@ -140,7 +140,7 @@ describe('Average computed handle', () => {
     await system.storage.create('Data', { value: undefined });
     
     const average = await system.storage.get(DICTIONARY_RECORD, 'dataAverage');
-    expect(average).closeTo(4.2, 1); // Only valid values (10 + 20) / 2
+    expect(average).toBeCloseTo(4.28, .1); // Only valid values (10 + 20) / 7 = 4.285714285714286
   });
 
   test('should handle empty collections', async () => {
@@ -437,7 +437,7 @@ describe('Average computed handle', () => {
     const m3 = await system.storage.create('Measurement', { value: null, isValid: false });
     
     let avg = await system.storage.get(DICTIONARY_RECORD, 'averageMeasurement');
-    expect(avg).toBe(100); // (100 + 200) / 3, null is ignored
+    expect(avg).toBe(100); // (100 + 200) / 3, null is considered as 0
     
     // Update null to valid value
     await system.storage.update('Measurement', BoolExp.atom({key: 'id', value: ['=', m3.id]}), { value: 300 });
