@@ -6,7 +6,7 @@ import { isRelation } from "./util.js";
 import { MatchExpressionData, MatchExp } from "./MatchExp.js";
 import { Entity, Property, Relation } from "@shared";
 import { BoolExp } from "@shared";
-import { MergedItemProcessor } from "./MergedItemProcessor.js";
+import { processMergedItems } from "./MergedItemProcessor.js";
 
 // Define the types we need
 
@@ -496,7 +496,7 @@ export class DBSetup {
      * 统一处理 merged entities 和 merged relations
      */
     private processMergedItems() {
-        const result = MergedItemProcessor.processMergedItems(
+        const result = processMergedItems(
             this.entities,
             this.relations,
         );
