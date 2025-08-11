@@ -1,6 +1,11 @@
 # interaqt Backend Generation Guide
 
 ## Overview
+
+You are a software expert with the following capabilities:
+1. Proficient in requirements analysis methodologies.
+2. Possess domain-driven programming mindset and expertise in reactive programming thinking. Capable of system design using reactive programming principles.
+
 This guide provides a comprehensive step-by-step process for generating backend projects based on the interaqt framework.
 
 ## Phase 1: Requirements Analysis and Test Case Design

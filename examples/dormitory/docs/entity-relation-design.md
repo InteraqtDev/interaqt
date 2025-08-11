@@ -1,206 +1,207 @@
-# 宿舍管理系统实体和关系设计
+# Entity and Relation Design
 
-## 实体设计
+## Overview
 
-### User (用户)
-**目的**: 系统中的所有用户，包括管理员、宿舍长和学生
-**属性**:
-- `id`: string (系统生成的唯一标识)
-- `name`: string (用户姓名)
-- `email`: string (邮箱地址，唯一)
-- `phone`: string (手机号码)
-- `role`: string (用户角色: admin/dormHead/student)
-- `status`: string (用户状态: active/suspended/expelled)
-- `createdAt`: number (创建时间戳)
-- `totalPenaltyPoints`: number (累计扣分，通过计算得出)
+本文档定义了宿舍管理系统的所有实体和关系，遵循interaqt框架的设计原则。
 
-### Dormitory (宿舍)
-**目的**: 宿舍楼宇信息
-**属性**:
-- `id`: string (宿舍唯一标识)
-- `name`: string (宿舍名称，如"A栋101")
-- `bedCount`: number (床位总数，4-6)
-- `availableBedCount`: number (可用床位数，通过计算得出)
-- `createdAt`: number (创建时间戳)
+## Entities
 
-### Bed (床位)
-**目的**: 宿舍内的具体床位
-**属性**:
-- `id`: string (床位唯一标识)
-- `bedNumber`: string (床位编号，如"床位1")
-- `status`: string (床位状态: available/occupied/maintenance)
-- `createdAt`: number (创建时间戳)
+### User
+- **Purpose**: 系统用户，包括管理员、宿舍长和普通学生
+- **Properties**:
+  - id: string (系统自动生成)
+  - name: string (用户姓名)
+  - email: string (用户邮箱，唯一标识)
+  - role: string (用户角色: admin/dormHead/student)
+  - status: string (用户状态: active/inactive/evicted，默认active)
+  - violationScore: number (累计违规分数，默认0)
+  - createdAt: number (创建时间戳)
+  - updatedAt: number (更新时间戳)
 
-### UserBedAssignment (用户床位分配)
-**目的**: 用户与床位的分配关系
-**属性**:
-- `id`: string (分配记录唯一标识)
-- `assignedAt`: number (分配时间戳)
-- `status`: string (分配状态: active/inactive)
+### Dormitory
+- **Purpose**: 宿舍房间
+- **Properties**:
+  - id: string (系统自动生成)
+  - name: string (宿舍名称，如"A栋301"，必须唯一)
+  - capacity: number (床位容量，4-6)
+  - status: string (宿舍状态: active/inactive，默认active)
+  - createdAt: number (创建时间戳)
+  - updatedAt: number (更新时间戳)
 
-### BehaviorRecord (行为记录)
-**目的**: 用户违规行为记录
-**属性**:
-- `id`: string (记录唯一标识)
-- `behaviorType`: string (违规类型: noise_violation/damage/hygiene/other)
-- `description`: string (违规描述)
-- `penaltyPoints`: number (扣分数值)
-- `recordedAt`: number (记录时间戳)
+### Bed
+- **Purpose**: 宿舍内的床位
+- **Properties**:
+  - id: string (系统自动生成)
+  - number: number (床位编号，1-6)
+  - status: string (床位状态: available/occupied，默认available)
+  - createdAt: number (创建时间戳)
+  - updatedAt: number (更新时间戳)
 
-### ExpulsionRequest (踢出申请)
-**目的**: 宿舍长申请踢出学生的请求
-**属性**:
-- `id`: string (申请唯一标识)
-- `reason`: string (申请理由)
-- `status`: string (申请状态: pending/approved/rejected)
-- `requestedAt`: number (申请时间戳)
-- `processedAt`: number (处理时间戳，可选)
-- `adminNotes`: string (管理员备注，可选)
+### ViolationRecord
+- **Purpose**: 用户的违规记录
+- **Properties**:
+  - id: string (系统自动生成)
+  - reason: string (违规原因描述)
+  - score: number (扣分值，1-10分)
+  - createdAt: number (记录时间戳)
 
-## 关系设计
+### EvictionRequest
+- **Purpose**: 宿舍长对违规用户的踢出申请
+- **Properties**:
+  - id: string (系统自动生成)
+  - reason: string (申请理由)
+  - status: string (申请状态: pending/approved/rejected，默认pending)
+  - createdAt: number (申请时间戳)
+  - processedAt: number (处理时间戳，可选)
+  - adminComment: string (管理员处理意见，可选)
 
-### UserDormitoryHeadRelation (用户-宿舍长关系)
-**类型**: n:1 (多个用户可以是宿舍长，但每个宿舍只有一个宿舍长)
-**目的**: 建立宿舍长与其管理宿舍的关系
-**源实体**: User (dormHead角色)
-**目标实体**: Dormitory
-**源属性**: `managedDormitory` (在User实体上创建此属性)
-**目标属性**: `dormHead` (在Dormitory实体上创建此属性)
-**关系属性**:
-- `assignedAt`: number (指定时间戳)
+## Relations
 
-**业务含义**: 宿舍长通过此关系管理特定宿舍，用户可以通过`user.managedDormitory`访问管理的宿舍，宿舍可以通过`dormitory.dormHead`访问宿舍长。
+### UserDormitoryRelation
+- **Type**: n:1 (多个用户对应一个宿舍)
+- **Purpose**: 用户被分配到的宿舍
+- **Source**: User
+- **Target**: Dormitory
+- **Source Property**: dormitory (在User实体上访问分配的宿舍)
+- **Target Property**: users (在Dormitory实体上访问所有居住用户)
+- **Properties**:
+  - assignedAt: number (分配时间戳)
+  - assignedBy: string (分配人ID)
 
-### DormitoryBedRelation (宿舍-床位关系)
-**类型**: 1:n (一个宿舍有多个床位)
-**目的**: 建立宿舍与其床位的关系
-**源实体**: Dormitory
-**目标实体**: Bed
-**源属性**: `beds` (在Dormitory实体上创建此属性)
-**目标属性**: `dormitory` (在Bed实体上创建此属性)
-**关系属性**: 无
+### UserBedRelation
+- **Type**: 1:1 (一个用户对应一个床位)
+- **Purpose**: 用户占用的具体床位
+- **Source**: User
+- **Target**: Bed
+- **Source Property**: bed (在User实体上访问占用的床位)
+- **Target Property**: occupant (在Bed实体上访问占用的用户)
+- **Properties**:
+  - assignedAt: number (分配时间戳)
 
-**业务含义**: 每个床位属于一个宿舍，宿舍可以通过`dormitory.beds`访问所有床位，床位可以通过`bed.dormitory`访问所属宿舍。
+### DormitoryBedsRelation
+- **Type**: 1:n (一个宿舍对应多个床位)
+- **Purpose**: 宿舍包含的所有床位
+- **Source**: Dormitory
+- **Target**: Bed
+- **Source Property**: beds (在Dormitory实体上访问所有床位)
+- **Target Property**: dormitory (在Bed实体上访问所属宿舍)
 
-### UserBedAssignmentRelation (用户-床位分配关系)
-**类型**: n:1 (多个分配记录对应一个用户，多个分配记录对应一个床位)
-**目的**: 建立用户与床位的分配关系
-**源实体**: UserBedAssignment
-**目标实体**: User
-**源属性**: `user` (在UserBedAssignment实体上)
-**目标属性**: `bedAssignments` (在User实体上)
-**关系属性**: 无
+### DormitoryDormHeadRelation
+- **Type**: 1:1 (一个宿舍对应一个宿舍长)
+- **Purpose**: 负责管理该宿舍的宿舍长
+- **Source**: Dormitory
+- **Target**: User
+- **Source Property**: dormHead (在Dormitory实体上访问宿舍长)
+- **Target Property**: managedDormitory (在User实体上访问管理的宿舍)
+- **Properties**:
+  - appointedAt: number (任命时间戳)
 
-### BedAssignmentBedRelation (床位分配-床位关系)
-**类型**: n:1 (多个分配记录对应一个床位)
-**目的**: 建立床位分配与床位的关系
-**源实体**: UserBedAssignment
-**目标实体**: Bed
-**源属性**: `bed` (在UserBedAssignment实体上)
-**目标属性**: `assignments` (在Bed实体上)
-**关系属性**: 无
+### UserViolationRelation
+- **Type**: 1:n (一个用户对应多个违规记录)
+- **Purpose**: 用户的所有违规记录
+- **Source**: User
+- **Target**: ViolationRecord
+- **Source Property**: violations (在User实体上访问所有违规记录)
+- **Target Property**: user (在ViolationRecord实体上访问违规用户)
 
-### UserBehaviorRecordRelation (用户-行为记录关系)
-**类型**: 1:n (一个用户有多个行为记录)
-**目的**: 建立用户与其行为记录的关系
-**源实体**: User
-**目标实体**: BehaviorRecord
-**源属性**: `behaviorRecords` (在User实体上)
-**目标属性**: `user` (在BehaviorRecord实体上)
-**关系属性**: 无
+### ViolationRecorderRelation
+- **Type**: n:1 (多个违规记录对应一个记录人)
+- **Purpose**: 记录违规的宿舍长
+- **Source**: ViolationRecord
+- **Target**: User
+- **Source Property**: recordedBy (在ViolationRecord实体上访问记录人)
+- **Target Property**: recordedViolations (在User实体上访问记录的所有违规)
 
-### BehaviorRecordRecorderRelation (行为记录-记录人关系)
-**类型**: n:1 (多个记录对应一个记录人)
-**目的**: 建立行为记录与记录人(宿舍长/管理员)的关系
-**源实体**: BehaviorRecord
-**目标实体**: User (记录人)
-**源属性**: `recorder` (在BehaviorRecord实体上)
-**目标属性**: `recordedBehaviors` (在User实体上)
-**关系属性**: 无
+### EvictionRequestUserRelation
+- **Type**: n:1 (多个申请对应一个用户)
+- **Purpose**: 被申请踢出的用户
+- **Source**: EvictionRequest
+- **Target**: User
+- **Source Property**: targetUser (在EvictionRequest实体上访问目标用户)
+- **Target Property**: evictionRequests (在User实体上访问所有踢出申请)
 
-### ExpulsionRequestRequesterRelation (踢出申请-申请人关系)
-**类型**: n:1 (多个申请对应一个申请人)
-**目的**: 建立踢出申请与申请人(宿舍长)的关系
-**源实体**: ExpulsionRequest
-**目标实体**: User (申请人)
-**源属性**: `requester` (在ExpulsionRequest实体上)
-**目标属性**: `expulsionRequests` (在User实体上)
-**关系属性**: 无
+### EvictionRequestDormHeadRelation
+- **Type**: n:1 (多个申请对应一个宿舍长)
+- **Purpose**: 发起申请的宿舍长
+- **Source**: EvictionRequest
+- **Target**: User
+- **Source Property**: requestedBy (在EvictionRequest实体上访问申请人)
+- **Target Property**: submittedEvictions (在User实体上访问提交的所有申请)
 
-### ExpulsionRequestTargetRelation (踢出申请-目标用户关系)
-**类型**: n:1 (多个申请对应一个目标用户)
-**目的**: 建立踢出申请与目标用户(学生)的关系
-**源实体**: ExpulsionRequest
-**目标实体**: User (目标用户)
-**源属性**: `targetUser` (在ExpulsionRequest实体上)
-**目标属性**: `expulsionRequestsAgainst` (在User实体上)
-**关系属性**: 无
+### EvictionRequestAdminRelation
+- **Type**: n:1 (多个申请对应一个管理员)
+- **Purpose**: 处理申请的管理员
+- **Source**: EvictionRequest
+- **Target**: User
+- **Source Property**: processedBy (在EvictionRequest实体上访问处理人)
+- **Target Property**: processedEvictions (在User实体上访问处理的所有申请)
 
-## 数据流图
+## Data Flow Diagram
 
 ```
-User (Student) ──1:n──> UserBedAssignment ──n:1──> Bed ──n:1──> Dormitory
-    │                                                               │
-    │                                                            1:n│
-    │                                                               │
-    └──1:n──> BehaviorRecord                                 User (DormHead)
-    │
-    │
-    └──1:n──> ExpulsionRequest (as target)
-              │
-              └──n:1──> User (DormHead as requester)
+┌─────────────────────────────────────────────┐
+│                  System Flow                 │
+├─────────────────────────────────────────────┤
+│                                             │
+│  User ──1:1──> Bed                         │
+│   │                                         │
+│   ├──n:1──> Dormitory ──1:n──> Beds       │
+│   │            │                            │
+│   │            └──1:1──> DormHead (User)   │
+│   │                                         │
+│   ├──1:n──> ViolationRecords               │
+│   │            │                            │
+│   │            └──n:1──> Recorder (User)   │
+│   │                                         │
+│   └──1:n──> EvictionRequests               │
+│                │                            │
+│                ├──n:1──> DormHead (User)   │
+│                │                            │
+│                └──n:1──> Admin (User)      │
+│                                             │
+└─────────────────────────────────────────────┘
 ```
 
-## 关键设计决策
+## Design Rationale
 
-### 🔴 NO ID引用字段
-**正确做法**: 所有实体间的关系都通过Relation定义，实体属性中不包含任何ID引用字段。
+### 为什么不在实体中包含引用ID字段？
 
-**错误示例**:
-```typescript
-// ❌ 错误：实体中包含ID引用
-const User = Entity.create({
-  properties: [
-    Property.create({ name: 'dormitoryId', type: 'string' }), // 不要这样!
-    Property.create({ name: 'bedId', type: 'string' })       // 不要这样!
-  ]
-})
-```
+遵循interaqt框架的最佳实践，我们不在实体属性中包含任何引用其他实体的ID字段（如User中不包含dormitoryId）。所有实体间的关联都通过Relation定义来实现。这种设计有以下优势：
 
-**正确示例**:
-```typescript
-// ✅ 正确：通过Relation建立关系
-const UserBedAssignmentRelation = Relation.create({
-  source: UserBedAssignment,
-  target: User,
-  sourceProperty: 'user',    // 创建 assignment.user
-  targetProperty: 'bedAssignments', // 创建 user.bedAssignments
-  type: 'n:1'
-})
-```
+1. **清晰的关系管理**：所有关系都在Relation定义中明确声明
+2. **避免数据不一致**：框架自动维护关系的完整性
+3. **更好的响应式支持**：关系变化可以触发相应的计算
+4. **灵活的查询**：通过关系属性可以方便地访问相关实体
 
-### 分配关系设计
-选择使用独立的`UserBedAssignment`实体而不是直接的User-Bed关系，原因:
-1. 需要记录分配的时间戳和状态
-2. 支持历史记录查询 (用户可能被重新分配)
-3. 便于实现复杂的分配规则和状态管理
+### 关系属性设计
 
-### 计算属性设计
-以下属性将通过计算实现:
-- `User.totalPenaltyPoints`: 累计所有BehaviorRecord的penaltyPoints
-- `Dormitory.availableBedCount`: 统计状态为'available'的床位数量
+每个关系都定义了源和目标属性名，使得代码更具可读性：
+- `user.dormitory` - 用户访问自己的宿舍
+- `dormitory.users` - 宿舍访问所有居住用户
+- `user.bed` - 用户访问自己的床位
+- `bed.occupant` - 床位访问占用的用户
 
-### 过滤实体潜在需求
-可能需要的过滤实体:
-- `ActiveUser`: 过滤status='active'的用户
-- `AvailableBed`: 过滤status='available'的床位
-- `PendingExpulsionRequest`: 过滤status='pending'的踢出申请
+### 状态管理设计
 
-## 验证清单
-- [ ] 所有实体名称使用PascalCase单数形式
-- [ ] 所有属性使用正确的类型
-- [ ] 所有defaultValue使用函数形式
-- [ ] 关系定义中没有name属性(自动生成)
-- [ ] 关系类型使用正确格式('1:1', 'n:1'等)
-- [ ] 实体属性中没有ID引用字段
-- [ ] 所有实体间关系都通过Relation定义
+不同实体有不同的状态字段，用于业务流程控制：
+- User.status: active/inactive/evicted
+- Bed.status: available/occupied
+- EvictionRequest.status: pending/approved/rejected
+- Dormitory.status: active/inactive
+
+这些状态将通过StateMachine进行管理，确保状态转换的正确性。
+
+## Implementation Notes
+
+1. **ID生成**：所有实体的ID都由框架自动生成，不需要手动指定
+2. **时间戳**：使用number类型存储Unix时间戳（秒），便于计算和比较
+3. **默认值**：所有默认值必须使用函数形式，如`defaultValue: () => 'active'`
+4. **唯一性约束**：User.email和Dormitory.name需要在业务逻辑中保证唯一性
+5. **关系类型**：严格使用'1:1'、'1:n'、'n:1'、'n:n'格式，不要使用其他格式
+
+## Next Steps
+
+基于这个设计文档，下一步将：
+1. 设计所有的Interactions（交互）
+2. 分析需要的Computations（计算）
+3. 生成实际的TypeScript代码实现

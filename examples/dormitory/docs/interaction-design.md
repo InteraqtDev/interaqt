@@ -1,302 +1,293 @@
-# 宿舍管理系统交互设计
+# Interaction Design
 
-## 交互设计原则
+## Overview
 
-### Stage 1 设计重点
-- **仅包含核心业务逻辑**：基础CRUD操作、状态转换、关系管理
-- **无权限检查**：先实现功能，后续添加权限控制
-- **无业务规则验证**：专注核心功能，后续添加复杂验证
-- **完整载荷定义**：确保所有必要参数都已定义
+本文档定义了宿舍管理系统的所有Interactions（交互），按照渐进式实施策略设计：
+- Stage 1：实现核心业务逻辑，不含权限和业务规则验证
+- Stage 2：添加权限控制和业务规则验证
 
-### Stage 2 扩展项目
-- **权限检查**：基于角色的访问控制
-- **业务规则验证**：容量限制、状态检查、时间限制等
-- **复杂数据验证**：除基础字段要求外的复杂验证
+## Core Interactions
 
-## 用户管理交互
+### 1. CreateDormitory - 创建宿舍
 
-### CreateUser
-**目的**: 创建新用户账号
-**载荷字段**:
-- `name`: string (必需) - 用户姓名
-- `email`: string (必需) - 邮箱地址
-- `phone`: string (必需) - 手机号码
-- `role`: string (必需) - 用户角色 (admin/dormHead/student)
+**Purpose**: 创建新的宿舍并自动生成对应数量的床位
 
-**效果**:
-- 创建新User实体
-- 设置初始状态为active
+**Payload**:
+- `name` (string, required): 宿舍名称，如"A栋301"
+- `capacity` (number, required): 床位容量
+
+**Effects**:
+- 创建新的Dormitory实体
+- 自动创建capacity数量的Bed实体（编号1到capacity）
+- 建立DormitoryBedsRelation关系
+- 所有床位初始状态为'available'
+- 宿舍初始状态为'active'
+
+**Stage 2 - Permissions**: 
+- 只有admin角色可以执行
+
+**Stage 2 - Business Rules**:
+- capacity必须在4-6之间
+- name必须唯一（不能与现有宿舍重名）
+
+---
+
+### 2. AssignUserToDormitory - 分配用户到宿舍
+
+**Purpose**: 将用户分配到指定宿舍的空床位
+
+**Payload**:
+- `userId` (string, required): 要分配的用户ID
+- `dormitoryId` (string, required): 目标宿舍ID
+
+**Effects**:
+- 建立UserDormitoryRelation关系
+- 自动选择第一个available状态的床位
+- 建立UserBedRelation关系
+- 更新选中床位状态为'occupied'
+- 记录分配时间和分配人
+
+**Stage 2 - Permissions**: 
+- 只有admin角色可以执行
+
+**Stage 2 - Business Rules**:
+- 用户不能已有宿舍（检查是否存在UserDormitoryRelation）
+- 宿舍必须有空床位（至少有一个床位status='available'）
+- 用户状态不能是'evicted'
+
+---
+
+### 3. AssignDormHead - 指定宿舍长
+
+**Purpose**: 指定某用户为特定宿舍的宿舍长
+
+**Payload**:
+- `userId` (string, required): 要指定为宿舍长的用户ID
+- `dormitoryId` (string, required): 目标宿舍ID
+
+**Effects**:
+- 更新用户的role为'dormHead'
+- 建立DormitoryDormHeadRelation关系
+- 记录任命时间戳
+
+**Stage 2 - Permissions**: 
+- 只有admin角色可以执行
+
+**Stage 2 - Business Rules**:
+- 用户必须是该宿舍的成员（存在UserDormitoryRelation）
+- 宿舍不能已有宿舍长（不存在DormitoryDormHeadRelation）
+
+---
+
+### 4. RecordViolation - 记录违规
+
+**Purpose**: 宿舍长记录本宿舍成员的违规行为
+
+**Payload**:
+- `userId` (string, required): 违规用户ID
+- `reason` (string, required): 违规原因描述
+- `score` (number, required): 扣分值
+
+**Effects**:
+- 创建新的ViolationRecord实体
+- 建立UserViolationRelation关系
+- 建立ViolationRecorderRelation关系（记录人为当前用户）
+- 累加用户的violationScore（使用StateMachine更新）
 - 记录创建时间戳
 
-**Stage 2 - 权限**: 仅管理员可创建
-**Stage 2 - 业务规则**: 邮箱唯一性检查
+**Stage 2 - Permissions**: 
+- 只有dormHead角色可以执行
 
-### AssignDormHead
-**目的**: 指定用户为宿舍长
-**载荷字段**:
-- `userId`: string (必需) - 目标用户ID
-- `dormitoryId`: string (必需) - 宿舍ID
+**Stage 2 - Business Rules**:
+- 只能记录本宿舍成员的违规（目标用户和记录人在同一宿舍）
+- 不能记录自己的违规（userId不能等于当前用户ID）
+- score必须在1-10之间
 
-**效果**:
-- 用户角色更新为dormHead
-- 创建UserDormitoryHeadRelation关系
-- 记录指定时间戳
+---
 
-**Stage 2 - 权限**: 仅管理员可操作
-**Stage 2 - 业务规则**: 
-- 目标用户必须存在
-- 宿舍必须存在且未分配宿舍长
+### 5. RequestEviction - 申请踢出
 
-### GetUserInfo
-**目的**: 获取用户信息
-**载荷字段**:
-- `userId`: string (可选) - 目标用户ID，不提供则返回当前用户信息
+**Purpose**: 宿舍长申请踢出违规严重的成员
 
-**效果**:
-- 返回用户基本信息
-- 包含相关的宿舍和分配信息
+**Payload**:
+- `userId` (string, required): 要踢出的用户ID
+- `reason` (string, required): 申请理由
 
-**Stage 2 - 权限**: 
-- Admin: 所有用户
-- DormHead: 本宿舍学生
-- Student: 仅本人信息
+**Effects**:
+- 创建新的EvictionRequest实体，状态为'pending'
+- 建立EvictionRequestUserRelation关系（目标用户）
+- 建立EvictionRequestDormHeadRelation关系（申请人为当前用户）
+- 记录申请时间戳
 
-## 宿舍管理交互
+**Stage 2 - Permissions**: 
+- 只有dormHead角色可以执行
 
-### CreateDormitory
-**目的**: 创建新宿舍
-**载荷字段**:
-- `name`: string (必需) - 宿舍名称
-- `bedCount`: number (必需) - 床位数量
+**Stage 2 - Business Rules**:
+- 只能申请踢出本宿舍成员
+- 不能申请踢出自己
+- 用户违规分数必须≥30
 
-**效果**:
-- 创建新Dormitory实体
-- 自动创建对应数量的Bed实体
-- 所有床位初始状态为available
+---
 
-**Stage 2 - 权限**: 仅管理员可创建
-**Stage 2 - 业务规则**: 床位数必须在4-6之间
+### 6. ApproveEviction - 批准踢出
 
-### AssignUserToBed
-**目的**: 分配用户到床位
-**载荷字段**:
-- `userId`: string (必需) - 用户ID
-- `bedId`: string (必需) - 床位ID
+**Purpose**: 管理员批准踢出申请
 
-**效果**:
-- 创建UserBedAssignment实体
-- 更新床位状态为occupied
-- 更新宿舍可用床位数
+**Payload**:
+- `requestId` (string, required): 踢出申请ID
+- `comment` (string, optional): 管理员处理意见
 
-**Stage 2 - 权限**: 仅管理员可操作
-**Stage 2 - 业务规则**:
-- 用户只能分配到一个床位
-- 床位必须可用
-- 宿舍不能超过容量
+**Effects**:
+- 更新EvictionRequest状态为'approved'
+- 记录管理员处理意见
+- 记录处理时间戳
+- 建立EvictionRequestAdminRelation关系（处理人为当前用户）
+- 更新目标用户状态为'evicted'
+- 解除UserDormitoryRelation关系
+- 解除UserBedRelation关系
+- 更新床位状态为'available'
 
-### GetDormitoryInfo
-**目的**: 获取宿舍信息
-**载荷字段**:
-- `dormitoryId`: string (必需) - 宿舍ID
+**Stage 2 - Permissions**: 
+- 只有admin角色可以执行
 
-**效果**:
-- 返回宿舍基本信息
-- 包含床位和住户信息
+**Stage 2 - Business Rules**:
+- 申请必须是'pending'状态
 
-**Stage 2 - 权限**:
-- Admin: 所有宿舍
-- DormHead: 所管理宿舍
-- Student: 所居住宿舍
+---
 
-### GetDormitoryList
-**目的**: 获取宿舍列表
-**载荷字段**:
-- `status`: string (可选) - 过滤状态
+### 7. RejectEviction - 拒绝踢出
 
-**效果**:
-- 返回宿舍列表
-- 包含床位占用情况
+**Purpose**: 管理员拒绝踢出申请
 
-**Stage 2 - 权限**: 基于角色的数据过滤
+**Payload**:
+- `requestId` (string, required): 踢出申请ID
+- `comment` (string, optional): 管理员处理意见
 
-## 行为管理交互
+**Effects**:
+- 更新EvictionRequest状态为'rejected'
+- 记录管理员处理意见
+- 记录处理时间戳
+- 建立EvictionRequestAdminRelation关系（处理人为当前用户）
+- 用户保持原状态不变
 
-### RecordBehavior
-**目的**: 记录用户违规行为
-**载荷字段**:
-- `userId`: string (必需) - 目标用户ID
-- `behaviorType`: string (必需) - 违规类型
-- `description`: string (必需) - 违规描述
-- `penaltyPoints`: number (必需) - 扣分数值
+**Stage 2 - Permissions**: 
+- 只有admin角色可以执行
 
-**效果**:
-- 创建BehaviorRecord实体
-- 自动累计用户总扣分
-- 记录时间和记录人信息
+**Stage 2 - Business Rules**:
+- 申请必须是'pending'状态
 
-**Stage 2 - 权限**:
-- Admin: 所有学生
-- DormHead: 本宿舍学生
+---
 
-**Stage 2 - 业务规则**: 扣分值必须为正数
+## Query Interactions (Optional - Lower Priority)
 
-### GetBehaviorRecords
-**目的**: 查看行为记录
-**载荷字段**:
-- `userId`: string (可选) - 目标用户ID
-- `startDate`: number (可选) - 开始时间戳
-- `endDate`: number (可选) - 结束时间戳
+### GetDormitoryInfo - 查询宿舍信息
 
-**效果**:
-- 返回行为记录列表
-- 包含扣分统计
+**Purpose**: 查询宿舍详细信息
 
-**Stage 2 - 权限**:
-- Admin: 所有记录
-- DormHead: 本宿舍学生记录
-- Student: 本人记录
+**Payload**:
+- `dormitoryId` (string, required): 宿舍ID
 
-## 踢出管理交互
+**Effects**: 只读操作，返回宿舍信息及相关统计
 
-### CreateExpulsionRequest
-**目的**: 申请踢出学生
-**载荷字段**:
-- `targetUserId`: string (必需) - 目标学生ID
-- `reason`: string (必需) - 申请理由
+---
 
-**效果**:
-- 创建ExpulsionRequest实体
-- 设置状态为pending
-- 记录申请时间
+### GetUserInfo - 查询用户信息
 
-**Stage 2 - 权限**: 宿舍长针对本宿舍学生
-**Stage 2 - 业务规则**:
-- 目标学生扣分达到阈值(100分)
-- 同一学生不能有pending状态的申请
+**Purpose**: 查询用户详细信息
 
-### ProcessExpulsionRequest
-**目的**: 处理踢出申请
-**载荷字段**:
-- `requestId`: string (必需) - 申请ID
-- `decision`: string (必需) - 决定 (approved/rejected)
-- `adminNotes`: string (可选) - 管理员备注
+**Payload**:
+- `userId` (string, required): 用户ID
 
-**效果**:
-- 更新申请状态
-- 如果批准：
-  - 用户状态变为expelled
-  - 床位分配状态变为inactive
-  - 床位状态变为available
-- 记录处理时间
+**Effects**: 只读操作，返回用户信息及相关记录
 
-**Stage 2 - 权限**: 仅管理员可处理
-**Stage 2 - 业务规则**: 申请状态必须为pending
+---
 
-### GetExpulsionRequests
-**目的**: 查看踢出申请
-**载荷字段**:
-- `status`: string (可选) - 过滤状态
+## Implementation Strategy
 
-**效果**:
-- 返回申请列表
-- 包含相关用户和申请人信息
+### Stage 1 - Core Business Logic
 
-**Stage 2 - 权限**:
-- Admin: 所有申请
-- DormHead: 本人提交的申请
+在Stage 1阶段，所有Interactions都实现基本功能，不包含任何权限检查或业务规则验证。这个阶段的目标是：
 
-## 实体引用交互
+1. 确保所有基本的CRUD操作正常工作
+2. 验证实体关系正确建立
+3. 测试计算属性正确更新
+4. 确认状态管理正常运行
 
-以下交互涉及实体引用，需要使用`isRef: true`和`base`属性:
+**测试策略**：
+- 使用正确的角色（admin、dormHead、student）
+- 使用有效的数据（符合未来业务规则的数据）
+- 确保所有核心功能测试通过（TC001-TC010）
 
-### UpdateUserBedAssignment
-**目的**: 更新床位分配状态
-**载荷字段**:
-- `assignment`: UserBedAssignment (必需, isRef: true) - 分配记录引用
-- `status`: string (必需) - 新状态
+### Stage 2 - Add Permissions and Business Rules
 
-### UpdateBedStatus
-**目的**: 更新床位状态
-**载荷字段**:
-- `bed`: Bed (必需, isRef: true) - 床位引用
-- `status`: string (必需) - 新状态
+在Stage 1完全通过后，添加：
 
-## 查询交互模式
+1. **权限控制**（通过condition）：
+   - 角色检查
+   - 权限范围验证
 
-### 列表查询模式
-```typescript
-export const GetDormitoryList = Interaction.create({
-  name: 'GetDormitoryList',
-  action: Action.create({ name: 'getDormitoryList' }),
-  payload: Payload.create({
-    items: [
-      PayloadItem.create({ name: 'status' }),
-      PayloadItem.create({ name: 'limit' }),
-      PayloadItem.create({ name: 'offset' })
-    ]
-  })
-});
+2. **业务规则**（通过condition）：
+   - 数值范围验证
+   - 唯一性检查
+   - 状态前置条件
+   - 关系约束
+
+**测试策略**：
+- Stage 1的测试应该仍然通过
+- 添加权限拒绝测试（TC011-TC015）
+- 添加业务规则违反测试（TC016-TC027）
+
+## Data Flow Examples
+
+### Example 1: 完整的用户入住流程
+
+1. **CreateDormitory** → 创建"A栋301"宿舍（4个床位）
+2. **AssignUserToDormitory** → 分配student1到宿舍
+3. **AssignUserToDormitory** → 分配student2到宿舍
+4. **AssignDormHead** → 指定student1为宿舍长
+
+### Example 2: 违规处理流程
+
+1. **RecordViolation** → 记录student2违规（5分）
+2. **RecordViolation** → 再次记录违规（10分）
+3. **RecordViolation** → 第三次违规（10分）
+4. **RecordViolation** → 第四次违规（8分，累计33分）
+5. **RequestEviction** → 申请踢出student2
+6. **ApproveEviction** → 批准踢出申请
+
+## Error Handling
+
+### Error Types
+
+1. **Permission Denied**: 用户角色不符合要求
+2. **Business Rule Violation**: 违反业务逻辑约束
+3. **Validation Error**: 输入数据不合法
+4. **State Error**: 实体状态不允许操作
+5. **Reference Error**: 引用的实体不存在
+
+### Error Response Format
+
+```javascript
+{
+  error: {
+    type: 'PERMISSION_DENIED',
+    message: '只有管理员可以创建宿舍'
+  }
+}
 ```
 
-### 详情查询模式
-```typescript
-export const GetUserDetail = Interaction.create({
-  name: 'GetUserDetail',
-  action: Action.create({ name: 'getUserDetail' }),
-  payload: Payload.create({
-    items: [
-      PayloadItem.create({ 
-        name: 'user',
-        base: User,
-        isRef: true,
-        required: true 
-      })
-    ]
-  })
-});
-```
+## Important Notes
 
-## 完整交互列表
+1. **不要在Interaction中包含操作逻辑**：所有业务逻辑通过Computations实现
+2. **Action只是标识符**：不包含任何execute或handler方法
+3. **用户通过执行时传入**：不是Interaction的属性
+4. **Stage 1优先**：先确保核心功能工作，再添加约束
+5. **测试数据要合理**：即使Stage 1不验证，也要使用符合规则的数据
 
-### 核心业务逻辑交互 (Stage 1)
-1. **CreateUser** - 创建用户
-2. **AssignDormHead** - 指定宿舍长
-3. **CreateDormitory** - 创建宿舍
-4. **AssignUserToBed** - 分配床位
-5. **RecordBehavior** - 记录违规行为
-6. **CreateExpulsionRequest** - 申请踢出
-7. **ProcessExpulsionRequest** - 处理踢出申请
+## Next Steps
 
-### 查询交互 (Stage 1)
-8. **GetUserInfo** - 获取用户信息
-9. **GetDormitoryInfo** - 获取宿舍信息
-10. **GetDormitoryList** - 获取宿舍列表
-11. **GetBehaviorRecords** - 查看行为记录
-12. **GetExpulsionRequests** - 查看踢出申请
-
-### 更新交互 (Stage 1)
-13. **UpdateUserBedAssignment** - 更新床位分配
-14. **UpdateBedStatus** - 更新床位状态
-
-## 设计验证清单
-
-- [ ] 所有用户操作都有对应交互
-- [ ] Action仅包含name标识符
-- [ ] 载荷项目有适当的required标记
-- [ ] 集合使用isCollection: true
-- [ ] 实体引用使用isRef和base
-- [ ] 未包含权限或约束条件
-- [ ] 载荷字段与测试用例匹配
-- [ ] TypeScript编译通过
-
-## Stage 2 扩展规划
-
-### 权限条件
-- 基于用户角色的访问控制
-- 基于关系的数据范围限制
-- 操作权限的细粒度控制
-
-### 业务规则条件
-- 容量和数量限制
-- 状态和流程约束
-- 时间和业务逻辑验证
+基于这个设计文档，下一步将：
+1. 分析需要的Computations（计算）
+2. 生成实际的TypeScript代码实现
+3. 实现Stage 1测试
+4. 添加Stage 2的权限和规则

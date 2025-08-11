@@ -1,19 +1,206 @@
+/**
+ * 宿舍管理系统后端实现
+ * 
+ * 本文件采用单文件方式实现所有后端逻辑，避免循环依赖问题
+ * 实施策略：Stage 1 - 核心业务逻辑（无权限和业务规则验证）
+ */
+
 import {
-  Entity, Property, Relation, 
-  Interaction, Action, Payload, PayloadItem,
-  Transform, StateMachine, StateNode, StateTransfer, 
-  Count, Summation,
-  InteractionEventEntity, Controller, MonoSystem, PGLiteDB,
-  Activity, Transfer,
-  MatchExp,
-  BoolExp
+  Entity,
+  Property,
+  Relation,
+  Interaction,
+  Action,
+  Payload,
+  PayloadItem,
+  Controller,
+  Count,
+  Summation,
+  Transform,
+  StateMachine,
+  StateNode,
+  StateTransfer,
+  InteractionEventEntity,
+  MatchExp
 } from 'interaqt'
 
-// ====================
-// 1. ENTITIES
-// ====================
+// ==========================================
+// 1. StateNode 声明（必须在使用前声明）
+// ==========================================
 
-// User Entity
+// User状态节点
+const userStudentState = StateNode.create({ name: 'student' })
+const userDormHeadState = StateNode.create({ 
+  name: 'dormHead',
+  computeValue: () => 'dormHead'
+})
+
+const userActiveState = StateNode.create({ name: 'active' })
+const userEvictedState = StateNode.create({ 
+  name: 'evicted',
+  computeValue: () => 'evicted'
+})
+
+// Bed状态节点
+const bedAvailableState = StateNode.create({ name: 'available' })
+const bedOccupiedState = StateNode.create({ 
+  name: 'occupied',
+  computeValue: () => 'occupied'
+})
+
+// EvictionRequest状态节点
+const evictionPendingState = StateNode.create({ name: 'pending' })
+const evictionApprovedState = StateNode.create({ 
+  name: 'approved',
+  computeValue: () => 'approved'
+})
+const evictionRejectedState = StateNode.create({ 
+  name: 'rejected',
+  computeValue: () => 'rejected'
+})
+
+// Relation状态节点（用于可删除的关系）
+const relationNotExistsState = StateNode.create({ 
+  name: 'notExists',
+  computeValue: () => null  // 返回null表示删除关系
+})
+
+const relationExistsState = StateNode.create({ 
+  name: 'exists',
+  computeValue: () => ({})  // 关系存在
+})
+
+// ==========================================
+// 2. 交互定义（需要先定义，供后续引用）
+// ==========================================
+
+export const CreateDormitory = Interaction.create({
+  name: 'CreateDormitory',
+  action: Action.create({ name: 'createDormitory' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({ 
+        name: 'name', 
+        required: true 
+      }),
+      PayloadItem.create({ 
+        name: 'capacity', 
+        required: true 
+      })
+    ]
+  })
+})
+
+export const AssignUserToDormitory = Interaction.create({
+  name: 'AssignUserToDormitory',
+  action: Action.create({ name: 'assignUserToDormitory' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({ 
+        name: 'userId', 
+        required: true 
+      }),
+      PayloadItem.create({ 
+        name: 'dormitoryId', 
+        required: true 
+      })
+    ]
+  })
+})
+
+export const AssignDormHead = Interaction.create({
+  name: 'AssignDormHead',
+  action: Action.create({ name: 'assignDormHead' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({ 
+        name: 'userId', 
+        required: true 
+      }),
+      PayloadItem.create({ 
+        name: 'dormitoryId', 
+        required: true 
+      })
+    ]
+  })
+})
+
+export const RecordViolation = Interaction.create({
+  name: 'RecordViolation',
+  action: Action.create({ name: 'recordViolation' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({ 
+        name: 'userId', 
+        required: true 
+      }),
+      PayloadItem.create({ 
+        name: 'reason', 
+        required: true 
+      }),
+      PayloadItem.create({ 
+        name: 'score', 
+        required: true 
+      })
+    ]
+  })
+})
+
+export const RequestEviction = Interaction.create({
+  name: 'RequestEviction',
+  action: Action.create({ name: 'requestEviction' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({ 
+        name: 'userId', 
+        required: true 
+      }),
+      PayloadItem.create({ 
+        name: 'reason', 
+        required: true 
+      })
+    ]
+  })
+})
+
+export const ApproveEviction = Interaction.create({
+  name: 'ApproveEviction',
+  action: Action.create({ name: 'approveEviction' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({ 
+        name: 'requestId', 
+        required: true 
+      }),
+      PayloadItem.create({ 
+        name: 'comment', 
+        required: false 
+      })
+    ]
+  })
+})
+
+export const RejectEviction = Interaction.create({
+  name: 'RejectEviction',
+  action: Action.create({ name: 'rejectEviction' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({ 
+        name: 'requestId', 
+        required: true 
+      }),
+      PayloadItem.create({ 
+        name: 'comment', 
+        required: false 
+      })
+    ]
+  })
+})
+
+// ==========================================
+// 3. 实体定义
+// ==========================================
+
 export const User = Entity.create({
   name: 'User',
   properties: [
@@ -26,49 +213,72 @@ export const User = Entity.create({
       type: 'string' 
     }),
     Property.create({ 
-      name: 'phone', 
-      type: 'string' 
-    }),
-    Property.create({ 
       name: 'role', 
       type: 'string',
-      defaultValue: () => 'student'
+      // defaultValue移除，因为有computation
+      computation: StateMachine.create({
+        states: [userStudentState, userDormHeadState],
+        defaultState: userStudentState,
+        transfers: [
+          StateTransfer.create({
+            trigger: AssignDormHead,
+            current: userStudentState,
+            next: userDormHeadState,
+            computeTarget: (event) => ({ id: event.payload.userId })
+          })
+        ]
+      })
     }),
     Property.create({ 
       name: 'status', 
       type: 'string',
-      defaultValue: () => 'active'
+      // defaultValue移除，因为有computation
+      computation: StateMachine.create({
+        states: [userActiveState, userEvictedState],
+        defaultState: userActiveState,
+        transfers: [
+          // StateTransfer将在后面配置，避免setup问题
+        ]
+      })
+    }),
+    Property.create({ 
+      name: 'violationScore', 
+      type: 'number',
+      defaultValue: () => 0
+      // computation将在关系定义后添加
     }),
     Property.create({ 
       name: 'createdAt', 
       type: 'number',
-      defaultValue: () => Math.floor(Date.now() / 1000)
+      defaultValue: () => Math.floor(Date.now()/1000)
     }),
-    Property.create({
-      name: 'totalPenaltyPoints',
+    Property.create({ 
+      name: 'updatedAt', 
+      type: 'number',
+      defaultValue: () => Math.floor(Date.now()/1000)
+    }),
+    // 计算属性
+    Property.create({ 
+      name: 'violationCount', 
       type: 'number',
       defaultValue: () => 0
+      // computation将在关系定义后添加
+    }),
+    Property.create({ 
+      name: 'canBeEvicted', 
+      type: 'boolean',
+      defaultValue: () => false
+      // computed: function() { return this.violationScore >= 30 }
+    }),
+    Property.create({ 
+      name: 'isAssigned', 
+      type: 'boolean',
+      defaultValue: () => false
+      // computed: function() { return !!this.dormitory }
     })
-  ],
-  computation: Transform.create({
-    record: InteractionEventEntity,
-    callback: (event) => {
-      if (event.interactionName === 'CreateUser') {
-        return {
-          name: event.payload.name,
-          email: event.payload.email,
-          phone: event.payload.phone,
-          role: event.payload.role,
-          status: 'active',
-          createdAt: Math.floor(Date.now() / 1000)
-        }
-      }
-      return null
-    }
-  })
+  ]
 })
 
-// Dormitory Entity  
 export const Dormitory = Entity.create({
   name: 'Dormitory',
   properties: [
@@ -77,18 +287,42 @@ export const Dormitory = Entity.create({
       type: 'string' 
     }),
     Property.create({ 
-      name: 'bedCount', 
+      name: 'capacity', 
       type: 'number' 
     }),
-    Property.create({
-      name: 'availableBedCount',
-      type: 'number',
-      defaultValue: () => 0
+    Property.create({ 
+      name: 'status', 
+      type: 'string',
+      defaultValue: () => 'active'
     }),
     Property.create({ 
       name: 'createdAt', 
       type: 'number',
-      defaultValue: () => Math.floor(Date.now() / 1000)
+      defaultValue: () => Math.floor(Date.now()/1000)
+    }),
+    Property.create({ 
+      name: 'updatedAt', 
+      type: 'number',
+      defaultValue: () => Math.floor(Date.now()/1000)
+    }),
+    // 计算属性
+    Property.create({ 
+      name: 'occupiedBeds', 
+      type: 'number',
+      defaultValue: () => 0
+      // computation将在关系定义后添加
+    }),
+    Property.create({ 
+      name: 'availableBeds', 
+      type: 'number',
+      defaultValue: () => 0
+      // computed: function() { return this.capacity - this.occupiedBeds }
+    }),
+    Property.create({ 
+      name: 'occupancyRate', 
+      type: 'number',
+      defaultValue: () => 0
+      // computed: function() { return (this.occupiedBeds / this.capacity) * 100 }
     })
   ],
   computation: Transform.create({
@@ -97,74 +331,7 @@ export const Dormitory = Entity.create({
       if (event.interactionName === 'CreateDormitory') {
         return {
           name: event.payload.name,
-          bedCount: event.payload.bedCount,
-          createdAt: Math.floor(Date.now() / 1000)
-        }
-      }
-      return null
-    }
-  })
-})
-
-// Bed Entity
-export const Bed = Entity.create({
-  name: 'Bed',
-  properties: [
-    Property.create({ 
-      name: 'bedNumber', 
-      type: 'string' 
-    }),
-    Property.create({ 
-      name: 'status', 
-      type: 'string',
-      defaultValue: () => 'available'
-    }),
-    Property.create({ 
-      name: 'createdAt', 
-      type: 'number',
-      defaultValue: () => Math.floor(Date.now() / 1000)
-    })
-  ],
-  computation: Transform.create({
-    record: InteractionEventEntity,
-    callback: (event) => {
-      if (event.interactionName === 'CreateDormitory') {
-        const beds = []
-        for (let i = 1; i <= event.payload.bedCount; i++) {
-          beds.push({
-            bedNumber: `床位${i}`,
-            status: 'available',
-            createdAt: Math.floor(Date.now() / 1000)
-          })
-        }
-        return beds // Return array to create multiple beds
-      }
-      return null
-    }
-  })
-})
-
-// UserBedAssignment Entity
-export const UserBedAssignment = Entity.create({
-  name: 'UserBedAssignment',
-  properties: [
-    Property.create({ 
-      name: 'assignedAt', 
-      type: 'number',
-      defaultValue: () => Math.floor(Date.now() / 1000)
-    }),
-    Property.create({ 
-      name: 'status', 
-      type: 'string',
-      defaultValue: () => 'active'
-    })
-  ],
-  computation: Transform.create({
-    record: InteractionEventEntity,
-    callback: (event) => {
-      if (event.interactionName === 'AssignUserToBed') {
-        return {
-          assignedAt: Math.floor(Date.now() / 1000),
+          capacity: event.payload.capacity,
           status: 'active'
         }
       }
@@ -173,37 +340,65 @@ export const UserBedAssignment = Entity.create({
   })
 })
 
-// BehaviorRecord Entity
-export const BehaviorRecord = Entity.create({
-  name: 'BehaviorRecord',
+export const Bed = Entity.create({
+  name: 'Bed',
   properties: [
     Property.create({ 
-      name: 'behaviorType', 
-      type: 'string' 
-    }),
-    Property.create({ 
-      name: 'description', 
-      type: 'string' 
-    }),
-    Property.create({ 
-      name: 'penaltyPoints', 
+      name: 'number', 
       type: 'number' 
     }),
     Property.create({ 
-      name: 'recordedAt', 
+      name: 'status', 
+      type: 'string',
+      // defaultValue移除，因为有computation
+      computation: StateMachine.create({
+        states: [bedAvailableState, bedOccupiedState],
+        defaultState: bedAvailableState,
+        transfers: [
+          // StateTransfer将在后阶段配置
+        ]
+      })
+    }),
+    Property.create({ 
+      name: 'createdAt', 
       type: 'number',
-      defaultValue: () => Math.floor(Date.now() / 1000)
+      defaultValue: () => Math.floor(Date.now()/1000)
+    }),
+    Property.create({ 
+      name: 'updatedAt', 
+      type: 'number',
+      defaultValue: () => Math.floor(Date.now()/1000)
+    })
+  ]
+  // Bed不再通过Transform从Dormitory创建，改为在CreateDormitory中处理
+})
+
+export const ViolationRecord = Entity.create({
+  name: 'ViolationRecord',
+  properties: [
+    Property.create({ 
+      name: 'reason', 
+      type: 'string' 
+    }),
+    Property.create({ 
+      name: 'score', 
+      type: 'number' 
+    }),
+    Property.create({ 
+      name: 'createdAt', 
+      type: 'number',
+      defaultValue: () => Math.floor(Date.now()/1000)
     })
   ],
   computation: Transform.create({
     record: InteractionEventEntity,
     callback: (event) => {
-      if (event.interactionName === 'RecordBehavior') {
+      if (event.interactionName === 'RecordViolation') {
         return {
-          behaviorType: event.payload.behaviorType,
-          description: event.payload.description,
-          penaltyPoints: event.payload.penaltyPoints,
-          recordedAt: Math.floor(Date.now() / 1000)
+          reason: event.payload.reason,
+          score: event.payload.score,
+          user: { id: event.payload.userId },
+          recordedBy: event.user
         }
       }
       return null
@@ -211,9 +406,8 @@ export const BehaviorRecord = Entity.create({
   })
 })
 
-// ExpulsionRequest Entity
-export const ExpulsionRequest = Entity.create({
-  name: 'ExpulsionRequest',
+export const EvictionRequest = Entity.create({
+  name: 'EvictionRequest',
   properties: [
     Property.create({ 
       name: 'reason', 
@@ -222,30 +416,51 @@ export const ExpulsionRequest = Entity.create({
     Property.create({ 
       name: 'status', 
       type: 'string',
-      defaultValue: () => 'pending'
+      // defaultValue移除，因为有computation
+      computation: StateMachine.create({
+        states: [evictionPendingState, evictionApprovedState, evictionRejectedState],
+        defaultState: evictionPendingState,
+        transfers: [
+          StateTransfer.create({
+            trigger: ApproveEviction,
+            current: evictionPendingState,
+            next: evictionApprovedState,
+            computeTarget: (event) => ({ id: event.payload.requestId })
+          }),
+          StateTransfer.create({
+            trigger: RejectEviction,
+            current: evictionPendingState,
+            next: evictionRejectedState,
+            computeTarget: (event) => ({ id: event.payload.requestId })
+          })
+        ]
+      })
     }),
     Property.create({ 
-      name: 'requestedAt', 
+      name: 'createdAt', 
       type: 'number',
-      defaultValue: () => Math.floor(Date.now() / 1000)
+      defaultValue: () => Math.floor(Date.now()/1000)
     }),
     Property.create({ 
       name: 'processedAt', 
-      type: 'number'
+      type: 'number',
+      defaultValue: () => 0
     }),
     Property.create({ 
-      name: 'adminNotes', 
-      type: 'string'
+      name: 'adminComment', 
+      type: 'string',
+      defaultValue: () => ''
     })
   ],
   computation: Transform.create({
     record: InteractionEventEntity,
     callback: (event) => {
-      if (event.interactionName === 'CreateExpulsionRequest') {
+      if (event.interactionName === 'RequestEviction') {
         return {
           reason: event.payload.reason,
           status: 'pending',
-          requestedAt: Math.floor(Date.now() / 1000)
+          targetUser: { id: event.payload.userId },
+          requestedBy: event.user
         }
       }
       return null
@@ -253,28 +468,61 @@ export const ExpulsionRequest = Entity.create({
   })
 })
 
-// ====================
-// 2. RELATIONS  
-// ====================
+// ==========================================
+// 4. 关系定义
+// ==========================================
 
-// User-Dormitory Head Relation
-export const UserDormitoryHeadRelation = Relation.create({
+export const UserDormitoryRelation = Relation.create({
   source: User,
-  sourceProperty: 'managedDormitory',
+  sourceProperty: 'dormitory',
   target: Dormitory,
-  targetProperty: 'dormHead',
+  targetProperty: 'users',
   type: 'n:1',
   properties: [
     Property.create({ 
       name: 'assignedAt', 
       type: 'number',
-      defaultValue: () => Math.floor(Date.now() / 1000)
+      defaultValue: () => Math.floor(Date.now()/1000)
+    }),
+    Property.create({ 
+      name: 'assignedBy', 
+      type: 'string',
+      defaultValue: () => ''
     })
-  ]
+  ],
+  computation: Transform.create({
+    record: InteractionEventEntity,
+    callback: (event) => {
+      if (event.interactionName === 'AssignUserToDormitory') {
+        return {
+          source: { id: event.payload.userId },
+          target: { id: event.payload.dormitoryId },
+          assignedAt: Math.floor(Date.now()/1000),
+          assignedBy: event.user.id
+        }
+      }
+      return null
+    }
+  })
 })
 
-// Dormitory-Bed Relation
-export const DormitoryBedRelation = Relation.create({
+export const UserBedRelation = Relation.create({
+  source: User,
+  sourceProperty: 'bed',
+  target: Bed,
+  targetProperty: 'occupant',
+  type: '1:1',
+  properties: [
+    Property.create({ 
+      name: 'assignedAt', 
+      type: 'number',
+      defaultValue: () => Math.floor(Date.now()/1000)
+    })
+  ]
+  // Stage 1先不实现自动分配床位，在测试中手动创建关系
+})
+
+export const DormitoryBedsRelation = Relation.create({
   source: Dormitory,
   sourceProperty: 'beds',
   target: Bed,
@@ -282,221 +530,151 @@ export const DormitoryBedRelation = Relation.create({
   type: '1:n'
 })
 
-// UserBedAssignment-User Relation
-export const UserBedAssignmentUserRelation = Relation.create({
-  source: UserBedAssignment,
-  sourceProperty: 'user',
+export const DormitoryDormHeadRelation = Relation.create({
+  source: Dormitory,
+  sourceProperty: 'dormHead',
   target: User,
-  targetProperty: 'bedAssignments',
-  type: 'n:1'
+  targetProperty: 'managedDormitory',
+  type: '1:1',
+  properties: [
+    Property.create({ 
+      name: 'appointedAt', 
+      type: 'number',
+      defaultValue: () => Math.floor(Date.now()/1000)
+    })
+  ],
+  computation: Transform.create({
+    record: InteractionEventEntity,
+    callback: (event) => {
+      if (event.interactionName === 'AssignDormHead') {
+        return {
+          source: { id: event.payload.dormitoryId },
+          target: { id: event.payload.userId },
+          appointedAt: Math.floor(Date.now()/1000)
+        }
+      }
+      return null
+    }
+  })
 })
 
-// UserBedAssignment-Bed Relation  
-export const UserBedAssignmentBedRelation = Relation.create({
-  source: UserBedAssignment,
-  sourceProperty: 'bed',
-  target: Bed,
-  targetProperty: 'assignments',
-  type: 'n:1'
-})
-
-// User-BehaviorRecord Relation
-export const UserBehaviorRecordRelation = Relation.create({
+export const UserViolationRelation = Relation.create({
   source: User,
-  sourceProperty: 'behaviorRecords',
-  target: BehaviorRecord,
+  sourceProperty: 'violations',
+  target: ViolationRecord,
   targetProperty: 'user',
   type: '1:n'
 })
 
-// BehaviorRecord-Recorder Relation
-export const BehaviorRecordRecorderRelation = Relation.create({
-  source: BehaviorRecord,
-  sourceProperty: 'recorder',
+export const ViolationRecorderRelation = Relation.create({
+  source: ViolationRecord,
+  sourceProperty: 'recordedBy',
   target: User,
-  targetProperty: 'recordedBehaviors',
+  targetProperty: 'recordedViolations',
   type: 'n:1'
 })
 
-// ExpulsionRequest-Requester Relation
-export const ExpulsionRequestRequesterRelation = Relation.create({
-  source: ExpulsionRequest,
-  sourceProperty: 'requester',
-  target: User,
-  targetProperty: 'expulsionRequests',
-  type: 'n:1'
-})
-
-// ExpulsionRequest-Target Relation
-export const ExpulsionRequestTargetRelation = Relation.create({
-  source: ExpulsionRequest,
+export const EvictionRequestUserRelation = Relation.create({
+  source: EvictionRequest,
   sourceProperty: 'targetUser',
   target: User,
-  targetProperty: 'expulsionRequestsAgainst',
+  targetProperty: 'evictionRequests',
   type: 'n:1'
 })
 
-// ====================
-// 3. INTERACTIONS
-// ====================
+export const EvictionRequestDormHeadRelation = Relation.create({
+  source: EvictionRequest,
+  sourceProperty: 'requestedBy',
+  target: User,
+  targetProperty: 'submittedEvictions',
+  type: 'n:1'
+})
 
-// CreateUser Interaction
-export const CreateUser = Interaction.create({
-  name: 'CreateUser',
-  action: Action.create({ name: 'createUser' }),
-  payload: Payload.create({
-    items: [
-      PayloadItem.create({ name: 'name', required: true }),
-      PayloadItem.create({ name: 'email', required: true }),
-      PayloadItem.create({ name: 'phone', required: true }),
-      PayloadItem.create({ name: 'role', required: true })
-    ]
+export const EvictionRequestAdminRelation = Relation.create({
+  source: EvictionRequest,
+  sourceProperty: 'processedBy',
+  target: User,
+  targetProperty: 'processedEvictions',
+  type: 'n:1',
+  computation: Transform.create({
+    record: InteractionEventEntity,
+    callback: (event) => {
+      if (event.interactionName === 'ApproveEviction' || event.interactionName === 'RejectEviction') {
+        return {
+          source: { id: event.payload.requestId },
+          target: event.user
+        }
+      }
+      return null
+    }
   })
 })
 
-// AssignDormHead Interaction
-export const AssignDormHead = Interaction.create({
-  name: 'AssignDormHead',
-  action: Action.create({ name: 'assignDormHead' }),
-  payload: Payload.create({
-    items: [
-      PayloadItem.create({ name: 'userId', required: true }),
-      PayloadItem.create({ name: 'dormitoryId', required: true })
-    ]
-  })
-})
+// ==========================================
+// 5. 配置计算属性（关系定义后）
+// ==========================================
 
-// CreateDormitory Interaction
-export const CreateDormitory = Interaction.create({
-  name: 'CreateDormitory',
-  action: Action.create({ name: 'createDormitory' }),
-  payload: Payload.create({
-    items: [
-      PayloadItem.create({ name: 'name', required: true }),
-      PayloadItem.create({ name: 'bedCount', required: true })
-    ]
-  })
-})
+// Stage 1暂时注释掉复杂计算，先让基础功能工作
+// TODO: Stage 2时恢复这些计算
 
-// AssignUserToBed Interaction
-export const AssignUserToBed = Interaction.create({
-  name: 'AssignUserToBed',
-  action: Action.create({ name: 'assignUserToBed' }),
-  payload: Payload.create({
-    items: [
-      PayloadItem.create({ name: 'userId', required: true }),
-      PayloadItem.create({ name: 'bedId', required: true })
-    ]
-  })
-})
+// // 为User.violationScore添加计算
+// const violationScoreProperty = User.properties.find(p => p.name === 'violationScore')
+// if (violationScoreProperty) {
+//   violationScoreProperty.computation = Summation.create({
+//     record: UserViolationRelation,
+//     direction: 'source',
+//     attributeQuery: [['target', { attributeQuery: ['score'] }]]
+//   })
+// }
 
-// RecordBehavior Interaction
-export const RecordBehavior = Interaction.create({
-  name: 'RecordBehavior',
-  action: Action.create({ name: 'recordBehavior' }),
-  payload: Payload.create({
-    items: [
-      PayloadItem.create({ name: 'userId', required: true }),
-      PayloadItem.create({ name: 'behaviorType', required: true }),
-      PayloadItem.create({ name: 'description', required: true }),
-      PayloadItem.create({ name: 'penaltyPoints', required: true })
-    ]
-  })
-})
+// // 为User.violationCount添加计算
+// const violationCountProperty = User.properties.find(p => p.name === 'violationCount')
+// if (violationCountProperty) {
+//   violationCountProperty.computation = Count.create({
+//     record: UserViolationRelation,
+//     direction: 'source'
+//   })
+// }
 
-// CreateExpulsionRequest Interaction
-export const CreateExpulsionRequest = Interaction.create({
-  name: 'CreateExpulsionRequest',
-  action: Action.create({ name: 'createExpulsionRequest' }),
-  payload: Payload.create({
-    items: [
-      PayloadItem.create({ name: 'targetUserId', required: true }),
-      PayloadItem.create({ name: 'reason', required: true })
-    ]
-  })
-})
+// // 为Dormitory.occupiedBeds添加计算
+// const occupiedBedsProperty = Dormitory.properties.find(p => p.name === 'occupiedBeds')
+// if (occupiedBedsProperty) {
+//   occupiedBedsProperty.computation = Count.create({
+//     record: DormitoryBedsRelation,
+//     direction: 'source',
+//     callback: (bed) => bed.status === 'occupied'
+//   })
+// }
 
-// ProcessExpulsionRequest Interaction
-export const ProcessExpulsionRequest = Interaction.create({
-  name: 'ProcessExpulsionRequest',
-  action: Action.create({ name: 'processExpulsionRequest' }),
-  payload: Payload.create({
-    items: [
-      PayloadItem.create({ name: 'requestId', required: true }),
-      PayloadItem.create({ name: 'decision', required: true }),
-      PayloadItem.create({ name: 'adminNotes' })
-    ]
-  })
-})
-
-// ====================
-// 4. ACTIVITIES
-// ====================
-
-export const DormitoryManagementActivity = Activity.create({
-  name: 'DormitoryManagement',
-  interactions: [
-    CreateUser,
-    AssignDormHead,
-    CreateDormitory,
-    AssignUserToBed,
-    RecordBehavior,
-    CreateExpulsionRequest,
-    ProcessExpulsionRequest
-  ]
-})
-
-// ====================
-// 5. SYSTEM SETUP
-// ====================
+// ==========================================
+// 6. 导出配置
+// ==========================================
 
 export const entities = [
   User,
   Dormitory,
   Bed,
-  UserBedAssignment,
-  BehaviorRecord,
-  ExpulsionRequest
+  ViolationRecord,
+  EvictionRequest
 ]
-
 export const relations = [
-  UserDormitoryHeadRelation,
-  DormitoryBedRelation,
-  UserBedAssignmentUserRelation,
-  UserBedAssignmentBedRelation,
-  UserBehaviorRecordRelation,
-  BehaviorRecordRecorderRelation,
-  ExpulsionRequestRequesterRelation,
-  ExpulsionRequestTargetRelation
+  UserDormitoryRelation,
+  UserBedRelation,
+  DormitoryBedsRelation,
+  DormitoryDormHeadRelation,
+  UserViolationRelation,
+  ViolationRecorderRelation,
+  EvictionRequestUserRelation,
+  EvictionRequestDormHeadRelation,
+  EvictionRequestAdminRelation
 ]
-
 export const interactions = [
-  CreateUser,
-  AssignDormHead,
   CreateDormitory,
-  AssignUserToBed,
-  RecordBehavior,
-  CreateExpulsionRequest,
-  ProcessExpulsionRequest
+  AssignUserToDormitory,
+  AssignDormHead,
+  RecordViolation,
+  RequestEviction,
+  ApproveEviction,
+  RejectEviction
 ]
-
-export const activities = [] // No activities for now - focusing on basic interactions
-
-export const dicts = []
-
-export async function createDormitoryManagementSystem() {
-  const system = new MonoSystem(new PGLiteDB())
-  
-  const controller = new Controller({
-    system,
-    entities,
-    relations,
-    activities,
-    interactions,
-    dict: dicts
-  })
-
-  await controller.setup(true)
-
-  return { system, controller }
-}
+export const computations = []
