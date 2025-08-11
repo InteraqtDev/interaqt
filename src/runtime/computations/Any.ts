@@ -64,7 +64,13 @@ export class GlobalAnyHandle implements DataBasedComputation {
             }
         } else if (mutationEvent.type === 'update') {
             const oldItemMatch = !!this.callback.call(this.controller, mutationEvent.oldRecord, dataDeps) 
-            const newItemMatch = !!this.callback.call(this.controller, mutationEvent.record, dataDeps) 
+            // 拉取全量的 new record 数据，因为可能关联关系有变化。
+            const newRecord = await this.controller.system.storage.findOne(mutationEvent.recordName, MatchExp.atom({
+                key: 'id',
+                value: ['=', mutationEvent.record!.id]
+            }), undefined, this.args.attributeQuery)
+
+            const newItemMatch = !!this.callback.call(this.controller, newRecord, dataDeps) 
             if (oldItemMatch === true && newItemMatch === false) {
                 matchCount = await this.state!.matchCount.set(matchCount - 1)
             } else if (oldItemMatch === false && newItemMatch === true) {

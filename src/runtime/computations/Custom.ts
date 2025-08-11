@@ -24,7 +24,11 @@ abstract class BaseCustomComputationHandle implements DataBasedComputation {
   createStateCallback?: Function
   getDefaultValueCallback?: Function
   asyncReturnCallback?: Function
-  
+
+  incrementalCompute?: (...args: any[]) => Promise<ComputationResult|any>
+  incrementalPatchCompute?: (...args: any[]) => Promise<ComputationResult|ComputationResultPatch|ComputationResultPatch[]|undefined>
+  asyncReturn?: (...args: any[]) => Promise<ComputationResult|any>
+
   constructor(public controller: Controller, public args: CustomInstance, public dataContext: DataContext) {
     // 设置 useLastValue
     this.useLastValue = args.useLastValue !== undefined ? args.useLastValue : true;
@@ -34,16 +38,59 @@ abstract class BaseCustomComputationHandle implements DataBasedComputation {
       this.dataDeps = args.dataDeps;
     }
     
+
+    // CAUTION 下面一定要采用这种写法，因为 Scheduler 中是通过实例上有没有相应方法来决定如何更新数据的。
+
     // 保存回调函数引用
     if (args.compute) {
       this.computeCallback = args.compute;
+      this.compute = async (...args: any[]): Promise<ComputationResult|any> => {
+        if (this.computeCallback) {
+          const [dataDeps, record] = args;
+          const context = {
+            controller: this.controller,
+            state: this.state,
+            getState: (key: string) => this.state[key]
+          };
+          return await this.computeCallback.call(context, dataDeps, record);
+        }
+      }
     }
+
     if (args.incrementalCompute) {
       this.incrementalComputeCallback = args.incrementalCompute;
+      this.incrementalCompute = async (...args: any[]): Promise<ComputationResult|any> => {
+        if (this.incrementalComputeCallback) {
+          // 传递 lastValue, mutationEvent 等参数
+          const [lastValue, mutationEvent, record, dataDeps] = args;
+          const context = {
+            controller: this.controller,
+            state: this.state,
+            getState: (key: string) => this.state[key]
+          };
+          return await this.incrementalComputeCallback.call(context, lastValue, mutationEvent, record, dataDeps);
+        }
+        // 如果没有定义增量计算，回退到全量计算
+        return ComputationResult.fullRecompute('No incrementalCompute defined');
+      }
+      this.incrementalComputeCallback = args.incrementalCompute;
     }
+
     if (args.incrementalPatchCompute) {
       this.incrementalPatchComputeCallback = args.incrementalPatchCompute;
+      this.incrementalPatchCompute = async (...args: any[]): Promise<ComputationResult|ComputationResultPatch|ComputationResultPatch[]|undefined> => {
+        if (this.incrementalPatchComputeCallback) {
+          const [lastValue, mutationEvent, record, dataDeps] = args;
+          const context = {
+            controller: this.controller,
+            state: this.state,
+            getState: (key: string) => this.state[key]
+          };
+          return await this.incrementalPatchComputeCallback.call(context, lastValue, mutationEvent, record, dataDeps);
+        }
+      }
     }
+
     if (args.createState) {
       this.createStateCallback = args.createState;
     }
@@ -52,6 +99,17 @@ abstract class BaseCustomComputationHandle implements DataBasedComputation {
     }
     if (args.asyncReturn) {
       this.asyncReturnCallback = args.asyncReturn;
+      this.asyncReturn = async (...args: any[]): Promise<ComputationResult|any> => {
+        if (this.asyncReturnCallback) {
+          const [asyncResult, dataDeps, record] = args;
+          const context = {
+            controller: this.controller,
+            state: this.state,
+            getState: (key: string) => this.state[key]
+          };
+          return await this.asyncReturnCallback.call(context, asyncResult, dataDeps, record);
+        }
+      }
     }
     
     // 如果提供了 createState，调用它来初始化 state
@@ -100,46 +158,6 @@ abstract class BaseCustomComputationHandle implements DataBasedComputation {
     return ComputationResult.skip();
   }
   
-  async incrementalCompute(...args: any[]): Promise<ComputationResult|any> {
-    if (this.incrementalComputeCallback) {
-      // 传递 lastValue, mutationEvent 等参数
-      const [lastValue, mutationEvent, record, dataDeps] = args;
-      const context = {
-        controller: this.controller,
-        state: this.state,
-        getState: (key: string) => this.state[key]
-      };
-      return await this.incrementalComputeCallback.call(context, lastValue, mutationEvent, record, dataDeps);
-    }
-    // 如果没有定义增量计算，回退到全量计算
-    return ComputationResult.fullRecompute('No incrementalCompute defined');
-  }
-  
-  async incrementalPatchCompute(...args: any[]): Promise<ComputationResult|ComputationResultPatch|ComputationResultPatch[]|undefined> {
-    if (this.incrementalPatchComputeCallback) {
-      const [lastValue, mutationEvent, record, dataDeps] = args;
-      const context = {
-        controller: this.controller,
-        state: this.state,
-        getState: (key: string) => this.state[key]
-      };
-      return await this.incrementalPatchComputeCallback.call(context, lastValue, mutationEvent, record, dataDeps);
-    }
-    return undefined;
-  }
-  
-  async asyncReturn(...args: any[]): Promise<ComputationResult|any> {
-    if (this.asyncReturnCallback) {
-      const [asyncResult, dataDeps, record] = args;
-      const context = {
-        controller: this.controller,
-        state: this.state,
-        getState: (key: string) => this.state[key]
-      };
-      return await this.asyncReturnCallback.call(context, asyncResult, dataDeps, record);
-    }
-    return ComputationResult.skip();
-  }
 }
 
 // Create specific handle classes for each context type

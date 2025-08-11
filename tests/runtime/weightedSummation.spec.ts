@@ -298,6 +298,182 @@ describe('WeightedSummation computed handle', () => {
     expect(netBalance).toBe(50);
   });
 
+  test('should calculate weighted summation for merged entity correctly', async () => {
+    // Create input entities for merged entity
+    const domesticSaleEntity = Entity.create({
+      name: 'DomesticSale',
+      properties: [
+        Property.create({name: 'productName', type: 'string'}),
+        Property.create({name: 'quantity', type: 'number'}),
+        Property.create({name: 'unitPrice', type: 'number'}),
+        Property.create({name: 'region', type: 'string', defaultValue: () => 'domestic'}),
+        Property.create({name: 'taxRate', type: 'number', defaultValue: () => 0.08})
+      ]
+    });
+
+    const internationalSaleEntity = Entity.create({
+      name: 'InternationalSale',
+      properties: [
+        Property.create({name: 'productName', type: 'string'}),
+        Property.create({name: 'quantity', type: 'number'}),
+        Property.create({name: 'unitPrice', type: 'number'}),
+        Property.create({name: 'country', type: 'string'}),
+        Property.create({name: 'region', type: 'string', defaultValue: () => 'international'}),
+        Property.create({name: 'taxRate', type: 'number', defaultValue: () => 0})
+      ]
+    });
+
+    const onlineSaleEntity = Entity.create({
+      name: 'OnlineSale',
+      properties: [
+        Property.create({name: 'productName', type: 'string'}),
+        Property.create({name: 'quantity', type: 'number'}),
+        Property.create({name: 'unitPrice', type: 'number'}),
+        Property.create({name: 'platformFee', type: 'number'}),
+        Property.create({name: 'region', type: 'string', defaultValue: () => 'online'}),
+        Property.create({name: 'taxRate', type: 'number', defaultValue: () => 0.05})
+      ]
+    });
+
+    // Create merged entity: Sale (combining all sale types)
+    const saleEntity = Entity.create({
+      name: 'Sale',
+      inputEntities: [domesticSaleEntity, internationalSaleEntity, onlineSaleEntity]
+    });
+
+    const entities = [domesticSaleEntity, internationalSaleEntity, onlineSaleEntity, saleEntity];
+
+    // Create dictionary items with weighted summation computations
+    const dictionary = [
+      Dictionary.create({
+        name: 'totalRevenue',
+        type: 'number',
+        collection: false,
+        computation: WeightedSummation.create({
+          record: saleEntity,
+          attributeQuery: ['quantity', 'unitPrice'],
+          callback: (sale: any) => {
+            return {
+              weight: sale.quantity,
+              value: sale.unitPrice
+            };
+          }
+        })
+      }),
+
+      Dictionary.create({
+        name: 'totalTaxRevenue',
+        type: 'number',
+        collection: false,
+        computation: WeightedSummation.create({
+          record: saleEntity,
+          attributeQuery: ['quantity', 'unitPrice', 'taxRate'],
+          callback: (sale: any) => {
+            const totalPrice = sale.quantity * sale.unitPrice;
+            return {
+              weight: sale.taxRate,
+              value: totalPrice
+            };
+          }
+        })
+      })
+    ];
+
+    // Setup system and controller
+    const system = new MonoSystem();
+    system.conceptClass = KlassByName;
+    const controller = new Controller({
+      system: system,
+      entities: entities,
+      dict: dictionary,
+      relations: [],
+      activities: [],
+      interactions: []
+    });
+    await controller.setup(true);
+
+    // Initial values should be 0
+    const initialRevenue = await system.storage.get(DICTIONARY_RECORD, 'totalRevenue');
+    expect(initialRevenue).toBe(0);
+
+    const initialTax = await system.storage.get(DICTIONARY_RECORD, 'totalTaxRevenue');
+    expect(initialTax).toBe(0);
+
+    // Create sales through different input entities
+    const domesticSale1 = await system.storage.create('DomesticSale', {
+      productName: 'Product A',
+      quantity: 10,
+      unitPrice: 100
+    });
+
+    // Revenue: 10 * 100 = 1000
+    const revenue1 = await system.storage.get(DICTIONARY_RECORD, 'totalRevenue');
+    expect(revenue1).toBe(1000);
+
+    // Tax: 1000 * 0.08 = 80
+    const tax1 = await system.storage.get(DICTIONARY_RECORD, 'totalTaxRevenue');
+    expect(tax1).toBe(80);
+
+    // Add international sale
+    const internationalSale1 = await system.storage.create('InternationalSale', {
+      productName: 'Product B',
+      quantity: 5,
+      unitPrice: 200,
+      country: 'Canada'
+    });
+
+    // Revenue: 1000 + (5 * 200) = 2000
+    const revenue2 = await system.storage.get(DICTIONARY_RECORD, 'totalRevenue');
+    expect(revenue2).toBe(2000);
+
+    // Tax: 80 + (1000 * 0) = 80 (international has 0 tax)
+    const tax2 = await system.storage.get(DICTIONARY_RECORD, 'totalTaxRevenue');
+    expect(tax2).toBe(80);
+
+    // Add online sale
+    const onlineSale1 = await system.storage.create('OnlineSale', {
+      productName: 'Product C',
+      quantity: 20,
+      unitPrice: 50,
+      platformFee: 15
+    });
+
+    // Revenue: 2000 + (20 * 50) = 3000
+    const revenue3 = await system.storage.get(DICTIONARY_RECORD, 'totalRevenue');
+    expect(revenue3).toBe(3000);
+
+    // Tax: 80 + (1000 * 0.05) = 130
+    const tax3 = await system.storage.get(DICTIONARY_RECORD, 'totalTaxRevenue');
+    expect(tax3).toBe(130);
+
+    // Update a sale quantity
+    await system.storage.update('DomesticSale',
+      MatchExp.atom({key: 'id', value: ['=', domesticSale1.id]}),
+      {quantity: 15}
+    );
+
+    // Revenue: (15 * 100) + (5 * 200) + (20 * 50) = 3500
+    const revenue4 = await system.storage.get(DICTIONARY_RECORD, 'totalRevenue');
+    expect(revenue4).toBe(3500);
+
+    // Tax: (1500 * 0.08) + (1000 * 0) + (1000 * 0.05) = 120 + 0 + 50 = 170
+    const tax4 = await system.storage.get(DICTIONARY_RECORD, 'totalTaxRevenue');
+    expect(tax4).toBe(170);
+
+    // Delete an online sale
+    await system.storage.delete('OnlineSale',
+      MatchExp.atom({key: 'id', value: ['=', onlineSale1.id]})
+    );
+
+    // Revenue: (15 * 100) + (5 * 200) = 2500
+    const revenue5 = await system.storage.get(DICTIONARY_RECORD, 'totalRevenue');
+    expect(revenue5).toBe(2500);
+
+    // Tax: (1500 * 0.08) + (1000 * 0) = 120
+    const tax5 = await system.storage.get(DICTIONARY_RECORD, 'totalTaxRevenue');
+    expect(tax5).toBe(120);
+  });
+
   test('should work with merged relation in property level computation', async () => {
     // Define entities
     const storeEntity = Entity.create({
