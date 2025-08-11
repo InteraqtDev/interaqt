@@ -11,7 +11,7 @@ import {
     SystemLogger,
     SystemLogType
 } from "./System.js";
-import { createClass, Property, EntityInstance, RelationInstance, Entity, Relation } from "@shared";
+import { createClass, Property, EntityInstance, RelationInstance, Entity, Relation, RefContainer } from "@shared";
 import {
     DBSetup,
     EntityQueryHandle,
@@ -183,43 +183,26 @@ export class MonoSystem implements System {
     }
     
     setup(originalEntities: EntityInstance[], originalRelations: RelationInstance[], states: ComputationState[], install = false){
-        const originalEntityToClonedEntity = new Map<EntityInstance, EntityInstance>()
-        const entities = originalEntities.map(entity => {
-            const clonedEntity = Entity.clone(entity, true)
-            originalEntityToClonedEntity.set(entity, clonedEntity)
-            return clonedEntity
-        })
-        const originalRelationToClonedRelation = new Map<RelationInstance, RelationInstance>()
-        const relations = originalRelations.map(relation => {
-            const clonedRelation = Relation.clone(relation, true)
-            originalRelationToClonedRelation.set(relation, clonedRelation)
-            return clonedRelation
-        })
+        // Use RefContainer to handle cloning and reference updates
+        const container = new RefContainer(originalEntities, originalRelations);
         
-        // 处理 filtered entity 和 filtered relation
-        for(let entity of entities) {
-            if (entity.baseEntity) {
-                entity.baseEntity = originalEntityToClonedEntity.get(entity.baseEntity as EntityInstance)!
-            }
-        }
-        for(let relation of relations) {
-            if (relation.source) {
-                relation.source = originalEntityToClonedEntity.get(relation.source as EntityInstance) || originalRelationToClonedRelation.get(relation.source as RelationInstance)!
-            }
-            if (relation.target) {
-                relation.target = originalEntityToClonedEntity.get(relation.target as EntityInstance) || originalRelationToClonedRelation.get(relation.target as RelationInstance)!
-            }
-            // 处理 filtered relation 的 baseRelation
-            if (relation.baseRelation) {
-                relation.baseRelation = originalRelationToClonedRelation.get(relation.baseRelation as RelationInstance)!
-            }
-        }
+        // Get cloned entities and relations with all references automatically updated
+        const { entities, relations } = container.getAll();
         
+        // Process states to inject properties into entities/relations
         states.forEach(({dataContext, state}) => {
             Object.entries(state).forEach(([stateName, stateItem]) => {
                 if (stateItem instanceof RecordBoundState) { 
-                    // FIXME 因为一个 entity 可以有多个 filtered entity，所以未来还要考虑 state key 重名问题。
-                    let rootEntity: EntityInstance|RelationInstance = entities.find(entity => entity.name === stateItem.record)! || relations.find(entity => entity.name === stateItem.record)!
+                    if (!stateItem.record) {
+                        return;
+                    }
+                    let rootEntity: EntityInstance|RelationInstance | undefined = container.getEntityByName(stateItem.record);
+                    if (!rootEntity) {
+                        rootEntity = container.getRelationByName(stateItem.record);
+                    }
+                    if (!rootEntity) {
+                        throw new Error(`Entity or Relation not found: ${stateItem.record}`);
+                    }
 
                     // 考虑 filtered entity 和 filtered relation 的级联问题，这里要找到根
                     while ((rootEntity as EntityInstance).baseEntity || (rootEntity as RelationInstance).baseRelation) {

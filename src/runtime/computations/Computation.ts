@@ -3,7 +3,6 @@ import {
     ActivityInstance, InteractionInstance,
     DictionaryInstance
 } from "@shared";
-import { BoolExp } from "@shared";
 import { Controller } from "../Controller";
 import { AttributeQueryData, MatchExp, MatchExpressionData, ModifierData } from "@storage";
 import { DICTIONARY_RECORD } from "../System";
