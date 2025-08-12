@@ -360,11 +360,21 @@ Note: The relation creates `user.dormitory` to access the assigned dormitory and
 **Remember**: The systematic analysis process ensures you select the RIGHT computation type for each use case. This analysis will guide your implementation in the next phase!
 
 
-## Phase 3: Code Generation and Initial Testing
+## Phase 3: Code Generation and Progressive Testing
+
+**🔄 PROGRESSIVE IMPLEMENTATION STRATEGY**
+
+Phase 3 follows a **progressive, test-driven approach**:
+1. **Implement incrementally**: Start with entities/relations, then interactions, then computations one by one
+2. **Type check immediately**: Run `npm run check` after each implementation step
+3. **Test each computation**: Write and run tests for each computation before moving to the next
+4. **Fix issues immediately**: Don't accumulate problems - fix them as soon as they appear
+5. **Build confidence gradually**: Each passing test confirms your implementation is correct
+
+This approach prevents the accumulation of errors and makes debugging much easier.
 
 ### 3.1 Code Generation and Implementation
 **Based on the analysis documents created in steps 2.1-2.3, now implement the actual code.**
-
 
 #### 3.1.1 🔴 CRITICAL: Read Complete API Reference First
 **Before generating ANY code, you MUST thoroughly read `./agentspace/knowledge/generator/api-reference.md`**
@@ -390,87 +400,140 @@ Common issues that can be avoided by reading the API reference:
 
 
 #### 3.1.2 Entity and Relation Implementation
-- [ ] Generate all entities based on `docs/entity-relation-design.md`
+- [ ] Generate all entities based on `docs/entity-relation-design.md`. **DO NOT define any computations yet**. No `computed` or `computation` on properties
 - [ ] Define entity properties with correct types
   - **Remember: NO reference ID fields in entities!**
   - Only primitive values and entity-specific data
+  - **IMPORTANT: If a property will have `computed` or `computation`, do NOT set `defaultValue`**
+    - The computation will provide the value, defaultValue would conflict
+    - Either use defaultValue OR computation, never both
 - [ ] Generate all relations with proper cardinality
   - Relations define how entities connect
   - Relations create the property names for accessing related entities
 - [ ] Define relation properties
+- [ ] **Type Check**: Run `npm run check` to ensure TypeScript compilation passes
+  - Fix any type errors before proceeding
+  - Do NOT continue until all type errors are resolved
 
 #### 3.1.3 Interaction Implementation
-- [ ] Generate all interactions based on `docs/interaction-design.md`
+- [ ] Generate all interactions based on `docs/interaction-design.md`. **DO NOT define any conditions yet** - we will add permissions and business rules later in section 3.2. No `condition` parameter in Interaction.create()
 - [ ] Start with simple payload-only interactions (no conditions initially)
-- [ ] Focus ONLY on Stage 1 - core business logic
 - [ ] Ensure all payloads match the documented fields
+- [ ] **Type Check**: Run `npm run check` to ensure TypeScript compilation passes
+  - Fix any type errors before proceeding
+  - Do NOT continue until all type errors are resolved
 
-#### 3.1.4 Computation Implementation
-- [ ] Implement computations based on `docs/computation-analysis.md`
-- [ ] For each entity computation decision, implement the selected type
-- [ ] For each property computation decision, implement the selected type
-- [ ] For each relation computation decision, implement the selected type
-- [ ] Ensure StateNodes are declared before use
-- [ ] Verify no Transform is used in Property computation
+#### 3.1.4 Progressive Computation Implementation with Testing
 
-
-#### 3.1.5 TypeScript Verification
-- [ ] Run `npm run check` to ensure TypeScript compilation passes
-- [ ] Fix any type errors
-- [ ] Ensure all imports are correct
-
-**🔴 Implementation Checklist:**
-- [ ] All entities from design document are implemented
-- [ ] All relations from design document are implemented
-- [ ] All interactions from design document are implemented
-- [ ] All computations match the analysis decisions
-- [ ] Code compiles without errors
-
-### 3.2 Initial Test Implementation
 **📖 MUST READ: `./agentspace/knowledge/generator/test-implementation.md`**
-
-#### 3.2.1 Complete CRUD Test Example
-**📖 Reference: `./tests/crud.example.test.ts`**
-
-For a comprehensive example of CRUD operations with the interaqt framework, refer to the complete test file `./tests/crud.example.test.ts`. This example demonstrates:
-
-- **Entity Definition**: User and Article entities with properties and computations
-- **State Management**: Article lifecycle using StateMachine (draft → published → deleted)
-- **Relations**: User-Article relationship with automatic article count
-- **Filtered Entities**: ActiveArticle entity that excludes deleted articles
-- **Interactions**: Complete CRUD operations (Create, Publish, Delete, Restore)
-- **Permission System**: 
-  - Role-based access control (admin, author, user)
-  - Condition for role checking
-  - Condition for payload validation
-  - Complex permission logic with OR conditions
-- **Comprehensive Tests**:
-  - Basic CRUD operations
-  - State transitions
-  - Permission enforcement
-  - Edge cases and error handling
-  - Complex workflows
-
-This example serves as a practical reference for implementing and testing CRUD functionality in your own interaqt projects.
-
-#### 3.2.2 Test Implementation
 
 ⚠️ **DO NOT proceed without reading the above reference document completely!**
 
-- [ ] Create test cases for all interactions
-- [ ] Verify basic functionality without permissions and business rules
-- [ ] **Focus on core business logic only**:
-  - Basic CRUD operations work correctly
-  - Entity relationships are properly established
-  - Computed properties calculate correctly
-  - State transitions work as expected
-- [ ] **DO NOT test at this stage**:
-  - Permission denials
-  - Business rule violations
-  - Complex validation scenarios
-- [ ] Ensure all tests pass
+**🔴 CRITICAL: Use Progressive Implementation with Immediate Testing**
 
-### 3.3 Permission and Business Rules Implementation
+This section follows a **test-driven progressive approach** where each computation is implemented and tested individually before moving to the next one.
+
+##### Step 1: Create Test File
+- [ ] Copy contents from `tests/template.test.ts` to create `tests/basic.test.ts`. **DO NOT add any test cases yet** - we will add them progressively as we implement each computation
+- [ ] This will be your main test file for progressive implementation
+- [ ] Import your backend definitions: `import { entities, relations, interactions } from '../backend'`
+
+
+##### Step 2: Create Implementation Plan
+- [ ] Based on `docs/computation-analysis.md`, analyze computation dependencies (which computations depend on other entities/relations)
+- [ ] Order computations from least dependent to most dependent. Start with computations that only depend on InteractionEventEntity
+- [ ] Create `docs/computation-implementation-plan.md`. **Write the plan in checklist format** for easy progress tracking.
+
+##### Step 3: Progressive Implementation Loop
+
+**For EACH computation in your plan, follow this cycle:**
+
+1. **Implement the Computation**
+   - [ ] Add the computation code to your entity/relation/property
+   - [ ] **Use assignment pattern to add computations** to avoid complex reference issues
+   - [ ] If adding computation to a property that has `defaultValue`, remove the `defaultValue` (computation will provide the default)
+   - [ ] Verify no Transform is used in Property computation
+
+2. **Type Check**
+   - [ ] Run `npm run check` to ensure TypeScript compilation passes
+   - [ ] Fix ALL type errors before proceeding
+   - [ ] Do NOT write tests until type checking passes
+
+3. **Write Focused Test Case**
+   - [ ] Add a new test case in `tests/basic.test.ts` specifically for this computation
+   - [ ] Test name should clearly indicate what computation is being tested
+   - [ ] Test should verify the computation works correctly
+   
+   **Example test structure:**
+   ```typescript
+   test('User.status has correct default value', async () => {
+     const user = await system.storage.create('User', {
+       name: 'Test User',
+       email: 'test@example.com'
+     })
+     
+     const foundUser = await system.storage.findOne(
+       'User',
+       MatchExp.atom({ key: 'id', value: ['=', user.id] }),
+       undefined,
+       ['id', 'status'] // Remember attributeQuery!
+     )
+     
+     expect(foundUser.status).toBe('active')
+   })
+   
+   test('Article.state transitions correctly', async () => {
+     // Create article in draft state
+     const result = await controller.callInteraction('CreateArticle', {
+       user: testUser,
+       payload: { title: 'Test', content: 'Content' }
+     })
+     
+     // Verify state is draft
+     const article = await system.storage.findOne(
+       'Article',
+       MatchExp.atom({ key: 'id', value: ['=', result.data.id] }),
+       undefined,
+       ['id', 'state']
+     )
+     expect(article.state).toBe('draft')
+     
+     // Transition to published
+     await controller.callInteraction('PublishArticle', {
+       user: testUser,
+       payload: { id: article.id }
+     })
+     
+     // Verify state changed
+     const published = await system.storage.findOne(
+       'Article',
+       MatchExp.atom({ key: 'id', value: ['=', article.id] }),
+       undefined,
+       ['id', 'state']
+     )
+     expect(published.state).toBe('published')
+   })
+   ```
+
+4. **Run Test**
+   - [ ] Run `npm run test tests/basic.test.ts` to test only this file
+   - [ ] Fix any test failures
+   - [ ] Do NOT proceed to next computation until current test passes
+
+5. **Document Progress**
+   - [ ] **MUST** check off completed computation in `docs/computation-implementation-plan.md`
+   - [ ] Note any issues or learnings for future reference
+
+**🛑 STOP GATE: DO NOT proceed to Step 4 until ALL computations in `docs/computation-implementation-plan.md` are checked off as complete with passing tests.**
+
+##### Step 4: Completion Checklist
+- [ ] All computations from `docs/computation-analysis.md` are implemented
+- [ ] Each computation has at least one passing test
+- [ ] All type checks pass (`npm run check`)
+- [ ] All tests pass (`npm run test tests/basic.test.ts`)
+
+
+### 3.2 Permission and Business Rules Implementation
 **📖 MUST READ: `./agentspace/knowledge/generator/permission-implementation.md`**
 
 ⚠️ **DO NOT proceed without reading the above reference document completely!**
@@ -492,7 +555,7 @@ This example serves as a practical reference for implementing and testing CRUD f
   - **Balance checks**: e.g., "Cannot withdraw more than account balance"
 - [ ] Ensure TypeScript type checking passes
 
-### 3.4 Permission and Business Rules Test Implementation
+### 3.3 Permission and Business Rules Test Implementation
 **📖 MUST READ: `./agentspace/knowledge/generator/permission-test-implementation.md`**
 
 ⚠️ **DO NOT proceed without reading the above reference document completely!**

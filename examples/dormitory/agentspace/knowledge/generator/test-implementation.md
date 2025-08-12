@@ -33,73 +33,6 @@ const result = await controller.callInteraction('CreateStyle', { ... })
 expect(result.error).toBeUndefined()
 ```
 
-## Test Setup Pattern
-
-### Basic Test Structure
-```typescript
-import { describe, test, expect, beforeEach } from 'vitest'
-import { Controller, MonoSystem, PGLiteDB, MatchExp } from 'interaqt'
-import { entities, relations, interactions } from '../backend'
-
-describe('Feature Tests', () => {
-  let system: MonoSystem
-  let controller: Controller
-
-  beforeEach(async () => {
-    // Create fresh system for each test
-    system = new MonoSystem(new PGLiteDB())
-    
-    controller = new Controller({
-      system,
-      entities,
-      relations,
-      activities: [],           // activities
-      interactions,             // interactions
-      dict: [],                 // global dictionaries
-      recordMutationSideEffects: []  // side effects
-    })
-
-    await controller.setup(true)
-  })
-  
-  test('should create style through interaction', async () => {
-    // Create test user
-    const testUser = await system.storage.create('User', {
-      username: 'admin',
-      email: 'admin@example.com',
-      role: 'admin'
-    })
-    
-    // Call interaction - this is the ONLY way to test business logic
-    const result = await controller.callInteraction('CreateStyle', {
-      user: testUser,
-      payload: {
-        label: 'Modern Style',
-        slug: 'modern-style',
-        description: 'A contemporary design',
-        type: 'premium',
-        priority: 10
-      }
-    })
-    
-    // Check if interaction succeeded
-    expect(result.error).toBeUndefined()
-    
-    // Verify the style was created
-    const style = await system.storage.findOne('Style',
-      MatchExp.atom({ key: 'slug', value: ['=', 'modern-style'] }),
-      undefined,
-      ['id', 'label', 'slug', 'status', 'createdAt']
-    )
-    
-    expect(style).toBeTruthy()
-    expect(style.label).toBe('Modern Style')
-    expect(style.status).toBe('draft')
-    expect(style.createdAt).toBeGreaterThan(0)
-  })
-})
-```
-
 ## callInteraction Return Value
 
 The `controller.callInteraction()` method returns a `InteractionCallResponse` object with the following structure:
@@ -206,51 +139,6 @@ const activityResult = await controller.callActivityInteraction(
 const activityId = activityResult.context?.activityId
 ```
 
-## 🔴 CRITICAL: Passing Reference Parameters (isRef)
-
-When an interaction's PayloadItem has `isRef: true`, you must pass an object with `id` property, NOT just the id string:
-
-```typescript
-// Interaction definition example
-const UpdateStyle = Interaction.create({
-  name: 'UpdateStyle',
-  payload: Payload.create({
-    items: [
-      PayloadItem.create({ 
-        name: 'style',
-        base: Style,
-        isRef: true,  // This means we're referencing an existing Style
-        required: true 
-      })
-    ]
-  })
-})
-
-// ❌ WRONG: Passing just the id string
-const result = await controller.callInteraction('UpdateStyle', {
-  user: adminUser,
-  payload: {
-    style: styleId  // WRONG! Don't pass plain id
-  }
-})
-
-// ✅ CORRECT: Pass object with id property
-const result = await controller.callInteraction('UpdateStyle', {
-  user: adminUser,
-  payload: {
-    style: { id: styleId }  // CORRECT! Pass as object
-  }
-})
-
-// ✅ ALSO CORRECT: Pass the entire entity object
-const style = await system.storage.findOne('Style', ...)
-const result = await controller.callInteraction('UpdateStyle', {
-  user: adminUser,
-  payload: {
-    style: style  // Works because style object has id property
-  }
-})
-```
 
 ### Multiple References Example
 ```typescript
