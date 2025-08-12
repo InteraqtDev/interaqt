@@ -81,13 +81,13 @@ Create `requirements/interaction-matrix.md` to ensure:
 - Document both access control requirements AND business logic validations
 
 
-## Phase 2: Code Generation
+## Phase 2: Design and Analysis
 
 ### 🔴 Document-First Approach
-**NEW: Phase 2 now follows a document-first approach:**
-1. **Steps 2.1-2.3**: Create design documents ONLY (no code)
-2. **Step 2.4**: Generate all code based on the design documents
-3. **Steps 2.5-2.8**: Test and enhance the implementation
+**Phase 2 focuses on creating comprehensive design documents before any code generation:**
+1. **Steps 2.1-2.3**: Create design documents for entities, interactions, and computations
+2. **Phase 3**: Generate code and perform initial testing based on the design documents
+3. **Remaining steps**: Add permissions, business rules, and enhance the implementation
 
 This ensures consistent design decisions across all components before any code is written.
 
@@ -357,13 +357,16 @@ Note: The relation creates `user.dormitory` to access the assigned dormitory and
 - [ ] Document reasoning for each computation decision
 - [ ] Follow the relation decision algorithm EXACTLY for relations
 
-**Remember**: The systematic analysis process ensures you select the RIGHT computation type for each use case. This analysis will guide your implementation in the next step!
+**Remember**: The systematic analysis process ensures you select the RIGHT computation type for each use case. This analysis will guide your implementation in the next phase!
 
-### 2.4 Code Generation and Implementation
+
+## Phase 3: Code Generation and Initial Testing
+
+### 3.1 Code Generation and Implementation
 **Based on the analysis documents created in steps 2.1-2.3, now implement the actual code.**
 
 
-#### 2.4.1 🔴 CRITICAL: Read Complete API Reference First
+#### 3.1.1 🔴 CRITICAL: Read Complete API Reference First
 **Before generating ANY code, you MUST thoroughly read `./agentspace/knowledge/generator/api-reference.md`**
 
 This document contains:
@@ -386,7 +389,7 @@ Common issues that can be avoided by reading the API reference:
 - Incorrect computation placement (e.g., Transform cannot be used in Property computation)
 
 
-#### 2.4.2 Entity and Relation Implementation
+#### 3.1.2 Entity and Relation Implementation
 - [ ] Generate all entities based on `docs/entity-relation-design.md`
 - [ ] Define entity properties with correct types
   - **Remember: NO reference ID fields in entities!**
@@ -395,24 +398,23 @@ Common issues that can be avoided by reading the API reference:
   - Relations define how entities connect
   - Relations create the property names for accessing related entities
 - [ ] Define relation properties
-- [ ] Add placeholder computations (will be implemented next)
 
-#### 2.4.3 Interaction Implementation
+#### 3.1.3 Interaction Implementation
 - [ ] Generate all interactions based on `docs/interaction-design.md`
 - [ ] Start with simple payload-only interactions (no conditions initially)
 - [ ] Focus ONLY on Stage 1 - core business logic
 - [ ] Ensure all payloads match the documented fields
 
-#### 2.4.4 Computation Implementation
+#### 3.1.4 Computation Implementation
 - [ ] Implement computations based on `docs/computation-analysis.md`
 - [ ] For each entity computation decision, implement the selected type
 - [ ] For each property computation decision, implement the selected type
 - [ ] For each relation computation decision, implement the selected type
 - [ ] Ensure StateNodes are declared before use
 - [ ] Verify no Transform is used in Property computation
-- [ ] Check for circular dependencies
 
-#### 2.4.5 TypeScript Verification
+
+#### 3.1.5 TypeScript Verification
 - [ ] Run `npm run check` to ensure TypeScript compilation passes
 - [ ] Fix any type errors
 - [ ] Ensure all imports are correct
@@ -424,10 +426,10 @@ Common issues that can be avoided by reading the API reference:
 - [ ] All computations match the analysis decisions
 - [ ] Code compiles without errors
 
-### 2.5 Initial Test Implementation
+### 3.2 Initial Test Implementation
 **📖 MUST READ: `./agentspace/knowledge/generator/test-implementation.md`**
 
-#### 2.5.1 Complete CRUD Test Example
+#### 3.2.1 Complete CRUD Test Example
 **📖 Reference: `./tests/crud.example.test.ts`**
 
 For a comprehensive example of CRUD operations with the interaqt framework, refer to the complete test file `./tests/crud.example.test.ts`. This example demonstrates:
@@ -451,7 +453,7 @@ For a comprehensive example of CRUD operations with the interaqt framework, refe
 
 This example serves as a practical reference for implementing and testing CRUD functionality in your own interaqt projects.
 
-#### 2.5.2 Test Implementation
+#### 3.2.2 Test Implementation
 
 ⚠️ **DO NOT proceed without reading the above reference document completely!**
 
@@ -468,7 +470,7 @@ This example serves as a practical reference for implementing and testing CRUD f
   - Complex validation scenarios
 - [ ] Ensure all tests pass
 
-### 2.6 Permission and Business Rules Implementation
+### 3.3 Permission and Business Rules Implementation
 **📖 MUST READ: `./agentspace/knowledge/generator/permission-implementation.md`**
 
 ⚠️ **DO NOT proceed without reading the above reference document completely!**
@@ -490,7 +492,7 @@ This example serves as a practical reference for implementing and testing CRUD f
   - **Balance checks**: e.g., "Cannot withdraw more than account balance"
 - [ ] Ensure TypeScript type checking passes
 
-### 2.7 Permission and Business Rules Test Implementation
+### 3.4 Permission and Business Rules Test Implementation
 **📖 MUST READ: `./agentspace/knowledge/generator/permission-test-implementation.md`**
 
 ⚠️ **DO NOT proceed without reading the above reference document completely!**
@@ -514,14 +516,14 @@ Since permissions and business rules are now unified in the `condition` API, the
 - Documenting expected error scenarios for each Interaction
 
 
-## Phase 3: Quality Assurance
+## Phase 4: Quality Assurance
 
-### 3.1 Code Review Checklist
+### 4.1 Code Review Checklist
 - [ ] All entities have proper computations
 - [ ] All interactions follow best practices
 - [ ] Proper error handling
 
-### 3.2 Test Coverage
+### 4.2 Test Coverage
 - [ ] All interactions tested
 - [ ] All permissions tested
 - [ ] Edge cases covered

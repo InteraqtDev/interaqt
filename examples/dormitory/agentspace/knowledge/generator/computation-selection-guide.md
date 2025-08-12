@@ -53,6 +53,7 @@ Before implementing ANY computations, create a document at `docs/computation-ana
 - **Purpose**: [What this property represents]
 - **Data Source**: [Where does the value come from]
 - **Update Frequency**: [Never/On specific interactions/Real-time]
+- **Strong Consistency**: [Yes/No - Is this value ALWAYS deterministically derived from other data?]
 - **Computation Decision**: [Selected computation type]
 - **Reasoning**: [Why this computation was chosen]
 - **Dependencies**: [If computation needed: List all required data - entities, relations, properties, interactions]
@@ -394,24 +395,50 @@ const UserDormitoryRelation = Relation.create({
 
 For EACH property in EACH entity, follow this systematic analysis:
 
+### 🔴 CRITICAL FIRST QUESTION: Strong Consistency Check
+
+**Before any other analysis, determine:**
+Is this property's value ALWAYS deterministically derived from other data with no exceptions?
+
+**Strong Consistency = YES when:**
+- The value is a pure calculation from other data (count, sum, average, etc.)
+- There are NO special cases where users can override the calculated value
+- The relationship between input data and output value is ALWAYS the same
+- Examples: totalAmount = sum of items, articleCount = count of articles, isAllCompleted = every task completed
+
+**Strong Consistency = NO when:**
+- Users can directly modify the value via interactions
+- There are special cases or overrides possible
+- The value represents a state that can transition independently
+- Examples: status fields, user-editable fields, timestamps that can be manually set
+
+**Decision Rule:**
+- **If Strong Consistency = YES** → Use data-based computations (Count, Summation, Average, Every, Any, WeightedSummation) or Custom if no suitable computation exists
+- **If Strong Consistency = NO** → Consider StateMachine for interaction-driven updates
+
 ### Q1: What is the nature of this property?
 
 ```mermaid
 graph TD
-    A[Property Nature] --> B{Static or Dynamic?}
+    Start[Analyze Property] --> SC{Strong Consistency?}
+    SC -->|Yes - Always derived from data| DC[Use Data Computations]
+    SC -->|No - User can modify| B{Static or Dynamic?}
+    
+    DC --> DT{Data Type?}
+    DT -->|Count| J[Use Count]
+    DT -->|Sum| K[Use Summation/WeightedSummation]
+    DT -->|Boolean all/any| L[Use Every/Any]
+    DT -->|Time-based| TM[Use RealTime]
+    DT -->|Complex calculation| M[Consider Custom]
+    
     B -->|Static| C[Use defaultValue only]
     B -->|Dynamic| D{What triggers change?}
     D -->|User Interaction| E{Type of change?}
     D -->|Time-based| F[Consider RealTime]
-    D -->|Other entities| G{Aggregation type?}
+    D -->|Other entities| G[Usually wrong - reconsider strong consistency]
     
     E -->|State transition| H[Use StateMachine]
     E -->|Value update| I[Use StateMachine with computeValue]
-    
-    G -->|Count| J[Use Count]
-    G -->|Sum| K[Use Summation/WeightedSummation]
-    G -->|Boolean check| L[Use Every/Any]
-    G -->|Complex| M[Consider Custom as LAST resort]
 ```
 
 ### Q2: Detailed Property Analysis Checklist
@@ -747,6 +774,7 @@ For EACH entity, document your analysis:
 - **Purpose**: Order fulfillment status
 - **Data Source**: State transitions
 - **Update Frequency**: On specific interactions (PayOrder, ShipOrder, DeliverOrder, CancelOrder)
+- **Strong Consistency**: No - User-driven state transitions, not derived from other data
 - **Computation Decision**: StateMachine
 - **Reasoning**: Has defined states (pending, paid, shipped, delivered, cancelled) with clear transitions
 - **Dependencies**: Interactions: PayOrder, ShipOrder, DeliverOrder, CancelOrder; Current status value
@@ -757,6 +785,7 @@ For EACH entity, document your analysis:
 - **Purpose**: Total order value
 - **Data Source**: Sum of order items
 - **Update Frequency**: When items added/removed/updated
+- **Strong Consistency**: Yes - Always equals sum of (price × quantity) for all items
 - **Computation Decision**: WeightedSummation
 - **Reasoning**: Need to calculate quantity × price for each item
 - **Dependencies**: OrderItemRelation (direction: source), Item entity (price, quantity properties)
@@ -767,6 +796,7 @@ For EACH entity, document your analysis:
 - **Purpose**: Number of items in order
 - **Data Source**: Count of OrderItemRelation
 - **Update Frequency**: Automatic when items added/removed
+- **Strong Consistency**: Yes - Always equals the count of related items
 - **Computation Decision**: Count
 - **Reasoning**: Direct count of related OrderItem entities
 - **Dependencies**: OrderItemRelation (direction: source)
@@ -777,6 +807,7 @@ For EACH entity, document your analysis:
 - **Purpose**: Last modification timestamp
 - **Data Source**: Any order update interaction
 - **Update Frequency**: On any change
+- **Strong Consistency**: No - Updated based on user interactions, not derived from data
 - **Computation Decision**: StateMachine with computeValue
 - **Reasoning**: Updates to current timestamp on any state change
 - **Dependencies**: All order-modifying interactions (UpdateOrder, PayOrder, ShipOrder, etc.)
@@ -834,6 +865,7 @@ After analysis, implement computations following this checklist:
 
 - [ ] All entities analyzed and documented
 - [ ] All properties analyzed and documented
+- [ ] Strong consistency determined for each property
 - [ ] Entity-level Transforms defined where needed
 - [ ] Property computations implemented according to analysis
 - [ ] Dependencies documented for all computations
@@ -849,28 +881,32 @@ After analysis, implement computations following this checklist:
 Before finalizing, answer these questions:
 
 1. **Have you analyzed EVERY property of EVERY entity?**
-2. **Is your reasoning documented for EACH computation choice?**
-3. **Did you consider simpler computations before Complex/Custom?**
-4. **Are all dependencies clearly listed for each computation?**
-5. **Are calculation methods described for each computation?**
-6. **Are all StateNodes declared before use?**
-7. **Are all Transforms in Entity/Relation computation only?**
-9. **Is the analysis document complete and saved?**
+2. **Did you determine strong consistency for EACH property?**
+3. **Are strongly consistent properties using data-based computations (not StateMachine)?**
+4. **Is your reasoning documented for EACH computation choice?**
+5. **Did you consider simpler computations before Complex/Custom?**
+6. **Are all dependencies clearly listed for each computation?**
+7. **Are calculation methods described for each computation?**
+8. **Are all StateNodes declared before use?**
+9. **Are all Transforms in Entity/Relation computation only?**
+10. **Is the analysis document complete and saved?**
 
 ## 🔴 CRITICAL REMINDERS
 
 1. **NEVER skip the analysis phase** - Document first, implement second
-2. **NEVER use Transform in Property computation** - Only in Entity/Relation
-3. **NEVER jump to Custom computation** - Try all other options first
-4. **ALWAYS declare StateNodes before use** - Not inside transfers
-5. **ALWAYS provide defaultValue** - For all computed properties
-6. **ALWAYS document your reasoning** - Future developers need to understand
-7. **ALWAYS document dependencies** - List all data sources each computation needs
-8. **ALWAYS describe calculation methods** - Explain how values are computed
-9. **ALWAYS analyze relation lifecycle** - Consider creation, updates, AND deletion
-10. **Transform can ONLY create** - If relations need deletion, use StateMachine or status field
-11. **Think about business events** - What events might cause relation changes?
-12. **Choose deletion strategy based on needs** - Use hard delete by default, soft delete when audit trail is required
+2. **ALWAYS check strong consistency first** - Determines if value is deterministically derived from data
+3. **NEVER use StateMachine for strongly consistent properties** - Use data-based computations instead
+4. **NEVER use Transform in Property computation** - Only in Entity/Relation
+5. **NEVER jump to Custom computation** - Try all other options first
+6. **ALWAYS declare StateNodes before use** - Not inside transfers
+7. **ALWAYS provide defaultValue** - For all computed properties
+8. **ALWAYS document your reasoning** - Future developers need to understand
+9. **ALWAYS document dependencies** - List all data sources each computation needs
+10. **ALWAYS describe calculation methods** - Explain how values are computed
+11. **ALWAYS analyze relation lifecycle** - Consider creation, updates, AND deletion
+12. **Transform can ONLY create** - If relations need deletion, use StateMachine or status field
+13. **Think about business events** - What events might cause relation changes?
+14. **Choose deletion strategy based on needs** - Use hard delete by default, soft delete when audit trail is required
 
 ## Example Complete Analysis
 
@@ -902,6 +938,7 @@ Here's an example of what a complete analysis might look like for a task managem
 - **Purpose**: Number of tasks in project
 - **Data Source**: Count of ProjectTaskRelation
 - **Update Frequency**: Automatic when tasks created/deleted
+- **Strong Consistency**: Yes - Always equals the count of tasks
 - **Computation Decision**: Count
 - **Reasoning**: Direct count of relations
 - **Dependencies**: ProjectTaskRelation (direction: source)
@@ -912,6 +949,7 @@ Here's an example of what a complete analysis might look like for a task managem
 - **Purpose**: Percentage of completed tasks
 - **Data Source**: Calculation based on task statuses
 - **Update Frequency**: When any task status changes
+- **Strong Consistency**: Yes - Always equals (completed/total) × 100
 - **Computation Decision**: Custom
 - **Reasoning**: Requires percentage calculation (completed/total), not a simple count
 - **Dependencies**: ProjectTaskRelation, Task entities (status property)
@@ -922,6 +960,7 @@ Here's an example of what a complete analysis might look like for a task managem
 - **Purpose**: Whether all tasks are completed
 - **Data Source**: Check all related tasks
 - **Update Frequency**: When any task status changes
+- **Strong Consistency**: Yes - Always true if and only if all tasks are completed
 - **Computation Decision**: Every
 - **Reasoning**: Returns true only if every task is completed
 - **Dependencies**: ProjectTaskRelation, Task entities (status property)
@@ -949,6 +988,7 @@ Here's an example of what a complete analysis might look like for a task managem
 - **Purpose**: Task completion status
 - **Data Source**: State transitions
 - **Update Frequency**: Via UpdateTaskStatus interaction
+- **Strong Consistency**: No - User-driven state changes, not derived from data
 - **Computation Decision**: StateMachine
 - **Reasoning**: Has defined states (todo, in_progress, review, completed)
 - **Dependencies**: UpdateTaskStatus interaction, current status value
@@ -959,6 +999,7 @@ Here's an example of what a complete analysis might look like for a task managem
 - **Purpose**: Total time worked on task (minutes)
 - **Data Source**: Sum of time entries
 - **Update Frequency**: When time entries added
+- **Strong Consistency**: Yes - Always equals sum of all time entries
 - **Computation Decision**: Summation
 - **Reasoning**: Simple sum of TimeEntry durations
 - **Dependencies**: TaskTimeEntryRelation (direction: source), TimeEntry entity (duration property)
@@ -969,6 +1010,7 @@ Here's an example of what a complete analysis might look like for a task managem
 - **Purpose**: Whether task passed deadline
 - **Data Source**: Comparison of current time with deadline
 - **Update Frequency**: Time-based check
+- **Strong Consistency**: Yes - Always equals (current time > deadline)
 - **Computation Decision**: RealTime
 - **Reasoning**: Depends on current time, needs periodic recomputation
 - **Dependencies**: Current task deadline property, system time

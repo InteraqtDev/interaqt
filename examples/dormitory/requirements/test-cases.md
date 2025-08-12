@@ -1,676 +1,574 @@
-# 宿舍管理系统测试用例
+# Test Cases - Dormitory Management System
 
-## 测试策略
+## Test Organization Strategy
 
-本文档按照渐进式实施策略组织测试用例：
-1. **Stage 1 - Core Business Logic Tests**：核心业务逻辑测试
-2. **Stage 2 - Permission Tests**：权限控制测试  
-3. **Stage 2 - Business Rule Tests**：业务规则验证测试
+All test cases are based on **Interactions**, not on direct Entity/Relation operations. Tests are organized in three phases:
 
-🔴 **重要提示**：所有测试用例必须通过 Interactions 进行，不得直接操作 storage！
+1. **Stage 1: Core Business Logic Tests** - Basic functionality without permissions or business rules
+2. **Stage 2A: Permission Tests** - Role-based access control validation
+3. **Stage 2B: Business Rule Tests** - Business constraint validation
 
 ---
 
-## Stage 1: Core Business Logic Tests（核心业务逻辑测试）
+## Stage 1: Core Business Logic Tests
 
-### TC001: 创建宿舍
+These tests verify basic functionality with valid inputs and proper user roles.
+
+### TC001: Create Dormitory (via CreateDormitory Interaction)
 - **Interaction**: CreateDormitory
-- **前置条件**: 管理员已登录
-- **输入数据**: 
-  ```javascript
-  {
-    user: { id: 'admin-1', role: 'admin' },
-    payload: { 
-      name: 'A栋301', 
-      capacity: 4 
-    }
+- **Preconditions**: Admin user exists
+- **Input Data**: 
+  ```typescript
+  user: admin (with role='admin')
+  payload: {
+    name: "Building A Room 101",
+    capacity: 4,
+    floor: 1,
+    building: "A"
   }
   ```
-- **预期结果**:
-  1. 成功创建宿舍记录
-  2. 宿舍名称为 'A栋301'
-  3. 宿舍容量为 4
-  4. 宿舍状态为 'active'
-  5. 自动创建 4 个床位（编号 1-4）
-  6. 所有床位状态为 'available'
-- **后置验证**: 通过查询确认宿舍和床位都已创建
+- **Expected Results**:
+  1. New Dormitory entity created
+  2. Dormitory has correct properties (name, capacity, floor, building)
+  3. Dormitory status is 'active'
+  4. 4 Bed entities automatically created
+  5. All beds have status 'vacant'
+  6. Beds are linked to dormitory
+- **Post Validation**: Dormitory appears in system with 4 available beds
 
-### TC002: 分配用户到宿舍
+### TC002: Appoint Dormitory Head (via AppointDormHead Interaction)
+- **Interaction**: AppointDormHead
+- **Preconditions**: 
+  - Admin user exists
+  - Student user exists (role='student')
+  - Dormitory exists
+- **Input Data**:
+  ```typescript
+  user: admin
+  payload: {
+    userId: student.id,
+    dormitoryId: dormitory.id
+  }
+  ```
+- **Expected Results**:
+  1. User role updated to 'dormHead'
+  2. DormitoryDormHeadRelation created
+  3. dormitory.dormHead references the user
+  4. user.managedDormitory references the dormitory
+  5. appointedAt timestamp recorded
+- **Post Validation**: User can perform dormHead operations
+
+### TC003: Assign User to Dormitory (via AssignUserToDormitory Interaction)
 - **Interaction**: AssignUserToDormitory
-- **前置条件**: 
-  - 管理员已登录
-  - 存在宿舍 'A栋301'（4个床位）
-  - 存在学生用户 'student1'
-- **输入数据**:
-  ```javascript
-  {
-    user: { id: 'admin-1', role: 'admin' },
-    payload: {
-      userId: 'student1',
-      dormitoryId: 'dorm-1'
-    }
+- **Preconditions**:
+  - Admin user exists
+  - Student user exists (not assigned)
+  - Dormitory with vacant beds exists
+- **Input Data**:
+  ```typescript
+  user: admin
+  payload: {
+    userId: student.id,
+    dormitoryId: dormitory.id,
+    bedId: bed.id
   }
   ```
-- **预期结果**:
-  1. 成功建立用户与宿舍的关系
-  2. 用户被分配到第一个可用床位（床位1）
-  3. 床位1状态变为 'occupied'
-  4. 宿舍的 occupiedBeds 计数为 1
-  5. 宿舍的 availableBeds 计数为 3
-- **后置验证**: 用户查询显示已分配宿舍和床位
+- **Expected Results**:
+  1. UserDormitoryRelation created
+  2. UserBedRelation created
+  3. Bed status updated to 'occupied'
+  4. user.dormitory references the dormitory
+  5. user.bed references the bed
+  6. dormitory.residents includes the user
+  7. Dormitory occupancy count increases by 1
+- **Post Validation**: User appears in dormitory resident list
 
-### TC003: 指定宿舍长
-- **Interaction**: AssignDormHead
-- **前置条件**:
-  - 管理员已登录
-  - 存在宿舍 'A栋301'
-  - 存在已分配到该宿舍的用户 'student1'
-- **输入数据**:
-  ```javascript
-  {
-    user: { id: 'admin-1', role: 'admin' },
-    payload: {
-      userId: 'student1',
-      dormitoryId: 'dorm-1'
-    }
-  }
-  ```
-- **预期结果**:
-  1. 用户角色更新为 'dormHead'
-  2. 建立宿舍与宿舍长的关系
-  3. 记录任命时间戳
-  4. 宿舍的 dormHead 属性指向该用户
-- **后置验证**: 宿舍查询显示有宿舍长
-
-### TC004: 记录违规
+### TC004: Record Violation (via RecordViolation Interaction)
 - **Interaction**: RecordViolation
-- **前置条件**:
-  - 宿舍长已登录（student1）
-  - 存在同宿舍的其他学生（student2）
-- **输入数据**:
-  ```javascript
-  {
-    user: { id: 'student1', role: 'dormHead' },
-    payload: {
-      userId: 'student2',
-      reason: '晚归',
-      score: 5
-    }
+- **Preconditions**:
+  - DormHead user exists
+  - Student assigned to dormHead's dormitory
+  - Student has 100 points initially
+- **Input Data**:
+  ```typescript
+  user: dormHead
+  payload: {
+    userId: student.id,
+    description: "Late night noise disturbance",
+    points: 10,
+    category: "noise"
   }
   ```
-- **预期结果**:
-  1. 创建违规记录
-  2. 违规原因为 '晚归'
-  3. 扣分值为 5
-  4. 用户累计违规分数增加 5
-  5. 用户违规次数增加 1
-  6. 记录创建时间戳
-- **后置验证**: 用户的 violationScore 为 5
+- **Expected Results**:
+  1. ViolationRecord created with all properties
+  2. ViolationRecord linked to user
+  3. User points reduced to 90 (100 - 10)
+  4. recordedBy field contains dormHead name
+  5. createdAt timestamp recorded
+- **Post Validation**: Violation appears in user's violation list
 
-### TC005: 多次违规累计
-- **Interaction**: RecordViolation（多次调用）
-- **前置条件**:
-  - 宿舍长已登录
-  - student2 已有 5 分违规记录
-- **输入数据**:
-  ```javascript
-  // 第二次违规
-  {
-    user: { id: 'student1', role: 'dormHead' },
-    payload: {
-      userId: 'student2',
-      reason: '违规使用电器',
-      score: 10
-    }
-  }
-  // 第三次违规
-  {
-    user: { id: 'student1', role: 'dormHead' },
-    payload: {
-      userId: 'student2',
-      reason: '打架斗殴',
-      score: 10
-    }
-  }
-  // 第四次违规
-  {
-    user: { id: 'student1', role: 'dormHead' },
-    payload: {
-      userId: 'student2',
-      reason: '破坏公物',
-      score: 8
-    }
+### TC005: Submit Eviction Request (via SubmitEvictionRequest Interaction)
+- **Interaction**: SubmitEvictionRequest
+- **Preconditions**:
+  - DormHead user exists
+  - Student in dormitory with points < 60 (e.g., 50 points)
+- **Input Data**:
+  ```typescript
+  user: dormHead
+  payload: {
+    userId: student.id,
+    reason: "Multiple violations and disruptive behavior"
   }
   ```
-- **预期结果**:
-  1. 创建 3 条新的违规记录
-  2. 用户累计违规分数为 33 (5+10+10+8)
-  3. 用户违规次数为 4
-  4. 用户 canBeEvicted 属性为 true（分数≥30）
-- **后置验证**: 违规记录查询显示 4 条记录
+- **Expected Results**:
+  1. EvictionRequest created
+  2. Status is 'pending'
+  3. Request linked to target user
+  4. Request linked to requesting dormHead
+  5. requestedAt timestamp recorded
+- **Post Validation**: Request appears in pending eviction requests
 
-### TC006: 申请踢出用户
-- **Interaction**: RequestEviction
-- **前置条件**:
-  - 宿舍长已登录
-  - student2 累计违规分数为 33（≥30）
-- **输入数据**:
-  ```javascript
-  {
-    user: { id: 'student1', role: 'dormHead' },
-    payload: {
-      userId: 'student2',
-      reason: '多次严重违规，累计扣分超过30分'
-    }
+### TC006: Approve Eviction Request (via ReviewEvictionRequest Interaction)
+- **Interaction**: ReviewEvictionRequest
+- **Preconditions**:
+  - Admin user exists
+  - Pending eviction request exists
+  - Student is currently assigned to dormitory and bed
+- **Input Data**:
+  ```typescript
+  user: admin
+  payload: {
+    requestId: evictionRequest.id,
+    decision: "approve",
+    adminNotes: "Confirmed violations, eviction approved"
   }
   ```
-- **预期结果**:
-  1. 创建踢出申请记录
-  2. 申请状态为 'pending'
-  3. 记录申请理由
-  4. 记录申请时间戳
-  5. 关联申请人（宿舍长）和目标用户
-- **后置验证**: 申请查询显示状态为 pending
+- **Expected Results**:
+  1. EvictionRequest status updated to 'approved'
+  2. User status updated to 'evicted'
+  3. User removed from dormitory (relation deleted)
+  4. User removed from bed (relation deleted)
+  5. Bed status updated to 'vacant'
+  6. Dormitory occupancy decreases by 1
+  7. evictedAt timestamp recorded on user
+  8. decidedAt timestamp recorded on request
+- **Post Validation**: User no longer in dormitory, bed is available
 
-### TC007: 批准踢出申请
-- **Interaction**: ApproveEviction
-- **前置条件**:
-  - 管理员已登录
-  - 存在 pending 状态的踢出申请
-- **输入数据**:
-  ```javascript
-  {
-    user: { id: 'admin-1', role: 'admin' },
-    payload: {
-      requestId: 'eviction-1',
-      comment: '情况属实，批准踢出'
-    }
+### TC007: Reject Eviction Request (via ReviewEvictionRequest Interaction)
+- **Interaction**: ReviewEvictionRequest
+- **Preconditions**:
+  - Admin user exists
+  - Pending eviction request exists
+- **Input Data**:
+  ```typescript
+  user: admin
+  payload: {
+    requestId: evictionRequest.id,
+    decision: "reject",
+    adminNotes: "Give student another chance with warning"
   }
   ```
-- **预期结果**:
-  1. 申请状态更新为 'approved'
-  2. 记录管理员处理意见
-  3. 记录处理时间戳
-  4. 用户状态更新为 'evicted'
-  5. 释放用户占用的床位（状态变为 'available'）
-  6. 解除用户与宿舍的关系
-  7. 解除用户与床位的关系
-  8. 宿舍 occupiedBeds 减 1
-- **后置验证**: 
-  - 用户状态为 evicted
-  - 用户无宿舍关联
-  - 原床位状态为 available
+- **Expected Results**:
+  1. EvictionRequest status updated to 'rejected'
+  2. User remains in dormitory
+  3. User status remains 'active'
+  4. decidedAt timestamp recorded
+  5. adminNotes recorded
+- **Post Validation**: User still assigned to dormitory and bed
 
-### TC008: 拒绝踢出申请
-- **Interaction**: RejectEviction
-- **前置条件**:
-  - 管理员已登录
-  - 存在另一个 pending 状态的踢出申请（针对 student3）
-- **输入数据**:
-  ```javascript
-  {
-    user: { id: 'admin-1', role: 'admin' },
-    payload: {
-      requestId: 'eviction-2',
-      comment: '初犯，给予警告即可'
-    }
-  }
-  ```
-- **预期结果**:
-  1. 申请状态更新为 'rejected'
-  2. 记录管理员处理意见
-  3. 记录处理时间戳
-  4. 用户状态保持不变（仍为 'active'）
-  5. 用户仍保留宿舍和床位关系
-- **后置验证**: 
-  - 申请状态为 rejected
-  - 用户仍在宿舍中
-
-### TC009: 满员宿舍测试
-- **Interaction**: AssignUserToDormitory（多次调用）
-- **前置条件**:
-  - 创建容量为 4 的宿舍
-  - 有 4 个待分配的学生
-- **输入数据**: 分别分配 4 个学生
-- **预期结果**:
-  1. 4 个学生都成功分配
-  2. 4 个床位都变为 'occupied'
-  3. occupiedBeds = 4
-  4. availableBeds = 0
-  5. occupancyRate = 100%
-- **后置验证**: 宿舍已满员
-
-### TC010: 宿舍容量边界测试
+### TC008: Create Dormitory with Maximum Capacity (via CreateDormitory Interaction)
 - **Interaction**: CreateDormitory
-- **前置条件**: 管理员已登录
-- **测试数据**:
-  - 容量 4：最小值
-  - 容量 5：中间值
-  - 容量 6：最大值
-- **预期结果**: 
-  1. 三个宿舍都创建成功
-  2. 分别创建 4、5、6 个床位
-  3. 床位编号正确（1-4、1-5、1-6）
-- **后置验证**: 床位数量与容量一致
+- **Preconditions**: Admin user exists
+- **Input Data**:
+  ```typescript
+  user: admin
+  payload: {
+    name: "Building B Room 201",
+    capacity: 6,
+    floor: 2,
+    building: "B"
+  }
+  ```
+- **Expected Results**:
+  1. Dormitory created with capacity 6
+  2. 6 Bed entities created
+  3. All 6 beds linked to dormitory
+- **Post Validation**: Dormitory has 6 available beds
+
+### TC009: Multiple Violations Accumulation (via RecordViolation Interaction)
+- **Interaction**: RecordViolation (multiple calls)
+- **Preconditions**:
+  - DormHead exists
+  - Student with 100 points
+- **Test Sequence**:
+  1. First violation: 10 points (noise)
+  2. Second violation: 20 points (curfew)
+  3. Third violation: 15 points (hygiene)
+- **Expected Results**:
+  1. Three ViolationRecord entities created
+  2. User points: 100 → 90 → 70 → 55
+  3. All violations linked to user
+  4. User becomes eligible for eviction (points < 60)
+- **Post Validation**: User has 3 violations, 55 points
+
+### TC010: Full Dormitory Assignment (via AssignUserToDormitory Interaction)
+- **Interaction**: AssignUserToDormitory (multiple calls)
+- **Preconditions**:
+  - Admin exists
+  - Dormitory with 4 beds exists
+  - 4 unassigned students exist
+- **Test Sequence**: Assign all 4 students to the 4 beds
+- **Expected Results**:
+  1. All 4 beds status = 'occupied'
+  2. Dormitory occupancy = 4
+  3. Available beds = 0
+  4. All students linked to dormitory
+- **Post Validation**: Dormitory is at full capacity
 
 ---
 
-## Stage 2: Permission Tests（权限控制测试）
+## Stage 2A: Permission Tests
 
-### TC011: 非管理员创建宿舍（权限拒绝）
+These tests verify role-based access control after core logic is working.
+
+### TC011: Non-Admin Cannot Create Dormitory
 - **Interaction**: CreateDormitory
-- **前置条件**: 宿舍长用户登录
-- **输入数据**:
-  ```javascript
-  {
-    user: { id: 'student1', role: 'dormHead' },
-    payload: { name: 'B栋201', capacity: 4 }
-  }
+- **Preconditions**: Student user exists
+- **Input Data**:
+  ```typescript
+  user: student (role='student')
+  payload: { name: "Unauthorized", capacity: 4, floor: 1, building: "A" }
   ```
-- **预期结果**:
-  1. Interaction 返回错误
-  2. 错误类型为权限不足
-  3. 没有创建宿舍记录
-- **后置验证**: 宿舍查询不存在 'B栋201'
+- **Expected Results**:
+  1. Interaction returns error
+  2. Error indicates permission denied
+  3. No dormitory created
+- **Post Validation**: Dormitory does not exist
 
-### TC012: 普通用户记录违规（权限拒绝）
+### TC012: Non-Admin Cannot Appoint DormHead
+- **Interaction**: AppointDormHead
+- **Preconditions**: 
+  - Student user exists
+  - Another student exists
+  - Dormitory exists
+- **Input Data**:
+  ```typescript
+  user: student
+  payload: { userId: otherStudent.id, dormitoryId: dormitory.id }
+  ```
+- **Expected Results**:
+  1. Interaction returns error
+  2. Error indicates permission denied
+  3. No role change occurs
+- **Post Validation**: User role remains 'student'
+
+### TC013: DormHead Cannot Manage Other Dormitories
 - **Interaction**: RecordViolation
-- **前置条件**: 普通学生用户登录
-- **输入数据**:
-  ```javascript
-  {
-    user: { id: 'student3', role: 'student' },
-    payload: {
-      userId: 'student4',
-      reason: '测试违规',
-      score: 5
-    }
+- **Preconditions**:
+  - DormHead manages Dormitory A
+  - Student assigned to Dormitory B
+- **Input Data**:
+  ```typescript
+  user: dormHeadA
+  payload: { 
+    userId: studentInDormB.id,
+    description: "Violation",
+    points: 10,
+    category: "noise"
   }
   ```
-- **预期结果**:
-  1. Interaction 返回错误
-  2. 错误类型为权限不足
-  3. 没有创建违规记录
-- **后置验证**: 目标用户违规分数不变
+- **Expected Results**:
+  1. Interaction returns error
+  2. Error indicates not authorized for this dormitory
+  3. No violation recorded
+- **Post Validation**: Student has no violations
 
-### TC013: 宿舍长记录其他宿舍成员违规（权限拒绝）
+### TC014: Student Cannot Record Violations
 - **Interaction**: RecordViolation
-- **前置条件**: 
-  - A栋宿舍长登录
-  - 目标用户在B栋
-- **输入数据**:
-  ```javascript
-  {
-    user: { id: 'dormHeadA', role: 'dormHead' },
-    payload: {
-      userId: 'studentInDormB',
-      reason: '跨宿舍记录',
-      score: 5
-    }
+- **Preconditions**:
+  - Student user exists
+  - Another student in same dormitory
+- **Input Data**:
+  ```typescript
+  user: student
+  payload: {
+    userId: otherStudent.id,
+    description: "Violation",
+    points: 10,
+    category: "noise"
   }
   ```
-- **预期结果**:
-  1. Interaction 返回错误
-  2. 错误信息提示只能管理本宿舍
-  3. 没有创建违规记录
-- **后置验证**: 目标用户无新增违规
+- **Expected Results**:
+  1. Interaction returns error
+  2. Error indicates permission denied
+  3. No violation recorded
+- **Post Validation**: No violation created
 
-### TC014: 非管理员审批踢出申请（权限拒绝）
-- **Interaction**: ApproveEviction
-- **前置条件**: 
-  - 宿舍长用户登录
-  - 存在 pending 申请
-- **输入数据**:
-  ```javascript
-  {
-    user: { id: 'student1', role: 'dormHead' },
-    payload: {
-      requestId: 'eviction-3',
-      comment: '批准'
-    }
+### TC015: Only Admin Can Review Eviction Requests
+- **Interaction**: ReviewEvictionRequest
+- **Preconditions**:
+  - DormHead exists
+  - Pending eviction request exists
+- **Input Data**:
+  ```typescript
+  user: dormHead
+  payload: {
+    requestId: request.id,
+    decision: "approve",
+    adminNotes: "Trying to approve"
   }
   ```
-- **预期结果**:
-  1. Interaction 返回错误
-  2. 错误类型为权限不足
-  3. 申请状态保持 pending
-- **后置验证**: 申请状态未改变
+- **Expected Results**:
+  1. Interaction returns error
+  2. Error indicates admin permission required
+  3. Request remains pending
+- **Post Validation**: Request status unchanged
 
-### TC015: 非管理员分配用户到宿舍（权限拒绝）
+---
+
+## Stage 2B: Business Rule Tests
+
+These tests verify business constraints and validations.
+
+### TC016: Cannot Create Dormitory with Invalid Capacity
+- **Interaction**: CreateDormitory
+- **Preconditions**: Admin exists
+- **Input Data**:
+  ```typescript
+  user: admin
+  payload: {
+    name: "Invalid Room",
+    capacity: 3,  // Below minimum
+    floor: 1,
+    building: "A"
+  }
+  ```
+- **Expected Results**:
+  1. Interaction returns error
+  2. Error indicates capacity must be 4-6
+  3. No dormitory created
+- **Post Validation**: Dormitory does not exist
+
+### TC017: Cannot Assign Already Assigned User
 - **Interaction**: AssignUserToDormitory
-- **前置条件**: 宿舍长用户登录
-- **输入数据**:
-  ```javascript
-  {
-    user: { id: 'student1', role: 'dormHead' },
-    payload: {
-      userId: 'newStudent',
-      dormitoryId: 'dorm-1'
-    }
+- **Preconditions**:
+  - Admin exists
+  - Student already assigned to a dormitory
+  - Another dormitory with vacant beds
+- **Input Data**:
+  ```typescript
+  user: admin
+  payload: {
+    userId: assignedStudent.id,
+    dormitoryId: otherDormitory.id,
+    bedId: vacantBed.id
   }
   ```
-- **预期结果**:
-  1. Interaction 返回错误
-  2. 错误类型为权限不足
-  3. 用户未被分配
-- **后置验证**: 用户无宿舍关联
+- **Expected Results**:
+  1. Interaction returns error
+  2. Error indicates user already assigned
+  3. User remains in original dormitory
+- **Post Validation**: User still in first dormitory only
 
----
-
-## Stage 2: Business Rule Tests（业务规则测试）
-
-### TC016: 创建容量超限的宿舍（业务规则）
-- **Interaction**: CreateDormitory
-- **前置条件**: 管理员已登录
-- **输入数据**:
-  ```javascript
-  {
-    user: { id: 'admin-1', role: 'admin' },
-    payload: { 
-      name: 'C栋101', 
-      capacity: 10  // 超过最大值6
-    }
-  }
-  ```
-- **预期结果**:
-  1. Interaction 返回错误
-  2. 错误信息提示容量必须在4-6之间
-  3. 没有创建宿舍
-- **后置验证**: 宿舍不存在
-
-### TC017: 创建容量过小的宿舍（业务规则）
-- **Interaction**: CreateDormitory
-- **前置条件**: 管理员已登录
-- **输入数据**:
-  ```javascript
-  {
-    user: { id: 'admin-1', role: 'admin' },
-    payload: { 
-      name: 'C栋102', 
-      capacity: 2  // 小于最小值4
-    }
-  }
-  ```
-- **预期结果**:
-  1. Interaction 返回错误
-  2. 错误信息提示容量必须在4-6之间
-  3. 没有创建宿舍
-- **后置验证**: 宿舍不存在
-
-### TC018: 重复分配用户到宿舍（业务规则）
+### TC018: Cannot Assign to Occupied Bed
 - **Interaction**: AssignUserToDormitory
-- **前置条件**: 
-  - 用户已分配到宿舍A
-  - 尝试分配到宿舍B
-- **输入数据**:
-  ```javascript
-  {
-    user: { id: 'admin-1', role: 'admin' },
-    payload: {
-      userId: 'student1',
-      dormitoryId: 'dorm-2'
-    }
+- **Preconditions**:
+  - Admin exists
+  - Unassigned student
+  - Bed already occupied
+- **Input Data**:
+  ```typescript
+  user: admin
+  payload: {
+    userId: newStudent.id,
+    dormitoryId: dormitory.id,
+    bedId: occupiedBed.id
   }
   ```
-- **预期结果**:
-  1. Interaction 返回错误
-  2. 错误信息提示用户已有宿舍
-  3. 用户保持原宿舍不变
-- **后置验证**: 用户仍在原宿舍
+- **Expected Results**:
+  1. Interaction returns error
+  2. Error indicates bed is occupied
+  3. Bed remains with original occupant
+- **Post Validation**: Original occupant unchanged
 
-### TC019: 分配用户到满员宿舍（业务规则）
+### TC019: Cannot Submit Eviction for High-Points User
+- **Interaction**: SubmitEvictionRequest
+- **Preconditions**:
+  - DormHead exists
+  - Student with 80 points (above 60 threshold)
+- **Input Data**:
+  ```typescript
+  user: dormHead
+  payload: {
+    userId: highPointsStudent.id,
+    reason: "Trying to evict"
+  }
+  ```
+- **Expected Results**:
+  1. Interaction returns error
+  2. Error indicates insufficient grounds (points >= 60)
+  3. No eviction request created
+- **Post Validation**: No pending eviction request
+
+### TC020: Cannot Submit Duplicate Eviction Request
+- **Interaction**: SubmitEvictionRequest
+- **Preconditions**:
+  - DormHead exists
+  - Student with low points
+  - Pending eviction request already exists for student
+- **Input Data**:
+  ```typescript
+  user: dormHead
+  payload: {
+    userId: student.id,
+    reason: "Another eviction attempt"
+  }
+  ```
+- **Expected Results**:
+  1. Interaction returns error
+  2. Error indicates pending request exists
+  3. No new request created
+- **Post Validation**: Only one pending request exists
+
+### TC021: Cannot Appoint DormHead to Already Managed Dormitory
+- **Interaction**: AppointDormHead
+- **Preconditions**:
+  - Admin exists
+  - Dormitory with existing dormHead
+  - Another student user
+- **Input Data**:
+  ```typescript
+  user: admin
+  payload: {
+    userId: newStudent.id,
+    dormitoryId: managedDormitory.id
+  }
+  ```
+- **Expected Results**:
+  1. Interaction returns error
+  2. Error indicates dormitory already has dormHead
+  3. Original dormHead unchanged
+- **Post Validation**: Original dormHead remains
+
+### TC022: Cannot Assign Evicted User
 - **Interaction**: AssignUserToDormitory
-- **前置条件**: 
-  - 宿舍已满员（4/4）
-  - 有新用户待分配
-- **输入数据**:
-  ```javascript
-  {
-    user: { id: 'admin-1', role: 'admin' },
-    payload: {
-      userId: 'newStudent',
-      dormitoryId: 'full-dorm'
-    }
+- **Preconditions**:
+  - Admin exists
+  - User with status='evicted'
+  - Dormitory with vacant beds
+- **Input Data**:
+  ```typescript
+  user: admin
+  payload: {
+    userId: evictedUser.id,
+    dormitoryId: dormitory.id,
+    bedId: vacantBed.id
   }
   ```
-- **预期结果**:
-  1. Interaction 返回错误
-  2. 错误信息提示宿舍已满
-  3. 用户未被分配
-- **后置验证**: 宿舍仍为满员状态
+- **Expected Results**:
+  1. Interaction returns error
+  2. Error indicates user is evicted
+  3. User remains unassigned
+- **Post Validation**: User not in any dormitory
 
-### TC020: 申请踢出违规分数不足的用户（业务规则）
-- **Interaction**: RequestEviction
-- **前置条件**: 
-  - 用户违规分数为 20（< 30）
-  - 宿舍长尝试申请踢出
-- **输入数据**:
-  ```javascript
-  {
-    user: { id: 'dormHead1', role: 'dormHead' },
-    payload: {
-      userId: 'lowScoreStudent',
-      reason: '尝试踢出'
-    }
+### TC023: Cannot Assign to Full Dormitory
+- **Interaction**: AssignUserToDormitory
+- **Preconditions**:
+  - Admin exists
+  - Dormitory at full capacity (all beds occupied)
+  - Unassigned student
+- **Input Data**:
+  ```typescript
+  user: admin
+  payload: {
+    userId: student.id,
+    dormitoryId: fullDormitory.id,
+    bedId: "any"  // Even if specified, all are occupied
   }
   ```
-- **预期结果**:
-  1. Interaction 返回错误
-  2. 错误信息提示违规分数不足30分
-  3. 没有创建踢出申请
-- **后置验证**: 无新的踢出申请记录
+- **Expected Results**:
+  1. Interaction returns error
+  2. Error indicates no available beds
+  3. Student remains unassigned
+- **Post Validation**: Dormitory remains at full capacity
 
-### TC021: 宿舍长记录自己的违规（业务规则）
+### TC024: Points Cannot Go Below Zero
 - **Interaction**: RecordViolation
-- **前置条件**: 宿舍长尝试记录自己
-- **输入数据**:
-  ```javascript
-  {
-    user: { id: 'dormHead1', role: 'dormHead' },
-    payload: {
-      userId: 'dormHead1',  // 自己
-      reason: '自我违规',
-      score: 5
-    }
+- **Preconditions**:
+  - DormHead exists
+  - Student with 10 points
+- **Input Data**:
+  ```typescript
+  user: dormHead
+  payload: {
+    userId: student.id,
+    description: "Major violation",
+    points: 50,  // Would result in -40
+    category: "damage"
   }
   ```
-- **预期结果**:
-  1. Interaction 返回错误
-  2. 错误信息提示不能记录自己
-  3. 没有创建违规记录
-- **后置验证**: 宿舍长违规分数不变
+- **Expected Results**:
+  1. Violation recorded
+  2. User points set to 0 (not negative)
+  3. User eligible for eviction
+- **Post Validation**: User has 0 points
 
-### TC022: 宿舍长申请踢出自己（业务规则）
-- **Interaction**: RequestEviction
-- **前置条件**: 宿舍长违规分数≥30
-- **输入数据**:
-  ```javascript
-  {
-    user: { id: 'dormHead1', role: 'dormHead' },
-    payload: {
-      userId: 'dormHead1',  // 自己
-      reason: '自我踢出'
-    }
+### TC025: Cannot Review Non-Pending Request
+- **Interaction**: ReviewEvictionRequest
+- **Preconditions**:
+  - Admin exists
+  - Already approved eviction request
+- **Input Data**:
+  ```typescript
+  user: admin
+  payload: {
+    requestId: approvedRequest.id,
+    decision: "reject",
+    adminNotes: "Trying to change decision"
   }
   ```
-- **预期结果**:
-  1. Interaction 返回错误
-  2. 错误信息提示不能申请踢出自己
-  3. 没有创建踢出申请
-- **后置验证**: 无新的踢出申请
-
-### TC023: 指定非本宿舍成员为宿舍长（业务规则）
-- **Interaction**: AssignDormHead
-- **前置条件**: 
-  - 用户A在宿舍1
-  - 尝试指定为宿舍2的宿舍长
-- **输入数据**:
-  ```javascript
-  {
-    user: { id: 'admin-1', role: 'admin' },
-    payload: {
-      userId: 'userInDorm1',
-      dormitoryId: 'dorm-2'
-    }
-  }
-  ```
-- **预期结果**:
-  1. Interaction 返回错误
-  2. 错误信息提示必须是本宿舍成员
-  3. 不建立宿舍长关系
-- **后置验证**: 宿舍2无宿舍长
-
-### TC024: 分配被踢出的用户到宿舍（业务规则）
-- **Interaction**: AssignUserToDormitory
-- **前置条件**: 用户状态为 evicted
-- **输入数据**:
-  ```javascript
-  {
-    user: { id: 'admin-1', role: 'admin' },
-    payload: {
-      userId: 'evictedUser',
-      dormitoryId: 'dorm-3'
-    }
-  }
-  ```
-- **预期结果**:
-  1. Interaction 返回错误
-  2. 错误信息提示用户已被踢出
-  3. 用户未被分配
-- **后置验证**: 用户无宿舍关联
-
-### TC025: 违规扣分超限（业务规则）
-- **Interaction**: RecordViolation
-- **前置条件**: 宿舍长记录违规
-- **输入数据**:
-  ```javascript
-  {
-    user: { id: 'dormHead1', role: 'dormHead' },
-    payload: {
-      userId: 'student5',
-      reason: '严重违规',
-      score: 15  // 超过最大值10
-    }
-  }
-  ```
-- **预期结果**:
-  1. Interaction 返回错误
-  2. 错误信息提示扣分必须在1-10之间
-  3. 没有创建违规记录
-- **后置验证**: 用户违规分数不变
-
-### TC026: 创建重名宿舍（业务规则）
-- **Interaction**: CreateDormitory
-- **前置条件**: 
-  - 已存在宿舍 'A栋301'
-- **输入数据**:
-  ```javascript
-  {
-    user: { id: 'admin-1', role: 'admin' },
-    payload: { 
-      name: 'A栋301',  // 重复名称
-      capacity: 5
-    }
-  }
-  ```
-- **预期结果**:
-  1. Interaction 返回错误
-  2. 错误信息提示宿舍名称已存在
-  3. 没有创建新宿舍
-- **后置验证**: 只有一个名为 'A栋301' 的宿舍
-
-### TC027: 处理已处理的踢出申请（业务规则）
-- **Interaction**: ApproveEviction
-- **前置条件**: 申请已被批准（状态为 approved）
-- **输入数据**:
-  ```javascript
-  {
-    user: { id: 'admin-1', role: 'admin' },
-    payload: {
-      requestId: 'processed-eviction',
-      comment: '重复批准'
-    }
-  }
-  ```
-- **预期结果**:
-  1. Interaction 返回错误
-  2. 错误信息提示申请已处理
-  3. 申请状态保持不变
-- **后置验证**: 申请仍为 approved 状态
+- **Expected Results**:
+  1. Interaction returns error
+  2. Error indicates request already decided
+  3. Request status remains 'approved'
+- **Post Validation**: Request unchanged
 
 ---
 
-## 复杂场景测试
+## Test Execution Strategy
 
-### TC028: 完整业务流程测试
-- **测试流程**:
-  1. 管理员创建宿舍（容量4）
-  2. 管理员分配4个学生
-  3. 管理员指定第1个学生为宿舍长
-  4. 宿舍长记录第2个学生多次违规（累计35分）
-  5. 宿舍长申请踢出第2个学生
-  6. 管理员批准踢出
-  7. 管理员分配新学生到空出的床位
-- **预期结果**: 每步都成功执行，最终宿舍仍为满员
+### Stage 1 Testing (Core Business Logic)
+1. Run tests TC001-TC010
+2. All must pass before proceeding
+3. If failures, fix implementation and retest
+4. Ensure 100% pass rate
 
-### TC029: 并发分配测试
-- **测试场景**: 模拟两个管理员同时分配不同用户到同一床位
-- **预期结果**: 只有一个分配成功，另一个失败
+### Stage 2A Testing (Permissions)
+1. Only start after Stage 1 complete
+2. Run tests TC011-TC015
+3. Stage 1 tests should still pass
+4. Fix permission implementation if needed
 
-### TC030: 批量操作测试
-- **测试场景**: 
-  1. 批量创建10个宿舍
-  2. 批量分配40个用户
-  3. 批量记录违规
-- **预期结果**: 所有操作正确执行，数据一致
+### Stage 2B Testing (Business Rules)
+1. Only start after Stage 1 complete
+2. Run tests TC016-TC025
+3. Stage 1 tests should still pass
+4. Fix business rule implementation if needed
 
----
+### Complete Test Suite
+- After all stages implemented:
+  - All 25 test cases should pass
+  - Stage 1 tests verify core functionality with valid inputs
+  - Stage 2 tests verify invalid inputs are rejected
+  - System is production-ready
 
-## 测试数据准备
+## Notes on Test Implementation
 
-### 基础测试数据
-```javascript
-// 用户数据
-const testUsers = {
-  admin1: { id: 'admin-1', name: '系统管理员', email: 'admin@test.com', role: 'admin' },
-  dormHead1: { id: 'dorm-head-1', name: '宿舍长1', email: 'head1@test.com', role: 'dormHead' },
-  student1: { id: 'student-1', name: '学生1', email: 'student1@test.com', role: 'student' },
-  student2: { id: 'student-2', name: '学生2', email: 'student2@test.com', role: 'student' },
-  // ... 更多测试用户
-};
-
-// 宿舍数据
-const testDorms = {
-  dormA301: { id: 'dorm-1', name: 'A栋301', capacity: 4 },
-  dormA302: { id: 'dorm-2', name: 'A栋302', capacity: 6 },
-  dormB201: { id: 'dorm-3', name: 'B栋201', capacity: 5 },
-};
-
-// 违规类型
-const violationTypes = [
-  { reason: '晚归', score: 3 },
-  { reason: '违规使用电器', score: 5 },
-  { reason: '打架斗殴', score: 10 },
-  { reason: '破坏公物', score: 8 },
-  { reason: '噪音扰民', score: 4 },
-];
-```
-
----
-
-## 测试执行顺序
-
-1. **Stage 1 Tests (TC001-TC010)**：先执行所有核心业务逻辑测试，确保基本功能正常
-2. **Stage 2 Permission Tests (TC011-TC015)**：在Stage 1全部通过后执行权限测试
-3. **Stage 2 Business Rule Tests (TC016-TC027)**：在Stage 1全部通过后执行业务规则测试
-4. **Complex Scenario Tests (TC028-TC030)**：最后执行复杂场景测试
-
----
-
-## 注意事项
-
-1. **不要直接操作 storage**：所有测试必须通过 Interactions 进行
-2. **Stage 1 使用正确的数据**：即使权限未实施，也要使用正确的角色和有效数据
-3. **保持测试独立性**：每个测试用例应该独立运行，不依赖其他测试的结果
-4. **清理测试数据**：每个测试结束后清理创建的数据，避免影响其他测试
-5. **验证完整性**：不仅验证主要结果，还要验证相关的计算属性和关系状态
+1. **Always use Interactions**: Never test by directly calling storage.create or storage.update
+2. **Use proper user roles**: Even in Stage 1, create users with correct roles
+3. **Use valid data**: In Stage 1, use data that will pass future business rules
+4. **Check complete state**: Verify all affected entities and relations after each interaction
+5. **Test atomicity**: Ensure failed operations don't partially modify state
+6. **Verify computations**: Check that computed properties update correctly
+7. **Test cascading effects**: Ensure related entities update appropriately
+8. **Use realistic scenarios**: Test cases should reflect actual usage patterns

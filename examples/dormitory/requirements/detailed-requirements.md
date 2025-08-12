@@ -1,311 +1,298 @@
-# 宿舍管理系统详细需求分析
+# Detailed Requirements Analysis - Dormitory Management System
 
-## 1. 系统概述
+## 1. Business Overview
+A comprehensive dormitory management system for educational institutions, enabling effective room assignment, discipline tracking, and eviction management processes.
 
-宿舍管理系统是一个用于高校或企业宿舍管理的业务系统，支持宿舍创建、人员分配、违规管理和踢出申请等核心功能。系统采用角色权限管理，确保不同角色用户只能执行授权的操作。
+## 2. Data Perspective Analysis
 
-## 2. 用户角色定义
+### 2.1 Core Entities
 
-### 2.1 管理员 (admin)
-- **职责**：系统的最高权限管理者
-- **权限**：
-  - 创建和管理宿舍
-  - 指定宿舍长
-  - 分配用户到宿舍床位
-  - 审批踢出申请
-  - 查看所有系统数据
+#### User
+- **Purpose**: Represents all system users with different roles
+- **Properties**:
+  - id: string (system-generated)
+  - name: string (user's display name)
+  - email: string (unique identifier for login)
+  - role: string (admin/dormHead/student)
+  - points: number (behavior points, default 100)
+  - status: string (active/evicted)
+  - evictedAt: number (timestamp when evicted, optional)
 
-### 2.2 宿舍长 (dormHead)
-- **职责**：负责管理特定宿舍的日常事务
-- **权限**：
-  - 记录宿舍成员的违规行为
-  - 申请踢出违规严重的成员
-  - 查看所管理宿舍的详细信息
-  - 查看宿舍成员的违规记录
+#### Dormitory
+- **Purpose**: Represents dormitory rooms
+- **Properties**:
+  - id: string (system-generated)
+  - name: string (dormitory identifier, e.g., "Building A Room 101")
+  - capacity: number (4-6 beds per room)
+  - floor: number (floor number)
+  - building: string (building identifier)
+  - status: string (active/inactive)
+  - createdAt: number (timestamp)
 
-### 2.3 普通用户/学生 (student)
-- **职责**：宿舍的普通住户
-- **权限**：
-  - 查看自己的宿舍信息
-  - 查看自己的违规记录
-  - 查看同宿舍成员的基本信息
+#### Bed
+- **Purpose**: Individual bed within a dormitory
+- **Properties**:
+  - id: string (system-generated)
+  - number: string (bed identifier within room, e.g., "A", "B", "C")
+  - status: string (vacant/occupied/maintenance)
+  - assignedAt: number (timestamp when last assigned)
 
-## 3. 数据实体分析
+#### ViolationRecord
+- **Purpose**: Track user behavior violations and point deductions
+- **Properties**:
+  - id: string (system-generated)
+  - description: string (violation details)
+  - points: number (points deducted)
+  - category: string (hygiene/noise/curfew/damage/other)
+  - createdAt: number (timestamp)
+  - recordedBy: string (name of the dormHead who recorded)
 
-### 3.1 User（用户）
-**用途**：系统中的所有用户账户
-**属性**：
-- id: string - 系统生成的唯一标识
-- name: string - 用户姓名
-- email: string - 用户邮箱（唯一）
-- role: string - 用户角色 (admin/dormHead/student)
-- status: string - 用户状态 (active/inactive/evicted)
-- violationScore: number - 累计违规分数（默认0）
-- createdAt: number - 创建时间戳
-- updatedAt: number - 更新时间戳
+#### EvictionRequest
+- **Purpose**: Formal request to evict a student from dormitory
+- **Properties**:
+  - id: string (system-generated)
+  - reason: string (detailed reason for eviction)
+  - status: string (pending/approved/rejected)
+  - requestedAt: number (timestamp)
+  - decidedAt: number (timestamp when decision made, optional)
+  - adminNotes: string (admin's decision notes, optional)
 
-### 3.2 Dormitory（宿舍）
-**用途**：宿舍楼或宿舍房间
-**属性**：
-- id: string - 系统生成的唯一标识
-- name: string - 宿舍名称（如"A栋301"）
-- capacity: number - 床位容量（4-6）
-- status: string - 宿舍状态 (active/inactive)
-- createdAt: number - 创建时间戳
-- updatedAt: number - 更新时间戳
+### 2.2 Entity Relationships
 
-### 3.3 Bed（床位）
-**用途**：宿舍内的单个床位
-**属性**：
-- id: string - 系统生成的唯一标识
-- number: number - 床位编号（1-6）
-- status: string - 床位状态 (available/occupied)
-- createdAt: number - 创建时间戳
-- updatedAt: number - 更新时间戳
+#### UserDormitoryRelation (n:1)
+- **Source**: User (many)
+- **Target**: Dormitory (one)
+- **Source Property**: dormitory
+- **Target Property**: residents
+- **Purpose**: Assigns users to dormitories
+- **Properties**:
+  - assignedAt: number (timestamp)
+  - assignedBy: string (admin who made assignment)
 
-### 3.4 ViolationRecord（违规记录）
-**用途**：记录用户的违规行为
-**属性**：
-- id: string - 系统生成的唯一标识
-- reason: string - 违规原因描述
-- score: number - 扣分值（1-10分）
-- createdAt: number - 记录时间戳
+#### UserBedRelation (1:1)
+- **Source**: User (one)
+- **Target**: Bed (one)
+- **Source Property**: bed
+- **Target Property**: occupant
+- **Purpose**: Assigns users to specific beds
+- **Properties**:
+  - assignedAt: number (timestamp)
 
-### 3.5 EvictionRequest（踢出申请）
-**用途**：宿舍长对违规用户的踢出申请
-**属性**：
-- id: string - 系统生成的唯一标识
-- reason: string - 申请理由
-- status: string - 申请状态 (pending/approved/rejected)
-- createdAt: number - 申请时间戳
-- processedAt: number - 处理时间戳（可选）
-- adminComment: string - 管理员处理意见（可选）
+#### DormitoryBedRelation (1:n)
+- **Source**: Dormitory (one)
+- **Target**: Bed (many)
+- **Source Property**: beds
+- **Target Property**: dormitory
+- **Purpose**: Links beds to their dormitory
 
-## 4. 关系定义
+#### DormitoryDormHeadRelation (1:1)
+- **Source**: Dormitory (one)
+- **Target**: User (one, with role='dormHead')
+- **Source Property**: dormHead
+- **Target Property**: managedDormitory
+- **Purpose**: Assigns dormitory head to manage a dormitory
+- **Properties**:
+  - appointedAt: number (timestamp)
+  - appointedBy: string (admin who appointed)
 
-### 4.1 UserDormitoryRelation（用户-宿舍关系）
-- **类型**：n:1（多个用户对应一个宿舍）
-- **含义**：用户被分配到的宿舍
-- **源属性**：dormitory（在User上）
-- **目标属性**：users（在Dormitory上）
-- **关系属性**：
-  - assignedAt: number - 分配时间戳
-  - assignedBy: string - 分配人ID
+#### UserViolationRelation (1:n)
+- **Source**: User (one)
+- **Target**: ViolationRecord (many)
+- **Source Property**: violations
+- **Target Property**: user
+- **Purpose**: Links violation records to users
 
-### 4.2 UserBedRelation（用户-床位关系）
-- **类型**：1:1（一个用户对应一个床位）
-- **含义**：用户占用的具体床位
-- **源属性**：bed（在User上）
-- **目标属性**：occupant（在Bed上）
-- **关系属性**：
-  - assignedAt: number - 分配时间戳
+#### UserEvictionRequestRelation (1:n)
+- **Source**: User (one)
+- **Target**: EvictionRequest (many)
+- **Source Property**: evictionRequests
+- **Target Property**: targetUser
+- **Purpose**: Links eviction requests to target users
 
-### 4.3 DormitoryBedsRelation（宿舍-床位关系）
-- **类型**：1:n（一个宿舍对应多个床位）
-- **含义**：宿舍包含的所有床位
-- **源属性**：beds（在Dormitory上）
-- **目标属性**：dormitory（在Bed上）
+#### DormHeadEvictionRequestRelation (1:n)
+- **Source**: User (one, dormHead)
+- **Target**: EvictionRequest (many)
+- **Source Property**: submittedEvictionRequests
+- **Target Property**: requestedBy
+- **Purpose**: Links eviction requests to the dormHead who submitted them
 
-### 4.4 DormitoryDormHeadRelation（宿舍-宿舍长关系）
-- **类型**：1:1（一个宿舍对应一个宿舍长）
-- **含义**：负责管理该宿舍的宿舍长
-- **源属性**：dormHead（在Dormitory上）
-- **目标属性**：managedDormitory（在User上）
-- **关系属性**：
-  - appointedAt: number - 任命时间戳
+## 3. Interaction Perspective Analysis
 
-### 4.5 UserViolationRelation（用户-违规记录关系）
-- **类型**：1:n（一个用户对应多个违规记录）
-- **含义**：用户的所有违规记录
-- **源属性**：violations（在User上）
-- **目标属性**：user（在ViolationRecord上）
+### 3.1 Administrator Operations
 
-### 4.6 ViolationRecorderRelation（违规记录-记录人关系）
-- **类型**：n:1（多个违规记录对应一个记录人）
-- **含义**：记录违规的宿舍长
-- **源属性**：recordedBy（在ViolationRecord上）
-- **目标属性**：recordedViolations（在User上）
+#### CreateDormitory
+- **Purpose**: Create a new dormitory room
+- **Payload**: name, capacity, floor, building
+- **Validations**: 
+  - Capacity must be 4-6
+  - Name must be unique
+- **Effects**: Creates Dormitory and associated Beds
 
-### 4.7 EvictionRequestUserRelation（踢出申请-用户关系）
-- **类型**：n:1（多个申请对应一个用户）
-- **含义**：被申请踢出的用户
-- **源属性**：targetUser（在EvictionRequest上）
-- **目标属性**：evictionRequests（在User上）
+#### AppointDormHead
+- **Purpose**: Appoint a user as dormitory head
+- **Payload**: userId, dormitoryId
+- **Validations**:
+  - User must be student role
+  - Dormitory cannot already have a dormHead
+  - User cannot already be a dormHead
+- **Effects**: 
+  - Updates user role to 'dormHead'
+  - Creates DormitoryDormHeadRelation
 
-### 4.8 EvictionRequestDormHeadRelation（踢出申请-宿舍长关系）
-- **类型**：n:1（多个申请对应一个宿舍长）
-- **含义**：发起申请的宿舍长
-- **源属性**：requestedBy（在EvictionRequest上）
-- **目标属性**：submittedEvictions（在User上）
+#### AssignUserToDormitory
+- **Purpose**: Assign a student to a dormitory and bed
+- **Payload**: userId, dormitoryId, bedId
+- **Validations**:
+  - User must not be already assigned
+  - Bed must be vacant
+  - Bed must belong to specified dormitory
+  - User must not be evicted
+- **Effects**:
+  - Creates UserDormitoryRelation
+  - Creates UserBedRelation
+  - Updates bed status to 'occupied'
 
-### 4.9 EvictionRequestAdminRelation（踢出申请-管理员关系）
-- **类型**：n:1（多个申请对应一个管理员）
-- **含义**：处理申请的管理员
-- **源属性**：processedBy（在EvictionRequest上）
-- **目标属性**：processedEvictions（在User上）
+#### ReviewEvictionRequest
+- **Purpose**: Approve or reject eviction request
+- **Payload**: requestId, decision (approve/reject), adminNotes
+- **Validations**:
+  - Request must be pending
+- **Effects**:
+  - Updates request status
+  - If approved: Updates user status to 'evicted', removes from dormitory and bed
 
-## 5. 业务流程
+### 3.2 Dormitory Head Operations
 
-### 5.1 宿舍创建流程
-1. 管理员创建宿舍，指定名称和容量
-2. 系统自动创建对应数量的床位（编号1到capacity）
-3. 所有床位初始状态为"available"
+#### RecordViolation
+- **Purpose**: Record a violation for a resident
+- **Payload**: userId, description, points, category
+- **Validations**:
+  - User must be in dormHead's dormitory
+  - Points must be positive
+  - User must not already be evicted
+- **Effects**:
+  - Creates ViolationRecord
+  - Deducts points from user
 
-### 5.2 用户分配流程
-1. 管理员选择用户和目标宿舍
-2. 系统检查宿舍是否有空床位
-3. 如果有空床位，分配用户到该宿舍的第一个空床位
-4. 更新床位状态为"occupied"
-5. 建立用户与宿舍、用户与床位的关系
+#### SubmitEvictionRequest
+- **Purpose**: Request eviction of a problematic resident
+- **Payload**: userId, reason
+- **Validations**:
+  - User must be in dormHead's dormitory
+  - User must have low points (< 60)
+  - No pending eviction request for user
+- **Effects**: Creates EvictionRequest with pending status
 
-### 5.3 宿舍长任命流程
-1. 管理员选择一个宿舍和一个用户
-2. 检查用户是否已经是该宿舍的成员
-3. 更新用户角色为"dormHead"
-4. 建立宿舍与宿舍长的关系
+### 3.3 Student Operations
 
-### 5.4 违规记录流程
-1. 宿舍长选择本宿舍的一个成员
-2. 填写违规原因和扣分值（1-10分）
-3. 创建违规记录
-4. 更新用户的累计违规分数
+#### ViewMyDormitory
+- **Purpose**: View assigned dormitory information
+- **Query**: Returns user's dormitory, bed, roommates
 
-### 5.5 踢出申请流程
-1. 宿舍长检查某用户的累计违规分数
-2. 如果分数达到阈值（如30分），可以发起踢出申请
-3. 填写申请理由，创建踢出申请（状态为pending）
-4. 管理员审核申请
-5. 如果批准：
-   - 更新申请状态为approved
-   - 更新用户状态为evicted
-   - 释放用户占用的床位
-   - 解除用户与宿舍的关系
-6. 如果拒绝：
-   - 更新申请状态为rejected
-   - 记录拒绝理由
+#### ViewMyViolations
+- **Purpose**: View violation history and current points
+- **Query**: Returns user's violations and current points
 
-## 6. 业务规则
+#### ViewMyEvictionStatus
+- **Purpose**: Check if there's any eviction request
+- **Query**: Returns pending/approved eviction requests
 
-### 6.1 宿舍管理规则
-- 宿舍容量必须在4-6之间
-- 宿舍名称必须唯一
-- 宿舍创建后自动生成对应数量的床位
-- 不能删除有人居住的宿舍
+## 4. Business Rules
 
-### 6.2 用户分配规则
-- 每个用户只能被分配到一个宿舍
-- 每个用户只能占用一个床位
-- 只有状态为active的用户才能被分配宿舍
-- 被踢出(evicted)的用户不能再被分配到任何宿舍
+### 4.1 Point System
+- All users start with 100 points
+- Points cannot go below 0
+- Point deduction thresholds:
+  - Minor violations (noise, minor hygiene): 5-10 points
+  - Medium violations (curfew, repeated offenses): 15-25 points
+  - Major violations (damage, safety): 30-50 points
+- Eviction eligibility: < 60 points
 
-### 6.3 宿舍长规则
-- 每个宿舍只能有一个宿舍长
-- 宿舍长必须是该宿舍的成员
-- 宿舍长不能记录自己的违规
-- 宿舍长不能申请踢出自己
+### 4.2 Dormitory Assignment Rules
+- One user can only be assigned to one dormitory
+- One user can only occupy one bed
+- Evicted users cannot be reassigned without admin approval
+- Dormitory capacity must be strictly enforced (4-6 beds)
 
-### 6.4 违规管理规则
-- 违规扣分范围为1-10分
-- 违规记录一旦创建不可删除或修改
-- 累计违规分数只增不减
-- 只有宿舍长可以记录本宿舍成员的违规
+### 4.3 Role Hierarchy
+- **Admin**: Full system access, all operations
+- **DormHead**: Manage assigned dormitory, record violations, request evictions
+- **Student**: View own information only
 
-### 6.5 踢出申请规则
-- 只有当用户累计违规分数≥30分时，才能发起踢出申请
-- 一个用户可以有多个pending状态的踢出申请
-- 一旦有申请被批准，用户立即被踢出
-- 被踢出的用户不能再被分配到任何宿舍（除非管理员重新激活其账户）
+### 4.4 Eviction Process
+1. User accumulates violations (points < 60)
+2. DormHead submits eviction request
+3. Admin reviews and decides
+4. If approved, user is immediately evicted and bed becomes vacant
+5. Evicted user's status permanently marked
 
-## 7. 计算属性
+## 5. Computed Properties
 
-### 7.1 Dormitory计算属性
-- occupiedBeds: number - 已占用床位数（通过beds关系计算）
-- availableBeds: number - 可用床位数（capacity - occupiedBeds）
-- occupancyRate: number - 入住率（occupiedBeds / capacity）
+### User Computations
+- **currentPoints**: Calculated from initial 100 minus sum of violations
+- **isEligibleForEviction**: Computed based on points < 60
+- **dormitoryName**: Retrieved through UserDormitoryRelation
+- **bedIdentifier**: Retrieved through UserBedRelation
 
-### 7.2 User计算属性
-- violationCount: number - 违规次数（violations关系的数量）
-- canBeEvicted: boolean - 是否可被踢出（violationScore >= 30）
-- isAssigned: boolean - 是否已分配宿舍（dormitory关系是否存在）
+### Dormitory Computations
+- **occupancy**: Count of occupied beds
+- **availableBeds**: Capacity minus occupancy
+- **occupancyRate**: Percentage of beds occupied
+- **residentsList**: List of all residents through relations
 
-### 7.3 EvictionRequest计算属性
-- isPending: boolean - 是否待处理（status === 'pending'）
-- isProcessed: boolean - 是否已处理（status !== 'pending'）
+### Statistical Computations
+- **totalViolationsByCategory**: Group violations by category
+- **averagePointsPerDormitory**: Average behavior points by dormitory
+- **evictionRate**: Percentage of evicted users
 
-## 8. 状态管理
+## 6. State Management
 
-### 8.1 User状态
-- active: 正常状态，可以被分配宿舍
-- inactive: 非活跃状态，暂时不能分配宿舍
-- evicted: 被踢出状态，永久不能分配宿舍
+### User States
+- **active**: Normal resident status
+- **warned**: Points below 70
+- **evictionPending**: Has pending eviction request
+- **evicted**: Removed from dormitory
 
-### 8.2 Bed状态
-- available: 可用，可以分配给用户
-- occupied: 已占用，有用户居住
+### Bed States
+- **vacant**: Available for assignment
+- **occupied**: Assigned to a user
+- **maintenance**: Temporarily unavailable
 
-### 8.3 EvictionRequest状态
-- pending: 待审核，等待管理员处理
-- approved: 已批准，用户已被踢出
-- rejected: 已拒绝，申请被驳回
+### EvictionRequest States
+- **pending**: Awaiting admin review
+- **approved**: Eviction executed
+- **rejected**: Request denied
 
-### 8.4 Dormitory状态
-- active: 正常使用
-- inactive: 停用，不接受新的分配
+## 7. Permission Matrix
 
-## 9. 权限矩阵
+| Operation | Admin | DormHead | Student |
+|-----------|-------|----------|---------|
+| CreateDormitory | ✓ | ✗ | ✗ |
+| AppointDormHead | ✓ | ✗ | ✗ |
+| AssignUserToDormitory | ✓ | ✗ | ✗ |
+| ReviewEvictionRequest | ✓ | ✗ | ✗ |
+| RecordViolation | ✗ | ✓ (own dorm) | ✗ |
+| SubmitEvictionRequest | ✗ | ✓ (own dorm) | ✗ |
+| ViewMyDormitory | ✓ | ✓ | ✓ |
+| ViewMyViolations | ✓ | ✓ | ✓ (own) |
+| ViewMyEvictionStatus | ✓ | ✓ | ✓ (own) |
 
-| 操作 | 管理员 | 宿舍长 | 普通用户 |
-|------|--------|--------|----------|
-| 创建宿舍 | ✓ | ✗ | ✗ |
-| 指定宿舍长 | ✓ | ✗ | ✗ |
-| 分配用户到宿舍 | ✓ | ✗ | ✗ |
-| 记录违规 | ✗ | ✓ | ✗ |
-| 申请踢出 | ✗ | ✓ | ✗ |
-| 审批踢出申请 | ✓ | ✗ | ✗ |
-| 查看所有宿舍 | ✓ | ✗ | ✗ |
-| 查看本宿舍信息 | ✓ | ✓ | ✓ |
-| 查看所有用户 | ✓ | ✗ | ✗ |
-| 查看本宿舍成员 | ✓ | ✓ | ✓ |
-| 查看自己信息 | ✓ | ✓ | ✓ |
+## 8. Data Validation Requirements
 
-## 10. 数据约束
+### Required Fields
+- All entity names and identifiers
+- Violation points and descriptions
+- Eviction reasons
+- Assignment timestamps
 
-### 10.1 唯一性约束
-- User.email 必须唯一
-- Dormitory.name 必须唯一
-- 一个用户只能占用一个床位
-- 一个床位只能被一个用户占用
-- 一个宿舍只能有一个宿舍长
+### Format Validations
+- Email must be valid format
+- Points must be non-negative integers
+- Capacity must be 4-6
+- Timestamps must be valid Unix timestamps
 
-### 10.2 引用完整性
-- 删除用户前必须解除所有关系
-- 删除宿舍前必须确保没有用户居住
-- 违规记录不可删除（审计需要）
-
-### 10.3 数值约束
-- Dormitory.capacity: 4-6
-- ViolationRecord.score: 1-10
-- User.violationScore: >= 0
-- Bed.number: 1-capacity
-
-## 11. 非功能需求
-
-### 11.1 性能要求
-- 用户分配操作应在1秒内完成
-- 违规记录创建应实时更新用户累计分数
-- 踢出操作应立即生效
-
-### 11.2 可靠性要求
-- 所有操作必须保证事务性
-- 关键操作（如踢出）需要记录操作日志
-- 系统应支持数据备份和恢复
-
-### 11.3 安全性要求
-- 严格的角色权限控制
-- 所有操作必须有用户身份验证
-- 敏感操作需要记录审计日志
-
-### 11.4 可扩展性
-- 支持未来添加更多角色类型
-- 支持自定义违规规则和分数
-- 支持批量操作（如批量分配）
+### Referential Integrity
+- Cannot delete dormitory with residents
+- Cannot delete user with pending eviction requests
+- Cannot assign to non-existent beds
+- Cannot violate unique constraints (one bed per user)

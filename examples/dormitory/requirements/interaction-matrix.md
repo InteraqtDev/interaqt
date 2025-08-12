@@ -1,316 +1,253 @@
-# 宿舍管理系统交互矩阵
+# Interaction Matrix - Dormitory Management System
 
-## 概述
+## Overview
+This document maps all system interactions to user roles, ensuring complete coverage of operations, permissions, and business rules.
 
-本文档定义了系统中所有的 Interactions，包括权限控制要求和业务规则验证。每个 Interaction 都明确标注了：
-- **允许的角色**：哪些角色可以执行此操作
-- **权限检查**：Stage 2 需要实施的权限控制
-- **业务规则**：Stage 2 需要验证的业务逻辑
-- **对应测试用例**：相关的测试用例编号
+## Interaction Summary by Category
 
----
+### Administrative Operations
+| Interaction | Purpose | Primary Actor |
+|-------------|---------|---------------|
+| CreateDormitory | Create new dormitory with beds | Admin |
+| AppointDormHead | Appoint student as dormitory head | Admin |
+| AssignUserToDormitory | Assign student to dormitory and bed | Admin |
+| ReviewEvictionRequest | Approve/reject eviction requests | Admin |
 
-## Interactions 列表
+### Dormitory Management Operations
+| Interaction | Purpose | Primary Actor |
+|-------------|---------|---------------|
+| RecordViolation | Record student violations and deduct points | DormHead |
+| SubmitEvictionRequest | Request eviction of problematic student | DormHead |
 
-### 1. CreateDormitory - 创建宿舍
+### Query Operations
+| Interaction | Purpose | Primary Actor |
+|-------------|---------|---------------|
+| ViewMyDormitory | View assigned dormitory information | Student/DormHead |
+| ViewMyViolations | View violation history and points | Student/DormHead |
+| ViewMyEvictionStatus | Check eviction request status | Student/DormHead |
 
-| 属性 | 说明 |
-|------|------|
-| **目的** | 创建新的宿舍并自动生成床位 |
-| **允许角色** | admin |
-| **输入参数** | name (string), capacity (number) |
-| **影响实体** | Dormitory, Bed |
-| **Stage 1 实现** | ✅ 创建宿舍和床位记录 |
-| **Stage 2 权限** | ❌ 拒绝非admin角色 |
-| **Stage 2 业务规则** | ❌ capacity必须在4-6之间<br>❌ name必须唯一 |
-| **测试用例** | TC001, TC010, TC011, TC016, TC017, TC026 |
+## Detailed Permission Matrix
 
-**实现要点**：
-- Stage 1: 直接创建实体，不检查权限和规则
-- Stage 2: 添加 condition 验证角色和业务规则
+### CreateDormitory
+| Role | Permission | Conditions | Business Rules |
+|------|------------|------------|----------------|
+| Admin | ✅ Allowed | None | Capacity must be 4-6 |
+| DormHead | ❌ Denied | N/A | N/A |
+| Student | ❌ Denied | N/A | N/A |
 
----
+**Test Coverage**: TC001 (valid), TC008 (max capacity), TC011 (permission denied), TC016 (invalid capacity)
 
-### 2. AssignUserToDormitory - 分配用户到宿舍
+### AppointDormHead
+| Role | Permission | Conditions | Business Rules |
+|------|------------|------------|----------------|
+| Admin | ✅ Allowed | None | - Target must be student<br>- Dormitory cannot have existing dormHead<br>- User cannot already be dormHead |
+| DormHead | ❌ Denied | N/A | N/A |
+| Student | ❌ Denied | N/A | N/A |
 
-| 属性 | 说明 |
-|------|------|
-| **目的** | 将用户分配到指定宿舍的空床位 |
-| **允许角色** | admin |
-| **输入参数** | userId (string), dormitoryId (string) |
-| **影响实体** | User, Dormitory, Bed |
-| **影响关系** | UserDormitoryRelation, UserBedRelation |
-| **Stage 1 实现** | ✅ 建立用户与宿舍、床位的关系 |
-| **Stage 2 权限** | ❌ 拒绝非admin角色 |
-| **Stage 2 业务规则** | ❌ 用户不能已有宿舍<br>❌ 宿舍必须有空床位<br>❌ 用户状态不能是evicted |
-| **测试用例** | TC002, TC009, TC015, TC018, TC019, TC024 |
+**Test Coverage**: TC002 (valid), TC012 (permission denied), TC021 (duplicate dormHead)
 
-**实现要点**：
-- 自动选择第一个可用床位
-- 更新床位状态为occupied
-- 记录分配时间和分配人
+### AssignUserToDormitory
+| Role | Permission | Conditions | Business Rules |
+|------|------------|------------|----------------|
+| Admin | ✅ Allowed | None | - User not already assigned<br>- Bed must be vacant<br>- User not evicted<br>- Bed belongs to specified dormitory |
+| DormHead | ❌ Denied | N/A | N/A |
+| Student | ❌ Denied | N/A | N/A |
 
----
+**Test Coverage**: TC003 (valid), TC010 (full assignment), TC017 (already assigned), TC018 (occupied bed), TC022 (evicted user), TC023 (full dormitory)
 
-### 3. AssignDormHead - 指定宿舍长
+### ReviewEvictionRequest
+| Role | Permission | Conditions | Business Rules |
+|------|------------|------------|----------------|
+| Admin | ✅ Allowed | None | Request must be pending |
+| DormHead | ❌ Denied | N/A | N/A |
+| Student | ❌ Denied | N/A | N/A |
 
-| 属性 | 说明 |
-|------|------|
-| **目的** | 指定某用户为特定宿舍的宿舍长 |
-| **允许角色** | admin |
-| **输入参数** | userId (string), dormitoryId (string) |
-| **影响实体** | User, Dormitory |
-| **影响关系** | DormitoryDormHeadRelation |
-| **Stage 1 实现** | ✅ 更新用户角色，建立宿舍长关系 |
-| **Stage 2 权限** | ❌ 拒绝非admin角色 |
-| **Stage 2 业务规则** | ❌ 用户必须是该宿舍成员<br>❌ 宿舍不能已有宿舍长 |
-| **测试用例** | TC003, TC023 |
+**Test Coverage**: TC006 (approve), TC007 (reject), TC015 (permission denied), TC025 (non-pending)
 
-**实现要点**：
-- 更新用户role为dormHead
-- 建立宿舍与宿舍长的1:1关系
-- 记录任命时间
+### RecordViolation
+| Role | Permission | Conditions | Business Rules |
+|------|------------|------------|----------------|
+| Admin | ❌ Denied | N/A | N/A |
+| DormHead | ✅ Allowed | User must be in managed dormitory | - Points must be positive<br>- User not evicted |
+| Student | ❌ Denied | N/A | N/A |
 
----
+**Test Coverage**: TC004 (valid), TC009 (multiple), TC013 (wrong dormitory), TC014 (student denied), TC024 (points floor)
 
-### 4. RecordViolation - 记录违规
+### SubmitEvictionRequest
+| Role | Permission | Conditions | Business Rules |
+|------|------------|------------|----------------|
+| Admin | ❌ Denied | N/A | N/A |
+| DormHead | ✅ Allowed | User must be in managed dormitory | - User points < 60<br>- No pending request exists |
+| Student | ❌ Denied | N/A | N/A |
 
-| 属性 | 说明 |
-|------|------|
-| **目的** | 宿舍长记录本宿舍成员的违规行为 |
-| **允许角色** | dormHead |
-| **输入参数** | userId (string), reason (string), score (number) |
-| **影响实体** | User, ViolationRecord |
-| **影响关系** | UserViolationRelation, ViolationRecorderRelation |
-| **Stage 1 实现** | ✅ 创建违规记录，更新用户违规分数 |
-| **Stage 2 权限** | ❌ 拒绝非dormHead角色 |
-| **Stage 2 业务规则** | ❌ 只能记录本宿舍成员<br>❌ 不能记录自己<br>❌ score必须在1-10之间 |
-| **测试用例** | TC004, TC005, TC012, TC013, TC021, TC025 |
+**Test Coverage**: TC005 (valid), TC019 (high points), TC020 (duplicate request)
 
-**实现要点**：
-- 创建违规记录
-- 累加用户的violationScore
-- 使用StateMachine更新用户违规分数
+### ViewMyDormitory
+| Role | Permission | Conditions | Business Rules |
+|------|------------|------------|----------------|
+| Admin | ✅ Allowed | Can view any user's dormitory | None |
+| DormHead | ✅ Allowed | Can view own dormitory | None |
+| Student | ✅ Allowed | Can view own dormitory | None |
 
----
+**Test Coverage**: Covered implicitly in assignment tests
 
-### 5. RequestEviction - 申请踢出
+### ViewMyViolations
+| Role | Permission | Conditions | Business Rules |
+|------|------------|------------|----------------|
+| Admin | ✅ Allowed | Can view any user's violations | None |
+| DormHead | ✅ Allowed | Can view own violations | None |
+| Student | ✅ Allowed | Can view own violations only | None |
 
-| 属性 | 说明 |
-|------|------|
-| **目的** | 宿舍长申请踢出违规严重的成员 |
-| **允许角色** | dormHead |
-| **输入参数** | userId (string), reason (string) |
-| **影响实体** | EvictionRequest |
-| **影响关系** | EvictionRequestUserRelation, EvictionRequestDormHeadRelation |
-| **Stage 1 实现** | ✅ 创建踢出申请（pending状态） |
-| **Stage 2 权限** | ❌ 拒绝非dormHead角色 |
-| **Stage 2 业务规则** | ❌ 只能申请本宿舍成员<br>❌ 不能申请自己<br>❌ 用户违规分数必须≥30 |
-| **测试用例** | TC006, TC020, TC022 |
+**Test Coverage**: Covered implicitly in violation tests
 
-**实现要点**：
-- 创建申请记录，初始状态为pending
-- 关联申请人、目标用户
-- 记录申请时间和理由
+### ViewMyEvictionStatus
+| Role | Permission | Conditions | Business Rules |
+|------|------------|------------|----------------|
+| Admin | ✅ Allowed | Can view any user's status | None |
+| DormHead | ✅ Allowed | Can view own status | None |
+| Student | ✅ Allowed | Can view own status only | None |
 
----
+**Test Coverage**: Covered implicitly in eviction tests
 
-### 6. ApproveEviction - 批准踢出
+## State Transitions Triggered by Interactions
 
-| 属性 | 说明 |
-|------|------|
-| **目的** | 管理员批准踢出申请 |
-| **允许角色** | admin |
-| **输入参数** | requestId (string), comment (string) |
-| **影响实体** | EvictionRequest, User, Bed |
-| **影响关系** | UserDormitoryRelation, UserBedRelation, EvictionRequestAdminRelation |
-| **Stage 1 实现** | ✅ 更新申请状态，踢出用户，释放床位 |
-| **Stage 2 权限** | ❌ 拒绝非admin角色 |
-| **Stage 2 业务规则** | ❌ 申请必须是pending状态 |
-| **测试用例** | TC007, TC014, TC027 |
-
-**实现要点**：
-- 更新申请状态为approved
-- 更新用户状态为evicted
-- 释放床位（状态改为available）
-- 解除所有宿舍关系
-- 记录处理时间和管理员
-
----
-
-### 7. RejectEviction - 拒绝踢出
-
-| 属性 | 说明 |
-|------|------|
-| **目的** | 管理员拒绝踢出申请 |
-| **允许角色** | admin |
-| **输入参数** | requestId (string), comment (string) |
-| **影响实体** | EvictionRequest |
-| **影响关系** | EvictionRequestAdminRelation |
-| **Stage 1 实现** | ✅ 更新申请状态为rejected |
-| **Stage 2 权限** | ❌ 拒绝非admin角色 |
-| **Stage 2 业务规则** | ❌ 申请必须是pending状态 |
-| **测试用例** | TC008 |
-
-**实现要点**：
-- 更新申请状态为rejected
-- 记录拒绝理由
-- 用户保持原状态不变
-
----
-
-## 权限控制矩阵
-
-| Interaction | Admin | DormHead | Student | 备注 |
-|-------------|-------|----------|---------|------|
-| CreateDormitory | ✅ | ❌ | ❌ | 仅管理员 |
-| AssignUserToDormitory | ✅ | ❌ | ❌ | 仅管理员 |
-| AssignDormHead | ✅ | ❌ | ❌ | 仅管理员 |
-| RecordViolation | ❌ | ✅ | ❌ | 仅宿舍长 |
-| RequestEviction | ❌ | ✅ | ❌ | 仅宿舍长 |
-| ApproveEviction | ✅ | ❌ | ❌ | 仅管理员 |
-| RejectEviction | ✅ | ❌ | ❌ | 仅管理员 |
-
----
-
-## 业务规则汇总
-
-### 数值范围规则
-- **宿舍容量**：4 ≤ capacity ≤ 6
-- **违规扣分**：1 ≤ score ≤ 10
-- **踢出阈值**：violationScore ≥ 30
-
-### 唯一性规则
-- **宿舍名称**：必须唯一
-- **用户邮箱**：必须唯一
-- **用户分配**：一个用户只能在一个宿舍
-- **床位占用**：一个床位只能一个用户
-- **宿舍长**：一个宿舍只能一个宿舍长
-
-### 状态规则
-- **用户状态**：
-  - active：可以被分配宿舍
-  - inactive：暂时不能分配
-  - evicted：永久不能分配
-- **床位状态**：
-  - available：可以分配
-  - occupied：已被占用
-- **申请状态**：
-  - pending：可以被处理
-  - approved/rejected：不能再处理
-
-### 权限范围规则
-- **宿舍长只能管理本宿舍**：
-  - 只能记录本宿舍成员违规
-  - 只能申请踢出本宿舍成员
-- **不能对自己操作**：
-  - 宿舍长不能记录自己违规
-  - 宿舍长不能申请踢出自己
-
-### 前置条件规则
-- **指定宿舍长**：用户必须是该宿舍成员
-- **申请踢出**：用户违规分数必须≥30
-- **分配到宿舍**：
-  - 宿舍必须有空床位
-  - 用户不能已有宿舍
-  - 用户状态必须是active
-
----
-
-## Stage 实施策略
-
-### Stage 1 - 核心业务逻辑
-**目标**：实现所有基础功能，不含权限和业务规则验证
-
-**实施内容**：
-1. 所有Interactions的基本功能
-2. 实体创建和关系建立
-3. 计算属性（Count、Summation等）
-4. 状态管理（StateMachine）
-
-**验证方式**：
-- 使用正确的角色和有效数据
-- 确保TC001-TC010全部通过
-
-### Stage 2 - 权限和业务规则
-**目标**：添加完整的权限控制和业务规则验证
-
-**实施内容**：
-1. 添加角色权限检查（condition）
-2. 添加业务规则验证（condition）
-3. 返回适当的错误信息
-
-**验证方式**：
-- TC011-TC027全部通过
-- Stage 1的测试仍然通过
-
----
-
-## 实现优先级
-
-### 高优先级（核心功能）
-1. CreateDormitory - 系统基础
-2. AssignUserToDormitory - 主要业务
-3. RecordViolation - 日常操作
-4. RequestEviction - 关键流程
-5. ApproveEviction - 完成闭环
-
-### 中优先级（管理功能）
-6. AssignDormHead - 角色管理
-7. RejectEviction - 流程完整性
-
-### 低优先级（可选功能）
-- ViewDormitoryInfo - 查询功能
-- ViewUserInfo - 查询功能
-- UpdateDormitory - 编辑功能
-- TransferUser - 调宿功能
-
----
-
-## 错误处理规范
-
-### 错误类型
-1. **权限错误**：用户角色不符合要求
-2. **业务规则错误**：违反业务逻辑约束
-3. **数据验证错误**：输入数据不合法
-4. **状态错误**：实体状态不允许操作
-5. **引用错误**：引用的实体不存在
-
-### 错误信息格式
-```javascript
-{
-  error: {
-    type: 'PERMISSION_DENIED' | 'BUSINESS_RULE_VIOLATION' | 'VALIDATION_ERROR' | 'STATE_ERROR' | 'REFERENCE_ERROR',
-    message: '具体的错误描述',
-    details: {
-      // 额外的错误详情
-    }
-  }
-}
+### User Status States
+```
+active → warned (automatic when points < 70)
+warned → evictionPending (via SubmitEvictionRequest)
+evictionPending → evicted (via ReviewEvictionRequest[approve])
+evictionPending → active/warned (via ReviewEvictionRequest[reject])
 ```
 
----
+### Bed Status States
+```
+vacant → occupied (via AssignUserToDormitory)
+occupied → vacant (via ReviewEvictionRequest[approve])
+```
 
-## 测试覆盖检查
+### EvictionRequest Status States
+```
+pending → approved (via ReviewEvictionRequest[approve])
+pending → rejected (via ReviewEvictionRequest[reject])
+```
 
-| Interaction | 正常流程 | 权限测试 | 业务规则测试 | 覆盖率 |
-|-------------|----------|----------|--------------|--------|
-| CreateDormitory | TC001, TC010 | TC011 | TC016, TC017, TC026 | ✅ 100% |
-| AssignUserToDormitory | TC002, TC009 | TC015 | TC018, TC019, TC024 | ✅ 100% |
-| AssignDormHead | TC003 | - | TC023 | ✅ 100% |
-| RecordViolation | TC004, TC005 | TC012, TC013 | TC021, TC025 | ✅ 100% |
-| RequestEviction | TC006 | - | TC020, TC022 | ✅ 100% |
-| ApproveEviction | TC007 | TC014 | TC027 | ✅ 100% |
-| RejectEviction | TC008 | - | - | ✅ 100% |
+## Computed Properties Affected by Interactions
 
-**总体测试覆盖率**: ✅ 100%
+| Computed Property | Triggering Interactions | Update Logic |
+|-------------------|------------------------|--------------|
+| User.currentPoints | RecordViolation | Subtract violation points from 100 |
+| User.isEligibleForEviction | RecordViolation | True when points < 60 |
+| Dormitory.occupancy | AssignUserToDormitory, ReviewEvictionRequest | Count of occupied beds |
+| Dormitory.availableBeds | AssignUserToDormitory, ReviewEvictionRequest | Capacity - occupancy |
+| Dormitory.occupancyRate | AssignUserToDormitory, ReviewEvictionRequest | (occupancy / capacity) * 100 |
 
----
+## Validation Cascade by Interaction
 
-## 注意事项
+### CreateDormitory
+1. Validate user role (admin)
+2. Validate capacity (4-6)
+3. Create dormitory entity
+4. Create bed entities (based on capacity)
+5. Link beds to dormitory
 
-1. **渐进式实施**：严格按照Stage 1 → Stage 2的顺序实施
-2. **测试先行**：每个功能实现前先确认测试用例
-3. **保持一致性**：权限和业务规则的实施要保持一致
-4. **错误处理**：提供清晰的错误信息便于调试
-5. **文档同步**：实现过程中及时更新相关文档
+### AssignUserToDormitory
+1. Validate user role (admin)
+2. Check user not already assigned
+3. Check user not evicted
+4. Check bed is vacant
+5. Check bed belongs to dormitory
+6. Create UserDormitoryRelation
+7. Create UserBedRelation
+8. Update bed status
+9. Update dormitory occupancy
+
+### ReviewEvictionRequest (Approve)
+1. Validate user role (admin)
+2. Check request is pending
+3. Update request status
+4. Update user status to evicted
+5. Delete UserDormitoryRelation
+6. Delete UserBedRelation
+7. Update bed status to vacant
+8. Update dormitory occupancy
+9. Record timestamps
+
+## Coverage Analysis
+
+### Role Coverage
+- **Admin**: 4 interactions (complete administrative control)
+- **DormHead**: 2 interactions (dormitory management)
+- **Student**: 3 query interactions (view-only access)
+
+### Operation Coverage
+- **Create**: Dormitory, Violation, EvictionRequest
+- **Update**: User role/status, Bed status, Request status
+- **Delete**: Relations on eviction
+- **Query**: Dormitory info, Violations, Eviction status
+
+### Business Rule Coverage
+- **Capacity constraints**: ✅ Enforced
+- **Assignment uniqueness**: ✅ Enforced
+- **Point thresholds**: ✅ Enforced
+- **Role hierarchy**: ✅ Enforced
+- **State consistency**: ✅ Maintained
+
+### Test Case Coverage
+- **Core functionality**: 10 test cases (TC001-TC010)
+- **Permission validation**: 5 test cases (TC011-TC015)
+- **Business rules**: 10 test cases (TC016-TC025)
+- **Total coverage**: 25 test cases
+
+## Implementation Priority
+
+### Stage 1 - Core Business Logic
+1. ✅ All interactions without permission checks
+2. ✅ All interactions without business rule validations
+3. ✅ Focus on happy path with valid inputs
+4. ✅ Ensure all relationships work correctly
+5. ✅ Verify computed properties update
+
+### Stage 2A - Permission Layer
+1. ⏸️ Add role-based condition to each interaction
+2. ⏸️ Implement permission denial logic
+3. ⏸️ Ensure proper error messages
+
+### Stage 2B - Business Rules Layer
+1. ⏸️ Add business rule condition to interactions
+2. ⏸️ Implement validation logic
+3. ⏸️ Handle edge cases and boundaries
+
+## Gaps and Recommendations
+
+### Identified Gaps
+None - All requirements are covered by the defined interactions.
+
+### Future Enhancements (Out of Scope)
+1. **Point Recovery System**: Allow points to be restored over time or through good behavior
+2. **Transfer Between Dormitories**: Direct transfer without eviction
+3. **Temporary Leave**: Handle students on leave/vacation
+4. **Maintenance Requests**: Report and track dormitory maintenance issues
+5. **Visitor Management**: Track and manage dormitory visitors
+6. **Curfew Tracking**: Automated curfew violation detection
+7. **Room Preferences**: Allow students to request specific rooms/roommates
+
+### Security Considerations
+1. All interactions require authenticated user
+2. User role must be verified on each interaction
+3. Cross-dormitory operations must be prevented
+4. Audit trail for all administrative actions
+5. Prevent privilege escalation attacks
+
+## Conclusion
+
+This interaction matrix ensures:
+1. ✅ Every user role has appropriate interactions
+2. ✅ Every interaction has clear permission controls
+3. ✅ Every interaction has corresponding test cases
+4. ✅ Both access control and business logic are documented
+5. ✅ Complete traceability from requirements to tests
+
+The system is ready for implementation following the progressive approach:
+- Stage 1: Implement core functionality
+- Stage 2A: Add permission layer
+- Stage 2B: Add business rule validations
