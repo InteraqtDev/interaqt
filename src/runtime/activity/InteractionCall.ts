@@ -484,9 +484,11 @@ export class InteractionCall {
     async check(interactionEventArgs: InteractionEventArgs, activityId?: string, checkUserRef?: CheckUserRef, context?: InteractionContext): Promise<InteractionCallResponse["error"]> {
         let error
         try {
-            await this.checkCondition(interactionEventArgs)
-            await this.checkUser(interactionEventArgs, activityId, checkUserRef)
-            await this.checkPayload(interactionEventArgs)
+            if (!this.controller.ignorePermission) {
+                await this.checkCondition(interactionEventArgs)
+                await this.checkUser(interactionEventArgs, activityId, checkUserRef)
+                await this.checkPayload(interactionEventArgs)
+            }
         } catch(e) {
             error = e
         }

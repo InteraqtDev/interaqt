@@ -66,6 +66,7 @@ export interface ControllerOptions {
     dict?: DictionaryInstance[]
     recordMutationSideEffects?: RecordMutationSideEffect[]
     computations?: (new (...args: any[]) => Computation)[]
+    ignorePermission?: boolean
 }
 
 export class Controller {
@@ -84,6 +85,7 @@ export class Controller {
     public interactions: InteractionInstance[]
     public dict: DictionaryInstance[] = []
     public recordMutationSideEffects: RecordMutationSideEffect[] = []
+    public ignorePermission: boolean
     constructor(options: ControllerOptions) {
         const {
             system,
@@ -93,11 +95,13 @@ export class Controller {
             interactions = [],
             dict = [],
             recordMutationSideEffects = [],
-            computations = []
+            computations = [],
+            ignorePermission = false
         } = options
         
         // 首先初始化 system
         this.system = system
+        this.ignorePermission = ignorePermission
         
         // 因为我们会对 entities 数组进行补充。如果外部复用了传入的数组对象，就会发生混乱，例如在测试用例中复用。
         this.entities = [...entities]

@@ -84,118 +84,7 @@ Create `requirements/interaction-matrix.md` to ensure:
 ## Phase 2: Design and Analysis
 
 ### 🔴 Document-First Approach
-**Phase 2 focuses on creating comprehensive design documents before any code generation:**
-1. **Steps 2.1-2.3**: Create design documents for entities, interactions, and computations
-2. **Phase 3**: Generate code and perform initial testing based on the design documents
-3. **Remaining steps**: Add permissions, business rules, and enhance the implementation
-
-This ensures consistent design decisions across all components before any code is written.
-
-### 🔴 Progressive Implementation Approach
-**CRITICAL: Follow a progressive implementation strategy:**
-
-1. **Stage 1 - Core Business Logic Only**
-   - Implement basic CRUD operations
-   - Focus on entity relationships and computations
-   - No permissions or business rules
-   - Get all basic functionality working first
-   
-   **🔴 CRITICAL for Stage 1 Test Cases:**
-   - **ALWAYS use correct user roles and valid data** in test cases
-   - Even though permissions aren't enforced yet, create users with proper roles (admin, dormHead, student, etc.)
-   - Use realistic and valid data that complies with future business rules
-   - This ensures Stage 1 tests will continue to pass after Stage 2 implementation
-   - Example:
-     ```typescript
-     // ✅ CORRECT: Use proper role even in Stage 1
-     const admin = await system.storage.create('User', {
-       name: 'Admin',
-       email: 'admin@example.com',
-       role: 'admin'  // Specify correct role from the start
-     })
-     
-     // ✅ CORRECT: Use valid data that will pass future business rules
-     const result = await controller.callInteraction('CreateDormitory', {
-       user: admin,  // Use admin user, not just any user
-       payload: { name: 'Dorm A', capacity: 4 }  // Valid capacity (4-6)
-     })
-     ```
-
-   **🛑 MANDATORY CHECKPOINT: Stage 1 Completion**
-   - **DO NOT proceed to Stage 2 until ALL Stage 1 tests pass**
-   - If tests fail, iterate and fix implementation until 100% pass rate
-   - Common issues to check:
-     - Entity relationships properly established
-     - Computed properties calculating correctly
-     - State machines transitioning as expected
-     - All CRUD operations functioning
-   - **Keep iterating Stage 1 until completely stable**
-
-2. **Stage 2 - Add Access Control and Business Rules**
-   - **ONLY start after Stage 1 is 100% complete and all tests pass**
-   - Add condition for permission checks
-   - Add condition for business rule validations
-   - Implement complex validations and constraints
-   - Only after Stage 1 is fully working
-   
-   **🔴 CRITICAL for Stage 2 Implementation:**
-   - **DO NOT modify Stage 1 test cases** - they should continue to pass
-   - **Write NEW test cases** specifically for permission and business rule validations
-   - Stage 1 tests verify core functionality works with valid inputs
-   - Stage 2 tests verify invalid inputs are properly rejected
-   - **Both test files should pass** after Stage 2 implementation
-
-
-### 🔴 Recommended: Single File Approach
-**To avoid complex circular references between files, it's recommended to generate all backend code in a single file:**
-
-- ✅ Define all entities, relations, interactions, and computations in one file
-- ✅ State nodes should be defined first, before entities that use them
-- ✅ This prevents circular dependency issues between separate entity/relation/computation files
-- ✅ Makes it easier to see all dependencies and ensure proper initialization order
-- ✅ Example structure: `backend/index.ts` containing all definitions
-
-**Benefits of single file approach:**
-- No circular imports between entity and computation files
-- Clear initialization order
-- Easier to maintain consistency
-- Simpler to debug issues
-
-
-### 🔴 CRITICAL: Framework Has Complete CRUD Capabilities
-**The interaqt framework has COMPLETE capability for all CRUD operations (Create, Read, Update, Delete).**
-
-**DO NOT make these mistakes:**
-- ❌ Assuming the framework "doesn't support field updates" 
-- ❌ Writing tests that expect no changes after update operations
-- ❌ Adding comments like "due to framework limitation"
-- ❌ Making tests pass by lowering expectations
-
-**If your update/delete operations aren't working:**
-- ✅ Your implementation is incorrect - review the documentation
-- ✅ Check if you're using the right computation type (Transform vs StateMachine)
-- ✅ Ensure StateMachine transfers are properly configured
-- ✅ Verify you're passing the correct payload structure
-
-**Example of WRONG test:**
-```typescript
-// ❌ WRONG: Cheating to make test pass
-test('Update Style', async () => {
-  const result = await controller.callInteraction('UpdateStyle', { ... })
-  // NOTE: Framework doesn't support updates
-  expect(style.label).toBe('Original Label') // Expecting no change!
-})
-```
-
-**Example of CORRECT test:**
-```typescript
-// ✅ CORRECT: Test actual functionality
-test('Update Style', async () => {
-  const result = await controller.callInteraction('UpdateStyle', { ... })
-  expect(result.error).toBeUndefined()
-  expect(style.label).toBe('Updated Label') // Expecting actual update!
-})
-```
+**Phase 2 focuses on creating comprehensive design documents before any code generation.**
 
 ### 2.1 Entity and Relation Analysis
 **📖 MUST READ: `./agentspace/knowledge/generator/entity-relation-generation.md`**
@@ -393,10 +282,15 @@ This document contains:
 - ❌ Do NOT guess parameter names or syntax
 
 Common issues that can be avoided by reading the API reference:
-- Incorrect parameter names (e.g., `from/to` vs `current/next` in StateTransfer)
 - Missing required parameters (e.g., `attributeQuery` in storage operations)
 - Wrong property usage (e.g., `symmetric` doesn't exist in Relation.create)
 - Incorrect computation placement (e.g., Transform cannot be used in Property computation)
+
+### 🔴 Recommended: Single File Approach
+**To avoid complex circular references between files, it's recommended to generate all backend code in a single file:**
+
+- ✅ Define all entities, relations, interactions, and computations in one file
+- ✅ Example structure: `backend/index.ts` containing all definitions
 
 
 #### 3.1.2 Entity and Relation Implementation
@@ -442,7 +336,52 @@ This section follows a **test-driven progressive approach** where each computati
 ##### Step 2: Create Implementation Plan
 - [ ] Based on `docs/computation-analysis.md`, analyze computation dependencies (which computations depend on other entities/relations)
 - [ ] Order computations from least dependent to most dependent. Start with computations that only depend on InteractionEventEntity
-- [ ] Create `docs/computation-implementation-plan.md`. **Write the plan in checklist format** for easy progress tracking.
+- [ ] Create `docs/computation-implementation-plan.md`. **Write the plan in checklist format** for easy progress tracking. **MUST include ALL computations from `docs/computation-analysis.md` - do not skip any!**
+
+**Template for `docs/computation-implementation-plan.md`:**
+```markdown
+# Computation Implementation Plan
+
+## Phase 1: Self-Dependent Property Computations
+*Properties with computed values that only depend on their own entity's fields, no external dependencies*
+
+- [ ] User.displayName (computed from firstName + lastName)
+- [ ] Article.slug (computed from title)
+- [ ] Product.discountedPrice (computed from price and discountRate)
+
+## Phase 2: InteractionEventEntity-Dependent Computations
+*Computations that only depend on InteractionEventEntity, typically for logging or activity tracking*
+
+- [ ] ActivityLog entity creation (Transform on InteractionEventEntity)
+- [ ] User.lastActivityTime (StateMachine triggered by any interaction)
+- [ ] SystemStats.totalInteractions (Count of InteractionEventEntity)
+
+## Phase 3: Single Entity/Relation Dependencies
+*Computations that depend on one other entity or relation*
+
+- [ ] User.postCount (Count of UserPost relation)
+- [ ] Category.articleCount (Count of articles in category)
+- [ ] Order.totalAmount (Summation of OrderItem amounts)
+
+## Phase 4: Multiple Dependencies
+*Computations that depend on multiple entities or relations*
+
+- [ ] Dashboard.stats (depends on User, Post, Comment entities)
+- [ ] Notification creation (Transform depending on User and various state changes)
+- [ ] RecommendationScore (computed from User preferences and Product features)
+
+## Phase 5: Complex Chain Dependencies
+*Computations that depend on other computed values*
+
+- [ ] User.reputation (depends on postCount, commentCount, likeCount - all computed)
+- [ ] Product.popularityScore (depends on orderCount and averageRating - both computed)
+
+## Notes
+- Start implementation from Phase 1 and proceed sequentially
+- Complete ALL computations in a phase before moving to the next
+- Run tests after each computation implementation
+- Document any blockers or issues in `docs/errors/`
+```
 
 ##### Step 3: Progressive Implementation Loop
 
@@ -460,9 +399,11 @@ This section follows a **test-driven progressive approach** where each computati
    - [ ] Do NOT write tests until type checking passes
 
 3. **Write Focused Test Case**
-   - [ ] Add a new test case in `tests/basic.test.ts` specifically for this computation
+   - [ ] Add a new test case in `tests/basic.test.ts` specifically for this computation (write all test cases in the 'Basic Functionality' describe group)
    - [ ] Test name should clearly indicate what computation is being tested
    - [ ] Test should verify the computation works correctly
+   - [ ] Test should cover all CRUD operations the computation supports (Create, Read, Update, Delete - if applicable)
+   - [ ] If the computation is a StateMachine, test should cover EVERY StateTransfer defined
    
    **Example test structure:**
    ```typescript
@@ -522,7 +463,7 @@ This section follows a **test-driven progressive approach** where each computati
 
 5. **Document Progress**
    - [ ] **MUST** check off completed computation in `docs/computation-implementation-plan.md`
-   - [ ] Note any issues or learnings for future reference
+   - [ ] Create new documents in `docs/errors/` to record any errors encountered
 
 **🛑 STOP GATE: DO NOT proceed to Step 4 until ALL computations in `docs/computation-implementation-plan.md` are checked off as complete with passing tests.**
 
@@ -537,6 +478,8 @@ This section follows a **test-driven progressive approach** where each computati
 **📖 MUST READ: `./agentspace/knowledge/generator/permission-implementation.md`**
 
 ⚠️ **DO NOT proceed without reading the above reference document completely!**
+
+**🔴 IMPORTANT: All test cases for permissions and business rules should be written in `tests/basic.test.ts` under the 'Permission and Business Rules' describe group.**
 
 **After core business logic is working correctly, add access control and business rules:**
 

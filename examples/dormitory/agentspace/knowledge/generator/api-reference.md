@@ -2110,7 +2110,8 @@ new Controller({
     activities: ActivityInstance[],
     interactions: InteractionInstance[],
     dict?: DictionaryInstance[],  // Note: This is for global dictionaries, NOT computations
-    recordMutationSideEffects?: RecordMutationSideEffect[]
+    recordMutationSideEffects?: RecordMutationSideEffect[],
+    ignorePermission?: boolean  // Skip condition checks when true
 })
 ```
 
@@ -2126,6 +2127,8 @@ await controller.setup(true) // Create database tables
 
 #### callInteraction(interactionName: string, args: InteractionEventArgs)
 Call interaction.
+
+**Note about ignorePermission**: When `controller.ignorePermission` is set to `true`, this method will bypass all condition checks, user validation, and payload validation defined in the interaction.
 
 **Return Type**
 ```typescript

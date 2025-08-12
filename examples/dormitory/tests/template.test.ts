@@ -7,7 +7,7 @@ import {
 } from 'interaqt'
 import { entities, relations, interactions, activities, dicts } from '../backend'
 
-describe('Simple CRUD Example', () => {
+describe('Basic Functionality', () => {
   let system: MonoSystem
   let controller: Controller
   
@@ -31,3 +31,27 @@ describe('Simple CRUD Example', () => {
     
   })
 }) 
+
+describe('Permission and Business Rules', () => {
+  let system: MonoSystem
+  let controller: Controller
+
+  beforeEach(async () => {
+    system = new MonoSystem(new PGLiteDB())
+    controller = new Controller({
+      system,
+      entities,
+      relations,
+      interactions,
+      activities,
+      dict: dicts,
+      ignorePermission: true
+    })
+
+    await controller.setup(true)
+  })
+
+  test('basic test', async () => {
+    
+  })
+})
