@@ -8,35 +8,64 @@ You are a software expert with the following capabilities:
 
 This guide provides a comprehensive step-by-step process for generating backend projects based on the interaqt framework.
 
-## 🔴 CRITICAL: Progress Tracking with STATUS.md
+## 🔴 CRITICAL: Progress Tracking with STATUS.json
 
 
-**Before starting ANY work, create `docs/STATUS.md` to track your progress:**
+**Before starting ANY work, create `docs/STATUS.json` to track your progress:**
 
-```markdown
-# Project Implementation Status
-
-## Current Task
-Task 1: Requirements Analysis
-
-
-## Completed Items
-- [ ] STATUS.md created
+```json
+{
+  "currentTask": "Task 1",
+  "completed": false,
+  "completedItems": []
+}
 ```
 
-**📌 IMPORTANT: All tasks in this guide use a global unique numbering system (Task x.x.x.x). You can always find your current position by checking `docs/STATUS.md`, which tracks the exact Task number you were working on.**
+**📌 IMPORTANT: All tasks in this guide use a global unique numbering system (Task x.x.x.x). You can always find your current position by checking `docs/STATUS.json`, which tracks the exact Task number you were working on.**
 
 ## Task 1: Requirements Analysis and Test Case Design
 
-**📖 START: Read `docs/STATUS.md` to check current progress before proceeding.**
+**📖 START: Read `docs/STATUS.json` to check current progress before proceeding.**
+
+**🔄 Update `docs/STATUS.json`:**
+```json
+{
+  "currentTask": "Task 1",
+  "completed": false
+}
+```
 
 ### Task 1.1: Deep Requirements Analysis
+
+**🔄 Update `docs/STATUS.json`:**
+```json
+{
+  "currentTask": "Task 1.1",
+  "completed": false
+}
+```
 - Analyze user business requirements, supplement vague or missing details
 - Analyze from data perspective: identify all entities, properties, relationships
 - Analyze from interaction perspective: list all user operations, permission requirements, business processes
 - Create `requirements/detailed-requirements.md` document
 
+**✅ END Task 1.1: Update `docs/STATUS.json`:**
+```json
+{
+  "currentTask": "Task 1.1",
+  "completed": true
+}
+```
+
 ### Task 1.2: Test Case Documentation (CRITICAL)
+
+**🔄 Update `docs/STATUS.json`:**
+```json
+{
+  "currentTask": "Task 1.2",
+  "completed": false
+}
+```
 Create `requirements/test-cases.md` document with complete test cases:
 
 **🔴 CRITICAL: All test cases MUST be based on Interactions, NOT on Entity/Relation operations**
@@ -93,27 +122,67 @@ Create `requirements/test-cases.md` document with complete test cases:
 - Note: This tests business rule validation, not core functionality
 ```
 
+**✅ END Task 1.2: Update `docs/STATUS.json`:**
+```json
+{
+  "currentTask": "Task 1.2",
+  "completed": true
+}
+```
+
 ### Task 1.3: Interaction Matrix
+
+**🔄 Update `docs/STATUS.json`:**
+```json
+{
+  "currentTask": "Task 1.3",
+  "completed": false
+}
+```
 Create `requirements/interaction-matrix.md` to ensure:
 - Every user role has corresponding Interactions for all operations
 - Every Interaction has clear permission controls or business rule constraints
 - Every Interaction has corresponding test cases
 - Document both access control requirements AND business logic validations
 
-**✅ END Task 1: Update `docs/STATUS.md` with:**
-- Mark Task 1 as complete
-- List all created documents
-- Set current phase to "Task 2: Design and Analysis"
-- Specify next steps: "Begin Task 2: Design and Analysis"
+
+**✅ END Task 1: Update `docs/STATUS.json`:**
+```json
+{
+  "currentTask": "Task 1",
+  "completed": true,
+  "completedItems": [
+    "detailed-requirements.md created",
+    "test-cases.md created",
+    "interaction-matrix.md created"
+  ]
+}
+```
 
 ## Task 2: Design and Analysis
 
-**📖 START: Read `docs/STATUS.md` to check current progress before proceeding.**
+**📖 START: Read `docs/STATUS.json` to check current progress before proceeding.**
+
+**🔄 Update `docs/STATUS.json`:**
+```json
+{
+  "currentTask": "Task 2",
+  "completed": false
+}
+```
 
 ### 🔴 Document-First Approach
 **Task 2 focuses on creating comprehensive design documents before any code generation.**
 
 ### Task 2.1: Entity and Relation Analysis
+
+**🔄 Update `docs/STATUS.json`:**
+```json
+{
+  "currentTask": "Task 2.1",
+  "completed": false
+}
+```
 **📖 MUST READ: `./agentspace/knowledge/generator/entity-relation-generation.md`**
 
 ⚠️ **DO NOT proceed without reading the above reference document completely!**
@@ -196,7 +265,23 @@ const UserDormitoryRelation = Relation.create({
 Note: The relation creates `user.dormitory` to access the assigned dormitory and `dormitory.users` to access all users in that dormitory. No ID fields are needed in the entities.
 ```
 
+**✅ END Task 2.1: Update `docs/STATUS.json`:**
+```json
+{
+  "currentTask": "Task 2.1",
+  "completed": true
+}
+```
+
 ### Task 2.2: Interaction Analysis
+
+**🔄 Update `docs/STATUS.json`:**
+```json
+{
+  "currentTask": "Task 2.2",
+  "completed": false
+}
+```
 **📖 MUST READ: `./agentspace/knowledge/generator/basic-interaction-generation.md`**
 
 ⚠️ **DO NOT proceed without reading the above reference document completely!**
@@ -249,7 +334,23 @@ Note: The relation creates `user.dormitory` to access the assigned dormitory and
   - Dormitory must have available capacity
 ```
 
+**✅ END Task 2.2: Update `docs/STATUS.json`:**
+```json
+{
+  "currentTask": "Task 2.2",
+  "completed": true
+}
+```
+
 ### Task 2.3: Computation Analysis
+
+**🔄 Update `docs/STATUS.json`:**
+```json
+{
+  "currentTask": "Task 2.3",
+  "completed": false
+}
+```
 **📖 PRIMARY GUIDE: `./agentspace/knowledge/generator/computation-selection-guide.md`**
 **📖 REFERENCE ONLY: `./agentspace/knowledge/generator/computation-implementation.md`**
 
@@ -275,18 +376,30 @@ Note: The relation creates `user.dormitory` to access the assigned dormitory and
 
 **Remember**: The systematic analysis process ensures you select the RIGHT computation type for each use case. This analysis will guide your implementation in the next phase!
 
-**✅ END Task 2: Update `docs/STATUS.md` with:**
-- Mark Task 2 as complete
-- List all design documents created
-- Specify next steps: "Begin Task 3: Code Generation and Progressive Testing"
+**✅ END Task 2: Update `docs/STATUS.json`:**
+```json
+{
+  "currentTask": "Task 2",
+  "completed": true,
+  "completedItems": [
+    "entity-relation-design.md created",
+    "interaction-design.md created",
+    "computation-analysis.md created"
+  ]
+}
+```
 
 ## Task 3: Code Generation and Progressive Testing
-**✅ Start Task 3: Update `docs/STATUS.md` with:**
-- Set current phase to "Task 3: Code Generation and Progressive Testing"
-- Set current step to "Begin Task 3: Code Generation and Progressive Testing"
-- Specify next steps: "Begin Task 3: Code Generation and Progressive Testing"
 
-**📖 START: Read `docs/STATUS.md` to check current progress before proceeding.**
+**📖 START: Read `docs/STATUS.json` to check current progress before proceeding.**
+
+**🔄 Update `docs/STATUS.json`:**
+```json
+{
+  "currentTask": "Task 3",
+  "completed": false
+}
+```
 
 **🔄 PROGRESSIVE IMPLEMENTATION STRATEGY**
 
@@ -300,13 +413,27 @@ Task 3 follows a **progressive, test-driven approach**:
 This approach prevents the accumulation of errors and makes debugging much easier.
 
 ### Task 3.1: Code Generation and Implementation
-**Update `docs/STATUS.md` with:**
-- Set current step to "Begin Task 3.1: Code Generation and Implementation"
+
+**🔄 Update `docs/STATUS.json`:**
+```json
+{
+  "currentTask": "Task 3.1",
+  "completed": false
+}
+```
 - Clear next steps
 
 **Based on the analysis documents created in Tasks 2.1-2.3, now implement the actual code.**
 
 #### Task 3.1.1: 🔴 CRITICAL: Read Complete API Reference First
+
+**🔄 Update `docs/STATUS.json`:**
+```json
+{
+  "currentTask": "Task 3.1.1",
+  "completed": false
+}
+```
 **Before generating ANY code, you MUST thoroughly read `./agentspace/knowledge/generator/api-reference.md`**
 
 This document contains:
@@ -333,13 +460,23 @@ Common issues that can be avoided by reading the API reference:
 - ✅ Define all entities, relations, interactions, and computations in one file
 - ✅ Example structure: `backend/index.ts` containing all definitions
 
-**Update `docs/STATUS.md` with:**
-- Mark Task 3.1.1 as complete
-- Set next step to "Begin Task 3.1.2: Entity and Relation Implementation"
+**✅ END Task 3.1.1: Update `docs/STATUS.json`:**
+```json
+{
+  "currentTask": "Task 3.1.1",
+  "completed": true
+}
+```
 
 #### Task 3.1.2: Entity and Relation Implementation
-**Update `docs/STATUS.md` with:**
-- Set current step to "Task 3.1.2: Entity and Relation Implementation"
+
+**🔄 Update `docs/STATUS.json`:**
+```json
+{
+  "currentTask": "Task 3.1.2",
+  "completed": false
+}
+```
 - Clear next steps
 
 - [ ] Generate all entities based on `docs/entity-relation-design.md`. **DO NOT define any computations yet**. No `computed` or `computation` on properties
@@ -357,13 +494,23 @@ Common issues that can be avoided by reading the API reference:
   - Fix any type errors before proceeding
   - Do NOT continue until all type errors are resolved
 
-**Update `docs/STATUS.md` with:**
-- Mark Task 3.1.2 as complete
-- Set next step to "Begin Task 3.1.3: Interaction Implementation"
+**✅ END Task 3.1.2: Update `docs/STATUS.json`:**
+```json
+{
+  "currentTask": "Task 3.1.2",
+  "completed": true
+}
+```
 
 #### Task 3.1.3: Interaction Implementation
-**Update `docs/STATUS.md` with:**
-- Set current step to "Task 3.1.3: Interaction Implementation"
+
+**🔄 Update `docs/STATUS.json`:**
+```json
+{
+  "currentTask": "Task 3.1.3",
+  "completed": false
+}
+```
 - Clear next step
 
 
@@ -374,14 +521,23 @@ Common issues that can be avoided by reading the API reference:
   - Fix any type errors before proceeding
   - Do NOT continue until all type errors are resolved
 
-**Update `docs/STATUS.md` with:**
-- Mark Task 3.1.3 as completed
-- Set next step to "Begin Task 3.1.4: Progressive Computation Implementation with Testing"
+**✅ END Task 3.1.3: Update `docs/STATUS.json`:**
+```json
+{
+  "currentTask": "Task 3.1.3",
+  "completed": true
+}
+```
 
 #### Task 3.1.4: Progressive Computation Implementation with Testing
 
-**Update `docs/STATUS.md` with:**
-- Set current step to "Task 3.1.4: Progressive Computation Implementation with Testing"
+**🔄 Update `docs/STATUS.json`:**
+```json
+{
+  "currentTask": "Task 3.1.4",
+  "completed": false
+}
+```
 - Clear next step
 
 **📖 MUST READ: `./agentspace/knowledge/generator/test-implementation.md`**
@@ -392,12 +548,35 @@ Common issues that can be avoided by reading the API reference:
 This section follows a **test-driven progressive approach** where each computation is implemented and tested individually before moving to the next one.
 
 ##### Task 3.1.4.1: Create Test File
+
+**🔄 Update `docs/STATUS.json`:**
+```json
+{
+  "currentTask": "Task 3.1.4.1",
+  "completed": false
+}
+```
 - [ ] Copy contents from `tests/basic.template.test.ts` to create `tests/basic.test.ts`. **DO NOT add any test cases yet** - we will add them progressively as we implement each computation
 - [ ] This will be your main test file for progressive implementation
 - [ ] Import your backend definitions: `import { entities, relations, interactions } from '../backend'`
 
+**✅ END Task 3.1.4.1: Update `docs/STATUS.json`:**
+```json
+{
+  "currentTask": "Task 3.1.4.1",
+  "completed": true
+}
+```
 
 ##### Task 3.1.4.2: Create Implementation Plan
+
+**🔄 Update `docs/STATUS.json`:**
+```json
+{
+  "currentTask": "Task 3.1.4.2",
+  "completed": false
+}
+```
 - [ ] Based on `docs/computation-analysis.md`, analyze computation dependencies (which computations depend on other entities/relations)
 - [ ] Order computations from least dependent to most dependent. Start with computations that only depend on InteractionEventEntity
 - [ ] Create `docs/computation-implementation-plan.md`. **Write the plan in checklist format** for easy progress tracking. **MUST include ALL computations from `docs/computation-analysis.md` - do not skip any!**
@@ -484,10 +663,23 @@ This section follows a **test-driven progressive approach** where each computati
 - Document any blockers or issues in `docs/errors/`
 ```
 
+**✅ END Task 3.1.4.2: Update `docs/STATUS.json`:**
+```json
+{
+  "currentTask": "Task 3.1.4.2",
+  "completed": true
+}
+```
+
 ##### Task 3.1.4.3: Progressive Implementation Loop
 
-** MUST UPDATE `docs/STATUS.md` with:**
-- Set current step to "Task 3.1.4.3: Progressive Implementation Loop"
+**🔄 Update `docs/STATUS.json`:**
+```json
+{
+  "currentTask": "Task 3.1.4.3",
+  "completed": false
+}
+```
 - Add note: "**DO NOT proceed without reading the above reference document completely**"
 - Add note: "**MUST Read `docs/computation-implementation-plan.md` to see which computations are completed and what's next.**"
 
@@ -598,24 +790,46 @@ This section follows a **test-driven progressive approach** where each computati
 
 **🛑 STOP GATE: DO NOT proceed to Task 3.1.4.4 until ALL computations in `docs/computation-implementation-plan.md` are checked off as complete with passing tests.**
 
+**✅ END Task 3.1.4.3: Update `docs/STATUS.json`:**
+```json
+{
+  "currentTask": "Task 3.1.4.3",
+  "completed": true
+}
+```
+
 ##### Task 3.1.4.4: Completion Checklist
+
+**🔄 Update `docs/STATUS.json`:**
+```json
+{
+  "currentTask": "Task 3.1.4.4",
+  "completed": false
+}
+```
 - [ ] All computations from `docs/computation-analysis.md` are implemented
 - [ ] Each computation has at least one passing test
 - [ ] All type checks pass (`npm run check`)
 - [ ] All tests pass (`npm run test tests/basic.test.ts`)
-- [ ] **Update `docs/STATUS.md`** to reflect:
-  - All computations implemented successfully
-  - All basic tests passing
-  - Ready to proceed to "Task 3.2: Permission and Business Rules Implementation"
 
-**Update `docs/STATUS.md` with:**
-- Mark Task 3.1 as completed
-- Set next step to "Begin Task 3.2: Permission and Business Rules Implementation"
+
+**✅ END Task 3.1: Update `docs/STATUS.json`:**
+```json
+{
+  "currentTask": "Task 3.1",
+  "completed": true
+}
+```
 
 ### Task 3.2: Permission and Business Rules Implementation
 
-**Update `docs/STATUS.md` with:**
-- Set current step to "Task 3.2: Permission and Business Rules Implementation"
+**🔄 Update `docs/STATUS.json`:**
+```json
+{
+  "currentTask": "Task 3.2",
+  "completed": false
+}
+```
 - Clear next step
 
 **📖 MUST READ: `./agentspace/knowledge/generator/permission-implementation.md`**
@@ -639,7 +853,23 @@ This section follows a **test-driven progressive approach** where each computati
   - **Balance checks**: e.g., "Cannot withdraw more than account balance"
 - [ ] Ensure TypeScript type checking passes
 
+**✅ END Task 3.2: Update `docs/STATUS.json`:**
+```json
+{
+  "currentTask": "Task 3.2",
+  "completed": true
+}
+```
+
 ### Task 3.3: Permission and Business Rules Test Implementation
+
+**🔄 Update `docs/STATUS.json`:**
+```json
+{
+  "currentTask": "Task 3.3",
+  "completed": false
+}
+```
 **📖 MUST READ: `./agentspace/knowledge/generator/permission-test-implementation.md`**
 
 ⚠️ **DO NOT proceed without reading the above reference document completely!**
@@ -674,16 +904,33 @@ Since permissions and business rules are now unified in the `condition` API, the
 - Testing both permission failures and business rule violations to ensure proper error handling
 - Documenting expected error scenarios for each Interaction
 
-**✅ END Task 3: Update `docs/STATUS.md` with:**
-- Mark Task 3 as complete
-- List all implemented components (entities, relations, interactions, computations)
-- List all tests created and passing
-- Set current phase to "Task 4: Complete Functional Testing"
-- Specify next steps: "Begin Task 4: Complete Functional Testing"
+
+
+**✅ END Task 3: Update `docs/STATUS.json`:**
+```json
+{
+  "currentTask": "Task 3",
+  "completed": true,
+  "completedItems": [
+    "All entities and relations implemented",
+    "All interactions implemented",
+    "All computations implemented with tests",
+    "Permissions and business rules implemented and tested"
+  ]
+}
+```
 
 ## Task 4: Complete Functional Testing
 
-**📖 START: Read `docs/STATUS.md` to check current progress before proceeding.**
+**📖 START: Read `docs/STATUS.json` to check current progress before proceeding.**
+
+**🔄 Update `docs/STATUS.json`:**
+```json
+{
+  "currentTask": "Task 4",
+  "completed": false
+}
+```
 
 **🎯 Goal: Implement and pass ALL test cases defined in `requirements/test-cases.md`**
 
@@ -691,23 +938,79 @@ This phase ensures your implementation meets all business requirements through c
 
 ### Task 4.1: Prepare for Complete Testing
 
+**🔄 Update `docs/STATUS.json`:**
+```json
+{
+  "currentTask": "Task 4.1",
+  "completed": false
+}
+```
+
 #### Task 4.1.1: Create Test Organization
+
+**🔄 Update `docs/STATUS.json`:**
+```json
+{
+  "currentTask": "Task 4.1.1",
+  "completed": false
+}
+```
 - [ ] Copy content from `tests/business.template.test.ts` to create `tests/business.test.ts` for comprehensive functional tests
 
+**✅ END Task 4.1.1: Update `docs/STATUS.json`:**
+```json
+{
+  "currentTask": "Task 4.1.1",
+  "completed": true
+}
+```
 
 #### Task 4.1.2: Test Case Mapping
+
+**🔄 Update `docs/STATUS.json`:**
+```json
+{
+  "currentTask": "Task 4.1.2",
+  "completed": false
+}
+```
 - [ ] Review ALL test cases in `requirements/test-cases.md`
 - [ ] Create `docs/test-implementation-plan.md` with checklist of all test cases
 - [ ] Group test cases by dependencies and complexity
 - [ ] Identify any test data or setup requirements
 
+
+**✅ END Task 4.1: Update `docs/STATUS.json`:**
+```json
+{
+  "currentTask": "Task 4.1",
+  "completed": true
+}
+```
+
 ### Task 4.2: Progressive Test Implementation
 
-**📖 LOOP START: Read `docs/STATUS.md` to see which test cases are completed and what's next.**
+**🔄 Update `docs/STATUS.json`:**
+```json
+{
+  "currentTask": "Task 4.2",
+  "completed": false
+}
+```
+
+**📖 LOOP START: Read `docs/STATUS.json` to see which test cases are completed and what's next.**
 
 **For EACH test case in `requirements/test-cases.md`, follow this cycle:**
 
 #### Task 4.2.1: Implement Test Case
+
+**🔄 Update `docs/STATUS.json`:**
+```json
+{
+  "currentTask": "Task 4.2.1",
+  "completed": false
+}
+```
 - [ ] Write the test case exactly as specified in requirements
 - [ ] Include all preconditions, inputs, and expected results
 - [ ] Use descriptive test names that match the requirement ID (e.g., "TC001: Create Article")
@@ -738,7 +1041,23 @@ This phase ensures your implementation meets all business requirements through c
   })
   ```
 
+**✅ END Task 4.2.1: Update `docs/STATUS.json`:**
+```json
+{
+  "currentTask": "Task 4.2.1",
+  "completed": true
+}
+```
+
 #### Task 4.2.2: Run and Fix
+
+**🔄 Update `docs/STATUS.json`:**
+```json
+{
+  "currentTask": "Task 4.2.2",
+  "completed": false
+}
+```
 - [ ] Run the specific test: `npm run test tests/complete.test.ts -t "TC001"`
 - [ ] If test fails, analyze the failure:
   - Is it an implementation issue? Fix in backend code
@@ -753,22 +1072,71 @@ This phase ensures your implementation meets all business requirements through c
 - [ ] If test still fails after 10 fix attempts, STOP and wait for user guidance
 - [ ] Document any fixes in `docs/errors/test-failures.md`
 
+**✅ END Task 4.2.2: Update `docs/STATUS.json`:**
+```json
+{
+  "currentTask": "Task 4.2.2",
+  "completed": true
+}
+```
+
 #### Task 4.2.3: Verify No Regression
+
+**🔄 Update `docs/STATUS.json`:**
+```json
+{
+  "currentTask": "Task 4.2.3",
+  "completed": false
+}
+```
 - [ ] After fixing, run ALL previous tests: `npm run test`
 - [ ] Ensure no existing tests are broken by your fix
 - [ ] If regression occurs, find a solution that satisfies both requirements
 
+**✅ END Task 4.2.3: Update `docs/STATUS.json`:**
+```json
+{
+  "currentTask": "Task 4.2.3",
+  "completed": true
+}
+```
+
 #### Task 4.2.4: Update Progress
+
+**🔄 Update `docs/STATUS.json`:**
+```json
+{
+  "currentTask": "Task 4.2.4",
+  "completed": false
+}
+```
 - [ ] Check off completed test case in `docs/test-implementation-plan.md`
 - [ ] Update test count in your progress tracking
 - [ ] Commit your changes with clear message: "Implement TC001: Create Article"
-- [ ] **Update `docs/STATUS.md`** with:
+- [ ] **Update `docs/STATUS.json`** with:
   - Current test case completed
   - Next test case to implement
   - Running total of tests passed
   - Any issues or blockers encountered
 
+
+**✅ END Task 4.2: Update `docs/STATUS.json`:**
+```json
+{
+  "currentTask": "Task 4.2",
+  "completed": true
+}
+```
+
 ### Task 4.3: Completion Criteria
+
+**🔄 Update `docs/STATUS.json`:**
+```json
+{
+  "currentTask": "Task 4.3",
+  "completed": false
+}
+```
 
 **🛑 STOP GATE: Do NOT consider the project complete until:**
 
@@ -794,11 +1162,31 @@ This phase ensures your implementation meets all business requirements through c
 
 **Remember: The goal is to have a production-ready implementation that passes ALL business requirements, not just to make tests pass.**
 
-**✅ PROJECT COMPLETE: Final update to `docs/STATUS.md`:**
-- Mark all phases as complete
-- List final statistics:
-  - Total entities/relations/interactions/computations implemented
-  - Total test cases passed
-  - Any known limitations or future improvements
-- Set status to "COMPLETE"
-- Add final timestamp
+**✅ END Task 4: Update `docs/STATUS.json`:**
+```json
+{
+  "currentTask": "Task 4",
+  "completed": true,
+  "completedItems": [
+    "All test cases from requirements/test-cases.md implemented",
+    "All tests passing without failures",
+    "Test completion report created"
+  ]
+}
+```
+
+**✅ PROJECT COMPLETE: Final update to `docs/STATUS.json`:**
+```json
+{
+  "currentTask": "COMPLETE",
+  "completed": true,
+  "completedItems": [
+    "Task 1: Requirements Analysis - COMPLETE",
+    "Task 2: Design and Analysis - COMPLETE",
+    "Task 3: Code Generation and Progressive Testing - COMPLETE",
+    "Task 4: Complete Functional Testing - COMPLETE",
+    "All tests passing",
+    "Project ready for production"
+  ]
+}
+```
