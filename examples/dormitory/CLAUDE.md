@@ -10,46 +10,33 @@ This guide provides a comprehensive step-by-step process for generating backend 
 
 ## 🔴 CRITICAL: Progress Tracking with STATUS.md
 
+
 **Before starting ANY work, create `docs/STATUS.md` to track your progress:**
 
 ```markdown
 # Project Implementation Status
 
-## Current Phase
-Phase 1: Requirements Analysis
+## Current Task
+Task 1: Requirements Analysis
 
-## Current Step
-Not started
 
 ## Completed Items
 - [ ] STATUS.md created
-
-
-## Notes
-- Project just initialized
-- Following progressive implementation approach
-
-## Last Updated
-[timestamp]
 ```
 
-**MANDATORY: Throughout the implementation:**
-- **MUST read `docs/STATUS.md`** at the start of EVERY phase and major loop
-- **MUST update `docs/STATUS.md`** at the end of EVERY phase and major loop
-- Include specific next steps based on current progress
-- Record any blockers or important decisions
+**📌 IMPORTANT: All tasks in this guide use a global unique numbering system (Task x.x.x.x). You can always find your current position by checking `docs/STATUS.md`, which tracks the exact Task number you were working on.**
 
-## Phase 1: Requirements Analysis and Test Case Design
+## Task 1: Requirements Analysis and Test Case Design
 
 **📖 START: Read `docs/STATUS.md` to check current progress before proceeding.**
 
-### 1.1 Deep Requirements Analysis
+### Task 1.1: Deep Requirements Analysis
 - Analyze user business requirements, supplement vague or missing details
 - Analyze from data perspective: identify all entities, properties, relationships
 - Analyze from interaction perspective: list all user operations, permission requirements, business processes
 - Create `requirements/detailed-requirements.md` document
 
-### 1.2 Test Case Documentation (CRITICAL)
+### Task 1.2: Test Case Documentation (CRITICAL)
 Create `requirements/test-cases.md` document with complete test cases:
 
 **🔴 CRITICAL: All test cases MUST be based on Interactions, NOT on Entity/Relation operations**
@@ -106,27 +93,27 @@ Create `requirements/test-cases.md` document with complete test cases:
 - Note: This tests business rule validation, not core functionality
 ```
 
-### 1.3 Interaction Matrix
+### Task 1.3: Interaction Matrix
 Create `requirements/interaction-matrix.md` to ensure:
 - Every user role has corresponding Interactions for all operations
 - Every Interaction has clear permission controls or business rule constraints
 - Every Interaction has corresponding test cases
 - Document both access control requirements AND business logic validations
 
-**✅ END Phase 1: Update `docs/STATUS.md` with:**
-- Mark Phase 1 as complete
+**✅ END Task 1: Update `docs/STATUS.md` with:**
+- Mark Task 1 as complete
 - List all created documents
-- Set current phase to "Phase 2: Design and Analysis"
-- Specify next steps: "Begin Phase 2: Design and Analysis"
+- Set current phase to "Task 2: Design and Analysis"
+- Specify next steps: "Begin Task 2: Design and Analysis"
 
-## Phase 2: Design and Analysis
+## Task 2: Design and Analysis
 
 **📖 START: Read `docs/STATUS.md` to check current progress before proceeding.**
 
 ### 🔴 Document-First Approach
-**Phase 2 focuses on creating comprehensive design documents before any code generation.**
+**Task 2 focuses on creating comprehensive design documents before any code generation.**
 
-### 2.1 Entity and Relation Analysis
+### Task 2.1: Entity and Relation Analysis
 **📖 MUST READ: `./agentspace/knowledge/generator/entity-relation-generation.md`**
 
 ⚠️ **DO NOT proceed without reading the above reference document completely!**
@@ -209,7 +196,7 @@ const UserDormitoryRelation = Relation.create({
 Note: The relation creates `user.dormitory` to access the assigned dormitory and `dormitory.users` to access all users in that dormitory. No ID fields are needed in the entities.
 ```
 
-### 2.2 Interaction Analysis
+### Task 2.2: Interaction Analysis
 **📖 MUST READ: `./agentspace/knowledge/generator/basic-interaction-generation.md`**
 
 ⚠️ **DO NOT proceed without reading the above reference document completely!**
@@ -262,7 +249,7 @@ Note: The relation creates `user.dormitory` to access the assigned dormitory and
   - Dormitory must have available capacity
 ```
 
-### 2.3 Computation Analysis
+### Task 2.3: Computation Analysis
 **📖 PRIMARY GUIDE: `./agentspace/knowledge/generator/computation-selection-guide.md`**
 **📖 REFERENCE ONLY: `./agentspace/knowledge/generator/computation-implementation.md`**
 
@@ -271,8 +258,8 @@ Note: The relation creates `user.dormitory` to access the assigned dormitory and
 **🔴 MANDATORY PROCESS:**
 1. **FIRST**: Read and understand `computation-selection-guide.md` completely
 2. **USE PREVIOUS OUTPUTS**: Base your analysis on:
-   - `docs/entity-relation-design.md` (from step 2.1)
-   - `docs/interaction-design.md` (from step 2.2)
+   - `docs/entity-relation-design.md` (from Task 2.1)
+   - `docs/interaction-design.md` (from Task 2.2)
 3. **ANALYZE**: For EVERY entity and EVERY property, follow the step-by-step analysis process
 4. **DOCUMENT**: Create `docs/computation-analysis.md` documenting your analysis for each entity/property
 5. **REFERENCE**: Use `computation-implementation.md` as a reference for syntax and examples
@@ -288,22 +275,22 @@ Note: The relation creates `user.dormitory` to access the assigned dormitory and
 
 **Remember**: The systematic analysis process ensures you select the RIGHT computation type for each use case. This analysis will guide your implementation in the next phase!
 
-**✅ END Phase 2: Update `docs/STATUS.md` with:**
-- Mark Phase 2 as complete
+**✅ END Task 2: Update `docs/STATUS.md` with:**
+- Mark Task 2 as complete
 - List all design documents created
-- Specify next steps: "Begin Phase 3: Code Generation and Progressive Testing"
+- Specify next steps: "Begin Task 3: Code Generation and Progressive Testing"
 
-## Phase 3: Code Generation and Progressive Testing
-**✅ Start Phase 3: Update `docs/STATUS.md` with:**
-- Set current phase to "Phase 3: Code Generation and Progressive Testing"
-- Set current step to "Begin Phase 3: Code Generation and Progressive Testing"
-- Specify next steps: "Begin Phase 3: Code Generation and Progressive Testing"
+## Task 3: Code Generation and Progressive Testing
+**✅ Start Task 3: Update `docs/STATUS.md` with:**
+- Set current phase to "Task 3: Code Generation and Progressive Testing"
+- Set current step to "Begin Task 3: Code Generation and Progressive Testing"
+- Specify next steps: "Begin Task 3: Code Generation and Progressive Testing"
 
 **📖 START: Read `docs/STATUS.md` to check current progress before proceeding.**
 
 **🔄 PROGRESSIVE IMPLEMENTATION STRATEGY**
 
-Phase 3 follows a **progressive, test-driven approach**:
+Task 3 follows a **progressive, test-driven approach**:
 1. **Implement incrementally**: Start with entities/relations, then interactions, then computations one by one
 2. **Type check immediately**: Run `npm run check` after each implementation step
 3. **Test each computation**: Write and run tests for each computation before moving to the next
@@ -312,14 +299,14 @@ Phase 3 follows a **progressive, test-driven approach**:
 
 This approach prevents the accumulation of errors and makes debugging much easier.
 
-### 3.1 Code Generation and Implementation
+### Task 3.1: Code Generation and Implementation
 **Update `docs/STATUS.md` with:**
-- Set current step to "Begin 3.1 Code Generation and Implementation"
+- Set current step to "Begin Task 3.1: Code Generation and Implementation"
 - Clear next steps
 
-**Based on the analysis documents created in steps 2.1-2.3, now implement the actual code.**
+**Based on the analysis documents created in Tasks 2.1-2.3, now implement the actual code.**
 
-#### 3.1.1 🔴 CRITICAL: Read Complete API Reference First
+#### Task 3.1.1: 🔴 CRITICAL: Read Complete API Reference First
 **Before generating ANY code, you MUST thoroughly read `./agentspace/knowledge/generator/api-reference.md`**
 
 This document contains:
@@ -347,12 +334,12 @@ Common issues that can be avoided by reading the API reference:
 - ✅ Example structure: `backend/index.ts` containing all definitions
 
 **Update `docs/STATUS.md` with:**
-- Mark Step 3.1.1 as complete
-- Set next step to "Begin 3.1.2 Entity and Relation Implementation"
+- Mark Task 3.1.1 as complete
+- Set next step to "Begin Task 3.1.2: Entity and Relation Implementation"
 
-#### 3.1.2 Entity and Relation Implementation
+#### Task 3.1.2: Entity and Relation Implementation
 **Update `docs/STATUS.md` with:**
-- Set current step to "3.1.2 Entity and Relation Implementation"
+- Set current step to "Task 3.1.2: Entity and Relation Implementation"
 - Clear next steps
 
 - [ ] Generate all entities based on `docs/entity-relation-design.md`. **DO NOT define any computations yet**. No `computed` or `computation` on properties
@@ -371,16 +358,16 @@ Common issues that can be avoided by reading the API reference:
   - Do NOT continue until all type errors are resolved
 
 **Update `docs/STATUS.md` with:**
-- Mark Step 3.1.2 as complete
-- Set next step to "Begin 3.1.3 Interaction Implementation"
+- Mark Task 3.1.2 as complete
+- Set next step to "Begin Task 3.1.3: Interaction Implementation"
 
-#### 3.1.3 Interaction Implementation
+#### Task 3.1.3: Interaction Implementation
 **Update `docs/STATUS.md` with:**
-- Set current step to "3.1.3 Code Generation and Implementation"
+- Set current step to "Task 3.1.3: Interaction Implementation"
 - Clear next step
 
 
-- [ ] Generate all interactions based on `docs/interaction-design.md`. **DO NOT define any conditions yet** - we will add permissions and business rules later in section 3.2. No `condition` parameter in Interaction.create()
+- [ ] Generate all interactions based on `docs/interaction-design.md`. **DO NOT define any conditions yet** - we will add permissions and business rules later in Task 3.2. No `condition` parameter in Interaction.create()
 - [ ] Start with simple payload-only interactions (no conditions initially)
 - [ ] Ensure all payloads match the documented fields
 - [ ] **Type Check**: Run `npm run check` to ensure TypeScript compilation passes
@@ -388,13 +375,13 @@ Common issues that can be avoided by reading the API reference:
   - Do NOT continue until all type errors are resolved
 
 **Update `docs/STATUS.md` with:**
-- Mark step 3.1.3 as completed
-- Set next step to "Begin 3.1.4 Progressive Computation Implementation with Testing"
+- Mark Task 3.1.3 as completed
+- Set next step to "Begin Task 3.1.4: Progressive Computation Implementation with Testing"
 
-#### 3.1.4 Progressive Computation Implementation with Testing
+#### Task 3.1.4: Progressive Computation Implementation with Testing
 
 **Update `docs/STATUS.md` with:**
-- Set current step to "3.1.4 Progressive Computation Implementation with Testing"
+- Set current step to "Task 3.1.4: Progressive Computation Implementation with Testing"
 - Clear next step
 
 **📖 MUST READ: `./agentspace/knowledge/generator/test-implementation.md`**
@@ -404,13 +391,13 @@ Common issues that can be avoided by reading the API reference:
 
 This section follows a **test-driven progressive approach** where each computation is implemented and tested individually before moving to the next one.
 
-##### Step 1: Create Test File
+##### Task 3.1.4.1: Create Test File
 - [ ] Copy contents from `tests/basic.template.test.ts` to create `tests/basic.test.ts`. **DO NOT add any test cases yet** - we will add them progressively as we implement each computation
 - [ ] This will be your main test file for progressive implementation
 - [ ] Import your backend definitions: `import { entities, relations, interactions } from '../backend'`
 
 
-##### Step 2: Create Implementation Plan
+##### Task 3.1.4.2: Create Implementation Plan
 - [ ] Based on `docs/computation-analysis.md`, analyze computation dependencies (which computations depend on other entities/relations)
 - [ ] Order computations from least dependent to most dependent. Start with computations that only depend on InteractionEventEntity
 - [ ] Create `docs/computation-implementation-plan.md`. **Write the plan in checklist format** for easy progress tracking. **MUST include ALL computations from `docs/computation-analysis.md` - do not skip any!**
@@ -423,25 +410,7 @@ This section follows a **test-driven progressive approach** where each computati
 ```markdown
 # Computation Implementation Plan
 
-## Phase 1: Self-Dependent Property Computations
-*Properties with computed values that only depend on their own entity's fields, no external dependencies*
-
-- [ ] **User.displayName**
-  - Decision: `computed` function on Property
-  - Method: Concatenates firstName and lastName fields
-  - Dependencies: User entity's own fields (firstName, lastName)
-
-- [ ] **Article.slug**
-  - Decision: `computed` function on Property
-  - Method: Generates URL-friendly slug from title using regex transformation
-  - Dependencies: Article entity's own field (title)
-
-- [ ] **Product.discountedPrice**
-  - Decision: `computed` function on Property
-  - Method: Calculates final price: price * (1 - discountRate)
-  - Dependencies: Product entity's own fields (price, discountRate)
-
-## Phase 2: InteractionEventEntity-Dependent Computations
+## Phase 1: InteractionEventEntity-Dependent Computations
 *Computations that only depend on InteractionEventEntity, typically for logging or activity tracking*
 
 - [ ] **ActivityLog entity creation**
@@ -459,7 +428,7 @@ This section follows a **test-driven progressive approach** where each computati
   - Method: Counts all InteractionEventEntity records
   - Dependencies: InteractionEventEntity
 
-## Phase 3: Single Entity/Relation Dependencies
+## Phase 2: Single Entity/Relation Dependencies
 *Computations that depend on one other entity or relation*
 
 - [ ] **User.postCount**
@@ -477,7 +446,7 @@ This section follows a **test-driven progressive approach** where each computati
   - Method: Sums amount field from all related OrderItem entities
   - Dependencies: OrderItem relation
 
-## Phase 4: Multiple Dependencies
+## Phase 3: Multiple Dependencies
 *Computations that depend on multiple entities or relations*
 
 - [ ] **Dashboard.stats**
@@ -495,7 +464,7 @@ This section follows a **test-driven progressive approach** where each computati
   - Method: Calculates weighted score from preferences and product features
   - Dependencies: UserPreference relation, Product entity, ProductFeature relation
 
-## Phase 5: Complex Chain Dependencies
+## Phase 4: Complex Chain Dependencies
 *Computations that depend on other computed values*
 
 - [ ] **User.reputation**
@@ -515,10 +484,10 @@ This section follows a **test-driven progressive approach** where each computati
 - Document any blockers or issues in `docs/errors/`
 ```
 
-##### Step 3: Progressive Implementation Loop
+##### Task 3.1.4.3: Progressive Implementation Loop
 
 ** MUST UPDATE `docs/STATUS.md` with:**
-- Set current step to "3.1.4 Step 3: Progressive Implementation Loop"
+- Set current step to "Task 3.1.4.3: Progressive Implementation Loop"
 - Add note: "**DO NOT proceed without reading the above reference document completely**"
 - Add note: "**MUST Read `docs/computation-implementation-plan.md` to see which computations are completed and what's next.**"
 
@@ -528,7 +497,23 @@ This section follows a **test-driven progressive approach** where each computati
 
 1. **Implement the Computation**
    - [ ] Add the computation code to your entity/relation/property
-   - [ ] **Use assignment pattern to add computations** to avoid complex reference issues
+   - [ ] **Use assignment pattern (`Entity.computation = ...` or `Property.computation = ...`)** to add computations after all entity/relation definitions but before the export section. This avoids complex complex reference issues. Example:
+     ```typescript
+     // 1. First define all entities and relations
+     const User = Entity.create({ name: 'User', properties: [...] })
+     const Post = Entity.create({ name: 'Post', properties: [...] })
+     const UserPostRelation = Relation.create({ source: User, target: Post, ... })
+     
+     // 2. Then add computations using assignment (append at the end of definition logic)
+     User.properties.find(p => p.name === 'postCount').computation = Count.create({
+       relation: UserPostRelation,
+       relationDirection: 'source'
+     })
+     
+     // 3. Finally export (export section stays at the very end)
+     export const entities = [User, Post]
+     export const relations = [UserPostRelation]
+     ```
    - [ ] If adding computation to a property that has `defaultValue`, remove the `defaultValue` (computation will provide the default)
    - [ ] Verify no Transform is used in Property computation
 
@@ -568,8 +553,6 @@ This section follows a **test-driven progressive approach** where each computati
        user: testUser,
        payload: { title: 'Test', content: 'Content' }
      })
-
-     expect(result.error).toBeUndefined()
      
      // Verify state is draft
      const article = await system.storage.findOne(
@@ -581,12 +564,10 @@ This section follows a **test-driven progressive approach** where each computati
      expect(article.state).toBe('draft')
      
      // Transition to published
-     const result1 = await controller.callInteraction('PublishArticle', {
+     await controller.callInteraction('PublishArticle', {
        user: testUser,
        payload: { id: article.id }
      })
-
-     expect(result1.error).toBeUndefined()
      
      // Verify state changed
      const published = await system.storage.findOne(
@@ -615,9 +596,9 @@ This section follows a **test-driven progressive approach** where each computati
    - [ ] **MUST** check off completed computation in `docs/computation-implementation-plan.md`
    - [ ] Create new documents in `docs/errors/` to record any errors encountered
 
-**🛑 STOP GATE: DO NOT proceed to Step 4 until ALL computations in `docs/computation-implementation-plan.md` are checked off as complete with passing tests.**
+**🛑 STOP GATE: DO NOT proceed to Task 3.1.4.4 until ALL computations in `docs/computation-implementation-plan.md` are checked off as complete with passing tests.**
 
-##### Step 4: Completion Checklist
+##### Task 3.1.4.4: Completion Checklist
 - [ ] All computations from `docs/computation-analysis.md` are implemented
 - [ ] Each computation has at least one passing test
 - [ ] All type checks pass (`npm run check`)
@@ -625,16 +606,16 @@ This section follows a **test-driven progressive approach** where each computati
 - [ ] **Update `docs/STATUS.md`** to reflect:
   - All computations implemented successfully
   - All basic tests passing
-  - Ready to proceed to "3.2 Permission and Business Rules Implementation"
+  - Ready to proceed to "Task 3.2: Permission and Business Rules Implementation"
 
 **Update `docs/STATUS.md` with:**
-- Mark step 3.1 as completed
-- Set next step to "Begin 3.2 Permission and Business Rules Implementation"
+- Mark Task 3.1 as completed
+- Set next step to "Begin Task 3.2: Permission and Business Rules Implementation"
 
-### 3.2 Permission and Business Rules Implementation
+### Task 3.2: Permission and Business Rules Implementation
 
 **Update `docs/STATUS.md` with:**
-- Set current step to "3.2 Permission and Business Rules Implementation"
+- Set current step to "Task 3.2: Permission and Business Rules Implementation"
 - Clear next step
 
 **📖 MUST READ: `./agentspace/knowledge/generator/permission-implementation.md`**
@@ -658,7 +639,7 @@ This section follows a **test-driven progressive approach** where each computati
   - **Balance checks**: e.g., "Cannot withdraw more than account balance"
 - [ ] Ensure TypeScript type checking passes
 
-### 3.3 Permission and Business Rules Test Implementation
+### Task 3.3: Permission and Business Rules Test Implementation
 **📖 MUST READ: `./agentspace/knowledge/generator/permission-test-implementation.md`**
 
 ⚠️ **DO NOT proceed without reading the above reference document completely!**
@@ -693,14 +674,14 @@ Since permissions and business rules are now unified in the `condition` API, the
 - Testing both permission failures and business rule violations to ensure proper error handling
 - Documenting expected error scenarios for each Interaction
 
-**✅ END Phase 3: Update `docs/STATUS.md` with:**
-- Mark Phase 3 as complete
+**✅ END Task 3: Update `docs/STATUS.md` with:**
+- Mark Task 3 as complete
 - List all implemented components (entities, relations, interactions, computations)
 - List all tests created and passing
-- Set current phase to "Phase 4: Complete Functional Testing"
-- Specify next steps: "Begin Phase 4: Complete Functional Testing"
+- Set current phase to "Task 4: Complete Functional Testing"
+- Specify next steps: "Begin Task 4: Complete Functional Testing"
 
-## Phase 4: Complete Functional Testing
+## Task 4: Complete Functional Testing
 
 **📖 START: Read `docs/STATUS.md` to check current progress before proceeding.**
 
@@ -708,25 +689,25 @@ Since permissions and business rules are now unified in the `condition` API, the
 
 This phase ensures your implementation meets all business requirements through comprehensive testing.
 
-### 4.1 Prepare for Complete Testing
+### Task 4.1: Prepare for Complete Testing
 
-#### Step 1: Create Test Organization
+#### Task 4.1.1: Create Test Organization
 - [ ] Copy content from `tests/business.template.test.ts` to create `tests/business.test.ts` for comprehensive functional tests
 
 
-#### Step 2: Test Case Mapping
+#### Task 4.1.2: Test Case Mapping
 - [ ] Review ALL test cases in `requirements/test-cases.md`
 - [ ] Create `docs/test-implementation-plan.md` with checklist of all test cases
 - [ ] Group test cases by dependencies and complexity
 - [ ] Identify any test data or setup requirements
 
-### 4.2 Progressive Test Implementation
+### Task 4.2: Progressive Test Implementation
 
 **📖 LOOP START: Read `docs/STATUS.md` to see which test cases are completed and what's next.**
 
 **For EACH test case in `requirements/test-cases.md`, follow this cycle:**
 
-#### Step 1: Implement Test Case
+#### Task 4.2.1: Implement Test Case
 - [ ] Write the test case exactly as specified in requirements
 - [ ] Include all preconditions, inputs, and expected results
 - [ ] Use descriptive test names that match the requirement ID (e.g., "TC001: Create Article")
@@ -757,7 +738,7 @@ This phase ensures your implementation meets all business requirements through c
   })
   ```
 
-#### Step 2: Run and Fix
+#### Task 4.2.2: Run and Fix
 - [ ] Run the specific test: `npm run test tests/complete.test.ts -t "TC001"`
 - [ ] If test fails, analyze the failure:
   - Is it an implementation issue? Fix in backend code
@@ -772,12 +753,12 @@ This phase ensures your implementation meets all business requirements through c
 - [ ] If test still fails after 10 fix attempts, STOP and wait for user guidance
 - [ ] Document any fixes in `docs/errors/test-failures.md`
 
-#### Step 3: Verify No Regression
+#### Task 4.2.3: Verify No Regression
 - [ ] After fixing, run ALL previous tests: `npm run test`
 - [ ] Ensure no existing tests are broken by your fix
 - [ ] If regression occurs, find a solution that satisfies both requirements
 
-#### Step 4: Update Progress
+#### Task 4.2.4: Update Progress
 - [ ] Check off completed test case in `docs/test-implementation-plan.md`
 - [ ] Update test count in your progress tracking
 - [ ] Commit your changes with clear message: "Implement TC001: Create Article"
@@ -787,7 +768,7 @@ This phase ensures your implementation meets all business requirements through c
   - Running total of tests passed
   - Any issues or blockers encountered
 
-### 4.3 Completion Criteria
+### Task 4.3: Completion Criteria
 
 **🛑 STOP GATE: Do NOT consider the project complete until:**
 
