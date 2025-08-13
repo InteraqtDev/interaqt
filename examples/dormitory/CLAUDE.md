@@ -8,7 +8,44 @@ You are a software expert with the following capabilities:
 
 This guide provides a comprehensive step-by-step process for generating backend projects based on the interaqt framework.
 
+## 🔴 CRITICAL: Progress Tracking with STATUS.md
+
+**Before starting ANY work, create `docs/STATUS.md` to track your progress:**
+
+```markdown
+# Project Implementation Status
+
+## Current Phase
+Phase 1: Requirements Analysis
+
+## Current Step
+Not started
+
+## Completed Items
+- [ ] STATUS.md created
+
+## Next Actions
+1. Start with Phase 1: Requirements Analysis
+2. Perform deep requirements analysis
+3. Create test case documentation
+
+## Notes
+- Project just initialized
+- Following progressive implementation approach
+
+## Last Updated
+[timestamp]
+```
+
+**MANDATORY: Throughout the implementation:**
+- **MUST read `docs/STATUS.md`** at the start of EVERY phase and major loop
+- **MUST update `docs/STATUS.md`** at the end of EVERY phase and major loop
+- Include specific next steps based on current progress
+- Record any blockers or important decisions
+
 ## Phase 1: Requirements Analysis and Test Case Design
+
+**📖 START: Read `docs/STATUS.md` to check current progress before proceeding.**
 
 ### 1.1 Deep Requirements Analysis
 - Analyze user business requirements, supplement vague or missing details
@@ -80,8 +117,15 @@ Create `requirements/interaction-matrix.md` to ensure:
 - Every Interaction has corresponding test cases
 - Document both access control requirements AND business logic validations
 
+**✅ END Phase 1: Update `docs/STATUS.md` with:**
+- Mark Phase 1 as complete
+- List all created documents
+- Set current phase to "Phase 2: Design and Analysis"
+- Specify next steps: "Begin Phase 2: Design and Analysis"
 
 ## Phase 2: Design and Analysis
+
+**📖 START: Read `docs/STATUS.md` to check current progress before proceeding.**
 
 ### 🔴 Document-First Approach
 **Phase 2 focuses on creating comprehensive design documents before any code generation.**
@@ -248,8 +292,15 @@ Note: The relation creates `user.dormitory` to access the assigned dormitory and
 
 **Remember**: The systematic analysis process ensures you select the RIGHT computation type for each use case. This analysis will guide your implementation in the next phase!
 
+**✅ END Phase 2: Update `docs/STATUS.md` with:**
+- Mark Phase 2 as complete
+- List all design documents created
+- Set current phase to "Phase 3: Code Generation and Progressive Testing"
+- Specify next steps: "Begin Phase 3: Code Generation and Progressive Testing"
 
 ## Phase 3: Code Generation and Progressive Testing
+
+**📖 START: Read `docs/STATUS.md` to check current progress before proceeding.**
 
 **🔄 PROGRESSIVE IMPLEMENTATION STRATEGY**
 
@@ -328,7 +379,7 @@ Common issues that can be avoided by reading the API reference:
 This section follows a **test-driven progressive approach** where each computation is implemented and tested individually before moving to the next one.
 
 ##### Step 1: Create Test File
-- [ ] Copy contents from `tests/template.test.ts` to create `tests/basic.test.ts`. **DO NOT add any test cases yet** - we will add them progressively as we implement each computation
+- [ ] Copy contents from `tests/basic.template.test.ts` to create `tests/basic.test.ts`. **DO NOT add any test cases yet** - we will add them progressively as we implement each computation
 - [ ] This will be your main test file for progressive implementation
 - [ ] Import your backend definitions: `import { entities, relations, interactions } from '../backend'`
 
@@ -384,6 +435,8 @@ This section follows a **test-driven progressive approach** where each computati
 ```
 
 ##### Step 3: Progressive Implementation Loop
+
+**📖 LOOP START: Read `docs/STATUS.md` to see which computations are completed and what's next.**
 
 **For EACH computation in your plan, follow this cycle:**
 
@@ -464,6 +517,10 @@ This section follows a **test-driven progressive approach** where each computati
 5. **Document Progress**
    - [ ] **MUST** check off completed computation in `docs/computation-implementation-plan.md`
    - [ ] Create new documents in `docs/errors/` to record any errors encountered
+   - [ ] **Update `docs/STATUS.md`** with:
+     - Current computation completed
+     - Next computation to implement
+     - Any blockers or issues
 
 **🛑 STOP GATE: DO NOT proceed to Step 4 until ALL computations in `docs/computation-implementation-plan.md` are checked off as complete with passing tests.**
 
@@ -472,6 +529,10 @@ This section follows a **test-driven progressive approach** where each computati
 - [ ] Each computation has at least one passing test
 - [ ] All type checks pass (`npm run check`)
 - [ ] All tests pass (`npm run test tests/basic.test.ts`)
+- [ ] **Update `docs/STATUS.md`** to reflect:
+  - All computations implemented successfully
+  - All basic tests passing
+  - Ready to proceed to "3.2 Permission and Business Rules Implementation"
 
 
 ### 3.2 Permission and Business Rules Implementation
@@ -521,16 +582,125 @@ Since permissions and business rules are now unified in the `condition` API, the
 - Testing both permission failures and business rule violations to ensure proper error handling
 - Documenting expected error scenarios for each Interaction
 
+**✅ END Phase 3: Update `docs/STATUS.md` with:**
+- Mark Phase 3 as complete
+- List all implemented components (entities, relations, interactions, computations)
+- List all tests created and passing
+- Set current phase to "Phase 4: Complete Functional Testing"
+- Specify next steps: "Begin Phase 4: Complete Functional Testing"
 
-## Phase 4: Quality Assurance
+## Phase 4: Complete Functional Testing
 
-### 4.1 Code Review Checklist
-- [ ] All entities have proper computations
-- [ ] All interactions follow best practices
-- [ ] Proper error handling
+**📖 START: Read `docs/STATUS.md` to check current progress before proceeding.**
 
-### 4.2 Test Coverage
-- [ ] All interactions tested
-- [ ] All permissions tested
-- [ ] Edge cases covered
-- [ ] Performance considerations
+**🎯 Goal: Implement and pass ALL test cases defined in `requirements/test-cases.md`**
+
+This phase ensures your implementation meets all business requirements through comprehensive testing.
+
+### 4.1 Prepare for Complete Testing
+
+#### Step 1: Create Test Organization
+- [ ] Copy content from `tests/business.template.test.ts` to create `tests/business.test.ts` for comprehensive functional tests
+
+
+#### Step 2: Test Case Mapping
+- [ ] Review ALL test cases in `requirements/test-cases.md`
+- [ ] Create `docs/test-implementation-plan.md` with checklist of all test cases
+- [ ] Group test cases by dependencies and complexity
+- [ ] Identify any test data or setup requirements
+
+### 4.2 Progressive Test Implementation
+
+**📖 LOOP START: Read `docs/STATUS.md` to see which test cases are completed and what's next.**
+
+**For EACH test case in `requirements/test-cases.md`, follow this cycle:**
+
+#### Step 1: Implement Test Case
+- [ ] Write the test case exactly as specified in requirements
+- [ ] Include all preconditions, inputs, and expected results
+- [ ] Use descriptive test names that match the requirement ID (e.g., "TC001: Create Article")
+- [ ] Example structure:
+  ```typescript
+  test('TC001: Create Article (via CreateArticle Interaction)', async () => {
+    // Preconditions
+    const user = await controller.storage.create('User', {name:'Jane'})
+    
+    // Execute
+    const result = await controller.callInteraction('CreateArticle', {
+      user,
+      payload: { 
+        title: 'Tech Sharing', 
+        content: 'Content...', 
+        tags: ['frontend', 'React'] 
+      }
+    })
+    
+    // Verify ALL expected results
+    expect(result.error).toBeUndefined()
+    expect(result.data.status).toBe('draft')
+    expect(result.data.createdAt).toBeDefined()
+    
+    // Post validation
+    const userArticles = await getUserArticles(user.id)
+    expect(userArticles).toContainEqual(result.data)
+  })
+  ```
+
+#### Step 2: Run and Fix
+- [ ] Run the specific test: `npm run test tests/complete.test.ts -t "TC001"`
+- [ ] If test fails, analyze the failure:
+  - Is it an implementation issue? Fix in backend code
+  - Is it a test setup issue? Fix test preconditions
+  - Is it a requirement misunderstanding? Clarify and document
+- [ ] **DO NOT modify the test to make it pass** - fix the implementation
+- [ ] Document any fixes in `docs/errors/test-failures.md`
+
+#### Step 3: Verify No Regression
+- [ ] After fixing, run ALL previous tests: `npm run test`
+- [ ] Ensure no existing tests are broken by your fix
+- [ ] If regression occurs, find a solution that satisfies both requirements
+
+#### Step 4: Update Progress
+- [ ] Check off completed test case in `docs/test-implementation-plan.md`
+- [ ] Update test count in your progress tracking
+- [ ] Commit your changes with clear message: "Implement TC001: Create Article"
+- [ ] **Update `docs/STATUS.md`** with:
+  - Current test case completed
+  - Next test case to implement
+  - Running total of tests passed
+  - Any issues or blockers encountered
+
+### 4.3 Completion Criteria
+
+**🛑 STOP GATE: Do NOT consider the project complete until:**
+
+- [ ] **100% of test cases** from `requirements/test-cases.md` are implemented
+- [ ] **ALL tests pass** without any failures or skips
+- [ ] **No console errors** during test execution
+- [ ] Final test run output shows:
+  ```
+  ✓ Complete Functional Tests (X tests)
+    ✓ Core Business Logic (X tests)
+    ✓ User Workflows (X tests)
+    ✓ Edge Cases (X tests)
+    ✓ Integration Scenarios (X tests)
+  
+  Test Suites: X passed, X total
+  Tests: X passed, X total
+  ```
+- [ ] Create final report in `docs/test-completion-report.md` with:
+  - Total test count
+  - Coverage statistics
+  - Any known limitations
+  - Performance metrics
+
+**Remember: The goal is to have a production-ready implementation that passes ALL business requirements, not just to make tests pass.**
+
+**✅ PROJECT COMPLETE: Final update to `docs/STATUS.md`:**
+- Mark all phases as complete
+- List final statistics:
+  - Total entities/relations/interactions/computations implemented
+  - Total test cases passed
+  - Any known limitations or future improvements
+- Set status to "COMPLETE"
+- Add final timestamp

@@ -21,7 +21,8 @@ describe('Basic Functionality', () => {
       relations,
       interactions,
       activities,
-      dict: dicts
+      dict: dicts,
+      ignorePermission: true
     })
 
     await controller.setup(true)
@@ -45,7 +46,6 @@ describe('Permission and Business Rules', () => {
       interactions,
       activities,
       dict: dicts,
-      ignorePermission: true
     })
 
     await controller.setup(true)
