@@ -2258,6 +2258,68 @@ const users = await storage.find('User',
 )
 ```
 
+**🔴 CRITICAL: Querying and Retrieving Related Entities**
+
+When working with related entities, you must use the correct syntax:
+
+1. **In matchExpression - Query by nested property path:**
+```typescript
+// ✅ CORRECT: Use dot notation to access related entity's properties
+const students = await storage.find('Student',
+  MatchExp.atom({ key: 'teacher.id', value: ['=', teacherId] }),
+  undefined,
+  ['id', 'name']
+)
+
+// ❌ WRONG: Cannot compare entity object directly
+const students = await storage.find('Student',
+  MatchExp.atom({ key: 'teacher', value: ['=', teacherId] }),  // This won't work!
+  undefined,
+  ['id', 'name']
+)
+```
+
+2. **In attributeQuery - Retrieve related entity fields:**
+```typescript
+// ✅ CORRECT: Use nested attributeQuery to fetch related entity fields
+const students = await storage.find('Student',
+  undefined,
+  undefined,
+  [
+    'id', 
+    'name',
+    ['teacher', { attributeQuery: ['id', 'name', 'email'] }]  // Nested query for related entity
+  ]
+)
+
+// ❌ WRONG: This only returns the reference, not the actual data
+const students = await storage.find('Student',
+  undefined,
+  undefined,
+  ['id', 'name', 'teacher']  // This won't fetch teacher's data!
+)
+```
+
+**Complete Example:**
+```typescript
+// Find all students of a specific teacher with teacher details
+const students = await storage.find('Student',
+  MatchExp.atom({ key: 'teacher.id', value: ['=', 'teacher123'] }),
+  { limit: 20 },
+  [
+    'id',
+    'name', 
+    'grade',
+    ['teacher', { 
+      attributeQuery: ['id', 'name', 'department'] 
+    }],
+    ['courses', { 
+      attributeQuery: ['id', 'title', 'credits'] 
+    }]
+  ]
+)
+```
+
 **findOne(entityName: string, matchExpression?: MatchExpressionData, modifier?: ModifierData, attributeQuery?: AttributeQueryData)**
 Find a single record matching the criteria.
 
@@ -2270,6 +2332,20 @@ const user = await storage.findOne('User',
   MatchExp.atom({ key: 'email', value: ['=', 'user@example.com'] }),
   undefined,
   ['id', 'name', 'email', 'role', 'createdAt']
+)
+```
+
+**🔴 The same rules for related entities apply to findOne:**
+```typescript
+// ✅ CORRECT: Query and retrieve related entity
+const student = await storage.findOne('Student',
+  MatchExp.atom({ key: 'teacher.id', value: ['=', teacherId] }),  // Use dot notation in query
+  undefined,
+  [
+    'id',
+    'name',
+    ['teacher', { attributeQuery: ['id', 'name'] }]  // Use nested attributeQuery for retrieval
+  ]
 )
 ```
 

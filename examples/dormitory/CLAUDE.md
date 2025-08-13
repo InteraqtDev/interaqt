@@ -24,10 +24,6 @@ Not started
 ## Completed Items
 - [ ] STATUS.md created
 
-## Next Actions
-1. Start with Phase 1: Requirements Analysis
-2. Perform deep requirements analysis
-3. Create test case documentation
 
 ## Notes
 - Project just initialized
@@ -295,10 +291,13 @@ Note: The relation creates `user.dormitory` to access the assigned dormitory and
 **✅ END Phase 2: Update `docs/STATUS.md` with:**
 - Mark Phase 2 as complete
 - List all design documents created
-- Set current phase to "Phase 3: Code Generation and Progressive Testing"
 - Specify next steps: "Begin Phase 3: Code Generation and Progressive Testing"
 
 ## Phase 3: Code Generation and Progressive Testing
+**✅ Start Phase 3: Update `docs/STATUS.md` with:**
+- Set current phase to "Phase 3: Code Generation and Progressive Testing"
+- Set current step to "Begin Phase 3: Code Generation and Progressive Testing"
+- Specify next steps: "Begin Phase 3: Code Generation and Progressive Testing"
 
 **📖 START: Read `docs/STATUS.md` to check current progress before proceeding.**
 
@@ -314,6 +313,10 @@ Phase 3 follows a **progressive, test-driven approach**:
 This approach prevents the accumulation of errors and makes debugging much easier.
 
 ### 3.1 Code Generation and Implementation
+**Update `docs/STATUS.md` with:**
+- Set current step to "Begin 3.1 Code Generation and Implementation"
+- Clear next steps
+
 **Based on the analysis documents created in steps 2.1-2.3, now implement the actual code.**
 
 #### 3.1.1 🔴 CRITICAL: Read Complete API Reference First
@@ -343,8 +346,15 @@ Common issues that can be avoided by reading the API reference:
 - ✅ Define all entities, relations, interactions, and computations in one file
 - ✅ Example structure: `backend/index.ts` containing all definitions
 
+**Update `docs/STATUS.md` with:**
+- Mark Step 3.1.1 as complete
+- Set next step to "Begin 3.1.2 Entity and Relation Implementation"
 
 #### 3.1.2 Entity and Relation Implementation
+**Update `docs/STATUS.md` with:**
+- Set current step to "3.1.2 Entity and Relation Implementation"
+- Clear next steps
+
 - [ ] Generate all entities based on `docs/entity-relation-design.md`. **DO NOT define any computations yet**. No `computed` or `computation` on properties
 - [ ] Define entity properties with correct types
   - **Remember: NO reference ID fields in entities!**
@@ -360,7 +370,16 @@ Common issues that can be avoided by reading the API reference:
   - Fix any type errors before proceeding
   - Do NOT continue until all type errors are resolved
 
+**Update `docs/STATUS.md` with:**
+- Mark Step 3.1.2 as complete
+- Set next step to "Begin 3.1.3 Interaction Implementation"
+
 #### 3.1.3 Interaction Implementation
+**Update `docs/STATUS.md` with:**
+- Set current step to "3.1.3 Code Generation and Implementation"
+- Clear next step
+
+
 - [ ] Generate all interactions based on `docs/interaction-design.md`. **DO NOT define any conditions yet** - we will add permissions and business rules later in section 3.2. No `condition` parameter in Interaction.create()
 - [ ] Start with simple payload-only interactions (no conditions initially)
 - [ ] Ensure all payloads match the documented fields
@@ -368,11 +387,18 @@ Common issues that can be avoided by reading the API reference:
   - Fix any type errors before proceeding
   - Do NOT continue until all type errors are resolved
 
+**Update `docs/STATUS.md` with:**
+- Mark step 3.1.3 as completed
+- Set next step to "Begin 3.1.4 Progressive Computation Implementation with Testing"
+
 #### 3.1.4 Progressive Computation Implementation with Testing
+
+**Update `docs/STATUS.md` with:**
+- Set current step to "3.1.4 Progressive Computation Implementation with Testing"
+- Clear next step
 
 **📖 MUST READ: `./agentspace/knowledge/generator/test-implementation.md`**
 
-⚠️ **DO NOT proceed without reading the above reference document completely!**
 
 **🔴 CRITICAL: Use Progressive Implementation with Immediate Testing**
 
@@ -388,6 +414,10 @@ This section follows a **test-driven progressive approach** where each computati
 - [ ] Based on `docs/computation-analysis.md`, analyze computation dependencies (which computations depend on other entities/relations)
 - [ ] Order computations from least dependent to most dependent. Start with computations that only depend on InteractionEventEntity
 - [ ] Create `docs/computation-implementation-plan.md`. **Write the plan in checklist format** for easy progress tracking. **MUST include ALL computations from `docs/computation-analysis.md` - do not skip any!**
+- [ ] **CRITICAL: Each computation item MUST include from `docs/computation-analysis.md`:**
+  - Computation Decision (e.g., StateMachine, Count, Transform)
+  - Calculation Method (brief description of how it works)
+  - Dependencies (what entities/relations/interactions it depends on)
 
 **Template for `docs/computation-implementation-plan.md`:**
 ```markdown
@@ -396,36 +426,87 @@ This section follows a **test-driven progressive approach** where each computati
 ## Phase 1: Self-Dependent Property Computations
 *Properties with computed values that only depend on their own entity's fields, no external dependencies*
 
-- [ ] User.displayName (computed from firstName + lastName)
-- [ ] Article.slug (computed from title)
-- [ ] Product.discountedPrice (computed from price and discountRate)
+- [ ] **User.displayName**
+  - Decision: `computed` function on Property
+  - Method: Concatenates firstName and lastName fields
+  - Dependencies: User entity's own fields (firstName, lastName)
+
+- [ ] **Article.slug**
+  - Decision: `computed` function on Property
+  - Method: Generates URL-friendly slug from title using regex transformation
+  - Dependencies: Article entity's own field (title)
+
+- [ ] **Product.discountedPrice**
+  - Decision: `computed` function on Property
+  - Method: Calculates final price: price * (1 - discountRate)
+  - Dependencies: Product entity's own fields (price, discountRate)
 
 ## Phase 2: InteractionEventEntity-Dependent Computations
 *Computations that only depend on InteractionEventEntity, typically for logging or activity tracking*
 
-- [ ] ActivityLog entity creation (Transform on InteractionEventEntity)
-- [ ] User.lastActivityTime (StateMachine triggered by any interaction)
-- [ ] SystemStats.totalInteractions (Count of InteractionEventEntity)
+- [ ] **ActivityLog entity creation**
+  - Decision: Transform on Entity.computedData
+  - Method: Creates new ActivityLog record for each interaction event
+  - Dependencies: InteractionEventEntity
+
+- [ ] **User.lastActivityTime**
+  - Decision: StateMachine on Property.computation
+  - Method: Updates timestamp when any user interaction occurs
+  - Dependencies: InteractionEventEntity, specific user interactions
+
+- [ ] **SystemStats.totalInteractions**
+  - Decision: Count on Dictionary.computation
+  - Method: Counts all InteractionEventEntity records
+  - Dependencies: InteractionEventEntity
 
 ## Phase 3: Single Entity/Relation Dependencies
 *Computations that depend on one other entity or relation*
 
-- [ ] User.postCount (Count of UserPost relation)
-- [ ] Category.articleCount (Count of articles in category)
-- [ ] Order.totalAmount (Summation of OrderItem amounts)
+- [ ] **User.postCount**
+  - Decision: Count on Property.computation
+  - Method: Counts UserPost relations where source = current user
+  - Dependencies: UserPost relation
+
+- [ ] **Category.articleCount**
+  - Decision: Count on Property.computation
+  - Method: Counts ArticleCategory relations where target = current category
+  - Dependencies: ArticleCategory relation
+
+- [ ] **Order.totalAmount**
+  - Decision: Summation on Property.computation
+  - Method: Sums amount field from all related OrderItem entities
+  - Dependencies: OrderItem relation
 
 ## Phase 4: Multiple Dependencies
 *Computations that depend on multiple entities or relations*
 
-- [ ] Dashboard.stats (depends on User, Post, Comment entities)
-- [ ] Notification creation (Transform depending on User and various state changes)
-- [ ] RecommendationScore (computed from User preferences and Product features)
+- [ ] **Dashboard.stats**
+  - Decision: Custom on Dictionary.computation
+  - Method: Aggregates statistics from multiple sources into single object
+  - Dependencies: User entity, Post entity, Comment entity
+
+- [ ] **NotificationEntity creation**
+  - Decision: Transform on Entity.computedData
+  - Method: Creates notifications based on specific interaction patterns
+  - Dependencies: InteractionEventEntity, User entity, multiple interaction types
+
+- [ ] **User.recommendationScore**
+  - Decision: WeightedSummation on Property.computation
+  - Method: Calculates weighted score from preferences and product features
+  - Dependencies: UserPreference relation, Product entity, ProductFeature relation
 
 ## Phase 5: Complex Chain Dependencies
 *Computations that depend on other computed values*
 
-- [ ] User.reputation (depends on postCount, commentCount, likeCount - all computed)
-- [ ] Product.popularityScore (depends on orderCount and averageRating - both computed)
+- [ ] **User.reputation**
+  - Decision: Custom on Property.computation
+  - Method: Formula using postCount * 10 + commentCount * 5 + likeCount
+  - Dependencies: User.postCount (computed), User.commentCount (computed), User.likeCount (computed)
+
+- [ ] **Product.popularityScore**
+  - Decision: Custom on Property.computation
+  - Method: Combines orderCount and averageRating with time decay factor
+  - Dependencies: Product.orderCount (computed), Product.averageRating (computed)
 
 ## Notes
 - Start implementation from Phase 1 and proceed sequentially
@@ -436,7 +517,12 @@ This section follows a **test-driven progressive approach** where each computati
 
 ##### Step 3: Progressive Implementation Loop
 
-**📖 LOOP START: Read `docs/STATUS.md` to see which computations are completed and what's next.**
+** MUST UPDATE `docs/STATUS.md` with:**
+- Set current step to "3.1.4 Step 3: Progressive Implementation Loop"
+- Add note: "**DO NOT proceed without reading the above reference document completely**"
+- Add note: "**MUST Read `docs/computation-implementation-plan.md` to see which computations are completed and what's next.**"
+
+**MUST Read `docs/computation-implementation-plan.md` to see which computations are completed and what's next.**
 
 **For EACH computation in your plan, follow this cycle:**
 
@@ -482,6 +568,8 @@ This section follows a **test-driven progressive approach** where each computati
        user: testUser,
        payload: { title: 'Test', content: 'Content' }
      })
+
+     expect(result.error).toBeUndefined()
      
      // Verify state is draft
      const article = await system.storage.findOne(
@@ -493,10 +581,12 @@ This section follows a **test-driven progressive approach** where each computati
      expect(article.state).toBe('draft')
      
      // Transition to published
-     await controller.callInteraction('PublishArticle', {
+     const result1 = await controller.callInteraction('PublishArticle', {
        user: testUser,
        payload: { id: article.id }
      })
+
+     expect(result1.error).toBeUndefined()
      
      // Verify state changed
      const published = await system.storage.findOne(
@@ -512,15 +602,18 @@ This section follows a **test-driven progressive approach** where each computati
 4. **Run Test**
    - [ ] Run `npm run test tests/basic.test.ts` to test only this file
    - [ ] Fix any test failures
+   - [ ] **🔴 CRITICAL: NEVER cheat to pass tests!**
+     - ❌ Do NOT mark tests as `.skip()` or `.todo()`
+     - ❌ Do NOT fake/mock data just to make tests pass
+     - ❌ Do NOT remove or ignore critical assertions
+     - ✅ Actually fix the implementation until tests genuinely pass
+   - [ ] If test still fails after 10 fix attempts, STOP and wait for user guidance
+   - [ ] **MUST record all encountered errors** in `docs/errors/` directory with descriptive filenames (e.g., `computation-user-status-error.md`)
    - [ ] Do NOT proceed to next computation until current test passes
 
 5. **Document Progress**
    - [ ] **MUST** check off completed computation in `docs/computation-implementation-plan.md`
    - [ ] Create new documents in `docs/errors/` to record any errors encountered
-   - [ ] **Update `docs/STATUS.md`** with:
-     - Current computation completed
-     - Next computation to implement
-     - Any blockers or issues
 
 **🛑 STOP GATE: DO NOT proceed to Step 4 until ALL computations in `docs/computation-implementation-plan.md` are checked off as complete with passing tests.**
 
@@ -534,11 +627,17 @@ This section follows a **test-driven progressive approach** where each computati
   - All basic tests passing
   - Ready to proceed to "3.2 Permission and Business Rules Implementation"
 
+**Update `docs/STATUS.md` with:**
+- Mark step 3.1 as completed
+- Set next step to "Begin 3.2 Permission and Business Rules Implementation"
 
 ### 3.2 Permission and Business Rules Implementation
-**📖 MUST READ: `./agentspace/knowledge/generator/permission-implementation.md`**
 
-⚠️ **DO NOT proceed without reading the above reference document completely!**
+**Update `docs/STATUS.md` with:**
+- Set current step to "3.2 Permission and Business Rules Implementation"
+- Clear next step
+
+**📖 MUST READ: `./agentspace/knowledge/generator/permission-implementation.md`**
 
 **🔴 IMPORTANT: All test cases for permissions and business rules should be written in `tests/basic.test.ts` under the 'Permission and Business Rules' describe group.**
 
@@ -568,12 +667,24 @@ This section follows a **test-driven progressive approach** where each computati
 - [ ] Add permission test cases
 - [ ] Test permission access scenarios
 - [ ] Test permission denial cases
+- [ ] **🔴 CRITICAL: NEVER cheat to pass tests!**
+  - ❌ Do NOT mark tests as `.skip()` or `.todo()`
+  - ❌ Do NOT fake/mock data just to make tests pass
+  - ❌ Do NOT remove or ignore critical assertions
+  - ✅ Actually fix the implementation until tests genuinely pass
+- [ ] If test still fails after 10 fix attempts, STOP and wait for user guidance
 
 #### Business Rules Tests
 - [ ] Test business rule validations
 - [ ] Test boundary conditions (e.g., exactly at limit)
 - [ ] Test rule violations with appropriate error messages
 - [ ] Test complex scenarios with multiple rules
+- [ ] **🔴 CRITICAL: NEVER cheat to pass tests!**
+  - ❌ Do NOT mark tests as `.skip()` or `.todo()`
+  - ❌ Do NOT fake/mock data just to make tests pass
+  - ❌ Do NOT remove or ignore critical assertions
+  - ✅ Actually fix the implementation until tests genuinely pass
+- [ ] If test still fails after 10 fix attempts, STOP and wait for user guidance
 - [ ] Ensure all tests pass
 
 **Note on Error Messages:**
@@ -652,7 +763,13 @@ This phase ensures your implementation meets all business requirements through c
   - Is it an implementation issue? Fix in backend code
   - Is it a test setup issue? Fix test preconditions
   - Is it a requirement misunderstanding? Clarify and document
-- [ ] **DO NOT modify the test to make it pass** - fix the implementation
+- [ ] **🔴 CRITICAL: NEVER cheat to pass tests!**
+  - ❌ Do NOT mark tests as `.skip()` or `.todo()`
+  - ❌ Do NOT fake/mock data just to make tests pass
+  - ❌ Do NOT remove or ignore critical assertions
+  - ❌ Do NOT modify the test to make it pass - fix the implementation
+  - ✅ Actually fix the implementation until tests genuinely pass
+- [ ] If test still fails after 10 fix attempts, STOP and wait for user guidance
 - [ ] Document any fixes in `docs/errors/test-failures.md`
 
 #### Step 3: Verify No Regression

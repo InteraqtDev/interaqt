@@ -51,7 +51,8 @@ describe('Permission and Business Rules', () => {
     await controller.setup(true)
   })
 
-  test('basic test', async () => {
-    
+  test('placeholder - will add tests later', async () => {
+    // Placeholder test to avoid empty suite error
+    expect(true).toBe(true)
   })
 })

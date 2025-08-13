@@ -395,6 +395,75 @@ const style = await system.storage.findOne('Style',
 )
 ```
 
+### Querying Relations for Related Entities
+
+When querying relations themselves (not entities with relations), the `source` and `target` properties should be treated like related entities in your queries:
+
+**🔴 CRITICAL: source/target in Relations are Related Entities**
+
+```typescript
+// ✅ CORRECT: Query relation by source entity's properties
+const userPostRelations = await system.storage.find(
+  'UserPostRelation',
+  MatchExp.atom({ key: 'source.id', value: ['=', userId] }),  // Use dot notation for source
+  undefined,
+  [
+    'id',
+    'createdAt',  // Relation's own property
+    ['source', { attributeQuery: ['id', 'name', 'email'] }],  // Nested query for source entity
+    ['target', { attributeQuery: ['id', 'title', 'status'] }]  // Nested query for target entity
+  ]
+)
+
+// ✅ CORRECT: Query by target entity's properties
+const postAuthorRelation = await system.storage.findOneRelationByName(
+  'PostAuthorRelation',
+  MatchExp.atom({ key: 'target.status', value: ['=', 'published'] }),  // Query by target's field
+  undefined,
+  [
+    'id',
+    ['source', { attributeQuery: ['id', 'title'] }],
+    ['target', { attributeQuery: ['id', 'name', 'role'] }]
+  ]
+)
+
+// ✅ CORRECT: Complex query with both source and target conditions
+const activeUserPublishedPostRelations = await system.storage.findRelationByName(
+  'UserPostRelation',
+  MatchExp.atom({ key: 'source.status', value: ['=', 'active'] })
+    .and({ key: 'target.publishedAt', value: ['not', null] }),
+  { limit: 10 },
+  [
+    'id',
+    'priority',  // Relation property
+    ['source', { attributeQuery: ['id', 'name'] }],
+    ['target', { attributeQuery: ['id', 'title', 'publishedAt'] }]
+  ]
+)
+
+// ❌ WRONG: Don't compare source/target directly
+const relations = await system.storage.findRelationByName(
+  'UserPostRelation',
+  MatchExp.atom({ key: 'source', value: ['=', userId] }),  // WRONG! Can't compare entity object
+  undefined,
+  ['id', 'source', 'target']  // WRONG! Missing nested attributeQuery
+)
+
+// ❌ WRONG: Don't forget nested attributeQuery for source/target
+const relations = await system.storage.findRelationByName(
+  'UserPostRelation',
+  MatchExp.atom({ key: 'source.id', value: ['=', userId] }),
+  undefined,
+  ['id', 'source', 'target']  // WRONG! This won't fetch entity data
+)
+```
+
+**Key Points:**
+1. **In matchExpression**: Use dot notation to access source/target properties (e.g., `source.id`, `target.status`)
+2. **In attributeQuery**: Use nested array format to fetch source/target data (e.g., `['source', { attributeQuery: [...] }]`)
+3. **source and target are entities**: They follow the same query rules as any related entity
+4. **Relation properties**: Can be queried directly without nesting (e.g., `'createdAt'`, `'priority'`)
+
 ### Important Notes
 - **Always explicitly list fields**: This ensures predictable results.
 - **Only requested fields are returned**: Any field not in attributeQuery will be undefined
