@@ -3,7 +3,8 @@ import { stringifyAttribute } from './utils.js';
 import type { EntityInstance, RelationInstance, AttributeQueryData, DataDependencies } from './types.js';
 
 export interface WeightedSummationInstance extends IInstance {
-  record: EntityInstance | RelationInstance;
+  record?: EntityInstance | RelationInstance;
+  property?: string;
   direction?: string;
   callback: Function;
   attributeQuery?: AttributeQueryData;
@@ -11,7 +12,8 @@ export interface WeightedSummationInstance extends IInstance {
 }
 
 export interface WeightedSummationCreateArgs {
-  record: EntityInstance | RelationInstance;
+  record?: EntityInstance | RelationInstance;
+  property?: string;
   direction?: string;
   callback: Function;
   attributeQuery?: AttributeQueryData;
@@ -22,7 +24,8 @@ export class WeightedSummation implements WeightedSummationInstance {
   public uuid: string;
   public _type = 'WeightedSummation';
   public _options?: { uuid?: string };
-  public record: EntityInstance | RelationInstance;
+  public record?: EntityInstance | RelationInstance;
+  public property?: string;
   public direction?: string;
   public callback: Function;
   public attributeQuery?: AttributeQueryData;
@@ -32,6 +35,7 @@ export class WeightedSummation implements WeightedSummationInstance {
     this._options = options;
     this.uuid = generateUUID(options);
     this.record = args.record;
+    this.property = args.property;
     this.direction = args.direction;
     this.callback = args.callback;
     this.attributeQuery = args.attributeQuery;
@@ -47,7 +51,12 @@ export class WeightedSummation implements WeightedSummationInstance {
     record: {
       type: ['Entity', 'Relation'] as const,
       collection: false as const,
-      required: true as const
+      required: false as const
+    },
+    property: {
+      type: 'string' as const,
+      collection: false as const,
+      required: false as const
     },
     direction: {
       type: 'string' as const,
@@ -87,6 +96,8 @@ export class WeightedSummation implements WeightedSummationInstance {
   static stringify(instance: WeightedSummationInstance): string {
     const args: WeightedSummationCreateArgs = {
       record: instance.record,
+      property: instance.property,
+      direction: instance.direction,
       attributeQuery: instance.attributeQuery ? stringifyAttribute(instance.attributeQuery) as AttributeQueryData : undefined,
       
       
@@ -106,6 +117,7 @@ export class WeightedSummation implements WeightedSummationInstance {
   static clone(instance: WeightedSummationInstance, deep: boolean): WeightedSummationInstance {
     return this.create({
       record: instance.record,
+      property: instance.property,
       direction: instance.direction,
       callback: instance.callback,
       attributeQuery: instance.attributeQuery,

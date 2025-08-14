@@ -107,11 +107,11 @@ describe('Every computed handle', () => {
         name: 'everyRequestHandled',
         type: 'boolean',
         computation: Every.create({
-            record: requestRelation,
-            attributeQuery: [['target', {attributeQuery: ['handled']}]],
+            property: 'requests',
+            attributeQuery: ['handled'],
             notEmpty: true,
-            callback: (relation:any) => {
-                return !!relation.target.handled
+            callback: (request:any) => {
+                return !!request.handled
             },
         })
     }))
@@ -203,10 +203,10 @@ describe('Every computed handle', () => {
         name: 'allStudentsPassed',
         type: 'boolean',
         computation: Every.create({
-          record: enrollmentRelation,
-          attributeQuery: ['passed'],
-          callback: (relation: any) => {
-            return relation.passed === true;
+          property: 'students',
+          attributeQuery: [['&', {attributeQuery: ['passed']}]],
+          callback: (student: any) => {
+            return student['&'].passed === true;
           },
           notEmpty: true
         })
@@ -344,12 +344,12 @@ describe('Every computed handle', () => {
         name: 'allEmployeesPassed',
         type: 'boolean',
         computation: Every.create({
-          record: companyEmployeeRelation,
+          property: 'employees',
           // Include the relation property in attributeQuery
-          attributeQuery: ['passedAssessment'],
-          callback: (relation: any) => {
+          attributeQuery: [['&', {attributeQuery: ['passedAssessment']}]],
+          callback: (employee: any) => {
             // Check the relation's own property, not the target entity's property
-            return relation.passedAssessment === true;
+            return employee['&'].passedAssessment === true;
           },
           notEmpty: true
         })
@@ -358,11 +358,11 @@ describe('Every computed handle', () => {
         name: 'allEmployeesHighScore',
         type: 'boolean',
         computation: Every.create({
-          record: companyEmployeeRelation,
-          attributeQuery: ['assessmentScore'],
-          callback: (relation: any) => {
+          property: 'employees',
+          attributeQuery: [['&', {attributeQuery: ['assessmentScore']}]],
+          callback: (employee: any) => {
             // Check if assessment score is above 80
-            return relation.assessmentScore >= 80;
+            return employee['&'].assessmentScore >= 80;
           },
           notEmpty: true
         })
@@ -371,14 +371,14 @@ describe('Every computed handle', () => {
         name: 'allEngineersPassedWithHighScore',
         type: 'boolean',
         computation: Every.create({
-          record: companyEmployeeRelation,
-          attributeQuery: ['passedAssessment', 'assessmentScore', ['target', {attributeQuery: ['department']}]],
-          callback: (relation: any) => {
+          property: 'employees',
+          attributeQuery: ['department',['&', {attributeQuery: ['passedAssessment', 'assessmentScore']}]],
+          callback: (employee: any) => {
             // Only check engineers, and they must pass with score >= 85
-            if (relation.target.department !== 'Engineering') {
+            if (employee.department !== 'Engineering') {
               return true; // Non-engineers are ignored
             }
-            return relation.passedAssessment === true && relation.assessmentScore >= 85;
+            return employee['&'].passedAssessment === true && employee['&'].assessmentScore >= 85;
           },
           notEmpty: false
         })
@@ -573,12 +573,11 @@ describe('Every computed handle', () => {
         name: 'everyRequestHasTwoItems',
         type: 'boolean',
         computation: Every.create({
-            record: requestRelation,
-            attributeQuery: [['target', {attributeQuery: [['items', {attributeQuery: ['name']}]]}]],
+            property: 'requests',
+            attributeQuery: [['items', {attributeQuery: ['name']}]],
             notEmpty: true,
-            callback: (relation:any) => {
-                if (!relation.target) debugger
-                return relation.target.items?.length === 2
+            callback: (request:any) => {
+                return request.items?.length === 2
             },
         })
     }))
@@ -746,10 +745,10 @@ describe('Every computed handle', () => {
         type: 'boolean',
         collection: false,
         computation: Every.create({
-          record: teamPlayerRelation,
-          attributeQuery: [['target', {attributeQuery: ['isEligible']}]],
-          callback: function(relation: any) {
-            return relation.target.isEligible;
+          property: 'players',
+          attributeQuery: ['isEligible'],
+          callback: function(player: any) {
+            return player.isEligible;
           },
           notEmpty: true
         })
@@ -759,10 +758,10 @@ describe('Every computed handle', () => {
         type: 'boolean',
         collection: false,
         computation: Every.create({
-          record: activeStarterRelation,
-          attributeQuery: [['target', {attributeQuery: ['isEligible']}]],
-          callback: function(relation: any) {
-            return relation.target.isEligible;
+          property: 'activeStarters',
+          attributeQuery: ['isEligible'],
+          callback: function(player: any) {
+            return player.isEligible;
           },
           notEmpty: true
         })
@@ -995,9 +994,9 @@ describe('Every computed handle', () => {
         type: 'boolean',
         collection: false,
         computation: Every.create({
-          record: factoryBatchRelation,
-          attributeQuery: ['passedQC'],
-          callback: (relation: any) => relation.passedQC === true
+          property: 'batches',
+          attributeQuery: [['&', {attributeQuery: ['passedQC']}]],
+          callback: (batch: any) => batch['&'].passedQC === true
         })
       }),
       Property.create({
@@ -1005,9 +1004,9 @@ describe('Every computed handle', () => {
         type: 'boolean',
         collection: false,
         computation: Every.create({
-          record: morningShiftRelation,
-          attributeQuery: ['passedQC'],
-          callback: (relation: any) => relation.passedQC === true
+          property: 'morningShiftBatches',
+          attributeQuery: [['&', {attributeQuery: ['passedQC']}]],
+          callback: (batch: any) => batch['&'].passedQC === true
         })
       }),
       Property.create({
@@ -1015,9 +1014,9 @@ describe('Every computed handle', () => {
         type: 'boolean',
         collection: false,
         computation: Every.create({
-          record: comprehensiveInspectionRelation,
-          attributeQuery: ['passedQC'],
-          callback: (relation: any) => relation.passedQC === true
+          property: 'comprehensiveInspectionBatches',
+          attributeQuery: [['&', {attributeQuery: ['passedQC']}]],
+          callback: (batch: any) => batch['&'].passedQC === true
         })
       }),
       Property.create({
@@ -1025,9 +1024,9 @@ describe('Every computed handle', () => {
         type: 'boolean',
         collection: false,
         computation: Every.create({
-          record: highScoreRelation,
-          attributeQuery: ['passedQC'],
-          callback: (relation: any) => relation.passedQC === true
+          property: 'highScoreBatches',
+          attributeQuery: [['&', {attributeQuery: ['passedQC']}]],
+          callback: (batch: any) => batch['&'].passedQC === true
         })
       }),
       Property.create({
@@ -1035,9 +1034,9 @@ describe('Every computed handle', () => {
         type: 'boolean',
         collection: false,
         computation: Every.create({
-          record: morningComprehensiveRelation,
-          attributeQuery: ['passedQC'],
-          callback: (relation: any) => relation.passedQC === true
+          property: 'morningComprehensiveBatches',
+          attributeQuery: [['&', {attributeQuery: ['passedQC']}]],
+          callback: (batch: any) => batch['&'].passedQC === true
         })
       })
     );
@@ -1432,10 +1431,10 @@ describe('Every computed handle', () => {
         name: 'allMilestonesCompleted',
         type: 'boolean',
         computation: Every.create({
-          record: projectAllMilestonesRelation,
-          attributeQuery: [['target', {attributeQuery: ['completed']}]],
-          callback: (relation: any) => {
-            return relation.target.completed === true;
+          property: 'allMilestones',
+          attributeQuery: ['completed'],
+          callback: (milestone: any) => {
+            return milestone.completed === true;
           }
         })
       }),
@@ -1443,11 +1442,11 @@ describe('Every computed handle', () => {
         name: 'allCriticalMilestonesCompleted',
         type: 'boolean',
         computation: Every.create({
-          record: projectAllMilestonesRelation,
-          attributeQuery: [['target', {attributeQuery: ['completed', 'importance']}]],
-          callback: (relation: any) => {
+          property: 'allMilestones',
+          attributeQuery: ['completed', 'importance'],
+          callback: (milestone: any) => {
             // Only check critical milestones
-            return relation.target.importance !== 'critical' || relation.target.completed === true;
+            return milestone.importance !== 'critical' || milestone.completed === true;
           }
         })
       })

@@ -402,8 +402,8 @@ describe('Sum computed handle', () => {
         type: 'number',
         collection: false,
         computation: Summation.create({
-          record: customerPurchaseRelation,
-          attributeQuery: [['target', {attributeQuery: ['amount']}]]
+          property: 'purchases',
+          attributeQuery: ['amount']
         })
       })
     );
@@ -487,7 +487,7 @@ describe('Sum computed handle', () => {
     );
     
     expect(updatedAlice.totalPurchases).toBe(1400); // 1200 + 50 + 150
-    expect(updatedBob.totalPurchases).toBe(600); // 500 + 100 (null is ignored)
+    expect(updatedBob.totalPurchases).toBe(600); // 500 + 0 + 100 (null is treated as 0)
     
     // Test incremental update
     const mousePurchase = await system.storage.findOne(
@@ -511,11 +511,6 @@ describe('Sum computed handle', () => {
   });
 
   test('should handle property level summation with filtered relations', async () => {
-    // NOTE: This test demonstrates a current limitation in the framework:
-    // Filtered relations do not automatically trigger computations when their 
-    // source relations change. This is because the dependency tracking system
-    // doesn't fully support transitive dependencies through filtered relations.
-    // Define entities
     const warehouseEntity = Entity.create({
       name: 'Warehouse',
       properties: [
@@ -575,12 +570,12 @@ describe('Sum computed handle', () => {
         type: 'number',
         collection: false,
         computation: WeightedSummation.create({
-          record: warehouseInventoryRelation,
-          attributeQuery: [['target', {attributeQuery: ['quantity', 'unitPrice']}]],
-          callback: function(relation: any) {
+          property: 'inventories',
+          attributeQuery: ['quantity', 'unitPrice'],
+          callback: function(inventory: any) {
             return {
-              weight: relation.target.quantity || 0,
-              value: relation.target.unitPrice || 0
+              weight: inventory.quantity || 0,
+              value: inventory.unitPrice || 0
             };
           }
         })
@@ -590,12 +585,12 @@ describe('Sum computed handle', () => {
         type: 'number',
         collection: false,
         computation: WeightedSummation.create({
-          record: availableABZoneRelation,
-          attributeQuery: [['target', {attributeQuery: ['quantity', 'unitPrice']}]],
-          callback: function(relation: any) {
+          property: 'availableABInventories',
+          attributeQuery: ['quantity', 'unitPrice'],
+          callback: function(inventory: any) {
             return {
-              weight: relation.target.quantity || 0,
-              value: relation.target.unitPrice || 0
+              weight: inventory.quantity || 0,
+              value: inventory.unitPrice || 0
             };
           }
         })
@@ -605,8 +600,8 @@ describe('Sum computed handle', () => {
         type: 'number',
         collection: false,
         computation: Summation.create({
-          record: availableABZoneRelation,
-          attributeQuery: [['target', {attributeQuery: ['quantity']}]]
+          property: 'availableABInventories',
+          attributeQuery: ['quantity']
         })
       })
     );
@@ -788,11 +783,6 @@ describe('Sum computed handle', () => {
   });
   
   test('should handle property level summation with filtered relations - Sales Territory Example', async () => {
-    // NOTE: This test demonstrates a current limitation in the framework:
-    // Filtered relations do not automatically trigger computations when their 
-    // source relations change. This is because the dependency tracking system
-    // doesn't fully support transitive dependencies through filtered relations.
-    // Define entities
     const territoryEntity = Entity.create({
       name: 'Territory',
       properties: [
@@ -862,7 +852,7 @@ describe('Sum computed handle', () => {
     const newDealRelation = Relation.create({
       name: 'NewDealRelation',
       baseRelation: territorySalesRelation,
-      sourceProperty: 'newDealSales',
+      sourceProperty: 'newDeals',
       targetProperty: 'newDealTerritories',
       matchExpression: MatchExp.atom({
         key: 'dealType',
@@ -892,8 +882,8 @@ describe('Sum computed handle', () => {
         type: 'number',
         collection: false,
         computation: Summation.create({
-          record: territorySalesRelation,
-          attributeQuery: ['revenue']
+          property: 'sales',
+          attributeQuery: [['&', {attributeQuery: ['revenue']}]]
         })
       }),
       Property.create({
@@ -901,8 +891,8 @@ describe('Sum computed handle', () => {
         type: 'number',
         collection: false,
         computation: Summation.create({
-          record: q1SalesRelation,
-          attributeQuery: ['revenue']
+          property: 'q1Sales',
+          attributeQuery: [['&', {attributeQuery: ['revenue']}]]
         })
       }),
       Property.create({
@@ -910,8 +900,8 @@ describe('Sum computed handle', () => {
         type: 'number',
         collection: false,
         computation: Summation.create({
-          record: q2SalesRelation,
-          attributeQuery: ['revenue']
+          property: 'q2Sales',
+          attributeQuery: [['&', {attributeQuery: ['revenue']}]]
         })
       }),
       Property.create({
@@ -919,8 +909,8 @@ describe('Sum computed handle', () => {
         type: 'number',
         collection: false,
         computation: Summation.create({
-          record: softwareSalesRelation,
-          attributeQuery: ['revenue']
+          property: 'softwareSales',
+          attributeQuery: [['&', {attributeQuery: ['revenue']}]]
         })
       }),
       Property.create({
@@ -928,8 +918,8 @@ describe('Sum computed handle', () => {
         type: 'number',
         collection: false,
         computation: Summation.create({
-          record: newDealRelation,
-          attributeQuery: ['revenue']
+          property: 'newDeals',
+          attributeQuery: [['&', {attributeQuery: ['revenue']}]]
         })
       }),
       Property.create({
@@ -937,8 +927,8 @@ describe('Sum computed handle', () => {
         type: 'number',
         collection: false,
         computation: Summation.create({
-          record: q1SoftwareRelation,
-          attributeQuery: ['revenue']
+          property: 'q1SoftwareSales',
+          attributeQuery: [['&', {attributeQuery: ['revenue']}]]
         })
       })
     );
@@ -1273,8 +1263,8 @@ describe('Sum computed handle', () => {
         name: 'totalPurchaseAmount',
         type: 'number',
         computation: Summation.create({
-          record: customerAllPurchasesRelation,
-          attributeQuery: [['target', {attributeQuery: ['amount']}]]
+          property: 'allPurchases',
+          attributeQuery: ['amount']
         })
       })
     );

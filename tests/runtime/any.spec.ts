@@ -99,10 +99,10 @@ describe('Any computed handle', () => {
         name: 'anyRequestHandled', 
         type: 'boolean',
         computation: Any.create({
-            record: requestRelation,
-            attributeQuery: [['target', {attributeQuery: ['handled']}]],
-            callback: (relation:any) => {
-                return relation.target.handled
+            property: 'requests',
+            attributeQuery: ['handled'],
+            callback: (request:any) => {
+                return request.handled
             },
         })
     }))
@@ -155,6 +155,221 @@ describe('Any computed handle', () => {
     expect(user6.anyRequestHandled).toBeFalsy()
 
     
+  });
+
+  test('should recompute when relation properties change', async () => {
+    // This test verifies that Any computation correctly recomputes when 
+    // properties on the relation itself (not the target entity) change
+    
+    // Define entities
+    const departmentEntity = Entity.create({
+      name: 'Department',
+      properties: [
+        Property.create({name: 'name', type: 'string'})
+      ]
+    });
+    
+    const employeeEntity = Entity.create({
+      name: 'Employee',
+      properties: [
+        Property.create({name: 'name', type: 'string'}),
+        Property.create({name: 'role', type: 'string'})
+      ]
+    });
+    
+    // Create relation with properties for performance tracking
+    const departmentEmployeeRelation = Relation.create({
+      source: departmentEntity,
+      sourceProperty: 'employees',
+      target: employeeEntity,
+      targetProperty: 'department',
+      name: 'DepartmentEmployee',
+      type: '1:n',
+      properties: [
+        Property.create({name: 'performanceRating', type: 'number', defaultValue: () => 0}),
+        Property.create({name: 'isActive', type: 'boolean', defaultValue: () => true}),
+        Property.create({name: 'joinDate', type: 'string', defaultValue: () => '2024-01-01'})
+      ]
+    });
+    
+    // Add Any computations that depend on relation properties
+    departmentEntity.properties.push(
+      Property.create({
+        name: 'hasHighPerformer',
+        type: 'boolean',
+        computation: Any.create({
+          property: 'employees',
+          // Include the relation property in attributeQuery
+          attributeQuery: [['&', {attributeQuery: ['performanceRating']}]],
+          callback: (employee: any) => {
+            // Check the relation's own property
+            return employee['&'].performanceRating >= 8;
+          }
+        })
+      }),
+      Property.create({
+        name: 'hasInactiveEmployee',
+        type: 'boolean',
+        computation: Any.create({
+          property: 'employees',
+          attributeQuery: [['&', {attributeQuery: ['isActive']}]],
+          callback: (employee: any) => {
+            return employee['&'].isActive === false;
+          }
+        })
+      }),
+      Property.create({
+        name: 'hasHighPerformingManager',
+        type: 'boolean',
+        computation: Any.create({
+          property: 'employees',
+          // Access both relation property and target entity property
+          attributeQuery: ['role', ['&', {attributeQuery: ['performanceRating', 'isActive']}]],
+          callback: (employee: any) => {
+            // Check managers with high performance who are active
+            return employee.role === 'manager' && 
+                   employee['&'].performanceRating >= 9 && 
+                   employee['&'].isActive === true;
+          }
+        })
+      })
+    );
+    
+    // Setup system and controller
+    const system = new MonoSystem(new PGLiteDB());
+    const controller = new Controller({
+      system: system,
+      entities: [departmentEntity, employeeEntity],
+      relations: [departmentEmployeeRelation],
+      activities: [],
+      interactions: []
+    });
+    await controller.setup(true);
+    
+    // Create test data
+    const dept = await system.storage.create('Department', { name: 'Engineering' });
+    
+    const employee1 = await system.storage.create('Employee', { 
+      name: 'Alice',
+      role: 'developer'
+    });
+    const employee2 = await system.storage.create('Employee', { 
+      name: 'Bob',
+      role: 'manager'
+    });
+    const employee3 = await system.storage.create('Employee', { 
+      name: 'Charlie',
+      role: 'developer'
+    });
+    
+    // Create relations with initial performance ratings
+    const relation1 = await system.storage.create('DepartmentEmployee', {
+      source: { id: dept.id },
+      target: { id: employee1.id },
+      performanceRating: 7,
+      isActive: true,
+      joinDate: '2024-01-15'
+    });
+    
+    const relation2 = await system.storage.create('DepartmentEmployee', {
+      source: { id: dept.id },
+      target: { id: employee2.id },
+      performanceRating: 6,
+      isActive: true,
+      joinDate: '2024-01-16'
+    });
+    
+    const relation3 = await system.storage.create('DepartmentEmployee', {
+      source: { id: dept.id },
+      target: { id: employee3.id },
+      performanceRating: 8,
+      isActive: true,
+      joinDate: '2024-01-17'
+    });
+    
+    // Check initial state
+    let deptData = await system.storage.findOne('Department',
+      MatchExp.atom({key: 'id', value: ['=', dept.id]}),
+      undefined,
+      ['id', 'name', 'hasHighPerformer', 'hasInactiveEmployee', 'hasHighPerformingManager']
+    );
+    
+    expect(deptData.hasHighPerformer).toBeTruthy(); // Charlie has rating 8
+    expect(deptData.hasInactiveEmployee).toBeFalsy(); // All employees are active
+    expect(deptData.hasHighPerformingManager).toBeFalsy(); // Bob (manager) has rating 6, needs 9
+    
+    // Update Bob's performance rating to high
+    await system.storage.update('DepartmentEmployee',
+      MatchExp.atom({key: 'id', value: ['=', relation2.id]}),
+      { performanceRating: 9 }
+    );
+    
+    // Check after performance update
+    deptData = await system.storage.findOne('Department',
+      MatchExp.atom({key: 'id', value: ['=', dept.id]}),
+      undefined,
+      ['id', 'name', 'hasHighPerformer', 'hasInactiveEmployee', 'hasHighPerformingManager']
+    );
+    
+    expect(deptData.hasHighPerformer).toBeTruthy(); // Charlie still has rating 8, Bob now has 9
+    expect(deptData.hasInactiveEmployee).toBeFalsy(); // Still all active
+    expect(deptData.hasHighPerformingManager).toBeTruthy(); // Bob now meets criteria (manager with rating 9)
+    
+    // Deactivate Alice
+    await system.storage.update('DepartmentEmployee',
+      MatchExp.atom({key: 'id', value: ['=', relation1.id]}),
+      { isActive: false }
+    );
+    
+    // Check after deactivation
+    deptData = await system.storage.findOne('Department',
+      MatchExp.atom({key: 'id', value: ['=', dept.id]}),
+      undefined,
+      ['id', 'name', 'hasHighPerformer', 'hasInactiveEmployee', 'hasHighPerformingManager']
+    );
+    
+    expect(deptData.hasHighPerformer).toBeTruthy(); // Charlie and Bob still have high ratings
+    expect(deptData.hasInactiveEmployee).toBeTruthy(); // Alice is now inactive
+    expect(deptData.hasHighPerformingManager).toBeTruthy(); // Bob still meets criteria
+    
+    // Lower all performance ratings below 8
+    await system.storage.update('DepartmentEmployee',
+      MatchExp.atom({key: 'id', value: ['=', relation2.id]}),
+      { performanceRating: 5 }
+    );
+    
+    await system.storage.update('DepartmentEmployee',
+      MatchExp.atom({key: 'id', value: ['=', relation3.id]}),
+      { performanceRating: 6 }
+    );
+    
+    // Check after lowering all ratings
+    deptData = await system.storage.findOne('Department',
+      MatchExp.atom({key: 'id', value: ['=', dept.id]}),
+      undefined,
+      ['id', 'name', 'hasHighPerformer', 'hasInactiveEmployee', 'hasHighPerformingManager']
+    );
+    
+    expect(deptData.hasHighPerformer).toBeFalsy(); // No one has rating >= 8 now
+    expect(deptData.hasInactiveEmployee).toBeTruthy(); // Alice is still inactive
+    expect(deptData.hasHighPerformingManager).toBeFalsy(); // Bob no longer has high rating
+    
+    // Reactivate Alice and give her high rating
+    await system.storage.update('DepartmentEmployee',
+      MatchExp.atom({key: 'id', value: ['=', relation1.id]}),
+      { isActive: true, performanceRating: 9 }
+    );
+    
+    // Check final state
+    deptData = await system.storage.findOne('Department',
+      MatchExp.atom({key: 'id', value: ['=', dept.id]}),
+      undefined,
+      ['id', 'name', 'hasHighPerformer', 'hasInactiveEmployee', 'hasHighPerformingManager']
+    );
+    
+    expect(deptData.hasHighPerformer).toBeTruthy(); // Alice now has rating 9
+    expect(deptData.hasInactiveEmployee).toBeFalsy(); // All employees are active again
+    expect(deptData.hasHighPerformingManager).toBeFalsy(); // Alice is developer, not manager
   });
 
   test('check entities should work with extra data deps for Any', async () => {
@@ -293,10 +508,10 @@ describe('Any computed handle', () => {
         type: 'boolean',
         collection: false,
         computation: Any.create({
-          record: projectTaskRelation,
-          attributeQuery: [['target', {attributeQuery: ['status']}]],
-          callback: function(relation: any) {
-            return relation.target.status === 'blocked';
+          property: 'tasks',
+          attributeQuery: ['status'],
+          callback: function(task: any) {
+            return task.status === 'blocked';
           }
         })
       }),
@@ -305,10 +520,10 @@ describe('Any computed handle', () => {
         type: 'boolean',
         collection: false,
         computation: Any.create({
-          record: activeHighPriorityRelation,
-          attributeQuery: [['target', {attributeQuery: ['isOverdue']}]],
-          callback: function(relation: any) {
-            return relation.target.isOverdue;
+          property: 'activeHighPriorityTasks',
+          attributeQuery: ['isOverdue'],
+          callback: function(task: any) {
+            return task.isOverdue;
           }
         })
       })
@@ -656,10 +871,10 @@ describe('Any computed handle', () => {
         name: 'hasUrgentTask',
         type: 'boolean',
         computation: Any.create({
-          record: teamAllTasksRelation,
-          attributeQuery: [['target', {attributeQuery: ['priority', 'status']}]],
-          callback: (relation: any) => {
-            return relation.target.priority === 'high' && relation.target.status !== 'completed';
+          property: 'allTasks',
+          attributeQuery: ['priority', 'status'],
+          callback: (task: any) => {
+            return task.priority === 'high' && task.status !== 'completed';
           }
         })
       })

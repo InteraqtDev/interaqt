@@ -4,8 +4,9 @@ import { Controller } from "../Controller.js";
 import { SummationInstance, EntityInstance, RelationInstance } from "@shared";
 import { ComputationResult, DataBasedComputation, DataDep, RecordsDataDep } from "./Computation.js";
 import { EtityMutationEvent } from "../Scheduler.js";
-import { MatchExp, AttributeQueryData } from "@storage";
+import { MatchExp, AttributeQueryData, LINK_SYMBOL } from "@storage";
 import { assert } from "../util.js";
+import { RecordQueryData } from "@storage";
 
 export class GlobalSumHandle implements DataBasedComputation {
     static computationType = Summation
@@ -16,7 +17,7 @@ export class GlobalSumHandle implements DataBasedComputation {
     record: (EntityInstance|RelationInstance)
     sumFieldPath: string[]
     constructor(public controller: Controller, public args: SummationInstance, public dataContext: DataContext) {
-        this.record = this.args.record
+        this.record = this.args.record!
         
         // 获取 attributeQuery 的第一个字段作为求和字段
         if (!this.args.attributeQuery || this.args.attributeQuery.length === 0) {
@@ -110,26 +111,35 @@ export class PropertySumHandle implements DataBasedComputation {
     relatedRecordName: string
     isSource: boolean
     relation: RelationInstance
+    property: string
+    reverseProperty: string
     relationAttributeQuery: AttributeQueryData
+    relatedAttributeQuery: AttributeQueryData
     sumFieldPath: string[]
 
     constructor(public controller: Controller, public args: SummationInstance, public dataContext: PropertyDataContext) {
-        // We assume in PropertySumHandle, the records array's first element is a Relation
-        this.relation = this.args.record as RelationInstance
+        // Find relation by property name or fall back to record
+        this.relation = this.controller.relations.find(r => (r.source === dataContext.host && r.sourceProperty === this.args.property) || (r.target === dataContext.host && r.targetProperty === this.args.property))!
+        assert(this.relation, 'summation computation must specify either property or record')
         this.isSource = this.args.direction ? this.args.direction === 'source' : this.relation.source.name === dataContext.host.name
         assert(this.isSource ? this.relation.source === dataContext.host : this.relation.target === dataContext.host, 'summation computation relation direction error')
         this.relationAttr = this.isSource ? this.relation.sourceProperty : this.relation.targetProperty
         this.relatedRecordName = this.isSource ? this.relation.target.name! : this.relation.source.name!
+        this.property = this.args.property!
+        this.reverseProperty = this.isSource ? this.relation.targetProperty : this.relation.sourceProperty
         
-        this.relationAttributeQuery = this.args.attributeQuery || []
+        const attributeQuery = this.args.attributeQuery || []
+        this.relatedAttributeQuery = this.args.attributeQuery?.filter(item => item[0] !== LINK_SYMBOL) || []
+        const relationQuery: AttributeQueryData|undefined = ((attributeQuery.find(item => item[0] === LINK_SYMBOL)||[])[1] as RecordQueryData)?.attributeQuery
+        this.relationAttributeQuery = [
+            [this.isSource ? 'target' : 'source', {attributeQuery: this.relatedAttributeQuery}],
+            ...(relationQuery ? relationQuery : [])
+        ]
         
         // 解析 attributeQuery 获取求和字段
-        if (!this.args.attributeQuery || this.args.attributeQuery.length === 0) {
-            throw new Error('Sum computation requires attributeQuery with at least one field')
-        }
         
         this.sumFieldPath = []
-        let attrPointer:any = this.args.attributeQuery
+        let attrPointer:any = attributeQuery
         while(attrPointer) {
             this.sumFieldPath.push(Array.isArray(attrPointer[0]) ? attrPointer[0][0]: attrPointer[0])
             attrPointer = Array.isArray(attrPointer[0]) ? attrPointer[0][1].attributeQuery : null
@@ -138,7 +148,7 @@ export class PropertySumHandle implements DataBasedComputation {
         this.dataDeps = {
             _current: {
                 type: 'property',
-                attributeQuery: [[this.relationAttr, {attributeQuery: [['&', {attributeQuery: this.relationAttributeQuery}]]}]]
+                attributeQuery: [[this.relationAttr, {attributeQuery: this.args.attributeQuery}]]
             }
         }
     }
@@ -165,11 +175,10 @@ export class PropertySumHandle implements DataBasedComputation {
         const relations = _current[this.relationAttr] || [];
         let sum = 0;
         
-        for (const relationItem of relations) {
-            // 根据 attributeQuery 的结构获取值
-            let value = this.resolveSumField(relationItem['&'], this.sumFieldPath)
-            await this.state.itemResult.set(relationItem['&'], value);
+        for (const relatedItem of relations) {
+            const value = this.resolveSumField(relatedItem, this.sumFieldPath) || 0;
             sum += value;
+            await this.state.itemResult.set(relatedItem, value);
         }
         
         return sum;
@@ -206,10 +215,11 @@ export class PropertySumHandle implements DataBasedComputation {
                 this.relationAttributeQuery
             );
             
-            // 获取字段值
-            const value = this.resolveSumField(newRelationWithEntity, this.sumFieldPath)
-            await this.state.itemResult.set(newRelationWithEntity, value);
+            const relatedRecord = newRelationWithEntity[this.isSource ? 'target' : 'source'];
+            relatedRecord['&'] = newRelationWithEntity;
+            const value = this.resolveSumField(relatedRecord) || 0;
             sum += value;
+            await this.state.itemResult.set(relatedRecord, value);
         } else if (relatedMutationEvent.type === 'delete' && relatedMutationEvent.recordName === this.relation.name!) {
             // FIXME 关联关系的删除 - 无法知道原本的字段值
             return ComputationResult.fullRecompute('Cannot determine sum value for deleted relation')
@@ -221,10 +231,13 @@ export class PropertySumHandle implements DataBasedComputation {
                 undefined, 
                 this.relationAttributeQuery
             );
-            const newValue = this.resolveSumField(newRelationWithEntity)
-            const oldValue = await this.state.itemResult.get(newRelationWithEntity);
-            await this.state.itemResult.set(newRelationWithEntity, newValue);
-            sum += newValue-oldValue 
+            
+            const relatedRecord = newRelationWithEntity[this.isSource ? 'target' : 'source'];
+            relatedRecord['&'] = newRelationWithEntity;
+            const newValue = this.resolveSumField(relatedRecord) || 0;
+            const oldValue = (await this.state.itemResult.get(relatedRecord)) || 0;
+            await this.state.itemResult.set(relatedRecord, newValue);
+            sum += newValue - oldValue;
         }
 
         return sum;

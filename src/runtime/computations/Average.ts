@@ -3,7 +3,7 @@ import { Average, AverageInstance, RelationInstance, EntityInstance } from "@sha
 import { Controller } from "../Controller.js";
 import { ComputationResult, DataBasedComputation, DataDep, RecordBoundState, GlobalBoundState, RecordsDataDep } from "./Computation.js";
 import { EtityMutationEvent } from "../Scheduler.js";
-import { MatchExp, AttributeQueryData } from "@storage";
+import { MatchExp, AttributeQueryData, RecordQueryData, LINK_SYMBOL } from "@storage";
 import { assert } from "../util.js";
 
 export class GlobalAverageHandle implements DataBasedComputation {
@@ -16,7 +16,7 @@ export class GlobalAverageHandle implements DataBasedComputation {
     avgFieldPath: string[]
     
     constructor(public controller: Controller, public args: AverageInstance, public dataContext: DataContext) {
-        this.record = this.args.record
+        this.record = this.args.record!
         
         // 获取 attributeQuery 的第一个字段作为平均值计算字段
         if (!this.args.attributeQuery || this.args.attributeQuery.length === 0) {
@@ -147,26 +147,33 @@ export class PropertyAverageHandle implements DataBasedComputation {
     relatedRecordName: string
     isSource: boolean
     relation: RelationInstance
+    property: string
+    reverseProperty: string
     relationAttributeQuery: AttributeQueryData
+    relatedAttributeQuery: AttributeQueryData
     avgFieldPath: string[]
 
     constructor(public controller: Controller, public args: AverageInstance, public dataContext: PropertyDataContext) {
-        // We assume in PropertyAverageHandle, the records array's first element is a Relation
-        this.relation = this.args.record as RelationInstance
+        // Find relation by property name or fall back to record
+        this.relation = this.controller.relations.find(r => (r.source === dataContext.host && r.sourceProperty === this.args.property) || (r.target === dataContext.host && r.targetProperty === this.args.property))!
         this.isSource = this.args.direction ? this.args.direction === 'source' : this.relation.source.name === dataContext.host.name
         assert(this.isSource ? this.relation.source === dataContext.host : this.relation.target === dataContext.host, 'average computation relation direction error')
         this.relationAttr = this.isSource ? this.relation.sourceProperty : this.relation.targetProperty
         this.relatedRecordName = this.isSource ? this.relation.target.name! : this.relation.source.name!
+        this.property = this.args.property || this.relationAttr
+        this.reverseProperty = this.isSource ? this.relation.targetProperty : this.relation.sourceProperty
         
-        this.relationAttributeQuery = this.args.attributeQuery || []
+        const attributeQuery = this.args.attributeQuery || []
+        this.relatedAttributeQuery = attributeQuery.filter(item => item && item[0] !== LINK_SYMBOL) || []
+        const relationQuery: AttributeQueryData|undefined = ((attributeQuery.find(item => item && item[0] === LINK_SYMBOL)||[])[1] as RecordQueryData)?.attributeQuery
+        this.relationAttributeQuery = [
+            [this.isSource ? 'target' : 'source', {attributeQuery: this.relatedAttributeQuery}],
+            ...(relationQuery ? relationQuery : [])
+        ]
         
-        // 解析 attributeQuery 获取平均值计算字段
-        if (!this.args.attributeQuery || this.args.attributeQuery.length === 0) {
-            throw new Error('Average computation requires attributeQuery with at least one field')
-        }
         
         this.avgFieldPath = []
-        let attrPointer:any = this.args.attributeQuery
+        let attrPointer:any = attributeQuery
         while(attrPointer) {
             this.avgFieldPath.push(Array.isArray(attrPointer[0]) ? attrPointer[0][0]: attrPointer[0])
             attrPointer = Array.isArray(attrPointer[0]) ? attrPointer[0][1].attributeQuery : null
@@ -175,7 +182,7 @@ export class PropertyAverageHandle implements DataBasedComputation {
         this.dataDeps = {
             _current: {
                 type: 'property',
-                attributeQuery: [[this.relationAttr, {attributeQuery: [['&', {attributeQuery: this.relationAttributeQuery}]]}]]
+                attributeQuery: [[this.relationAttr, {attributeQuery: this.args.attributeQuery}]]
             }
         }
     }
@@ -205,15 +212,11 @@ export class PropertyAverageHandle implements DataBasedComputation {
         let sum = 0;
         let count = 0;
         
-        for (const relationItem of relations) {
-            // relationItem 包含 '&' 属性，它指向关联的实体
-            const relatedEntity = relationItem['&'];
-            const value = this.resolveAvgField(relatedEntity, this.avgFieldPath)
-            if (value !== null) {
-                sum += value;
-                count++;
-            }
-            await this.state.itemResult.set(relatedEntity, value);
+        for (const relatedItem of relations) {
+            const value = this.resolveAvgField(relatedItem, this.avgFieldPath) || 0;
+            sum += value;
+            count++;
+            await this.state.itemResult.set(relatedItem, value);
         }
         
         await this.state.count.set(_current, count);
@@ -253,13 +256,13 @@ export class PropertyAverageHandle implements DataBasedComputation {
                 undefined, 
                 this.relationAttributeQuery
             );
-            
-            const value = this.resolveAvgField(newRelationWithEntity)
-            if (value !== null) {
-                sum += value;
-                count++;
-            }
-            await this.state.itemResult.set(newRelationWithEntity, value);
+
+            const relatedRecord = newRelationWithEntity[this.isSource ? 'target' : 'source'];
+            relatedRecord['&'] = newRelationWithEntity;
+            const value = this.resolveAvgField(relatedRecord) || 0;
+            sum += value;
+            count++;
+            await this.state.itemResult.set(relatedRecord, value);
         } else if (relatedMutationEvent.type === 'delete' && relatedMutationEvent.recordName === this.relation.name!) {
             // FIXME 关联关系的删除 - 无法知道原本的字段值
             return ComputationResult.fullRecompute('Cannot determine average value for deleted relation')
@@ -271,24 +274,16 @@ export class PropertyAverageHandle implements DataBasedComputation {
                 undefined, 
                 this.relationAttributeQuery
             );
-            const newValue = this.resolveAvgField(newRelationWithEntity)
 
-            const oldValue = await this.state.itemResult.get(newRelationWithEntity);
-            await this.state.itemResult.set(newRelationWithEntity, newValue);
+            const relatedRecord = newRelationWithEntity[this.isSource ? 'target' : 'source'];
+            relatedRecord['&'] = newRelationWithEntity;
+            const newValue = this.resolveAvgField(relatedRecord) || 0;
+
+            const oldValue = (await this.state.itemResult.get(relatedRecord)) || 0;
+            await this.state.itemResult.set(relatedRecord, newValue);
             
             // 更新 sum 和 count
-            if (oldValue !== null && newValue !== null) {
-                // 两个值都有效，只更新 sum
-                sum += newValue - oldValue;
-            } else if (oldValue === null && newValue !== null) {
-                // 旧值无效，新值有效，增加计数
-                sum += newValue;
-                count++;
-            } else if (oldValue !== null && newValue === null) {
-                // 旧值有效，新值无效，减少计数
-                sum -= oldValue;
-                count--;
-            }
+            sum += newValue - oldValue;
         }
 
         await this.state.count.set(mutationEvent.record, count);

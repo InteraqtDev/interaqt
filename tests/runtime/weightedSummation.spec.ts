@@ -136,12 +136,12 @@ describe('WeightedSummation computed handle', () => {
         name: 'totalPurchaseValue',
         type: 'number',
         computation: WeightedSummation.create({
-          record: purchaseRelation,
-          attributeQuery: [['target', {attributeQuery: ['quantity', 'price']}]],
-          callback: (relation: any) => {
+          property: 'purchases',
+          attributeQuery: ['quantity', 'price'],
+          callback: (item: any) => {
             return {
-              weight: relation.target.quantity || 0,
-              value: relation.target.price || 0
+              weight: item.quantity || 0,
+              value: item.price || 0
             };
           }
         })
@@ -534,12 +534,12 @@ describe('WeightedSummation computed handle', () => {
         name: 'totalInventoryValue',
         type: 'number',
         computation: WeightedSummation.create({
-          record: storeTotalInventoryRelation,
-          attributeQuery: [['target', {attributeQuery: ['unitPrice', 'quantity']}]],
-          callback: (relation: any) => {
+          property: 'allInventoryItems',
+          attributeQuery: ['unitPrice', 'quantity'],
+          callback: (item: any) => {
             return {
-              weight: relation.target.quantity || 0,
-              value: relation.target.unitPrice || 0
+              weight: item.quantity || 0,
+              value: item.unitPrice || 0
             };
           }
         })

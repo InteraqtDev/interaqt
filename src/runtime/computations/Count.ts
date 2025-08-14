@@ -4,7 +4,7 @@ import { Controller } from "../Controller.js";
 import { CountInstance, EntityInstance, RelationInstance } from "@shared";
 import { ComputationResult, DataBasedComputation, DataDep, GlobalBoundState, RecordBoundState, RecordsDataDep } from "./Computation.js";
 import { EtityMutationEvent } from "../Scheduler.js";
-import { MatchExp } from "@storage";
+import { MatchExp, AttributeQueryData, RecordQueryData, LINK_SYMBOL } from "@storage";
 import { assert } from "../util.js";
 
 export class GlobalCountHandle implements DataBasedComputation {
@@ -17,7 +17,7 @@ export class GlobalCountHandle implements DataBasedComputation {
     record: (EntityInstance|RelationInstance)
 
     constructor(public controller: Controller, public args: CountInstance, public dataContext: DataContext) {
-        this.record = this.args.record
+        this.record = this.args.record!
         this.callback = this.args.callback?.bind(this) || (() => true)
         
         this.dataDeps = {
@@ -113,25 +113,40 @@ export class PropertyCountHandle implements DataBasedComputation {
     relatedRecordName: string
     isSource: boolean
     relation: RelationInstance
-    relationAttributeQuery: any
+    property: string
+    reverseProperty: string
+    relationAttributeQuery: AttributeQueryData
+    relatedAttributeQuery: AttributeQueryData
 
     constructor(public controller: Controller, public args: CountInstance, public dataContext: PropertyDataContext) {
         this.callback = this.args.callback?.bind(this.controller)
         
-        // We assume in PropertyCountHandle, the records array's first element is a Relation
-        this.relation = this.args.record as RelationInstance
+        // Find relation by property name or fall back to record
+        if (this.args.property) {
+            this.relation = this.controller.relations.find(r => (r.source === dataContext.host && r.sourceProperty === this.args.property) || (r.target === dataContext.host && r.targetProperty === this.args.property))!
+        } else {
+            this.relation = this.args.record as RelationInstance
+        }
         this.isSource = this.args.direction ? this.args.direction === 'source' : this.relation.source.name === dataContext.host.name
         assert(this.isSource ? this.relation.source === dataContext.host : this.relation.target === dataContext.host, 'count computation relation direction error')
         this.relationAttr = this.isSource ? this.relation.sourceProperty : this.relation.targetProperty
         this.relatedRecordName = this.isSource ? this.relation.target.name! : this.relation.source.name!
+        this.property = this.args.property || this.relationAttr
+        this.reverseProperty = this.isSource ? this.relation.targetProperty : this.relation.sourceProperty
         
-        this.relationAttributeQuery = this.args.attributeQuery || []
+        const attributeQuery = this.args.attributeQuery || []
+        this.relatedAttributeQuery = attributeQuery.filter(item => item && item[0] !== LINK_SYMBOL) || []
+        const relationQuery: AttributeQueryData|undefined = ((attributeQuery.find(item => item && item[0] === LINK_SYMBOL)||[])[1] as RecordQueryData)?.attributeQuery
+        this.relationAttributeQuery = [
+            [this.isSource ? 'target' : 'source', {attributeQuery: this.relatedAttributeQuery}],
+            ...(relationQuery ? relationQuery : [])
+        ]
         
         this.dataDeps = {
             _current: {
                 type: 'property',
                 attributeQuery: this.callback ? 
-                    [[this.relationAttr, {attributeQuery: [['&', {attributeQuery: this.relationAttributeQuery}]]}]] : 
+                    [[this.relationAttr, {attributeQuery: attributeQuery.length > 0 ? attributeQuery : ['id']}]] : 
                     [[this.relationAttr, {attributeQuery: ['id']}]]
             },
             ...(this.args.dataDeps || {})
@@ -154,11 +169,13 @@ export class PropertyCountHandle implements DataBasedComputation {
         
         if (this.callback) {
             // 如果有 callback，过滤符合条件的关联记录
-            for(let relation of relations) {
-                const isItemMatch= this.callback!.call(this.controller, relation['&'], dataDeps)
+            for(let item of relations) {
+                const isItemMatch = this.callback!.call(this.controller, item, dataDeps)
                 if (isItemMatch) {
-                    (this.state as StateWithCallback).isItemMatchCount!.set(relation, true)
+                    await (this.state as StateWithCallback).isItemMatchCount!.set(item, true)
                     count++
+                } else {
+                    await (this.state as StateWithCallback).isItemMatchCount!.set(item, false)
                 }
             }
         } else {
@@ -198,10 +215,15 @@ export class PropertyCountHandle implements DataBasedComputation {
                     this.relationAttributeQuery
                 );
                 
-                const itemMatch = !!this.callback.call(this.controller, newRelationWithEntity, dataDeps);
+                const relatedRecord = newRelationWithEntity[this.isSource ? 'target' : 'source']
+                relatedRecord['&'] = relationRecord
+                
+                const itemMatch = !!this.callback.call(this.controller, relatedRecord, dataDeps);
                 if (itemMatch) {
-                    (this.state as StateWithCallback).isItemMatchCount!.set(newRelationWithEntity, true)
+                    await (this.state as StateWithCallback).isItemMatchCount!.set(relationRecord, true)
                     count = count + 1;
+                } else {
+                    await (this.state as StateWithCallback).isItemMatchCount!.set(relationRecord, false)
                 }
             } else {
                 count = count + 1;
@@ -218,17 +240,30 @@ export class PropertyCountHandle implements DataBasedComputation {
         } else if (relatedMutationEvent.type === 'update') {
             // 这里可能是关联关系上的更新，也可能是关联实体的更新。不管哪一种，我们都重新查询一遍。
             if(this.callback) {
+                // relatedAttribute 是从当前 dataContext 出发
+                // 现在要把匹配的 key 改成从关联关系出发。
+                const relationMatchKey = mutationEvent.relatedAttribute[1] === LINK_SYMBOL ? 
+                    mutationEvent.relatedAttribute.slice(2).concat('id').join('.') : // 从2开始就是关联关系的字段了
+                    (mutationEvent.relatedAttribute.length === 1 ? 
+                        `${this.isSource ? 'target' : 'source'}.id` : // 只有1个字段，就是关联实体的 id
+                        `${this.isSource ? 'target' : 'source'}.${mutationEvent.relatedAttribute.slice(1).concat('id').join('.')}` // 有多个字段，就是关联实体再关联上的字段
+                    )
+                
                 const newRelationWithEntity = await this.controller.system.storage.findOne(
                     this.relation.name!, 
-                    MatchExp.atom({key: mutationEvent.relatedAttribute.slice(2).concat('id').join('.'), value: ['=', relatedMutationEvent.oldRecord!.id]}), 
+                    MatchExp.atom({key: relationMatchKey, value: ['=', relatedMutationEvent.oldRecord!.id]}), 
                     undefined, 
                     this.relationAttributeQuery
                 );
                 
-                const isNewMatch = !!this.callback.call(this.controller, newRelationWithEntity, dataDeps);
+                const relatedRecord = newRelationWithEntity[this.isSource ? 'target' : 'source']
+                relatedRecord['&'] = newRelationWithEntity
+                
+                const isNewMatch = !!this.callback.call(this.controller, relatedRecord, dataDeps);
                 const isOldMatch = await (this.state as StateWithCallback).isItemMatchCount!.get(newRelationWithEntity)
                 if (isNewMatch !== isOldMatch) {
                     count = isNewMatch ? (count + 1) : (count-1);
+                    await (this.state as StateWithCallback).isItemMatchCount!.set(newRelationWithEntity, isNewMatch)
                 }
             }
         } else {

@@ -3,7 +3,8 @@ import type { AttributeQueryData, DataDependencies, EntityInstance, RelationInst
 import { stringifyAttribute } from './utils.js';
 
 export interface AnyInstance extends IInstance {
-  record: EntityInstance | RelationInstance;
+  record?: EntityInstance | RelationInstance;
+  property?: string;
   direction?: string;
   callback: Function;
   attributeQuery?: AttributeQueryData; // AttributeQueryData
@@ -11,7 +12,8 @@ export interface AnyInstance extends IInstance {
 }
 
 export interface AnyCreateArgs {
-  record: EntityInstance | RelationInstance;
+  record?: EntityInstance | RelationInstance;
+  property?: string;
   direction?: string;
   callback: Function;
   attributeQuery?: AttributeQueryData; // AttributeQueryData
@@ -22,7 +24,8 @@ export class Any implements AnyInstance {
   public uuid: string;
   public _type = 'Any';
   public _options?: { uuid?: string };
-  public record: EntityInstance | RelationInstance;
+  public record?: EntityInstance | RelationInstance;
+  public property?: string;
   public direction?: string;
   public callback: Function;
   public attributeQuery?: AttributeQueryData;
@@ -32,6 +35,7 @@ export class Any implements AnyInstance {
     this._options = options;
     this.uuid = generateUUID(options);
     this.record = args.record;
+    this.property = args.property;
     this.direction = args.direction;
     this.callback = args.callback;
     this.attributeQuery = args.attributeQuery;
@@ -47,7 +51,12 @@ export class Any implements AnyInstance {
     record: {
       type: ['Entity', 'Relation'] as const,
       collection: false as const,
-      required: true as const
+      required: false as const
+    },
+    property: {
+      type: 'string' as const,
+      collection: false as const,
+      required: false as const
     },
     direction: {
       type: 'string' as const,
@@ -87,6 +96,7 @@ export class Any implements AnyInstance {
   static stringify(instance: AnyInstance): string {
     const args: AnyCreateArgs = {
       record: instance.record,
+      property: instance.property,
       attributeQuery: instance.attributeQuery,
       
       dataDeps: instance.dataDeps,
@@ -105,6 +115,7 @@ export class Any implements AnyInstance {
   static clone(instance: AnyInstance, deep: boolean): AnyInstance {
     return this.create({
       record: instance.record,
+      property: instance.property,
       direction: instance.direction,
       callback: instance.callback,
       attributeQuery: instance.attributeQuery,

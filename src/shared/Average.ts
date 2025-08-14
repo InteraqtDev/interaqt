@@ -3,13 +3,15 @@ import { stringifyAttribute } from './utils.js';
 import type { EntityInstance, RelationInstance, AttributeQueryData } from './types.js';
 
 export interface AverageInstance extends IInstance {
-  record: EntityInstance | RelationInstance;
+  record?: EntityInstance | RelationInstance;
+  property?: string;
   direction?: string;
   attributeQuery: AttributeQueryData;
 }
 
 export interface AverageCreateArgs {
-  record: EntityInstance | RelationInstance;
+  record?: EntityInstance | RelationInstance;
+  property?: string;
   direction?: string;
   attributeQuery: AttributeQueryData;
 }
@@ -18,7 +20,8 @@ export class Average implements AverageInstance {
   public uuid: string;
   public _type = 'Average';
   public _options?: { uuid?: string };
-  public record: EntityInstance | RelationInstance;
+  public record?: EntityInstance | RelationInstance;
+  public property?: string;
   public direction?: string;
   public attributeQuery: AttributeQueryData;
   
@@ -26,6 +29,7 @@ export class Average implements AverageInstance {
     this._options = options;
     this.uuid = generateUUID(options);
     this.record = args.record;
+    this.property = args.property;
     this.direction = args.direction;
     this.attributeQuery = args.attributeQuery;
   }

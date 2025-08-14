@@ -5,7 +5,8 @@ import { Entity } from './Entity.js';
 import { Relation } from './Relation.js';
 
 export interface CountInstance extends IInstance {
-  record: EntityInstance | RelationInstance;
+  record?: EntityInstance | RelationInstance;
+  property?: string;
   direction?: string;
   callback?: Function;
   attributeQuery?: AttributeQueryData;
@@ -13,7 +14,8 @@ export interface CountInstance extends IInstance {
 }
 
 export interface CountCreateArgs {
-  record: EntityInstance | RelationInstance;
+  record?: EntityInstance | RelationInstance;
+  property?: string;
   direction?: string;
   callback?: Function;
   attributeQuery?: AttributeQueryData;
@@ -24,7 +26,8 @@ export class Count implements CountInstance {
   public uuid: string;
   public _type = 'Count';
   public _options?: { uuid?: string };
-  public record: EntityInstance | RelationInstance;
+  public record?: EntityInstance | RelationInstance;
+  public property?: string;
   public direction?: string;
   public callback?: Function;
   public attributeQuery?: AttributeQueryData;
@@ -34,6 +37,7 @@ export class Count implements CountInstance {
     this._options = options;
     this.uuid = generateUUID(options);
     this.record = args.record;
+    this.property = args.property;
     this.direction = args.direction;
     this.callback = args.callback;
     this.attributeQuery = args.attributeQuery;

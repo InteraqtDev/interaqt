@@ -117,7 +117,7 @@ export class AttributeQuery {
             const [attributeName, subQueryData, onlyRelationData] = item
 
             if (attributeName === LINK_SYMBOL) {
-                assert(!!(this.parentRecord && this.attributeName), `${this.parentRecord} ${this.attributeName} cannot be empty when query link data`)
+                assert(!!(this.parentRecord && this.attributeName), `parent record and attribute name cannot be empty when query link data, you passed ${this.parentRecord} ${this.attributeName}`)
                 const info = this.map.getInfo(this.parentRecord!, this.attributeName!)
                 this.parentLinkRecordQuery = RecordQuery.create(info.linkName, this.map, subQueryData as RecordQueryData, undefined)
                 return

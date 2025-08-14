@@ -5,7 +5,7 @@ import { WeightedSummationInstance, EntityInstance, RelationInstance } from "@sh
 import { ComputationResult, DataDep, RecordsDataDep, RecordBoundState } from "./Computation.js";
 import { DataBasedComputation } from "./Computation.js";
 import { EtityMutationEvent } from "../Scheduler.js";
-import { AttributeQueryData, MatchExp } from "@storage";
+import { AttributeQueryData, MatchExp, LINK_SYMBOL, RecordQueryData } from "@storage";
 import { assert } from "../util.js";
 
 export class GlobalWeightedSummationHandle implements DataBasedComputation {
@@ -19,7 +19,7 @@ export class GlobalWeightedSummationHandle implements DataBasedComputation {
 
     constructor(public controller: Controller, public args: WeightedSummationInstance, public dataContext: DataContext) {
         this.matchRecordToWeight = this.args.callback.bind(this.controller)
-        this.record = this.args.record
+        this.record = this.args.record!
         
         
         this.dataDeps = {
@@ -94,23 +94,36 @@ export class PropertyWeightedSummationHandle implements DataBasedComputation {
     relatedRecordName: string
     isSource: boolean
     relation: RelationInstance
+    property: string
+    reverseProperty: string
     relationAttributeQuery: AttributeQueryData
+    relatedAttributeQuery: AttributeQueryData
 
     constructor(public controller: Controller, public args: WeightedSummationInstance, public dataContext: PropertyDataContext) {
         this.matchRecordToWeight = this.args.callback.bind(this.controller)
 
-        // 我们假设在PropertyWeightedSummationHandle中，records数组的第一个元素是一个Relation
-        this.relation = this.args.record as RelationInstance
-        this.relationAttr = this.relation.source.name === dataContext.host.name ? this.relation.sourceProperty : this.relation.targetProperty
-        this.isSource = this.relation.source.name === dataContext.host.name
+        // Find relation by property name
+        this.relation = this.controller.relations.find(r => (r.source === dataContext.host && r.sourceProperty === this.args.property) || (r.target === dataContext.host && r.targetProperty === this.args.property))!
+        assert(this.relation, 'weighted summation computation must specify property')
+        this.isSource = this.args.direction ? this.args.direction === 'source' : this.relation.source.name === dataContext.host.name
         assert(this.isSource ? this.relation.source === dataContext.host : this.relation.target === dataContext.host, 'weighted summation computation relation direction error')
+        this.relationAttr = this.isSource ? this.relation.sourceProperty : this.relation.targetProperty
         this.relatedRecordName = this.isSource ? this.relation.target.name! : this.relation.source.name!
-        this.relationAttributeQuery = this.args.attributeQuery || []
+        this.property = this.args.property || this.relationAttr
+        this.reverseProperty = this.isSource ? this.relation.targetProperty : this.relation.sourceProperty
+        
+        const attributeQuery = this.args.attributeQuery || []
+        this.relatedAttributeQuery = this.args.attributeQuery?.filter(item => item[0] !== LINK_SYMBOL) || []
+        const relationQuery: AttributeQueryData|undefined = ((attributeQuery.find(item => item[0] === LINK_SYMBOL)||[])[1] as RecordQueryData)?.attributeQuery
+        this.relationAttributeQuery = [
+            [this.isSource ? 'target' : 'source', {attributeQuery: this.relatedAttributeQuery}],
+            ...(relationQuery ? relationQuery : [])
+        ]
         
         this.dataDeps = {
             _current: {
                 type: 'property',
-                attributeQuery: [[this.relationAttr, {attributeQuery: [['&', {attributeQuery: this.relationAttributeQuery}]]}]]
+                attributeQuery: [[this.relationAttr, {attributeQuery: this.args.attributeQuery}]]
             },
             ...(this.args.dataDeps || {})
         }
@@ -126,22 +139,21 @@ export class PropertyWeightedSummationHandle implements DataBasedComputation {
         return 0
     }
 
-    async compute({_current}: {_current: any}): Promise<number> {
-        // FIXME 没有验证过
+    async compute({_current, ...dataDeps}: {_current: any, [key: string]: any}): Promise<number> {
+        const relations = _current[this.relationAttr] || [];
         let summation = 0;
         
-        for (const record of _current[this.relationAttr]) {
-            const relationRecord = record['&']
-            const valueAndWeight = this.matchRecordToWeight.call(this.controller, relationRecord);
+        for (const relatedItem of relations) {
+            const valueAndWeight = this.matchRecordToWeight.call(this.controller, relatedItem, dataDeps);
             const result = valueAndWeight.weight * valueAndWeight.value;
-            await this.state.itemResult.set(relationRecord, result);
+            await this.state.itemResult.set(relatedItem, result);
             summation += result;
         }
         
         return summation;
     }
 
-    async incrementalCompute(lastValue: number, mutationEvent: EtityMutationEvent): Promise<number|ComputationResult> {
+    async incrementalCompute(lastValue: number, mutationEvent: EtityMutationEvent, record: any, dataDeps: {[key: string]: any}): Promise<number|ComputationResult> {
         // 只能支持通过 args.record 指定的关联关系或者关联实体的增量更新。
         if (
             mutationEvent.recordName !== this.dataContext.host.name ||
@@ -159,18 +171,20 @@ export class PropertyWeightedSummationHandle implements DataBasedComputation {
         let summation = lastValue;
         const relatedMutationEvent = mutationEvent.relatedMutationEvent!;
 
-        if (relatedMutationEvent.type === 'create') {
+        if (relatedMutationEvent.type === 'create' && relatedMutationEvent.recordName === this.relation.name!) {
             // 关联关系的新建
-            const newRelationRecord = await this.controller.system.storage.findOne(this.relation.name!, MatchExp.atom({
+            const newRelationWithEntity = await this.controller.system.storage.findOne(this.relation.name!, MatchExp.atom({
                 key: 'id',
                 value: ['=', relatedMutationEvent.record!.id]
             }), undefined, this.relationAttributeQuery);
 
-            const valueAndWeight = this.matchRecordToWeight.call(this.controller, newRelationRecord);
+            const relatedRecord = newRelationWithEntity[this.isSource ? 'target' : 'source'];
+            relatedRecord['&'] = newRelationWithEntity;
+            const valueAndWeight = this.matchRecordToWeight.call(this.controller, relatedRecord, dataDeps);
             const result = valueAndWeight.weight * valueAndWeight.value;
-            await this.state!.itemResult.set(newRelationRecord, result);
+            await this.state!.itemResult.set(relatedRecord, result);
             summation = summation + result;
-        } else if (relatedMutationEvent.type === 'delete') {
+        } else if (relatedMutationEvent.type === 'delete' && relatedMutationEvent.recordName === this.relation.name!) {
             // 关联关系的删除
             const oldResult = await this.state!.itemResult.get(relatedMutationEvent.record);
             summation = summation - oldResult;
@@ -182,12 +196,14 @@ export class PropertyWeightedSummationHandle implements DataBasedComputation {
                 value: ['=', relatedMutationEvent!.oldRecord!.id]
             }) 
 
-            const newRelationRecord = await this.controller.system.storage.findOne(this.relation.name!, relationMatch, undefined, this.relationAttributeQuery);
+            const newRelationWithEntity = await this.controller.system.storage.findOne(this.relation.name!, relationMatch, undefined, this.relationAttributeQuery);
 
-            const oldResult = await this.state!.itemResult.get(newRelationRecord);
-            const newValueAndWeight = this.matchRecordToWeight.call(this.controller, newRelationRecord);
+            const relatedRecord = newRelationWithEntity[this.isSource ? 'target' : 'source'];
+            relatedRecord['&'] = newRelationWithEntity;
+            const oldResult = await this.state!.itemResult.get(relatedRecord);
+            const newValueAndWeight = this.matchRecordToWeight.call(this.controller, relatedRecord, dataDeps);
             const newResult = newValueAndWeight.weight * newValueAndWeight.value;
-            await this.state!.itemResult.set(newRelationRecord, newResult);
+            await this.state!.itemResult.set(relatedRecord, newResult);
             summation = summation - oldResult + newResult;
         }
 

@@ -5,6 +5,7 @@ import {
     boolExpToAttributives,
     Controller,
     createUserRoleAttributive,
+    Custom,
     Entity,
     Every,
     Interaction,
@@ -346,12 +347,16 @@ RequestEntity.properties.push(
         name: 'approved',
         type: 'boolean',
         collection: false,
-        computation: Every.create({
-            record: reviewerRelation,
-            attributeQuery: ['result'],
-            notEmpty: true,
-            callback:(relation: any) => {
-                return relation.result === 'approved'
+        computation: Custom.create({
+            name: 'approved',
+            dataDeps: {
+                self: {
+                    type: 'property',
+                    attributeQuery: [['to', {attributeQuery: [['&', {attributeQuery: ['result']}]]}]]
+                }
+            },
+            compute: async function(this: Controller, dataDeps: any) {
+                return dataDeps.self.to['&'].result === 'approved'
             }
         })
     }),
@@ -359,13 +364,17 @@ RequestEntity.properties.push(
         name: 'rejected',
         type: 'boolean',
         collection: false,
-        computation: Any.create({
-            record: reviewerRelation,
-            attributeQuery: ['result'],
-            callback:(relation: any) => {
-                return relation.result === 'rejected'
+        computation: Custom.create({
+            name: 'rejected',
+            dataDeps: {
+                self: {
+                    type: 'property',
+                    attributeQuery: [['to', {attributeQuery: [['&', {attributeQuery: ['result']}]]}]]
+                }
+            },
+            compute: async function(this: Controller, dataDeps: any) {
+                return dataDeps.self.to['&'].result === 'rejected'
             }
-
         })
     }),
     Property.create({

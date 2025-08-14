@@ -361,12 +361,12 @@ export function createData() {
     
     // 计算 unhandled request 的总数
      const userTotalUnhandledRequest = WeightedSummation.create({
-        record: receivedRequestRelation,
-        attributeQuery: [['source', {attributeQuery: ['result']}]],
-        callback: (relation: any) => {
+        property: 'request',
+        attributeQuery: ['result'],
+        callback: (request: any) => {
             return {
                 weight: 1,
-                value: relation.source.result === 'pending' ? 0 : 1,
+                value: request.result === 'pending' ? 0 : 1,
             }
         }
     })
@@ -388,9 +388,9 @@ export function createData() {
         type: 'boolean',
         collection: false,
         computation: Every.create({
-            record: sendRequestRelation,
-            attributeQuery: [['source', {attributeQuery: ['result']}]],
-            callback: (relation: any) => relation.source.result !== 'pending'
+            property: 'request',
+            attributeQuery: ['result'],  
+            callback: (request: any) => request.result !== 'pending'
         })
     }))
     
@@ -399,9 +399,9 @@ export function createData() {
         type: 'boolean',
         collection: false,
         computation: Any.create({
-            record: sendRequestRelation,
-            attributeQuery: [['source', {attributeQuery: ['result']}]],
-            callback: (relation: any) => relation.source.result !== 'pending'
+            property: 'request',
+            attributeQuery: ['result'],
+            callback: (request: any) => request.result !== 'pending'
         })
     }))
     

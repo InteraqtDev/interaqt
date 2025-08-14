@@ -5,7 +5,7 @@ import { AnyInstance, RelationInstance } from "@shared";
 import { ComputationResult, DataDep, GlobalBoundState, RecordBoundState, RecordsDataDep } from "./Computation.js";
 import { DataBasedComputation } from "./Computation.js";
 import { EtityMutationEvent } from "../ComputationSourceMap.js";
-import { MatchExp, AttributeQueryData } from "@storage";
+import { MatchExp, AttributeQueryData, RecordQueryData, LINK_SYMBOL } from "@storage";
 import { assert } from "../util.js";
 
 
@@ -21,7 +21,7 @@ export class GlobalAnyHandle implements DataBasedComputation {
         this.dataDeps = {
             main: {
                 type: 'records',
-                source:this.args.record,
+                source:this.args.record!,
                 attributeQuery: this.args.attributeQuery
             },
             ...(this.args.dataDeps || {})
@@ -31,7 +31,7 @@ export class GlobalAnyHandle implements DataBasedComputation {
     createState() {
         return {
             matchCount: new GlobalBoundState<number>(0),
-            isItemMatch: new RecordBoundState<boolean>(false, this.args.record.name!)
+            isItemMatch: new RecordBoundState<boolean>(false, this.args.record!.name!)
         }
     }
     
@@ -112,21 +112,40 @@ export class PropertyAnyHandle implements DataBasedComputation {
     relatedRecordName: string
     isSource: boolean
     relation: RelationInstance
+    property: string
+    reverseProperty: string
     relationAttributeQuery: AttributeQueryData
+    relatedAttributeQuery: AttributeQueryData
     constructor(public controller: Controller,  public args: AnyInstance,  public dataContext: PropertyDataContext ) {
         this.callback = this.args.callback.bind(this.controller)
 
-        const relation = this.args.record as RelationInstance
-        this.relation = relation
-        this.isSource = this.args.direction ? this.args.direction === 'source' :relation.source.name === dataContext.host.name
-        assert(this.isSource ? this.relation.source === dataContext.host : this.relation.target === dataContext.host, 'count computation relation direction error')
-        this.relationAttr = this.isSource ? relation.sourceProperty : relation.targetProperty
-        this.relatedRecordName = this.isSource ? relation.target.name! : relation.source.name!
-        this.relationAttributeQuery = this.args.attributeQuery || []
+        this.relation = this.controller.relations.find(r => (r.source === dataContext.host && r.sourceProperty === this.args.property) || (r.target === dataContext.host && r.targetProperty === this.args.property))!
+        assert(this.relation, `cannot find relation for property ${this.args.property} in "Any" computation`)
+        this.isSource = this.args.direction ? this.args.direction === 'source' : this.relation.source.name === dataContext.host.name
+        assert(this.isSource ? this.relation.source === dataContext.host : this.relation.target === dataContext.host, 'any computation relation direction error')
+
+        let baseRelation = this.relation.baseRelation || this.relation
+        while(baseRelation.baseRelation) {
+            baseRelation = baseRelation.baseRelation
+        }
+        const relType = baseRelation.type.split(':')
+        assert(relType[this.isSource?1:0]==='n', `property-level Any computation argument must be an x:n relation. ${this.dataContext.host.name}.${this.args.property}" is a ${this.isSource?relType.join(':'):relType.slice().reverse().join(':')} relation`)
+        
+        this.relationAttr = this.isSource ? this.relation.sourceProperty : this.relation.targetProperty
+        this.relatedRecordName = this.isSource ? this.relation.target.name! : this.relation.source.name!
+        this.property = this.args.property!
+        this.reverseProperty = this.isSource ? this.relation.targetProperty : this.relation.sourceProperty
+        const attributeQuery = this.args.attributeQuery || []
+        this.relatedAttributeQuery = this.args.attributeQuery?.filter(item => item[0] !== LINK_SYMBOL) || []
+        const relationQuery: AttributeQueryData|undefined = ((attributeQuery.find(item => item[0] === LINK_SYMBOL)||[])[1] as RecordQueryData)?.attributeQuery
+        this.relationAttributeQuery = [
+            [this.isSource ? 'target' : 'source', {attributeQuery: this.relatedAttributeQuery}],
+            ...(relationQuery ? relationQuery : [])
+        ]
         this.dataDeps = {
             _current: {
                 type: 'property',
-                attributeQuery: [[this.relationAttr, {attributeQuery: [['&', {attributeQuery: this.relationAttributeQuery}]]}]]
+                attributeQuery: [[this.property, {attributeQuery: this.args.attributeQuery}]]
             },
             ...(this.args.dataDeps || {})
         }
@@ -144,7 +163,17 @@ export class PropertyAnyHandle implements DataBasedComputation {
     }
 
     async compute({_current, ...dataDeps}: {_current: any, [key: string]: any}): Promise<boolean> {
-        const matchCount = await this.state.matchCount.set(_current, _current[this.relationAttr].filter((item: any) => this.callback.call(this.controller, item, dataDeps)).length)
+        let matchCount = 0
+        for(const item of _current[this.relationAttr]) {
+            const isMatch = this.callback.call(this.controller, item, dataDeps)
+            if (isMatch) {
+                matchCount++
+                await this.state!.isItemMatch.set(item, true)
+            } else {
+                await this.state!.isItemMatch.set(item, false)
+            }
+        }
+        await this.state.matchCount.set(_current, matchCount)
         return matchCount>0
     }
 
@@ -173,11 +202,15 @@ export class PropertyAnyHandle implements DataBasedComputation {
                 value: ['=', relationRecord.id]
             }), undefined, this.relationAttributeQuery)
 
-            const newItemMatch = !!this.callback.call(this.controller, newRelationWithEntity, dataDeps) 
+            const relatedRecord = newRelationWithEntity[this.isSource ? 'target' : 'source']
+            relatedRecord['&'] = relationRecord
+
+            const newItemMatch = !!this.callback.call(this.controller, relatedRecord, dataDeps) 
             if (newItemMatch === true) {
                 matchCount = await this.state!.matchCount.set(mutationEvent.record, matchCount + 1)
                 await this.state!.isItemMatch.set(relationRecord, true)
-
+            } else {
+                await this.state!.isItemMatch.set(relationRecord, false)
             }
         } else if (relatedMutationEvent.type === 'delete'&&relatedMutationEvent.recordName === this.relation.name!) {
             // 关联关系的删除
@@ -190,15 +223,26 @@ export class PropertyAnyHandle implements DataBasedComputation {
             // 关联实体或者关联关系上的字段的更新
             const currentRecord = mutationEvent.oldRecord!
             // 关联关系或者关联实体的更新
+            // relatedAttribute 是从当前 dataContext 出发
+            // 现在要把匹配的 key 改成从关联关系出发。
+            const relationMatchKey = mutationEvent.relatedAttribute[1] === '&' ? 
+                mutationEvent.relatedAttribute.slice(2).concat('id').join('.') : // 从2开始就是关联关系的字段了
+                (mutationEvent.relatedAttribute.length === 1 ? 
+                    `${this.isSource ? 'target' : 'source'}.id` : // 只有1个字段，就是关联实体的 id
+                    `${this.isSource ? 'target' : 'source'}.${mutationEvent.relatedAttribute.slice(1).concat('id').join('.')}` // 有多个字段，就是关联实体再关联上的字段
+                )
+
             const relationMatch = MatchExp.atom({
-                key: mutationEvent.relatedAttribute.slice(2).concat('id').join('.'),
+                key: relationMatchKey,
                 value: ['=', relatedMutationEvent!.oldRecord!.id]
             }) 
 
             const relationRecord = await this.controller.system.storage.findOne(this.relation.name!, relationMatch, undefined, this.relationAttributeQuery)
+            const relatedRecord = relationRecord[this.isSource ? 'target' : 'source']
+            relatedRecord['&'] = relationRecord
 
             const oldItemMatch = !!await this.state!.isItemMatch.get(relationRecord)
-            const newItemMatch = !!this.callback.call(this.controller, relationRecord, dataDeps) 
+            const newItemMatch = !!this.callback.call(this.controller, relatedRecord, dataDeps) 
             if (oldItemMatch === true && newItemMatch === false) {
                 matchCount = await this.state!.matchCount.set(currentRecord, matchCount - 1)
             } else if (oldItemMatch === false && newItemMatch === true) {
