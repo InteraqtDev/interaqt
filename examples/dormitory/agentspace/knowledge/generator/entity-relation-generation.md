@@ -235,7 +235,7 @@ Filtered entities are derived entities that automatically filter records from a 
 ```typescript
 const PublishedStyle = Entity.create({
   name: 'PublishedStyle',
-  sourceEntity: Style,  // The entity to filter from
+  baseEntity: Style,  // The entity to filter from
   matchExpression: MatchExp.atom({
     key: 'status',
     value: ['=', 'published']
@@ -319,7 +319,7 @@ matchExpression: MatchExp.atom({
 ```typescript
 const ActiveUser = Entity.create({
   name: 'ActiveUser',
-  sourceEntity: User,
+  baseEntity: User,
   matchExpression: MatchExp.atom({
     key: 'status',
     value: ['=', 'active']
@@ -334,7 +334,7 @@ const ActiveUser = Entity.create({
 ```typescript
 const HighPriorityStyle = Entity.create({
   name: 'HighPriorityStyle',
-  sourceEntity: Style,
+  baseEntity: Style,
   matchExpression: MatchExp.atom({
     key: 'priority',
     value: ['>=', 8]
@@ -349,7 +349,7 @@ const HighPriorityStyle = Entity.create({
 ```typescript
 const FeaturedContent = Entity.create({
   name: 'FeaturedContent',
-  sourceEntity: Article,
+  baseEntity: Article,
   matchExpression: MatchExp.atom({
     key: 'type',
     value: ['=', 'premium']
@@ -369,7 +369,7 @@ You can also create filtered entities from relations:
 ```typescript
 const RecentUserPost = Entity.create({
   name: 'RecentUserPost',
-  sourceEntity: UserPostRelation,
+  baseEntity: UserPostRelation,
   matchExpression: MatchExp.atom({
     key: 'createdAt',
     value: ['>', Math.floor(Date.now()/1000) - 30 * 24 * 60 * 60]  // Last 30 days in seconds
@@ -391,5 +391,5 @@ const RecentUserPost = Entity.create({
 - [ ] No relation has a name property (auto-generated)
 - [ ] Relation types use correct format ('1:1', 'n:1', etc.)
 - [ ] No entities are imported from interaqt package
-- [ ] Filtered entities have valid sourceEntity and matchExpression
+- [ ] Filtered entities have valid baseEntity and matchExpression
 - [ ] TypeScript compilation passes 

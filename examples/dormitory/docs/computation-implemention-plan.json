@@ -1,0 +1,210 @@
+{
+  "totalComputations": 14,
+  "implementationOrder": [
+    {
+      "phase": 1,
+      "computations": [
+        {
+          "id": "User",
+          "type": "entity",
+          "entityName": "User",
+          "computationType": "Transform",
+          "dependencies": [
+            "CreateUser",
+            "InteractionEventEntity"
+          ],
+          "reasoning": "Users are created via CreateUser interaction",
+          "calculationMethod": "When CreateUser interaction fires, create new User entity with data from event.payload, initializing points to 100",
+          "completed": true
+        },
+        {
+          "id": "User.status",
+          "type": "property",
+          "entityName": "User",
+          "propertyName": "status",
+          "computationType": "StateMachine",
+          "dependencies": [
+            "ApproveEviction"
+          ],
+          "reasoning": "Has defined states with clear transitions triggered by business events",
+          "calculationMethod": "State transition from active to evicted when eviction is approved",
+          "completed": true
+        },
+        {
+          "id": "User.points",
+          "type": "property",
+          "entityName": "User",
+          "propertyName": "points",
+          "computationType": "Custom",
+          "dependencies": [
+            "UserPointDeductionRelation.points"
+          ],
+          "reasoning": "Need to calculate initial points minus all deductions",
+          "calculationMethod": "Initial value (100) minus sum of all point deductions for this user",
+          "completed": true,
+          "issues": "Relation data not being passed correctly to Custom computation - framework issue"
+        },
+        {
+          "id": "Dormitory",
+          "type": "entity",
+          "entityName": "Dormitory",
+          "computationType": "Transform",
+          "dependencies": [
+            "CreateDormitory",
+            "InteractionEventEntity"
+          ],
+          "reasoning": "Dormitories are created via CreateDormitory interaction",
+          "calculationMethod": "When CreateDormitory interaction fires, create new Dormitory entity and automatically create Bed records based on capacity",
+          "completed": true
+        },
+        {
+          "id": "Bed",
+          "type": "entity",
+          "entityName": "Bed",
+          "computationType": "Transform",
+          "dependencies": [
+            "CreateDormitory",
+            "Dormitory.capacity"
+          ],
+          "reasoning": "Beds are created automatically when dormitory is created",
+          "calculationMethod": "When CreateDormitory creates a dormitory, automatically create Bed records numbered 1 to capacity",
+          "completed": true
+        },
+        {
+          "id": "Bed.status",
+          "type": "property",
+          "entityName": "Bed",
+          "propertyName": "status",
+          "computationType": "StateMachine",
+          "dependencies": [
+            "AssignUserToBed",
+            "RemoveFromDormitory"
+          ],
+          "reasoning": "Status changes based on user assignment/removal",
+          "calculationMethod": "Transition to 'occupied' when user assigned, 'available' when user removed",
+          "completed": true
+        },
+        {
+          "id": "PointDeduction",
+          "type": "entity",
+          "entityName": "PointDeduction",
+          "computationType": "Transform",
+          "dependencies": [
+            "DeductPoints",
+            "InteractionEventEntity"
+          ],
+          "reasoning": "Point deductions are created via DeductPoints interaction",
+          "calculationMethod": "When DeductPoints interaction fires, create new PointDeduction entity with data from event.payload and event.user",
+          "completed": true
+        },
+        {
+          "id": "EvictionRequest",
+          "type": "entity",
+          "entityName": "EvictionRequest",
+          "computationType": "Transform",
+          "dependencies": [
+            "RequestEviction",
+            "InteractionEventEntity"
+          ],
+          "reasoning": "Eviction requests are created via RequestEviction interaction",
+          "calculationMethod": "When RequestEviction interaction fires, create new EvictionRequest entity with initial status 'pending'",
+          "completed": true
+        },
+        {
+          "id": "EvictionRequest.status",
+          "type": "property",
+          "entityName": "EvictionRequest",
+          "propertyName": "status",
+          "computationType": "StateMachine",
+          "dependencies": [
+            "ApproveEviction",
+            "RejectEviction"
+          ],
+          "reasoning": "Has defined states with clear transitions",
+          "calculationMethod": "Initial state 'pending', transitions to 'approved' or 'rejected' based on admin action",
+          "completed": true,
+          "issues": "StateMachine computation fails with framework error - cannot read status property of undefined - BLOCKS other EvictionRequest computations"
+        },
+        {
+          "id": "EvictionRequest.processedAt",
+          "type": "property",
+          "entityName": "EvictionRequest",
+          "propertyName": "processedAt",
+          "computationType": "StateMachine with computeValue",
+          "dependencies": [
+            "ApproveEviction",
+            "RejectEviction"
+          ],
+          "reasoning": "Updates to current timestamp when request is processed",
+          "calculationMethod": "Set to Date.now() when state transitions from pending to approved/rejected",
+          "completed": true,
+          "issues": "Blocked by EvictionRequest.status framework issue"
+        },
+        {
+          "id": "EvictionRequest.processedBy",
+          "type": "property",
+          "entityName": "EvictionRequest",
+          "propertyName": "processedBy",
+          "computationType": "StateMachine with computeValue",
+          "dependencies": [
+            "ApproveEviction",
+            "RejectEviction"
+          ],
+          "reasoning": "Updates to admin user when request is processed",
+          "calculationMethod": "Set to event.user.id when state transitions from pending to approved/rejected",
+          "completed": true,
+          "issues": "Blocked by EvictionRequest.status framework issue"
+        },
+        {
+          "id": "UserDormitoryRelation",
+          "type": "relation",
+          "relationName": "UserDormitoryRelation",
+          "computationType": "StateMachine",
+          "dependencies": [
+            "AssignUserToDormitory",
+            "RemoveFromDormitory",
+            "ApproveEviction"
+          ],
+          "reasoning": "Need both creation and deletion capability, no audit trail required",
+          "calculationMethod": "Create relation on AssignUserToDormitory, delete (hard) on RemoveFromDormitory or ApproveEviction",
+          "completed": true
+        },
+        {
+          "id": "UserBedRelation",
+          "type": "relation",
+          "relationName": "UserBedRelation",
+          "computationType": "StateMachine",
+          "dependencies": [
+            "AssignUserToBed",
+            "RemoveFromDormitory",
+            "ApproveEviction"
+          ],
+          "reasoning": "Need both creation and deletion capability, no audit trail required",
+          "calculationMethod": "Create relation on AssignUserToBed, delete (hard) on RemoveFromDormitory or ApproveEviction",
+          "completed": true
+        }
+      ],
+      "description": "Phase 1: 5 entity computation(s), 6 property computation(s), 2 relation computation(s)"
+    },
+    {
+      "phase": 2,
+      "computations": [
+        {
+          "id": "Dormitory.status",
+          "type": "property",
+          "entityName": "Dormitory",
+          "propertyName": "status",
+          "computationType": "Custom",
+          "dependencies": [
+            "UserDormitoryRelation",
+            "Dormitory.capacity"
+          ],
+          "reasoning": "Status depends on whether occupancy equals capacity",
+          "calculationMethod": "If count of assigned users equals capacity, status is 'full', otherwise 'active'",
+          "completed": false
+        }
+      ],
+      "description": "Phase 2: 1 property computation(s)"
+    }
+  ]
+}

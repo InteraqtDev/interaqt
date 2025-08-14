@@ -442,7 +442,7 @@ For entities that support deletion, business logic usually only needs to referen
 // Create Filtered Entity containing only non-deleted articles
 const ActiveArticle = Entity.create({
   name: 'ActiveArticle',
-  sourceEntity: Article,
+  baseEntity: Article,
   filterCondition: MatchExp.atom({
     key: 'status',
     value: ['!=', 'deleted']
@@ -907,7 +907,7 @@ const Article = Entity.create({
 // === Filtered Entities ===
 const ActiveArticle = Entity.create({
   name: 'ActiveArticle',
-  sourceEntity: Article,
+  baseEntity: Article,
   filterCondition: MatchExp.atom({
     key: 'status',
     value: ['!=', 'deleted']
@@ -916,7 +916,7 @@ const ActiveArticle = Entity.create({
 
 const PublishedArticle = Entity.create({
   name: 'PublishedArticle',
-  sourceEntity: Article,
+  baseEntity: Article,
   filterCondition: MatchExp.atom({
     key: 'status',
     value: ['=', 'published']

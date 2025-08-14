@@ -28,716 +28,403 @@ describe('Basic Functionality', () => {
     await controller.setup(true)
   })
 
-  test('User.isEligibleForEviction returns false when points >= 60', async () => {
-    const user = await system.storage.create('User', {
-      name: 'John Doe',
-      email: 'john@example.com',
-      role: 'student',
-      points: 80,
-      status: 'active'
-    })
-    
-    const foundUser = await system.storage.findOne(
-      'User',
-      MatchExp.atom({ key: 'id', value: ['=', user.id] }),
-      undefined,
-      ['id', 'points', 'isEligibleForEviction']
-    )
-    
-    expect(foundUser.isEligibleForEviction).toBe(false)
-  })
-
-  test('User.isEligibleForEviction returns true when points < 60', async () => {
-    const user = await system.storage.create('User', {
-      name: 'Jane Doe',
-      email: 'jane@example.com',
-      role: 'student',
-      points: 45,
-      status: 'active'
-    })
-    
-    const foundUser = await system.storage.findOne(
-      'User',
-      MatchExp.atom({ key: 'id', value: ['=', user.id] }),
-      undefined,
-      ['id', 'points', 'isEligibleForEviction']
-    )
-    
-    expect(foundUser.isEligibleForEviction).toBe(true)
-  })
-
-  test('User.isEligibleForEviction returns false at boundary (points = 60)', async () => {
-    const user = await system.storage.create('User', {
-      name: 'Bob Smith',
-      email: 'bob@example.com',
-      role: 'student',
-      points: 60,
-      status: 'active'
-    })
-    
-    const foundUser = await system.storage.findOne(
-      'User',
-      MatchExp.atom({ key: 'id', value: ['=', user.id] }),
-      undefined,
-      ['id', 'points', 'isEligibleForEviction']
-    )
-    
-    expect(foundUser.isEligibleForEviction).toBe(false)
-  })
-
-  test('Dormitory direct creation works', async () => {
-    // First test direct creation to ensure the entity works
-    const dorm = await system.storage.create('Dormitory', {
-      name: 'Test Dorm',
-      capacity: 4,
-      floor: 2,
-      building: 'B',
-      status: 'active',
-      createdAt: Math.floor(Date.now() / 1000)
-    })
-    
-    const foundDorm = await system.storage.findOne(
-      'Dormitory',
-      MatchExp.atom({ key: 'id', value: ['=', dorm.id] }),
-      undefined,
-      ['name', 'capacity']
-    )
-    
-    expect(foundDorm.name).toBe('Test Dorm')
-    expect(foundDorm.capacity).toBe(4)
-  })
-
-  test('Bed entities are created when Dormitory is created', async () => {
-    // Create a dormitory with capacity 2
-    const dormitory = await system.storage.create('Dormitory', {
-      name: 'Test Dorm A',
-      capacity: 2,
-      floor: 1,
-      building: 'A',
-      status: 'active',
-      createdAt: Math.floor(Date.now() / 1000)
-    })
-    
-    // Wait for the Transform computation to process
-    await new Promise(resolve => setTimeout(resolve, 100))
-    
-    // Check that beds were created - need to query with attributes
-    const beds = await system.storage.find('Bed', undefined, ['number', 'status', 'assignedAt'])
-    
-    // Should have 2 beds based on dormitory capacity
-    expect(beds.length).toBe(2)
-    
-    // Check bed properties
-    expect(beds[0].number).toBe(`${dormitory.id}-01`)
-    expect(beds[0].status).toBe('vacant')
-    expect(beds[0].assignedAt).toBe(0)
-    
-    expect(beds[1].number).toBe(`${dormitory.id}-02`)
-    expect(beds[1].status).toBe('vacant')
-    expect(beds[1].assignedAt).toBe(0)
-  })
-
-  test('ViolationRecord entities are created when RecordViolation interaction is called', async () => {
-    // Create a user to record violation against
-    const user = await system.storage.create('User', {
-      name: 'Test User',
-      email: 'test@example.com',
-      role: 'student',
-      points: 80,
-      status: 'active'
-    })
-    
-    // Call RecordViolation interaction
-    await controller.callInteraction('recordViolation', {
-      user: { id: 'admin-user' },
+  test('User entity computation - CreateUser interaction creates user with initial values', async () => {
+    // Call CreateUser interaction
+    const result = await controller.callInteraction('CreateUser', {
+      user: { id: 'admin1', name: 'Admin User', email: 'admin@test.com', role: 'admin' },
       payload: {
-        userId: user.id,
-        description: 'Noise violation after hours',
-        points: 10,
-        category: 'noise'
-      }
-    })
-    
-    // Wait for computation to process
-    await new Promise(resolve => setTimeout(resolve, 100))
-    
-    // Check that violation record was created
-    const violations = await system.storage.find('ViolationRecord', undefined, ['description', 'points', 'category', 'recordedBy'])
-    
-    // Should have 1 violation record
-    expect(violations.length).toBe(1)
-    
-    // Check violation properties
-    expect(violations[0].description).toBe('Noise violation after hours')
-    expect(violations[0].points).toBe(10)
-    expect(violations[0].category).toBe('noise')
-    expect(violations[0].recordedBy).toBe('admin-user')
-  })
-
-  test('User.role transitions from student to dormHead when appointed', async () => {
-    // Create a student user
-    const user = await system.storage.create('User', {
-      name: 'Jane Smith',
-      email: 'jane@example.com',
-      role: 'student',
-      points: 80,
-      status: 'active'
-    })
-    
-    // Verify initial role
-    const foundUser = await system.storage.findOne(
-      'User',
-      MatchExp.atom({ key: 'id', value: ['=', user.id] }),
-      undefined,
-      ['id', 'role']
-    )
-    expect(foundUser.role).toBe('student')
-    
-    // Call AppointDormHead interaction
-    await controller.callInteraction('appointDormHead', {
-      user: { id: 'admin-user' },
-      payload: {
-        userId: user.id,
-        dormitoryId: 'dorm-123'
-      }
-    })
-    
-    // Verify role changed
-    const updatedUser = await system.storage.findOne(
-      'User',
-      MatchExp.atom({ key: 'id', value: ['=', user.id] }),
-      undefined,
-      ['id', 'role']
-    )
-    expect(updatedUser.role).toBe('dormHead')
-  })
-
-  test('User.status transitions from active to evicted when eviction approved', async () => {
-    // Create a user with active status
-    const user = await system.storage.create('User', {
-      name: 'John Doe',
-      email: 'john@example.com',
-      role: 'student',
-      points: 50,
-      status: 'active'
-    })
-    
-    // Verify initial status
-    const foundUser = await system.storage.findOne(
-      'User',
-      MatchExp.atom({ key: 'id', value: ['=', user.id] }),
-      undefined,
-      ['id', 'status']
-    )
-    expect(foundUser.status).toBe('active')
-    
-    // Call ReviewEvictionRequest interaction with approved decision
-    const result = await controller.callInteraction('reviewEvictionRequest', {
-      user: { id: 'admin-user' },
-      payload: {
-        requestId: 'req-123',
-        decision: 'approved',
-        userId: user.id
+        name: 'John Doe',
+        email: 'john@example.com',
+        role: 'student'
       }
     })
 
+    // Verify interaction succeeded
     expect(result.error).toBeUndefined()
-    
-    // Verify status changed to evicted
-    const updatedUser = await system.storage.findOne(
-      'User',
-      MatchExp.atom({ key: 'id', value: ['=', user.id] }),
+    expect(result.effects).toBeDefined()
+    expect(result.effects!.length).toBeGreaterThan(0)
+
+    // Find the created user
+    const user = await system.storage.findOne('User',
+      MatchExp.atom({ key: 'email', value: ['=', 'john@example.com'] }),
       undefined,
-      ['id', 'status']
+      ['id', 'name', 'email', 'role', 'status', 'points', 'createdAt']
     )
-    expect(updatedUser.status).toBe('evicted')
+
+    // Verify all initial values are set correctly
+    expect(user).toBeDefined()
+    expect(user.name).toBe('John Doe')
+    expect(user.email).toBe('john@example.com')
+    expect(user.role).toBe('student')
+    expect(user.status).toBe('active')
+    expect(user.points).toBe(100)
+    expect(user.createdAt).toBeDefined()
+    expect(typeof user.createdAt).toBe('number')
   })
 
-  test('User.status remains active when eviction rejected', async () => {
-    // Create a user with active status
-    const user = await system.storage.create('User', {
-      name: 'Jane Doe',
-      email: 'jane@example.com',
-      role: 'student',
-      points: 50,
-      status: 'active'
-    })
-    
-    // Verify initial status
-    const foundUser = await system.storage.findOne(
-      'User',
-      MatchExp.atom({ key: 'id', value: ['=', user.id] }),
-      undefined,
-      ['id', 'status']
-    )
-    expect(foundUser.status).toBe('active')
-    
-    // Call ReviewEvictionRequest interaction with rejected decision
-    await controller.callInteraction('reviewEvictionRequest', {
-      user: { id: 'admin-user' },
+  test('User.status StateMachine - should have correct initial status', async () => {
+    // Create a student user
+    const createUserResult = await controller.callInteraction('CreateUser', {
+      user: { id: 'admin1', name: 'Admin User', email: 'admin@test.com', role: 'admin' },
       payload: {
-        requestId: 'req-456',
-        decision: 'rejected',
-        userId: user.id
+        name: 'Jane Smith',
+        email: 'jane@example.com',
+        role: 'student'
       }
     })
-    
-    // Verify status remains active
-    const updatedUser = await system.storage.findOne(
-      'User',
-      MatchExp.atom({ key: 'id', value: ['=', user.id] }),
+
+    expect(createUserResult.error).toBeUndefined()
+
+    // Find the created user and check initial status
+    const user = await system.storage.findOne('User',
+      MatchExp.atom({ key: 'email', value: ['=', 'jane@example.com'] }),
       undefined,
-      ['id', 'status']
+      ['id', 'name', 'email', 'role', 'status', 'points', 'createdAt']
     )
-    expect(updatedUser.status).toBe('active')
+
+    expect(user).toBeDefined()
+    expect(user.name).toBe('Jane Smith')
+    expect(user.email).toBe('jane@example.com')
+    expect(user.role).toBe('student')
+    expect(user.status).toBe('active')  // Default state from StateMachine
+    expect(user.points).toBe(100)
+    expect(user.createdAt).toBeDefined()
   })
 
-  test('User.evictedAt is set when eviction approved', async () => {
-    // Create a user without specifying evictedAt (default should be 0 or undefined)
-    const user = await system.storage.create('User', {
-      name: 'Bob Smith',
-      email: 'bob@example.com',
-      role: 'student',
-      points: 30,
-      status: 'active'
-    })
-    
-    // Verify initial evictedAt is 0 (default for number type)
-    const foundUser = await system.storage.findOne(
-      'User',
-      MatchExp.atom({ key: 'id', value: ['=', user.id] }),
-      undefined,
-      ['id', 'evictedAt']
-    )
-    expect(foundUser.evictedAt).toBe(0)
-    
-    // Call ReviewEvictionRequest interaction with approved decision
-    await controller.callInteraction('reviewEvictionRequest', {
-      user: { id: 'admin-user' },
+  test('User.points Custom computation - should calculate points correctly', async () => {
+    // Create a student user
+    const createUserResult = await controller.callInteraction('CreateUser', {
+      user: { id: 'admin1', name: 'Admin User', email: 'admin@test.com', role: 'admin' },
       payload: {
-        requestId: 'req-789',
-        decision: 'approved',
-        userId: user.id
+        name: 'Bob Johnson',
+        email: 'bob@example.com',
+        role: 'student'
       }
     })
-    
-    // Verify evictedAt is set to a timestamp
-    const updatedUser = await system.storage.findOne(
-      'User',
-      MatchExp.atom({ key: 'id', value: ['=', user.id] }),
-      undefined,
-      ['id', 'evictedAt']
-    )
-    expect(updatedUser.evictedAt).not.toBe(0)
-    expect(typeof updatedUser.evictedAt).toBe('number')
-    expect(updatedUser.evictedAt).toBeGreaterThan(0)
-  })
 
-  test('User.evictedAt remains 0 when eviction rejected', async () => {
-    // Create a user without specifying evictedAt
-    const user = await system.storage.create('User', {
-      name: 'Alice Johnson',
-      email: 'alice@example.com',
-      role: 'student',
-      points: 30,
-      status: 'active'
-    })
-    
-    // Verify initial evictedAt is 0
-    const foundUser = await system.storage.findOne(
-      'User',
-      MatchExp.atom({ key: 'id', value: ['=', user.id] }),
-      undefined,
-      ['id', 'evictedAt']
-    )
-    expect(foundUser.evictedAt).toBe(0)
-    
-    // Call ReviewEvictionRequest interaction with rejected decision
-    await controller.callInteraction('reviewEvictionRequest', {
-      user: { id: 'admin-user' },
-      payload: {
-        requestId: 'req-999',
-        decision: 'rejected',
-        userId: user.id
-      }
-    })
-    
-    // Verify evictedAt remains 0
-    const updatedUser = await system.storage.findOne(
-      'User',
-      MatchExp.atom({ key: 'id', value: ['=', user.id] }),
-      undefined,
-      ['id', 'evictedAt']
-    )
-    expect(updatedUser.evictedAt).toBe(0)
-  })
+    expect(createUserResult.error).toBeUndefined()
 
-  test('Bed.status transitions from vacant to occupied when user assigned', async () => {
-    // Create a dormitory first
-    const dormitory = await system.storage.create('Dormitory', {
-      name: 'Test Dorm',
-      capacity: 4,
-      floor: 2,
-      building: 'B',
-      status: 'active',
-      createdAt: Math.floor(Date.now() / 1000)
-    })
-    
-    // Create a bed
-    const bed = await system.storage.create('Bed', {
-      number: '101',
-      status: 'vacant'
-    })
-    
-    // Verify initial status
-    const foundBed = await system.storage.findOne(
-      'Bed',
-      MatchExp.atom({ key: 'id', value: ['=', bed.id] }),
+    // Get the created user
+    const user = await system.storage.findOne('User',
+      MatchExp.atom({ key: 'email', value: ['=', 'bob@example.com'] }),
       undefined,
-      ['id', 'status']
+      ['id', 'name', 'email', 'points']
     )
-    expect(foundBed.status).toBe('vacant')
-    
-    // Create a user
-    const user = await system.storage.create('User', {
-      name: 'John Doe',
-      email: 'john@example.com',
-      role: 'student',
-      points: 80,
-      status: 'active'
-    })
-    
-    // Call AssignUserToDormitory interaction
-    await controller.callInteraction('assignUserToDormitory', {
-      user: { id: 'admin-user' },
+
+    expect(user).toBeDefined()
+    expect(user.points).toBe(100)  // Initial points
+
+    // Deduct 10 points
+    const deductResult = await controller.callInteraction('DeductPoints', {
+      user: { id: 'admin1', name: 'Admin User', email: 'admin@test.com', role: 'admin' },
       payload: {
         userId: user.id,
-        dormitoryId: dormitory.id,
+        points: 10,
+        reason: 'Late for curfew'
+      }
+    })
+
+    expect(deductResult.error).toBeUndefined()
+
+    // Check that points were updated
+    const updatedUser = await system.storage.findOne('User',
+      MatchExp.atom({ key: 'id', value: ['=', user.id] }),
+      undefined,
+      ['id', 'points']
+    )
+
+    expect(updatedUser.points).toBe(90)  // 100 - 10 = 90
+
+    // Deduct another 20 points
+    await controller.callInteraction('DeductPoints', {
+      user: { id: 'admin1', name: 'Admin User', email: 'admin@test.com', role: 'admin' },
+      payload: {
+        userId: user.id,
+        points: 20,
+        reason: 'Noise violation'
+      }
+    })
+
+    // Check final points
+    const finalUser = await system.storage.findOne('User',
+      MatchExp.atom({ key: 'id', value: ['=', user.id] }),
+      undefined,
+      ['id', 'points']
+    )
+
+    expect(finalUser.points).toBe(70)  // 100 - 10 - 20 = 70
+  })
+
+  test('Dormitory entity computation - CreateDormitory interaction creates dormitory with initial values', async () => {
+    // Call CreateDormitory interaction
+    const result = await controller.callInteraction('CreateDormitory', {
+      user: { id: 'admin1', name: 'Admin User', email: 'admin@test.com', role: 'admin' },
+      payload: {
+        name: 'Dorm A',
+        capacity: 4
+      }
+    })
+
+    // Verify interaction succeeded
+    expect(result.error).toBeUndefined()
+    expect(result.effects).toBeDefined()
+    expect(result.effects!.length).toBeGreaterThan(0)
+
+    // Find the created dormitory
+    const dormitory = await system.storage.findOne('Dormitory',
+      MatchExp.atom({ key: 'name', value: ['=', 'Dorm A'] }),
+      undefined,
+      ['id', 'name', 'capacity', 'status', 'createdAt']
+    )
+
+    // Verify all initial values are set correctly
+    expect(dormitory).toBeDefined()
+    expect(dormitory.name).toBe('Dorm A')
+    expect(dormitory.capacity).toBe(4)
+    expect(dormitory.status).toBe('active')
+    expect(dormitory.createdAt).toBeDefined()
+    expect(typeof dormitory.createdAt).toBe('number')
+  })
+
+  test('Bed entity computation - automatically creates beds when dormitory is created', async () => {
+    // Create a dormitory with capacity 4
+    const createResult = await controller.callInteraction('CreateDormitory', {
+      user: { id: 'admin1', name: 'Admin User', email: 'admin@test.com', role: 'admin' },
+      payload: {
+        name: 'Dorm B',
+        capacity: 4
+      }
+    })
+
+    expect(createResult.error).toBeUndefined()
+
+    // Find the created dormitory
+    const dormitory = await system.storage.findOne('Dormitory',
+      MatchExp.atom({ key: 'name', value: ['=', 'Dorm B'] }),
+      undefined,
+      ['id', 'capacity']
+    )
+
+    expect(dormitory).toBeDefined()
+    expect(dormitory.capacity).toBe(4)
+
+    // Check that beds were created automatically
+    const beds = await system.storage.find('Bed',
+      undefined, // No filter - get all beds
+      undefined, // No sort
+      ['id', 'bedNumber', 'status', 'dormitory']
+    )
+
+    // Should have 4 beds for this dormitory
+    const dormBeds = beds.filter(bed => bed.dormitory.id === dormitory.id)
+    expect(dormBeds.length).toBe(4)
+
+    // Check bed numbers are 1-4
+    const bedNumbers = dormBeds.map(bed => bed.bedNumber).sort()
+    expect(bedNumbers).toEqual([1, 2, 3, 4])
+
+    // All beds should be available initially
+    dormBeds.forEach(bed => {
+      expect(bed.status).toBe('available')
+    })
+  })
+
+  test('Bed.status StateMachine - should transition from available to occupied when user assigned', async () => {
+    // Create a dormitory
+    const dormResult = await controller.callInteraction('CreateDormitory', {
+      user: { id: 'admin1', name: 'Admin User', email: 'admin@test.com', role: 'admin' },
+      payload: {
+        name: 'Dorm C',
+        capacity: 2
+      }
+    })
+
+    expect(dormResult.error).toBeUndefined()
+
+    // Get the created dormitory to find its ID
+    const dormitory = await system.storage.findOne('Dormitory',
+      MatchExp.atom({ key: 'name', value: ['=', 'Dorm C'] }),
+      undefined,
+      ['id']
+    )
+
+    expect(dormitory).toBeDefined()
+
+    // Get all beds and find one from this dormitory
+    const allBeds = await system.storage.find('Bed',
+      undefined,
+      undefined,
+      ['id', 'status', 'dormitory']
+    )
+    
+    // Find beds belonging to this dormitory
+    const bed = allBeds.find(b => b.dormitory?.id === dormitory.id)
+
+    expect(bed).toBeDefined()
+    expect(bed.status).toBe('available')
+
+    // Create a user
+    const userResult = await controller.callInteraction('CreateUser', {
+      user: { id: 'admin1', name: 'Admin User', email: 'admin@test.com', role: 'admin' },
+      payload: {
+        name: 'Alice Smith',
+        email: 'alice@example.com',
+        role: 'student'
+      }
+    })
+
+    expect(userResult.error).toBeUndefined()
+
+    // Get the created user
+    const user = await system.storage.findOne('User',
+      MatchExp.atom({ key: 'email', value: ['=', 'alice@example.com'] }),
+      undefined,
+      ['id']
+    )
+
+    // Assign user to the bed
+    const assignResult = await controller.callInteraction('AssignUserToBed', {
+      user: { id: 'admin1', name: 'Admin User', email: 'admin@test.com', role: 'admin' },
+      payload: {
+        userId: user.id,
         bedId: bed.id
       }
     })
-    
-    // Verify bed status changed to occupied
-    const updatedBed = await system.storage.findOne(
-      'Bed',
+
+    expect(assignResult.error).toBeUndefined()
+
+    // Check that bed status changed to occupied
+    const updatedBed = await system.storage.findOne('Bed',
       MatchExp.atom({ key: 'id', value: ['=', bed.id] }),
       undefined,
       ['id', 'status']
     )
+
     expect(updatedBed.status).toBe('occupied')
   })
 
-  test('Bed.status remains vacant when assignment fails', async () => {
-    // Create a bed
-    const bed = await system.storage.create('Bed', {
-      number: '102',
-      status: 'vacant'
-    })
-    
-    // Verify initial status
-    const foundBed = await system.storage.findOne(
-      'Bed',
-      MatchExp.atom({ key: 'id', value: ['=', bed.id] }),
-      undefined,
-      ['id', 'status']
-    )
-    expect(foundBed.status).toBe('vacant')
-    
-    // Try to assign without proper parameters (this should not trigger the state change)
-    // Note: In a real scenario, this would be handled by conditions/permissions
-    // For this test, we're just verifying the state doesn't change on invalid calls
-    
-    // Verify status remains vacant
-    const updatedBed = await system.storage.findOne(
-      'Bed',
-      MatchExp.atom({ key: 'id', value: ['=', bed.id] }),
-      undefined,
-      ['id', 'status']
-    )
-    expect(updatedBed.status).toBe('vacant')
-  })
-
-  test('Bed.assignedAt is set when user is assigned to bed', async () => {
-    // Create a dormitory first
-    const dormitory = await system.storage.create('Dormitory', {
-      name: 'Test Dorm',
-      capacity: 4,
-      floor: 2,
-      building: 'B',
-      status: 'active',
-      createdAt: Math.floor(Date.now() / 1000)
-    })
-    
-    // Create a bed
-    const bed = await system.storage.create('Bed', {
-      number: '201',
-      status: 'vacant'
-    })
-    
-    // Verify initial assignedAt is 0
-    const foundBed = await system.storage.findOne(
-      'Bed',
-      MatchExp.atom({ key: 'id', value: ['=', bed.id] }),
-      undefined,
-      ['id', 'assignedAt']
-    )
-    expect(foundBed.assignedAt).toBe(0)
-    
+  test('EvictionRequest.status StateMachine - should transition from pending to approved when approved', async () => {
     // Create a user
-    const user = await system.storage.create('User', {
-      name: 'Jane Smith',
-      email: 'jane@example.com',
-      role: 'student',
-      points: 85,
-      status: 'active'
+    const userResult = await controller.callInteraction('CreateUser', {
+      user: { id: 'admin1', name: 'Admin User', email: 'admin@test.com', role: 'admin' },
+      payload: {
+        name: 'Bob Wilson',
+        email: 'bob@example.com',
+        role: 'student'
+      }
     })
-    
-    // Call AssignUserToDormitory interaction
-    await controller.callInteraction('assignUserToDormitory', {
-      user: { id: 'admin-user' },
+
+    expect(userResult.error).toBeUndefined()
+
+    // Get the created user
+    const user = await system.storage.findOne('User',
+      MatchExp.atom({ key: 'email', value: ['=', 'bob@example.com'] }),
+      undefined,
+      ['id']
+    )
+
+    // Request eviction
+    const requestResult = await controller.callInteraction('RequestEviction', {
+      user: { id: 'admin1', name: 'Admin User', email: 'admin@test.com', role: 'admin' },
       payload: {
         userId: user.id,
-        dormitoryId: dormitory.id,
-        bedId: bed.id
+        reason: 'Multiple violations'
       }
     })
-    
-    // Verify assignedAt is set to a timestamp
-    const updatedBed = await system.storage.findOne(
-      'Bed',
-      MatchExp.atom({ key: 'id', value: ['=', bed.id] }),
-      undefined,
-      ['id', 'assignedAt']
-    )
-    expect(updatedBed.assignedAt).not.toBe(0)
-    expect(typeof updatedBed.assignedAt).toBe('number')
-    expect(updatedBed.assignedAt).toBeGreaterThan(0)
-  })
 
-  test('Bed.assignedAt remains 0 when bed is not assigned', async () => {
-    // Create a bed
-    const bed = await system.storage.create('Bed', {
-      number: '202',
-      status: 'vacant'
-    })
-    
-    // Verify initial assignedAt is 0
-    const foundBed = await system.storage.findOne(
-      'Bed',
-      MatchExp.atom({ key: 'id', value: ['=', bed.id] }),
-      undefined,
-      ['id', 'assignedAt']
-    )
-    expect(foundBed.assignedAt).toBe(0)
-    
-    // Don't assign any user - bed should remain unassigned
-    
-    // Verify assignedAt remains 0
-    const updatedBed = await system.storage.findOne(
-      'Bed',
-      MatchExp.atom({ key: 'id', value: ['=', bed.id] }),
-      undefined,
-      ['id', 'assignedAt']
-    )
-    expect(updatedBed.assignedAt).toBe(0)
-  })
+    expect(requestResult.error).toBeUndefined()
 
-  test('EvictionRequest.status transitions from pending to approved when approved', async () => {
-    // Create an eviction request
-    const request = await system.storage.create('EvictionRequest', {
-      reason: 'Multiple violations',
-      status: 'pending',
-      requestedAt: Math.floor(Date.now() / 1000),
-      decidedAt: 0,
-      adminNotes: ''
-    })
-    
-    // Verify initial status
-    const foundRequest = await system.storage.findOne(
-      'EvictionRequest',
-      MatchExp.atom({ key: 'id', value: ['=', request.id] }),
+    // Get the created request
+    const request = await system.storage.findOne('EvictionRequest',
+      undefined, // Get the first one
       undefined,
       ['id', 'status']
     )
-    expect(foundRequest.status).toBe('pending')
-    
-    // Call ReviewEvictionRequest interaction with approved decision
-    await controller.callInteraction('reviewEvictionRequest', {
-      user: { id: 'admin-user' },
+
+    expect(request).toBeDefined()
+    expect(request.status).toBe('pending')
+
+    // Approve the request
+    const approveResult = await controller.callInteraction('ApproveEviction', {
+      user: { id: 'admin1', name: 'Admin User', email: 'admin@test.com', role: 'admin' },
       payload: {
-        requestId: request.id,
-        decision: 'approved',
-        adminNotes: 'Approved due to repeated violations'
+        requestId: request.id
       }
     })
-    
-    // Verify status changed to approved
-    const updatedRequest = await system.storage.findOne(
-      'EvictionRequest',
+
+    expect(approveResult.error).toBeUndefined()
+
+    // Check that status changed to approved
+    const updatedRequest = await system.storage.findOne('EvictionRequest',
       MatchExp.atom({ key: 'id', value: ['=', request.id] }),
       undefined,
       ['id', 'status']
     )
+
     expect(updatedRequest.status).toBe('approved')
   })
 
-  test('EvictionRequest.status transitions from pending to rejected when rejected', async () => {
-    // Create an eviction request
-    const request = await system.storage.create('EvictionRequest', {
-      reason: 'Minor infraction',
-      status: 'pending',
-      requestedAt: Math.floor(Date.now() / 1000),
-      decidedAt: 0,
-      adminNotes: ''
-    })
-    
-    // Verify initial status
-    const foundRequest = await system.storage.findOne(
-      'EvictionRequest',
-      MatchExp.atom({ key: 'id', value: ['=', request.id] }),
-      undefined,
-      ['id', 'status']
-    )
-    expect(foundRequest.status).toBe('pending')
-    
-    // Call ReviewEvictionRequest interaction with rejected decision
-    await controller.callInteraction('reviewEvictionRequest', {
-      user: { id: 'admin-user' },
+  test('EvictionRequest.processedAt StateMachine - should set timestamp when request is processed', async () => {
+    // Create a user
+    const userResult = await controller.callInteraction('CreateUser', {
+      user: { id: 'admin1', name: 'Admin User', email: 'admin@test.com', role: 'admin' },
       payload: {
-        requestId: request.id,
-        decision: 'rejected',
-        adminNotes: 'First offense, warning issued'
+        name: 'Charlie Brown',
+        email: 'charlie@example.com',
+        role: 'student'
       }
     })
-    
-    // Verify status changed to rejected
-    const updatedRequest = await system.storage.findOne(
-      'EvictionRequest',
-      MatchExp.atom({ key: 'id', value: ['=', request.id] }),
-      undefined,
-      ['id', 'status']
-    )
-    expect(updatedRequest.status).toBe('rejected')
-  })
 
-  test('EvictionRequest.decidedAt is set when any decision is made', async () => {
-    // Create an eviction request
-    const request = await system.storage.create('EvictionRequest', {
-      reason: 'Test violation',
-      status: 'pending',
-      requestedAt: Math.floor(Date.now() / 1000),
-      decidedAt: 0,
-      adminNotes: ''
-    })
-    
-    // Verify initial decidedAt is 0
-    const foundRequest = await system.storage.findOne(
-      'EvictionRequest',
-      MatchExp.atom({ key: 'id', value: ['=', request.id] }),
-      undefined,
-      ['id', 'decidedAt']
-    )
-    expect(foundRequest.decidedAt).toBe(0)
-    
-    // Call ReviewEvictionRequest interaction with approved decision
-    await controller.callInteraction('reviewEvictionRequest', {
-      user: { id: 'admin-user' },
-      payload: {
-        requestId: request.id,
-        decision: 'approved',
-        adminNotes: 'Test approval'
-      }
-    })
-    
-    // Verify decidedAt is set to a timestamp
-    const updatedRequest = await system.storage.findOne(
-      'EvictionRequest',
-      MatchExp.atom({ key: 'id', value: ['=', request.id] }),
-      undefined,
-      ['id', 'decidedAt']
-    )
-    expect(updatedRequest.decidedAt).not.toBe(0)
-    expect(typeof updatedRequest.decidedAt).toBe('number')
-    expect(updatedRequest.decidedAt).toBeGreaterThan(0)
-  })
+    expect(userResult.error).toBeUndefined()
 
-  test('EvictionRequest.adminNotes is set when provided in review', async () => {
-    // Create an eviction request
-    const request = await system.storage.create('EvictionRequest', {
-      reason: 'Test violation',
-      status: 'pending',
-      requestedAt: Math.floor(Date.now() / 1000),
-      decidedAt: 0,
-      adminNotes: ''
-    })
-    
-    // Verify initial adminNotes is empty
-    const foundRequest = await system.storage.findOne(
-      'EvictionRequest',
-      MatchExp.atom({ key: 'id', value: ['=', request.id] }),
+    // Get the created user
+    const user = await system.storage.findOne('User',
+      MatchExp.atom({ key: 'email', value: ['=', 'charlie@example.com'] }),
       undefined,
-      ['id', 'adminNotes']
+      ['id']
     )
-    expect(foundRequest.adminNotes).toBe('')
-    
-    // Call ReviewEvictionRequest interaction with admin notes
-    const testNotes = 'This is a test admin note'
-    await controller.callInteraction('reviewEvictionRequest', {
-      user: { id: 'admin-user' },
-      payload: {
-        requestId: request.id,
-        decision: 'approved',
-        adminNotes: testNotes
-      }
-    })
-    
-    // Verify adminNotes is set
-    const updatedRequest = await system.storage.findOne(
-      'EvictionRequest',
-      MatchExp.atom({ key: 'id', value: ['=', request.id] }),
-      undefined,
-      ['id', 'adminNotes']
-    )
-    expect(updatedRequest.adminNotes).toBe(testNotes)
-  })
 
-  test('EvictionRequest.adminNotes remains empty when not provided', async () => {
-    // Create an eviction request
-    const request = await system.storage.create('EvictionRequest', {
-      reason: 'Test violation',
-      status: 'pending',
-      requestedAt: Math.floor(Date.now() / 1000),
-      decidedAt: 0,
-      adminNotes: ''
-    })
-    
-    // Verify initial adminNotes is empty
-    const foundRequest = await system.storage.findOne(
-      'EvictionRequest',
-      MatchExp.atom({ key: 'id', value: ['=', request.id] }),
-      undefined,
-      ['id', 'adminNotes']
-    )
-    expect(foundRequest.adminNotes).toBe('')
-    
-    // Call ReviewEvictionRequest interaction without admin notes
-    await controller.callInteraction('reviewEvictionRequest', {
-      user: { id: 'admin-user' },
+    // Request eviction
+    const requestResult = await controller.callInteraction('RequestEviction', {
+      user: { id: 'admin1', name: 'Admin User', email: 'admin@test.com', role: 'admin' },
       payload: {
-        requestId: request.id,
-        decision: 'rejected'
-        // No adminNotes provided
+        userId: user.id,
+        reason: 'Multiple violations'
       }
     })
-    
-    // Verify adminNotes remains empty
-    const updatedRequest = await system.storage.findOne(
-      'EvictionRequest',
+
+    expect(requestResult.error).toBeUndefined()
+
+    // Get the created request
+    const request = await system.storage.findOne('EvictionRequest',
+      undefined, // Get the first one
+      undefined,
+      ['id', 'processedAt']
+    )
+
+    expect(request).toBeDefined()
+    expect(request.processedAt).toBeNull() // Should be null when pending
+
+    // Approve the request
+    const approveResult = await controller.callInteraction('ApproveEviction', {
+      user: { id: 'admin1', name: 'Admin User', email: 'admin@test.com', role: 'admin' },
+      payload: {
+        requestId: request.id
+      }
+    })
+
+    expect(approveResult.error).toBeUndefined()
+
+    // Check that processedAt was set
+    const updatedRequest = await system.storage.findOne('EvictionRequest',
       MatchExp.atom({ key: 'id', value: ['=', request.id] }),
       undefined,
-      ['id', 'adminNotes']
+      ['id', 'processedAt']
     )
-    expect(updatedRequest.adminNotes).toBe('')
+
+    expect(updatedRequest.processedAt).toBeDefined()
+    expect(typeof updatedRequest.processedAt).toBe('number')
+    expect(updatedRequest.processedAt).toBeGreaterThan(0) // Should be a valid timestamp
   })
 }) 
 

@@ -1,298 +1,171 @@
-# Detailed Requirements Analysis - Dormitory Management System
+# Dormitory Management System - Detailed Requirements Analysis
 
-## 1. Business Overview
-A comprehensive dormitory management system for educational institutions, enabling effective room assignment, discipline tracking, and eviction management processes.
+## Business Context
+The system requires a comprehensive dormitory management solution that handles:
+- User management with role-based permissions
+- Dormitory creation and capacity management
+- User assignment to dormitories with bed allocation
+- Behavior tracking and point deduction system
+- User eviction process with approval workflow
 
-## 2. Data Perspective Analysis
+## Data Perspective Analysis
 
-### 2.1 Core Entities
+### Entities
 
 #### User
-- **Purpose**: Represents all system users with different roles
+- **Purpose**: System users with different roles and permissions
 - **Properties**:
-  - id: string (system-generated)
+  - id: string (system-generated unique identifier)
   - name: string (user's display name)
-  - email: string (unique identifier for login)
+  - email: string (unique login identifier)
   - role: string (admin/dormHead/student)
-  - points: number (behavior points, default 100)
   - status: string (active/evicted)
-  - evictedAt: number (timestamp when evicted, optional)
+  - points: number (behavior points, starts at 100)
+  - createdAt: number (timestamp of account creation)
 
 #### Dormitory
-- **Purpose**: Represents dormitory rooms
+- **Purpose**: Physical dormitory buildings with capacity management
 - **Properties**:
-  - id: string (system-generated)
-  - name: string (dormitory identifier, e.g., "Building A Room 101")
-  - capacity: number (4-6 beds per room)
-  - floor: number (floor number)
-  - building: string (building identifier)
-  - status: string (active/inactive)
-  - createdAt: number (timestamp)
+  - id: string (system-generated unique identifier)
+  - name: string (dormitory name/number)
+  - capacity: number (4-6 beds per dormitory)
+  - status: string (active/full)
+  - createdAt: number (timestamp of creation)
 
 #### Bed
-- **Purpose**: Individual bed within a dormitory
+- **Purpose**: Individual bed spaces within dormitories
 - **Properties**:
-  - id: string (system-generated)
-  - number: string (bed identifier within room, e.g., "A", "B", "C")
-  - status: string (vacant/occupied/maintenance)
-  - assignedAt: number (timestamp when last assigned)
+  - id: string (system-generated unique identifier)
+  - bedNumber: number (1-6 within the dormitory)
+  - status: string (available/occupied)
+  - dormitoryId: string (reference to parent dormitory)
 
-#### ViolationRecord
-- **Purpose**: Track user behavior violations and point deductions
+#### PointDeduction
+- **Purpose**: Track behavior violations and point deductions
 - **Properties**:
-  - id: string (system-generated)
-  - description: string (violation details)
+  - id: string (system-generated unique identifier)
+  - userId: string (user who committed violation)
+  - reason: string (description of violation)
   - points: number (points deducted)
-  - category: string (hygiene/noise/curfew/damage/other)
-  - createdAt: number (timestamp)
-  - recordedBy: string (name of the dormHead who recorded)
+  - createdAt: number (timestamp of deduction)
+  - recordedBy: string (who recorded the violation)
 
 #### EvictionRequest
-- **Purpose**: Formal request to evict a student from dormitory
+- **Purpose**: Track requests to evict users from dormitories
 - **Properties**:
-  - id: string (system-generated)
-  - reason: string (detailed reason for eviction)
+  - id: string (system-generated unique identifier)
+  - userId: string (user to be evicted)
+  - requestedBy: string (dorm head who made request)
+  - reason: string (reason for eviction request)
   - status: string (pending/approved/rejected)
-  - requestedAt: number (timestamp)
-  - decidedAt: number (timestamp when decision made, optional)
-  - adminNotes: string (admin's decision notes, optional)
+  - createdAt: number (timestamp of request)
+  - processedAt: number (timestamp of admin decision)
+  - processedBy: string (admin who processed request)
 
-### 2.2 Entity Relationships
+### Relations
 
-#### UserDormitoryRelation (n:1)
-- **Source**: User (many)
-- **Target**: Dormitory (one)
-- **Source Property**: dormitory
-- **Target Property**: residents
-- **Purpose**: Assigns users to dormitories
+#### UserDormitoryRelation
+- **Type**: n:1 (many users to one dormitory)
+- **Purpose**: Assigns students to dormitories
+- **Source Property**: `dormitory` (on User entity)
+- **Target Property**: `users` (on Dormitory entity)
 - **Properties**:
-  - assignedAt: number (timestamp)
-  - assignedBy: string (admin who made assignment)
+  - assignedAt: number (timestamp of assignment)
+  - assignedBy: string (who made the assignment)
 
-#### UserBedRelation (1:1)
-- **Source**: User (one)
-- **Target**: Bed (one)
-- **Source Property**: bed
-- **Target Property**: occupant
-- **Purpose**: Assigns users to specific beds
+#### UserBedRelation
+- **Type**: 1:1 (one user to one bed)
+- **Purpose**: Assigns specific bed to user
+- **Source Property**: `bed` (on User entity)
+- **Target Property**: `user` (on Bed entity)
 - **Properties**:
-  - assignedAt: number (timestamp)
+  - assignedAt: number (timestamp of bed assignment)
 
-#### DormitoryBedRelation (1:n)
-- **Source**: Dormitory (one)
-- **Target**: Bed (many)
-- **Source Property**: beds
-- **Target Property**: dormitory
+#### DormitoryBedsRelation
+- **Type**: 1:n (one dormitory to many beds)
 - **Purpose**: Links beds to their dormitory
+- **Source Property**: `beds` (on Dormitory entity)
+- **Target Property**: `dormitory` (on Bed entity)
 
-#### DormitoryDormHeadRelation (1:1)
-- **Source**: Dormitory (one)
-- **Target**: User (one, with role='dormHead')
-- **Source Property**: dormHead
-- **Target Property**: managedDormitory
-- **Purpose**: Assigns dormitory head to manage a dormitory
-- **Properties**:
-  - appointedAt: number (timestamp)
-  - appointedBy: string (admin who appointed)
+## Interaction Perspective Analysis
 
-#### UserViolationRelation (1:n)
-- **Source**: User (one)
-- **Target**: ViolationRecord (many)
-- **Source Property**: violations
-- **Target Property**: user
-- **Purpose**: Links violation records to users
+### User Management Operations
+1. **Create User** - Admin creates new user accounts
+2. **Update User Role** - Admin can assign/promote users to dorm head
+3. **View Users** - Admin can view all users, dorm heads can view users in their dormitory
 
-#### UserEvictionRequestRelation (1:n)
-- **Source**: User (one)
-- **Target**: EvictionRequest (many)
-- **Source Property**: evictionRequests
-- **Target Property**: targetUser
-- **Purpose**: Links eviction requests to target users
+### Dormitory Management Operations
+1. **Create Dormitory** - Admin creates new dormitories with specified capacity
+2. **View Dormitories** - All users can view dormitory list and details
+3. **Update Dormitory** - Admin can modify dormitory details
 
-#### DormHeadEvictionRequestRelation (1:n)
-- **Source**: User (one, dormHead)
-- **Target**: EvictionRequest (many)
-- **Source Property**: submittedEvictionRequests
-- **Target Property**: requestedBy
-- **Purpose**: Links eviction requests to the dormHead who submitted them
+### Assignment Operations
+1. **Assign User to Dormitory** - Admin assigns students to available dormitories
+2. **Assign User to Bed** - Admin assigns specific bed within dormitory
+3. **View Assignments** - Users can view their assignment, admin can view all
 
-## 3. Interaction Perspective Analysis
+### Point System Operations
+1. **Deduct Points** - Dorm heads can deduct points for rule violations
+2. **View Points** - Users can view their points, admins can view all points
+3. **View Point History** - Users can see their deduction history
 
-### 3.1 Administrator Operations
+### Eviction Process Operations
+1. **Request Eviction** - Dorm heads can request eviction when points are low
+2. **Approve Eviction** - Admin can approve eviction requests
+3. **Reject Eviction** - Admin can reject eviction requests
+4. **View Eviction Requests** - Admin can view all pending requests
 
-#### CreateDormitory
-- **Purpose**: Create a new dormitory room
-- **Payload**: name, capacity, floor, building
-- **Validations**: 
-  - Capacity must be 4-6
-  - Name must be unique
-- **Effects**: Creates Dormitory and associated Beds
+## Permission Requirements
 
-#### AppointDormHead
-- **Purpose**: Appoint a user as dormitory head
-- **Payload**: userId, dormitoryId
-- **Validations**:
-  - User must be student role
-  - Dormitory cannot already have a dormHead
-  - User cannot already be a dormHead
-- **Effects**: 
-  - Updates user role to 'dormHead'
-  - Creates DormitoryDormHeadRelation
+### Admin Permissions
+- Full access to all operations
+- Can create/update/delete dormitories
+- Can assign users to dormitories and beds
+- Can manage user roles
+- Can approve/reject eviction requests
+- Can view all system data
 
-#### AssignUserToDormitory
-- **Purpose**: Assign a student to a dormitory and bed
-- **Payload**: userId, dormitoryId, bedId
-- **Validations**:
-  - User must not be already assigned
-  - Bed must be vacant
-  - Bed must belong to specified dormitory
-  - User must not be evicted
-- **Effects**:
-  - Creates UserDormitoryRelation
-  - Creates UserBedRelation
-  - Updates bed status to 'occupied'
+### Dorm Head Permissions
+- Can view users in their dormitory
+- Can deduct points from users in their dormitory
+- Can request eviction of users with low points
+- Can view dormitory details and assignments
+- Cannot modify dormitory settings
+- Cannot assign users to other dormitories
 
-#### ReviewEvictionRequest
-- **Purpose**: Approve or reject eviction request
-- **Payload**: requestId, decision (approve/reject), adminNotes
-- **Validations**:
-  - Request must be pending
-- **Effects**:
-  - Updates request status
-  - If approved: Updates user status to 'evicted', removes from dormitory and bed
+### Student Permissions
+- Can view their own profile and assignments
+- Can view their points and point history
+- Can view available dormitories
+- Cannot modify any system data
+- Cannot view other users' private data
 
-### 3.2 Dormitory Head Operations
+## Business Rules and Constraints
 
-#### RecordViolation
-- **Purpose**: Record a violation for a resident
-- **Payload**: userId, description, points, category
-- **Validations**:
-  - User must be in dormHead's dormitory
-  - Points must be positive
-  - User must not already be evicted
-- **Effects**:
-  - Creates ViolationRecord
-  - Deducts points from user
+### Assignment Rules
+- Each user can only be assigned to one dormitory
+- Each user can only occupy one bed
+- Dormitory capacity cannot be exceeded (4-6 users)
+- Beds must exist within a dormitory
+- Users cannot be assigned to full dormitories
 
-#### SubmitEvictionRequest
-- **Purpose**: Request eviction of a problematic resident
-- **Payload**: userId, reason
-- **Validations**:
-  - User must be in dormHead's dormitory
-  - User must have low points (< 60)
-  - No pending eviction request for user
-- **Effects**: Creates EvictionRequest with pending status
-
-### 3.3 Student Operations
-
-#### ViewMyDormitory
-- **Purpose**: View assigned dormitory information
-- **Query**: Returns user's dormitory, bed, roommates
-
-#### ViewMyViolations
-- **Purpose**: View violation history and current points
-- **Query**: Returns user's violations and current points
-
-#### ViewMyEvictionStatus
-- **Purpose**: Check if there's any eviction request
-- **Query**: Returns pending/approved eviction requests
-
-## 4. Business Rules
-
-### 4.1 Point System
-- All users start with 100 points
+### Point System Rules
+- Users start with 100 points
+- Point deductions are recorded with reason and timestamp
+- Only dorm heads can deduct points from users in their dormitory
 - Points cannot go below 0
-- Point deduction thresholds:
-  - Minor violations (noise, minor hygiene): 5-10 points
-  - Medium violations (curfew, repeated offenses): 15-25 points
-  - Major violations (damage, safety): 30-50 points
-- Eviction eligibility: < 60 points
+- Point history cannot be modified
 
-### 4.2 Dormitory Assignment Rules
-- One user can only be assigned to one dormitory
-- One user can only occupy one bed
-- Evicted users cannot be reassigned without admin approval
-- Dormitory capacity must be strictly enforced (4-6 beds)
+### Eviction Rules
+- Only dorm heads can request eviction
+- Eviction can only be requested when user points are below threshold (e.g., 50)
+- Only admins can approve/reject eviction requests
+- Approved evictions remove user from dormitory and bed assignment
+- Rejected requests are recorded but no action taken
 
-### 4.3 Role Hierarchy
-- **Admin**: Full system access, all operations
-- **DormHead**: Manage assigned dormitory, record violations, request evictions
-- **Student**: View own information only
-
-### 4.4 Eviction Process
-1. User accumulates violations (points < 60)
-2. DormHead submits eviction request
-3. Admin reviews and decides
-4. If approved, user is immediately evicted and bed becomes vacant
-5. Evicted user's status permanently marked
-
-## 5. Computed Properties
-
-### User Computations
-- **currentPoints**: Calculated from initial 100 minus sum of violations
-- **isEligibleForEviction**: Computed based on points < 60
-- **dormitoryName**: Retrieved through UserDormitoryRelation
-- **bedIdentifier**: Retrieved through UserBedRelation
-
-### Dormitory Computations
-- **occupancy**: Count of occupied beds
-- **availableBeds**: Capacity minus occupancy
-- **occupancyRate**: Percentage of beds occupied
-- **residentsList**: List of all residents through relations
-
-### Statistical Computations
-- **totalViolationsByCategory**: Group violations by category
-- **averagePointsPerDormitory**: Average behavior points by dormitory
-- **evictionRate**: Percentage of evicted users
-
-## 6. State Management
-
-### User States
-- **active**: Normal resident status
-- **warned**: Points below 70
-- **evictionPending**: Has pending eviction request
-- **evicted**: Removed from dormitory
-
-### Bed States
-- **vacant**: Available for assignment
-- **occupied**: Assigned to a user
-- **maintenance**: Temporarily unavailable
-
-### EvictionRequest States
-- **pending**: Awaiting admin review
-- **approved**: Eviction executed
-- **rejected**: Request denied
-
-## 7. Permission Matrix
-
-| Operation | Admin | DormHead | Student |
-|-----------|-------|----------|---------|
-| CreateDormitory | ✓ | ✗ | ✗ |
-| AppointDormHead | ✓ | ✗ | ✗ |
-| AssignUserToDormitory | ✓ | ✗ | ✗ |
-| ReviewEvictionRequest | ✓ | ✗ | ✗ |
-| RecordViolation | ✗ | ✓ (own dorm) | ✗ |
-| SubmitEvictionRequest | ✗ | ✓ (own dorm) | ✗ |
-| ViewMyDormitory | ✓ | ✓ | ✓ |
-| ViewMyViolations | ✓ | ✓ | ✓ (own) |
-| ViewMyEvictionStatus | ✓ | ✓ | ✓ (own) |
-
-## 8. Data Validation Requirements
-
-### Required Fields
-- All entity names and identifiers
-- Violation points and descriptions
-- Eviction reasons
-- Assignment timestamps
-
-### Format Validations
-- Email must be valid format
-- Points must be non-negative integers
-- Capacity must be 4-6
-- Timestamps must be valid Unix timestamps
-
-### Referential Integrity
-- Cannot delete dormitory with residents
-- Cannot delete user with pending eviction requests
-- Cannot assign to non-existent beds
-- Cannot violate unique constraints (one bed per user)
+### Data Integrity Rules
+- All timestamps are automatically generated
+- User emails must be unique
+- Dormitory names must be unique
+- Bed numbers must be unique within a dormitory
+- Soft delete for users (status change instead of deletion)

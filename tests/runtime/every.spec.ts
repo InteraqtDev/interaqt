@@ -165,6 +165,366 @@ describe('Every computed handle', () => {
     
   });
 
+  test('should recompute when relation properties change', async () => {
+    // Simple test to verify Every computation recomputes when relation properties change
+    
+    // Define entities
+    const schoolEntity = Entity.create({
+      name: 'School',
+      properties: [
+        Property.create({name: 'name', type: 'string'})
+      ]
+    });
+    
+    const studentEntity = Entity.create({
+      name: 'Student',
+      properties: [
+        Property.create({name: 'name', type: 'string'})
+      ]
+    });
+    
+    // Create relation with a property
+    const enrollmentRelation = Relation.create({
+      source: schoolEntity,
+      sourceProperty: 'students',
+      target: studentEntity,
+      targetProperty: 'school',
+      name: 'Enrollment',
+      type: '1:n',
+      properties: [
+        Property.create({name: 'passed', type: 'boolean', defaultValue: () => false}),
+        Property.create({name: 'grade', type: 'number', defaultValue: () => 0})
+      ]
+    });
+    
+    // Add Every computation that checks if all students passed
+    schoolEntity.properties.push(
+      Property.create({
+        name: 'allStudentsPassed',
+        type: 'boolean',
+        computation: Every.create({
+          record: enrollmentRelation,
+          attributeQuery: ['passed'],
+          callback: (relation: any) => {
+            return relation.passed === true;
+          },
+          notEmpty: true
+        })
+      })
+    );
+    
+    const entities = [schoolEntity, studentEntity];
+    const relations = [enrollmentRelation];
+    
+    // Setup system and controller
+    const system = new MonoSystem(new PGLiteDB());
+    const controller = new Controller({
+      system: system,
+      entities: entities,
+      relations: relations,
+      activities: [],
+      interactions: []
+    });
+    await controller.setup(true);
+    
+    // Create test data
+    const school = await system.storage.create('School', { name: 'Test School' });
+    
+    const student1 = await system.storage.create('Student', { name: 'Alice' });
+    const student2 = await system.storage.create('Student', { name: 'Bob' });
+    
+    // Create enrollments with initial values
+    const enrollment1 = await system.storage.create('Enrollment', {
+      source: { id: school.id },
+      target: { id: student1.id },
+      passed: false,
+      grade: 70
+    });
+    
+    const enrollment2 = await system.storage.create('Enrollment', {
+      source: { id: school.id },
+      target: { id: student2.id },
+      passed: false,
+      grade: 60
+    });
+    
+    // Check initial state
+    let schoolData = await system.storage.findOne('School',
+      MatchExp.atom({key: 'id', value: ['=', school.id]}),
+      undefined,
+      ['id', 'name', 'allStudentsPassed']
+    );
+    
+    expect(schoolData.allStudentsPassed).toBe(false); // No students passed (returns 0 when false)
+    
+    // Update first enrollment - student passed
+    await system.storage.update('Enrollment',
+      MatchExp.atom({key: 'id', value: ['=', enrollment1.id]}),
+      { passed: true, grade: 85 }
+    );
+    
+    // Check after first update
+    schoolData = await system.storage.findOne('School',
+      MatchExp.atom({key: 'id', value: ['=', school.id]}),
+      undefined,
+      ['id', 'name', 'allStudentsPassed']
+    );
+    
+    expect(schoolData.allStudentsPassed).toBe(false); // Still not all passed (returns 0 when false)
+    
+    // Update second enrollment - student passed
+    await system.storage.update('Enrollment',
+      MatchExp.atom({key: 'id', value: ['=', enrollment2.id]}),
+      { passed: true, grade: 80 }
+    );
+    
+    // Check after second update
+    schoolData = await system.storage.findOne('School',
+      MatchExp.atom({key: 'id', value: ['=', school.id]}),
+      undefined,
+      ['id', 'name', 'allStudentsPassed']
+    );
+    
+    expect(schoolData.allStudentsPassed).toBe(true); // All students have now passed (returns 1 when true)
+    
+    // Update one enrollment back to failed
+    await system.storage.update('Enrollment',
+      MatchExp.atom({key: 'id', value: ['=', enrollment1.id]}),
+      { passed: false, grade: 50 }
+    );
+    
+    // Check after third update
+    schoolData = await system.storage.findOne('School',
+      MatchExp.atom({key: 'id', value: ['=', school.id]}),
+      undefined,
+      ['id', 'name', 'allStudentsPassed']
+    );
+    
+    expect(schoolData.allStudentsPassed).toBe(false); // Not all passed anymore (returns 0 when false)
+  });
+
+  test('should recompute when relation properties change - complex scenario', async () => {
+    // This test verifies that Every computation correctly recomputes when 
+    // properties on the relation itself (not the target entity) change
+    
+    // Define entities
+    const companyEntity = Entity.create({
+      name: 'Company',
+      properties: [
+        Property.create({name: 'name', type: 'string'})
+      ]
+    });
+    
+    const employeeEntity = Entity.create({
+      name: 'Employee',
+      properties: [
+        Property.create({name: 'name', type: 'string'}),
+        Property.create({name: 'department', type: 'string'})
+      ]
+    });
+    
+    // Create relation with properties for assessment tracking
+    const companyEmployeeRelation = Relation.create({
+      source: companyEntity,
+      sourceProperty: 'employees',
+      target: employeeEntity,
+      targetProperty: 'company',
+      name: 'CompanyEmployee',
+      type: '1:n',
+      properties: [
+        Property.create({name: 'passedAssessment', type: 'boolean', defaultValue: () => false}),
+        Property.create({name: 'assessmentScore', type: 'number', defaultValue: () => 0}),
+        Property.create({name: 'assessmentDate', type: 'string'})
+      ]
+    });
+    
+    // Add Every computation that depends on relation property
+    companyEntity.properties.push(
+      Property.create({
+        name: 'allEmployeesPassed',
+        type: 'boolean',
+        computation: Every.create({
+          record: companyEmployeeRelation,
+          // Include the relation property in attributeQuery
+          attributeQuery: ['passedAssessment'],
+          callback: (relation: any) => {
+            // Check the relation's own property, not the target entity's property
+            return relation.passedAssessment === true;
+          },
+          notEmpty: true
+        })
+      }),
+      Property.create({
+        name: 'allEmployeesHighScore',
+        type: 'boolean',
+        computation: Every.create({
+          record: companyEmployeeRelation,
+          attributeQuery: ['assessmentScore'],
+          callback: (relation: any) => {
+            // Check if assessment score is above 80
+            return relation.assessmentScore >= 80;
+          },
+          notEmpty: true
+        })
+      }),
+      Property.create({
+        name: 'allEngineersPassedWithHighScore',
+        type: 'boolean',
+        computation: Every.create({
+          record: companyEmployeeRelation,
+          attributeQuery: ['passedAssessment', 'assessmentScore', ['target', {attributeQuery: ['department']}]],
+          callback: (relation: any) => {
+            // Only check engineers, and they must pass with score >= 85
+            if (relation.target.department !== 'Engineering') {
+              return true; // Non-engineers are ignored
+            }
+            return relation.passedAssessment === true && relation.assessmentScore >= 85;
+          },
+          notEmpty: false
+        })
+      })
+    );
+    
+    const entities = [companyEntity, employeeEntity];
+    const relations = [companyEmployeeRelation];
+    
+    // Setup system and controller
+    const system = new MonoSystem(new PGLiteDB());
+    const controller = new Controller({
+      system: system,
+      entities: entities,
+      relations: relations,
+      activities: [],
+      interactions: []
+    });
+    await controller.setup(true);
+    
+    // Create test data
+    const company = await system.storage.create('Company', { name: 'TechCorp' });
+    
+    const employee1 = await system.storage.create('Employee', { 
+      name: 'Alice',
+      department: 'Engineering'
+    });
+    
+    const employee2 = await system.storage.create('Employee', { 
+      name: 'Bob',
+      department: 'Sales'
+    });
+    
+    const employee3 = await system.storage.create('Employee', { 
+      name: 'Charlie',
+      department: 'Marketing'
+    });
+    
+    // Create relations with initial assessment status
+    const relation1 = await system.storage.create('CompanyEmployee', {
+      source: { id: company.id },
+      target: { id: employee1.id },
+      passedAssessment: false,
+      assessmentScore: 75,
+      assessmentDate: '2024-01-15'
+    });
+    
+    const relation2 = await system.storage.create('CompanyEmployee', {
+      source: { id: company.id },
+      target: { id: employee2.id },
+      passedAssessment: false,
+      assessmentScore: 60,
+      assessmentDate: '2024-01-16'
+    });
+    
+    const relation3 = await system.storage.create('CompanyEmployee', {
+      source: { id: company.id },
+      target: { id: employee3.id },
+      passedAssessment: true,
+      assessmentScore: 85,
+      assessmentDate: '2024-01-17'
+    });
+    
+    // Check initial state
+    let companyData = await system.storage.findOne('Company',
+      MatchExp.atom({key: 'id', value: ['=', company.id]}),
+      undefined,
+      ['id', 'name', 'allEmployeesPassed', 'allEmployeesHighScore']
+    );
+    
+    expect(companyData.allEmployeesPassed).toBe(false); // Only Charlie passed (returns 0 when false)
+    expect(companyData.allEmployeesHighScore).toBe(false); // Only Charlie has score >= 80 (returns 0 when false)
+    
+    // Update Alice's assessment - she passed
+    await system.storage.update('CompanyEmployee',
+      MatchExp.atom({key: 'id', value: ['=', relation1.id]}),
+      { passedAssessment: true, assessmentScore: 90 }
+    );
+    
+    // Check after first update
+    companyData = await system.storage.findOne('Company',
+      MatchExp.atom({key: 'id', value: ['=', company.id]}),
+      undefined,
+      ['id', 'name', 'allEmployeesPassed', 'allEmployeesHighScore']
+    );
+    
+    expect(companyData.allEmployeesPassed).toBe(false); // Bob still hasn't passed (returns 0 when false)
+    expect(companyData.allEmployeesHighScore).toBe(false); // Bob's score is still 60 (returns 0 when false)
+    
+    // Update Bob's assessment - he passed with high score
+    await system.storage.update('CompanyEmployee',
+      MatchExp.atom({key: 'id', value: ['=', relation2.id]}),
+      { passedAssessment: true, assessmentScore: 88 }
+    );
+    
+    // Check after second update
+    companyData = await system.storage.findOne('Company',
+      MatchExp.atom({key: 'id', value: ['=', company.id]}),
+      undefined,
+      ['id', 'name', 'allEmployeesPassed', 'allEmployeesHighScore']
+    );
+    
+    expect(companyData.allEmployeesPassed).toBe(true); // All employees have now passed (returns 1 when true)
+    expect(companyData.allEmployeesHighScore).toBe(true); // All have score >= 80 (returns 1 when true)
+    
+    // Update Charlie's score to fail the high score requirement
+    await system.storage.update('CompanyEmployee',
+      MatchExp.atom({key: 'id', value: ['=', relation3.id]}),
+      { assessmentScore: 70 }
+    );
+    
+    // Check after third update
+    companyData = await system.storage.findOne('Company',
+      MatchExp.atom({key: 'id', value: ['=', company.id]}),
+      undefined,
+      ['id', 'name', 'allEmployeesPassed', 'allEmployeesHighScore']
+    );
+    
+    expect(companyData.allEmployeesPassed).toBe(true); // Still all passed (returns 1 when true)
+    expect(companyData.allEmployeesHighScore).toBe(false); // Charlie's score dropped below 80 (returns 0 when false)
+    
+    // Check the combined condition (allEngineersPassedWithHighScore)
+    companyData = await system.storage.findOne('Company',
+      MatchExp.atom({key: 'id', value: ['=', company.id]}),
+      undefined,
+      ['id', 'name', 'allEngineersPassedWithHighScore']
+    );
+    
+    expect(companyData.allEngineersPassedWithHighScore).toBe(true); // Alice (engineer) passed with score 90 (returns 1 when true)
+    
+    // Lower Alice's score
+    await system.storage.update('CompanyEmployee',
+      MatchExp.atom({key: 'id', value: ['=', relation1.id]}),
+      { assessmentScore: 82 }
+    );
+    
+    // Check after lowering engineer's score
+    companyData = await system.storage.findOne('Company',
+      MatchExp.atom({key: 'id', value: ['=', company.id]}),
+      undefined,
+      ['id', 'name', 'allEngineersPassedWithHighScore']
+    );
+    
+    expect(companyData.allEngineersPassedWithHighScore).toBe(false); // Alice's score is now below 85 (returns 0 when false)
+  });
+
   test('should be true when every request with n:n items of a user is handled', async () => {
     const userEntity = Entity.create({
         name: 'User',

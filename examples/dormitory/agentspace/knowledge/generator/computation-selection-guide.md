@@ -33,57 +33,86 @@ Before analyzing, understand ALL available computation types:
 
 ### Step 1: Create Analysis Document
 
-Before implementing ANY computations, create a document at `docs/computation-analysis.md` with this structure:
+Before implementing ANY computations, create a document at `docs/computation-analysis.json` with this structure:
 
-```markdown
-# Computation Analysis
+**🔴 CRITICAL: Dependencies Format**
+When documenting dependencies, use the following format:
 
-## Entity: [EntityName]
+**Basic Rules:**
+- **Entity/Relation properties**: `EntityName.propertyName` or `RelationName.propertyName`
+- **Self-reference properties**: Use `_self.propertyName` when a property depends on other properties of the same entity
+- **Multiple properties from same entity**: List ALL separately, e.g., `["User.name", "User.email", "User.role"]`
+- **Dictionary**: `DictionaryName` (without dot notation)
+- **Symmetric Relations ONLY**: Use `RelationName(source)` or `RelationName(target)` to indicate direction
+  - A relation is symmetric when source and target are the same entity type (e.g., User follows User)
+  - Non-symmetric relations (e.g., User→Post) do NOT need direction notation
+- **Interactions**: Use the interaction name directly, e.g., `CreateUser`, `UpdatePost`
+- **Special entities**: `InteractionEventEntity` for interaction events
 
-### Entity-Level Analysis
-- **Purpose**: [What this entity represents]
-- **Creation Source**: [How are instances created? Via interaction/transform/etc]
-- **Update Requirements**: [What fields need updates and when]
-- **Deletion Strategy**: [Hard delete or soft delete with status]
+**🔴 MANDATORY: Specific Property Declaration**
+- When depending on regular entities/relations, you MUST list ALL specific properties used in the computation
+- ONLY exceptions: Interactions and InteractionEventEntity don't require property specification
+- ❌ WRONG: `"dependencies": ["User"]` - too vague
+- ✅ CORRECT: `"dependencies": ["User.name", "User.email", "User.status"]` - specific properties
 
-### Property Analysis
+Examples:
+- `"dependencies": ["User.status", "User.role"]` - depends on specific User properties
+- `"dependencies": ["_self.price", "_self.discountRate"]` - property depends on other properties of same entity
+- `"dependencies": ["UserFollowRelation(source).time"]` - symmetric relation needs direction
+- `"dependencies": ["UserPostRelation"]` - non-symmetric relation doesn't need direction
+- `"dependencies": ["SystemConfig", "CreateOrder"]` - Dictionary and Interaction don't need properties
 
-#### Property: [propertyName]
-- **Type**: [string/number/boolean/etc]
-- **Purpose**: [What this property represents]
-- **Data Source**: [Where does the value come from]
-- **Update Frequency**: [Never/On specific interactions/Real-time]
-- **Strong Consistency**: [Yes/No - Is this value ALWAYS deterministically derived from other data?]
-- **Computation Decision**: [Selected computation type]
-- **Reasoning**: [Why this computation was chosen]
-- **Dependencies**: [If computation needed: List all required data - entities, relations, properties, interactions]
-- **Calculation Method**: [If computation needed: Brief description of how the value is calculated]
-
-[Repeat for each property]
-
-### Entity Computation Decision
-- **Type**: [Transform/None]
-- **Source**: [InteractionEventEntity/Other entity/etc]
-- **Reasoning**: [Why this computation was chosen]
-- **Dependencies**: [If computation needed: List trigger events and required data]
-- **Calculation Method**: [If computation needed: When and how entities are created]
-
-[Repeat for each entity]
-
-## Relation: [RelationName]
-
-### Relation Analysis
-- **Purpose**: [What this relation represents]
-- **Creation**: [When/how the relation is created]
-- **Deletion Requirements**: [Never/Hard delete when.../Soft delete when...]
-- **Update Requirements**: [What properties might need updates]
-- **State Management**: [If status field needed, describe states]
-- **Computation Decision**: [Transform/StateMachine/None]
-- **Reasoning**: [Why this computation was chosen]
-- **Dependencies**: [If computation needed: Interactions, entities, existing records]
-- **Calculation Method**: [If computation needed: When created, how state changes]
-
-[Repeat for each relation]
+```json
+{
+  "entities": [
+    {
+      "name": "EntityName",
+      "entityLevelAnalysis": {
+        "purpose": "What this entity represents",
+        "creationSource": "How are instances created? Via interaction/transform/etc",
+        "updateRequirements": "What fields need updates and when",
+        "deletionStrategy": "Hard delete or soft delete with status"
+      },
+      "propertyAnalysis": [
+        {
+          "propertyName": "propertyName",
+          "type": "string/number/boolean/etc",
+          "purpose": "What this property represents",
+          "dataSource": "Where does the value come from",
+          "updateFrequency": "Never/On specific interactions/Real-time",
+          "strongConsistency": true,
+          "computationDecision": "Selected computation type",
+          "reasoning": "Why this computation was chosen",
+          "dependencies": ["EntityName.field1", "EntityName.field2", "RelationName.propertyName", "InteractionName"],
+          "calculationMethod": "Brief description of how the value is calculated"
+        }
+      ],
+      "entityComputationDecision": {
+        "type": "Transform/None",
+        "source": "InteractionEventEntity/Other entity/etc",
+        "reasoning": "Why this computation was chosen",
+        "dependencies": ["CreateEntityInteraction", "InteractionEventEntity"],
+        "calculationMethod": "When and how entities are created"
+      }
+    }
+  ],
+  "relations": [
+    {
+      "name": "RelationName",
+      "relationAnalysis": {
+        "purpose": "What this relation represents",
+        "creation": "When/how the relation is created",
+        "deletionRequirements": "Never/Hard delete when.../Soft delete when...",
+        "updateRequirements": "What properties might need updates",
+        "stateManagement": "If status field needed, describe states",
+        "computationDecision": "Transform/StateMachine/None",
+        "reasoning": "Why this computation was chosen",
+        "dependencies": ["CreateRelationInteraction", "User.id", "Post.id"],
+        "calculationMethod": "When created, how state changes"
+      }
+    }
+  ]
+}
 ```
 
 ## Step 2: Entity-Level Decision Tree
@@ -364,14 +393,16 @@ const UserDormitoryRelation = Relation.create({
 
 ### Common Relation Scenarios
 
-| Scenario | Creation | Deletion | Pattern to Use |
-|----------|----------|----------|----------------|
-| Article author | With Article | Never | No computation |
-| User likes post | Via interaction | Via unlike (no history needed) | StateMachine only (hard delete) |
-| Order items | With Order | With Order | No computation |
-| Friend request | Via interaction | Via unfriend (show history) | Transform + status StateMachine |
-| User follows user | Via interaction | Via unfollow (no history) | StateMachine only (hard delete) |
-| Role assignment | Via interaction | Via role change (audit needed) | Transform + status StateMachine |
+| Scenario | Creation | Deletion | Pattern to Use | Symmetric? |
+|----------|----------|----------|----------------|------------|
+| Article author | With Article | Never | No computation | No (User→Article) |
+| User likes post | Via interaction | Via unlike (no history needed) | StateMachine only (hard delete) | No (User→Post) |
+| Order items | With Order | With Order | No computation | No (Order→Item) |
+| Friend request | Via interaction | Via unfriend (show history) | Transform + status StateMachine | Yes (User→User)* |
+| User follows user | Via interaction | Via unfollow (no history) | StateMachine only (hard delete) | Yes (User→User)* |
+| Role assignment | Via interaction | Via role change (audit needed) | Transform + status StateMachine | No (User→Role) |
+
+*Symmetric relations require direction notation in dependencies: `UserFollowRelation(source)` or `UserFollowRelation(target)`
 
 ### 🔴 Critical Questions for Every Relation
 
@@ -559,7 +590,7 @@ Property.create({
 
 ### Pattern 2: Aggregations
 ```typescript
-// Count related records
+// Count related records (non-symmetric relation)
 Property.create({
   name: 'commentCount',
   type: 'number',
@@ -742,121 +773,140 @@ const activeUserIds = Dictionary.create({
 
 For EACH entity, document your analysis:
 
-```markdown
-## Entity: Order
-
-### Entity-Level Analysis
-- **Purpose**: Customer orders in the e-commerce system
-- **Creation Source**: Created via CreateOrder interaction
-- **Update Requirements**: Status updates, payment confirmation, shipping info
-- **Deletion Strategy**: Soft delete with status (cancelled)
-
-### Property Analysis
-
-#### Property: id
-- **Type**: string
-- **Purpose**: Unique identifier
-- **Data Source**: System-generated
-- **Update Frequency**: Never
-- **Computation Decision**: None (system handles)
-- **Reasoning**: IDs are auto-generated by the framework
-
-#### Property: orderNumber
-- **Type**: string
-- **Purpose**: Human-readable order reference
-- **Data Source**: CreateOrder interaction (generated)
-- **Update Frequency**: Never
-- **Computation Decision**: None (set during creation)
-- **Reasoning**: Generated once during creation, never changes
-
-#### Property: status
-- **Type**: string
-- **Purpose**: Order fulfillment status
-- **Data Source**: State transitions
-- **Update Frequency**: On specific interactions (PayOrder, ShipOrder, DeliverOrder, CancelOrder)
-- **Strong Consistency**: No - User-driven state transitions, not derived from other data
-- **Computation Decision**: StateMachine
-- **Reasoning**: Has defined states (pending, paid, shipped, delivered, cancelled) with clear transitions
-- **Dependencies**: Interactions: PayOrder, ShipOrder, DeliverOrder, CancelOrder; Current status value
-- **Calculation Method**: State transitions triggered by interactions - pending→paid (PayOrder), paid→shipped (ShipOrder), shipped→delivered (DeliverOrder), any→cancelled (CancelOrder)
-
-#### Property: totalAmount
-- **Type**: number
-- **Purpose**: Total order value
-- **Data Source**: Sum of order items
-- **Update Frequency**: When items added/removed/updated
-- **Strong Consistency**: Yes - Always equals sum of (price × quantity) for all items
-- **Computation Decision**: WeightedSummation
-- **Reasoning**: Need to calculate quantity × price for each item
-- **Dependencies**: OrderItemRelation (direction: source), Item entity (price, quantity properties)
-- **Calculation Method**: Sum of (item.price × item.quantity) for all related OrderItems
-
-#### Property: itemCount
-- **Type**: number
-- **Purpose**: Number of items in order
-- **Data Source**: Count of OrderItemRelation
-- **Update Frequency**: Automatic when items added/removed
-- **Strong Consistency**: Yes - Always equals the count of related items
-- **Computation Decision**: Count
-- **Reasoning**: Direct count of related OrderItem entities
-- **Dependencies**: OrderItemRelation (direction: source)
-- **Calculation Method**: Count all OrderItemRelation records where this Order is the source
-
-#### Property: updatedAt
-- **Type**: number
-- **Purpose**: Last modification timestamp
-- **Data Source**: Any order update interaction
-- **Update Frequency**: On any change
-- **Strong Consistency**: No - Updated based on user interactions, not derived from data
-- **Computation Decision**: StateMachine with computeValue
-- **Reasoning**: Updates to current timestamp on any state change
-- **Dependencies**: All order-modifying interactions (UpdateOrder, PayOrder, ShipOrder, etc.)
-- **Calculation Method**: Set to Date.now() whenever any state transition occurs
-
-### Entity Computation Decision
-- **Type**: Transform
-- **Source**: InteractionEventEntity
-- **Reasoning**: Orders are created via CreateOrder interaction
-- **Dependencies**: CreateOrder interaction event, user context, payload data
-- **Calculation Method**: When CreateOrder interaction fires, create new Order entity with data from event.payload
-
-## Relation: UserOrderRelation
-
-### Relation Analysis
-- **Purpose**: Links users to their orders (order history)
-- **Creation**: Created automatically when Order is created
-- **Deletion Requirements**: Never deleted (maintain order history)
-- **Update Requirements**: No property updates needed
-- **State Management**: No status needed
-- **Computation Decision**: None
-- **Reasoning**: Created as part of Order creation via entity reference
-- **Dependencies**: N/A (created with Order entity)
-- **Calculation Method**: N/A (automatic with Order creation)
-
-## Relation: OrderFavoriteRelation
-
-### Relation Analysis
-- **Purpose**: Users can favorite orders for quick reorder
-- **Creation**: Via user interaction on existing orders
-- **Deletion Requirements**: Hard delete when user unfavorites
-- **Update Requirements**: No property updates
-- **State Management**: No status (existence = favorited)
-- **Computation Decision**: StateMachine
-- **Reasoning**: Need both creation and deletion capability
-- **Dependencies**: FavoriteOrder and UnfavoriteOrder interactions, existing User and Order entities
-- **Calculation Method**: Create relation on FavoriteOrder interaction, delete (hard) on UnfavoriteOrder interaction
-
-## Dictionary: DailyOrderStats
-
-### Dictionary-Level Analysis
-- **Purpose**: Daily order statistics for dashboard
-- **Type**: object
-- **Collection**: false
-- **Update Frequency**: Real-time as orders change
-- **Computation Decision**: Custom
-- **Reasoning**: Complex aggregation requiring multiple calculations (count by status, total revenue, average order value)
-- **Dependencies**: All Order entities, Order status property, Order totalAmount property
-- **Calculation Method**: Aggregate all orders - group by status for counts, sum totalAmount for revenue, calculate average order value as revenue/count
+```json
+{
+  "entities": [
+    {
+      "name": "Order",
+      "entityLevelAnalysis": {
+        "purpose": "Customer orders in the e-commerce system",
+        "creationSource": "Created via CreateOrder interaction",
+        "updateRequirements": "Status updates, payment confirmation, shipping info",
+        "deletionStrategy": "Soft delete with status (cancelled)"
+      },
+      "propertyAnalysis": [
+        {
+          "propertyName": "id",
+          "type": "string",
+          "purpose": "Unique identifier",
+          "dataSource": "System-generated",
+          "updateFrequency": "Never",
+          "computationDecision": "None",
+          "reasoning": "IDs are auto-generated by the framework"
+        },
+        {
+          "propertyName": "orderNumber",
+          "type": "string",
+          "purpose": "Human-readable order reference",
+          "dataSource": "CreateOrder interaction (generated)",
+          "updateFrequency": "Never",
+          "computationDecision": "None",
+          "reasoning": "Generated once during creation, never changes"
+        },
+        {
+          "propertyName": "status",
+          "type": "string",
+          "purpose": "Order fulfillment status",
+          "dataSource": "State transitions",
+          "updateFrequency": "On specific interactions (PayOrder, ShipOrder, DeliverOrder, CancelOrder)",
+          "strongConsistency": false,
+          "computationDecision": "StateMachine",
+          "reasoning": "Has defined states (pending, paid, shipped, delivered, cancelled) with clear transitions",
+          "dependencies": ["PayOrder", "ShipOrder", "DeliverOrder", "CancelOrder"],
+          "calculationMethod": "State transitions triggered by interactions - pending→paid (PayOrder), paid→shipped (ShipOrder), shipped→delivered (DeliverOrder), any→cancelled (CancelOrder)"
+        },
+        {
+          "propertyName": "totalAmount",
+          "type": "number",
+          "purpose": "Total order value",
+          "dataSource": "Sum of order items",
+          "updateFrequency": "When items added/removed/updated",
+          "strongConsistency": true,
+          "computationDecision": "WeightedSummation",
+          "reasoning": "Need to calculate quantity × price for each item",
+          "dependencies": ["OrderItemRelation.status", "Item.price", "Item.quantity"],
+          "calculationMethod": "Sum of (item.price × item.quantity) for all related OrderItems"
+        },
+        {
+          "propertyName": "itemCount",
+          "type": "number",
+          "purpose": "Number of items in order",
+          "dataSource": "Count of OrderItemRelation",
+          "updateFrequency": "Automatic when items added/removed",
+          "strongConsistency": true,
+          "computationDecision": "Count",
+          "reasoning": "Direct count of related OrderItem entities",
+          "dependencies": ["OrderItemRelation"],
+          "calculationMethod": "Count all OrderItemRelation records where this Order is the source"
+        },
+        {
+          "propertyName": "updatedAt",
+          "type": "number",
+          "purpose": "Last modification timestamp",
+          "dataSource": "Any order update interaction",
+          "updateFrequency": "On any change",
+          "strongConsistency": false,
+          "computationDecision": "StateMachine with computeValue",
+          "reasoning": "Updates to current timestamp on any state change",
+          "dependencies": ["UpdateOrder", "PayOrder", "ShipOrder", "DeliverOrder", "CancelOrder"],
+          "calculationMethod": "Set to Date.now() whenever any state transition occurs"
+        }
+      ],
+      "entityComputationDecision": {
+        "type": "Transform",
+        "source": "InteractionEventEntity",
+        "reasoning": "Orders are created via CreateOrder interaction",
+        "dependencies": ["CreateOrder", "InteractionEventEntity"],
+        "calculationMethod": "When CreateOrder interaction fires, create new Order entity with data from event.payload"
+      }
+    }
+  ],
+  "relations": [
+    {
+      "name": "UserOrderRelation",
+      "relationAnalysis": {
+        "purpose": "Links users to their orders (order history)",
+        "creation": "Created automatically when Order is created",
+        "deletionRequirements": "Never deleted (maintain order history)",
+        "updateRequirements": "No property updates needed",
+        "stateManagement": "No status needed",
+        "computationDecision": "None",
+        "reasoning": "Created as part of Order creation via entity reference",
+        "dependencies": [],
+        "calculationMethod": "N/A (automatic with Order creation)"
+      }
+    },
+    {
+      "name": "OrderFavoriteRelation",
+      "relationAnalysis": {
+        "purpose": "Users can favorite orders for quick reorder",
+        "creation": "Via user interaction on existing orders",
+        "deletionRequirements": "Hard delete when user unfavorites",
+        "updateRequirements": "No property updates",
+        "stateManagement": "No status (existence = favorited)",
+        "computationDecision": "StateMachine",
+        "reasoning": "Need both creation and deletion capability",
+        "dependencies": ["FavoriteOrder", "UnfavoriteOrder"],
+        "calculationMethod": "Create relation on FavoriteOrder interaction, delete (hard) on UnfavoriteOrder interaction"
+      }
+    }
+  ],
+  "dictionaries": [
+    {
+      "name": "DailyOrderStats",
+      "dictionaryAnalysis": {
+        "purpose": "Daily order statistics for dashboard",
+        "type": "object",
+        "collection": false,
+        "updateFrequency": "Real-time as orders change",
+        "computationDecision": "Custom",
+        "reasoning": "Complex aggregation requiring multiple calculations (count by status, total revenue, average order value)",
+        "dependencies": ["Order.status", "Order.totalAmount"],
+        "calculationMethod": "Aggregate all orders - group by status for counts, sum totalAmount for revenue, calculate average order value as revenue/count"
+      }
+    }
+  ]
+}
 ```
 
 ## Step 6: Implementation Checklist
@@ -874,7 +924,7 @@ After analysis, implement computations following this checklist:
 - [ ] No Transform used in Property computation
 - [ ] No circular dependencies
 - [ ] Default values provided for all computed properties
-- [ ] Analysis document saved to `docs/computation-analysis.md`
+- [ ] Analysis document saved to `docs/computation-analysis.json`
 
 ## Step 7: Validation Questions
 
@@ -901,169 +951,174 @@ Before finalizing, answer these questions:
 6. **ALWAYS declare StateNodes before use** - Not inside transfers
 7. **ALWAYS provide defaultValue** - For all computed properties
 8. **ALWAYS document your reasoning** - Future developers need to understand
-9. **ALWAYS document dependencies** - List all data sources each computation needs
+9. **ALWAYS document dependencies with specific properties** - List exact fields used, not just entity names
 10. **ALWAYS describe calculation methods** - Explain how values are computed
 11. **ALWAYS analyze relation lifecycle** - Consider creation, updates, AND deletion
 12. **Transform can ONLY create** - If relations need deletion, use StateMachine or status field
 13. **Think about business events** - What events might cause relation changes?
 14. **Choose deletion strategy based on needs** - Use hard delete by default, soft delete when audit trail is required
+15. **ONLY symmetric relations need direction** - Use `(source)` or `(target)` ONLY for symmetric relations
+16. **Dependencies MUST be specific** - List all properties used, except for Interactions and InteractionEventEntity
 
 ## Example Complete Analysis
 
 Here's an example of what a complete analysis might look like for a task management system:
 
-```markdown
-# Computation Analysis for Task Management System
-
-## Entity: Project
-
-### Entity-Level Analysis
-- **Purpose**: Projects that contain multiple tasks
-- **Creation Source**: CreateProject interaction
-- **Update Requirements**: Name, description, status changes
-- **Deletion Strategy**: Soft delete with status (archived)
-
-### Property Analysis
-
-#### Property: name
-- **Type**: string
-- **Purpose**: Project name
-- **Data Source**: CreateProject payload
-- **Update Frequency**: Via UpdateProject interaction
-- **Computation Decision**: None
-- **Reasoning**: Simple field updated directly
-
-#### Property: taskCount
-- **Type**: number
-- **Purpose**: Number of tasks in project
-- **Data Source**: Count of ProjectTaskRelation
-- **Update Frequency**: Automatic when tasks created/deleted
-- **Strong Consistency**: Yes - Always equals the count of tasks
-- **Computation Decision**: Count
-- **Reasoning**: Direct count of relations
-- **Dependencies**: ProjectTaskRelation (direction: source)
-- **Calculation Method**: Count all ProjectTaskRelation records where this Project is the source
-
-#### Property: completionRate
-- **Type**: number
-- **Purpose**: Percentage of completed tasks
-- **Data Source**: Calculation based on task statuses
-- **Update Frequency**: When any task status changes
-- **Strong Consistency**: Yes - Always equals (completed/total) × 100
-- **Computation Decision**: Custom
-- **Reasoning**: Requires percentage calculation (completed/total), not a simple count
-- **Dependencies**: ProjectTaskRelation, Task entities (status property)
-- **Calculation Method**: (Count of tasks with status='completed' / Total task count) × 100
-
-#### Property: isCompleted
-- **Type**: boolean
-- **Purpose**: Whether all tasks are completed
-- **Data Source**: Check all related tasks
-- **Update Frequency**: When any task status changes
-- **Strong Consistency**: Yes - Always true if and only if all tasks are completed
-- **Computation Decision**: Every
-- **Reasoning**: Returns true only if every task is completed
-- **Dependencies**: ProjectTaskRelation, Task entities (status property)
-- **Calculation Method**: Check if every related Task has status === 'completed'
-
-### Entity Computation Decision
-- **Type**: Transform
-- **Source**: InteractionEventEntity
-- **Reasoning**: Projects created via CreateProject interaction
-- **Dependencies**: CreateProject interaction event, payload data
-- **Calculation Method**: When CreateProject fires, create new Project with name and description from payload
-
-## Entity: Task
-
-### Entity-Level Analysis
-- **Purpose**: Individual tasks within projects
-- **Creation Source**: CreateTask interaction
-- **Update Requirements**: Title, description, assignee, status, priority
-- **Deletion Strategy**: Hard delete (removed from project)
-
-### Property Analysis
-
-#### Property: status
-- **Type**: string
-- **Purpose**: Task completion status
-- **Data Source**: State transitions
-- **Update Frequency**: Via UpdateTaskStatus interaction
-- **Strong Consistency**: No - User-driven state changes, not derived from data
-- **Computation Decision**: StateMachine
-- **Reasoning**: Has defined states (todo, in_progress, review, completed)
-- **Dependencies**: UpdateTaskStatus interaction, current status value
-- **Calculation Method**: State transitions: todo→in_progress→review→completed, with possible back-transitions
-
-#### Property: timeSpent
-- **Type**: number
-- **Purpose**: Total time worked on task (minutes)
-- **Data Source**: Sum of time entries
-- **Update Frequency**: When time entries added
-- **Strong Consistency**: Yes - Always equals sum of all time entries
-- **Computation Decision**: Summation
-- **Reasoning**: Simple sum of TimeEntry durations
-- **Dependencies**: TaskTimeEntryRelation (direction: source), TimeEntry entity (duration property)
-- **Calculation Method**: Sum of all related TimeEntry.duration values
-
-#### Property: isOverdue
-- **Type**: boolean
-- **Purpose**: Whether task passed deadline
-- **Data Source**: Comparison of current time with deadline
-- **Update Frequency**: Time-based check
-- **Strong Consistency**: Yes - Always equals (current time > deadline)
-- **Computation Decision**: RealTime
-- **Reasoning**: Depends on current time, needs periodic recomputation
-- **Dependencies**: Current task deadline property, system time
-- **Calculation Method**: Compare current time (now) with task deadline, return now > deadline
-- **Implementation Note**: Uses RealTime with Inequality return type:
-  ```typescript
-  computation: RealTime.create({
-    dataDeps: {
-      _current: {
-        type: 'property',
-        attributeQuery: ['deadline']
+```json
+{
+  "entities": [
+    {
+      "name": "Project",
+      "entityLevelAnalysis": {
+        "purpose": "Projects that contain multiple tasks",
+        "creationSource": "CreateProject interaction",
+        "updateRequirements": "Name, description, status changes",
+        "deletionStrategy": "Soft delete with status (archived)"
+      },
+      "propertyAnalysis": [
+        {
+          "propertyName": "name",
+          "type": "string",
+          "purpose": "Project name",
+          "dataSource": "CreateProject payload",
+          "updateFrequency": "Via UpdateProject interaction",
+          "computationDecision": "None",
+          "reasoning": "Simple field updated directly"
+        },
+        {
+          "propertyName": "taskCount",
+          "type": "number",
+          "purpose": "Number of tasks in project",
+          "dataSource": "Count of ProjectTaskRelation",
+          "updateFrequency": "Automatic when tasks created/deleted",
+          "strongConsistency": true,
+          "computationDecision": "Count",
+          "reasoning": "Direct count of relations",
+          "dependencies": ["ProjectTaskRelation"],
+          "calculationMethod": "Count all ProjectTaskRelation records where this Project is the source"
+        },
+        {
+          "propertyName": "completionRate",
+          "type": "number",
+          "purpose": "Percentage of completed tasks",
+          "dataSource": "Calculation based on task statuses",
+          "updateFrequency": "When any task status changes",
+          "strongConsistency": true,
+          "computationDecision": "Custom",
+          "reasoning": "Requires percentage calculation (completed/total), not a simple count",
+          "dependencies": ["ProjectTaskRelation.createdAt", "Task.status"],
+          "calculationMethod": "(Count of tasks with status='completed' / Total task count) × 100"
+        },
+        {
+          "propertyName": "isCompleted",
+          "type": "boolean",
+          "purpose": "Whether all tasks are completed",
+          "dataSource": "Check all related tasks",
+          "updateFrequency": "When any task status changes",
+          "strongConsistency": true,
+          "computationDecision": "Every",
+          "reasoning": "Returns true only if every task is completed",
+          "dependencies": ["ProjectTaskRelation.updatedAt", "Task.status"],
+          "calculationMethod": "Check if every related Task has status === 'completed'"
+        }
+      ],
+      "entityComputationDecision": {
+        "type": "Transform",
+        "source": "InteractionEventEntity",
+        "reasoning": "Projects created via CreateProject interaction",
+        "dependencies": ["CreateProject", "InteractionEventEntity"],
+        "calculationMethod": "When CreateProject fires, create new Project with name and description from payload"
       }
     },
-    callback: async (now: Expression, dataDeps: any) => {
-      const deadline = dataDeps._current?.deadline || Date.now() + 86400000;
-      // Returns Inequality - system auto-schedules recomputation at deadline
-      return now.gt(deadline);
+    {
+      "name": "Task",
+      "entityLevelAnalysis": {
+        "purpose": "Individual tasks within projects",
+        "creationSource": "CreateTask interaction",
+        "updateRequirements": "Title, description, assignee, status, priority",
+        "deletionStrategy": "Hard delete (removed from project)"
+      },
+      "propertyAnalysis": [
+        {
+          "propertyName": "status",
+          "type": "string",
+          "purpose": "Task completion status",
+          "dataSource": "State transitions",
+          "updateFrequency": "Via UpdateTaskStatus interaction",
+          "strongConsistency": false,
+          "computationDecision": "StateMachine",
+          "reasoning": "Has defined states (todo, in_progress, review, completed)",
+          "dependencies": ["UpdateTaskStatus"],
+          "calculationMethod": "State transitions: todo→in_progress→review→completed, with possible back-transitions"
+        },
+        {
+          "propertyName": "timeSpent",
+          "type": "number",
+          "purpose": "Total time worked on task (minutes)",
+          "dataSource": "Sum of time entries",
+          "updateFrequency": "When time entries added",
+          "strongConsistency": true,
+          "computationDecision": "Summation",
+          "reasoning": "Simple sum of TimeEntry durations",
+          "dependencies": ["TaskTimeEntryRelation.createAt", "TimeEntry.duration"],
+          "calculationMethod": "Sum of all related TimeEntry.duration values"
+        },
+        {
+          "propertyName": "isOverdue",
+          "type": "boolean",
+          "purpose": "Whether task passed deadline",
+          "dataSource": "Comparison of current time with deadline",
+          "updateFrequency": "Time-based check",
+          "strongConsistency": true,
+          "computationDecision": "RealTime",
+          "reasoning": "Depends on current time, needs periodic recomputation",
+          "dependencies": ["_self.deadline"],
+          "calculationMethod": "Compare current time (now) with task deadline, return now > deadline",
+          "implementationNote": "Uses RealTime with Inequality return type - system auto-schedules recomputation at deadline"
+        }
+      ],
+      "entityComputationDecision": {
+        "type": "Transform",
+        "source": "InteractionEventEntity",
+        "reasoning": "Tasks created via CreateTask interaction",
+        "dependencies": ["CreateTask", "InteractionEventEntity"],
+        "calculationMethod": "When CreateTask fires, create new Task with project reference and initial status='todo'"
+      }
     }
-  })
-  ```
-
-### Entity Computation Decision
-- **Type**: Transform
-- **Source**: InteractionEventEntity
-- **Reasoning**: Tasks created via CreateTask interaction
-- **Dependencies**: CreateTask interaction event, project reference, payload data
-- **Calculation Method**: When CreateTask fires, create new Task with project reference and initial status='todo'
-
-## Relation: ProjectTaskRelation
-
-### Relation Analysis
-- **Purpose**: Links projects to their tasks
-- **Creation**: Automatic when task created with project reference
-- **Deletion Requirements**: Hard delete when task is deleted; soft delete when task is archived
-- **Update Requirements**: No property updates needed
-- **State Management**: No explicit state needed (follows task lifecycle)
-- **Computation Decision**: None
-- **Reasoning**: Created automatically via entity reference when Task is created; deleted when Task is deleted
-- **Dependencies**: N/A (no computation needed)
-- **Calculation Method**: N/A (no computation needed)
-
-## Dictionary: SystemMetrics
-
-### Dictionary Analysis
-- **Purpose**: System-wide task metrics
-- **Type**: object
-- **Update Frequency**: Real-time as tasks change
-- **Computation Decision**: Custom
-- **Reasoning**: Complex aggregations (avg completion time, tasks by status, overdue count)
-- **Dependencies**: All Task entities (status, createdAt, completedAt properties), current time
-- **Calculation Method**: Aggregate all tasks - group by status, calculate average (completedAt - createdAt) for completed tasks, count tasks where deadline < now
+  ],
+  "relations": [
+    {
+      "name": "ProjectTaskRelation",
+      "relationAnalysis": {
+        "purpose": "Links projects to their tasks",
+        "creation": "Automatic when task created with project reference",
+        "deletionRequirements": "Hard delete when task is deleted; soft delete when task is archived",
+        "updateRequirements": "No property updates needed",
+        "stateManagement": "No explicit state needed (follows task lifecycle)",
+        "computationDecision": "None",
+        "reasoning": "Created automatically via entity reference when Task is created; deleted when Task is deleted",
+        "dependencies": [],
+        "calculationMethod": "N/A (no computation needed)"
+      }
+    }
+  ],
+  "dictionaries": [
+    {
+      "name": "SystemMetrics",
+      "dictionaryAnalysis": {
+        "purpose": "System-wide task metrics",
+        "type": "object",
+        "updateFrequency": "Real-time as tasks change",
+        "computationDecision": "Custom",
+        "reasoning": "Complex aggregations (avg completion time, tasks by status, overdue count)",
+        "dependencies": ["Task.status", "Task.createdAt", "Task.completedAt"],
+        "calculationMethod": "Aggregate all tasks - group by status, calculate average (completedAt - createdAt) for completed tasks, count tasks where deadline < now"
+      }
+    }
+  ]
+}
 ```
 
 ## Example Analysis Output
 
-Your final `docs/computation-analysis.md` should be comprehensive and cover EVERY entity and EVERY property. This documentation is as important as the code itself and must be maintained alongside the implementation. 
+Your final `docs/computation-analysis.json` should be comprehensive and cover EVERY entity and EVERY property. This documentation is as important as the code itself and must be maintained alongside the implementation. 

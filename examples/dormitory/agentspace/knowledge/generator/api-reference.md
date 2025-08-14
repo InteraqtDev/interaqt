@@ -17,7 +17,7 @@ Entity.create(config: EntityConfig): EntityInstance
 - `config.name` (string, required): Entity name, must match `/^[a-zA-Z0-9_]+$/` format
 - `config.properties` (Property[], required): Entity property list, defaults to empty array
 - `config.computation` (Computation[], optional): Entity-level computed data
-- `config.sourceEntity` (Entity|Relation, optional): Source entity for filtered entity (used to create filtered entities)
+- `config.baseEntity` (Entity|Relation, optional): Base entity for filtered entity (used to create filtered entities)
 - `config.matchExpression` (MatchExp, optional): Match expression (used to create filtered entities)
 
 **Examples**
@@ -33,12 +33,12 @@ const User = Entity.create({
 
 // Create filtered entity
 const ActiveUser = Entity.create({
-    name: 'ActiveUser',
-    sourceEntity: User,
-    matchExpression: MatchExp.atom({
-        key: 'status',
-        value: ['=', 'active']
-    })
+  name: 'ActiveUser',
+  baseEntity: User,
+  matchExpression: MatchExp.atom({
+    key: 'status',
+    value: ['=', 'active']
+  })
 })
 ```
 
@@ -46,12 +46,12 @@ const ActiveUser = Entity.create({
 
 Filtered entities are views of existing entities that automatically filter records based on specified conditions. They support:
 
-1. **Cascade Filtering**: Filtered entities can be used as `sourceEntity` to create new filtered entities:
+1. **Cascade Filtering**: Filtered entities can be used as `baseEntity` to create new filtered entities:
 ```typescript
 // First level filter
 const ActiveUser = Entity.create({
     name: 'ActiveUser',
-    sourceEntity: User,
+    baseEntity: User,
     matchExpression: MatchExp.atom({
         key: 'isActive',
         value: ['=', true]
@@ -61,7 +61,7 @@ const ActiveUser = Entity.create({
 // Second level filter - based on ActiveUser
 const TechActiveUser = Entity.create({
     name: 'TechActiveUser',
-    sourceEntity: ActiveUser,  // Using filtered entity as source
+    baseEntity: ActiveUser,  // Using filtered entity as base
     matchExpression: MatchExp.atom({
         key: 'department',
         value: ['=', 'Tech']
@@ -71,7 +71,7 @@ const TechActiveUser = Entity.create({
 // Third level filter - even more specific
 const SeniorTechActiveUser = Entity.create({
     name: 'SeniorTechActiveUser',
-    sourceEntity: TechActiveUser,
+    baseEntity: TechActiveUser,
     matchExpression: MatchExp.atom({
         key: 'role',
         value: ['=', 'senior']
@@ -83,7 +83,7 @@ const SeniorTechActiveUser = Entity.create({
 ```typescript
 const TechYoungUser = Entity.create({
     name: 'TechYoungUser',
-    sourceEntity: User,
+    baseEntity: User,
     matchExpression: MatchExp.atom({
         key: 'age',
         value: ['<', 30]
@@ -158,7 +158,7 @@ Relation.create(config: RelationConfig): RelationInstance
 
 **Two Types of Relations**
 1. **Base Relations**: Define direct relationships between entities (requires `source`, `target`, `type`)
-2. **Filtered Relations**: Create filtered views of existing relations (requires `sourceRelation`, `matchExpression`)
+2. **Filtered Relations**: Create filtered views of existing relations (requires `baseRelation`, `matchExpression`)
 
 **Important: Auto-Generated Relation Names**
 
@@ -175,7 +175,7 @@ If you did not specify a `name` property when creating relations, The framework 
 - `config.type` (string, required for base relations): Relationship type, options: '1:1' | '1:n' | 'n:1' | 'n:n'
 - `config.properties` (Property[], optional): Properties of the relationship itself
 - `config.computation` (Computation, optional): Relationship-level computed data
-- `config.sourceRelation` (Relation, required for filtered relations): Source relation to filter from
+- `config.baseRelation` (Relation, required for filtered relations): Base relation to filter from
 - `config.matchExpression` (MatchExp, required for filtered relations): Filter condition for the relation records
 
 
@@ -247,7 +247,7 @@ const UserPostRelation = Relation.create({
 // Filtered relation - only published posts
 const PublishedUserPostRelation = Relation.create({
     name: 'PublishedUserPostRelation',
-    sourceRelation: UserPostRelation,
+    baseRelation: UserPostRelation,
     sourceProperty: 'publishedPosts',
     targetProperty: 'publishedAuthor',
     matchExpression: MatchExp.atom({
@@ -257,12 +257,12 @@ const PublishedUserPostRelation = Relation.create({
 })
 ```
 
-2. **Cascade Filtering**: Filtered relations can be used as `sourceRelation` to create new filtered relations:
+2. **Cascade Filtering**: Filtered relations can be used as `baseRelation` to create new filtered relations:
 ```typescript
 // First level filter - active assignments
 const ActiveUserProjectRelation = Relation.create({
     name: 'ActiveUserProjectRelation',
-    sourceRelation: UserProjectRelation,
+    baseRelation: UserProjectRelation,
     sourceProperty: 'activeProjects',
     targetProperty: 'activeUsers',
     matchExpression: MatchExp.atom({
@@ -274,7 +274,7 @@ const ActiveUserProjectRelation = Relation.create({
 // Second level filter - only lead roles from active assignments
 const LeadUserProjectRelation = Relation.create({
     name: 'LeadUserProjectRelation',
-    sourceRelation: ActiveUserProjectRelation,  // Using filtered relation as source
+    baseRelation: ActiveUserProjectRelation,  // Using filtered relation as base
     sourceProperty: 'leadProjects',
     targetProperty: 'leadUsers',
     matchExpression: MatchExp.atom({
@@ -288,7 +288,7 @@ const LeadUserProjectRelation = Relation.create({
 ```typescript
 const ImportantActiveRelation = Relation.create({
     name: 'ImportantActiveRelation',
-    sourceRelation: UserTaskRelation,
+    baseRelation: UserTaskRelation,
     sourceProperty: 'importantActiveTasks',
     targetProperty: 'assignedToImportant',
     matchExpression: MatchExp.atom({
@@ -1198,7 +1198,7 @@ const User = Entity.create({
             computation: Custom.create({
                 name: 'UserLevelCalculator',
                 dataDeps: {
-                    _current: {
+                    self: {
                         type: 'property',
                         attributeQuery: ['score']
                     },
@@ -1208,7 +1208,7 @@ const User = Entity.create({
                     }
                 },
                 compute: async function(dataDeps, record) {
-                    const score = dataDeps._current?.score || 0;
+                    const score = dataDeps.self?.score || 0;
                     const config = dataDeps.levelConfig || { 
                         beginner: 0, 
                         intermediate: 100, 

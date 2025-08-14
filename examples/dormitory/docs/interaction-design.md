@@ -1,316 +1,272 @@
-# Interaction Design - Dormitory Management System
+# Dormitory Management System - Interaction Design
 
-## Overview
-This document defines all interactions for the dormitory management system, organized by user role and purpose. Following the progressive implementation approach, interactions are designed for Stage 1 (core business logic) first, with Stage 2 enhancements (permissions and business rules) documented but not initially implemented.
+## User Management Interactions
 
-## Administrative Interactions
-
-### CreateDormitory
-- **Purpose**: Create a new dormitory room with beds
-- **Actor**: Admin
-- **Action Name**: 'createDormitory'
-- **Payload Fields**:
-  - name: string (required) - Dormitory identifier
-  - capacity: number (required) - Number of beds (4-6)
-  - floor: number (required) - Floor number
-  - building: string (required) - Building identifier
+### CreateUser
+- **Purpose**: Create new user accounts
+- **Payload**:
+  - name: string (required)
+  - email: string (required)
+  - role: string (required, admin/dormHead/student)
 - **Effects**:
-  - Creates new Dormitory entity with status='active'
-  - Automatically creates Bed entities based on capacity
-  - Creates DormitoryBedRelation for each bed
-  - Beds initialized with status='vacant'
-- **Stage 2 - Permission Requirements**: 
-  - User must have role='admin'
-- **Stage 2 - Business Rules**:
-  - Capacity must be between 4 and 6
-  - Name must be unique in the system
+  - Creates new User entity
+  - Initializes points to 100
+  - Sets status to active
+- **Stage 2 - Permissions**: Admin only
+- **Stage 2 - Business Rules**: Email must be unique
 
-### AppointDormHead
-- **Purpose**: Appoint a student as dormitory head
-- **Actor**: Admin
-- **Action Name**: 'appointDormHead'
-- **Payload Fields**:
-  - userId: string (required) - ID of user to appoint
-  - dormitoryId: string (required) - ID of dormitory to manage
+### UpdateUserRole
+- **Purpose**: Promote users to dorm head role
+- **Payload**:
+  - userId: string (required)
+  - role: string (required)
 - **Effects**:
-  - Updates user.role from 'student' to 'dormHead'
-  - Creates DormitoryDormHeadRelation
-  - Sets appointedAt timestamp
-  - Records appointedBy (admin name)
-- **Stage 2 - Permission Requirements**:
-  - User must have role='admin'
-- **Stage 2 - Business Rules**:
-  - Target user must currently have role='student'
-  - Dormitory must not have an existing dormHead
-  - User cannot already be managing another dormitory
+  - Updates user's role
+- **Stage 2 - Permissions**: Admin only
+- **Stage 2 - Business Rules**: Cannot change own role
 
-### AssignUserToDormitory
-- **Purpose**: Assign a student to a dormitory and specific bed
-- **Actor**: Admin
-- **Action Name**: 'assignUserToDormitory'
-- **Payload Fields**:
-  - userId: string (required) - ID of user to assign
-  - dormitoryId: string (required) - ID of target dormitory
-  - bedId: string (required) - ID of specific bed
+### UpdateUser
+- **Purpose**: Modify user details
+- **Payload**:
+  - userId: string (required)
+  - name: string (optional)
+  - email: string (optional)
 - **Effects**:
-  - Creates UserDormitoryRelation
-  - Creates UserBedRelation
-  - Updates bed.status from 'vacant' to 'occupied'
-  - Sets assignedAt timestamp
-  - Records assignedBy (admin name)
-  - Updates dormitory occupancy count (computed)
-- **Stage 2 - Permission Requirements**:
-  - User must have role='admin'
-- **Stage 2 - Business Rules**:
-  - User must not already be assigned to any dormitory
-  - Bed must have status='vacant'
-  - Bed must belong to the specified dormitory
-  - User must not have status='evicted'
+  - Updates user properties
+- **Stage 2 - Permissions**: Admin only
+- **Stage 2 - Business Rules**: Email must be unique if changed
 
-### ReviewEvictionRequest
-- **Purpose**: Approve or reject an eviction request
-- **Actor**: Admin
-- **Action Name**: 'reviewEvictionRequest'
-- **Payload Fields**:
-  - requestId: string (required) - ID of eviction request
-  - decision: string (required) - 'approve' or 'reject'
-  - adminNotes: string (optional) - Decision explanation
-- **Effects on Approval**:
-  - Updates evictionRequest.status to 'approved'
-  - Updates user.status to 'evicted'
-  - Sets user.evictedAt timestamp
-  - Deletes UserDormitoryRelation
-  - Deletes UserBedRelation
-  - Updates bed.status to 'vacant'
-  - Updates dormitory occupancy (computed)
-  - Sets decidedAt timestamp
-- **Effects on Rejection**:
-  - Updates evictionRequest.status to 'rejected'
-  - User remains in dormitory
-  - Sets decidedAt timestamp
-  - Records adminNotes
-- **Stage 2 - Permission Requirements**:
-  - User must have role='admin'
-- **Stage 2 - Business Rules**:
-  - Request must have status='pending'
+### DeleteUser
+- **Purpose**: Soft delete user accounts
+- **Payload**:
+  - userId: string (required)
+- **Effects**:
+  - Marks user as inactive
+  - Removes from dormitory and bed assignments
+- **Stage 2 - Permissions**: Admin only
+- **Stage 2 - Business Rules**: Cannot delete users with pending requests
 
 ## Dormitory Management Interactions
 
-### RecordViolation
-- **Purpose**: Record a violation for a resident student
-- **Actor**: DormHead
-- **Action Name**: 'recordViolation'
-- **Payload Fields**:
-  - userId: string (required) - ID of violating user
-  - description: string (required) - Violation details
-  - points: number (required) - Points to deduct
-  - category: string (required) - hygiene/noise/curfew/damage/other
+### CreateDormitory
+- **Purpose**: Create new dormitories
+- **Payload**:
+  - name: string (required)
+  - capacity: number (required, 4-6)
 - **Effects**:
-  - Creates ViolationRecord entity
-  - Creates UserViolationRelation
-  - Updates user.points (computed as 100 - sum of violations)
-  - Sets createdAt timestamp
-  - Records recordedBy (dormHead name)
-- **Stage 2 - Permission Requirements**:
-  - User must have role='dormHead'
-  - Target user must be in dormHead's managed dormitory
-- **Stage 2 - Business Rules**:
-  - Points must be positive number
-  - Target user must not have status='evicted'
-  - Points cannot reduce user below 0
+  - Creates new Dormitory entity
+  - Creates bed records automatically
+- **Stage 2 - Permissions**: Admin only
+- **Stage 2 - Business Rules**: Capacity must be 4-6, name must be unique
 
-### SubmitEvictionRequest
-- **Purpose**: Request eviction of a problematic resident
-- **Actor**: DormHead
-- **Action Name**: 'submitEvictionRequest'
-- **Payload Fields**:
-  - userId: string (required) - ID of user to evict
-  - reason: string (required) - Detailed eviction reason
+### UpdateDormitory
+- **Purpose**: Modify dormitory details
+- **Payload**:
+  - dormitoryId: string (required)
+  - name: string (optional)
+  - capacity: number (optional)
 - **Effects**:
-  - Creates EvictionRequest entity with status='pending'
-  - Creates UserEvictionRequestRelation
-  - Creates DormHeadEvictionRequestRelation
-  - Sets requestedAt timestamp
-- **Stage 2 - Permission Requirements**:
-  - User must have role='dormHead'
-  - Target user must be in dormHead's managed dormitory
+  - Updates dormitory properties
+- **Stage 2 - Permissions**: Admin only
+- **Stage 2 - Business Rules**: Cannot reduce capacity below current occupancy
+
+### DeleteDormitory
+- **Purpose**: Remove dormitories (soft delete)
+- **Payload**:
+  - dormitoryId: string (required)
+- **Effects**:
+  - Marks dormitory as inactive
+- **Stage 2 - Permissions**: Admin only
+- **Stage 2 - Business Rules**: Cannot delete dormitory with active users
+
+### ViewDormitories
+- **Purpose**: View list of dormitories
+- **Payload**:
+  - status: string (optional, filter by status)
+- **Effects**:
+  - Returns dormitory list with basic info
+- **Stage 2 - Permissions**: All users
+- **Stage 2 - Business Rules**: Students see limited info
+
+## Assignment Interactions
+
+### AssignUserToDormitory
+- **Purpose**: Assign users to dormitories
+- **Payload**:
+  - userId: string (required)
+  - dormitoryId: string (required)
+- **Effects**:
+  - Creates UserDormitoryRelation
+  - Updates dormitory occupancy count
+- **Stage 2 - Permissions**: Admin only
+- **Stage 2 - Business Rules**: 
+  - User must not already be assigned
+  - Dormitory must have available capacity
+  - Dormitory must be active
+
+### AssignUserToBed
+- **Purpose**: Assign specific bed to user
+- **Payload**:
+  - userId: string (required)
+  - bedId: string (required)
+- **Effects**:
+  - Creates UserBedRelation
+  - Updates bed status to occupied
+- **Stage 2 - Permissions**: Admin only
 - **Stage 2 - Business Rules**:
-  - Target user must have points < 60
-  - No pending eviction request for the same user
+  - User must be assigned to dormitory
+  - Bed must be in user's dormitory
+  - Bed must be available
+
+### RemoveFromDormitory
+- **Purpose**: Remove user from dormitory
+- **Payload**:
+  - userId: string (required)
+- **Effects**:
+  - Removes UserDormitoryRelation
+  - Removes UserBedRelation
+  - Resets bed status to available
+- **Stage 2 - Permissions**: Admin only
+- **Stage 2 - Business Rules**: User must be assigned
+
+### ViewAssignments
+- **Purpose**: View dormitory assignments
+- **Payload**:
+  - dormitoryId: string (optional)
+- **Effects**:
+  - Returns assignment information
+- **Stage 2 - Permissions**: Limited by role
+- **Stage 2 - Business Rules**: Users see only their assignments
+
+## Point System Interactions
+
+### DeductPoints
+- **Purpose**: Deduct points for violations
+- **Payload**:
+  - userId: string (required)
+  - points: number (required)
+  - reason: string (required)
+- **Effects**:
+  - Creates PointDeduction record
+  - Updates user's points
+- **Stage 2 - Permissions**: Admin or Dorm Head of user's dormitory
+- **Stage 2 - Business Rules**:
+  - User must be in dorm head's dormitory (for dorm heads)
+  - User must have sufficient points
+  - Points must be positive number
+
+### ViewPoints
+- **Purpose**: View current points
+- **Payload**:
+  - userId: string (optional)
+- **Effects**:
+  - Returns user's current points
+- **Stage 2 - Permissions**: Limited by role
+- **Stage 2 - Business Rules**: Users see only their points
+
+### ViewPointHistory
+- **Purpose**: View point deduction history
+- **Payload**:
+  - userId: string (optional)
+  - limit: number (optional)
+- **Effects**:
+  - Returns point deduction records
+- **Stage 2 - Permissions**: Limited by role
+- **Stage 2 - Business Rules**: Users see only their history
+
+### ResetPoints
+- **Purpose**: Reset user points to default
+- **Payload**:
+  - userId: string (required)
+- **Effects**:
+  - Resets user points to 100
+- **Stage 2 - Permissions**: Admin only
+- **Stage 2 - Business Rules**: Creates point deduction record for reset
+
+## Eviction Process Interactions
+
+### RequestEviction
+- **Purpose**: Request user eviction
+- **Payload**:
+  - userId: string (required)
+  - reason: string (required)
+- **Effects**:
+  - Creates EvictionRequest with pending status
+- **Stage 2 - Permissions**: Admin or Dorm Head of user's dormitory
+- **Stage 2 - Business Rules**:
+  - User must be in requestor's dormitory
+  - User points must be below threshold (e.g., 50)
+  - No pending request already exists
+
+### ApproveEviction
+- **Purpose**: Approve eviction request
+- **Payload**:
+  - requestId: string (required)
+- **Effects**:
+  - Updates request status to approved
+  - Removes user from dormitory and bed
+- **Stage 2 - Permissions**: Admin only
+- **Stage 2 - Business Rules**:
+  - Request must be in pending status
+  - User must still be in dormitory
+
+### RejectEviction
+- **Purpose**: Reject eviction request
+- **Payload**:
+  - requestId: string (required)
+- **Effects**:
+  - Updates request status to rejected
+- **Stage 2 - Permissions**: Admin only
+- **Stage 2 - Business Rules**: Request must be in pending status
+
+### ViewEvictionRequests
+- **Purpose**: View eviction requests
+- **Payload**:
+  - status: string (optional, filter by status)
+- **Effects**:
+  - Returns eviction request list
+- **Stage 2 - Permissions**: Limited by role
+- **Stage 2 - Business Rules**: Dorm heads see only their requests
 
 ## Query Interactions
 
-### ViewMyDormitory
-- **Purpose**: View assigned dormitory information
-- **Actor**: Student/DormHead/Admin
-- **Action Name**: 'viewMyDormitory'
-- **Payload Fields**:
-  - userId: string (optional) - For admin to view any user's dormitory
-- **Query Returns**:
-  - User's assigned dormitory details
-  - Bed assignment information
-  - List of roommates (other users in same dormitory)
-  - Dormitory head information
-- **Stage 2 - Permission Requirements**:
-  - Students can only view their own dormitory
-  - DormHeads can view their own dormitory
-  - Admins can view any user's dormitory
+### GetUsers
+- **Purpose**: Get list of users
+- **Payload**:
+  - role: string (optional)
+  - status: string (optional)
+  - dormitoryId: string (optional)
+- **Effects**: Returns filtered user list
+- **Stage 2 - Permissions**: Limited by role
 
-### ViewMyViolations
-- **Purpose**: View violation history and current points
-- **Actor**: Student/DormHead/Admin
-- **Action Name**: 'viewMyViolations'
-- **Payload Fields**:
-  - userId: string (optional) - For admin to view any user's violations
-- **Query Returns**:
-  - List of all violation records
-  - Current points (100 - sum of violations)
-  - Violation categories breakdown
-  - Eligibility for eviction status
-- **Stage 2 - Permission Requirements**:
-  - Students can only view their own violations
-  - DormHeads can view their own violations
-  - Admins can view any user's violations
+### GetUserDetail
+- **Purpose**: Get detailed user information
+- **Payload**:
+  - userId: string (required)
+- **Effects**: Returns complete user profile
+- **Stage 2 - Permissions**: Limited by role
 
-### ViewMyEvictionStatus
-- **Purpose**: Check eviction request status
-- **Actor**: Student/DormHead/Admin
-- **Action Name**: 'viewMyEvictionStatus'
-- **Payload Fields**:
-  - userId: string (optional) - For admin to view any user's status
-- **Query Returns**:
-  - Pending eviction requests
-  - Approved/rejected eviction history
-  - Current user status (active/evicted)
-  - Eviction reasons and admin notes
-- **Stage 2 - Permission Requirements**:
-  - Students can only view their own status
-  - DormHeads can view their own status
-  - Admins can view any user's status
+### GetDormitoryDetail
+- **Purpose**: Get detailed dormitory information
+- **Payload**:
+  - dormitoryId: string (required)
+- **Effects**: Returns complete dormitory data
+- **Stage 2 - Permissions**: Limited by role
 
-## Interaction Flow Diagrams
+## Important Implementation Notes
 
-### Complete Assignment Flow
-```
-1. Admin → CreateDormitory
-   - Creates dormitory with beds
-   
-2. Admin → AppointDormHead
-   - Assigns dormHead to manage dormitory
-   
-3. Admin → AssignUserToDormitory
-   - Assigns students to beds
-```
+### Core Business Logic First
+- Implement all interactions without conditions first
+- Focus on basic CRUD operations and state transitions
+- Test core functionality before adding permissions
 
-### Violation and Eviction Flow
-```
-1. DormHead → RecordViolation (multiple times)
-   - User points decrease
-   
-2. When points < 60:
-   DormHead → SubmitEvictionRequest
-   - Creates pending request
-   
-3. Admin → ReviewEvictionRequest
-   - Approves or rejects
-   - If approved, user evicted and bed freed
-```
+### Stage 2 Considerations
+- Permissions will be added via `condition` parameter
+- Business rules will be validated via `condition` parameter
+- Complex validations will be implemented after core logic works
 
-## Implementation Priority
-
-### Stage 1 - Core Business Logic (Implement First)
-All interactions without conditions:
-1. CreateDormitory - Basic dormitory creation
-2. AppointDormHead - Role assignment
-3. AssignUserToDormitory - Bed assignment
-4. RecordViolation - Violation tracking
-5. SubmitEvictionRequest - Request creation
-6. ReviewEvictionRequest - Decision handling
-7. ViewMyDormitory - Query dormitory info
-8. ViewMyViolations - Query violations
-9. ViewMyEvictionStatus - Query eviction status
-
-### Stage 2A - Add Permissions (After Stage 1 Works)
-Add condition for role-based access:
-- Admin-only interactions
-- DormHead restrictions to their dormitory
-- Student view restrictions
-
-### Stage 2B - Add Business Rules (After Stage 1 Works)
-Add condition for business validations:
-- Capacity limits (4-6)
-- Assignment uniqueness
-- Point thresholds (< 60 for eviction)
-- Status checks (pending, evicted)
-
-## Payload Validation Rules
-
-### Required Fields
-- All entity IDs when referencing existing entities
-- All descriptive fields (names, reasons, descriptions)
-- Decision fields (approve/reject)
-- Numeric values (points, capacity)
-
-### Optional Fields
-- Admin notes
-- Query filters
-- Timestamps (auto-generated)
-
-### Field Types
-- IDs: string
-- Names/Descriptions: string
-- Points/Capacity: number
-- Timestamps: number (Unix seconds)
-- Status/Role: string (from defined enums)
-
-## Error Handling Strategy
-
-### Stage 1 Errors (Basic Validation)
-- Missing required fields
-- Invalid field types
-- Entity not found
-
-### Stage 2A Errors (Permission Denied)
-- Insufficient role permissions
-- Cross-dormitory access attempt
-- Unauthorized view access
-
-### Stage 2B Errors (Business Rule Violations)
-- Capacity exceeded
-- Already assigned
-- Insufficient eviction grounds
-- Invalid state transitions
-
-## Testing Considerations
-
-### Stage 1 Tests
-- Create all entities successfully
-- Perform all assignments
-- Record violations
-- Submit and review requests
-- Query all information
-
-### Stage 2 Tests
-- Permission denials
-- Business rule violations
-- Edge cases and boundaries
-- Complex scenarios
-
-## Summary
-
-This design provides 9 core interactions covering:
-- 4 administrative operations
-- 2 dormitory management operations
-- 3 query operations
-
-Each interaction is:
-- Clearly defined with purpose and effects
-- Properly structured with required/optional fields
-- Documented for both Stage 1 and Stage 2 implementation
-- Linked to test cases from requirements
-
-The progressive approach ensures:
-1. Core functionality works first
-2. Permissions added systematically
-3. Business rules enforced consistently
-4. Complete test coverage at each stage
+### Common Patterns
+- All create operations generate timestamps automatically
+- Update operations only modify updatable fields
+- Delete operations use soft delete pattern
+- View operations respect role-based visibility

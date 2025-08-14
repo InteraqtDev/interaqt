@@ -1,6 +1,6 @@
 import { IInstance, SerializedData, generateUUID } from './interfaces.js';
 import { stringifyAttribute } from './utils.js';
-import type { ComputationRecord, AttributeQueryData } from './types.js';
+import { DataDep } from './Computation.js';
 
 export interface CustomInstance extends IInstance {
   name: string;
@@ -16,7 +16,7 @@ export interface CustomInstance extends IInstance {
 
 export interface CustomCreateArgs {
   name: string;
-  dataDeps?: { [key: string]: any };
+  dataDeps?: { [key: string]: DataDep };
   compute?: Function;
   incrementalCompute?: Function;
   incrementalPatchCompute?: Function;

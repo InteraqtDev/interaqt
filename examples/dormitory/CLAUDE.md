@@ -362,11 +362,11 @@ Note: The relation creates `user.dormitory` to access the assigned dormitory and
    - `docs/entity-relation-design.md` (from Task 2.1)
    - `docs/interaction-design.md` (from Task 2.2)
 3. **ANALYZE**: For EVERY entity and EVERY property, follow the step-by-step analysis process
-4. **DOCUMENT**: Create `docs/computation-analysis.md` documenting your analysis for each entity/property
+4. **DOCUMENT**: Create `docs/computation-analysis.json` documenting your analysis for each entity/property
 5. **REFERENCE**: Use `computation-implementation.md` as a reference for syntax and examples
 
 **Key Steps from computation-selection-guide.md:**
-- [ ] Create analysis document at `docs/computation-analysis.md`
+- [ ] Create analysis document at `docs/computation-analysis.json`
 - [ ] Analyze each entity systematically (creation source, update requirements, deletion strategy)
 - [ ] Analyze each property individually (type, purpose, data source, update frequency)
 - [ ] Analyze each relation's complete lifecycle (creation, updates, deletion)
@@ -384,7 +384,7 @@ Note: The relation creates `user.dormitory` to access the assigned dormitory and
   "completedItems": [
     "entity-relation-design.md created",
     "interaction-design.md created",
-    "computation-analysis.md created"
+    "computation-analysis.json created"
   ]
 }
 ```
@@ -577,91 +577,24 @@ This section follows a **test-driven progressive approach** where each computati
   "completed": false
 }
 ```
-- [ ] Based on `docs/computation-analysis.md`, analyze computation dependencies (which computations depend on other entities/relations)
-- [ ] Order computations from least dependent to most dependent. Start with computations that only depend on InteractionEventEntity
-- [ ] Create `docs/computation-implementation-plan.md`. **Write the plan in checklist format** for easy progress tracking. **MUST include ALL computations from `docs/computation-analysis.md` - do not skip any!**
-- [ ] **CRITICAL: Each computation item MUST include from `docs/computation-analysis.md`:**
-  - Computation Decision (e.g., StateMachine, Count, Transform)
-  - Calculation Method (brief description of how it works)
-  - Dependencies (what entities/relations/interactions it depends on)
 
-**Template for `docs/computation-implementation-plan.md`:**
-```markdown
-# Computation Implementation Plan
+**📋 Generate the Computation Implementation Plan:**
 
-## Phase 1: InteractionEventEntity-Dependent Computations
-*Computations that only depend on InteractionEventEntity, typically for logging or activity tracking*
+- [ ] Run the command: `npm run plan`
+  - This command analyzes `docs/computation-analysis.json` and automatically generates the implementation plan
+  - The plan will be created at `docs/computation-implementation-plan.json`
+  - Computations are automatically ordered by dependencies (least to most dependent)
 
-- [ ] **ActivityLog entity creation**
-  - Decision: Transform on Entity.computedData
-  - Method: Creates new ActivityLog record for each interaction event
-  - Dependencies: InteractionEventEntity
+- [ ] **Verify the generated file:**
+  - Check that `docs/computation-implementation-plan.json` exists
+  - Open the file and confirm it contains:
+    - Multiple phases organized by dependency complexity
+    - Each computation with its decision, method, and dependencies
+    - A logical progression from simple to complex computations
 
-- [ ] **User.lastActivityTime**
-  - Decision: StateMachine on Property.computation
-  - Method: Updates timestamp when any user interaction occurs
-  - Dependencies: InteractionEventEntity, specific user interactions
-
-- [ ] **SystemStats.totalInteractions**
-  - Decision: Count on Dictionary.computation
-  - Method: Counts all InteractionEventEntity records
-  - Dependencies: InteractionEventEntity
-
-## Phase 2: Single Entity/Relation Dependencies
-*Computations that depend on one other entity or relation*
-
-- [ ] **User.postCount**
-  - Decision: Count on Property.computation
-  - Method: Counts UserPost relations where source = current user
-  - Dependencies: UserPost relation
-
-- [ ] **Category.articleCount**
-  - Decision: Count on Property.computation
-  - Method: Counts ArticleCategory relations where target = current category
-  - Dependencies: ArticleCategory relation
-
-- [ ] **Order.totalAmount**
-  - Decision: Summation on Property.computation
-  - Method: Sums amount field from all related OrderItem entities
-  - Dependencies: OrderItem relation
-
-## Phase 3: Multiple Dependencies
-*Computations that depend on multiple entities or relations*
-
-- [ ] **Dashboard.stats**
-  - Decision: Custom on Dictionary.computation
-  - Method: Aggregates statistics from multiple sources into single object
-  - Dependencies: User entity, Post entity, Comment entity
-
-- [ ] **NotificationEntity creation**
-  - Decision: Transform on Entity.computedData
-  - Method: Creates notifications based on specific interaction patterns
-  - Dependencies: InteractionEventEntity, User entity, multiple interaction types
-
-- [ ] **User.recommendationScore**
-  - Decision: WeightedSummation on Property.computation
-  - Method: Calculates weighted score from preferences and product features
-  - Dependencies: UserPreference relation, Product entity, ProductFeature relation
-
-## Phase 4: Complex Chain Dependencies
-*Computations that depend on other computed values*
-
-- [ ] **User.reputation**
-  - Decision: Custom on Property.computation
-  - Method: Formula using postCount * 10 + commentCount * 5 + likeCount
-  - Dependencies: User.postCount (computed), User.commentCount (computed), User.likeCount (computed)
-
-- [ ] **Product.popularityScore**
-  - Decision: Custom on Property.computation
-  - Method: Combines orderCount and averageRating with time decay factor
-  - Dependencies: Product.orderCount (computed), Product.averageRating (computed)
-
-## Notes
-- Start implementation from Phase 1 and proceed sequentially
-- Complete ALL computations in a phase before moving to the next
-- Run tests after each computation implementation
-- Document any blockers or issues in `docs/errors/`
-```
+**🔴 CRITICAL: If the command fails or the file is not generated:**
+1. Check that `docs/computation-analysis.json` exists and is valid JSON
+2. If issues persist, stop and wait for user commands
 
 **✅ END Task 3.1.4.2: Update `docs/STATUS.json`:**
 ```json
@@ -680,31 +613,30 @@ This section follows a **test-driven progressive approach** where each computati
   "completed": false
 }
 ```
-- Add note: "**DO NOT proceed without reading the above reference document completely**"
-- Add note: "**MUST Read `docs/computation-implementation-plan.md` to see which computations are completed and what's next.**"
+**MUST Read `docs/computation-implementation-plan.json` to see which computations are completed and what's next.**
 
-**MUST Read `docs/computation-implementation-plan.md` to see which computations are completed and what's next.**
+**📖 Reference `tests/crud.example.test.ts`** for computation implementation code patterns and best practices
 
 **For EACH computation in your plan, follow this cycle:**
 
 1. **Implement the Computation**
    - [ ] Add the computation code to your entity/relation/property
-   - [ ] **Use assignment pattern (`Entity.computation = ...` or `Property.computation = ...`)** to add computations after all entity/relation definitions but before the export section. This avoids complex complex reference issues. Example:
+   - [ ] **Use assignment pattern (`Entity.computation = ...` or `Property.computation = ...`)** to add computations at the end of file. This avoids complex complex reference issues. Example:
      ```typescript
      // 1. First define all entities and relations
      const User = Entity.create({ name: 'User', properties: [...] })
      const Post = Entity.create({ name: 'Post', properties: [...] })
      const UserPostRelation = Relation.create({ source: User, target: Post, ... })
      
-     // 2. Then add computations using assignment (append at the end of definition logic)
+     // 2. export section (export section stays at the very end)
+     export const entities = [User, Post]
+     export const relations = [UserPostRelation]
+
+     // 3. add computations using assignment (append at the end of the file)
      User.properties.find(p => p.name === 'postCount').computation = Count.create({
        relation: UserPostRelation,
        relationDirection: 'source'
      })
-     
-     // 3. Finally export (export section stays at the very end)
-     export const entities = [User, Post]
-     export const relations = [UserPostRelation]
      ```
    - [ ] If adding computation to a property that has `defaultValue`, remove the `defaultValue` (computation will provide the default)
    - [ ] Verify no Transform is used in Property computation
@@ -785,10 +717,10 @@ This section follows a **test-driven progressive approach** where each computati
    - [ ] Do NOT proceed to next computation until current test passes
 
 5. **Document Progress**
-   - [ ] **MUST** check off completed computation in `docs/computation-implementation-plan.md`
+   - [ ] **MUST** update the completed computation status in `docs/computation-implemention-plan.json` (mark as `"completed": true`)
    - [ ] Create new documents in `docs/errors/` to record any errors encountered
 
-**🛑 STOP GATE: DO NOT proceed to Task 3.1.4.4 until ALL computations in `docs/computation-implementation-plan.md` are checked off as complete with passing tests.**
+**🛑 STOP GATE: DO NOT proceed to Task 3.1.4.4 until ALL computations in `docs/computation-implementation-plan.json` are marked as complete with passing tests.**
 
 **✅ END Task 3.1.4.3: Update `docs/STATUS.json`:**
 ```json
@@ -807,7 +739,7 @@ This section follows a **test-driven progressive approach** where each computati
   "completed": false
 }
 ```
-- [ ] All computations from `docs/computation-analysis.md` are implemented
+- [ ] All computations from `docs/computation-analysis.json` are implemented
 - [ ] Each computation has at least one passing test
 - [ ] All type checks pass (`npm run check`)
 - [ ] All tests pass (`npm run test tests/basic.test.ts`)

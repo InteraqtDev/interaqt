@@ -42,11 +42,12 @@ export const dicts = []
   console.log('Recreated backend/index.ts');
 
   // 3. Delete all test files except *.example.test.ts
+
   const testsDir = path.join(projectRoot, 'tests');
   if (fs.existsSync(testsDir)) {
     const files = fs.readdirSync(testsDir);
     for (const file of files) {
-      if (!file.endsWith('.example.test.ts')) {
+      if (!file.endsWith('.example.test.ts') && !file.endsWith('.template.test.ts')) {
         const filePath = path.join(testsDir, file);
         if (fs.statSync(filePath).isDirectory()) {
           fs.rmSync(filePath, { recursive: true, force: true });

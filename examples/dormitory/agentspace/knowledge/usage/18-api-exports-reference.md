@@ -82,7 +82,7 @@ import {
   User,                // No pre-built User entity
   RelationBasedEvery,  // Only 'Every' exists
   InteractionEvent,    // Correct name is 'InteractionEventEntity'
-  FilteredEntity,      // Created via Entity.create with sourceEntity
+  FilteredEntity,      // Created via Entity.create with baseEntity
   SideEffect,          // Not a direct export
   DataAttributive      // Use Attributive for all purposes
 } from 'interaqt';
@@ -171,6 +171,6 @@ const controller = new Controller({
 
 3. **Special Entity Names**: `InteractionEventEntity` is the only pre-defined entity, used for listening to interaction events.
 
-4. **Filtered Entities**: Created using `Entity.create()` with `sourceEntity` and `filterCondition`, not a separate import.
+4. **Filtered Entities**: Created using `Entity.create()` with `baseEntity` and `filterCondition`, not a separate import.
 
 5. **Database Drivers**: Choose one based on your needs - PGLiteDB for in-memory testing, PostgreSQLDB for production, etc. 

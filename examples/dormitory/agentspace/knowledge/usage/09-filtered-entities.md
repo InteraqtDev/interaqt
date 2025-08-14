@@ -35,7 +35,7 @@ const getPublishedPostCount = async () => {
 // Filtered entity approach: Automatically maintained, reactive updates
 const PublishedPost = Entity.create({
   name: 'PublishedPost',
-  sourceEntity: Post,
+  baseEntity: Post,
   filterCondition: MatchExp.atom({
     key: 'status',
     value: ['=', 'published']
@@ -81,7 +81,7 @@ const Post = Entity.create({
 // Create filtered entity for published posts
 const PublishedPost = Entity.create({
   name: 'PublishedPost',
-  sourceEntity: Post,
+  baseEntity: Post,
   filterCondition: MatchExp.atom({
     key: 'status',
     value: ['=', 'published']
@@ -91,7 +91,7 @@ const PublishedPost = Entity.create({
 // Create filtered entity for popular posts
 const PopularPost = Entity.create({
   name: 'PopularPost',
-  sourceEntity: Post,
+  baseEntity: Post,
   filterCondition: MatchExp.atom({
     key: 'status',
     value: ['=', 'published']
@@ -104,7 +104,7 @@ const PopularPost = Entity.create({
 // Create filtered entity for tech posts
 const TechPost = Entity.create({
   name: 'TechPost',
-  sourceEntity: Post,
+  baseEntity: Post,
   filterCondition: MatchExp.atom({
     key: 'category',
     value: ['=', 'technology']
@@ -139,7 +139,7 @@ const UserPost = Relation.create({
 // Create filtered entity for active users (logged in within the last 30 days)
 const ActiveUser = Entity.create({
   name: 'ActiveUser',
-  sourceEntity: User,
+  baseEntity: User,
   filterCondition: MatchExp.atom({
     key: 'status',
     value: ['=', 'active']
@@ -156,7 +156,7 @@ const ActiveUser = Entity.create({
 // Create filtered entity for users with posts (needs to be implemented through relation queries)
 const AuthorUser = Entity.create({
   name: 'AuthorUser',
-  sourceEntity: User,
+  baseEntity: User,
   filterCondition: MatchExp.atom({
     key: 'id',
     value: ['in', 'SELECT DISTINCT author FROM Post WHERE author IS NOT NULL']

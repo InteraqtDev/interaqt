@@ -17,7 +17,7 @@ Entity.create(config: EntityConfig): KlassInstance<typeof Entity>
 - `config.name` (string, required): Entity name, must match `/^[a-zA-Z0-9_]+$/` format
 - `config.properties` (Property[], required): Entity property list, defaults to empty array
 - `config.computation` (Computation[], optional): Entity-level computed data
-- `config.sourceEntity` (Entity|Relation, optional): Source entity for filtered entity (used to create filtered entities)
+- `config.baseEntity` (Entity|Relation, optional): Base entity for filtered entity (used to create filtered entities)
 - `config.filterCondition` (MatchExp, optional): Filter condition (used to create filtered entities)
 
 **Examples**
@@ -34,7 +34,7 @@ const User = Entity.create({
 // Create filtered entity
 const ActiveUser = Entity.create({
     name: 'ActiveUser',
-    sourceEntity: User,
+    baseEntity: User,
     filterCondition: MatchExp.atom({
         key: 'status',
         value: ['=', 'active']
