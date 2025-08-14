@@ -142,7 +142,7 @@ const postCount = Property.create({
     name: 'postCount',
     type: 'number',
     computation: Count.create({
-        record: UserPostRelation
+        property: 'posts'  // Use property name from relation
     })
 })
 ```
@@ -315,7 +315,8 @@ Count.create(config: CountConfig): CountInstance
 ```
 
 **Parameters**
-- `config.record` (Entity|Relation, required): Entity or relation to count
+- `config.record` (Entity|Relation, optional): Entity or relation to count (for entity/global level computation)
+- `config.property` (string, optional): Property name from relation (for property level computation)
 - `config.direction` (string, optional): Relationship direction, options: 'source' | 'target', only for relation counting
 - `config.callback` (function, optional): Filter callback function, returns boolean to decide if included in count
 - `config.attributeQuery` (AttributeQueryData, optional): Attribute query configuration to optimize data fetching
@@ -333,7 +334,7 @@ const userPostCount = Property.create({
     name: 'postCount',
     type: 'number',
     computation: Count.create({
-        record: UserPostRelation
+        property: 'posts'  // Use property name from relation
     })
 })
 
@@ -342,10 +343,10 @@ const publishedPostCount = Property.create({
     name: 'publishedPostCount',
     type: 'number',
     computation: Count.create({
-        record: UserPostRelation,
-        attributeQuery: [['target', {attributeQuery: ['status']}]],
-        callback: function(relation) {
-            return relation.target.status === 'published'
+        property: 'posts',  // Use property name from relation
+        attributeQuery: ['status'],  // Query properties on related entity
+        callback: function(post) {
+            return post.status === 'published'
         }
     })
 })
@@ -360,16 +361,16 @@ const highScorePostCount = Property.create({
     name: 'highScorePostCount',
     type: 'number',
     computation: Count.create({
-        record: UserPostRelation,
-        attributeQuery: [['target', {attributeQuery: ['score']}]],
+        property: 'posts',  // Use property name from relation
+        attributeQuery: ['score'],  // Query properties on related entity
         dataDeps: {
             minScore: {
                 type: 'global',
                 source: minScoreThreshold
             }
         },
-        callback: function(relation, dataDeps) {
-            return relation.target.score >= dataDeps.minScore
+        callback: function(post, dataDeps) {
+            return post.score >= dataDeps.minScore
         }
     })
 })
@@ -405,8 +406,7 @@ const authorPostCount = Property.create({
     name: 'authoredPostCount',
     type: 'number',
     computation: Count.create({
-        record: UserPostRelation,
-        direction: 'target'  // Count related posts from user perspective
+        property: 'posts',  // Use property name from relation
     })
 })
 ```
@@ -421,7 +421,8 @@ WeightedSummation.create(config: WeightedSummationConfig): WeightedSummationInst
 ```
 
 **Parameters**
-- `config.record` (Entity|Relation, required): Entity or relation to compute
+- `config.record` (Entity|Relation, optional): Entity or relation to compute (for entity/global level computation)
+- `config.property` (string, optional): Property name from relation (for property level computation)
 - `config.callback` (function, required): Callback function to calculate weight and value, returns `{weight: number, value: number}`
 - `config.attributeQuery` (AttributeQueryData, required): Attribute query configuration
 
@@ -432,7 +433,7 @@ const userTotalScore = Property.create({
     name: 'totalScore',
     type: 'number',
     computation: WeightedSummation.create({
-        record: UserScoreRelation,
+        property: 'scores',  // Use property name from relation
         callback: function(scoreRecord) {
             return {
                 weight: scoreRecord.multiplier || 1,
@@ -464,7 +465,8 @@ Summation.create(config: SummationConfig): SummationInstance
 ```
 
 **Parameters**
-- `config.record` (Entity|Relation, required): Entity or relation to compute
+- `config.record` (Entity|Relation, optional): Entity or relation to compute (for entity/global level computation)
+- `config.property` (string, optional): Property name from relation (for property level computation)
 - `config.attributeQuery` (AttributeQueryData, required): Attribute query configuration, specifies field path to sum
 - `config.direction` (string, optional): Relationship direction, options: 'source' | 'target', only for relation summation
 
@@ -490,8 +492,8 @@ const userTotalSpent = Property.create({
     name: 'totalSpent',
     type: 'number',
     computation: Summation.create({
-        record: UserOrderRelation,
-        attributeQuery: [['target', {attributeQuery: ['totalAmount']}]]
+        property: 'orders',  // Use property name from relation
+        attributeQuery: ['totalAmount']  // Query properties on related entity
     })
 })
 
@@ -500,12 +502,10 @@ const departmentBudget = Property.create({
     name: 'totalBudget',
     type: 'number',
     computation: Summation.create({
-        record: DepartmentProjectRelation,
-        attributeQuery: [['target', {
-            attributeQuery: [['budget', {
-                attributeQuery: ['allocatedAmount']
-            }]]
-        }]]
+        property: 'projects',  // Use property name from relation
+        attributeQuery: [['budget', {
+            attributeQuery: ['allocatedAmount']
+        }]]  // Query nested properties on related entity
     })
 })
 
@@ -514,8 +514,8 @@ const totalShippingCost = Property.create({
     name: 'totalShippingCost',
     type: 'number',
     computation: Summation.create({
-        record: OrderShipmentRelation,
-        attributeQuery: ['shippingFee']  // Relation's own property
+        property: 'shipments',  // Use property name from relation
+        attributeQuery: [['&', {attributeQuery: ['shippingFee']}]]  // Access relation's own property with '&'
     })
 })
 
@@ -560,8 +560,8 @@ const orderTotal = Property.create({
     name: 'total',
     type: 'number',
     computation: Summation.create({
-        record: OrderItemRelation,
-        attributeQuery: [['target', {attributeQuery: ['finalPrice']}]]
+        property: 'items',  // Use property name from relation
+        attributeQuery: ['finalPrice']  // Query properties on related entity
     })
 });
 ```
@@ -576,7 +576,8 @@ Every.create(config: EveryConfig): EveryInstance
 ```
 
 **Parameters**
-- `config.record` (Entity|Relation, required): Entity or relation to check
+- `config.record` (Entity|Relation, optional): Entity or relation to check (for entity/global level computation)
+- `config.property` (string, optional): Property name from relation (for property level computation)
 - `config.callback` (function, required): Condition check function, returns boolean
 - `config.attributeQuery` (AttributeQueryData, required): Attribute query configuration
 - `config.notEmpty` (boolean, optional): Return value when collection is empty
@@ -588,9 +589,10 @@ const completedAllRequired = Property.create({
     name: 'completedAllRequired',
     type: 'boolean',
     computation: Every.create({
-        record: UserCourseRelation,
+        property: 'courses',  // Use property name from relation
+        attributeQuery: [['&', {attributeQuery: ['status']}]],  // Access relation's own property with '&'
         callback: function(courseRelation) {
-            return courseRelation.status === 'completed'
+            return courseRelation['&'].status === 'completed'
         },
         notEmpty: false
     })
@@ -607,7 +609,8 @@ Any.create(config: AnyConfig): AnyInstance
 ```
 
 **Parameters**
-- `config.record` (Entity|Relation, required): Entity or relation to check
+- `config.record` (Entity|Relation, optional): Entity or relation to check (for entity/global level computation)
+- `config.property` (string, optional): Property name from relation (for property level computation)
 - `config.callback` (function, required): Condition check function, returns boolean
 - `config.attributeQuery` (AttributeQueryData, required): Attribute query configuration
 
@@ -618,9 +621,10 @@ const hasPendingTasks = Property.create({
     name: 'hasPendingTasks',
     type: 'boolean',
     computation: Any.create({
-        record: UserTaskRelation,
+        property: 'tasks',  // Use property name from relation
+        attributeQuery: [['&', {attributeQuery: ['status']}]],  // Access relation's own property with '&'
         callback: function(taskRelation) {
-            return taskRelation.status === 'pending'
+            return taskRelation['&'].status === 'pending'
         }
     })
 })
@@ -2784,7 +2788,7 @@ const User = Entity.create({
         Property.create({
             name: 'postCount',
             type: 'number',
-            computation: Count.create({ record: UserPostRelation })
+            computation: Count.create({ property: 'posts' })  // Use property name from relation
         })
     ]
 })
@@ -2797,7 +2801,7 @@ const Post = Entity.create({
         Property.create({
             name: 'likeCount',
             type: 'number',
-            computation: Count.create({ record: PostLikeRelation })
+            computation: Count.create({ property: 'likes' })  // Use property name from relation
         })
     ]
 })

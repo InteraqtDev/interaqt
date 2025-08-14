@@ -634,8 +634,7 @@ This section follows a **test-driven progressive approach** where each computati
 
      // 3. add computations using assignment (append at the end of the file)
      User.properties.find(p => p.name === 'postCount').computation = Count.create({
-       relation: UserPostRelation,
-       relationDirection: 'source'
+       property: 'posts'  // Use property name from relation
      })
      ```
    - [ ] If adding computation to a property that has `defaultValue`, remove the `defaultValue` (computation will provide the default)

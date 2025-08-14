@@ -596,7 +596,7 @@ Property.create({
   type: 'number',
   defaultValue: () => 0,
   computation: Count.create({ 
-    record: PostCommentRelation,
+    property: 'comments',  // Use property name from relation
     direction: 'source'  // Count comments for this post
   })
 })
@@ -606,9 +606,9 @@ Property.create({
   name: 'totalRevenue',
   type: 'number',
   computation: Summation.create({
-    record: OrderItemRelation,
+    property: 'items',  // Use property name from relation
     direction: 'source',  // Sum items for this order
-    attributeQuery: [['target', { attributeQuery: ['price', 'quantity'] }]]
+    attributeQuery: [['price', 'quantity']]  // Query properties on related entity
   })
 })
 
@@ -617,12 +617,14 @@ Property.create({
   name: 'totalAmount',
   type: 'number',
   computation: WeightedSummation.create({
-    record: OrderItemRelation,
+    property: 'items',  // Use property name from relation
     direction: 'source',
-    attributeQuery: [['target', { attributeQuery: ['price', 'quantity'] }]],
-    computeWeight: (orderItem) => {
-      const item = orderItem.target;
-      return (item.price || 0) * (item.quantity || 0);
+    attributeQuery: ['price', 'quantity'],  // Query properties on related entity
+    callback: (item) => {
+      return {
+        weight: item.quantity || 1,
+        value: item.price || 0
+      };
     }
   })
 })

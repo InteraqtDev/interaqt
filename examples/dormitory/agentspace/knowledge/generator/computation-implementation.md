@@ -678,7 +678,7 @@ const User = Entity.create({
       name: 'styleCount',
       type: 'number',
       computation: Count.create({
-        record: UserStyleRelation,
+        property: 'styles',  // Use property name from relation
         direction: 'target'  // Count from user to styles
       })
     }),
@@ -687,11 +687,11 @@ const User = Entity.create({
       name: 'activeStyleCount',
       type: 'number',
       computation: Count.create({
-        record: UserStyleRelation,
+        property: 'styles',  // Use property name from relation
         direction: 'target',
-        attributeQuery: [['target', { attributeQuery: ['status'] }]],
-        callback: function(relation) {
-          return relation.target.status === 'active';
+        attributeQuery: ['status'],  // Query properties on related entity
+        callback: function(style) {
+          return style.status === 'active';
         }
       })
     })
@@ -727,11 +727,11 @@ const Order = Entity.create({
       name: 'totalAmount',
       type: 'number',
       computation: WeightedSummation.create({
-        record: OrderItemRelation,
-        attributeQuery: [['target', { attributeQuery: ['quantity', 'price'] }]],
-        callback: (relation) => ({
+        property: 'items',  // Use property name from relation
+        attributeQuery: ['quantity', 'price'],  // Query properties on related entity
+        callback: (item) => ({
           weight: 1,
-          value: relation.target.quantity * relation.target.price
+          value: item.quantity * item.price
         })
       })
     })
@@ -767,16 +767,18 @@ const Project = Entity.create({
       name: 'isCompleted',
       type: 'boolean',
       computation: Every.create({
-        record: ProjectTaskRelation,
-        callback: (relation) => relation.target.isCompleted === true
+        property: 'tasks',  // Use property name from relation
+        attributeQuery: ['isCompleted'],  // Query properties on related entity
+        callback: (task) => task.isCompleted === true
       })
     }),
     Property.create({
       name: 'hasCompletedTasks',
       type: 'boolean',
       computation: Any.create({
-        record: ProjectTaskRelation,
-        callback: (relation) => relation.target.isCompleted === true
+        property: 'tasks',  // Use property name from relation
+        attributeQuery: ['isCompleted'],  // Query properties on related entity
+        callback: (task) => task.isCompleted === true
       })
     })
   ]
