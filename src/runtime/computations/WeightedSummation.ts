@@ -86,7 +86,7 @@ export class GlobalWeightedSummationHandle implements DataBasedComputation {
 export class PropertyWeightedSummationHandle implements DataBasedComputation {
     static computationType = WeightedSummation
     static contextType = 'property' as const
-    matchRecordToWeight: (this: Controller, item: any) => { weight: number; value: number }
+    matchRecordToWeight: (this: Controller, item: any, dataDeps: {[key: string]: any}) => { weight: number; value: number }
     state!: ReturnType<typeof this.createState>
     useLastValue: boolean = true
     dataDeps: {[key: string]: DataDep} = {}
