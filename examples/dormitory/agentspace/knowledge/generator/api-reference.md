@@ -997,7 +997,10 @@ Custom.create(config: CustomConfig): CustomInstance
     record?: any
   ): Promise<any>
   ```
-- `config.dataDeps` (object, optional): Data dependency configuration, format: `{[key: string]: DataDep}`
+- `config.dataDeps` (object, optional): Data dependency configuration, format: `{[key: string]: DataDep}`. 
+  - For Property computation: use `type: 'property'` with `property: 'relationPropertyName'`
+  - For Dictionary computation: use `type: 'records'` with `source: EntityName`
+  - For accessing dictionaries: use `type: 'global'` with `source: DictionaryInstance`
 - `config.useLastValue` (boolean, optional): Whether to use last computed value in incremental computation
 - `config.attributeQuery` (AttributeQueryData, optional): Attribute query configuration
 
@@ -1152,7 +1155,7 @@ const apiDataProcessor = Dictionary.create({
     })
 });
 
-// Complex relation-based computation
+// Complex relation-based computation (Dictionary level)
 const relationAnalyzer = Dictionary.create({
     name: 'relationStats',
     type: 'object',
@@ -1161,12 +1164,12 @@ const relationAnalyzer = Dictionary.create({
         name: 'RelationAnalyzer',
         dataDeps: {
             posts: {
-                type: 'records',
+                type: 'records',  // Global query for all posts
                 source: Post,
                 attributeQuery: ['id', 'title']
             },
             relations: {
-                type: 'relation',
+                type: 'records',  // Global query for all relations
                 source: PostAuthorRelation,
                 attributeQuery: ['source', 'target']
             }
@@ -1190,7 +1193,7 @@ const relationAnalyzer = Dictionary.create({
     })
 });
 
-// Property-level custom computation (requires global data dependency to trigger)
+// Property-level custom computation accessing own properties
 const User = Entity.create({
     name: 'User',
     properties: [
@@ -1204,6 +1207,7 @@ const User = Entity.create({
                 dataDeps: {
                     self: {
                         type: 'property',
+                        property: '_self',  // Special keyword for current record
                         attributeQuery: ['score']
                     },
                     levelConfig: {
@@ -1227,6 +1231,38 @@ const User = Entity.create({
         })
     ]
 });
+
+// Property-level custom computation accessing related entities
+const Order = Entity.create({
+    name: 'Order',
+    properties: [
+        Property.create({ name: 'orderId', type: 'string' }),
+        Property.create({
+            name: 'totalValue',
+            type: 'number',
+            defaultValue: () => 0,
+            computation: Custom.create({
+                name: 'OrderTotalCalculator',
+                dataDeps: {
+                    items: {
+                        type: 'property',  // Access via relation property
+                        property: 'items',  // Property defined by OrderItemRelation
+                        attributeQuery: ['price', 'quantity', 'discount']
+                    }
+                },
+                compute: async function(dataDeps, record) {
+                    const items = dataDeps.items || [];
+                    return items.reduce((total, item) => {
+                        const price = item.price || 0;
+                        const quantity = item.quantity || 1;
+                        const discount = item.discount || 0;
+                        return total + (price * quantity * (1 - discount));
+                    }, 0);
+                }
+            })
+        })
+    ]
+});
 ```
 
 **Advanced Features**
@@ -1238,10 +1274,41 @@ const User = Entity.create({
 3. **Patch-based Updates**: Use `incrementalPatchCompute` for fine-grained updates that return specific changes rather than full recomputation.
 
 4. **Flexible Data Dependencies**: Configure complex data dependencies including:
-   - `type: 'records'`: Fetch entity/relation records
-   - `type: 'property'`: Access current property value
+   - `type: 'records'`: Fetch all entity/relation records globally (for Dictionary/global computations)
+   - `type: 'property'`: Access related entities through relation properties (for Property computations)
    - `type: 'global'`: Access global dictionary values
-   - `type: 'relation'`: Access relation data
+
+**🔴 CRITICAL: dataDeps type Configuration**
+
+**For Property-level Custom computation:**
+- Use `type: 'property'` to access related entities through relations
+- Specify `property: 'propertyName'` where propertyName is defined by the relation
+- Example: If you have a UserPostRelation with `sourceProperty: 'posts'`, use:
+  ```typescript
+  dataDeps: {
+    posts: {
+      type: 'property',  // NOT 'records'!
+      property: 'posts',  // Relation property name
+      attributeQuery: ['title', 'status']
+    }
+  }
+  ```
+
+**For Dictionary-level Custom computation:**
+- Use `type: 'records'` for global entity queries
+- Specify `source: EntityName` to query all records of that entity
+- Example:
+  ```typescript
+  dataDeps: {
+    users: {
+      type: 'records',  // Global query
+      source: User,
+      attributeQuery: ['id', 'status']
+    }
+  }
+  ```
+
+**Common mistake**: Using `type: 'records'` in Property computation won't work correctly - it won't access the related entities for the specific record!
 
 5. **Async Support**: Set `asyncReturn: true` to return async task definitions that will be processed by the system's task queue.
 
@@ -1249,9 +1316,13 @@ const User = Entity.create({
 
 1. **Always provide `getDefaultValue`**: This ensures the computation has a valid initial value
 2. **Use appropriate context type**: Global computations for system-wide values, property computations for entity-specific values
-3. **Handle missing data gracefully**: Check for null/undefined in dataDeps
-4. **Optimize with incremental computation**: Use `incrementalCompute` for expensive calculations
-5. **Property computations need triggers**: Property-level computations require global data dependencies to trigger on entity creation
+3. **Use correct dataDeps type**: 
+   - `type: 'property'` for accessing related entities in Property computations
+   - `type: 'records'` for global queries in Dictionary computations
+   - Never use `type: 'records'` in Property computations (won't access the specific record's relations)
+4. **Handle missing data gracefully**: Check for null/undefined in dataDeps
+5. **Optimize with incremental computation**: Use `incrementalCompute` for expensive calculations
+6. **Property computations need triggers**: Property-level computations require global data dependencies to trigger on entity creation
 
 ### Dictionary.create()
 
@@ -2758,8 +2829,11 @@ type DataContext = {
 
 // Computation dependency
 type DataDep = {
-    type: 'records' | 'property'
-    source?: Entity | Relation
+    type: 'records' | 'property' | 'global'
+    // For type: 'records' - the entity/relation to query globally
+    source?: Entity | Relation | Dictionary  
+    // For type: 'property' - the relation property name to access
+    property?: string  
     attributeQuery?: AttributeQueryData
 }
 

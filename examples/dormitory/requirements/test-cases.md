@@ -1,286 +1,400 @@
-# Dormitory Management System - Test Cases
+# 宿舍管理系统测试用例
 
-## Core Business Logic Tests
+## 测试阶段说明
+测试分为三个阶段进行：
+1. **核心业务逻辑测试**（优先实现）- 测试基本的CRUD操作和状态转换
+2. **权限测试**（核心逻辑通过后实现）- 测试角色权限控制
+3. **业务规则测试**（核心逻辑通过后实现）- 测试复杂的业务约束和验证
 
-### TC001: Create Dormitory (via CreateDormitory Interaction)
+---
+
+## 第一阶段：核心业务逻辑测试
+
+### TC001: 创建宿舍（通过 CreateDormitory Interaction）
 - **Interaction**: CreateDormitory
-- **Preconditions**: Admin user logged in
-- **Input Data**: name="Dorm A", capacity=4
-- **Expected Results**:
-  1. New dormitory record created with provided name and capacity
-  2. Dormitory status is "active"
-  3. Creation timestamp is current time
-  4. 4 bed records automatically created for the dormitory
-  5. All beds have status "available"
-- **Post Validation**: Dormitory appears in dormitory list with correct capacity
+- **前置条件**: 管理员已登录
+- **输入数据**: 
+  ```
+  name: "A栋101"
+  capacity: 4
+  floor: 1
+  building: "A栋"
+  ```
+- **预期结果**:
+  1. 创建新的宿舍记录
+  2. 宿舍状态为'available'
+  3. 自动创建4个床位记录
+  4. 每个床位状态为'vacant'
+  5. 床位编号为"1号床"、"2号床"、"3号床"、"4号床"
+- **后置验证**: 宿舍出现在宿舍列表中，床位数量正确
 
-### TC002: Create Dormitory with Invalid Capacity (via CreateDormitory Interaction)
-- **Interaction**: CreateDormitory
-- **Preconditions**: Admin user logged in
-- **Input Data**: name="Dorm B", capacity=10 (invalid - exceeds limit)
-- **Expected Results**:
-  1. Interaction returns error
-  2. Error message indicates capacity must be between 4-6
-  3. No dormitory record created
-  4. No bed records created
-
-### TC003: Create User (via CreateUser Interaction)
-- **Interaction**: CreateUser
-- **Preconditions**: Admin user logged in
-- **Input Data**: name="John Doe", email="john@example.com", role="student"
-- **Expected Results**:
-  1. New user record created with provided details
-  2. User status is "active"
-  3. User points initialized to 100
-  4. Creation timestamp is current time
-  5. User has no dormitory or bed assignment initially
-
-### TC004: Assign User to Dormitory (via AssignUserToDormitory Interaction)
+### TC002: 分配用户到宿舍（通过 AssignUserToDormitory Interaction）
 - **Interaction**: AssignUserToDormitory
-- **Preconditions**: 
-  - Admin user logged in
-  - Dormitory exists with available capacity
-  - User exists without dormitory assignment
-- **Input Data**: userId="user123", dormitoryId="dorm456"
-- **Expected Results**:
-  1. UserDormitoryRelation created linking user to dormitory
-  2. User's dormitory property now references the assigned dormitory
-  3. Dormitory's users list includes the assigned user
-  4. Assignment timestamp is recorded
-  5. Dormitory occupancy count increases by 1
+- **前置条件**: 
+  - 管理员已登录
+  - 存在宿舍"A栋101"，有空闲床位
+  - 存在用户"张三"，未分配宿舍
+- **输入数据**:
+  ```
+  userId: "user-zhang"
+  dormitoryId: "dorm-a101"
+  bedId: "bed-1"
+  ```
+- **预期结果**:
+  1. 创建用户-宿舍关系
+  2. 创建用户-床位关系
+  3. 床位状态变为'occupied'
+  4. 宿舍入住人数增加1
+  5. 记录分配时间
+- **后置验证**: 用户的宿舍信息正确，床位状态已更新
 
-### TC005: Assign User to Full Dormitory (via AssignUserToDormitory Interaction)
-- **Interaction**: AssignUserToDormitory
-- **Preconditions**:
-  - Admin user logged in
-  - Dormitory exists at full capacity
-  - User exists without dormitory assignment
-- **Input Data**: userId="user123", dormitoryId="dorm456" (full dormitory)
-- **Expected Results**:
-  1. Interaction returns error
-  2. Error message indicates dormitory is full
-  3. No assignment relation created
-  4. User remains unassigned
+### TC003: 任命宿舍长（通过 AppointDormHead Interaction）
+- **Interaction**: AppointDormHead
+- **前置条件**:
+  - 管理员已登录
+  - 用户"张三"已分配到宿舍"A栋101"
+- **输入数据**:
+  ```
+  userId: "user-zhang"
+  dormitoryId: "dorm-a101"
+  ```
+- **预期结果**:
+  1. 用户角色更新为'dormHead'
+  2. 创建宿舍-宿舍长关系
+  3. 记录任命时间
+- **后置验证**: 用户角色正确，宿舍有对应的宿舍长
 
-### TC006: Assign User to Bed (via AssignUserToBed Interaction)
-- **Interaction**: AssignUserToBed
-- **Preconditions**:
-  - Admin user logged in
-  - User already assigned to dormitory
-  - Bed exists and is available in user's dormitory
-- **Input Data**: userId="user123", bedId="bed789"
-- **Expected Results**:
-  1. UserBedRelation created linking user to bed
-  2. User's bed property now references the assigned bed
-  3. Bed's user property now references the assigned user
-  4. Bed status changes to "occupied"
-  5. Assignment timestamp is recorded
+### TC004: 记录扣分（通过 RecordPointDeduction Interaction）
+- **Interaction**: RecordPointDeduction
+- **前置条件**:
+  - 宿舍长"张三"已登录
+  - 存在同宿舍成员"李四"，初始积分100
+- **输入数据**:
+  ```
+  targetUserId: "user-li"
+  reason: "宿舍卫生不合格"
+  points: 10
+  category: "hygiene"
+  ```
+- **预期结果**:
+  1. 创建扣分记录
+  2. 用户积分减少10分（变为90分）
+  3. 记录扣分时间和记录者
+  4. 用户的扣分次数增加1
+- **后置验证**: 扣分记录存在，用户积分正确更新
 
-### TC007: Deduct Points from User (via DeductPoints Interaction)
-- **Interaction**: DeductPoints
-- **Preconditions**:
-  - Dorm head user logged in
-  - Target user is in dorm head's dormitory
-  - User has sufficient points (> deduction amount)
-- **Input Data**: userId="user123", points=10, reason="Late curfew"
-- **Expected Results**:
-  1. PointDeduction record created with all details
-  2. User's points decrease by specified amount
-  3. Deduction timestamp is current time
-  4. RecordedBy field contains dorm head's ID
-  5. User's point history is updated
-
-### TC008: Request Eviction (via RequestEviction Interaction)
+### TC005: 申请踢出用户（通过 RequestEviction Interaction）
 - **Interaction**: RequestEviction
-- **Preconditions**:
-  - Dorm head user logged in
-  - Target user is in dorm head's dormitory
-  - User points are below eviction threshold (e.g., 50)
-- **Input Data**: userId="user123", reason="Multiple rule violations"
-- **Expected Results**:
-  1. EvictionRequest record created with pending status
-  2. Request contains user ID, reason, and requesting dorm head
-  3. Creation timestamp is current time
-  4. Request appears in admin's pending requests list
+- **前置条件**:
+  - 宿舍长已登录
+  - 目标用户积分已低于30分（经过多次扣分）
+- **输入数据**:
+  ```
+  targetUserId: "user-wang"
+  reason: "多次违反宿舍规定，积分过低"
+  ```
+- **预期结果**:
+  1. 创建踢出申请记录
+  2. 申请状态为'pending'
+  3. 记录申请时间和申请人
+  4. 记录当前累计扣分
+- **后置验证**: 申请记录存在，状态正确
 
-### TC009: Approve Eviction Request (via ApproveEviction Interaction)
+### TC006: 批准踢出申请（通过 ApproveEviction Interaction）
 - **Interaction**: ApproveEviction
-- **Preconditions**:
-  - Admin user logged in
-  - Eviction request exists with pending status
-  - Requested user is still in dormitory
-- **Input Data**: requestId="evict456"
-- **Expected Results**:
-  1. EvictionRequest status changes to "approved"
-  2. Processed timestamp is current time
-  3. ProcessedBy field contains admin's ID
-  4. User is removed from dormitory (UserDormitoryRelation deleted)
-  5. User is removed from bed (UserBedRelation deleted)
-  6. User status changes to "evicted"
-  7. Bed status changes to "available"
+- **前置条件**:
+  - 管理员已登录
+  - 存在待处理的踢出申请
+- **输入数据**:
+  ```
+  requestId: "evict-001"
+  adminComment: "情况属实，批准踢出"
+  ```
+- **预期结果**:
+  1. 申请状态变为'approved'
+  2. 目标用户状态变为'inactive'
+  3. 解除用户-宿舍关系
+  4. 解除用户-床位关系
+  5. 床位状态变为'vacant'
+  6. 宿舍入住人数减少1
+  7. 记录处理时间和审批人
+- **后置验证**: 用户已无宿舍关系，床位已释放
 
-### TC010: Reject Eviction Request (via RejectEviction Interaction)
+### TC007: 拒绝踢出申请（通过 RejectEviction Interaction）
 - **Interaction**: RejectEviction
-- **Preconditions**:
-  - Admin user logged in
-  - Eviction request exists with pending status
-- **Input Data**: requestId="evict456"
-- **Expected Results**:
-  1. EvictionRequest status changes to "rejected"
-  2. Processed timestamp is current time
-  3. ProcessedBy field contains admin's ID
-  4. User remains in dormitory with no changes
-  5. Bed assignment remains unchanged
+- **前置条件**:
+  - 管理员已登录
+  - 存在待处理的踢出申请
+- **输入数据**:
+  ```
+  requestId: "evict-002"
+  adminComment: "首次违规，给予改正机会"
+  ```
+- **预期结果**:
+  1. 申请状态变为'rejected'
+  2. 用户状态保持不变
+  3. 用户宿舍关系保持不变
+  4. 记录处理时间和审批人
+- **后置验证**: 用户仍在原宿舍
 
-## Permission Tests
+### TC008: 查看我的宿舍信息（通过 ViewMyDormitory Interaction）
+- **Interaction**: ViewMyDormitory
+- **前置条件**: 普通用户已登录并分配了宿舍
+- **输入数据**: 无（使用当前用户）
+- **预期结果**:
+  1. 返回用户的宿舍信息
+  2. 包含宿舍名称、楼栋、楼层
+  3. 包含床位号
+  4. 包含同宿舍成员列表
+- **后置验证**: 信息准确完整
 
-### TC101: Non-Admin Creating Dormitory (via CreateDormitory Interaction)
+### TC009: 查看我的积分记录（通过 ViewMyPoints Interaction）
+- **Interaction**: ViewMyPoints
+- **前置条件**: 用户已登录，有扣分记录
+- **输入数据**: 无（使用当前用户）
+- **预期结果**:
+  1. 返回当前积分
+  2. 返回所有扣分记录列表
+  3. 每条记录包含原因、分数、时间、记录者
+- **后置验证**: 记录完整准确
+
+### TC010: 宿舍满员自动更新状态
+- **Interaction**: AssignUserToDormitory（多次调用）
+- **前置条件**: 宿舍容量为4，已有3人入住
+- **输入数据**: 分配第4个用户
+- **预期结果**:
+  1. 第4个用户成功分配
+  2. 宿舍状态自动变为'full'
+  3. 宿舍可用床位数为0
+- **后置验证**: 状态正确更新
+
+---
+
+## 第二阶段：权限测试
+
+### TC011: 非管理员尝试创建宿舍（权限拒绝）
 - **Interaction**: CreateDormitory
-- **Preconditions**: Non-admin user (student/dorm head) logged in
-- **Input Data**: name="Unauthorized Dorm", capacity=4
-- **Expected Results**:
-  1. Interaction returns error
-  2. Error indicates insufficient permissions
-  3. No dormitory created
+- **测试阶段**: 权限测试
+- **前置条件**: 普通用户或宿舍长登录
+- **输入数据**: 宿舍创建信息
+- **预期结果**:
+  1. Interaction返回错误
+  2. 错误类型为"permission denied"
+  3. 没有创建宿舍记录
+- **注意**: 不要使用storage.create测试，会绕过权限检查
 
-### TC102: Student Deducting Points (via DeductPoints Interaction)
-- **Interaction**: DeductPoints
-- **Preconditions**: Student user logged in
-- **Input Data**: userId="otherUser", points=5, reason="Test"
-- **Expected Results**:
-  1. Interaction returns error
-  2. Error indicates insufficient permissions
-  3. No points deducted
-  4. No deduction record created
+### TC012: 宿舍长只能记录本宿舍成员扣分
+- **Interaction**: RecordPointDeduction
+- **测试阶段**: 权限测试
+- **前置条件**: 
+  - 宿舍长登录（A栋101宿舍长）
+  - 目标用户在B栋202宿舍
+- **输入数据**: 其他宿舍用户的扣分信息
+- **预期结果**:
+  1. Interaction返回错误
+  2. 错误信息表明无权对其他宿舍成员扣分
+  3. 没有创建扣分记录
+- **后置验证**: 目标用户积分未变化
 
-### TC103: Dorm Head Deducting Points from Other Dormitory (via DeductPoints Interaction)
-- **Interaction**: DeductPoints
-- **Preconditions**: Dorm head logged in, targeting user from different dormitory
-- **Input Data**: userId="otherDormUser", points=5, reason="Test"
-- **Expected Results**:
-  1. Interaction returns error
-  2. Error indicates cannot deduct points from users outside dormitory
-  3. No points deducted
+### TC013: 普通用户无法记录扣分
+- **Interaction**: RecordPointDeduction
+- **测试阶段**: 权限测试
+- **前置条件**: 普通用户登录
+- **输入数据**: 扣分信息
+- **预期结果**:
+  1. Interaction返回错误
+  2. 错误类型为"permission denied"
+  3. 没有创建扣分记录
 
-### TC104: Student Requesting Eviction (via RequestEviction Interaction)
-- **Interaction**: RequestEviction
-- **Preconditions**: Student user logged in
-- **Input Data**: userId="targetUser", reason="Test"
-- **Expected Results**:
-  1. Interaction returns error
-  2. Error indicates insufficient permissions
-  3. No eviction request created
-
-### TC105: Non-Admin Approving Eviction (via ApproveEviction Interaction)
+### TC014: 只有管理员能审批踢出申请
 - **Interaction**: ApproveEviction
-- **Preconditions**: Non-admin user (student/dorm head) logged in
-- **Input Data**: requestId="pendingRequest"
-- **Expected Results**:
-  1. Interaction returns error
-  2. Error indicates insufficient permissions
-  3. Request status remains unchanged
+- **测试阶段**: 权限测试
+- **前置条件**: 宿舍长或普通用户登录
+- **输入数据**: 申请ID
+- **预期结果**:
+  1. Interaction返回错误
+  2. 错误类型为"permission denied"
+  3. 申请状态保持'pending'
 
-## Business Rule Tests
+### TC015: 管理员可以查看所有宿舍信息
+- **Interaction**: ViewAllDormitories（如果有）
+- **测试阶段**: 权限测试
+- **前置条件**: 管理员登录
+- **预期结果**:
+  1. 返回所有宿舍列表
+  2. 包含每个宿舍的详细信息
+  3. 包含入住率统计
 
-### TC201: Assign User Already in Dormitory (via AssignUserToDormitory Interaction)
-- **Interaction**: AssignUserToDormitory
-- **Preconditions**: User already assigned to a dormitory
-- **Input Data**: userId="assignedUser", dormitoryId="newDorm"
-- **Expected Results**:
-  1. Interaction returns error
-  2. Error indicates user already assigned to dormitory
-  3. No new assignment created
-  4. User remains in original dormitory
+---
 
-### TC202: Create Duplicate Dormitory Name (via CreateDormitory Interaction)
+## 第三阶段：业务规则测试
+
+### TC016: 宿舍容量限制验证
 - **Interaction**: CreateDormitory
-- **Preconditions**: Dormitory with same name already exists
-- **Input Data**: name="Existing Name", capacity=4
-- **Expected Results**:
-  1. Interaction returns error
-  2. Error indicates dormitory name must be unique
-  3. No new dormitory created
+- **测试阶段**: 业务规则
+- **前置条件**: 管理员登录
+- **输入数据**: 
+  ```
+  capacity: 8  // 超出6的上限
+  ```
+- **预期结果**:
+  1. Interaction返回错误
+  2. 错误信息表明容量必须在4-6之间
+  3. 没有创建宿舍记录
 
-### TC203: Deduct More Points Than Available (via DeductPoints Interaction)
-- **Interaction**: DeductPoints
-- **Preconditions**: User has 10 points
-- **Input Data**: userId="lowPointUser", points=15, reason="Test"
-- **Expected Results**:
-  1. Interaction returns error
-  2. Error indicates insufficient points
-  3. No deduction performed
-  4. User points remain unchanged
-
-### TC204: Request Eviction with High Points (via RequestEviction Interaction)
-- **Interaction**: RequestEviction
-- **Preconditions**: Target user has 80 points (above threshold)
-- **Input Data**: userId="highPointUser", reason="Test"
-- **Expected Results**:
-  1. Interaction returns error
-  2. Error indicates user points too high for eviction
-  3. No eviction request created
-
-### TC205: Approve Already Processed Request (via ApproveEviction Interaction)
-- **Interaction**: ApproveEviction
-- **Preconditions**: Eviction request already approved
-- **Input Data**: requestId="processedRequest"
-- **Expected Results**:
-  1. Interaction returns error
-  2. Error indicates request already processed
-  3. Request status remains unchanged
-
-### TC206: Assign Bed from Different Dormitory (via AssignUserToBed Interaction)
-- **Interaction**: AssignUserToBed
-- **Preconditions**: Bed is in different dormitory than user's assigned dormitory
-- **Input Data**: userId="user123", bedId="otherDormBed"
-- **Expected Results**:
-  1. Interaction returns error
-  2. Error indicates bed must be in user's dormitory
-  3. No bed assignment created
-
-### TC207: Assign Already Occupied Bed (via AssignUserToBed Interaction)
-- **Interaction**: AssignUserToBed
-- **Preconditions**: Bed already occupied by another user
-- **Input Data**: userId="user123", bedId="occupiedBed"
-- **Expected Results**:
-  1. Interaction returns error
-  2. Error indicates bed already occupied
-  3. No bed assignment created
-  4. Current occupant remains assigned
-
-## Edge Case Tests
-
-### TC301: Create User with Duplicate Email (via CreateUser Interaction)
-- **Interaction**: CreateUser
-- **Preconditions**: User with same email already exists
-- **Input Data**: name="John Doe", email="existing@example.com", role="student"
-- **Expected Results**:
-  1. Interaction returns error
-  2. Error indicates email must be unique
-  3. No user created
-
-### TC302: View Evicted User Profile
-- **Interaction**: ViewUser (implicit through data retrieval)
-- **Preconditions**: User has been evicted
-- **Expected Results**:
-  1. User profile shows evicted status
-  2. No dormitory or bed assignment displayed
-  3. Point history still accessible
-
-### TC303: Assign User to Deleted Dormitory
+### TC017: 用户不能重复分配宿舍
 - **Interaction**: AssignUserToDormitory
-- **Preconditions**: Dormitory has been marked as inactive
-- **Input Data**: userId="user123", dormitoryId="inactiveDorm"
-- **Expected Results**:
-  1. Interaction returns error
-  2. Error indicates dormitory not available
-  3. No assignment created
+- **测试阶段**: 业务规则
+- **前置条件**: 用户已分配到A栋101
+- **输入数据**: 尝试分配到B栋202
+- **预期结果**:
+  1. Interaction返回错误
+  2. 错误信息表明用户已有宿舍
+  3. 用户宿舍关系未改变
 
-### TC304: Multiple Simultaneous Eviction Requests
+### TC018: 床位不能重复分配
+- **Interaction**: AssignUserToDormitory
+- **测试阶段**: 业务规则
+- **前置条件**: 床位已被占用
+- **输入数据**: 尝试分配到已占用床位
+- **预期结果**:
+  1. Interaction返回错误
+  2. 错误信息表明床位已占用
+  3. 床位状态保持不变
+
+### TC019: 积分高于30分不能申请踢出
 - **Interaction**: RequestEviction
-- **Preconditions**: User already has pending eviction request
-- **Input Data**: userId="user123", reason="Another reason"
-- **Expected Results**:
-  1. Interaction returns error
-  2. Error indicates pending request already exists
-  3. No duplicate request created
+- **测试阶段**: 业务规则
+- **前置条件**: 
+  - 宿舍长登录
+  - 目标用户积分为50分
+- **输入数据**: 踢出申请信息
+- **预期结果**:
+  1. Interaction返回错误
+  2. 错误信息表明积分未达到踢出标准
+  3. 没有创建申请记录
+
+### TC020: 扣分数值必须为正数
+- **Interaction**: RecordPointDeduction
+- **测试阶段**: 业务规则
+- **前置条件**: 宿舍长登录
+- **输入数据**: 
+  ```
+  points: -10  // 负数扣分
+  ```
+- **预期结果**:
+  1. Interaction返回错误
+  2. 错误信息表明扣分必须为正数
+  3. 用户积分未变化
+
+### TC021: 满员宿舍不能继续分配
+- **Interaction**: AssignUserToDormitory
+- **测试阶段**: 业务规则
+- **前置条件**: 宿舍状态为'full'
+- **输入数据**: 尝试分配新用户
+- **预期结果**:
+  1. Interaction返回错误
+  2. 错误信息表明宿舍已满
+  3. 宿舍入住人数未变化
+
+### TC022: 只能任命本宿舍成员为宿舍长
+- **Interaction**: AppointDormHead
+- **测试阶段**: 业务规则
+- **前置条件**: 
+  - 管理员登录
+  - 用户不在目标宿舍
+- **输入数据**: 非宿舍成员的用户ID
+- **预期结果**:
+  1. Interaction返回错误
+  2. 错误信息表明用户必须是宿舍成员
+  3. 宿舍长关系未创建
+
+### TC023: 用户积分不能为负数
+- **Interaction**: RecordPointDeduction
+- **测试阶段**: 业务规则
+- **前置条件**: 用户当前积分为5分
+- **输入数据**: 
+  ```
+  points: 10  // 扣分后会变成-5
+  ```
+- **预期结果**:
+  1. Interaction返回错误或将积分设为0
+  2. 用户积分最低为0
+  3. 扣分记录仍创建（记录实际扣分）
+
+### TC024: 已处理的踢出申请不能再次处理
+- **Interaction**: ApproveEviction
+- **测试阶段**: 业务规则
+- **前置条件**: 申请状态已为'approved'或'rejected'
+- **输入数据**: 已处理的申请ID
+- **预期结果**:
+  1. Interaction返回错误
+  2. 错误信息表明申请已处理
+  3. 申请状态未改变
+
+### TC025: 级联更新测试 - 用户被踢出后的关联数据清理
+- **Interaction**: ApproveEviction
+- **测试阶段**: 业务规则
+- **前置条件**: 
+  - 用户有宿舍关系
+  - 用户有床位关系
+  - 用户有扣分记录
+- **预期结果**:
+  1. 用户-宿舍关系被删除
+  2. 用户-床位关系被删除
+  3. 扣分记录保留（审计需要）
+  4. 用户状态变为'inactive'
+  5. 床位状态变为'vacant'
+
+---
+
+## 异常场景测试
+
+### TC026: 并发分配同一床位
+- **Interaction**: AssignUserToDormitory（并发调用）
+- **前置条件**: 两个管理员同时操作
+- **输入数据**: 两个不同用户分配到同一床位
+- **预期结果**:
+  1. 只有一个分配成功
+  2. 另一个返回床位已占用错误
+  3. 数据一致性保持
+
+### TC027: 空值和边界值测试
+- **各个Interaction**: 
+- **测试内容**:
+  - 必填字段为空
+  - 字符串超长
+  - 数值为0或边界值
+- **预期结果**: 适当的验证错误
+
+---
+
+## 测试数据准备
+
+### 初始数据
+1. **管理员账户**: 
+   - email: admin@dorm.com
+   - role: admin
+   
+2. **测试用户**:
+   - 张三: user1@dorm.com (将成为宿舍长)
+   - 李四: user2@dorm.com
+   - 王五: user3@dorm.com
+   - 赵六: user4@dorm.com
+   - 钱七: user5@dorm.com
+
+3. **测试宿舍**:
+   - A栋101 (容量4)
+   - B栋202 (容量6)
+   - C栋303 (容量5)
+
+---
+
+## 测试执行顺序
+
+1. 先执行第一阶段核心业务逻辑测试（TC001-TC010）
+2. 核心功能稳定后，执行第二阶段权限测试（TC011-TC015）
+3. 最后执行第三阶段业务规则测试（TC016-TC025）
+4. 补充异常场景测试（TC026-TC027）
+
+每个测试用例应该独立运行，使用beforeEach进行数据初始化，确保测试之间不相互影响。

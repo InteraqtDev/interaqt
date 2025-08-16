@@ -8,6 +8,7 @@ interface PropertyComputation {
   propertyName: string;
   computationDecision: string;
   dependencies?: string[];
+  interactionDependencies?: string[];
   reasoning?: string;
   calculationMethod?: string;
 }
@@ -16,6 +17,7 @@ interface EntityComputation {
   type: string;
   source?: string;
   dependencies?: string[];
+  interactionDependencies?: string[];
   reasoning?: string;
   calculationMethod?: string;
 }
@@ -29,6 +31,7 @@ interface Entity {
 interface RelationComputation {
   computationDecision: string;
   dependencies?: string[];
+  interactionDependencies?: string[];
   reasoning?: string;
   calculationMethod?: string;
 }
@@ -43,6 +46,7 @@ interface Dictionary {
   computation?: {
     type: string;
     dependencies?: string[];
+    interactionDependencies?: string[];
   };
 }
 
@@ -61,6 +65,7 @@ interface ComputationNode {
   dictionaryName?: string;
   computationType: string;
   dependencies: string[];
+  interactionDependencies?: string[];
   reasoning?: string;
   calculationMethod?: string;
   completed: boolean;
@@ -157,6 +162,7 @@ function buildComputationGraph(analysis: ComputationAnalysis): { nodes: Computat
         entityName: entity.name,
         computationType: entity.entityComputationDecision.type,
         dependencies: parsedDeps,
+        interactionDependencies: entity.entityComputationDecision.interactionDependencies,
         reasoning: entity.entityComputationDecision.reasoning,
         calculationMethod: entity.entityComputationDecision.calculationMethod,
         completed: false
@@ -177,6 +183,7 @@ function buildComputationGraph(analysis: ComputationAnalysis): { nodes: Computat
           propertyName: prop.propertyName,
           computationType: prop.computationDecision,
           dependencies: parsedDeps,
+          interactionDependencies: prop.interactionDependencies,
           reasoning: prop.reasoning,
           calculationMethod: prop.calculationMethod,
           completed: false
@@ -198,6 +205,7 @@ function buildComputationGraph(analysis: ComputationAnalysis): { nodes: Computat
         relationName: relation.name,
         computationType: relation.relationAnalysis.computationDecision,
         dependencies: parsedDeps,
+        interactionDependencies: relation.relationAnalysis.interactionDependencies,
         reasoning: relation.relationAnalysis.reasoning,
         calculationMethod: relation.relationAnalysis.calculationMethod,
         completed: false
@@ -218,6 +226,7 @@ function buildComputationGraph(analysis: ComputationAnalysis): { nodes: Computat
         dictionaryName: dict.name,
         computationType: dict.computation.type,
         dependencies: parsedDeps,
+        interactionDependencies: dict.computation.interactionDependencies,
         reasoning: '',
         calculationMethod: '',
         completed: false

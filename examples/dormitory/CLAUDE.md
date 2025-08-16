@@ -47,6 +47,27 @@ This guide provides a comprehensive step-by-step process for generating backend 
 - Analyze user business requirements, supplement vague or missing details
 - Analyze from data perspective: identify all entities, properties, relationships
 - Analyze from interaction perspective: list all user operations, permission requirements, business processes
+
+**🔴 CRITICAL: Entity Design Principle**
+- **NEVER include reference IDs as entity properties!**
+- ❌ WRONG: Entity has properties like `userId`, `postId`, `requestId`, `dormitoryId`
+- ✅ CORRECT: Use Relations to connect entities - Relations define the property names for accessing related entities
+- Example:
+  ```
+  ❌ WRONG:
+  PointDeduction entity with property: userId: string
+
+  ✅ CORRECT:
+  UserPointDeductionRelation defines:
+  - source: User 
+  - sourceProperty: 'pointDeductions' (accessed related PointDeduction via property 'pointDeductions')
+  - target: PointDeduction 
+  - targetProperty: 'user' (accessed via property 'user')
+  ```
+- Entity properties should ONLY contain:
+  - Primitive data specific to that entity (name, status, points, timestamp)
+  - NO references to other entities (those belong in Relations)
+
 - Create `requirements/detailed-requirements.md` document
 
 **✅ END Task 1.1: Update `docs/STATUS.json`:**
@@ -159,6 +180,8 @@ Create `requirements/interaction-matrix.md` to ensure:
 }
 ```
 
+**🛑 STOP: Task 1 completed. Wait for user instructions before proceeding to Task 2.**
+
 ## Task 2: Design and Analysis
 
 **📖 START: Read `docs/STATUS.json` to check current progress before proceeding.**
@@ -174,7 +197,7 @@ Create `requirements/interaction-matrix.md` to ensure:
 ### 🔴 Document-First Approach
 **Task 2 focuses on creating comprehensive design documents before any code generation.**
 
-### Task 2.1: Entity and Relation Analysis
+### Task 2.1: Data Analysis
 
 **🔄 Update `docs/STATUS.json`:**
 ```json
@@ -183,87 +206,11 @@ Create `requirements/interaction-matrix.md` to ensure:
   "completed": false
 }
 ```
-**📖 MUST READ: `./agentspace/knowledge/generator/entity-relation-generation.md`**
+**📖 Follow strictly according to `./agentspace/knowledge/generator/data-analysis.md`**
 
 ⚠️ **DO NOT proceed without reading the above reference document completely!**
 
-**Create `docs/entity-relation-design.md` documenting:**
-
-- [ ] All entities identified from use cases
-- [ ] Each entity's properties with types and purposes
-- [ ] All relations between entities
-- [ ] Relation properties and cardinality (1:1, 1:n, n:n)
-- [ ] Document the business meaning of each entity and relation
-- [ ] Include data flow diagrams if helpful
-
-**🔴 CRITICAL: Entity Property Design Rules**
-- **NEVER include reference ID fields in entity properties!**
-  - ❌ WRONG: User entity with `dormitoryId` property
-  - ❌ WRONG: Article entity with `authorId` property
-  - ✅ CORRECT: Define these as Relations instead
-- **Relationships are defined through Relation definitions ONLY**
-- **The property name to access related entities is defined in the Relation**
-  - Example: `UserDormitoryRelation` might create `user.dormitory` and `dormitory.users`
-- **Entity properties should only contain:**
-  - Primitive values (string, number, boolean)
-  - Computed values based on the entity itself
-  - Embedded data structures (objects/arrays) that are part of the entity
-- **All inter-entity connections MUST use Relations**
-
-**Example structure:**
-```markdown
-# Entity and Relation Design
-
-## Entities
-
-### User
-- **Purpose**: System users with different roles
-- **Properties**:
-  - id: string (system-generated)
-  - name: string (user's display name)
-  - email: string (unique identifier)
-  - role: string (admin/dormHead/student)
-
-### Dormitory
-- **Purpose**: Dormitory buildings
-- **Properties**:
-  - id: string
-  - name: string
-  - capacity: number (4-6 beds)
-  
-❌ **Common Mistake to Avoid:**
-```typescript
-// WRONG: Don't add ID references as properties
-const User = Entity.create({
-  properties: [
-    Property.create({ name: 'dormitoryId', type: 'string' }), // ❌ NO!
-    Property.create({ name: 'supervisorId', type: 'string' })  // ❌ NO!
-  ]
-})
-
-// CORRECT: Use Relations instead
-const UserDormitoryRelation = Relation.create({
-  source: User,
-  target: Dormitory,
-  sourceProperty: 'dormitory',  // Creates user.dormitory
-  targetProperty: 'users',      // Creates dormitory.users
-  type: 'n:1'
-})
-```
-
-## Relations
-
-### UserDormitoryRelation
-- **Type**: n:1 (many users to one dormitory)
-- **Purpose**: Assigns students to dormitories
-- **Source Property**: `dormitory` (on User entity)
-- **Target Property**: `users` (on Dormitory entity)
-- **Properties**: 
-  - assignedAt: number (timestamp)
-  - status: string (active/inactive)
-
-Note: The relation creates `user.dormitory` to access the assigned dormitory and `dormitory.users` to access all users in that dormitory. No ID fields are needed in the entities.
-```
+**Use the Analysis Documentation Template from `data-analysis.md` to create your `docs/data-design.json`**
 
 **✅ END Task 2.1: Update `docs/STATUS.json`:**
 ```json
@@ -359,7 +306,7 @@ Note: The relation creates `user.dormitory` to access the assigned dormitory and
 **🔴 MANDATORY PROCESS:**
 1. **FIRST**: Read and understand `computation-selection-guide.md` completely
 2. **USE PREVIOUS OUTPUTS**: Base your analysis on:
-   - `docs/entity-relation-design.md` (from Task 2.1)
+   - `docs/data-design.json` (from Task 2.1)
    - `docs/interaction-design.md` (from Task 2.2)
 3. **ANALYZE**: For EVERY entity and EVERY property, follow the step-by-step analysis process
 4. **DOCUMENT**: Create `docs/computation-analysis.json` documenting your analysis for each entity/property
@@ -382,12 +329,14 @@ Note: The relation creates `user.dormitory` to access the assigned dormitory and
   "currentTask": "Task 2",
   "completed": true,
   "completedItems": [
-    "entity-relation-design.md created",
+    "data-design.json created",
     "interaction-design.md created",
     "computation-analysis.json created"
   ]
 }
 ```
+
+**🛑 STOP: Task 2 completed. Wait for user instructions before proceeding to Task 3.**
 
 ## Task 3: Code Generation and Progressive Testing
 
@@ -479,10 +428,12 @@ Common issues that can be avoided by reading the API reference:
 ```
 - Clear next steps
 
-- [ ] Generate all entities based on `docs/entity-relation-design.md`. **DO NOT define any computations yet**. No `computed` or `computation` on properties
+- [ ] Generate all entities based on `docs/data-design.json`. **DO NOT define any computations yet**. No `computed` or `computation` on properties
 - [ ] Define entity properties with correct types
-  - **Remember: NO reference ID fields in entities!**
-  - Only primitive values and entity-specific data
+  - **🔴 CRITICAL: NO reference ID fields in entities!**
+    - ❌ NEVER: `userId`, `postId`, `requestId`, `dormitoryId` as properties
+    - ✅ Relations will handle all entity connections
+  - Only primitive values and entity-specific data (name, status, timestamp, etc.)
   - **IMPORTANT: If a property will have `computed` or `computation`, do NOT set `defaultValue`**
     - The computation will provide the value, defaultValue would conflict
     - Either use defaultValue OR computation, never both
@@ -851,6 +802,8 @@ Since permissions and business rules are now unified in the `condition` API, the
 }
 ```
 
+**🛑 STOP: Task 3 completed. Wait for user instructions before proceeding to Task 4.**
+
 ## Task 4: Complete Functional Testing
 
 **📖 START: Read `docs/STATUS.json` to check current progress before proceeding.**
@@ -1105,7 +1058,6 @@ This phase ensures your implementation meets all business requirements through c
   ]
 }
 ```
-
 **✅ PROJECT COMPLETE: Final update to `docs/STATUS.json`:**
 ```json
 {
