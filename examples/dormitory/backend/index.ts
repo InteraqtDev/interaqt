@@ -53,7 +53,7 @@ const User = Entity.create({
     Property.create({
       name: 'points',
       type: 'number'
-      // Managed by StateMachine computation
+      // Managed by StateMachine computation - defaults to 100
     }),
     Property.create({
       name: 'joinedAt',
@@ -343,304 +343,6 @@ const EvictionRequestApproverRelation = Relation.create({
   ]
 })
 
-// ================== CONDITIONS ==================
-
-// Role-based permission conditions
-const AdminRole = Condition.create({
-  name: 'AdminRole',
-  content: async function(this: Controller, event: any) {
-    return event.user?.role === 'admin';
-  }
-});
-
-const DormHeadRole = Condition.create({
-  name: 'DormHeadRole',
-  content: async function(this: Controller, event: any) {
-    return event.user?.role === 'dormHead';
-  }
-});
-
-const AdminOrDormHead = Condition.create({
-  name: 'AdminOrDormHead',
-  content: async function(this: Controller, event: any) {
-    const role = event.user?.role;
-    return role === 'admin' || role === 'dormHead';
-  }
-});
-
-const AuthenticatedUser = Condition.create({
-  name: 'AuthenticatedUser',
-  content: async function(this: Controller, event: any) {
-    return !!event.user && !!event.user.id;
-  }
-});
-
-// Business rule conditions for CreateDormitory
-const ValidDormitoryCapacity = Condition.create({
-  name: 'ValidDormitoryCapacity',
-  content: async function(this: Controller, event: any) {
-    const capacity = event.payload?.capacity;
-    return capacity >= 4 && capacity <= 6;
-  }
-});
-
-const UniqueDormitoryName = Condition.create({
-  name: 'UniqueDormitoryName',
-  content: async function(this: Controller, event: any) {
-    const name = event.payload?.name;
-    if (!name) return false;
-    
-    const existing = await this.system.storage.findOne('Dormitory',
-      MatchExp.atom({ key: 'name', value: ['=', name] }),
-      undefined,
-      ['id']
-    );
-    
-    return !existing;
-  }
-});
-
-// Business rule conditions for AssignUserToDormitory
-const UserNotAssigned = Condition.create({
-  name: 'UserNotAssigned',
-  content: async function(this: Controller, event: any) {
-    const userId = event.payload?.userId;
-    if (!userId) return false;
-    
-    const existingRelation = await this.system.storage.findOne('UserDormitoryRelation',
-      MatchExp.atom({ key: 'source', value: ['=', { id: userId }] }),
-      undefined,
-      ['id']
-    );
-    
-    return !existingRelation;
-  }
-});
-
-const BedIsVacant = Condition.create({
-  name: 'BedIsVacant',
-  content: async function(this: Controller, event: any) {
-    const bedId = event.payload?.bedId;
-    if (!bedId) return false;
-    
-    const bed = await this.system.storage.findOne('Bed',
-      MatchExp.atom({ key: 'id', value: ['=', bedId] }),
-      undefined,
-      ['status']
-    );
-    
-    return bed?.status === 'vacant';
-  }
-});
-
-const BedBelongsToDormitory = Condition.create({
-  name: 'BedBelongsToDormitory',
-  content: async function(this: Controller, event: any) {
-    const bedId = event.payload?.bedId;
-    const dormitoryId = event.payload?.dormitoryId;
-    if (!bedId || !dormitoryId) return false;
-    
-    const relation = await this.system.storage.findOne('DormitoryBedRelation',
-      BoolExp.and(
-        MatchExp.atom({ key: 'source', value: ['=', { id: dormitoryId }] }),
-        MatchExp.atom({ key: 'target', value: ['=', { id: bedId }] })
-      ),
-      undefined,
-      ['id']
-    );
-    
-    return !!relation;
-  }
-});
-
-// Business rule conditions for AppointDormHead
-const UserInTargetDormitory = Condition.create({
-  name: 'UserInTargetDormitory',
-  content: async function(this: Controller, event: any) {
-    const userId = event.payload?.userId;
-    const dormitoryId = event.payload?.dormitoryId;
-    if (!userId || !dormitoryId) return false;
-    
-    const relation = await this.system.storage.findOne('UserDormitoryRelation',
-      BoolExp.and(
-        MatchExp.atom({ key: 'source', value: ['=', { id: userId }] }),
-        MatchExp.atom({ key: 'target', value: ['=', { id: dormitoryId }] })
-      ),
-      undefined,
-      ['id']
-    );
-    
-    return !!relation;
-  }
-});
-
-// Business rule conditions for RecordPointDeduction
-const DormHeadSameDormitory = Condition.create({
-  name: 'DormHeadSameDormitory',
-  content: async function(this: Controller, event: any) {
-    // Admin can deduct from anyone
-    if (event.user?.role === 'admin') return true;
-    
-    // DormHead must be in same dormitory as target
-    if (event.user?.role === 'dormHead') {
-      const targetUserId = event.payload?.targetUserId;
-      if (!targetUserId) return false;
-      
-      // Get dormHead's dormitory
-      const dormHeadRelation = await this.system.storage.findOne('UserDormitoryRelation',
-        MatchExp.atom({ key: 'source', value: ['=', event.user] }),
-        undefined,
-        ['target']
-      );
-      
-      if (!dormHeadRelation) return false;
-      
-      // Check if target user is in same dormitory
-      const targetRelation = await this.system.storage.findOne('UserDormitoryRelation',
-        BoolExp.and(
-          MatchExp.atom({ key: 'source', value: ['=', { id: targetUserId }] }),
-          MatchExp.atom({ key: 'target', value: ['=', dormHeadRelation.target] })
-        ),
-        undefined,
-        ['id']
-      );
-      
-      return !!targetRelation;
-    }
-    
-    return false;
-  }
-});
-
-const ValidPointDeduction = Condition.create({
-  name: 'ValidPointDeduction',
-  content: async function(this: Controller, event: any) {
-    const points = event.payload?.points;
-    return points > 0;
-  }
-});
-
-// Business rule conditions for RequestEviction
-const TargetUserLowPoints = Condition.create({
-  name: 'TargetUserLowPoints',
-  content: async function(this: Controller, event: any) {
-    const targetUserId = event.payload?.targetUserId;
-    if (!targetUserId) return false;
-    
-    const user = await this.system.storage.findOne('User',
-      MatchExp.atom({ key: 'id', value: ['=', targetUserId] }),
-      undefined,
-      ['points']
-    );
-    
-    return user?.points < 30;
-  }
-});
-
-const NoPendingEvictionRequest = Condition.create({
-  name: 'NoPendingEvictionRequest',
-  content: async function(this: Controller, event: any) {
-    const targetUserId = event.payload?.targetUserId;
-    if (!targetUserId) return false;
-    
-    // Check for existing pending request for this user
-    const existingRequest = await this.system.storage.find('EvictionRequest',
-      MatchExp.atom({ key: 'status', value: ['=', 'pending'] }),
-      undefined,
-      ['id', 'targetUser']
-    );
-    
-    // Check if any of the pending requests are for this user
-    for (const request of existingRequest) {
-      const targetRelation = await this.system.storage.findOne('EvictionRequestTargetUserRelation',
-        BoolExp.and(
-          MatchExp.atom({ key: 'source', value: ['=', request] }),
-          MatchExp.atom({ key: 'target', value: ['=', { id: targetUserId }] })
-        ),
-        undefined,
-        ['id']
-      );
-      
-      if (targetRelation) return false;
-    }
-    
-    return true;
-  }
-});
-
-// Business rule conditions for ApproveEviction/RejectEviction
-const RequestIsPending = Condition.create({
-  name: 'RequestIsPending',
-  content: async function(this: Controller, event: any) {
-    const requestId = event.payload?.requestId;
-    if (!requestId) return false;
-    
-    const request = await this.system.storage.findOne('EvictionRequest',
-      MatchExp.atom({ key: 'id', value: ['=', requestId] }),
-      undefined,
-      ['status', 'processedAt']
-    );
-    
-    return request?.status === 'pending' && !request?.processedAt;
-  }
-});
-
-// Query permission conditions
-const UserHasDormitory = Condition.create({
-  name: 'UserHasDormitory',
-  content: async function(this: Controller, event: any) {
-    const relation = await this.system.storage.findOne('UserDormitoryRelation',
-      MatchExp.atom({ key: 'source', value: ['=', event.user] }),
-      undefined,
-      ['id']
-    );
-    
-    return !!relation;
-  }
-});
-
-const CanViewDormitory = Condition.create({
-  name: 'CanViewDormitory',
-  content: async function(this: Controller, event: any) {
-    // Admin can view any dormitory
-    if (event.user?.role === 'admin') return true;
-    
-    const dormitoryId = event.payload?.dormitoryId;
-    
-    // If no dormitory specified, user must have one
-    if (!dormitoryId) {
-      return await UserHasDormitory.content.call(this, event);
-    }
-    
-    // Otherwise, check if user is in that dormitory
-    const relation = await this.system.storage.findOne('UserDormitoryRelation',
-      BoolExp.and(
-        MatchExp.atom({ key: 'source', value: ['=', event.user] }),
-        MatchExp.atom({ key: 'target', value: ['=', { id: dormitoryId }] })
-      ),
-      undefined,
-      ['id']
-    );
-    
-    if (relation) return true;
-    
-    // Or if user is dormHead of that dormitory
-    if (event.user?.role === 'dormHead') {
-      const dormHeadRelation = await this.system.storage.findOne('DormitoryDormHeadRelation',
-        BoolExp.and(
-          MatchExp.atom({ key: 'source', value: ['=', { id: dormitoryId }] }),
-          MatchExp.atom({ key: 'target', value: ['=', event.user] })
-        ),
-        undefined,
-        ['id']
-      );
-      
-      return !!dormHeadRelation;
-    }
-    
-    return false;
-  }
-});
 
 // ================== INTERACTIONS ==================
 
@@ -668,11 +370,6 @@ const CreateDormitory = Interaction.create({
       })
     ]
   }),
-  conditions: Conditions.create({
-    content: BoolExp.atom(AdminRole)
-      .and(BoolExp.atom(ValidDormitoryCapacity))
-      .and(BoolExp.atom(UniqueDormitoryName))
-  })
 })
 
 // AssignUserToDormitory - Admin assigns a student to a dormitory bed
@@ -695,12 +392,7 @@ const AssignUserToDormitory = Interaction.create({
       })
     ]
   }),
-  conditions: Conditions.create({
-    content: BoolExp.atom(AdminRole)
-      .and(BoolExp.atom(UserNotAssigned))
-      .and(BoolExp.atom(BedIsVacant))
-      .and(BoolExp.atom(BedBelongsToDormitory))
-  })
+  
 })
 
 // AppointDormHead - Admin appoints a user as dormitory head
@@ -719,10 +411,7 @@ const AppointDormHead = Interaction.create({
       })
     ]
   }),
-  conditions: Conditions.create({
-    content: BoolExp.atom(AdminRole)
-      .and(BoolExp.atom(UserInTargetDormitory))
-  })
+  
 })
 
 // RecordPointDeduction - Record a point deduction for violations
@@ -753,11 +442,7 @@ const RecordPointDeduction = Interaction.create({
       })
     ]
   }),
-  conditions: Conditions.create({
-    content: BoolExp.atom(AdminOrDormHead)
-      .and(BoolExp.atom(DormHeadSameDormitory))
-      .and(BoolExp.atom(ValidPointDeduction))
-  })
+  
 })
 
 // RequestEviction - DormHead requests to evict a problematic resident
@@ -776,12 +461,7 @@ const RequestEviction = Interaction.create({
       })
     ]
   }),
-  conditions: Conditions.create({
-    content: BoolExp.atom(DormHeadRole)
-      .and(BoolExp.atom(DormHeadSameDormitory))
-      .and(BoolExp.atom(TargetUserLowPoints))
-      .and(BoolExp.atom(NoPendingEvictionRequest))
-  })
+  
 })
 
 // ApproveEviction - Admin approves an eviction request
@@ -800,10 +480,7 @@ const ApproveEviction = Interaction.create({
       })
     ]
   }),
-  conditions: Conditions.create({
-    content: BoolExp.atom(AdminRole)
-      .and(BoolExp.atom(RequestIsPending))
-  })
+  
 })
 
 // RejectEviction - Admin rejects an eviction request
@@ -822,10 +499,7 @@ const RejectEviction = Interaction.create({
       })
     ]
   }),
-  conditions: Conditions.create({
-    content: BoolExp.atom(AdminRole)
-      .and(BoolExp.atom(RequestIsPending))
-  })
+  
 })
 
 // Query interactions - read-only operations
@@ -837,10 +511,38 @@ const ViewMyDormitory = Interaction.create({
   payload: Payload.create({
     items: []
   }),
-  conditions: Conditions.create({
-    content: BoolExp.atom(AuthenticatedUser)
-      .and(BoolExp.atom(UserHasDormitory))
-  })
+  query: async function(this: Controller, event: any) {
+    // Get user's dormitory information
+    const user = await this.system.storage.findOne(
+      'User',
+      MatchExp.atom({ key: 'id', value: ['=', event.user.id] }),
+      undefined,
+      ['id', 'name', ['dormitory', { 
+        attributeQuery: ['id', 'name', 'capacity', 'occupancy']
+      }]]
+    )
+    
+    if (!user || !user.dormitory) {
+      return null
+    }
+    
+    // Get dormitory members
+    const members = await this.system.storage.find(
+      'User',
+      undefined,
+      undefined,
+      ['id', 'name', 'role', 'points', ['dormitory', {
+        attributeQuery: ['id']
+      }]]
+    )
+    
+    const dormMembers = members.filter(m => m.dormitory?.id === user.dormitory.id)
+    
+    return {
+      dormitory: user.dormitory,
+      members: dormMembers
+    }
+  }
 })
 
 // ViewMyPoints - View current user's points and deduction history
@@ -850,7 +552,38 @@ const ViewMyPoints = Interaction.create({
   payload: Payload.create({
     items: []
   }),
-  conditions: AuthenticatedUser
+  query: async function(this: Controller, event: any) {
+    // Get user's points
+    const user = await this.system.storage.findOne(
+      'User',
+      MatchExp.atom({ key: 'id', value: ['=', event.user.id] }),
+      undefined,
+      ['id', 'name', 'points']
+    )
+    
+    if (!user) {
+      return null
+    }
+    
+    // Get user's point deduction history
+    const allDeductions = await this.system.storage.find(
+      'PointDeduction',
+      undefined,
+      undefined,
+      ['id', 'points', 'reason', 'category', 'recordedAt', ['user', {
+        attributeQuery: ['id']
+      }]]
+    )
+    
+    const userDeductions = allDeductions
+      .filter(d => d.user?.id === event.user.id)
+      .sort((a, b) => new Date(b.recordedAt).getTime() - new Date(a.recordedAt).getTime())
+    
+    return {
+      currentPoints: user.points,
+      deductionHistory: userDeductions
+    }
+  }
 })
 
 // ViewDormitoryMembers - View members of a dormitory
@@ -865,10 +598,7 @@ const ViewDormitoryMembers = Interaction.create({
       })
     ]
   }),
-  conditions: Conditions.create({
-    content: BoolExp.atom(AuthenticatedUser)
-      .and(BoolExp.atom(CanViewDormitory))
-  })
+  
 })
 
 // ViewAllDormitories - View all dormitories in the system
@@ -878,7 +608,6 @@ const ViewAllDormitories = Interaction.create({
   payload: Payload.create({
     items: []
   }),
-  conditions: AdminRole
 })
 
 // ================== EXPORTS ==================
@@ -980,6 +709,8 @@ User.properties.find(p => p.name === 'status').computation = UserStatusStateMach
 
 // === User.points StateMachine ===
 // This uses a single-state machine with self-transition to track point deductions
+// IMPORTANT: Points always initialize to 100. To set different initial points, 
+// use RecordPointDeduction after user creation.
 const userPointsState = StateNode.create({
   name: 'tracking',
   computeValue: (lastValue, event) => {
@@ -1302,4 +1033,494 @@ EvictionRequestApproverRelation.computation = Transform.create({
     }
     return null
   }
+})
+
+// ================== PERMISSIONS AND BUSINESS RULES ==================
+// All conditions are added via assignment pattern below
+
+// === Phase 1: Basic Role-Based Permissions ===
+
+// P001: Only admin can create dormitories
+const isAdminForCreateDormitory = Condition.create({
+  name: 'isAdminForCreateDormitory',
+  content: function(this: Controller, event: any) {
+    return event.user.role === 'admin'
+  }
+})
+CreateDormitory.conditions = isAdminForCreateDormitory
+
+// P002: Only admin can assign users to dormitories
+const isAdminForAssignUser = Condition.create({
+  name: 'isAdminForAssignUser',
+  content: function(this: Controller, event: any) {
+    return event.user.role === 'admin'
+  }
+})
+AssignUserToDormitory.conditions = isAdminForAssignUser
+
+// P003: Only admin can appoint dormitory heads
+const isAdminForAppointDormHead = Condition.create({
+  name: 'isAdminForAppointDormHead',
+  content: function(this: Controller, event: any) {
+    return event.user.role === 'admin'
+  }
+})
+AppointDormHead.conditions = isAdminForAppointDormHead
+
+// P004: Only dormHead can request evictions
+const isDormHeadForRequestEviction = Condition.create({
+  name: 'isDormHeadForRequestEviction',
+  content: function(this: Controller, event: any) {
+    return event.user.role === 'dormHead'
+  }
+})
+RequestEviction.conditions = isDormHeadForRequestEviction
+
+// P005: Only admin can approve evictions
+const isAdminForApproveEviction = Condition.create({
+  name: 'isAdminForApproveEviction',
+  content: function(this: Controller, event: any) {
+    return event.user.role === 'admin'
+  }
+})
+ApproveEviction.conditions = isAdminForApproveEviction
+
+// P006: Only admin can reject evictions
+const isAdminForRejectEviction = Condition.create({
+  name: 'isAdminForRejectEviction',
+  content: function(this: Controller, event: any) {
+    return event.user.role === 'admin'
+  }
+})
+RejectEviction.conditions = isAdminForRejectEviction
+
+// P007: Only admin can view all dormitories
+const isAdminForViewAllDormitories = Condition.create({
+  name: 'isAdminForViewAllDormitories',
+  content: function(this: Controller, event: any) {
+    return event.user.role === 'admin'
+  }
+})
+ViewAllDormitories.conditions = isAdminForViewAllDormitories
+
+// === Phase 2: Simple Payload Validations ===
+
+// BR001: Dormitory capacity must be between 4-6
+const hasValidCapacity = Condition.create({
+  name: 'hasValidCapacity',
+  content: function(this: Controller, event: any) {
+    const capacity = event.payload.capacity
+    return capacity >= 4 && capacity <= 6
+  }
+})
+
+// Combine P001 (admin permission) with BR001 (capacity validation) for CreateDormitory
+CreateDormitory.conditions = Conditions.create({
+  content: BoolExp.atom(isAdminForCreateDormitory).and(hasValidCapacity)
+})
+
+// BR002: Points must be positive number
+const hasPositivePoints = Condition.create({
+  name: 'hasPositivePoints',
+  content: function(this: Controller, event: any) {
+    return event.payload.points > 0
+  }
+})
+
+// RecordPointDeduction only has BR002 for now (P008 will be added in Phase 3)
+RecordPointDeduction.conditions = hasPositivePoints
+
+// === Phase 3: Complex Permissions with Data Queries ===
+
+// P008: RecordPointDeduction permission
+// Admin can deduct from any user, DormHead can only deduct from users in their dormitory
+const canDeductPoints = Condition.create({
+  name: 'canDeductPoints',
+  content: async function(this: Controller, event: any) {
+    // Admin can deduct from anyone
+    if (event.user.role === 'admin') {
+      return true
+    }
+    
+    // DormHead can only deduct from users in their dormitory
+    if (event.user.role === 'dormHead') {
+      // Find the dormitory managed by this dormHead
+      // DormitoryDormHeadRelation is stored in Dormitory entity
+      // First, find all dormitories to see their structure
+      const allDorms = await this.system.storage.find(
+        'Dormitory',
+        undefined,
+        undefined,
+        ['id', 'name', ['dormHead', { attributeQuery: ['id'] }]]
+      )
+      
+      // Find the dormitory where this user is the dormHead
+      const managedDormitory = allDorms.find(d => d.dormHead?.id === event.user.id)
+      
+      if (!managedDormitory) {
+        return false // DormHead doesn't manage any dormitory
+      }
+      
+      // Check if target user is in the managed dormitory
+      // UserDormitoryRelation is stored in User entity
+      const targetUser = await this.system.storage.findOne(
+        'User',
+        MatchExp.atom({ key: 'id', value: ['=', event.payload.targetUserId] }),
+        undefined,
+        ['id', ['dormitory', { attributeQuery: ['id'] }]]
+      )
+      
+      return targetUser && targetUser.dormitory?.id === managedDormitory.id
+    }
+    
+    // Regular users cannot deduct points
+    return false
+  }
+})
+
+// Combine BR002 (positive points) with P008 (permission check) for RecordPointDeduction
+RecordPointDeduction.conditions = Conditions.create({
+  content: BoolExp.atom(hasPositivePoints).and(canDeductPoints)
+})
+
+// P009: ViewDormitoryMembers permission
+// Users can view their own dormitory, DormHeads their managed dormitory, Admins any
+const canViewDormitoryMembers = Condition.create({
+  name: 'canViewDormitoryMembers',
+  content: async function(this: Controller, event: any) {
+    const requestedDormitoryId = event.payload.dormitoryId
+    
+    // Admin can view any dormitory
+    if (event.user.role === 'admin') {
+      return true
+    }
+    
+    // Check if user is viewing their own dormitory
+    // UserDormitoryRelation is stored in User entity
+    const currentUser = await this.system.storage.findOne(
+      'User',
+      MatchExp.atom({ key: 'id', value: ['=', event.user.id] }),
+      undefined,
+      ['id', ['dormitory', { attributeQuery: ['id'] }]]
+    )
+    
+    if (currentUser && currentUser.dormitory?.id === requestedDormitoryId) {
+      return true // User can view their own dormitory
+    }
+    
+    // Check if user is a dormHead viewing their managed dormitory
+    if (event.user.role === 'dormHead') {
+      // DormitoryDormHeadRelation is stored in Dormitory entity
+      const requestedDorm = await this.system.storage.findOne(
+        'Dormitory',
+        MatchExp.atom({ key: 'id', value: ['=', requestedDormitoryId] }),
+        undefined,
+        ['id', ['dormHead', { attributeQuery: ['id'] }]]
+      )
+      
+      if (requestedDorm && requestedDorm.dormHead?.id === event.user.id) {
+        return true // DormHead can view their managed dormitory
+      }
+    }
+    
+    return false // User cannot view this dormitory
+  }
+})
+
+ViewDormitoryMembers.conditions = canViewDormitoryMembers
+
+// === Phase 4: Business Rules with Entity State Checks ===
+
+// BR003: AssignUserToDormitory - User must not already have a dormitory assignment
+const userHasNoDormitory = Condition.create({
+  name: 'userHasNoDormitory',
+  content: async function(this: Controller, event: any) {
+    // Check if user already has a dormitory assignment
+    const user = await this.system.storage.findOne(
+      'User',
+      MatchExp.atom({ key: 'id', value: ['=', event.payload.userId] }),
+      undefined,
+      ['id', ['dormitory', { attributeQuery: ['id'] }]]
+    )
+    
+    // Return true if user exists but has no dormitory
+    return user && !user.dormitory
+  }
+})
+
+// BR004: AssignUserToDormitory - Bed must be vacant
+const bedIsVacant = Condition.create({
+  name: 'bedIsVacant',
+  content: async function(this: Controller, event: any) {
+    const bed = await this.system.storage.findOne(
+      'Bed',
+      MatchExp.atom({ key: 'id', value: ['=', event.payload.bedId] }),
+      undefined,
+      ['id', 'status']
+    )
+    
+    return bed && bed.status === 'vacant'
+  }
+})
+
+// BR005: AssignUserToDormitory - Bed must belong to specified dormitory
+const bedBelongsToDormitory = Condition.create({
+  name: 'bedBelongsToDormitory',
+  content: async function(this: Controller, event: any) {
+    const bed = await this.system.storage.findOne(
+      'Bed',
+      MatchExp.atom({ key: 'id', value: ['=', event.payload.bedId] }),
+      undefined,
+      ['id', ['dormitory', { attributeQuery: ['id'] }]]
+    )
+    
+    return bed && bed.dormitory?.id === event.payload.dormitoryId
+  }
+})
+
+// Update AssignUserToDormitory conditions to include all business rules
+// Combine P002 (admin permission) with BR003, BR004, BR005
+AssignUserToDormitory.conditions = Conditions.create({
+  content: BoolExp.atom(isAdminForAssignUser)
+    .and(userHasNoDormitory)
+    .and(bedIsVacant)
+    .and(bedBelongsToDormitory)
+})
+
+// BR006: AppointDormHead - User must be a member of the target dormitory
+const userInTargetDormitory = Condition.create({
+  name: 'userInTargetDormitory',
+  content: async function(this: Controller, event: any) {
+    const user = await this.system.storage.findOne(
+      'User',
+      MatchExp.atom({ key: 'id', value: ['=', event.payload.userId] }),
+      undefined,
+      ['id', ['dormitory', { attributeQuery: ['id'] }]]
+    )
+    
+    return user && user.dormitory?.id === event.payload.dormitoryId
+  }
+})
+
+// BR007: AppointDormHead - Dormitory should not already have a head
+const dormitoryHasNoHead = Condition.create({
+  name: 'dormitoryHasNoHead',
+  content: async function(this: Controller, event: any) {
+    const dormitory = await this.system.storage.findOne(
+      'Dormitory',
+      MatchExp.atom({ key: 'id', value: ['=', event.payload.dormitoryId] }),
+      undefined,
+      ['id', ['dormHead', { attributeQuery: ['id'] }]]
+    )
+    
+    return dormitory && !dormitory.dormHead
+  }
+})
+
+// Update AppointDormHead conditions to include business rules
+// Combine P003 (admin permission) with BR006, BR007
+AppointDormHead.conditions = Conditions.create({
+  content: BoolExp.atom(isAdminForAppointDormHead)
+    .and(userInTargetDormitory)
+    .and(dormitoryHasNoHead)
+})
+
+// BR008: RequestEviction - Target user must be in requester's dormitory
+const targetUserInRequesterDormitory = Condition.create({
+  name: 'targetUserInRequesterDormitory',
+  content: async function(this: Controller, event: any) {
+    // Find the dormitory managed by the requester (dormHead)
+    const allDorms = await this.system.storage.find(
+      'Dormitory',
+      undefined,
+      undefined,
+      ['id', ['dormHead', { attributeQuery: ['id'] }]]
+    )
+    
+    const managedDormitory = allDorms.find(d => d.dormHead?.id === event.user.id)
+    
+    if (!managedDormitory) {
+      return false // Requester doesn't manage any dormitory
+    }
+    
+    // Check if target user is in the managed dormitory
+    const targetUser = await this.system.storage.findOne(
+      'User',
+      MatchExp.atom({ key: 'id', value: ['=', event.payload.targetUserId] }),
+      undefined,
+      ['id', ['dormitory', { attributeQuery: ['id'] }]]
+    )
+    
+    return targetUser && targetUser.dormitory?.id === managedDormitory.id
+  }
+})
+
+// BR009: RequestEviction - Target user points must be below 30
+const targetUserPointsBelow30 = Condition.create({
+  name: 'targetUserPointsBelow30',
+  content: async function(this: Controller, event: any) {
+    const targetUser = await this.system.storage.findOne(
+      'User',
+      MatchExp.atom({ key: 'id', value: ['=', event.payload.targetUserId] }),
+      undefined,
+      ['id', 'points']
+    )
+    
+    return targetUser && targetUser.points < 30
+  }
+})
+
+// BR010: RequestEviction - No existing pending request for same user
+const noPendingEvictionRequest = Condition.create({
+  name: 'noPendingEvictionRequest',
+  content: async function(this: Controller, event: any) {
+    // Find all eviction requests
+    const allRequests = await this.system.storage.find(
+      'EvictionRequest',
+      undefined,
+      undefined,
+      ['id', 'status', ['targetUser', { attributeQuery: ['id'] }]]
+    )
+    
+    // Check if there's any pending request for the target user
+    const hasPendingRequest = allRequests.some(
+      req => req.status === 'pending' && req.targetUser?.id === event.payload.targetUserId
+    )
+
+    return !hasPendingRequest
+  }
+})
+
+// Update RequestEviction conditions to include all business rules
+// Combine P004 (dormHead permission) with BR008, BR009, BR010
+RequestEviction.conditions = Conditions.create({
+  content: BoolExp.atom(isDormHeadForRequestEviction)
+    .and(targetUserInRequesterDormitory)
+    .and(targetUserPointsBelow30)
+    .and(noPendingEvictionRequest)
+})
+
+// BR011: ApproveEviction - Request must be in 'pending' status
+const evictionRequestIsPending = Condition.create({
+  name: 'evictionRequestIsPending',
+  content: async function(this: Controller, event: any) {
+    const request = await this.system.storage.findOne(
+      'EvictionRequest',
+      MatchExp.atom({ key: 'id', value: ['=', event.payload.requestId] }),
+      undefined,
+      ['id', 'status']
+    )
+    
+    return request && request.status === 'pending'
+  }
+})
+
+// Update ApproveEviction conditions to include business rule
+// Combine P005 (admin permission) with BR011
+ApproveEviction.conditions = Conditions.create({
+  content: BoolExp.atom(isAdminForApproveEviction)
+    .and(evictionRequestIsPending)
+})
+
+// BR012: RejectEviction - Request must be in 'pending' status
+// Note: BR012 uses the same condition as BR011 (evictionRequestIsPending)
+
+// Update RejectEviction conditions to include business rule
+// Combine P006 (admin permission) with BR012
+RejectEviction.conditions = Conditions.create({
+  content: BoolExp.atom(isAdminForRejectEviction)
+    .and(evictionRequestIsPending)
+})
+
+// ================== Phase 5: Query Interaction Rules ==================
+
+// P010: ViewMyDormitory - Any logged-in user can view
+const userExistsForViewMyDormitory = Condition.create({
+  name: 'userExistsForViewMyDormitory',
+  content: function(this: Controller, event: any) {
+    return event.user && event.user.id
+  }
+})
+
+// BR013: ViewMyDormitory - User must have dormitory assignment
+const userHasDormitoryAssignment = Condition.create({
+  name: 'userHasDormitoryAssignment',
+  content: async function(this: Controller, event: any) {
+    const user = await this.system.storage.findOne(
+      'User',
+      MatchExp.atom({ key: 'id', value: ['=', event.user.id] }),
+      undefined,
+      ['id', ['dormitory', { attributeQuery: ['id'] }]]
+    )
+    
+    return user && user.dormitory && user.dormitory.id
+  }
+})
+
+// Combine P010 and BR013 for ViewMyDormitory
+ViewMyDormitory.conditions = Conditions.create({
+  content: BoolExp.atom(userExistsForViewMyDormitory)
+    .and(userHasDormitoryAssignment)
+})
+
+// P011: ViewMyPoints - Any logged-in user can view
+const userExistsForViewMyPoints = Condition.create({
+  name: 'userExistsForViewMyPoints',
+  content: function(this: Controller, event: any) {
+    return event.user && event.user.id
+  }
+})
+
+ViewMyPoints.conditions = userExistsForViewMyPoints
+
+// BR014: CreateDormitory - Dormitory name must be unique
+const dormitoryNameIsUnique = Condition.create({
+  name: 'dormitoryNameIsUnique',
+  content: async function(this: Controller, event: any) {
+    const existingDorm = await this.system.storage.findOne(
+      'Dormitory',
+      MatchExp.atom({ key: 'name', value: ['=', event.payload.name] }),
+      undefined,
+      ['id']
+    )
+    
+    return !existingDorm // Return true if no existing dormitory with same name
+  }
+})
+
+// Update CreateDormitory conditions to include BR014
+// CreateDormitory already has permission and capacity checks, add name uniqueness
+CreateDormitory.conditions = Conditions.create({
+  content: BoolExp.atom(isAdminForCreateDormitory)
+    .and(hasValidCapacity)
+    .and(dormitoryNameIsUnique)
+})
+
+// BR015: AssignUserToDormitory - Dormitory must not be full
+const dormitoryHasSpace = Condition.create({
+  name: 'dormitoryHasSpace',
+  content: async function(this: Controller, event: any) {
+    const dormitory = await this.system.storage.findOne(
+      'Dormitory',
+      MatchExp.atom({ key: 'id', value: ['=', event.payload.dormitoryId] }),
+      undefined,
+      ['id', 'capacity', 'occupancy']
+    )
+    
+    if (!dormitory) {
+      return false // Dormitory doesn't exist
+    }
+    
+    return dormitory.occupancy < dormitory.capacity
+  }
+})
+
+// Update AssignUserToDormitory conditions to include BR015
+// AssignUserToDormitory already has other checks, add capacity check
+AssignUserToDormitory.conditions = Conditions.create({
+  content: BoolExp.atom(isAdminForAssignUser)
+    .and(userHasNoDormitory)
+    .and(bedIsVacant)
+    .and(bedBelongsToDormitory)
+    .and(dormitoryHasSpace)
 })

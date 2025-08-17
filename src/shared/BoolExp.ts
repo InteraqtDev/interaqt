@@ -229,10 +229,10 @@ export type BoolExpressionRawData<T> = {
   right? : ExpressionData<T>
 }
 
-export type EvaluateError = {
-  data:unknown,
-  stack: unknown[],
-  error: unknown,
+export type EvaluateError<T> = {
+  data:T,
+  stack: ExpressionData<T>[],
+  error: any,
   inverse: boolean
 }
 
@@ -375,13 +375,13 @@ export class BoolExp<T> {
     }
   }
   
-  evaluate(atomHandle: AtomHandle<T>, stack :unknown[] = [], inverse: boolean = false): true|EvaluateError {
+  evaluate(atomHandle: AtomHandle<T>, stack :ExpressionData<T>[] = [], inverse: boolean = false): true|EvaluateError<T> {
     const currentStack = stack.concat(this.raw)
 
     if (this.isAtom()) {
       const data = (this.raw as AtomData<T>).data
       const result = atomHandle(data)
-      const error = { data, inverse, stack, error: 'atom evaluate error' }
+      const error: EvaluateError<T> = { data, inverse, stack, error: 'atom evaluate error' }
       return (result && !inverse || !result && inverse) ? true : error
     }
 
@@ -405,13 +405,13 @@ export class BoolExp<T> {
     throw new Error(`invalid bool expression type: ${JSON.stringify(this.raw)}`)
   }
   
-  async evaluateAsync(atomHandle: AtomHandle<T>, stack :unknown[] = [], inverse: boolean = false): Promise<true|EvaluateError> {
+  async evaluateAsync(atomHandle: AtomHandle<T>, stack :ExpressionData<T>[] = [], inverse: boolean = false): Promise<true|EvaluateError<T>> {
     const currentStack = stack.concat(this.raw)
 
     if (this.isAtom()) {
       const data = (this.raw as AtomData<T>).data
       const result = await atomHandle(data)
-      const error = { data, inverse, stack, error: 'atom evaluate error' }
+      const error: EvaluateError<T> = { data, inverse, stack, error: 'atom evaluate error' }
       return (result && !inverse || !result && inverse) ? true : error
     }
 

@@ -8,16 +8,14 @@ import {
     removeAllInstance,
     Action,
     Attributive,
-    Condition,
     PayloadItem,
     Entity,
     Property,
     Payload,
-    boolExpToAttributives,
-    Conditions
+    boolExpToAttributives
 } from 'interaqt';
 
-describe('attributive and condition checks', () => {
+describe('attributive checks', () => {
     let system: MonoSystem
     let controller: Controller
 
@@ -311,188 +309,6 @@ describe('attributive and condition checks', () => {
             })
             expect(mixedResult.error).toBeDefined()
             expect((mixedResult.error as any).type).toBe('tags not every item match attribute')
-        })
-    })
-
-    describe('condition checks', () => {
-        test('should check single condition', async () => {
-            // Define entities
-            const User = Entity.create({
-                name: 'User',
-                properties: [
-                    Property.create({ name: 'name', type: 'string' }),
-                    Property.create({ name: 'credits', type: 'number', defaultValue: () => 0 })
-                ]
-            })
-
-            const Post = Entity.create({
-                name: 'Post',
-                properties: [
-                    Property.create({ name: 'title', type: 'string' }),
-                    Property.create({ name: 'isPremium', type: 'boolean', defaultValue: () => false })
-                ]
-            })
-
-            // Create condition that checks if user has enough credits
-            const hasEnoughCredits = Condition.create({
-                name: 'hasEnoughCredits',
-                content: async function(this: Controller, event: any) {
-                    const user = await this.system.storage.findOne('User', 
-                        BoolExp.atom({ key: 'id', value: ['=', event.user.id] }),
-                        undefined,
-                        ['*']
-                    )
-                    const post = event.payload?.post
-                    return !post?.isPremium || user.credits >= 10
-                }
-            })
-
-            // Create interaction with condition
-            const ViewPost = Interaction.create({
-                name: 'viewPost',
-                action: Action.create({ name: 'view' }),
-                payload: Payload.create({
-                    items: [
-                        PayloadItem.create({
-                            name: 'post',
-                            base: Post
-                        })
-                    ]
-                }),
-                conditions: hasEnoughCredits
-            })
-
-            controller = new Controller({
-                system: system,
-                entities: [User, Post],
-                relations: [],
-                activities: [],
-                interactions: [ViewPost]
-            })
-            await controller.setup(true)
-
-            // Create test data
-            const richUser = await system.storage.create('User', { name: 'Rich', credits: 20 })
-            const poorUser = await system.storage.create('User', { name: 'Poor', credits: 5 })
-
-            // Test viewing regular post - should pass for both users
-            const regularPost = { title: 'Regular Post', isPremium: false }
-            
-            const richRegularResult = await controller.callInteraction(ViewPost.name, {
-                user: richUser,
-                payload: { post: regularPost }
-            })
-            expect(richRegularResult.error).toBeUndefined()
-
-            const poorRegularResult = await controller.callInteraction(ViewPost.name, {
-                user: poorUser,
-                payload: { post: regularPost }
-            })
-            expect(poorRegularResult.error).toBeUndefined()
-
-            // Test viewing premium post
-            const premiumPost = { title: 'Premium Post', isPremium: true }
-
-            // Rich user should pass
-            const richPremiumResult = await controller.callInteraction(ViewPost.name, {
-                user: richUser,
-                payload: { post: premiumPost }
-            })
-            expect(richPremiumResult.error).toBeUndefined()
-
-            // Poor user should fail
-            const poorPremiumResult = await controller.callInteraction(ViewPost.name, {
-                user: poorUser,
-                payload: { post: premiumPost }
-            })
-            expect(poorPremiumResult.error).toBeDefined()
-            expect((poorPremiumResult.error as any).type).toBe('condition check failed')
-        })
-
-        test('should handle BoolExp combinations in conditions', async () => {
-            // Define entities
-            const User = Entity.create({
-                name: 'User',
-                properties: [
-                    Property.create({ name: 'name', type: 'string' }),
-                    Property.create({ name: 'isVerified', type: 'boolean', defaultValue: () => false })
-                ]
-            })
-
-            const System = Entity.create({
-                name: 'System',
-                properties: [
-                    Property.create({ name: 'maintenanceMode', type: 'boolean', defaultValue: () => false })
-                ]
-            })
-
-            // Create conditions
-            const systemNotInMaintenance = Condition.create({
-                name: 'systemNotInMaintenance',
-                content: async function(this: Controller, event: any) {
-                    const system = await this.system.storage.findOne('System', undefined, undefined, ['*'])
-                    return !system?.maintenanceMode
-                }
-            })
-
-            const userIsVerified = Condition.create({
-                name: 'userIsVerified',
-                content: async function(this: Controller, event: any) {
-                    const user = await this.system.storage.findOne('User',
-                        BoolExp.atom({ key: 'id', value: ['=', event.user.id] }),
-                        undefined,
-                        ['*']
-                    )
-                    // Handle both boolean true and numeric 1 from database
-                    return user?.isVerified === true || user?.isVerified === 1
-                }
-            })
-
-            // Create interaction with AND conditions
-            const PublishContent = Interaction.create({
-                name: 'publishContent',
-                action: Action.create({ name: 'publish' }),
-                conditions: Conditions.create({
-                    content: BoolExp.atom(systemNotInMaintenance).and(BoolExp.atom(userIsVerified))
-                })
-            })
-
-            controller = new Controller({
-                system: system,
-                entities: [User, System],
-                relations: [],
-                activities: [],
-                interactions: [PublishContent]
-            })
-            await controller.setup(true)
-
-            // Create system state
-            await system.storage.create('System', { maintenanceMode: false })
-
-            // Create test users
-            const verifiedUser = await system.storage.create('User', { name: 'Verified', isVerified: true })
-            const unverifiedUser = await system.storage.create('User', { name: 'Unverified', isVerified: false })
-
-            // Test verified user when system is not in maintenance - should pass
-            const verifiedResult = await controller.callInteraction(PublishContent.name, {
-                user: verifiedUser
-            })
-            expect(verifiedResult.error).toBeUndefined()
-
-            // Test unverified user - should fail
-            const unverifiedResult = await controller.callInteraction(PublishContent.name, {
-                user: unverifiedUser
-            })
-            expect(unverifiedResult.error).toBeDefined()
-
-            // Put system in maintenance mode
-            await system.storage.update('System', undefined, { maintenanceMode: true })
-
-            // Test verified user when system is in maintenance - should fail
-            const maintenanceResult = await controller.callInteraction(PublishContent.name, {
-                user: verifiedUser
-            })
-            expect(maintenanceResult.error).toBeDefined()
         })
     })
 

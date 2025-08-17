@@ -2315,6 +2315,14 @@ await storage.rollbackTransaction('updateOrder')
 - This is a common source of bugs in tests and applications
 - Always explicitly list all fields you need
 
+🔴 **CRITICAL: Relations have source and target as nested entities!**
+When working with relations (not regular entities), remember that:
+- **Relations** have `source` and `target` fields that reference entities
+- These fields should be treated as **nested entities**, not simple values
+- In `matchExpression`: Use dot notation (`source.id`, `target.name`)
+- In `attributeQuery`: Use nested query syntax (`['source', { attributeQuery: [...] }]`)
+- This applies to ALL storage methods when querying relations: `find()`, `findOne()`, `findRelationByName()`, `findOneRelationByName()`
+
 **find(entityName: string, matchExpression?: MatchExpressionData, modifier?: ModifierData, attributeQuery?: AttributeQueryData)**
 Find multiple records matching the criteria.
 
@@ -2330,6 +2338,50 @@ const users = await storage.find('User',
   MatchExp.atom({ key: 'status', value: ['=', 'active'] }),
   { limit: 10, orderBy: { createdAt: 'desc' } },
   ['id', 'username', 'email', 'lastLoginDate']
+)
+```
+
+**🔴 CRITICAL: Querying Relations with source/target Fields**
+
+When querying relations that have `source` and `target` fields, these fields should be treated as related entities:
+
+1. **In matchExpression - Use dot notation for nested properties:**
+```typescript
+// ✅ CORRECT: Use dot notation to access source/target entity properties
+const relations = await storage.find('UserPostRelation',
+  MatchExp.atom({ key: 'source.id', value: ['=', userId] })
+    .and({ key: 'target.status', value: ['=', 'published'] }),
+  undefined,
+  ['id', 'createdAt']
+)
+
+// ❌ WRONG: Cannot compare source/target directly
+const relations = await storage.find('UserPostRelation',
+  MatchExp.atom({ key: 'source', value: ['=', userId] }),  // This won't work!
+  undefined,
+  ['id']
+)
+```
+
+2. **In attributeQuery - Use nested query syntax for source/target:**
+```typescript
+// ✅ CORRECT: Use nested attributeQuery to fetch source/target entity fields
+const relations = await storage.find('UserPostRelation',
+  undefined,
+  undefined,
+  [
+    'id',
+    'createdAt',  // Relation's own property
+    ['source', { attributeQuery: ['id', 'name', 'email'] }],  // Source entity fields
+    ['target', { attributeQuery: ['id', 'title', 'status'] }]  // Target entity fields
+  ]
+)
+
+// ❌ WRONG: This won't fetch the actual entity data
+const relations = await storage.find('UserPostRelation',
+  undefined,
+  undefined,
+  ['id', 'source', 'target']  // This only returns entity references, not data!
 )
 ```
 
@@ -2424,6 +2476,28 @@ const student = await storage.findOne('Student',
 )
 ```
 
+**🔴 When using findOne with Relations:**
+```typescript
+// ✅ CORRECT: Query relation with source/target using dot notation
+const relation = await storage.findOne('UserPostRelation',
+  MatchExp.atom({ key: 'source.id', value: ['=', userId] })
+    .and({ key: 'target.id', value: ['=', postId] }),
+  undefined,
+  [
+    'id',
+    ['source', { attributeQuery: ['id', 'name'] }],
+    ['target', { attributeQuery: ['id', 'title'] }]
+  ]
+)
+
+// ❌ WRONG: Don't query source/target directly
+const relation = await storage.findOne('UserPostRelation',
+  MatchExp.atom({ key: 'source', value: ['=', userId] }),  // Won't work!
+  undefined,
+  ['id', 'source', 'target']  // Won't fetch entity data!
+)
+```
+
 **create(entityName: string, data: any, events?: RecordMutationEvent[])**
 Create a new record.
 
@@ -2473,14 +2547,34 @@ await storage.delete('User',
 
 #### Relation-Specific Operations
 
+**🔴 IMPORTANT: Relations have source and target fields that should be treated as related entities**
+
+When using relation-specific operations, the same rules apply for source/target fields:
+- In `matchExpression`: Use dot notation like `source.id` or `target.status`
+- In `attributeQuery`: Use nested query syntax like `['source', { attributeQuery: [...] }]`
+
 **findRelationByName(relationName: string, matchExpression?: MatchExpressionData, modifier?: ModifierData, attributeQuery?: AttributeQueryData)**
 Find relation records by relation name.
 
 ```typescript
+// ✅ CORRECT: Use dot notation in matchExpression and nested query in attributeQuery
 const userPosts = await storage.findRelationByName('UserPostRelation',
-  MatchExp.atom({ key: 'source.id', value: ['=', userId] }),
+  MatchExp.atom({ key: 'source.id', value: ['=', userId] })
+    .and({ key: 'target.status', value: ['=', 'published'] }),
   { limit: 10 },
-  ['id', 'createdAt', ['target', { attributeQuery: ['title', 'status'] }]]
+  [
+    'id', 
+    'createdAt',
+    ['source', { attributeQuery: ['id', 'name'] }],
+    ['target', { attributeQuery: ['id', 'title', 'status'] }]
+  ]
+)
+
+// ❌ WRONG: Don't use source/target directly in matchExpression
+const userPosts = await storage.findRelationByName('UserPostRelation',
+  MatchExp.atom({ key: 'source', value: ['=', userId] }),  // Won't work!
+  undefined,
+  ['id', 'source', 'target']  // Won't fetch entity data!
 )
 ```
 
@@ -2488,10 +2582,24 @@ const userPosts = await storage.findRelationByName('UserPostRelation',
 Find a single relation record by relation name.
 
 ```typescript
+// ✅ CORRECT: Properly query and fetch relation with entity data
+const relation = await storage.findOneRelationByName('UserPostRelation',
+  MatchExp.atom({ key: 'source.id', value: ['=', userId] })
+    .and({ key: 'target.id', value: ['=', postId] }),
+  undefined,
+  [
+    'id',
+    'createdAt',
+    ['source', { attributeQuery: ['id', 'name', 'email'] }],
+    ['target', { attributeQuery: ['id', 'title', 'content'] }]
+  ]
+)
+
+// Simple case - just fetch by relation ID
 const relation = await storage.findOneRelationByName('UserPostRelation',
   MatchExp.atom({ key: 'id', value: ['=', relationId] }),
   undefined,
-  ['*']
+  ['*']  // This is OK for fetching all relation properties, but won't expand source/target
 )
 ```
 
@@ -2511,9 +2619,23 @@ await storage.addRelationByNameById('UserPostRelation',
 Update relation properties (cannot update source/target).
 
 ```typescript
+// Update by relation ID
 await storage.updateRelationByName('UserPostRelation',
   MatchExp.atom({ key: 'id', value: ['=', relationId] }),
   { priority: 'high' }  // Only update relation properties
+)
+
+// ✅ CORRECT: Find and update relations using source/target properties
+await storage.updateRelationByName('UserPostRelation',
+  MatchExp.atom({ key: 'source.id', value: ['=', userId] })
+    .and({ key: 'target.status', value: ['=', 'draft'] }),
+  { reviewed: true }
+)
+
+// ❌ WRONG: Don't use source/target directly
+await storage.updateRelationByName('UserPostRelation',
+  MatchExp.atom({ key: 'source', value: ['=', userId] }),  // Won't work!
+  { reviewed: true }
 )
 ```
 
@@ -2521,8 +2643,20 @@ await storage.updateRelationByName('UserPostRelation',
 Remove relations.
 
 ```typescript
+// Remove by relation ID
 await storage.removeRelationByName('UserPostRelation',
   MatchExp.atom({ key: 'id', value: ['=', relationId] })
+)
+
+// ✅ CORRECT: Remove relations using source/target properties
+await storage.removeRelationByName('UserPostRelation',
+  MatchExp.atom({ key: 'source.id', value: ['=', userId] })
+    .and({ key: 'target.id', value: ['=', postId] })
+)
+
+// ❌ WRONG: Don't use source/target directly
+await storage.removeRelationByName('UserPostRelation',
+  MatchExp.atom({ key: 'target', value: ['=', postId] })  // Won't work!
 )
 ```
 

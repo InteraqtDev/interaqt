@@ -706,7 +706,7 @@ This section follows a **test-driven progressive approach** where each computati
 }
 ```
 
-### Task 3.2: Permission and Business Rules Implementation
+### Task 3.2: Progressive Permission and Business Rules Implementation with Testing
 
 **🔄 Update `docs/STATUS.json`:**
 ```json
@@ -715,80 +715,324 @@ This section follows a **test-driven progressive approach** where each computati
   "completed": false
 }
 ```
-- Clear next step
 
-**📖 MUST READ: `./agentspace/knowledge/generator/permission-implementation.md`**
+#### Task 3.2.1: Create Implementation Plan
 
-**🔴 IMPORTANT: All test cases for permissions and business rules should be written in `tests/basic.test.ts` under the 'Permission and Business Rules' describe group.**
+**🔄 Update `docs/STATUS.json`:**
+```json
+{
+  "currentTask": "Task 3.2.1",
+  "completed": false
+}
+```
 
-**After core business logic is working correctly, add access control and business rules:**
+**📋 Create the Permission and Business Rules Implementation Plan:**
 
-#### Permission Implementation
-- [ ] Add condition to interactions for role-based access control
-- [ ] Implement permission checks based on user roles
-- [ ] Control who can perform which operations
+- [ ] Create `docs/business-rules-and-permission-control-implementation-plan.json` based on:
+  - `docs/interaction-design.md` (Stage 2 requirements)
+  - `requirements/interaction-matrix.md` (permission requirements)
+  - `requirements/test-cases.md` (business rule scenarios)
 
-#### Business Rules Implementation
-- [ ] Add condition for business rule validations
-- [ ] Implement common business rules:
-  - **Quantity limits**: e.g., "Cannot request leave more than 3 times per month"
-  - **State checks**: e.g., "Cannot edit published articles"
-  - **Time restrictions**: e.g., "Cannot book rooms more than 7 days in advance"
-  - **Relationship constraints**: e.g., "Cannot delete user with active orders"
-  - **Balance checks**: e.g., "Cannot withdraw more than account balance"
-- [ ] Ensure TypeScript type checking passes
+- [ ] **Structure the plan with progressive phases:**
+  ```json
+  {
+    "phases": [
+      {
+        "phase": 1,
+        "name": "Basic Permissions",
+        "rules": [
+          {
+            "id": "P001",
+            "interaction": "CreateDormitory",
+            "type": "permission",
+            "description": "Only admin can create dormitories",
+            "condition": "user.role === 'admin'",
+            "testScenarios": [
+              "Admin can create dormitory",
+              "Non-admin cannot create dormitory"
+            ],
+            "completed": false
+          }
+        ]
+      },
+      {
+        "phase": 2,
+        "name": "Simple Business Rules",
+        "rules": [
+          {
+            "id": "BR001",
+            "interaction": "CreateDormitory",
+            "type": "business_rule",
+            "description": "Dormitory capacity must be 4-6",
+            "condition": "payload.capacity >= 4 && payload.capacity <= 6",
+            "testScenarios": [
+              "Can create with capacity 4",
+              "Can create with capacity 6",
+              "Cannot create with capacity 3",
+              "Cannot create with capacity 7"
+            ],
+            "completed": false
+          }
+        ]
+      },
+      {
+        "phase": 3,
+        "name": "Complex Business Rules",
+        "rules": [
+          {
+            "id": "BR002",
+            "interaction": "RequestLeave",
+            "type": "business_rule",
+            "description": "Cannot request more than 3 leaves per month",
+            "condition": "Check user's leave count for current month < 3",
+            "dependencies": ["Needs to query existing leave requests"],
+            "testScenarios": [
+              "Can request first leave",
+              "Can request third leave",
+              "Cannot request fourth leave in same month",
+              "Can request leave in new month"
+            ],
+            "completed": false
+          }
+        ]
+      }
+    ]
+  }
+  ```
+
+- [ ] **Organize rules by complexity:**
+  - Phase 1: Simple role-based permissions
+  - Phase 2: Simple payload validations
+  - Phase 3: Rules requiring database queries
+  - Phase 4: Complex multi-condition rules
+
+**✅ END Task 3.2.1: Update `docs/STATUS.json`:**
+```json
+{
+  "currentTask": "Task 3.2.1",
+  "completed": true
+}
+```
+
+#### Task 3.2.2: Progressive Implementation Loop
+
+**🔄 Update `docs/STATUS.json`:**
+```json
+{
+  "currentTask": "Task 3.2.2",
+  "completed": false
+}
+```
+
+**📖 MUST READ FIRST:**
+- `./agentspace/knowledge/generator/permission-implementation.md`
+- `./agentspace/knowledge/generator/permission-test-implementation.md`
+
+**🔴 CRITICAL: Use Progressive Implementation with Immediate Testing**
+
+This task follows the **same progressive approach as Task 3.1** - each permission/business rule is implemented and tested individually before moving to the next one.
+
+**MUST Read `docs/business-rules-and-permission-control-implementation-plan.json` to see which rules are completed and what's next.**
+
+**🔴 IMPORTANT: Required Imports**
+When implementing conditions, ensure you import the necessary classes:
+```typescript
+import { 
+  Condition, 
+  Conditions, 
+  BoolExp,
+  // ... other imports
+} from 'interaqt'
+```
+
+**For EACH rule in your plan, follow this cycle:**
+
+1. **Implement the Rule**
+   - [ ] **Use assignment pattern (`Interaction.conditions = ...`)** to add conditions at the end of file
+   - [ ] Use Condition.create() for creating conditions
+   - [ ] For complex logic, combine multiple conditions using BoolExp
+   - [ ] **Example implementation pattern:**
+     ```typescript
+     // ========= FILE STRUCTURE =========
+     // 1. First section: All entity and relation definitions
+     const User = Entity.create({ name: 'User', properties: [...] })
+     const Dormitory = Entity.create({ name: 'Dormitory', properties: [...] })
+     
+     // 2. Second section: All interaction definitions WITHOUT conditions
+     const CreateDormitory = Interaction.create({
+       name: 'CreateDormitory',
+       payload: Payload.create({
+         items: [
+           PayloadItem.create({ name: 'name', type: 'string' }),
+           PayloadItem.create({ name: 'capacity', type: 'number' })
+         ]
+       })
+       // NO conditions here initially
+     })
+     
+     const RequestLeave = Interaction.create({
+       name: 'RequestLeave',
+       payload: Payload.create({
+         items: [
+           PayloadItem.create({ name: 'reason', type: 'string' }),
+           PayloadItem.create({ name: 'days', type: 'number' })
+         ]
+       })
+       // NO conditions here initially
+     })
+     
+     // 3. Export section (this section stays at the end before conditions)
+     export const entities = [User, Dormitory]
+     export const interactions = [CreateDormitory, RequestLeave]
+     
+     // ========= ADD CONDITIONS BELOW THIS LINE (append to file) =========
+     // DO NOT modify any code above this line
+     // All conditions are added via assignment pattern below
+     // Simple permission check
+     const isAdmin = Condition.create({
+       name: 'isAdmin',
+       content: function(this: Controller, event: any) {
+         return event.user.role === 'admin'
+       }
+     })
+     
+     // Assign condition to existing interaction
+     CreateDormitory.conditions = isAdmin
+     
+     // Complex business rule with async check
+     const canRequestLeave = Condition.create({
+       name: 'canRequestLeave',
+       content: async function(this: Controller, event: any) {
+         // Check monthly leave count
+         const currentMonth = new Date().getMonth()
+         const currentYear = new Date().getFullYear()
+         const existingLeaves = await this.system.storage.find(
+           'LeaveRequest',
+           BoolExp.atom({ key: 'userId', value: ['=', event.user.id] })
+             .and({ key: 'month', value: ['=', currentMonth] })
+             .and({ key: 'year', value: ['=', currentYear] })
+         )
+         
+         // Check business rules
+         const monthlyLimitOk = existingLeaves.length < 3
+         const daysLimitOk = event.payload.days <= 7
+         
+         return monthlyLimitOk && daysLimitOk
+       }
+     })
+     
+     // Assign condition to existing interaction
+     RequestLeave.conditions = canRequestLeave
+     
+     // For combining multiple conditions
+     const isAdminOrManager = Condition.create({
+       name: 'isAdminOrManager',
+       content: function(this: Controller, event: any) {
+         return event.user.role === 'admin' || event.user.role === 'manager'
+       }
+     })
+     
+     const hasValidCapacity = Condition.create({
+       name: 'hasValidCapacity',
+       content: function(this: Controller, event: any) {
+         const capacity = event.payload.capacity
+         return capacity >= 4 && capacity <= 6
+       }
+     })
+     
+     // Assign combined conditions using BoolExp
+     CreateDormitory.conditions = Conditions.create({
+       content: BoolExp.atom(isAdminOrManager).and(hasValidCapacity)
+     })
+     ```
+
+2. **Type Check**
+   - [ ] Run `npm run check` to ensure TypeScript compilation passes
+   - [ ] Fix ALL type errors before proceeding
+   - [ ] Do NOT write tests until type checking passes
+
+3. **Write Focused Test Cases**
+   - [ ] Add test cases in `tests/basic.test.ts` under the 'Permission and Business Rules' describe group
+   - [ ] Test EVERY scenario listed in the implementation plan
+   - [ ] Test both success and failure cases
+   
+4. **Run Test**
+   - [ ] **🔴 CRITICAL: Run FULL test suite every time** to ensure no regression: `npm run test tests/basic.test.ts`
+     - This runs ALL tests in the file, not just the new ones
+     - Ensures new rules don't break existing functionality
+     - If ANY test fails (new or existing), must fix before proceeding
+   - [ ] Fix any test failures (both new tests and any regressions)
+   - [ ] **🔴 CRITICAL: NEVER cheat to pass tests!**
+     - ❌ Do NOT mark tests as `.skip()` or `.todo()`
+     - ❌ Do NOT fake/mock data just to make tests pass
+     - ❌ Do NOT remove or ignore critical assertions
+     - ✅ Actually fix the implementation until tests genuinely pass
+   - [ ] If test still fails after 10 fix attempts, STOP and wait for user guidance
+   - [ ] **MUST record all encountered errors** in `docs/errors/` directory with descriptive filenames (e.g., `permission-admin-error.md`)
+   - [ ] Do NOT proceed to next rule until ALL tests pass (both new and existing)
+
+5. **Document Progress**
+   - [ ] **MUST** update the completed rule status in `docs/business-rules-and-permission-control-implementation-plan.json` (mark as `"completed": true`)
+   - [ ] Create new documents in `docs/errors/` to record any errors encountered
+   - [ ] Add comments in code explaining complex conditions
+
+**🛑 STOP GATE: DO NOT proceed to Task 3.2.3 until ALL rules in `docs/business-rules-and-permission-control-implementation-plan.json` are marked as complete with passing tests.**
+
+**✅ END Task 3.2.2: Update `docs/STATUS.json`:**
+```json
+{
+  "currentTask": "Task 3.2.2",
+  "completed": true
+}
+```
+
+#### Task 3.2.3: Completion Checklist
+
+**🔄 Update `docs/STATUS.json`:**
+```json
+{
+  "currentTask": "Task 3.2.3",
+  "completed": false
+}
+```
+
+- [ ] All permissions from `docs/interaction-design.md` are implemented
+- [ ] All business rules from requirements are implemented
+- [ ] Each rule has comprehensive test coverage (success and failure cases)
+- [ ] All type checks pass (`npm run check`)
+- [ ] All tests pass (`npm run test tests/basic.test.ts`)
+- [ ] Error scenarios are properly documented
+
+**Note on Error Messages:**
+Since permissions and business rules are unified in the `conditions` API, the framework returns a generic error when conditions fail:
+- The error type will be `'condition check failed'` for all condition failures
+- You cannot distinguish between different types of failures in the error message
+- Best practices:
+  - Use descriptive Condition names (e.g., 'isAdmin', 'hasValidCapacity')
+  - Document expected error scenarios for each Interaction
+  - Test both permission failures and business rule violations separately
+  - Consider logging more detailed information within the condition's content function for debugging
+
+**✅ END Task 3.2.3: Update `docs/STATUS.json`:**
+```json
+{
+  "currentTask": "Task 3.2.3",
+  "completed": true
+}
+```
 
 **✅ END Task 3.2: Update `docs/STATUS.json`:**
 ```json
 {
   "currentTask": "Task 3.2",
-  "completed": true
+  "completed": true,
+  "completedItems": [
+    "All permissions implemented with tests",
+    "All business rules implemented with tests",
+    "business-rules-and-permission-control-implementation-plan.json completed"
+  ]
 }
 ```
-
-### Task 3.3: Permission and Business Rules Test Implementation
-
-**🔄 Update `docs/STATUS.json`:**
-```json
-{
-  "currentTask": "Task 3.3",
-  "completed": false
-}
-```
-**📖 MUST READ: `./agentspace/knowledge/generator/permission-test-implementation.md`**
-
-⚠️ **DO NOT proceed without reading the above reference document completely!**
-
-#### Permission Tests
-- [ ] Add permission test cases
-- [ ] Test permission access scenarios
-- [ ] Test permission denial cases
-- [ ] **🔴 CRITICAL: NEVER cheat to pass tests!**
-  - ❌ Do NOT mark tests as `.skip()` or `.todo()`
-  - ❌ Do NOT fake/mock data just to make tests pass
-  - ❌ Do NOT remove or ignore critical assertions
-  - ✅ Actually fix the implementation until tests genuinely pass
-- [ ] If test still fails after 10 fix attempts, STOP and wait for user guidance
-
-#### Business Rules Tests
-- [ ] Test business rule validations
-- [ ] Test boundary conditions (e.g., exactly at limit)
-- [ ] Test rule violations with appropriate error messages
-- [ ] Test complex scenarios with multiple rules
-- [ ] **🔴 CRITICAL: NEVER cheat to pass tests!**
-  - ❌ Do NOT mark tests as `.skip()` or `.todo()`
-  - ❌ Do NOT fake/mock data just to make tests pass
-  - ❌ Do NOT remove or ignore critical assertions
-  - ✅ Actually fix the implementation until tests genuinely pass
-- [ ] If test still fails after 10 fix attempts, STOP and wait for user guidance
-- [ ] Ensure all tests pass
-
-**Note on Error Messages:**
-Since permissions and business rules are now unified in the `condition` API, the framework will return a generic error when the condition fails. Consider:
-- Structuring your BoolExpression atoms with descriptive keys that indicate the type of failure
-- Testing both permission failures and business rule violations to ensure proper error handling
-- Documenting expected error scenarios for each Interaction
-
 
 
 **✅ END Task 3: Update `docs/STATUS.json`:**

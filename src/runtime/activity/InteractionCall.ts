@@ -13,7 +13,8 @@ import {
     ExpressionData,
     GetAction,
     InteractionInstanceType,
-    DataAttributives
+    DataAttributives,
+    EvaluateError
 } from "@shared";
 import { MatchExp } from "@storage";
 import { RecordMutationEvent, System } from "../System.js";
@@ -78,8 +79,9 @@ export class AttributeError {
     }
 }
 
+
 export class ConditionError {
-    constructor(public type: string, public error: unknown) {
+    constructor(public type: string, public error: EvaluateError<ConditionInstance>) {
     }
 }
 
