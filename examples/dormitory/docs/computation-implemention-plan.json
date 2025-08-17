@@ -1,0 +1,307 @@
+{
+  "totalComputations": 19,
+  "implementationOrder": [
+    {
+      "phase": 1,
+      "computations": [
+        {
+          "id": "User.role",
+          "type": "property",
+          "entityName": "User",
+          "propertyName": "role",
+          "computationType": "StateMachine",
+          "dependencies": [],
+          "interactionDependencies": [
+            "AppointDormHead"
+          ],
+          "reasoning": "Has interactionDependencies that can modify it",
+          "calculationMethod": "Initially set to 'user', changed to 'dormHead' by AppointDormHead interaction",
+          "completed": true
+        },
+        {
+          "id": "User.status",
+          "type": "property",
+          "entityName": "User",
+          "propertyName": "status",
+          "computationType": "StateMachine",
+          "dependencies": [],
+          "interactionDependencies": [
+            "ApproveEviction"
+          ],
+          "reasoning": "Has interactionDependencies that can modify it",
+          "calculationMethod": "Initially 'active', set to 'inactive' when ApproveEviction is executed for this user",
+          "completed": true
+        },
+        {
+          "id": "User.points",
+          "type": "property",
+          "entityName": "User",
+          "propertyName": "points",
+          "computationType": "StateMachine",
+          "dependencies": [],
+          "interactionDependencies": [
+            "RecordPointDeduction"
+          ],
+          "reasoning": "Has interactionDependencies that can modify it",
+          "calculationMethod": "Initially 100, reduced by points value in RecordPointDeduction interaction",
+          "completed": true
+        },
+        {
+          "id": "User.totalDeductions",
+          "type": "property",
+          "entityName": "User",
+          "propertyName": "totalDeductions",
+          "computationType": "Summation",
+          "dependencies": [
+            "UserPointDeductionRelation",
+            "PointDeduction.points"
+          ],
+          "interactionDependencies": [],
+          "reasoning": "ComputationMethod contains 'Summation of', has dataDependencies with relations",
+          "calculationMethod": "Summation of PointDeduction.points across all UserPointDeductionRelation",
+          "completed": true
+        },
+        {
+          "id": "User.deductionCount",
+          "type": "property",
+          "entityName": "User",
+          "propertyName": "deductionCount",
+          "computationType": "Count",
+          "dependencies": [
+            "UserPointDeductionRelation"
+          ],
+          "interactionDependencies": [],
+          "reasoning": "ComputationMethod contains 'Count of', has dataDependencies with relations",
+          "calculationMethod": "Count of UserPointDeductionRelation where target = this user",
+          "completed": true
+        },
+        {
+          "id": "Dormitory",
+          "type": "entity",
+          "entityName": "Dormitory",
+          "computationType": "Transform",
+          "dependencies": [
+            "InteractionEventEntity"
+          ],
+          "interactionDependencies": [
+            "CreateDormitory"
+          ],
+          "reasoning": "interactionDependencies includes CreateDormitory which creates the entity",
+          "calculationMethod": "Created by CreateDormitory interaction from admin users",
+          "completed": true
+        },
+        {
+          "id": "Dormitory.status",
+          "type": "property",
+          "entityName": "Dormitory",
+          "propertyName": "status",
+          "computationType": "computed",
+          "dependencies": [
+            "_self.occupancy",
+            "_self.capacity"
+          ],
+          "interactionDependencies": [],
+          "reasoning": "Uses only own properties (occupancy and capacity) for calculation",
+          "calculationMethod": "Set to 'full' when occupancy equals capacity, 'available' when occupancy < capacity",
+          "completed": true
+        },
+        {
+          "id": "Dormitory.availableBeds",
+          "type": "property",
+          "entityName": "Dormitory",
+          "propertyName": "availableBeds",
+          "computationType": "computed",
+          "dependencies": [
+            "_self.capacity",
+            "_self.occupancy"
+          ],
+          "interactionDependencies": [],
+          "reasoning": "Uses only own properties for calculation",
+          "calculationMethod": "capacity - occupancy",
+          "completed": true
+        },
+        {
+          "id": "Bed.status",
+          "type": "property",
+          "entityName": "Bed",
+          "propertyName": "status",
+          "computationType": "StateMachine",
+          "dependencies": [],
+          "interactionDependencies": [
+            "AssignUserToDormitory",
+            "ApproveEviction"
+          ],
+          "reasoning": "Has interactionDependencies that can modify it",
+          "calculationMethod": "Set to 'occupied' by AssignUserToDormitory, set to 'vacant' by ApproveEviction",
+          "completed": true
+        },
+        {
+          "id": "PointDeduction",
+          "type": "entity",
+          "entityName": "PointDeduction",
+          "computationType": "Transform",
+          "dependencies": [
+            "InteractionEventEntity"
+          ],
+          "interactionDependencies": [
+            "RecordPointDeduction"
+          ],
+          "reasoning": "interactionDependencies includes RecordPointDeduction which creates the entity",
+          "calculationMethod": "Created by RecordPointDeduction interaction when dormHead or admin records a violation",
+          "completed": true
+        },
+        {
+          "id": "EvictionRequest",
+          "type": "entity",
+          "entityName": "EvictionRequest",
+          "computationType": "Transform",
+          "dependencies": [
+            "InteractionEventEntity"
+          ],
+          "interactionDependencies": [
+            "RequestEviction"
+          ],
+          "reasoning": "interactionDependencies includes RequestEviction which creates the entity",
+          "calculationMethod": "Created by RequestEviction interaction when dormHead requests to evict a user",
+          "completed": true
+        },
+        {
+          "id": "EvictionRequest.status",
+          "type": "property",
+          "entityName": "EvictionRequest",
+          "propertyName": "status",
+          "computationType": "StateMachine",
+          "dependencies": [],
+          "interactionDependencies": [
+            "RequestEviction",
+            "ApproveEviction",
+            "RejectEviction"
+          ],
+          "reasoning": "Has interactionDependencies that can modify it",
+          "calculationMethod": "Initially 'pending', changed to 'approved' by ApproveEviction or 'rejected' by RejectEviction",
+          "completed": true
+        },
+        {
+          "id": "EvictionRequest.processedAt",
+          "type": "property",
+          "entityName": "EvictionRequest",
+          "propertyName": "processedAt",
+          "computationType": "StateMachine",
+          "dependencies": [],
+          "interactionDependencies": [
+            "ApproveEviction",
+            "RejectEviction"
+          ],
+          "reasoning": "Has interactionDependencies that can modify it",
+          "calculationMethod": "Set to current timestamp when ApproveEviction or RejectEviction is executed",
+          "completed": true
+        },
+        {
+          "id": "EvictionRequest.adminComment",
+          "type": "property",
+          "entityName": "EvictionRequest",
+          "propertyName": "adminComment",
+          "computationType": "StateMachine",
+          "dependencies": [],
+          "interactionDependencies": [
+            "ApproveEviction",
+            "RejectEviction"
+          ],
+          "reasoning": "Has interactionDependencies that can modify it",
+          "calculationMethod": "Set from ApproveEviction or RejectEviction payload",
+          "completed": true
+        },
+        {
+          "id": "UserBedRelation",
+          "type": "relation",
+          "relationName": "UserBedRelation",
+          "computationType": "StateMachine",
+          "dependencies": [
+            "User",
+            "Bed"
+          ],
+          "interactionDependencies": [
+            "AssignUserToDormitory",
+            "ApproveEviction"
+          ],
+          "reasoning": "Interaction-created relation that can be deleted (hard-delete), requires StateMachine only",
+          "calculationMethod": "Created by AssignUserToDormitory when user is assigned, deleted by ApproveEviction when user is evicted",
+          "completed": true
+        }
+      ],
+      "description": "Phase 1: 3 entity computation(s), 11 property computation(s), 1 relation computation(s)"
+    },
+    {
+      "phase": 2,
+      "computations": [
+        {
+          "id": "Dormitory.occupancy",
+          "type": "property",
+          "entityName": "Dormitory",
+          "propertyName": "occupancy",
+          "computationType": "Count",
+          "dependencies": [
+            "DormitoryBedRelation",
+            "Bed.status"
+          ],
+          "interactionDependencies": [],
+          "reasoning": "ComputationMethod contains 'Count of', has dataDependencies with relations",
+          "calculationMethod": "Count of DormitoryBedRelation where Bed.status = 'occupied'",
+          "completed": true
+        },
+        {
+          "id": "UserDormitoryRelation",
+          "type": "relation",
+          "relationName": "UserDormitoryRelation",
+          "computationType": "StateMachine",
+          "dependencies": [
+            "User",
+            "Dormitory"
+          ],
+          "interactionDependencies": [
+            "AssignUserToDormitory",
+            "ApproveEviction"
+          ],
+          "reasoning": "Interaction-created relation that can be deleted (hard-delete), requires StateMachine only",
+          "calculationMethod": "Created by AssignUserToDormitory when user is assigned, deleted by ApproveEviction when user is evicted",
+          "completed": true
+        },
+        {
+          "id": "DormitoryDormHeadRelation",
+          "type": "relation",
+          "relationName": "DormitoryDormHeadRelation",
+          "computationType": "StateMachine",
+          "dependencies": [
+            "Dormitory",
+            "User"
+          ],
+          "interactionDependencies": [
+            "AppointDormHead"
+          ],
+          "reasoning": "Interaction-created relation that can be deleted (hard-delete), requires StateMachine only",
+          "calculationMethod": "Created by AppointDormHead when admin appoints a user as dormitory head",
+          "completed": true
+        },
+        {
+          "id": "EvictionRequestApproverRelation",
+          "type": "relation",
+          "relationName": "EvictionRequestApproverRelation",
+          "computationType": "Transform",
+          "dependencies": [
+            "EvictionRequest",
+            "User",
+            "InteractionEventEntity"
+          ],
+          "interactionDependencies": [
+            "ApproveEviction",
+            "RejectEviction"
+          ],
+          "reasoning": "Interaction-created relation that cannot be deleted, requires Transform with InteractionEventEntity",
+          "calculationMethod": "Created when ApproveEviction or RejectEviction is executed",
+          "completed": true
+        }
+      ],
+      "description": "Phase 2: 1 property computation(s), 3 relation computation(s)"
+    }
+  ]
+}

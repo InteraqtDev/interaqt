@@ -1,0 +1,4384 @@
+
+> interaqt-cms-example@1.0.0 test
+> vitest run tests/basic.test.ts -t RecordPointDeduction
+
+
+ RUN  v3.2.4 /Users/camus/Work/interqat/interaqt-old/examples/dormitory
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'scheme'[39m,
+  name: [32m''[39m,
+  sql: [32m'CREATE Table IF NOT EXISTS "_IDS_" (last INTEGER, name TEXT)'[39m,
+  params: [90mundefined[39m
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'scheme'[39m,
+  name: [32m''[39m,
+  sql: [32m'\n'[39m +
+    [32m'CREATE TABLE "User" (\n'[39m +
+    [32m'    "_rowId" SERIAL PRIMARY KEY,    "use_nam_1" TEXT,    "use_ema_2" TEXT,    "use_pho_3" TEXT,    "use_rol_4" TEXT,    "use_sta_5" TEXT,    "use_poi_6" INT,    "use_joi_7" TEXT,    "use_tot_8" INT,    "use_ded_9" INT,    "use__10" TEXT,    "use__11" TEXT,    "use__12" TEXT,    "use_id_13" UUID,    "use_ass_67" TEXT,    "use__68" TEXT,    "use__69" INT,    "use_id_70" UUID,    "use_dor_90" UUID,    "use_occ_71" TEXT,    "use__72" TEXT,    "use__73" INT,    "use_id_74" UUID,    "use_bed_91" UUID\n'[39m +
+    [32m')\n'[39m,
+  params: [90mundefined[39m
+}
+{
+  type: [32m'scheme'[39m,
+  name: [32m''[39m,
+  sql: [32m'\n'[39m +
+    [32m'CREATE TABLE "Dormitory" (\n'[39m +
+    [32m'    "_rowId" SERIAL PRIMARY KEY,    "dor_nam_14" TEXT,    "dor_cap_15" INT,    "dor_flo_16" INT,    "dor_bui_17" TEXT,    "dor_sta_18" TEXT,    "dor_cre_19" TEXT,    "dor_occ_20" INT,    "dor_ava_21" INT,    "dor__22" TEXT,    "dor__23" INT,    "dor_id_24" UUID,    "dor_app_76" TEXT,    "dor__77" TEXT,    "dor__78" INT,    "dor_id_79" UUID,    "dor_dor_93" UUID\n'[39m +
+    [32m')\n'[39m,
+  params: [90mundefined[39m
+}
+{
+  type: [32m'scheme'[39m,
+  name: [32m''[39m,
+  sql: [32m'\n'[39m +
+    [32m'CREATE TABLE "Bed" (\n'[39m +
+    [32m'    "_rowId" SERIAL PRIMARY KEY,    "bed_bed_25" TEXT,    "bed_sta_26" TEXT,    "bed_cre_27" TEXT,    "bed__28" TEXT,    "bed__29" INT,    "bed__30" TEXT,    "bed_id_31" UUID,    "dor_id_75" UUID,    "bed_dor_92" UUID\n'[39m +
+    [32m')\n'[39m,
+  params: [90mundefined[39m
+}
+{
+  type: [32m'scheme'[39m,
+  name: [32m''[39m,
+  sql: [32m'\n'[39m +
+    [32m'CREATE TABLE "PointDeduction" (\n'[39m +
+    [32m'    "_rowId" SERIAL PRIMARY KEY,    "poi_rea_32" TEXT,    "poi_poi_33" INT,    "poi_cat_34" TEXT,    "poi_occ_35" TEXT,    "poi_rec_36" TEXT,    "poi__37" TEXT,    "poi__38" INT,    "poi_id_39" UUID,    "use__80" INT,    "use_id_81" UUID,    "poi_use_94" UUID,    "poi_id_82" UUID,    "poi_rec_95" UUID\n'[39m +
+    [32m')\n'[39m,
+  params: [90mundefined[39m
+}
+{
+  type: [32m'scheme'[39m,
+  name: [32m''[39m,
+  sql: [32m'\n'[39m +
+    [32m'CREATE TABLE "EvictionRequest" (\n'[39m +
+    [32m'    "_rowId" SERIAL PRIMARY KEY,    "evi_rea_40" TEXT,    "evi_tot_41" INT,    "evi_sta_42" TEXT,    "evi_req_43" TEXT,    "evi_pro_44" TEXT,    "evi_adm_45" TEXT,    "evi__46" TEXT,    "evi__47" INT,    "evi__48" TEXT,    "evi__49" TEXT,    "evi__50" TEXT,    "evi_id_51" UUID,    "evi_id_83" UUID,    "evi_tar_96" UUID,    "evi_id_84" UUID,    "evi_req_97" UUID,    "evi_app_85" TEXT,    "evi__86" TEXT,    "evi__87" INT,    "evi_id_88" UUID,    "evi_app_98" UUID\n'[39m +
+    [32m')\n'[39m,
+  params: [90mundefined[39m
+}
+{
+  type: [32m'scheme'[39m,
+  name: [32m''[39m,
+  sql: [32m'\n'[39m +
+    [32m'CREATE TABLE "_Activity_" (\n'[39m +
+    [32m'    "_rowId" SERIAL PRIMARY KEY,    "_act_52" TEXT,    "_act_53" TEXT,    "_act_54" JSON,    "_act_55" JSON,    "_act_56" UUID\n'[39m +
+    [32m')\n'[39m,
+  params: [90mundefined[39m
+}
+{
+  type: [32m'scheme'[39m,
+  name: [32m''[39m,
+  sql: [32m'\n'[39m +
+    [32m'CREATE TABLE "_Interaction_" (\n'[39m +
+    [32m'    "_rowId" SERIAL PRIMARY KEY,    "_int_57" TEXT,    "_int_58" TEXT,    "_int_59" JSON,    "_int_60" JSON,    "_int_61" JSON,    "_int_62" UUID,    "act_id_89" UUID,    "_int_99" UUID\n'[39m +
+    [32m')\n'[39m,
+  params: [90mundefined[39m
+}
+{
+  type: [32m'scheme'[39m,
+  name: [32m''[39m,
+  sql: [32m'\n'[39m +
+    [32m'CREATE TABLE "_System_" (\n'[39m +
+    [32m'    "_rowId" SERIAL PRIMARY KEY,    "_sys_63" TEXT,    "_sys_64" TEXT,    "_sys_65" TEXT,    "_sys_66" UUID\n'[39m +
+    [32m')\n'[39m,
+  params: [90mundefined[39m
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'find record for deleting Dormitory'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"Dormitory"."dor_nam_14" AS "FIELD_0",\n'[39m +
+    [32m'"Dormitory"."dor_cap_15" AS "FIELD_1",\n'[39m +
+    [32m'"Dormitory"."dor_flo_16" AS "FIELD_2",\n'[39m +
+    [32m'"Dormitory"."dor_bui_17" AS "FIELD_3",\n'[39m +
+    [32m'"Dormitory"."dor_sta_18" AS "FIELD_4",\n'[39m +
+    [32m'"Dormitory"."dor_cre_19" AS "FIELD_5",\n'[39m +
+    [32m'"Dormitory"."dor_occ_20" AS "FIELD_6",\n'[39m +
+    [32m'"Dormitory"."dor_ava_21" AS "FIELD_7",\n'[39m +
+    [32m'"Dormitory"."dor__22" AS "FIELD_8",\n'[39m +
+    [32m'"Dormitory"."dor__23" AS "FIELD_9",\n'[39m +
+    [32m'"Dormitory"."dor_id_24" AS "FIELD_10",\n'[39m +
+    [32m'"Dormitory"."dor_dor_93" AS "FIELD_11",\n'[39m +
+    [32m'"Dormitory"."dor_app_76" AS "FIELD_12",\n'[39m +
+    [32m'"Dormitory"."dor__77" AS "FIELD_13",\n'[39m +
+    [32m'"Dormitory"."dor__78" AS "FIELD_14",\n'[39m +
+    [32m'"Dormitory"."dor_id_79" AS "FIELD_15"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"Dormitory" AS "Dormitory"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'("Dormitory"."dor_id_24" IS NOT NULL AND "Dormitory"."dor_id_24" IS NOT NULL)\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: []
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'find record for deleting Bed'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"Bed"."bed_bed_25" AS "FIELD_0",\n'[39m +
+    [32m'"Bed"."bed_sta_26" AS "FIELD_1",\n'[39m +
+    [32m'"Bed"."bed_cre_27" AS "FIELD_2",\n'[39m +
+    [32m'"Bed"."bed__28" AS "FIELD_3",\n'[39m +
+    [32m'"Bed"."bed__29" AS "FIELD_4",\n'[39m +
+    [32m'"Bed"."bed__30" AS "FIELD_5",\n'[39m +
+    [32m'"Bed"."bed_id_31" AS "FIELD_6",\n'[39m +
+    [32m'"Bed"."bed_dor_92" AS "FIELD_7",\n'[39m +
+    [32m'"Bed"."dor_id_75" AS "FIELD_8"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"Bed" AS "Bed"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'("Bed"."bed_id_31" IS NOT NULL AND "Bed"."bed_id_31" IS NOT NULL)\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: []
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'find record for deleting PointDeduction'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"PointDeduction"."poi_rea_32" AS "FIELD_0",\n'[39m +
+    [32m'"PointDeduction"."poi_poi_33" AS "FIELD_1",\n'[39m +
+    [32m'"PointDeduction"."poi_cat_34" AS "FIELD_2",\n'[39m +
+    [32m'"PointDeduction"."poi_occ_35" AS "FIELD_3",\n'[39m +
+    [32m'"PointDeduction"."poi_rec_36" AS "FIELD_4",\n'[39m +
+    [32m'"PointDeduction"."poi__37" AS "FIELD_5",\n'[39m +
+    [32m'"PointDeduction"."poi__38" AS "FIELD_6",\n'[39m +
+    [32m'"PointDeduction"."poi_id_39" AS "FIELD_7",\n'[39m +
+    [32m'"PointDeduction"."poi_use_94" AS "FIELD_8",\n'[39m +
+    [32m'"PointDeduction"."use__80" AS "FIELD_9",\n'[39m +
+    [32m'"PointDeduction"."use_id_81" AS "FIELD_10",\n'[39m +
+    [32m'"PointDeduction"."poi_rec_95" AS "FIELD_11",\n'[39m +
+    [32m'"PointDeduction"."poi_id_82" AS "FIELD_12"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"PointDeduction" AS "PointDeduction"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'("PointDeduction"."poi_id_39" IS NOT NULL AND "PointDeduction"."poi_id_39" IS NOT NULL)\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: []
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'find record for deleting EvictionRequest'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"EvictionRequest"."evi_rea_40" AS "FIELD_0",\n'[39m +
+    [32m'"EvictionRequest"."evi_tot_41" AS "FIELD_1",\n'[39m +
+    [32m'"EvictionRequest"."evi_sta_42" AS "FIELD_2",\n'[39m +
+    [32m'"EvictionRequest"."evi_req_43" AS "FIELD_3",\n'[39m +
+    [32m'"EvictionRequest"."evi_pro_44" AS "FIELD_4",\n'[39m +
+    [32m'"EvictionRequest"."evi_adm_45" AS "FIELD_5",\n'[39m +
+    [32m'"EvictionRequest"."evi__46" AS "FIELD_6",\n'[39m +
+    [32m'"EvictionRequest"."evi__47" AS "FIELD_7",\n'[39m +
+    [32m'"EvictionRequest"."evi__48" AS "FIELD_8",\n'[39m +
+    [32m'"EvictionRequest"."evi__49" AS "FIELD_9",\n'[39m +
+    [32m'"EvictionRequest"."evi__50" AS "FIELD_10",\n'[39m +
+    [32m'"EvictionRequest"."evi_id_51" AS "FIELD_11",\n'[39m +
+    [32m'"EvictionRequest"."evi_tar_96" AS "FIELD_12",\n'[39m +
+    [32m'"EvictionRequest"."evi_id_83" AS "FIELD_13",\n'[39m +
+    [32m'"EvictionRequest"."evi_req_97" AS "FIELD_14",\n'[39m +
+    [32m'"EvictionRequest"."evi_id_84" AS "FIELD_15",\n'[39m +
+    [32m'"EvictionRequest"."evi_app_98" AS "FIELD_16",\n'[39m +
+    [32m'"EvictionRequest"."evi_app_85" AS "FIELD_17",\n'[39m +
+    [32m'"EvictionRequest"."evi__86" AS "FIELD_18",\n'[39m +
+    [32m'"EvictionRequest"."evi__87" AS "FIELD_19",\n'[39m +
+    [32m'"EvictionRequest"."evi_id_88" AS "FIELD_20"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"EvictionRequest" AS "EvictionRequest"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'("EvictionRequest"."evi_id_51" IS NOT NULL AND "EvictionRequest"."evi_id_51" IS NOT NULL)\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: []
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'find record for deleting UserDormitoryRelation'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"UserDormitoryRelation"."use_ass_67" AS "FIELD_0",\n'[39m +
+    [32m'"UserDormitoryRelation"."use__68" AS "FIELD_1",\n'[39m +
+    [32m'"UserDormitoryRelation"."use__69" AS "FIELD_2",\n'[39m +
+    [32m'"UserDormitoryRelation"."use_id_70" AS "FIELD_3",\n'[39m +
+    [32m'"UserDormitoryRelation"."use_dor_90" AS "FIELD_4"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"User" AS "UserDormitoryRelation"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'("UserDormitoryRelation"."use_id_70" IS NOT NULL AND "UserDormitoryRelation"."use_id_70" IS NOT NULL)\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: []
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'find record for deleting UserBedRelation'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"UserBedRelation"."use_occ_71" AS "FIELD_0",\n'[39m +
+    [32m'"UserBedRelation"."use__72" AS "FIELD_1",\n'[39m +
+    [32m'"UserBedRelation"."use__73" AS "FIELD_2",\n'[39m +
+    [32m'"UserBedRelation"."use_id_74" AS "FIELD_3",\n'[39m +
+    [32m'"UserBedRelation"."use_bed_91" AS "FIELD_4"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"User" AS "UserBedRelation"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'("UserBedRelation"."use_id_74" IS NOT NULL AND "UserBedRelation"."use_id_74" IS NOT NULL)\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: []
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'find record for deleting DormitoryDormHeadRelation'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"DormitoryDormHeadRelation"."dor_app_76" AS "FIELD_0",\n'[39m +
+    [32m'"DormitoryDormHeadRelation"."dor__77" AS "FIELD_1",\n'[39m +
+    [32m'"DormitoryDormHeadRelation"."dor__78" AS "FIELD_2",\n'[39m +
+    [32m'"DormitoryDormHeadRelation"."dor_id_79" AS "FIELD_3",\n'[39m +
+    [32m'"DormitoryDormHeadRelation"."dor_dor_93" AS "FIELD_4"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"Dormitory" AS "DormitoryDormHeadRelation"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'("DormitoryDormHeadRelation"."dor_id_79" IS NOT NULL AND "DormitoryDormHeadRelation"."dor_id_79" IS NOT NULL)\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: []
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'find record for deleting EvictionRequestApproverRelation'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"EvictionRequestApproverRelation"."evi_app_85" AS "FIELD_0",\n'[39m +
+    [32m'"EvictionRequestApproverRelation"."evi__86" AS "FIELD_1",\n'[39m +
+    [32m'"EvictionRequestApproverRelation"."evi__87" AS "FIELD_2",\n'[39m +
+    [32m'"EvictionRequestApproverRelation"."evi_id_88" AS "FIELD_3",\n'[39m +
+    [32m'"EvictionRequestApproverRelation"."evi_app_98" AS "FIELD_4"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"EvictionRequest" AS "EvictionRequestApproverRelation"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'("EvictionRequestApproverRelation"."evi_id_88" IS NOT NULL AND "EvictionRequestApproverRelation"."evi_id_88" IS NOT NULL)\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: []
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'finding combined records for User to flash out, for creation with data {"name":"Admin User","email":"admin@test.com","role":"admin","id":"0198b66a-3fa2-7ef1-874f-b0930a0934a1"}'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"User"."use_nam_1" AS "FIELD_0",\n'[39m +
+    [32m'"User"."use_ema_2" AS "FIELD_1",\n'[39m +
+    [32m'"User"."use_pho_3" AS "FIELD_2",\n'[39m +
+    [32m'"User"."use_rol_4" AS "FIELD_3",\n'[39m +
+    [32m'"User"."use_sta_5" AS "FIELD_4",\n'[39m +
+    [32m'"User"."use_poi_6" AS "FIELD_5",\n'[39m +
+    [32m'"User"."use_joi_7" AS "FIELD_6",\n'[39m +
+    [32m'"User"."use_tot_8" AS "FIELD_7",\n'[39m +
+    [32m'"User"."use_ded_9" AS "FIELD_8",\n'[39m +
+    [32m'"User"."use__10" AS "FIELD_9",\n'[39m +
+    [32m'"User"."use__11" AS "FIELD_10",\n'[39m +
+    [32m'"User"."use__12" AS "FIELD_11",\n'[39m +
+    [32m'"User"."use_id_13" AS "FIELD_12",\n'[39m +
+    [32m'"User"."use_dor_90" AS "FIELD_13",\n'[39m +
+    [32m'"User"."use_ass_67" AS "FIELD_14",\n'[39m +
+    [32m'"User"."use__68" AS "FIELD_15",\n'[39m +
+    [32m'"User"."use__69" AS "FIELD_16",\n'[39m +
+    [32m'"User"."use_id_70" AS "FIELD_17",\n'[39m +
+    [32m'"User"."use_bed_91" AS "FIELD_18",\n'[39m +
+    [32m'"User"."use_occ_71" AS "FIELD_19",\n'[39m +
+    [32m'"User"."use__72" AS "FIELD_20",\n'[39m +
+    [32m'"User"."use__73" AS "FIELD_21",\n'[39m +
+    [32m'"User"."use_id_74" AS "FIELD_22"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"User" AS "User"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'1=$1\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: [ [33m1[39m ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'insert'[39m,
+  name: [32m'create record User from handle'[39m,
+  sql: [32m'\n'[39m +
+    [32m'INSERT INTO "User"\n'[39m +
+    [32m'("use_nam_1","use_ema_2","use_rol_4","use_id_13","use_pho_3","use_joi_7","use__10","use__11","use__12")\n'[39m +
+    [32m'VALUES\n'[39m +
+    [32m'($1,$2,$3,$4,$5,$6,$7,$8,$9) \n'[39m,
+  params: [
+    [32m'Admin User'[39m,
+    [32m'admin@test.com'[39m,
+    [32m'admin'[39m,
+    [32m'0198b66a-3fa2-7ef1-874f-b0930a0934a1'[39m,
+    [32m''[39m,
+    [32m'2025-08-17T05:04:33.187Z'[39m,
+    [32m'user'[39m,
+    [32m'active'[39m,
+    [32m'tracking'[39m
+  ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'find record for updating User'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"User"."use_nam_1" AS "FIELD_0",\n'[39m +
+    [32m'"User"."use_ema_2" AS "FIELD_1",\n'[39m +
+    [32m'"User"."use_pho_3" AS "FIELD_2",\n'[39m +
+    [32m'"User"."use_rol_4" AS "FIELD_3",\n'[39m +
+    [32m'"User"."use_sta_5" AS "FIELD_4",\n'[39m +
+    [32m'"User"."use_poi_6" AS "FIELD_5",\n'[39m +
+    [32m'"User"."use_joi_7" AS "FIELD_6",\n'[39m +
+    [32m'"User"."use_tot_8" AS "FIELD_7",\n'[39m +
+    [32m'"User"."use_ded_9" AS "FIELD_8",\n'[39m +
+    [32m'"User"."use__10" AS "FIELD_9",\n'[39m +
+    [32m'"User"."use__11" AS "FIELD_10",\n'[39m +
+    [32m'"User"."use__12" AS "FIELD_11",\n'[39m +
+    [32m'"User"."use_id_13" AS "FIELD_12",\n'[39m +
+    [32m'"User"."use_dor_90" AS "FIELD_13",\n'[39m +
+    [32m'"User"."use_ass_67" AS "FIELD_14",\n'[39m +
+    [32m'"User"."use__68" AS "FIELD_15",\n'[39m +
+    [32m'"User"."use__69" AS "FIELD_16",\n'[39m +
+    [32m'"User"."use_id_70" AS "FIELD_17",\n'[39m +
+    [32m'"User"."use_bed_91" AS "FIELD_18",\n'[39m +
+    [32m'"User"."use_occ_71" AS "FIELD_19",\n'[39m +
+    [32m'"User"."use__72" AS "FIELD_20",\n'[39m +
+    [32m'"User"."use__73" AS "FIELD_21",\n'[39m +
+    [32m'"User"."use_id_74" AS "FIELD_22"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"User" AS "User"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'("User"."use_id_13" = $1 AND "User"."use_id_13" IS NOT NULL)\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: [ [32m'0198b66a-3fa2-7ef1-874f-b0930a0934a1'[39m ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'finding combined records for User to flash out, for updating with data {"role":"user","id":"0198b66a-3fa2-7ef1-874f-b0930a0934a1"}'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"User"."use_nam_1" AS "FIELD_0",\n'[39m +
+    [32m'"User"."use_ema_2" AS "FIELD_1",\n'[39m +
+    [32m'"User"."use_pho_3" AS "FIELD_2",\n'[39m +
+    [32m'"User"."use_rol_4" AS "FIELD_3",\n'[39m +
+    [32m'"User"."use_sta_5" AS "FIELD_4",\n'[39m +
+    [32m'"User"."use_poi_6" AS "FIELD_5",\n'[39m +
+    [32m'"User"."use_joi_7" AS "FIELD_6",\n'[39m +
+    [32m'"User"."use_tot_8" AS "FIELD_7",\n'[39m +
+    [32m'"User"."use_ded_9" AS "FIELD_8",\n'[39m +
+    [32m'"User"."use__10" AS "FIELD_9",\n'[39m +
+    [32m'"User"."use__11" AS "FIELD_10",\n'[39m +
+    [32m'"User"."use__12" AS "FIELD_11",\n'[39m +
+    [32m'"User"."use_id_13" AS "FIELD_12",\n'[39m +
+    [32m'"User"."use_dor_90" AS "FIELD_13",\n'[39m +
+    [32m'"User"."use_ass_67" AS "FIELD_14",\n'[39m +
+    [32m'"User"."use__68" AS "FIELD_15",\n'[39m +
+    [32m'"User"."use__69" AS "FIELD_16",\n'[39m +
+    [32m'"User"."use_id_70" AS "FIELD_17",\n'[39m +
+    [32m'"User"."use_bed_91" AS "FIELD_18",\n'[39m +
+    [32m'"User"."use_occ_71" AS "FIELD_19",\n'[39m +
+    [32m'"User"."use__72" AS "FIELD_20",\n'[39m +
+    [32m'"User"."use__73" AS "FIELD_21",\n'[39m +
+    [32m'"User"."use_id_74" AS "FIELD_22"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"User" AS "User"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'1=$1\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: [ [33m1[39m ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'update'[39m,
+  name: [32m'update record User by id'[39m,
+  sql: [32m'\n'[39m +
+    [32m'UPDATE "User"\n'[39m +
+    [32m'SET "use_rol_4" = $1,"use_id_13" = $2\n'[39m +
+    [32m'WHERE "use_id_13" = ($3)\n'[39m +
+    [32m'         RETURNING "use_id_13" AS id'[39m,
+  params: [
+    [32m'user'[39m,
+    [32m'0198b66a-3fa2-7ef1-874f-b0930a0934a1'[39m,
+    [32m'0198b66a-3fa2-7ef1-874f-b0930a0934a1'[39m
+  ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'find record for updating User'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"User"."use_nam_1" AS "FIELD_0",\n'[39m +
+    [32m'"User"."use_ema_2" AS "FIELD_1",\n'[39m +
+    [32m'"User"."use_pho_3" AS "FIELD_2",\n'[39m +
+    [32m'"User"."use_rol_4" AS "FIELD_3",\n'[39m +
+    [32m'"User"."use_sta_5" AS "FIELD_4",\n'[39m +
+    [32m'"User"."use_poi_6" AS "FIELD_5",\n'[39m +
+    [32m'"User"."use_joi_7" AS "FIELD_6",\n'[39m +
+    [32m'"User"."use_tot_8" AS "FIELD_7",\n'[39m +
+    [32m'"User"."use_ded_9" AS "FIELD_8",\n'[39m +
+    [32m'"User"."use__10" AS "FIELD_9",\n'[39m +
+    [32m'"User"."use__11" AS "FIELD_10",\n'[39m +
+    [32m'"User"."use__12" AS "FIELD_11",\n'[39m +
+    [32m'"User"."use_id_13" AS "FIELD_12",\n'[39m +
+    [32m'"User"."use_dor_90" AS "FIELD_13",\n'[39m +
+    [32m'"User"."use_ass_67" AS "FIELD_14",\n'[39m +
+    [32m'"User"."use__68" AS "FIELD_15",\n'[39m +
+    [32m'"User"."use__69" AS "FIELD_16",\n'[39m +
+    [32m'"User"."use_id_70" AS "FIELD_17",\n'[39m +
+    [32m'"User"."use_bed_91" AS "FIELD_18",\n'[39m +
+    [32m'"User"."use_occ_71" AS "FIELD_19",\n'[39m +
+    [32m'"User"."use__72" AS "FIELD_20",\n'[39m +
+    [32m'"User"."use__73" AS "FIELD_21",\n'[39m +
+    [32m'"User"."use_id_74" AS "FIELD_22"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"User" AS "User"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'("User"."use_id_13" = $1 AND "User"."use_id_13" IS NOT NULL)\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: [ [32m'0198b66a-3fa2-7ef1-874f-b0930a0934a1'[39m ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'finding combined records for User to flash out, for updating with data {"status":"active","id":"0198b66a-3fa2-7ef1-874f-b0930a0934a1"}'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"User"."use_nam_1" AS "FIELD_0",\n'[39m +
+    [32m'"User"."use_ema_2" AS "FIELD_1",\n'[39m +
+    [32m'"User"."use_pho_3" AS "FIELD_2",\n'[39m +
+    [32m'"User"."use_rol_4" AS "FIELD_3",\n'[39m +
+    [32m'"User"."use_sta_5" AS "FIELD_4",\n'[39m +
+    [32m'"User"."use_poi_6" AS "FIELD_5",\n'[39m +
+    [32m'"User"."use_joi_7" AS "FIELD_6",\n'[39m +
+    [32m'"User"."use_tot_8" AS "FIELD_7",\n'[39m +
+    [32m'"User"."use_ded_9" AS "FIELD_8",\n'[39m +
+    [32m'"User"."use__10" AS "FIELD_9",\n'[39m +
+    [32m'"User"."use__11" AS "FIELD_10",\n'[39m +
+    [32m'"User"."use__12" AS "FIELD_11",\n'[39m +
+    [32m'"User"."use_id_13" AS "FIELD_12",\n'[39m +
+    [32m'"User"."use_dor_90" AS "FIELD_13",\n'[39m +
+    [32m'"User"."use_ass_67" AS "FIELD_14",\n'[39m +
+    [32m'"User"."use__68" AS "FIELD_15",\n'[39m +
+    [32m'"User"."use__69" AS "FIELD_16",\n'[39m +
+    [32m'"User"."use_id_70" AS "FIELD_17",\n'[39m +
+    [32m'"User"."use_bed_91" AS "FIELD_18",\n'[39m +
+    [32m'"User"."use_occ_71" AS "FIELD_19",\n'[39m +
+    [32m'"User"."use__72" AS "FIELD_20",\n'[39m +
+    [32m'"User"."use__73" AS "FIELD_21",\n'[39m +
+    [32m'"User"."use_id_74" AS "FIELD_22"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"User" AS "User"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'1=$1\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: [ [33m1[39m ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'update'[39m,
+  name: [32m'update record User by id'[39m,
+  sql: [32m'\n'[39m +
+    [32m'UPDATE "User"\n'[39m +
+    [32m'SET "use_sta_5" = $1,"use_id_13" = $2\n'[39m +
+    [32m'WHERE "use_id_13" = ($3)\n'[39m +
+    [32m'         RETURNING "use_id_13" AS id'[39m,
+  params: [
+    [32m'active'[39m,
+    [32m'0198b66a-3fa2-7ef1-874f-b0930a0934a1'[39m,
+    [32m'0198b66a-3fa2-7ef1-874f-b0930a0934a1'[39m
+  ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'find record for updating User'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"User"."use_nam_1" AS "FIELD_0",\n'[39m +
+    [32m'"User"."use_ema_2" AS "FIELD_1",\n'[39m +
+    [32m'"User"."use_pho_3" AS "FIELD_2",\n'[39m +
+    [32m'"User"."use_rol_4" AS "FIELD_3",\n'[39m +
+    [32m'"User"."use_sta_5" AS "FIELD_4",\n'[39m +
+    [32m'"User"."use_poi_6" AS "FIELD_5",\n'[39m +
+    [32m'"User"."use_joi_7" AS "FIELD_6",\n'[39m +
+    [32m'"User"."use_tot_8" AS "FIELD_7",\n'[39m +
+    [32m'"User"."use_ded_9" AS "FIELD_8",\n'[39m +
+    [32m'"User"."use__10" AS "FIELD_9",\n'[39m +
+    [32m'"User"."use__11" AS "FIELD_10",\n'[39m +
+    [32m'"User"."use__12" AS "FIELD_11",\n'[39m +
+    [32m'"User"."use_id_13" AS "FIELD_12",\n'[39m +
+    [32m'"User"."use_dor_90" AS "FIELD_13",\n'[39m +
+    [32m'"User"."use_ass_67" AS "FIELD_14",\n'[39m +
+    [32m'"User"."use__68" AS "FIELD_15",\n'[39m +
+    [32m'"User"."use__69" AS "FIELD_16",\n'[39m +
+    [32m'"User"."use_id_70" AS "FIELD_17",\n'[39m +
+    [32m'"User"."use_bed_91" AS "FIELD_18",\n'[39m +
+    [32m'"User"."use_occ_71" AS "FIELD_19",\n'[39m +
+    [32m'"User"."use__72" AS "FIELD_20",\n'[39m +
+    [32m'"User"."use__73" AS "FIELD_21",\n'[39m +
+    [32m'"User"."use_id_74" AS "FIELD_22"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"User" AS "User"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'("User"."use_id_13" = $1 AND "User"."use_id_13" IS NOT NULL)\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: [ [32m'0198b66a-3fa2-7ef1-874f-b0930a0934a1'[39m ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'finding combined records for User to flash out, for updating with data {"points":100,"id":"0198b66a-3fa2-7ef1-874f-b0930a0934a1"}'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"User"."use_nam_1" AS "FIELD_0",\n'[39m +
+    [32m'"User"."use_ema_2" AS "FIELD_1",\n'[39m +
+    [32m'"User"."use_pho_3" AS "FIELD_2",\n'[39m +
+    [32m'"User"."use_rol_4" AS "FIELD_3",\n'[39m +
+    [32m'"User"."use_sta_5" AS "FIELD_4",\n'[39m +
+    [32m'"User"."use_poi_6" AS "FIELD_5",\n'[39m +
+    [32m'"User"."use_joi_7" AS "FIELD_6",\n'[39m +
+    [32m'"User"."use_tot_8" AS "FIELD_7",\n'[39m +
+    [32m'"User"."use_ded_9" AS "FIELD_8",\n'[39m +
+    [32m'"User"."use__10" AS "FIELD_9",\n'[39m +
+    [32m'"User"."use__11" AS "FIELD_10",\n'[39m +
+    [32m'"User"."use__12" AS "FIELD_11",\n'[39m +
+    [32m'"User"."use_id_13" AS "FIELD_12",\n'[39m +
+    [32m'"User"."use_dor_90" AS "FIELD_13",\n'[39m +
+    [32m'"User"."use_ass_67" AS "FIELD_14",\n'[39m +
+    [32m'"User"."use__68" AS "FIELD_15",\n'[39m +
+    [32m'"User"."use__69" AS "FIELD_16",\n'[39m +
+    [32m'"User"."use_id_70" AS "FIELD_17",\n'[39m +
+    [32m'"User"."use_bed_91" AS "FIELD_18",\n'[39m +
+    [32m'"User"."use_occ_71" AS "FIELD_19",\n'[39m +
+    [32m'"User"."use__72" AS "FIELD_20",\n'[39m +
+    [32m'"User"."use__73" AS "FIELD_21",\n'[39m +
+    [32m'"User"."use_id_74" AS "FIELD_22"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"User" AS "User"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'1=$1\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: [ [33m1[39m ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'update'[39m,
+  name: [32m'update record User by id'[39m,
+  sql: [32m'\n'[39m +
+    [32m'UPDATE "User"\n'[39m +
+    [32m'SET "use_poi_6" = $1,"use_id_13" = $2\n'[39m +
+    [32m'WHERE "use_id_13" = ($3)\n'[39m +
+    [32m'         RETURNING "use_id_13" AS id'[39m,
+  params: [
+    [33m100[39m,
+    [32m'0198b66a-3fa2-7ef1-874f-b0930a0934a1'[39m,
+    [32m'0198b66a-3fa2-7ef1-874f-b0930a0934a1'[39m
+  ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'find record for updating User'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"User"."use_nam_1" AS "FIELD_0",\n'[39m +
+    [32m'"User"."use_ema_2" AS "FIELD_1",\n'[39m +
+    [32m'"User"."use_pho_3" AS "FIELD_2",\n'[39m +
+    [32m'"User"."use_rol_4" AS "FIELD_3",\n'[39m +
+    [32m'"User"."use_sta_5" AS "FIELD_4",\n'[39m +
+    [32m'"User"."use_poi_6" AS "FIELD_5",\n'[39m +
+    [32m'"User"."use_joi_7" AS "FIELD_6",\n'[39m +
+    [32m'"User"."use_tot_8" AS "FIELD_7",\n'[39m +
+    [32m'"User"."use_ded_9" AS "FIELD_8",\n'[39m +
+    [32m'"User"."use__10" AS "FIELD_9",\n'[39m +
+    [32m'"User"."use__11" AS "FIELD_10",\n'[39m +
+    [32m'"User"."use__12" AS "FIELD_11",\n'[39m +
+    [32m'"User"."use_id_13" AS "FIELD_12",\n'[39m +
+    [32m'"User"."use_dor_90" AS "FIELD_13",\n'[39m +
+    [32m'"User"."use_ass_67" AS "FIELD_14",\n'[39m +
+    [32m'"User"."use__68" AS "FIELD_15",\n'[39m +
+    [32m'"User"."use__69" AS "FIELD_16",\n'[39m +
+    [32m'"User"."use_id_70" AS "FIELD_17",\n'[39m +
+    [32m'"User"."use_bed_91" AS "FIELD_18",\n'[39m +
+    [32m'"User"."use_occ_71" AS "FIELD_19",\n'[39m +
+    [32m'"User"."use__72" AS "FIELD_20",\n'[39m +
+    [32m'"User"."use__73" AS "FIELD_21",\n'[39m +
+    [32m'"User"."use_id_74" AS "FIELD_22"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"User" AS "User"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'("User"."use_id_13" = $1 AND "User"."use_id_13" IS NOT NULL)\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: [ [32m'0198b66a-3fa2-7ef1-874f-b0930a0934a1'[39m ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'finding combined records for User to flash out, for updating with data {"totalDeductions":0,"id":"0198b66a-3fa2-7ef1-874f-b0930a0934a1"}'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"User"."use_nam_1" AS "FIELD_0",\n'[39m +
+    [32m'"User"."use_ema_2" AS "FIELD_1",\n'[39m +
+    [32m'"User"."use_pho_3" AS "FIELD_2",\n'[39m +
+    [32m'"User"."use_rol_4" AS "FIELD_3",\n'[39m +
+    [32m'"User"."use_sta_5" AS "FIELD_4",\n'[39m +
+    [32m'"User"."use_poi_6" AS "FIELD_5",\n'[39m +
+    [32m'"User"."use_joi_7" AS "FIELD_6",\n'[39m +
+    [32m'"User"."use_tot_8" AS "FIELD_7",\n'[39m +
+    [32m'"User"."use_ded_9" AS "FIELD_8",\n'[39m +
+    [32m'"User"."use__10" AS "FIELD_9",\n'[39m +
+    [32m'"User"."use__11" AS "FIELD_10",\n'[39m +
+    [32m'"User"."use__12" AS "FIELD_11",\n'[39m +
+    [32m'"User"."use_id_13" AS "FIELD_12",\n'[39m +
+    [32m'"User"."use_dor_90" AS "FIELD_13",\n'[39m +
+    [32m'"User"."use_ass_67" AS "FIELD_14",\n'[39m +
+    [32m'"User"."use__68" AS "FIELD_15",\n'[39m +
+    [32m'"User"."use__69" AS "FIELD_16",\n'[39m +
+    [32m'"User"."use_id_70" AS "FIELD_17",\n'[39m +
+    [32m'"User"."use_bed_91" AS "FIELD_18",\n'[39m +
+    [32m'"User"."use_occ_71" AS "FIELD_19",\n'[39m +
+    [32m'"User"."use__72" AS "FIELD_20",\n'[39m +
+    [32m'"User"."use__73" AS "FIELD_21",\n'[39m +
+    [32m'"User"."use_id_74" AS "FIELD_22"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"User" AS "User"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'1=$1\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: [ [33m1[39m ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'update'[39m,
+  name: [32m'update record User by id'[39m,
+  sql: [32m'\n'[39m +
+    [32m'UPDATE "User"\n'[39m +
+    [32m'SET "use_tot_8" = $1,"use_id_13" = $2\n'[39m +
+    [32m'WHERE "use_id_13" = ($3)\n'[39m +
+    [32m'         RETURNING "use_id_13" AS id'[39m,
+  params: [
+    [33m0[39m,
+    [32m'0198b66a-3fa2-7ef1-874f-b0930a0934a1'[39m,
+    [32m'0198b66a-3fa2-7ef1-874f-b0930a0934a1'[39m
+  ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'find record for updating User'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"User"."use_nam_1" AS "FIELD_0",\n'[39m +
+    [32m'"User"."use_ema_2" AS "FIELD_1",\n'[39m +
+    [32m'"User"."use_pho_3" AS "FIELD_2",\n'[39m +
+    [32m'"User"."use_rol_4" AS "FIELD_3",\n'[39m +
+    [32m'"User"."use_sta_5" AS "FIELD_4",\n'[39m +
+    [32m'"User"."use_poi_6" AS "FIELD_5",\n'[39m +
+    [32m'"User"."use_joi_7" AS "FIELD_6",\n'[39m +
+    [32m'"User"."use_tot_8" AS "FIELD_7",\n'[39m +
+    [32m'"User"."use_ded_9" AS "FIELD_8",\n'[39m +
+    [32m'"User"."use__10" AS "FIELD_9",\n'[39m +
+    [32m'"User"."use__11" AS "FIELD_10",\n'[39m +
+    [32m'"User"."use__12" AS "FIELD_11",\n'[39m +
+    [32m'"User"."use_id_13" AS "FIELD_12",\n'[39m +
+    [32m'"User"."use_dor_90" AS "FIELD_13",\n'[39m +
+    [32m'"User"."use_ass_67" AS "FIELD_14",\n'[39m +
+    [32m'"User"."use__68" AS "FIELD_15",\n'[39m +
+    [32m'"User"."use__69" AS "FIELD_16",\n'[39m +
+    [32m'"User"."use_id_70" AS "FIELD_17",\n'[39m +
+    [32m'"User"."use_bed_91" AS "FIELD_18",\n'[39m +
+    [32m'"User"."use_occ_71" AS "FIELD_19",\n'[39m +
+    [32m'"User"."use__72" AS "FIELD_20",\n'[39m +
+    [32m'"User"."use__73" AS "FIELD_21",\n'[39m +
+    [32m'"User"."use_id_74" AS "FIELD_22"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"User" AS "User"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'("User"."use_id_13" = $1 AND "User"."use_id_13" IS NOT NULL)\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: [ [32m'0198b66a-3fa2-7ef1-874f-b0930a0934a1'[39m ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'finding combined records for User to flash out, for updating with data {"deductionCount":0,"id":"0198b66a-3fa2-7ef1-874f-b0930a0934a1"}'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"User"."use_nam_1" AS "FIELD_0",\n'[39m +
+    [32m'"User"."use_ema_2" AS "FIELD_1",\n'[39m +
+    [32m'"User"."use_pho_3" AS "FIELD_2",\n'[39m +
+    [32m'"User"."use_rol_4" AS "FIELD_3",\n'[39m +
+    [32m'"User"."use_sta_5" AS "FIELD_4",\n'[39m +
+    [32m'"User"."use_poi_6" AS "FIELD_5",\n'[39m +
+    [32m'"User"."use_joi_7" AS "FIELD_6",\n'[39m +
+    [32m'"User"."use_tot_8" AS "FIELD_7",\n'[39m +
+    [32m'"User"."use_ded_9" AS "FIELD_8",\n'[39m +
+    [32m'"User"."use__10" AS "FIELD_9",\n'[39m +
+    [32m'"User"."use__11" AS "FIELD_10",\n'[39m +
+    [32m'"User"."use__12" AS "FIELD_11",\n'[39m +
+    [32m'"User"."use_id_13" AS "FIELD_12",\n'[39m +
+    [32m'"User"."use_dor_90" AS "FIELD_13",\n'[39m +
+    [32m'"User"."use_ass_67" AS "FIELD_14",\n'[39m +
+    [32m'"User"."use__68" AS "FIELD_15",\n'[39m +
+    [32m'"User"."use__69" AS "FIELD_16",\n'[39m +
+    [32m'"User"."use_id_70" AS "FIELD_17",\n'[39m +
+    [32m'"User"."use_bed_91" AS "FIELD_18",\n'[39m +
+    [32m'"User"."use_occ_71" AS "FIELD_19",\n'[39m +
+    [32m'"User"."use__72" AS "FIELD_20",\n'[39m +
+    [32m'"User"."use__73" AS "FIELD_21",\n'[39m +
+    [32m'"User"."use_id_74" AS "FIELD_22"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"User" AS "User"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'1=$1\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: [ [33m1[39m ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'update'[39m,
+  name: [32m'update record User by id'[39m,
+  sql: [32m'\n'[39m +
+    [32m'UPDATE "User"\n'[39m +
+    [32m'SET "use_ded_9" = $1,"use_id_13" = $2\n'[39m +
+    [32m'WHERE "use_id_13" = ($3)\n'[39m +
+    [32m'         RETURNING "use_id_13" AS id'[39m,
+  params: [
+    [33m0[39m,
+    [32m'0198b66a-3fa2-7ef1-874f-b0930a0934a1'[39m,
+    [32m'0198b66a-3fa2-7ef1-874f-b0930a0934a1'[39m
+  ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'finding combined records for User to flash out, for creation with data {"name":"Dorm Head","email":"dormhead@test.com","role":"dormHead","id":"0198b66a-3faf-7f13-8582-5353784c1eb9"}'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"User"."use_nam_1" AS "FIELD_0",\n'[39m +
+    [32m'"User"."use_ema_2" AS "FIELD_1",\n'[39m +
+    [32m'"User"."use_pho_3" AS "FIELD_2",\n'[39m +
+    [32m'"User"."use_rol_4" AS "FIELD_3",\n'[39m +
+    [32m'"User"."use_sta_5" AS "FIELD_4",\n'[39m +
+    [32m'"User"."use_poi_6" AS "FIELD_5",\n'[39m +
+    [32m'"User"."use_joi_7" AS "FIELD_6",\n'[39m +
+    [32m'"User"."use_tot_8" AS "FIELD_7",\n'[39m +
+    [32m'"User"."use_ded_9" AS "FIELD_8",\n'[39m +
+    [32m'"User"."use__10" AS "FIELD_9",\n'[39m +
+    [32m'"User"."use__11" AS "FIELD_10",\n'[39m +
+    [32m'"User"."use__12" AS "FIELD_11",\n'[39m +
+    [32m'"User"."use_id_13" AS "FIELD_12",\n'[39m +
+    [32m'"User"."use_dor_90" AS "FIELD_13",\n'[39m +
+    [32m'"User"."use_ass_67" AS "FIELD_14",\n'[39m +
+    [32m'"User"."use__68" AS "FIELD_15",\n'[39m +
+    [32m'"User"."use__69" AS "FIELD_16",\n'[39m +
+    [32m'"User"."use_id_70" AS "FIELD_17",\n'[39m +
+    [32m'"User"."use_bed_91" AS "FIELD_18",\n'[39m +
+    [32m'"User"."use_occ_71" AS "FIELD_19",\n'[39m +
+    [32m'"User"."use__72" AS "FIELD_20",\n'[39m +
+    [32m'"User"."use__73" AS "FIELD_21",\n'[39m +
+    [32m'"User"."use_id_74" AS "FIELD_22"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"User" AS "User"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'1=$1\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: [ [33m1[39m ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'insert'[39m,
+  name: [32m'create record User from handle'[39m,
+  sql: [32m'\n'[39m +
+    [32m'INSERT INTO "User"\n'[39m +
+    [32m'("use_nam_1","use_ema_2","use_rol_4","use_id_13","use_pho_3","use_joi_7","use__10","use__11","use__12")\n'[39m +
+    [32m'VALUES\n'[39m +
+    [32m'($1,$2,$3,$4,$5,$6,$7,$8,$9) \n'[39m,
+  params: [
+    [32m'Dorm Head'[39m,
+    [32m'dormhead@test.com'[39m,
+    [32m'dormHead'[39m,
+    [32m'0198b66a-3faf-7f13-8582-5353784c1eb9'[39m,
+    [32m''[39m,
+    [32m'2025-08-17T05:04:33.199Z'[39m,
+    [32m'user'[39m,
+    [32m'active'[39m,
+    [32m'tracking'[39m
+  ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'find record for updating User'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"User"."use_nam_1" AS "FIELD_0",\n'[39m +
+    [32m'"User"."use_ema_2" AS "FIELD_1",\n'[39m +
+    [32m'"User"."use_pho_3" AS "FIELD_2",\n'[39m +
+    [32m'"User"."use_rol_4" AS "FIELD_3",\n'[39m +
+    [32m'"User"."use_sta_5" AS "FIELD_4",\n'[39m +
+    [32m'"User"."use_poi_6" AS "FIELD_5",\n'[39m +
+    [32m'"User"."use_joi_7" AS "FIELD_6",\n'[39m +
+    [32m'"User"."use_tot_8" AS "FIELD_7",\n'[39m +
+    [32m'"User"."use_ded_9" AS "FIELD_8",\n'[39m +
+    [32m'"User"."use__10" AS "FIELD_9",\n'[39m +
+    [32m'"User"."use__11" AS "FIELD_10",\n'[39m +
+    [32m'"User"."use__12" AS "FIELD_11",\n'[39m +
+    [32m'"User"."use_id_13" AS "FIELD_12",\n'[39m +
+    [32m'"User"."use_dor_90" AS "FIELD_13",\n'[39m +
+    [32m'"User"."use_ass_67" AS "FIELD_14",\n'[39m +
+    [32m'"User"."use__68" AS "FIELD_15",\n'[39m +
+    [32m'"User"."use__69" AS "FIELD_16",\n'[39m +
+    [32m'"User"."use_id_70" AS "FIELD_17",\n'[39m +
+    [32m'"User"."use_bed_91" AS "FIELD_18",\n'[39m +
+    [32m'"User"."use_occ_71" AS "FIELD_19",\n'[39m +
+    [32m'"User"."use__72" AS "FIELD_20",\n'[39m +
+    [32m'"User"."use__73" AS "FIELD_21",\n'[39m +
+    [32m'"User"."use_id_74" AS "FIELD_22"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"User" AS "User"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'("User"."use_id_13" = $1 AND "User"."use_id_13" IS NOT NULL)\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: [ [32m'0198b66a-3faf-7f13-8582-5353784c1eb9'[39m ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'finding combined records for User to flash out, for updating with data {"role":"user","id":"0198b66a-3faf-7f13-8582-5353784c1eb9"}'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"User"."use_nam_1" AS "FIELD_0",\n'[39m +
+    [32m'"User"."use_ema_2" AS "FIELD_1",\n'[39m +
+    [32m'"User"."use_pho_3" AS "FIELD_2",\n'[39m +
+    [32m'"User"."use_rol_4" AS "FIELD_3",\n'[39m +
+    [32m'"User"."use_sta_5" AS "FIELD_4",\n'[39m +
+    [32m'"User"."use_poi_6" AS "FIELD_5",\n'[39m +
+    [32m'"User"."use_joi_7" AS "FIELD_6",\n'[39m +
+    [32m'"User"."use_tot_8" AS "FIELD_7",\n'[39m +
+    [32m'"User"."use_ded_9" AS "FIELD_8",\n'[39m +
+    [32m'"User"."use__10" AS "FIELD_9",\n'[39m +
+    [32m'"User"."use__11" AS "FIELD_10",\n'[39m +
+    [32m'"User"."use__12" AS "FIELD_11",\n'[39m +
+    [32m'"User"."use_id_13" AS "FIELD_12",\n'[39m +
+    [32m'"User"."use_dor_90" AS "FIELD_13",\n'[39m +
+    [32m'"User"."use_ass_67" AS "FIELD_14",\n'[39m +
+    [32m'"User"."use__68" AS "FIELD_15",\n'[39m +
+    [32m'"User"."use__69" AS "FIELD_16",\n'[39m +
+    [32m'"User"."use_id_70" AS "FIELD_17",\n'[39m +
+    [32m'"User"."use_bed_91" AS "FIELD_18",\n'[39m +
+    [32m'"User"."use_occ_71" AS "FIELD_19",\n'[39m +
+    [32m'"User"."use__72" AS "FIELD_20",\n'[39m +
+    [32m'"User"."use__73" AS "FIELD_21",\n'[39m +
+    [32m'"User"."use_id_74" AS "FIELD_22"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"User" AS "User"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'1=$1\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: [ [33m1[39m ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'update'[39m,
+  name: [32m'update record User by id'[39m,
+  sql: [32m'\n'[39m +
+    [32m'UPDATE "User"\n'[39m +
+    [32m'SET "use_rol_4" = $1,"use_id_13" = $2\n'[39m +
+    [32m'WHERE "use_id_13" = ($3)\n'[39m +
+    [32m'         RETURNING "use_id_13" AS id'[39m,
+  params: [
+    [32m'user'[39m,
+    [32m'0198b66a-3faf-7f13-8582-5353784c1eb9'[39m,
+    [32m'0198b66a-3faf-7f13-8582-5353784c1eb9'[39m
+  ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'find record for updating User'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"User"."use_nam_1" AS "FIELD_0",\n'[39m +
+    [32m'"User"."use_ema_2" AS "FIELD_1",\n'[39m +
+    [32m'"User"."use_pho_3" AS "FIELD_2",\n'[39m +
+    [32m'"User"."use_rol_4" AS "FIELD_3",\n'[39m +
+    [32m'"User"."use_sta_5" AS "FIELD_4",\n'[39m +
+    [32m'"User"."use_poi_6" AS "FIELD_5",\n'[39m +
+    [32m'"User"."use_joi_7" AS "FIELD_6",\n'[39m +
+    [32m'"User"."use_tot_8" AS "FIELD_7",\n'[39m +
+    [32m'"User"."use_ded_9" AS "FIELD_8",\n'[39m +
+    [32m'"User"."use__10" AS "FIELD_9",\n'[39m +
+    [32m'"User"."use__11" AS "FIELD_10",\n'[39m +
+    [32m'"User"."use__12" AS "FIELD_11",\n'[39m +
+    [32m'"User"."use_id_13" AS "FIELD_12",\n'[39m +
+    [32m'"User"."use_dor_90" AS "FIELD_13",\n'[39m +
+    [32m'"User"."use_ass_67" AS "FIELD_14",\n'[39m +
+    [32m'"User"."use__68" AS "FIELD_15",\n'[39m +
+    [32m'"User"."use__69" AS "FIELD_16",\n'[39m +
+    [32m'"User"."use_id_70" AS "FIELD_17",\n'[39m +
+    [32m'"User"."use_bed_91" AS "FIELD_18",\n'[39m +
+    [32m'"User"."use_occ_71" AS "FIELD_19",\n'[39m +
+    [32m'"User"."use__72" AS "FIELD_20",\n'[39m +
+    [32m'"User"."use__73" AS "FIELD_21",\n'[39m +
+    [32m'"User"."use_id_74" AS "FIELD_22"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"User" AS "User"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'("User"."use_id_13" = $1 AND "User"."use_id_13" IS NOT NULL)\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: [ [32m'0198b66a-3faf-7f13-8582-5353784c1eb9'[39m ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'finding combined records for User to flash out, for updating with data {"status":"active","id":"0198b66a-3faf-7f13-8582-5353784c1eb9"}'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"User"."use_nam_1" AS "FIELD_0",\n'[39m +
+    [32m'"User"."use_ema_2" AS "FIELD_1",\n'[39m +
+    [32m'"User"."use_pho_3" AS "FIELD_2",\n'[39m +
+    [32m'"User"."use_rol_4" AS "FIELD_3",\n'[39m +
+    [32m'"User"."use_sta_5" AS "FIELD_4",\n'[39m +
+    [32m'"User"."use_poi_6" AS "FIELD_5",\n'[39m +
+    [32m'"User"."use_joi_7" AS "FIELD_6",\n'[39m +
+    [32m'"User"."use_tot_8" AS "FIELD_7",\n'[39m +
+    [32m'"User"."use_ded_9" AS "FIELD_8",\n'[39m +
+    [32m'"User"."use__10" AS "FIELD_9",\n'[39m +
+    [32m'"User"."use__11" AS "FIELD_10",\n'[39m +
+    [32m'"User"."use__12" AS "FIELD_11",\n'[39m +
+    [32m'"User"."use_id_13" AS "FIELD_12",\n'[39m +
+    [32m'"User"."use_dor_90" AS "FIELD_13",\n'[39m +
+    [32m'"User"."use_ass_67" AS "FIELD_14",\n'[39m +
+    [32m'"User"."use__68" AS "FIELD_15",\n'[39m +
+    [32m'"User"."use__69" AS "FIELD_16",\n'[39m +
+    [32m'"User"."use_id_70" AS "FIELD_17",\n'[39m +
+    [32m'"User"."use_bed_91" AS "FIELD_18",\n'[39m +
+    [32m'"User"."use_occ_71" AS "FIELD_19",\n'[39m +
+    [32m'"User"."use__72" AS "FIELD_20",\n'[39m +
+    [32m'"User"."use__73" AS "FIELD_21",\n'[39m +
+    [32m'"User"."use_id_74" AS "FIELD_22"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"User" AS "User"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'1=$1\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: [ [33m1[39m ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'update'[39m,
+  name: [32m'update record User by id'[39m,
+  sql: [32m'\n'[39m +
+    [32m'UPDATE "User"\n'[39m +
+    [32m'SET "use_sta_5" = $1,"use_id_13" = $2\n'[39m +
+    [32m'WHERE "use_id_13" = ($3)\n'[39m +
+    [32m'         RETURNING "use_id_13" AS id'[39m,
+  params: [
+    [32m'active'[39m,
+    [32m'0198b66a-3faf-7f13-8582-5353784c1eb9'[39m,
+    [32m'0198b66a-3faf-7f13-8582-5353784c1eb9'[39m
+  ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'find record for updating User'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"User"."use_nam_1" AS "FIELD_0",\n'[39m +
+    [32m'"User"."use_ema_2" AS "FIELD_1",\n'[39m +
+    [32m'"User"."use_pho_3" AS "FIELD_2",\n'[39m +
+    [32m'"User"."use_rol_4" AS "FIELD_3",\n'[39m +
+    [32m'"User"."use_sta_5" AS "FIELD_4",\n'[39m +
+    [32m'"User"."use_poi_6" AS "FIELD_5",\n'[39m +
+    [32m'"User"."use_joi_7" AS "FIELD_6",\n'[39m +
+    [32m'"User"."use_tot_8" AS "FIELD_7",\n'[39m +
+    [32m'"User"."use_ded_9" AS "FIELD_8",\n'[39m +
+    [32m'"User"."use__10" AS "FIELD_9",\n'[39m +
+    [32m'"User"."use__11" AS "FIELD_10",\n'[39m +
+    [32m'"User"."use__12" AS "FIELD_11",\n'[39m +
+    [32m'"User"."use_id_13" AS "FIELD_12",\n'[39m +
+    [32m'"User"."use_dor_90" AS "FIELD_13",\n'[39m +
+    [32m'"User"."use_ass_67" AS "FIELD_14",\n'[39m +
+    [32m'"User"."use__68" AS "FIELD_15",\n'[39m +
+    [32m'"User"."use__69" AS "FIELD_16",\n'[39m +
+    [32m'"User"."use_id_70" AS "FIELD_17",\n'[39m +
+    [32m'"User"."use_bed_91" AS "FIELD_18",\n'[39m +
+    [32m'"User"."use_occ_71" AS "FIELD_19",\n'[39m +
+    [32m'"User"."use__72" AS "FIELD_20",\n'[39m +
+    [32m'"User"."use__73" AS "FIELD_21",\n'[39m +
+    [32m'"User"."use_id_74" AS "FIELD_22"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"User" AS "User"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'("User"."use_id_13" = $1 AND "User"."use_id_13" IS NOT NULL)\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: [ [32m'0198b66a-3faf-7f13-8582-5353784c1eb9'[39m ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'finding combined records for User to flash out, for updating with data {"points":100,"id":"0198b66a-3faf-7f13-8582-5353784c1eb9"}'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"User"."use_nam_1" AS "FIELD_0",\n'[39m +
+    [32m'"User"."use_ema_2" AS "FIELD_1",\n'[39m +
+    [32m'"User"."use_pho_3" AS "FIELD_2",\n'[39m +
+    [32m'"User"."use_rol_4" AS "FIELD_3",\n'[39m +
+    [32m'"User"."use_sta_5" AS "FIELD_4",\n'[39m +
+    [32m'"User"."use_poi_6" AS "FIELD_5",\n'[39m +
+    [32m'"User"."use_joi_7" AS "FIELD_6",\n'[39m +
+    [32m'"User"."use_tot_8" AS "FIELD_7",\n'[39m +
+    [32m'"User"."use_ded_9" AS "FIELD_8",\n'[39m +
+    [32m'"User"."use__10" AS "FIELD_9",\n'[39m +
+    [32m'"User"."use__11" AS "FIELD_10",\n'[39m +
+    [32m'"User"."use__12" AS "FIELD_11",\n'[39m +
+    [32m'"User"."use_id_13" AS "FIELD_12",\n'[39m +
+    [32m'"User"."use_dor_90" AS "FIELD_13",\n'[39m +
+    [32m'"User"."use_ass_67" AS "FIELD_14",\n'[39m +
+    [32m'"User"."use__68" AS "FIELD_15",\n'[39m +
+    [32m'"User"."use__69" AS "FIELD_16",\n'[39m +
+    [32m'"User"."use_id_70" AS "FIELD_17",\n'[39m +
+    [32m'"User"."use_bed_91" AS "FIELD_18",\n'[39m +
+    [32m'"User"."use_occ_71" AS "FIELD_19",\n'[39m +
+    [32m'"User"."use__72" AS "FIELD_20",\n'[39m +
+    [32m'"User"."use__73" AS "FIELD_21",\n'[39m +
+    [32m'"User"."use_id_74" AS "FIELD_22"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"User" AS "User"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'1=$1\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: [ [33m1[39m ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'update'[39m,
+  name: [32m'update record User by id'[39m,
+  sql: [32m'\n'[39m +
+    [32m'UPDATE "User"\n'[39m +
+    [32m'SET "use_poi_6" = $1,"use_id_13" = $2\n'[39m +
+    [32m'WHERE "use_id_13" = ($3)\n'[39m +
+    [32m'         RETURNING "use_id_13" AS id'[39m,
+  params: [
+    [33m100[39m,
+    [32m'0198b66a-3faf-7f13-8582-5353784c1eb9'[39m,
+    [32m'0198b66a-3faf-7f13-8582-5353784c1eb9'[39m
+  ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'find record for updating User'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"User"."use_nam_1" AS "FIELD_0",\n'[39m +
+    [32m'"User"."use_ema_2" AS "FIELD_1",\n'[39m +
+    [32m'"User"."use_pho_3" AS "FIELD_2",\n'[39m +
+    [32m'"User"."use_rol_4" AS "FIELD_3",\n'[39m +
+    [32m'"User"."use_sta_5" AS "FIELD_4",\n'[39m +
+    [32m'"User"."use_poi_6" AS "FIELD_5",\n'[39m +
+    [32m'"User"."use_joi_7" AS "FIELD_6",\n'[39m +
+    [32m'"User"."use_tot_8" AS "FIELD_7",\n'[39m +
+    [32m'"User"."use_ded_9" AS "FIELD_8",\n'[39m +
+    [32m'"User"."use__10" AS "FIELD_9",\n'[39m +
+    [32m'"User"."use__11" AS "FIELD_10",\n'[39m +
+    [32m'"User"."use__12" AS "FIELD_11",\n'[39m +
+    [32m'"User"."use_id_13" AS "FIELD_12",\n'[39m +
+    [32m'"User"."use_dor_90" AS "FIELD_13",\n'[39m +
+    [32m'"User"."use_ass_67" AS "FIELD_14",\n'[39m +
+    [32m'"User"."use__68" AS "FIELD_15",\n'[39m +
+    [32m'"User"."use__69" AS "FIELD_16",\n'[39m +
+    [32m'"User"."use_id_70" AS "FIELD_17",\n'[39m +
+    [32m'"User"."use_bed_91" AS "FIELD_18",\n'[39m +
+    [32m'"User"."use_occ_71" AS "FIELD_19",\n'[39m +
+    [32m'"User"."use__72" AS "FIELD_20",\n'[39m +
+    [32m'"User"."use__73" AS "FIELD_21",\n'[39m +
+    [32m'"User"."use_id_74" AS "FIELD_22"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"User" AS "User"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'("User"."use_id_13" = $1 AND "User"."use_id_13" IS NOT NULL)\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: [ [32m'0198b66a-3faf-7f13-8582-5353784c1eb9'[39m ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'finding combined records for User to flash out, for updating with data {"totalDeductions":0,"id":"0198b66a-3faf-7f13-8582-5353784c1eb9"}'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"User"."use_nam_1" AS "FIELD_0",\n'[39m +
+    [32m'"User"."use_ema_2" AS "FIELD_1",\n'[39m +
+    [32m'"User"."use_pho_3" AS "FIELD_2",\n'[39m +
+    [32m'"User"."use_rol_4" AS "FIELD_3",\n'[39m +
+    [32m'"User"."use_sta_5" AS "FIELD_4",\n'[39m +
+    [32m'"User"."use_poi_6" AS "FIELD_5",\n'[39m +
+    [32m'"User"."use_joi_7" AS "FIELD_6",\n'[39m +
+    [32m'"User"."use_tot_8" AS "FIELD_7",\n'[39m +
+    [32m'"User"."use_ded_9" AS "FIELD_8",\n'[39m +
+    [32m'"User"."use__10" AS "FIELD_9",\n'[39m +
+    [32m'"User"."use__11" AS "FIELD_10",\n'[39m +
+    [32m'"User"."use__12" AS "FIELD_11",\n'[39m +
+    [32m'"User"."use_id_13" AS "FIELD_12",\n'[39m +
+    [32m'"User"."use_dor_90" AS "FIELD_13",\n'[39m +
+    [32m'"User"."use_ass_67" AS "FIELD_14",\n'[39m +
+    [32m'"User"."use__68" AS "FIELD_15",\n'[39m +
+    [32m'"User"."use__69" AS "FIELD_16",\n'[39m +
+    [32m'"User"."use_id_70" AS "FIELD_17",\n'[39m +
+    [32m'"User"."use_bed_91" AS "FIELD_18",\n'[39m +
+    [32m'"User"."use_occ_71" AS "FIELD_19",\n'[39m +
+    [32m'"User"."use__72" AS "FIELD_20",\n'[39m +
+    [32m'"User"."use__73" AS "FIELD_21",\n'[39m +
+    [32m'"User"."use_id_74" AS "FIELD_22"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"User" AS "User"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'1=$1\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: [ [33m1[39m ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'update'[39m,
+  name: [32m'update record User by id'[39m,
+  sql: [32m'\n'[39m +
+    [32m'UPDATE "User"\n'[39m +
+    [32m'SET "use_tot_8" = $1,"use_id_13" = $2\n'[39m +
+    [32m'WHERE "use_id_13" = ($3)\n'[39m +
+    [32m'         RETURNING "use_id_13" AS id'[39m,
+  params: [
+    [33m0[39m,
+    [32m'0198b66a-3faf-7f13-8582-5353784c1eb9'[39m,
+    [32m'0198b66a-3faf-7f13-8582-5353784c1eb9'[39m
+  ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'find record for updating User'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"User"."use_nam_1" AS "FIELD_0",\n'[39m +
+    [32m'"User"."use_ema_2" AS "FIELD_1",\n'[39m +
+    [32m'"User"."use_pho_3" AS "FIELD_2",\n'[39m +
+    [32m'"User"."use_rol_4" AS "FIELD_3",\n'[39m +
+    [32m'"User"."use_sta_5" AS "FIELD_4",\n'[39m +
+    [32m'"User"."use_poi_6" AS "FIELD_5",\n'[39m +
+    [32m'"User"."use_joi_7" AS "FIELD_6",\n'[39m +
+    [32m'"User"."use_tot_8" AS "FIELD_7",\n'[39m +
+    [32m'"User"."use_ded_9" AS "FIELD_8",\n'[39m +
+    [32m'"User"."use__10" AS "FIELD_9",\n'[39m +
+    [32m'"User"."use__11" AS "FIELD_10",\n'[39m +
+    [32m'"User"."use__12" AS "FIELD_11",\n'[39m +
+    [32m'"User"."use_id_13" AS "FIELD_12",\n'[39m +
+    [32m'"User"."use_dor_90" AS "FIELD_13",\n'[39m +
+    [32m'"User"."use_ass_67" AS "FIELD_14",\n'[39m +
+    [32m'"User"."use__68" AS "FIELD_15",\n'[39m +
+    [32m'"User"."use__69" AS "FIELD_16",\n'[39m +
+    [32m'"User"."use_id_70" AS "FIELD_17",\n'[39m +
+    [32m'"User"."use_bed_91" AS "FIELD_18",\n'[39m +
+    [32m'"User"."use_occ_71" AS "FIELD_19",\n'[39m +
+    [32m'"User"."use__72" AS "FIELD_20",\n'[39m +
+    [32m'"User"."use__73" AS "FIELD_21",\n'[39m +
+    [32m'"User"."use_id_74" AS "FIELD_22"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"User" AS "User"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'("User"."use_id_13" = $1 AND "User"."use_id_13" IS NOT NULL)\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: [ [32m'0198b66a-3faf-7f13-8582-5353784c1eb9'[39m ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'finding combined records for User to flash out, for updating with data {"deductionCount":0,"id":"0198b66a-3faf-7f13-8582-5353784c1eb9"}'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"User"."use_nam_1" AS "FIELD_0",\n'[39m +
+    [32m'"User"."use_ema_2" AS "FIELD_1",\n'[39m +
+    [32m'"User"."use_pho_3" AS "FIELD_2",\n'[39m +
+    [32m'"User"."use_rol_4" AS "FIELD_3",\n'[39m +
+    [32m'"User"."use_sta_5" AS "FIELD_4",\n'[39m +
+    [32m'"User"."use_poi_6" AS "FIELD_5",\n'[39m +
+    [32m'"User"."use_joi_7" AS "FIELD_6",\n'[39m +
+    [32m'"User"."use_tot_8" AS "FIELD_7",\n'[39m +
+    [32m'"User"."use_ded_9" AS "FIELD_8",\n'[39m +
+    [32m'"User"."use__10" AS "FIELD_9",\n'[39m +
+    [32m'"User"."use__11" AS "FIELD_10",\n'[39m +
+    [32m'"User"."use__12" AS "FIELD_11",\n'[39m +
+    [32m'"User"."use_id_13" AS "FIELD_12",\n'[39m +
+    [32m'"User"."use_dor_90" AS "FIELD_13",\n'[39m +
+    [32m'"User"."use_ass_67" AS "FIELD_14",\n'[39m +
+    [32m'"User"."use__68" AS "FIELD_15",\n'[39m +
+    [32m'"User"."use__69" AS "FIELD_16",\n'[39m +
+    [32m'"User"."use_id_70" AS "FIELD_17",\n'[39m +
+    [32m'"User"."use_bed_91" AS "FIELD_18",\n'[39m +
+    [32m'"User"."use_occ_71" AS "FIELD_19",\n'[39m +
+    [32m'"User"."use__72" AS "FIELD_20",\n'[39m +
+    [32m'"User"."use__73" AS "FIELD_21",\n'[39m +
+    [32m'"User"."use_id_74" AS "FIELD_22"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"User" AS "User"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'1=$1\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: [ [33m1[39m ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'update'[39m,
+  name: [32m'update record User by id'[39m,
+  sql: [32m'\n'[39m +
+    [32m'UPDATE "User"\n'[39m +
+    [32m'SET "use_ded_9" = $1,"use_id_13" = $2\n'[39m +
+    [32m'WHERE "use_id_13" = ($3)\n'[39m +
+    [32m'         RETURNING "use_id_13" AS id'[39m,
+  params: [
+    [33m0[39m,
+    [32m'0198b66a-3faf-7f13-8582-5353784c1eb9'[39m,
+    [32m'0198b66a-3faf-7f13-8582-5353784c1eb9'[39m
+  ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'finding combined records for User to flash out, for creation with data {"name":"Regular User","email":"regular@test.com","role":"user","id":"0198b66a-3fb9-7846-9d9a-41b0dc9c915b"}'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"User"."use_nam_1" AS "FIELD_0",\n'[39m +
+    [32m'"User"."use_ema_2" AS "FIELD_1",\n'[39m +
+    [32m'"User"."use_pho_3" AS "FIELD_2",\n'[39m +
+    [32m'"User"."use_rol_4" AS "FIELD_3",\n'[39m +
+    [32m'"User"."use_sta_5" AS "FIELD_4",\n'[39m +
+    [32m'"User"."use_poi_6" AS "FIELD_5",\n'[39m +
+    [32m'"User"."use_joi_7" AS "FIELD_6",\n'[39m +
+    [32m'"User"."use_tot_8" AS "FIELD_7",\n'[39m +
+    [32m'"User"."use_ded_9" AS "FIELD_8",\n'[39m +
+    [32m'"User"."use__10" AS "FIELD_9",\n'[39m +
+    [32m'"User"."use__11" AS "FIELD_10",\n'[39m +
+    [32m'"User"."use__12" AS "FIELD_11",\n'[39m +
+    [32m'"User"."use_id_13" AS "FIELD_12",\n'[39m +
+    [32m'"User"."use_dor_90" AS "FIELD_13",\n'[39m +
+    [32m'"User"."use_ass_67" AS "FIELD_14",\n'[39m +
+    [32m'"User"."use__68" AS "FIELD_15",\n'[39m +
+    [32m'"User"."use__69" AS "FIELD_16",\n'[39m +
+    [32m'"User"."use_id_70" AS "FIELD_17",\n'[39m +
+    [32m'"User"."use_bed_91" AS "FIELD_18",\n'[39m +
+    [32m'"User"."use_occ_71" AS "FIELD_19",\n'[39m +
+    [32m'"User"."use__72" AS "FIELD_20",\n'[39m +
+    [32m'"User"."use__73" AS "FIELD_21",\n'[39m +
+    [32m'"User"."use_id_74" AS "FIELD_22"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"User" AS "User"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'1=$1\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: [ [33m1[39m ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'insert'[39m,
+  name: [32m'create record User from handle'[39m,
+  sql: [32m'\n'[39m +
+    [32m'INSERT INTO "User"\n'[39m +
+    [32m'("use_nam_1","use_ema_2","use_rol_4","use_id_13","use_pho_3","use_joi_7","use__10","use__11","use__12")\n'[39m +
+    [32m'VALUES\n'[39m +
+    [32m'($1,$2,$3,$4,$5,$6,$7,$8,$9) \n'[39m,
+  params: [
+    [32m'Regular User'[39m,
+    [32m'regular@test.com'[39m,
+    [32m'user'[39m,
+    [32m'0198b66a-3fb9-7846-9d9a-41b0dc9c915b'[39m,
+    [32m''[39m,
+    [32m'2025-08-17T05:04:33.210Z'[39m,
+    [32m'user'[39m,
+    [32m'active'[39m,
+    [32m'tracking'[39m
+  ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'find record for updating User'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"User"."use_nam_1" AS "FIELD_0",\n'[39m +
+    [32m'"User"."use_ema_2" AS "FIELD_1",\n'[39m +
+    [32m'"User"."use_pho_3" AS "FIELD_2",\n'[39m +
+    [32m'"User"."use_rol_4" AS "FIELD_3",\n'[39m +
+    [32m'"User"."use_sta_5" AS "FIELD_4",\n'[39m +
+    [32m'"User"."use_poi_6" AS "FIELD_5",\n'[39m +
+    [32m'"User"."use_joi_7" AS "FIELD_6",\n'[39m +
+    [32m'"User"."use_tot_8" AS "FIELD_7",\n'[39m +
+    [32m'"User"."use_ded_9" AS "FIELD_8",\n'[39m +
+    [32m'"User"."use__10" AS "FIELD_9",\n'[39m +
+    [32m'"User"."use__11" AS "FIELD_10",\n'[39m +
+    [32m'"User"."use__12" AS "FIELD_11",\n'[39m +
+    [32m'"User"."use_id_13" AS "FIELD_12",\n'[39m +
+    [32m'"User"."use_dor_90" AS "FIELD_13",\n'[39m +
+    [32m'"User"."use_ass_67" AS "FIELD_14",\n'[39m +
+    [32m'"User"."use__68" AS "FIELD_15",\n'[39m +
+    [32m'"User"."use__69" AS "FIELD_16",\n'[39m +
+    [32m'"User"."use_id_70" AS "FIELD_17",\n'[39m +
+    [32m'"User"."use_bed_91" AS "FIELD_18",\n'[39m +
+    [32m'"User"."use_occ_71" AS "FIELD_19",\n'[39m +
+    [32m'"User"."use__72" AS "FIELD_20",\n'[39m +
+    [32m'"User"."use__73" AS "FIELD_21",\n'[39m +
+    [32m'"User"."use_id_74" AS "FIELD_22"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"User" AS "User"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'("User"."use_id_13" = $1 AND "User"."use_id_13" IS NOT NULL)\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: [ [32m'0198b66a-3fb9-7846-9d9a-41b0dc9c915b'[39m ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'finding combined records for User to flash out, for updating with data {"role":"user","id":"0198b66a-3fb9-7846-9d9a-41b0dc9c915b"}'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"User"."use_nam_1" AS "FIELD_0",\n'[39m +
+    [32m'"User"."use_ema_2" AS "FIELD_1",\n'[39m +
+    [32m'"User"."use_pho_3" AS "FIELD_2",\n'[39m +
+    [32m'"User"."use_rol_4" AS "FIELD_3",\n'[39m +
+    [32m'"User"."use_sta_5" AS "FIELD_4",\n'[39m +
+    [32m'"User"."use_poi_6" AS "FIELD_5",\n'[39m +
+    [32m'"User"."use_joi_7" AS "FIELD_6",\n'[39m +
+    [32m'"User"."use_tot_8" AS "FIELD_7",\n'[39m +
+    [32m'"User"."use_ded_9" AS "FIELD_8",\n'[39m +
+    [32m'"User"."use__10" AS "FIELD_9",\n'[39m +
+    [32m'"User"."use__11" AS "FIELD_10",\n'[39m +
+    [32m'"User"."use__12" AS "FIELD_11",\n'[39m +
+    [32m'"User"."use_id_13" AS "FIELD_12",\n'[39m +
+    [32m'"User"."use_dor_90" AS "FIELD_13",\n'[39m +
+    [32m'"User"."use_ass_67" AS "FIELD_14",\n'[39m +
+    [32m'"User"."use__68" AS "FIELD_15",\n'[39m +
+    [32m'"User"."use__69" AS "FIELD_16",\n'[39m +
+    [32m'"User"."use_id_70" AS "FIELD_17",\n'[39m +
+    [32m'"User"."use_bed_91" AS "FIELD_18",\n'[39m +
+    [32m'"User"."use_occ_71" AS "FIELD_19",\n'[39m +
+    [32m'"User"."use__72" AS "FIELD_20",\n'[39m +
+    [32m'"User"."use__73" AS "FIELD_21",\n'[39m +
+    [32m'"User"."use_id_74" AS "FIELD_22"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"User" AS "User"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'1=$1\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: [ [33m1[39m ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'update'[39m,
+  name: [32m'update record User by id'[39m,
+  sql: [32m'\n'[39m +
+    [32m'UPDATE "User"\n'[39m +
+    [32m'SET "use_rol_4" = $1,"use_id_13" = $2\n'[39m +
+    [32m'WHERE "use_id_13" = ($3)\n'[39m +
+    [32m'         RETURNING "use_id_13" AS id'[39m,
+  params: [
+    [32m'user'[39m,
+    [32m'0198b66a-3fb9-7846-9d9a-41b0dc9c915b'[39m,
+    [32m'0198b66a-3fb9-7846-9d9a-41b0dc9c915b'[39m
+  ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'find record for updating User'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"User"."use_nam_1" AS "FIELD_0",\n'[39m +
+    [32m'"User"."use_ema_2" AS "FIELD_1",\n'[39m +
+    [32m'"User"."use_pho_3" AS "FIELD_2",\n'[39m +
+    [32m'"User"."use_rol_4" AS "FIELD_3",\n'[39m +
+    [32m'"User"."use_sta_5" AS "FIELD_4",\n'[39m +
+    [32m'"User"."use_poi_6" AS "FIELD_5",\n'[39m +
+    [32m'"User"."use_joi_7" AS "FIELD_6",\n'[39m +
+    [32m'"User"."use_tot_8" AS "FIELD_7",\n'[39m +
+    [32m'"User"."use_ded_9" AS "FIELD_8",\n'[39m +
+    [32m'"User"."use__10" AS "FIELD_9",\n'[39m +
+    [32m'"User"."use__11" AS "FIELD_10",\n'[39m +
+    [32m'"User"."use__12" AS "FIELD_11",\n'[39m +
+    [32m'"User"."use_id_13" AS "FIELD_12",\n'[39m +
+    [32m'"User"."use_dor_90" AS "FIELD_13",\n'[39m +
+    [32m'"User"."use_ass_67" AS "FIELD_14",\n'[39m +
+    [32m'"User"."use__68" AS "FIELD_15",\n'[39m +
+    [32m'"User"."use__69" AS "FIELD_16",\n'[39m +
+    [32m'"User"."use_id_70" AS "FIELD_17",\n'[39m +
+    [32m'"User"."use_bed_91" AS "FIELD_18",\n'[39m +
+    [32m'"User"."use_occ_71" AS "FIELD_19",\n'[39m +
+    [32m'"User"."use__72" AS "FIELD_20",\n'[39m +
+    [32m'"User"."use__73" AS "FIELD_21",\n'[39m +
+    [32m'"User"."use_id_74" AS "FIELD_22"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"User" AS "User"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'("User"."use_id_13" = $1 AND "User"."use_id_13" IS NOT NULL)\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: [ [32m'0198b66a-3fb9-7846-9d9a-41b0dc9c915b'[39m ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'finding combined records for User to flash out, for updating with data {"status":"active","id":"0198b66a-3fb9-7846-9d9a-41b0dc9c915b"}'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"User"."use_nam_1" AS "FIELD_0",\n'[39m +
+    [32m'"User"."use_ema_2" AS "FIELD_1",\n'[39m +
+    [32m'"User"."use_pho_3" AS "FIELD_2",\n'[39m +
+    [32m'"User"."use_rol_4" AS "FIELD_3",\n'[39m +
+    [32m'"User"."use_sta_5" AS "FIELD_4",\n'[39m +
+    [32m'"User"."use_poi_6" AS "FIELD_5",\n'[39m +
+    [32m'"User"."use_joi_7" AS "FIELD_6",\n'[39m +
+    [32m'"User"."use_tot_8" AS "FIELD_7",\n'[39m +
+    [32m'"User"."use_ded_9" AS "FIELD_8",\n'[39m +
+    [32m'"User"."use__10" AS "FIELD_9",\n'[39m +
+    [32m'"User"."use__11" AS "FIELD_10",\n'[39m +
+    [32m'"User"."use__12" AS "FIELD_11",\n'[39m +
+    [32m'"User"."use_id_13" AS "FIELD_12",\n'[39m +
+    [32m'"User"."use_dor_90" AS "FIELD_13",\n'[39m +
+    [32m'"User"."use_ass_67" AS "FIELD_14",\n'[39m +
+    [32m'"User"."use__68" AS "FIELD_15",\n'[39m +
+    [32m'"User"."use__69" AS "FIELD_16",\n'[39m +
+    [32m'"User"."use_id_70" AS "FIELD_17",\n'[39m +
+    [32m'"User"."use_bed_91" AS "FIELD_18",\n'[39m +
+    [32m'"User"."use_occ_71" AS "FIELD_19",\n'[39m +
+    [32m'"User"."use__72" AS "FIELD_20",\n'[39m +
+    [32m'"User"."use__73" AS "FIELD_21",\n'[39m +
+    [32m'"User"."use_id_74" AS "FIELD_22"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"User" AS "User"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'1=$1\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: [ [33m1[39m ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'update'[39m,
+  name: [32m'update record User by id'[39m,
+  sql: [32m'\n'[39m +
+    [32m'UPDATE "User"\n'[39m +
+    [32m'SET "use_sta_5" = $1,"use_id_13" = $2\n'[39m +
+    [32m'WHERE "use_id_13" = ($3)\n'[39m +
+    [32m'         RETURNING "use_id_13" AS id'[39m,
+  params: [
+    [32m'active'[39m,
+    [32m'0198b66a-3fb9-7846-9d9a-41b0dc9c915b'[39m,
+    [32m'0198b66a-3fb9-7846-9d9a-41b0dc9c915b'[39m
+  ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'find record for updating User'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"User"."use_nam_1" AS "FIELD_0",\n'[39m +
+    [32m'"User"."use_ema_2" AS "FIELD_1",\n'[39m +
+    [32m'"User"."use_pho_3" AS "FIELD_2",\n'[39m +
+    [32m'"User"."use_rol_4" AS "FIELD_3",\n'[39m +
+    [32m'"User"."use_sta_5" AS "FIELD_4",\n'[39m +
+    [32m'"User"."use_poi_6" AS "FIELD_5",\n'[39m +
+    [32m'"User"."use_joi_7" AS "FIELD_6",\n'[39m +
+    [32m'"User"."use_tot_8" AS "FIELD_7",\n'[39m +
+    [32m'"User"."use_ded_9" AS "FIELD_8",\n'[39m +
+    [32m'"User"."use__10" AS "FIELD_9",\n'[39m +
+    [32m'"User"."use__11" AS "FIELD_10",\n'[39m +
+    [32m'"User"."use__12" AS "FIELD_11",\n'[39m +
+    [32m'"User"."use_id_13" AS "FIELD_12",\n'[39m +
+    [32m'"User"."use_dor_90" AS "FIELD_13",\n'[39m +
+    [32m'"User"."use_ass_67" AS "FIELD_14",\n'[39m +
+    [32m'"User"."use__68" AS "FIELD_15",\n'[39m +
+    [32m'"User"."use__69" AS "FIELD_16",\n'[39m +
+    [32m'"User"."use_id_70" AS "FIELD_17",\n'[39m +
+    [32m'"User"."use_bed_91" AS "FIELD_18",\n'[39m +
+    [32m'"User"."use_occ_71" AS "FIELD_19",\n'[39m +
+    [32m'"User"."use__72" AS "FIELD_20",\n'[39m +
+    [32m'"User"."use__73" AS "FIELD_21",\n'[39m +
+    [32m'"User"."use_id_74" AS "FIELD_22"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"User" AS "User"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'("User"."use_id_13" = $1 AND "User"."use_id_13" IS NOT NULL)\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: [ [32m'0198b66a-3fb9-7846-9d9a-41b0dc9c915b'[39m ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'finding combined records for User to flash out, for updating with data {"points":100,"id":"0198b66a-3fb9-7846-9d9a-41b0dc9c915b"}'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"User"."use_nam_1" AS "FIELD_0",\n'[39m +
+    [32m'"User"."use_ema_2" AS "FIELD_1",\n'[39m +
+    [32m'"User"."use_pho_3" AS "FIELD_2",\n'[39m +
+    [32m'"User"."use_rol_4" AS "FIELD_3",\n'[39m +
+    [32m'"User"."use_sta_5" AS "FIELD_4",\n'[39m +
+    [32m'"User"."use_poi_6" AS "FIELD_5",\n'[39m +
+    [32m'"User"."use_joi_7" AS "FIELD_6",\n'[39m +
+    [32m'"User"."use_tot_8" AS "FIELD_7",\n'[39m +
+    [32m'"User"."use_ded_9" AS "FIELD_8",\n'[39m +
+    [32m'"User"."use__10" AS "FIELD_9",\n'[39m +
+    [32m'"User"."use__11" AS "FIELD_10",\n'[39m +
+    [32m'"User"."use__12" AS "FIELD_11",\n'[39m +
+    [32m'"User"."use_id_13" AS "FIELD_12",\n'[39m +
+    [32m'"User"."use_dor_90" AS "FIELD_13",\n'[39m +
+    [32m'"User"."use_ass_67" AS "FIELD_14",\n'[39m +
+    [32m'"User"."use__68" AS "FIELD_15",\n'[39m +
+    [32m'"User"."use__69" AS "FIELD_16",\n'[39m +
+    [32m'"User"."use_id_70" AS "FIELD_17",\n'[39m +
+    [32m'"User"."use_bed_91" AS "FIELD_18",\n'[39m +
+    [32m'"User"."use_occ_71" AS "FIELD_19",\n'[39m +
+    [32m'"User"."use__72" AS "FIELD_20",\n'[39m +
+    [32m'"User"."use__73" AS "FIELD_21",\n'[39m +
+    [32m'"User"."use_id_74" AS "FIELD_22"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"User" AS "User"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'1=$1\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: [ [33m1[39m ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'update'[39m,
+  name: [32m'update record User by id'[39m,
+  sql: [32m'\n'[39m +
+    [32m'UPDATE "User"\n'[39m +
+    [32m'SET "use_poi_6" = $1,"use_id_13" = $2\n'[39m +
+    [32m'WHERE "use_id_13" = ($3)\n'[39m +
+    [32m'         RETURNING "use_id_13" AS id'[39m,
+  params: [
+    [33m100[39m,
+    [32m'0198b66a-3fb9-7846-9d9a-41b0dc9c915b'[39m,
+    [32m'0198b66a-3fb9-7846-9d9a-41b0dc9c915b'[39m
+  ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'find record for updating User'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"User"."use_nam_1" AS "FIELD_0",\n'[39m +
+    [32m'"User"."use_ema_2" AS "FIELD_1",\n'[39m +
+    [32m'"User"."use_pho_3" AS "FIELD_2",\n'[39m +
+    [32m'"User"."use_rol_4" AS "FIELD_3",\n'[39m +
+    [32m'"User"."use_sta_5" AS "FIELD_4",\n'[39m +
+    [32m'"User"."use_poi_6" AS "FIELD_5",\n'[39m +
+    [32m'"User"."use_joi_7" AS "FIELD_6",\n'[39m +
+    [32m'"User"."use_tot_8" AS "FIELD_7",\n'[39m +
+    [32m'"User"."use_ded_9" AS "FIELD_8",\n'[39m +
+    [32m'"User"."use__10" AS "FIELD_9",\n'[39m +
+    [32m'"User"."use__11" AS "FIELD_10",\n'[39m +
+    [32m'"User"."use__12" AS "FIELD_11",\n'[39m +
+    [32m'"User"."use_id_13" AS "FIELD_12",\n'[39m +
+    [32m'"User"."use_dor_90" AS "FIELD_13",\n'[39m +
+    [32m'"User"."use_ass_67" AS "FIELD_14",\n'[39m +
+    [32m'"User"."use__68" AS "FIELD_15",\n'[39m +
+    [32m'"User"."use__69" AS "FIELD_16",\n'[39m +
+    [32m'"User"."use_id_70" AS "FIELD_17",\n'[39m +
+    [32m'"User"."use_bed_91" AS "FIELD_18",\n'[39m +
+    [32m'"User"."use_occ_71" AS "FIELD_19",\n'[39m +
+    [32m'"User"."use__72" AS "FIELD_20",\n'[39m +
+    [32m'"User"."use__73" AS "FIELD_21",\n'[39m +
+    [32m'"User"."use_id_74" AS "FIELD_22"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"User" AS "User"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'("User"."use_id_13" = $1 AND "User"."use_id_13" IS NOT NULL)\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: [ [32m'0198b66a-3fb9-7846-9d9a-41b0dc9c915b'[39m ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'finding combined records for User to flash out, for updating with data {"totalDeductions":0,"id":"0198b66a-3fb9-7846-9d9a-41b0dc9c915b"}'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"User"."use_nam_1" AS "FIELD_0",\n'[39m +
+    [32m'"User"."use_ema_2" AS "FIELD_1",\n'[39m +
+    [32m'"User"."use_pho_3" AS "FIELD_2",\n'[39m +
+    [32m'"User"."use_rol_4" AS "FIELD_3",\n'[39m +
+    [32m'"User"."use_sta_5" AS "FIELD_4",\n'[39m +
+    [32m'"User"."use_poi_6" AS "FIELD_5",\n'[39m +
+    [32m'"User"."use_joi_7" AS "FIELD_6",\n'[39m +
+    [32m'"User"."use_tot_8" AS "FIELD_7",\n'[39m +
+    [32m'"User"."use_ded_9" AS "FIELD_8",\n'[39m +
+    [32m'"User"."use__10" AS "FIELD_9",\n'[39m +
+    [32m'"User"."use__11" AS "FIELD_10",\n'[39m +
+    [32m'"User"."use__12" AS "FIELD_11",\n'[39m +
+    [32m'"User"."use_id_13" AS "FIELD_12",\n'[39m +
+    [32m'"User"."use_dor_90" AS "FIELD_13",\n'[39m +
+    [32m'"User"."use_ass_67" AS "FIELD_14",\n'[39m +
+    [32m'"User"."use__68" AS "FIELD_15",\n'[39m +
+    [32m'"User"."use__69" AS "FIELD_16",\n'[39m +
+    [32m'"User"."use_id_70" AS "FIELD_17",\n'[39m +
+    [32m'"User"."use_bed_91" AS "FIELD_18",\n'[39m +
+    [32m'"User"."use_occ_71" AS "FIELD_19",\n'[39m +
+    [32m'"User"."use__72" AS "FIELD_20",\n'[39m +
+    [32m'"User"."use__73" AS "FIELD_21",\n'[39m +
+    [32m'"User"."use_id_74" AS "FIELD_22"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"User" AS "User"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'1=$1\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: [ [33m1[39m ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'update'[39m,
+  name: [32m'update record User by id'[39m,
+  sql: [32m'\n'[39m +
+    [32m'UPDATE "User"\n'[39m +
+    [32m'SET "use_tot_8" = $1,"use_id_13" = $2\n'[39m +
+    [32m'WHERE "use_id_13" = ($3)\n'[39m +
+    [32m'         RETURNING "use_id_13" AS id'[39m,
+  params: [
+    [33m0[39m,
+    [32m'0198b66a-3fb9-7846-9d9a-41b0dc9c915b'[39m,
+    [32m'0198b66a-3fb9-7846-9d9a-41b0dc9c915b'[39m
+  ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'find record for updating User'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"User"."use_nam_1" AS "FIELD_0",\n'[39m +
+    [32m'"User"."use_ema_2" AS "FIELD_1",\n'[39m +
+    [32m'"User"."use_pho_3" AS "FIELD_2",\n'[39m +
+    [32m'"User"."use_rol_4" AS "FIELD_3",\n'[39m +
+    [32m'"User"."use_sta_5" AS "FIELD_4",\n'[39m +
+    [32m'"User"."use_poi_6" AS "FIELD_5",\n'[39m +
+    [32m'"User"."use_joi_7" AS "FIELD_6",\n'[39m +
+    [32m'"User"."use_tot_8" AS "FIELD_7",\n'[39m +
+    [32m'"User"."use_ded_9" AS "FIELD_8",\n'[39m +
+    [32m'"User"."use__10" AS "FIELD_9",\n'[39m +
+    [32m'"User"."use__11" AS "FIELD_10",\n'[39m +
+    [32m'"User"."use__12" AS "FIELD_11",\n'[39m +
+    [32m'"User"."use_id_13" AS "FIELD_12",\n'[39m +
+    [32m'"User"."use_dor_90" AS "FIELD_13",\n'[39m +
+    [32m'"User"."use_ass_67" AS "FIELD_14",\n'[39m +
+    [32m'"User"."use__68" AS "FIELD_15",\n'[39m +
+    [32m'"User"."use__69" AS "FIELD_16",\n'[39m +
+    [32m'"User"."use_id_70" AS "FIELD_17",\n'[39m +
+    [32m'"User"."use_bed_91" AS "FIELD_18",\n'[39m +
+    [32m'"User"."use_occ_71" AS "FIELD_19",\n'[39m +
+    [32m'"User"."use__72" AS "FIELD_20",\n'[39m +
+    [32m'"User"."use__73" AS "FIELD_21",\n'[39m +
+    [32m'"User"."use_id_74" AS "FIELD_22"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"User" AS "User"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'("User"."use_id_13" = $1 AND "User"."use_id_13" IS NOT NULL)\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: [ [32m'0198b66a-3fb9-7846-9d9a-41b0dc9c915b'[39m ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'finding combined records for User to flash out, for updating with data {"deductionCount":0,"id":"0198b66a-3fb9-7846-9d9a-41b0dc9c915b"}'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"User"."use_nam_1" AS "FIELD_0",\n'[39m +
+    [32m'"User"."use_ema_2" AS "FIELD_1",\n'[39m +
+    [32m'"User"."use_pho_3" AS "FIELD_2",\n'[39m +
+    [32m'"User"."use_rol_4" AS "FIELD_3",\n'[39m +
+    [32m'"User"."use_sta_5" AS "FIELD_4",\n'[39m +
+    [32m'"User"."use_poi_6" AS "FIELD_5",\n'[39m +
+    [32m'"User"."use_joi_7" AS "FIELD_6",\n'[39m +
+    [32m'"User"."use_tot_8" AS "FIELD_7",\n'[39m +
+    [32m'"User"."use_ded_9" AS "FIELD_8",\n'[39m +
+    [32m'"User"."use__10" AS "FIELD_9",\n'[39m +
+    [32m'"User"."use__11" AS "FIELD_10",\n'[39m +
+    [32m'"User"."use__12" AS "FIELD_11",\n'[39m +
+    [32m'"User"."use_id_13" AS "FIELD_12",\n'[39m +
+    [32m'"User"."use_dor_90" AS "FIELD_13",\n'[39m +
+    [32m'"User"."use_ass_67" AS "FIELD_14",\n'[39m +
+    [32m'"User"."use__68" AS "FIELD_15",\n'[39m +
+    [32m'"User"."use__69" AS "FIELD_16",\n'[39m +
+    [32m'"User"."use_id_70" AS "FIELD_17",\n'[39m +
+    [32m'"User"."use_bed_91" AS "FIELD_18",\n'[39m +
+    [32m'"User"."use_occ_71" AS "FIELD_19",\n'[39m +
+    [32m'"User"."use__72" AS "FIELD_20",\n'[39m +
+    [32m'"User"."use__73" AS "FIELD_21",\n'[39m +
+    [32m'"User"."use_id_74" AS "FIELD_22"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"User" AS "User"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'1=$1\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: [ [33m1[39m ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'update'[39m,
+  name: [32m'update record User by id'[39m,
+  sql: [32m'\n'[39m +
+    [32m'UPDATE "User"\n'[39m +
+    [32m'SET "use_ded_9" = $1,"use_id_13" = $2\n'[39m +
+    [32m'WHERE "use_id_13" = ($3)\n'[39m +
+    [32m'         RETURNING "use_id_13" AS id'[39m,
+  params: [
+    [33m0[39m,
+    [32m'0198b66a-3fb9-7846-9d9a-41b0dc9c915b'[39m,
+    [32m'0198b66a-3fb9-7846-9d9a-41b0dc9c915b'[39m
+  ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+[INFO] interaction: CreateDormitory {}
+{
+  type: [32m'scheme'[39m,
+  name: [32m'CreateDormitory'[39m,
+  sql: [32m'BEGIN'[39m,
+  params: [90mundefined[39m
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'finding Dormitory from handle'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"Dormitory"."dor_id_24" AS "FIELD_0"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"Dormitory" AS "Dormitory"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'("Dormitory"."dor_nam_14" = $1 AND "Dormitory"."dor_id_24" IS NOT NULL)\n'[39m +
+    [32m'\n'[39m +
+    [32m'LIMIT 1\n'[39m,
+  params: [ [32m'Test Dorm'[39m ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'finding combined records for _Activity_ to flash out, for creation with data {"id":"0198b66a-3fc5-7436-9762-ab72449210e9"}'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"_Activity_"."_act_52" AS "FIELD_0",\n'[39m +
+    [32m'"_Activity_"."_act_53" AS "FIELD_1",\n'[39m +
+    [32m'"_Activity_"."_act_54" AS "FIELD_2",\n'[39m +
+    [32m'"_Activity_"."_act_55" AS "FIELD_3",\n'[39m +
+    [32m'"_Activity_"."_act_56" AS "FIELD_4"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"_Activity_" AS "_Activity_"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'1=$1\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: [ [33m1[39m ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'insert'[39m,
+  name: [32m'create merged link dep record _Interaction_.activity'[39m,
+  sql: [32m'\nINSERT INTO "_Activity_"\n("_act_56")\nVALUES\n($1) \n'[39m,
+  params: [ [32m'0198b66a-3fc5-7436-9762-ab72449210e9'[39m ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'finding combined records for _Interaction_ to flash out, for creation with data {"interactionName":"CreateDormitory","interactionId":"18f166b4-994d-4c10-9de7-2a5d4a355c6b","user":{"_rowId":1,"name":"Admin User","email":"admin@test.com","role":"admin","id":"0198b66a-3fa2-7ef1-874f-b0930a0934a1"},"query":{},"payload":{"name":"Test Dorm","capacity":4},"args":{"user":{"_rowId":1,"name":"Admin User","email":"admin@test.com","role":"admin","id":"0198b66a-3fa2-7ef1-874f-b0930a0934a1"},"payload":{"name":"Test Dorm","capacity":4}},"activity":{"_rowId":1,"id":"0198b66a-3fc5-7436-9762-ab72449210e9","&":{"id":"0198b66a-3fc5-7436-9762-ab74613c36dc"}},"id":"0198b66a-3fc5-7436-9762-ab73ac16a105"}'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"_Interaction_"."_int_57" AS "FIELD_0",\n'[39m +
+    [32m'"_Interaction_"."_int_58" AS "FIELD_1",\n'[39m +
+    [32m'"_Interaction_"."_int_59" AS "FIELD_2",\n'[39m +
+    [32m'"_Interaction_"."_int_60" AS "FIELD_3",\n'[39m +
+    [32m'"_Interaction_"."_int_61" AS "FIELD_4",\n'[39m +
+    [32m'"_Interaction_"."_int_62" AS "FIELD_5",\n'[39m +
+    [32m'"_Interaction_"."_int_99" AS "FIELD_6",\n'[39m +
+    [32m'"_Interaction_"."act_id_89" AS "FIELD_7"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"_Interaction_" AS "_Interaction_"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'1=$1\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: [ [33m1[39m ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'insert'[39m,
+  name: [32m'create record _Interaction_ from handle'[39m,
+  sql: [32m'\n'[39m +
+    [32m'INSERT INTO "_Interaction_"\n'[39m +
+    [32m'("_int_58","_int_57","_int_60","_int_61","_int_59","_int_62","_int_99","act_id_89")\n'[39m +
+    [32m'VALUES\n'[39m +
+    [32m'($1,$2,$3,$4,$5,$6,$7,$8) \n'[39m,
+  params: [
+    [32m'CreateDormitory'[39m,
+    [32m'18f166b4-994d-4c10-9de7-2a5d4a355c6b'[39m,
+    [32m'{"_rowId":1,"name":"Admin User","email":"admin@test.com","role":"admin","id":"0198b66a-3fa2-7ef1-874f-b0930a0934a1"}'[39m,
+    [32m'{}'[39m,
+    [32m'{"name":"Test Dorm","capacity":4}'[39m,
+    [32m'0198b66a-3fc5-7436-9762-ab73ac16a105'[39m,
+    [32m'0198b66a-3fc5-7436-9762-ab72449210e9'[39m,
+    [32m'0198b66a-3fc5-7436-9762-ab74613c36dc'[39m
+  ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'finding _Interaction_ from handle'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"_Interaction_"."_int_62" AS "FIELD_0",\n'[39m +
+    [32m'"_Interaction_"."_int_58" AS "FIELD_1",\n'[39m +
+    [32m'"_Interaction_"."_int_59" AS "FIELD_2",\n'[39m +
+    [32m'"_Interaction_"."_int_60" AS "FIELD_3"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"_Interaction_" AS "_Interaction_"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'"_Interaction_"."_int_62" IS NOT NULL\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: []
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'finding Dormitory from handle'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"Dormitory"."dor_nam_14" AS "FIELD_0",\n'[39m +
+    [32m'"Dormitory"."dor_cap_15" AS "FIELD_1",\n'[39m +
+    [32m'"Dormitory"."dor_flo_16" AS "FIELD_2",\n'[39m +
+    [32m'"Dormitory"."dor_bui_17" AS "FIELD_3",\n'[39m +
+    [32m'"Dormitory"."dor_sta_18" AS "FIELD_4",\n'[39m +
+    [32m'"Dormitory"."dor_cre_19" AS "FIELD_5",\n'[39m +
+    [32m'"Dormitory"."dor_occ_20" AS "FIELD_6",\n'[39m +
+    [32m'"Dormitory"."dor_ava_21" AS "FIELD_7",\n'[39m +
+    [32m'"Dormitory"."dor__22" AS "FIELD_8",\n'[39m +
+    [32m'"Dormitory"."dor__23" AS "FIELD_9",\n'[39m +
+    [32m'"Dormitory"."dor_id_24" AS "FIELD_10"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"Dormitory" AS "Dormitory"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'"Dormitory"."dor_id_24" IS NOT NULL\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: []
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'finding _Interaction_ from handle'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"_Interaction_"."_int_62" AS "FIELD_0",\n'[39m +
+    [32m'"_Interaction_"."_int_58" AS "FIELD_1",\n'[39m +
+    [32m'"_Interaction_"."_int_59" AS "FIELD_2",\n'[39m +
+    [32m'"_Interaction_"."_int_60" AS "FIELD_3"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"_Interaction_" AS "_Interaction_"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'("_Interaction_"."_int_62" = $1 AND "_Interaction_"."_int_62" IS NOT NULL)\n'[39m +
+    [32m'\n'[39m +
+    [32m'LIMIT 1\n'[39m,
+  params: [ [32m'0198b66a-3fc5-7436-9762-ab73ac16a105'[39m ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'finding combined records for Dormitory to flash out, for creation with data {"name":"Test Dorm","capacity":4,"floor":0,"building":"","_Dormitory_bound_sourceRecordId":"0198b66a-3fc5-7436-9762-ab73ac16a105","_Dormitory_bound_transformIndex":0,"id":"0198b66a-3fc8-7109-ba65-ebe5b816446d"}'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"Dormitory"."dor_nam_14" AS "FIELD_0",\n'[39m +
+    [32m'"Dormitory"."dor_cap_15" AS "FIELD_1",\n'[39m +
+    [32m'"Dormitory"."dor_flo_16" AS "FIELD_2",\n'[39m +
+    [32m'"Dormitory"."dor_bui_17" AS "FIELD_3",\n'[39m +
+    [32m'"Dormitory"."dor_sta_18" AS "FIELD_4",\n'[39m +
+    [32m'"Dormitory"."dor_cre_19" AS "FIELD_5",\n'[39m +
+    [32m'"Dormitory"."dor_occ_20" AS "FIELD_6",\n'[39m +
+    [32m'"Dormitory"."dor_ava_21" AS "FIELD_7",\n'[39m +
+    [32m'"Dormitory"."dor__22" AS "FIELD_8",\n'[39m +
+    [32m'"Dormitory"."dor__23" AS "FIELD_9",\n'[39m +
+    [32m'"Dormitory"."dor_id_24" AS "FIELD_10",\n'[39m +
+    [32m'"Dormitory"."dor_dor_93" AS "FIELD_11",\n'[39m +
+    [32m'"Dormitory"."dor_app_76" AS "FIELD_12",\n'[39m +
+    [32m'"Dormitory"."dor__77" AS "FIELD_13",\n'[39m +
+    [32m'"Dormitory"."dor__78" AS "FIELD_14",\n'[39m +
+    [32m'"Dormitory"."dor_id_79" AS "FIELD_15"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"Dormitory" AS "Dormitory"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'1=$1\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: [ [33m1[39m ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'insert'[39m,
+  name: [32m'create record Dormitory from handle'[39m,
+  sql: [32m'\n'[39m +
+    [32m'INSERT INTO "Dormitory"\n'[39m +
+    [32m'("dor_nam_14","dor_cap_15","dor_flo_16","dor_bui_17","dor__22","dor__23","dor_id_24","dor_cre_19","dor_sta_18","dor_ava_21")\n'[39m +
+    [32m'VALUES\n'[39m +
+    [32m'($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) \n'[39m,
+  params: [
+    [32m'Test Dorm'[39m,
+    [33m4[39m,
+    [33m0[39m,
+    [32m''[39m,
+    [32m'0198b66a-3fc5-7436-9762-ab73ac16a105'[39m,
+    [33m0[39m,
+    [32m'0198b66a-3fc8-7109-ba65-ebe5b816446d'[39m,
+    [32m'2025-08-17T05:04:33.224Z'[39m,
+    [32m'available'[39m,
+    [33m4[39m
+  ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'find record for updating Dormitory'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"Dormitory"."dor_nam_14" AS "FIELD_0",\n'[39m +
+    [32m'"Dormitory"."dor_cap_15" AS "FIELD_1",\n'[39m +
+    [32m'"Dormitory"."dor_flo_16" AS "FIELD_2",\n'[39m +
+    [32m'"Dormitory"."dor_bui_17" AS "FIELD_3",\n'[39m +
+    [32m'"Dormitory"."dor_sta_18" AS "FIELD_4",\n'[39m +
+    [32m'"Dormitory"."dor_cre_19" AS "FIELD_5",\n'[39m +
+    [32m'"Dormitory"."dor_occ_20" AS "FIELD_6",\n'[39m +
+    [32m'"Dormitory"."dor_ava_21" AS "FIELD_7",\n'[39m +
+    [32m'"Dormitory"."dor__22" AS "FIELD_8",\n'[39m +
+    [32m'"Dormitory"."dor__23" AS "FIELD_9",\n'[39m +
+    [32m'"Dormitory"."dor_id_24" AS "FIELD_10",\n'[39m +
+    [32m'"Dormitory"."dor_dor_93" AS "FIELD_11",\n'[39m +
+    [32m'"Dormitory"."dor_app_76" AS "FIELD_12",\n'[39m +
+    [32m'"Dormitory"."dor__77" AS "FIELD_13",\n'[39m +
+    [32m'"Dormitory"."dor__78" AS "FIELD_14",\n'[39m +
+    [32m'"Dormitory"."dor_id_79" AS "FIELD_15"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"Dormitory" AS "Dormitory"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'("Dormitory"."dor_id_24" = $1 AND "Dormitory"."dor_id_24" IS NOT NULL)\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: [ [32m'0198b66a-3fc8-7109-ba65-ebe5b816446d'[39m ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'finding combined records for Dormitory to flash out, for updating with data {"occupancy":0,"id":"0198b66a-3fc8-7109-ba65-ebe5b816446d"}'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"Dormitory"."dor_nam_14" AS "FIELD_0",\n'[39m +
+    [32m'"Dormitory"."dor_cap_15" AS "FIELD_1",\n'[39m +
+    [32m'"Dormitory"."dor_flo_16" AS "FIELD_2",\n'[39m +
+    [32m'"Dormitory"."dor_bui_17" AS "FIELD_3",\n'[39m +
+    [32m'"Dormitory"."dor_sta_18" AS "FIELD_4",\n'[39m +
+    [32m'"Dormitory"."dor_cre_19" AS "FIELD_5",\n'[39m +
+    [32m'"Dormitory"."dor_occ_20" AS "FIELD_6",\n'[39m +
+    [32m'"Dormitory"."dor_ava_21" AS "FIELD_7",\n'[39m +
+    [32m'"Dormitory"."dor__22" AS "FIELD_8",\n'[39m +
+    [32m'"Dormitory"."dor__23" AS "FIELD_9",\n'[39m +
+    [32m'"Dormitory"."dor_id_24" AS "FIELD_10",\n'[39m +
+    [32m'"Dormitory"."dor_dor_93" AS "FIELD_11",\n'[39m +
+    [32m'"Dormitory"."dor_app_76" AS "FIELD_12",\n'[39m +
+    [32m'"Dormitory"."dor__77" AS "FIELD_13",\n'[39m +
+    [32m'"Dormitory"."dor__78" AS "FIELD_14",\n'[39m +
+    [32m'"Dormitory"."dor_id_79" AS "FIELD_15"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"Dormitory" AS "Dormitory"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'1=$1\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: [ [33m1[39m ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'update'[39m,
+  name: [32m'update record Dormitory by id'[39m,
+  sql: [32m'\n'[39m +
+    [32m'UPDATE "Dormitory"\n'[39m +
+    [32m'SET "dor_occ_20" = $1,"dor_id_24" = $2\n'[39m +
+    [32m'WHERE "dor_id_24" = ($3)\n'[39m +
+    [32m'         RETURNING "dor_id_24" AS id'[39m,
+  params: [
+    [33m0[39m,
+    [32m'0198b66a-3fc8-7109-ba65-ebe5b816446d'[39m,
+    [32m'0198b66a-3fc8-7109-ba65-ebe5b816446d'[39m
+  ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'finding Dormitory from handle'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"Dormitory"."dor_id_24" AS "FIELD_0",\n'[39m +
+    [32m'"Dormitory"."dor_cap_15" AS "FIELD_1"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"Dormitory" AS "Dormitory"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'"Dormitory"."dor_id_24" IS NOT NULL\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: []
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'finding Bed from handle'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"Bed"."bed_bed_25" AS "FIELD_0",\n'[39m +
+    [32m'"Bed"."bed_sta_26" AS "FIELD_1",\n'[39m +
+    [32m'"Bed"."bed_cre_27" AS "FIELD_2",\n'[39m +
+    [32m'"Bed"."bed__28" AS "FIELD_3",\n'[39m +
+    [32m'"Bed"."bed__29" AS "FIELD_4",\n'[39m +
+    [32m'"Bed"."bed__30" AS "FIELD_5",\n'[39m +
+    [32m'"Bed"."bed_id_31" AS "FIELD_6"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"Bed" AS "Bed"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'"Bed"."bed_id_31" IS NOT NULL\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: []
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'finding Dormitory from handle'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"Dormitory"."dor_id_24" AS "FIELD_0",\n'[39m +
+    [32m'"Dormitory"."dor_cap_15" AS "FIELD_1"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"Dormitory" AS "Dormitory"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'("Dormitory"."dor_id_24" = $1 AND "Dormitory"."dor_id_24" IS NOT NULL)\n'[39m +
+    [32m'\n'[39m +
+    [32m'LIMIT 1\n'[39m,
+  params: [ [32m'0198b66a-3fc8-7109-ba65-ebe5b816446d'[39m ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'finding combined records for Bed to flash out, for creation with data {"bedNumber":"001","dormitory":{"id":"0198b66a-3fc8-7109-ba65-ebe5b816446d","&":{"id":"0198b66a-3fcd-74ae-a7c6-74a6e929a62f"}},"_Bed_bound_sourceRecordId":"0198b66a-3fc8-7109-ba65-ebe5b816446d","_Bed_bound_transformIndex":0,"id":"0198b66a-3fcc-7910-acb0-c8eef13a62cd"}'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"Bed"."bed_bed_25" AS "FIELD_0",\n'[39m +
+    [32m'"Bed"."bed_sta_26" AS "FIELD_1",\n'[39m +
+    [32m'"Bed"."bed_cre_27" AS "FIELD_2",\n'[39m +
+    [32m'"Bed"."bed__28" AS "FIELD_3",\n'[39m +
+    [32m'"Bed"."bed__29" AS "FIELD_4",\n'[39m +
+    [32m'"Bed"."bed__30" AS "FIELD_5",\n'[39m +
+    [32m'"Bed"."bed_id_31" AS "FIELD_6",\n'[39m +
+    [32m'"Bed"."bed_dor_92" AS "FIELD_7",\n'[39m +
+    [32m'"Bed"."dor_id_75" AS "FIELD_8"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"Bed" AS "Bed"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'1=$1\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: [ [33m1[39m ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'insert'[39m,
+  name: [32m'create record Bed from handle'[39m,
+  sql: [32m'\n'[39m +
+    [32m'INSERT INTO "Bed"\n'[39m +
+    [32m'("bed_bed_25","bed__28","bed__29","bed_id_31","bed_cre_27","bed__30","bed_dor_92","dor_id_75")\n'[39m +
+    [32m'VALUES\n'[39m +
+    [32m'($1,$2,$3,$4,$5,$6,$7,$8) \n'[39m,
+  params: [
+    [32m'001'[39m,
+    [32m'0198b66a-3fc8-7109-ba65-ebe5b816446d'[39m,
+    [33m0[39m,
+    [32m'0198b66a-3fcc-7910-acb0-c8eef13a62cd'[39m,
+    [32m'2025-08-17T05:04:33.229Z'[39m,
+    [32m'vacant'[39m,
+    [32m'0198b66a-3fc8-7109-ba65-ebe5b816446d'[39m,
+    [32m'0198b66a-3fcd-74ae-a7c6-74a6e929a62f'[39m
+  ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'find record for updating Bed'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"Bed"."bed_bed_25" AS "FIELD_0",\n'[39m +
+    [32m'"Bed"."bed_sta_26" AS "FIELD_1",\n'[39m +
+    [32m'"Bed"."bed_cre_27" AS "FIELD_2",\n'[39m +
+    [32m'"Bed"."bed__28" AS "FIELD_3",\n'[39m +
+    [32m'"Bed"."bed__29" AS "FIELD_4",\n'[39m +
+    [32m'"Bed"."bed__30" AS "FIELD_5",\n'[39m +
+    [32m'"Bed"."bed_id_31" AS "FIELD_6",\n'[39m +
+    [32m'"Bed"."bed_dor_92" AS "FIELD_7",\n'[39m +
+    [32m'"Bed"."dor_id_75" AS "FIELD_8"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"Bed" AS "Bed"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'("Bed"."bed_id_31" = $1 AND "Bed"."bed_id_31" IS NOT NULL)\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: [ [32m'0198b66a-3fcc-7910-acb0-c8eef13a62cd'[39m ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'finding combined records for Bed to flash out, for updating with data {"status":"vacant","id":"0198b66a-3fcc-7910-acb0-c8eef13a62cd"}'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"Bed"."bed_bed_25" AS "FIELD_0",\n'[39m +
+    [32m'"Bed"."bed_sta_26" AS "FIELD_1",\n'[39m +
+    [32m'"Bed"."bed_cre_27" AS "FIELD_2",\n'[39m +
+    [32m'"Bed"."bed__28" AS "FIELD_3",\n'[39m +
+    [32m'"Bed"."bed__29" AS "FIELD_4",\n'[39m +
+    [32m'"Bed"."bed__30" AS "FIELD_5",\n'[39m +
+    [32m'"Bed"."bed_id_31" AS "FIELD_6",\n'[39m +
+    [32m'"Bed"."bed_dor_92" AS "FIELD_7",\n'[39m +
+    [32m'"Bed"."dor_id_75" AS "FIELD_8"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"Bed" AS "Bed"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'1=$1\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: [ [33m1[39m ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'update'[39m,
+  name: [32m'update record Bed by id'[39m,
+  sql: [32m'\n'[39m +
+    [32m'UPDATE "Bed"\n'[39m +
+    [32m'SET "bed_sta_26" = $1,"bed_id_31" = $2\n'[39m +
+    [32m'WHERE "bed_id_31" = ($3)\n'[39m +
+    [32m'         RETURNING "bed_id_31" AS id'[39m,
+  params: [
+    [32m'vacant'[39m,
+    [32m'0198b66a-3fcc-7910-acb0-c8eef13a62cd'[39m,
+    [32m'0198b66a-3fcc-7910-acb0-c8eef13a62cd'[39m
+  ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'finding combined records for Bed to flash out, for creation with data {"bedNumber":"002","dormitory":{"id":"0198b66a-3fc8-7109-ba65-ebe5b816446d","&":{"id":"0198b66a-3fcf-7de3-b060-f335de529369"}},"_Bed_bound_sourceRecordId":"0198b66a-3fc8-7109-ba65-ebe5b816446d","_Bed_bound_transformIndex":1,"id":"0198b66a-3fcf-7de3-b060-f334998003d4"}'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"Bed"."bed_bed_25" AS "FIELD_0",\n'[39m +
+    [32m'"Bed"."bed_sta_26" AS "FIELD_1",\n'[39m +
+    [32m'"Bed"."bed_cre_27" AS "FIELD_2",\n'[39m +
+    [32m'"Bed"."bed__28" AS "FIELD_3",\n'[39m +
+    [32m'"Bed"."bed__29" AS "FIELD_4",\n'[39m +
+    [32m'"Bed"."bed__30" AS "FIELD_5",\n'[39m +
+    [32m'"Bed"."bed_id_31" AS "FIELD_6",\n'[39m +
+    [32m'"Bed"."bed_dor_92" AS "FIELD_7",\n'[39m +
+    [32m'"Bed"."dor_id_75" AS "FIELD_8"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"Bed" AS "Bed"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'1=$1\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: [ [33m1[39m ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'insert'[39m,
+  name: [32m'create record Bed from handle'[39m,
+  sql: [32m'\n'[39m +
+    [32m'INSERT INTO "Bed"\n'[39m +
+    [32m'("bed_bed_25","bed__28","bed__29","bed_id_31","bed_cre_27","bed__30","bed_dor_92","dor_id_75")\n'[39m +
+    [32m'VALUES\n'[39m +
+    [32m'($1,$2,$3,$4,$5,$6,$7,$8) \n'[39m,
+  params: [
+    [32m'002'[39m,
+    [32m'0198b66a-3fc8-7109-ba65-ebe5b816446d'[39m,
+    [33m1[39m,
+    [32m'0198b66a-3fcf-7de3-b060-f334998003d4'[39m,
+    [32m'2025-08-17T05:04:33.231Z'[39m,
+    [32m'vacant'[39m,
+    [32m'0198b66a-3fc8-7109-ba65-ebe5b816446d'[39m,
+    [32m'0198b66a-3fcf-7de3-b060-f335de529369'[39m
+  ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'find record for updating Bed'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"Bed"."bed_bed_25" AS "FIELD_0",\n'[39m +
+    [32m'"Bed"."bed_sta_26" AS "FIELD_1",\n'[39m +
+    [32m'"Bed"."bed_cre_27" AS "FIELD_2",\n'[39m +
+    [32m'"Bed"."bed__28" AS "FIELD_3",\n'[39m +
+    [32m'"Bed"."bed__29" AS "FIELD_4",\n'[39m +
+    [32m'"Bed"."bed__30" AS "FIELD_5",\n'[39m +
+    [32m'"Bed"."bed_id_31" AS "FIELD_6",\n'[39m +
+    [32m'"Bed"."bed_dor_92" AS "FIELD_7",\n'[39m +
+    [32m'"Bed"."dor_id_75" AS "FIELD_8"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"Bed" AS "Bed"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'("Bed"."bed_id_31" = $1 AND "Bed"."bed_id_31" IS NOT NULL)\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: [ [32m'0198b66a-3fcf-7de3-b060-f334998003d4'[39m ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'finding combined records for Bed to flash out, for updating with data {"status":"vacant","id":"0198b66a-3fcf-7de3-b060-f334998003d4"}'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"Bed"."bed_bed_25" AS "FIELD_0",\n'[39m +
+    [32m'"Bed"."bed_sta_26" AS "FIELD_1",\n'[39m +
+    [32m'"Bed"."bed_cre_27" AS "FIELD_2",\n'[39m +
+    [32m'"Bed"."bed__28" AS "FIELD_3",\n'[39m +
+    [32m'"Bed"."bed__29" AS "FIELD_4",\n'[39m +
+    [32m'"Bed"."bed__30" AS "FIELD_5",\n'[39m +
+    [32m'"Bed"."bed_id_31" AS "FIELD_6",\n'[39m +
+    [32m'"Bed"."bed_dor_92" AS "FIELD_7",\n'[39m +
+    [32m'"Bed"."dor_id_75" AS "FIELD_8"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"Bed" AS "Bed"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'1=$1\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: [ [33m1[39m ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'update'[39m,
+  name: [32m'update record Bed by id'[39m,
+  sql: [32m'\n'[39m +
+    [32m'UPDATE "Bed"\n'[39m +
+    [32m'SET "bed_sta_26" = $1,"bed_id_31" = $2\n'[39m +
+    [32m'WHERE "bed_id_31" = ($3)\n'[39m +
+    [32m'         RETURNING "bed_id_31" AS id'[39m,
+  params: [
+    [32m'vacant'[39m,
+    [32m'0198b66a-3fcf-7de3-b060-f334998003d4'[39m,
+    [32m'0198b66a-3fcf-7de3-b060-f334998003d4'[39m
+  ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'finding combined records for Bed to flash out, for creation with data {"bedNumber":"003","dormitory":{"id":"0198b66a-3fc8-7109-ba65-ebe5b816446d","&":{"id":"0198b66a-3fd1-75a7-bbe4-125fc8c382a7"}},"_Bed_bound_sourceRecordId":"0198b66a-3fc8-7109-ba65-ebe5b816446d","_Bed_bound_transformIndex":2,"id":"0198b66a-3fd1-75a7-bbe4-125e2ce5359f"}'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"Bed"."bed_bed_25" AS "FIELD_0",\n'[39m +
+    [32m'"Bed"."bed_sta_26" AS "FIELD_1",\n'[39m +
+    [32m'"Bed"."bed_cre_27" AS "FIELD_2",\n'[39m +
+    [32m'"Bed"."bed__28" AS "FIELD_3",\n'[39m +
+    [32m'"Bed"."bed__29" AS "FIELD_4",\n'[39m +
+    [32m'"Bed"."bed__30" AS "FIELD_5",\n'[39m +
+    [32m'"Bed"."bed_id_31" AS "FIELD_6",\n'[39m +
+    [32m'"Bed"."bed_dor_92" AS "FIELD_7",\n'[39m +
+    [32m'"Bed"."dor_id_75" AS "FIELD_8"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"Bed" AS "Bed"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'1=$1\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: [ [33m1[39m ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'insert'[39m,
+  name: [32m'create record Bed from handle'[39m,
+  sql: [32m'\n'[39m +
+    [32m'INSERT INTO "Bed"\n'[39m +
+    [32m'("bed_bed_25","bed__28","bed__29","bed_id_31","bed_cre_27","bed__30","bed_dor_92","dor_id_75")\n'[39m +
+    [32m'VALUES\n'[39m +
+    [32m'($1,$2,$3,$4,$5,$6,$7,$8) \n'[39m,
+  params: [
+    [32m'003'[39m,
+    [32m'0198b66a-3fc8-7109-ba65-ebe5b816446d'[39m,
+    [33m2[39m,
+    [32m'0198b66a-3fd1-75a7-bbe4-125e2ce5359f'[39m,
+    [32m'2025-08-17T05:04:33.233Z'[39m,
+    [32m'vacant'[39m,
+    [32m'0198b66a-3fc8-7109-ba65-ebe5b816446d'[39m,
+    [32m'0198b66a-3fd1-75a7-bbe4-125fc8c382a7'[39m
+  ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'find record for updating Bed'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"Bed"."bed_bed_25" AS "FIELD_0",\n'[39m +
+    [32m'"Bed"."bed_sta_26" AS "FIELD_1",\n'[39m +
+    [32m'"Bed"."bed_cre_27" AS "FIELD_2",\n'[39m +
+    [32m'"Bed"."bed__28" AS "FIELD_3",\n'[39m +
+    [32m'"Bed"."bed__29" AS "FIELD_4",\n'[39m +
+    [32m'"Bed"."bed__30" AS "FIELD_5",\n'[39m +
+    [32m'"Bed"."bed_id_31" AS "FIELD_6",\n'[39m +
+    [32m'"Bed"."bed_dor_92" AS "FIELD_7",\n'[39m +
+    [32m'"Bed"."dor_id_75" AS "FIELD_8"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"Bed" AS "Bed"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'("Bed"."bed_id_31" = $1 AND "Bed"."bed_id_31" IS NOT NULL)\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: [ [32m'0198b66a-3fd1-75a7-bbe4-125e2ce5359f'[39m ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'finding combined records for Bed to flash out, for updating with data {"status":"vacant","id":"0198b66a-3fd1-75a7-bbe4-125e2ce5359f"}'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"Bed"."bed_bed_25" AS "FIELD_0",\n'[39m +
+    [32m'"Bed"."bed_sta_26" AS "FIELD_1",\n'[39m +
+    [32m'"Bed"."bed_cre_27" AS "FIELD_2",\n'[39m +
+    [32m'"Bed"."bed__28" AS "FIELD_3",\n'[39m +
+    [32m'"Bed"."bed__29" AS "FIELD_4",\n'[39m +
+    [32m'"Bed"."bed__30" AS "FIELD_5",\n'[39m +
+    [32m'"Bed"."bed_id_31" AS "FIELD_6",\n'[39m +
+    [32m'"Bed"."bed_dor_92" AS "FIELD_7",\n'[39m +
+    [32m'"Bed"."dor_id_75" AS "FIELD_8"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"Bed" AS "Bed"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'1=$1\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: [ [33m1[39m ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'update'[39m,
+  name: [32m'update record Bed by id'[39m,
+  sql: [32m'\n'[39m +
+    [32m'UPDATE "Bed"\n'[39m +
+    [32m'SET "bed_sta_26" = $1,"bed_id_31" = $2\n'[39m +
+    [32m'WHERE "bed_id_31" = ($3)\n'[39m +
+    [32m'         RETURNING "bed_id_31" AS id'[39m,
+  params: [
+    [32m'vacant'[39m,
+    [32m'0198b66a-3fd1-75a7-bbe4-125e2ce5359f'[39m,
+    [32m'0198b66a-3fd1-75a7-bbe4-125e2ce5359f'[39m
+  ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'finding combined records for Bed to flash out, for creation with data {"bedNumber":"004","dormitory":{"id":"0198b66a-3fc8-7109-ba65-ebe5b816446d","&":{"id":"0198b66a-3fd3-7c52-b7bb-01dce4228830"}},"_Bed_bound_sourceRecordId":"0198b66a-3fc8-7109-ba65-ebe5b816446d","_Bed_bound_transformIndex":3,"id":"0198b66a-3fd3-7c52-b7bb-01db972b6c69"}'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"Bed"."bed_bed_25" AS "FIELD_0",\n'[39m +
+    [32m'"Bed"."bed_sta_26" AS "FIELD_1",\n'[39m +
+    [32m'"Bed"."bed_cre_27" AS "FIELD_2",\n'[39m +
+    [32m'"Bed"."bed__28" AS "FIELD_3",\n'[39m +
+    [32m'"Bed"."bed__29" AS "FIELD_4",\n'[39m +
+    [32m'"Bed"."bed__30" AS "FIELD_5",\n'[39m +
+    [32m'"Bed"."bed_id_31" AS "FIELD_6",\n'[39m +
+    [32m'"Bed"."bed_dor_92" AS "FIELD_7",\n'[39m +
+    [32m'"Bed"."dor_id_75" AS "FIELD_8"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"Bed" AS "Bed"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'1=$1\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: [ [33m1[39m ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'insert'[39m,
+  name: [32m'create record Bed from handle'[39m,
+  sql: [32m'\n'[39m +
+    [32m'INSERT INTO "Bed"\n'[39m +
+    [32m'("bed_bed_25","bed__28","bed__29","bed_id_31","bed_cre_27","bed__30","bed_dor_92","dor_id_75")\n'[39m +
+    [32m'VALUES\n'[39m +
+    [32m'($1,$2,$3,$4,$5,$6,$7,$8) \n'[39m,
+  params: [
+    [32m'004'[39m,
+    [32m'0198b66a-3fc8-7109-ba65-ebe5b816446d'[39m,
+    [33m3[39m,
+    [32m'0198b66a-3fd3-7c52-b7bb-01db972b6c69'[39m,
+    [32m'2025-08-17T05:04:33.236Z'[39m,
+    [32m'vacant'[39m,
+    [32m'0198b66a-3fc8-7109-ba65-ebe5b816446d'[39m,
+    [32m'0198b66a-3fd3-7c52-b7bb-01dce4228830'[39m
+  ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'find record for updating Bed'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"Bed"."bed_bed_25" AS "FIELD_0",\n'[39m +
+    [32m'"Bed"."bed_sta_26" AS "FIELD_1",\n'[39m +
+    [32m'"Bed"."bed_cre_27" AS "FIELD_2",\n'[39m +
+    [32m'"Bed"."bed__28" AS "FIELD_3",\n'[39m +
+    [32m'"Bed"."bed__29" AS "FIELD_4",\n'[39m +
+    [32m'"Bed"."bed__30" AS "FIELD_5",\n'[39m +
+    [32m'"Bed"."bed_id_31" AS "FIELD_6",\n'[39m +
+    [32m'"Bed"."bed_dor_92" AS "FIELD_7",\n'[39m +
+    [32m'"Bed"."dor_id_75" AS "FIELD_8"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"Bed" AS "Bed"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'("Bed"."bed_id_31" = $1 AND "Bed"."bed_id_31" IS NOT NULL)\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: [ [32m'0198b66a-3fd3-7c52-b7bb-01db972b6c69'[39m ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'finding combined records for Bed to flash out, for updating with data {"status":"vacant","id":"0198b66a-3fd3-7c52-b7bb-01db972b6c69"}'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"Bed"."bed_bed_25" AS "FIELD_0",\n'[39m +
+    [32m'"Bed"."bed_sta_26" AS "FIELD_1",\n'[39m +
+    [32m'"Bed"."bed_cre_27" AS "FIELD_2",\n'[39m +
+    [32m'"Bed"."bed__28" AS "FIELD_3",\n'[39m +
+    [32m'"Bed"."bed__29" AS "FIELD_4",\n'[39m +
+    [32m'"Bed"."bed__30" AS "FIELD_5",\n'[39m +
+    [32m'"Bed"."bed_id_31" AS "FIELD_6",\n'[39m +
+    [32m'"Bed"."bed_dor_92" AS "FIELD_7",\n'[39m +
+    [32m'"Bed"."dor_id_75" AS "FIELD_8"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"Bed" AS "Bed"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'1=$1\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: [ [33m1[39m ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'update'[39m,
+  name: [32m'update record Bed by id'[39m,
+  sql: [32m'\n'[39m +
+    [32m'UPDATE "Bed"\n'[39m +
+    [32m'SET "bed_sta_26" = $1,"bed_id_31" = $2\n'[39m +
+    [32m'WHERE "bed_id_31" = ($3)\n'[39m +
+    [32m'         RETURNING "bed_id_31" AS id'[39m,
+  params: [
+    [32m'vacant'[39m,
+    [32m'0198b66a-3fd3-7c52-b7bb-01db972b6c69'[39m,
+    [32m'0198b66a-3fd3-7c52-b7bb-01db972b6c69'[39m
+  ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'finding _Interaction_ from handle'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"_Interaction_"."_int_62" AS "FIELD_0",\n'[39m +
+    [32m'"_Interaction_"."_int_58" AS "FIELD_1",\n'[39m +
+    [32m'"_Interaction_"."_int_59" AS "FIELD_2",\n'[39m +
+    [32m'"_Interaction_"."_int_60" AS "FIELD_3"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"_Interaction_" AS "_Interaction_"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'"_Interaction_"."_int_62" IS NOT NULL\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: []
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'finding PointDeduction from handle'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"PointDeduction"."poi_rea_32" AS "FIELD_0",\n'[39m +
+    [32m'"PointDeduction"."poi_poi_33" AS "FIELD_1",\n'[39m +
+    [32m'"PointDeduction"."poi_cat_34" AS "FIELD_2",\n'[39m +
+    [32m'"PointDeduction"."poi_occ_35" AS "FIELD_3",\n'[39m +
+    [32m'"PointDeduction"."poi_rec_36" AS "FIELD_4",\n'[39m +
+    [32m'"PointDeduction"."poi__37" AS "FIELD_5",\n'[39m +
+    [32m'"PointDeduction"."poi__38" AS "FIELD_6",\n'[39m +
+    [32m'"PointDeduction"."poi_id_39" AS "FIELD_7"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"PointDeduction" AS "PointDeduction"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'"PointDeduction"."poi_id_39" IS NOT NULL\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: []
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'finding _Interaction_ from handle'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"_Interaction_"."_int_62" AS "FIELD_0",\n'[39m +
+    [32m'"_Interaction_"."_int_58" AS "FIELD_1",\n'[39m +
+    [32m'"_Interaction_"."_int_59" AS "FIELD_2",\n'[39m +
+    [32m'"_Interaction_"."_int_60" AS "FIELD_3"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"_Interaction_" AS "_Interaction_"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'("_Interaction_"."_int_62" = $1 AND "_Interaction_"."_int_62" IS NOT NULL)\n'[39m +
+    [32m'\n'[39m +
+    [32m'LIMIT 1\n'[39m,
+  params: [ [32m'0198b66a-3fc5-7436-9762-ab73ac16a105'[39m ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'finding _Interaction_ from handle'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"_Interaction_"."_int_62" AS "FIELD_0",\n'[39m +
+    [32m'"_Interaction_"."_int_58" AS "FIELD_1",\n'[39m +
+    [32m'"_Interaction_"."_int_59" AS "FIELD_2",\n'[39m +
+    [32m'"_Interaction_"."_int_60" AS "FIELD_3"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"_Interaction_" AS "_Interaction_"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'"_Interaction_"."_int_62" IS NOT NULL\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: []
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'finding EvictionRequest from handle'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"EvictionRequest"."evi_rea_40" AS "FIELD_0",\n'[39m +
+    [32m'"EvictionRequest"."evi_tot_41" AS "FIELD_1",\n'[39m +
+    [32m'"EvictionRequest"."evi_sta_42" AS "FIELD_2",\n'[39m +
+    [32m'"EvictionRequest"."evi_req_43" AS "FIELD_3",\n'[39m +
+    [32m'"EvictionRequest"."evi_pro_44" AS "FIELD_4",\n'[39m +
+    [32m'"EvictionRequest"."evi_adm_45" AS "FIELD_5",\n'[39m +
+    [32m'"EvictionRequest"."evi__46" AS "FIELD_6",\n'[39m +
+    [32m'"EvictionRequest"."evi__47" AS "FIELD_7",\n'[39m +
+    [32m'"EvictionRequest"."evi__48" AS "FIELD_8",\n'[39m +
+    [32m'"EvictionRequest"."evi__49" AS "FIELD_9",\n'[39m +
+    [32m'"EvictionRequest"."evi__50" AS "FIELD_10",\n'[39m +
+    [32m'"EvictionRequest"."evi_id_51" AS "FIELD_11"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"EvictionRequest" AS "EvictionRequest"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'"EvictionRequest"."evi_id_51" IS NOT NULL\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: []
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'finding _Interaction_ from handle'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"_Interaction_"."_int_62" AS "FIELD_0",\n'[39m +
+    [32m'"_Interaction_"."_int_58" AS "FIELD_1",\n'[39m +
+    [32m'"_Interaction_"."_int_59" AS "FIELD_2",\n'[39m +
+    [32m'"_Interaction_"."_int_60" AS "FIELD_3"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"_Interaction_" AS "_Interaction_"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'("_Interaction_"."_int_62" = $1 AND "_Interaction_"."_int_62" IS NOT NULL)\n'[39m +
+    [32m'\n'[39m +
+    [32m'LIMIT 1\n'[39m,
+  params: [ [32m'0198b66a-3fc5-7436-9762-ab73ac16a105'[39m ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'finding _Interaction_ from handle'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"_Interaction_"."_int_62" AS "FIELD_0",\n'[39m +
+    [32m'"_Interaction_"."_int_58" AS "FIELD_1",\n'[39m +
+    [32m'"_Interaction_"."_int_59" AS "FIELD_2"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"_Interaction_" AS "_Interaction_"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'"_Interaction_"."_int_62" IS NOT NULL\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: []
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'finding UserDormitoryRelation from handle'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"UserDormitoryRelation"."use_ass_67" AS "FIELD_0",\n'[39m +
+    [32m'"UserDormitoryRelation"."use__68" AS "FIELD_1",\n'[39m +
+    [32m'"UserDormitoryRelation"."use__69" AS "FIELD_2",\n'[39m +
+    [32m'"UserDormitoryRelation"."use_id_70" AS "FIELD_3"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"User" AS "UserDormitoryRelation"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'"UserDormitoryRelation"."use_id_70" IS NOT NULL\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: []
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'finding _Interaction_ from handle'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"_Interaction_"."_int_62" AS "FIELD_0",\n'[39m +
+    [32m'"_Interaction_"."_int_58" AS "FIELD_1",\n'[39m +
+    [32m'"_Interaction_"."_int_59" AS "FIELD_2"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"_Interaction_" AS "_Interaction_"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'("_Interaction_"."_int_62" = $1 AND "_Interaction_"."_int_62" IS NOT NULL)\n'[39m +
+    [32m'\n'[39m +
+    [32m'LIMIT 1\n'[39m,
+  params: [ [32m'0198b66a-3fc5-7436-9762-ab73ac16a105'[39m ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'finding _Interaction_ from handle'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"_Interaction_"."_int_62" AS "FIELD_0",\n'[39m +
+    [32m'"_Interaction_"."_int_58" AS "FIELD_1",\n'[39m +
+    [32m'"_Interaction_"."_int_59" AS "FIELD_2"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"_Interaction_" AS "_Interaction_"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'"_Interaction_"."_int_62" IS NOT NULL\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: []
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'finding UserBedRelation from handle'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"UserBedRelation"."use_occ_71" AS "FIELD_0",\n'[39m +
+    [32m'"UserBedRelation"."use__72" AS "FIELD_1",\n'[39m +
+    [32m'"UserBedRelation"."use__73" AS "FIELD_2",\n'[39m +
+    [32m'"UserBedRelation"."use_id_74" AS "FIELD_3"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"User" AS "UserBedRelation"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'"UserBedRelation"."use_id_74" IS NOT NULL\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: []
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'finding _Interaction_ from handle'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"_Interaction_"."_int_62" AS "FIELD_0",\n'[39m +
+    [32m'"_Interaction_"."_int_58" AS "FIELD_1",\n'[39m +
+    [32m'"_Interaction_"."_int_59" AS "FIELD_2"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"_Interaction_" AS "_Interaction_"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'("_Interaction_"."_int_62" = $1 AND "_Interaction_"."_int_62" IS NOT NULL)\n'[39m +
+    [32m'\n'[39m +
+    [32m'LIMIT 1\n'[39m,
+  params: [ [32m'0198b66a-3fc5-7436-9762-ab73ac16a105'[39m ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'finding _Interaction_ from handle'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"_Interaction_"."_int_62" AS "FIELD_0",\n'[39m +
+    [32m'"_Interaction_"."_int_58" AS "FIELD_1",\n'[39m +
+    [32m'"_Interaction_"."_int_59" AS "FIELD_2"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"_Interaction_" AS "_Interaction_"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'"_Interaction_"."_int_62" IS NOT NULL\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: []
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'finding DormitoryDormHeadRelation from handle'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"DormitoryDormHeadRelation"."dor_app_76" AS "FIELD_0",\n'[39m +
+    [32m'"DormitoryDormHeadRelation"."dor__77" AS "FIELD_1",\n'[39m +
+    [32m'"DormitoryDormHeadRelation"."dor__78" AS "FIELD_2",\n'[39m +
+    [32m'"DormitoryDormHeadRelation"."dor_id_79" AS "FIELD_3"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"Dormitory" AS "DormitoryDormHeadRelation"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'"DormitoryDormHeadRelation"."dor_id_79" IS NOT NULL\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: []
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'finding _Interaction_ from handle'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"_Interaction_"."_int_62" AS "FIELD_0",\n'[39m +
+    [32m'"_Interaction_"."_int_58" AS "FIELD_1",\n'[39m +
+    [32m'"_Interaction_"."_int_59" AS "FIELD_2"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"_Interaction_" AS "_Interaction_"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'("_Interaction_"."_int_62" = $1 AND "_Interaction_"."_int_62" IS NOT NULL)\n'[39m +
+    [32m'\n'[39m +
+    [32m'LIMIT 1\n'[39m,
+  params: [ [32m'0198b66a-3fc5-7436-9762-ab73ac16a105'[39m ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'finding _Interaction_ from handle'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"_Interaction_"."_int_62" AS "FIELD_0",\n'[39m +
+    [32m'"_Interaction_"."_int_58" AS "FIELD_1",\n'[39m +
+    [32m'"_Interaction_"."_int_59" AS "FIELD_2",\n'[39m +
+    [32m'"_Interaction_"."_int_60" AS "FIELD_3"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"_Interaction_" AS "_Interaction_"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'"_Interaction_"."_int_62" IS NOT NULL\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: []
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'finding EvictionRequestApproverRelation from handle'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"EvictionRequestApproverRelation"."evi_app_85" AS "FIELD_0",\n'[39m +
+    [32m'"EvictionRequestApproverRelation"."evi__86" AS "FIELD_1",\n'[39m +
+    [32m'"EvictionRequestApproverRelation"."evi__87" AS "FIELD_2",\n'[39m +
+    [32m'"EvictionRequestApproverRelation"."evi_id_88" AS "FIELD_3"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"EvictionRequest" AS "EvictionRequestApproverRelation"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'"EvictionRequestApproverRelation"."evi_id_88" IS NOT NULL\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: []
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'finding _Interaction_ from handle'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"_Interaction_"."_int_62" AS "FIELD_0",\n'[39m +
+    [32m'"_Interaction_"."_int_58" AS "FIELD_1",\n'[39m +
+    [32m'"_Interaction_"."_int_59" AS "FIELD_2",\n'[39m +
+    [32m'"_Interaction_"."_int_60" AS "FIELD_3"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"_Interaction_" AS "_Interaction_"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'("_Interaction_"."_int_62" = $1 AND "_Interaction_"."_int_62" IS NOT NULL)\n'[39m +
+    [32m'\n'[39m +
+    [32m'LIMIT 1\n'[39m,
+  params: [ [32m'0198b66a-3fc5-7436-9762-ab73ac16a105'[39m ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'scheme'[39m,
+  name: [32m'CreateDormitory'[39m,
+  sql: [32m'COMMIT'[39m,
+  params: [90mundefined[39m
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'finding Dormitory from handle'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"Dormitory"."dor_id_24" AS "FIELD_0",\n'[39m +
+    [32m'"Dormitory"."dor_nam_14" AS "FIELD_1",\n'[39m +
+    [32m'"Dormitory"."dor_cap_15" AS "FIELD_2"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"Dormitory" AS "Dormitory"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'("Dormitory"."dor_nam_14" = $1 AND "Dormitory"."dor_id_24" IS NOT NULL)\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: [ [32m'Test Dorm'[39m ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'finding Bed from handle'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"Bed"."bed_id_31" AS "FIELD_0",\n'[39m +
+    [32m'"Bed"."bed_bed_25" AS "FIELD_1",\n'[39m +
+    [32m'"Bed"."bed_dor_92" AS "FIELD_2"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"Bed" AS "Bed"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'"Bed"."bed_id_31" IS NOT NULL\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: []
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+[INFO] interaction: CreateDormitory {}
+{
+  type: [32m'scheme'[39m,
+  name: [32m'CreateDormitory'[39m,
+  sql: [32m'BEGIN'[39m,
+  params: [90mundefined[39m
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'finding Dormitory from handle'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"Dormitory"."dor_id_24" AS "FIELD_0"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"Dormitory" AS "Dormitory"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'("Dormitory"."dor_nam_14" = $1 AND "Dormitory"."dor_id_24" IS NOT NULL)\n'[39m +
+    [32m'\n'[39m +
+    [32m'LIMIT 1\n'[39m,
+  params: [ [32m'Another Dorm'[39m ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'finding combined records for _Activity_ to flash out, for creation with data {"id":"0198b66a-3fdd-7945-8f01-6146c7f4b1a1"}'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"_Activity_"."_act_52" AS "FIELD_0",\n'[39m +
+    [32m'"_Activity_"."_act_53" AS "FIELD_1",\n'[39m +
+    [32m'"_Activity_"."_act_54" AS "FIELD_2",\n'[39m +
+    [32m'"_Activity_"."_act_55" AS "FIELD_3",\n'[39m +
+    [32m'"_Activity_"."_act_56" AS "FIELD_4"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"_Activity_" AS "_Activity_"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'1=$1\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: [ [33m1[39m ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'insert'[39m,
+  name: [32m'create merged link dep record _Interaction_.activity'[39m,
+  sql: [32m'\nINSERT INTO "_Activity_"\n("_act_56")\nVALUES\n($1) \n'[39m,
+  params: [ [32m'0198b66a-3fdd-7945-8f01-6146c7f4b1a1'[39m ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'finding combined records for _Interaction_ to flash out, for creation with data {"interactionName":"CreateDormitory","interactionId":"18f166b4-994d-4c10-9de7-2a5d4a355c6b","user":{"_rowId":1,"name":"Admin User","email":"admin@test.com","role":"admin","id":"0198b66a-3fa2-7ef1-874f-b0930a0934a1"},"query":{},"payload":{"name":"Another Dorm","capacity":4},"args":{"user":{"_rowId":1,"name":"Admin User","email":"admin@test.com","role":"admin","id":"0198b66a-3fa2-7ef1-874f-b0930a0934a1"},"payload":{"name":"Another Dorm","capacity":4}},"activity":{"_rowId":2,"id":"0198b66a-3fdd-7945-8f01-6146c7f4b1a1","&":{"id":"0198b66a-3fdd-7945-8f01-61486124a53f"}},"id":"0198b66a-3fdd-7945-8f01-6147e670daf5"}'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"_Interaction_"."_int_57" AS "FIELD_0",\n'[39m +
+    [32m'"_Interaction_"."_int_58" AS "FIELD_1",\n'[39m +
+    [32m'"_Interaction_"."_int_59" AS "FIELD_2",\n'[39m +
+    [32m'"_Interaction_"."_int_60" AS "FIELD_3",\n'[39m +
+    [32m'"_Interaction_"."_int_61" AS "FIELD_4",\n'[39m +
+    [32m'"_Interaction_"."_int_62" AS "FIELD_5",\n'[39m +
+    [32m'"_Interaction_"."_int_99" AS "FIELD_6",\n'[39m +
+    [32m'"_Interaction_"."act_id_89" AS "FIELD_7"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"_Interaction_" AS "_Interaction_"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'1=$1\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: [ [33m1[39m ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'insert'[39m,
+  name: [32m'create record _Interaction_ from handle'[39m,
+  sql: [32m'\n'[39m +
+    [32m'INSERT INTO "_Interaction_"\n'[39m +
+    [32m'("_int_58","_int_57","_int_60","_int_61","_int_59","_int_62","_int_99","act_id_89")\n'[39m +
+    [32m'VALUES\n'[39m +
+    [32m'($1,$2,$3,$4,$5,$6,$7,$8) \n'[39m,
+  params: [
+    [32m'CreateDormitory'[39m,
+    [32m'18f166b4-994d-4c10-9de7-2a5d4a355c6b'[39m,
+    [32m'{"_rowId":1,"name":"Admin User","email":"admin@test.com","role":"admin","id":"0198b66a-3fa2-7ef1-874f-b0930a0934a1"}'[39m,
+    [32m'{}'[39m,
+    [32m'{"name":"Another Dorm","capacity":4}'[39m,
+    [32m'0198b66a-3fdd-7945-8f01-6147e670daf5'[39m,
+    [32m'0198b66a-3fdd-7945-8f01-6146c7f4b1a1'[39m,
+    [32m'0198b66a-3fdd-7945-8f01-61486124a53f'[39m
+  ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'finding _Interaction_ from handle'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"_Interaction_"."_int_62" AS "FIELD_0",\n'[39m +
+    [32m'"_Interaction_"."_int_58" AS "FIELD_1",\n'[39m +
+    [32m'"_Interaction_"."_int_59" AS "FIELD_2",\n'[39m +
+    [32m'"_Interaction_"."_int_60" AS "FIELD_3"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"_Interaction_" AS "_Interaction_"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'"_Interaction_"."_int_62" IS NOT NULL\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: []
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'finding Dormitory from handle'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"Dormitory"."dor_nam_14" AS "FIELD_0",\n'[39m +
+    [32m'"Dormitory"."dor_cap_15" AS "FIELD_1",\n'[39m +
+    [32m'"Dormitory"."dor_flo_16" AS "FIELD_2",\n'[39m +
+    [32m'"Dormitory"."dor_bui_17" AS "FIELD_3",\n'[39m +
+    [32m'"Dormitory"."dor_sta_18" AS "FIELD_4",\n'[39m +
+    [32m'"Dormitory"."dor_cre_19" AS "FIELD_5",\n'[39m +
+    [32m'"Dormitory"."dor_occ_20" AS "FIELD_6",\n'[39m +
+    [32m'"Dormitory"."dor_ava_21" AS "FIELD_7",\n'[39m +
+    [32m'"Dormitory"."dor__22" AS "FIELD_8",\n'[39m +
+    [32m'"Dormitory"."dor__23" AS "FIELD_9",\n'[39m +
+    [32m'"Dormitory"."dor_id_24" AS "FIELD_10"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"Dormitory" AS "Dormitory"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'"Dormitory"."dor_id_24" IS NOT NULL\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: []
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'finding _Interaction_ from handle'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"_Interaction_"."_int_62" AS "FIELD_0",\n'[39m +
+    [32m'"_Interaction_"."_int_58" AS "FIELD_1",\n'[39m +
+    [32m'"_Interaction_"."_int_59" AS "FIELD_2",\n'[39m +
+    [32m'"_Interaction_"."_int_60" AS "FIELD_3"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"_Interaction_" AS "_Interaction_"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'("_Interaction_"."_int_62" = $1 AND "_Interaction_"."_int_62" IS NOT NULL)\n'[39m +
+    [32m'\n'[39m +
+    [32m'LIMIT 1\n'[39m,
+  params: [ [32m'0198b66a-3fdd-7945-8f01-6147e670daf5'[39m ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'finding combined records for Dormitory to flash out, for creation with data {"name":"Another Dorm","capacity":4,"floor":0,"building":"","_Dormitory_bound_sourceRecordId":"0198b66a-3fdd-7945-8f01-6147e670daf5","_Dormitory_bound_transformIndex":0,"id":"0198b66a-3fdf-75c6-8f2a-0d009996a55b"}'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"Dormitory"."dor_nam_14" AS "FIELD_0",\n'[39m +
+    [32m'"Dormitory"."dor_cap_15" AS "FIELD_1",\n'[39m +
+    [32m'"Dormitory"."dor_flo_16" AS "FIELD_2",\n'[39m +
+    [32m'"Dormitory"."dor_bui_17" AS "FIELD_3",\n'[39m +
+    [32m'"Dormitory"."dor_sta_18" AS "FIELD_4",\n'[39m +
+    [32m'"Dormitory"."dor_cre_19" AS "FIELD_5",\n'[39m +
+    [32m'"Dormitory"."dor_occ_20" AS "FIELD_6",\n'[39m +
+    [32m'"Dormitory"."dor_ava_21" AS "FIELD_7",\n'[39m +
+    [32m'"Dormitory"."dor__22" AS "FIELD_8",\n'[39m +
+    [32m'"Dormitory"."dor__23" AS "FIELD_9",\n'[39m +
+    [32m'"Dormitory"."dor_id_24" AS "FIELD_10",\n'[39m +
+    [32m'"Dormitory"."dor_dor_93" AS "FIELD_11",\n'[39m +
+    [32m'"Dormitory"."dor_app_76" AS "FIELD_12",\n'[39m +
+    [32m'"Dormitory"."dor__77" AS "FIELD_13",\n'[39m +
+    [32m'"Dormitory"."dor__78" AS "FIELD_14",\n'[39m +
+    [32m'"Dormitory"."dor_id_79" AS "FIELD_15"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"Dormitory" AS "Dormitory"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'1=$1\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: [ [33m1[39m ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'insert'[39m,
+  name: [32m'create record Dormitory from handle'[39m,
+  sql: [32m'\n'[39m +
+    [32m'INSERT INTO "Dormitory"\n'[39m +
+    [32m'("dor_nam_14","dor_cap_15","dor_flo_16","dor_bui_17","dor__22","dor__23","dor_id_24","dor_cre_19","dor_sta_18","dor_ava_21")\n'[39m +
+    [32m'VALUES\n'[39m +
+    [32m'($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) \n'[39m,
+  params: [
+    [32m'Another Dorm'[39m,
+    [33m4[39m,
+    [33m0[39m,
+    [32m''[39m,
+    [32m'0198b66a-3fdd-7945-8f01-6147e670daf5'[39m,
+    [33m0[39m,
+    [32m'0198b66a-3fdf-75c6-8f2a-0d009996a55b'[39m,
+    [32m'2025-08-17T05:04:33.248Z'[39m,
+    [32m'available'[39m,
+    [33m4[39m
+  ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'find record for updating Dormitory'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"Dormitory"."dor_nam_14" AS "FIELD_0",\n'[39m +
+    [32m'"Dormitory"."dor_cap_15" AS "FIELD_1",\n'[39m +
+    [32m'"Dormitory"."dor_flo_16" AS "FIELD_2",\n'[39m +
+    [32m'"Dormitory"."dor_bui_17" AS "FIELD_3",\n'[39m +
+    [32m'"Dormitory"."dor_sta_18" AS "FIELD_4",\n'[39m +
+    [32m'"Dormitory"."dor_cre_19" AS "FIELD_5",\n'[39m +
+    [32m'"Dormitory"."dor_occ_20" AS "FIELD_6",\n'[39m +
+    [32m'"Dormitory"."dor_ava_21" AS "FIELD_7",\n'[39m +
+    [32m'"Dormitory"."dor__22" AS "FIELD_8",\n'[39m +
+    [32m'"Dormitory"."dor__23" AS "FIELD_9",\n'[39m +
+    [32m'"Dormitory"."dor_id_24" AS "FIELD_10",\n'[39m +
+    [32m'"Dormitory"."dor_dor_93" AS "FIELD_11",\n'[39m +
+    [32m'"Dormitory"."dor_app_76" AS "FIELD_12",\n'[39m +
+    [32m'"Dormitory"."dor__77" AS "FIELD_13",\n'[39m +
+    [32m'"Dormitory"."dor__78" AS "FIELD_14",\n'[39m +
+    [32m'"Dormitory"."dor_id_79" AS "FIELD_15"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"Dormitory" AS "Dormitory"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'("Dormitory"."dor_id_24" = $1 AND "Dormitory"."dor_id_24" IS NOT NULL)\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: [ [32m'0198b66a-3fdf-75c6-8f2a-0d009996a55b'[39m ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'finding combined records for Dormitory to flash out, for updating with data {"occupancy":0,"id":"0198b66a-3fdf-75c6-8f2a-0d009996a55b"}'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"Dormitory"."dor_nam_14" AS "FIELD_0",\n'[39m +
+    [32m'"Dormitory"."dor_cap_15" AS "FIELD_1",\n'[39m +
+    [32m'"Dormitory"."dor_flo_16" AS "FIELD_2",\n'[39m +
+    [32m'"Dormitory"."dor_bui_17" AS "FIELD_3",\n'[39m +
+    [32m'"Dormitory"."dor_sta_18" AS "FIELD_4",\n'[39m +
+    [32m'"Dormitory"."dor_cre_19" AS "FIELD_5",\n'[39m +
+    [32m'"Dormitory"."dor_occ_20" AS "FIELD_6",\n'[39m +
+    [32m'"Dormitory"."dor_ava_21" AS "FIELD_7",\n'[39m +
+    [32m'"Dormitory"."dor__22" AS "FIELD_8",\n'[39m +
+    [32m'"Dormitory"."dor__23" AS "FIELD_9",\n'[39m +
+    [32m'"Dormitory"."dor_id_24" AS "FIELD_10",\n'[39m +
+    [32m'"Dormitory"."dor_dor_93" AS "FIELD_11",\n'[39m +
+    [32m'"Dormitory"."dor_app_76" AS "FIELD_12",\n'[39m +
+    [32m'"Dormitory"."dor__77" AS "FIELD_13",\n'[39m +
+    [32m'"Dormitory"."dor__78" AS "FIELD_14",\n'[39m +
+    [32m'"Dormitory"."dor_id_79" AS "FIELD_15"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"Dormitory" AS "Dormitory"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'1=$1\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: [ [33m1[39m ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'update'[39m,
+  name: [32m'update record Dormitory by id'[39m,
+  sql: [32m'\n'[39m +
+    [32m'UPDATE "Dormitory"\n'[39m +
+    [32m'SET "dor_occ_20" = $1,"dor_id_24" = $2\n'[39m +
+    [32m'WHERE "dor_id_24" = ($3)\n'[39m +
+    [32m'         RETURNING "dor_id_24" AS id'[39m,
+  params: [
+    [33m0[39m,
+    [32m'0198b66a-3fdf-75c6-8f2a-0d009996a55b'[39m,
+    [32m'0198b66a-3fdf-75c6-8f2a-0d009996a55b'[39m
+  ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'finding Dormitory from handle'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"Dormitory"."dor_id_24" AS "FIELD_0",\n'[39m +
+    [32m'"Dormitory"."dor_cap_15" AS "FIELD_1"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"Dormitory" AS "Dormitory"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'"Dormitory"."dor_id_24" IS NOT NULL\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: []
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'finding Bed from handle'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"Bed"."bed_bed_25" AS "FIELD_0",\n'[39m +
+    [32m'"Bed"."bed_sta_26" AS "FIELD_1",\n'[39m +
+    [32m'"Bed"."bed_cre_27" AS "FIELD_2",\n'[39m +
+    [32m'"Bed"."bed__28" AS "FIELD_3",\n'[39m +
+    [32m'"Bed"."bed__29" AS "FIELD_4",\n'[39m +
+    [32m'"Bed"."bed__30" AS "FIELD_5",\n'[39m +
+    [32m'"Bed"."bed_id_31" AS "FIELD_6"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"Bed" AS "Bed"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'"Bed"."bed_id_31" IS NOT NULL\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: []
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'finding Dormitory from handle'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"Dormitory"."dor_id_24" AS "FIELD_0",\n'[39m +
+    [32m'"Dormitory"."dor_cap_15" AS "FIELD_1"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"Dormitory" AS "Dormitory"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'("Dormitory"."dor_id_24" = $1 AND "Dormitory"."dor_id_24" IS NOT NULL)\n'[39m +
+    [32m'\n'[39m +
+    [32m'LIMIT 1\n'[39m,
+  params: [ [32m'0198b66a-3fdf-75c6-8f2a-0d009996a55b'[39m ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'finding combined records for Bed to flash out, for creation with data {"bedNumber":"001","dormitory":{"id":"0198b66a-3fdf-75c6-8f2a-0d009996a55b","&":{"id":"0198b66a-3fe3-77c1-8d60-75a4a108051e"}},"_Bed_bound_sourceRecordId":"0198b66a-3fdf-75c6-8f2a-0d009996a55b","_Bed_bound_transformIndex":0,"id":"0198b66a-3fe3-77c1-8d60-75a33805edbb"}'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"Bed"."bed_bed_25" AS "FIELD_0",\n'[39m +
+    [32m'"Bed"."bed_sta_26" AS "FIELD_1",\n'[39m +
+    [32m'"Bed"."bed_cre_27" AS "FIELD_2",\n'[39m +
+    [32m'"Bed"."bed__28" AS "FIELD_3",\n'[39m +
+    [32m'"Bed"."bed__29" AS "FIELD_4",\n'[39m +
+    [32m'"Bed"."bed__30" AS "FIELD_5",\n'[39m +
+    [32m'"Bed"."bed_id_31" AS "FIELD_6",\n'[39m +
+    [32m'"Bed"."bed_dor_92" AS "FIELD_7",\n'[39m +
+    [32m'"Bed"."dor_id_75" AS "FIELD_8"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"Bed" AS "Bed"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'1=$1\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: [ [33m1[39m ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'insert'[39m,
+  name: [32m'create record Bed from handle'[39m,
+  sql: [32m'\n'[39m +
+    [32m'INSERT INTO "Bed"\n'[39m +
+    [32m'("bed_bed_25","bed__28","bed__29","bed_id_31","bed_cre_27","bed__30","bed_dor_92","dor_id_75")\n'[39m +
+    [32m'VALUES\n'[39m +
+    [32m'($1,$2,$3,$4,$5,$6,$7,$8) \n'[39m,
+  params: [
+    [32m'001'[39m,
+    [32m'0198b66a-3fdf-75c6-8f2a-0d009996a55b'[39m,
+    [33m0[39m,
+    [32m'0198b66a-3fe3-77c1-8d60-75a33805edbb'[39m,
+    [32m'2025-08-17T05:04:33.251Z'[39m,
+    [32m'vacant'[39m,
+    [32m'0198b66a-3fdf-75c6-8f2a-0d009996a55b'[39m,
+    [32m'0198b66a-3fe3-77c1-8d60-75a4a108051e'[39m
+  ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'find record for updating Bed'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"Bed"."bed_bed_25" AS "FIELD_0",\n'[39m +
+    [32m'"Bed"."bed_sta_26" AS "FIELD_1",\n'[39m +
+    [32m'"Bed"."bed_cre_27" AS "FIELD_2",\n'[39m +
+    [32m'"Bed"."bed__28" AS "FIELD_3",\n'[39m +
+    [32m'"Bed"."bed__29" AS "FIELD_4",\n'[39m +
+    [32m'"Bed"."bed__30" AS "FIELD_5",\n'[39m +
+    [32m'"Bed"."bed_id_31" AS "FIELD_6",\n'[39m +
+    [32m'"Bed"."bed_dor_92" AS "FIELD_7",\n'[39m +
+    [32m'"Bed"."dor_id_75" AS "FIELD_8"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"Bed" AS "Bed"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'("Bed"."bed_id_31" = $1 AND "Bed"."bed_id_31" IS NOT NULL)\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: [ [32m'0198b66a-3fe3-77c1-8d60-75a33805edbb'[39m ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'finding combined records for Bed to flash out, for updating with data {"status":"vacant","id":"0198b66a-3fe3-77c1-8d60-75a33805edbb"}'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"Bed"."bed_bed_25" AS "FIELD_0",\n'[39m +
+    [32m'"Bed"."bed_sta_26" AS "FIELD_1",\n'[39m +
+    [32m'"Bed"."bed_cre_27" AS "FIELD_2",\n'[39m +
+    [32m'"Bed"."bed__28" AS "FIELD_3",\n'[39m +
+    [32m'"Bed"."bed__29" AS "FIELD_4",\n'[39m +
+    [32m'"Bed"."bed__30" AS "FIELD_5",\n'[39m +
+    [32m'"Bed"."bed_id_31" AS "FIELD_6",\n'[39m +
+    [32m'"Bed"."bed_dor_92" AS "FIELD_7",\n'[39m +
+    [32m'"Bed"."dor_id_75" AS "FIELD_8"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"Bed" AS "Bed"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'1=$1\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: [ [33m1[39m ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'update'[39m,
+  name: [32m'update record Bed by id'[39m,
+  sql: [32m'\n'[39m +
+    [32m'UPDATE "Bed"\n'[39m +
+    [32m'SET "bed_sta_26" = $1,"bed_id_31" = $2\n'[39m +
+    [32m'WHERE "bed_id_31" = ($3)\n'[39m +
+    [32m'         RETURNING "bed_id_31" AS id'[39m,
+  params: [
+    [32m'vacant'[39m,
+    [32m'0198b66a-3fe3-77c1-8d60-75a33805edbb'[39m,
+    [32m'0198b66a-3fe3-77c1-8d60-75a33805edbb'[39m
+  ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'finding combined records for Bed to flash out, for creation with data {"bedNumber":"002","dormitory":{"id":"0198b66a-3fdf-75c6-8f2a-0d009996a55b","&":{"id":"0198b66a-3fe5-7389-8676-949352431199"}},"_Bed_bound_sourceRecordId":"0198b66a-3fdf-75c6-8f2a-0d009996a55b","_Bed_bound_transformIndex":1,"id":"0198b66a-3fe5-7389-8676-949238e1f330"}'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"Bed"."bed_bed_25" AS "FIELD_0",\n'[39m +
+    [32m'"Bed"."bed_sta_26" AS "FIELD_1",\n'[39m +
+    [32m'"Bed"."bed_cre_27" AS "FIELD_2",\n'[39m +
+    [32m'"Bed"."bed__28" AS "FIELD_3",\n'[39m +
+    [32m'"Bed"."bed__29" AS "FIELD_4",\n'[39m +
+    [32m'"Bed"."bed__30" AS "FIELD_5",\n'[39m +
+    [32m'"Bed"."bed_id_31" AS "FIELD_6",\n'[39m +
+    [32m'"Bed"."bed_dor_92" AS "FIELD_7",\n'[39m +
+    [32m'"Bed"."dor_id_75" AS "FIELD_8"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"Bed" AS "Bed"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'1=$1\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: [ [33m1[39m ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'insert'[39m,
+  name: [32m'create record Bed from handle'[39m,
+  sql: [32m'\n'[39m +
+    [32m'INSERT INTO "Bed"\n'[39m +
+    [32m'("bed_bed_25","bed__28","bed__29","bed_id_31","bed_cre_27","bed__30","bed_dor_92","dor_id_75")\n'[39m +
+    [32m'VALUES\n'[39m +
+    [32m'($1,$2,$3,$4,$5,$6,$7,$8) \n'[39m,
+  params: [
+    [32m'002'[39m,
+    [32m'0198b66a-3fdf-75c6-8f2a-0d009996a55b'[39m,
+    [33m1[39m,
+    [32m'0198b66a-3fe5-7389-8676-949238e1f330'[39m,
+    [32m'2025-08-17T05:04:33.253Z'[39m,
+    [32m'vacant'[39m,
+    [32m'0198b66a-3fdf-75c6-8f2a-0d009996a55b'[39m,
+    [32m'0198b66a-3fe5-7389-8676-949352431199'[39m
+  ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'find record for updating Bed'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"Bed"."bed_bed_25" AS "FIELD_0",\n'[39m +
+    [32m'"Bed"."bed_sta_26" AS "FIELD_1",\n'[39m +
+    [32m'"Bed"."bed_cre_27" AS "FIELD_2",\n'[39m +
+    [32m'"Bed"."bed__28" AS "FIELD_3",\n'[39m +
+    [32m'"Bed"."bed__29" AS "FIELD_4",\n'[39m +
+    [32m'"Bed"."bed__30" AS "FIELD_5",\n'[39m +
+    [32m'"Bed"."bed_id_31" AS "FIELD_6",\n'[39m +
+    [32m'"Bed"."bed_dor_92" AS "FIELD_7",\n'[39m +
+    [32m'"Bed"."dor_id_75" AS "FIELD_8"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"Bed" AS "Bed"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'("Bed"."bed_id_31" = $1 AND "Bed"."bed_id_31" IS NOT NULL)\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: [ [32m'0198b66a-3fe5-7389-8676-949238e1f330'[39m ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'finding combined records for Bed to flash out, for updating with data {"status":"vacant","id":"0198b66a-3fe5-7389-8676-949238e1f330"}'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"Bed"."bed_bed_25" AS "FIELD_0",\n'[39m +
+    [32m'"Bed"."bed_sta_26" AS "FIELD_1",\n'[39m +
+    [32m'"Bed"."bed_cre_27" AS "FIELD_2",\n'[39m +
+    [32m'"Bed"."bed__28" AS "FIELD_3",\n'[39m +
+    [32m'"Bed"."bed__29" AS "FIELD_4",\n'[39m +
+    [32m'"Bed"."bed__30" AS "FIELD_5",\n'[39m +
+    [32m'"Bed"."bed_id_31" AS "FIELD_6",\n'[39m +
+    [32m'"Bed"."bed_dor_92" AS "FIELD_7",\n'[39m +
+    [32m'"Bed"."dor_id_75" AS "FIELD_8"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"Bed" AS "Bed"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'1=$1\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: [ [33m1[39m ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'update'[39m,
+  name: [32m'update record Bed by id'[39m,
+  sql: [32m'\n'[39m +
+    [32m'UPDATE "Bed"\n'[39m +
+    [32m'SET "bed_sta_26" = $1,"bed_id_31" = $2\n'[39m +
+    [32m'WHERE "bed_id_31" = ($3)\n'[39m +
+    [32m'         RETURNING "bed_id_31" AS id'[39m,
+  params: [
+    [32m'vacant'[39m,
+    [32m'0198b66a-3fe5-7389-8676-949238e1f330'[39m,
+    [32m'0198b66a-3fe5-7389-8676-949238e1f330'[39m
+  ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'finding combined records for Bed to flash out, for creation with data {"bedNumber":"003","dormitory":{"id":"0198b66a-3fdf-75c6-8f2a-0d009996a55b","&":{"id":"0198b66a-3fe7-7e24-a388-6f016d24bf09"}},"_Bed_bound_sourceRecordId":"0198b66a-3fdf-75c6-8f2a-0d009996a55b","_Bed_bound_transformIndex":2,"id":"0198b66a-3fe7-7e24-a388-6f00047677f9"}'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"Bed"."bed_bed_25" AS "FIELD_0",\n'[39m +
+    [32m'"Bed"."bed_sta_26" AS "FIELD_1",\n'[39m +
+    [32m'"Bed"."bed_cre_27" AS "FIELD_2",\n'[39m +
+    [32m'"Bed"."bed__28" AS "FIELD_3",\n'[39m +
+    [32m'"Bed"."bed__29" AS "FIELD_4",\n'[39m +
+    [32m'"Bed"."bed__30" AS "FIELD_5",\n'[39m +
+    [32m'"Bed"."bed_id_31" AS "FIELD_6",\n'[39m +
+    [32m'"Bed"."bed_dor_92" AS "FIELD_7",\n'[39m +
+    [32m'"Bed"."dor_id_75" AS "FIELD_8"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"Bed" AS "Bed"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'1=$1\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: [ [33m1[39m ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'insert'[39m,
+  name: [32m'create record Bed from handle'[39m,
+  sql: [32m'\n'[39m +
+    [32m'INSERT INTO "Bed"\n'[39m +
+    [32m'("bed_bed_25","bed__28","bed__29","bed_id_31","bed_cre_27","bed__30","bed_dor_92","dor_id_75")\n'[39m +
+    [32m'VALUES\n'[39m +
+    [32m'($1,$2,$3,$4,$5,$6,$7,$8) \n'[39m,
+  params: [
+    [32m'003'[39m,
+    [32m'0198b66a-3fdf-75c6-8f2a-0d009996a55b'[39m,
+    [33m2[39m,
+    [32m'0198b66a-3fe7-7e24-a388-6f00047677f9'[39m,
+    [32m'2025-08-17T05:04:33.255Z'[39m,
+    [32m'vacant'[39m,
+    [32m'0198b66a-3fdf-75c6-8f2a-0d009996a55b'[39m,
+    [32m'0198b66a-3fe7-7e24-a388-6f016d24bf09'[39m
+  ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'find record for updating Bed'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"Bed"."bed_bed_25" AS "FIELD_0",\n'[39m +
+    [32m'"Bed"."bed_sta_26" AS "FIELD_1",\n'[39m +
+    [32m'"Bed"."bed_cre_27" AS "FIELD_2",\n'[39m +
+    [32m'"Bed"."bed__28" AS "FIELD_3",\n'[39m +
+    [32m'"Bed"."bed__29" AS "FIELD_4",\n'[39m +
+    [32m'"Bed"."bed__30" AS "FIELD_5",\n'[39m +
+    [32m'"Bed"."bed_id_31" AS "FIELD_6",\n'[39m +
+    [32m'"Bed"."bed_dor_92" AS "FIELD_7",\n'[39m +
+    [32m'"Bed"."dor_id_75" AS "FIELD_8"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"Bed" AS "Bed"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'("Bed"."bed_id_31" = $1 AND "Bed"."bed_id_31" IS NOT NULL)\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: [ [32m'0198b66a-3fe7-7e24-a388-6f00047677f9'[39m ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'finding combined records for Bed to flash out, for updating with data {"status":"vacant","id":"0198b66a-3fe7-7e24-a388-6f00047677f9"}'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"Bed"."bed_bed_25" AS "FIELD_0",\n'[39m +
+    [32m'"Bed"."bed_sta_26" AS "FIELD_1",\n'[39m +
+    [32m'"Bed"."bed_cre_27" AS "FIELD_2",\n'[39m +
+    [32m'"Bed"."bed__28" AS "FIELD_3",\n'[39m +
+    [32m'"Bed"."bed__29" AS "FIELD_4",\n'[39m +
+    [32m'"Bed"."bed__30" AS "FIELD_5",\n'[39m +
+    [32m'"Bed"."bed_id_31" AS "FIELD_6",\n'[39m +
+    [32m'"Bed"."bed_dor_92" AS "FIELD_7",\n'[39m +
+    [32m'"Bed"."dor_id_75" AS "FIELD_8"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"Bed" AS "Bed"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'1=$1\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: [ [33m1[39m ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'update'[39m,
+  name: [32m'update record Bed by id'[39m,
+  sql: [32m'\n'[39m +
+    [32m'UPDATE "Bed"\n'[39m +
+    [32m'SET "bed_sta_26" = $1,"bed_id_31" = $2\n'[39m +
+    [32m'WHERE "bed_id_31" = ($3)\n'[39m +
+    [32m'         RETURNING "bed_id_31" AS id'[39m,
+  params: [
+    [32m'vacant'[39m,
+    [32m'0198b66a-3fe7-7e24-a388-6f00047677f9'[39m,
+    [32m'0198b66a-3fe7-7e24-a388-6f00047677f9'[39m
+  ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'finding combined records for Bed to flash out, for creation with data {"bedNumber":"004","dormitory":{"id":"0198b66a-3fdf-75c6-8f2a-0d009996a55b","&":{"id":"0198b66a-3fe8-771d-9417-4ec82d51507d"}},"_Bed_bound_sourceRecordId":"0198b66a-3fdf-75c6-8f2a-0d009996a55b","_Bed_bound_transformIndex":3,"id":"0198b66a-3fe8-771d-9417-4ec736712fe7"}'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"Bed"."bed_bed_25" AS "FIELD_0",\n'[39m +
+    [32m'"Bed"."bed_sta_26" AS "FIELD_1",\n'[39m +
+    [32m'"Bed"."bed_cre_27" AS "FIELD_2",\n'[39m +
+    [32m'"Bed"."bed__28" AS "FIELD_3",\n'[39m +
+    [32m'"Bed"."bed__29" AS "FIELD_4",\n'[39m +
+    [32m'"Bed"."bed__30" AS "FIELD_5",\n'[39m +
+    [32m'"Bed"."bed_id_31" AS "FIELD_6",\n'[39m +
+    [32m'"Bed"."bed_dor_92" AS "FIELD_7",\n'[39m +
+    [32m'"Bed"."dor_id_75" AS "FIELD_8"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"Bed" AS "Bed"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'1=$1\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: [ [33m1[39m ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'insert'[39m,
+  name: [32m'create record Bed from handle'[39m,
+  sql: [32m'\n'[39m +
+    [32m'INSERT INTO "Bed"\n'[39m +
+    [32m'("bed_bed_25","bed__28","bed__29","bed_id_31","bed_cre_27","bed__30","bed_dor_92","dor_id_75")\n'[39m +
+    [32m'VALUES\n'[39m +
+    [32m'($1,$2,$3,$4,$5,$6,$7,$8) \n'[39m,
+  params: [
+    [32m'004'[39m,
+    [32m'0198b66a-3fdf-75c6-8f2a-0d009996a55b'[39m,
+    [33m3[39m,
+    [32m'0198b66a-3fe8-771d-9417-4ec736712fe7'[39m,
+    [32m'2025-08-17T05:04:33.257Z'[39m,
+    [32m'vacant'[39m,
+    [32m'0198b66a-3fdf-75c6-8f2a-0d009996a55b'[39m,
+    [32m'0198b66a-3fe8-771d-9417-4ec82d51507d'[39m
+  ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'find record for updating Bed'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"Bed"."bed_bed_25" AS "FIELD_0",\n'[39m +
+    [32m'"Bed"."bed_sta_26" AS "FIELD_1",\n'[39m +
+    [32m'"Bed"."bed_cre_27" AS "FIELD_2",\n'[39m +
+    [32m'"Bed"."bed__28" AS "FIELD_3",\n'[39m +
+    [32m'"Bed"."bed__29" AS "FIELD_4",\n'[39m +
+    [32m'"Bed"."bed__30" AS "FIELD_5",\n'[39m +
+    [32m'"Bed"."bed_id_31" AS "FIELD_6",\n'[39m +
+    [32m'"Bed"."bed_dor_92" AS "FIELD_7",\n'[39m +
+    [32m'"Bed"."dor_id_75" AS "FIELD_8"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"Bed" AS "Bed"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'("Bed"."bed_id_31" = $1 AND "Bed"."bed_id_31" IS NOT NULL)\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: [ [32m'0198b66a-3fe8-771d-9417-4ec736712fe7'[39m ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'finding combined records for Bed to flash out, for updating with data {"status":"vacant","id":"0198b66a-3fe8-771d-9417-4ec736712fe7"}'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"Bed"."bed_bed_25" AS "FIELD_0",\n'[39m +
+    [32m'"Bed"."bed_sta_26" AS "FIELD_1",\n'[39m +
+    [32m'"Bed"."bed_cre_27" AS "FIELD_2",\n'[39m +
+    [32m'"Bed"."bed__28" AS "FIELD_3",\n'[39m +
+    [32m'"Bed"."bed__29" AS "FIELD_4",\n'[39m +
+    [32m'"Bed"."bed__30" AS "FIELD_5",\n'[39m +
+    [32m'"Bed"."bed_id_31" AS "FIELD_6",\n'[39m +
+    [32m'"Bed"."bed_dor_92" AS "FIELD_7",\n'[39m +
+    [32m'"Bed"."dor_id_75" AS "FIELD_8"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"Bed" AS "Bed"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'1=$1\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: [ [33m1[39m ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'update'[39m,
+  name: [32m'update record Bed by id'[39m,
+  sql: [32m'\n'[39m +
+    [32m'UPDATE "Bed"\n'[39m +
+    [32m'SET "bed_sta_26" = $1,"bed_id_31" = $2\n'[39m +
+    [32m'WHERE "bed_id_31" = ($3)\n'[39m +
+    [32m'         RETURNING "bed_id_31" AS id'[39m,
+  params: [
+    [32m'vacant'[39m,
+    [32m'0198b66a-3fe8-771d-9417-4ec736712fe7'[39m,
+    [32m'0198b66a-3fe8-771d-9417-4ec736712fe7'[39m
+  ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'finding _Interaction_ from handle'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"_Interaction_"."_int_62" AS "FIELD_0",\n'[39m +
+    [32m'"_Interaction_"."_int_58" AS "FIELD_1",\n'[39m +
+    [32m'"_Interaction_"."_int_59" AS "FIELD_2",\n'[39m +
+    [32m'"_Interaction_"."_int_60" AS "FIELD_3"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"_Interaction_" AS "_Interaction_"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'"_Interaction_"."_int_62" IS NOT NULL\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: []
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'finding PointDeduction from handle'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"PointDeduction"."poi_rea_32" AS "FIELD_0",\n'[39m +
+    [32m'"PointDeduction"."poi_poi_33" AS "FIELD_1",\n'[39m +
+    [32m'"PointDeduction"."poi_cat_34" AS "FIELD_2",\n'[39m +
+    [32m'"PointDeduction"."poi_occ_35" AS "FIELD_3",\n'[39m +
+    [32m'"PointDeduction"."poi_rec_36" AS "FIELD_4",\n'[39m +
+    [32m'"PointDeduction"."poi__37" AS "FIELD_5",\n'[39m +
+    [32m'"PointDeduction"."poi__38" AS "FIELD_6",\n'[39m +
+    [32m'"PointDeduction"."poi_id_39" AS "FIELD_7"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"PointDeduction" AS "PointDeduction"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'"PointDeduction"."poi_id_39" IS NOT NULL\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: []
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'finding _Interaction_ from handle'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"_Interaction_"."_int_62" AS "FIELD_0",\n'[39m +
+    [32m'"_Interaction_"."_int_58" AS "FIELD_1",\n'[39m +
+    [32m'"_Interaction_"."_int_59" AS "FIELD_2",\n'[39m +
+    [32m'"_Interaction_"."_int_60" AS "FIELD_3"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"_Interaction_" AS "_Interaction_"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'("_Interaction_"."_int_62" = $1 AND "_Interaction_"."_int_62" IS NOT NULL)\n'[39m +
+    [32m'\n'[39m +
+    [32m'LIMIT 1\n'[39m,
+  params: [ [32m'0198b66a-3fdd-7945-8f01-6147e670daf5'[39m ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'finding _Interaction_ from handle'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"_Interaction_"."_int_62" AS "FIELD_0",\n'[39m +
+    [32m'"_Interaction_"."_int_58" AS "FIELD_1",\n'[39m +
+    [32m'"_Interaction_"."_int_59" AS "FIELD_2",\n'[39m +
+    [32m'"_Interaction_"."_int_60" AS "FIELD_3"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"_Interaction_" AS "_Interaction_"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'"_Interaction_"."_int_62" IS NOT NULL\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: []
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'finding EvictionRequest from handle'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"EvictionRequest"."evi_rea_40" AS "FIELD_0",\n'[39m +
+    [32m'"EvictionRequest"."evi_tot_41" AS "FIELD_1",\n'[39m +
+    [32m'"EvictionRequest"."evi_sta_42" AS "FIELD_2",\n'[39m +
+    [32m'"EvictionRequest"."evi_req_43" AS "FIELD_3",\n'[39m +
+    [32m'"EvictionRequest"."evi_pro_44" AS "FIELD_4",\n'[39m +
+    [32m'"EvictionRequest"."evi_adm_45" AS "FIELD_5",\n'[39m +
+    [32m'"EvictionRequest"."evi__46" AS "FIELD_6",\n'[39m +
+    [32m'"EvictionRequest"."evi__47" AS "FIELD_7",\n'[39m +
+    [32m'"EvictionRequest"."evi__48" AS "FIELD_8",\n'[39m +
+    [32m'"EvictionRequest"."evi__49" AS "FIELD_9",\n'[39m +
+    [32m'"EvictionRequest"."evi__50" AS "FIELD_10",\n'[39m +
+    [32m'"EvictionRequest"."evi_id_51" AS "FIELD_11"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"EvictionRequest" AS "EvictionRequest"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'"EvictionRequest"."evi_id_51" IS NOT NULL\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: []
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'finding _Interaction_ from handle'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"_Interaction_"."_int_62" AS "FIELD_0",\n'[39m +
+    [32m'"_Interaction_"."_int_58" AS "FIELD_1",\n'[39m +
+    [32m'"_Interaction_"."_int_59" AS "FIELD_2",\n'[39m +
+    [32m'"_Interaction_"."_int_60" AS "FIELD_3"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"_Interaction_" AS "_Interaction_"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'("_Interaction_"."_int_62" = $1 AND "_Interaction_"."_int_62" IS NOT NULL)\n'[39m +
+    [32m'\n'[39m +
+    [32m'LIMIT 1\n'[39m,
+  params: [ [32m'0198b66a-3fdd-7945-8f01-6147e670daf5'[39m ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'finding _Interaction_ from handle'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"_Interaction_"."_int_62" AS "FIELD_0",\n'[39m +
+    [32m'"_Interaction_"."_int_58" AS "FIELD_1",\n'[39m +
+    [32m'"_Interaction_"."_int_59" AS "FIELD_2"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"_Interaction_" AS "_Interaction_"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'"_Interaction_"."_int_62" IS NOT NULL\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: []
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'finding UserDormitoryRelation from handle'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"UserDormitoryRelation"."use_ass_67" AS "FIELD_0",\n'[39m +
+    [32m'"UserDormitoryRelation"."use__68" AS "FIELD_1",\n'[39m +
+    [32m'"UserDormitoryRelation"."use__69" AS "FIELD_2",\n'[39m +
+    [32m'"UserDormitoryRelation"."use_id_70" AS "FIELD_3"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"User" AS "UserDormitoryRelation"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'"UserDormitoryRelation"."use_id_70" IS NOT NULL\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: []
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'finding _Interaction_ from handle'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"_Interaction_"."_int_62" AS "FIELD_0",\n'[39m +
+    [32m'"_Interaction_"."_int_58" AS "FIELD_1",\n'[39m +
+    [32m'"_Interaction_"."_int_59" AS "FIELD_2"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"_Interaction_" AS "_Interaction_"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'("_Interaction_"."_int_62" = $1 AND "_Interaction_"."_int_62" IS NOT NULL)\n'[39m +
+    [32m'\n'[39m +
+    [32m'LIMIT 1\n'[39m,
+  params: [ [32m'0198b66a-3fdd-7945-8f01-6147e670daf5'[39m ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'finding _Interaction_ from handle'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"_Interaction_"."_int_62" AS "FIELD_0",\n'[39m +
+    [32m'"_Interaction_"."_int_58" AS "FIELD_1",\n'[39m +
+    [32m'"_Interaction_"."_int_59" AS "FIELD_2"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"_Interaction_" AS "_Interaction_"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'"_Interaction_"."_int_62" IS NOT NULL\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: []
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'finding UserBedRelation from handle'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"UserBedRelation"."use_occ_71" AS "FIELD_0",\n'[39m +
+    [32m'"UserBedRelation"."use__72" AS "FIELD_1",\n'[39m +
+    [32m'"UserBedRelation"."use__73" AS "FIELD_2",\n'[39m +
+    [32m'"UserBedRelation"."use_id_74" AS "FIELD_3"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"User" AS "UserBedRelation"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'"UserBedRelation"."use_id_74" IS NOT NULL\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: []
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'finding _Interaction_ from handle'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"_Interaction_"."_int_62" AS "FIELD_0",\n'[39m +
+    [32m'"_Interaction_"."_int_58" AS "FIELD_1",\n'[39m +
+    [32m'"_Interaction_"."_int_59" AS "FIELD_2"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"_Interaction_" AS "_Interaction_"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'("_Interaction_"."_int_62" = $1 AND "_Interaction_"."_int_62" IS NOT NULL)\n'[39m +
+    [32m'\n'[39m +
+    [32m'LIMIT 1\n'[39m,
+  params: [ [32m'0198b66a-3fdd-7945-8f01-6147e670daf5'[39m ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'finding _Interaction_ from handle'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"_Interaction_"."_int_62" AS "FIELD_0",\n'[39m +
+    [32m'"_Interaction_"."_int_58" AS "FIELD_1",\n'[39m +
+    [32m'"_Interaction_"."_int_59" AS "FIELD_2"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"_Interaction_" AS "_Interaction_"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'"_Interaction_"."_int_62" IS NOT NULL\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: []
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'finding DormitoryDormHeadRelation from handle'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"DormitoryDormHeadRelation"."dor_app_76" AS "FIELD_0",\n'[39m +
+    [32m'"DormitoryDormHeadRelation"."dor__77" AS "FIELD_1",\n'[39m +
+    [32m'"DormitoryDormHeadRelation"."dor__78" AS "FIELD_2",\n'[39m +
+    [32m'"DormitoryDormHeadRelation"."dor_id_79" AS "FIELD_3"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"Dormitory" AS "DormitoryDormHeadRelation"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'"DormitoryDormHeadRelation"."dor_id_79" IS NOT NULL\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: []
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'finding _Interaction_ from handle'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"_Interaction_"."_int_62" AS "FIELD_0",\n'[39m +
+    [32m'"_Interaction_"."_int_58" AS "FIELD_1",\n'[39m +
+    [32m'"_Interaction_"."_int_59" AS "FIELD_2"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"_Interaction_" AS "_Interaction_"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'("_Interaction_"."_int_62" = $1 AND "_Interaction_"."_int_62" IS NOT NULL)\n'[39m +
+    [32m'\n'[39m +
+    [32m'LIMIT 1\n'[39m,
+  params: [ [32m'0198b66a-3fdd-7945-8f01-6147e670daf5'[39m ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'finding _Interaction_ from handle'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"_Interaction_"."_int_62" AS "FIELD_0",\n'[39m +
+    [32m'"_Interaction_"."_int_58" AS "FIELD_1",\n'[39m +
+    [32m'"_Interaction_"."_int_59" AS "FIELD_2",\n'[39m +
+    [32m'"_Interaction_"."_int_60" AS "FIELD_3"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"_Interaction_" AS "_Interaction_"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'"_Interaction_"."_int_62" IS NOT NULL\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: []
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'finding EvictionRequestApproverRelation from handle'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"EvictionRequestApproverRelation"."evi_app_85" AS "FIELD_0",\n'[39m +
+    [32m'"EvictionRequestApproverRelation"."evi__86" AS "FIELD_1",\n'[39m +
+    [32m'"EvictionRequestApproverRelation"."evi__87" AS "FIELD_2",\n'[39m +
+    [32m'"EvictionRequestApproverRelation"."evi_id_88" AS "FIELD_3"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"EvictionRequest" AS "EvictionRequestApproverRelation"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'"EvictionRequestApproverRelation"."evi_id_88" IS NOT NULL\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: []
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'finding _Interaction_ from handle'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"_Interaction_"."_int_62" AS "FIELD_0",\n'[39m +
+    [32m'"_Interaction_"."_int_58" AS "FIELD_1",\n'[39m +
+    [32m'"_Interaction_"."_int_59" AS "FIELD_2",\n'[39m +
+    [32m'"_Interaction_"."_int_60" AS "FIELD_3"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"_Interaction_" AS "_Interaction_"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'("_Interaction_"."_int_62" = $1 AND "_Interaction_"."_int_62" IS NOT NULL)\n'[39m +
+    [32m'\n'[39m +
+    [32m'LIMIT 1\n'[39m,
+  params: [ [32m'0198b66a-3fdd-7945-8f01-6147e670daf5'[39m ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'scheme'[39m,
+  name: [32m'CreateDormitory'[39m,
+  sql: [32m'COMMIT'[39m,
+  params: [90mundefined[39m
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'query'[39m,
+  name: [32m'finding Dormitory from handle'[39m,
+  sql: [32m'\n'[39m +
+    [32m'SELECT\n'[39m +
+    [32m'"Dormitory"."dor_id_24" AS "FIELD_0"\n'[39m +
+    [32m'FROM\n'[39m +
+    [32m'"Dormitory" AS "Dormitory"\n'[39m +
+    [32m'\n'[39m +
+    [32m'WHERE\n'[39m +
+    [32m'("Dormitory"."dor_nam_14" = $1 AND "Dormitory"."dor_id_24" IS NOT NULL)\n'[39m +
+    [32m'\n'[39m +
+    [32m'\n'[39m,
+  params: [ [32m'Another Dorm'[39m ]
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+[INFO] interaction: AssignUserToDormitory {}
+{
+  type: [32m'scheme'[39m,
+  name: [32m'AssignUserToDormitory'[39m,
+  sql: [32m'BEGIN'[39m,
+  params: [90mundefined[39m
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'scheme'[39m,
+  name: [32m'AssignUserToDormitory'[39m,
+  sql: [32m'ROLLBACK'[39m,
+  params: [90mundefined[39m
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+[INFO] interaction: AppointDormHead {}
+{
+  type: [32m'scheme'[39m,
+  name: [32m'AppointDormHead'[39m,
+  sql: [32m'BEGIN'[39m,
+  params: [90mundefined[39m
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'scheme'[39m,
+  name: [32m'AppointDormHead'[39m,
+  sql: [32m'ROLLBACK'[39m,
+  params: [90mundefined[39m
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+[INFO] interaction: AssignUserToDormitory {}
+{
+  type: [32m'scheme'[39m,
+  name: [32m'AssignUserToDormitory'[39m,
+  sql: [32m'BEGIN'[39m,
+  params: [90mundefined[39m
+}
+
+stdout | tests/basic.test.ts > Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points
+{
+  type: [32m'scheme'[39m,
+  name: [32m'AssignUserToDormitory'[39m,
+  sql: [32m'ROLLBACK'[39m,
+  params: [90mundefined[39m
+}
+
+ ❯ tests/basic.test.ts (15 tests | 1 failed | 14 skipped) 725ms
+   ↓ Basic Functionality > User.role StateMachine transitions from user to dormHead
+   ↓ Basic Functionality > User.status StateMachine transitions from active to inactive on eviction approval
+   ↓ Basic Functionality > User.points StateMachine deducts points correctly
+   ↓ Basic Functionality > PointDeduction Transform creates entities and aggregations work
+   ↓ Basic Functionality > Dormitory Transform creates entities with Beds and computed properties
+   ↓ Basic Functionality > EvictionRequest Transform and status StateMachine
+   ↓ Basic Functionality > EvictionRequest rejection flow
+   ↓ Basic Functionality > EvictionRequest.adminComment StateMachine updates correctly
+   ↓ Basic Functionality > Bed.status StateMachine transitions
+   ↓ Basic Functionality > DormitoryDormHeadRelation creation via AppointDormHead
+   ↓ Basic Functionality > EvictionRequestApproverRelation Transform creates relations
+   ↓ Basic Functionality > Dormitory.occupancy Count computation updates correctly
+   ↓ Permission and Business Rules > CreateDormitory - only admin can create dormitories
+   ↓ Permission and Business Rules > AssignUserToDormitory - only admin can assign users
+   × Permission and Business Rules > RecordPointDeduction - admin and dormHead can deduct points 725ms
+     → we only support Exist function match on entity for now. yours: source = [object Object]
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 14 skipped (15)
+   Start at  13:04:31
+   Duration  1.42s (transform 311ms, setup 0ms, collect 476ms, tests 725ms, environment 0ms, prepare 36ms)
+

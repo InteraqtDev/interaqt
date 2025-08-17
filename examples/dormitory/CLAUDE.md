@@ -655,8 +655,11 @@ This section follows a **test-driven progressive approach** where each computati
    ```
 
 4. **Run Test**
-   - [ ] Run `npm run test tests/basic.test.ts` to test only this file
-   - [ ] Fix any test failures
+   - [ ] **🔴 CRITICAL: Run FULL test suite every time** to ensure no regression: `npm run test tests/basic.test.ts`
+     - This runs ALL tests in the file, not just the new one
+     - Ensures new computation doesn't break any existing functionality
+     - If ANY test fails (new or existing), must fix before proceeding
+   - [ ] Fix any test failures (both new tests and any regressions)
    - [ ] **🔴 CRITICAL: NEVER cheat to pass tests!**
      - ❌ Do NOT mark tests as `.skip()` or `.todo()`
      - ❌ Do NOT fake/mock data just to make tests pass
@@ -664,7 +667,7 @@ This section follows a **test-driven progressive approach** where each computati
      - ✅ Actually fix the implementation until tests genuinely pass
    - [ ] If test still fails after 10 fix attempts, STOP and wait for user guidance
    - [ ] **MUST record all encountered errors** in `docs/errors/` directory with descriptive filenames (e.g., `computation-user-status-error.md`)
-   - [ ] Do NOT proceed to next computation until current test passes
+   - [ ] Do NOT proceed to next computation until ALL tests pass (both new and existing)
 
 5. **Document Progress**
    - [ ] **MUST** update the completed computation status in `docs/computation-implemention-plan.json` (mark as `"completed": true`)
