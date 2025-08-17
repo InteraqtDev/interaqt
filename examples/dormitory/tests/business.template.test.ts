@@ -26,4 +26,8 @@ describe('Complete Functional Tests', () => {
 
     await controller.setup(true)
   })
+
+  test('basic test placeholder', async () => {
+    expect(true).toBe(true)
+  })
 }) 

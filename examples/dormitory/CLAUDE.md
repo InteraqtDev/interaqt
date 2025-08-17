@@ -1107,8 +1107,6 @@ This phase ensures your implementation meets all business requirements through c
 ```
 - [ ] Review ALL test cases in `requirements/test-cases.md`
 - [ ] Create `docs/test-implementation-plan.md` with checklist of all test cases
-- [ ] Group test cases by dependencies and complexity
-- [ ] Identify any test data or setup requirements
 
 
 **✅ END Task 4.1: Update `docs/STATUS.json`:**
@@ -1119,7 +1117,7 @@ This phase ensures your implementation meets all business requirements through c
 }
 ```
 
-### Task 4.2: Progressive Test Implementation
+### Task 4.2: Progressive Test Implementation Loop
 
 **🔄 Update `docs/STATUS.json`:**
 ```json
@@ -1129,133 +1127,129 @@ This phase ensures your implementation meets all business requirements through c
 }
 ```
 
-**📖 LOOP START: Read `docs/STATUS.json` to see which test cases are completed and what's next.**
+**🔴 CRITICAL: Use Progressive Implementation with Immediate Testing**
+
+This task follows a **test-driven progressive approach** where each test case from `requirements/test-cases.md` is implemented and verified individually before moving to the next one.
+
+
+**📖 MUST READ FIRST:**
+- `./agentspace/knowledge/generator/test-implementation.md`
+- `./agentspace/knowledge/generator/permission-test-implementation.md`
+- `./agentspace/knowledge/generator/permission-implementation.md`
+- `docs/test-implementation-plan.md`
 
 **For EACH test case in `requirements/test-cases.md`, follow this cycle:**
 
-#### Task 4.2.1: Implement Test Case
+1. **Implement the Test Case**
+   - [ ] Write the test case exactly as specified in requirements
+   - [ ] Include all preconditions, inputs, and expected results
+   - [ ] Use descriptive test names that match the requirement ID (e.g., "TC001: Create Article")
+   - [ ] Add the test in `tests/business.test.ts` in the appropriate describe group
+   - [ ] **Example structure:**
+     ```typescript
+     test('TC001: Create Article (via CreateArticle Interaction)', async () => {
+       // Preconditions
+       const user = await system.storage.create('User', {
+         name: 'Jane',
+         email: 'jane@example.com',
+         role: 'publisher'
+       })
+       
+       // Execute interaction
+       const result = await controller.callInteraction('CreateArticle', {
+         user,
+         payload: { 
+           title: 'Tech Sharing', 
+           content: 'Content...', 
+           tags: ['frontend', 'React'] 
+         }
+       })
+       
+       // Verify ALL expected results from requirements
+       expect(result.error).toBeUndefined()
+       expect(result.data).toBeDefined()
+       
+       // Check created article properties
+       const article = await system.storage.findOne(
+         'Article',
+         MatchExp.atom({ key: 'id', value: ['=', result.data.id] }),
+         undefined,
+         ['id', 'title', 'content', 'status', 'createdAt', 'tags']
+       )
+       expect(article.title).toBe('Tech Sharing')
+       expect(article.status).toBe('draft')
+       expect(article.createdAt).toBeDefined()
+       
+       // Post validation - check user's article count
+       const userWithCount = await system.storage.findOne(
+         'User',
+         MatchExp.atom({ key: 'id', value: ['=', user.id] }),
+         undefined,
+         ['id', 'articleCount']
+       )
+       expect(userWithCount.articleCount).toBe(1)
+     })
+     ```
 
-**🔄 Update `docs/STATUS.json`:**
-```json
-{
-  "currentTask": "Task 4.2.1",
-  "completed": false
-}
-```
-- [ ] Write the test case exactly as specified in requirements
-- [ ] Include all preconditions, inputs, and expected results
-- [ ] Use descriptive test names that match the requirement ID (e.g., "TC001: Create Article")
-- [ ] Example structure:
-  ```typescript
-  test('TC001: Create Article (via CreateArticle Interaction)', async () => {
-    // Preconditions
-    const user = await controller.storage.create('User', {name:'Jane'})
-    
-    // Execute
-    const result = await controller.callInteraction('CreateArticle', {
-      user,
-      payload: { 
-        title: 'Tech Sharing', 
-        content: 'Content...', 
-        tags: ['frontend', 'React'] 
-      }
-    })
-    
-    // Verify ALL expected results
-    expect(result.error).toBeUndefined()
-    expect(result.data.status).toBe('draft')
-    expect(result.data.createdAt).toBeDefined()
-    
-    // Post validation
-    const userArticles = await getUserArticles(user.id)
-    expect(userArticles).toContainEqual(result.data)
-  })
-  ```
+2. **Type Check**
+   - [ ] Run `npm run check` to ensure TypeScript compilation passes
+   - [ ] Fix ALL type errors before proceeding
+   - [ ] Do NOT run tests until type checking passes
 
-**✅ END Task 4.2.1: Update `docs/STATUS.json`:**
-```json
-{
-  "currentTask": "Task 4.2.1",
-  "completed": true
-}
-```
+3. **Run the Test**
+   - [ ] Run the specific test first: `npm run test tests/business.test.ts -t "TC001"`
+   - [ ] If test passes, proceed to step 4
+   - [ ] If test fails, analyze the failure:
+     - Is it an implementation issue? Fix in backend code
+     - Is it a test setup issue? Fix test preconditions
+     - Is it a missing feature? Implement it in backend
+     - Is it a requirement misunderstanding? Clarify and document
+   - [ ] **🔴 CRITICAL: NEVER cheat to pass tests!**
+     - ❌ Do NOT mark tests as `.skip()` or `.todo()`
+     - ❌ Do NOT fake/mock data just to make tests pass
+     - ❌ Do NOT remove or ignore critical assertions
+     - ❌ Do NOT modify the test expectations to match wrong behavior
+     - ✅ Actually fix the implementation until tests genuinely pass
+   - [ ] If test still fails after 10 fix attempts, STOP and wait for user guidance
+   - [ ] **MUST record all encountered errors** in `docs/errors/` directory with descriptive filenames (e.g., `tc001-create-article-error.md`)
 
-#### Task 4.2.2: Run and Fix
+4. **Verify No Regression**
+   - [ ] **🔴 CRITICAL: Run ALL tests every time** to ensure no regression:
+     ```bash
+     npm run test tests/basic.test.ts    # Run all basic tests
+     npm run test tests/business.test.ts  # Run all business tests so far
+     ```
+   - [ ] This ensures the new test doesn't break existing functionality
+   - [ ] If ANY test fails (new or existing), must fix before proceeding
+   - [ ] If regression occurs, find a solution that satisfies both requirements
+   - [ ] Do NOT proceed to next test case until ALL tests pass
 
-**🔄 Update `docs/STATUS.json`:**
-```json
-{
-  "currentTask": "Task 4.2.2",
-  "completed": false
-}
-```
-- [ ] Run the specific test: `npm run test tests/complete.test.ts -t "TC001"`
-- [ ] If test fails, analyze the failure:
-  - Is it an implementation issue? Fix in backend code
-  - Is it a test setup issue? Fix test preconditions
-  - Is it a requirement misunderstanding? Clarify and document
-- [ ] **🔴 CRITICAL: NEVER cheat to pass tests!**
-  - ❌ Do NOT mark tests as `.skip()` or `.todo()`
-  - ❌ Do NOT fake/mock data just to make tests pass
-  - ❌ Do NOT remove or ignore critical assertions
-  - ❌ Do NOT modify the test to make it pass - fix the implementation
-  - ✅ Actually fix the implementation until tests genuinely pass
-- [ ] If test still fails after 10 fix attempts, STOP and wait for user guidance
-- [ ] Document any fixes in `docs/errors/test-failures.md`
+5. **Document Progress**
+   - [ ] **MUST** update the completed test case status in `docs/test-implementation-plan.md`
+   - [ ] Mark the test case as `"completed": true` with current timestamp
+   - [ ] Add any implementation notes or issues encountered
+   - [ ] Update running statistics (e.g., "15 of 30 test cases completed")
+   - [ ] Create new documents in `docs/errors/` to record any errors encountered
+   - [ ] Commit changes with clear message: "Implement TC001: Create Article - All tests passing"
 
-**✅ END Task 4.2.2: Update `docs/STATUS.json`:**
-```json
-{
-  "currentTask": "Task 4.2.2",
-  "completed": true
-}
-```
+**🛑 STOP GATE: DO NOT proceed to the next test case until:**
+- [ ] Current test case passes completely
+- [ ] ALL existing tests still pass (no regression)
+- [ ] Progress is documented in `docs/test-implementation-plan.md`
+- [ ] Any errors are documented in `docs/errors/`
 
-#### Task 4.2.3: Verify No Regression
-
-**🔄 Update `docs/STATUS.json`:**
-```json
-{
-  "currentTask": "Task 4.2.3",
-  "completed": false
-}
-```
-- [ ] After fixing, run ALL previous tests: `npm run test`
-- [ ] Ensure no existing tests are broken by your fix
-- [ ] If regression occurs, find a solution that satisfies both requirements
-
-**✅ END Task 4.2.3: Update `docs/STATUS.json`:**
-```json
-{
-  "currentTask": "Task 4.2.3",
-  "completed": true
-}
-```
-
-#### Task 4.2.4: Update Progress
-
-**🔄 Update `docs/STATUS.json`:**
-```json
-{
-  "currentTask": "Task 4.2.4",
-  "completed": false
-}
-```
-- [ ] Check off completed test case in `docs/test-implementation-plan.md`
-- [ ] Update test count in your progress tracking
-- [ ] Commit your changes with clear message: "Implement TC001: Create Article"
-- [ ] **Update `docs/STATUS.json`** with:
-  - Current test case completed
-  - Next test case to implement
-  - Running total of tests passed
-  - Any issues or blockers encountered
-
+**🔁 REPEAT: Continue this loop for EVERY test case in `requirements/test-cases.md` until all are complete.**
 
 **✅ END Task 4.2: Update `docs/STATUS.json`:**
 ```json
 {
   "currentTask": "Task 4.2",
-  "completed": true
+  "completed": true,
+  "completedItems": [
+    "All test cases from requirements/test-cases.md implemented",
+    "Each test case verified individually with no regression",
+    "Complete test coverage achieved"
+  ]
 }
 ```
 

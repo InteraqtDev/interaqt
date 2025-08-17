@@ -64,7 +64,8 @@ interface ComputationNode {
   relationName?: string;
   dictionaryName?: string;
   computationType: string;
-  dependencies: string[];
+  dependencies: string[];  // 原始的直接计算依赖
+  expandedDependencies: string[];  // 展开后的所有依赖（包括实体创建依赖）
   interactionDependencies?: string[];
   reasoning?: string;
   calculationMethod?: string;
@@ -149,32 +150,91 @@ function buildComputationGraph(analysis: ComputationAnalysis): { nodes: Computat
   const nodes: ComputationNode[] = [];
   const edges: { from: string; to: string }[] = [];
   
-  // 处理实体级别的计算
+  // Step 1: 创建所有实体节点（无论有没有 computation，只要有 dependencies 或有 property 依赖它）
   for (const entity of analysis.entities) {
-    if (entity.entityComputationDecision && entity.entityComputationDecision.type !== 'None') {
+    const hasDependencies = (entity.entityComputationDecision?.dependencies?.length ?? 0) > 0 ||
+                           (entity.entityComputationDecision?.interactionDependencies?.length ?? 0) > 0;
+    const hasComputation = entity.entityComputationDecision?.type !== 'None';
+    const hasComputedProperties = entity.propertyAnalysis.some(p => 
+      p.computationDecision && p.computationDecision !== 'None'
+    );
+    
+    // 如果实体有依赖、有计算、或有需要计算的属性，就创建节点
+    if (hasDependencies || hasComputation || hasComputedProperties) {
       const nodeId = createComputationId('entity', entity.name);
-      const deps = entity.entityComputationDecision.dependencies || [];
+      const deps = entity.entityComputationDecision?.dependencies || [];
       const parsedDeps = deps.map(parseDependency);
       
       nodes.push({
         id: nodeId,
         type: 'entity',
         entityName: entity.name,
-        computationType: entity.entityComputationDecision.type,
-        dependencies: parsedDeps,
-        interactionDependencies: entity.entityComputationDecision.interactionDependencies,
-        reasoning: entity.entityComputationDecision.reasoning,
-        calculationMethod: entity.entityComputationDecision.calculationMethod,
+        computationType: entity.entityComputationDecision?.type || 'Creation',
+        dependencies: parsedDeps,  // 保持原始依赖
+        expandedDependencies: parsedDeps,  // 实体节点的展开依赖与原始依赖相同
+        interactionDependencies: entity.entityComputationDecision?.interactionDependencies,
+        reasoning: entity.entityComputationDecision?.reasoning || 'Entity creation/setup',
+        calculationMethod: entity.entityComputationDecision?.calculationMethod || 'Entity must exist before its properties',
         completed: false
       });
     }
+  }
+  
+  // Step 2: 创建所有关系节点（同样的逻辑）
+  for (const relation of analysis.relations) {
+    const hasDependencies = (relation.relationAnalysis?.dependencies?.length ?? 0) > 0 ||
+                           (relation.relationAnalysis?.interactionDependencies?.length ?? 0) > 0;
+    const hasComputation = relation.relationAnalysis?.computationDecision !== 'None';
     
-    // 处理属性级别的计算
+    // 如果关系有依赖或有计算，就创建节点
+    if (hasDependencies || hasComputation) {
+      const nodeId = createComputationId('relation', undefined, undefined, relation.name);
+      const deps = relation.relationAnalysis?.dependencies || [];
+      const parsedDeps = deps.map(parseDependency);
+      
+      nodes.push({
+        id: nodeId,
+        type: 'relation',
+        relationName: relation.name,
+        computationType: relation.relationAnalysis?.computationDecision || 'Creation',
+        dependencies: parsedDeps,  // 保持原始依赖
+        expandedDependencies: parsedDeps,  // 关系节点的展开依赖与原始依赖相同
+        interactionDependencies: relation.relationAnalysis?.interactionDependencies,
+        reasoning: relation.relationAnalysis?.reasoning || 'Relation creation/setup',
+        calculationMethod: relation.relationAnalysis?.calculationMethod || 'Relation must exist',
+        completed: false
+      });
+    }
+  }
+  
+  // Step 3: 创建所有属性计算节点
+  for (const entity of analysis.entities) {
     for (const prop of entity.propertyAnalysis) {
       if (prop.computationDecision && prop.computationDecision !== 'None') {
         const nodeId = createComputationId('property', entity.name, prop.propertyName);
         const deps = prop.dependencies || [];
         const parsedDeps = deps.map(parseDependency);
+        
+        // 构建展开的依赖
+        const expandedDeps = [];
+        
+        // 1. 属性必须依赖于其所在的实体
+        expandedDeps.push(entity.name);
+        
+        // 2. 添加原始依赖
+        for (const dep of parsedDeps) {
+          if (!expandedDeps.includes(dep)) {
+            expandedDeps.push(dep);
+          }
+          
+          // 3. 如果依赖 Entity.property，也要依赖 Entity
+          if (dep.includes('.')) {
+            const entityOrRelationName = dep.split('.')[0];
+            if (!expandedDeps.includes(entityOrRelationName)) {
+              expandedDeps.push(entityOrRelationName);
+            }
+          }
+        }
         
         nodes.push({
           id: nodeId,
@@ -182,7 +242,8 @@ function buildComputationGraph(analysis: ComputationAnalysis): { nodes: Computat
           entityName: entity.name,
           propertyName: prop.propertyName,
           computationType: prop.computationDecision,
-          dependencies: parsedDeps,
+          dependencies: parsedDeps,  // 保持原始的计算依赖
+          expandedDependencies: expandedDeps,  // 展开的所有依赖
           interactionDependencies: prop.interactionDependencies,
           reasoning: prop.reasoning,
           calculationMethod: prop.calculationMethod,
@@ -192,40 +253,34 @@ function buildComputationGraph(analysis: ComputationAnalysis): { nodes: Computat
     }
   }
   
-  // 处理关系级别的计算
-  for (const relation of analysis.relations) {
-    if (relation.relationAnalysis.computationDecision && relation.relationAnalysis.computationDecision !== 'None') {
-      const nodeId = createComputationId('relation', undefined, undefined, relation.name);
-      const deps = relation.relationAnalysis.dependencies || [];
-      const parsedDeps = deps.map(parseDependency);
-      
-      nodes.push({
-        id: nodeId,
-        type: 'relation',
-        relationName: relation.name,
-        computationType: relation.relationAnalysis.computationDecision,
-        dependencies: parsedDeps,
-        interactionDependencies: relation.relationAnalysis.interactionDependencies,
-        reasoning: relation.relationAnalysis.reasoning,
-        calculationMethod: relation.relationAnalysis.calculationMethod,
-        completed: false
-      });
-    }
-  }
-  
-  // 处理字典级别的计算
+  // Step 4: 处理字典级别的计算
   for (const dict of analysis.dictionaries) {
     if (dict.computation && dict.computation.type !== 'None') {
       const nodeId = createComputationId('dictionary', undefined, undefined, undefined, dict.name);
       const deps = dict.computation.dependencies || [];
       const parsedDeps = deps.map(parseDependency);
       
+      // 构建展开的依赖
+      const expandedDeps = [];
+      for (const dep of parsedDeps) {
+        expandedDeps.push(dep);
+        
+        // 如果依赖 Entity.property，也要依赖 Entity
+        if (dep.includes('.')) {
+          const entityOrRelationName = dep.split('.')[0];
+          if (!expandedDeps.includes(entityOrRelationName)) {
+            expandedDeps.push(entityOrRelationName);
+          }
+        }
+      }
+      
       nodes.push({
         id: nodeId,
         type: 'dictionary',
         dictionaryName: dict.name,
         computationType: dict.computation.type,
-        dependencies: parsedDeps,
+        dependencies: parsedDeps,  // 保持原始的计算依赖
+        expandedDependencies: expandedDeps,  // 展开的所有依赖
         interactionDependencies: dict.computation.interactionDependencies,
         reasoning: '',
         calculationMethod: '',
@@ -234,9 +289,9 @@ function buildComputationGraph(analysis: ComputationAnalysis): { nodes: Computat
     }
   }
   
-  // 在所有节点创建完成后，处理边
+  // Step 5: 构建边（依赖关系）- 使用 expandedDependencies 构建完整的依赖图
   for (const node of nodes) {
-    for (const dep of node.dependencies) {
+    for (const dep of node.expandedDependencies) {
       // 检查是否是交互或系统依赖
       const isInteractionOrSystem = isInteractionDependency(dep) || isSystemDependency(dep);
       
@@ -244,9 +299,10 @@ function buildComputationGraph(analysis: ComputationAnalysis): { nodes: Computat
         // 尝试找到依赖对应的节点ID
         const fromNodeId = findNodeIdByDependency(dep, nodes);
         if (fromNodeId) {
-          edges.push({ from: fromNodeId, to: node.id });
-        } else {
-          // 依赖不是计算节点（例如普通属性或没有计算的关系）
+          // 避免重复边
+          if (!edges.some(e => e.from === fromNodeId && e.to === node.id)) {
+            edges.push({ from: fromNodeId, to: node.id });
+          }
         }
       }
     }
@@ -299,13 +355,25 @@ function topologicalSort(nodes: ComputationNode[], edges: { from: string; to: st
       const remaining = nodes.filter(n => !visited.has(n.id));
       console.log('\nNote: Some computations depend on non-computed properties/relations:');
       for (const node of remaining) {
-        const missingDeps = node.dependencies.filter(d => 
+        // 检查展开依赖中缺失的节点
+        const missingExpandedDeps = node.expandedDependencies.filter(d => 
           !isInteractionDependency(d) && 
           !isSystemDependency(d) && 
           !nodes.some(n => n.id === d)
         );
-        if (missingDeps.length > 0) {
-          console.log(`  - ${node.id} depends on: ${missingDeps.join(', ')}`);
+        
+        // 但显示原始依赖，这样更清晰
+        const missingOriginalDeps = node.dependencies.filter(d => 
+          !isInteractionDependency(d) && 
+          !isSystemDependency(d) && 
+          !nodes.some(n => n.id === d)
+        );
+        
+        if (missingExpandedDeps.length > 0) {
+          console.log(`  - ${node.id} has missing dependencies in graph: ${missingExpandedDeps.join(', ')}`);
+          if (missingOriginalDeps.length > 0) {
+            console.log(`    (original computation dependencies: ${missingOriginalDeps.join(', ')})`);
+          }
         }
       }
       currentLevel.push(...remaining);
