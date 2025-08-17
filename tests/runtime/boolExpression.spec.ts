@@ -18,7 +18,7 @@ describe('bool expression', () => {
         expect(evaluator.evaluate(handle)).toBe(true)
 
         const evaluator2 = parse<AtomType>(`trueA && falseB`)
-        const result = evaluator2.evaluate(handle) as EvaluateError
+        const result = evaluator2.evaluate(handle)
 
 
         expect(result).not.toBe(true)
@@ -36,7 +36,7 @@ describe('bool expression', () => {
         expect(evaluator2.evaluate(handle)).toBe(true)
 
         const evaluator3 = parse<AtomType>(`falseA || falseB`)
-        const result = evaluator3.evaluate(handle) as EvaluateError
+        const result = evaluator3.evaluate(handle)
 
         expect(result).not.toBe(true)
         expect((result as any).data.key).toBe('falseB')
@@ -53,7 +53,7 @@ describe('bool expression', () => {
         expect(evaluator2.evaluate(handle)).toBe(true)
 
         const evaluator3 = parse<AtomType>(`trueA  && (falseA || falseB)`)
-        const result = evaluator3.evaluate(handle) as EvaluateError
+        const result = evaluator3.evaluate(handle)
         expect(result).not.toBe(true)
         expect((result as any).data.key).toBe('falseB')
         expect((result as any).stack.length).toBe(2)
@@ -69,7 +69,7 @@ describe('bool expression', () => {
         expect(evaluator2.evaluate(handle)).toBe(true)
 
         const evaluator3 = parse<AtomType>(`trueA  && (falseA || falseB)`)
-        const result = evaluator3.evaluate(handle) as EvaluateError
+        const result = evaluator3.evaluate(handle)
         expect(result).not.toBe(true)
         expect((result as any).data.key).toBe('falseB')
         expect((result as any).stack.length).toBe(2)
@@ -81,7 +81,7 @@ describe('bool expression', () => {
         expect(evaluator.evaluate(handle)).toBe(true)
 
         const evaluator2 = parse<AtomType>(`!trueA`)
-        const result = evaluator2.evaluate(handle) as EvaluateError
+        const result = evaluator2.evaluate(handle)
         expect(result).not.toBe(true)
         expect((result as any).data.key).toBe('trueA')
         expect((result as any).inverse).toBe(true)

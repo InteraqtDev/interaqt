@@ -108,7 +108,7 @@ export interface QueryItemInstance extends IInstance {
 
 export interface QueryItemCreateArgs {
   name: string;
-  value: string;
+  value: any;
 }
 
 export class QueryItem implements QueryItemInstance {

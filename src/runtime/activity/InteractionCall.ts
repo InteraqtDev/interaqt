@@ -1,5 +1,5 @@
 import {
-    AttributiveInstance, ConditionInstance, DataAttributiveInstance, EntityInstance,
+    AttributiveInstance, ConditionInstance, EntityInstance,
     Attributive,
     Attributives,
     BoolExp,
@@ -13,17 +13,16 @@ import {
     ExpressionData,
     GetAction,
     InteractionInstanceType,
-    DataAttributives,
     EvaluateError
 } from "@shared";
-import { MatchExp } from "@storage";
+import { MatchAtom, MatchExp, MatchExpressionData } from "@storage";
 import { RecordMutationEvent, System } from "../System.js";
 import { assert, everyWithErrorAsync, someAsync } from "../util.js";
 import { ActivityCall } from "./ActivityCall.js";
 import { Controller, InteractionContext } from "../Controller.js";
 
 export type EventQuery = {
-    match?: BoolExp<EntityInstance>,
+    match?: MatchExpressionData,
     modifier?: Record<string, unknown>,
     attributeQuery?: string[],
 }
@@ -447,22 +446,6 @@ export class InteractionCall {
         return await this.controller.activityManager.saveEvent(interactionEvent, effects)
     }
     async retrieveData(interactionEvent: InteractionEventArgs) {
-        const matchFn = this.interaction.dataAttributives ?
-            (DataAttributives.is(this.interaction.dataAttributives) ?
-                BoolExp.fromValue<DataAttributiveInstance>(
-                    this.interaction.dataAttributives!.content! as ExpressionData<DataAttributiveInstance>
-                ) :
-                BoolExp.atom<DataAttributiveInstance>(
-                    this.interaction.dataAttributives as DataAttributiveInstance
-                )
-            ) :
-            undefined
-
-        const match = matchFn?.map((dataAttributiveAtom) => {
-            const { content: createMatch } = dataAttributiveAtom.toValue().data
-            return createMatch.call(this.controller, interactionEvent)
-        })
-
         let data: any
         if (Entity.is(this.interaction.data) || Relation.is(this.interaction.data)) {
             const recordName = (this.interaction.data as EntityInstance).name!
@@ -471,9 +454,7 @@ export class InteractionCall {
             const modifier = {...(interactionEvent.query?.modifier||{}), ...(fixedModifier||{})}
             // TODO 怎么判断 attributeQuery 是在 fixed 的q范围里面？？？？
             const attributeQuery = interactionEvent.query?.attributeQuery || []
-            const matchInQuery = interactionEvent.query?.match ? BoolExp.fromValue(interactionEvent.query?.match as ExpressionData<EntityInstance>) : undefined
-            const finalMatch = (matchInQuery && match) ? match.and(matchInQuery) : (match || matchInQuery)
-            data = await this.system.storage.find(recordName, finalMatch, modifier, attributeQuery)
+            data = await this.system.storage.find(recordName, interactionEvent.query?.match, modifier, attributeQuery)
         // } else if (Computation.is(this.interaction.data)){
         //     const { content: computation } = this.interaction.data as KlassInstance<typeof Computation>
         //     data= await computation.call(this.controller, match, interactionEvent.query, interactionEvent )

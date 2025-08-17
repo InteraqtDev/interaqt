@@ -260,7 +260,7 @@ describe("Computation System - createClass functionality", () => {
         callback: (user: any) => user.active === true
       });
 
-      expect(count.record.name).toBe("User");
+      expect(count.record?.name).toBe("User");
       expect(count.callback).toBeDefined();
     });
 
@@ -275,7 +275,7 @@ describe("Computation System - createClass functionality", () => {
       
       expect(cloned).not.toBe(original);
       expect(cloned.record).not.toBe(original.record); // Deep clone
-      expect(cloned.record.name).toBe(original.record.name);
+      expect(cloned.record?.name).toBe(original.record?.name);
     });
   });
 }); 

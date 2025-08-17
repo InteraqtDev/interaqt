@@ -4,7 +4,6 @@ import {
     BoolExp,
     boolExpToAttributives,
     createUserRoleAttributive,
-    DataAttributive,
     Entity,
     GetAction,
     Interaction,
@@ -20,7 +19,9 @@ import {
     Controller, 
     InteractionEventArgs, 
     InteractionEventEntity,
-    Count
+    Count,
+    Query,
+    QueryItem
 } from 'interaqt';
 
 export const globalUserRole = createUserRoleAttributive({})
@@ -252,32 +253,20 @@ UserEntity.properties.push(
     })
 )
 
-const MineDataAttr = DataAttributive.create({
-    name: 'MyData',
-    content: (event: any) => {
-        return {
-            key: 'reviewer.id',
-            value: ['=', event.user.id]
-        }
-    }
-})
-
-const PendingDataAttr = DataAttributive.create({
-    name: 'PendingData',
-    content: (event: any) => {
-        return {
-            key: 'result',
-            value: ['=', 'pending']
-        }
-    }
-})
-
 // 查看 我的、未处理的 request
+// 现在过滤逻辑移到调用时通过 query.match 传入
 const getMyPendingRequests = Interaction.create({
     name: 'getMyPendingRequests',
     action: GetAction,
-    dataAttributives: boolExpToAttributives(BoolExp.atom(MineDataAttr).and(PendingDataAttr)),
     data: RequestEntity,
+    query: Query.create({
+        items: [
+            QueryItem.create({
+                name: 'attributeQuery',
+                value: ['id', 'reason', 'result', 'reviewer']
+            })
+        ]
+    })
 })
 
 export const entities = [UserEntity, RequestEntity]

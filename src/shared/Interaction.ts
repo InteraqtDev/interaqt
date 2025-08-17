@@ -5,8 +5,6 @@ import { ConditionsInstance } from './Conditions.js';
 import { AttributiveInstance, AttributivesInstance } from './Attributive.js';
 import { PayloadInstance } from './Payload.js';
 import { SideEffectInstance } from './SideEffect.js';
-import { DataAttributiveInstance } from './Data.js';
-import { DataAttributivesInstance } from './DataAttributives.js';
 import { EntityInstance } from './Entity.js';
 import { RelationInstance } from './Relation.js';
 import { QueryInstance } from './Data.js';
@@ -19,7 +17,6 @@ export interface InteractionInstance extends IInstance {
   action: ActionInstance;
   payload?: PayloadInstance;
   sideEffects?: SideEffectInstance[];
-  dataAttributives?: DataAttributiveInstance | DataAttributivesInstance;
   data?: EntityInstance | RelationInstance;
   query?: QueryInstance;
 }
@@ -32,7 +29,6 @@ export interface InteractionCreateArgs {
   action: ActionInstance;
   payload?: PayloadInstance;
   sideEffects?: SideEffectInstance[];
-  dataAttributives?: DataAttributiveInstance | DataAttributivesInstance;
   data?: EntityInstance | RelationInstance;
   query?: QueryInstance;
 }
@@ -48,7 +44,6 @@ export class Interaction implements InteractionInstance {
   public action: ActionInstance;
   public payload?: PayloadInstance;
   public sideEffects: SideEffectInstance[];
-  public dataAttributives?: DataAttributiveInstance | DataAttributivesInstance;
   public data?: EntityInstance | RelationInstance;
   public query?: QueryInstance;
   
@@ -62,7 +57,6 @@ export class Interaction implements InteractionInstance {
     this.action = args.action;
     this.payload = args.payload;
     this.sideEffects = args.sideEffects || [];
-    this.dataAttributives = args.dataAttributives;
     this.data = args.data;
     this.query = args.query;
   }
@@ -106,11 +100,6 @@ export class Interaction implements InteractionInstance {
       collection: true as const,
       defaultValue: () => []
     },
-    dataAttributives: {
-      type: ['DataAttributive', 'DataAttributives'] as const,
-      required: false as const,
-      collection: false as const,
-    },
     data: {
       type: ['Entity', 'Relation'] as const,
       required: false as const,
@@ -146,7 +135,7 @@ export class Interaction implements InteractionInstance {
     if (instance.userRef !== undefined) args.userRef = instance.userRef;
     if (instance.payload !== undefined) args.payload = instance.payload;
     if (instance.sideEffects && instance.sideEffects.length > 0) args.sideEffects = instance.sideEffects;
-    if (instance.dataAttributives !== undefined) args.dataAttributives = instance.dataAttributives;
+
     if (instance.data !== undefined) args.data = instance.data;
     if (instance.query !== undefined) args.query = instance.query;
     
@@ -169,7 +158,7 @@ export class Interaction implements InteractionInstance {
     if (instance.userRef !== undefined) args.userRef = instance.userRef;
     if (instance.payload !== undefined) args.payload = instance.payload;
     if (instance.sideEffects && instance.sideEffects.length > 0) args.sideEffects = instance.sideEffects;
-    if (instance.dataAttributives !== undefined) args.dataAttributives = instance.dataAttributives;
+
     if (instance.data !== undefined) args.data = instance.data;
     if (instance.query !== undefined) args.query = instance.query;
     
