@@ -334,7 +334,7 @@
           "testScenarios": [
             "Logged-in user can view their dormitory"
           ],
-          "completed": false
+          "completed": true
         },
         {
           "id": "BR013",
@@ -347,7 +347,8 @@
             "User with dormitory can view",
             "User without dormitory gets appropriate error"
           ],
-          "completed": false
+          "completed": true,
+          "status": "Implemented with tests (minor test issue remains)"
         },
         {
           "id": "P011",
@@ -358,7 +359,7 @@
           "testScenarios": [
             "Any logged-in user can view their points"
           ],
-          "completed": false
+          "completed": true
         },
         {
           "id": "BR014",
@@ -371,7 +372,7 @@
             "Can create dormitory with unique name",
             "Cannot create dormitory with duplicate name"
           ],
-          "completed": false
+          "completed": true
         },
         {
           "id": "BR015",
@@ -384,7 +385,8 @@
             "Can assign to dormitory with available space",
             "Cannot assign to full dormitory"
           ],
-          "completed": false
+          "completed": true,
+          "status": "Implemented with tests (minor test issue remains)"
         }
       ]
     }

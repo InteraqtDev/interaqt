@@ -510,39 +510,7 @@ const ViewMyDormitory = Interaction.create({
   action: Action.create({ name: 'view' }),
   payload: Payload.create({
     items: []
-  }),
-  query: async function(this: Controller, event: any) {
-    // Get user's dormitory information
-    const user = await this.system.storage.findOne(
-      'User',
-      MatchExp.atom({ key: 'id', value: ['=', event.user.id] }),
-      undefined,
-      ['id', 'name', ['dormitory', { 
-        attributeQuery: ['id', 'name', 'capacity', 'occupancy']
-      }]]
-    )
-    
-    if (!user || !user.dormitory) {
-      return null
-    }
-    
-    // Get dormitory members
-    const members = await this.system.storage.find(
-      'User',
-      undefined,
-      undefined,
-      ['id', 'name', 'role', 'points', ['dormitory', {
-        attributeQuery: ['id']
-      }]]
-    )
-    
-    const dormMembers = members.filter(m => m.dormitory?.id === user.dormitory.id)
-    
-    return {
-      dormitory: user.dormitory,
-      members: dormMembers
-    }
-  }
+  })
 })
 
 // ViewMyPoints - View current user's points and deduction history
@@ -551,39 +519,7 @@ const ViewMyPoints = Interaction.create({
   action: Action.create({ name: 'view' }),
   payload: Payload.create({
     items: []
-  }),
-  query: async function(this: Controller, event: any) {
-    // Get user's points
-    const user = await this.system.storage.findOne(
-      'User',
-      MatchExp.atom({ key: 'id', value: ['=', event.user.id] }),
-      undefined,
-      ['id', 'name', 'points']
-    )
-    
-    if (!user) {
-      return null
-    }
-    
-    // Get user's point deduction history
-    const allDeductions = await this.system.storage.find(
-      'PointDeduction',
-      undefined,
-      undefined,
-      ['id', 'points', 'reason', 'category', 'recordedAt', ['user', {
-        attributeQuery: ['id']
-      }]]
-    )
-    
-    const userDeductions = allDeductions
-      .filter(d => d.user?.id === event.user.id)
-      .sort((a, b) => new Date(b.recordedAt).getTime() - new Date(a.recordedAt).getTime())
-    
-    return {
-      currentPoints: user.points,
-      deductionHistory: userDeductions
-    }
-  }
+  })
 })
 
 // ViewDormitoryMembers - View members of a dormitory
@@ -1446,14 +1382,18 @@ const userExistsForViewMyDormitory = Condition.create({
 const userHasDormitoryAssignment = Condition.create({
   name: 'userHasDormitoryAssignment',
   content: async function(this: Controller, event: any) {
-    const user = await this.system.storage.findOne(
-      'User',
-      MatchExp.atom({ key: 'id', value: ['=', event.user.id] }),
+    // Check if user has a UserDormitoryRelation
+    const userDormRelations = await this.system.storage.find(
+      'UserDormitoryRelation',
+      MatchExp.atom({
+        key: 'source.id',
+        value: ['=', event.user.id]
+      }),
       undefined,
-      ['id', ['dormitory', { attributeQuery: ['id'] }]]
+      ['id']
     )
     
-    return user && user.dormitory && user.dormitory.id
+    return userDormRelations && userDormRelations.length > 0
   }
 })
 

@@ -327,7 +327,134 @@ test('resource ownership permission', async () => {
 })
 ```
 
-### 4. Payload Condition Test
+### 4. Data Retrieval Permission Test
+
+Test permissions for data retrieval interactions using GetAction:
+
+```typescript
+import { GetAction, Query, QueryItem } from 'interaqt'
+
+// Check query-based permissions
+export const CanViewPrivateData = Condition.create({
+  name: 'CanViewPrivateData',
+  content: async function(this: Controller, event) {
+    if (event.user?.role === 'admin') return true
+    
+    const queryMatch = event.query?.match
+    if (!queryMatch) return true // No filter means public data
+    
+    // Users can only query their own data
+    if (queryMatch.key === 'owner.id') {
+      return queryMatch.value?.[1] === event.user?.id
+    }
+    
+    // Allow public status queries
+    if (queryMatch.key === 'status') {
+      const status = queryMatch.value?.[1]
+      return status === 'public' || status === 'published'
+    }
+    
+    return false
+  }
+})
+
+// Department-based access control
+export const DepartmentDataAccess = Condition.create({
+  name: 'DepartmentDataAccess',
+  content: async function(this: Controller, event) {
+    const userDept = event.user?.department
+    if (!userDept) return false
+    
+    const queryMatch = event.query?.match
+    if (queryMatch?.key === 'department') {
+      return queryMatch.value?.[1] === userDept
+    }
+    
+    return false
+  }
+})
+
+// Apply conditions to data retrieval
+export const GetUserDocuments = Interaction.create({
+  name: 'GetUserDocuments',
+  action: GetAction,
+  data: Document,
+  conditions: CanViewPrivateData
+})
+
+// Test implementation
+test('data retrieval permissions based on query', async () => {
+  const admin = await system.storage.create('User', {
+    role: 'admin'
+  })
+  
+  const user1 = await system.storage.create('User', {
+    role: 'user'
+  })
+  
+  const user2 = await system.storage.create('User', {
+    role: 'user'
+  })
+  
+  // Create documents
+  await system.storage.create('Document', {
+    title: 'Private Doc',
+    status: 'private',
+    owner: { id: user1.id }
+  })
+  
+  // Admin can view private documents
+  const adminResult = await controller.callInteraction('GetUserDocuments', {
+    user: admin,
+    query: {
+      match: MatchExp.atom({ key: 'status', value: ['=', 'private'] }),
+      attributeQuery: ['id', 'title', 'status']
+    }
+  })
+  expect(adminResult.error).toBeUndefined()
+  
+  // User can view own documents
+  const ownResult = await controller.callInteraction('GetUserDocuments', {
+    user: user1,
+    query: {
+      match: MatchExp.atom({ key: 'owner.id', value: ['=', user1.id] }),
+      attributeQuery: ['id', 'title']
+    }
+  })
+  expect(ownResult.error).toBeUndefined()
+  
+  // User cannot view others' documents
+  const othersResult = await controller.callInteraction('GetUserDocuments', {
+    user: user1,
+    query: {
+      match: MatchExp.atom({ key: 'owner.id', value: ['=', user2.id] }),
+      attributeQuery: ['id', 'title']
+    }
+  })
+  expect(othersResult.error).toBeDefined()
+  expect(othersResult.error.type).toBe('condition check failed')
+  expect(othersResult.error.error.data.name).toBe('CanViewPrivateData')
+})
+
+// Pagination limits based on user role
+export const EnforcePaginationLimits = Condition.create({
+  name: 'EnforcePaginationLimits',
+  content: async function(this: Controller, event) {
+    const modifier = event.query?.modifier
+    const maxLimits = { admin: 1000, premium: 500, user: 100 }
+    const userLimit = maxLimits[event.user?.role] || 50
+    
+    if (modifier?.limit && modifier.limit > userLimit) {
+      event.error = `Limit exceeds maximum allowed (${userLimit})`
+      return false
+    }
+    
+    return true
+  }
+})
+```
+
+### 5. Payload Condition Test
 
 Define payload conditions:
 

@@ -1765,6 +1765,8 @@ Interaction.create(config: InteractionConfig): InteractionInstance
 - `config.query` (Query, optional): Query definition for data fetching
 
 **Examples**
+
+1. **Create Data Interaction**
 ```typescript
 // Create post interaction
 const CreatePostInteraction = Interaction.create({
@@ -1787,6 +1789,122 @@ const CreatePostInteraction = Interaction.create({
     })
 })
 ```
+
+2. **Get Data Interactions**
+
+To retrieve data, use `GetAction` and specify the `data` field:
+
+```typescript
+// Get all users
+const GetAllUsers = Interaction.create({
+    name: 'getAllUsers',
+    action: GetAction,  // Special action for data retrieval
+    data: User          // Entity to query
+})
+
+// Get filtered data with query configuration
+const GetActiveUsers = Interaction.create({
+    name: 'getActiveUsers',
+    action: GetAction,
+    data: User,
+    query: Query.create({
+        items: [
+            QueryItem.create({
+                name: 'attributeQuery',
+                value: ['id', 'name', 'email', 'status']  // Fields to retrieve
+            })
+        ]
+    })
+})
+
+// Get data with complex conditions
+const GetUserPosts = Interaction.create({
+    name: 'getUserPosts',
+    action: GetAction,
+    data: Post,
+    conditions: Condition.create({
+        name: 'canViewPosts',
+        content: async function(this: Controller, event) {
+            // Check if user can view posts based on query
+            const targetUserId = event.query?.match?.key === 'author.id' 
+                ? event.query.match.value[1] 
+                : null;
+            
+            // Allow users to see their own posts or public posts
+            return targetUserId === event.user.id || event.user.role === 'admin';
+        }
+    })
+})
+
+// Get paginated data
+const GetPostsPaginated = Interaction.create({
+    name: 'getPostsPaginated',
+    action: GetAction,
+    data: Post,
+    query: Query.create({
+        items: [
+            QueryItem.create({
+                name: 'attributeQuery',
+                value: ['id', 'title', 'content', 'createdAt', 'author']
+            }),
+            QueryItem.create({
+                name: 'modifier',
+                value: { limit: 10, offset: 0 }  // Pagination
+            })
+        ]
+    })
+})
+```
+
+**Usage Examples for Get Data Interactions**
+
+```typescript
+// Get all users
+const result = await controller.callInteraction('getAllUsers', {
+    user: { id: 'admin-user' }
+})
+// result.data contains array of users
+
+// Get filtered users with runtime query
+const activeUsersResult = await controller.callInteraction('getActiveUsers', {
+    user: { id: 'admin-user' },
+    query: {
+        match: MatchExp.atom({ key: 'status', value: ['=', 'active'] }),
+        attributeQuery: ['id', 'name', 'email']
+    }
+})
+// result.data contains filtered users with specified fields
+
+// Get user's posts
+const userPostsResult = await controller.callInteraction('getUserPosts', {
+    user: { id: 'user123' },
+    query: {
+        match: MatchExp.atom({ key: 'author.id', value: ['=', 'user123'] }),
+        attributeQuery: ['id', 'title', 'content', 'createdAt']
+    }
+})
+// result.data contains posts authored by user123
+
+// Get paginated posts
+const paginatedResult = await controller.callInteraction('getPostsPaginated', {
+    user: { id: 'user123' },
+    query: {
+        match: MatchExp.atom({ key: 'status', value: ['=', 'published'] }),
+        modifier: { limit: 10, offset: 20 },  // Get page 3 (assuming 10 per page)
+        attributeQuery: ['id', 'title', 'createdAt']
+    }
+})
+// result.data contains 10 posts starting from offset 20
+```
+
+**Key Points for Data Retrieval**
+
+1. **Required**: Must use `GetAction` as the action
+2. **Required**: Must specify `data` field with the Entity or Relation to query
+3. **Optional**: Use `query` in Interaction definition for fixed query configuration
+4. **Runtime Query**: Pass `query` object in `callInteraction` to dynamically filter data
+5. **Conditions**: Can use conditions to control access based on query parameters
+6. **Response**: Retrieved data is returned in `result.data` field
 
 ### Action.create()
 
