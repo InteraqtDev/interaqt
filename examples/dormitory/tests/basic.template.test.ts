@@ -22,7 +22,8 @@ describe('Basic Functionality', () => {
       interactions,
       activities,
       dict: dicts,
-      ignorePermission: true
+      ignorePermission: true,
+      forceThtrowInteractionError: true // 使用 throw 的方式来处理 interaction 的 error
     })
 
     await controller.setup(true)
@@ -45,7 +46,7 @@ describe('Permission and Business Rules', () => {
       relations,
       interactions,
       activities,
-      dict: dicts,
+      dict: dicts
     })
 
     await controller.setup(true)

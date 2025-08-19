@@ -1,277 +1,324 @@
-# 宿舍管理系统 - 交互矩阵
+# Dormitory Management System - Interaction Matrix
 
-## 概述
-本文档定义了系统中所有的交互操作（Interactions），明确每个角色的操作权限、业务规则约束，并确保每个交互都有对应的测试用例。
+## Overview
 
-## 交互分类
+This document maps all system interactions to user roles, defining permission requirements, business rule constraints, and corresponding test cases for each interaction.
 
-### 1. 宿舍管理类交互
-用于管理宿舍的创建、配置和状态。
+## Interaction Categories
 
-### 2. 用户管理类交互
-用于管理用户分配、角色任命等。
-
-### 3. 积分管理类交互
-用于记录和管理用户积分扣除。
-
-### 4. 申请处理类交互
-用于处理各类申请（如踢出申请）。
-
-### 5. 查询类交互
-用于查询各类信息。
+1. **Dormitory Management**: Creating and managing dormitory entities
+2. **User Management**: Assigning users, managing roles
+3. **Disciplinary Actions**: Point deductions and removal processes
+4. **Information Access**: Viewing and querying data
 
 ---
 
-## 完整交互列表
+## Complete Interaction Matrix
 
-### 1. CreateDormitory - 创建宿舍
+| Interaction | Admin | Dorm Head | Student | Permission Rules | Business Rules | Test Cases |
+|------------|--------|-----------|---------|------------------|----------------|------------|
+| **CreateDormitory** | ✅ | ❌ | ❌ | Must be admin | Capacity 4-6 | TC001, TC011, TC017, TC018 |
+| **UpdateDormitory** | ✅ | ❌ | ❌ | Must be admin | Valid status values | TC009 |
+| **DeactivateDormitory** | ✅ | ❌ | ❌ | Must be admin | Check existing assignments | TC025 |
+| **AssignDormHead** | ✅ | ❌ | ❌ | Must be admin | User must be active | TC003 |
+| **RemoveDormHead** | ✅ | ❌ | ❌ | Must be admin | - | - |
+| **AssignUserToDormitory** | ✅ | ❌ | ❌ | Must be admin | No existing assignment, capacity check | TC002, TC019, TC020, TC026 |
+| **RemoveUserFromDormitory** | ✅ | ❌ | ❌ | Must be admin | User must be assigned | TC008 |
+| **IssuePointDeduction** | ✅ | ✅* | ❌ | Admin or relevant dorm head | Points 1-10, target in dormitory | TC004, TC012, TC013, TC021, TC022 |
+| **InitiateRemovalRequest** | ❌ | ✅* | ❌ | Must be dorm head of user's dorm | User has ≥30 points, no pending request | TC005, TC014, TC023, TC024 |
+| **CancelRemovalRequest** | ❌ | ✅* | ❌ | Must be original requester | Request must be pending | TC010 |
+| **ProcessRemovalRequest** | ✅ | ❌ | ❌ | Must be admin | Request must be pending | TC006, TC007, TC015 |
+| **ViewSystemStats** | ✅ | ❌ | ❌ | Must be admin | - | - |
+| **ViewDormitoryStats** | ✅ | ✅* | ❌ | Admin or dorm head of that dorm | - | - |
+| **ViewUserDeductions** | ✅ | ✅* | ✅* | Varies by target | Students only see own | TC016 |
+| **ViewMyDormitory** | ✅ | ✅ | ✅ | Must be authenticated | - | - |
+| **ViewMyDeductions** | ✅ | ✅ | ✅ | Must be authenticated | - | - |
+| **ViewMyBed** | ✅ | ✅ | ✅ | Must be authenticated | - | - |
 
-| 属性 | 说明 |
-|-----|------|
-| **描述** | 创建新的宿舍并自动生成对应数量的床位 |
-| **允许角色** | Admin |
-| **输入参数** | name (string), capacity (number), floor (number), building (string) |
-| **权限要求** | user.role === 'admin' |
-| **业务规则** | - capacity必须在4-6之间<br>- name必须唯一<br>- 自动创建capacity数量的床位 |
-| **影响实体** | Dormitory (创建), Bed (批量创建) |
-| **测试用例** | TC001, TC016 |
-| **实现阶段** | 阶段1（核心逻辑）+ 阶段2（权限）+ 阶段3（业务规则） |
-
-### 2. AssignUserToDormitory - 分配用户到宿舍
-
-| 属性 | 说明 |
-|-----|------|
-| **描述** | 将用户分配到指定宿舍的指定床位 |
-| **允许角色** | Admin |
-| **输入参数** | userId (string), dormitoryId (string), bedId (string) |
-| **权限要求** | user.role === 'admin' |
-| **业务规则** | - 用户不能已有宿舍<br>- 床位必须空闲<br>- 宿舍不能已满<br>- 床位必须属于该宿舍 |
-| **影响实体** | User-Dormitory关系 (创建), User-Bed关系 (创建), Bed.status (更新), Dormitory计算属性 (更新) |
-| **测试用例** | TC002, TC010, TC017, TC018, TC021, TC026 |
-| **实现阶段** | 阶段1（核心逻辑）+ 阶段3（业务规则） |
-
-### 3. AppointDormHead - 任命宿舍长
-
-| 属性 | 说明 |
-|-----|------|
-| **描述** | 任命指定用户为宿舍长 |
-| **允许角色** | Admin |
-| **输入参数** | userId (string), dormitoryId (string) |
-| **权限要求** | user.role === 'admin' |
-| **业务规则** | - 用户必须是该宿舍成员<br>- 宿舍不能已有宿舍长（或需要先撤销） |
-| **影响实体** | User.role (更新), Dormitory-DormHead关系 (创建) |
-| **测试用例** | TC003, TC022 |
-| **实现阶段** | 阶段1（核心逻辑）+ 阶段3（业务规则） |
-
-### 4. RecordPointDeduction - 记录扣分
-
-| 属性 | 说明 |
-|-----|------|
-| **描述** | 记录对指定用户的扣分 |
-| **允许角色** | Admin, DormHead |
-| **输入参数** | targetUserId (string), reason (string), points (number), category (enum) |
-| **权限要求** | user.role === 'admin' OR (user.role === 'dormHead' AND 目标用户与操作者同宿舍) |
-| **业务规则** | - points必须为正数<br>- 目标用户必须存在<br>- 宿舍长只能扣本宿舍成员分<br>- 扣分后积分不能为负（最低为0） |
-| **影响实体** | PointDeduction (创建), User.points (更新), User计算属性 (更新) |
-| **测试用例** | TC004, TC012, TC013, TC020, TC023 |
-| **实现阶段** | 阶段1（核心逻辑）+ 阶段2（权限）+ 阶段3（业务规则） |
-
-### 5. RequestEviction - 申请踢出用户
-
-| 属性 | 说明 |
-|-----|------|
-| **描述** | 宿舍长申请踢出违规用户 |
-| **允许角色** | DormHead |
-| **输入参数** | targetUserId (string), reason (string) |
-| **权限要求** | user.role === 'dormHead' AND 目标用户与申请者同宿舍 |
-| **业务规则** | - 目标用户积分必须低于30分<br>- 目标用户必须是本宿舍成员<br>- 不能有未处理的相同申请 |
-| **影响实体** | EvictionRequest (创建) |
-| **测试用例** | TC005, TC019 |
-| **实现阶段** | 阶段1（核心逻辑）+ 阶段2（权限）+ 阶段3（业务规则） |
-
-### 6. ApproveEviction - 批准踢出申请
-
-| 属性 | 说明 |
-|-----|------|
-| **描述** | 管理员批准踢出申请 |
-| **允许角色** | Admin |
-| **输入参数** | requestId (string), adminComment (string, 可选) |
-| **权限要求** | user.role === 'admin' |
-| **业务规则** | - 申请必须处于pending状态<br>- 批准后自动执行踢出操作 |
-| **影响实体** | EvictionRequest.status (更新), User.status (更新), User-Dormitory关系 (删除), User-Bed关系 (删除), Bed.status (更新) |
-| **测试用例** | TC006, TC014, TC024, TC025 |
-| **实现阶段** | 阶段1（核心逻辑）+ 阶段2（权限）+ 阶段3（业务规则） |
-
-### 7. RejectEviction - 拒绝踢出申请
-
-| 属性 | 说明 |
-|-----|------|
-| **描述** | 管理员拒绝踢出申请 |
-| **允许角色** | Admin |
-| **输入参数** | requestId (string), adminComment (string, 可选) |
-| **权限要求** | user.role === 'admin' |
-| **业务规则** | - 申请必须处于pending状态 |
-| **影响实体** | EvictionRequest.status (更新) |
-| **测试用例** | TC007 |
-| **实现阶段** | 阶段1（核心逻辑）+ 阶段2（权限） |
-
-### 8. ViewMyDormitory - 查看我的宿舍信息
-
-| 属性 | 说明 |
-|-----|------|
-| **描述** | 查看当前用户的宿舍信息 |
-| **允许角色** | User, DormHead, Admin |
-| **输入参数** | 无（使用当前用户） |
-| **权限要求** | 已登录即可 |
-| **业务规则** | - 用户必须已分配宿舍 |
-| **影响实体** | 无（只读查询） |
-| **测试用例** | TC008 |
-| **实现阶段** | 阶段1（核心逻辑） |
-
-### 9. ViewMyPoints - 查看我的积分记录
-
-| 属性 | 说明 |
-|-----|------|
-| **描述** | 查看当前用户的积分和扣分记录 |
-| **允许角色** | User, DormHead, Admin |
-| **输入参数** | 无（使用当前用户） |
-| **权限要求** | 已登录即可 |
-| **业务规则** | 无 |
-| **影响实体** | 无（只读查询） |
-| **测试用例** | TC009 |
-| **实现阶段** | 阶段1（核心逻辑） |
-
-### 10. ViewDormitoryMembers - 查看宿舍成员
-
-| 属性 | 说明 |
-|-----|------|
-| **描述** | 查看指定宿舍或当前用户宿舍的成员列表 |
-| **允许角色** | User, DormHead, Admin |
-| **输入参数** | dormitoryId (string, 可选) |
-| **权限要求** | - 普通用户只能查看自己宿舍<br>- 宿舍长可以查看自己管理的宿舍<br>- 管理员可以查看任何宿舍 |
-| **业务规则** | 无 |
-| **影响实体** | 无（只读查询） |
-| **测试用例** | TC008（部分） |
-| **实现阶段** | 阶段1（核心逻辑）+ 阶段2（权限） |
-
-### 11. ViewAllDormitories - 查看所有宿舍
-
-| 属性 | 说明 |
-|-----|------|
-| **描述** | 查看系统中所有宿舍的列表和统计信息 |
-| **允许角色** | Admin |
-| **输入参数** | 无 |
-| **权限要求** | user.role === 'admin' |
-| **业务规则** | 无 |
-| **影响实体** | 无（只读查询） |
-| **测试用例** | TC015 |
-| **实现阶段** | 阶段2（权限） |
+*With restrictions as noted in Permission Rules
 
 ---
 
-## 权限控制总结
+## Detailed Interaction Specifications
 
-### Admin（管理员）权限
-- ✅ 所有交互操作
-- 特有操作：CreateDormitory, AppointDormHead, AssignUserToDormitory, ApproveEviction, RejectEviction, ViewAllDormitories
+### 1. CreateDormitory
+- **Purpose**: Create a new dormitory with beds
+- **Actors**: Admin only
+- **Payload**:
+  - name: string (required)
+  - capacity: number (required, 4-6)
+  - floor: number (optional)
+  - building: string (optional)
+- **Permissions**: `user.role === 'admin'`
+- **Business Rules**:
+  - `capacity >= 4 && capacity <= 6`
+  - Name must be unique
+- **Side Effects**:
+  - Creates dormitory entity
+  - Creates bed entities (count = capacity)
+  - Establishes dormitory-bed relationships
+- **Error Cases**:
+  - Non-admin user (permission denied)
+  - Invalid capacity (validation error)
+  - Duplicate name (constraint error)
 
-### DormHead（宿舍长）权限
-- ✅ RecordPointDeduction（仅本宿舍成员）
-- ✅ RequestEviction（仅本宿舍成员）
-- ✅ 所有查询操作（受限于本宿舍）
+### 2. AssignUserToDormitory
+- **Purpose**: Assign a student to a dormitory and bed
+- **Actors**: Admin only
+- **Payload**:
+  - userId: string (required)
+  - dormitoryId: string (required)
+  - bedNumber: string (required)
+- **Permissions**: `user.role === 'admin'`
+- **Business Rules**:
+  - User must not have existing dormitory assignment
+  - Dormitory must have available capacity
+  - Bed must exist and be available
+  - Dormitory must be active
+- **Side Effects**:
+  - Creates UserDormitoryRelation
+  - Creates UserBedRelation
+  - Updates bed status to 'occupied'
+  - Updates dormitory occupancy count
+- **Error Cases**:
+  - User already assigned
+  - Dormitory full
+  - Bed not available
+  - Dormitory inactive
 
-### User（普通用户）权限
-- ✅ ViewMyDormitory
-- ✅ ViewMyPoints
-- ✅ ViewDormitoryMembers（仅本宿舍）
-- ❌ 所有管理操作
+### 3. IssuePointDeduction
+- **Purpose**: Issue disciplinary points to a user
+- **Actors**: Admin, Dorm Head (own dormitory only)
+- **Payload**:
+  - targetUserId: string (required)
+  - reason: string (required)
+  - points: number (required, 1-10)
+  - category: string (required, enum)
+  - description: string (optional)
+  - evidence: string (optional)
+- **Permissions**: 
+  ```
+  user.role === 'admin' || 
+  (user.role === 'dormHead' && targetUser.dormitory === user.managedDormitory)
+  ```
+- **Business Rules**:
+  - `points >= 1 && points <= 10`
+  - Target user must be in a dormitory
+  - Category must be valid enum value
+- **Side Effects**:
+  - Creates PointDeduction entity
+  - Creates UserPointDeductionRelation
+  - Creates DeductionIssuerRelation
+  - Updates user's total points
+  - May trigger removal eligibility
+- **Error Cases**:
+  - Insufficient permissions
+  - Invalid point amount
+  - Target not in issuer's dormitory
+
+### 4. InitiateRemovalRequest
+- **Purpose**: Request removal of a problematic user
+- **Actors**: Dorm Head (own dormitory only)
+- **Payload**:
+  - targetUserId: string (required)
+  - reason: string (required)
+- **Permissions**: 
+  ```
+  user.role === 'dormHead' && 
+  targetUser.dormitory === user.managedDormitory
+  ```
+- **Business Rules**:
+  - Target user must have ≥30 accumulated points
+  - No existing pending removal request for user
+  - Target must be in requester's dormitory
+- **Side Effects**:
+  - Creates RemovalRequest entity
+  - Creates RemovalRequestTargetRelation
+  - Creates RemovalRequestInitiatorRelation
+  - Computes and stores total points
+- **Error Cases**:
+  - Insufficient points for removal
+  - Existing pending request
+  - Target not in managed dormitory
+
+### 5. ProcessRemovalRequest
+- **Purpose**: Approve or reject a removal request
+- **Actors**: Admin only
+- **Payload**:
+  - requestId: string (required)
+  - decision: string (required, 'approved'|'rejected')
+  - adminComment: string (optional)
+- **Permissions**: `user.role === 'admin'`
+- **Business Rules**:
+  - Request must be in 'pending' status
+  - Decision must be valid enum value
+- **Side Effects (if approved)**:
+  - Updates request status to 'approved'
+  - Creates RemovalRequestAdminRelation
+  - Updates user status to 'removed'
+  - Deletes UserDormitoryRelation
+  - Deletes UserBedRelation
+  - Updates bed status to 'available'
+  - Updates dormitory occupancy
+- **Side Effects (if rejected)**:
+  - Updates request status to 'rejected'
+  - Creates RemovalRequestAdminRelation
+  - No changes to user assignments
+- **Error Cases**:
+  - Non-admin user
+  - Request not pending
+  - Invalid decision value
+
+### 6. ViewUserDeductions
+- **Purpose**: View deduction history for a user
+- **Actors**: Admin, Dorm Head (own dormitory), Student (self only)
+- **Payload**:
+  - targetUserId: string (required)
+- **Permissions**:
+  ```
+  user.role === 'admin' ||
+  (user.role === 'dormHead' && targetUser.dormitory === user.managedDormitory) ||
+  (user.role === 'student' && targetUserId === user.id)
+  ```
+- **Business Rules**: None beyond permissions
+- **Returns**: List of deductions with details
+- **Error Cases**:
+  - Unauthorized access attempt
 
 ---
 
-## 业务规则验证总结
+## Access Control Summary
 
-### 数据完整性规则
-1. **唯一性约束**
-   - User.email唯一
-   - Dormitory.name唯一
-   - 每个宿舍内Bed.bedNumber唯一
+### Admin Capabilities
+- Full system access
+- All CRUD operations on dormitories
+- User role management
+- Assignment management
+- Point deductions (any user)
+- Process removal requests
+- View all data
 
-2. **引用完整性**
-   - 分配用户时，用户和宿舍必须存在
-   - 任命宿舍长时，用户必须是宿舍成员
-   - 记录扣分时，目标用户必须存在
+### Dorm Head Capabilities
+- Issue deductions (own dormitory only)
+- Initiate removal requests (own dormitory only)
+- Cancel own removal requests
+- View dormitory statistics (own dormitory)
+- View user deductions (own dormitory)
+- Standard user capabilities
 
-### 业务逻辑规则
-1. **容量限制**
-   - 宿舍容量4-6个床位
-   - 满员宿舍不能继续分配
-
-2. **分配规则**
-   - 用户只能分配到一个宿舍
-   - 床位不能重复分配
-   - 用户被踢出后需重新分配
-
-3. **积分规则**
-   - 扣分必须为正数
-   - 用户积分不能为负
-   - 积分低于30分才能申请踢出
-
-4. **申请规则**
-   - 只能对本宿舍成员发起申请
-   - 已处理的申请不能重复处理
+### Student Capabilities
+- View own dormitory assignment
+- View own bed assignment
+- View own deduction history
+- No administrative actions
 
 ---
 
-## 测试覆盖度检查
+## Business Rule Validation Layers
 
-| 交互名称 | 核心功能测试 | 权限测试 | 业务规则测试 | 覆盖率 |
-|---------|------------|---------|-------------|--------|
-| CreateDormitory | TC001 | TC011 | TC016 | ✅ 100% |
-| AssignUserToDormitory | TC002, TC010 | - | TC017, TC018, TC021, TC026 | ✅ 100% |
-| AppointDormHead | TC003 | - | TC022 | ✅ 100% |
-| RecordPointDeduction | TC004 | TC012, TC013 | TC020, TC023 | ✅ 100% |
-| RequestEviction | TC005 | - | TC019 | ✅ 100% |
-| ApproveEviction | TC006 | TC014 | TC024, TC025 | ✅ 100% |
-| RejectEviction | TC007 | - | - | ✅ 100% |
-| ViewMyDormitory | TC008 | - | - | ✅ 100% |
-| ViewMyPoints | TC009 | - | - | ✅ 100% |
-| ViewDormitoryMembers | TC008 | - | - | ✅ 100% |
-| ViewAllDormitories | - | TC015 | - | ✅ 100% |
+### Layer 1: Input Validation
+- Data type checking
+- Required field validation
+- Format validation (email, phone)
+- Enum value validation
 
-**总体测试覆盖率**: 100% ✅
+### Layer 2: Permission Checking
+- Role-based access control
+- Scope-based permissions (dorm heads)
+- Self-access permissions (students)
 
----
+### Layer 3: Business Logic Validation
+- Capacity constraints
+- Point thresholds
+- State transition rules
+- Uniqueness constraints
+- Relationship constraints
 
-## 实现优先级
-
-### 第一优先级（核心业务）
-1. CreateDormitory
-2. AssignUserToDormitory
-3. AppointDormHead
-4. RecordPointDeduction
-5. RequestEviction
-6. ApproveEviction
-7. RejectEviction
-
-### 第二优先级（查询功能）
-1. ViewMyDormitory
-2. ViewMyPoints
-3. ViewDormitoryMembers
-4. ViewAllDormitories
-
-### 第三优先级（扩展功能）
-- 后续可添加：
-  - TransferUser（转宿舍）
-  - ResignDormHead（辞去宿舍长）
-  - RestorePoints（恢复积分）
-  - ViewStatistics（查看统计）
+### Layer 4: Consistency Validation
+- No orphaned records
+- Referential integrity
+- State consistency
+- Computed value accuracy
 
 ---
 
-## 注意事项
+## Interaction Dependencies
 
-1. **权限检查优先**：所有交互必须先进行权限检查，再进行业务规则验证
-2. **事务一致性**：涉及多个实体更新的操作（如ApproveEviction）必须保证事务一致性
-3. **审计追踪**：所有修改操作都应记录操作时间和操作者
-4. **错误处理**：返回清晰的错误信息，区分权限错误和业务规则错误
-5. **性能考虑**：查询操作应考虑分页和缓存策略
+```mermaid
+graph TD
+    CreateDormitory --> AssignUserToDormitory
+    AssignDormHead --> IssuePointDeduction
+    AssignUserToDormitory --> IssuePointDeduction
+    IssuePointDeduction --> InitiateRemovalRequest
+    InitiateRemovalRequest --> ProcessRemovalRequest
+    ProcessRemovalRequest --> RemoveUserFromDormitory
+```
+
+---
+
+## Testing Coverage Requirements
+
+Each interaction must have test coverage for:
+1. **Happy Path**: Valid inputs with proper permissions
+2. **Permission Failures**: Each invalid role attempt
+3. **Business Rule Failures**: Each constraint violation
+4. **Edge Cases**: Boundary values, empty data
+5. **State Transitions**: Before/after state validation
+6. **Side Effects**: All related entity updates
+
+---
+
+## Audit Requirements
+
+All interactions that modify data must log:
+- Timestamp of action
+- User who performed action
+- Target entities affected
+- Previous values (for updates)
+- New values
+- Success/failure status
+- Error messages (if any)
+
+---
+
+## Performance Considerations
+
+### High-Frequency Interactions
+- ViewMyDormitory
+- ViewMyDeductions
+- ViewMyBed
+
+**Optimization**: Cache user's current assignments
+
+### Complex Queries
+- ViewSystemStats
+- ViewDormitoryStats
+
+**Optimization**: Pre-compute aggregates, update reactively
+
+### Bulk Operations
+- Beginning of semester assignments
+- End of semester removals
+
+**Optimization**: Batch processing capabilities
+
+---
+
+## Future Enhancement Considerations
+
+### Planned Interactions
+- TransferUserBetweenDormitories
+- AppealPointDeduction
+- RequestBedChange
+- ReportMaintenance
+- ScheduleInspection
+
+### Permission Evolution
+- Deputy dorm heads
+- Floor representatives
+- Maintenance staff role
+
+### Business Rule Evolution
+- Seasonal capacity adjustments
+- Point expiration system
+- Probation periods

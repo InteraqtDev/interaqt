@@ -1,10 +1,10 @@
 {
   "entities": {
     "User": {
-      "purpose": "System users with different roles (admin, dormHead, user) who can be assigned to dormitories",
+      "purpose": "System users with different roles (admin, dormHead, student)",
       "dataDependencies": [],
-      "interactionDependencies": ["CreateDormitory", "AssignUserToDormitory", "AppointDormHead"],
-      "computationMethod": "Independently created during system initialization or user registration (not part of current system scope)",
+      "interactionDependencies": ["CreateUser"],
+      "computationMethod": "Independently created by CreateUser interaction or system initialization",
       "lifecycle": {
         "creation": "interaction-created",
         "deletion": {
@@ -23,89 +23,97 @@
         },
         "name": {
           "type": "string",
-          "purpose": "User's display name",
+          "purpose": "User's full name",
           "dataDependencies": [],
-          "interactionDependencies": [],
-          "computationMethod": "Set at creation, assumed to be provided",
+          "interactionDependencies": ["CreateUser", "UpdateUserProfile"],
+          "computationMethod": "Direct assignment from CreateUser and UpdateUserProfile interactions",
           "initialValue": "Required at creation"
         },
         "email": {
           "type": "string",
-          "purpose": "Unique email identifier for the user",
+          "purpose": "Unique identifier and contact email",
           "dataDependencies": [],
-          "interactionDependencies": [],
-          "computationMethod": "Set at creation, immutable thereafter",
-          "initialValue": "Required at creation"
+          "interactionDependencies": ["CreateUser"],
+          "computationMethod": "Set once at creation by CreateUser, immutable thereafter",
+          "initialValue": "Required at creation, must be unique"
         },
         "phone": {
           "type": "string",
-          "purpose": "Contact phone number",
+          "purpose": "Optional contact phone number",
           "dataDependencies": [],
-          "interactionDependencies": [],
-          "computationMethod": "Set at creation, can be updated",
-          "initialValue": "Optional at creation"
+          "interactionDependencies": ["CreateUser", "UpdateUserProfile"],
+          "computationMethod": "Direct assignment from CreateUser and UpdateUserProfile interactions",
+          "initialValue": "null"
         },
         "role": {
           "type": "string",
-          "purpose": "User role in the system (admin, dormHead, user)",
+          "purpose": "User role (admin, dormHead, student)",
           "dataDependencies": [],
-          "interactionDependencies": ["AppointDormHead"],
-          "computationMethod": "Initially set to 'user', changed to 'dormHead' by AppointDormHead interaction",
-          "initialValue": "user"
+          "interactionDependencies": ["CreateUser", "AssignDormHead", "RemoveDormHead"],
+          "computationMethod": "Set at creation by CreateUser, changes to 'dormHead' via AssignDormHead, reverts to 'student' via RemoveDormHead",
+          "initialValue": "student"
         },
         "status": {
           "type": "string",
-          "purpose": "User account status (active or inactive)",
+          "purpose": "User account status (active, suspended, removed)",
           "dataDependencies": [],
-          "interactionDependencies": ["ApproveEviction"],
-          "computationMethod": "Initially 'active', set to 'inactive' when ApproveEviction is executed for this user",
+          "interactionDependencies": ["CreateUser", "ProcessRemovalRequest", "RemoveUserFromDormitory"],
+          "computationMethod": "Set to 'active' at creation, changes to 'removed' when removal request approved, can be 'suspended' via admin action",
           "initialValue": "active"
         },
-        "points": {
+        "totalPoints": {
           "type": "number",
-          "purpose": "User's behavior points, reduced by deductions",
-          "dataDependencies": [],
-          "interactionDependencies": ["RecordPointDeduction"],
-          "computationMethod": "Initially 100, reduced by points value in RecordPointDeduction interaction",
-          "initialValue": "100"
-        },
-        "joinedAt": {
-          "type": "datetime",
-          "purpose": "Timestamp when user joined the system",
-          "dataDependencies": [],
+          "purpose": "Total accumulated disciplinary points",
+          "dataDependencies": ["UserPointDeductionRelation", "PointDeduction.points", "PointDeduction.status"],
           "interactionDependencies": [],
-          "computationMethod": "Set to current timestamp at creation",
+          "computationMethod": "Summation of PointDeduction.points across all UserPointDeductionRelation where PointDeduction.status = 'active'",
+          "initialValue": 0
+        },
+        "isRemovable": {
+          "type": "boolean",
+          "purpose": "Whether user is eligible for removal (totalPoints >= 30)",
+          "dataDependencies": ["totalPoints"],
+          "interactionDependencies": [],
+          "computationMethod": "Computed as totalPoints >= 30",
+          "initialValue": false
+        },
+        "isDormHead": {
+          "type": "boolean",
+          "purpose": "Whether user is currently a dorm head",
+          "dataDependencies": ["role", "DormitoryDormHeadRelation"],
+          "interactionDependencies": [],
+          "computationMethod": "Computed as role === 'dormHead' AND has DormitoryDormHeadRelation",
+          "initialValue": false
+        },
+        "createdAt": {
+          "type": "timestamp",
+          "purpose": "Account creation timestamp",
+          "dataDependencies": [],
+          "interactionDependencies": ["CreateUser"],
+          "computationMethod": "Set to current timestamp when CreateUser creates the user",
           "initialValue": "Current timestamp at creation"
         },
-        "totalDeductions": {
-          "type": "number",
-          "purpose": "Total points deducted from this user",
-          "dataDependencies": ["UserPointDeductionRelation", "PointDeduction.points"],
-          "interactionDependencies": [],
-          "computationMethod": "Summation of PointDeduction.points across all UserPointDeductionRelation",
-          "initialValue": "0"
-        },
-        "deductionCount": {
-          "type": "number",
-          "purpose": "Number of times points have been deducted",
-          "dataDependencies": ["UserPointDeductionRelation"],
-          "interactionDependencies": [],
-          "computationMethod": "Count of UserPointDeductionRelation where target = this user",
-          "initialValue": "0"
+        "updatedAt": {
+          "type": "timestamp",
+          "purpose": "Last update timestamp",
+          "dataDependencies": [],
+          "interactionDependencies": ["UpdateUserProfile", "AssignDormHead", "RemoveDormHead", "ProcessRemovalRequest"],
+          "computationMethod": "Updated to current timestamp whenever user properties are modified",
+          "initialValue": "Current timestamp at creation"
         }
       }
     },
     "Dormitory": {
-      "purpose": "Dormitory rooms that can house multiple students",
+      "purpose": "Dormitory rooms that house students",
       "dataDependencies": [],
       "interactionDependencies": ["CreateDormitory"],
-      "computationMethod": "Created by CreateDormitory interaction from admin users",
+      "computationMethod": "Independently created by CreateDormitory interaction",
       "lifecycle": {
         "creation": "interaction-created",
         "deletion": {
           "canBeDeleted": false,
-          "deletionType": "none",
-          "deletionInteractions": []
+          "deletionType": "soft-delete",
+          "deletionInteractions": ["DeactivateDormitory"]
         }
       },
       "properties": {
@@ -118,75 +126,91 @@
         },
         "name": {
           "type": "string",
-          "purpose": "Dormitory name (e.g., 'A栋101')",
+          "purpose": "Dormitory name (e.g., 'Building A - Room 301')",
           "dataDependencies": [],
-          "interactionDependencies": ["CreateDormitory"],
-          "computationMethod": "Set from CreateDormitory payload",
+          "interactionDependencies": ["CreateDormitory", "UpdateDormitory"],
+          "computationMethod": "Direct assignment from CreateDormitory and UpdateDormitory interactions",
           "initialValue": "Required at creation"
         },
         "capacity": {
           "type": "number",
-          "purpose": "Maximum number of beds/residents (4-6)",
+          "purpose": "Maximum number of beds (4-6)",
           "dataDependencies": [],
           "interactionDependencies": ["CreateDormitory"],
-          "computationMethod": "Set from CreateDormitory payload, must be between 4-6",
-          "initialValue": "Required at creation"
+          "computationMethod": "Set once at creation by CreateDormitory, must be 4-6, immutable thereafter",
+          "initialValue": "Required at creation (4-6)"
         },
         "floor": {
           "type": "number",
-          "purpose": "Floor number where dormitory is located",
+          "purpose": "Floor number in building",
           "dataDependencies": [],
-          "interactionDependencies": ["CreateDormitory"],
-          "computationMethod": "Set from CreateDormitory payload",
-          "initialValue": "Optional at creation"
+          "interactionDependencies": ["CreateDormitory", "UpdateDormitory"],
+          "computationMethod": "Direct assignment from CreateDormitory and UpdateDormitory interactions",
+          "initialValue": "null"
         },
         "building": {
           "type": "string",
-          "purpose": "Building name where dormitory is located",
+          "purpose": "Building name or code",
           "dataDependencies": [],
-          "interactionDependencies": ["CreateDormitory"],
-          "computationMethod": "Set from CreateDormitory payload",
-          "initialValue": "Optional at creation"
+          "interactionDependencies": ["CreateDormitory", "UpdateDormitory"],
+          "computationMethod": "Direct assignment from CreateDormitory and UpdateDormitory interactions",
+          "initialValue": "null"
         },
         "status": {
           "type": "string",
-          "purpose": "Dormitory availability status (available, full, maintenance)",
-          "dataDependencies": ["occupancy", "capacity"],
-          "interactionDependencies": [],
-          "computationMethod": "Set to 'full' when occupancy equals capacity, 'available' when occupancy < capacity",
-          "initialValue": "available"
-        },
-        "createdAt": {
-          "type": "datetime",
-          "purpose": "Timestamp when dormitory was created",
+          "purpose": "Dormitory operational status (active, inactive)",
           "dataDependencies": [],
-          "interactionDependencies": ["CreateDormitory"],
-          "computationMethod": "Set to current timestamp when CreateDormitory is executed",
-          "initialValue": "Current timestamp at creation"
+          "interactionDependencies": ["CreateDormitory", "UpdateDormitory", "DeactivateDormitory"],
+          "computationMethod": "Set to 'active' at creation, can be changed to 'inactive' via UpdateDormitory or DeactivateDormitory",
+          "initialValue": "active"
         },
         "occupancy": {
           "type": "number",
-          "purpose": "Current number of occupied beds",
-          "dataDependencies": ["DormitoryBedRelation", "Bed.status"],
+          "purpose": "Current number of assigned users",
+          "dataDependencies": ["UserDormitoryRelation"],
           "interactionDependencies": [],
-          "computationMethod": "Count of DormitoryBedRelation where Bed.status = 'occupied'",
-          "initialValue": "0"
+          "computationMethod": "Count of UserDormitoryRelation where target = this dormitory",
+          "initialValue": 0
         },
         "availableBeds": {
           "type": "number",
           "purpose": "Number of available beds",
           "dataDependencies": ["capacity", "occupancy"],
           "interactionDependencies": [],
-          "computationMethod": "capacity - occupancy",
+          "computationMethod": "Computed as capacity - occupancy",
           "initialValue": "Same as capacity"
+        },
+        "hasDormHead": {
+          "type": "boolean",
+          "purpose": "Whether dormitory has an assigned dorm head",
+          "dataDependencies": ["DormitoryDormHeadRelation"],
+          "interactionDependencies": [],
+          "computationMethod": "Computed as existence of DormitoryDormHeadRelation",
+          "initialValue": false
+        },
+        "createdAt": {
+          "type": "timestamp",
+          "purpose": "Dormitory creation timestamp",
+          "dataDependencies": [],
+          "interactionDependencies": ["CreateDormitory"],
+          "computationMethod": "Set to current timestamp when CreateDormitory creates the dormitory",
+          "initialValue": "Current timestamp at creation"
+        },
+        "updatedAt": {
+          "type": "timestamp",
+          "purpose": "Last update timestamp",
+          "dataDependencies": [],
+          "interactionDependencies": ["UpdateDormitory", "DeactivateDormitory"],
+          "computationMethod": "Updated to current timestamp whenever dormitory properties are modified",
+          "initialValue": "Current timestamp at creation"
         }
       }
     },
     "Bed": {
-      "purpose": "Individual bed within a dormitory",
+      "purpose": "Individual bed units within dormitories",
       "dataDependencies": ["Dormitory"],
       "interactionDependencies": ["CreateDormitory"],
-      "computationMethod": "Created together with Dormitory entity by CreateDormitory interaction",
+      "computationMethod": "Created together with Dormitory entity, number of beds equals dormitory capacity",
       "lifecycle": {
         "creation": "created-with-parent",
         "deletion": {
@@ -205,41 +229,65 @@
         },
         "bedNumber": {
           "type": "string",
-          "purpose": "Bed number within dormitory (e.g., '1号床')",
+          "purpose": "Bed identifier within dormitory (e.g., 'A', 'B', '1', '2')",
           "dataDependencies": [],
           "interactionDependencies": ["CreateDormitory"],
-          "computationMethod": "Auto-generated based on index when CreateDormitory creates beds",
-          "initialValue": "Generated at creation"
+          "computationMethod": "Set at creation based on position (1st bed='A', 2nd='B', etc.)",
+          "initialValue": "Auto-assigned based on creation order"
         },
         "status": {
           "type": "string",
-          "purpose": "Bed occupancy status (vacant or occupied)",
+          "purpose": "Bed status (available, occupied, maintenance)",
+          "dataDependencies": ["UserBedRelation"],
+          "interactionDependencies": ["AssignUserToDormitory", "RemoveUserFromDormitory", "ProcessRemovalRequest", "SetBedMaintenance"],
+          "computationMethod": "Changes to 'occupied' when UserBedRelation created, 'available' when relation deleted, 'maintenance' via admin action",
+          "initialValue": "available"
+        },
+        "isAvailable": {
+          "type": "boolean",
+          "purpose": "Whether bed can be assigned",
+          "dataDependencies": ["status", "UserBedRelation"],
+          "interactionDependencies": [],
+          "computationMethod": "Computed as status === 'available' AND no UserBedRelation exists",
+          "initialValue": true
+        },
+        "assignedAt": {
+          "type": "timestamp",
+          "purpose": "When current occupant was assigned",
           "dataDependencies": [],
-          "interactionDependencies": ["AssignUserToDormitory", "ApproveEviction"],
-          "computationMethod": "Set to 'occupied' by AssignUserToDormitory, set to 'vacant' by ApproveEviction",
-          "initialValue": "vacant"
+          "interactionDependencies": ["AssignUserToDormitory"],
+          "computationMethod": "Set to current timestamp when UserBedRelation is created, null when deleted",
+          "initialValue": "null"
         },
         "createdAt": {
-          "type": "datetime",
-          "purpose": "Timestamp when bed was created",
+          "type": "timestamp",
+          "purpose": "Bed creation timestamp",
           "dataDependencies": [],
           "interactionDependencies": ["CreateDormitory"],
           "computationMethod": "Set to current timestamp when CreateDormitory creates the bed",
+          "initialValue": "Current timestamp at creation"
+        },
+        "updatedAt": {
+          "type": "timestamp",
+          "purpose": "Last update timestamp",
+          "dataDependencies": [],
+          "interactionDependencies": ["AssignUserToDormitory", "RemoveUserFromDormitory", "ProcessRemovalRequest", "SetBedMaintenance"],
+          "computationMethod": "Updated to current timestamp whenever bed status changes",
           "initialValue": "Current timestamp at creation"
         }
       }
     },
     "PointDeduction": {
-      "purpose": "Record of points deducted from a user for violations",
-      "dataDependencies": [],
-      "interactionDependencies": ["RecordPointDeduction"],
-      "computationMethod": "Created by RecordPointDeduction interaction when dormHead or admin records a violation",
+      "purpose": "Disciplinary point records for user violations",
+      "dataDependencies": ["User"],
+      "interactionDependencies": ["IssuePointDeduction"],
+      "computationMethod": "Independently created by IssuePointDeduction interaction",
       "lifecycle": {
         "creation": "interaction-created",
         "deletion": {
           "canBeDeleted": false,
-          "deletionType": "none",
-          "deletionInteractions": []
+          "deletionType": "soft-delete",
+          "deletionInteractions": ["CancelDeduction"]
         }
       },
       "properties": {
@@ -252,56 +300,80 @@
         },
         "reason": {
           "type": "string",
-          "purpose": "Reason for the point deduction",
+          "purpose": "Brief description of violation",
           "dataDependencies": [],
-          "interactionDependencies": ["RecordPointDeduction"],
-          "computationMethod": "Set from RecordPointDeduction payload",
+          "interactionDependencies": ["IssuePointDeduction"],
+          "computationMethod": "Set at creation by IssuePointDeduction, immutable thereafter",
           "initialValue": "Required at creation"
         },
         "points": {
           "type": "number",
-          "purpose": "Number of points deducted (positive number)",
+          "purpose": "Number of points deducted (1-10)",
           "dataDependencies": [],
-          "interactionDependencies": ["RecordPointDeduction"],
-          "computationMethod": "Set from RecordPointDeduction payload, must be positive",
-          "initialValue": "Required at creation"
+          "interactionDependencies": ["IssuePointDeduction"],
+          "computationMethod": "Set at creation by IssuePointDeduction, must be 1-10, immutable thereafter",
+          "initialValue": "Required at creation (1-10)"
         },
         "category": {
           "type": "string",
-          "purpose": "Category of violation (hygiene, noise, lateness, damage, other)",
+          "purpose": "Violation category (hygiene, noise, curfew, damage, other)",
           "dataDependencies": [],
-          "interactionDependencies": ["RecordPointDeduction"],
-          "computationMethod": "Set from RecordPointDeduction payload",
+          "interactionDependencies": ["IssuePointDeduction"],
+          "computationMethod": "Set at creation by IssuePointDeduction from enum values",
           "initialValue": "Required at creation"
         },
-        "occurredAt": {
-          "type": "datetime",
-          "purpose": "When the violation occurred",
+        "status": {
+          "type": "string",
+          "purpose": "Deduction status (active, appealed, cancelled)",
           "dataDependencies": [],
-          "interactionDependencies": ["RecordPointDeduction"],
-          "computationMethod": "Set from RecordPointDeduction payload or defaults to current time",
-          "initialValue": "Current timestamp or provided value"
+          "interactionDependencies": ["IssuePointDeduction", "AppealDeduction", "CancelDeduction"],
+          "computationMethod": "Set to 'active' at creation, can change to 'appealed' or 'cancelled' via interactions",
+          "initialValue": "active"
         },
-        "recordedAt": {
-          "type": "datetime",
-          "purpose": "When the deduction was recorded",
+        "description": {
+          "type": "string",
+          "purpose": "Detailed explanation of violation",
           "dataDependencies": [],
-          "interactionDependencies": ["RecordPointDeduction"],
-          "computationMethod": "Set to current timestamp when RecordPointDeduction is executed",
+          "interactionDependencies": ["IssuePointDeduction"],
+          "computationMethod": "Optional field set at creation by IssuePointDeduction",
+          "initialValue": "null"
+        },
+        "evidence": {
+          "type": "string",
+          "purpose": "URL or reference to supporting evidence",
+          "dataDependencies": [],
+          "interactionDependencies": ["IssuePointDeduction"],
+          "computationMethod": "Optional field set at creation by IssuePointDeduction",
+          "initialValue": "null"
+        },
+        "deductedAt": {
+          "type": "timestamp",
+          "purpose": "When the deduction was issued",
+          "dataDependencies": [],
+          "interactionDependencies": ["IssuePointDeduction"],
+          "computationMethod": "Set to current timestamp when IssuePointDeduction creates the deduction",
+          "initialValue": "Current timestamp at creation"
+        },
+        "createdAt": {
+          "type": "timestamp",
+          "purpose": "Record creation timestamp",
+          "dataDependencies": [],
+          "interactionDependencies": ["IssuePointDeduction"],
+          "computationMethod": "Set to current timestamp when IssuePointDeduction creates the deduction",
           "initialValue": "Current timestamp at creation"
         }
       }
     },
-    "EvictionRequest": {
-      "purpose": "Request to evict a user from dormitory due to violations",
-      "dataDependencies": [],
-      "interactionDependencies": ["RequestEviction"],
-      "computationMethod": "Created by RequestEviction interaction when dormHead requests to evict a user",
+    "RemovalRequest": {
+      "purpose": "Requests to remove problematic users from dormitories",
+      "dataDependencies": ["User"],
+      "interactionDependencies": ["InitiateRemovalRequest"],
+      "computationMethod": "Independently created by InitiateRemovalRequest when user has ≥30 points",
       "lifecycle": {
         "creation": "interaction-created",
         "deletion": {
           "canBeDeleted": false,
-          "deletionType": "none",
+          "deletionType": "soft-delete",
           "deletionInteractions": []
         }
       },
@@ -315,51 +387,59 @@
         },
         "reason": {
           "type": "string",
-          "purpose": "Reason for requesting eviction",
+          "purpose": "Explanation for removal request",
           "dataDependencies": [],
-          "interactionDependencies": ["RequestEviction"],
-          "computationMethod": "Set from RequestEviction payload",
+          "interactionDependencies": ["InitiateRemovalRequest"],
+          "computationMethod": "Set at creation by InitiateRemovalRequest, immutable thereafter",
           "initialValue": "Required at creation"
         },
         "totalPoints": {
           "type": "number",
-          "purpose": "User's total points at time of request",
-          "dataDependencies": [],
-          "interactionDependencies": ["RequestEviction"],
-          "computationMethod": "Captured from target user's points when RequestEviction is executed",
-          "initialValue": "Set at creation"
+          "purpose": "Total points of target user at request time",
+          "dataDependencies": ["RemovalRequestTargetRelation", "User.totalPoints"],
+          "interactionDependencies": [],
+          "computationMethod": "Computed from target user's totalPoints when request is created",
+          "initialValue": "Target user's total points"
         },
         "status": {
           "type": "string",
-          "purpose": "Request status (pending, approved, rejected)",
+          "purpose": "Request status (pending, approved, rejected, cancelled)",
           "dataDependencies": [],
-          "interactionDependencies": ["RequestEviction", "ApproveEviction", "RejectEviction"],
-          "computationMethod": "Initially 'pending', changed to 'approved' by ApproveEviction or 'rejected' by RejectEviction",
+          "interactionDependencies": ["InitiateRemovalRequest", "ProcessRemovalRequest", "CancelRemovalRequest"],
+          "computationMethod": "Set to 'pending' at creation, changes via ProcessRemovalRequest or CancelRemovalRequest",
           "initialValue": "pending"
-        },
-        "requestedAt": {
-          "type": "datetime",
-          "purpose": "When the eviction was requested",
-          "dataDependencies": [],
-          "interactionDependencies": ["RequestEviction"],
-          "computationMethod": "Set to current timestamp when RequestEviction is executed",
-          "initialValue": "Current timestamp at creation"
-        },
-        "processedAt": {
-          "type": "datetime",
-          "purpose": "When the request was processed",
-          "dataDependencies": [],
-          "interactionDependencies": ["ApproveEviction", "RejectEviction"],
-          "computationMethod": "Set to current timestamp when ApproveEviction or RejectEviction is executed",
-          "initialValue": "null"
         },
         "adminComment": {
           "type": "string",
-          "purpose": "Admin's comment on the decision",
+          "purpose": "Admin's decision comment",
           "dataDependencies": [],
-          "interactionDependencies": ["ApproveEviction", "RejectEviction"],
-          "computationMethod": "Set from ApproveEviction or RejectEviction payload",
+          "interactionDependencies": ["ProcessRemovalRequest"],
+          "computationMethod": "Set by ProcessRemovalRequest when admin makes decision",
           "initialValue": "null"
+        },
+        "processedAt": {
+          "type": "timestamp",
+          "purpose": "When admin processed the request",
+          "dataDependencies": [],
+          "interactionDependencies": ["ProcessRemovalRequest"],
+          "computationMethod": "Set to current timestamp when ProcessRemovalRequest executes",
+          "initialValue": "null"
+        },
+        "createdAt": {
+          "type": "timestamp",
+          "purpose": "Request creation timestamp",
+          "dataDependencies": [],
+          "interactionDependencies": ["InitiateRemovalRequest"],
+          "computationMethod": "Set to current timestamp when InitiateRemovalRequest creates the request",
+          "initialValue": "Current timestamp at creation"
+        },
+        "updatedAt": {
+          "type": "timestamp",
+          "purpose": "Last update timestamp",
+          "dataDependencies": [],
+          "interactionDependencies": ["ProcessRemovalRequest", "CancelRemovalRequest"],
+          "computationMethod": "Updated to current timestamp when request status changes",
+          "initialValue": "Current timestamp at creation"
         }
       }
     }
@@ -367,61 +447,43 @@
   "relations": {
     "UserDormitoryRelation": {
       "type": "n:1",
-      "purpose": "Assigns users to their dormitory",
+      "purpose": "Assigns users to dormitories",
       "sourceEntity": "User",
       "targetEntity": "Dormitory",
       "sourceProperty": "dormitory",
-      "targetProperty": "residents",
+      "targetProperty": "users",
       "dataDependencies": ["User", "Dormitory"],
-      "interactionDependencies": ["AssignUserToDormitory", "ApproveEviction"],
-      "computationMethod": "Created by AssignUserToDormitory when user is assigned, deleted by ApproveEviction when user is evicted",
+      "interactionDependencies": ["AssignUserToDormitory", "RemoveUserFromDormitory", "ProcessRemovalRequest"],
+      "computationMethod": "Created by AssignUserToDormitory, deleted by RemoveUserFromDormitory or approved ProcessRemovalRequest",
       "lifecycle": {
         "creation": "interaction-created",
         "deletion": {
           "canBeDeleted": true,
           "deletionType": "hard-delete",
-          "deletionInteractions": ["ApproveEviction"]
+          "deletionInteractions": ["RemoveUserFromDormitory", "ProcessRemovalRequest"]
         }
       },
-      "properties": {
-        "assignedAt": {
-          "type": "datetime",
-          "purpose": "When the user was assigned to this dormitory",
-          "dataDependencies": [],
-          "interactionDependencies": ["AssignUserToDormitory"],
-          "computationMethod": "Set to current timestamp when AssignUserToDormitory creates the relation",
-          "initialValue": "Current timestamp at creation"
-        }
-      }
+      "properties": {}
     },
     "UserBedRelation": {
       "type": "1:1",
-      "purpose": "Assigns users to their specific bed",
+      "purpose": "Assigns users to specific beds",
       "sourceEntity": "User",
       "targetEntity": "Bed",
       "sourceProperty": "bed",
       "targetProperty": "occupant",
       "dataDependencies": ["User", "Bed"],
-      "interactionDependencies": ["AssignUserToDormitory", "ApproveEviction"],
-      "computationMethod": "Created by AssignUserToDormitory when user is assigned, deleted by ApproveEviction when user is evicted",
+      "interactionDependencies": ["AssignUserToDormitory", "RemoveUserFromDormitory", "ProcessRemovalRequest"],
+      "computationMethod": "Created by AssignUserToDormitory, deleted by RemoveUserFromDormitory or approved ProcessRemovalRequest",
       "lifecycle": {
         "creation": "interaction-created",
         "deletion": {
           "canBeDeleted": true,
           "deletionType": "hard-delete",
-          "deletionInteractions": ["ApproveEviction"]
+          "deletionInteractions": ["RemoveUserFromDormitory", "ProcessRemovalRequest"]
         }
       },
-      "properties": {
-        "occupiedAt": {
-          "type": "datetime",
-          "purpose": "When the user occupied this bed",
-          "dataDependencies": [],
-          "interactionDependencies": ["AssignUserToDormitory"],
-          "computationMethod": "Set to current timestamp when AssignUserToDormitory creates the relation",
-          "initialValue": "Current timestamp at creation"
-        }
-      }
+      "properties": {}
     },
     "DormitoryBedRelation": {
       "type": "1:n",
@@ -432,7 +494,7 @@
       "targetProperty": "dormitory",
       "dataDependencies": ["Dormitory", "Bed"],
       "interactionDependencies": ["CreateDormitory"],
-      "computationMethod": "Created together with Bed entities when CreateDormitory is executed",
+      "computationMethod": "Created together with Bed entities when CreateDormitory creates the dormitory",
       "lifecycle": {
         "creation": "created-with-entity",
         "deletion": {
@@ -444,44 +506,35 @@
       "properties": {}
     },
     "DormitoryDormHeadRelation": {
-      "type": "1:1",
-      "purpose": "Designates the head of a dormitory",
+      "type": "n:1",
+      "purpose": "Assigns dorm heads to manage dormitories",
       "sourceEntity": "Dormitory",
       "targetEntity": "User",
       "sourceProperty": "dormHead",
       "targetProperty": "managedDormitory",
       "dataDependencies": ["Dormitory", "User"],
-      "interactionDependencies": ["AppointDormHead"],
-      "computationMethod": "Created by AppointDormHead when admin appoints a user as dormitory head",
+      "interactionDependencies": ["AssignDormHead", "RemoveDormHead"],
+      "computationMethod": "Created by AssignDormHead when appointing dorm head, deleted by RemoveDormHead",
       "lifecycle": {
         "creation": "interaction-created",
         "deletion": {
           "canBeDeleted": true,
           "deletionType": "hard-delete",
-          "deletionInteractions": []
+          "deletionInteractions": ["RemoveDormHead"]
         }
       },
-      "properties": {
-        "appointedAt": {
-          "type": "datetime",
-          "purpose": "When the user was appointed as dorm head",
-          "dataDependencies": [],
-          "interactionDependencies": ["AppointDormHead"],
-          "computationMethod": "Set to current timestamp when AppointDormHead creates the relation",
-          "initialValue": "Current timestamp at creation"
-        }
-      }
+      "properties": {}
     },
     "UserPointDeductionRelation": {
       "type": "1:n",
-      "purpose": "Links users to their point deduction records",
+      "purpose": "Links users to their point deductions",
       "sourceEntity": "User",
       "targetEntity": "PointDeduction",
       "sourceProperty": "pointDeductions",
       "targetProperty": "user",
       "dataDependencies": ["User", "PointDeduction"],
-      "interactionDependencies": ["RecordPointDeduction"],
-      "computationMethod": "Created together with PointDeduction entity by RecordPointDeduction interaction",
+      "interactionDependencies": ["IssuePointDeduction"],
+      "computationMethod": "Created together with PointDeduction entity by IssuePointDeduction",
       "lifecycle": {
         "creation": "created-with-entity",
         "deletion": {
@@ -492,16 +545,16 @@
       },
       "properties": {}
     },
-    "PointDeductionRecorderRelation": {
+    "DeductionIssuerRelation": {
       "type": "n:1",
-      "purpose": "Links point deductions to the user who recorded them",
+      "purpose": "Tracks who issued each point deduction",
       "sourceEntity": "PointDeduction",
       "targetEntity": "User",
-      "sourceProperty": "recorder",
-      "targetProperty": "recordedDeductions",
+      "sourceProperty": "issuedBy",
+      "targetProperty": "issuedDeductions",
       "dataDependencies": ["PointDeduction", "User"],
-      "interactionDependencies": ["RecordPointDeduction"],
-      "computationMethod": "Created together with PointDeduction entity by RecordPointDeduction interaction",
+      "interactionDependencies": ["IssuePointDeduction"],
+      "computationMethod": "Created together with PointDeduction entity by IssuePointDeduction",
       "lifecycle": {
         "creation": "created-with-entity",
         "deletion": {
@@ -512,16 +565,16 @@
       },
       "properties": {}
     },
-    "EvictionRequestTargetUserRelation": {
+    "RemovalRequestTargetRelation": {
       "type": "n:1",
-      "purpose": "Links eviction requests to the target user",
-      "sourceEntity": "EvictionRequest",
+      "purpose": "Links removal requests to target users",
+      "sourceEntity": "RemovalRequest",
       "targetEntity": "User",
       "sourceProperty": "targetUser",
-      "targetProperty": "evictionRequests",
-      "dataDependencies": ["EvictionRequest", "User"],
-      "interactionDependencies": ["RequestEviction"],
-      "computationMethod": "Created together with EvictionRequest entity by RequestEviction interaction",
+      "targetProperty": "removalRequests",
+      "dataDependencies": ["RemovalRequest", "User"],
+      "interactionDependencies": ["InitiateRemovalRequest"],
+      "computationMethod": "Created together with RemovalRequest entity by InitiateRemovalRequest",
       "lifecycle": {
         "creation": "created-with-entity",
         "deletion": {
@@ -532,16 +585,16 @@
       },
       "properties": {}
     },
-    "EvictionRequestRequesterRelation": {
+    "RemovalRequestInitiatorRelation": {
       "type": "n:1",
-      "purpose": "Links eviction requests to the requester (dormHead)",
-      "sourceEntity": "EvictionRequest",
+      "purpose": "Tracks who initiated each removal request",
+      "sourceEntity": "RemovalRequest",
       "targetEntity": "User",
-      "sourceProperty": "requester",
-      "targetProperty": "submittedEvictionRequests",
-      "dataDependencies": ["EvictionRequest", "User"],
-      "interactionDependencies": ["RequestEviction"],
-      "computationMethod": "Created together with EvictionRequest entity by RequestEviction interaction",
+      "sourceProperty": "requestedBy",
+      "targetProperty": "initiatedRemovalRequests",
+      "dataDependencies": ["RemovalRequest", "User"],
+      "interactionDependencies": ["InitiateRemovalRequest"],
+      "computationMethod": "Created together with RemovalRequest entity by InitiateRemovalRequest",
       "lifecycle": {
         "creation": "created-with-entity",
         "deletion": {
@@ -552,16 +605,16 @@
       },
       "properties": {}
     },
-    "EvictionRequestApproverRelation": {
+    "RemovalRequestAdminRelation": {
       "type": "n:1",
-      "purpose": "Links eviction requests to the admin who approved/rejected them",
-      "sourceEntity": "EvictionRequest",
+      "purpose": "Tracks which admin processed each removal request",
+      "sourceEntity": "RemovalRequest",
       "targetEntity": "User",
-      "sourceProperty": "approver",
-      "targetProperty": "processedEvictionRequests",
-      "dataDependencies": ["EvictionRequest", "User"],
-      "interactionDependencies": ["ApproveEviction", "RejectEviction"],
-      "computationMethod": "Created when ApproveEviction or RejectEviction is executed",
+      "sourceProperty": "processedBy",
+      "targetProperty": "processedRemovalRequests",
+      "dataDependencies": ["RemovalRequest", "User"],
+      "interactionDependencies": ["ProcessRemovalRequest"],
+      "computationMethod": "Created when ProcessRemovalRequest approves or rejects the request",
       "lifecycle": {
         "creation": "interaction-created",
         "deletion": {

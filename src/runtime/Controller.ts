@@ -67,6 +67,7 @@ export interface ControllerOptions {
     recordMutationSideEffects?: RecordMutationSideEffect[]
     computations?: (new (...args: any[]) => Computation)[]
     ignorePermission?: boolean
+    forceThtrowInteractionError?: boolean
 }
 
 export class Controller {
@@ -86,6 +87,7 @@ export class Controller {
     public dict: DictionaryInstance[] = []
     public recordMutationSideEffects: RecordMutationSideEffect[] = []
     public ignorePermission: boolean
+    public forceThtrowInteractionError: boolean
     constructor(options: ControllerOptions) {
         const {
             system,
@@ -96,13 +98,14 @@ export class Controller {
             dict = [],
             recordMutationSideEffects = [],
             computations = [],
-            ignorePermission = false
+            ignorePermission = false,
+            forceThtrowInteractionError = false // 会 catch 住 error，并在 result 中返回。
         } = options
         
         // 首先初始化 system
         this.system = system
         this.ignorePermission = ignorePermission
-        
+        this.forceThtrowInteractionError = forceThtrowInteractionError
         // 因为我们会对 entities 数组进行补充。如果外部复用了传入的数组对象，就会发生混乱，例如在测试用例中复用。
         this.entities = [...entities]
         this.relations = [...relations]
@@ -227,7 +230,13 @@ export class Controller {
 
     async callInteraction(interactionName:string, interactionEventArgs: InteractionEventArgs) {
         try {
-            return await this.activityManager.callInteraction(interactionName, interactionEventArgs)
+            // 内部 error 已经 catch 住了，如果 option 中没有声明 returnInteractionError，则直接 throw 出去。
+            const result = await this.activityManager.callInteraction(interactionName, interactionEventArgs)
+            if (result.error && this.forceThtrowInteractionError) {
+                throw result.error
+            } else {
+                return result
+            }
         } catch (e) {
             const error = new InteractionExecutionError('Failed to call interaction', {
                 interactionName,
@@ -241,7 +250,12 @@ export class Controller {
     }
     async callActivityInteraction(activityName:string, interactionName:string, activityId: string|undefined, interactionEventArgs: InteractionEventArgs) {
         try {
-            return await this.activityManager.callActivityInteraction(activityName, interactionName, activityId, interactionEventArgs)
+            const result = await this.activityManager.callActivityInteraction(activityName, interactionName, activityId, interactionEventArgs)
+            if (result.error && this.forceThtrowInteractionError) {
+                throw result.error
+            } else {
+                return result
+            }
         } catch (e) {
             const error = new InteractionExecutionError('Failed to call activity interaction', {
                 interactionName,

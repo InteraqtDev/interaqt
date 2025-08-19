@@ -547,6 +547,8 @@ This section follows a **test-driven progressive approach** where each computati
 1. Check that `docs/computation-analysis.json` exists and is valid JSON
 2. If issues persist, stop and wait for user commands
 
+**🛑 STOP: Computation implementation plan generated. Review `docs/computation-implementation-plan.json` and wait for user instructions before proceeding to Task 3.1.4.3.**
+
 **✅ END Task 3.1.4.2: Update `docs/STATUS.json`:**
 ```json
 {
@@ -564,46 +566,88 @@ This section follows a **test-driven progressive approach** where each computati
   "completed": false
 }
 ```
-**MUST Read `docs/computation-implementation-plan.json` to see which computations are completed and what's next.**
 
 **📖 Reference `tests/crud.example.test.ts`** for computation implementation code patterns and best practices
 
-**For EACH computation in your plan, follow this cycle:**
+**For EACH computation in your plan, follow this progressive implementation cycle:**
+
+## START: Select Next Computation
+
+1. **Read `docs/computation-implementation-plan.json`** to find the FIRST uncompleted computation
+   - ALWAYS select the FIRST uncompleted computation
+   - NEVER skip ahead - dependencies must be completed in order
+   - Phase 1 must complete before Phase 2, etc.
+
+2. **Check if computation has `lastError` field:**
+   - If YES → Execute DEEP DEBUG MODE below
+   - If NO → Execute NORMAL IMPLEMENTATION FLOW below
+
+## DEEP DEBUG MODE (when lastError exists):
+
+1. **Review Previous Error**: Read the error document at the path in `lastError` to understand what failed and what was already attempted
+
+2. **Analyze Root Cause**:
+   - Verify implementation code correctness
+   - Check all `expandedDependencies` are properly handled
+   - Cross-reference with `requirements/interaction-matrix.md` for business logic
+   - Confirm test expectations match business requirements
+   - Review similar successful computations for patterns
+
+3. **Apply Fix Based on Analysis**:
+   - **Implementation Issue** → Fix computation code in backend/index.ts
+   - **Test Issue** → Fix test case logic or expectations
+   - **Dependency Issue** → Fix data creation order
+   - **Business Logic Issue** → Re-read requirements and adjust
+
+4. **Test the Fix**:
+   - Run `npm run check` for type verification
+   - Run the specific test
+   - If successful: Remove `lastError` field, mark `"completed": true`, return to START
+   - If still failing: Update error document with new attempts
+   - After 3 additional attempts, STOP and wait for user guidance
+
+## NORMAL IMPLEMENTATION FLOW (when no lastError):
 
 1. **Implement the Computation**
-   - [ ] Add the computation code to your entity/relation/property
-   - [ ] **Use assignment pattern (`Entity.computation = ...` or `Property.computation = ...`)** to add computations at the end of file. This avoids complex complex reference issues. Example:
+   - Add computation code using assignment pattern at end of file:
      ```typescript
-     // 1. First define all entities and relations
-     const User = Entity.create({ name: 'User', properties: [...] })
-     const Post = Entity.create({ name: 'Post', properties: [...] })
-     const UserPostRelation = Relation.create({ source: User, target: Post, ... })
-     
-     // 2. export section (export section stays at the very end)
-     export const entities = [User, Post]
-     export const relations = [UserPostRelation]
-
-     // 3. add computations using assignment (append at the end of the file)
+     // At end of backend/index.ts, after exports:
      User.properties.find(p => p.name === 'postCount').computation = Count.create({
-       property: 'posts'  // Use property name from relation
+       property: 'posts'
      })
      ```
-   - [ ] If adding computation to a property that has `defaultValue`, remove the `defaultValue` (computation will provide the default)
-   - [ ] Verify no Transform is used in Property computation
+   - Remove any `defaultValue` if adding computation to that property
+   - Never use Transform in Property computation
 
 2. **Type Check**
-   - [ ] Run `npm run check` to ensure TypeScript compilation passes
-   - [ ] Fix ALL type errors before proceeding
-   - [ ] Do NOT write tests until type checking passes
+   - Run `npm run check`
+   - Fix all type errors before proceeding to tests
 
-3. **Write Focused Test Case**
-   - [ ] Add a new test case in `tests/basic.test.ts` specifically for this computation (write all test cases in the 'Basic Functionality' describe group)
-   - [ ] Test name should clearly indicate what computation is being tested
-   - [ ] Test should verify the computation works correctly
-   - [ ] Test should cover all CRUD operations the computation supports (Create, Read, Update, Delete - if applicable)
-   - [ ] If the computation is a StateMachine, test should cover EVERY StateTransfer defined
+3. **Create Test Case Plan**
+   - Read computation details from `docs/computation-implementation-plan.json`
+   - Check `expandedDependencies` to understand all required dependencies
+   - Write test plan comment with: dependencies, test steps, business logic notes
+   - Cross-reference with `requirements/interaction-matrix.md` and `docs/data-design.json`
    
-   **Example test structure:**
+   ```typescript
+   test('User.dormitoryCount computation', async () => {
+     /**
+      * Test Plan for: User.dormitoryCount
+      * Dependencies: User entity, UserDormitoryRelation
+      * Steps: 1) Create user 2) Create dormitories 3) Create relations 4) Verify count
+      * Business Logic: Count of dormitories user is assigned to
+      */
+     // Implementation...
+   })
+   ```
+
+4. **Write Test Implementation**
+   - Add test to `tests/basic.test.ts` in 'Basic Functionality' describe group
+   - Follow the test plan created above
+   - For StateMachine computations, test ALL StateTransfer transitions
+   - Test all CRUD operations the computation supports
+   
+   Example patterns:
    ```typescript
    test('User.status has correct default value', async () => {
      const user = await system.storage.create('User', {
@@ -654,24 +698,30 @@ This section follows a **test-driven progressive approach** where each computati
    })
    ```
 
-4. **Run Test**
-   - [ ] **🔴 CRITICAL: Run FULL test suite every time** to ensure no regression: `npm run test tests/basic.test.ts`
-     - This runs ALL tests in the file, not just the new one
-     - Ensures new computation doesn't break any existing functionality
-     - If ANY test fails (new or existing), must fix before proceeding
-   - [ ] Fix any test failures (both new tests and any regressions)
-   - [ ] **🔴 CRITICAL: NEVER cheat to pass tests!**
-     - ❌ Do NOT mark tests as `.skip()` or `.todo()`
-     - ❌ Do NOT fake/mock data just to make tests pass
-     - ❌ Do NOT remove or ignore critical assertions
-     - ✅ Actually fix the implementation until tests genuinely pass
-   - [ ] If test still fails after 10 fix attempts, STOP and wait for user guidance
-   - [ ] **MUST record all encountered errors** in `docs/errors/` directory with descriptive filenames (e.g., `computation-user-status-error.md`)
-   - [ ] Do NOT proceed to next computation until ALL tests pass (both new and existing)
+5. **Run Test**
+   - Run full test suite: `npm run test tests/basic.test.ts`
+   - Must fix any failures (new tests or regressions) before proceeding
+   
+   **If test fails after type check passes:**
+   - Review test plan - are dependencies properly set up?
+   - Verify against `requirements/interaction-matrix.md` and `docs/data-design.json`
+   - Check if test data matches `expandedDependencies`
+   - Common issues: missing dependencies, wrong operation order, incorrect expectations
+   
+   **Error handling:**
+   - After 10 fix attempts, STOP and wait for user guidance
+   - Create error document in `docs/errors/` with test plan, code, error, and attempts
+   - Update `lastError` field in computation-implementation-plan.json with error doc path
+   - Never skip tests or fake data to pass
 
-5. **Document Progress**
-   - [ ] **MUST** update the completed computation status in `docs/computation-implemention-plan.json` (mark as `"completed": true`)
-   - [ ] Create new documents in `docs/errors/` to record any errors encountered
+6. **Document Progress**
+   - Update computation in `docs/computation-implemention-plan.json`:
+     - Set `"completed": true`
+     - Remove `lastError` field if it exists
+
+7. **Loop Back**
+   - Return to START to select next uncompleted computation
+   - STOP after each computation for user confirmation before continuing
 
 **🛑 STOP GATE: DO NOT proceed to Task 3.1.4.4 until ALL computations in `docs/computation-implementation-plan.json` are marked as complete with passing tests.**
 
@@ -976,6 +1026,10 @@ import {
    - [ ] Create new documents in `docs/errors/` to record any errors encountered
    - [ ] Add comments in code explaining complex conditions
 
+**🛑 STOP: Current rule implementation completed. Wait for user instructions before proceeding to the next rule.**
+
+**After receiving user confirmation, repeat steps 1-5 for the next uncompleted rule in `docs/business-rules-and-permission-control-implementation-plan.json`.**
+
 **🛑 STOP GATE: DO NOT proceed to Task 3.2.3 until ALL rules in `docs/business-rules-and-permission-control-implementation-plan.json` are marked as complete with passing tests.**
 
 **✅ END Task 3.2.2: Update `docs/STATUS.json`:**
@@ -1049,256 +1103,6 @@ Since permissions and business rules are unified in the `conditions` API, the fr
 }
 ```
 
-**🛑 STOP: Task 3 completed. Wait for user instructions before proceeding to Task 4.**
-
-## Task 4: Complete Functional Testing
-
-**📖 START: Read `docs/STATUS.json` to check current progress before proceeding.**
-
-**🔄 Update `docs/STATUS.json`:**
-```json
-{
-  "currentTask": "Task 4",
-  "completed": false
-}
-```
-
-**🎯 Goal: Implement and pass ALL test cases defined in `requirements/test-cases.md`**
-
-This phase ensures your implementation meets all business requirements through comprehensive testing.
-
-### Task 4.1: Prepare for Complete Testing
-
-**🔄 Update `docs/STATUS.json`:**
-```json
-{
-  "currentTask": "Task 4.1",
-  "completed": false
-}
-```
-
-#### Task 4.1.1: Create Test Organization
-
-**🔄 Update `docs/STATUS.json`:**
-```json
-{
-  "currentTask": "Task 4.1.1",
-  "completed": false
-}
-```
-- [ ] Copy content from `tests/business.template.test.ts` to create `tests/business.test.ts` for comprehensive functional tests
-
-**✅ END Task 4.1.1: Update `docs/STATUS.json`:**
-```json
-{
-  "currentTask": "Task 4.1.1",
-  "completed": true
-}
-```
-
-#### Task 4.1.2: Test Case Mapping
-
-**🔄 Update `docs/STATUS.json`:**
-```json
-{
-  "currentTask": "Task 4.1.2",
-  "completed": false
-}
-```
-- [ ] Review ALL test cases in `requirements/test-cases.md`
-- [ ] Create `docs/test-implementation-plan.md` with checklist of all test cases
-
-
-**✅ END Task 4.1: Update `docs/STATUS.json`:**
-```json
-{
-  "currentTask": "Task 4.1",
-  "completed": true
-}
-```
-
-### Task 4.2: Progressive Test Implementation Loop
-
-**🔄 Update `docs/STATUS.json`:**
-```json
-{
-  "currentTask": "Task 4.2",
-  "completed": false
-}
-```
-
-**🔴 CRITICAL: Use Progressive Implementation with Immediate Testing**
-
-This task follows a **test-driven progressive approach** where each test case from `requirements/test-cases.md` is implemented and verified individually before moving to the next one.
-
-
-**📖 MUST READ FIRST:**
-- `./agentspace/knowledge/generator/test-implementation.md`
-- `./agentspace/knowledge/generator/permission-test-implementation.md`
-- `./agentspace/knowledge/generator/permission-implementation.md`
-- `docs/test-implementation-plan.md`
-
-**For EACH test case in `requirements/test-cases.md`, follow this cycle:**
-
-1. **Implement the Test Case**
-   - [ ] Write the test case exactly as specified in requirements
-   - [ ] Include all preconditions, inputs, and expected results
-   - [ ] Use descriptive test names that match the requirement ID (e.g., "TC001: Create Article")
-   - [ ] Add the test in `tests/business.test.ts` in the appropriate describe group
-   - [ ] **Example structure:**
-     ```typescript
-     test('TC001: Create Article (via CreateArticle Interaction)', async () => {
-       // Preconditions
-       const user = await system.storage.create('User', {
-         name: 'Jane',
-         email: 'jane@example.com',
-         role: 'publisher'
-       })
-       
-       // Execute interaction
-       const result = await controller.callInteraction('CreateArticle', {
-         user,
-         payload: { 
-           title: 'Tech Sharing', 
-           content: 'Content...', 
-           tags: ['frontend', 'React'] 
-         }
-       })
-       
-       // Verify ALL expected results from requirements
-       expect(result.error).toBeUndefined()
-       expect(result.data).toBeDefined()
-       
-       // Check created article properties
-       const article = await system.storage.findOne(
-         'Article',
-         MatchExp.atom({ key: 'id', value: ['=', result.data.id] }),
-         undefined,
-         ['id', 'title', 'content', 'status', 'createdAt', 'tags']
-       )
-       expect(article.title).toBe('Tech Sharing')
-       expect(article.status).toBe('draft')
-       expect(article.createdAt).toBeDefined()
-       
-       // Post validation - check user's article count
-       const userWithCount = await system.storage.findOne(
-         'User',
-         MatchExp.atom({ key: 'id', value: ['=', user.id] }),
-         undefined,
-         ['id', 'articleCount']
-       )
-       expect(userWithCount.articleCount).toBe(1)
-     })
-     ```
-
-2. **Type Check**
-   - [ ] Run `npm run check` to ensure TypeScript compilation passes
-   - [ ] Fix ALL type errors before proceeding
-   - [ ] Do NOT run tests until type checking passes
-
-3. **Run the Test**
-   - [ ] Run the specific test first: `npm run test tests/business.test.ts -t "TC001"`
-   - [ ] If test passes, proceed to step 4
-   - [ ] If test fails, analyze the failure:
-     - Is it an implementation issue? Fix in backend code
-     - Is it a test setup issue? Fix test preconditions
-     - Is it a missing feature? Implement it in backend
-     - Is it a requirement misunderstanding? Clarify and document
-   - [ ] **🔴 CRITICAL: NEVER cheat to pass tests!**
-     - ❌ Do NOT mark tests as `.skip()` or `.todo()`
-     - ❌ Do NOT fake/mock data just to make tests pass
-     - ❌ Do NOT remove or ignore critical assertions
-     - ❌ Do NOT modify the test expectations to match wrong behavior
-     - ✅ Actually fix the implementation until tests genuinely pass
-   - [ ] If test still fails after 10 fix attempts, STOP and wait for user guidance
-   - [ ] **MUST record all encountered errors** in `docs/errors/` directory with descriptive filenames (e.g., `tc001-create-article-error.md`)
-
-4. **Verify No Regression**
-   - [ ] **🔴 CRITICAL: Run ALL tests every time** to ensure no regression:
-     ```bash
-     npm run test tests/basic.test.ts    # Run all basic tests
-     npm run test tests/business.test.ts  # Run all business tests so far
-     ```
-   - [ ] This ensures the new test doesn't break existing functionality
-   - [ ] If ANY test fails (new or existing), must fix before proceeding
-   - [ ] If regression occurs, find a solution that satisfies both requirements
-   - [ ] Do NOT proceed to next test case until ALL tests pass
-
-5. **Document Progress**
-   - [ ] **MUST** update the completed test case status in `docs/test-implementation-plan.md`
-   - [ ] Mark the test case as `"completed": true` with current timestamp
-   - [ ] Add any implementation notes or issues encountered
-   - [ ] Update running statistics (e.g., "15 of 30 test cases completed")
-   - [ ] Create new documents in `docs/errors/` to record any errors encountered
-   - [ ] Commit changes with clear message: "Implement TC001: Create Article - All tests passing"
-
-**🛑 STOP GATE: DO NOT proceed to the next test case until:**
-- [ ] Current test case passes completely
-- [ ] ALL existing tests still pass (no regression)
-- [ ] Progress is documented in `docs/test-implementation-plan.md`
-- [ ] Any errors are documented in `docs/errors/`
-
-**🔁 REPEAT: Continue this loop for EVERY test case in `requirements/test-cases.md` until all are complete.**
-
-**✅ END Task 4.2: Update `docs/STATUS.json`:**
-```json
-{
-  "currentTask": "Task 4.2",
-  "completed": true,
-  "completedItems": [
-    "All test cases from requirements/test-cases.md implemented",
-    "Each test case verified individually with no regression",
-    "Complete test coverage achieved"
-  ]
-}
-```
-
-### Task 4.3: Completion Criteria
-
-**🔄 Update `docs/STATUS.json`:**
-```json
-{
-  "currentTask": "Task 4.3",
-  "completed": false
-}
-```
-
-**🛑 STOP GATE: Do NOT consider the project complete until:**
-
-- [ ] **100% of test cases** from `requirements/test-cases.md` are implemented
-- [ ] **ALL tests pass** without any failures or skips
-- [ ] **No console errors** during test execution
-- [ ] Final test run output shows:
-  ```
-  ✓ Complete Functional Tests (X tests)
-    ✓ Core Business Logic (X tests)
-    ✓ User Workflows (X tests)
-    ✓ Edge Cases (X tests)
-    ✓ Integration Scenarios (X tests)
-  
-  Test Suites: X passed, X total
-  Tests: X passed, X total
-  ```
-- [ ] Create final report in `docs/test-completion-report.md` with:
-  - Total test count
-  - Coverage statistics
-  - Any known limitations
-  - Performance metrics
-
-**Remember: The goal is to have a production-ready implementation that passes ALL business requirements, not just to make tests pass.**
-
-**✅ END Task 4: Update `docs/STATUS.json`:**
-```json
-{
-  "currentTask": "Task 4",
-  "completed": true,
-  "completedItems": [
-    "All test cases from requirements/test-cases.md implemented",
-    "All tests passing without failures",
-    "Test completion report created"
-  ]
-}
-```
 **✅ PROJECT COMPLETE: Final update to `docs/STATUS.json`:**
 ```json
 {
@@ -1308,7 +1112,6 @@ This task follows a **test-driven progressive approach** where each test case fr
     "Task 1: Requirements Analysis - COMPLETE",
     "Task 2: Design and Analysis - COMPLETE",
     "Task 3: Code Generation and Progressive Testing - COMPLETE",
-    "Task 4: Complete Functional Testing - COMPLETE",
     "All tests passing",
     "Project ready for production"
   ]

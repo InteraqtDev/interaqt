@@ -146,7 +146,7 @@ function findNodeIdByDependency(dep: string, nodes: ComputationNode[]): string |
 }
 
 // 构建计算节点和依赖图
-function buildComputationGraph(analysis: ComputationAnalysis): { nodes: ComputationNode[], edges: { from: string; to: string }[] } {
+function buildComputationGraph(analysis: ComputationAnalysis, dataDesign?: any): { nodes: ComputationNode[], edges: { from: string; to: string }[] } {
   const nodes: ComputationNode[] = [];
   const edges: { from: string; to: string }[] = [];
   
@@ -192,13 +192,31 @@ function buildComputationGraph(analysis: ComputationAnalysis): { nodes: Computat
       const deps = relation.relationAnalysis?.dependencies || [];
       const parsedDeps = deps.map(parseDependency);
       
+      // 构建展开的依赖，包括 source 和 target 实体
+      const expandedDeps = [...parsedDeps];
+      
+      // 从 dataDesign 中查找 relation 的 source 和 target 实体
+      if (dataDesign && dataDesign.relations && dataDesign.relations[relation.name]) {
+        const relationDesign = dataDesign.relations[relation.name];
+        
+        // 添加 sourceEntity 到展开依赖（如果不在原始依赖中）
+        if (relationDesign.sourceEntity && !expandedDeps.includes(relationDesign.sourceEntity)) {
+          expandedDeps.push(relationDesign.sourceEntity);
+        }
+        
+        // 添加 targetEntity 到展开依赖（如果不在原始依赖中）
+        if (relationDesign.targetEntity && !expandedDeps.includes(relationDesign.targetEntity)) {
+          expandedDeps.push(relationDesign.targetEntity);
+        }
+      }
+      
       nodes.push({
         id: nodeId,
         type: 'relation',
         relationName: relation.name,
         computationType: relation.relationAnalysis?.computationDecision || 'Creation',
         dependencies: parsedDeps,  // 保持原始依赖
-        expandedDependencies: parsedDeps,  // 关系节点的展开依赖与原始依赖相同
+        expandedDependencies: expandedDeps,  // 包含 source/target 的展开依赖
         interactionDependencies: relation.relationAnalysis?.interactionDependencies,
         reasoning: relation.relationAnalysis?.reasoning || 'Relation creation/setup',
         calculationMethod: relation.relationAnalysis?.calculationMethod || 'Relation must exist',
@@ -213,7 +231,16 @@ function buildComputationGraph(analysis: ComputationAnalysis): { nodes: Computat
       if (prop.computationDecision && prop.computationDecision !== 'None') {
         const nodeId = createComputationId('property', entity.name, prop.propertyName);
         const deps = prop.dependencies || [];
-        const parsedDeps = deps.map(parseDependency);
+        
+        // 处理 _self. 前缀的依赖，转换为实际的属性引用
+        const parsedDeps = deps.map(dep => {
+          if (dep.startsWith('_self.')) {
+            // 将 _self.propertyName 转换为 EntityName.propertyName
+            const propertyName = dep.substring(6); // 移除 '_self.' 前缀
+            return `${entity.name}.${propertyName}`;
+          }
+          return parseDependency(dep);
+        });
         
         // 构建展开的依赖
         const expandedDeps = [];
@@ -221,7 +248,7 @@ function buildComputationGraph(analysis: ComputationAnalysis): { nodes: Computat
         // 1. 属性必须依赖于其所在的实体
         expandedDeps.push(entity.name);
         
-        // 2. 添加原始依赖
+        // 2. 添加处理后的依赖
         for (const dep of parsedDeps) {
           if (!expandedDeps.includes(dep)) {
             expandedDeps.push(dep);
@@ -242,8 +269,8 @@ function buildComputationGraph(analysis: ComputationAnalysis): { nodes: Computat
           entityName: entity.name,
           propertyName: prop.propertyName,
           computationType: prop.computationDecision,
-          dependencies: parsedDeps,  // 保持原始的计算依赖
-          expandedDependencies: expandedDeps,  // 展开的所有依赖
+          dependencies: deps,  // 保持原始的依赖（带 _self. 前缀）
+          expandedDependencies: expandedDeps,  // 展开的所有依赖（_self. 已转换）
           interactionDependencies: prop.interactionDependencies,
           reasoning: prop.reasoning,
           calculationMethod: prop.calculationMethod,
@@ -441,6 +468,7 @@ function main() {
   try {
     // 读取输入文件
     const inputPath = path.join(process.cwd(), 'docs', 'computation-analysis.json');
+    const dataDesignPath = path.join(process.cwd(), 'docs', 'data-design.json');
     const outputPath = path.join(process.cwd(), 'docs', 'computation-implemention-plan.json');
     
     if (!fs.existsSync(inputPath)) {
@@ -448,10 +476,16 @@ function main() {
       process.exit(1);
     }
     
+    if (!fs.existsSync(dataDesignPath)) {
+      console.error(`Error: Data design file not found at ${dataDesignPath}`);
+      process.exit(1);
+    }
+    
     const analysisData = JSON.parse(fs.readFileSync(inputPath, 'utf-8')) as ComputationAnalysis;
+    const dataDesignData = JSON.parse(fs.readFileSync(dataDesignPath, 'utf-8'));
     
     // 构建计算图
-    const { nodes, edges } = buildComputationGraph(analysisData);
+    const { nodes, edges } = buildComputationGraph(analysisData, dataDesignData);
     
     console.log(`Found ${nodes.length} computations to analyze`);
     console.log(`Found ${edges.length} dependency edges`);

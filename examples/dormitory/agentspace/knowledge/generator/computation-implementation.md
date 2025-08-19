@@ -275,6 +275,7 @@ export const Style = Entity.create({
     Property.create({ name: 'thumbKey', type: 'string' }),
     Property.create({ name: 'priority', type: 'number', defaultValue: () => 0 }),
     Property.create({ name: 'status', type: 'string', defaultValue: () => 'draft' }),
+    // 🔴 CRITICAL: Always use seconds for timestamps, not milliseconds!
     Property.create({ name: 'createdAt', type: 'number', defaultValue: () => Math.floor(Date.now()/1000) }),
     Property.create({ name: 'updatedAt', type: 'number', defaultValue: () => Math.floor(Date.now()/1000) })
   ],
@@ -291,8 +292,8 @@ export const Style = Entity.create({
           thumbKey: event.payload.thumbKey || '',
           priority: event.payload.priority || 0,
           status: 'draft',
-          createdAt: Math.floor(Date.now()/1000),
-          updatedAt: Math.floor(Date.now()/1000),
+          createdAt: Math.floor(Date.now()/1000),  // Always use seconds!
+          updatedAt: Math.floor(Date.now()/1000),  // Always use seconds!
           lastModifiedBy: event.user  // Creates relation automatically
         };
       }
@@ -333,8 +334,8 @@ export const StyleSnapshot = Entity.create({
           label: style.label,
           slug: style.slug,
           description: style.description || '',
-          snapshotTakenAt: Math.floor(Date.now()/1000),
-          version: Date.now(),  // Simple version number
+          snapshotTakenAt: Math.floor(Date.now()/1000),  // In seconds
+          version: Math.floor(Date.now()/1000),  // Version number in seconds
           // 🔴 CRITICAL: Must explicitly reference source entity to create relation
           originalStyle: style  // ← This creates the relation to source Style
         };
@@ -415,7 +416,7 @@ export const StyleSnapshotRelation = Relation.create({
      targetProperty: 'favoritedBy',
      type: 'n:n',
      properties: [
-       Property.create({ name: 'addedAt', type: 'bigint', defaultValue: () => Date.now() })
+       Property.create({ name: 'addedAt', type: 'number', defaultValue: () => Math.floor(Date.now()/1000) })  // In seconds
      ],
      // Transform ONLY for connecting existing entities
      computation: Transform.create({
@@ -425,7 +426,7 @@ export const StyleSnapshotRelation = Relation.create({
            return {
              source: event.user,
              target: { id: event.payload.styleId },
-             addedAt: Date.now()
+             addedAt: Math.floor(Date.now()/1000)  // In seconds
            };
          }
          return null;
@@ -1018,7 +1019,7 @@ const riskScoreCalculation = Dictionary.create({
             complianceRisk,
             ageRisk
           },
-          calculatedAt: Date.now()
+          calculatedAt: Math.floor(Date.now()/1000)  // In seconds
         };
       }
       
@@ -1195,19 +1196,36 @@ Property.create({
 
 ## Common Patterns
 
-### Timestamp Tracking
+### 🔴 CRITICAL: Timestamp Tracking - Always Use Seconds!
+
+**The database does NOT support millisecond precision. You MUST use `Math.floor(Date.now()/1000)` to convert milliseconds to seconds.**
+
 ```typescript
-// Created at - set once
+// ❌ WRONG: Using milliseconds directly
+Property.create({
+  name: 'createdAt',
+  type: 'number',
+  defaultValue: () => Date.now()  // ERROR! Returns milliseconds, but database only supports seconds!
+})
+
+// ✅ CORRECT: Convert to seconds
+Property.create({
+  name: 'createdAt',
+  type: 'number',
+  defaultValue: () => Math.floor(Date.now()/1000)  // Correct! Unix timestamp in seconds
+})
+
+// ✅ CORRECT: Created at - set once (in seconds)
 Property.create({
   name: 'createdAt',
   type: 'number',
   defaultValue: () => Math.floor(Date.now()/1000)
 })
 
-// Updated at - updates on changes
+// ✅ CORRECT: Updated at - updates on changes (in seconds)
 const updatedState = StateNode.create({
   name: 'updated',
-  computeValue: () => Math.floor(Date.now()/1000)
+  computeValue: () => Math.floor(Date.now()/1000)  // Always convert to seconds!
 });
 
 Property.create({
@@ -1263,8 +1281,8 @@ export const Version = Entity.create({
         const style = dataDeps.styles.find(s => s.id === event.payload.styleId);
         if (style) {
           return {
-            version: Date.now(), // Or use a version counter
-            publishedAt: Date.now(),
+            version: Math.floor(Date.now()/1000),  // Version number in seconds
+            publishedAt: Math.floor(Date.now()/1000),  // In seconds
             isActive: true,
             publishedBy: event.user,
             style: { id: style.id }

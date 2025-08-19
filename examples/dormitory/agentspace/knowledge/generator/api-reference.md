@@ -113,6 +113,11 @@ Property.create(config: PropertyConfig): PropertyInstance
 - `config.computed` (function, optional): Computed property function
 - `config.computation` (Computation, optional): Property computed data
 
+**⚠️ IMPORTANT: Timestamp Properties**
+When creating timestamp properties with `defaultValue`, **always convert milliseconds to seconds** using `Math.floor(Date.now()/1000)`:
+- ❌ WRONG: `defaultValue: () => Date.now()` - Returns milliseconds, database doesn't support this!
+- ✅ CORRECT: `defaultValue: () => Math.floor(Date.now()/1000)` - Returns Unix timestamp in seconds
+
 **Examples**
 ```typescript
 // Basic property
@@ -121,11 +126,12 @@ const username = Property.create({
     type: 'string'
 })
 
-// Property with default value
+// Property with default value - timestamp
+// 🔴 CRITICAL: Always use seconds for timestamps, not milliseconds!
 const createdAt = Property.create({
     name: 'createdAt',
     type: 'number',
-    defaultValue: () => Math.floor(Date.now()/1000)
+    defaultValue: () => Math.floor(Date.now()/1000)  // Convert to seconds - database doesn't support milliseconds!
 })
 
 // Computed property
@@ -1078,7 +1084,7 @@ const counterDict = Dictionary.create({
                 total,
                 count: dataDeps.counters.length,
                 lastChange: diff,
-                timestamp: Date.now()
+                timestamp: Math.floor(Date.now()/1000)  // In seconds
             };
         },
         getDefaultValue: function() {
@@ -1462,7 +1468,7 @@ const processedState = StateNode.create({
 const activeState = StateNode.create({
     name: 'active',
     computeValue: () => ({
-        activatedAt: Date.now(),
+        activatedAt: Math.floor(Date.now()/1000),  // In seconds
         status: 'active',
         metadata: { source: 'manual' }
     })
@@ -1534,7 +1540,7 @@ const approvedState = StateNode.create({
         const approver = event?.user?.name || 'system';
         return {
             status: 'approved',
-            approvedAt: Date.now(),
+            approvedAt: Math.floor(Date.now()/1000),  // In seconds
             approvedBy: approver
         };
     }
@@ -1549,7 +1555,7 @@ const updatedState = StateNode.create({
             return {
                 ...lastValue,
                 ...event.payload.updates,
-                lastModifiedAt: Date.now(),
+                lastModifiedAt: Math.floor(Date.now()/1000),  // In seconds
                 lastModifiedBy: event.user?.id
             };
         }
@@ -1563,11 +1569,11 @@ const reviewedState = StateNode.create({
     computeValue: (lastValue, event) => {
         // Different behavior based on which interaction triggered the transition
         if (event?.interactionName === 'approve') {
-            return { status: 'approved', reviewedAt: Date.now() };
+            return { status: 'approved', reviewedAt: Math.floor(Date.now()/1000) };  // In seconds
         } else if (event?.interactionName === 'reject') {
             return { 
                 status: 'rejected', 
-                reviewedAt: Date.now(),
+                reviewedAt: Math.floor(Date.now()/1000),  // In seconds
                 reason: event.payload?.reason || 'No reason provided'
             };
         }
@@ -2645,7 +2651,7 @@ Update existing records.
 ```typescript
 await storage.update('User', 
   MatchExp.atom({ key: 'id', value: ['=', userId] }), 
-  { status: 'inactive', lastModified: Date.now() }
+  { status: 'inactive', lastModified: Math.floor(Date.now()/1000) }  // In seconds
 )
 ```
 
@@ -2729,7 +2735,7 @@ Create a relation between two entities by their IDs.
 await storage.addRelationByNameById('UserPostRelation', 
   userId, 
   postId,
-  { createdAt: Date.now() }  // Optional relation properties
+  { createdAt: Math.floor(Date.now()/1000) }  // Optional relation properties - in seconds
 )
 ```
 
