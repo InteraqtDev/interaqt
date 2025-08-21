@@ -540,9 +540,9 @@ When querying relations themselves (not entities with relations), the `source` a
 **🔴 CRITICAL: source/target in Relations are Related Entities**
 
 ```typescript
-// ✅ CORRECT: Query relation by source entity's properties
+// ✅ CORRECT: Use relation instance name and query by source entity's properties
 const userPostRelations = await system.storage.find(
-  'UserPostRelation',
+  UserPostRelation.name,  // Use relation instance's name property
   MatchExp.atom({ key: 'source.id', value: ['=', userId] }),  // Use dot notation for source
   undefined,
   [
@@ -553,9 +553,9 @@ const userPostRelations = await system.storage.find(
   ]
 )
 
-// ✅ CORRECT: Query by target entity's properties
+// ✅ CORRECT: Use relation instance name and query by target entity's properties
 const postAuthorRelation = await system.storage.findOneRelationByName(
-  'PostAuthorRelation',
+  PostAuthorRelation.name,  // Use relation instance's name property
   MatchExp.atom({ key: 'target.status', value: ['=', 'published'] }),  // Query by target's field
   undefined,
   [
@@ -567,7 +567,7 @@ const postAuthorRelation = await system.storage.findOneRelationByName(
 
 // ✅ CORRECT: Complex query with both source and target conditions
 const activeUserPublishedPostRelations = await system.storage.findRelationByName(
-  'UserPostRelation',
+  UserPostRelation.name,  // Use relation instance's name property
   MatchExp.atom({ key: 'source.status', value: ['=', 'active'] })
     .and({ key: 'target.publishedAt', value: ['not', null] }),
   { limit: 10 },
@@ -579,17 +579,17 @@ const activeUserPublishedPostRelations = await system.storage.findRelationByName
   ]
 )
 
-// ❌ WRONG: Don't compare source/target directly
+// ❌ WRONG: Don't hardcode relation names or compare source/target directly
 const relations = await system.storage.findRelationByName(
-  'UserPostRelation',
+  'UserPostRelation',  // WRONG! Don't hardcode, use UserPostRelation.name
   MatchExp.atom({ key: 'source', value: ['=', userId] }),  // WRONG! Can't compare entity object
   undefined,
   ['id', 'source', 'target']  // WRONG! Missing nested attributeQuery
 )
 
-// ❌ WRONG: Don't forget nested attributeQuery for source/target
+// ❌ WRONG: Don't hardcode names and don't forget nested attributeQuery for source/target
 const relations = await system.storage.findRelationByName(
-  'UserPostRelation',
+  'UserPostRelation',  // WRONG! Use UserPostRelation.name instead
   MatchExp.atom({ key: 'source.id', value: ['=', userId] }),
   undefined,
   ['id', 'source', 'target']  // WRONG! This won't fetch entity data

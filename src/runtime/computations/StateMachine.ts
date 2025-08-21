@@ -99,11 +99,11 @@ export class PropertyStateMachineHandle implements EventBasedComputation {
         const trigger = this.mutationEventToTrigger(mutationEvent)
         if (trigger) {
             const transfers = this.transitionFinder.findTransfers(trigger)
-            
-            return Promise.all(transfers.map(transfer => {
+            // CAUTION 不能返回有 null 的节点，所以加上 filter。
+            return (await Promise.all(transfers.map(transfer => {
                 const event = mutationEvent.recordName === INTERACTION_RECORD ? mutationEvent.record : mutationEvent
                 return transfer.computeTarget!.call(this.controller, event)
-            }))
+            }))).flat().filter(Boolean)
         }
     }
     
@@ -162,10 +162,10 @@ export class RecordStateMachineHandle implements EventBasedComputation {
         if (trigger) {
             const transfers = this.transitionFinder.findTransfers(trigger)
             
-            return Promise.all(transfers.map(transfer => {
+            return (await Promise.all(transfers.map(transfer => {
                 const event = mutationEvent.recordName === INTERACTION_RECORD ? mutationEvent.record : mutationEvent
                 return transfer.computeTarget!.call(this.controller, event)
-            }))
+            }))).flat().filter(Boolean)
         }
     }
     

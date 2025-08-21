@@ -430,7 +430,7 @@ export class Scheduler {
         if (eventBasedComputation.computeDirtyRecords) {
             let dirtyRecords = (await eventBasedComputation.computeDirtyRecords!(mutationEvent)) || []
             dirtyRecords = Array.isArray(dirtyRecords) ? dirtyRecords : [dirtyRecords]
-            return dirtyRecords.map(record => [record, {
+            return dirtyRecords.filter(Boolean).map(record => [record, {
                 dataDep: source.dataDep,
                 ...mutationEvent
             }]) as [any, EtityMutationEvent][]

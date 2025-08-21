@@ -12,6 +12,7 @@ import {
   WeightedSummation,
   Transform,
   StateMachine,
+
   StateNode,
   StateTransfer,
   Condition,
@@ -24,448 +25,446 @@ import {
   QueryItem
 } from 'interaqt'
 
-// ========= ENTITIES =========
+// ==================== ENTITIES ====================
 
-// User entity - System users with different roles
+// User Entity
 const User = Entity.create({
   name: 'User',
   properties: [
-    Property.create({ name: 'name', type: 'string' }),
+    Property.create({ name: 'id', type: 'string' }),
+    Property.create({ name: 'name', type: 'string' }), // Will have StateMachine computation
     Property.create({ name: 'email', type: 'string' }),
-    Property.create({ name: 'phone', type: 'string' }),
-    Property.create({ name: 'role', type: 'string', defaultValue: () => 'student' }), // admin, dormHead, student
-    Property.create({ name: 'status', type: 'string', defaultValue: () => 'active' }), // active, suspended, removed
-    Property.create({ name: 'totalPoints', type: 'number' }), // Will add computation later
-    Property.create({ name: 'isRemovable', type: 'boolean' }), // Will add computation later
-    Property.create({ name: 'isDormHead', type: 'boolean' }), // Will add computation later
-    Property.create({ name: 'createdAt', type: 'timestamp', defaultValue: () => Date.now() }),
-    Property.create({ name: 'updatedAt', type: 'timestamp', defaultValue: () => Date.now() })
+    Property.create({ name: 'phone', type: 'string' }), // Will have StateMachine computation
+    Property.create({ name: 'role', type: 'string' }), // Will have StateMachine computation
+    Property.create({ name: 'status', type: 'string' }), // Will have StateMachine computation
+    Property.create({ name: 'totalPoints', type: 'number' }), // Will have Summation computation
+    Property.create({ name: 'isRemovable', type: 'boolean' }), // Will have computed function
+    Property.create({ name: 'isDormHead', type: 'boolean' }), // Will have computed function
+    Property.create({ name: 'createdAt', type: 'string' }),
+    Property.create({ name: 'updatedAt', type: 'string' }) // Will have StateMachine computation
   ]
 })
 
-// Dormitory entity - Dormitory rooms that house students
+// Dormitory Entity
 const Dormitory = Entity.create({
   name: 'Dormitory',
   properties: [
-    Property.create({ name: 'name', type: 'string' }),
-    Property.create({ name: 'capacity', type: 'number' }), // 4-6 beds
-    Property.create({ name: 'floor', type: 'number' }),
-    Property.create({ name: 'building', type: 'string' }),
-    Property.create({ name: 'status', type: 'string', defaultValue: () => 'active' }), // active, inactive
-    Property.create({ name: 'occupancy', type: 'number' }), // Will add computation later
-    Property.create({ name: 'availableBeds', type: 'number' }), // Will add computation later
-    Property.create({ name: 'hasDormHead', type: 'boolean' }), // Will add computation later
-    Property.create({ name: 'createdAt', type: 'timestamp', defaultValue: () => Date.now() }),
-    Property.create({ name: 'updatedAt', type: 'timestamp', defaultValue: () => Date.now() })
+    Property.create({ name: 'id', type: 'string' }),
+    Property.create({ name: 'name', type: 'string' }), // Will have StateMachine computation
+    Property.create({ name: 'capacity', type: 'number' }),
+    Property.create({ name: 'floor', type: 'number' }), // Will have StateMachine computation
+    Property.create({ name: 'building', type: 'string' }), // Will have StateMachine computation
+    Property.create({ name: 'status', type: 'string' }), // Will have StateMachine computation
+    Property.create({ name: 'occupancy', type: 'number' }), // Will have Count computation
+    Property.create({ name: 'availableBeds', type: 'number' }), // Will have computed function
+    Property.create({ name: 'hasDormHead', type: 'boolean' }), // Will have Count computation
+    Property.create({ name: 'createdAt', type: 'string' }),
+    Property.create({ name: 'updatedAt', type: 'string' }) // Will have StateMachine computation
   ]
 })
 
-// Bed entity - Individual bed units within dormitories
+// Bed Entity
 const Bed = Entity.create({
   name: 'Bed',
   properties: [
-    Property.create({ name: 'code', type: 'string' }), // e.g., 'A', 'B', '1', '2'
-    Property.create({ name: 'status', type: 'string', defaultValue: () => 'available' }), // available, occupied, maintenance
-    Property.create({ name: 'isAvailable', type: 'boolean' }), // Will add computation later
-    Property.create({ name: 'assignedAt', type: 'timestamp' }),
-    Property.create({ name: 'createdAt', type: 'timestamp', defaultValue: () => Date.now() }),
-    Property.create({ name: 'updatedAt', type: 'timestamp', defaultValue: () => Date.now() })
+    Property.create({ name: 'id', type: 'string' }),
+    Property.create({ name: 'bedNumber', type: 'string' }),
+    Property.create({ name: 'status', type: 'string' }), // Will have StateMachine computation
+    Property.create({ name: 'isAvailable', type: 'boolean' }), // Will have computed function
+    Property.create({ name: 'assignedAt', type: 'string' }), // Will have StateMachine computation
+    Property.create({ name: 'createdAt', type: 'string' }),
+    Property.create({ name: 'updatedAt', type: 'string' }) // Will have StateMachine computation
   ]
 })
 
-// PointDeduction entity - Disciplinary point records
+// PointDeduction Entity
 const PointDeduction = Entity.create({
   name: 'PointDeduction',
   properties: [
+    Property.create({ name: 'id', type: 'string' }),
     Property.create({ name: 'reason', type: 'string' }),
-    Property.create({ name: 'points', type: 'number' }), // 1-10 points
-    Property.create({ name: 'category', type: 'string' }), // hygiene, noise, curfew, damage, other
-    Property.create({ name: 'status', type: 'string', defaultValue: () => 'active' }), // active, appealed, cancelled
-    Property.create({ name: 'details', type: 'string' }),
+    Property.create({ name: 'points', type: 'number' }),
+    Property.create({ name: 'category', type: 'string' }),
+    Property.create({ name: 'status', type: 'string' }), // Will have StateMachine computation
+    Property.create({ name: 'description', type: 'string' }),
     Property.create({ name: 'evidence', type: 'string' }),
-    Property.create({ name: 'issuedAt', type: 'timestamp', defaultValue: () => Date.now() }),
-    Property.create({ name: 'createdAt', type: 'timestamp', defaultValue: () => Date.now() })
+    Property.create({ name: 'deductedAt', type: 'string' }),
+    Property.create({ name: 'createdAt', type: 'string' })
   ]
 })
 
-// RemovalRequest entity - Requests to remove problematic users
+// RemovalRequest Entity
 const RemovalRequest = Entity.create({
   name: 'RemovalRequest',
   properties: [
+    Property.create({ name: 'id', type: 'string' }),
     Property.create({ name: 'reason', type: 'string' }),
-    Property.create({ name: 'targetPoints', type: 'number' }), // Will add computation later
-    Property.create({ name: 'status', type: 'string', defaultValue: () => 'pending' }), // pending, approved, rejected, cancelled
-    Property.create({ name: 'adminComment', type: 'string' }),
-    Property.create({ name: 'processedAt', type: 'timestamp' }),
-    Property.create({ name: 'createdAt', type: 'timestamp', defaultValue: () => Date.now() }),
-    Property.create({ name: 'updatedAt', type: 'timestamp', defaultValue: () => Date.now() })
+    Property.create({ name: 'totalPoints', type: 'number' }), // Will have Transform computation
+    Property.create({ name: 'status', type: 'string' }), // Will have StateMachine computation
+    Property.create({ name: 'adminComment', type: 'string' }), // Will have StateMachine computation
+    Property.create({ name: 'processedAt', type: 'string' }), // Will have StateMachine computation
+    Property.create({ name: 'createdAt', type: 'string' }),
+    Property.create({ name: 'updatedAt', type: 'string' }) // Will have StateMachine computation
   ]
 })
 
-// ========= RELATIONS =========
+// ==================== RELATIONS ====================
 
-// UserDormitoryRelation - Assigns users to dormitories (n:1)
+// UserDormitoryRelation: n:1 (many users to one dormitory)
 const UserDormitoryRelation = Relation.create({
+  name: 'UserDormitoryRelation',
   source: User,
   sourceProperty: 'dormitory',
   target: Dormitory,
   targetProperty: 'users',
-  type: 'n:1',
-  properties: [
-    Property.create({ name: 'assignedAt', type: 'timestamp', defaultValue: () => Date.now() }),
-    Property.create({ name: 'assignedBy', type: 'string' })
-  ]
+  type: 'n:1'
 })
 
-// UserBedRelation - Assigns users to specific beds (1:1)
+// UserBedRelation: 1:1 (one user to one bed)
 const UserBedRelation = Relation.create({
+  name: 'UserBedRelation',
   source: User,
   sourceProperty: 'bed',
   target: Bed,
-  targetProperty: 'user',
-  type: '1:1',
-  properties: [
-    Property.create({ name: 'assignedAt', type: 'timestamp', defaultValue: () => Date.now() }),
-    Property.create({ name: 'assignedBy', type: 'string' })
-  ]
+  targetProperty: 'occupant',
+  type: '1:1'
 })
 
-// DormitoryBedRelation - Links dormitories to their beds (1:n)
+// DormitoryBedRelation: 1:n (one dormitory to many beds)
 const DormitoryBedRelation = Relation.create({
+  name: 'DormitoryBedRelation',
   source: Dormitory,
   sourceProperty: 'beds',
   target: Bed,
   targetProperty: 'dormitory',
-  type: '1:n',
-  properties: [
-    Property.create({ name: 'createdAt', type: 'timestamp', defaultValue: () => Date.now() })
-  ]
+  type: '1:n'
 })
 
-// DormitoryDormHeadRelation - Assigns dorm heads to manage dormitories (n:1)
+// DormitoryDormHeadRelation: n:1 (many dormitories to one dorm head)
 const DormitoryDormHeadRelation = Relation.create({
+  name: 'DormitoryDormHeadRelation',
   source: Dormitory,
   sourceProperty: 'dormHead',
   target: User,
-  targetProperty: 'managedDormitories',
-  type: 'n:1',
-  properties: [
-    Property.create({ name: 'assignedAt', type: 'timestamp', defaultValue: () => Date.now() }),
-    Property.create({ name: 'assignedBy', type: 'string' })
-  ]
+  targetProperty: 'managedDormitory',
+  type: 'n:1'
 })
 
-// UserPointDeductionRelation - Links users to their point deductions (1:n)
+// UserPointDeductionRelation: 1:n (one user to many point deductions)
 const UserPointDeductionRelation = Relation.create({
+  name: 'UserPointDeductionRelation',
   source: User,
   sourceProperty: 'pointDeductions',
   target: PointDeduction,
   targetProperty: 'user',
-  type: '1:n',
-  properties: [
-    Property.create({ name: 'createdAt', type: 'timestamp', defaultValue: () => Date.now() })
-  ]
+  type: '1:n'
 })
 
-// PointDeductionIssuerRelation - Tracks who issued each point deduction (n:1)
-const PointDeductionIssuerRelation = Relation.create({
+// DeductionIssuerRelation: n:1 (many deductions to one issuer)
+const DeductionIssuerRelation = Relation.create({
+  name: 'DeductionIssuerRelation',
   source: PointDeduction,
-  sourceProperty: 'issuer',
+  sourceProperty: 'issuedBy',
   target: User,
   targetProperty: 'issuedDeductions',
-  type: 'n:1',
-  properties: [
-    Property.create({ name: 'createdAt', type: 'timestamp', defaultValue: () => Date.now() })
-  ]
+  type: 'n:1'
 })
 
-// RemovalRequestTargetRelation - Links removal requests to target users (n:1)
+// RemovalRequestTargetRelation: n:1 (many requests to one target user)
 const RemovalRequestTargetRelation = Relation.create({
+  name: 'RemovalRequestTargetRelation',
   source: RemovalRequest,
   sourceProperty: 'targetUser',
   target: User,
-  targetProperty: 'removalRequestsTargeting',
-  type: 'n:1',
-  properties: [
-    Property.create({ name: 'createdAt', type: 'timestamp', defaultValue: () => Date.now() })
-  ]
+  targetProperty: 'removalRequests',
+  type: 'n:1'
 })
 
-// RemovalRequestInitiatorRelation - Tracks who initiated each removal request (n:1)
+// RemovalRequestInitiatorRelation: n:1 (many requests to one initiator)
 const RemovalRequestInitiatorRelation = Relation.create({
+  name: 'RemovalRequestInitiatorRelation',
   source: RemovalRequest,
-  sourceProperty: 'initiator',
+  sourceProperty: 'requestedBy',
   target: User,
   targetProperty: 'initiatedRemovalRequests',
-  type: 'n:1',
-  properties: [
-    Property.create({ name: 'createdAt', type: 'timestamp', defaultValue: () => Date.now() })
-  ]
+  type: 'n:1'
 })
 
-// RemovalRequestProcessorRelation - Tracks which admin processed each removal request (n:1)
-const RemovalRequestProcessorRelation = Relation.create({
+// RemovalRequestAdminRelation: n:1 (many requests to one admin processor)
+const RemovalRequestAdminRelation = Relation.create({
+  name: 'RemovalRequestAdminRelation',
   source: RemovalRequest,
-  sourceProperty: 'processor',
+  sourceProperty: 'processedBy',
   target: User,
   targetProperty: 'processedRemovalRequests',
-  type: 'n:1',
-  properties: [
-    Property.create({ name: 'processedAt', type: 'timestamp', defaultValue: () => Date.now() })
-  ]
+  type: 'n:1'
 })
 
-// ========= INTERACTIONS =========
+// ==================== INTERACTIONS ====================
 
-// CreateDormitory - Create new dormitory with beds
+// CreateDormitory Interaction
 const CreateDormitory = Interaction.create({
   name: 'CreateDormitory',
+  action: Action.create({ name: 'create' }),
   payload: Payload.create({
     items: [
-      PayloadItem.create({ name: 'name' }),
-      PayloadItem.create({ name: 'capacity' }),
+      PayloadItem.create({ name: 'name', required: true }),
+      PayloadItem.create({ name: 'capacity', required: true }),
       PayloadItem.create({ name: 'floor' }),
       PayloadItem.create({ name: 'building' })
     ]
-  }),
-  action: Action.create({ name: 'create' })
+  })
 })
 
-// UpdateDormitory - Modify dormitory details
+// UpdateDormitory Interaction
 const UpdateDormitory = Interaction.create({
   name: 'UpdateDormitory',
+  action: Action.create({ name: 'update' }),
   payload: Payload.create({
     items: [
-      PayloadItem.create({ name: 'dormitoryId' }),
+      PayloadItem.create({ name: 'dormitoryId', required: true }),
       PayloadItem.create({ name: 'name' }),
       PayloadItem.create({ name: 'floor' }),
       PayloadItem.create({ name: 'building' }),
       PayloadItem.create({ name: 'status' })
     ]
-  }),
-  action: Action.create({ name: 'update' })
+  })
 })
 
-// DeactivateDormitory - Mark dormitory as inactive
+// DeactivateDormitory Interaction
 const DeactivateDormitory = Interaction.create({
   name: 'DeactivateDormitory',
+  action: Action.create({ name: 'update' }),
   payload: Payload.create({
     items: [
-      PayloadItem.create({ name: 'dormitoryId' })
+      PayloadItem.create({ name: 'dormitoryId', required: true })
     ]
-  }),
-  action: Action.create({ name: 'update' })
+  })
 })
 
-// AssignDormHead - Appoint user as dorm head
+// AssignDormHead Interaction
 const AssignDormHead = Interaction.create({
   name: 'AssignDormHead',
+  action: Action.create({ name: 'create' }),
   payload: Payload.create({
     items: [
-      PayloadItem.create({ name: 'userId' }),
-      PayloadItem.create({ name: 'dormitoryId' })
+      PayloadItem.create({ name: 'userId', required: true }),
+      PayloadItem.create({ name: 'dormitoryId', required: true })
     ]
-  }),
-  action: Action.create({ name: 'create' })
+  })
 })
 
-// RemoveDormHead - Remove dorm head privileges
+// RemoveDormHead Interaction
 const RemoveDormHead = Interaction.create({
   name: 'RemoveDormHead',
+  action: Action.create({ name: 'delete' }),
   payload: Payload.create({
     items: [
-      PayloadItem.create({ name: 'userId' })
+      PayloadItem.create({ name: 'userId', required: true })
     ]
-  }),
-  action: Action.create({ name: 'delete' })
+  })
 })
 
-// AssignUserToDormitory - Assign student to dormitory and bed
+// AssignUserToDormitory Interaction
 const AssignUserToDormitory = Interaction.create({
   name: 'AssignUserToDormitory',
+  action: Action.create({ name: 'create' }),
   payload: Payload.create({
     items: [
-      PayloadItem.create({ name: 'userId' }),
-      PayloadItem.create({ name: 'dormitoryId' }),
-      PayloadItem.create({ name: 'bedCode' })
+      PayloadItem.create({ name: 'userId', required: true }),
+      PayloadItem.create({ name: 'dormitoryId', required: true }),
+      PayloadItem.create({ name: 'bedNumber', required: true })
     ]
-  }),
-  action: Action.create({ name: 'create' })
+  })
 })
 
-// RemoveUserFromDormitory - Remove user from dormitory
+// RemoveUserFromDormitory Interaction
 const RemoveUserFromDormitory = Interaction.create({
   name: 'RemoveUserFromDormitory',
+  action: Action.create({ name: 'delete' }),
   payload: Payload.create({
     items: [
-      PayloadItem.create({ name: 'userId' }),
+      PayloadItem.create({ name: 'userId', required: true }),
       PayloadItem.create({ name: 'reason' })
     ]
-  }),
-  action: Action.create({ name: 'delete' })
+  })
 })
 
-// IssuePointDeduction - Issue disciplinary points
+// IssuePointDeduction Interaction
 const IssuePointDeduction = Interaction.create({
   name: 'IssuePointDeduction',
+  action: Action.create({ name: 'create' }),
   payload: Payload.create({
     items: [
-      PayloadItem.create({ name: 'targetUserId' }),
-      PayloadItem.create({ name: 'reason' }),
-      PayloadItem.create({ name: 'points' }),
-      PayloadItem.create({ name: 'category' }),
-      PayloadItem.create({ name: 'details' }),
+      PayloadItem.create({ name: 'targetUserId', required: true }),
+      PayloadItem.create({ name: 'reason', required: true }),
+      PayloadItem.create({ name: 'points', required: true }),
+      PayloadItem.create({ name: 'category', required: true }),
+      PayloadItem.create({ name: 'description' }),
       PayloadItem.create({ name: 'evidence' })
     ]
-  }),
-  action: Action.create({ name: 'create' })
+  })
 })
 
-// InitiateRemovalRequest - Request removal of problematic user
+// InitiateRemovalRequest Interaction
 const InitiateRemovalRequest = Interaction.create({
   name: 'InitiateRemovalRequest',
+  action: Action.create({ name: 'create' }),
   payload: Payload.create({
     items: [
-      PayloadItem.create({ name: 'targetUserId' }),
-      PayloadItem.create({ name: 'reason' })
+      PayloadItem.create({ name: 'targetUserId', required: true }),
+      PayloadItem.create({ name: 'reason', required: true })
     ]
-  }),
-  action: Action.create({ name: 'create' })
+  })
 })
 
-// CancelRemovalRequest - Cancel pending removal request
+// CancelRemovalRequest Interaction
 const CancelRemovalRequest = Interaction.create({
   name: 'CancelRemovalRequest',
+  action: Action.create({ name: 'update' }),
   payload: Payload.create({
     items: [
-      PayloadItem.create({ name: 'requestId' })
+      PayloadItem.create({ name: 'requestId', required: true })
     ]
-  }),
-  action: Action.create({ name: 'update' })
+  })
 })
 
-// ProcessRemovalRequest - Approve or reject removal request
+// ProcessRemovalRequest Interaction
 const ProcessRemovalRequest = Interaction.create({
   name: 'ProcessRemovalRequest',
+  action: Action.create({ name: 'update' }),
   payload: Payload.create({
     items: [
-      PayloadItem.create({ name: 'requestId' }),
-      PayloadItem.create({ name: 'decision' }),
+      PayloadItem.create({ name: 'requestId', required: true }),
+      PayloadItem.create({ name: 'decision', required: true }),
       PayloadItem.create({ name: 'adminComment' })
     ]
-  }),
-  action: Action.create({ name: 'update' })
+  })
 })
 
-// CreateUser - Create new user (for testing/initialization)
-const CreateUser = Interaction.create({
-  name: 'CreateUser',
+// ViewSystemStats Interaction
+const ViewSystemStats = Interaction.create({
+  name: 'ViewSystemStats',
+  action: Action.create({ name: 'read' }),
+  payload: Payload.create({
+    items: []
+  })
+})
+
+// ViewDormitoryStats Interaction
+const ViewDormitoryStats = Interaction.create({
+  name: 'ViewDormitoryStats',
+  action: Action.create({ name: 'read' }),
   payload: Payload.create({
     items: [
-      PayloadItem.create({ name: 'name' }),
-      PayloadItem.create({ name: 'email' }),
+      PayloadItem.create({ name: 'dormitoryId', required: true })
+    ]
+  })
+})
+
+// ViewUserDeductions Interaction
+const ViewUserDeductions = Interaction.create({
+  name: 'ViewUserDeductions',
+  action: Action.create({ name: 'read' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({ name: 'targetUserId', required: true })
+    ]
+  })
+})
+
+// ViewMyDormitory Interaction
+const ViewMyDormitory = Interaction.create({
+  name: 'ViewMyDormitory',
+  action: Action.create({ name: 'read' }),
+  payload: Payload.create({
+    items: []
+  })
+})
+
+// ViewMyDeductions Interaction
+const ViewMyDeductions = Interaction.create({
+  name: 'ViewMyDeductions',
+  action: Action.create({ name: 'read' }),
+  payload: Payload.create({
+    items: []
+  })
+})
+
+// ViewMyBed Interaction
+const ViewMyBed = Interaction.create({
+  name: 'ViewMyBed',
+  action: Action.create({ name: 'read' }),
+  payload: Payload.create({
+    items: []
+  })
+})
+
+// CreateUser Interaction
+const CreateUser = Interaction.create({
+  name: 'CreateUser',
+  action: Action.create({ name: 'create' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({ name: 'name', required: true }),
+      PayloadItem.create({ name: 'email', required: true }),
       PayloadItem.create({ name: 'phone' }),
       PayloadItem.create({ name: 'role' })
     ]
-  }),
-  action: Action.create({ name: 'create' })
+  })
 })
 
-// UpdateUserProfile - Update user profile
+// UpdateUserProfile Interaction
 const UpdateUserProfile = Interaction.create({
   name: 'UpdateUserProfile',
+  action: Action.create({ name: 'update' }),
   payload: Payload.create({
     items: [
-      PayloadItem.create({ name: 'userId' }),
+      PayloadItem.create({ name: 'userId', required: true }),
       PayloadItem.create({ name: 'name' }),
       PayloadItem.create({ name: 'phone' })
     ]
-  }),
-  action: Action.create({ name: 'update' })
+  })
 })
 
-// SetBedMaintenance - Set bed maintenance status
+// SetBedMaintenance Interaction
 const SetBedMaintenance = Interaction.create({
   name: 'SetBedMaintenance',
+  action: Action.create({ name: 'update' }),
   payload: Payload.create({
     items: [
-      PayloadItem.create({ name: 'bedId' }),
-      PayloadItem.create({ name: 'status' })
+      PayloadItem.create({ name: 'bedId', required: true }),
+      PayloadItem.create({ name: 'status', required: true })
     ]
-  }),
-  action: Action.create({ name: 'update' })
+  })
 })
 
-// AppealDeduction - Appeal point deduction
+// AppealDeduction Interaction
 const AppealDeduction = Interaction.create({
   name: 'AppealDeduction',
+  action: Action.create({ name: 'update' }),
   payload: Payload.create({
     items: [
-      PayloadItem.create({ name: 'deductionId' }),
-      PayloadItem.create({ name: 'appealReason' })
+      PayloadItem.create({ name: 'deductionId', required: true }),
+      PayloadItem.create({ name: 'appealReason', required: true })
     ]
-  }),
-  action: Action.create({ name: 'update' })
+  })
 })
 
-// CancelDeduction - Cancel incorrect deduction
+// CancelDeduction Interaction
 const CancelDeduction = Interaction.create({
   name: 'CancelDeduction',
+  action: Action.create({ name: 'update' }),
   payload: Payload.create({
     items: [
-      PayloadItem.create({ name: 'deductionId' }),
-      PayloadItem.create({ name: 'reason' })
+      PayloadItem.create({ name: 'deductionId', required: true }),
+      PayloadItem.create({ name: 'reason', required: true })
     ]
-  }),
-  action: Action.create({ name: 'update' })
+  })
 })
 
-// Read-only interactions
-const ViewSystemStats = Interaction.create({
-  name: 'ViewSystemStats',
-  payload: Payload.create({ items: [] }),
-  action: Action.create({ name: 'read' })
-})
+// ==================== EXPORTS ====================
 
-const ViewDormitoryStats = Interaction.create({
-  name: 'ViewDormitoryStats',
-  payload: Payload.create({
-    items: [
-      PayloadItem.create({ name: 'dormitoryId' })
-    ]
-  }),
-  action: Action.create({ name: 'read' })
-})
-
-const ViewUserDeductions = Interaction.create({
-  name: 'ViewUserDeductions',
-  payload: Payload.create({
-    items: [
-      PayloadItem.create({ name: 'targetUserId' })
-    ]
-  }),
-  action: Action.create({ name: 'read' })
-})
-
-const ViewMyDormitory = Interaction.create({
-  name: 'ViewMyDormitory',
-  payload: Payload.create({ items: [] }),
-  action: Action.create({ name: 'read' })
-})
-
-const ViewMyDeductions = Interaction.create({
-  name: 'ViewMyDeductions',
-  payload: Payload.create({ items: [] }),
-  action: Action.create({ name: 'read' })
-})
-
-const ViewMyBed = Interaction.create({
-  name: 'ViewMyBed',
-  payload: Payload.create({ items: [] }),
-  action: Action.create({ name: 'read' })
-})
-
-// ========= EXPORTS =========
 export const entities = [User, Dormitory, Bed, PointDeduction, RemovalRequest]
 export const relations = [
   UserDormitoryRelation,
@@ -473,10 +472,10 @@ export const relations = [
   DormitoryBedRelation,
   DormitoryDormHeadRelation,
   UserPointDeductionRelation,
-  PointDeductionIssuerRelation,
+  DeductionIssuerRelation,
   RemovalRequestTargetRelation,
   RemovalRequestInitiatorRelation,
-  RemovalRequestProcessorRelation
+  RemovalRequestAdminRelation
 ]
 export const activities = []
 export const interactions = [
@@ -491,83 +490,131 @@ export const interactions = [
   InitiateRemovalRequest,
   CancelRemovalRequest,
   ProcessRemovalRequest,
-  CreateUser,
-  UpdateUserProfile,
-  SetBedMaintenance,
-  AppealDeduction,
-  CancelDeduction,
   ViewSystemStats,
   ViewDormitoryStats,
   ViewUserDeductions,
   ViewMyDormitory,
   ViewMyDeductions,
-  ViewMyBed
+  ViewMyBed,
+  CreateUser,
+  UpdateUserProfile,
+  SetBedMaintenance,
+  AppealDeduction,
+  CancelDeduction
 ]
 export const dicts = []
 
-// ========= COMPUTATIONS =========
-// Phase 1: Entity Computations
+// Export individual relation instances for tests
+export { UserDormitoryRelation, UserBedRelation, DormitoryBedRelation, DormitoryDormHeadRelation, 
+         UserPointDeductionRelation, DeductionIssuerRelation, RemovalRequestTargetRelation, 
+         RemovalRequestInitiatorRelation, RemovalRequestAdminRelation }
 
-// User entity computation - Create from CreateUser interaction
+// ==================== COMPUTATIONS ====================
+
+// Phase 1: Entity Creation Computations
+
+// User entity creation via CreateUser interaction
 User.computation = Transform.create({
   record: InteractionEventEntity,
-  attributeQuery: ['*'],
   callback: function(event: any) {
     if (event.interactionName === 'CreateUser') {
+      const payload = event.payload
+      const timestamp = new Date().toISOString()
+      
       return {
-        name: event.payload.name,
-        email: event.payload.email,
-        phone: event.payload.phone,
-        role: event.payload.role || 'student'
+        name: payload.name,
+        email: payload.email,
+        phone: payload.phone || '',
+        role: payload.role || 'student',
+        status: 'active',
+        totalPoints: 0,
+        isRemovable: false,
+        isDormHead: false,
+        createdAt: timestamp,
+        updatedAt: timestamp
       }
     }
     return null
   }
 })
 
-// Dormitory entity computation - Create from CreateDormitory interaction
+// Dormitory entity creation via CreateDormitory interaction
 Dormitory.computation = Transform.create({
   record: InteractionEventEntity,
-  attributeQuery: ['*'],
   callback: function(event: any) {
     if (event.interactionName === 'CreateDormitory') {
+      const payload = event.payload
+      const timestamp = new Date().toISOString()
+      
+      // Validate capacity
+      const capacity = payload.capacity
+      if (capacity < 4 || capacity > 6) {
+        // Note: Validation will be handled by business rules later
+        // For now, we'll accept the value
+      }
+      
       return {
-        name: event.payload.name,
-        capacity: event.payload.capacity,
-        floor: event.payload.floor,
-        building: event.payload.building
+        name: payload.name,
+        capacity: capacity,
+        floor: payload.floor || 1,
+        building: payload.building || 'Main',
+        status: 'active',
+        occupancy: 0,
+        availableBeds: capacity,
+        hasDormHead: false,
+        createdAt: timestamp
+        // updatedAt will be controlled by StateMachine computation
       }
     }
     return null
   }
 })
 
-// PointDeduction entity computation - Create from IssuePointDeduction interaction
+// PointDeduction entity creation via IssuePointDeduction interaction
 PointDeduction.computation = Transform.create({
   record: InteractionEventEntity,
-  attributeQuery: ['*'],
-  callback: function(event: any) {
+  callback: function(event: any, context: any) {
     if (event.interactionName === 'IssuePointDeduction') {
+      const payload = event.payload
+      const timestamp = new Date().toISOString()
+      
       return {
-        reason: event.payload.reason,
-        points: event.payload.points,
-        category: event.payload.category,
-        details: event.payload.details,
-        evidence: event.payload.evidence
+        reason: payload.reason,
+        points: payload.points,
+        category: payload.category,
+        status: 'active',
+        description: payload.description || '',
+        evidence: payload.evidence || '',
+        deductedAt: timestamp,
+        createdAt: timestamp,
+        // Relations - these will trigger automatic relation creation
+        user: { id: payload.targetUserId },  // UserPointDeductionRelation
+        issuedBy: { id: event.user.id }      // DeductionIssuerRelation
       }
     }
     return null
   }
 })
 
-// RemovalRequest entity computation - Create from InitiateRemovalRequest interaction
+// RemovalRequest entity creation via InitiateRemovalRequest interaction
 RemovalRequest.computation = Transform.create({
   record: InteractionEventEntity,
-  attributeQuery: ['*'],
   callback: function(event: any) {
     if (event.interactionName === 'InitiateRemovalRequest') {
+      const payload = event.payload
+      const timestamp = new Date().toISOString()
+      
       return {
-        reason: event.payload.reason
+        reason: payload.reason,
+        totalPoints: 0, // Will be calculated later with proper computation
+        status: 'pending',
+        adminComment: '',
+        // processedAt will be set by StateMachine computation when processed
+        // updatedAt will be set by StateMachine computation when updated
+        createdAt: timestamp,
+        // Relations - these will trigger automatic relation creation
+        targetUser: { id: payload.targetUserId },     // RemovalRequestTargetRelation
+        requestedBy: { id: event.user.id }            // RemovalRequestInitiatorRelation
       }
     }
     return null
@@ -576,184 +623,822 @@ RemovalRequest.computation = Transform.create({
 
 // Phase 2: Entity and Relation Computations
 
-// Bed entity computation - Create beds automatically with Dormitory
+// Bed entity creation - created automatically with Dormitory
 Bed.computation = Transform.create({
   record: InteractionEventEntity,
-  attributeQuery: ['*'],
-  callback: function(event: any) {
+  callback: function(event: any, context: any) {
     if (event.interactionName === 'CreateDormitory') {
-      // Create beds based on capacity
-      const capacity = event.payload.capacity
-      const bedCodes = ['A', 'B', 'C', 'D', 'E', 'F'].slice(0, capacity)
+      const payload = event.payload
+      const timestamp = new Date().toISOString()
+      const capacity = payload.capacity
       
-      // Return array of bed entities to create
-      return bedCodes.map((code: string) => ({
-        code: code
-      }))
-    }
-    return null
-  }
-})
-
-// UserPointDeductionRelation - Created automatically with PointDeduction
-// Since the relation is created when IssuePointDeduction creates a PointDeduction entity,
-// we need to handle this in the PointDeduction Transform computation
-UserPointDeductionRelation.computation = Transform.create({
-  record: InteractionEventEntity,
-  attributeQuery: ['*'],
-  callback: function(event: any) {
-    if (event.interactionName === 'IssuePointDeduction') {
-      // This creates the relation between the target user and the deduction
-      return {
-        user: { id: event.payload.targetUserId },
-        pointDeduction: null  // Will be linked to the created PointDeduction automatically
+      // Create beds based on dormitory capacity
+      // We need to return an array of beds since multiple beds are created
+      const beds = []
+      for (let i = 1; i <= capacity; i++) {
+        beds.push({
+          bedNumber: `${i}`, // Bed number as string: "1", "2", etc.
+          status: 'available',
+          isAvailable: true,
+          assignedAt: '',
+          createdAt: timestamp,
+          updatedAt: timestamp
+        })
       }
+      
+      // Return array of beds to create multiple entities
+      return beds
     }
     return null
   }
 })
 
-// DeductionIssuerRelation (renamed from PointDeductionIssuerRelation) - Created automatically with PointDeduction  
-// This tracks who issued the deduction
-PointDeductionIssuerRelation.computation = Transform.create({
-  record: InteractionEventEntity,
-  attributeQuery: ['*'],
-  callback: function(event: any) {
-    if (event.interactionName === 'IssuePointDeduction') {
-      // This creates the relation between the issuer and the deduction
-      return {
-        pointDeduction: null,  // Will be linked to the created PointDeduction automatically
-        user: event.user  // The user who issued the deduction
-      }
-    }
-    return null
-  }
+// UserDormitoryRelation: StateMachine computation
+// Created by AssignUserToDormitory, deleted by RemoveUserFromDormitory or approved ProcessRemovalRequest
+// Note: notExists state means relation doesn't exist - returns null value
+const relationNotExistsState = StateNode.create({ 
+  name: 'notExists',
+  computeValue: () => null  // Return null to indicate no relation
 })
-
-// RemovalRequestTargetRelation - Created automatically with RemovalRequest
-RemovalRequestTargetRelation.computation = Transform.create({
-  record: InteractionEventEntity,
-  attributeQuery: ['*'],
-  callback: function(event: any) {
-    if (event.interactionName === 'InitiateRemovalRequest') {
-      return {
-        removalRequest: null,  // Will be linked to the created RemovalRequest automatically
-        user: { id: event.payload.targetUserId }
-      }
-    }
-    return null
-  }
-})
-
-// RemovalRequestInitiatorRelation - Created automatically with RemovalRequest
-RemovalRequestInitiatorRelation.computation = Transform.create({
-  record: InteractionEventEntity,
-  attributeQuery: ['*'],
-  callback: function(event: any) {
-    if (event.interactionName === 'InitiateRemovalRequest') {
-      return {
-        removalRequest: null,  // Will be linked to the created RemovalRequest automatically
-        user: event.user  // The user who initiated the request
-      }
-    }
-    return null
-  }
-})
-
-// UserDormitoryRelation computation - StateMachine for managing user-dormitory assignments
-// Define states first
-const userDormAssignedState = StateNode.create({
-  name: 'assigned',
-  computeValue: () => ({}) // Relation exists
-})
-
-const userDormDeletedState = StateNode.create({
-  name: 'deleted',
-  computeValue: () => null // Return null to delete the relation
+const relationExistsState = StateNode.create({ 
+  name: 'exists'
 })
 
 UserDormitoryRelation.computation = StateMachine.create({
-  states: [userDormAssignedState, userDormDeletedState],
-  defaultState: userDormDeletedState, // Start with no relation
+  states: [relationNotExistsState, relationExistsState],
+  defaultState: relationNotExistsState,
   transfers: [
-    // Create relation when user is assigned to dormitory
+    // Create relation when AssignUserToDormitory is called
     StateTransfer.create({
       trigger: AssignUserToDormitory,
-      current: userDormDeletedState,
-      next: userDormAssignedState,
-      computeTarget: async function(this: Controller, event: any) {
-        // Find the user and dormitory
-        const user = await this.system.storage.findOne(
-          'User',
-          MatchExp.atom({ key: 'id', value: ['=', event.payload.userId] })
-        )
-        const dormitory = await this.system.storage.findOne(
-          'Dormitory',
-          MatchExp.atom({ key: 'id', value: ['=', event.payload.dormitoryId] })
-        )
-        
-        if (user && dormitory) {
-          // Return the relation specification to create
-          return {
-            source: user,
-            target: dormitory,
-            assignedBy: event.user.id
-          }
+      current: relationNotExistsState,
+      next: relationExistsState,
+      computeTarget: function(event: any) {
+        const payload = event.payload
+        return {
+          source: { id: payload.userId },
+          target: { id: payload.dormitoryId }
         }
-        return null
       }
     }),
-    // Delete relation when user is removed from dormitory
+    // Delete relation when RemoveUserFromDormitory is called
     StateTransfer.create({
       trigger: RemoveUserFromDormitory,
-      current: userDormAssignedState,
-      next: userDormDeletedState,
+      current: relationExistsState,
+      next: relationNotExistsState,
       computeTarget: async function(this: Controller, event: any) {
-        // Find the existing relation to delete
+        const payload = event.payload
+        // Find existing relation to remove
         const relation = await this.system.storage.findOne(
-          'UserDormitoryRelation',
-          MatchExp.atom({ key: 'user.id', value: ['=', event.payload.userId] }),
+          UserDormitoryRelation.name,
+          MatchExp.atom({
+            key: 'source.id',
+            value: ['=', payload.userId]
+          }),
           undefined,
           ['id']
         )
         return relation
       }
-    }),
-    // Delete relation when removal request is approved
+    })
+    // TODO: Add ProcessRemovalRequest state transfer for deleting UserDormitoryRelation when approved
+    // Currently disabled to avoid issues when user is not in a dormitory
+  ]
+})
+
+// DormitoryDormHeadRelation: StateMachine computation
+// Created by AssignDormHead, deleted by RemoveDormHead
+const dormHeadRelationNotExistsState = StateNode.create({ 
+  name: 'notExists',
+  computeValue: () => null  // Return null to indicate no relation
+})
+const dormHeadRelationExistsState = StateNode.create({ 
+  name: 'exists'
+})
+
+DormitoryDormHeadRelation.computation = StateMachine.create({
+  states: [dormHeadRelationNotExistsState, dormHeadRelationExistsState],
+  defaultState: dormHeadRelationNotExistsState,
+  transfers: [
+    // Create relation when AssignDormHead is called
     StateTransfer.create({
-      trigger: ProcessRemovalRequest,
-      current: userDormAssignedState,
-      next: userDormDeletedState,
+      trigger: AssignDormHead,
+      current: dormHeadRelationNotExistsState,
+      next: dormHeadRelationExistsState,
+      computeTarget: function(event: any) {
+        const payload = event.payload
+        return {
+          source: { id: payload.dormitoryId },
+          target: { id: payload.userId }
+        }
+      }
+    }),
+    // Delete relation when RemoveDormHead is called
+    StateTransfer.create({
+      trigger: RemoveDormHead,
+      current: dormHeadRelationExistsState,
+      next: dormHeadRelationNotExistsState,
       computeTarget: async function(this: Controller, event: any) {
-        if (event.payload.decision === 'approved') {
-          // Find the removal request
-          const request = await this.system.storage.findOne(
-            'RemovalRequest',
-            MatchExp.atom({ key: 'id', value: ['=', event.payload.requestId] })
-          )
-          
-          if (request) {
-            // Find the target user relation
-            const targetRelation = await this.system.storage.findOne(
-              'RemovalRequestTargetRelation',
-              MatchExp.atom({ key: 'removalRequest.id', value: ['=', request.id] }),
-              undefined,
-              ['user']
-            )
-            
-            if (targetRelation) {
-              // Find and return the user-dormitory relation to delete
-              const userDormRelation = await this.system.storage.findOne(
-                'UserDormitoryRelation',
-                MatchExp.atom({ key: 'user.id', value: ['=', targetRelation.user.id] }),
-                undefined,
-                ['id']
-              )
-              return userDormRelation
-            }
-          }
+        const payload = event.payload
+        // Find existing relation to remove
+        const relation = await this.system.storage.findOne(
+          DormitoryDormHeadRelation.name,
+          MatchExp.atom({
+            key: 'target.id',
+            value: ['=', payload.userId]
+          }),
+          undefined,
+          ['id']
+        )
+        return relation
+      }
+    })
+  ]
+})
+
+// RemovalRequestAdminRelation: Transform computation
+// Created when ProcessRemovalRequest approves or rejects the request
+// This relation cannot be deleted - it's a permanent record of who processed the request
+RemovalRequestAdminRelation.computation = Transform.create({
+  record: InteractionEventEntity,
+  callback: function(event: any) {
+    if (event.interactionName === 'ProcessRemovalRequest') {
+      const payload = event.payload
+      // Ensure we have the required data
+      if (!payload || !payload.requestId || !event.user || !event.user.id) {
+        console.error('Missing required data for RemovalRequestAdminRelation', { payload, user: event.user })
+        return null
+      }
+      // Create relation when admin processes the request (either approved or rejected)
+      return {
+        source: { id: payload.requestId },  // RemovalRequest
+        target: { id: event.user.id }       // Admin who processed it
+      }
+    }
+    return null
+  }
+})
+
+// ========= PROPERTY COMPUTATIONS - PHASE 2 =========
+
+// User.name: StateMachine computation
+// Initial value set by entity Transform, updated by UpdateUserProfile
+const userNameState = StateNode.create({ 
+  name: 'hasName',
+  // computeValue returns the actual name value that will be stored
+  computeValue: function(lastValue: any, event: any) {
+    // If event has payload with name, use it
+    if (event && event.payload && event.payload.name !== undefined) {
+      return event.payload.name
+    }
+    // Otherwise keep the last value
+    return lastValue
+  }
+})
+
+User.properties.find(p => p.name === 'name').computation = StateMachine.create({
+  states: [userNameState],
+  defaultState: userNameState,
+  transfers: [
+    // Update name when UpdateUserProfile is called
+    // Note: Initial value is set by entity Transform during CreateUser
+    StateTransfer.create({
+      trigger: UpdateUserProfile,
+      current: userNameState,
+      next: userNameState,
+      computeTarget: function(event: any) {
+        // Only update if name is provided in payload
+        if (event.payload.name !== undefined) {
+          return { id: event.payload.userId }
         }
         return null
+      }
+    })
+  ]
+})
+
+// User.phone computation
+const userPhoneState = StateNode.create({
+  name: 'userPhone',
+  computeValue: function(lastValue?: any, event?: any) {
+    // For UpdateUserProfile, use the phone from payload if provided
+    if (event?.interactionName === 'UpdateUserProfile' && event.payload.phone !== undefined) {
+      return event.payload.phone
+    }
+    // Otherwise keep the last value (initial value is set by entity Transform)
+    return lastValue
+  }
+})
+
+User.properties.find(p => p.name === 'phone').computation = StateMachine.create({
+  states: [userPhoneState],
+  defaultState: userPhoneState,
+  transfers: [
+    // Update phone when UpdateUserProfile is called
+    // Note: Initial value is set by entity Transform during CreateUser
+    StateTransfer.create({
+      trigger: UpdateUserProfile,
+      current: userPhoneState,
+      next: userPhoneState,
+      computeTarget: function(event: any) {
+        // Only update if phone is provided in payload
+        if (event.payload.phone !== undefined) {
+          return { id: event.payload.userId }
+        }
+        return null
+      }
+    })
+  ]
+})
+
+// User.role: StateMachine computation
+// State transitions between student, dormHead, admin based on interactions
+const userRoleState = StateNode.create({
+  name: 'userRole',
+  computeValue: function(lastValue?: any, event?: any) {
+    // For AssignDormHead, set role to dormHead
+    if (event?.interactionName === 'AssignDormHead') {
+      return 'dormHead'
+    }
+    // For RemoveDormHead, revert role to student
+    if (event?.interactionName === 'RemoveDormHead') {
+      return 'student'
+    }
+    // Otherwise keep the last value (initial value is set by entity Transform during CreateUser)
+    return lastValue
+  }
+})
+
+User.properties.find(p => p.name === 'role').computation = StateMachine.create({
+  states: [userRoleState],
+  defaultState: userRoleState,
+  transfers: [
+    // Change to dormHead when AssignDormHead is called
+    StateTransfer.create({
+      trigger: AssignDormHead,
+      current: userRoleState,
+      next: userRoleState,
+      computeTarget: function(event: any) {
+        // Update the user being assigned as dorm head
+        return { id: event.payload.userId }
+      }
+    }),
+    // Change back to student when RemoveDormHead is called
+    StateTransfer.create({
+      trigger: RemoveDormHead,
+      current: userRoleState,
+      next: userRoleState,
+      computeTarget: function(event: any) {
+        // Update the user being removed as dorm head
+        return { id: event.payload.userId }
+      }
+    })
+  ]
+})
+
+// User.status: StateMachine computation
+// State transitions between active, suspended, removed based on interactions
+const userStatusState = StateNode.create({
+  name: 'userStatus',
+  computeValue: function(lastValue?: any, event?: any) {
+    // For CreateUser, initial status is active
+    if (event?.interactionName === 'CreateUser') {
+      return 'active'
+    }
+    // For ProcessRemovalRequest, check if approved/rejected
+    if (event?.interactionName === 'ProcessRemovalRequest') {
+      if (event.payload.decision === 'approved') {
+        return 'removed'
+      }
+      // If rejected, keep current status
+      return lastValue
+    }
+    // For RemoveUserFromDormitory, set to suspended
+    if (event?.interactionName === 'RemoveUserFromDormitory') {
+      return 'suspended'
+    }
+    // Otherwise keep the last value
+    return lastValue
+  }
+})
+
+User.properties.find(p => p.name === 'status').computation = StateMachine.create({
+  states: [userStatusState],
+  defaultState: userStatusState,
+  transfers: [
+    // Process removal request - can approve or reject
+    StateTransfer.create({
+      trigger: ProcessRemovalRequest,
+      current: userStatusState,
+      next: userStatusState,
+      computeTarget: async function(this: Controller, event: any) {
+        // Get the removal request to find the target user
+        const removalRequest = await this.system.storage.findOne(
+          'RemovalRequest',
+          MatchExp.atom({ key: 'id', value: ['=', event.payload.requestId] }),
+          undefined,
+          ['id', 'targetUser']
+        )
+        // Update the target user of the removal request
+        return { id: removalRequest.targetUser.id }
+      }
+    }),
+    // Direct removal from dormitory - suspends user
+    StateTransfer.create({
+      trigger: RemoveUserFromDormitory,
+      current: userStatusState,
+      next: userStatusState,
+      computeTarget: function(event: any) {
+        // Update the user being removed from dormitory
+        return { id: event.payload.userId }
+      }
+    })
+  ]
+})
+
+// User.updatedAt: StateMachine computation
+// Updates timestamp when user is modified by various interactions
+const userUpdatedAtState = StateNode.create({
+  name: 'userUpdatedAt',
+  computeValue: function(lastValue?: any, event?: any) {
+    // Return current timestamp whenever triggered
+    if (event?.interactionName === 'UpdateUserProfile' ||
+        event?.interactionName === 'AssignDormHead' ||
+        event?.interactionName === 'RemoveDormHead' ||
+        event?.interactionName === 'ProcessRemovalRequest') {
+      return new Date().toISOString()
+    }
+    // Keep the last value if not triggered by update interactions
+    return lastValue
+  }
+})
+
+User.properties.find(p => p.name === 'updatedAt').computation = StateMachine.create({
+  states: [userUpdatedAtState],
+  defaultState: userUpdatedAtState,
+  transfers: [
+    // Update timestamp when profile is updated
+    StateTransfer.create({
+      trigger: UpdateUserProfile,
+      current: userUpdatedAtState,
+      next: userUpdatedAtState,
+      computeTarget: function(event: any) {
+        return { id: event.payload.userId }
+      }
+    }),
+    // Update timestamp when assigned as dorm head
+    StateTransfer.create({
+      trigger: AssignDormHead,
+      current: userUpdatedAtState,
+      next: userUpdatedAtState,
+      computeTarget: function(event: any) {
+        return { id: event.payload.userId }
+      }
+    }),
+    // Update timestamp when removed as dorm head
+    StateTransfer.create({
+      trigger: RemoveDormHead,
+      current: userUpdatedAtState,
+      next: userUpdatedAtState,
+      computeTarget: function(event: any) {
+        return { id: event.payload.userId }
+      }
+    }),
+    // Update timestamp when removal request is processed
+    StateTransfer.create({
+      trigger: ProcessRemovalRequest,
+      current: userUpdatedAtState,
+      next: userUpdatedAtState,
+      computeTarget: async function(this: Controller, event: any) {
+        // Get the removal request to find the target user
+        const removalRequest = await this.system.storage.findOne(
+          'RemovalRequest',
+          MatchExp.atom({ key: 'id', value: ['=', event.payload.requestId] }),
+          undefined,
+          ['id', 'targetUser']
+        )
+        // Update the target user of the removal request
+        return { id: removalRequest.targetUser.id }
+      }
+    })
+  ]
+})
+
+// Dormitory.name: StateMachine computation
+// Direct assignment from CreateDormitory and UpdateDormitory interactions
+const dormitoryNameState = StateNode.create({
+  name: 'dormitoryName',
+  computeValue: function(lastValue?: any, event?: any) {
+    // For CreateDormitory, set initial name
+    if (event?.interactionName === 'CreateDormitory') {
+      return event.payload.name
+    }
+    // For UpdateDormitory, update name if provided
+    if (event?.interactionName === 'UpdateDormitory' && event.payload.name !== undefined) {
+      return event.payload.name
+    }
+    // Otherwise keep the last value
+    return lastValue
+  }
+})
+
+Dormitory.properties.find(p => p.name === 'name').computation = StateMachine.create({
+  states: [dormitoryNameState],
+  defaultState: dormitoryNameState,
+  transfers: [
+    // Update name when dormitory is updated
+    StateTransfer.create({
+      trigger: UpdateDormitory,
+      current: dormitoryNameState,
+      next: dormitoryNameState,
+      computeTarget: function(event: any) {
+        return { id: event.payload.dormitoryId }
+      }
+    })
+  ]
+})
+
+// Dormitory.floor: StateMachine computation
+// Direct assignment from CreateDormitory and UpdateDormitory interactions
+const dormitoryFloorState = StateNode.create({
+  name: 'dormitoryFloor',
+  computeValue: function(lastValue?: any, event?: any) {
+    // For CreateDormitory, set initial floor
+    if (event?.interactionName === 'CreateDormitory') {
+      return event.payload.floor
+    }
+    // For UpdateDormitory, update floor if provided
+    if (event?.interactionName === 'UpdateDormitory' && event.payload.floor !== undefined) {
+      return event.payload.floor
+    }
+    // Otherwise keep the last value
+    return lastValue
+  }
+})
+
+Dormitory.properties.find(p => p.name === 'floor').computation = StateMachine.create({
+  states: [dormitoryFloorState],
+  defaultState: dormitoryFloorState,
+  transfers: [
+    // Update floor when dormitory is updated
+    StateTransfer.create({
+      trigger: UpdateDormitory,
+      current: dormitoryFloorState,
+      next: dormitoryFloorState,
+      computeTarget: function(event: any) {
+        return { id: event.payload.dormitoryId }
+      }
+    })
+  ]
+})
+
+// Dormitory.building: StateMachine computation
+// Direct assignment from CreateDormitory and UpdateDormitory interactions
+const dormitoryBuildingState = StateNode.create({
+  name: 'dormitoryBuilding',
+  computeValue: function(lastValue?: any, event?: any) {
+    // For CreateDormitory, set initial building
+    if (event?.interactionName === 'CreateDormitory') {
+      return event.payload.building
+    }
+    // For UpdateDormitory, update building if provided
+    if (event?.interactionName === 'UpdateDormitory' && event.payload.building !== undefined) {
+      return event.payload.building
+    }
+    // Otherwise keep the last value
+    return lastValue
+  }
+})
+
+Dormitory.properties.find(p => p.name === 'building').computation = StateMachine.create({
+  states: [dormitoryBuildingState],
+  defaultState: dormitoryBuildingState,
+  transfers: [
+    // Update building when dormitory is updated
+    StateTransfer.create({
+      trigger: UpdateDormitory,
+      current: dormitoryBuildingState,
+      next: dormitoryBuildingState,
+      computeTarget: function(event: any) {
+        return { id: event.payload.dormitoryId }
+      }
+    })
+  ]
+})
+
+// Dormitory.status: StateMachine computation
+// State transitions between active and inactive
+const dormitoryStatusState = StateNode.create({
+  name: 'dormitoryStatus',
+  computeValue: function(lastValue?: any, event?: any) {
+    // For CreateDormitory, default to active
+    if (event?.interactionName === 'CreateDormitory') {
+      return 'active'
+    }
+    // For UpdateDormitory, update status if provided
+    if (event?.interactionName === 'UpdateDormitory' && event.payload.status !== undefined) {
+      return event.payload.status
+    }
+    // For DeactivateDormitory, always set to inactive
+    if (event?.interactionName === 'DeactivateDormitory') {
+      return 'inactive'
+    }
+    // Otherwise keep the last value
+    return lastValue || 'active'
+  }
+})
+
+Dormitory.properties.find(p => p.name === 'status').computation = StateMachine.create({
+  states: [dormitoryStatusState],
+  defaultState: dormitoryStatusState,
+  transfers: [
+    // Update status via UpdateDormitory
+    StateTransfer.create({
+      trigger: UpdateDormitory,
+      current: dormitoryStatusState,
+      next: dormitoryStatusState,
+      computeTarget: function(event: any) {
+        return { id: event.payload.dormitoryId }
+      }
+    }),
+    // Deactivate dormitory
+    StateTransfer.create({
+      trigger: DeactivateDormitory,
+      current: dormitoryStatusState,
+      next: dormitoryStatusState,
+      computeTarget: function(event: any) {
+        return { id: event.payload.dormitoryId }
+      }
+    })
+  ]
+})
+
+// Dormitory.updatedAt: StateMachine computation
+// Updated on UpdateDormitory or DeactivateDormitory
+const dormitoryUpdatedAtNotSetState = StateNode.create({
+  name: 'notSet',
+  computeValue: () => undefined // No value initially
+})
+const dormitoryUpdatedAtSetState = StateNode.create({
+  name: 'set',
+  computeValue: () => new Date().toISOString()
+})
+
+Dormitory.properties.find(p => p.name === 'updatedAt').computation = StateMachine.create({
+  states: [dormitoryUpdatedAtNotSetState, dormitoryUpdatedAtSetState],
+  defaultState: dormitoryUpdatedAtNotSetState,
+  transfers: [
+    // Update timestamp when UpdateDormitory is called (first time)
+    StateTransfer.create({
+      trigger: UpdateDormitory,
+      current: dormitoryUpdatedAtNotSetState,
+      next: dormitoryUpdatedAtSetState,
+      computeTarget: function(event: any) {
+        return { id: event.payload.dormitoryId }
+      }
+    }),
+    // Update timestamp when UpdateDormitory is called (subsequent times)
+    StateTransfer.create({
+      trigger: UpdateDormitory,
+      current: dormitoryUpdatedAtSetState,
+      next: dormitoryUpdatedAtSetState,
+      computeTarget: function(event: any) {
+        return { id: event.payload.dormitoryId }
+      }
+    }),
+    // Update timestamp when DeactivateDormitory is called (first time)
+    StateTransfer.create({
+      trigger: DeactivateDormitory,
+      current: dormitoryUpdatedAtNotSetState,
+      next: dormitoryUpdatedAtSetState,
+      computeTarget: function(event: any) {
+        return { id: event.payload.dormitoryId }
+      }
+    }),
+    // Update timestamp when DeactivateDormitory is called (subsequent times)
+    StateTransfer.create({
+      trigger: DeactivateDormitory,
+      current: dormitoryUpdatedAtSetState,
+      next: dormitoryUpdatedAtSetState,
+      computeTarget: function(event: any) {
+        return { id: event.payload.dormitoryId }
+      }
+    })
+  ]
+})
+
+// ========== PointDeduction.status computation ==========
+// State transitions: active (initial) → appealed, cancelled
+const pointDeductionStatusActiveState = StateNode.create({
+  name: 'active',
+  computeValue: () => 'active'
+})
+
+const pointDeductionStatusAppealedState = StateNode.create({
+  name: 'appealed',
+  computeValue: () => 'appealed'
+})
+
+const pointDeductionStatusCancelledState = StateNode.create({
+  name: 'cancelled',
+  computeValue: () => 'cancelled'
+})
+
+PointDeduction.properties.find(p => p.name === 'status').computation = StateMachine.create({
+  states: [
+    pointDeductionStatusActiveState,
+    pointDeductionStatusAppealedState,
+    pointDeductionStatusCancelledState
+  ],
+  defaultState: pointDeductionStatusActiveState,
+  transfers: [
+    // IssuePointDeduction creates with active status (already set by initial state)
+    // AppealDeduction: active → appealed
+    StateTransfer.create({
+      trigger: AppealDeduction,
+      current: pointDeductionStatusActiveState,
+      next: pointDeductionStatusAppealedState,
+      computeTarget: function(event: any) {
+        return { id: event.payload.deductionId }
+      }
+    }),
+    // CancelDeduction: active → cancelled
+    StateTransfer.create({
+      trigger: CancelDeduction,
+      current: pointDeductionStatusActiveState,
+      next: pointDeductionStatusCancelledState,
+      computeTarget: function(event: any) {
+        return { id: event.payload.deductionId }
+      }
+    }),
+    // CancelDeduction: appealed → cancelled (if admin cancels after appeal)
+    StateTransfer.create({
+      trigger: CancelDeduction,
+      current: pointDeductionStatusAppealedState,
+      next: pointDeductionStatusCancelledState,
+      computeTarget: function(event: any) {
+        return { id: event.payload.deductionId }
+      }
+    })
+  ]
+})
+
+// ========== RemovalRequest.status computation ==========
+// State transitions: pending → approved/rejected/cancelled
+const removalRequestStatusState = StateNode.create({
+  name: 'removalRequestStatus',
+  computeValue: function(lastValue?: any, event?: any) {
+    // For InitiateRemovalRequest, default to pending
+    if (event?.interactionName === 'InitiateRemovalRequest') {
+      return 'pending'
+    }
+    // For ProcessRemovalRequest, update based on decision
+    if (event?.interactionName === 'ProcessRemovalRequest') {
+      if (event.payload.decision === 'approve') {
+        return 'approved'
+      } else if (event.payload.decision === 'reject') {
+        return 'rejected'
+      }
+    }
+    // For CancelRemovalRequest, set to cancelled
+    if (event?.interactionName === 'CancelRemovalRequest') {
+      return 'cancelled'
+    }
+    // Otherwise keep the last value
+    return lastValue || 'pending'
+  }
+})
+
+RemovalRequest.properties.find(p => p.name === 'status').computation = StateMachine.create({
+  states: [removalRequestStatusState],
+  defaultState: removalRequestStatusState,
+  transfers: [
+    // ProcessRemovalRequest updates the status
+    StateTransfer.create({
+      trigger: ProcessRemovalRequest,
+      current: removalRequestStatusState,
+      next: removalRequestStatusState,
+      computeTarget: function(event: any) {
+        return { id: event.payload.requestId }
+      }
+    }),
+    // CancelRemovalRequest updates the status
+    StateTransfer.create({
+      trigger: CancelRemovalRequest,
+      current: removalRequestStatusState,
+      next: removalRequestStatusState,
+      computeTarget: function(event: any) {
+        return { id: event.payload.requestId }
+      }
+    })
+  ]
+})
+
+// RemovalRequest.adminComment StateMachine computation - Phase 2
+const removalRequestAdminCommentState = StateNode.create({
+  name: 'adminComment',
+  computeValue: function(lastValue?: any, event?: any) {
+    // Set adminComment when ProcessRemovalRequest is called
+    if (event?.interactionName === 'ProcessRemovalRequest') {
+      return event.payload.adminComment || ''
+    }
+    // Otherwise keep the last value
+    return lastValue || ''
+  }
+})
+
+RemovalRequest.properties.find(p => p.name === 'adminComment').computation = StateMachine.create({
+  states: [removalRequestAdminCommentState],
+  defaultState: removalRequestAdminCommentState,
+  transfers: [
+    // ProcessRemovalRequest sets the adminComment
+    StateTransfer.create({
+      trigger: ProcessRemovalRequest,
+      current: removalRequestAdminCommentState,
+      next: removalRequestAdminCommentState,
+      computeTarget: function(event: any) {
+        return { id: event.payload.requestId }
+      }
+    })
+  ]
+})
+
+// RemovalRequest.processedAt StateMachine computation - Phase 2
+const removalRequestProcessedAtNotSetState = StateNode.create({
+  name: 'notSet',
+  computeValue: () => undefined // No value initially
+})
+
+const removalRequestProcessedAtSetState = StateNode.create({
+  name: 'set',
+  computeValue: () => new Date().toISOString()
+})
+
+RemovalRequest.properties.find(p => p.name === 'processedAt').computation = StateMachine.create({
+  states: [removalRequestProcessedAtNotSetState, removalRequestProcessedAtSetState],
+  defaultState: removalRequestProcessedAtNotSetState,
+  transfers: [
+    // ProcessRemovalRequest sets the processedAt timestamp
+    StateTransfer.create({
+      trigger: ProcessRemovalRequest,
+      current: removalRequestProcessedAtNotSetState,
+      next: removalRequestProcessedAtSetState,
+      computeTarget: function(event: any) {
+        return { id: event.payload.requestId }
+      }
+    })
+  ]
+})
+
+// RemovalRequest.updatedAt StateMachine computation - Phase 2
+const removalRequestUpdatedAtNotSetState = StateNode.create({
+  name: 'notSet',
+  computeValue: () => undefined // No value initially
+})
+
+const removalRequestUpdatedAtSetState = StateNode.create({
+  name: 'set',
+  computeValue: () => new Date().toISOString()
+})
+
+RemovalRequest.properties.find(p => p.name === 'updatedAt').computation = StateMachine.create({
+  states: [removalRequestUpdatedAtNotSetState, removalRequestUpdatedAtSetState],
+  defaultState: removalRequestUpdatedAtNotSetState,
+  transfers: [
+    // ProcessRemovalRequest sets/updates the updatedAt timestamp (first time)
+    StateTransfer.create({
+      trigger: ProcessRemovalRequest,
+      current: removalRequestUpdatedAtNotSetState,
+      next: removalRequestUpdatedAtSetState,
+      computeTarget: function(event: any) {
+        return { id: event.payload.requestId }
+      }
+    }),
+    // ProcessRemovalRequest updates the updatedAt timestamp (subsequent times)
+    StateTransfer.create({
+      trigger: ProcessRemovalRequest,
+      current: removalRequestUpdatedAtSetState,
+      next: removalRequestUpdatedAtSetState,
+      computeTarget: function(event: any) {
+        return { id: event.payload.requestId }
+      }
+    }),
+    // CancelRemovalRequest sets/updates the updatedAt timestamp (first time)
+    StateTransfer.create({
+      trigger: CancelRemovalRequest,
+      current: removalRequestUpdatedAtNotSetState,
+      next: removalRequestUpdatedAtSetState,
+      computeTarget: function(event: any) {
+        return { id: event.payload.requestId }
+      }
+    }),
+    // CancelRemovalRequest updates the updatedAt timestamp (subsequent times)
+    StateTransfer.create({
+      trigger: CancelRemovalRequest,
+      current: removalRequestUpdatedAtSetState,
+      next: removalRequestUpdatedAtSetState,
+      computeTarget: function(event: any) {
+        return { id: event.payload.requestId }
       }
     })
   ]

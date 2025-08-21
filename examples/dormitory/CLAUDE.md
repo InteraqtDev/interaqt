@@ -402,6 +402,7 @@ Common issues that can be avoided by reading the API reference:
 - Missing required parameters (e.g., `attributeQuery` in storage operations)
 - Wrong property usage (e.g., `symmetric` doesn't exist in Relation.create)
 - Incorrect computation placement (e.g., Transform cannot be used in Property computation)
+- Hardcoded relation names (always use `RelationInstance.name` when querying relations)
 
 ### 🔴 Recommended: Single File Approach
 **To avoid complex circular references between files, it's recommended to generate all backend code in a single file:**
@@ -647,6 +648,11 @@ This section follows a **test-driven progressive approach** where each computati
    - For StateMachine computations, test ALL StateTransfer transitions
    - Test all CRUD operations the computation supports
    
+   **🔴 CRITICAL: When querying Relations in tests:**
+   - ALWAYS use the relation instance's `.name` property: `storage.find(UserPostRelation.name, ...)`
+   - NEVER hardcode relation names: `storage.find('UserPostRelation', ...)` ❌
+   - This ensures tests work regardless of whether relation names are manually specified or auto-generated
+   
    Example patterns:
    ```typescript
    test('User.status has correct default value', async () => {
@@ -696,6 +702,26 @@ This section follows a **test-driven progressive approach** where each computati
      )
      expect(published.state).toBe('published')
    })
+   
+   // Example: Querying Relations (if needed in tests)
+   test('User-Post relation exists after creation', async () => {
+     // Import the relation instance
+     import { UserPostRelation } from '../backend'
+     
+     // Query using relation instance name
+     const relations = await system.storage.find(
+       UserPostRelation.name,  // ✅ CORRECT: Use instance name
+       MatchExp.atom({ key: 'source.id', value: ['=', userId] }),
+       undefined,
+       [
+         'id',
+         ['source', { attributeQuery: ['id', 'name'] }],
+         ['target', { attributeQuery: ['id', 'title'] }]
+       ]
+     )
+     
+     expect(relations.length).toBe(1)
+   })
    ```
 
 5. **Run Test**
@@ -720,7 +746,6 @@ This section follows a **test-driven progressive approach** where each computati
      - Remove `lastError` field if it exists
 
 7. **Loop Back**
-   - Return to START to select next uncompleted computation
    - STOP after each computation for user confirmation before continuing
 
 **🛑 STOP GATE: DO NOT proceed to Task 3.1.4.4 until ALL computations in `docs/computation-implementation-plan.json` are marked as complete with passing tests.**
@@ -970,6 +995,12 @@ import {
          return monthlyLimitOk && daysLimitOk
        }
      })
+     
+     // Note: If checking relations in conditions, use relation instance name:
+     // const relations = await this.system.storage.find(
+     //   UserLeaveRelation.name,  // ✅ Use instance name
+     //   MatchExp.atom({ key: 'source.id', value: ['=', event.user.id] })
+     // )
      
      // Assign condition to existing interaction
      RequestLeave.conditions = canRequestLeave

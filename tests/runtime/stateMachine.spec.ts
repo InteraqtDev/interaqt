@@ -669,4 +669,483 @@ describe('StateMachineRunner', () => {
         expect(messageData.lastUpdatedBy).toBe('unknown')  // 没有用户时返回 'unknown'
         expect(messageData.updateCount).toBe(19)  // 15 + 4
     })
+
+    test('delete x:1 relation through state machine', async () => {
+        // 创建一个简单的 x:1 关系，通过 StateMachine 删除
+        const { Entity, Property, Relation, Interaction, Action, Payload, PayloadItem, StateMachine, StateNode, StateTransfer } = await import('@shared')
+        
+        // 创建用户实体
+        const User = Entity.create({
+            name: 'User',
+            properties: [
+                Property.create({
+                    name: 'name',
+                    type: 'string',
+                })
+            ]
+        })
+
+        // 创建文档实体
+        const Document = Entity.create({
+            name: 'Document',
+            properties: [
+                Property.create({
+                    name: 'title',
+                    type: 'string',
+                })
+            ]
+        })
+
+        // 创建分配文档的交互
+        const AssignDocumentInteraction = Interaction.create({
+            name: 'assignDocument',
+            action: Action.create({ name: 'assignDocument' }),
+            payload: Payload.create({
+                items: [
+                    PayloadItem.create({
+                        name: 'document',
+                        isRef: true,
+                        base: Document
+                    }),
+                    PayloadItem.create({
+                        name: 'owner',
+                        isRef: true,
+                        base: User
+                    })
+                ]
+            })
+        })
+
+        // 创建取消分配的交互
+        const UnassignDocumentInteraction = Interaction.create({
+            name: 'unassignDocument',
+            action: Action.create({ name: 'unassignDocument' }),
+            payload: Payload.create({
+                items: [
+                    PayloadItem.create({
+                        name: 'document',
+                        isRef: true,
+                        base: Document
+                    })
+                ]
+            })
+        })
+
+        // 创建状态节点
+        const AssignedState = StateNode.create({
+            name: 'assigned',
+            computeValue: () => ({})  // 返回空对象，表示关系存在
+        })
+
+        const UnassignedState = StateNode.create({
+            name: 'unassigned',
+            computeValue: () => null  // 返回 null，表示删除关系
+        })
+
+        // 创建状态转换
+        const AssignTransfer = StateTransfer.create({
+            trigger: AssignDocumentInteraction,
+            current: UnassignedState,
+            next: AssignedState,
+            computeTarget: (event: any) => {
+                return {
+                    source: event.payload!.document,
+                    target: event.payload!.owner
+                }
+            }
+        })
+
+        const UnassignTransfer = StateTransfer.create({
+            trigger: UnassignDocumentInteraction,
+            current: AssignedState,
+            next: UnassignedState,
+            computeTarget: async function(this: any, event: any) {
+                // 查找现有的关系并返回，以便删除
+                const MatchExp = this.globals.MatchExp
+                const existingRelation = await this.system.storage.findOne(
+                    'DocumentOwner',
+                    MatchExp.atom({
+                        key: 'source.id',
+                        value: ['=', event.payload!.document.id]
+                    }),
+                    undefined,
+                    ['*']
+                )
+                return existingRelation
+            }
+        })
+
+        // 创建状态机
+        const OwnershipStateMachine = StateMachine.create({
+            states: [AssignedState, UnassignedState],
+            transfers: [AssignTransfer, UnassignTransfer],
+            defaultState: UnassignedState
+        })
+
+        // 创建 x:1 关系 (一个文档只能有一个所有者)
+        const DocumentOwnerRelation = Relation.create({
+            name: 'DocumentOwner',
+            source: Document,
+            sourceProperty: 'owner',
+            target: User,
+            targetProperty: 'documents',
+            type: 'n:1',
+            computation: OwnershipStateMachine
+        })
+
+        // 设置测试环境
+        const system = new MonoSystem()
+        const controller = new Controller({
+            system: system,
+            entities: [User, Document],
+            relations: [DocumentOwnerRelation],
+            activities: [],
+            interactions: [AssignDocumentInteraction, UnassignDocumentInteraction]
+        })
+        await controller.setup(true)
+
+        // 创建测试数据
+        const alice = await controller.system.storage.create('User', { name: 'Alice' })
+        const bob = await controller.system.storage.create('User', { name: 'Bob' })
+        const doc1 = await controller.system.storage.create('Document', { title: 'Document 1' })
+        const doc2 = await controller.system.storage.create('Document', { title: 'Document 2' })
+
+        // 验证初始状态 - 没有关系
+        let relations = await controller.system.storage.find('DocumentOwner', undefined, undefined, ['*'])
+        expect(relations.length).toBe(0)
+
+        // 分配文档给 Alice
+        await controller.callInteraction('assignDocument', {
+            user: alice,
+            payload: {
+                document: { id: doc1.id },
+                owner: { id: alice.id }
+            }
+        })
+
+        // 验证关系已创建
+        relations = await controller.system.storage.find('DocumentOwner', undefined, undefined, ['*', ['source', {attributeQuery:['*']}], ['target', {attributeQuery:['*']}]])
+        expect(relations.length).toBe(1)
+        expect(relations[0].source.id).toBe(doc1.id)
+        expect(relations[0].target.id).toBe(alice.id)
+
+        // 分配第二个文档给 Bob
+        await controller.callInteraction('assignDocument', {
+            user: bob,
+            payload: {
+                document: { id: doc2.id },
+                owner: { id: bob.id }
+            }
+        })
+
+        relations = await controller.system.storage.find('DocumentOwner', undefined, undefined, ['*'])
+        expect(relations.length).toBe(2)
+
+        // 取消分配第一个文档 - 应该删除关系
+        await controller.callInteraction('unassignDocument', {
+            user: alice,
+            payload: {
+                document: { id: doc1.id }
+            }
+        })
+
+        // 验证关系已被删除
+        relations = await controller.system.storage.find('DocumentOwner', undefined, undefined, ['*', ['source', {attributeQuery:['*']}], ['target', {attributeQuery:['*']}]])
+        expect(relations.length).toBe(1)
+        expect(relations[0].source.id).toBe(doc2.id)
+        expect(relations[0].target.id).toBe(bob.id)
+
+        // 取消分配第二个文档
+        await controller.callInteraction('unassignDocument', {
+            user: bob,
+            payload: {
+                document: { id: doc2.id }
+            }
+        })
+
+        // 验证所有关系都已被删除
+        relations = await controller.system.storage.find('DocumentOwner', undefined, undefined, ['*'])
+        expect(relations.length).toBe(0)
+    })
+
+    test('delete x:n relation through state machine', async () => {
+        // 创建一个 x:n 关系（多对多），通过 StateMachine 删除
+        const { Entity, Property, Relation, Interaction, Action, Payload, PayloadItem, StateMachine, StateNode, StateTransfer } = await import('@shared')
+        
+        // 创建用户实体
+        const User = Entity.create({
+            name: 'User',
+            properties: [
+                Property.create({
+                    name: 'name',
+                    type: 'string',
+                })
+            ]
+        })
+
+        // 创建项目实体
+        const Project = Entity.create({
+            name: 'Project',
+            properties: [
+                Property.create({
+                    name: 'name',
+                    type: 'string',
+                })
+            ]
+        })
+
+        // 创建加入项目的交互
+        const JoinProjectInteraction = Interaction.create({
+            name: 'joinProject',
+            action: Action.create({ name: 'joinProject' }),
+            payload: Payload.create({
+                items: [
+                    PayloadItem.create({
+                        name: 'user',
+                        isRef: true,
+                        base: User
+                    }),
+                    PayloadItem.create({
+                        name: 'project',
+                        isRef: true,
+                        base: Project
+                    }),
+                    PayloadItem.create({
+                        name: 'role',
+                    })
+                ]
+            })
+        })
+
+        // 创建离开项目的交互
+        const LeaveProjectInteraction = Interaction.create({
+            name: 'leaveProject',
+            action: Action.create({ name: 'leaveProject' }),
+            payload: Payload.create({
+                items: [
+                    PayloadItem.create({
+                        name: 'user',
+                        isRef: true,
+                        base: User
+                    }),
+                    PayloadItem.create({
+                        name: 'project',
+                        isRef: true,
+                        base: Project
+                    })
+                ]
+            })
+        })
+
+        // 创建移除所有成员的交互
+        const ClearProjectMembersInteraction = Interaction.create({
+            name: 'clearProjectMembers',
+            action: Action.create({ name: 'clearProjectMembers' }),
+            payload: Payload.create({
+                items: [
+                    PayloadItem.create({
+                        name: 'project',
+                        isRef: true,
+                        base: Project
+                    })
+                ]
+            })
+        })
+
+        // 创建状态节点
+        const MemberState = StateNode.create({
+            name: 'member',
+            computeValue: (lastValue: any, event: any) => {
+                // 返回成员信息，包含角色属性
+                return {}  // 返回空对象表示关系存在
+            }
+        })
+
+        const NonMemberState = StateNode.create({
+            name: 'nonMember',
+            computeValue: () => null  // 返回 null 删除关系
+        })
+
+        // 创建状态转换
+        const JoinTransfer = StateTransfer.create({
+            trigger: JoinProjectInteraction,
+            current: NonMemberState,
+            next: MemberState,
+            computeTarget: (event: any) => {
+                return {
+                    source: event.payload!.user,
+                    target: event.payload!.project,
+                    role: event.payload!.role  // 添加角色属性
+                }
+            }
+        })
+
+        const LeaveTransfer = StateTransfer.create({
+            trigger: LeaveProjectInteraction,
+            current: MemberState,
+            next: NonMemberState,
+            computeTarget: async function(this: any, event: any) {
+                // 查找特定用户和项目的关系
+                const relations = await this.system.storage.find(
+                    'ProjectMembership',
+                    undefined,
+                    undefined,
+                    ['id', ['source', {attributeQuery:['id']}], ['target', {attributeQuery:['id']}]]
+                )
+                // 找到匹配的关系
+                const existingRelation = relations.find((r: any) => 
+                    r.source?.id === event.payload!.user.id && 
+                    r.target?.id === event.payload!.project.id
+                )
+                // 需要返回包含 id 的对象
+                return existingRelation ? { id: existingRelation.id } : null
+            }
+        })
+
+        const ClearMembersTransfer = StateTransfer.create({
+            trigger: ClearProjectMembersInteraction,
+            current: MemberState,
+            next: NonMemberState,
+            computeTarget: async function(this: any, event: any) {
+                // 查找项目的所有成员关系
+                const existingRelations = await this.system.storage.find(
+                    'ProjectMembership',
+                    undefined,
+                    undefined,
+                    ['id', ['target', {attributeQuery:['id']}]]
+                )
+                // 过滤出该项目的关系
+                const projectRelations = existingRelations.filter((r: any) => 
+                    r.target?.id === event.payload!.project.id
+                )
+                // 返回所有关系的ID以便删除
+                return projectRelations.map((r: any) => ({ id: r.id }))
+            }
+        })
+
+        // 创建状态机
+        const MembershipStateMachine = StateMachine.create({
+            states: [MemberState, NonMemberState],
+            transfers: [JoinTransfer, LeaveTransfer, ClearMembersTransfer],
+            defaultState: NonMemberState
+        })
+
+        // 创建 x:n 关系 (多对多关系)
+        const ProjectMembershipRelation = Relation.create({
+            name: 'ProjectMembership',
+            source: User,
+            sourceProperty: 'projects',
+            target: Project,
+            targetProperty: 'members',
+            type: 'n:n',
+            computation: MembershipStateMachine,
+            properties: [
+                Property.create({
+                    name: 'role',
+                    type: 'string'
+                })
+            ]
+        })
+
+        // 设置测试环境
+        const system = new MonoSystem()
+        const controller = new Controller({
+            system: system,
+            entities: [User, Project],
+            relations: [ProjectMembershipRelation],
+            activities: [],
+            interactions: [JoinProjectInteraction, LeaveProjectInteraction, ClearProjectMembersInteraction]
+        })
+        await controller.setup(true)
+
+        // 创建测试数据
+        const alice = await controller.system.storage.create('User', { name: 'Alice' })
+        const bob = await controller.system.storage.create('User', { name: 'Bob' })
+        const charlie = await controller.system.storage.create('User', { name: 'Charlie' })
+        const project1 = await controller.system.storage.create('Project', { name: 'Project Alpha' })
+        const project2 = await controller.system.storage.create('Project', { name: 'Project Beta' })
+
+        // 验证初始状态 - 没有关系
+        let memberships = await controller.system.storage.find('ProjectMembership', undefined, undefined, ['*'])
+        expect(memberships.length).toBe(0)
+
+        // Alice 加入 project1 作为 developer
+        await controller.callInteraction('joinProject', {
+            user: alice,
+            payload: {
+                user: { id: alice.id },
+                project: { id: project1.id },
+                role: 'developer'
+            }
+        })
+
+        // Bob 加入 project1 作为 manager
+        await controller.callInteraction('joinProject', {
+            user: bob,
+            payload: {
+                user: { id: bob.id },
+                project: { id: project1.id },
+                role: 'manager'
+            }
+        })
+
+        // Charlie 加入两个项目
+        await controller.callInteraction('joinProject', {
+            user: charlie,
+            payload: {
+                user: { id: charlie.id },
+                project: { id: project1.id },
+                role: 'tester'
+            }
+        })
+        
+        await controller.callInteraction('joinProject', {
+            user: charlie,
+            payload: {
+                user: { id: charlie.id },
+                project: { id: project2.id },
+                role: 'developer'
+            }
+        })
+
+        // 验证关系已创建
+        memberships = await controller.system.storage.find('ProjectMembership', undefined, undefined, ['*', ['source', {attributeQuery:['*']}], ['target', {attributeQuery:['*']}]])
+        expect(memberships.length).toBe(4)
+        
+        // 验证角色信息
+        const aliceMembership = memberships.find(m => m.source.id === alice.id && m.target.id === project1.id)
+        expect(aliceMembership?.role).toBe('developer')
+        
+        const bobMembership = memberships.find(m => m.source.id === bob.id && m.target.id === project1.id)
+        expect(bobMembership?.role).toBe('manager')
+
+        // Alice 离开 project1
+        await controller.callInteraction('leaveProject', {
+            user: alice,
+            payload: {
+                user: { id: alice.id },
+                project: { id: project1.id }
+            }
+        })
+
+        // 验证 Alice 的关系已被删除
+        memberships = await controller.system.storage.find('ProjectMembership', undefined, undefined, ['*', ['source', {attributeQuery:['*']}], ['target', {attributeQuery:['*']}]])
+        expect(memberships.length).toBe(3)
+        expect(memberships.find(m => m.source.id === alice.id && m.target.id === project1.id)).toBeUndefined()
+
+        // 清空 project1 的所有成员
+        await controller.callInteraction('clearProjectMembers', {
+            user: alice,
+            payload: {
+                project: { id: project1.id }
+            }
+        })
+
+        // 验证 project1 的所有关系都已被删除，但 project2 的关系还在
+        memberships = await controller.system.storage.find('ProjectMembership', undefined, undefined, ['*', ['source', {attributeQuery:['*']}], ['target', {attributeQuery:['*']}]])
+        expect(memberships.length).toBe(1)
+        expect(memberships[0].source.id).toBe(charlie.id)
+        expect(memberships[0].target.id).toBe(project2.id)
+        expect(memberships[0].role).toBe('developer')
+    })
 });     

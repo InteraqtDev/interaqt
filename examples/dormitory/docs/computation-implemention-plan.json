@@ -117,8 +117,7 @@
           ],
           "reasoning": "Interaction-created and can be deleted (hard-delete), requires StateMachine only",
           "calculationMethod": "Created by AssignUserToDormitory, deleted by RemoveUserFromDormitory or approved ProcessRemovalRequest",
-          "completed": false,
-          "lastError": "docs/errors/userdormitory-relation-deletion-issue.md"
+          "completed": true
         },
         {
           "id": "DormitoryDormHeadRelation",
@@ -136,7 +135,7 @@
           ],
           "reasoning": "Interaction-created and can be deleted (hard-delete), requires StateMachine only",
           "calculationMethod": "Created by AssignDormHead, deleted by RemoveDormHead",
-          "completed": false
+          "completed": true
         },
         {
           "id": "UserPointDeductionRelation",
@@ -236,7 +235,7 @@
           ],
           "reasoning": "Interaction-created but cannot be deleted, use Transform with InteractionEventEntity",
           "calculationMethod": "Created when ProcessRemovalRequest approves or rejects the request",
-          "completed": false
+          "completed": true
         },
         {
           "id": "User.name",
@@ -254,7 +253,7 @@
           ],
           "reasoning": "Has interactionDependencies that can modify it after creation",
           "calculationMethod": "Direct assignment from interactions",
-          "completed": false
+          "completed": true
         },
         {
           "id": "User.phone",
@@ -272,7 +271,7 @@
           ],
           "reasoning": "Has interactionDependencies that can modify it after creation",
           "calculationMethod": "Direct assignment from interactions",
-          "completed": false
+          "completed": true
         },
         {
           "id": "User.role",
@@ -291,7 +290,7 @@
           ],
           "reasoning": "Has interactionDependencies that can modify it after creation",
           "calculationMethod": "State transitions between student, dormHead, admin",
-          "completed": false
+          "completed": true
         },
         {
           "id": "User.status",
@@ -310,7 +309,7 @@
           ],
           "reasoning": "Has interactionDependencies that can modify it after creation",
           "calculationMethod": "State transitions between active, suspended, removed",
-          "completed": false
+          "completed": true
         },
         {
           "id": "User.updatedAt",
@@ -330,7 +329,7 @@
           ],
           "reasoning": "Has interactionDependencies that update it",
           "calculationMethod": "Current timestamp on any update",
-          "completed": false
+          "completed": true
         },
         {
           "id": "Dormitory.name",
@@ -348,7 +347,7 @@
           ],
           "reasoning": "Has interactionDependencies that can modify it after creation",
           "calculationMethod": "Direct assignment from interactions",
-          "completed": false
+          "completed": true
         },
         {
           "id": "Dormitory.floor",
@@ -366,7 +365,7 @@
           ],
           "reasoning": "Has interactionDependencies that can modify it after creation",
           "calculationMethod": "Direct assignment from interactions",
-          "completed": false
+          "completed": true
         },
         {
           "id": "Dormitory.building",
@@ -384,7 +383,7 @@
           ],
           "reasoning": "Has interactionDependencies that can modify it after creation",
           "calculationMethod": "Direct assignment from interactions",
-          "completed": false
+          "completed": true
         },
         {
           "id": "Dormitory.status",
@@ -403,7 +402,7 @@
           ],
           "reasoning": "Has interactionDependencies that can modify it after creation",
           "calculationMethod": "State transitions between active and inactive",
-          "completed": false
+          "completed": true
         },
         {
           "id": "Dormitory.updatedAt",
@@ -421,7 +420,7 @@
           ],
           "reasoning": "Has interactionDependencies that update it",
           "calculationMethod": "Current timestamp on any update",
-          "completed": false
+          "completed": true
         },
         {
           "id": "PointDeduction.status",
@@ -440,7 +439,7 @@
           ],
           "reasoning": "Has interactionDependencies that can modify it after creation",
           "calculationMethod": "State transitions between active, appealed, cancelled",
-          "completed": false
+          "completed": true
         },
         {
           "id": "RemovalRequest.status",
@@ -459,7 +458,7 @@
           ],
           "reasoning": "Has interactionDependencies that can modify it after creation",
           "calculationMethod": "State transitions: pending → approved/rejected/cancelled",
-          "completed": false
+          "completed": true
         },
         {
           "id": "RemovalRequest.adminComment",
@@ -476,7 +475,7 @@
           ],
           "reasoning": "Has interactionDependencies that set it",
           "calculationMethod": "Set when ProcessRemovalRequest executes",
-          "completed": false
+          "completed": true
         },
         {
           "id": "RemovalRequest.processedAt",
@@ -493,7 +492,7 @@
           ],
           "reasoning": "Has interactionDependencies that set it",
           "calculationMethod": "Current timestamp when processed",
-          "completed": false
+          "completed": true
         },
         {
           "id": "RemovalRequest.updatedAt",
@@ -511,7 +510,7 @@
           ],
           "reasoning": "Has interactionDependencies that update it",
           "calculationMethod": "Current timestamp on any update",
-          "completed": false
+          "completed": true
         }
       ],
       "description": "Phase 2: 1 entity computation(s), 15 property computation(s), 7 relation computation(s)"

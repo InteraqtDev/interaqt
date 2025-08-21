@@ -287,6 +287,15 @@ export class InteractionCall {
     }
     async checkPayload(interactionEvent: InteractionEventArgs) {
         const payloadDefs = this.interaction.payload?.items || []
+
+        // 检查是否存在传了没定义的字段的情况。
+        const payloadKeys = Object.keys(interactionEvent.payload || {})
+        for(let payloadKey of payloadKeys) {
+            if (!payloadDefs.some(payloadDef => payloadDef.name === payloadKey)) {
+                throw new Error(`${payloadKey} in payload is not defined in interaction ${this.interaction.name}`)
+            }
+        }
+        
         for(let payloadDef of payloadDefs) {
 
             const payloadItem = interactionEvent.payload![payloadDef.name!]
@@ -344,6 +353,7 @@ export class InteractionCall {
                     await this.system.storage.findOne(payloadDef.base!.name!, itemMatch, undefined, ['*'])
             }
 
+            // TODO deprecate
             if (payloadDef.attributives) {
                 const attributives =  Attributives.is(payloadDef.attributives) ?
                     new BoolExp<AttributiveInstance>(payloadDef.attributives.content as BoolExpressionRawData<AttributiveInstance>) :
@@ -469,9 +479,9 @@ export class InteractionCall {
         try {
             if (!this.controller.ignorePermission) {
                 await this.checkCondition(interactionEventArgs)
-                await this.checkUser(interactionEventArgs, activityId, checkUserRef)
-                await this.checkPayload(interactionEventArgs)
             }
+            await this.checkUser(interactionEventArgs, activityId, checkUserRef)
+            await this.checkPayload(interactionEventArgs)
         } catch(e) {
             error = e
         }
