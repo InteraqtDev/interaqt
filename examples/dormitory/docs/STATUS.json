@@ -1,9 +1,34 @@
 {
-  "currentTask": "Task 2",
-  "completed": true,
-  "completedItems": [
-    "data-design.json created",
-    "interaction-design.md created",
-    "computation-analysis.json created"
-  ]
+  "currentTask": "Task 3.1.4.3",
+  "completed": false,
+  "currentComputation": "RemovalRequest.status",
+  "completedComputations": [
+    "User",
+    "Dormitory",
+    "Bed",
+    "DormitoryBedRelation",
+    "PointDeduction",
+    "RemovalRequest",
+    "UserDormitoryRelation",
+    "DormitoryDormHeadRelation",
+    "UserPointDeductionRelation",
+    "DeductionIssuerRelation",
+    "RemovalRequestTargetRelation",
+    "RemovalRequestInitiatorRelation",
+    "RemovalRequestAdminRelation",
+    "User.name",
+    "User.phone",
+    "User.role",
+    "User.status",
+    "User.updatedAt",
+    "Dormitory.name",
+    "Dormitory.floor",
+    "Dormitory.building",
+    "Dormitory.status",
+    "Dormitory.updatedAt",
+    "PointDeduction.status"
+  ],
+  "phase1Complete": true,
+  "phase2RelationsComplete": true,
+  "note": "PointDeduction.status computation completed successfully. Next is RemovalRequest.status."
 }

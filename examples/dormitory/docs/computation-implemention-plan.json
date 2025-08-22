@@ -21,7 +21,7 @@
           ],
           "reasoning": "interaction-created with soft-delete, Transform for creation + status StateMachine",
           "calculationMethod": "Independently created by CreateUser (admin) or RegisterUser (self-registration) interactions",
-          "completed": false
+          "completed": true
         },
         {
           "id": "Dormitory",
@@ -39,7 +39,7 @@
           ],
           "reasoning": "interaction-created with soft-delete, Transform for creation + status StateMachine",
           "calculationMethod": "Independently created by CreateDormitory interaction",
-          "completed": false
+          "completed": true
         },
         {
           "id": "PointDeduction",
@@ -57,7 +57,7 @@
           ],
           "reasoning": "interaction-created with soft-delete, Transform for creation + status StateMachine",
           "calculationMethod": "Independently created by IssuePointDeduction interaction",
-          "completed": false
+          "completed": true
         },
         {
           "id": "RemovalRequest",
@@ -75,7 +75,7 @@
           ],
           "reasoning": "interaction-created with soft-delete, Transform for creation + status StateMachine",
           "calculationMethod": "Independently created by InitiateRemovalRequest interaction",
-          "completed": false
+          "completed": true
         }
       ],
       "description": "Phase 1: 4 entity computation(s)"
@@ -99,7 +99,7 @@
           ],
           "reasoning": "created-with-parent, created by Dormitory's computation",
           "calculationMethod": "Created together with Dormitory entity by CreateDormitory interaction (creates capacity number of beds)",
-          "completed": false
+          "completed": true
         },
         {
           "id": "UserDormitoryRelation",
@@ -123,7 +123,7 @@
           ],
           "reasoning": "interaction-created with hard-delete capability, must use StateMachine",
           "calculationMethod": "Created by AssignUserToDormitory, deleted by RemoveUserFromDormitory or approved ProcessRemovalRequest",
-          "completed": false
+          "completed": true
         },
         {
           "id": "DormitoryDormHeadRelation",
@@ -146,7 +146,7 @@
           ],
           "reasoning": "interaction-created with hard-delete capability, must use StateMachine",
           "calculationMethod": "Created by AssignDormHead, deleted by RemoveDormHead",
-          "completed": false
+          "completed": true
         },
         {
           "id": "UserPointDeductionRelation",
@@ -166,7 +166,7 @@
           ],
           "reasoning": "created-with-entity, created by PointDeduction's computation",
           "calculationMethod": "Created together with PointDeduction by IssuePointDeduction interaction",
-          "completed": false
+          "completed": true
         },
         {
           "id": "DeductionIssuerRelation",
@@ -186,7 +186,7 @@
           ],
           "reasoning": "created-with-entity, created by PointDeduction's computation",
           "calculationMethod": "Created together with PointDeduction by IssuePointDeduction interaction",
-          "completed": false
+          "completed": true
         },
         {
           "id": "RemovalRequestTargetRelation",
@@ -206,7 +206,7 @@
           ],
           "reasoning": "created-with-entity, created by RemovalRequest's computation",
           "calculationMethod": "Created together with RemovalRequest by InitiateRemovalRequest interaction",
-          "completed": false
+          "completed": true
         },
         {
           "id": "RemovalRequestInitiatorRelation",
@@ -226,7 +226,7 @@
           ],
           "reasoning": "created-with-entity, created by RemovalRequest's computation",
           "calculationMethod": "Created together with RemovalRequest by InitiateRemovalRequest interaction",
-          "completed": false
+          "completed": true
         },
         {
           "id": "RemovalRequestAdminRelation",
@@ -248,7 +248,7 @@
           ],
           "reasoning": "interaction-created with no deletion capability",
           "calculationMethod": "Created by ProcessRemovalRequest when admin approves/rejects",
-          "completed": false
+          "completed": true
         },
         {
           "id": "User.name",
@@ -270,7 +270,7 @@
           ],
           "reasoning": "Modified by interactions (CreateUser, RegisterUser, UpdateUserProfile)",
           "calculationMethod": "Direct assignment from interactions",
-          "completed": false
+          "completed": true
         },
         {
           "id": "User.phone",
@@ -292,7 +292,7 @@
           ],
           "reasoning": "Modified by interactions (CreateUser, RegisterUser, UpdateUserProfile)",
           "calculationMethod": "Direct assignment from interactions",
-          "completed": false
+          "completed": true
         },
         {
           "id": "User.role",
@@ -315,7 +315,7 @@
           ],
           "reasoning": "Modified by multiple interactions with state transitions",
           "calculationMethod": "Set at creation, can be changed to/from dormHead by admin interactions",
-          "completed": false
+          "completed": true
         },
         {
           "id": "User.status",
@@ -338,7 +338,7 @@
           ],
           "reasoning": "State transitions managed by interactions",
           "calculationMethod": "Set to 'active' at creation, changed to 'removed' when removal request approved, can be set to 'suspended' by admin",
-          "completed": false
+          "completed": true
         },
         {
           "id": "User.updatedAt",
@@ -361,7 +361,7 @@
           ],
           "reasoning": "Updated by multiple interactions",
           "calculationMethod": "Updated to current timestamp on any modification",
-          "completed": false
+          "completed": true
         },
         {
           "id": "Dormitory.name",
@@ -382,7 +382,7 @@
           ],
           "reasoning": "Modified by interactions (CreateDormitory, UpdateDormitory)",
           "calculationMethod": "Direct assignment from interactions",
-          "completed": false
+          "completed": true
         },
         {
           "id": "Dormitory.floor",
@@ -403,7 +403,7 @@
           ],
           "reasoning": "Modified by interactions",
           "calculationMethod": "Direct assignment from interactions",
-          "completed": false
+          "completed": true
         },
         {
           "id": "Dormitory.building",
@@ -424,7 +424,7 @@
           ],
           "reasoning": "Modified by interactions",
           "calculationMethod": "Direct assignment from interactions",
-          "completed": false
+          "completed": true
         },
         {
           "id": "Dormitory.status",
@@ -445,7 +445,7 @@
           ],
           "reasoning": "State transitions managed by interactions",
           "calculationMethod": "Set to 'active' at creation, can be set to 'inactive' by DeactivateDormitory",
-          "completed": false
+          "completed": true
         },
         {
           "id": "Dormitory.updatedAt",
@@ -466,7 +466,7 @@
           ],
           "reasoning": "Updated by multiple interactions",
           "calculationMethod": "Updated to current timestamp on any modification",
-          "completed": false
+          "completed": true
         },
         {
           "id": "PointDeduction.status",
@@ -486,7 +486,7 @@
           ],
           "reasoning": "State transitions managed by interactions",
           "calculationMethod": "Set to 'active' at creation, can be changed to 'cancelled' by admin (future: appeal system)",
-          "completed": false
+          "completed": true
         },
         {
           "id": "RemovalRequest.status",
@@ -619,7 +619,7 @@
           ],
           "reasoning": "created-with-entity, created by Bed's computation",
           "calculationMethod": "Created together with Bed entities by CreateDormitory interaction",
-          "completed": false
+          "completed": true
         },
         {
           "id": "User.totalPoints",

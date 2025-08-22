@@ -2,7 +2,7 @@ import { StateMachine, StateMachineInstance, StateNodeInstance } from "@shared";
 import { Controller } from "../Controller.js";
 import { EntityIdRef, RecordMutationEvent } from '../System.js';
 import { INTERACTION_RECORD } from "../activity/ActivityManager.js";
-import { DataContext, EntityDataContext } from "./Computation.js";
+import { DataContext, EntityDataContext, PropertyDataContext } from "./Computation.js";
 import { ComputationResult, ComputationResultPatch, EventBasedComputation, EventDep, GlobalBoundState, RecordBoundState } from "./Computation.js";
 import { EtityMutationEvent } from "../Scheduler.js";
 import { TransitionFinder } from "./TransitionFinder.js";
@@ -72,9 +72,11 @@ export class PropertyStateMachineHandle implements EventBasedComputation {
     useLastValue: boolean = true
     eventDeps: {[key: string]: EventDep} = {}
     defaultState: StateNodeInstance
-    constructor(public controller: Controller, public args: StateMachineInstance, public dataContext: DataContext) {
+    dataContext: PropertyDataContext
+    constructor(public controller: Controller, public args: StateMachineInstance, dataContext: DataContext) {
         this.transitionFinder = new TransitionFinder(this.args)
         this.defaultState = this.args.defaultState
+        this.dataContext = dataContext as PropertyDataContext
     }
     createState() {
         return {
@@ -82,8 +84,20 @@ export class PropertyStateMachineHandle implements EventBasedComputation {
         }
     }
     // 这里的 defaultValue 不能是 async 的模式。因为是直接创建时填入的。
-    getDefaultValue(event:any) {
-        return this.defaultState.computeValue ? this.defaultState.computeValue.call(this.controller, undefined, event) : this.defaultState.name
+    getDefaultValue(initialRecord:any) {
+        const lastValue = initialRecord[this.dataContext.id.name]
+        assert(
+            !(lastValue !== undefined && !this.defaultState.computeValue), 
+            `${this.dataContext.host.name}.${this.dataContext.id.name} have been set when ${this.dataContext.host.name} created, 
+if you want to save the use the initial value, you need to define computeValue in defaultState to save it.
+Or if you want to use state name as value, you should not set ${this.dataContext.host.name}.${this.dataContext.id.name} when ${this.dataContext.host.name} created.
+`
+        )
+        if (lastValue !== undefined || this.defaultState.computeValue) {
+            return this.defaultState.computeValue!.call(this.controller, lastValue, undefined)
+        } else {
+            return this.defaultState.name
+        }
     }
     mutationEventToTrigger(mutationEvent: RecordMutationEvent) {
         // FIXME 支持 data mutation

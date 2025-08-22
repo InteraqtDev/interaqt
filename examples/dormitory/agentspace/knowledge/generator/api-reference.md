@@ -682,6 +682,27 @@ StateMachine.create(config: StateMachineConfig): StateMachineInstance
 - `config.transfers` (StateTransfer[], required): List of state transfers
 - `config.defaultState` (StateNode, required): Default state
 
+**Important: Initial Value Handling**
+
+When using StateMachine for entity/relation properties:
+- If the property's initial value is set when the entity/relation is created, handle it in the entity/relation's computation
+- If the StateMachine needs to save or modify this initial value, explicitly define `computeValue` on the `defaultState` to handle it
+
+```typescript
+// Example: StateMachine handling initial value
+const MyStateMachine = StateMachine.create({
+    states: [pendingState, activeState],
+    transfers: [...],
+    defaultState: StateNode.create({
+        name: 'pending',
+        computeValue: (lastValue) => {
+            // Explicitly handle initial value
+            return lastValue || 'initial_state_value';
+        }
+    })
+});
+```
+
 **Examples**
 ```typescript
 // First declare state nodes
