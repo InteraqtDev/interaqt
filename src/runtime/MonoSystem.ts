@@ -145,30 +145,57 @@ class MonoStorage implements Storage{
 
 
 
+// Define log levels for database logger
+export enum DBLogLevel {
+    ERROR = 0,
+    INFO = 1,
+}
+
 export class DBConsoleLogger implements DatabaseLogger{
+    constructor(private level: DBLogLevel = DBLogLevel.ERROR) {}
+    
     info({type, name, sql, params}: Parameters<DatabaseLogger["info"]>[0]) {
-        console.log({type, name, sql, params})
+        if (this.level >= DBLogLevel.INFO) {
+            console.log({type, name, sql, params})
+        }
     }
     error({type, name, sql, params, error}: Parameters<DatabaseLogger["error"]>[0]) {
-        console.error({type, name, sql, params, error})
+        if (this.level >= DBLogLevel.ERROR) {
+            console.error({type, name, sql, params, error})
+        }
     }
     child() {
-        return new DBConsoleLogger()
+        return new DBConsoleLogger(this.level)
     }
 }
 
+// Define log levels for system logger
+export enum SystemLogLevel {
+    ERROR = 0,
+    INFO = 1,
+    DEBUG = 2,
+}
+
 export class SystemConsoleLogger implements SystemLogger{
+    constructor(private level: SystemLogLevel = SystemLogLevel.ERROR) {}
+    
     error({label, message, ...rest}: SystemLogType) {
-        console.error(`[ERROR] ${label}: ${message}`, rest)
+        if (this.level >= SystemLogLevel.ERROR) {
+            console.error(`[ERROR] ${label}: ${message}`, rest)
+        }
     }
     info({label, message, ...rest}: SystemLogType) {
-        console.info(`[INFO] ${label}: ${message}`, rest)
+        if (this.level >= SystemLogLevel.INFO) {
+            console.info(`[INFO] ${label}: ${message}`, rest)
+        }
     }
     debug({label, message, ...rest}: SystemLogType) {
-        console.debug(`[DEBUG] ${label}: ${message}`, rest)
+        if (this.level >= SystemLogLevel.DEBUG) {
+            console.debug(`[DEBUG] ${label}: ${message}`, rest)
+        }
     }
     child(fixed: object) {
-        return new SystemConsoleLogger()
+        return new SystemConsoleLogger(this.level)
     }
 }
 export const dbPinoLogger = pino()

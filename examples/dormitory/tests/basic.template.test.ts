@@ -33,27 +33,3 @@ describe('Basic Functionality', () => {
     
   })
 }) 
-
-describe('Permission and Business Rules', () => {
-  let system: MonoSystem
-  let controller: Controller
-
-  beforeEach(async () => {
-    system = new MonoSystem(new PGLiteDB())
-    controller = new Controller({
-      system,
-      entities,
-      relations,
-      interactions,
-      activities,
-      dict: dicts
-    })
-
-    await controller.setup(true)
-  })
-
-  test('placeholder - will add tests later', async () => {
-    // Placeholder test to avoid empty suite error
-    expect(true).toBe(true)
-  })
-})

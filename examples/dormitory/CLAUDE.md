@@ -595,7 +595,7 @@ This section follows a **test-driven progressive approach** where each computati
    - Review similar successful computations for patterns
 
 3. **Apply Fix Based on Analysis**:
-   - **Implementation Issue** → Fix computation code in backend/index.ts
+   - **Implementation Issue** → Fix computation code in backend/index.ts (refer to API reference)
    - **Test Issue** → Fix test case logic or expectations
    - **Dependency Issue** → Fix data creation order
    - **Business Logic Issue** → Re-read requirements and adjust
@@ -609,7 +609,13 @@ This section follows a **test-driven progressive approach** where each computati
 
 ## NORMAL IMPLEMENTATION FLOW (when no lastError):
 
-1. **Implement the Computation**
+1. **Implement the Computation** (following API Reference)
+   - **📖 CRITICAL: Implementation MUST follow patterns from `./agentspace/knowledge/generator/api-reference.md`**. Read FIRST.
+   - **🔴 SPECIAL CASE: `_parent:[parent]` notation**
+     - If the computation name contains `_parent:[parent]` (e.g., `_parent:[User]`), this means:
+       - You should modify the PARENT entity's computation, not the current entity
+       - Example: For `_parent:[User]`, modify the `User` entity's computation that creates Posts
+       - This typically occurs when a child entity needs to be created by a parent's Transform computation
    - Add computation code using assignment pattern at end of file:
      ```typescript
      // At end of backend/index.ts, after exports:
@@ -629,6 +635,7 @@ This section follows a **test-driven progressive approach** where each computati
    - Check `expandedDependencies` to understand all required dependencies
    - Write test plan comment with: dependencies, test steps, business logic notes
    - Cross-reference with `requirements/interaction-matrix.md` and `docs/data-design.json`
+   - **🔴 For `_parent:[parent]` computations**: Test the parent entity's behavior that creates/manages the child entities
    
    ```typescript
    test('User.dormitoryCount computation', async () => {
@@ -637,6 +644,17 @@ This section follows a **test-driven progressive approach** where each computati
       * Dependencies: User entity, UserDormitoryRelation
       * Steps: 1) Create user 2) Create dormitories 3) Create relations 4) Verify count
       * Business Logic: Count of dormitories user is assigned to
+      */
+     // Implementation...
+   })
+   
+   // For _parent:[parent] computations:
+   test('Post creation through User Transform (_parent:[User])', async () => {
+     /**
+      * Test Plan for: _parent:[User]
+      * This tests the User's Transform computation that creates Posts
+      * Steps: 1) Trigger interaction that creates User 2) Verify Posts are created
+      * Business Logic: User's Transform creates related Posts
       */
      // Implementation...
    })
@@ -788,6 +806,33 @@ This section follows a **test-driven progressive approach** where each computati
 {
   "currentTask": "Task 3.2",
   "completed": false
+}
+```
+
+#### Task 3.2.0: Create Permission Test File
+
+**🔄 Update `docs/STATUS.json`:**
+```json
+{
+  "currentTask": "Task 3.2.0",
+  "completed": false
+}
+```
+
+**📋 Set up dedicated test file for permissions and business rules:**
+
+- [ ] Copy contents from `tests/permission.template.test.ts` to create `tests/permission.test.ts`
+  - This template is specifically designed for permission and business rule testing
+  - **DO NOT add any test cases yet** - we will add them progressively as we implement each rule
+- [ ] This will be your dedicated test file for all permission and business rule tests
+- [ ] Import your backend definitions: `import { entities, relations, interactions } from '../backend'`
+- [ ] Verify the file structure includes the 'Permission and Business Rules' describe group
+
+**✅ END Task 3.2.0: Update `docs/STATUS.json`:**
+```json
+{
+  "currentTask": "Task 3.2.0",
+  "completed": true
 }
 ```
 
@@ -1033,13 +1078,13 @@ import {
    - [ ] Do NOT write tests until type checking passes
 
 3. **Write Focused Test Cases**
-   - [ ] Add test cases in `tests/basic.test.ts` under the 'Permission and Business Rules' describe group
+   - [ ] Add test cases in `tests/permission.test.ts` under the 'Permission and Business Rules' describe group
    - [ ] Test EVERY scenario listed in the implementation plan
    - [ ] Test both success and failure cases
    
 4. **Run Test**
-   - [ ] **🔴 CRITICAL: Run FULL test suite every time** to ensure no regression: `npm run test tests/basic.test.ts`
-     - This runs ALL tests in the file, not just the new ones
+   - [ ] **🔴 CRITICAL: Run BOTH test suites every time** to ensure no regression:
+     - Run permission tests: `npm run test tests/permission.test.ts`
      - Ensures new rules don't break existing functionality
      - If ANY test fails (new or existing), must fix before proceeding
    - [ ] Fix any test failures (both new tests and any regressions)
@@ -1085,7 +1130,7 @@ import {
 - [ ] All business rules from requirements are implemented
 - [ ] Each rule has comprehensive test coverage (success and failure cases)
 - [ ] All type checks pass (`npm run check`)
-- [ ] All tests pass (`npm run test tests/basic.test.ts`)
+- [ ] All permission tests pass (`npm run test tests/permission.test.ts`)
 - [ ] Error scenarios are properly documented
 
 **Note on Error Messages:**
@@ -1112,9 +1157,11 @@ Since permissions and business rules are unified in the `conditions` API, the fr
   "currentTask": "Task 3.2",
   "completed": true,
   "completedItems": [
-    "All permissions implemented with tests",
-    "All business rules implemented with tests",
-    "business-rules-and-permission-control-implementation-plan.json completed"
+    "Permission test file created from template",
+    "All permissions implemented with tests in permission.test.ts",
+    "All business rules implemented with tests in permission.test.ts",
+    "business-rules-and-permission-control-implementation-plan.json completed",
+    "Both test suites passing (basic.test.ts and permission.test.ts)"
   ]
 }
 ```

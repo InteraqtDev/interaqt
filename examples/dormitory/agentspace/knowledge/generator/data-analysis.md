@@ -40,7 +40,9 @@ Identify how the entity comes into existence:
 **For created-with-parent entities**:
 - List parent entity in `dataDependencies`
 - Include parent's creation interactions in `interactionDependencies`
-- Describe the relationship in `computationMethod`
+- **CRITICAL**: The creation logic is NOT in this entity's own computation, but in the parent entity's computation
+- Must clearly state in `computationMethod`: "Created by [ParentEntity]'s computation when [condition]"
+- Example: AuditLog's `computationMethod` should be "Created by Transaction's computation when Transaction is created or updated"
 
 **Deletion Patterns**:
 Only relevant for interaction-created entities:
@@ -340,7 +342,7 @@ Use this JSON template to document your analysis results.
 
 **Key Principles of the Simplified Structure**:
 1. **All dependencies are string arrays**: List names only, describe usage in `computationMethod`
-2. **Lifecycle is simplified**: Focus on creation pattern and deletion capability
+2. **Lifecycle is structured**: Creation is an object with `type` (interaction-created, derived, or created-with-parent/entity) and `parent` (entity name when type is created-with-*)
 3. **Updates are property-level**: Never analyze updates at entity/relation level
 4. **Creation patterns are clear**: interaction-created, derived, or created-with-parent/entity
 5. **Deletion is straightforward**: Can delete? Type? Which interactions?
@@ -354,7 +356,10 @@ Use this JSON template to document your analysis results.
       "interactionDependencies": ["interaction1", "interaction2"],
       "computationMethod": "[How this entity is created: 'interaction-created' | 'derived from X' | 'created with parent entity Y']",
       "lifecycle": {
-        "creation": "[interaction-created | derived | created-with-parent]",
+        "creation": {
+          "type": "[interaction-created | derived | created-with-parent]",
+          "parent": "[ParentEntityName if type is created-with-parent, null otherwise]"
+        },
         "deletion": {
           "canBeDeleted": true,
           "deletionType": "[soft-delete | hard-delete]",
@@ -386,7 +391,10 @@ Use this JSON template to document your analysis results.
       "interactionDependencies": ["CreateUser", "BulkImportUsers", "RegisterUser", "DeleteUser", "BanUser"],
       "computationMethod": "Independently created by CreateUser, BulkImportUsers, or RegisterUser interactions",
       "lifecycle": {
-        "creation": "interaction-created",
+        "creation": {
+          "type": "interaction-created",
+          "parent": null
+        },
         "deletion": {
           "canBeDeleted": true,
           "deletionType": "soft-delete",
@@ -449,7 +457,10 @@ Use this JSON template to document your analysis results.
       "interactionDependencies": ["interaction1", "interaction2"],
       "computationMethod": "[How this relation is created: 'interaction-created' | 'derived from conditions' | 'created with entity X']",
       "lifecycle": {
-        "creation": "[interaction-created | derived | created-with-entity]",
+        "creation": {
+          "type": "[interaction-created | derived | created-with-entity]",
+          "parent": "[ParentEntityName if type is created-with-entity, null otherwise]"
+        },
         "deletion": {
           "canBeDeleted": true,
           "deletionType": "[soft-delete | hard-delete | auto-delete]",
@@ -479,7 +490,10 @@ Use this JSON template to document your analysis results.
       "interactionDependencies": ["CreatePost", "ImportPost", "DeletePost", "PurgeUserContent"],
       "computationMethod": "Created together with Post entity by CreatePost or ImportPost interactions",
       "lifecycle": {
-        "creation": "created-with-entity",
+        "creation": {
+          "type": "created-with-entity",
+          "parent": "Post"
+        },
         "deletion": {
           "canBeDeleted": true,
           "deletionType": "auto-delete",
@@ -509,7 +523,10 @@ Use this JSON template to document your analysis results.
       "interactionDependencies": ["AssignDormitory", "BulkAssignStudents", "UnassignDormitory", "GraduateStudent", "TransferDormitory"],
       "computationMethod": "Independently created by AssignDormitory or BulkAssignStudents when User.role='student' and Dormitory has capacity",
       "lifecycle": {
-        "creation": "interaction-created",
+        "creation": {
+          "type": "interaction-created",
+          "parent": null
+        },
         "deletion": {
           "canBeDeleted": true,
           "deletionType": "hard-delete",
@@ -542,7 +559,10 @@ Use this JSON template to document your analysis results.
       "interactionDependencies": [],
       "computationMethod": "Derived from User where lastLoginDate > (now - 30 days)",
       "lifecycle": {
-        "creation": "derived",
+        "creation": {
+          "type": "derived",
+          "parent": null
+        },
         "deletion": {
           "canBeDeleted": false,
           "deletionType": "auto-delete",
@@ -558,9 +578,12 @@ Use this JSON template to document your analysis results.
       "purpose": "Audit trail for important operations (example of created-with-parent)",
       "dataDependencies": ["Transaction"],
       "interactionDependencies": ["CreateTransaction", "UpdateTransaction"],
-      "computationMethod": "Created automatically whenever Transaction is created or updated",
+      "computationMethod": "Created by Transaction's computation when Transaction is created or updated (NOT by AuditLog's own computation)",
       "lifecycle": {
-        "creation": "created-with-parent",
+        "creation": {
+          "type": "created-with-parent",
+          "parent": "Transaction"
+        },
         "deletion": {
           "canBeDeleted": false,
           "deletionType": "none",

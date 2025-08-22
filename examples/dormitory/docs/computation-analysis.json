@@ -5,8 +5,8 @@
       "entityLevelAnalysis": {
         "purpose": "System users with different roles (admin, dormHead, student)",
         "creationSource": "interaction-created",
-        "updateRequirements": "Profile updates, role changes, status changes",
-        "deletionStrategy": "soft-delete"
+        "updateRequirements": "Properties can be updated via UpdateUserProfile, role changes via AssignDormHead/RemoveDormHead",
+        "deletionStrategy": "soft-delete (status changed to 'removed')"
       },
       "propertyAnalysis": [
         {
@@ -15,7 +15,7 @@
           "purpose": "System-generated unique identifier",
           "dataSource": "auto-generated",
           "computationDecision": "None",
-          "reasoning": "System-generated identifier, no computation needed",
+          "reasoning": "System-generated ID, handled by framework",
           "dependencies": [],
           "interactionDependencies": [],
           "calculationMethod": "auto-generated"
@@ -24,75 +24,75 @@
           "propertyName": "name",
           "type": "string",
           "purpose": "User's full name",
-          "dataSource": "Direct assignment from CreateUser and UpdateUserProfile interactions",
+          "dataSource": "Direct assignment from interactions",
           "computationDecision": "StateMachine",
-          "reasoning": "Has interactionDependencies that can modify it after creation",
-          "dependencies": [],
-          "interactionDependencies": ["CreateUser", "UpdateUserProfile"],
+          "reasoning": "Modified by interactions (CreateUser, RegisterUser, UpdateUserProfile)",
+          "dependencies": ["InteractionEventEntity"],
+          "interactionDependencies": ["CreateUser", "RegisterUser", "UpdateUserProfile"],
           "calculationMethod": "Direct assignment from interactions"
         },
         {
           "propertyName": "email",
           "type": "string",
-          "purpose": "Unique identifier and contact email",
-          "dataSource": "Set once at creation by CreateUser, immutable thereafter",
+          "purpose": "Unique identifier and authentication",
+          "dataSource": "Set once at creation, immutable thereafter",
           "computationDecision": "None",
-          "reasoning": "Set only at creation time, never modified",
+          "reasoning": "Only set at creation, never modified",
           "dependencies": [],
-          "interactionDependencies": ["CreateUser"],
-          "calculationMethod": "Set once at creation, immutable"
+          "interactionDependencies": ["CreateUser", "RegisterUser"],
+          "calculationMethod": "Set once at creation, immutable thereafter"
         },
         {
           "propertyName": "phone",
           "type": "string",
-          "purpose": "Optional contact phone number",
-          "dataSource": "Direct assignment from CreateUser and UpdateUserProfile interactions",
+          "purpose": "Contact number",
+          "dataSource": "Direct assignment from interactions",
           "computationDecision": "StateMachine",
-          "reasoning": "Has interactionDependencies that can modify it after creation",
-          "dependencies": [],
-          "interactionDependencies": ["CreateUser", "UpdateUserProfile"],
+          "reasoning": "Modified by interactions (CreateUser, RegisterUser, UpdateUserProfile)",
+          "dependencies": ["InteractionEventEntity"],
+          "interactionDependencies": ["CreateUser", "RegisterUser", "UpdateUserProfile"],
           "calculationMethod": "Direct assignment from interactions"
         },
         {
           "propertyName": "role",
           "type": "string",
           "purpose": "User role (admin, dormHead, student)",
-          "dataSource": "Set at creation by CreateUser, changes via AssignDormHead/RemoveDormHead",
+          "dataSource": "Set at creation, can be changed to/from dormHead by admin interactions",
           "computationDecision": "StateMachine",
-          "reasoning": "Has interactionDependencies that can modify it after creation",
-          "dependencies": [],
-          "interactionDependencies": ["CreateUser", "AssignDormHead", "RemoveDormHead"],
-          "calculationMethod": "State transitions between student, dormHead, admin"
+          "reasoning": "Modified by multiple interactions with state transitions",
+          "dependencies": ["InteractionEventEntity"],
+          "interactionDependencies": ["CreateUser", "RegisterUser", "AssignDormHead", "RemoveDormHead"],
+          "calculationMethod": "Set at creation, can be changed to/from dormHead by admin interactions"
         },
         {
           "propertyName": "status",
           "type": "string",
           "purpose": "User account status (active, suspended, removed)",
-          "dataSource": "Set to 'active' at creation, changes via ProcessRemovalRequest",
+          "dataSource": "Set to 'active' at creation, changed to 'removed' when removal request approved",
           "computationDecision": "StateMachine",
-          "reasoning": "Has interactionDependencies that can modify it after creation",
-          "dependencies": [],
-          "interactionDependencies": ["CreateUser", "ProcessRemovalRequest", "RemoveUserFromDormitory"],
-          "calculationMethod": "State transitions between active, suspended, removed"
+          "reasoning": "State transitions managed by interactions",
+          "dependencies": ["InteractionEventEntity"],
+          "interactionDependencies": ["CreateUser", "RegisterUser", "ProcessRemovalRequest", "RemoveUserFromDormitory"],
+          "calculationMethod": "Set to 'active' at creation, changed to 'removed' when removal request approved, can be set to 'suspended' by admin"
         },
         {
           "propertyName": "totalPoints",
           "type": "number",
-          "purpose": "Total accumulated disciplinary points",
-          "dataSource": "Summation of PointDeduction.points across all UserPointDeductionRelation where PointDeduction.status = 'active'",
+          "purpose": "Total active point deductions",
+          "dataSource": "Summation of PointDeduction.points where PointDeduction.status = 'active' across UserPointDeductionRelation",
           "computationDecision": "Summation",
-          "reasoning": "Has dataDependencies with aggregation across relations, computationMethod contains 'Summation of'",
+          "reasoning": "Aggregation of points from related entities",
           "dependencies": ["UserPointDeductionRelation", "PointDeduction.points", "PointDeduction.status"],
           "interactionDependencies": [],
-          "calculationMethod": "Summation of active PointDeduction.points"
+          "calculationMethod": "Summation of PointDeduction.points where PointDeduction.status = 'active' across UserPointDeductionRelation"
         },
         {
           "propertyName": "isRemovable",
           "type": "boolean",
-          "purpose": "Whether user is eligible for removal (totalPoints >= 30)",
-          "dataSource": "Computed as totalPoints >= 30",
+          "purpose": "Whether user has enough points for removal",
+          "dataSource": "totalPoints >= 30",
           "computationDecision": "computed",
-          "reasoning": "Uses only own entity properties (totalPoints)",
+          "reasoning": "Simple derivation from own property",
           "dependencies": ["_self.totalPoints"],
           "interactionDependencies": [],
           "calculationMethod": "totalPoints >= 30"
@@ -100,43 +100,43 @@
         {
           "propertyName": "isDormHead",
           "type": "boolean",
-          "purpose": "Whether user is currently a dorm head",
-          "dataSource": "Computed as role === 'dormHead' AND has DormitoryDormHeadRelation",
-          "computationDecision": "computed",
-          "reasoning": "Uses own property and relation existence check",
+          "purpose": "Whether user is a dorm head",
+          "dataSource": "role === 'dormHead' && exists DormitoryDormHeadRelation where target = this user",
+          "computationDecision": "Custom",
+          "reasoning": "Complex logic combining property and relation existence",
           "dependencies": ["_self.role", "DormitoryDormHeadRelation"],
           "interactionDependencies": [],
-          "calculationMethod": "role === 'dormHead' AND exists(DormitoryDormHeadRelation)"
+          "calculationMethod": "role === 'dormHead' && exists DormitoryDormHeadRelation where target = this user"
         },
         {
           "propertyName": "createdAt",
           "type": "timestamp",
           "purpose": "Account creation timestamp",
-          "dataSource": "Set to current timestamp when CreateUser creates the user",
+          "dataSource": "Set to current timestamp at creation",
           "computationDecision": "None",
-          "reasoning": "Set only at creation time by entity Transform",
+          "reasoning": "Set only at creation time",
           "dependencies": [],
-          "interactionDependencies": ["CreateUser"],
-          "calculationMethod": "Current timestamp at creation"
+          "interactionDependencies": [],
+          "calculationMethod": "Set to current timestamp at creation"
         },
         {
           "propertyName": "updatedAt",
           "type": "timestamp",
-          "purpose": "Last update timestamp",
-          "dataSource": "Updated to current timestamp whenever user properties are modified",
+          "purpose": "Last modification timestamp",
+          "dataSource": "Updated to current timestamp on any modification",
           "computationDecision": "StateMachine",
-          "reasoning": "Has interactionDependencies that update it",
-          "dependencies": [],
+          "reasoning": "Updated by multiple interactions",
+          "dependencies": ["InteractionEventEntity"],
           "interactionDependencies": ["UpdateUserProfile", "AssignDormHead", "RemoveDormHead", "ProcessRemovalRequest"],
-          "calculationMethod": "Current timestamp on any update"
+          "calculationMethod": "Updated to current timestamp on any modification"
         }
       ],
       "entityComputationDecision": {
         "type": "Transform",
-        "reasoning": "Has interactionDependencies (CreateUser), lifecycle.creation is 'interaction-created'",
+        "reasoning": "interaction-created with soft-delete, Transform for creation + status StateMachine",
         "dependencies": ["InteractionEventEntity"],
-        "interactionDependencies": ["CreateUser"],
-        "calculationMethod": "Create User entity when CreateUser interaction is triggered"
+        "interactionDependencies": ["CreateUser", "RegisterUser"],
+        "calculationMethod": "Independently created by CreateUser (admin) or RegisterUser (self-registration) interactions"
       }
     },
     {
@@ -144,8 +144,8 @@
       "entityLevelAnalysis": {
         "purpose": "Dormitory rooms that house students",
         "creationSource": "interaction-created",
-        "updateRequirements": "Name, floor, building, status updates",
-        "deletionStrategy": "soft-delete"
+        "updateRequirements": "Properties updated via UpdateDormitory, status via DeactivateDormitory",
+        "deletionStrategy": "soft-delete (status changed to 'inactive')"
       },
       "propertyAnalysis": [
         {
@@ -154,7 +154,7 @@
           "purpose": "System-generated unique identifier",
           "dataSource": "auto-generated",
           "computationDecision": "None",
-          "reasoning": "System-generated identifier, no computation needed",
+          "reasoning": "System-generated ID, handled by framework",
           "dependencies": [],
           "interactionDependencies": [],
           "calculationMethod": "auto-generated"
@@ -162,11 +162,11 @@
         {
           "propertyName": "name",
           "type": "string",
-          "purpose": "Dormitory name (e.g., 'Building A - Room 301')",
-          "dataSource": "Direct assignment from CreateDormitory and UpdateDormitory interactions",
+          "purpose": "Dormitory name",
+          "dataSource": "Direct assignment from interactions",
           "computationDecision": "StateMachine",
-          "reasoning": "Has interactionDependencies that can modify it after creation",
-          "dependencies": [],
+          "reasoning": "Modified by interactions (CreateDormitory, UpdateDormitory)",
+          "dependencies": ["InteractionEventEntity"],
           "interactionDependencies": ["CreateDormitory", "UpdateDormitory"],
           "calculationMethod": "Direct assignment from interactions"
         },
@@ -174,21 +174,21 @@
           "propertyName": "capacity",
           "type": "number",
           "purpose": "Maximum number of beds (4-6)",
-          "dataSource": "Set once at creation by CreateDormitory, must be 4-6, immutable thereafter",
+          "dataSource": "Set at creation, immutable (must be 4-6)",
           "computationDecision": "None",
-          "reasoning": "Set only at creation time, never modified",
+          "reasoning": "Only set at creation, never modified",
           "dependencies": [],
           "interactionDependencies": ["CreateDormitory"],
-          "calculationMethod": "Set once at creation, immutable"
+          "calculationMethod": "Set at creation, immutable (must be 4-6)"
         },
         {
           "propertyName": "floor",
           "type": "number",
-          "purpose": "Floor number in building",
-          "dataSource": "Direct assignment from CreateDormitory and UpdateDormitory interactions",
+          "purpose": "Floor number",
+          "dataSource": "Direct assignment from interactions",
           "computationDecision": "StateMachine",
-          "reasoning": "Has interactionDependencies that can modify it after creation",
-          "dependencies": [],
+          "reasoning": "Modified by interactions",
+          "dependencies": ["InteractionEventEntity"],
           "interactionDependencies": ["CreateDormitory", "UpdateDormitory"],
           "calculationMethod": "Direct assignment from interactions"
         },
@@ -196,23 +196,23 @@
           "propertyName": "building",
           "type": "string",
           "purpose": "Building name or code",
-          "dataSource": "Direct assignment from CreateDormitory and UpdateDormitory interactions",
+          "dataSource": "Direct assignment from interactions",
           "computationDecision": "StateMachine",
-          "reasoning": "Has interactionDependencies that can modify it after creation",
-          "dependencies": [],
+          "reasoning": "Modified by interactions",
+          "dependencies": ["InteractionEventEntity"],
           "interactionDependencies": ["CreateDormitory", "UpdateDormitory"],
           "calculationMethod": "Direct assignment from interactions"
         },
         {
           "propertyName": "status",
           "type": "string",
-          "purpose": "Dormitory operational status (active, inactive)",
-          "dataSource": "Set to 'active' at creation, can be changed via UpdateDormitory or DeactivateDormitory",
+          "purpose": "Dormitory status (active, inactive)",
+          "dataSource": "Set to 'active' at creation, can be set to 'inactive' by DeactivateDormitory",
           "computationDecision": "StateMachine",
-          "reasoning": "Has interactionDependencies that can modify it after creation",
-          "dependencies": [],
-          "interactionDependencies": ["CreateDormitory", "UpdateDormitory", "DeactivateDormitory"],
-          "calculationMethod": "State transitions between active and inactive"
+          "reasoning": "State transitions managed by interactions",
+          "dependencies": ["InteractionEventEntity"],
+          "interactionDependencies": ["CreateDormitory", "DeactivateDormitory"],
+          "calculationMethod": "Set to 'active' at creation, can be set to 'inactive' by DeactivateDormitory"
         },
         {
           "propertyName": "occupancy",
@@ -220,18 +220,18 @@
           "purpose": "Current number of assigned users",
           "dataSource": "Count of UserDormitoryRelation where target = this dormitory",
           "computationDecision": "Count",
-          "reasoning": "Has dataDependencies with relations, computationMethod contains 'Count of'",
+          "reasoning": "Counting related entities",
           "dependencies": ["UserDormitoryRelation"],
           "interactionDependencies": [],
-          "calculationMethod": "Count of UserDormitoryRelation"
+          "calculationMethod": "Count of UserDormitoryRelation where target = this dormitory"
         },
         {
           "propertyName": "availableBeds",
           "type": "number",
           "purpose": "Number of available beds",
-          "dataSource": "Computed as capacity - occupancy",
+          "dataSource": "capacity - occupancy",
           "computationDecision": "computed",
-          "reasoning": "Uses only own entity properties",
+          "reasoning": "Simple calculation from own properties",
           "dependencies": ["_self.capacity", "_self.occupancy"],
           "interactionDependencies": [],
           "calculationMethod": "capacity - occupancy"
@@ -240,51 +240,51 @@
           "propertyName": "hasDormHead",
           "type": "boolean",
           "purpose": "Whether dormitory has an assigned dorm head",
-          "dataSource": "Computed as existence of DormitoryDormHeadRelation",
-          "computationDecision": "Count",
-          "reasoning": "Checks existence of relation",
+          "dataSource": "exists DormitoryDormHeadRelation where source = this dormitory",
+          "computationDecision": "Any",
+          "reasoning": "Checking existence of relation",
           "dependencies": ["DormitoryDormHeadRelation"],
           "interactionDependencies": [],
-          "calculationMethod": "Count(DormitoryDormHeadRelation) > 0"
+          "calculationMethod": "exists DormitoryDormHeadRelation where source = this dormitory"
         },
         {
           "propertyName": "createdAt",
           "type": "timestamp",
-          "purpose": "Dormitory creation timestamp",
-          "dataSource": "Set to current timestamp when CreateDormitory creates the dormitory",
+          "purpose": "Creation timestamp",
+          "dataSource": "Set to current timestamp at creation",
           "computationDecision": "None",
-          "reasoning": "Set only at creation time by entity Transform",
+          "reasoning": "Set only at creation time",
           "dependencies": [],
-          "interactionDependencies": ["CreateDormitory"],
-          "calculationMethod": "Current timestamp at creation"
+          "interactionDependencies": [],
+          "calculationMethod": "Set to current timestamp at creation"
         },
         {
           "propertyName": "updatedAt",
           "type": "timestamp",
-          "purpose": "Last update timestamp",
-          "dataSource": "Updated to current timestamp whenever dormitory properties are modified",
+          "purpose": "Last modification timestamp",
+          "dataSource": "Updated to current timestamp on any modification",
           "computationDecision": "StateMachine",
-          "reasoning": "Has interactionDependencies that update it",
-          "dependencies": [],
+          "reasoning": "Updated by multiple interactions",
+          "dependencies": ["InteractionEventEntity"],
           "interactionDependencies": ["UpdateDormitory", "DeactivateDormitory"],
-          "calculationMethod": "Current timestamp on any update"
+          "calculationMethod": "Updated to current timestamp on any modification"
         }
       ],
       "entityComputationDecision": {
         "type": "Transform",
-        "reasoning": "Has interactionDependencies (CreateDormitory), lifecycle.creation is 'interaction-created'",
+        "reasoning": "interaction-created with soft-delete, Transform for creation + status StateMachine",
         "dependencies": ["InteractionEventEntity"],
         "interactionDependencies": ["CreateDormitory"],
-        "calculationMethod": "Create Dormitory entity when CreateDormitory interaction is triggered"
+        "calculationMethod": "Independently created by CreateDormitory interaction"
       }
     },
     {
       "name": "Bed",
       "entityLevelAnalysis": {
-        "purpose": "Individual bed units within dormitories",
-        "creationSource": "created-with-parent",
-        "updateRequirements": "Status updates, assignment tracking",
-        "deletionStrategy": "none"
+        "purpose": "Individual beds within dormitories",
+        "creationSource": "created-with-parent (Dormitory)",
+        "updateRequirements": "Status updated via AssignUserToDormitory, RemoveUserFromDormitory",
+        "deletionStrategy": "auto-delete with parent"
       },
       "propertyAnalysis": [
         {
@@ -293,7 +293,7 @@
           "purpose": "System-generated unique identifier",
           "dataSource": "auto-generated",
           "computationDecision": "None",
-          "reasoning": "System-generated identifier, no computation needed",
+          "reasoning": "System-generated ID, handled by framework",
           "dependencies": [],
           "interactionDependencies": [],
           "calculationMethod": "auto-generated"
@@ -301,85 +301,85 @@
         {
           "propertyName": "bedNumber",
           "type": "string",
-          "purpose": "Bed identifier within dormitory (e.g., 'A', 'B', '1', '2')",
-          "dataSource": "Set at creation based on position (1st bed='A', 2nd='B', etc.)",
+          "purpose": "Bed identifier within dormitory",
+          "dataSource": "Set at creation based on position (1, 2, 3, etc.)",
           "computationDecision": "None",
-          "reasoning": "Set only at creation time, never modified",
+          "reasoning": "Only set at creation, never modified",
           "dependencies": [],
           "interactionDependencies": ["CreateDormitory"],
-          "calculationMethod": "Auto-assigned based on creation order"
+          "calculationMethod": "Set at creation based on position (1, 2, 3, etc.)"
         },
         {
           "propertyName": "status",
           "type": "string",
           "purpose": "Bed status (available, occupied, maintenance)",
-          "dataSource": "Changes to 'occupied' when UserBedRelation created, 'available' when relation deleted, 'maintenance' via admin action",
+          "dataSource": "Set to 'occupied' when UserBedRelation exists, 'available' when no relation",
           "computationDecision": "StateMachine",
-          "reasoning": "Has interactionDependencies that can modify it",
-          "dependencies": ["UserBedRelation"],
-          "interactionDependencies": ["AssignUserToDormitory", "RemoveUserFromDormitory", "ProcessRemovalRequest", "SetBedMaintenance"],
-          "calculationMethod": "State transitions between available, occupied, maintenance"
+          "reasoning": "Modified by interactions with state transitions",
+          "dependencies": ["InteractionEventEntity", "UserBedRelation"],
+          "interactionDependencies": ["AssignUserToDormitory", "RemoveUserFromDormitory", "ProcessRemovalRequest"],
+          "calculationMethod": "Set to 'occupied' when UserBedRelation exists, 'available' when no relation, can be set to 'maintenance' by admin"
         },
         {
           "propertyName": "isAvailable",
           "type": "boolean",
           "purpose": "Whether bed can be assigned",
-          "dataSource": "Computed as status === 'available' AND no UserBedRelation exists",
-          "computationDecision": "computed",
-          "reasoning": "Uses own property and relation existence check",
+          "dataSource": "status === 'available' && !exists UserBedRelation",
+          "computationDecision": "Custom",
+          "reasoning": "Complex logic combining property and relation existence",
           "dependencies": ["_self.status", "UserBedRelation"],
           "interactionDependencies": [],
-          "calculationMethod": "status === 'available' AND !exists(UserBedRelation)"
+          "calculationMethod": "status === 'available' && !exists UserBedRelation"
         },
         {
           "propertyName": "assignedAt",
           "type": "timestamp",
-          "purpose": "When current occupant was assigned",
-          "dataSource": "Set to current timestamp when UserBedRelation is created, null when deleted",
+          "purpose": "When current user was assigned",
+          "dataSource": "Set to current timestamp when user assigned, null when unassigned",
           "computationDecision": "StateMachine",
-          "reasoning": "Has interactionDependencies that update it",
-          "dependencies": [],
+          "reasoning": "Modified by interactions",
+          "dependencies": ["InteractionEventEntity"],
           "interactionDependencies": ["AssignUserToDormitory"],
-          "calculationMethod": "Current timestamp when assigned, null when unassigned"
+          "calculationMethod": "Set to current timestamp when user assigned, null when unassigned"
         },
         {
           "propertyName": "createdAt",
           "type": "timestamp",
-          "purpose": "Bed creation timestamp",
-          "dataSource": "Set to current timestamp when CreateDormitory creates the bed",
+          "purpose": "Creation timestamp",
+          "dataSource": "Set to current timestamp at creation",
           "computationDecision": "None",
-          "reasoning": "Set only at creation time by parent entity",
+          "reasoning": "Set only at creation time",
           "dependencies": [],
-          "interactionDependencies": ["CreateDormitory"],
-          "calculationMethod": "Current timestamp at creation"
+          "interactionDependencies": [],
+          "calculationMethod": "Set to current timestamp at creation"
         },
         {
           "propertyName": "updatedAt",
           "type": "timestamp",
-          "purpose": "Last update timestamp",
-          "dataSource": "Updated to current timestamp whenever bed status changes",
+          "purpose": "Last modification timestamp",
+          "dataSource": "Updated to current timestamp on any modification",
           "computationDecision": "StateMachine",
-          "reasoning": "Has interactionDependencies that update it",
-          "dependencies": [],
-          "interactionDependencies": ["AssignUserToDormitory", "RemoveUserFromDormitory", "ProcessRemovalRequest", "SetBedMaintenance"],
-          "calculationMethod": "Current timestamp on any update"
+          "reasoning": "Updated by interactions",
+          "dependencies": ["InteractionEventEntity"],
+          "interactionDependencies": ["AssignUserToDormitory", "RemoveUserFromDormitory"],
+          "calculationMethod": "Updated to current timestamp on any modification"
         }
       ],
       "entityComputationDecision": {
-        "type": "None",
-        "reasoning": "Created-with-parent (Dormitory), automatic creation",
+        "type": "_parent:Dormitory",
+        "reasoning": "created-with-parent, created by Dormitory's computation",
         "dependencies": ["Dormitory"],
         "interactionDependencies": ["CreateDormitory"],
-        "calculationMethod": "Created automatically with Dormitory entity"
+        "calculationMethod": "Created together with Dormitory entity by CreateDormitory interaction (creates capacity number of beds)"
       }
     },
     {
       "name": "PointDeduction",
       "entityLevelAnalysis": {
-        "purpose": "Disciplinary point records for user violations",
+        "purpose": "Disciplinary point deductions for rule violations",
         "creationSource": "interaction-created",
-        "updateRequirements": "Status updates for appeals/cancellations",
-        "deletionStrategy": "soft-delete"
+        "updateRequirements": "Status can be changed to cancelled",
+        "deletionStrategy": "soft-delete (status changed)"
       },
       "propertyAnalysis": [
         {
@@ -388,7 +388,7 @@
           "purpose": "System-generated unique identifier",
           "dataSource": "auto-generated",
           "computationDecision": "None",
-          "reasoning": "System-generated identifier, no computation needed",
+          "reasoning": "System-generated ID, handled by framework",
           "dependencies": [],
           "interactionDependencies": [],
           "calculationMethod": "auto-generated"
@@ -396,107 +396,107 @@
         {
           "propertyName": "reason",
           "type": "string",
-          "purpose": "Brief description of violation",
-          "dataSource": "Set at creation by IssuePointDeduction, immutable thereafter",
+          "purpose": "Description of violation",
+          "dataSource": "Set at creation, immutable",
           "computationDecision": "None",
-          "reasoning": "Set only at creation time, never modified",
+          "reasoning": "Only set at creation, never modified",
           "dependencies": [],
           "interactionDependencies": ["IssuePointDeduction"],
-          "calculationMethod": "Set once at creation, immutable"
+          "calculationMethod": "Set at creation, immutable"
         },
         {
           "propertyName": "points",
           "type": "number",
-          "purpose": "Number of points deducted (1-10)",
-          "dataSource": "Set at creation by IssuePointDeduction, must be 1-10, immutable thereafter",
+          "purpose": "Deduction amount (1-10)",
+          "dataSource": "Set at creation, immutable (must be 1-10)",
           "computationDecision": "None",
-          "reasoning": "Set only at creation time, never modified",
+          "reasoning": "Only set at creation, never modified",
           "dependencies": [],
           "interactionDependencies": ["IssuePointDeduction"],
-          "calculationMethod": "Set once at creation, immutable"
+          "calculationMethod": "Set at creation, immutable (must be 1-10)"
         },
         {
           "propertyName": "category",
           "type": "string",
-          "purpose": "Violation category (hygiene, noise, curfew, damage, other)",
-          "dataSource": "Set at creation by IssuePointDeduction from enum values",
+          "purpose": "Violation category",
+          "dataSource": "Set at creation, immutable",
           "computationDecision": "None",
-          "reasoning": "Set only at creation time, never modified",
+          "reasoning": "Only set at creation, never modified",
           "dependencies": [],
           "interactionDependencies": ["IssuePointDeduction"],
-          "calculationMethod": "Set once at creation from enum"
+          "calculationMethod": "Set at creation, immutable"
         },
         {
           "propertyName": "status",
           "type": "string",
           "purpose": "Deduction status (active, appealed, cancelled)",
-          "dataSource": "Set to 'active' at creation, can change to 'appealed' or 'cancelled' via interactions",
+          "dataSource": "Set to 'active' at creation, can be changed to 'cancelled' by admin",
           "computationDecision": "StateMachine",
-          "reasoning": "Has interactionDependencies that can modify it after creation",
-          "dependencies": [],
-          "interactionDependencies": ["IssuePointDeduction", "AppealDeduction", "CancelDeduction"],
-          "calculationMethod": "State transitions between active, appealed, cancelled"
+          "reasoning": "State transitions managed by interactions",
+          "dependencies": ["InteractionEventEntity"],
+          "interactionDependencies": ["IssuePointDeduction"],
+          "calculationMethod": "Set to 'active' at creation, can be changed to 'cancelled' by admin (future: appeal system)"
         },
         {
           "propertyName": "description",
           "type": "string",
-          "purpose": "Detailed explanation of violation",
-          "dataSource": "Optional field set at creation by IssuePointDeduction",
+          "purpose": "Detailed explanation",
+          "dataSource": "Set at creation, immutable",
           "computationDecision": "None",
-          "reasoning": "Set only at creation time, never modified",
+          "reasoning": "Only set at creation, never modified",
           "dependencies": [],
           "interactionDependencies": ["IssuePointDeduction"],
-          "calculationMethod": "Set once at creation, optional"
+          "calculationMethod": "Set at creation, immutable"
         },
         {
           "propertyName": "evidence",
           "type": "string",
-          "purpose": "URL or reference to supporting evidence",
-          "dataSource": "Optional field set at creation by IssuePointDeduction",
+          "purpose": "URL or reference to evidence",
+          "dataSource": "Set at creation, immutable",
           "computationDecision": "None",
-          "reasoning": "Set only at creation time, never modified",
+          "reasoning": "Only set at creation, never modified",
           "dependencies": [],
           "interactionDependencies": ["IssuePointDeduction"],
-          "calculationMethod": "Set once at creation, optional"
+          "calculationMethod": "Set at creation, immutable"
         },
         {
           "propertyName": "deductedAt",
           "type": "timestamp",
-          "purpose": "When the deduction was issued",
-          "dataSource": "Set to current timestamp when IssuePointDeduction creates the deduction",
+          "purpose": "When deduction was made",
+          "dataSource": "Set to current timestamp at creation",
           "computationDecision": "None",
-          "reasoning": "Set only at creation time by entity Transform",
+          "reasoning": "Set only at creation time",
           "dependencies": [],
-          "interactionDependencies": ["IssuePointDeduction"],
-          "calculationMethod": "Current timestamp at creation"
+          "interactionDependencies": [],
+          "calculationMethod": "Set to current timestamp at creation"
         },
         {
           "propertyName": "createdAt",
           "type": "timestamp",
-          "purpose": "Record creation timestamp",
-          "dataSource": "Set to current timestamp when IssuePointDeduction creates the deduction",
+          "purpose": "Creation timestamp",
+          "dataSource": "Set to current timestamp at creation",
           "computationDecision": "None",
-          "reasoning": "Set only at creation time by entity Transform",
+          "reasoning": "Set only at creation time",
           "dependencies": [],
-          "interactionDependencies": ["IssuePointDeduction"],
-          "calculationMethod": "Current timestamp at creation"
+          "interactionDependencies": [],
+          "calculationMethod": "Set to current timestamp at creation"
         }
       ],
       "entityComputationDecision": {
         "type": "Transform",
-        "reasoning": "Has interactionDependencies (IssuePointDeduction), lifecycle.creation is 'interaction-created'",
+        "reasoning": "interaction-created with soft-delete, Transform for creation + status StateMachine",
         "dependencies": ["InteractionEventEntity"],
         "interactionDependencies": ["IssuePointDeduction"],
-        "calculationMethod": "Create PointDeduction entity when IssuePointDeduction interaction is triggered"
+        "calculationMethod": "Independently created by IssuePointDeduction interaction"
       }
     },
     {
       "name": "RemovalRequest",
       "entityLevelAnalysis": {
-        "purpose": "Requests to remove problematic users from dormitories",
+        "purpose": "Requests to remove problematic users from dormitory",
         "creationSource": "interaction-created",
-        "updateRequirements": "Status updates, admin comments, processing timestamps",
-        "deletionStrategy": "soft-delete"
+        "updateRequirements": "Status updated via ProcessRemovalRequest, CancelRemovalRequest",
+        "deletionStrategy": "soft-delete (status changed)"
       },
       "propertyAnalysis": [
         {
@@ -505,7 +505,7 @@
           "purpose": "System-generated unique identifier",
           "dataSource": "auto-generated",
           "computationDecision": "None",
-          "reasoning": "System-generated identifier, no computation needed",
+          "reasoning": "System-generated ID, handled by framework",
           "dependencies": [],
           "interactionDependencies": [],
           "calculationMethod": "auto-generated"
@@ -514,86 +514,86 @@
           "propertyName": "reason",
           "type": "string",
           "purpose": "Explanation for removal request",
-          "dataSource": "Set at creation by InitiateRemovalRequest, immutable thereafter",
+          "dataSource": "Set at creation, immutable",
           "computationDecision": "None",
-          "reasoning": "Set only at creation time, never modified",
+          "reasoning": "Only set at creation, never modified",
           "dependencies": [],
           "interactionDependencies": ["InitiateRemovalRequest"],
-          "calculationMethod": "Set once at creation, immutable"
+          "calculationMethod": "Set at creation, immutable"
         },
         {
           "propertyName": "totalPoints",
           "type": "number",
-          "purpose": "Total points of target user at request time",
-          "dataSource": "Computed from target user's totalPoints when request is created",
-          "computationDecision": "None",
-          "reasoning": "Set at creation from target user, captured as snapshot",
+          "purpose": "Total points deducted for target user at time of request",
+          "dataSource": "Copy of target User.totalPoints at creation time",
+          "computationDecision": "Custom",
+          "reasoning": "Requires accessing related user's property at creation",
           "dependencies": ["RemovalRequestTargetRelation", "User.totalPoints"],
           "interactionDependencies": [],
-          "calculationMethod": "Snapshot of target user's totalPoints at creation"
+          "calculationMethod": "Copy of target User.totalPoints at creation time"
         },
         {
           "propertyName": "status",
           "type": "string",
           "purpose": "Request status (pending, approved, rejected, cancelled)",
-          "dataSource": "Set to 'pending' at creation, changes via ProcessRemovalRequest or CancelRemovalRequest",
+          "dataSource": "Set to 'pending' at creation, changed by interactions",
           "computationDecision": "StateMachine",
-          "reasoning": "Has interactionDependencies that can modify it after creation",
-          "dependencies": [],
+          "reasoning": "State transitions managed by interactions",
+          "dependencies": ["InteractionEventEntity"],
           "interactionDependencies": ["InitiateRemovalRequest", "ProcessRemovalRequest", "CancelRemovalRequest"],
-          "calculationMethod": "State transitions: pending → approved/rejected/cancelled"
+          "calculationMethod": "Set to 'pending' at creation, changed to 'approved'/'rejected' by ProcessRemovalRequest, or 'cancelled' by CancelRemovalRequest"
         },
         {
           "propertyName": "adminComment",
           "type": "string",
           "purpose": "Admin's decision comment",
-          "dataSource": "Set by ProcessRemovalRequest when admin makes decision",
+          "dataSource": "Set by ProcessRemovalRequest when approving/rejecting",
           "computationDecision": "StateMachine",
-          "reasoning": "Has interactionDependencies that set it",
-          "dependencies": [],
+          "reasoning": "Modified by interaction",
+          "dependencies": ["InteractionEventEntity"],
           "interactionDependencies": ["ProcessRemovalRequest"],
-          "calculationMethod": "Set when ProcessRemovalRequest executes"
+          "calculationMethod": "Set by ProcessRemovalRequest when approving/rejecting"
         },
         {
           "propertyName": "processedAt",
           "type": "timestamp",
-          "purpose": "When admin processed the request",
+          "purpose": "When admin made decision",
           "dataSource": "Set to current timestamp when ProcessRemovalRequest executes",
           "computationDecision": "StateMachine",
-          "reasoning": "Has interactionDependencies that set it",
-          "dependencies": [],
+          "reasoning": "Set by interaction when processing",
+          "dependencies": ["InteractionEventEntity"],
           "interactionDependencies": ["ProcessRemovalRequest"],
-          "calculationMethod": "Current timestamp when processed"
+          "calculationMethod": "Set to current timestamp when ProcessRemovalRequest executes"
         },
         {
           "propertyName": "createdAt",
           "type": "timestamp",
-          "purpose": "Request creation timestamp",
-          "dataSource": "Set to current timestamp when InitiateRemovalRequest creates the request",
+          "purpose": "Creation timestamp",
+          "dataSource": "Set to current timestamp at creation",
           "computationDecision": "None",
-          "reasoning": "Set only at creation time by entity Transform",
+          "reasoning": "Set only at creation time",
           "dependencies": [],
-          "interactionDependencies": ["InitiateRemovalRequest"],
-          "calculationMethod": "Current timestamp at creation"
+          "interactionDependencies": [],
+          "calculationMethod": "Set to current timestamp at creation"
         },
         {
           "propertyName": "updatedAt",
           "type": "timestamp",
-          "purpose": "Last update timestamp",
-          "dataSource": "Updated to current timestamp when request status changes",
+          "purpose": "Last modification timestamp",
+          "dataSource": "Updated to current timestamp on any modification",
           "computationDecision": "StateMachine",
-          "reasoning": "Has interactionDependencies that update it",
-          "dependencies": [],
+          "reasoning": "Updated by multiple interactions",
+          "dependencies": ["InteractionEventEntity"],
           "interactionDependencies": ["ProcessRemovalRequest", "CancelRemovalRequest"],
-          "calculationMethod": "Current timestamp on any update"
+          "calculationMethod": "Updated to current timestamp on any modification"
         }
       ],
       "entityComputationDecision": {
         "type": "Transform",
-        "reasoning": "Has interactionDependencies (InitiateRemovalRequest), lifecycle.creation is 'interaction-created'",
+        "reasoning": "interaction-created with soft-delete, Transform for creation + status StateMachine",
         "dependencies": ["InteractionEventEntity"],
         "interactionDependencies": ["InitiateRemovalRequest"],
-        "calculationMethod": "Create RemovalRequest entity when InitiateRemovalRequest interaction is triggered"
+        "calculationMethod": "Independently created by InitiateRemovalRequest interaction"
       }
     }
   ],
@@ -601,16 +601,12 @@
     {
       "name": "UserDormitoryRelation",
       "relationAnalysis": {
-        "purpose": "Assigns users to dormitories",
+        "purpose": "Assigns users to their dormitory",
         "creation": "interaction-created",
-        "deletionRequirements": {
-          "canBeDeleted": true,
-          "deletionType": "hard-delete",
-          "deletionInteractions": ["RemoveUserFromDormitory", "ProcessRemovalRequest"]
-        },
+        "deletionRequirements": "canBeDeleted: true, hard-delete",
         "computationDecision": "StateMachine",
-        "reasoning": "Interaction-created and can be deleted (hard-delete), requires StateMachine only",
-        "dependencies": [],
+        "reasoning": "interaction-created with hard-delete capability, must use StateMachine",
+        "dependencies": ["InteractionEventEntity", "User", "Dormitory"],
         "interactionDependencies": ["AssignUserToDormitory", "RemoveUserFromDormitory", "ProcessRemovalRequest"],
         "calculationMethod": "Created by AssignUserToDormitory, deleted by RemoveUserFromDormitory or approved ProcessRemovalRequest"
       }
@@ -620,14 +616,10 @@
       "relationAnalysis": {
         "purpose": "Assigns users to specific beds",
         "creation": "interaction-created",
-        "deletionRequirements": {
-          "canBeDeleted": true,
-          "deletionType": "hard-delete",
-          "deletionInteractions": ["RemoveUserFromDormitory", "ProcessRemovalRequest"]
-        },
+        "deletionRequirements": "canBeDeleted: true, hard-delete",
         "computationDecision": "StateMachine",
-        "reasoning": "Interaction-created and can be deleted (hard-delete), requires StateMachine only",
-        "dependencies": [],
+        "reasoning": "interaction-created with hard-delete capability, must use StateMachine",
+        "dependencies": ["InteractionEventEntity", "User", "Bed"],
         "interactionDependencies": ["AssignUserToDormitory", "RemoveUserFromDormitory", "ProcessRemovalRequest"],
         "calculationMethod": "Created by AssignUserToDormitory, deleted by RemoveUserFromDormitory or approved ProcessRemovalRequest"
       }
@@ -636,32 +628,24 @@
       "name": "DormitoryBedRelation",
       "relationAnalysis": {
         "purpose": "Links dormitories to their beds",
-        "creation": "created-with-entity",
-        "deletionRequirements": {
-          "canBeDeleted": false,
-          "deletionType": "none",
-          "deletionInteractions": []
-        },
-        "computationDecision": "None",
-        "reasoning": "Created-with-entity and cannot be deleted, automatic creation",
+        "creation": "created-with-entity (Bed)",
+        "deletionRequirements": "canBeDeleted: false, auto-delete",
+        "computationDecision": "_parent:Bed",
+        "reasoning": "created-with-entity, created by Bed's computation",
         "dependencies": ["Dormitory", "Bed"],
         "interactionDependencies": ["CreateDormitory"],
-        "calculationMethod": "Created automatically when Bed entities are created with Dormitory"
+        "calculationMethod": "Created together with Bed entities by CreateDormitory interaction"
       }
     },
     {
       "name": "DormitoryDormHeadRelation",
       "relationAnalysis": {
-        "purpose": "Assigns dorm heads to manage dormitories",
+        "purpose": "Assigns dorm heads to dormitories",
         "creation": "interaction-created",
-        "deletionRequirements": {
-          "canBeDeleted": true,
-          "deletionType": "hard-delete",
-          "deletionInteractions": ["RemoveDormHead"]
-        },
+        "deletionRequirements": "canBeDeleted: true, hard-delete",
         "computationDecision": "StateMachine",
-        "reasoning": "Interaction-created and can be deleted (hard-delete), requires StateMachine only",
-        "dependencies": [],
+        "reasoning": "interaction-created with hard-delete capability, must use StateMachine",
+        "dependencies": ["InteractionEventEntity", "Dormitory", "User"],
         "interactionDependencies": ["AssignDormHead", "RemoveDormHead"],
         "calculationMethod": "Created by AssignDormHead, deleted by RemoveDormHead"
       }
@@ -670,85 +654,65 @@
       "name": "UserPointDeductionRelation",
       "relationAnalysis": {
         "purpose": "Links users to their point deductions",
-        "creation": "created-with-entity",
-        "deletionRequirements": {
-          "canBeDeleted": false,
-          "deletionType": "none",
-          "deletionInteractions": []
-        },
-        "computationDecision": "None",
-        "reasoning": "Created-with-entity and cannot be deleted, automatic creation",
+        "creation": "created-with-entity (PointDeduction)",
+        "deletionRequirements": "canBeDeleted: false, auto-delete",
+        "computationDecision": "_parent:PointDeduction",
+        "reasoning": "created-with-entity, created by PointDeduction's computation",
         "dependencies": ["User", "PointDeduction"],
         "interactionDependencies": ["IssuePointDeduction"],
-        "calculationMethod": "Created automatically with PointDeduction entity"
+        "calculationMethod": "Created together with PointDeduction by IssuePointDeduction interaction"
       }
     },
     {
       "name": "DeductionIssuerRelation",
       "relationAnalysis": {
-        "purpose": "Tracks who issued each point deduction",
-        "creation": "created-with-entity",
-        "deletionRequirements": {
-          "canBeDeleted": false,
-          "deletionType": "none",
-          "deletionInteractions": []
-        },
-        "computationDecision": "None",
-        "reasoning": "Created-with-entity and cannot be deleted, automatic creation",
+        "purpose": "Links point deductions to the user who issued them",
+        "creation": "created-with-entity (PointDeduction)",
+        "deletionRequirements": "canBeDeleted: false, auto-delete",
+        "computationDecision": "_parent:PointDeduction",
+        "reasoning": "created-with-entity, created by PointDeduction's computation",
         "dependencies": ["PointDeduction", "User"],
         "interactionDependencies": ["IssuePointDeduction"],
-        "calculationMethod": "Created automatically with PointDeduction entity"
+        "calculationMethod": "Created together with PointDeduction by IssuePointDeduction interaction"
       }
     },
     {
       "name": "RemovalRequestTargetRelation",
       "relationAnalysis": {
-        "purpose": "Links removal requests to target users",
-        "creation": "created-with-entity",
-        "deletionRequirements": {
-          "canBeDeleted": false,
-          "deletionType": "none",
-          "deletionInteractions": []
-        },
-        "computationDecision": "None",
-        "reasoning": "Created-with-entity and cannot be deleted, automatic creation",
+        "purpose": "Links removal requests to the target user",
+        "creation": "created-with-entity (RemovalRequest)",
+        "deletionRequirements": "canBeDeleted: false, auto-delete",
+        "computationDecision": "_parent:RemovalRequest",
+        "reasoning": "created-with-entity, created by RemovalRequest's computation",
         "dependencies": ["RemovalRequest", "User"],
         "interactionDependencies": ["InitiateRemovalRequest"],
-        "calculationMethod": "Created automatically with RemovalRequest entity"
+        "calculationMethod": "Created together with RemovalRequest by InitiateRemovalRequest interaction"
       }
     },
     {
       "name": "RemovalRequestInitiatorRelation",
       "relationAnalysis": {
-        "purpose": "Tracks who initiated each removal request",
-        "creation": "created-with-entity",
-        "deletionRequirements": {
-          "canBeDeleted": false,
-          "deletionType": "none",
-          "deletionInteractions": []
-        },
-        "computationDecision": "None",
-        "reasoning": "Created-with-entity and cannot be deleted, automatic creation",
+        "purpose": "Links removal requests to the dorm head who initiated them",
+        "creation": "created-with-entity (RemovalRequest)",
+        "deletionRequirements": "canBeDeleted: false, auto-delete",
+        "computationDecision": "_parent:RemovalRequest",
+        "reasoning": "created-with-entity, created by RemovalRequest's computation",
         "dependencies": ["RemovalRequest", "User"],
         "interactionDependencies": ["InitiateRemovalRequest"],
-        "calculationMethod": "Created automatically with RemovalRequest entity"
+        "calculationMethod": "Created together with RemovalRequest by InitiateRemovalRequest interaction"
       }
     },
     {
       "name": "RemovalRequestAdminRelation",
       "relationAnalysis": {
-        "purpose": "Tracks which admin processed each removal request",
+        "purpose": "Links removal requests to the admin who processed them",
         "creation": "interaction-created",
-        "deletionRequirements": {
-          "canBeDeleted": false,
-          "deletionType": "none",
-          "deletionInteractions": []
-        },
+        "deletionRequirements": "canBeDeleted: false",
         "computationDecision": "Transform",
-        "reasoning": "Interaction-created but cannot be deleted, use Transform with InteractionEventEntity",
-        "dependencies": ["InteractionEventEntity"],
+        "reasoning": "interaction-created with no deletion capability",
+        "dependencies": ["InteractionEventEntity", "RemovalRequest", "User"],
         "interactionDependencies": ["ProcessRemovalRequest"],
-        "calculationMethod": "Created when ProcessRemovalRequest approves or rejects the request"
+        "calculationMethod": "Created by ProcessRemovalRequest when admin approves/rejects"
       }
     }
   ],
