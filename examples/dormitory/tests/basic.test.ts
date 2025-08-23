@@ -439,7 +439,7 @@ describe('Basic Functionality', () => {
     expect(removalRequest.adminComment).toBeUndefined()
     expect(removalRequest.processedAt).toBeUndefined()
     expect(removalRequest.createdAt).toBeDefined()
-    expect(removalRequest.updatedAt).toBeDefined()
+    expect(removalRequest.updatedAt).toBeUndefined() // Initial value is undefined, will be set by interactions
     
     // Import the relations we need to check
     const RemovalRequestTargetRelation = relations.find(r => r.source.name === 'RemovalRequest' && r.sourceProperty === 'targetUser')
@@ -1787,5 +1787,1235 @@ describe('Basic Functionality', () => {
     // })
     // const cancelledDeduction = await system.storage.findOne(...)
     // expect(cancelledDeduction.status).toBe('cancelled')
+  })
+  
+  test('RemovalRequest.status computation', async () => {
+    /**
+     * Test Plan for: RemovalRequest.status
+     * Dependencies: RemovalRequest entity, User entities, InteractionEventEntity
+     * Steps: 
+     *   1) Create actual admin user
+     *   2) Create target user 
+     *   3) Create initiator user
+     *   4) Initiate removal request - verify status is 'pending'
+     *   5) Process request (approve) - verify status changes to 'approved'
+     *   6) Create another removal request
+     *   7) Process request (reject) - verify status changes to 'rejected'
+     *   8) Create third removal request
+     *   9) Cancel request - verify status changes to 'cancelled'
+     * Business Logic: Set to 'pending' at creation, changed to 'approved'/'rejected' by ProcessRemovalRequest, or 'cancelled' by CancelRemovalRequest
+     */
+    
+    // Step 1: Create actual admin user for processing requests
+    await controller.callInteraction('CreateUser', {
+      user: { id: 'admin-system', role: 'admin' },
+      payload: {
+        name: 'Admin Processor',
+        email: 'admin.processor@example.com',
+        phone: '1111111111',
+        role: 'admin'
+      }
+    })
+    
+    const adminUser = await system.storage.findOne(
+      'User',
+      MatchExp.atom({ key: 'email', value: ['=', 'admin.processor@example.com'] }),
+      undefined,
+      ['id']
+    )
+    
+    // Step 2: Create target user to be removed
+    await controller.callInteraction('CreateUser', {
+      user: { id: 'admin-system', role: 'admin' },
+      payload: {
+        name: 'Target User',
+        email: 'target.remove@example.com',
+        phone: '1234567890',
+        role: 'student'
+      }
+    })
+    
+    const targetUser = await system.storage.findOne(
+      'User',
+      MatchExp.atom({ key: 'email', value: ['=', 'target.remove@example.com'] }),
+      undefined,
+      ['id']
+    )
+    
+    // Step 3: Create initiator user (dorm head)
+    await controller.callInteraction('CreateUser', {
+      user: { id: 'admin-system', role: 'admin' },
+      payload: {
+        name: 'Dorm Head',
+        email: 'dormhead@example.com',
+        phone: '9876543210',
+        role: 'dormHead'
+      }
+    })
+    
+    const initiatorUser = await system.storage.findOne(
+      'User',
+      MatchExp.atom({ key: 'email', value: ['=', 'dormhead@example.com'] }),
+      undefined,
+      ['id']
+    )
+    
+    // Step 4: Initiate removal request
+    await controller.callInteraction('InitiateRemovalRequest', {
+      user: { id: initiatorUser.id, role: 'dormHead' },
+      payload: {
+        userId: targetUser.id,
+        reason: 'Multiple rule violations'
+      }
+    })
+    
+    // Verify status is 'pending'
+    const pendingRequest = await system.storage.findOne(
+      'RemovalRequest',
+      MatchExp.atom({ key: 'reason', value: ['=', 'Multiple rule violations'] }),
+      undefined,
+      ['id', 'status', 'reason']
+    )
+    
+    expect(pendingRequest).toBeDefined()
+    expect(pendingRequest.status).toBe('pending')
+    
+    // Step 5: Process request - approve it
+    await controller.callInteraction('ProcessRemovalRequest', {
+      user: { id: adminUser.id, role: 'admin' },
+      payload: {
+        requestId: pendingRequest.id,
+        decision: 'approve',
+        adminComment: 'Request approved due to serious violations'
+      }
+    })
+    
+    // Verify status changed to 'approved'
+    const approvedRequest = await system.storage.findOne(
+      'RemovalRequest',
+      MatchExp.atom({ key: 'id', value: ['=', pendingRequest.id] }),
+      undefined,
+      ['id', 'status']
+    )
+    
+    expect(approvedRequest.status).toBe('approved')
+    
+    // Step 6: Create another removal request to test rejection
+    await controller.callInteraction('CreateUser', {
+      user: { id: 'admin-system', role: 'admin' },
+      payload: {
+        name: 'Another User',
+        email: 'another@example.com',
+        phone: '5555555555',
+        role: 'student'
+      }
+    })
+    
+    const anotherUser = await system.storage.findOne(
+      'User',
+      MatchExp.atom({ key: 'email', value: ['=', 'another@example.com'] }),
+      undefined,
+      ['id']
+    )
+    
+    await controller.callInteraction('InitiateRemovalRequest', {
+      user: { id: initiatorUser.id, role: 'dormHead' },
+      payload: {
+        userId: anotherUser.id,
+        reason: 'Minor infractions'
+      }
+    })
+    
+    const secondRequest = await system.storage.findOne(
+      'RemovalRequest',
+      MatchExp.atom({ key: 'reason', value: ['=', 'Minor infractions'] }),
+      undefined,
+      ['id', 'status']
+    )
+    
+    // Step 7: Process request - reject it
+    await controller.callInteraction('ProcessRemovalRequest', {
+      user: { id: adminUser.id, role: 'admin' },
+      payload: {
+        requestId: secondRequest.id,
+        decision: 'reject',
+        adminComment: 'Not severe enough for removal'
+      }
+    })
+    
+    const rejectedRequest = await system.storage.findOne(
+      'RemovalRequest',
+      MatchExp.atom({ key: 'id', value: ['=', secondRequest.id] }),
+      undefined,
+      ['id', 'status']
+    )
+    
+    expect(rejectedRequest.status).toBe('rejected')
+    
+    // Step 8: Create third removal request to test cancellation
+    await controller.callInteraction('CreateUser', {
+      user: { id: 'admin-system', role: 'admin' },
+      payload: {
+        name: 'Third User',
+        email: 'third@example.com',
+        phone: '6666666666',
+        role: 'student'
+      }
+    })
+    
+    const thirdUser = await system.storage.findOne(
+      'User',
+      MatchExp.atom({ key: 'email', value: ['=', 'third@example.com'] }),
+      undefined,
+      ['id']
+    )
+    
+    await controller.callInteraction('InitiateRemovalRequest', {
+      user: { id: initiatorUser.id, role: 'dormHead' },
+      payload: {
+        userId: thirdUser.id,
+        reason: 'Request to be cancelled'
+      }
+    })
+    
+    const thirdRequest = await system.storage.findOne(
+      'RemovalRequest',
+      MatchExp.atom({ key: 'reason', value: ['=', 'Request to be cancelled'] }),
+      undefined,
+      ['id', 'status']
+    )
+    
+    // Step 9: Cancel the request
+    await controller.callInteraction('CancelRemovalRequest', {
+      user: { id: initiatorUser.id, role: 'dormHead' },
+      payload: {
+        requestId: thirdRequest.id
+      }
+    })
+    
+    const cancelledRequest = await system.storage.findOne(
+      'RemovalRequest',
+      MatchExp.atom({ key: 'id', value: ['=', thirdRequest.id] }),
+      undefined,
+      ['id', 'status']
+    )
+    
+    expect(cancelledRequest.status).toBe('cancelled')
+  })
+
+  test('RemovalRequest.adminComment computation', async () => {
+    /**
+     * Test Plan for: RemovalRequest.adminComment
+     * Dependencies: RemovalRequest entity, User entities, InteractionEventEntity
+     * Steps: 
+     *   1) Create admin user
+     *   2) Create target user 
+     *   3) Create initiator user
+     *   4) Initiate removal request - verify adminComment is null initially
+     *   5) Process request with admin comment - verify adminComment is set
+     *   6) Create another request and process without comment - verify adminComment remains null
+     * Business Logic: Set by ProcessRemovalRequest when approving/rejecting
+     */
+    
+    // Step 1: Create admin user for processing requests
+    await controller.callInteraction('CreateUser', {
+      user: { id: 'admin-system', role: 'admin' },
+      payload: {
+        name: 'Admin Commenter',
+        email: 'admin.commenter@example.com',
+        phone: '1111111111',
+        role: 'admin'
+      }
+    })
+    
+    const adminUser = await system.storage.findOne(
+      'User',
+      MatchExp.atom({ key: 'email', value: ['=', 'admin.commenter@example.com'] }),
+      undefined,
+      ['id']
+    )
+    
+    // Step 2: Create target user to be removed
+    await controller.callInteraction('CreateUser', {
+      user: { id: 'admin-system', role: 'admin' },
+      payload: {
+        name: 'Target Comment User',
+        email: 'target.comment@example.com',
+        phone: '2222222222',
+        role: 'student'
+      }
+    })
+    
+    const targetUser = await system.storage.findOne(
+      'User',
+      MatchExp.atom({ key: 'email', value: ['=', 'target.comment@example.com'] }),
+      undefined,
+      ['id']
+    )
+    
+    // Step 3: Create initiator user (dorm head)
+    await controller.callInteraction('CreateUser', {
+      user: { id: 'admin-system', role: 'admin' },
+      payload: {
+        name: 'Dorm Head Commenter',
+        email: 'dormhead.comment@example.com',
+        phone: '3333333333',
+        role: 'dormHead'
+      }
+    })
+    
+    const initiatorUser = await system.storage.findOne(
+      'User',
+      MatchExp.atom({ key: 'email', value: ['=', 'dormhead.comment@example.com'] }),
+      undefined,
+      ['id']
+    )
+    
+    // Step 4: Initiate removal request
+    await controller.callInteraction('InitiateRemovalRequest', {
+      user: { id: initiatorUser.id, role: 'dormHead' },
+      payload: {
+        userId: targetUser.id,
+        reason: 'Test comment on approval'
+      }
+    })
+    
+    // Verify adminComment is null initially
+    const pendingRequest = await system.storage.findOne(
+      'RemovalRequest',
+      MatchExp.atom({ key: 'reason', value: ['=', 'Test comment on approval'] }),
+      undefined,
+      ['id', 'adminComment']
+    )
+    
+    expect(pendingRequest).toBeDefined()
+    expect(pendingRequest.adminComment).toBeUndefined() // Initial value is undefined
+    
+    // Step 5: Process request with admin comment
+    await controller.callInteraction('ProcessRemovalRequest', {
+      user: { id: adminUser.id, role: 'admin' },
+      payload: {
+        requestId: pendingRequest.id,
+        decision: 'approve',
+        adminComment: 'Approved after reviewing evidence of violations'
+      }
+    })
+    
+    // Verify adminComment is set correctly
+    const approvedRequest = await system.storage.findOne(
+      'RemovalRequest',
+      MatchExp.atom({ key: 'id', value: ['=', pendingRequest.id] }),
+      undefined,
+      ['id', 'adminComment', 'status']
+    )
+    
+    expect(approvedRequest.adminComment).toBe('Approved after reviewing evidence of violations')
+    expect(approvedRequest.status).toBe('approved')
+    
+    // Step 6: Create another request and process without comment
+    // Create another target user
+    await controller.callInteraction('CreateUser', {
+      user: { id: 'admin-system', role: 'admin' },
+      payload: {
+        name: 'Target No Comment',
+        email: 'target.nocomment@example.com',
+        phone: '4444444444',
+        role: 'student'
+      }
+    })
+    
+    const targetUser2 = await system.storage.findOne(
+      'User',
+      MatchExp.atom({ key: 'email', value: ['=', 'target.nocomment@example.com'] }),
+      undefined,
+      ['id']
+    )
+    
+    await controller.callInteraction('InitiateRemovalRequest', {
+      user: { id: initiatorUser.id, role: 'dormHead' },
+      payload: {
+        userId: targetUser2.id,
+        reason: 'Test no comment on rejection'
+      }
+    })
+    
+    const secondRequest = await system.storage.findOne(
+      'RemovalRequest',
+      MatchExp.atom({ key: 'reason', value: ['=', 'Test no comment on rejection'] }),
+      undefined,
+      ['id']
+    )
+    
+    // Process without adminComment
+    await controller.callInteraction('ProcessRemovalRequest', {
+      user: { id: adminUser.id, role: 'admin' },
+      payload: {
+        requestId: secondRequest.id,
+        decision: 'reject'
+        // No adminComment provided
+      }
+    })
+    
+    // Verify adminComment remains null when not provided
+    const rejectedRequest = await system.storage.findOne(
+      'RemovalRequest',
+      MatchExp.atom({ key: 'id', value: ['=', secondRequest.id] }),
+      undefined,
+      ['id', 'adminComment', 'status']
+    )
+    
+    expect(rejectedRequest.adminComment).toBeUndefined() // Remains undefined when not provided
+    expect(rejectedRequest.status).toBe('rejected')
+  })
+
+  test('RemovalRequest.processedAt computation', async () => {
+    /**
+     * Test Plan for: RemovalRequest.processedAt
+     * Dependencies: RemovalRequest entity, User entities, InteractionEventEntity
+     * Steps: 
+     *   1) Create admin user
+     *   2) Create target user 
+     *   3) Create initiator user
+     *   4) Initiate removal request - verify processedAt is null initially
+     *   5) Process request (approve) - verify processedAt is set to current timestamp
+     *   6) Create another request and process (reject) - verify processedAt is also set
+     * Business Logic: Set to current timestamp when ProcessRemovalRequest executes
+     */
+    
+    // Step 1: Create admin user for processing requests
+    await controller.callInteraction('CreateUser', {
+      user: { id: 'admin-system', role: 'admin' },
+      payload: {
+        name: 'Admin Processor',
+        email: 'admin.processor@example.com',
+        phone: '5555555555',
+        role: 'admin'
+      }
+    })
+    
+    const adminUser = await system.storage.findOne(
+      'User',
+      MatchExp.atom({ key: 'email', value: ['=', 'admin.processor@example.com'] }),
+      undefined,
+      ['id']
+    )
+    
+    // Step 2: Create target user to be removed
+    await controller.callInteraction('CreateUser', {
+      user: { id: 'admin-system', role: 'admin' },
+      payload: {
+        name: 'Target Process User',
+        email: 'target.process@example.com',
+        phone: '6666666666',
+        role: 'student'
+      }
+    })
+    
+    const targetUser = await system.storage.findOne(
+      'User',
+      MatchExp.atom({ key: 'email', value: ['=', 'target.process@example.com'] }),
+      undefined,
+      ['id']
+    )
+    
+    // Step 3: Create initiator user (dorm head)
+    await controller.callInteraction('CreateUser', {
+      user: { id: 'admin-system', role: 'admin' },
+      payload: {
+        name: 'Dorm Head Processor',
+        email: 'dormhead.process@example.com',
+        phone: '7777777777',
+        role: 'dormHead'
+      }
+    })
+    
+    const initiatorUser = await system.storage.findOne(
+      'User',
+      MatchExp.atom({ key: 'email', value: ['=', 'dormhead.process@example.com'] }),
+      undefined,
+      ['id']
+    )
+    
+    // Step 4: Initiate removal request
+    await controller.callInteraction('InitiateRemovalRequest', {
+      user: { id: initiatorUser.id, role: 'dormHead' },
+      payload: {
+        userId: targetUser.id,
+        reason: 'Test processedAt timestamp'
+      }
+    })
+    
+    // Verify processedAt is null initially
+    const pendingRequest = await system.storage.findOne(
+      'RemovalRequest',
+      MatchExp.atom({ key: 'reason', value: ['=', 'Test processedAt timestamp'] }),
+      undefined,
+      ['id', 'processedAt', 'status']
+    )
+    
+    expect(pendingRequest).toBeDefined()
+    expect(pendingRequest.processedAt).toBeUndefined() // Initial value is undefined
+    expect(pendingRequest.status).toBe('pending')
+    
+    // Record timestamp before processing
+    const beforeTimestamp = Math.floor(Date.now() / 1000)
+    
+    // Step 5: Process request (approve) - verify processedAt is set
+    await controller.callInteraction('ProcessRemovalRequest', {
+      user: { id: adminUser.id, role: 'admin' },
+      payload: {
+        requestId: pendingRequest.id,
+        decision: 'approve',
+        adminComment: 'Approved for testing'
+      }
+    })
+    
+    // Record timestamp after processing
+    const afterTimestamp = Math.floor(Date.now() / 1000)
+    
+    // Verify processedAt is set correctly
+    const approvedRequest = await system.storage.findOne(
+      'RemovalRequest',
+      MatchExp.atom({ key: 'id', value: ['=', pendingRequest.id] }),
+      undefined,
+      ['id', 'processedAt', 'status']
+    )
+    
+    expect(approvedRequest.processedAt).not.toBeNull()
+    expect(approvedRequest.processedAt).toBeGreaterThanOrEqual(beforeTimestamp)
+    expect(approvedRequest.processedAt).toBeLessThanOrEqual(afterTimestamp)
+    expect(approvedRequest.status).toBe('approved')
+    
+    // Step 6: Create another request and process (reject) - verify processedAt is also set
+    // Create another target user
+    await controller.callInteraction('CreateUser', {
+      user: { id: 'admin-system', role: 'admin' },
+      payload: {
+        name: 'Target Process User 2',
+        email: 'target.process2@example.com',
+        phone: '8888888888',
+        role: 'student'
+      }
+    })
+    
+    const targetUser2 = await system.storage.findOne(
+      'User',
+      MatchExp.atom({ key: 'email', value: ['=', 'target.process2@example.com'] }),
+      undefined,
+      ['id']
+    )
+    
+    await controller.callInteraction('InitiateRemovalRequest', {
+      user: { id: initiatorUser.id, role: 'dormHead' },
+      payload: {
+        userId: targetUser2.id,
+        reason: 'Test processedAt on rejection'
+      }
+    })
+    
+    const secondRequest = await system.storage.findOne(
+      'RemovalRequest',
+      MatchExp.atom({ key: 'reason', value: ['=', 'Test processedAt on rejection'] }),
+      undefined,
+      ['id', 'processedAt']
+    )
+    
+    expect(secondRequest.processedAt).toBeUndefined() // Initially undefined
+    
+    // Record timestamp before processing
+    const beforeRejectTimestamp = Math.floor(Date.now() / 1000)
+    
+    // Process with rejection
+    await controller.callInteraction('ProcessRemovalRequest', {
+      user: { id: adminUser.id, role: 'admin' },
+      payload: {
+        requestId: secondRequest.id,
+        decision: 'reject'
+      }
+    })
+    
+    // Record timestamp after processing
+    const afterRejectTimestamp = Math.floor(Date.now() / 1000)
+    
+    // Verify processedAt is set for rejection too
+    const rejectedRequest = await system.storage.findOne(
+      'RemovalRequest',
+      MatchExp.atom({ key: 'id', value: ['=', secondRequest.id] }),
+      undefined,
+      ['id', 'processedAt', 'status']
+    )
+    
+    expect(rejectedRequest.processedAt).not.toBeNull()
+    expect(rejectedRequest.processedAt).toBeGreaterThanOrEqual(beforeRejectTimestamp)
+    expect(rejectedRequest.processedAt).toBeLessThanOrEqual(afterRejectTimestamp)
+    expect(rejectedRequest.status).toBe('rejected')
+  })
+
+  test('RemovalRequest.updatedAt computation', async () => {
+    /**
+     * Test Plan for: RemovalRequest.updatedAt
+     * Dependencies: RemovalRequest entity, User entities, InteractionEventEntity
+     * Steps: 
+     *   1) Create admin user
+     *   2) Create target user 
+     *   3) Create initiator user
+     *   4) Initiate removal request - verify updatedAt is null initially
+     *   5) Process request (approve) - verify updatedAt is set to current timestamp
+     *   6) Create another request and cancel it - verify updatedAt is set for cancellation
+     * Business Logic: Updated to current timestamp on ProcessRemovalRequest or CancelRemovalRequest
+     */
+    
+    // Step 1: Create admin user for processing requests
+    await controller.callInteraction('CreateUser', {
+      user: { id: 'admin-system', role: 'admin' },
+      payload: {
+        name: 'Admin Updater',
+        email: 'admin.updater@example.com',
+        phone: '9999999999',
+        role: 'admin'
+      }
+    })
+    
+    const adminUser = await system.storage.findOne(
+      'User',
+      MatchExp.atom({ key: 'email', value: ['=', 'admin.updater@example.com'] }),
+      undefined,
+      ['id']
+    )
+    
+    // Step 2: Create target user to be removed
+    await controller.callInteraction('CreateUser', {
+      user: { id: 'admin-system', role: 'admin' },
+      payload: {
+        name: 'Target Update User',
+        email: 'target.update@example.com',
+        phone: '1010101010',
+        role: 'student'
+      }
+    })
+    
+    const targetUser = await system.storage.findOne(
+      'User',
+      MatchExp.atom({ key: 'email', value: ['=', 'target.update@example.com'] }),
+      undefined,
+      ['id']
+    )
+    
+    // Step 3: Create initiator user (dorm head)
+    await controller.callInteraction('CreateUser', {
+      user: { id: 'admin-system', role: 'admin' },
+      payload: {
+        name: 'Dorm Head Updater',
+        email: 'dormhead.updater@example.com',
+        phone: '1111111111',
+        role: 'dormHead'
+      }
+    })
+    
+    const initiatorUser = await system.storage.findOne(
+      'User',
+      MatchExp.atom({ key: 'email', value: ['=', 'dormhead.updater@example.com'] }),
+      undefined,
+      ['id']
+    )
+    
+    // Step 4: Initiate removal request
+    await controller.callInteraction('InitiateRemovalRequest', {
+      user: { id: initiatorUser.id, role: 'dormHead' },
+      payload: {
+        userId: targetUser.id,
+        reason: 'Test updatedAt timestamp'
+      }
+    })
+    
+    // Verify updatedAt is null initially
+    const pendingRequest = await system.storage.findOne(
+      'RemovalRequest',
+      MatchExp.atom({ key: 'reason', value: ['=', 'Test updatedAt timestamp'] }),
+      undefined,
+      ['id', 'updatedAt', 'status']
+    )
+    
+    expect(pendingRequest).toBeDefined()
+    expect(pendingRequest.updatedAt).toBeUndefined() // Initial value is undefined
+    expect(pendingRequest.status).toBe('pending')
+    
+    // Record timestamp before processing
+    const beforeTimestamp = Math.floor(Date.now() / 1000)
+    
+    // Step 5: Process request (approve) - verify updatedAt is set
+    await controller.callInteraction('ProcessRemovalRequest', {
+      user: { id: adminUser.id, role: 'admin' },
+      payload: {
+        requestId: pendingRequest.id,
+        decision: 'approve',
+        adminComment: 'Approved for testing updatedAt'
+      }
+    })
+    
+    // Record timestamp after processing
+    const afterTimestamp = Math.floor(Date.now() / 1000)
+    
+    // Verify updatedAt is set correctly
+    const approvedRequest = await system.storage.findOne(
+      'RemovalRequest',
+      MatchExp.atom({ key: 'id', value: ['=', pendingRequest.id] }),
+      undefined,
+      ['id', 'updatedAt', 'status']
+    )
+    
+    expect(approvedRequest.updatedAt).not.toBeNull()
+    expect(approvedRequest.updatedAt).toBeGreaterThanOrEqual(beforeTimestamp)
+    expect(approvedRequest.updatedAt).toBeLessThanOrEqual(afterTimestamp)
+    expect(approvedRequest.status).toBe('approved')
+    
+    // Step 6: Create another request and cancel it - verify updatedAt is set for cancellation
+    // Create another target user
+    await controller.callInteraction('CreateUser', {
+      user: { id: 'admin-system', role: 'admin' },
+      payload: {
+        name: 'Target Cancel User',
+        email: 'target.cancel@example.com',
+        phone: '1212121212',
+        role: 'student'
+      }
+    })
+    
+    const targetUser2 = await system.storage.findOne(
+      'User',
+      MatchExp.atom({ key: 'email', value: ['=', 'target.cancel@example.com'] }),
+      undefined,
+      ['id']
+    )
+    
+    // Create new removal request
+    await controller.callInteraction('InitiateRemovalRequest', {
+      user: { id: initiatorUser.id, role: 'dormHead' },
+      payload: {
+        userId: targetUser2.id,
+        reason: 'Test updatedAt on cancellation'
+      }
+    })
+    
+    const secondRequest = await system.storage.findOne(
+      'RemovalRequest',
+      MatchExp.atom({ key: 'reason', value: ['=', 'Test updatedAt on cancellation'] }),
+      undefined,
+      ['id', 'updatedAt']
+    )
+    
+    expect(secondRequest.updatedAt).toBeUndefined() // Initially undefined
+    
+    // Record timestamp before cancellation
+    const beforeCancelTimestamp = Math.floor(Date.now() / 1000)
+    
+    // Cancel the request
+    await controller.callInteraction('CancelRemovalRequest', {
+      user: { id: initiatorUser.id, role: 'dormHead' },
+      payload: {
+        requestId: secondRequest.id
+      }
+    })
+    
+    // Record timestamp after cancellation
+    const afterCancelTimestamp = Math.floor(Date.now() / 1000)
+    
+    // Verify updatedAt is set for cancellation
+    const cancelledRequest = await system.storage.findOne(
+      'RemovalRequest',
+      MatchExp.atom({ key: 'id', value: ['=', secondRequest.id] }),
+      undefined,
+      ['id', 'updatedAt', 'status']
+    )
+    
+    expect(cancelledRequest.updatedAt).not.toBeNull()
+    expect(cancelledRequest.updatedAt).toBeGreaterThanOrEqual(beforeCancelTimestamp)
+    expect(cancelledRequest.updatedAt).toBeLessThanOrEqual(afterCancelTimestamp)
+    expect(cancelledRequest.status).toBe('cancelled')
+    
+    // Test updating timestamp on already updated request
+    // Process the cancelled request again (should update timestamp)
+    const beforeSecondUpdateTimestamp = Math.floor(Date.now() / 1000)
+    
+    // Wait a small amount of time to ensure different timestamp
+    await new Promise(resolve => setTimeout(resolve, 1000))
+    
+    // Cancel again to test state transition from already updated state
+    await controller.callInteraction('CancelRemovalRequest', {
+      user: { id: initiatorUser.id, role: 'dormHead' },
+      payload: {
+        requestId: secondRequest.id
+      }
+    })
+    
+    const afterSecondUpdateTimestamp = Math.floor(Date.now() / 1000)
+    
+    const reUpdatedRequest = await system.storage.findOne(
+      'RemovalRequest',
+      MatchExp.atom({ key: 'id', value: ['=', secondRequest.id] }),
+      undefined,
+      ['id', 'updatedAt']
+    )
+    
+    // Should have a newer timestamp
+    expect(reUpdatedRequest.updatedAt).toBeGreaterThanOrEqual(beforeSecondUpdateTimestamp)
+    expect(reUpdatedRequest.updatedAt).toBeLessThanOrEqual(afterSecondUpdateTimestamp)
+  })
+  
+  test('UserBedRelation computation - StateMachine manages bed assignments', async () => {
+    /**
+     * Test Plan for: UserBedRelation
+     * Dependencies: User entity, Bed entity, UserBedRelation, AssignUserToDormitory, RemoveUserFromDormitory, ProcessRemovalRequest
+     * Steps: 1) Create users and dormitory 2) Assign user to dormitory (creates bed relation) 3) Remove user (deletes relation) 4) Test removal request approval
+     * Business Logic: Manages 1:1 relationship between users and beds
+     */
+    
+    // Import UserBedRelation for test
+    const UserBedRelation = relations.find(r => r.source.name === 'User' && r.target.name === 'Bed')
+    
+    // Create admin user
+    await controller.callInteraction('CreateUser', {
+      user: { id: 'super-admin', role: 'admin' },
+      payload: {
+        name: 'Admin User',
+        email: 'admin@test.com',
+        phone: '1111111111',
+        role: 'admin'
+      }
+    })
+    
+    const adminUser = await system.storage.findOne(
+      'User',
+      MatchExp.atom({ key: 'email', value: ['=', 'admin@test.com'] }),
+      undefined,
+      ['id', 'role']
+    )
+    
+    // Create test users
+    await controller.callInteraction('CreateUser', {
+      user: adminUser,
+      payload: {
+        name: 'Test User 1',
+        email: 'user1@test.com',
+        phone: '2222222222',
+        role: 'student'
+      }
+    })
+    
+    await controller.callInteraction('CreateUser', {
+      user: adminUser,
+      payload: {
+        name: 'Test User 2',
+        email: 'user2@test.com',
+        phone: '3333333333',
+        role: 'student'
+      }
+    })
+    
+    const user1 = await system.storage.findOne(
+      'User',
+      MatchExp.atom({ key: 'email', value: ['=', 'user1@test.com'] }),
+      undefined,
+      ['id']
+    )
+    
+    const user2 = await system.storage.findOne(
+      'User',
+      MatchExp.atom({ key: 'email', value: ['=', 'user2@test.com'] }),
+      undefined,
+      ['id']
+    )
+    
+    // Create dormitory with beds
+    await controller.callInteraction('CreateDormitory', {
+      user: adminUser,
+      payload: {
+        name: 'Dorm A',
+        capacity: 4,
+        floor: 1,
+        building: 'Building A'
+      }
+    })
+    
+    const dormitory = await system.storage.findOne(
+      'Dormitory',
+      MatchExp.atom({ key: 'name', value: ['=', 'Dorm A'] }),
+      undefined,
+      ['id']
+    )
+    
+    // Get beds for this dormitory
+    const beds = await system.storage.find(
+      'Bed',
+      BoolExp.atom({ key: 'dormitory.id', value: ['=', dormitory.id] }),
+      undefined,
+      ['id', 'bedNumber']
+    )
+    
+    expect(beds.length).toBe(4) // Dormitory should have 4 beds
+    
+    // Initially no UserBedRelation should exist
+    const initialRelations = await system.storage.find(
+      UserBedRelation.name,
+      undefined,
+      undefined,
+      ['id']
+    )
+    expect(initialRelations.length).toBe(0)
+    
+    // Assign user1 to dormitory with specific bed
+    await controller.callInteraction('AssignUserToDormitory', {
+      user: adminUser,
+      payload: {
+        userId: user1.id,
+        dormitoryId: dormitory.id,
+        bedId: beds[0].id
+      }
+    })
+    
+    // Verify UserBedRelation was created
+    const user1BedRelations = await system.storage.find(
+      UserBedRelation.name,
+      BoolExp.atom({ key: 'source.id', value: ['=', user1.id] }),
+      undefined,
+      ['id', ['source', { attributeQuery: ['id'] }], ['target', { attributeQuery: ['id', 'bedNumber'] }]]
+    )
+    
+    expect(user1BedRelations.length).toBe(1)
+    expect(user1BedRelations[0].source.id).toBe(user1.id)
+    expect(user1BedRelations[0].target.id).toBe(beds[0].id)
+    
+    // Assign user2 to dormitory with different bed
+    await controller.callInteraction('AssignUserToDormitory', {
+      user: adminUser,
+      payload: {
+        userId: user2.id,
+        dormitoryId: dormitory.id,
+        bedId: beds[1].id
+      }
+    })
+    
+    // Verify both relations exist
+    const allBedRelations = await system.storage.find(
+      UserBedRelation.name,
+      undefined,
+      undefined,
+      ['id', ['source', { attributeQuery: ['id'] }], ['target', { attributeQuery: ['id'] }]]
+    )
+    
+    expect(allBedRelations.length).toBe(2)
+    
+    // Test removing user1 from dormitory
+    await controller.callInteraction('RemoveUserFromDormitory', {
+      user: adminUser,
+      payload: {
+        userId: user1.id
+      }
+    })
+    
+    // Verify user1's bed relation was deleted
+    const user1BedRelationsAfterRemoval = await system.storage.find(
+      UserBedRelation.name,
+      BoolExp.atom({ key: 'source.id', value: ['=', user1.id] }),
+      undefined,
+      ['id']
+    )
+    
+    expect(user1BedRelationsAfterRemoval.length).toBe(0)
+    
+    // Verify user2's relation still exists
+    const user2BedRelations = await system.storage.find(
+      UserBedRelation.name,
+      BoolExp.atom({ key: 'source.id', value: ['=', user2.id] }),
+      undefined,
+      ['id']
+    )
+    
+    expect(user2BedRelations.length).toBe(1)
+    
+    // Test removal request approval (should also delete bed relation)
+    // First, create a dorm head to initiate removal request
+    await controller.callInteraction('CreateUser', {
+      user: adminUser,
+      payload: {
+        name: 'Dorm Head',
+        email: 'dormhead@test.com',
+        phone: '4444444444',
+        role: 'dormHead'
+      }
+    })
+    
+    const dormHead = await system.storage.findOne(
+      'User',
+      MatchExp.atom({ key: 'email', value: ['=', 'dormhead@test.com'] }),
+      undefined,
+      ['id']
+    )
+    
+    // Assign dorm head to manage the dormitory
+    await controller.callInteraction('AssignDormHead', {
+      user: adminUser,
+      payload: {
+        dormitoryId: dormitory.id,
+        userId: dormHead.id
+      }
+    })
+    
+    // Re-assign user1 to test removal via removal request
+    await controller.callInteraction('AssignUserToDormitory', {
+      user: adminUser,
+      payload: {
+        userId: user1.id,
+        dormitoryId: dormitory.id,
+        bedId: beds[2].id
+      }
+    })
+    
+    // Verify user1 has bed relation again
+    const user1ReassignedRelations = await system.storage.find(
+      UserBedRelation.name,
+      BoolExp.atom({ key: 'source.id', value: ['=', user1.id] }),
+      undefined,
+      ['id']
+    )
+    
+    expect(user1ReassignedRelations.length).toBe(1)
+    
+    // Create removal request
+    await controller.callInteraction('InitiateRemovalRequest', {
+      user: dormHead,
+      payload: {
+        userId: user1.id,
+        reason: 'Test removal'
+      }
+    })
+    
+    const removalRequest = await system.storage.findOne(
+      'RemovalRequest',
+      MatchExp.atom({ key: 'reason', value: ['=', 'Test removal'] }),
+      undefined,
+      ['id']
+    )
+    
+    // Process removal request (approve it)
+    await controller.callInteraction('ProcessRemovalRequest', {
+      user: adminUser,
+      payload: {
+        requestId: removalRequest.id,
+        decision: 'approved',
+        adminComment: 'Approved for testing'
+      }
+    })
+    
+    // Verify user1's bed relation was deleted by approval
+    const user1BedRelationsAfterApproval = await system.storage.find(
+      UserBedRelation.name,
+      BoolExp.atom({ key: 'source.id', value: ['=', user1.id] }),
+      undefined,
+      ['id']
+    )
+    
+    expect(user1BedRelationsAfterApproval.length).toBe(0)
+    
+    // Test rejection (should NOT delete bed relation)
+    // First re-assign user2 to a new bed
+    await controller.callInteraction('RemoveUserFromDormitory', {
+      user: adminUser,
+      payload: {
+        userId: user2.id
+      }
+    })
+    
+    await controller.callInteraction('AssignUserToDormitory', {
+      user: adminUser,
+      payload: {
+        userId: user2.id,
+        dormitoryId: dormitory.id,
+        bedId: beds[3].id
+      }
+    })
+    
+    // Create another removal request for user2
+    await controller.callInteraction('InitiateRemovalRequest', {
+      user: dormHead,
+      payload: {
+        userId: user2.id,
+        reason: 'Test rejection'
+      }
+    })
+    
+    const rejectionRequest = await system.storage.findOne(
+      'RemovalRequest',
+      MatchExp.atom({ key: 'reason', value: ['=', 'Test rejection'] }),
+      undefined,
+      ['id']
+    )
+    
+    // Process removal request (reject it)
+    await controller.callInteraction('ProcessRemovalRequest', {
+      user: adminUser,
+      payload: {
+        requestId: rejectionRequest.id,
+        decision: 'rejected',
+        adminComment: 'Rejected for testing'
+      }
+    })
+    
+    // Verify user2's bed relation still exists after rejection
+    const user2BedRelationsAfterRejection = await system.storage.find(
+      UserBedRelation.name,
+      BoolExp.atom({ key: 'source.id', value: ['=', user2.id] }),
+      undefined,
+      ['id']
+    )
+    
+    expect(user2BedRelationsAfterRejection.length).toBe(1) // Relation should still exist
+  })
+
+  test('User.totalPoints computation - Summation of point deductions', async () => {
+    /**
+     * Test Plan for: User.totalPoints
+     * Dependencies: User entity, PointDeduction entity, UserPointDeductionRelation
+     * Steps: 
+     *   1) Create admin/issuer user
+     *   2) Create target user
+     *   3) Verify initial totalPoints is 0
+     *   4) Issue first point deduction
+     *   5) Verify totalPoints is updated
+     *   6) Issue second point deduction
+     *   7) Verify totalPoints is sum of both deductions
+     *   8) Issue third point deduction with different amount
+     *   9) Verify totalPoints is sum of all three
+     * Business Logic: Sum of all point deductions for the user
+     */
+    
+    // Step 1: Create admin/issuer user
+    await controller.callInteraction('CreateUser', {
+      user: { id: 'super-admin', role: 'admin' },
+      payload: {
+        name: 'Points Admin',
+        email: 'points.admin@example.com',
+        phone: '1111111111',
+        role: 'admin'
+      }
+    })
+    
+    const adminUser = await system.storage.findOne(
+      'User',
+      MatchExp.atom({ key: 'email', value: ['=', 'points.admin@example.com'] }),
+      undefined,
+      ['id', 'role']
+    )
+    
+    // Step 2: Create target user
+    await controller.callInteraction('CreateUser', {
+      user: adminUser,
+      payload: {
+        name: 'Points Test User',
+        email: 'points.test@example.com',
+        phone: '2222222222',
+        role: 'student'
+      }
+    })
+    
+    const targetUser = await system.storage.findOne(
+      'User',
+      MatchExp.atom({ key: 'email', value: ['=', 'points.test@example.com'] }),
+      undefined,
+      ['id', 'totalPoints']
+    )
+    
+    // Step 3: Verify initial totalPoints is 0
+    expect(targetUser).toBeDefined()
+    expect(targetUser.totalPoints).toBe(0) // Should be 0 with no deductions
+    
+    // Step 4: Issue first point deduction (5 points)
+    await controller.callInteraction('IssuePointDeduction', {
+      user: adminUser,
+      payload: {
+        userId: targetUser.id,
+        reason: 'First violation',
+        points: 5,
+        category: 'discipline',
+        description: 'Late return',
+        evidence: 'Security log'
+      }
+    })
+    
+    // Step 5: Verify totalPoints is updated to 5
+    const userAfterFirst = await system.storage.findOne(
+      'User',
+      MatchExp.atom({ key: 'id', value: ['=', targetUser.id] }),
+      undefined,
+      ['id', 'totalPoints']
+    )
+    
+    expect(userAfterFirst.totalPoints).toBe(5)
+    
+    // Step 6: Issue second point deduction (3 points)
+    await controller.callInteraction('IssuePointDeduction', {
+      user: adminUser,
+      payload: {
+        userId: targetUser.id,
+        reason: 'Second violation',
+        points: 3,
+        category: 'cleanliness',
+        description: 'Room inspection failed',
+        evidence: 'Inspection report'
+      }
+    })
+    
+    // Step 7: Verify totalPoints is sum of both deductions (5 + 3 = 8)
+    const userAfterSecond = await system.storage.findOne(
+      'User',
+      MatchExp.atom({ key: 'id', value: ['=', targetUser.id] }),
+      undefined,
+      ['id', 'totalPoints']
+    )
+    
+    expect(userAfterSecond.totalPoints).toBe(8)
+    
+    // Step 8: Issue third point deduction (10 points)
+    await controller.callInteraction('IssuePointDeduction', {
+      user: adminUser,
+      payload: {
+        userId: targetUser.id,
+        reason: 'Third violation',
+        points: 10,
+        category: 'discipline',
+        description: 'Major rule violation',
+        evidence: 'Witness report'
+      }
+    })
+    
+    // Step 9: Verify totalPoints is sum of all three (5 + 3 + 10 = 18)
+    const userAfterThird = await system.storage.findOne(
+      'User',
+      MatchExp.atom({ key: 'id', value: ['=', targetUser.id] }),
+      undefined,
+      ['id', 'totalPoints']
+    )
+    
+    expect(userAfterThird.totalPoints).toBe(18)
+    
+    // Additional test: Verify totalPoints for user with no deductions stays 0
+    await controller.callInteraction('CreateUser', {
+      user: adminUser,
+      payload: {
+        name: 'No Deductions User',
+        email: 'no.deductions@example.com',
+        phone: '3333333333',
+        role: 'student'
+      }
+    })
+    
+    const userNoDeductions = await system.storage.findOne(
+      'User',
+      MatchExp.atom({ key: 'email', value: ['=', 'no.deductions@example.com'] }),
+      undefined,
+      ['id', 'totalPoints']
+    )
+    
+    expect(userNoDeductions.totalPoints).toBe(0)
   })
 }) 

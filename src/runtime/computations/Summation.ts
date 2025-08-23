@@ -219,15 +219,24 @@ export class PropertySumHandle implements DataBasedComputation {
             relatedRecord['&'] = newRelationWithEntity;
             const value = this.resolveSumField(relatedRecord) || 0;
             sum += value;
-            await this.state.itemResult.set(relatedRecord, value);
+            await this.state.itemResult.set(newRelationWithEntity, value);
         } else if (relatedMutationEvent.type === 'delete' && relatedMutationEvent.recordName === this.relation.name!) {
-            // FIXME 关联关系的删除 - 无法知道原本的字段值
-            return ComputationResult.fullRecompute('Cannot determine sum value for deleted relation')
+             // 关联关系的删除
+             const oldResult = await this.state!.itemResult.get(relatedMutationEvent.record);
+             sum = sum - oldResult;
         } else if (relatedMutationEvent.type === 'update') {
-            // 可能是关系更新也可能是关联实体更新
+            // relatedAttribute 是从当前 dataContext 出发
+            // 现在要把匹配的 key 改成从关联关系出发。
+            const relationMatchKey = mutationEvent.relatedAttribute[1] === LINK_SYMBOL ? 
+                mutationEvent.relatedAttribute.slice(2).concat('id').join('.') : // 从2开始就是关联关系的字段了
+                (mutationEvent.relatedAttribute.length === 1 ? 
+                    `${this.isSource ? 'target' : 'source'}.id` : // 只有1个字段，就是关联实体的 id
+                    `${this.isSource ? 'target' : 'source'}.${mutationEvent.relatedAttribute.slice(1).concat('id').join('.')}` // 有多个字段，就是关联实体再关联上的字段
+                )
+            
             const newRelationWithEntity = await this.controller.system.storage.findOne(
-                this.relation.name!,
-                MatchExp.atom({key: mutationEvent.relatedAttribute.slice(2).concat('id').join('.'), value: ['=', relatedMutationEvent.oldRecord!.id]}), 
+                this.relation.name!, 
+                MatchExp.atom({key: relationMatchKey, value: ['=', relatedMutationEvent.oldRecord!.id]}), 
                 undefined, 
                 this.relationAttributeQuery
             );
@@ -235,8 +244,8 @@ export class PropertySumHandle implements DataBasedComputation {
             const relatedRecord = newRelationWithEntity[this.isSource ? 'target' : 'source'];
             relatedRecord['&'] = newRelationWithEntity;
             const newValue = this.resolveSumField(relatedRecord) || 0;
-            const oldValue = (await this.state.itemResult.get(relatedRecord)) || 0;
-            await this.state.itemResult.set(relatedRecord, newValue);
+            const oldValue = (await this.state.itemResult.get(newRelationWithEntity)) || 0;
+            await this.state.itemResult.set(newRelationWithEntity, newValue);
             sum += newValue - oldValue;
         }
 

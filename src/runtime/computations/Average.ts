@@ -262,10 +262,11 @@ export class PropertyAverageHandle implements DataBasedComputation {
             const value = this.resolveAvgField(relatedRecord) || 0;
             sum += value;
             count++;
-            await this.state.itemResult.set(relatedRecord, value);
+            await this.state.itemResult.set(newRelationWithEntity, value);
         } else if (relatedMutationEvent.type === 'delete' && relatedMutationEvent.recordName === this.relation.name!) {
-            // FIXME 关联关系的删除 - 无法知道原本的字段值
-            return ComputationResult.fullRecompute('Cannot determine average value for deleted relation')
+            const oldResult = await this.state!.itemResult.get(relatedMutationEvent.record);
+            sum = sum - oldResult;  
+            count--;
         } else if (relatedMutationEvent.type === 'update') {
             // 可能是关系更新也可能是关联实体更新
             const newRelationWithEntity = await this.controller.system.storage.findOne(
@@ -279,8 +280,8 @@ export class PropertyAverageHandle implements DataBasedComputation {
             relatedRecord['&'] = newRelationWithEntity;
             const newValue = this.resolveAvgField(relatedRecord) || 0;
 
-            const oldValue = (await this.state.itemResult.get(relatedRecord)) || 0;
-            await this.state.itemResult.set(relatedRecord, newValue);
+            const oldValue = (await this.state.itemResult.get(newRelationWithEntity)) || 0;
+            await this.state.itemResult.set(newRelationWithEntity, newValue);
             
             // 更新 sum 和 count
             sum += newValue - oldValue;

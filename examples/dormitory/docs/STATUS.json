@@ -1,7 +1,7 @@
 {
   "currentTask": "Task 3.1.4.3",
   "completed": false,
-  "currentComputation": "RemovalRequest.status",
+  "currentComputation": "User.totalPoints Complete - Next: User.isDormHead",
   "completedComputations": [
     "User",
     "Dormitory",
@@ -26,9 +26,16 @@
     "Dormitory.building",
     "Dormitory.status",
     "Dormitory.updatedAt",
-    "PointDeduction.status"
+    "PointDeduction.status",
+    "RemovalRequest.status",
+    "RemovalRequest.adminComment",
+    "RemovalRequest.processedAt",
+    "RemovalRequest.updatedAt",
+    "UserBedRelation",
+    "User.totalPoints"
   ],
   "phase1Complete": true,
-  "phase2RelationsComplete": true,
-  "note": "PointDeduction.status computation completed successfully. Next is RemovalRequest.status."
+  "phase2Complete": true,
+  "phase3InProgress": true,
+  "note": "User.totalPoints computation completed successfully. Test passes - correctly sums all point deductions for a user. Next computation in Phase 3 is User.isDormHead (Custom)."
 }

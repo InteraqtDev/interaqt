@@ -182,7 +182,7 @@ export class PropertyWeightedSummationHandle implements DataBasedComputation {
             relatedRecord['&'] = newRelationWithEntity;
             const valueAndWeight = this.matchRecordToWeight.call(this.controller, relatedRecord, dataDeps);
             const result = valueAndWeight.weight * valueAndWeight.value;
-            await this.state!.itemResult.set(relatedRecord, result);
+            await this.state!.itemResult.set(newRelationWithEntity, result);
             summation = summation + result;
         } else if (relatedMutationEvent.type === 'delete' && relatedMutationEvent.recordName === this.relation.name!) {
             // 关联关系的删除
@@ -190,20 +190,28 @@ export class PropertyWeightedSummationHandle implements DataBasedComputation {
             summation = summation - oldResult;
 
         } else if (relatedMutationEvent.type === 'update') {
-            // 关联关系或者关联实体的更新
-            const relationMatch = MatchExp.atom({
-                key: mutationEvent.relatedAttribute.slice(2).concat('id').join('.'),
-                value: ['=', relatedMutationEvent!.oldRecord!.id]
-            }) 
-
-            const newRelationWithEntity = await this.controller.system.storage.findOne(this.relation.name!, relationMatch, undefined, this.relationAttributeQuery);
+            // relatedAttribute 是从当前 dataContext 出发
+            // 现在要把匹配的 key 改成从关联关系出发。
+            const relationMatchKey = mutationEvent.relatedAttribute[1] === LINK_SYMBOL ? 
+                mutationEvent.relatedAttribute.slice(2).concat('id').join('.') : // 从2开始就是关联关系的字段了
+                (mutationEvent.relatedAttribute.length === 1 ? 
+                    `${this.isSource ? 'target' : 'source'}.id` : // 只有1个字段，就是关联实体的 id
+                    `${this.isSource ? 'target' : 'source'}.${mutationEvent.relatedAttribute.slice(1).concat('id').join('.')}` // 有多个字段，就是关联实体再关联上的字段
+                )
+            
+            const newRelationWithEntity = await this.controller.system.storage.findOne(
+                this.relation.name!, 
+                MatchExp.atom({key: relationMatchKey, value: ['=', relatedMutationEvent.oldRecord!.id]}), 
+                undefined, 
+                this.relationAttributeQuery
+            );
 
             const relatedRecord = newRelationWithEntity[this.isSource ? 'target' : 'source'];
             relatedRecord['&'] = newRelationWithEntity;
-            const oldResult = await this.state!.itemResult.get(relatedRecord);
+            const oldResult = await this.state!.itemResult.get(newRelationWithEntity);
             const newValueAndWeight = this.matchRecordToWeight.call(this.controller, relatedRecord, dataDeps);
             const newResult = newValueAndWeight.weight * newValueAndWeight.value;
-            await this.state!.itemResult.set(relatedRecord, newResult);
+            await this.state!.itemResult.set(newRelationWithEntity, newResult);
             summation = summation - oldResult + newResult;
         }
 

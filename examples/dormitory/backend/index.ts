@@ -92,10 +92,10 @@ const RemovalRequest = Entity.create({
     Property.create({ name: 'reason', type: 'string' }),
     Property.create({ name: 'totalPoints', type: 'number' }), // Will add computation
     Property.create({ name: 'status', type: 'string' }), // Will add default value in computation phase
-    Property.create({ name: 'adminComment', type: 'string' }),
-    Property.create({ name: 'processedAt', type: 'number' }),
+    Property.create({ name: 'adminComment', type: 'string', defaultValue: null }),
+    Property.create({ name: 'processedAt', type: 'number' }), // Will add computation
     Property.create({ name: 'createdAt', type: 'number', defaultValue: () => Math.floor(Date.now()/1000) }),
-    Property.create({ name: 'updatedAt', type: 'number', defaultValue: () => Math.floor(Date.now()/1000) })
+    Property.create({ name: 'updatedAt', type: 'number' }) // Will add computation - removed defaultValue
   ]
 });
 
@@ -579,6 +579,7 @@ RemovalRequest.computation = Transform.create({
       return {
         reason: event.payload.reason,
         status: 'pending',  // Default status when created
+        // adminComment and processedAt are handled by defaultValue in property definition
         createdAt: Math.floor(Date.now()/1000),
         updatedAt: Math.floor(Date.now()/1000),
         // Create relations to both the target user and initiator
@@ -1342,4 +1343,285 @@ PointDeduction.properties.find(p => p.name === 'status').computation = StateMach
     //   }
     // })
   ]
+});
+
+// RemovalRequest.status computation - StateMachine (manages status transitions)
+const removalRequestStatusPendingState = StateNode.create({
+  name: 'removalRequestStatusPending',
+  computeValue: function() {
+    return 'pending';
+  }
+});
+
+const removalRequestStatusProcessedState = StateNode.create({
+  name: 'removalRequestStatusProcessed',
+  computeValue: function(_: any, event: any) {
+    // Determine status based on the decision in the payload
+    if (event && event.payload && event.payload.decision === 'approve') {
+      return 'approved';
+    } else if (event && event.payload && event.payload.decision === 'reject') {
+      return 'rejected';
+    }
+    // This shouldn't happen, but return rejected as fallback
+    return 'rejected';
+  }
+});
+
+const removalRequestStatusCancelledState = StateNode.create({
+  name: 'removalRequestStatusCancelled',
+  computeValue: function() {
+    return 'cancelled';
+  }
+});
+
+RemovalRequest.properties.find(p => p.name === 'status').computation = StateMachine.create({
+  states: [
+    removalRequestStatusPendingState,
+    removalRequestStatusProcessedState,
+    removalRequestStatusCancelledState
+  ],
+  defaultState: removalRequestStatusPendingState,
+  transfers: [
+    // ProcessRemovalRequest processes the request (can be approved or rejected based on payload)
+    StateTransfer.create({
+      trigger: ProcessRemovalRequest,
+      current: removalRequestStatusPendingState,
+      next: removalRequestStatusProcessedState,
+      computeTarget: function(event: any) {
+        return { id: event.payload.requestId };
+      }
+    }),
+    // CancelRemovalRequest cancels the request
+    StateTransfer.create({
+      trigger: CancelRemovalRequest,
+      current: removalRequestStatusPendingState,
+      next: removalRequestStatusCancelledState,
+      computeTarget: function(event: any) {
+        return { id: event.payload.requestId };
+      }
+    })
+  ]
+});
+
+// RemovalRequest.adminComment computation - StateMachine (set by ProcessRemovalRequest)
+const removalRequestAdminCommentDefaultState = StateNode.create({
+  name: 'removalRequestAdminCommentDefault',
+  computeValue: function() {
+    // Always return null for the default state (adminComment not set yet)
+    return null;
+  }
+});
+
+const removalRequestAdminCommentSetState = StateNode.create({
+  name: 'removalRequestAdminCommentSet',
+  computeValue: function(_: any, event: any) {
+    // Set admin comment from ProcessRemovalRequest payload
+    if (event && event.payload && event.payload.adminComment) {
+      return event.payload.adminComment;
+    }
+    return null;
+  }
+});
+
+RemovalRequest.properties.find(p => p.name === 'adminComment').computation = StateMachine.create({
+  states: [removalRequestAdminCommentDefaultState, removalRequestAdminCommentSetState],
+  defaultState: removalRequestAdminCommentDefaultState,
+  transfers: [
+    // ProcessRemovalRequest sets the admin comment
+    StateTransfer.create({
+      trigger: ProcessRemovalRequest,
+      current: removalRequestAdminCommentDefaultState,
+      next: removalRequestAdminCommentSetState,
+      computeTarget: function(event: any) {
+        return { id: event.payload.requestId };
+      }
+    })
+  ]
+});
+
+// RemovalRequest.processedAt computation - StateMachine (set when ProcessRemovalRequest executes)
+const removalRequestProcessedAtInitialState = StateNode.create({
+  name: 'removalRequestProcessedAtInitial',
+  computeValue: function() {
+    // Initial state - not processed yet
+    return null;
+  }
+});
+
+const removalRequestProcessedAtSetState = StateNode.create({
+  name: 'removalRequestProcessedAtSet',
+  computeValue: function() {
+    // Set to current timestamp when processed
+    return Math.floor(Date.now() / 1000);
+  }
+});
+
+RemovalRequest.properties.find(p => p.name === 'processedAt').computation = StateMachine.create({
+  states: [removalRequestProcessedAtInitialState, removalRequestProcessedAtSetState],
+  defaultState: removalRequestProcessedAtInitialState,
+  transfers: [
+    // ProcessRemovalRequest sets the processedAt timestamp
+    StateTransfer.create({
+      trigger: ProcessRemovalRequest,
+      current: removalRequestProcessedAtInitialState,
+      next: removalRequestProcessedAtSetState,
+      computeTarget: function(event: any) {
+        return { id: event.payload.requestId };
+      }
+    })
+  ]
+});
+
+// RemovalRequest.updatedAt computation - StateMachine (updated on ProcessRemovalRequest or CancelRemovalRequest)
+const removalRequestUpdatedAtInitialState = StateNode.create({
+  name: 'removalRequestUpdatedAtInitial',
+  computeValue: function() {
+    // Initial state - not updated yet
+    return null;
+  }
+});
+
+const removalRequestUpdatedAtSetState = StateNode.create({
+  name: 'removalRequestUpdatedAtSet',
+  computeValue: function() {
+    // Set to current timestamp when updated
+    return Math.floor(Date.now() / 1000);
+  }
+});
+
+RemovalRequest.properties.find(p => p.name === 'updatedAt').computation = StateMachine.create({
+  states: [removalRequestUpdatedAtInitialState, removalRequestUpdatedAtSetState],
+  defaultState: removalRequestUpdatedAtInitialState,
+  transfers: [
+    // ProcessRemovalRequest updates the timestamp (from initial state)
+    StateTransfer.create({
+      trigger: ProcessRemovalRequest,
+      current: removalRequestUpdatedAtInitialState,
+      next: removalRequestUpdatedAtSetState,
+      computeTarget: function(event: any) {
+        return { id: event.payload.requestId };
+      }
+    }),
+    // ProcessRemovalRequest updates the timestamp (from already updated state)
+    StateTransfer.create({
+      trigger: ProcessRemovalRequest,
+      current: removalRequestUpdatedAtSetState,
+      next: removalRequestUpdatedAtSetState,
+      computeTarget: function(event: any) {
+        return { id: event.payload.requestId };
+      }
+    }),
+    // CancelRemovalRequest updates the timestamp (from initial state)
+    StateTransfer.create({
+      trigger: CancelRemovalRequest,
+      current: removalRequestUpdatedAtInitialState,
+      next: removalRequestUpdatedAtSetState,
+      computeTarget: function(event: any) {
+        return { id: event.payload.requestId };
+      }
+    }),
+    // CancelRemovalRequest updates the timestamp (from already updated state)
+    StateTransfer.create({
+      trigger: CancelRemovalRequest,
+      current: removalRequestUpdatedAtSetState,
+      next: removalRequestUpdatedAtSetState,
+      computeTarget: function(event: any) {
+        return { id: event.payload.requestId };
+      }
+    })
+  ]
+});
+
+// UserBedRelation computation - StateMachine (created by AssignUserToDormitory, deleted by RemoveUserFromDormitory or approved ProcessRemovalRequest)
+// Define states for the relation
+const userBedNotExistsState = StateNode.create({
+  name: 'notExists',
+  computeValue: () => null  // Return null means no relation
+});
+
+const userBedExistsState = StateNode.create({
+  name: 'exists',
+  computeValue: () => ({})  // Relation exists
+});
+
+UserBedRelation.computation = StateMachine.create({
+  states: [userBedNotExistsState, userBedExistsState],
+  defaultState: userBedNotExistsState,
+  transfers: [
+    // Create relation on AssignUserToDormitory
+    StateTransfer.create({
+      trigger: AssignUserToDormitory,
+      current: userBedNotExistsState,
+      next: userBedExistsState,
+      computeTarget: (event) => ({
+        source: { id: event.payload.userId },
+        target: { id: event.payload.bedId }
+      })
+    }),
+    // Delete relation on RemoveUserFromDormitory
+    StateTransfer.create({
+      trigger: RemoveUserFromDormitory,
+      current: userBedExistsState,
+      next: userBedNotExistsState,
+      computeTarget: async function(this: Controller, event) {
+        // Find the existing relation to delete
+        const relations = await this.system.storage.find(
+          UserBedRelation.name,
+          BoolExp.atom({
+            key: 'source.id',
+            value: ['=', event.payload.userId]
+          }),
+          undefined,
+          ['id']
+        );
+        return relations[0]; // Return the first (and should be only) relation
+      }
+    }),
+    // Delete relation on ProcessRemovalRequest when approved
+    StateTransfer.create({
+      trigger: ProcessRemovalRequest,
+      current: userBedExistsState,
+      next: userBedNotExistsState,
+      computeTarget: async function(this: Controller, event) {
+        // Only process if the request is approved
+        if (event.payload.decision !== 'approved') {
+          return null;
+        }
+        
+        // Find the removal request to get the target user
+        const removalRequest = await this.system.storage.findOne(
+          'RemovalRequest',
+          BoolExp.atom({ key: 'id', value: ['=', event.payload.requestId] }),
+          undefined,
+          [
+            'id',
+            ['targetUser', { attributeQuery: ['id'] }]
+          ]
+        );
+        
+        if (!removalRequest || !removalRequest.targetUser) {
+          return null;
+        }
+        
+        // Find the user's bed relation to delete
+        const relations = await this.system.storage.find(
+          UserBedRelation.name,
+          BoolExp.atom({
+            key: 'source.id',
+            value: ['=', removalRequest.targetUser.id]
+          }),
+          undefined,
+          ['id']
+        );
+        
+        return relations[0]; // Return the first (and should be only) relation
+      }
+    })
+  ]
+});
+
+// User.totalPoints computation - Summation (sum of all point deductions for the user)
+User.properties.find(p => p.name === 'totalPoints').computation = Summation.create({
+  property: 'pointDeductions',  // Use property name from UserPointDeductionRelation
+  attributeQuery: ['points']  // Sum the 'points' field from PointDeduction entities
 });
