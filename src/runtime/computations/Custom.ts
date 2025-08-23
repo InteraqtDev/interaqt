@@ -1,4 +1,4 @@
-import { DataContext } from "./Computation.js";
+import { DataContext, PropertyDataContext } from "./Computation.js";
 import { Custom, CustomInstance } from "@shared";
 import { Controller } from "../Controller.js";
 import { 
@@ -9,6 +9,7 @@ import {
   RecordBoundState,
   GlobalBoundState
 } from "./Computation.js";
+import { assert } from "../util.js";
 
 // Base class for shared implementation
 abstract class BaseCustomComputationHandle implements DataBasedComputation {
@@ -175,6 +176,17 @@ export class RelationCustomHandle extends BaseCustomComputationHandle {
 
 export class PropertyCustomHandle extends BaseCustomComputationHandle {
   static contextType = 'property' as const
+
+  constructor(controller: Controller, args: CustomInstance, dataContext: PropertyDataContext) {
+    if (args.dataDeps) {
+      const recordTypeDataDeps = Object.keys(args.dataDeps!).filter(key => args.dataDeps![key].type === 'records');
+      assert(recordTypeDataDeps.length === 0, `property-level custom computation dataDeps should not contain "records” type dataDeps, but got ${recordTypeDataDeps.join(', ')}
+If you want to use related entity/relation as dataDeps, please use "property" type dataDeps with args: { type: "property", property: "[sourceProperty/targetProperty in relation definition]", attributeQuery: [attributeQuery] }
+If you want to use aggregated data from all records in the entity/relation, you should define a different dict value to store the aggregated data, and then use the dict value as dataDeps.
+`)
+    }
+    super(controller, args, dataContext);
+  }
 }
 
 // Export all handles
