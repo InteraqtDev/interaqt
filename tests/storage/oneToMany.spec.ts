@@ -287,10 +287,12 @@ describe('one to many', () => {
                 record: {
                     id: userA.leader[LINK_SYMBOL].id,
                     source: {
-                        name: "a1",
-                        age: 11,
                         id: 2,
                     },
+                    // IMPORTANT: Both source and target should be present in delete events
+                    target: {
+                        id: userA.leader.id
+                    }
                 }
             }, {
                 type: "delete",
@@ -486,7 +488,14 @@ describe('one to many', () => {
                 type: "delete",
                 recordName: "User_leader_member_User",
                 record: {
-                    id: updatedUser.member[0][LINK_SYMBOL].id
+                    id: updatedUser.member[0][LINK_SYMBOL].id,
+                    // IMPORTANT: Both source and target should be present in delete events
+                    source: expect.objectContaining({
+                        id: updatedUser.member[0].id
+                    }),
+                    target: expect.objectContaining({
+                        id: userA.id
+                    })
                 }
             },
             {
@@ -573,6 +582,10 @@ describe('one to many', () => {
                   "target":  {
                     "id": 2,
                   },
+                  // IMPORTANT: Both source and target should be present in delete events
+                  "source": expect.objectContaining({
+                    "id": userA.id
+                  })
                 },
                 "recordName": "User_leader_member_User",
                 "type": "delete",
@@ -676,7 +689,14 @@ describe('one to many', () => {
                 type: "delete",
                 recordName: "User_leader_member_User",
                 record: {
-                    id: updatedUserA.member[0][LINK_SYMBOL].id
+                    id: updatedUserA.member[0][LINK_SYMBOL].id,
+                    // IMPORTANT: Both source and target should be present in delete events
+                    source: expect.objectContaining({
+                        id: userB.id
+                    }),
+                    target: expect.objectContaining({
+                        id: userA.id
+                    })
                 }
             }, {
                 type: "create",
@@ -757,6 +777,13 @@ describe('one to many', () => {
                 recordName: "User_leader_member_User",
                 record: {
                     id: updatedUserA.leader[LINK_SYMBOL].id,
+                    // IMPORTANT: Both source and target should be present in delete events
+                    source: expect.objectContaining({
+                        id: userA.id
+                    }),
+                    target: expect.objectContaining({
+                        id: userB.id
+                    })
                 }
             },
             {
@@ -822,6 +849,109 @@ describe('one to many', () => {
                 name: 'a1'
             }
         })
+    })
+
+    test('delete one to many relation as source: should have both source and target in delete event', async () => {
+        const leader = await entityQueryHandle.create('User', {
+            name: 'leader',
+            age: 40,
+            member: [
+                {name: 'member1', age: 20},
+                {name: 'member2', age: 25}
+            ]
+        })
+
+        const events: RecordMutationEvent[] = []
+        
+        // Delete the leader
+        await entityQueryHandle.delete('User', 
+            MatchExp.atom({ key: 'id', value: ['=', leader.id]}),
+            events
+        )
+
+        // Find all delete events for User_leader_member_User relations
+        const relationDeleteEvents = events.filter(e => 
+            e.type === 'delete' && e.recordName === 'User_leader_member_User'
+        )
+
+        expect(relationDeleteEvents.length).toBe(2)
+        
+        // All relation delete events should have both source and target
+        relationDeleteEvents.forEach((event, index) => {
+            expect(event.record).toHaveProperty('source')
+            expect(event.record).toHaveProperty('target')
+            expect(event.record?.source).toHaveProperty('id')
+            expect(event.record?.target).toHaveProperty('id')
+            
+            // Verify that leader is the target in the relation
+            expect(event.record?.target.id).toBe(leader.id)
+            // Verify that member is the source
+            expect(event.record?.source.id).toBe(leader.member[index].id)
+        })
+    })
+
+    test('delete one to many relation as target: should have both source and target in delete event', async () => {
+        const leader = await entityQueryHandle.create('User', {name: 'leader', age: 40})
+        const member = await entityQueryHandle.create('User', {
+            name: 'member',
+            age: 25,
+            leader: leader
+        })
+
+        const events: RecordMutationEvent[] = []
+        
+        // Delete the member (which has a leader)
+        await entityQueryHandle.delete('User', 
+            MatchExp.atom({ key: 'id', value: ['=', member.id]}),
+            events
+        )
+
+        // Find the delete event for User_leader_member_User relation
+        const relationDeleteEvent = events.find(e => 
+            e.type === 'delete' && e.recordName === 'User_leader_member_User'
+        )
+
+        expect(relationDeleteEvent).toBeDefined()
+        
+        // The relation delete event should have both source and target
+        expect(relationDeleteEvent?.record).toHaveProperty('source')
+        expect(relationDeleteEvent?.record).toHaveProperty('target')
+        
+        // Verify the IDs
+        expect(relationDeleteEvent?.record?.source).toHaveProperty('id', member.id)
+        expect(relationDeleteEvent?.record?.target).toHaveProperty('id', leader.id)
+    })
+
+    test('update one to many relation: delete event should have both source and target', async () => {
+        const leader1 = await entityQueryHandle.create('User', {name: 'leader1', age: 35})
+        const leader2 = await entityQueryHandle.create('User', {name: 'leader2', age: 40})
+        const member = await entityQueryHandle.create('User', {
+            name: 'member',
+            age: 25,
+            leader: leader1
+        })
+
+        const events: RecordMutationEvent[] = []
+        
+        // Update member's leader from leader1 to leader2
+        await entityQueryHandle.update('User',
+            MatchExp.atom({ key: 'id', value: ['=', member.id]}),
+            { leader: leader2 },
+            events
+        )
+
+        // Find the delete event for the old relation
+        const deleteEvent = events.find(e => 
+            e.type === 'delete' && e.recordName === 'User_leader_member_User'
+        )
+
+        expect(deleteEvent).toBeDefined()
+        
+        // The delete event should have both source and target
+        expect(deleteEvent?.record).toHaveProperty('source')
+        expect(deleteEvent?.record).toHaveProperty('target')
+        expect(deleteEvent?.record?.source).toHaveProperty('id', member.id)
+        expect(deleteEvent?.record?.target).toHaveProperty('id', leader1.id)
     })
 })
 

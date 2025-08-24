@@ -45,7 +45,8 @@ export class AttributeQuery {
 
     }
     public static getAttributeQueryDataForRecord(
-        recordName:string, map: EntityToTableMap,
+        recordName:string, 
+        map: EntityToTableMap,
         includeSameTableReliance?: boolean,
         includeMergedRecordAttribute?: boolean,
         includeManagedRecordAttributes?: boolean, // link record 的 source/target 字段

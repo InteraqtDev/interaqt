@@ -319,7 +319,7 @@ const AssignUserToDormitory = Interaction.create({
     items: [
       PayloadItem.create({ name: 'userId', required: true }),
       PayloadItem.create({ name: 'dormitoryId', required: true }),
-      PayloadItem.create({ name: 'bedId', required: false })
+      PayloadItem.create({ name: 'bedId', required: true })
     ]
   })
 });

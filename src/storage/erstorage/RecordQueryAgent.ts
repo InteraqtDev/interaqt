@@ -1277,6 +1277,7 @@ WHERE "${entityInfo.idField}" = (${p()})
                 this.map,
                 true,
                 true,
+                true,
                 true
             )
         })
@@ -1329,7 +1330,7 @@ WHERE "${entityInfo.idField}" = (${p()})
                 const hasSameRowData = recordInfo.notRelianceCombined.some(info => {
                     return !!recordWithSameRowData[0]?.[info.attributeName]?.id
                 })
-
+                // 存在合表的1:1关系，且不是 reliance。当前 record 删了，其他数据仍然要留下。
                 if (hasSameRowData) {
                     // 存在同行 record，只能用 update
                     const p = this.getPlaceholder()
@@ -1360,7 +1361,12 @@ WHERE "${recordInfo.idField}" = ${p()}
                         recordName: relianceInfo.linkName,
                         record: {
                             ...record[relianceInfo.attributeName][LINK_SYMBOL],
-                            [relianceInfo.isRecordSource() ? 'source' : 'target']: record[relianceInfo.attributeName]
+                            [relianceInfo.isRecordSource() ? 'source' : 'target']: {
+                                id: record.id
+                            },
+                            [relianceInfo.isRecordSource() ? 'target' : 'source']: {
+                                id: record[relianceInfo.attributeName].id
+                            }
                         },
                     })
 
@@ -1378,10 +1384,35 @@ WHERE "${recordInfo.idField}" = ${p()}
                         // CAUTION 注意这里一定要增加 link 上对于原始 record 的引用。外部计算的时候可能需要，那时可能 record 也删了查询不到了。
                         record: {
                             ...record[attributeInfo.attributeName][LINK_SYMBOL],
-                            [attributeInfo.isRecordSource() ? 'source' : 'target']: record
+                            [attributeInfo.isRecordSource() ? 'source' : 'target']: {
+                                id: record.id
+                            },
+                            [attributeInfo.isRecordSource() ? 'target' : 'source']: {
+                                id: record[attributeInfo.attributeName].id
+                            }
                         },
                     })
                 }
+            })
+
+            recordInfo.notRelianceCombined.forEach(attributeInfo => {
+                if (recordInfo.isRelation && (attributeInfo.attributeName === 'target' || attributeInfo.attributeName === 'source')) return
+                if (record[attributeInfo.attributeName]?.id === undefined) return
+                // 记录和自己合并的 link 事件
+                events?.push({
+                    type: 'delete',
+                    recordName: attributeInfo.linkName,
+                    // CAUTION 注意这里一定要增加 link 上对于原始 record 的引用。外部计算的时候可能需要，那时可能 record 也删了查询不到了。
+                    record: {
+                        ...record[attributeInfo.attributeName][LINK_SYMBOL],
+                        [attributeInfo.isRecordSource() ? 'source' : 'target']: {
+                            id: record.id
+                        },
+                        [attributeInfo.isRecordSource() ? 'target' : 'source']: {
+                            id: record[attributeInfo.attributeName].id
+                        }
+                    },
+                })
             })
         }
         
@@ -1435,14 +1466,7 @@ WHERE "${recordInfo.idField}" = ${p()}
                 })
                 // 关系事件上全部都要增加原始 record 的引用。注意不能给所有 events 都去加，因为删除 link 时也可能有关联实体被删除事件。
                 //  只有最后哪些 events 是删除 link 的事件。
-                const deletedLinkRecords =await this.deleteRecord(info.linkName, newMatch, events)
-                if (events) {
-                    const recordsById = new Map(deletedLinkRecords.map(r => [r.id, r]))
-                    const deletedLinkRecordEvents = events.slice(events.length - deletedLinkRecords.length)
-                    deletedLinkRecordEvents.forEach(event => {
-                        event.record![info.isRecordSource() ? 'source' : 'target'] = recordsById.get(event.record![info.isRecordSource() ? 'source' : 'target'].id)
-                    })
-                }
+                await this.deleteRecord(info.linkName, newMatch, events)
             }
         }
     }

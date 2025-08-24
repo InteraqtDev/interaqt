@@ -55,6 +55,7 @@ export class RecordInfo {
 
         return valueFields.concat(...linkFields, ...managedRecordAttributeFields, ...relianceFields)
     }
+    // 合并了 link 字段的 record
     get mergedRecordAttributes() {
         return this.strictRecordAttributes.filter(info => {
             return info.isLinkMergedWithParent()

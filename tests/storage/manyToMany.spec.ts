@@ -246,13 +246,27 @@ describe('many to many', () => {
                 type: "delete",
                 recordName: "User_teams_members_Team",
                 record: {
-                    id: userA.teams[0][LINK_SYMBOL].id
+                    id: userA.teams[0][LINK_SYMBOL].id,
+                    // IMPORTANT: Both source and target should be present in delete events
+                    source: expect.objectContaining({
+                        id: userA.id
+                    }),
+                    target: expect.objectContaining({
+                        id: userA.teams[0].id
+                    })
                 }
             }, {
                 type: "delete",
                 recordName: "User_teams_members_Team",
                 record: {
-                    id: userA.teams[1][LINK_SYMBOL].id
+                    id: userA.teams[1][LINK_SYMBOL].id,
+                    // IMPORTANT: Both source and target should be present in delete events
+                    source: expect.objectContaining({
+                        id: userA.id
+                    }),
+                    target: expect.objectContaining({
+                        id: userA.teams[1].id
+                    })
                 }
             }, {
                 type: "delete",
@@ -452,13 +466,27 @@ describe('many to many', () => {
                 type: "delete",
                 recordName: "User_teams_members_Team",
                 record: {
-                    id: userA.teams[0][LINK_SYMBOL].id
+                    id: userA.teams[0][LINK_SYMBOL].id,
+                    // IMPORTANT: Both source and target should be present in delete events
+                    source: expect.objectContaining({
+                        id: userA.id
+                    }),
+                    target: expect.objectContaining({
+                        id: teamA.id
+                    })
                 }
             }, {
                 type: "delete",
                 recordName: "User_teams_members_Team",
                 record: {
-                    id: userA.teams[1][LINK_SYMBOL].id
+                    id: userA.teams[1][LINK_SYMBOL].id,
+                    // IMPORTANT: Both source and target should be present in delete events
+                    source: expect.objectContaining({
+                        id: userA.id
+                    }),
+                    target: expect.objectContaining({
+                        id: teamB.id
+                    })
                 }
             }, {
                 type: "create",
@@ -620,6 +648,36 @@ describe('many to many', () => {
         // const foundUser2 = await handle.find('User', undefined, {}, ['id', 'name', ['teams', {attributeQuery: ['name',['participates', {attributeQuery: ['name']}]]}]])
         
         expect(foundUser.length).toBe(2)
+    })
+
+    test('delete many to many symmetric relation: should have both source and target in delete event', async () => {
+        const user1 = await handle.create('User', {name: 'user1', age: 17 })
+        const user2 = await handle.create('User', {name: 'user2', age: 18})
+        const user3 = await handle.create('User', {name: 'user3', age: 19 })
+
+        // Create symmetric friend relations
+        const relation1 = await handle.addRelationById('User', 'friends', user1.id, user2.id, { level: 1 })
+        const relation2 = await handle.addRelationById('User', 'friends', user3.id, user1.id, { level: 2 })
+
+        const events: RecordMutationEvent[] = []
+        // Delete user1 which is involved in both relations
+        await handle.delete('User', MatchExp.atom({ key: 'id', value: ['=', user1.id]}), events)
+
+        // Check that delete events for relations have both source and target
+        const relationDeleteEvents = events.filter(e => e.type === 'delete' && e.recordName === 'User_friends_friends_User')
+        
+        expect(relationDeleteEvents.length).toBe(1)
+        
+        const event = relationDeleteEvents[0]
+        expect(event.record).toHaveProperty('source')
+        expect(event.record).toHaveProperty('target')
+        expect(event.record.source).toHaveProperty('id')
+        expect(event.record.target).toHaveProperty('id')
+        
+        // Verify that user1 is involved in each relation
+        const isUser1Source = event.record.source.id === user1.id
+        const isUser1Target = event.record.target.id === user1.id
+        expect(isUser1Source || isUser1Target).toBe(true)
     })
 })
 

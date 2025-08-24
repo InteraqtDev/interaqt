@@ -215,29 +215,68 @@ describe('one to one', () => {
 
         // reliance 会被连带删除
         expect(findItems.length).toBe(0)
-
+        console.log(JSON.stringify(events, null, 2))
         expect(events).toMatchObject([
             {
-                type: "delete",
-                recordName: "User_item_owner_Item",
-                record: {
-                    id: userA.item[LINK_SYMBOL].id
+              "type": "delete",
+              "recordName": "User_item_owner_Item",
+              "record": {
+                "id": 1,
+                "source": {
+                  "id": 1,
+                },
+                "target": {
+                  "id": 1
                 }
-            }, {
-                type: "delete",
-                recordName: "Item",
-                record: {
-                    itemName: "item1",
-                    id: userA.item.id,
+              }
+            },
+            {
+              "type": "delete",
+              "recordName": "Item",
+              "record": {
+                "itemName": "item1",
+                "id": 1,
+                "&": {
+                  "id": 1
                 }
-            }, {
-                type: "delete",
-                recordName: "User",
-                record: {
-                    name: "a1",
-                    age: 12,
-                    id: userA.id,
+              }
+            },
+            {
+              "type": "delete",
+              "recordName": "Profile_owner_profile_User",
+              "record": {
+                "id": 1,
+                "target": {
+                  "id": 1
+                },
+                "source": {
+                  "id": 1
                 }
+              }
+            },
+            {
+              "type": "delete",
+              "recordName": "User",
+              "record": {
+                "name": "a1",
+                "age": 12,
+                "gender": "male",
+                "id": 1,
+                "item": {
+                  "itemName": "item1",
+                  "id": 1,
+                  "&": {
+                    "id": 1
+                  }
+                },
+                "profile": {
+                  "title": "f1",
+                  "id": 1,
+                  "&": {
+                    "id": 1
+                  }
+                }
+              }
             }
         ])
     })
@@ -311,6 +350,13 @@ describe('one to one', () => {
                 "recordName": "Profile_owner_profile_User",
                 "record": {
                     "id": 1,
+                    // IMPORTANT: Both source and target should be present in delete events
+                    source: expect.objectContaining({
+                        id: userA.profile.id
+                    }),
+                    target: expect.objectContaining({
+                        id: userA.id
+                    })
                 }
             },
             {
@@ -409,7 +455,14 @@ describe('one to one', () => {
                 type: "delete",
                 recordName: "Profile_owner_profile_User",
                 record: {
-                    id: userA.profile[LINK_SYMBOL].id
+                    id: userA.profile[LINK_SYMBOL].id,
+                    // IMPORTANT: Both source and target should be present in delete events
+                    source: expect.objectContaining({
+                        id: userA.profile.id
+                    }),
+                    target: expect.objectContaining({
+                        id: userA.id
+                    })
                 }
             }, {
                 type: "create",
@@ -420,6 +473,82 @@ describe('one to one', () => {
             }
         ])
 
+    })
+
+    test('delete one to one combined relation: should have both source and target in delete event', async () => {
+        // Create a user with a profile (combined table relation)
+        const userA = await entityQueryHandle.create('User', {
+            name: 'testUser',
+            age: 25,
+            profile: {
+                title: 'Developer'
+            }
+        })
+
+        const events: RecordMutationEvent[] = []
+        
+        // Delete the user
+        await entityQueryHandle.delete('User', 
+            MatchExp.atom({ key: 'id', value: ['=', userA.id]}),
+            events
+        )
+
+        const profileA = await entityQueryHandle.findOne('Profile',
+            undefined,
+            undefined,
+            ['title']
+        )
+        // profile 不是 reliance，应该还存在，只是关系删除了。
+        expect(profileA).toBeDefined()
+
+        // Find the delete event for the Profile_owner_profile_User relation
+        const relationDeleteEvent = events.find(e => 
+            e.type === 'delete' && e.recordName === 'Profile_owner_profile_User'
+        )
+
+        expect(relationDeleteEvent).toBeDefined()
+        
+        // Both source and target should be present
+        expect(relationDeleteEvent?.record).toHaveProperty('source')
+        expect(relationDeleteEvent?.record).toHaveProperty('target')
+        
+        // Verify the IDs are correct
+        expect(relationDeleteEvent?.record.source).toHaveProperty('id', userA.profile.id)
+        expect(relationDeleteEvent?.record.target).toHaveProperty('id', userA.id)
+    })
+
+    test('update one to one relation: delete event should have both source and target', async () => {
+        const userA = await entityQueryHandle.create('User', {
+            name: 'userA',
+            age: 30,
+            profile: {
+                title: 'Manager'
+            }
+        })
+
+        const profileB = await entityQueryHandle.create('Profile', {title: 'Director'})
+
+        const events: RecordMutationEvent[] = []
+        
+        // Update user's profile to a different one
+        await entityQueryHandle.update('User',
+            MatchExp.atom({ key: 'id', value: ['=', userA.id]}),
+            { profile: profileB },
+            events
+        )
+
+        // Find the delete event for the old relation
+        const deleteEvent = events.find(e => 
+            e.type === 'delete' && e.recordName === 'Profile_owner_profile_User'
+        )
+
+        expect(deleteEvent).toBeDefined()
+        
+        // Both source and target should be present in the delete event
+        expect(deleteEvent?.record).toHaveProperty('source')
+        expect(deleteEvent?.record).toHaveProperty('target')
+        expect(deleteEvent?.record.source).toHaveProperty('id')
+        expect(deleteEvent?.record.target).toHaveProperty('id')
     })
 })
 

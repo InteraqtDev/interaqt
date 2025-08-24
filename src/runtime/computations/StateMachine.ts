@@ -1,4 +1,4 @@
-import { StateMachine, StateMachineInstance, StateNodeInstance } from "@shared";
+import { Relation, StateMachine, StateMachineInstance, StateNodeInstance } from "@shared";
 import { Controller } from "../Controller.js";
 import { EntityIdRef, RecordMutationEvent } from '../System.js';
 import { INTERACTION_RECORD } from "../activity/ActivityManager.js";
@@ -147,10 +147,12 @@ export class RecordStateMachineHandle implements EventBasedComputation {
     eventDeps: {[key: string]: EventDep} = {}
     defaultState: StateNodeInstance
     dataContext: EntityDataContext
+    isRelation: boolean
     constructor(public controller: Controller, public args: StateMachineInstance, dataContext: DataContext) {
         this.transitionFinder = new TransitionFinder(this.args)
         this.defaultState = this.args.defaultState
         this.dataContext = dataContext as EntityDataContext
+        this.isRelation = this.dataContext.id instanceof Relation
     }
     createState() {
         return {
@@ -211,7 +213,15 @@ export class RecordStateMachineHandle implements EventBasedComputation {
                 }
             }
         } else {
+            // 这个时候 dirtyRecord 是 computeTarget 继续算出来的要创建的新关系
             if (nextValue) {
+
+                assert(!(this.isRelation && (dirtyRecord.source?.id===undefined || dirtyRecord.target?.id===undefined)), 
+                    `
+${this.dataContext.id.name} StateMachine transfer from ${currentStateName} to ${nextState.name} will create new relation, 
+it requires both source and target id, but your computeTarget function returned ${JSON.stringify(dirtyRecord)}`
+                )
+                
                 return {
                     type: 'insert',
                     data: {

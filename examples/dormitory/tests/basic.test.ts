@@ -524,13 +524,21 @@ describe('Basic Functionality', () => {
       undefined,
       ['id', 'name']
     )
+
+    const bed = await system.storage.findOne(
+      'Bed',
+      MatchExp.atom({ key: 'dormitory.id', value: ['=', dormitory.id] }),
+      undefined,
+      ['id']
+    )
     
     // Assign user to dormitory
     await controller.callInteraction('AssignUserToDormitory', {
       user: { id: 'admin1', role: 'admin' },
       payload: {
         userId: user.id,
-        dormitoryId: dormitory.id
+        dormitoryId: dormitory.id,
+        bedId: bed.id
       }
     })
     
@@ -574,7 +582,8 @@ describe('Basic Functionality', () => {
       user: { id: 'admin1', role: 'admin' },
       payload: {
         userId: user.id,
-        dormitoryId: dormitory.id
+        dormitoryId: dormitory.id,
+        bedId: bed.id
       }
     })
     
@@ -1044,12 +1053,20 @@ describe('Basic Functionality', () => {
       undefined,
       ['id']
     )
+
+    const bed = await system.storage.findOne(
+      'Bed',
+      MatchExp.atom({ key: 'dormitory.id', value: ['=', dorm.id] }),
+      undefined,
+      ['id']
+    )
     
     await controller.callInteraction('AssignUserToDormitory', {
       user: admin,
       payload: {
         userId: student.id,
-        dormitoryId: dorm.id
+        dormitoryId: dorm.id,
+        bedId: bed.id
       }
     })
     
@@ -4100,12 +4117,18 @@ describe('Basic Functionality', () => {
     )
     
     // Step 3: Assign first user to the dormitory
+    const bed = await system.storage.findOne(
+      'Bed',
+      MatchExp.atom({ key: 'dormitory.id', value: ['=', dormitory.id] }),
+      undefined,
+      ['id']
+    )
     await controller.callInteraction('AssignUserToDormitory', {
       user: systemAdmin,
       payload: {
         userId: user1.id,
-        dormitoryId: dormitory.id
-        // bedId is optional, will be assigned automatically
+        dormitoryId: dormitory.id,
+        bedId: bed.id
       }
     })
     
@@ -4122,12 +4145,18 @@ describe('Basic Functionality', () => {
     expect(dormWithOneUser.availableBeds).toBe(3)
     
     // Assign second user to the dormitory
+    const bed2 = await system.storage.findOne(
+      'Bed',
+      MatchExp.atom({ key: 'dormitory.id', value: ['=', dormWithOneUser.id] }),
+      undefined,
+      ['id']
+    )
     await controller.callInteraction('AssignUserToDormitory', {
       user: systemAdmin,
       payload: {
         userId: user2.id,
-        dormitoryId: dormitory.id
-        // bedId is optional, will be assigned automatically
+        dormitoryId: dormitory.id,
+        bedId: bed2.id
       }
     })
     
