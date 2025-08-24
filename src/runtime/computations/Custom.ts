@@ -181,7 +181,7 @@ export class PropertyCustomHandle extends BaseCustomComputationHandle {
     if (args.dataDeps) {
       const recordTypeDataDeps = Object.keys(args.dataDeps!).filter(key => args.dataDeps![key].type === 'records');
       assert(recordTypeDataDeps.length === 0, `property-level custom computation dataDeps should not contain "records” type dataDeps, but got ${recordTypeDataDeps.join(', ')}
-If you want to use related entity/relation as dataDeps, please use "property" type dataDeps with args: { type: "property", property: "[sourceProperty/targetProperty in relation definition]", attributeQuery: [attributeQuery] }
+If you want to use related entity/relation as dataDeps, please use "property" type dataDeps with args: { type: "property", attributeQuery: [attributeQuery] }
 If you want to use aggregated data from all records in the entity/relation, you should define a different dict value to store the aggregated data, and then use the dict value as dataDeps.
 `)
     }

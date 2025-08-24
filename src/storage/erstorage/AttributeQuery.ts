@@ -17,17 +17,43 @@ export class AttributeQuery {
     public fullQueryTree: RecordQueryTree
     public parentLinkRecordQuery?: RecordQuery
     public id = Math.random()
+    public static mergeAttributeQueryData(attributeQueryData: AttributeQueryData, otherAttributeQueryData: AttributeQueryData): AttributeQueryData {
+
+        const allAttributeQueryData = [...attributeQueryData, ...otherAttributeQueryData]
+
+        // 如果是普通字段有相同的就忽略。没有相同的就push。
+        // 如果是对象，就要深度合并。
+        const propertyAttributes = new Set<string>(allAttributeQueryData.filter(item => typeof item === 'string'))
+
+        const recordAttributes: AttributeQueryDataRecordItem[] = allAttributeQueryData.filter(item => typeof item !== 'string')
+
+        const recordAttributesByName = recordAttributes.reduce((acc, item) => {
+            const [attributeName, subQueryData] = item
+            if(acc[attributeName]) {
+                acc[attributeName] = { attributeQuery: AttributeQuery.mergeAttributeQueryData(acc[attributeName].attributeQuery!, subQueryData.attributeQuery!) }
+            } else {
+                acc[attributeName] = subQueryData
+            }
+            return acc
+        }, {} as Record<string, RecordQueryData>)
+
+        return [
+            ...propertyAttributes, 
+            ...Object.entries(recordAttributesByName)
+        ]
+
+
+    }
     public static getAttributeQueryDataForRecord(
         recordName:string, map: EntityToTableMap,
-        includeSameTableReliance = false,
-        includeMergedRecordAttribute = false,
-        includeManagedRecordAttributes = false, // link record 的 source/target 字段
-        includeNotRelianceCombined: boolean = false
+        includeSameTableReliance?: boolean,
+        includeMergedRecordAttribute?: boolean,
+        includeManagedRecordAttributes?: boolean, // link record 的 source/target 字段
+        includeNotRelianceCombined?: boolean
     ): AttributeQueryData{
         const inputRecordInfo = map.getRecordInfo(recordName)
         const recordInfo = inputRecordInfo.resolvedBaseRecordName ? map.getRecordInfo(inputRecordInfo.resolvedBaseRecordName) : inputRecordInfo
-
-        const result: AttributeQueryData = recordInfo.valueAttributes.map(info => info.attributeName)
+        let result: AttributeQueryData = recordInfo.valueAttributes.map(info => info.attributeName)
 
         // FIXME 再想想以下几个参数的递归查询，特别是关系上的数据。
         if(includeSameTableReliance) {
@@ -45,7 +71,7 @@ export class AttributeQuery {
                     attributeQueryItem[1].attributeQuery!.push([LINK_SYMBOL, { attributeQuery: relianceRelationAttributeQueryData }])
                 }
 
-                result.push(attributeQueryItem)
+                result = AttributeQuery.mergeAttributeQueryData(result, [attributeQueryItem])
             })
         }
 
@@ -75,34 +101,35 @@ export class AttributeQuery {
                     attributeQueryItem[1].attributeQuery!.push([LINK_SYMBOL, { attributeQuery: relianceRelationAttributeQueryData }])
                 }
 
-                result.push(attributeQueryItem)
+                result = AttributeQuery.mergeAttributeQueryData(result, [attributeQueryItem])
             })
         }
 
         if(includeMergedRecordAttribute) {
             recordInfo.mergedRecordAttributes.forEach(info =>{
                 const relianceRelationAttributeQueryData = AttributeQuery.getAttributeQueryDataForRecord(info.linkName, map, includeSameTableReliance, true)
-                result.push(
+                result = AttributeQuery.mergeAttributeQueryData(result, [
                     [
                         info.attributeName,
                         {
                             attributeQuery: ['id', [LINK_SYMBOL, { attributeQuery: relianceRelationAttributeQueryData }]]
                         }
                     ]
-                )
+                ])
             })
         }
         // link record 的 source/target 字段
         if (includeManagedRecordAttributes) {
             recordInfo.managedRecordAttributes.forEach(info => {
-                result.push(
+                result = AttributeQuery.mergeAttributeQueryData(result, [
                     [
                         info.attributeName,
                         {
                             attributeQuery: ['id']
                         }
                     ]
-                )
+                ])
+                console.log(result)
             })
         }
 

@@ -662,7 +662,7 @@
           "interactionDependencies": [],
           "reasoning": "Complex logic combining property and relation existence",
           "calculationMethod": "role === 'dormHead' && exists DormitoryDormHeadRelation where target = this user",
-          "completed": false
+          "completed": true
         },
         {
           "id": "Dormitory.occupancy",
@@ -680,7 +680,7 @@
           "interactionDependencies": [],
           "reasoning": "Counting related entities",
           "calculationMethod": "Count of UserDormitoryRelation where target = this dormitory",
-          "completed": false
+          "completed": true
         },
         {
           "id": "Dormitory.hasDormHead",
@@ -698,7 +698,8 @@
           "interactionDependencies": [],
           "reasoning": "Checking existence of relation",
           "calculationMethod": "exists DormitoryDormHeadRelation where source = this dormitory",
-          "completed": false
+          "completed": true,
+          "workaround": "Due to n:1 relation limitation (Any only works with x:n relations), the hasDormHead property doesn't have a computation. Instead, check dormHead property directly for null/undefined. See docs/errors/dormitory-hasdormhead-error.md"
         },
         {
           "id": "Bed.assignedAt",
@@ -718,7 +719,7 @@
           ],
           "reasoning": "Modified by interactions",
           "calculationMethod": "Set to current timestamp when user assigned, null when unassigned",
-          "completed": false
+          "completed": true
         },
         {
           "id": "Bed.updatedAt",
@@ -739,7 +740,7 @@
           ],
           "reasoning": "Updated by interactions",
           "calculationMethod": "Updated to current timestamp on any modification",
-          "completed": false
+          "completed": true
         }
       ],
       "description": "Phase 3: 6 property computation(s), 2 relation computation(s)"
@@ -763,7 +764,7 @@
           "interactionDependencies": [],
           "reasoning": "Simple derivation from own property",
           "calculationMethod": "totalPoints >= 30",
-          "completed": false
+          "completed": true
         },
         {
           "id": "Dormitory.availableBeds",
@@ -783,7 +784,7 @@
           "interactionDependencies": [],
           "reasoning": "Simple calculation from own properties",
           "calculationMethod": "capacity - occupancy",
-          "completed": false
+          "completed": true
         },
         {
           "id": "Bed.status",
@@ -807,14 +808,14 @@
           ],
           "reasoning": "Modified by interactions with state transitions",
           "calculationMethod": "Set to 'occupied' when UserBedRelation exists, 'available' when no relation, can be set to 'maintenance' by admin",
-          "completed": false
+          "completed": true
         },
         {
           "id": "RemovalRequest.totalPoints",
           "type": "property",
           "entityName": "RemovalRequest",
           "propertyName": "totalPoints",
-          "computationType": "Custom",
+          "computationType": "Transform",
           "dependencies": [
             "RemovalRequestTargetRelation",
             "User.totalPoints"
@@ -827,8 +828,9 @@
           ],
           "interactionDependencies": [],
           "reasoning": "Requires accessing related user's property at creation",
-          "calculationMethod": "Copy of target User.totalPoints at creation time",
-          "completed": false
+          "calculationMethod": "Copy of target User.totalPoints at creation time - handled in RemovalRequest Transform",
+          "completed": true,
+          "implementation_note": "Implemented within RemovalRequest Transform computation to capture value at creation time"
         }
       ],
       "description": "Phase 4: 4 property computation(s)"
@@ -854,7 +856,7 @@
           "interactionDependencies": [],
           "reasoning": "Complex logic combining property and relation existence",
           "calculationMethod": "status === 'available' && !exists UserBedRelation",
-          "completed": false
+          "completed": true
         }
       ],
       "description": "Phase 5: 1 property computation(s)"

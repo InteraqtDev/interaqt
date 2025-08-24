@@ -1025,7 +1025,7 @@ Custom.create(config: CustomConfig): CustomInstance
   ): Promise<any>
   ```
 - `config.dataDeps` (object, optional): Data dependency configuration, format: `{[key: string]: DataDep}`. 
-  - For Property computation: use `type: 'property'` with `property: 'relationPropertyName'`
+  - For Property computation: use `type: 'property'` with `attributeQuery` to access current record and its relations
   - For Dictionary computation: use `type: 'records'` with `source: EntityName`
   - For accessing dictionaries: use `type: 'global'` with `source: DictionaryInstance`
 - `config.useLastValue` (boolean, optional): Whether to use last computed value in incremental computation
@@ -1234,8 +1234,7 @@ const User = Entity.create({
                 dataDeps: {
                     self: {
                         type: 'property',
-                        property: '_self',  // Special keyword for current record
-                        attributeQuery: ['score']
+                        attributeQuery: ['score']  // Access current record's score property
                     },
                     levelConfig: {
                         type: 'global',
@@ -1271,14 +1270,17 @@ const Order = Entity.create({
             computation: Custom.create({
                 name: 'OrderTotalCalculator',
                 dataDeps: {
-                    items: {
-                        type: 'property',  // Access via relation property
-                        property: 'items',  // Property defined by OrderItemRelation
-                        attributeQuery: ['price', 'quantity', 'discount']
+                    orderData: {
+                        type: 'property',
+                        attributeQuery: [
+                            ['items', {  // Access related items through nested query
+                                attributeQuery: ['price', 'quantity', 'discount']
+                            }]
+                        ]
                     }
                 },
                 compute: async function(dataDeps, record) {
-                    const items = dataDeps.items || [];
+                    const items = dataDeps.orderData?.items || [];
                     return items.reduce((total, item) => {
                         const price = item.price || 0;
                         const quantity = item.quantity || 1;
@@ -1302,23 +1304,28 @@ const Order = Entity.create({
 
 4. **Flexible Data Dependencies**: Configure complex data dependencies including:
    - `type: 'records'`: Fetch all entity/relation records globally (for Dictionary/global computations)
-   - `type: 'property'`: Access related entities through relation properties (for Property computations)
+   - `type: 'property'`: Access current record's data including relations via nested attributeQuery (for Property computations)
    - `type: 'global'`: Access global dictionary values
 
 **🔴 CRITICAL: dataDeps type Configuration**
 
 **For Property-level Custom computation:**
-- Use `type: 'property'` to access related entities through relations
-- Specify `property: 'propertyName'` where propertyName is defined by the relation
+- Use `type: 'property'` to access the current record's data
+- Use nested attributeQuery to access related entities through relations
 - Example: If you have a UserPostRelation with `sourceProperty: 'posts'`, use:
   ```typescript
   dataDeps: {
-    posts: {
-      type: 'property',  // NOT 'records'!
-      property: 'posts',  // Relation property name
-      attributeQuery: ['title', 'status']
+    currentRecord: {
+      type: 'property',
+      attributeQuery: [
+        'id', 'name',  // Current record's own properties
+        ['posts', {  // Access related entities through nested query
+          attributeQuery: ['title', 'status']
+        }]
+      ]
     }
   }
+  // Then access in compute: dataDeps.currentRecord.posts
   ```
 
 **For Dictionary-level Custom computation:**
@@ -1344,7 +1351,7 @@ const Order = Entity.create({
 1. **Always provide `getDefaultValue`**: This ensures the computation has a valid initial value
 2. **Use appropriate context type**: Global computations for system-wide values, property computations for entity-specific values
 3. **Use correct dataDeps type**: 
-   - `type: 'property'` for accessing related entities in Property computations
+   - `type: 'property'` for accessing current record data in Property computations (use nested attributeQuery for relations)
    - `type: 'records'` for global queries in Dictionary computations
    - Never use `type: 'records'` in Property computations (won't access the specific record's relations)
 4. **Handle missing data gracefully**: Check for null/undefined in dataDeps

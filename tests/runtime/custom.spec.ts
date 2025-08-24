@@ -793,4 +793,349 @@ describe('Custom computation', () => {
     expect(stats.hybridOnlineAttendees).toBe(0);
     expect(stats.totalAttendees).toBe(680);
   });
+
+  test('should support property type dataDeps for same record properties', async () => {
+    // Create entity with computed properties depending on other properties
+    const Product = Entity.create({
+      name: 'Product',
+      properties: [
+        Property.create({ name: 'name', type: 'string' }),
+        Property.create({ name: 'basePrice', type: 'number' }),
+        Property.create({ name: 'taxRate', type: 'number', defaultValue: () => 0.1 }),
+        Property.create({ name: 'discount', type: 'number', defaultValue: () => 0 }),
+        Property.create({ 
+          name: 'finalPrice',
+          type: 'number',
+          computation: Custom.create({
+            name: 'FinalPriceCalculator',
+            dataDeps: {
+              _current: {
+                type: 'property',
+                attributeQuery: ['basePrice', 'taxRate', 'discount']
+              }
+            },
+            compute: async function(this: Controller, dataDeps: any, record: any) {
+              console.log('FinalPriceCalculator compute called with dataDeps:', dataDeps);
+              const basePrice = dataDeps._current?.basePrice || 0;
+              const taxRate = dataDeps._current?.taxRate || 0;
+              const discount = dataDeps._current?.discount || 0;
+              
+              // Calculate final price: basePrice * (1 + taxRate) * (1 - discount)
+              const priceWithTax = basePrice * (1 + taxRate);
+              const finalPrice = priceWithTax * (1 - discount);
+              
+              console.log('Calculated finalPrice:', finalPrice, 'from basePrice:', basePrice, 'taxRate:', taxRate, 'discount:', discount);
+              return Math.round(finalPrice * 100) / 100; // Round to 2 decimal places
+            },
+            getDefaultValue: function() {
+              return 0;
+            }
+          })
+        }),
+        Property.create({
+          name: 'priceDescription',
+          type: 'string',
+          computation: Custom.create({
+            name: 'PriceDescriptionGenerator',
+            dataDeps: {
+              _self: {
+                type: 'property',
+                attributeQuery: ['name', 'basePrice', 'finalPrice', 'discount']
+              }
+            },
+            compute: async function(this: Controller, dataDeps: any, record: any) {
+              console.log('PriceDescriptionGenerator compute called with dataDeps:', dataDeps);
+              const name = dataDeps._self?.name || 'Unknown Product';
+              const basePrice = dataDeps._self?.basePrice || 0;
+              const finalPrice = dataDeps._self?.finalPrice || 0;
+              const discount = dataDeps._self?.discount || 0;
+              
+              if (discount > 0) {
+                return `${name}: $${basePrice} -> $${finalPrice} (${Math.round(discount * 100)}% off)`;
+              } else {
+                return `${name}: $${finalPrice}`;
+              }
+            },
+            getDefaultValue: function() {
+              return '';
+            }
+          })
+        })
+      ]
+    });
+
+    // Setup system and controller
+    const system = new MonoSystem();
+    system.conceptClass = KlassByName;
+    controller = new Controller({
+      system: system,
+      entities: [Product],
+      dict: [],
+      relations: [],
+      activities: [],
+      interactions: []
+    });
+    await controller.setup(true);
+
+    // Create product with base price
+    const product1 = await system.storage.create('Product', {
+      name: 'Laptop',
+      basePrice: 1000,
+      taxRate: 0.08,
+      discount: 0.15
+    });
+
+    // Wait for computation
+    await new Promise(resolve => setTimeout(resolve, 300));
+
+    // Check computed values
+    const result1 = await system.storage.findOne(
+      'Product',
+      MatchExp.atom({ key: 'id', value: ['=', product1.id] }),
+      undefined,
+      ['name', 'basePrice', 'taxRate', 'discount', 'finalPrice', 'priceDescription']
+    );
+
+    console.log('Product after creation:', result1);
+    
+    // finalPrice should be: 1000 * 1.08 * 0.85 = 918
+    expect(result1.finalPrice).toBe(918);
+    expect(result1.priceDescription).toBe('Laptop: $1000 -> $918 (15% off)');
+
+    // Update discount
+    await system.storage.update(
+      'Product',
+      MatchExp.atom({ key: 'id', value: ['=', product1.id] }),
+      { discount: 0.25 }
+    );
+
+    // Wait for recomputation
+    await new Promise(resolve => setTimeout(resolve, 300));
+
+    const result2 = await system.storage.findOne(
+      'Product',
+      MatchExp.atom({ key: 'id', value: ['=', product1.id] }),
+      undefined,
+      ['finalPrice', 'priceDescription']
+    );
+
+    console.log('Product after discount update:', result2);
+    
+    // finalPrice should be: 1000 * 1.08 * 0.75 = 810
+    expect(result2.finalPrice).toBe(810);
+    expect(result2.priceDescription).toBe('Laptop: $1000 -> $810 (25% off)');
+
+    // Create product without discount
+    const product2 = await system.storage.create('Product', {
+      name: 'Mouse',
+      basePrice: 25,
+      taxRate: 0.05
+    });
+
+    // Wait for computation
+    await new Promise(resolve => setTimeout(resolve, 300));
+
+    const result3 = await system.storage.findOne(
+      'Product',
+      MatchExp.atom({ key: 'id', value: ['=', product2.id] }),
+      undefined,
+      ['finalPrice', 'priceDescription']
+    );
+
+    console.log('Product without discount:', result3);
+    
+    // finalPrice should be: 25 * 1.05 = 26.25
+    expect(result3.finalPrice).toBe(26.25);
+    expect(result3.priceDescription).toBe('Mouse: $26.25');
+  });
+
+  test('should support property type dataDeps with relations', async () => {
+    // Create entities
+    const Department = Entity.create({
+      name: 'Department',
+      properties: [
+        Property.create({ name: 'name', type: 'string' }),
+        Property.create({ name: 'budget', type: 'number' })
+      ]
+    });
+
+    const Employee = Entity.create({
+      name: 'Employee',
+      properties: [
+        Property.create({ name: 'name', type: 'string' }),
+        Property.create({ name: 'salary', type: 'number' }),
+        Property.create({ name: 'position', type: 'string' }),
+        Property.create({
+          name: 'departmentInfo',
+          type: 'string',
+          computation: Custom.create({
+            name: 'DepartmentInfoGenerator',
+            dataDeps: {
+              _current: {
+                type: 'property',
+                // Access the department through the relation
+                attributeQuery: ['name', 'position', ['department', { attributeQuery: ['name', 'budget'] }]]
+              }
+            },
+            compute: async function(this: Controller, dataDeps: any, record: any) {
+              console.log('DepartmentInfoGenerator compute called with dataDeps:', dataDeps);
+              const employeeName = dataDeps._current?.name || 'Unknown';
+              const position = dataDeps._current?.position || 'Unknown Position';
+              const department = dataDeps._current?.department;
+              
+              if (department) {
+                return `${employeeName} (${position}) works in ${department.name} department with budget $${department.budget}`;
+              } else {
+                return `${employeeName} (${position}) - No department assigned`;
+              }
+            },
+            getDefaultValue: function() {
+              return 'No department info';
+            }
+          })
+        }),
+        Property.create({
+          name: 'salaryPercentageOfBudget',
+          type: 'number',
+          computation: Custom.create({
+            name: 'SalaryPercentageCalculator',
+            dataDeps: {
+              _self: {
+                type: 'property',
+                attributeQuery: ['salary', ['department', { attributeQuery: ['budget'] }]]
+              }
+            },
+            compute: async function(this: Controller, dataDeps: any, record: any) {
+              console.log('SalaryPercentageCalculator compute called with dataDeps:', dataDeps);
+              const salary = dataDeps._self?.salary || 0;
+              const departmentBudget = dataDeps._self?.department?.budget || 0;
+              
+              if (departmentBudget > 0) {
+                const percentage = (salary / departmentBudget) * 100;
+                return Math.round(percentage * 100) / 100; // Round to 2 decimal places
+              }
+              return 0;
+            },
+            getDefaultValue: function() {
+              return 0;
+            }
+          })
+        })
+      ]
+    });
+
+    // Create relation
+    const EmploymentRelation = Relation.create({
+      name: 'EmploymentRelation',
+      source: Employee,
+      target: Department,
+      sourceProperty: 'department',
+      targetProperty: 'employees',
+      type: 'n:1'
+    });
+
+    // Setup system and controller
+    const system = new MonoSystem();
+    system.conceptClass = KlassByName;
+    controller = new Controller({
+      system: system,
+      entities: [Department, Employee],
+      dict: [],
+      relations: [EmploymentRelation],
+      activities: [],
+      interactions: []
+    });
+    await controller.setup(true);
+
+    // Create department
+    const department1 = await system.storage.create('Department', {
+      name: 'Engineering',
+      budget: 1000000
+    });
+
+    // Create employee without department
+    const employee1 = await system.storage.create('Employee', {
+      name: 'Alice',
+      salary: 120000,
+      position: 'Senior Developer'
+    });
+
+    // Wait for computation
+    await new Promise(resolve => setTimeout(resolve, 300));
+
+    // Check computed values before adding relation
+    let result1 = await system.storage.findOne(
+      'Employee',
+      MatchExp.atom({ key: 'id', value: ['=', employee1.id] }),
+      undefined,
+      ['departmentInfo', 'salaryPercentageOfBudget']
+    );
+
+    console.log('Employee without department:', result1);
+    expect(result1.departmentInfo).toBe('Alice (Senior Developer) - No department assigned');
+    expect(result1.salaryPercentageOfBudget).toBe(0);
+
+    // Add employee to department
+    await system.storage.addRelationByNameById('EmploymentRelation', employee1.id, department1.id, {});
+
+    // Wait for recomputation
+    await new Promise(resolve => setTimeout(resolve, 300));
+
+    // Check computed values after adding relation
+    result1 = await system.storage.findOne(
+      'Employee',
+      MatchExp.atom({ key: 'id', value: ['=', employee1.id] }),
+      undefined,
+      ['departmentInfo', 'salaryPercentageOfBudget']
+    );
+
+    console.log('Employee with department:', result1);
+    expect(result1.departmentInfo).toBe('Alice (Senior Developer) works in Engineering department with budget $1000000');
+    expect(result1.salaryPercentageOfBudget).toBe(12); // 120000 / 1000000 * 100 = 12%
+
+    // Create another employee directly with department
+    const employee2 = await system.storage.create('Employee', {
+      name: 'Bob',
+      salary: 80000,
+      position: 'Junior Developer'
+    });
+
+    await system.storage.addRelationByNameById('EmploymentRelation', employee2.id, department1.id, {});
+
+    // Wait for computation
+    await new Promise(resolve => setTimeout(resolve, 300));
+
+    const result2 = await system.storage.findOne(
+      'Employee',
+      MatchExp.atom({ key: 'id', value: ['=', employee2.id] }),
+      undefined,
+      ['departmentInfo', 'salaryPercentageOfBudget']
+    );
+
+    console.log('Second employee:', result2);
+    expect(result2.departmentInfo).toBe('Bob (Junior Developer) works in Engineering department with budget $1000000');
+    expect(result2.salaryPercentageOfBudget).toBe(8); // 80000 / 1000000 * 100 = 8%
+
+    // Update department budget
+    await system.storage.update(
+      'Department',
+      MatchExp.atom({ key: 'id', value: ['=', department1.id] }),
+      { budget: 500000 }
+    );
+
+    // Wait for recomputation
+    await new Promise(resolve => setTimeout(resolve, 300));
+
+    // Check if employee's computed properties are updated
+    const result3 = await system.storage.findOne(
+      'Employee',
+      MatchExp.atom({ key: 'id', value: ['=', employee1.id] }),
+      undefined,
+      ['departmentInfo', 'salaryPercentageOfBudget']
+    );
+
+    console.log('Employee after department budget update:', result3);
+    expect(result3.departmentInfo).toBe('Alice (Senior Developer) works in Engineering department with budget $500000');
+    expect(result3.salaryPercentageOfBudget).toBe(24); // 120000 / 500000 * 100 = 24%
+  });
 }); 

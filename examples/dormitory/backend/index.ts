@@ -18,7 +18,9 @@ import {
   BoolExp,
   MatchExp,
   InteractionEventEntity,
-  GetAction
+  GetAction,
+  Custom,
+  Any
 } from 'interaqt';
 
 // ============ Entity Definitions ============
@@ -66,7 +68,7 @@ const Bed = Entity.create({
     Property.create({ name: 'isAvailable', type: 'boolean' }), // Will add computation
     Property.create({ name: 'assignedAt', type: 'number' }),
     Property.create({ name: 'createdAt', type: 'number', defaultValue: () => Math.floor(Date.now()/1000) }),
-    Property.create({ name: 'updatedAt', type: 'number', defaultValue: () => Math.floor(Date.now()/1000) })
+    Property.create({ name: 'updatedAt', type: 'number' }) // No defaultValue - managed by computation
   ]
 });
 
@@ -194,6 +196,19 @@ export const relations = [
   RemovalRequestInitiatorRelation,
   RemovalRequestAdminRelation
 ];
+
+// Export relations individually for testing
+export {
+  UserDormitoryRelation,
+  UserBedRelation,
+  DormitoryBedRelation,
+  DormitoryDormHeadRelation,
+  UserPointDeductionRelation,
+  DeductionIssuerRelation,
+  RemovalRequestTargetRelation,
+  RemovalRequestInitiatorRelation,
+  RemovalRequestAdminRelation
+};
 
 // ============ Interaction Definitions ============
 
@@ -523,6 +538,7 @@ Bed.computation = Transform.create({
       beds.push({
         bedNumber: `${i}`,
         status: 'available',
+        assignedAt: null,  // Initially not assigned
         dormitory: { id: dormitory.id },  // Reference to the dormitory (creates relation automatically)
         createdAt: Math.floor(Date.now()/1000),
         updatedAt: Math.floor(Date.now()/1000)
@@ -573,12 +589,25 @@ RemovalRequest.computation = Transform.create({
     'payload',
     'user'
   ],
-  callback: function(event) {
+  callback: async function(this: Controller, event) {
     // Handle InitiateRemovalRequest interaction
     if (event.interactionName === 'InitiateRemovalRequest') {
+      // Get the target user's totalPoints at creation time
+      const targetUser = await this.system.storage.findOne(
+        'User',
+        BoolExp.atom({ key: 'id', value: ['=', event.payload.userId] }),
+        undefined,
+        ['id', 'totalPoints']
+      );
+      
+      const totalPoints = targetUser && typeof targetUser.totalPoints === 'number' 
+        ? targetUser.totalPoints 
+        : 0;
+      
       return {
         reason: event.payload.reason,
         status: 'pending',  // Default status when created
+        totalPoints: totalPoints,  // Capture user's totalPoints at creation time
         // adminComment and processedAt are handled by defaultValue in property definition
         createdAt: Math.floor(Date.now()/1000),
         updatedAt: Math.floor(Date.now()/1000),
@@ -1624,4 +1653,456 @@ UserBedRelation.computation = StateMachine.create({
 User.properties.find(p => p.name === 'totalPoints').computation = Summation.create({
   property: 'pointDeductions',  // Use property name from UserPointDeductionRelation
   attributeQuery: ['points']  // Sum the 'points' field from PointDeduction entities
+});
+
+// User.isDormHead computation - Custom (check role and DormitoryDormHeadRelation existence)
+User.properties.find(p => p.name === 'isDormHead').computation = Custom.create({
+  name: 'UserIsDormHeadChecker',
+  dataDeps: {
+    self: {
+      type: 'property',
+      attributeQuery: [
+        'role',
+        ['managedDormitory', { attributeQuery: ['id'] }]  // Access the relation
+      ]
+    }
+  },
+  compute: async function(dataDeps, record) {
+    // Check if user has 'dormHead' role and has a managed dormitory
+    const userRole = dataDeps.self?.role;
+    const managedDormitory = dataDeps.self?.managedDormitory;
+    
+    // For a user to be a dormHead, they must:
+    // 1. Have the 'dormHead' role
+    // 2. Have at least one managedDormitory relation
+    const hasManagedDormitory = Array.isArray(managedDormitory) && managedDormitory.length > 0;
+    const result = userRole === 'dormHead' && hasManagedDormitory;
+    
+    return result;
+  },
+  getDefaultValue: function() {
+    return false;
+  }
+});
+
+// Dormitory.occupancy computation - Count (count of UserDormitoryRelation where target = this dormitory)
+Dormitory.properties.find(p => p.name === 'occupancy').computation = Count.create({
+  property: 'users'  // Use property name from UserDormitoryRelation targetProperty
+});
+
+// Dormitory.hasDormHead - Remove computation and check dormHead directly
+// Note: Due to limitations with n:1 relations and computations, we'll check dormHead directly
+// The hasDormHead property will be computed based on whether dormHead exists
+// This is a workaround - ideally this would be handled by a proper computation
+
+// Bed.assignedAt StateMachine computation - tracks when a user is assigned to a bed
+const bedNotAssignedState = StateNode.create({
+  name: 'notAssigned',
+  computeValue: () => null  // No assignment timestamp
+});
+
+const bedAssignedState = StateNode.create({
+  name: 'assigned',
+  computeValue: () => Math.floor(Date.now() / 1000)  // Set current timestamp when assigned
+});
+
+const BedAssignmentStateMachine = StateMachine.create({
+  states: [bedNotAssignedState, bedAssignedState],
+  transfers: [
+    // Transition to assigned when user is assigned to dormitory with a bed
+    StateTransfer.create({
+      trigger: AssignUserToDormitory,
+      current: bedNotAssignedState,
+      next: bedAssignedState,
+      computeTarget: async function(this: Controller, event) {
+        // Only process if bedId is provided
+        if (!event.payload.bedId) {
+          return null;
+        }
+        
+        // Return the bed that's being assigned
+        const bed = await this.system.storage.findOne(
+          'Bed',
+          BoolExp.atom({ key: 'id', value: ['=', event.payload.bedId] }),
+          undefined,
+          ['id']
+        );
+        
+        return bed;
+      }
+    }),
+    // Transition to not assigned when user is removed from dormitory
+    StateTransfer.create({
+      trigger: RemoveUserFromDormitory,
+      current: bedAssignedState,
+      next: bedNotAssignedState,
+      computeTarget: async function(this: Controller, event) {
+        // Find all beds and check which one has this user as occupant
+        // We need to check all beds because the relation might be in process of deletion
+        const allBeds = await this.system.storage.find(
+          'Bed',
+          undefined,
+          undefined,
+          ['id', 'assignedAt']
+        );
+        
+        // For each bed, check if it has the user as occupant
+        for (const bed of allBeds) {
+          // Only check beds that are currently assigned (have assignedAt)
+          if (bed.assignedAt) {
+            // Check if this bed is occupied by the user being removed
+            const bedWithOccupant = await this.system.storage.findOne(
+              'Bed',
+              BoolExp.atom({ key: 'id', value: ['=', bed.id] }),
+              undefined,
+              [
+                'id',
+                ['occupant', { attributeQuery: ['id'] }]
+              ]
+            );
+            
+            if (bedWithOccupant?.occupant?.id === event.payload.userId) {
+              return bedWithOccupant;  // Return the bed to update
+            }
+          }
+        }
+        
+        return null;  // No bed found for this user
+      }
+    }),
+    // Also transition to not assigned when removal request is approved
+    StateTransfer.create({
+      trigger: ProcessRemovalRequest,
+      current: bedAssignedState,
+      next: bedNotAssignedState,
+      computeTarget: async function(this: Controller, event) {
+        // Only process if the request is approved
+        if (event.payload.decision !== 'approved') {
+          return null;
+        }
+        
+        // Find the removal request to get the target user
+        const removalRequest = await this.system.storage.findOne(
+          'RemovalRequest',
+          BoolExp.atom({ key: 'id', value: ['=', event.payload.requestId] }),
+          undefined,
+          [
+            'id',
+            ['targetUser', { attributeQuery: ['id'] }]
+          ]
+        );
+        
+        if (!removalRequest || !removalRequest.targetUser) {
+          return null;
+        }
+        
+        // Find all beds and check which one has this user as occupant
+        const allBeds = await this.system.storage.find(
+          'Bed',
+          undefined,
+          undefined,
+          ['id', 'assignedAt']
+        );
+        
+        // For each bed, check if it has the user as occupant
+        for (const bed of allBeds) {
+          // Only check beds that are currently assigned (have assignedAt)
+          if (bed.assignedAt) {
+            // Check if this bed is occupied by the user being removed
+            const bedWithOccupant = await this.system.storage.findOne(
+              'Bed',
+              BoolExp.atom({ key: 'id', value: ['=', bed.id] }),
+              undefined,
+              [
+                'id',
+                ['occupant', { attributeQuery: ['id'] }]
+              ]
+            );
+            
+            if (bedWithOccupant?.occupant?.id === removalRequest.targetUser.id) {
+              return bedWithOccupant;  // Return the bed to update
+            }
+          }
+        }
+        
+        return null;  // No bed found for this user
+      }
+    })
+  ],
+  defaultState: bedNotAssignedState
+});
+
+// Apply the StateMachine to Bed.assignedAt property
+Bed.properties.find(p => p.name === 'assignedAt').computation = BedAssignmentStateMachine;
+
+// Bed.updatedAt StateMachine computation - tracks when bed information is modified
+const bedUpdatedAtInitialState = StateNode.create({
+  name: 'bedInitial',
+  computeValue: () => null  // Initial state has no update timestamp
+});
+
+const bedUpdatedAtUpdatedState = StateNode.create({
+  name: 'bedUpdated',
+  computeValue: () => Math.floor(Date.now() / 1000)  // Set current timestamp when updated
+});
+
+const BedUpdatedAtStateMachine = StateMachine.create({
+  states: [bedUpdatedAtInitialState, bedUpdatedAtUpdatedState],
+  defaultState: bedUpdatedAtInitialState,
+  transfers: [
+    // AssignUserToDormitory updates timestamp (initial -> updated)
+    StateTransfer.create({
+      trigger: AssignUserToDormitory,
+      current: bedUpdatedAtInitialState,
+      next: bedUpdatedAtUpdatedState,
+      computeTarget: async function(this: Controller, event) {
+        // Only process if bedId is provided
+        if (!event.payload.bedId) {
+          return null;
+        }
+        
+        // Return the bed that's being updated
+        const bed = await this.system.storage.findOne(
+          'Bed',
+          BoolExp.atom({ key: 'id', value: ['=', event.payload.bedId] }),
+          undefined,
+          ['id']
+        );
+        
+        return bed;
+      }
+    }),
+    // AssignUserToDormitory updates timestamp (updated -> updated)
+    StateTransfer.create({
+      trigger: AssignUserToDormitory,
+      current: bedUpdatedAtUpdatedState,
+      next: bedUpdatedAtUpdatedState,
+      computeTarget: async function(this: Controller, event) {
+        // Only process if bedId is provided
+        if (!event.payload.bedId) {
+          return null;
+        }
+        
+        // Return the bed that's being updated
+        const bed = await this.system.storage.findOne(
+          'Bed',
+          BoolExp.atom({ key: 'id', value: ['=', event.payload.bedId] }),
+          undefined,
+          ['id']
+        );
+        
+        return bed;
+      }
+    }),
+    // RemoveUserFromDormitory updates timestamp (initial -> updated)
+    StateTransfer.create({
+      trigger: RemoveUserFromDormitory,
+      current: bedUpdatedAtInitialState,
+      next: bedUpdatedAtUpdatedState,
+      computeTarget: async function(this: Controller, event) {
+        // Find the UserBedRelation to identify which bed is being freed
+        const userBedRelations = await this.system.storage.find(
+          UserBedRelation.name,
+          BoolExp.atom({ key: 'source.id', value: ['=', event.payload.userId] }),
+          undefined,
+          [
+            'id',
+            ['target', { attributeQuery: ['id'] }]
+          ]
+        );
+        
+        // If we found a relation, return the bed to update
+        if (userBedRelations.length > 0 && userBedRelations[0].target) {
+          return { id: userBedRelations[0].target.id };
+        }
+        
+        return null;  // No bed found for this user
+      }
+    }),
+    // RemoveUserFromDormitory updates timestamp (updated -> updated)
+    StateTransfer.create({
+      trigger: RemoveUserFromDormitory,
+      current: bedUpdatedAtUpdatedState,
+      next: bedUpdatedAtUpdatedState,
+      computeTarget: async function(this: Controller, event) {
+        // Find the UserBedRelation to identify which bed is being freed
+        const userBedRelations = await this.system.storage.find(
+          UserBedRelation.name,
+          BoolExp.atom({ key: 'source.id', value: ['=', event.payload.userId] }),
+          undefined,
+          [
+            'id',
+            ['target', { attributeQuery: ['id'] }]
+          ]
+        );
+        
+        // If we found a relation, return the bed to update
+        if (userBedRelations.length > 0 && userBedRelations[0].target) {
+          return { id: userBedRelations[0].target.id };
+        }
+        
+        return null;  // No bed found for this user
+      }
+    })
+  ]
+});
+
+// Apply the StateMachine to Bed.updatedAt property
+Bed.properties.find(p => p.name === 'updatedAt').computation = BedUpdatedAtStateMachine;
+
+// User.isRemovable computation - computed (totalPoints >= 30)
+User.properties.find(p => p.name === 'isRemovable').computed = function(user) {
+  return user.totalPoints >= 30;
+};
+
+// Dormitory.availableBeds computation - computed (capacity - occupancy)
+Dormitory.properties.find(p => p.name === 'availableBeds').computed = function(dormitory) {
+  // Handle case where occupancy might be undefined or null initially
+  const occupancy = dormitory.occupancy ?? 0;
+  return dormitory.capacity - occupancy;
+};
+
+// Bed.status StateMachine computation - tracks bed state transitions
+const bedAvailableState = StateNode.create({
+  name: 'available',
+  computeValue: () => 'available'  // Bed is available for assignment
+});
+
+const bedOccupiedState = StateNode.create({
+  name: 'occupied',
+  computeValue: () => 'occupied'  // Bed is occupied by a user
+});
+
+const bedMaintenanceState = StateNode.create({
+  name: 'maintenance',
+  computeValue: () => 'maintenance'  // Bed is under maintenance (not currently used)
+});
+
+const BedStatusStateMachine = StateMachine.create({
+  states: [bedAvailableState, bedOccupiedState, bedMaintenanceState],
+  defaultState: bedAvailableState,
+  transfers: [
+    // Transition to occupied when user is assigned to dormitory with a bed
+    StateTransfer.create({
+      trigger: AssignUserToDormitory,
+      current: bedAvailableState,
+      next: bedOccupiedState,
+      computeTarget: async function(this: Controller, event) {
+        // Only process if bedId is provided
+        if (!event.payload.bedId) {
+          return null;
+        }
+        
+        // Return the bed that's being occupied
+        const bed = await this.system.storage.findOne(
+          'Bed',
+          BoolExp.atom({ key: 'id', value: ['=', event.payload.bedId] }),
+          undefined,
+          ['id']
+        );
+        
+        return bed;
+      }
+    }),
+    // Transition to available when user is removed from dormitory
+    StateTransfer.create({
+      trigger: RemoveUserFromDormitory,
+      current: bedOccupiedState,
+      next: bedAvailableState,
+      computeTarget: async function(this: Controller, event) {
+        // Find the UserBedRelation to identify which bed is being freed
+        const userBedRelations = await this.system.storage.find(
+          UserBedRelation.name,
+          BoolExp.atom({ key: 'source.id', value: ['=', event.payload.userId] }),
+          undefined,
+          [
+            'id',
+            ['target', { attributeQuery: ['id'] }]
+          ]
+        );
+        
+        // If we found a relation, return the bed to update
+        if (userBedRelations.length > 0 && userBedRelations[0].target) {
+          return { id: userBedRelations[0].target.id };
+        }
+        
+        return null;  // No bed found for this user
+      }
+    }),
+    // Transition to available when removal request is approved
+    StateTransfer.create({
+      trigger: ProcessRemovalRequest,
+      current: bedOccupiedState,
+      next: bedAvailableState,
+      computeTarget: async function(this: Controller, event) {
+        // Only process if the request is approved
+        if (event.payload.decision !== 'approved') {
+          return null;
+        }
+        
+        // Find the removal request to get the target user
+        const removalRequest = await this.system.storage.findOne(
+          'RemovalRequest',
+          BoolExp.atom({ key: 'id', value: ['=', event.payload.requestId] }),
+          undefined,
+          [
+            'id',
+            ['targetUser', { attributeQuery: ['id'] }]
+          ]
+        );
+        
+        if (!removalRequest || !removalRequest.targetUser) {
+          return null;
+        }
+        
+        // Find the user's bed through UserBedRelation
+        const userBedRelations = await this.system.storage.find(
+          UserBedRelation.name,
+          BoolExp.atom({ key: 'source.id', value: ['=', removalRequest.targetUser.id] }),
+          undefined,
+          [
+            'id',
+            ['target', { attributeQuery: ['id'] }]
+          ]
+        );
+        
+        // If we found a relation, return the bed to update
+        if (userBedRelations.length > 0 && userBedRelations[0].target) {
+          return { id: userBedRelations[0].target.id };
+        }
+        
+        return null;  // No bed found for this user
+      }
+    })
+  ]
+});
+
+// Apply the StateMachine to Bed.status property
+Bed.properties.find(p => p.name === 'status').computation = BedStatusStateMachine;
+
+// RemovalRequest.totalPoints is now handled directly in the Transform computation
+// No separate property computation needed since it's set at creation time and doesn't change
+
+// Bed.isAvailable Custom computation - checks if bed is available and not occupied
+Bed.properties.find(p => p.name === 'isAvailable').computation = Custom.create({
+  name: 'BedAvailabilityChecker',
+  dataDeps: {
+    selfData: {
+      type: 'property',
+      attributeQuery: [
+        'status',
+        ['occupant', { attributeQuery: ['id'] }]  // Access the occupant through the relation
+      ]
+    }
+  },
+  compute: async function(dataDeps: any, record: any) {
+    // Check if bed status is 'available'
+    const statusIsAvailable = dataDeps.selfData?.status === 'available';
+    
+    // Check if there's no occupant (UserBedRelation)
+    const hasNoOccupant = !dataDeps.selfData?.occupant;
+    
+    // Bed is available if status is 'available' AND there's no occupant
+    return statusIsAvailable && hasNoOccupant;
+  }
 });

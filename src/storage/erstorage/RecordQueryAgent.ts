@@ -915,7 +915,7 @@ ${innerQuerySQL}
     }
 
     async relocateCombinedRecordDataForLink(linkName: string, matchExpressionData: MatchExpressionData, moveSource = false, events?: RecordMutationEvent[]) {
-        const attributeQuery: AttributeQueryData = AttributeQuery.getAttributeQueryDataForRecord(linkName, this.map, true, true, false, true)
+        const attributeQuery: AttributeQueryData = AttributeQuery.getAttributeQueryDataForRecord(linkName, this.map, true, true, true, true)
         const moveAttribute = moveSource ? 'source' : 'target'
 
         const records = await this.findRecords(RecordQuery.create(linkName, this.map, {
