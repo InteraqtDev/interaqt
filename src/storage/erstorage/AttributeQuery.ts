@@ -130,7 +130,6 @@ export class AttributeQuery {
                         }
                     ]
                 ])
-                console.log(result)
             })
         }
 

@@ -171,6 +171,7 @@ export class DBConsoleLogger implements DatabaseLogger{
 
 // Define log levels for system logger
 export enum SystemLogLevel {
+    MUTE = -1,
     ERROR = 0,
     INFO = 1,
     DEBUG = 2,

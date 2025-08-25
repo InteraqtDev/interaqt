@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, test } from "vitest";
 import {
     Controller, MonoSystem,
     BoolExp, Interaction,
-    KlassByName, SQLiteDB, AttributeError
+    KlassByName, SQLiteDB, ConditionError
 } from 'interaqt';
 import { createData } from './data/leaveRequest.js';
 
@@ -112,7 +112,7 @@ describe('map interaction', () => {
 
         // should throw
         const _res2 = await controller.callInteraction(approveRequestName,  {user: userC, payload: _payload2})
-        expect(_res2.error).toBeInstanceOf(AttributeError)
+        expect(_res2.error).toBeInstanceOf(ConditionError)
         // FIXME 获取 userAttribute error 信息
 
         // 4. b 接受

@@ -25,6 +25,11 @@ export {
     SchedulerError
 } from './SystemErrors.js'
 
+// Condition errors
+export {
+    ConditionError
+} from './ConditionErrors.js'
+
 /**
  * Error utility functions
  */

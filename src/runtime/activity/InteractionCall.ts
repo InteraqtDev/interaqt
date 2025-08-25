@@ -20,6 +20,7 @@ import { RecordMutationEvent, System } from "../System.js";
 import { assert, everyWithErrorAsync, someAsync } from "../util.js";
 import { ActivityCall } from "./ActivityCall.js";
 import { Controller, InteractionContext } from "../Controller.js";
+import { ConditionError } from "../errors/index.js";
 
 export type EventQuery = {
     match?: MatchExpressionData,
@@ -73,16 +74,7 @@ type AtomError = {
 }
 
 
-export class AttributeError {
-    constructor(public type: string, public error: unknown) {
-    }
-}
 
-
-export class ConditionError {
-    constructor(public type: string, public error: EvaluateError<ConditionInstance>) {
-    }
-}
 
 type SideEffectResult = {
     result?: unknown,
@@ -130,7 +122,6 @@ export class InteractionCall {
             try {
                 result = await testFn.call(this.controller, attributiveTarget, interactionEvent)
             } catch(e) {
-                console.warn(`check function throw`, e)
                 result = false
             }
 
@@ -178,7 +169,7 @@ export class InteractionCall {
 
         if (res === true) return res
 
-        throw new AttributeError('check user failed', res)
+        throw ConditionError.userCheckFailed(res)
     }
     // 用来check attributive 形容的后面的  target 到底是不是那个概念的实例。
     async checkConcept(instance: ConceptInstance, concept: Concept, attributives?: BoolExpressionRawData<AttributiveInstance>, stack: ConceptCheckStack[] = []): Promise<ConceptCheckResponse> {
@@ -300,23 +291,23 @@ export class InteractionCall {
 
             const payloadItem = interactionEvent.payload![payloadDef.name!]
             if (payloadDef.required && !payloadItem) {
-                throw new AttributeError(`payload ${payloadDef.name} missing`, interactionEvent.payload)
+                throw ConditionError.payloadValidationFailed(payloadDef.name!, 'missing', interactionEvent.payload)
             }
 
             if (!payloadItem) return
 
 
             if (payloadDef.isCollection && !Array.isArray(payloadItem)) {
-                throw new AttributeError(`${payloadDef.name} data is not array`, payloadItem)
+                throw ConditionError.payloadValidationFailed(payloadDef.name!, 'data is not array', payloadItem)
             }
 
             if (payloadDef.isCollection) {
                 if (payloadDef.isRef && !((payloadItem as unknown[]) as {id: string}[]).every(item => !!item.id)) {
-                    throw new AttributeError(`${payloadDef.name} data not every is ref`, payloadItem)
+                    throw ConditionError.payloadValidationFailed(payloadDef.name!, 'data not every is ref', payloadItem)
                 }
             } else {
                 if (payloadDef.isRef && !(payloadItem as {id: string}).id) {
-                    throw new AttributeError(`${payloadDef.name} data is not a ref`, payloadItem)
+                    throw ConditionError.payloadValidationFailed(payloadDef.name!, 'data is not a ref', payloadItem)
                 }
             }
 
@@ -326,12 +317,12 @@ export class InteractionCall {
                 if (payloadDef.isCollection) {
                     const result = await everyWithErrorAsync(payloadItem as unknown[],(item => this.checkConcept(item, payloadDef.base as unknown as Concept)))
                     if (result !== true) {
-                        throw new AttributeError(`${payloadDef.name} check concept failed`, result)
+                        throw ConditionError.conceptCheckFailed(payloadDef.name!, result)
                     }
                 } else {
                     const result = await this.checkConcept(payloadItem, payloadDef.base as unknown as Concept)
                     if (result !== true) {
-                        throw new AttributeError(`${payloadDef.name} check concept failed`, result)
+                        throw ConditionError.conceptCheckFailed(payloadDef.name!, result)
                     }
                 }
             }
@@ -372,7 +363,7 @@ export class InteractionCall {
                     }))
 
                     if (result !== true) {
-                        throw new AttributeError(`${payloadDef.name} not every item match attribute`, fullPayloadItem)
+                        throw ConditionError.attributiveCheckFailed(payloadDef.name!, 'not every item match attribute', fullPayloadItem, result)
                     }
                 } else {
                     const handleAttribute = this.createHandleAttributive(
@@ -382,7 +373,7 @@ export class InteractionCall {
                     )
                     const result = await this.checkAttributives(attributives, handleAttribute)
                     if (result !== true ) {
-                        throw new AttributeError(`${payloadDef.name} not match attributive`, { payload: fullPayloadItem, result})
+                        throw ConditionError.attributiveCheckFailed(payloadDef.name!, 'not match attributive', fullPayloadItem, result)
                     }
                 }
             }
@@ -423,7 +414,7 @@ export class InteractionCall {
             const result =  await conditions.evaluateAsync(handleAttribute)
 
             if (result !== true ) {
-                throw new ConditionError(`condition check failed`, result)
+                throw ConditionError.conditionCheckFailed(result)
             }
         }
     }

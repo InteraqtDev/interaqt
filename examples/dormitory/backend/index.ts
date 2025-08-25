@@ -1951,16 +1951,36 @@ const BedUpdatedAtStateMachine = StateMachine.create({
 Bed.properties.find(p => p.name === 'updatedAt').computation = BedUpdatedAtStateMachine;
 
 // User.isRemovable computation - computed (totalPoints >= 30)
-User.properties.find(p => p.name === 'isRemovable').computed = function(user) {
-  return user.totalPoints >= 30;
-};
+User.properties.find(p => p.name === 'isRemovable').computation = Custom.create({
+  name: 'UserIsRemovableCalculator',
+  dataDeps: {
+    self: { 
+      type: 'property',
+      attributeQuery: ['totalPoints']
+    }
+  },
+  compute: async function(dataDeps: any, record: any) {
+    const totalPoints = dataDeps.self?.totalPoints ?? 0;
+    return totalPoints >= 30;
+  }
+});
 
 // Dormitory.availableBeds computation - computed (capacity - occupancy)
-Dormitory.properties.find(p => p.name === 'availableBeds').computed = function(dormitory) {
-  // Handle case where occupancy might be undefined or null initially
-  const occupancy = dormitory.occupancy ?? 0;
-  return dormitory.capacity - occupancy;
-};
+Dormitory.properties.find(p => p.name === 'availableBeds').computation = Custom.create({
+  name: 'DormitoryAvailableBedsCalculator',
+  dataDeps: {
+    self: { 
+      type: 'property',
+      attributeQuery: ['capacity', 'occupancy']
+    }
+  },
+  compute: async function(dataDeps: any, record: any) {
+    // Handle case where occupancy might be undefined or null initially
+    const occupancy = dataDeps.self?.occupancy ?? 0;
+    const capacity = dataDeps.self?.capacity ?? 0;
+    return capacity - occupancy;
+  }
+});
 
 // Bed.status StateMachine computation - tracks bed state transitions
 const bedAvailableState = StateNode.create({
@@ -2105,4 +2125,556 @@ Bed.properties.find(p => p.name === 'isAvailable').computation = Custom.create({
     // Bed is available if status is 'available' AND there's no occupant
     return statusIsAvailable && hasNoOccupant;
   }
+});
+
+// ========= PERMISSION AND BUSINESS RULES SECTION =========
+// All conditions are added via assignment pattern below
+// Phase 1: Basic Permissions - Admin Only
+
+// P001: Only admin can create dormitories
+const isAdminForCreateDormitory = Condition.create({
+  name: 'isAdminForCreateDormitory',
+  content: function(this: Controller, event: any) {
+    return event.user.role === 'admin';
+  }
+});
+
+CreateDormitory.conditions = isAdminForCreateDormitory;
+
+// P002: Only admin can update dormitories
+const isAdminForUpdateDormitory = Condition.create({
+  name: 'isAdminForUpdateDormitory',
+  content: function(this: Controller, event: any) {
+    return event.user.role === 'admin';
+  }
+});
+
+UpdateDormitory.conditions = isAdminForUpdateDormitory;
+
+// P003: Only admin can deactivate dormitories
+const isAdminForDeactivateDormitory = Condition.create({
+  name: 'isAdminForDeactivateDormitory',
+  content: function(this: Controller, event: any) {
+    return event.user.role === 'admin';
+  }
+});
+
+DeactivateDormitory.conditions = isAdminForDeactivateDormitory;
+
+// P004: Only admin can create users
+const isAdminForCreateUser = Condition.create({
+  name: 'isAdminForCreateUser',
+  content: function(this: Controller, event: any) {
+    return event.user.role === 'admin';
+  }
+});
+
+CreateUser.conditions = isAdminForCreateUser;
+
+// P005: Only admin can assign dorm heads
+const isAdminForAssignDormHead = Condition.create({
+  name: 'isAdminForAssignDormHead',
+  content: function(this: Controller, event: any) {
+    return event.user.role === 'admin';
+  }
+});
+
+AssignDormHead.conditions = isAdminForAssignDormHead;
+
+// P006: Only admin can remove dorm heads
+const isAdminForRemoveDormHead = Condition.create({
+  name: 'isAdminForRemoveDormHead',
+  content: function(this: Controller, event: any) {
+    return event.user.role === 'admin';
+  }
+});
+
+RemoveDormHead.conditions = isAdminForRemoveDormHead;
+
+// P007: Only admin can assign users to dormitories
+const isAdminForAssignUserToDormitory = Condition.create({
+  name: 'isAdminForAssignUserToDormitory',
+  content: function(this: Controller, event: any) {
+    return event.user.role === 'admin';
+  }
+});
+
+// AssignUserToDormitory.conditions moved to end of file to combine with BR003
+
+// P008: Only admin can remove users from dormitories
+const isAdminForRemoveUserFromDormitory = Condition.create({
+  name: 'isAdminForRemoveUserFromDormitory',
+  content: function(this: Controller, event: any) {
+    return event.user.role === 'admin';
+  }
+});
+
+RemoveUserFromDormitory.conditions = isAdminForRemoveUserFromDormitory;
+
+// P009: Only admin can process removal requests
+const isAdminForProcessRemovalRequest = Condition.create({
+  name: 'isAdminForProcessRemovalRequest',
+  content: function(this: Controller, event: any) {
+    return event.user.role === 'admin';
+  }
+});
+
+ProcessRemovalRequest.conditions = isAdminForProcessRemovalRequest;
+
+// ========= Phase 2: Simple Business Rules - Payload Validation =========
+
+// BR001: Dormitory capacity must be 4-6
+const hasValidDormitoryCapacity = Condition.create({
+  name: 'hasValidDormitoryCapacity',
+  content: function(this: Controller, event: any) {
+    const capacity = event.payload.capacity;
+    return capacity >= 4 && capacity <= 6;
+  }
+});
+
+// Combine P001 (admin permission) with BR001 (capacity validation) for CreateDormitory
+CreateDormitory.conditions = Conditions.create({
+  content: BoolExp.atom(isAdminForCreateDormitory).and(hasValidDormitoryCapacity)
+});
+
+// BR002: Points must be between 1 and 10
+const hasValidPointRange = Condition.create({
+  name: 'hasValidPointRange',
+  content: function(this: Controller, event: any) {
+    const points = event.payload.points;
+    return points >= 1 && points <= 10;
+  }
+});
+
+// Temporary permission: Allow admin to issue points (will be replaced by P010 later)
+const canIssuePoints = Condition.create({
+  name: 'canIssuePoints',
+  content: async function(this: Controller, event: any) {
+    // P010: Admin or dorm head of user's dormitory can issue points
+    
+    // Admin can always issue points
+    if (event.user.role === 'admin') {
+      return true;
+    }
+    
+    // Check if user is a dorm head and target is in their managed dormitory
+    if (event.user.role === 'dormHead') {
+      // Get the target user's dormitory
+      const targetUserDormRelations = await this.system.storage.find(
+        UserDormitoryRelation.name,
+        BoolExp.atom({ key: 'source.id', value: ['=', event.payload.userId] }),
+        undefined,
+        [
+          'id',
+          ['target', { attributeQuery: ['id'] }]
+        ]
+      );
+      
+      if (targetUserDormRelations.length === 0) {
+        // Target user not assigned to any dormitory
+        return false;
+      }
+      
+      const targetDormitoryId = targetUserDormRelations[0].target.id;
+      
+      // Check if the issuer is the dorm head of this dormitory
+      const dormHeadRelations = await this.system.storage.find(
+        DormitoryDormHeadRelation.name,
+        BoolExp.atom({ key: 'source.id', value: ['=', targetDormitoryId] })
+          .and({ key: 'target.id', value: ['=', event.user.id] }),
+        undefined,
+        ['id']
+      );
+      
+      return dormHeadRelations.length > 0;
+    }
+    
+    // Student or other roles cannot issue points
+    return false;
+  }
+});
+
+// Combine permission and validation for IssuePointDeduction
+IssuePointDeduction.conditions = Conditions.create({
+  content: BoolExp.atom(canIssuePoints).and(hasValidPointRange)
+});
+
+// ========= Phase 3: Complex Permissions - Role with Context =========
+
+// P011: Only dorm head of user's dormitory can initiate removal
+const canInitiateRemoval = Condition.create({
+  name: 'canInitiateRemoval',
+  content: async function(this: Controller, event: any) {
+    // Must be a dorm head
+    if (event.user.role !== 'dormHead') {
+      return false;
+    }
+    
+    // Get the target user's dormitory
+    const targetUserDormRelations = await this.system.storage.find(
+      UserDormitoryRelation.name,
+      BoolExp.atom({ key: 'source.id', value: ['=', event.payload.userId] }),
+      undefined,
+      [
+        'id',
+        ['target', { attributeQuery: ['id'] }]
+      ]
+    );
+    
+    if (targetUserDormRelations.length === 0) {
+      // Target user not assigned to any dormitory
+      return false;
+    }
+    
+    const targetDormitoryId = targetUserDormRelations[0].target.id;
+    
+    // Check if the requesting user is the dorm head of this dormitory
+    const dormHeadRelations = await this.system.storage.find(
+      DormitoryDormHeadRelation.name,
+      BoolExp.atom({ key: 'source.id', value: ['=', targetDormitoryId] })
+        .and({ key: 'target.id', value: ['=', event.user.id] }),
+      undefined,
+      ['id']
+    );
+    
+    // Return true if the user is the dorm head of the target user's dormitory
+    return dormHeadRelations.length > 0;
+  }
+});
+
+// BR008: Target user must have totalPoints >= 30
+const targetHasEnoughPoints = Condition.create({
+  name: 'targetHasEnoughPoints',
+  content: async function(this: Controller, event: any) {
+    // Get the target user's totalPoints
+    const targetUser = await this.system.storage.findOne(
+      'User',
+      BoolExp.atom({ key: 'id', value: ['=', event.payload.userId] }),
+      undefined,
+      ['id', 'totalPoints']
+    );
+    
+    if (!targetUser) {
+      return false;
+    }
+    
+    // Check if totalPoints >= 30
+    return targetUser.totalPoints >= 30;
+  }
+});
+
+// BR009: Cannot have existing pending request for same user
+const noPendingRequestForUser = Condition.create({
+  name: 'noPendingRequestForUser',
+  content: async function(this: Controller, event: any) {
+    // Check if there's an existing pending removal request for the target user
+    // First, find all removal requests for the target user through RemovalRequestTargetRelation
+    const targetRelations = await this.system.storage.find(
+      RemovalRequestTargetRelation.name,
+      BoolExp.atom({ key: 'target.id', value: ['=', event.payload.userId] }),
+      undefined,
+      [
+        'id',
+        ['source', { attributeQuery: ['id', 'status'] }]  // source is the RemovalRequest
+      ]
+    );
+    
+    // Check if any of the requests are in pending status
+    for (const relation of targetRelations) {
+      if (relation.source && relation.source.status === 'pending') {
+        return false; // Found a pending request, cannot create another
+      }
+    }
+    
+    return true; // No pending requests found
+  }
+});
+
+// Combine P011 permission, BR008, and BR009 business rules
+InitiateRemovalRequest.conditions = Conditions.create({
+  content: BoolExp.atom(canInitiateRemoval).and(targetHasEnoughPoints).and(noPendingRequestForUser)
+});
+
+// P012: Only the initiating dorm head can cancel
+const canCancelRemovalRequest = Condition.create({
+  name: 'canCancelRemovalRequest',
+  content: async function(this: Controller, event: any) {
+    // Find the initiator through the RemovalRequestInitiatorRelation
+    const initiatorRelations = await this.system.storage.find(
+      RemovalRequestInitiatorRelation.name,
+      BoolExp.atom({ key: 'source.id', value: ['=', event.payload.requestId] }),
+      undefined,
+      [
+        'id',
+        ['target', { attributeQuery: ['id'] }]  // target is the initiator User
+      ]
+    );
+    
+    if (initiatorRelations.length === 0) {
+      // No initiator found (request might not exist)
+      return false;
+    }
+    
+    const initiatorId = initiatorRelations[0].target?.id;
+    
+    // Check if the current user is the initiator
+    return initiatorId === event.user.id;
+  }
+});
+
+CancelRemovalRequest.conditions = canCancelRemovalRequest;
+
+// P013: Admin or self can update profile
+const canUpdateProfile = Condition.create({
+  name: 'canUpdateProfile',
+  content: function(this: Controller, event: any) {
+    // Admin can update any user profile
+    if (event.user.role === 'admin') {
+      return true;
+    }
+    
+    // User can update their own profile
+    return event.payload.userId === event.user.id;
+  }
+});
+
+UpdateUserProfile.conditions = canUpdateProfile;
+
+// ========= Phase 4: Complex Business Rules - Database Queries =========
+
+// BR003: User cannot already be assigned to a dormitory
+const userNotAlreadyAssigned = Condition.create({
+  name: 'userNotAlreadyAssigned',
+  content: async function(this: Controller, event: any) {
+    // Check if user already has a dormitory assignment
+    const existingRelations = await this.system.storage.find(
+      UserDormitoryRelation.name,
+      MatchExp.atom({ key: 'source.id', value: ['=', event.payload.userId] }),
+      undefined,
+      ['id']
+    );
+    
+    // Return true if NO existing relations found (user not assigned)
+    return existingRelations.length === 0;
+  }
+});
+
+// Combine P007 (admin permission) with BR003 (user not already assigned) for AssignUserToDormitory
+// First, we need to re-reference the admin condition since it was defined earlier
+const isAdminForAssignUserToDormitoryRef = Condition.create({
+  name: 'isAdminForAssignUserToDormitoryRef',
+  content: function(this: Controller, event: any) {
+    return event.user.role === 'admin';
+  }
+});
+
+// BR004: Dormitory must have available capacity
+const dormitoryHasCapacity = Condition.create({
+  name: 'dormitoryHasCapacity',
+  content: async function(this: Controller, event: any) {
+    // Find the dormitory
+    const dormitory = await this.system.storage.findOne(
+      'Dormitory',
+      MatchExp.atom({ key: 'id', value: ['=', event.payload.dormitoryId] }),
+      undefined,
+      ['id', 'capacity', 'occupancy']
+    );
+    
+    if (!dormitory) {
+      // If dormitory doesn't exist, return false
+      return false;
+    }
+    
+    // Check if there's available space (occupancy < capacity)
+    return dormitory.occupancy < dormitory.capacity;
+  }
+});
+
+// BR005: Check if dormitory is active
+const dormitoryMustBeActive = Condition.create({
+  name: 'dormitoryMustBeActive',
+  content: async function(this: Controller, event: any) {
+    const dormitory = await this.system.storage.findOne(
+      'Dormitory',
+      MatchExp.atom({ key: 'id', value: ['=', event.payload.dormitoryId] }),
+      undefined,
+      ['id', 'status']
+    );
+    
+    if (!dormitory) {
+      return false; // Dormitory not found
+    }
+    
+    return dormitory.status === 'active';
+  }
+});
+
+// Now combine all four conditions
+AssignUserToDormitory.conditions = Conditions.create({
+  content: BoolExp.atom(isAdminForAssignUserToDormitoryRef)
+    .and(userNotAlreadyAssigned)
+    .and(dormitoryHasCapacity)
+    .and(dormitoryMustBeActive)
+});
+
+// ========= BR006 & BR007: Business Rules for AssignDormHead =========
+// BR006: Dormitory can only have one dorm head
+const dormitoryHasNoDormHead = Condition.create({
+  name: 'dormitoryHasNoDormHead',
+  content: async function(this: Controller, event: any) {
+    // Check if dormitory already has a dorm head
+    const existingDormHeadRelations = await this.system.storage.find(
+      DormitoryDormHeadRelation.name,
+      MatchExp.atom({ key: 'source.id', value: ['=', event.payload.dormitoryId] }),
+      undefined,
+      ['id']
+    );
+    
+    // Return true if NO existing dorm head relations found
+    return existingDormHeadRelations.length === 0;
+  }
+});
+
+// BR007: User cannot be dorm head of multiple dormitories
+const userNotAlreadyDormHead = Condition.create({
+  name: 'userNotAlreadyDormHead',
+  content: async function(this: Controller, event: any) {
+    // Check if user is already a dorm head of any dormitory
+    const existingDormHeadRelations = await this.system.storage.find(
+      DormitoryDormHeadRelation.name,
+      MatchExp.atom({ key: 'target.id', value: ['=', event.payload.userId] }),
+      undefined,
+      ['id']
+    );
+    
+    // Return true if user is NOT already a dorm head
+    return existingDormHeadRelations.length === 0;
+  }
+});
+
+// Re-reference the admin permission for AssignDormHead
+const isAdminForAssignDormHeadRef = Condition.create({
+  name: 'isAdminForAssignDormHeadRef',
+  content: function(this: Controller, event: any) {
+    return event.user.role === 'admin';
+  }
+});
+
+// Combine permission with business rules for AssignDormHead
+AssignDormHead.conditions = Conditions.create({
+  content: BoolExp.atom(isAdminForAssignDormHeadRef)
+    .and(dormitoryHasNoDormHead)
+    .and(userNotAlreadyDormHead)
+});
+
+// ========= BR010: ProcessRemovalRequest must be in pending status =========
+const requestMustBePending = Condition.create({
+  name: 'requestMustBePending',
+  content: async function(this: Controller, event: any) {
+    // Find the removal request
+    const request = await this.system.storage.findOne(
+      'RemovalRequest',
+      MatchExp.atom({ key: 'id', value: ['=', event.payload.requestId] }),
+      undefined,
+      ['id', 'status']
+    );
+    
+    if (!request) {
+      // If request doesn't exist, return false
+      return false;
+    }
+    
+    // Check if request is in pending status
+    return request.status === 'pending';
+  }
+});
+
+// Re-reference the admin permission for ProcessRemovalRequest
+const isAdminForProcessRemovalRequestRef = Condition.create({
+  name: 'isAdminForProcessRemovalRequestRef',
+  content: function(this: Controller, event: any) {
+    return event.user.role === 'admin';
+  }
+});
+
+// Combine permission with business rule for ProcessRemovalRequest
+ProcessRemovalRequest.conditions = Conditions.create({
+  content: BoolExp.atom(isAdminForProcessRemovalRequestRef).and(requestMustBePending)
+});
+
+// ========= BR011: CancelRemovalRequest must be in pending status =========
+const cancelRequestMustBePending = Condition.create({
+  name: 'cancelRequestMustBePending',
+  content: async function(this: Controller, event: any) {
+    // Find the removal request
+    const request = await this.system.storage.findOne(
+      'RemovalRequest',
+      MatchExp.atom({ key: 'id', value: ['=', event.payload.requestId] }),
+      undefined,
+      ['id', 'status']
+    );
+    
+    if (!request) {
+      // If request doesn't exist, return false
+      return false;
+    }
+    
+    // Check if request is in pending status
+    return request.status === 'pending';
+  }
+});
+
+// Combine existing permission (canCancelRemovalRequest) with the new business rule
+// Note: canCancelRemovalRequest was already defined earlier in the file
+CancelRemovalRequest.conditions = Conditions.create({
+  content: BoolExp.atom(canCancelRemovalRequest).and(cancelRequestMustBePending)
+});
+
+// ========= BR012: DeactivateDormitory - Cannot deactivate if users are assigned =========
+const dormitoryMustBeEmpty = Condition.create({
+  name: 'dormitoryMustBeEmpty',
+  content: async function(this: Controller, event: any) {
+    // Find the dormitory
+    const dormitory = await this.system.storage.findOne(
+      'Dormitory',
+      MatchExp.atom({ key: 'id', value: ['=', event.payload.dormitoryId] }),
+      undefined,
+      ['id', 'occupancy']
+    );
+    
+    if (!dormitory) {
+      // If dormitory doesn't exist, return false
+      return false;
+    }
+    
+    // Check if dormitory has zero occupancy
+    return dormitory.occupancy === 0;
+  }
+});
+
+// Combine admin permission with business rule for DeactivateDormitory
+DeactivateDormitory.conditions = Conditions.create({
+  content: BoolExp.atom(isAdminForDeactivateDormitory).and(dormitoryMustBeEmpty)
+});
+
+// ========= BR013: RemoveUserFromDormitory - User must be assigned to a dormitory =========
+const userMustBeAssigned = Condition.create({
+  name: 'userMustBeAssigned',
+  content: async function(this: Controller, event: any) {
+    // Check if user has an existing UserDormitoryRelation
+    const relations = await this.system.storage.find(
+      UserDormitoryRelation.name,
+      MatchExp.atom({ key: 'source.id', value: ['=', event.payload.userId] }),
+      undefined,
+      ['id']
+    );
+    
+    // User must have at least one dormitory assignment
+    return relations.length > 0;
+  }
+});
+
+// Combine admin permission with business rule for RemoveUserFromDormitory
+RemoveUserFromDormitory.conditions = Conditions.create({
+  content: BoolExp.atom(isAdminForRemoveUserFromDormitory).and(userMustBeAssigned)
 });
