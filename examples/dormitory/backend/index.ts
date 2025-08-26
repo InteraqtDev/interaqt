@@ -577,3 +577,92 @@ export const interactions = [
 
 export const activities: any[] = []
 export const dicts = dictionaries
+
+// ========================= COMPUTATIONS =========================
+
+// Phase 1: Entity Computations
+
+// User entity Transform computation - handles creation from CreateUser and Registration interactions
+User.computation = Transform.create({
+  record: InteractionEventEntity,
+  callback: function(event) {
+    if (event.interactionName === 'CreateUser') {
+      return {
+        username: event.payload.username,
+        password: event.payload.password,
+        email: event.payload.email,
+        name: event.payload.name,
+        role: event.payload.role || 'resident',
+        points: 100,
+        createdAt: Math.floor(Date.now() / 1000),
+        isDeleted: false
+      }
+    }
+    if (event.interactionName === 'Registration') {
+      return {
+        username: event.payload.username,
+        password: event.payload.password,
+        email: event.payload.email,
+        name: event.payload.name,
+        role: 'resident',
+        points: 100,
+        createdAt: Math.floor(Date.now() / 1000),
+        isDeleted: false
+      }
+    }
+    return null
+  }
+})
+
+// Dormitory entity Transform computation - handles creation from CreateDormitory interaction
+Dormitory.computation = Transform.create({
+  record: InteractionEventEntity,
+  callback: function(event) {
+    if (event.interactionName === 'CreateDormitory') {
+      return {
+        name: event.payload.name,
+        capacity: event.payload.capacity,
+        floor: event.payload.floor,
+        building: event.payload.building,
+        createdAt: Math.floor(Date.now() / 1000),
+        isDeleted: false,
+        occupiedBeds: 0
+      }
+    }
+    return null
+  }
+})
+
+// PointDeduction entity Transform computation - handles creation from DeductPoints and DeductResidentPoints interactions
+PointDeduction.computation = Transform.create({
+  record: InteractionEventEntity,
+  callback: function(event) {
+    if (event.interactionName === 'DeductPoints' || event.interactionName === 'DeductResidentPoints') {
+      return {
+        reason: event.payload.reason,
+        points: event.payload.points,
+        description: event.payload.description,
+        createdAt: Math.floor(Date.now() / 1000),
+        createdBy: event.user?.id || 'system'
+      }
+    }
+    return null
+  }
+})
+
+// RemovalRequest entity Transform computation - handles creation from SubmitRemovalRequest interaction
+RemovalRequest.computation = Transform.create({
+  record: InteractionEventEntity,
+  callback: function(event) {
+    if (event.interactionName === 'SubmitRemovalRequest') {
+      return {
+        reason: event.payload.reason,
+        status: 'pending',
+        createdAt: Math.floor(Date.now() / 1000),
+        processedAt: null,
+        adminComment: null
+      }
+    }
+    return null
+  }
+})

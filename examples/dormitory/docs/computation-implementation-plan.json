@@ -17,7 +17,7 @@
           ],
           "reasoning": "interaction-created with soft-delete capability, uses Transform for creation with status property for soft deletion",
           "calculationMethod": "Independently created by CreateUser or Registration interactions",
-          "completed": false
+          "completed": true
         },
         {
           "id": "Dormitory",
@@ -31,7 +31,7 @@
           ],
           "reasoning": "interaction-created with soft-delete capability, uses Transform for creation with status property for soft deletion",
           "calculationMethod": "Independently created by CreateDormitory interaction",
-          "completed": false
+          "completed": true
         },
         {
           "id": "Bed",
@@ -45,7 +45,7 @@
           ],
           "reasoning": "created-with-parent type, created by Dormitory's computation",
           "calculationMethod": "Created by Dormitory's computation when Dormitory is created (NOT by Bed's own computation)",
-          "completed": false
+          "completed": true
         },
         {
           "id": "PointDeduction",
@@ -60,7 +60,7 @@
           ],
           "reasoning": "interaction-created with canBeDeleted: false, uses Transform with InteractionEventEntity",
           "calculationMethod": "Independently created by DeductPoints or DeductResidentPoints interactions",
-          "completed": false
+          "completed": true
         },
         {
           "id": "RemovalRequest",
@@ -74,7 +74,7 @@
           ],
           "reasoning": "interaction-created with canBeDeleted: false, uses Transform with InteractionEventEntity",
           "calculationMethod": "Independently created by SubmitRemovalRequest interaction",
-          "completed": false
+          "completed": true
         }
       ],
       "description": "Phase 1: 5 entity computation(s)"
