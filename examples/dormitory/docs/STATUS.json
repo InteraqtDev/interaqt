@@ -1,9 +1,9 @@
 {
-  "currentTask": "Task 1",
+  "currentTask": "Task 2",
   "completed": true,
   "completedItems": [
-    "detailed-requirements.md created",
-    "test-cases.md created",
-    "interaction-matrix.md created"
+    "data-design.json created",
+    "interaction-design.md created",
+    "computation-analysis.json created"
   ]
 }
