@@ -1148,4 +1148,400 @@ describe('StateMachineRunner', () => {
         expect(memberships[0].target.id).toBe(project2.id)
         expect(memberships[0].role).toBe('developer')
     })
+
+    test('create and delete entity through state machine', async () => {
+        // 测试通过 StateMachine 创建和删除实体
+        const { Entity, Property, Interaction, Action, Payload, PayloadItem, StateMachine, StateNode, StateTransfer, Transform, InteractionEventEntity } = await import('@shared')
+        
+        // 创建用户实体
+        const User = Entity.create({
+            name: 'User',
+            properties: [
+                Property.create({
+                    name: 'name',
+                    type: 'string',
+                })
+            ]
+        })
+
+        // 创建任务实体
+        const Task = Entity.create({
+            name: 'Task',
+            properties: [
+                Property.create({
+                    name: 'title',
+                    type: 'string',
+                }),
+                Property.create({
+                    name: 'description',
+                    type: 'string',
+                }),
+                Property.create({
+                    name: 'status',
+                    type: 'string',
+                })
+            ]
+        })
+
+        // 创建任务的交互
+        const CreateTaskInteraction = Interaction.create({
+            name: 'createTask',
+            action: Action.create({ name: 'createTask' }),
+            payload: Payload.create({
+                items: [
+                    PayloadItem.create({
+                        name: 'title',
+                    }),
+                    PayloadItem.create({
+                        name: 'description',
+                    })
+                ]
+            })
+        })
+
+        // 删除任务的交互
+        const DeleteTaskInteraction = Interaction.create({
+            name: 'deleteTask',
+            action: Action.create({ name: 'deleteTask' }),
+            payload: Payload.create({
+                items: [
+                    PayloadItem.create({
+                        name: 'task',
+                        isRef: true,
+                        base: Task
+                    })
+                ]
+            })
+        })
+
+        // 创建状态节点
+        const NonExistentState = StateNode.create({
+            name: 'nonExistent',
+            computeValue: () => null  // 返回 null 表示删除实体
+        })
+
+        const ActiveState = StateNode.create({
+            name: 'active',
+            computeValue: (lastValue: any, event: any) => {
+                // 创建任务时，返回任务数据
+                if (event && event.payload) {
+                    return {
+                        title: event.payload.title,
+                        description: event.payload.description,
+                        status: 'active'
+                    }
+                }
+                return {}
+            }
+        })
+
+        // 创建状态转换
+        const CreateTaskTransfer = StateTransfer.create({
+            trigger: CreateTaskInteraction,
+            current: NonExistentState,
+            next: ActiveState,
+            computeTarget: (event: any) => {
+                // 创建新任务时，返回任务数据
+                return {
+                    // title: event.payload!.title,
+                    // description: event.payload!.description,
+                    // status: 'active'
+                }
+            }
+        })
+
+        const DeleteTaskTransfer = StateTransfer.create({
+            trigger: DeleteTaskInteraction,
+            current: ActiveState,
+            next: NonExistentState,
+            computeTarget: (event: any) => {
+                // 删除任务时，返回任务 ID
+                return { id: event.payload!.task.id }
+            }
+        })
+
+        // 创建状态机
+        const TaskStateMachine = StateMachine.create({
+            states: [NonExistentState, ActiveState],
+            transfers: [CreateTaskTransfer, DeleteTaskTransfer],
+            defaultState: NonExistentState
+        })
+
+        // 将状态机附加到 Task 实体
+        Task.computation = TaskStateMachine
+
+        // 设置测试环境
+        const system = new MonoSystem()
+        const controller = new Controller({
+            system: system,
+            entities: [User, Task],
+            relations: [],
+            activities: [],
+            interactions: [CreateTaskInteraction, DeleteTaskInteraction]
+        })
+        await controller.setup(true)
+
+        // 创建用户
+        const user = await controller.system.storage.create('User', { name: 'Alice' })
+
+        // 验证初始状态 - 没有任务
+        let tasks = await controller.system.storage.find('Task', undefined, undefined, ['*'])
+        expect(tasks.length).toBe(0)
+
+        // 创建第一个任务
+        await controller.callInteraction('createTask', {
+            user: user,
+            payload: {
+                title: 'Task 1',
+                description: 'First task description'
+            }
+        })
+
+        // 验证任务已创建
+        tasks = await controller.system.storage.find('Task', undefined, undefined, ['*'])
+        expect(tasks.length).toBe(1)
+        expect(tasks[0].title).toBe('Task 1')
+        expect(tasks[0].description).toBe('First task description')
+        expect(tasks[0].status).toBe('active')
+
+        // 创建第二个任务
+        await controller.callInteraction('createTask', {
+            user: user,
+            payload: {
+                title: 'Task 2',
+                description: 'Second task description'
+            }
+        })
+
+        tasks = await controller.system.storage.find('Task', undefined, undefined, ['*'])
+        expect(tasks.length).toBe(2)
+
+        // 删除第一个任务
+        await controller.callInteraction('deleteTask', {
+            user: user,
+            payload: {
+                task: { id: tasks[0].id }
+            }
+        })
+
+        // 验证任务已被删除
+        tasks = await controller.system.storage.find('Task', undefined, undefined, ['*'])
+        expect(tasks.length).toBe(1)
+        expect(tasks[0].title).toBe('Task 2')
+
+        // 删除第二个任务
+        const task2 = tasks[0]
+        await controller.callInteraction('deleteTask', {
+            user: user,
+            payload: {
+                task: { id: task2.id }
+            }
+        })
+
+        // 验证所有任务都已被删除
+        tasks = await controller.system.storage.find('Task', undefined, undefined, ['*'])
+        expect(tasks.length).toBe(0)
+    })
+
+    test('create entity with relations through state machine', async () => {
+        // 测试通过 StateMachine 创建带有关系的实体
+        const { Entity, Property, Relation, Interaction, Action, Payload, PayloadItem, StateMachine, StateNode, StateTransfer } = await import('@shared')
+        
+        // 创建用户实体
+        const User = Entity.create({
+            name: 'User',
+            properties: [
+                Property.create({
+                    name: 'name',
+                    type: 'string',
+                })
+            ]
+        })
+
+        // 创建订单实体 - 通过状态机创建
+        const Order = Entity.create({
+            name: 'Order',
+            properties: [
+                Property.create({
+                    name: 'orderNumber',
+                    type: 'string',
+                }),
+                Property.create({
+                    name: 'totalAmount',
+                    type: 'number',
+                })
+            ]
+        })
+
+        // 创建订单的交互
+        const PlaceOrderInteraction = Interaction.create({
+            name: 'placeOrder',
+            action: Action.create({ name: 'placeOrder' }),
+            payload: Payload.create({
+                items: [
+                    PayloadItem.create({
+                        name: 'customer',
+                        isRef: true,
+                        base: User
+                    }),
+                    PayloadItem.create({
+                        name: 'orderNumber',
+                    }),
+                    PayloadItem.create({
+                        name: 'totalAmount',
+                        type: 'number'
+                    })
+                ]
+            })
+        })
+
+        // 取消订单的交互
+        const CancelOrderInteraction = Interaction.create({
+            name: 'cancelOrder',
+            action: Action.create({ name: 'cancelOrder' }),
+            payload: Payload.create({
+                items: [
+                    PayloadItem.create({
+                        name: 'order',
+                        isRef: true,
+                        base: Order
+                    })
+                ]
+            })
+        })
+
+        // 创建状态节点
+        const NonExistentState = StateNode.create({
+            name: 'nonExistent',
+            computeValue: () => null
+        })
+
+        const PendingState = StateNode.create({
+            name: 'pending',
+            computeValue: (lastValue: any, event: any) => {
+                if (event && event.payload) {
+                    return {
+                        orderNumber: event.payload.orderNumber,
+                        totalAmount: event.payload.totalAmount,
+                        customer: event.payload.customer  // 包含客户关系
+                    }
+                }
+                return lastValue || {}
+            }
+        })
+
+        // 创建状态转换
+        const PlaceOrderTransfer = StateTransfer.create({
+            trigger: PlaceOrderInteraction,
+            current: NonExistentState,
+            next: PendingState,
+            computeTarget: (event: any) => {
+                return {
+                    orderNumber: event.payload!.orderNumber,
+                    totalAmount: event.payload!.totalAmount,
+                    customer: event.payload!.customer
+                }
+            }
+        })
+
+        const CancelOrderTransfer = StateTransfer.create({
+            trigger: CancelOrderInteraction,
+            current: PendingState,
+            next: NonExistentState,
+            computeTarget: (event: any) => {
+                return { id: event.payload!.order.id }
+            }
+        })
+
+        // 创建状态机
+        const OrderStateMachine = StateMachine.create({
+            states: [NonExistentState, PendingState],
+            transfers: [PlaceOrderTransfer, CancelOrderTransfer],
+            defaultState: NonExistentState
+        })
+
+        // 将状态机附加到 Order 实体
+        Order.computation = OrderStateMachine
+
+        // 创建订单-客户关系
+        const OrderCustomerRelation = Relation.create({
+            name: 'OrderCustomer',
+            source: Order,
+            sourceProperty: 'customer',
+            target: User,
+            targetProperty: 'orders',
+            type: 'n:1'
+        })
+
+        // 设置测试环境
+        const system = new MonoSystem()
+        const controller = new Controller({
+            system: system,
+            entities: [User, Order],
+            relations: [OrderCustomerRelation],
+            activities: [],
+            interactions: [PlaceOrderInteraction, CancelOrderInteraction]
+        })
+        await controller.setup(true)
+
+        // 创建用户
+        const alice = await controller.system.storage.create('User', { name: 'Alice' })
+        const bob = await controller.system.storage.create('User', { name: 'Bob' })
+
+        // 验证初始状态 - 没有订单
+        let orders = await controller.system.storage.find('Order', undefined, undefined, ['*'])
+        expect(orders.length).toBe(0)
+
+        // Alice 下订单
+        await controller.callInteraction('placeOrder', {
+            user: alice,
+            payload: {
+                customer: { id: alice.id },
+                orderNumber: 'ORD-001',
+                totalAmount: 100.50
+            }
+        })
+
+        // 验证订单已创建
+        orders = await controller.system.storage.find('Order', undefined, undefined, ['*', ['customer', {attributeQuery:['*']}]])
+        expect(orders.length).toBe(1)
+        expect(orders[0].orderNumber).toBe('ORD-001')
+        expect(orders[0].totalAmount).toBe(100.50)
+        expect(orders[0].customer.id).toBe(alice.id)
+
+        // Bob 下订单
+        await controller.callInteraction('placeOrder', {
+            user: bob,
+            payload: {
+                customer: { id: bob.id },
+                orderNumber: 'ORD-002',
+                totalAmount: 200.75
+            }
+        })
+
+        orders = await controller.system.storage.find('Order', undefined, undefined, ['*'])
+        expect(orders.length).toBe(2)
+
+        // 验证关系已创建
+        const relations = await controller.system.storage.find('OrderCustomer', undefined, undefined, ['*', ['source', {attributeQuery:['*']}], ['target', {attributeQuery:['*']}]])
+        expect(relations.length).toBe(2)
+
+        // 取消 Alice 的订单
+        const aliceOrder = orders.find(o => o.orderNumber === 'ORD-001')
+        await controller.callInteraction('cancelOrder', {
+            user: alice,
+            payload: {
+                order: { id: aliceOrder!.id }
+            }
+        })
+
+        // 验证订单已被删除
+        orders = await controller.system.storage.find('Order', undefined, undefined, ['*'])
+        expect(orders.length).toBe(1)
+        expect(orders[0].orderNumber).toBe('ORD-002')
+
+        // 验证关系也被删除
+        const remainingRelations = await controller.system.storage.find('OrderCustomer', undefined, undefined, ['*'])
+        expect(remainingRelations.length).toBe(1)
+    })
 });     

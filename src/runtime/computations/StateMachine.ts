@@ -226,7 +226,7 @@ it requires both source and target id, but your computeTarget function returned 
                     type: 'insert',
                     data: {
                         ...dirtyRecord,
-                        ...nextState,
+                        ...nextValue,
                         [this.state.currentState.key]: nextState.name
                     }
                 }
