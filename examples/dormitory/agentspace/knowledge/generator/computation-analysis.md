@@ -123,13 +123,14 @@ Create `docs/computation-analysis.json` with this structure:
   "entities": [
     {
       "name": "<from data-design.json>",
-      "entityLevelAnalysis": {
+      "entityAnalysis": {
         "purpose": "<from data-design.json>",
-        "creationSource": "<from lifecycle.creation>",
-        "updateRequirements": "<from interaction-design.md effects>",
-        "deletionStrategy": "<from lifecycle.deletion.deletionType>"
+        "lifecycle": "<directly copy from lifecycle field in data-design.json>",
+        "computationDecision": "<Transform/StateMachine/_parent:[ParentName]/None based on rules>",
+        "reasoning": "<automated based on lifecycle and deletion capability>",
+        "calculationMethod": "<from computationMethod>"
       },
-            "propertyAnalysis": [
+      "propertyAnalysis": [
         {
           "propertyName": "<property name>",
           "type": "<from data-design.json>",
@@ -141,14 +142,7 @@ Create `docs/computation-analysis.json` with this structure:
           "interactionDependencies": <from data-design.json>,
           "calculationMethod": "<from computationMethod>"
         }
-      ],
-      "entityComputationDecision": {
-        "type": "<Transform/StateMachine/_parent:[ParentName]/None based on rules>",
-        "reasoning": "<automated based on lifecycle and deletion capability>",
-        "dependencies": <add InteractionEventEntity if needed>,
-        "interactionDependencies": <from data-design.json>,
-        "calculationMethod": "<from computationMethod>"
-      }
+      ]
     }
   ],
   "relations": [
@@ -156,12 +150,9 @@ Create `docs/computation-analysis.json` with this structure:
       "name": "<from data-design.json>",
       "relationAnalysis": {
         "purpose": "<from data-design.json>",
-        "creation": "<from lifecycle.creation>",
-        "deletionRequirements": "<from lifecycle.deletion>",
+        "lifecycle": "<directly copy from lifecycle field in data-design.json>",
         "computationDecision": "<Transform/_parent:[ParentName]/StateMachine based on rules>",
         "reasoning": "<automated based on lifecycle>",
-        "dependencies": <format properly>,
-        "interactionDependencies": <from data-design.json>,
         "calculationMethod": "<from computationMethod>"
       }
     }

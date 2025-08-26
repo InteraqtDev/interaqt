@@ -114,13 +114,13 @@
   "completed": false
 }
 ```
-**📖 PRIMARY GUIDE: `./agentspace/knowledge/generator/computation-selection-guide.md`**
+**📖 PRIMARY GUIDE: `./agentspace/knowledge/generator/computation-analysis.md`**
 **📖 REFERENCE ONLY: `./agentspace/knowledge/generator/computation-implementation.md`**
 
-⚠️ **CRITICAL: You MUST strictly follow the systematic process in `computation-selection-guide.md`!**
+⚠️ **CRITICAL: You MUST strictly follow the systematic process in `computation-analysis.md`!**
 
 **🔴 MANDATORY PROCESS:**
-1. **FIRST**: Read and understand `computation-selection-guide.md` completely
+1. **FIRST**: Read and understand `computation-analysis.md` completely
 2. **USE PREVIOUS OUTPUTS**: Base your analysis on:
    - `docs/data-design.json` (from Task 2.1)
    - `docs/interaction-design.md` (from Task 2.2)
@@ -128,7 +128,7 @@
 4. **DOCUMENT**: Create `docs/computation-analysis.json` documenting your analysis for each entity/property
 5. **REFERENCE**: Use `computation-implementation.md` as a reference for syntax and examples
 
-**Key Steps from computation-selection-guide.md:**
+**Key Steps from computation-analysis.md:**
 - [ ] Create analysis document at `docs/computation-analysis.json`
 - [ ] Analyze each entity systematically (creation source, update requirements, deletion strategy)
 - [ ] Analyze each property individually (type, purpose, data source, update frequency)

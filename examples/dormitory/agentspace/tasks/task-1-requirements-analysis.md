@@ -27,12 +27,14 @@
 - For each Entity and Relation, analyze deletion requirements:
   - **Can it be deleted?** (Yes/No with business justification)
   - **Deletion type:** Soft delete (mark as deleted but keep data) or Hard delete (permanently remove)
+  - **Soft delete implementation:** Add explicit `isDeleted: boolean` property to entity
   - **Cascade behavior:** What happens to related entities/relations when deleted
   - Example:
     ```
     User Entity:
     - Can be deleted: Yes (account deactivation)
     - Deletion type: Soft delete (preserve historical data for audit)
+    - Implementation: Add isDeleted: boolean property
     - Cascade: Soft delete all user's posts, but keep comments for context
     
     PointDeduction Entity:
@@ -53,6 +55,7 @@
     - name: Freely modifiable
     - createdAt: Immutable after creation (audit requirement)
     - points: Modifiable with restrictions (only via point deduction/reward interactions)
+    - isDeleted: Modifiable with restrictions (only via delete interactions)
     ```
 
 **🔴 CRITICAL: Entity Design Principle**
