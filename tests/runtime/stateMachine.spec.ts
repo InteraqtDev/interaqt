@@ -1151,7 +1151,7 @@ describe('StateMachineRunner', () => {
 
     test('create and delete entity through state machine', async () => {
         // 测试通过 StateMachine 创建和删除实体
-        const { Entity, Property, Interaction, Action, Payload, PayloadItem, StateMachine, StateNode, StateTransfer, Transform, InteractionEventEntity } = await import('@shared')
+        const { Entity, Property, Interaction, Action, Payload, PayloadItem, StateMachine, StateNode, StateTransfer, Transform } = await import('@shared')
         
         // 创建用户实体
         const User = Entity.create({
@@ -1389,7 +1389,6 @@ describe('StateMachineRunner', () => {
                     }),
                     PayloadItem.create({
                         name: 'totalAmount',
-                        type: 'number'
                     })
                 ]
             })
