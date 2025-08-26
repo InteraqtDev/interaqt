@@ -1,271 +1,268 @@
 # Dormitory Management System - Detailed Requirements Analysis
 
-## 1. System Overview
+## System Overview
+A comprehensive dormitory management system that facilitates administrative control over dormitory assignments, resident management, and behavioral monitoring through a point-based discipline system.
 
-A comprehensive dormitory management system for educational institutions or corporate housing, focusing on room assignment, behavioral management, and disciplinary processes.
+## Business Domain Analysis
 
-## 2. Core Entities and Properties
+### Core Business Concepts
+1. **Dormitory Management**: Centralized control of dormitory creation, bed allocation, and resident assignments
+2. **User Role System**: Hierarchical structure with Admin and Dormitory Head roles
+3. **Point-Based Discipline System**: Behavior monitoring through point deductions and removal procedures
+4. **Bed Assignment Management**: Allocation and tracking of dormitory beds (4-6 per dormitory)
 
-### 2.1 User Entity
-**Properties:**
-- `id`: string (auto-generated)
-- `name`: string (required, user's full name)
-- `email`: string (required, unique, for authentication)
-- `phone`: string (optional, contact number)
-- `role`: string (enum: 'admin' | 'dormHead' | 'student', default: 'student')
-- `status`: string (enum: 'active' | 'suspended' | 'removed', default: 'active')
-- `createdAt`: timestamp (auto-generated)
-- `updatedAt`: timestamp (auto-updated)
+## Entity Analysis
 
-### 2.2 Dormitory Entity
-**Properties:**
-- `id`: string (auto-generated)
-- `name`: string (required, e.g., "Building A - Room 301")
-- `capacity`: number (required, must be 4-6)
-- `floor`: number (optional, floor number)
-- `building`: string (optional, building name/code)
-- `status`: string (enum: 'active' | 'inactive', default: 'active')
-- `occupancy`: number (computed, current number of assigned users)
-- `availableBeds`: number (computed, capacity - occupancy)
-- `createdAt`: timestamp (auto-generated)
-- `updatedAt`: timestamp (auto-updated)
+### 1. User Entity
+**Purpose**: Represents all system users including administrators, dormitory heads, and regular residents
 
-### 2.3 Bed Entity
-**Properties:**
-- `id`: string (auto-generated)
-- `bedNumber`: string (required, e.g., "A", "B", "1", "2")
-- `status`: string (enum: 'available' | 'occupied' | 'maintenance', default: 'available')
-- `assignedAt`: timestamp (nullable, when current user was assigned)
-- `createdAt`: timestamp (auto-generated)
-- `updatedAt`: timestamp (auto-updated)
+**Properties**:
+- id: string (Immutable after creation - system generated unique identifier)
+- name: string (Freely modifiable - user's display name)
+- email: string (Modifiable with restrictions - requires verification for changes)
+- isAdmin: boolean (Modifiable with restrictions - only by system admin)
+- points: number (Modifiable with restrictions - only via point deduction interactions, default: 100)
+- createdAt: Date (Immutable after creation - timestamp of account creation)
+- updatedAt: Date (System managed - automatically updated on any change)
 
-### 2.4 PointDeduction Entity
-**Properties:**
-- `id`: string (auto-generated)
-- `reason`: string (required, description of violation)
-- `points`: number (required, positive integer, deduction amount)
-- `category`: string (enum: 'hygiene' | 'noise' | 'curfew' | 'damage' | 'other')
-- `status`: string (enum: 'active' | 'appealed' | 'cancelled', default: 'active')
-- `description`: string (optional, detailed explanation)
-- `evidence`: string (optional, URL or reference to evidence)
-- `deductedAt`: timestamp (auto-generated, when deduction was made)
-- `createdAt`: timestamp (auto-generated)
+**Deletion Analysis**:
+- Can be deleted: Yes (account termination)
+- Deletion type: Soft delete (preserve historical data for audit trail)
+- Cascade behavior: 
+  - Soft delete all point deductions associated with user
+  - Remove from dormitory bed assignment
+  - Remove dormitory head status if applicable
+  - Preserve removal requests for historical reference
 
-### 2.5 RemovalRequest Entity
-**Properties:**
-- `id`: string (auto-generated)
-- `reason`: string (required, explanation for removal request)
-- `totalPoints`: number (computed, total points deducted for target user)
-- `status`: string (enum: 'pending' | 'approved' | 'rejected' | 'cancelled', default: 'pending')
-- `adminComment`: string (optional, admin's decision comment)
-- `processedAt`: timestamp (nullable, when admin made decision)
-- `createdAt`: timestamp (auto-generated)
-- `updatedAt`: timestamp (auto-updated)
+### 2. Dormitory Entity
+**Purpose**: Represents individual dormitory units with configurable bed capacity
 
-## 3. Entity Relationships
+**Properties**:
+- id: string (Immutable after creation - system generated)
+- name: string (Freely modifiable - dormitory identifier/name)
+- bedCount: number (Modifiable with restrictions - between 4-6, only when dormitory is empty)
+- createdAt: Date (Immutable after creation)
+- updatedAt: Date (System managed)
 
-### 3.1 User-Dormitory Relations
-- **UserDormitoryRelation** (n:1)
-  - Source: User (property: 'dormitory')
-  - Target: Dormitory (property: 'users')
-  - A user can belong to at most one dormitory
+**Deletion Analysis**:
+- Can be deleted: Yes (only when empty)
+- Deletion type: Soft delete (maintain historical records)
+- Cascade behavior:
+  - Can only delete if no current bed assignments exist
+  - Preserve historical assignment records
 
-### 3.2 User-Bed Relations
-- **UserBedRelation** (1:1)
-  - Source: User (property: 'bed')
-  - Target: Bed (property: 'occupant')
-  - One user occupies exactly one bed when assigned
+### 3. BedAssignment Entity
+**Purpose**: Tracks the assignment of users to specific dormitory beds
 
-### 3.3 Dormitory-Bed Relations
-- **DormitoryBedRelation** (1:n)
-  - Source: Dormitory (property: 'beds')
-  - Target: Bed (property: 'dormitory')
-  - A dormitory contains multiple beds (4-6)
+**Properties**:
+- id: string (Immutable after creation)
+- bedNumber: number (Immutable after creation - assigned bed position 1-6)
+- assignedAt: Date (Immutable after creation - assignment timestamp)
+- removedAt: Date | null (Set once when user is removed from bed)
 
-### 3.4 DormHead Relations
-- **DormitoryDormHeadRelation** (n:1)
-  - Source: Dormitory (property: 'dormHead')
-  - Target: User (property: 'managedDormitory')
-  - Each dormitory can have one dorm head
+**Deletion Analysis**:
+- Can be deleted: No (permanent audit record)
+- Deletion type: N/A (use removedAt for logical removal)
 
-### 3.5 Point Deduction Relations
-- **UserPointDeductionRelation** (1:n)
-  - Source: User (property: 'pointDeductions')
-  - Target: PointDeduction (property: 'user')
-  - A user can have multiple point deductions
+### 4. PointDeduction Entity
+**Purpose**: Records behavioral infractions and associated point penalties
 
-- **DeductionIssuerRelation** (n:1)
-  - Source: PointDeduction (property: 'issuedBy')
-  - Target: User (property: 'issuedDeductions')
-  - Each deduction is issued by one user (admin or dorm head)
+**Properties**:
+- id: string (Immutable after creation)
+- reason: string (Immutable after creation - description of infraction)
+- points: number (Immutable after creation - points deducted)
+- createdAt: Date (Immutable after creation)
 
-### 3.6 Removal Request Relations
-- **RemovalRequestTargetRelation** (n:1)
-  - Source: RemovalRequest (property: 'targetUser')
-  - Target: User (property: 'removalRequests')
-  - Each request targets one user
+**Deletion Analysis**:
+- Can be deleted: No (audit trail requirement)
+- Deletion type: N/A (permanent record for accountability)
 
-- **RemovalRequestInitiatorRelation** (n:1)
-  - Source: RemovalRequest (property: 'requestedBy')
-  - Target: User (property: 'initiatedRemovalRequests')
-  - Each request is initiated by one dorm head
+### 5. RemovalRequest Entity
+**Purpose**: Tracks dormitory head requests to remove residents
 
-- **RemovalRequestAdminRelation** (n:1)
-  - Source: RemovalRequest (property: 'processedBy')
-  - Target: User (property: 'processedRemovalRequests')
-  - Each request is processed by one admin (when approved/rejected)
+**Properties**:
+- id: string (Immutable after creation)
+- reason: string (Immutable after creation - justification for removal)
+- status: 'pending' | 'approved' | 'rejected' (Modifiable with restrictions - only via admin interaction)
+- createdAt: Date (Immutable after creation)
+- processedAt: Date | null (Set once when admin processes request)
 
-## 4. Business Rules
+**Deletion Analysis**:
+- Can be deleted: No (audit trail requirement)
+- Deletion type: N/A (permanent record)
 
-### 4.1 Dormitory Management Rules
-- **BR001**: Dormitory capacity must be between 4 and 6 beds
-- **BR002**: Cannot assign users to a dormitory that is at full capacity
-- **BR003**: A user can only be assigned to one dormitory at a time
-- **BR004**: A user can only occupy one bed at a time
-- **BR005**: Only active dormitories can receive new assignments
+### 6. AdminComment Entity
+**Purpose**: Admin's feedback when processing removal requests
 
-### 4.2 Role and Permission Rules
-- **BR006**: Only admins can create/modify dormitories
-- **BR007**: Only admins can appoint/remove dorm heads
-- **BR008**: Dorm heads can only manage users in their assigned dormitory
-- **BR009**: Students cannot issue point deductions or removal requests
+**Properties**:
+- id: string (Immutable after creation)
+- comment: string (Immutable after creation - admin's decision rationale)
+- decision: 'approved' | 'rejected' (Immutable after creation)
+- createdAt: Date (Immutable after creation)
 
-### 4.3 Point Deduction Rules
-- **BR010**: Minimum deduction is 1 point, maximum is 10 points per incident
-- **BR011**: Only admins and relevant dorm heads can issue deductions
-- **BR012**: Deductions cannot be modified after 7 days
-- **BR013**: Total accumulated points threshold for removal eligibility: 30 points
+**Deletion Analysis**:
+- Can be deleted: No (audit trail requirement)
+- Deletion type: N/A (permanent record)
 
-### 4.4 Removal Process Rules
-- **BR014**: Removal requests can only be initiated when user has ≥30 accumulated points
-- **BR015**: Only the dorm head of the user's dormitory can initiate removal
-- **BR016**: Only admins can approve/reject removal requests
-- **BR017**: Once removed, user's status changes to 'removed' and bed becomes available
-- **BR018**: Removed users lose dormitory and bed assignments
+## Relation Analysis
 
-## 5. User Interactions
+### 1. DormitoryHeadRelation
+- **Source**: Dormitory (1)
+- **Target**: User (0..1)
+- **Source Property**: 'dormHead' (Dormitory accesses its head via this property)
+- **Target Property**: 'headOfDormitory' (User accesses dormitory they head via this property)
+- **Deletion**: Can be removed when changing dormitory head
 
-### 5.1 Admin Interactions
-- **CreateDormitory**: Create new dormitory with specified capacity
-- **UpdateDormitory**: Modify dormitory details
-- **DeactivateDormitory**: Mark dormitory as inactive
-- **AssignDormHead**: Appoint a user as dorm head
-- **RemoveDormHead**: Remove dorm head privileges
-- **AssignUserToDormitory**: Assign a student to a dormitory and bed
-- **RemoveUserFromDormitory**: Manually remove user from dormitory
-- **IssuePointDeduction**: Issue disciplinary points
-- **ProcessRemovalRequest**: Approve or reject removal requests
-- **ViewSystemStats**: View overall system statistics
+### 2. UserBedAssignmentRelation
+- **Source**: User (1)
+- **Target**: BedAssignment (0..1 active)
+- **Source Property**: 'bedAssignment' (User accesses their current bed)
+- **Target Property**: 'user' (BedAssignment accesses assigned user)
+- **Note**: Only one active assignment per user (where removedAt is null)
 
-### 5.2 Dorm Head Interactions
-- **IssuePointDeduction**: Issue points to users in their dormitory
-- **InitiateRemovalRequest**: Request removal of problematic user
-- **CancelRemovalRequest**: Cancel pending removal request
-- **ViewDormitoryStats**: View statistics for their dormitory
-- **ViewUserDeductions**: View deduction history for users
+### 3. DormitoryBedAssignmentRelation
+- **Source**: Dormitory (1)
+- **Target**: BedAssignment (0..*)
+- **Source Property**: 'bedAssignments' (Dormitory accesses all its bed assignments)
+- **Target Property**: 'dormitory' (BedAssignment accesses its dormitory)
 
-### 5.3 Student Interactions
-- **ViewMyDormitory**: View assigned dormitory details
-- **ViewMyDeductions**: View personal deduction history
-- **ViewMyBed**: View assigned bed information
+### 4. UserPointDeductionRelation
+- **Source**: User (1)
+- **Target**: PointDeduction (0..*)
+- **Source Property**: 'pointDeductions' (User accesses their deduction history)
+- **Target Property**: 'user' (PointDeduction accesses the affected user)
 
-### 5.4 System-triggered Actions
-- **UpdateBedStatus**: Automatically update bed status on assignment/removal
-- **UpdateDormitoryOccupancy**: Automatically update occupancy count
-- **CalculateTotalPoints**: Automatically sum active deductions
+### 5. CreatorPointDeductionRelation
+- **Source**: User (1) - The admin or dormitory head who created the deduction
+- **Target**: PointDeduction (0..*)
+- **Source Property**: 'createdDeductions' (User accesses deductions they created)
+- **Target Property**: 'createdBy' (PointDeduction accesses who created it)
 
-## 6. Computed Properties and Reactive Updates
+### 6. RemovalRequestUserRelation
+- **Source**: User (1) - The resident being requested for removal
+- **Target**: RemovalRequest (0..*)
+- **Source Property**: 'removalRequests' (User accesses removal requests about them)
+- **Target Property**: 'targetUser' (RemovalRequest accesses target user)
 
-### 6.1 Dormitory Computations
-- `occupancy`: Count of users assigned to dormitory
-- `availableBeds`: capacity - occupancy
-- `hasDormHead`: Boolean indicating if dorm head is assigned
+### 7. RemovalRequestCreatorRelation
+- **Source**: User (1) - The dormitory head creating the request
+- **Target**: RemovalRequest (0..*)
+- **Source Property**: 'createdRemovalRequests' (User accesses requests they created)
+- **Target Property**: 'requestedBy' (RemovalRequest accesses creator)
 
-### 6.2 User Computations
-- `totalPoints`: Sum of all active point deductions
-- `isRemovable`: totalPoints >= 30
-- `isDormHead`: Boolean based on role and assignment
+### 8. RemovalRequestDormitoryRelation
+- **Source**: Dormitory (1)
+- **Target**: RemovalRequest (0..*)
+- **Source Property**: 'removalRequests' (Dormitory accesses all removal requests)
+- **Target Property**: 'dormitory' (RemovalRequest accesses related dormitory)
 
-### 6.3 Bed Computations
-- `isAvailable`: status === 'available' && no occupant
+### 9. RemovalRequestAdminCommentRelation
+- **Source**: RemovalRequest (1)
+- **Target**: AdminComment (0..1)
+- **Source Property**: 'adminComment' (RemovalRequest accesses admin's comment)
+- **Target Property**: 'removalRequest' (AdminComment accesses the request)
 
-## 7. State Transitions
+### 10. AdminCommentAuthorRelation
+- **Source**: User (1) - The admin who wrote the comment
+- **Target**: AdminComment (0..*)
+- **Source Property**: 'adminComments' (User accesses comments they wrote)
+- **Target Property**: 'author' (AdminComment accesses who wrote it)
 
-### 7.1 User Status Transitions
-- active → suspended (via admin action)
-- active → removed (via approved removal request)
-- suspended → active (via admin action)
+## Interaction Analysis
 
-### 7.2 Bed Status Transitions
-- available → occupied (via user assignment)
-- occupied → available (via user removal)
-- available/occupied → maintenance (via admin action)
-- maintenance → available (via admin action)
+### Admin Interactions
 
-### 7.3 Removal Request Status Transitions
-- pending → approved (via admin approval)
-- pending → rejected (via admin rejection)
-- pending → cancelled (via dorm head cancellation)
+1. **CreateDormitory**
+   - Permission: Admin only
+   - Input: name, bedCount (4-6)
+   - Creates: Dormitory entity
+   - Validation: bedCount must be between 4 and 6
 
-### 7.4 Point Deduction Status Transitions
-- active → appealed (via appeal process - future feature)
-- active → cancelled (via admin action)
-- appealed → active (appeal rejected)
-- appealed → cancelled (appeal approved)
+2. **AssignDormitoryHead**
+   - Permission: Admin only
+   - Input: dormitoryId, userId
+   - Creates/Updates: DormitoryHeadRelation
+   - Validation: User must exist, dormitory must exist
+   - Business Rule: User cannot be head of multiple dormitories
 
-## 8. Data Validation Requirements
+3. **AssignUserToBed**
+   - Permission: Admin only
+   - Input: userId, dormitoryId, bedNumber
+   - Creates: BedAssignment entity and relations
+   - Validation: 
+     - User not already assigned to a bed
+     - Bed number valid for dormitory capacity
+     - Bed not already occupied
 
-### 8.1 Field Validations
-- Email must be valid format
-- Phone must be valid format (if provided)
-- Names cannot be empty strings
-- Capacity must be integer 4-6
-- Points must be positive integers 1-10
-- Timestamps must be valid dates
+4. **ProcessRemovalRequest**
+   - Permission: Admin only
+   - Input: removalRequestId, decision (approve/reject), comment
+   - Updates: RemovalRequest status
+   - Creates: AdminComment
+   - Side Effect: If approved, sets BedAssignment.removedAt
 
-### 8.2 Business Logic Validations
-- Cannot exceed dormitory capacity
-- Cannot assign to inactive dormitory
-- Cannot issue deductions to users not in your dormitory (for dorm heads)
-- Cannot request removal for users with <30 points
-- Cannot have multiple pending removal requests for same user
+### Dormitory Head Interactions
 
-## 9. Permission Matrix
+5. **DeductPoints**
+   - Permission: Dormitory head for residents in their dormitory
+   - Input: userId, reason, points
+   - Creates: PointDeduction entity
+   - Updates: User.points (decrements)
+   - Validation: User must be in head's dormitory
 
-| Interaction | Admin | Dorm Head | Student |
-|------------|-------|-----------|---------|
-| Create Dormitory | ✓ | ✗ | ✗ |
-| Assign Users | ✓ | ✗ | ✗ |
-| Appoint Dorm Head | ✓ | ✗ | ✗ |
-| Issue Deductions | ✓ | ✓* | ✗ |
-| Request Removal | ✗ | ✓* | ✗ |
-| Approve Removal | ✓ | ✗ | ✗ |
-| View All Data | ✓ | ✗ | ✗ |
-| View Dorm Data | ✓ | ✓* | ✓* |
-| View Own Data | ✓ | ✓ | ✓ |
+6. **RequestUserRemoval**
+   - Permission: Dormitory head for residents in their dormitory
+   - Input: userId, reason
+   - Creates: RemovalRequest entity
+   - Validation: 
+     - User must be in head's dormitory
+     - User points must be below threshold (e.g., <= 20)
+     - No pending removal request for same user
 
-*Limited to their assigned dormitory
+### User Interactions
 
-## 10. Additional Considerations
+7. **ViewMyStatus**
+   - Permission: Authenticated users
+   - Returns: User profile, bed assignment, points, deduction history
 
-### 10.1 Audit Trail
-- All critical actions (assignments, deductions, removals) should be logged
-- Timestamps and actor information must be preserved
+8. **ViewDormitoryInfo**
+   - Permission: Authenticated users assigned to a dormitory
+   - Returns: Dormitory details, residents list, dormitory head info
 
-### 10.2 Future Enhancements
-- Appeal system for point deductions
-- Transfer requests between dormitories
-- Bed preference system
-- Roommate compatibility matching
-- Maintenance scheduling system
-- Points expiration/forgiveness system
+## Business Rules
 
-### 10.3 Performance Considerations
-- Dormitory occupancy should be computed efficiently
-- User total points should be cached/computed
-- Bulk assignment operations for new semester
+1. **Bed Capacity Rule**: Each dormitory must have 4-6 beds
+2. **Single Assignment Rule**: A user can only be assigned to one bed at a time
+3. **Dormitory Head Uniqueness**: A user can only be head of one dormitory
+4. **Point Threshold for Removal**: Removal requests can only be made when user points <= 20
+5. **Removal Request Processing**: Only admins can approve/reject removal requests
+6. **Point Deduction Authority**: Only admins and relevant dormitory heads can deduct points
+7. **Initial Points**: New users start with 100 points
+8. **Minimum Points**: User points cannot go below 0
 
-### 10.4 Data Integrity
-- Orphaned beds should not exist (must belong to dormitory)
-- Users cannot be in limbo state (must have clear status)
-- Historical data preservation for removed users
+## Computed Properties
+
+1. **Dormitory.occupancy**: Count of active bed assignments
+2. **Dormitory.availableBeds**: bedCount - occupancy
+3. **User.totalDeductions**: Sum of all point deductions
+4. **User.isRemovable**: points <= 20
+5. **RemovalRequest.isPending**: status === 'pending'
+
+## State Machines
+
+### RemovalRequest State Machine
+- States: pending → approved/rejected
+- Transitions: Only via ProcessRemovalRequest interaction
+- Terminal States: approved, rejected
+
+### BedAssignment Lifecycle
+- Active: removedAt === null
+- Removed: removedAt !== null
+- Transition: Via approved removal request or admin action
+
+## Security Considerations
+
+1. **Role-Based Access Control**: Strict enforcement of admin vs dormitory head permissions
+2. **Scope Limitation**: Dormitory heads can only affect users in their dormitory
+3. **Audit Trail**: All point deductions and removal requests are permanent records
+4. **Data Integrity**: Immutable properties ensure historical accuracy

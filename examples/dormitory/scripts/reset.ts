@@ -159,10 +159,22 @@ async function resetProject(taskLevel: number = 0) {
     }
   }
 
-  // Always delete .claude directory
-  const claudeDir = path.join(projectRoot, '.claude');
-  if (deleteDirectory(claudeDir)) {
-    console.log('Deleted: .claude directory');
+
+
+  
+  // 5. Delete all files in errors directory but keep the directory
+  const errorsDir = path.join(projectRoot, 'errors');
+  if (fs.existsSync(errorsDir)) {
+    const files = fs.readdirSync(errorsDir);
+    for (const file of files) {
+      const filePath = path.join(errorsDir, file);
+      if (fs.statSync(filePath).isDirectory()) {
+        fs.rmSync(filePath, { recursive: true, force: true });
+      } else {
+        fs.unlinkSync(filePath);
+      }
+    }
+    console.log('Cleaned errors directory (kept directory structure)');
   }
 
   // Update STATUS.json based on target task level

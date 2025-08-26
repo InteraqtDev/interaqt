@@ -1,11 +1,10 @@
 # Dormitory Management System - Test Cases
 
-## Test Organization Strategy
-
-Tests are organized in three phases:
-1. **Phase 1: Core Business Logic Tests** - Basic CRUD and state management
-2. **Phase 2: Permission Tests** - Role-based access control
-3. **Phase 3: Business Rule Tests** - Complex validations and constraints
+## Test Case Organization
+Test cases are organized in phases to ensure proper system validation:
+1. **Phase 1: Core Business Logic** - Basic functionality without permissions
+2. **Phase 2: Permission Tests** - Role-based access control validation
+3. **Phase 3: Business Rule Tests** - Complex business logic and constraints
 
 ---
 
@@ -13,489 +12,307 @@ Tests are organized in three phases:
 
 ### TC001: Create Dormitory (via CreateDormitory Interaction)
 - **Interaction**: CreateDormitory
-- **Preconditions**: Admin user exists
+- **Preconditions**: Admin user logged in
 - **Input Data**: 
-  ```
-  name: "Building A - Room 301"
-  capacity: 4
-  floor: 3
-  building: "A"
-  ```
+  - name: "Building A - Room 101"
+  - bedCount: 4
 - **Expected Results**:
-  1. New dormitory record created
-  2. Dormitory status is 'active'
-  3. Occupancy is 0
-  4. Available beds equals capacity (4)
-  5. 4 bed entities automatically created with status 'available'
-  6. Beds are linked to the dormitory
+  1. New dormitory entity created
+  2. Dormitory.name = "Building A - Room 101"
+  3. Dormitory.bedCount = 4
+  4. Dormitory.createdAt = current timestamp
+  5. Dormitory.occupancy computed as 0
+  6. Dormitory.availableBeds computed as 4
 - **Post Validation**: Dormitory appears in system dormitory list
 
-### TC002: Assign User to Dormitory (via AssignUserToDormitory Interaction)
-- **Interaction**: AssignUserToDormitory
+### TC002: Create Dormitory with Invalid Bed Count (via CreateDormitory Interaction)
+- **Interaction**: CreateDormitory
+- **Preconditions**: Admin user logged in
+- **Input Data**:
+  - name: "Building B - Room 201"
+  - bedCount: 8 (exceeds maximum)
+- **Expected Results**:
+  1. Interaction returns validation error
+  2. Error message: "Bed count must be between 4 and 6"
+  3. No dormitory entity created
+- **Negative Test**: Validates bed capacity constraints
+
+### TC003: Assign Dormitory Head (via AssignDormitoryHead Interaction)
+- **Interaction**: AssignDormitoryHead
 - **Preconditions**: 
-  - Admin user exists
-  - Target user exists with status 'active' and no dormitory
-  - Dormitory exists with available beds
+  - Admin user logged in
+  - Dormitory exists (id: "dorm-001")
+  - Regular user exists (id: "user-001")
 - **Input Data**:
-  ```
-  userId: "user-123"
-  dormitoryId: "dorm-456"
-  bedNumber: "A"
-  ```
+  - dormitoryId: "dorm-001"
+  - userId: "user-001"
 - **Expected Results**:
-  1. UserDormitoryRelation created
-  2. UserBedRelation created
-  3. Bed status changes from 'available' to 'occupied'
-  4. Dormitory occupancy increases by 1
-  5. Available beds decreases by 1
-  6. User can access dormitory via 'dormitory' property
-  7. User can access bed via 'bed' property
-- **Post Validation**: User appears in dormitory's user list
+  1. DormitoryHeadRelation created
+  2. Dormitory.dormHead points to user-001
+  3. User.headOfDormitory points to dorm-001
+  4. User.isAdmin remains false
+- **Post Validation**: User appears as dormitory head in dormitory info
 
-### TC003: Appoint Dorm Head (via AssignDormHead Interaction)
-- **Interaction**: AssignDormHead
+### TC004: Assign User to Bed (via AssignUserToBed Interaction)
+- **Interaction**: AssignUserToBed
 - **Preconditions**:
-  - Admin user exists
-  - Target user exists with status 'active'
-  - Dormitory exists without a dorm head
+  - Admin user logged in
+  - Dormitory exists with 4 beds (id: "dorm-001")
+  - User exists without bed assignment (id: "user-002")
 - **Input Data**:
-  ```
-  userId: "user-789"
-  dormitoryId: "dorm-456"
-  ```
+  - userId: "user-002"
+  - dormitoryId: "dorm-001"
+  - bedNumber: 2
 - **Expected Results**:
-  1. User role changes to 'dormHead'
-  2. DormitoryDormHeadRelation created
-  3. User can access managed dormitory via 'managedDormitory' property
-  4. Dormitory can access dorm head via 'dormHead' property
-- **Post Validation**: User has dorm head permissions for the dormitory
+  1. BedAssignment entity created
+  2. BedAssignment.bedNumber = 2
+  3. BedAssignment.assignedAt = current timestamp
+  4. BedAssignment.removedAt = null
+  5. User.bedAssignment points to new assignment
+  6. Dormitory.occupancy increments to 1
+  7. Dormitory.availableBeds decrements to 3
+- **Post Validation**: User appears in dormitory resident list
 
-### TC004: Issue Point Deduction (via IssuePointDeduction Interaction)
-- **Interaction**: IssuePointDeduction
+### TC005: Attempt Duplicate Bed Assignment (via AssignUserToBed Interaction)
+- **Interaction**: AssignUserToBed
 - **Preconditions**:
-  - Issuer is admin or dorm head
-  - Target user exists and is in a dormitory
+  - User already assigned to bed 2 in dorm-001
 - **Input Data**:
-  ```
-  targetUserId: "user-123"
-  reason: "Excessive noise after 10 PM"
-  points: 5
-  category: "noise"
-  description: "Multiple complaints from roommates"
-  ```
+  - userId: "user-002" (same user)
+  - dormitoryId: "dorm-002"
+  - bedNumber: 1
+- **Expected Results**:
+  1. Interaction returns error
+  2. Error message: "User already assigned to a bed"
+  3. No new BedAssignment created
+  4. User remains in original bed
+- **Negative Test**: Validates single assignment rule
+
+### TC006: Deduct Points (via DeductPoints Interaction)
+- **Interaction**: DeductPoints
+- **Preconditions**:
+  - Dormitory head logged in (id: "user-001")
+  - Target user in same dormitory (id: "user-002", points: 100)
+- **Input Data**:
+  - userId: "user-002"
+  - reason: "Late return after curfew"
+  - points: 10
 - **Expected Results**:
   1. PointDeduction entity created
-  2. UserPointDeductionRelation created
-  3. DeductionIssuerRelation created
-  4. Deduction status is 'active'
-  5. User's total points increases by 5
-  6. Timestamp recorded as deductedAt
-- **Post Validation**: Deduction appears in user's deduction history
+  2. PointDeduction.reason = "Late return after curfew"
+  3. PointDeduction.points = 10
+  4. PointDeduction.createdBy points to user-001
+  5. User.points decrements from 100 to 90
+  6. User.totalDeductions computed as 10
+- **Post Validation**: Deduction appears in user's history
 
-### TC005: Initiate Removal Request (via InitiateRemovalRequest Interaction)
-- **Interaction**: InitiateRemovalRequest
+### TC007: Request User Removal (via RequestUserRemoval Interaction)
+- **Interaction**: RequestUserRemoval
 - **Preconditions**:
-  - Requester is dorm head of target user's dormitory
-  - Target user has accumulated points >= 30
+  - Dormitory head logged in (id: "user-001")
+  - Target user has low points (id: "user-003", points: 15)
+  - User-003 is in head's dormitory
 - **Input Data**:
-  ```
-  targetUserId: "user-123"
-  reason: "Repeated violations and 35 accumulated points"
-  ```
+  - userId: "user-003"
+  - reason: "Multiple violations and uncooperative behavior"
 - **Expected Results**:
   1. RemovalRequest entity created
-  2. Status is 'pending'
-  3. RemovalRequestTargetRelation created
-  4. RemovalRequestInitiatorRelation created
-  5. totalPoints computed as 35
-- **Post Validation**: Request appears in admin's pending requests
+  2. RemovalRequest.status = "pending"
+  3. RemovalRequest.reason = provided reason
+  4. RemovalRequest.targetUser points to user-003
+  5. RemovalRequest.requestedBy points to user-001
+  6. RemovalRequest.dormitory points to the dormitory
+  7. RemovalRequest.isPending computed as true
+- **Post Validation**: Request appears in admin's pending list
 
-### TC006: Process Removal Request - Approval (via ProcessRemovalRequest Interaction)
+### TC008: Process Removal Request - Approve (via ProcessRemovalRequest Interaction)
 - **Interaction**: ProcessRemovalRequest
 - **Preconditions**:
-  - Admin user exists
-  - Removal request exists with status 'pending'
+  - Admin logged in
+  - Pending removal request exists (id: "request-001")
 - **Input Data**:
-  ```
-  requestId: "request-001"
-  decision: "approved"
-  adminComment: "Multiple violations confirmed"
-  ```
+  - removalRequestId: "request-001"
+  - decision: "approved"
+  - comment: "Verified violations, removal approved"
 - **Expected Results**:
-  1. RemovalRequest status changes to 'approved'
-  2. processedAt timestamp recorded
-  3. RemovalRequestAdminRelation created
-  4. Target user status changes to 'removed'
-  5. UserDormitoryRelation deleted
-  6. UserBedRelation deleted
-  7. Bed status changes to 'available'
-  8. Dormitory occupancy decreases by 1
-- **Post Validation**: User no longer has dormitory access
+  1. RemovalRequest.status updates to "approved"
+  2. RemovalRequest.processedAt = current timestamp
+  3. AdminComment entity created with decision and comment
+  4. BedAssignment.removedAt set to current timestamp
+  5. User.bedAssignment becomes null
+  6. Dormitory.occupancy decrements
+  7. Dormitory.availableBeds increments
+- **Post Validation**: User no longer appears in dormitory residents
 
-### TC007: Process Removal Request - Rejection (via ProcessRemovalRequest Interaction)
+### TC009: Process Removal Request - Reject (via ProcessRemovalRequest Interaction)
 - **Interaction**: ProcessRemovalRequest
 - **Preconditions**:
-  - Admin user exists
-  - Removal request exists with status 'pending'
+  - Admin logged in
+  - Pending removal request exists (id: "request-002")
 - **Input Data**:
-  ```
-  requestId: "request-002"
-  decision: "rejected"
-  adminComment: "First offense, warning issued instead"
-  ```
+  - removalRequestId: "request-002"
+  - decision: "rejected"
+  - comment: "First offense, warning issued instead"
 - **Expected Results**:
-  1. RemovalRequest status changes to 'rejected'
-  2. processedAt timestamp recorded
-  3. RemovalRequestAdminRelation created
-  4. Target user status remains 'active'
-  5. User keeps dormitory and bed assignments
-- **Post Validation**: User still has dormitory access
-
-### TC008: Remove User from Dormitory Manually (via RemoveUserFromDormitory Interaction)
-- **Interaction**: RemoveUserFromDormitory
-- **Preconditions**:
-  - Admin user exists
-  - Target user is assigned to a dormitory
-- **Input Data**:
-  ```
-  userId: "user-456"
-  reason: "Voluntary withdrawal"
-  ```
-- **Expected Results**:
-  1. UserDormitoryRelation deleted
-  2. UserBedRelation deleted
-  3. Bed status changes to 'available'
-  4. Dormitory occupancy decreases
-  5. User status may change based on reason
-- **Post Validation**: User no longer appears in dormitory user list
-
-### TC009: Update Dormitory Details (via UpdateDormitory Interaction)
-- **Interaction**: UpdateDormitory
-- **Preconditions**:
-  - Admin user exists
-  - Dormitory exists
-- **Input Data**:
-  ```
-  dormitoryId: "dorm-456"
-  name: "Building B - Room 302"
-  status: "inactive"
-  ```
-- **Expected Results**:
-  1. Dormitory name updated
-  2. Dormitory status changed to 'inactive'
-  3. Existing assignments remain unchanged
-  4. Cannot assign new users to inactive dormitory
-- **Post Validation**: Dormitory shows updated details
-
-### TC010: Cancel Removal Request (via CancelRemovalRequest Interaction)
-- **Interaction**: CancelRemovalRequest
-- **Preconditions**:
-  - Dorm head who initiated the request
-  - Request status is 'pending'
-- **Input Data**:
-  ```
-  requestId: "request-003"
-  ```
-- **Expected Results**:
-  1. RemovalRequest status changes to 'cancelled'
-  2. No changes to user status or assignments
-- **Post Validation**: Request no longer in pending list
+  1. RemovalRequest.status updates to "rejected"
+  2. RemovalRequest.processedAt = current timestamp
+  3. AdminComment entity created with decision and comment
+  4. BedAssignment remains unchanged (removedAt still null)
+  5. User remains in dormitory
+- **Post Validation**: User still appears in dormitory residents
 
 ---
 
 ## Phase 2: Permission Tests
 
-### TC011: Non-Admin Cannot Create Dormitory
+### TC010: Non-Admin Attempts Create Dormitory
 - **Interaction**: CreateDormitory
-- **Preconditions**: User logged in as student or dorm head
+- **Preconditions**: Regular user logged in (not admin)
 - **Input Data**: Valid dormitory data
 - **Expected Results**:
-  1. Interaction returns error
-  2. Error type is 'condition check failed'
+  1. Interaction returns permission error
+  2. Error message: "Admin permission required"
   3. No dormitory created
-- **Post Validation**: Dormitory count unchanged
+- **Permission Test**: Validates admin-only access
 
-### TC012: Student Cannot Issue Point Deduction
-- **Interaction**: IssuePointDeduction
-- **Preconditions**: User logged in as student
+### TC011: Regular User Attempts Point Deduction
+- **Interaction**: DeductPoints
+- **Preconditions**: Regular user logged in (not dormitory head)
 - **Input Data**: Valid deduction data
 - **Expected Results**:
-  1. Interaction returns error
-  2. Error type is 'condition check failed'
-  3. No deduction created
-- **Post Validation**: Target user's points unchanged
+  1. Interaction returns permission error
+  2. Error message: "Must be admin or dormitory head"
+  3. No point deduction created
+- **Permission Test**: Validates authority hierarchy
 
-### TC013: Dorm Head Can Only Deduct Points in Own Dormitory
-- **Interaction**: IssuePointDeduction
-- **Preconditions**: 
-  - User is dorm head of Dormitory A
-  - Target user is in Dormitory B
-- **Input Data**: Valid deduction data
-- **Expected Results**:
-  1. Interaction returns error
-  2. Error type is 'condition check failed'
-  3. No deduction created
-- **Post Validation**: Target user's points unchanged
-
-### TC014: Only Dorm Head Can Initiate Removal for Their Dormitory
-- **Interaction**: InitiateRemovalRequest
+### TC012: Dormitory Head Deducts Points Outside Their Dormitory
+- **Interaction**: DeductPoints
 - **Preconditions**:
-  - User is dorm head of Dormitory A
-  - Target user is in Dormitory B
-- **Input Data**: Valid removal request
+  - Dormitory head of dorm-001 logged in
+  - Target user in dorm-002
+- **Input Data**: userId from different dormitory
 - **Expected Results**:
-  1. Interaction returns error
-  2. Error type is 'condition check failed'
-  3. No removal request created
-- **Post Validation**: No pending requests for target user
+  1. Interaction returns permission error
+  2. Error message: "Can only deduct points from residents in your dormitory"
+  3. No deduction created
+- **Permission Test**: Validates scope limitation
 
-### TC015: Only Admin Can Process Removal Requests
-- **Interaction**: ProcessRemovalRequest
-- **Preconditions**: 
-  - User logged in as dorm head or student
-  - Pending removal request exists
-- **Input Data**: Approval decision
+### TC013: User Views Own Status
+- **Interaction**: ViewMyStatus
+- **Preconditions**: Any authenticated user
 - **Expected Results**:
-  1. Interaction returns error
-  2. Error type is 'condition check failed'
-  3. Request status remains 'pending'
-- **Post Validation**: Target user status unchanged
-
-### TC016: Student Cannot View Other Users' Deductions
-- **Interaction**: ViewUserDeductions
-- **Preconditions**:
-  - User logged in as student
-  - Attempting to view another user's deductions
-- **Input Data**: Other user's ID
-- **Expected Results**:
-  1. Interaction returns error or empty result
-  2. No deduction details exposed
-- **Post Validation**: Privacy maintained
+  1. Returns user's profile data
+  2. Shows current bed assignment (if any)
+  3. Shows current points
+  4. Lists point deduction history
+- **Permission Test**: Validates self-access permission
 
 ---
 
 ## Phase 3: Business Rule Tests
 
-### TC017: Cannot Create Dormitory with Invalid Capacity
-- **Interaction**: CreateDormitory
-- **Preconditions**: Admin user logged in
-- **Input Data**: 
-  ```
-  name: "Test Dorm"
-  capacity: 3  // Below minimum
-  ```
-- **Expected Results**:
-  1. Interaction returns error
-  2. Error type is 'condition check failed'
-  3. No dormitory created
-- **Post Validation**: Dormitory list unchanged
-
-### TC018: Cannot Create Dormitory with Excessive Capacity
-- **Interaction**: CreateDormitory
-- **Preconditions**: Admin user logged in
-- **Input Data**:
-  ```
-  name: "Test Dorm"
-  capacity: 7  // Above maximum
-  ```
-- **Expected Results**:
-  1. Interaction returns error
-  2. Error type is 'condition check failed'
-  3. No dormitory created
-- **Post Validation**: Dormitory list unchanged
-
-### TC019: Cannot Assign User to Full Dormitory
-- **Interaction**: AssignUserToDormitory
+### TC014: Request Removal with High Points
+- **Interaction**: RequestUserRemoval
 - **Preconditions**:
-  - Admin user logged in
-  - Dormitory at full capacity (all beds occupied)
-- **Input Data**: Valid user and dormitory IDs
-- **Expected Results**:
-  1. Interaction returns error
-  2. Error indicates dormitory is full
-  3. No assignment created
-- **Post Validation**: Dormitory occupancy unchanged
-
-### TC020: Cannot Assign User Who Already Has Dormitory
-- **Interaction**: AssignUserToDormitory
-- **Preconditions**:
-  - Admin user logged in
-  - Target user already assigned to a dormitory
-- **Input Data**: User ID and different dormitory ID
-- **Expected Results**:
-  1. Interaction returns error
-  2. Error indicates user already assigned
-  3. No new assignment created
-- **Post Validation**: User remains in original dormitory
-
-### TC021: Cannot Issue Invalid Point Amount
-- **Interaction**: IssuePointDeduction
-- **Preconditions**: Admin or dorm head logged in
-- **Input Data**:
-  ```
-  points: 0  // Below minimum
-  ```
-- **Expected Results**:
-  1. Interaction returns error
-  2. Error type is 'condition check failed'
-  3. No deduction created
-- **Post Validation**: User's points unchanged
-
-### TC022: Cannot Issue Excessive Points
-- **Interaction**: IssuePointDeduction
-- **Preconditions**: Admin or dorm head logged in
-- **Input Data**:
-  ```
-  points: 11  // Above maximum
-  ```
-- **Expected Results**:
-  1. Interaction returns error
-  2. Error type is 'condition check failed'
-  3. No deduction created
-- **Post Validation**: User's points unchanged
-
-### TC023: Cannot Request Removal for User with Insufficient Points
-- **Interaction**: InitiateRemovalRequest
-- **Preconditions**:
-  - Dorm head logged in
-  - Target user has only 25 points (below threshold)
+  - Dormitory head logged in
+  - Target user has high points (points: 75)
 - **Input Data**: Valid removal request
 - **Expected Results**:
-  1. Interaction returns error
-  2. Error indicates insufficient points
+  1. Interaction returns business rule error
+  2. Error message: "User must have 20 or fewer points for removal request"
   3. No removal request created
-- **Post Validation**: No pending requests created
+- **Business Rule Test**: Validates point threshold
 
-### TC024: Cannot Have Multiple Pending Removal Requests
-- **Interaction**: InitiateRemovalRequest
-- **Preconditions**:
-  - Dorm head logged in
-  - Pending removal request already exists for target user
-- **Input Data**: New removal request for same user
-- **Expected Results**:
-  1. Interaction returns error
-  2. Error indicates existing pending request
-  3. No new request created
-- **Post Validation**: Only one pending request exists
-
-### TC025: Cannot Assign to Inactive Dormitory
-- **Interaction**: AssignUserToDormitory
+### TC015: Assign User to Occupied Bed
+- **Interaction**: AssignUserToBed
 - **Preconditions**:
   - Admin logged in
-  - Target dormitory status is 'inactive'
-- **Input Data**: Valid user and dormitory IDs
+  - Bed 3 in dorm-001 already occupied
+- **Input Data**: 
+  - Different userId
+  - Same dormitoryId and bedNumber
 - **Expected Results**:
   1. Interaction returns error
-  2. Error indicates dormitory is inactive
-  3. No assignment created
-- **Post Validation**: Dormitory occupancy unchanged
+  2. Error message: "Bed is already occupied"
+  3. No new assignment created
+- **Business Rule Test**: Validates bed occupancy
 
-### TC026: Cannot Assign Non-Existent Bed
-- **Interaction**: AssignUserToDormitory
+### TC016: Create Duplicate Removal Request
+- **Interaction**: RequestUserRemoval
 - **Preconditions**:
-  - Admin logged in
-  - Bed number doesn't exist in dormitory
-- **Input Data**:
-  ```
-  bedNumber: "Z"  // Non-existent bed
-  ```
+  - Pending removal request already exists for user
+- **Input Data**: Same userId
 - **Expected Results**:
   1. Interaction returns error
-  2. Error indicates bed not found
+  2. Error message: "Removal request already pending for this user"
+  3. No duplicate request created
+- **Business Rule Test**: Validates request uniqueness
+
+### TC017: Assign Multiple Dormitory Head Roles
+- **Interaction**: AssignDormitoryHead
+- **Preconditions**:
+  - User already head of dorm-001
+- **Input Data**: 
+  - Same userId
+  - Different dormitoryId (dorm-002)
+- **Expected Results**:
+  1. Interaction returns error
+  2. Error message: "User is already head of another dormitory"
+  3. No new assignment created
+- **Business Rule Test**: Validates head uniqueness
+
+### TC018: Deduct Points Below Zero
+- **Interaction**: DeductPoints
+- **Preconditions**:
+  - User has 5 points remaining
+- **Input Data**: 
+  - points: 10 (would result in -5)
+- **Expected Results**:
+  1. Deduction created successfully
+  2. User.points set to 0 (not negative)
+  3. User.isRemovable computed as true
+- **Business Rule Test**: Validates minimum points constraint
+
+### TC019: Exceed Dormitory Bed Capacity
+- **Interaction**: AssignUserToBed
+- **Preconditions**:
+  - Dormitory has 4 beds, all occupied
+- **Input Data**: 
+  - bedNumber: 5 (exceeds capacity)
+- **Expected Results**:
+  1. Interaction returns error
+  2. Error message: "Bed number exceeds dormitory capacity"
   3. No assignment created
-- **Post Validation**: All beds maintain current status
+- **Business Rule Test**: Validates bed capacity
 
-### TC027: Automatic Point Calculation
-- **Interaction**: Multiple IssuePointDeduction calls
-- **Preconditions**: User has no deductions
-- **Input Data**: Issue 3 deductions: 5, 10, 8 points
+### TC020: View Dormitory Info
+- **Interaction**: ViewDormitoryInfo
+- **Preconditions**: User assigned to dormitory
 - **Expected Results**:
-  1. After first: totalPoints = 5
-  2. After second: totalPoints = 15
-  3. After third: totalPoints = 23
-  4. User.isRemovable = false (below 30)
-- **Post Validation**: Total points correctly computed
-
-### TC028: Removal Eligibility Threshold
-- **Interaction**: IssuePointDeduction
-- **Preconditions**: User has 28 points
-- **Input Data**: New deduction of 5 points
-- **Expected Results**:
-  1. totalPoints becomes 33
-  2. User.isRemovable changes to true
-  3. Dorm head can now initiate removal
-- **Post Validation**: Removal request can be created
+  1. Returns dormitory details
+  2. Shows all current residents
+  3. Shows dormitory head information
+  4. Shows occupancy status
+- **Permission Test**: Validates dormitory member access
 
 ---
 
-## Test Data Setup
+## Test Execution Notes
 
-### Standard Test Users
-```
-Admin User: {
-  id: 'admin-001',
-  name: 'System Admin',
-  email: 'admin@dorm.edu',
-  role: 'admin',
-  status: 'active'
-}
+1. **Test Data Setup**: Create test fixtures for users, dormitories, and initial states
+2. **Test Isolation**: Each test should run in isolation with clean state
+3. **Assertion Coverage**: Verify both successful operations and error conditions
+4. **Computed Property Validation**: Always check that computed properties update correctly
+5. **Cascade Effect Testing**: Verify all related entities update appropriately
+6. **State Machine Testing**: Ensure proper state transitions and terminal states
+7. **Audit Trail Verification**: Confirm immutable properties remain unchanged
 
-Dorm Head User: {
-  id: 'head-001',
-  name: 'John Smith',
-  email: 'john@dorm.edu',
-  role: 'dormHead',
-  status: 'active'
-}
+## Critical Test Patterns
 
-Student Users: [
-  { id: 'student-001', name: 'Alice Brown', email: 'alice@dorm.edu' },
-  { id: 'student-002', name: 'Bob Wilson', email: 'bob@dorm.edu' },
-  { id: 'student-003', name: 'Carol Davis', email: 'carol@dorm.edu' },
-  { id: 'student-004', name: 'David Lee', email: 'david@dorm.edu' }
-]
-```
-
-### Standard Test Dormitories
-```
-Dormitory A: {
-  id: 'dorm-001',
-  name: 'Building A - Room 101',
-  capacity: 4,
-  status: 'active'
-}
-
-Dormitory B: {
-  id: 'dorm-002',
-  name: 'Building B - Room 201',
-  capacity: 6,
-  status: 'active'
-}
-```
-
----
-
-## Test Execution Order
-
-1. **Setup Phase**: Create base test data
-2. **Phase 1**: Run all core business logic tests (TC001-TC010)
-3. **Phase 2**: Run all permission tests (TC011-TC016)
-4. **Phase 3**: Run all business rule tests (TC017-TC028)
-5. **Cleanup Phase**: Reset test data
-
-## Success Criteria
-
-- All tests in Phase 1 must pass before proceeding to Phase 2
-- All tests in Phase 2 must pass before proceeding to Phase 3
-- 100% test pass rate required for production deployment
-- No test should be skipped or marked as TODO
-
-## Error Documentation
-
-Any test failures should be documented in `docs/errors/` with:
-- Test case ID
-- Actual vs Expected behavior
-- Error messages
-- Stack traces
-- Attempted fixes
-- Resolution status
+1. **Never test with direct storage operations** - Always use Interactions
+2. **Test both positive and negative cases** for each Interaction
+3. **Verify computed properties** after state changes
+4. **Check cascade effects** on related entities
+5. **Validate permission boundaries** for each role
+6. **Test business rule enforcement** at Interaction level
+7. **Ensure audit trail integrity** for all operations

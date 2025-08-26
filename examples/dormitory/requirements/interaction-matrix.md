@@ -1,324 +1,308 @@
 # Dormitory Management System - Interaction Matrix
 
 ## Overview
+This matrix maps all user interactions with their corresponding permissions, business rules, and test coverage to ensure complete system implementation.
 
-This document maps all system interactions to user roles, defining permission requirements, business rule constraints, and corresponding test cases for each interaction.
+## Role Definitions
 
-## Interaction Categories
-
-1. **Dormitory Management**: Creating and managing dormitory entities
-2. **User Management**: Assigning users, managing roles
-3. **Disciplinary Actions**: Point deductions and removal processes
-4. **Information Access**: Viewing and querying data
+| Role | Description | Permissions |
+|------|-------------|------------|
+| **Admin** | System administrator with full control | All system operations |
+| **Dormitory Head** | User assigned to manage a specific dormitory | Limited management operations within their dormitory |
+| **Regular User** | Standard system user | View own data, no management capabilities |
 
 ---
 
-## Complete Interaction Matrix
+## Interaction Permission Matrix
 
-| Interaction | Admin | Dorm Head | Student | Permission Rules | Business Rules | Test Cases |
-|------------|--------|-----------|---------|------------------|----------------|------------|
-| **CreateDormitory** | ✅ | ❌ | ❌ | Must be admin | Capacity 4-6 | TC001, TC011, TC017, TC018 |
-| **UpdateDormitory** | ✅ | ❌ | ❌ | Must be admin | Valid status values | TC009 |
-| **DeactivateDormitory** | ✅ | ❌ | ❌ | Must be admin | Check existing assignments | TC025 |
-| **AssignDormHead** | ✅ | ❌ | ❌ | Must be admin | User must be active | TC003 |
-| **RemoveDormHead** | ✅ | ❌ | ❌ | Must be admin | - | - |
-| **AssignUserToDormitory** | ✅ | ❌ | ❌ | Must be admin | No existing assignment, capacity check | TC002, TC019, TC020, TC026 |
-| **RemoveUserFromDormitory** | ✅ | ❌ | ❌ | Must be admin | User must be assigned | TC008 |
-| **IssuePointDeduction** | ✅ | ✅* | ❌ | Admin or relevant dorm head | Points 1-10, target in dormitory | TC004, TC012, TC013, TC021, TC022 |
-| **InitiateRemovalRequest** | ❌ | ✅* | ❌ | Must be dorm head of user's dorm | User has ≥30 points, no pending request | TC005, TC014, TC023, TC024 |
-| **CancelRemovalRequest** | ❌ | ✅* | ❌ | Must be original requester | Request must be pending | TC010 |
-| **ProcessRemovalRequest** | ✅ | ❌ | ❌ | Must be admin | Request must be pending | TC006, TC007, TC015 |
-| **ViewSystemStats** | ✅ | ❌ | ❌ | Must be admin | - | - |
-| **ViewDormitoryStats** | ✅ | ✅* | ❌ | Admin or dorm head of that dorm | - | - |
-| **ViewUserDeductions** | ✅ | ✅* | ✅* | Varies by target | Students only see own | TC016 |
-| **ViewMyDormitory** | ✅ | ✅ | ✅ | Must be authenticated | - | - |
-| **ViewMyDeductions** | ✅ | ✅ | ✅ | Must be authenticated | - | - |
-| **ViewMyBed** | ✅ | ✅ | ✅ | Must be authenticated | - | - |
-
-*With restrictions as noted in Permission Rules
+| Interaction | Admin | Dormitory Head | Regular User | Business Rules |
+|------------|-------|----------------|--------------|----------------|
+| **CreateDormitory** | ✅ | ❌ | ❌ | - Bed count must be 4-6<br>- Dormitory name must be unique |
+| **AssignDormitoryHead** | ✅ | ❌ | ❌ | - User can only head one dormitory<br>- Target user must exist |
+| **AssignUserToBed** | ✅ | ❌ | ❌ | - User can only have one bed assignment<br>- Bed must be available<br>- Bed number within dormitory capacity |
+| **DeductPoints** | ✅ | ✅* | ❌ | - *Dormitory heads only for their residents<br>- Points cannot go below 0<br>- Must provide reason |
+| **RequestUserRemoval** | ❌ | ✅* | ❌ | - *Only for residents in their dormitory<br>- User must have ≤20 points<br>- No duplicate pending requests |
+| **ProcessRemovalRequest** | ✅ | ❌ | ❌ | - Request must be pending<br>- Must provide comment<br>- Updates bed assignment if approved |
+| **ViewMyStatus** | ✅ | ✅ | ✅ | - Users can only view their own status |
+| **ViewDormitoryInfo** | ✅ | ✅* | ✅* | - *Must be assigned to the dormitory |
 
 ---
 
 ## Detailed Interaction Specifications
 
-### 1. CreateDormitory
-- **Purpose**: Create a new dormitory with beds
+### Administrative Interactions
+
+#### 1. CreateDormitory
+- **Purpose**: Create a new dormitory in the system
 - **Actors**: Admin only
-- **Payload**:
-  - name: string (required)
-  - capacity: number (required, 4-6)
-  - floor: number (optional)
-  - building: string (optional)
-- **Permissions**: `user.role === 'admin'`
-- **Business Rules**:
-  - `capacity >= 4 && capacity <= 6`
-  - Name must be unique
+- **Preconditions**: 
+  - User has admin privileges
+  - Dormitory name is unique
+- **Input Parameters**:
+  - `name`: string (required, unique)
+  - `bedCount`: number (required, 4-6)
+- **Validations**:
+  - Name not empty
+  - Name not already in use
+  - Bed count between 4 and 6 inclusive
 - **Side Effects**:
-  - Creates dormitory entity
-  - Creates bed entities (count = capacity)
-  - Establishes dormitory-bed relationships
-- **Error Cases**:
-  - Non-admin user (permission denied)
-  - Invalid capacity (validation error)
-  - Duplicate name (constraint error)
+  - Creates Dormitory entity
+  - Sets initial occupancy to 0
+- **Test Cases**: TC001, TC002, TC010
 
-### 2. AssignUserToDormitory
-- **Purpose**: Assign a student to a dormitory and bed
+#### 2. AssignDormitoryHead
+- **Purpose**: Assign a user as dormitory head
 - **Actors**: Admin only
-- **Payload**:
-  - userId: string (required)
-  - dormitoryId: string (required)
-  - bedNumber: string (required)
-- **Permissions**: `user.role === 'admin'`
-- **Business Rules**:
-  - User must not have existing dormitory assignment
-  - Dormitory must have available capacity
-  - Bed must exist and be available
-  - Dormitory must be active
+- **Preconditions**:
+  - User has admin privileges
+  - Target dormitory exists
+  - Target user exists
+- **Input Parameters**:
+  - `dormitoryId`: string (required)
+  - `userId`: string (required)
+- **Validations**:
+  - User not already head of another dormitory
+  - Dormitory exists
+  - User exists
 - **Side Effects**:
-  - Creates UserDormitoryRelation
-  - Creates UserBedRelation
-  - Updates bed status to 'occupied'
-  - Updates dormitory occupancy count
-- **Error Cases**:
-  - User already assigned
-  - Dormitory full
-  - Bed not available
-  - Dormitory inactive
+  - Creates/Updates DormitoryHeadRelation
+  - Previous head (if any) loses role
+- **Test Cases**: TC003, TC017
 
-### 3. IssuePointDeduction
-- **Purpose**: Issue disciplinary points to a user
-- **Actors**: Admin, Dorm Head (own dormitory only)
-- **Payload**:
-  - targetUserId: string (required)
-  - reason: string (required)
-  - points: number (required, 1-10)
-  - category: string (required, enum)
-  - description: string (optional)
-  - evidence: string (optional)
-- **Permissions**: 
-  ```
-  user.role === 'admin' || 
-  (user.role === 'dormHead' && targetUser.dormitory === user.managedDormitory)
-  ```
-- **Business Rules**:
-  - `points >= 1 && points <= 10`
-  - Target user must be in a dormitory
-  - Category must be valid enum value
+#### 3. AssignUserToBed
+- **Purpose**: Assign a user to a dormitory bed
+- **Actors**: Admin only
+- **Preconditions**:
+  - User has admin privileges
+  - Target user not already assigned
+  - Bed is available
+- **Input Parameters**:
+  - `userId`: string (required)
+  - `dormitoryId`: string (required)
+  - `bedNumber`: number (required)
+- **Validations**:
+  - User exists
+  - Dormitory exists
+  - Bed number within capacity (1 to bedCount)
+  - Bed not occupied
+  - User not already assigned elsewhere
 - **Side Effects**:
-  - Creates PointDeduction entity
-  - Creates UserPointDeductionRelation
-  - Creates DeductionIssuerRelation
-  - Updates user's total points
-  - May trigger removal eligibility
-- **Error Cases**:
-  - Insufficient permissions
-  - Invalid point amount
-  - Target not in issuer's dormitory
+  - Creates BedAssignment entity
+  - Updates dormitory occupancy
+  - Links user to bed
+- **Test Cases**: TC004, TC005, TC015, TC019
 
-### 4. InitiateRemovalRequest
-- **Purpose**: Request removal of a problematic user
-- **Actors**: Dorm Head (own dormitory only)
-- **Payload**:
-  - targetUserId: string (required)
-  - reason: string (required)
-- **Permissions**: 
-  ```
-  user.role === 'dormHead' && 
-  targetUser.dormitory === user.managedDormitory
-  ```
-- **Business Rules**:
-  - Target user must have ≥30 accumulated points
-  - No existing pending removal request for user
-  - Target must be in requester's dormitory
-- **Side Effects**:
-  - Creates RemovalRequest entity
-  - Creates RemovalRequestTargetRelation
-  - Creates RemovalRequestInitiatorRelation
-  - Computes and stores total points
-- **Error Cases**:
-  - Insufficient points for removal
-  - Existing pending request
-  - Target not in managed dormitory
-
-### 5. ProcessRemovalRequest
+#### 4. ProcessRemovalRequest
 - **Purpose**: Approve or reject a removal request
 - **Actors**: Admin only
-- **Payload**:
-  - requestId: string (required)
-  - decision: string (required, 'approved'|'rejected')
-  - adminComment: string (optional)
-- **Permissions**: `user.role === 'admin'`
-- **Business Rules**:
-  - Request must be in 'pending' status
-  - Decision must be valid enum value
-- **Side Effects (if approved)**:
-  - Updates request status to 'approved'
-  - Creates RemovalRequestAdminRelation
-  - Updates user status to 'removed'
-  - Deletes UserDormitoryRelation
-  - Deletes UserBedRelation
-  - Updates bed status to 'available'
-  - Updates dormitory occupancy
-- **Side Effects (if rejected)**:
-  - Updates request status to 'rejected'
-  - Creates RemovalRequestAdminRelation
-  - No changes to user assignments
-- **Error Cases**:
-  - Non-admin user
-  - Request not pending
-  - Invalid decision value
+- **Preconditions**:
+  - User has admin privileges
+  - Request is in pending status
+- **Input Parameters**:
+  - `removalRequestId`: string (required)
+  - `decision`: 'approved' | 'rejected' (required)
+  - `comment`: string (required)
+- **Validations**:
+  - Request exists
+  - Request is pending
+  - Comment not empty
+- **Side Effects**:
+  - Updates RemovalRequest status
+  - Creates AdminComment
+  - If approved: Sets BedAssignment.removedAt
+  - If approved: Updates dormitory occupancy
+- **Test Cases**: TC008, TC009
 
-### 6. ViewUserDeductions
-- **Purpose**: View deduction history for a user
-- **Actors**: Admin, Dorm Head (own dormitory), Student (self only)
-- **Payload**:
-  - targetUserId: string (required)
-- **Permissions**:
-  ```
-  user.role === 'admin' ||
-  (user.role === 'dormHead' && targetUser.dormitory === user.managedDormitory) ||
-  (user.role === 'student' && targetUserId === user.id)
-  ```
-- **Business Rules**: None beyond permissions
-- **Returns**: List of deductions with details
-- **Error Cases**:
-  - Unauthorized access attempt
+### Dormitory Head Interactions
 
----
+#### 5. DeductPoints
+- **Purpose**: Deduct points from a resident for violations
+- **Actors**: Admin, Dormitory Head (for their residents)
+- **Preconditions**:
+  - User is admin OR dormitory head of target's dormitory
+  - Target user exists and is in dormitory
+- **Input Parameters**:
+  - `userId`: string (required)
+  - `reason`: string (required)
+  - `points`: number (required, positive)
+- **Validations**:
+  - Target user in actor's dormitory (if dormitory head)
+  - Reason not empty
+  - Points > 0
+- **Side Effects**:
+  - Creates PointDeduction entity
+  - Updates user points (min 0)
+  - Links deduction to creator
+- **Test Cases**: TC006, TC011, TC012, TC018
 
-## Access Control Summary
+#### 6. RequestUserRemoval
+- **Purpose**: Request removal of a problematic resident
+- **Actors**: Dormitory Head only
+- **Preconditions**:
+  - User is dormitory head
+  - Target has ≤20 points
+  - No pending request for target
+- **Input Parameters**:
+  - `userId`: string (required)
+  - `reason`: string (required)
+- **Validations**:
+  - Actor is dormitory head
+  - Target in actor's dormitory
+  - Target points ≤ 20
+  - No existing pending request for target
+  - Reason not empty
+- **Side Effects**:
+  - Creates RemovalRequest entity
+  - Links to dormitory and users
+- **Test Cases**: TC007, TC014, TC016
 
-### Admin Capabilities
-- Full system access
-- All CRUD operations on dormitories
-- User role management
-- Assignment management
-- Point deductions (any user)
-- Process removal requests
-- View all data
+### User Interactions
 
-### Dorm Head Capabilities
-- Issue deductions (own dormitory only)
-- Initiate removal requests (own dormitory only)
-- Cancel own removal requests
-- View dormitory statistics (own dormitory)
-- View user deductions (own dormitory)
-- Standard user capabilities
+#### 7. ViewMyStatus
+- **Purpose**: View own profile and status
+- **Actors**: All authenticated users
+- **Preconditions**:
+  - User is authenticated
+- **Input Parameters**: None (uses current user context)
+- **Returns**:
+  - User profile (name, email, points)
+  - Current bed assignment (if any)
+  - Point deduction history
+  - Dormitory head status (if applicable)
+- **Test Cases**: TC013
 
-### Student Capabilities
-- View own dormitory assignment
-- View own bed assignment
-- View own deduction history
-- No administrative actions
-
----
-
-## Business Rule Validation Layers
-
-### Layer 1: Input Validation
-- Data type checking
-- Required field validation
-- Format validation (email, phone)
-- Enum value validation
-
-### Layer 2: Permission Checking
-- Role-based access control
-- Scope-based permissions (dorm heads)
-- Self-access permissions (students)
-
-### Layer 3: Business Logic Validation
-- Capacity constraints
-- Point thresholds
-- State transition rules
-- Uniqueness constraints
-- Relationship constraints
-
-### Layer 4: Consistency Validation
-- No orphaned records
-- Referential integrity
-- State consistency
-- Computed value accuracy
+#### 8. ViewDormitoryInfo
+- **Purpose**: View dormitory details and residents
+- **Actors**: All users assigned to dormitory
+- **Preconditions**:
+  - User is authenticated
+  - User has bed assignment in dormitory
+- **Input Parameters**: None (uses user's dormitory)
+- **Returns**:
+  - Dormitory details (name, capacity)
+  - Current residents list
+  - Dormitory head information
+  - Occupancy statistics
+- **Test Cases**: TC020
 
 ---
 
-## Interaction Dependencies
+## Interaction Flow Diagrams
 
-```mermaid
-graph TD
-    CreateDormitory --> AssignUserToDormitory
-    AssignDormHead --> IssuePointDeduction
-    AssignUserToDormitory --> IssuePointDeduction
-    IssuePointDeduction --> InitiateRemovalRequest
-    InitiateRemovalRequest --> ProcessRemovalRequest
-    ProcessRemovalRequest --> RemoveUserFromDormitory
+### User Removal Flow
+```
+1. Dormitory Head: DeductPoints (multiple times)
+   ↓
+2. User points drop to ≤20
+   ↓
+3. Dormitory Head: RequestUserRemoval
+   ↓
+4. Admin: ProcessRemovalRequest
+   ↓
+5. If approved: User removed from bed
+   If rejected: User remains
+```
+
+### Dormitory Setup Flow
+```
+1. Admin: CreateDormitory
+   ↓
+2. Admin: AssignDormitoryHead
+   ↓
+3. Admin: AssignUserToBed (multiple users)
+   ↓
+4. System ready for operations
 ```
 
 ---
 
-## Testing Coverage Requirements
+## Coverage Analysis
 
-Each interaction must have test coverage for:
-1. **Happy Path**: Valid inputs with proper permissions
-2. **Permission Failures**: Each invalid role attempt
-3. **Business Rule Failures**: Each constraint violation
-4. **Edge Cases**: Boundary values, empty data
-5. **State Transitions**: Before/after state validation
-6. **Side Effects**: All related entity updates
+### Entity Coverage
+| Entity | Create | Read | Update | Delete | Interactions |
+|--------|--------|------|--------|--------|--------------|
+| User | External | ✅ | ✅ | Soft | DeductPoints, ViewMyStatus |
+| Dormitory | ✅ | ✅ | ❌ | Soft | CreateDormitory, ViewDormitoryInfo |
+| BedAssignment | ✅ | ✅ | ✅ | No | AssignUserToBed, ProcessRemovalRequest |
+| PointDeduction | ✅ | ✅ | ❌ | No | DeductPoints |
+| RemovalRequest | ✅ | ✅ | ✅ | No | RequestUserRemoval, ProcessRemovalRequest |
+| AdminComment | ✅ | ✅ | ❌ | No | ProcessRemovalRequest |
 
----
-
-## Audit Requirements
-
-All interactions that modify data must log:
-- Timestamp of action
-- User who performed action
-- Target entities affected
-- Previous values (for updates)
-- New values
-- Success/failure status
-- Error messages (if any)
-
----
-
-## Performance Considerations
-
-### High-Frequency Interactions
-- ViewMyDormitory
-- ViewMyDeductions
-- ViewMyBed
-
-**Optimization**: Cache user's current assignments
-
-### Complex Queries
-- ViewSystemStats
-- ViewDormitoryStats
-
-**Optimization**: Pre-compute aggregates, update reactively
-
-### Bulk Operations
-- Beginning of semester assignments
-- End of semester removals
-
-**Optimization**: Batch processing capabilities
+### Relation Coverage
+| Relation | Managed By | Test Coverage |
+|----------|------------|---------------|
+| DormitoryHeadRelation | AssignDormitoryHead | TC003, TC017 |
+| UserBedAssignmentRelation | AssignUserToBed | TC004, TC005 |
+| DormitoryBedAssignmentRelation | AssignUserToBed | TC004, TC015 |
+| UserPointDeductionRelation | DeductPoints | TC006 |
+| CreatorPointDeductionRelation | DeductPoints | TC006 |
+| RemovalRequestUserRelation | RequestUserRemoval | TC007 |
+| RemovalRequestCreatorRelation | RequestUserRemoval | TC007 |
+| RemovalRequestDormitoryRelation | RequestUserRemoval | TC007 |
+| RemovalRequestAdminCommentRelation | ProcessRemovalRequest | TC008, TC009 |
+| AdminCommentAuthorRelation | ProcessRemovalRequest | TC008, TC009 |
 
 ---
 
-## Future Enhancement Considerations
+## Security Matrix
 
-### Planned Interactions
-- TransferUserBetweenDormitories
-- AppealPointDeduction
-- RequestBedChange
-- ReportMaintenance
-- ScheduleInspection
+| Interaction | Authentication | Authorization | Scope Limitation |
+|------------|---------------|---------------|------------------|
+| CreateDormitory | Required | Admin only | System-wide |
+| AssignDormitoryHead | Required | Admin only | System-wide |
+| AssignUserToBed | Required | Admin only | System-wide |
+| DeductPoints | Required | Admin or Dorm Head | Dormitory-scoped |
+| RequestUserRemoval | Required | Dorm Head only | Dormitory-scoped |
+| ProcessRemovalRequest | Required | Admin only | System-wide |
+| ViewMyStatus | Required | Self only | User-scoped |
+| ViewDormitoryInfo | Required | Dormitory members | Dormitory-scoped |
 
-### Permission Evolution
-- Deputy dorm heads
-- Floor representatives
-- Maintenance staff role
+---
 
-### Business Rule Evolution
-- Seasonal capacity adjustments
-- Point expiration system
-- Probation periods
+## Business Rule Enforcement
+
+### Critical Business Rules by Interaction
+
+| Rule | Enforced In | Validation Type |
+|------|------------|-----------------|
+| Bed count 4-6 | CreateDormitory | Input validation |
+| Single bed assignment | AssignUserToBed | State validation |
+| Single dormitory head role | AssignDormitoryHead | State validation |
+| Points ≥ 0 | DeductPoints | Computation logic |
+| Removal threshold ≤20 points | RequestUserRemoval | State validation |
+| No duplicate pending requests | RequestUserRemoval | State validation |
+| Bed capacity limits | AssignUserToBed | Input + State validation |
+| Dormitory scope for heads | DeductPoints, RequestUserRemoval | Authorization check |
+
+---
+
+## Implementation Priority
+
+### Phase 1: Core Setup (Admin Functions)
+1. CreateDormitory
+2. AssignDormitoryHead
+3. AssignUserToBed
+
+### Phase 2: Management Functions
+4. DeductPoints
+5. RequestUserRemoval
+6. ProcessRemovalRequest
+
+### Phase 3: View Functions
+7. ViewMyStatus
+8. ViewDormitoryInfo
+
+---
+
+## Validation Checklist
+
+✅ Every user role has necessary interactions
+✅ Every interaction has defined permissions
+✅ Every interaction has test cases
+✅ All entities are covered by interactions
+✅ All relations are properly managed
+✅ Business rules are enforced at interaction level
+✅ No direct storage access outside interactions
+✅ Computed properties update automatically
+✅ Audit trail maintained for all changes
+✅ Security boundaries properly defined

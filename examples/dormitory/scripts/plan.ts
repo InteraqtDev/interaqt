@@ -243,7 +243,7 @@ function buildComputationGraph(analysis: ComputationAnalysis, dataDesign?: any):
         });
         
         // 构建展开的依赖
-        const expandedDeps = [];
+        const expandedDeps: string[] = [];
         
         // 1. 属性必须依赖于其所在的实体
         expandedDeps.push(entity.name);
@@ -288,7 +288,7 @@ function buildComputationGraph(analysis: ComputationAnalysis, dataDesign?: any):
       const parsedDeps = deps.map(parseDependency);
       
       // 构建展开的依赖
-      const expandedDeps = [];
+      const expandedDeps: string[] = [];
       for (const dep of parsedDeps) {
         expandedDeps.push(dep);
         
@@ -433,7 +433,7 @@ function generateImplementationPlan(levels: ComputationNode[][], totalNodes: num
     const dictionaryComputations = level.filter(n => n.type === 'dictionary');
     
     let description = `Phase ${index + 1}: `;
-    const parts = [];
+    const parts: string[] = [];
     
     if (entityComputations.length > 0) {
       parts.push(`${entityComputations.length} entity computation(s)`);
@@ -469,7 +469,7 @@ function main() {
     // 读取输入文件
     const inputPath = path.join(process.cwd(), 'docs', 'computation-analysis.json');
     const dataDesignPath = path.join(process.cwd(), 'docs', 'data-design.json');
-    const outputPath = path.join(process.cwd(), 'docs', 'computation-implemention-plan.json');
+    const outputPath = path.join(process.cwd(), 'docs', 'computation-implementation-plan.json');
     
     if (!fs.existsSync(inputPath)) {
       console.error(`Error: Input file not found at ${inputPath}`);
