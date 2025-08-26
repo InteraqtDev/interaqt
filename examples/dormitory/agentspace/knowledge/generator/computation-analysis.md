@@ -13,11 +13,19 @@ You will receive two input files:
 
 ## Direct Mapping Rules
 
-### Special Notation: _parent
+### Special Notations
 
+#### _parent:[ParentName]
 The `_parent:[ParentName]` notation indicates that this entity or relation is created by its parent's computation, not by its own computation. This occurs when `lifecycle.creation.type` is `"created-with-parent"` (for entities) or `"created-with-entity"` (for relations). The parent entity's computation is responsible for creating this child entity/relation.
 
 Example: If an AuditLog has `lifecycle.creation.type: "created-with-parent"` and `lifecycle.creation.parent: "Transaction"`, its computationDecision would be `"_parent:Transaction"`.
+
+#### _owner
+The `_owner` notation indicates that this property's value is fully controlled by its owner entity or relation's computation. This applies when:
+- `controlType` is `"creation-only"`: Property is set during entity/relation creation and never modified separately
+- `controlType` is `"derived-with-parent"`: Property belongs to a derived entity/relation and is computed as part of the parent's overall derivation
+
+Properties marked with `_owner` don't need separate computation control - their logic is embedded in the owner's creation or derivation process.
 
 ### 1. Entity-Level Computations
 
@@ -50,11 +58,20 @@ Check `lifecycle.creation` and `lifecycle.deletion`:
 
 ### 3. Property-Level Computations
 
+First check the property's `controlType`, then analyze dependencies if needed:
+
+| Control Type | Computation Decision |
+|--------------|---------------------|
+| `creation-only` | `_owner` - controlled by entity/relation creation |
+| `derived-with-parent` | `_owner` - controlled by parent's derivation |
+| `independent` | Further analysis needed (see below) |
+
+#### For `independent` Properties
+
 Analyze the property's `dataDependencies`, `interactionDependencies`, and `computationMethod`:
 
 | Condition | Computation Decision |
 |-----------|---------------------|
-| Set at entity/relation creation, never modified | No computation (None) - controlled by entity/relation |
 | Has `interactionDependencies` that can modify it | `StateMachine` for state transitions or value updates |
 | Has `dataDependencies` with relations/entities | Aggregation computation based on `computationMethod` |
 | `dataDependencies` = self properties only | `computed` function |
@@ -63,10 +80,10 @@ Analyze the property's `dataDependencies`, `interactionDependencies`, and `compu
 
 #### Decision Priority (check in order):
 
-1. **If property is set only at creation time**:
-   - Check if `interactionDependencies` only includes the create interaction
-   - If no other interactions can modify it → **None** (property controlled by entity/relation)
-   - Examples: bedNumber in Bed, assignedBy in relations
+1. **Check `controlType` first**:
+   - `creation-only` → **_owner** (property controlled by entity/relation creation)
+   - `derived-with-parent` → **_owner** (property controlled by parent derivation)
+   - `independent` → Continue to step 2
 
 2. **If has `interactionDependencies` that can modify**:
    - Property changes in response to interactions → `StateMachine`
@@ -110,9 +127,12 @@ Read `data-design.json` and extract:
 
 ### Step 2: Apply Mapping Rules
 For each element:
-1. Check lifecycle.creation.type and lifecycle.deletion
-2. Apply the appropriate rules based on creation type and deletion capability
-3. For entities/relations that can be hard-deleted, use StateMachine instead of Transform
+1. Check lifecycle.creation.type and lifecycle.deletion for entities and relations
+2. For properties, check controlType first:
+   - If `creation-only` or `derived-with-parent` → use `_owner`
+   - If `independent` → apply standard dependency analysis rules
+3. Apply the appropriate rules based on creation type and deletion capability
+4. For entities/relations that can be hard-deleted, use StateMachine instead of Transform
 
 ### Step 3: Generate Output Document
 
@@ -135,9 +155,10 @@ Create `docs/computation-analysis.json` with this structure:
           "propertyName": "<property name>",
           "type": "<from data-design.json>",
           "purpose": "<from data-design.json>",
+          "controlType": "<from data-design.json: creation-only/derived-with-parent/independent>",
           "dataSource": "<from computationMethod>",
-          "computationDecision": "<None/StateMachine/Count/etc. based on rules>",
-          "reasoning": "<automated based on rules>",
+          "computationDecision": "<_owner/StateMachine/Count/etc. based on controlType and rules>",
+          "reasoning": "<automated based on controlType and rules>",
           "dependencies": <convert dataDependencies to proper format>,
           "interactionDependencies": <from data-design.json>,
           "calculationMethod": "<from computationMethod>"
@@ -207,11 +228,14 @@ Examples:
    └─ Never deleted? → Transform (if interaction-created) or _parent:[parent]
 
 3. Property Value?
-   ├─ Set only at creation, never modified? → None (controlled by entity/relation)
-   ├─ Has interactionDependencies that can modify? → StateMachine
-   ├─ Has dataDependencies with relations? → Aggregation computation
-   ├─ Only uses own properties? → computed
-   └─ Complex with multiple entities? → Custom
+   ├─ controlType: "creation-only"? → _owner (controlled by entity/relation)
+   ├─ controlType: "derived-with-parent"? → _owner (controlled by parent)
+   ├─ controlType: "independent"?
+   │  ├─ Has interactionDependencies that can modify? → StateMachine
+   │  ├─ Has dataDependencies with relations? → Aggregation computation
+   │  ├─ Only uses own properties? → computed
+   │  └─ Complex with multiple entities? → Custom
+   └─ Only has initialValue? → defaultValue
 
 4. Dictionary Aggregation?
    └─ Check computationMethod → Map to Count/Summation/Custom
@@ -221,12 +245,14 @@ Examples:
 
 - [ ] Parse `data-design.json` completely
 - [ ] Apply mapping rules for every entity (check deletion capability)
-- [ ] Apply mapping rules for every property
+- [ ] Check `controlType` for every property first
+- [ ] Apply mapping rules for properties based on `controlType`
 - [ ] Apply mapping rules for every relation
 - [ ] Apply mapping rules for every dictionary
 - [ ] Format all dependencies correctly
 - [ ] Separate `dependencies` and `interactionDependencies`
 - [ ] Add `InteractionEventEntity` when needed
+- [ ] Verify properties with `controlType: "creation-only"` or `"derived-with-parent"` use `_owner`
 - [ ] Verify no Transform is used for deletable entities (hard-delete)
 - [ ] Verify no Transform is used for deletable relations (hard-delete)
 - [ ] Generate complete `computation-analysis.json`
@@ -268,10 +294,11 @@ Before finalizing, verify:
    - If `canBeDeleted: true` with `hard-delete` → Must use StateMachine
    - If `canBeDeleted: false` → Can use Transform (unless `created-with-parent`)
 2. Entities/relations with `lifecycle.creation.type: "created-with-parent/entity"` use `_parent:[ParentName]`
-3. Properties set only at creation time have computation "None"
-4. Properties with modifying `interactionDependencies` use StateMachine
-5. Properties with only `dataDependencies` use data-based computation
-6. No entities or relations with `canBeDeleted:true` and `hard-delete` use Transform alone
-7. All dependencies are properly formatted with specific properties
-8. `InteractionEventEntity` is included when interactions are dependencies
-9. The parent name in `_parent:[ParentName]` matches `lifecycle.creation.parent`
+3. Properties with `controlType: "creation-only"` or `"derived-with-parent"` have computation `_owner`
+4. Properties with `controlType: "independent"` are analyzed for appropriate computation
+5. Properties with modifying `interactionDependencies` use StateMachine (if `controlType: "independent"`)
+6. Properties with only `dataDependencies` use data-based computation (if `controlType: "independent"`)
+7. No entities or relations with `canBeDeleted:true` and `hard-delete` use Transform alone
+8. All dependencies are properly formatted with specific properties
+9. `InteractionEventEntity` is included when interactions are dependencies
+10. The parent name in `_parent:[ParentName]` matches `lifecycle.creation.parent`

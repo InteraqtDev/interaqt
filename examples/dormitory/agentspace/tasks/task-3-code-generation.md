@@ -271,20 +271,52 @@ This section follows a **test-driven progressive approach** where each computati
 
 1. **Implement the Computation** (following API Reference)
    - **📖 CRITICAL: Implementation MUST follow patterns from `./agentspace/knowledge/generator/api-reference.md`**. Read FIRST.
-   - **🔴 SPECIAL CASE: `_parent:[parent]` notation**
+   - **🔴 SPECIAL CASE 1: `_parent:[parent]` notation**
      - If the computation name contains `_parent:[parent]` (e.g., `_parent:[User]`), this means:
        - You should modify the PARENT entity's computation, not the current entity
        - Example: For `_parent:[User]`, modify the `User` entity's computation that creates Posts
        - This typically occurs when a child entity needs to be created by a parent's Transform computation
+   - **🔴 SPECIAL CASE 2: `_owner` notation**
+     - If the computation decision is `_owner`, this means:
+       - The property's value is fully controlled by its owner entity/relation's computation
+       - You should modify the OWNER entity/relation's creation or derivation logic, not add a separate property computation
+       - For `controlType: "creation-only"`: Add the property assignment logic in the entity/relation's creation Transform or StateMachine
+       - For `controlType: "derived-with-parent"`: The property is part of the parent's derivation computation
+       - Example: For a `createdAt` property with `_owner`, add timestamp assignment in the entity's Transform that creates it
    - Add computation code using assignment pattern at end of file:
      ```typescript
      // At end of backend/index.ts, after exports:
+     
+     // Normal property computation
      User.properties.find(p => p.name === 'postCount').computation = Count.create({
        property: 'posts'
+     })
+     
+     // For _owner properties, modify the owner entity's computation instead:
+     Post.computationTarget = Transform.create({
+       items: [
+         TransformItem.create({
+           from: 'InteractionEventEntity',
+           name: 'event',
+           transform: async function(this: Controller, event: InteractionEventEntity) {
+             if (event.interaction === 'CreatePost') {
+               // Create the Post entity with _owner properties
+               return {
+                 title: event.payload.title,
+                 content: event.payload.content,
+                 createdAt: Math.floor(Date.now() / 1000), // _owner property set here
+                 status: 'draft' // _owner property set here
+               }
+             }
+             return null
+           }
+         })
+       ]
      })
      ```
    - Remove any `defaultValue` if adding computation to that property
    - Never use Transform in Property computation
+   - For `_owner` properties, always set them in the owner's creation/derivation logic
 
 2. **Type Check**
    - Run `npm run check`
@@ -296,6 +328,7 @@ This section follows a **test-driven progressive approach** where each computati
    - Write test plan comment with: dependencies, test steps, business logic notes
    - Cross-reference with `requirements/interaction-matrix.md` and `docs/data-design.json`
    - **🔴 For `_parent:[parent]` computations**: Test the parent entity's behavior that creates/manages the child entities
+   - **🔴 For `_owner` computations**: Test that the property is correctly set when the owner entity/relation is created
    
    ```typescript
    test('User.dormitoryCount computation', async () => {
@@ -315,6 +348,17 @@ This section follows a **test-driven progressive approach** where each computati
       * This tests the User's Transform computation that creates Posts
       * Steps: 1) Trigger interaction that creates User 2) Verify Posts are created
       * Business Logic: User's Transform creates related Posts
+      */
+     // Implementation...
+   })
+   
+   // For _owner computations:
+   test('Post.createdAt set by owner computation (_owner)', async () => {
+     /**
+      * Test Plan for: _owner
+      * This tests that createdAt is properly set when Post is created
+      * Steps: 1) Trigger interaction that creates Post 2) Verify createdAt is set
+      * Business Logic: Post's creation computation sets createdAt timestamp
       */
      // Implementation...
    })

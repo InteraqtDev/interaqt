@@ -133,6 +133,30 @@ Analyze the source of data for each property by identifying dependencies:
 
 **Note**: Some properties may have both types of dependencies. For example, a property might be computed from other data but can also be overridden by specific interactions. Document both arrays and explain the combined behavior in the computationMethod field.
 
+#### 2.3 Property Control Type
+
+Determine how each property's value is controlled:
+
+**Control Types**:
+- **creation-only**: Set during entity/relation creation and never modified separately
+  - Examples: creation timestamps, immutable IDs, business constants
+  - These don't need separate computation control
+  - Logic is embedded in the entity/relation creation process
+  
+- **derived-with-parent**: Property belongs to a derived entity/relation and is computed as part of the parent's overall derivation
+  - Maintains strong consistency with parent computation
+  - Cannot be modified independently of parent's computation rules
+  - Examples: all properties of a filtered/derived entity
+  
+- **independent**: Requires separate computation control
+  - Can be modified after creation
+  - Has its own update logic separate from entity/relation creation
+  - Examples: status fields, counters, mutable business data
+
+**Key Questions**:
+- Is this property only set at creation and never changed?
+- Is this property part of a derived entity/relation's computation?
+- Does this property need independent update control?
 
 ### Step 3: Relation Analysis
 
@@ -370,6 +394,7 @@ Use this JSON template to document your analysis results.
         "id": {
           "type": "string",
           "purpose": "System-generated unique identifier",
+          "controlType": "creation-only",
           "dataDependencies": null,
           "interactionDependencies": null,
           "initialValue": "auto-generated"
@@ -377,6 +402,7 @@ Use this JSON template to document your analysis results.
         "[propertyName]": {
           "type": "[string/number/boolean/object]",
           "purpose": "[What this property represents]",
+          "controlType": "[creation-only | derived-with-parent | independent]",
           "dataDependencies": ["dependency1", "dependency2"],
           "interactionDependencies": ["interaction1", "interaction2"],
           "computationMethod": "[how this property is computed from data dependencies OR how interactions modify it]",
@@ -405,6 +431,7 @@ Use this JSON template to document your analysis results.
         "id": {
           "type": "string",
           "purpose": "System-generated unique identifier",
+          "controlType": "creation-only",
           "dataDependencies": null,
           "interactionDependencies": null,
           "initialValue": "auto-generated"
@@ -412,6 +439,7 @@ Use this JSON template to document your analysis results.
         "name": {
           "type": "string",
           "purpose": "User's display name",
+          "controlType": "independent",
           "dataDependencies": [],
           "interactionDependencies": ["CreateUser", "UpdateUserProfile"],
           "computationMethod": "Direct assignment from interactions",
@@ -420,6 +448,7 @@ Use this JSON template to document your analysis results.
         "email": {
           "type": "string",
           "purpose": "Unique identifier and contact",
+          "controlType": "creation-only",
           "dataDependencies": [],
           "interactionDependencies": ["CreateUser"],
           "computationMethod": "Set once at creation, immutable thereafter",
@@ -428,6 +457,7 @@ Use this JSON template to document your analysis results.
         "postCount": {
           "type": "number",
           "purpose": "Total posts created by user",
+          "controlType": "independent",
           "dataDependencies": ["UserPostRelation"],
           "interactionDependencies": [],
           "computationMethod": "Count of UserPostRelation where target = this user",
@@ -436,6 +466,7 @@ Use this JSON template to document your analysis results.
         "status": {
           "type": "string",
           "purpose": "User account status (example of mixed dependencies)",
+          "controlType": "independent",
           "dataDependencies": ["lastLoginDate"],
           "interactionDependencies": ["CreateUser", "ActivateUser", "DeactivateUser", "BanUser"],
           "computationMethod": "Set to 'inactive' if lastLoginDate > 90 days ago, but can be overridden by direct interaction updates",
@@ -471,6 +502,7 @@ Use this JSON template to document your analysis results.
         "[propertyName]": {
           "type": "[string/number/boolean]",
           "purpose": "[meaning in the relationship context]",
+          "controlType": "[creation-only | derived-with-parent | independent]",
           "dataDependencies": ["dependency1", "dependency2"],
           "interactionDependencies": ["interaction1", "interaction2"],
           "computationMethod": "[how this property is computed from data dependencies OR how interactions modify it]",
@@ -504,6 +536,7 @@ Use this JSON template to document your analysis results.
         "createdAt": {
           "type": "number",
           "purpose": "Timestamp of post creation",
+          "controlType": "creation-only",
           "dataDependencies": [],
           "interactionDependencies": ["CreatePost"],
           "computationMethod": "Set to current timestamp when CreatePost creates the relation",
@@ -537,6 +570,7 @@ Use this JSON template to document your analysis results.
         "assignedAt": {
           "type": "number",
           "purpose": "Timestamp of assignment",
+          "controlType": "creation-only",
           "dataDependencies": [],
           "interactionDependencies": ["AssignDormitory"],
           "computationMethod": "Set to current timestamp when AssignDormitory creates the relation",
@@ -545,6 +579,7 @@ Use this JSON template to document your analysis results.
         "status": {
           "type": "string",
           "purpose": "Assignment status",
+          "controlType": "independent",
           "dataDependencies": ["User.enrollmentStatus"],
           "interactionDependencies": ["CheckInStudent", "CheckOutStudent"],
           "computationMethod": "Set to 'inactive' if User.enrollmentStatus is not 'enrolled', can be directly set to 'checked-in' or 'checked-out' by interactions",
@@ -570,7 +605,33 @@ Use this JSON template to document your analysis results.
         }
       },
       "properties": {
-        "// inherits all properties from User": {}
+        "id": {
+          "type": "string",
+          "purpose": "User's ID (inherited)",
+          "controlType": "derived-with-parent",
+          "dataDependencies": ["User.id"],
+          "interactionDependencies": [],
+          "computationMethod": "Inherited from User entity during derivation",
+          "initialValue": "from User"
+        },
+        "name": {
+          "type": "string",
+          "purpose": "User's name (inherited)",
+          "controlType": "derived-with-parent",
+          "dataDependencies": ["User.name"],
+          "interactionDependencies": [],
+          "computationMethod": "Inherited from User entity during derivation",
+          "initialValue": "from User"
+        },
+        "lastLoginDate": {
+          "type": "number",
+          "purpose": "Last login timestamp (inherited)",
+          "controlType": "derived-with-parent",
+          "dataDependencies": ["User.lastLoginDate"],
+          "interactionDependencies": [],
+          "computationMethod": "Inherited from User entity during derivation",
+          "initialValue": "from User"
+        }
       }
     },
     
@@ -594,6 +655,7 @@ Use this JSON template to document your analysis results.
         "action": {
           "type": "string",
           "purpose": "The action performed",
+          "controlType": "creation-only",
           "dataDependencies": [],
           "interactionDependencies": ["CreateTransaction", "UpdateTransaction"],
           "computationMethod": "Set based on the triggering interaction type",
