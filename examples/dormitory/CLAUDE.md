@@ -36,7 +36,7 @@ Based on the current task in `docs/STATUS.json`, read and follow the correspondi
 - **Task 3** → Follow `agentspace/tasks/task-3-code-generation.md`
 
 **🔴 CRITICAL EXECUTION RULES:**
-- **STRICTLY follow task documents in sequential order** - Never skip sections or jump ahead
+- **Create TODO plans STRICTLY from task guidance** - Follow task documents exactly to create TODO plans, do NOT summarize or paraphrase - this ensures strict execution
 - **STOP immediately when instructed** - When you see STOP or similar instructions, exit and wait for user
 - **NO advance planning** - Focus only on the current task, do not plan or prepare for future tasks
 - **Execute ONE step at a time** - Complete current step fully before reading next instructions
