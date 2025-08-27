@@ -134,6 +134,34 @@ describe('Basic Functionality', () => {
     expect(dormitory.isDeleted).toBe(false)
     expect(dormitory.occupiedBeds).toBe(0)
     expect(dormitory.createdAt).toBeGreaterThan(0)
+    
+    // Verify Beds were created
+    const beds = await system.storage.find(
+      'Bed',
+      undefined,
+      undefined,
+      ['id', 'bedNumber', 'isOccupied', 'createdAt']
+    )
+    
+    expect(beds).toHaveLength(4) // Should match capacity
+    beds.forEach((bed, index) => {
+      expect(bed.bedNumber).toBe(`${index + 1}`)
+      expect(bed.isOccupied).toBe(false)
+      expect(bed.createdAt).toBeGreaterThan(0)
+    })
+    
+    // Verify DormitoryBedsRelation was created by checking dormitory has beds
+    const dormitoryWithBeds = await system.storage.findOne(
+      'Dormitory',
+      MatchExp.atom({ key: 'id', value: ['=', dormitory.id] }),
+      undefined,
+      [['beds', { attributeQuery: ['id', 'bedNumber'] }]]
+    )
+    
+    expect(dormitoryWithBeds.beds).toHaveLength(4) // One relation per bed
+    dormitoryWithBeds.beds.forEach((bed, index) => {
+      expect(bed.bedNumber).toBe(`${index + 1}`)
+    })
   })
   
   test('PointDeduction entity Transform computation - DeductPoints interaction', async () => {

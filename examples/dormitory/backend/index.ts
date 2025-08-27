@@ -615,11 +615,12 @@ User.computation = Transform.create({
 })
 
 // Dormitory entity Transform computation - handles creation from CreateDormitory interaction
+// Also creates Bed entities and DormitoryBedsRelation when a Dormitory is created
 Dormitory.computation = Transform.create({
   record: InteractionEventEntity,
   callback: function(event) {
     if (event.interactionName === 'CreateDormitory') {
-      return {
+      const dormitoryData = {
         name: event.payload.name,
         capacity: event.payload.capacity,
         floor: event.payload.floor,
@@ -627,6 +628,22 @@ Dormitory.computation = Transform.create({
         createdAt: Math.floor(Date.now() / 1000),
         isDeleted: false,
         occupiedBeds: 0
+      }
+      
+      // Create beds based on capacity
+      const beds = []
+      for (let i = 1; i <= event.payload.capacity; i++) {
+        beds.push({
+          bedNumber: `${i}`,
+          isOccupied: false,
+          createdAt: Math.floor(Date.now() / 1000)
+        })
+      }
+      
+      // Return dormitory data with beds property for relation creation
+      return {
+        ...dormitoryData,
+        beds: beds
       }
     }
     return null
