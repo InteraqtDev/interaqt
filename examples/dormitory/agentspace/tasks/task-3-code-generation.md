@@ -279,6 +279,23 @@ This section follows a **test-driven progressive approach** where each computati
        - You should modify the PARENT entity's computation, not the current entity
        - Example: For `_parent:[User]`, modify the `User` entity's computation that creates Posts
        - This typically occurs when a child entity needs to be created by a parent's Transform computation
+       - **How to create child entities**: Use the relation's source/target property name in the parent's Transform return value
+       - Example: If `OrderItemRelation` has `sourceProperty: 'items'`, then in Order's Transform:
+         ```typescript
+         Order.computation = Transform.create({
+           record: InteractionEventEntity,
+           callback: function(event) {
+             if (event.interactionName === 'CreateOrder') {
+               return {
+                 orderNumber: event.payload.orderNumber,
+                 customerName: event.payload.customerName,
+                 items: event.payload.items // Creates OrderItem entities via 'items' relation property
+               };
+             }
+             return null;
+           }
+         });
+         ```
    - **🔴 SPECIAL CASE 2: `_owner` notation**
      - If the computation decision is `_owner`, this means:
        - The property's value is fully controlled by its owner entity/relation's computation

@@ -596,12 +596,13 @@ User.computation = Transform.create({
   }
 })
 
-// Entity: Dormitory - Transform computation for creation
+// Entity: Dormitory - Transform computation for creation  
+// Also creates Bed entities and DormitoryBedsRelation
 Dormitory.computation = Transform.create({
   record: InteractionEventEntity,
   callback: function(event) {
     if (event.interactionName === 'CreateDormitory') {
-      return {
+      const dormitory = {
         name: event.payload.name,
         capacity: event.payload.capacity,
         floor: event.payload.floor,
@@ -610,6 +611,29 @@ Dormitory.computation = Transform.create({
         isDeleted: false,
         occupiedBeds: 0
       }
+      
+      // Create beds for the dormitory
+      const beds = []
+      for (let i = 1; i <= event.payload.capacity; i++) {
+        beds.push({
+          bedNumber: `${i}`,
+          isOccupied: false,
+          createdAt: Math.floor(Date.now() / 1000)
+        })
+      }
+      
+      // Create DormitoryBedsRelation for each bed
+      const dormitoryBedsRelations = beds.map(bed => ({
+        source: dormitory,
+        target: bed,
+        assignedAt: Math.floor(Date.now() / 1000)
+      }))
+      
+      return [
+        dormitory,
+        ...beds,
+        ...dormitoryBedsRelations
+      ]
     }
     return null
   }
