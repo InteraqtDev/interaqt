@@ -447,12 +447,16 @@ This section follows a **test-driven progressive approach** where each computati
    })
    ```
 
-5. **Run Test**
-   - **First run type check**: `npm run check` to ensure test code has no type errors
+5. **Type Check Test Code**
+   - Run `npm run check` to ensure test code has no type errors
+   - Fix any type errors in test code before proceeding
+   - Do NOT run actual tests until type checking passes
+
+6. **Run Test**
    - Run full test suite: `npm run test tests/basic.test.ts`
+   - Must fix any failures (new tests or regressions) before proceeding
    
-   
-   **If test fails after type check passes:**
+   **If test fails:**
    - Review test plan - are dependencies properly set up?
    - Verify against `requirements/interaction-matrix.md` and `docs/data-design.json`
    - Check if test data matches `expandedDependencies`
@@ -464,9 +468,7 @@ This section follows a **test-driven progressive approach** where each computati
    - Update `lastError` field in computation-implementation-plan.json with error doc path
    - Never skip tests or fake data to pass
 
-6. **Document Progress**
-   Must fix any failures (new tests or regressions) before proceeding
-
+7. **Document Progress**
    - **🔴 CRITICAL: Update `docs/computation-implementation-plan.json` based on test results:**
      - **If ALL tests pass** (`npm run test tests/basic.test.ts` shows ALL tests passing):
        - Set `"completed": true`
@@ -476,7 +478,7 @@ This section follows a **test-driven progressive approach** where each computati
        - Add/update `lastError` field with path to error document in `docs/errors/`
        - The computation remains incomplete and needs fixing
 
-7. **Complete and Exit**
+8. **Complete and Exit**
    - **🛑 MANDATORY STOP: Exit immediately after completing ONE computation**
    - Wait for user confirmation before selecting the next computation
 
