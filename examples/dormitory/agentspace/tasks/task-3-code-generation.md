@@ -234,6 +234,8 @@ This section follows a **test-driven progressive approach** where each computati
 
 ## START: Select Next Computation
 
+**🔴 CRITICAL: Implement ONLY ONE computation per session, then STOP and wait for user confirmation.**
+
 1. **Read `docs/computation-implementation-plan.json`** to find the FIRST uncompleted computation
    - ALWAYS select the FIRST uncompleted computation
    - NEVER skip ahead - dependencies must be completed in order
@@ -467,8 +469,9 @@ This section follows a **test-driven progressive approach** where each computati
      - Set `"completed": true`
      - Remove `lastError` field if it exists
 
-7. **Loop Back**
-   - STOP after each computation for user confirmation before continuing
+7. **Complete and Exit**
+   - **🛑 MANDATORY STOP: Exit immediately after completing ONE computation**
+   - Wait for user confirmation before selecting the next computation
 
 **🛑 STOP GATE: DO NOT proceed to Task 3.1.4.4 until ALL computations in `docs/computation-implementation-plan.json` are marked as complete with passing tests.**
 
@@ -806,7 +809,7 @@ import {
    - [ ] Create new documents in `docs/errors/` to record any errors encountered
    - [ ] Add comments in code explaining complex conditions
 
-**🛑 STOP: Current rule implementation completed. Wait for user instructions before proceeding to the next rule.**
+**🛑 MANDATORY STOP: ONE rule implementation completed. Exit immediately and wait for user instructions.**
 
 **After receiving user confirmation, repeat steps 1-5 for the next uncompleted rule in `docs/business-rules-and-permission-control-implementation-plan.json`.**
 
