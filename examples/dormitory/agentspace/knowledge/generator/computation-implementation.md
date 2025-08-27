@@ -18,8 +18,8 @@ Transform converts one collection (source) into another collection (target). Und
    - Target: Entity/Relation collection being created
 
 2. **Callback Can Return One or Multiple Items**: The callback can return:
-   - A single object → creates one record
-   - An array of objects → creates multiple records from one source
+   - A single object → creates one record of target type
+   - An array of objects → creates multiple records of target type from one source
    - `null`/`undefined` → creates no records
    
    ```typescript
@@ -29,12 +29,8 @@ Transform converts one collection (source) into another collection (target). Und
      // Option 1: Return single item
      return { /* single entity data */ };
      
-     // Option 2: Return multiple items
-     return [
-       { /* first entity data */ },
-       { /* second entity data */ },
-       { /* third entity data */ }
-     ];
+     // Option 2: Return multiple entities
+     return [];
      
      // Option 3: Return nothing (filter out)
      return null;
@@ -206,7 +202,9 @@ Style.computation = Transform.create({
 
 #### Created With Parent - Child Entities in Parent Transform
 
-**When to Use**: When child entities' lifecycle is completely dependent on parent entity.
+**When to Use**: 
+- When child entities' lifecycle is completely dependent on parent entity
+- **When computationDecision is expressed as `_parent:[Parent]`** - this indicates the child entity should be created through the parent's Transform computation
 
 **Example**: Order with OrderItems
 
@@ -243,12 +241,10 @@ Order.computation = Transform.create({
   record: InteractionEventEntity,
   callback: function(event) {
     if (event.interactionName === 'CreateOrder') {
-      const items = event.payload.items || [];
-      
       return {
         orderNumber: event.payload.orderNumber,
         customerName: event.payload.customerName
-        items // OrderItem and OrderItemRelation created with parent
+        items: event.payload.items // OrderItem and OrderItemRelation created with parent
       };
     }
     return null;
