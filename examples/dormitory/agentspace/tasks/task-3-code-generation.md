@@ -269,6 +269,8 @@ This section follows a **test-driven progressive approach** where each computati
 
 ## NORMAL IMPLEMENTATION FLOW (when no lastError):
 
+**🔴 CRITICAL: You MUST strictly follow the steps below to update the todo list and strictly adhere to each step's requirements and standards. Do not skip or modify any step.**
+
 1. **Implement the Computation** (following API Reference)
    - **📖 MANDATORY FIRST STEP: Completely read `./agentspace/knowledge/generator/api-reference.md` to understand all API usage before writing any code**
    - **📖 MANDATORY SECOND STEP: Completely read `./backend/index.ts` to understand all existing implementations from previous tasks**
