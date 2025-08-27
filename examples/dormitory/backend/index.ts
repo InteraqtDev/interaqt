@@ -666,3 +666,55 @@ RemovalRequest.computation = Transform.create({
     return null
   }
 })
+
+// Phase 2: Relation Computations
+
+// UserDormitoryLeaderRelation StateMachine computation - handles creation and deletion
+const leaderNotExistsState = StateNode.create({ 
+  name: 'notExists',
+  computeValue: () => null
+})
+
+const leaderExistsState = StateNode.create({ 
+  name: 'exists',
+  computeValue: () => ({})
+})
+
+UserDormitoryLeaderRelation.computation = StateMachine.create({
+  states: [leaderNotExistsState, leaderExistsState],
+  defaultState: leaderNotExistsState,
+  transfers: [
+    // Create leader relation when AssignDormitoryLeader is called
+    StateTransfer.create({
+      trigger: AssignDormitoryLeader,
+      current: leaderNotExistsState,
+      next: leaderExistsState,
+      computeTarget: function(event) {
+        return {
+          source: { id: event.payload.userId },
+          target: { id: event.payload.dormitoryId }
+        }
+      }
+    }),
+    // Delete leader relation when RemoveDormitoryLeader is called
+    StateTransfer.create({
+      trigger: RemoveDormitoryLeader,
+      current: leaderExistsState,
+      next: leaderNotExistsState,
+      computeTarget: async function(this: Controller, event) {
+        // Find the existing relation to delete
+        const MatchExp = this.globals.MatchExp
+        const existingRelation = await this.system.storage.findOne(
+          'UserDormitoryLeaderRelation',
+          MatchExp.atom({
+            key: 'source.id',
+            value: ['=', event.payload.userId]
+          }),
+          undefined,
+          ['id']
+        )
+        return existingRelation
+      }
+    })
+  ]
+})

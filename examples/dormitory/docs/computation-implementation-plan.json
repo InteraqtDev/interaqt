@@ -97,7 +97,7 @@
           ],
           "reasoning": "interaction-created with canBeDeleted: true (hard-delete), must use StateMachine for both create and delete",
           "calculationMethod": "Independently created by AssignDormitoryLeader interaction",
-          "completed": false
+          "completed": true
         },
         {
           "id": "DormitoryBedsRelation",
