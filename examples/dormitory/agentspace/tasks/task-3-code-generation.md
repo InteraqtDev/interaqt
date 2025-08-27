@@ -465,9 +465,14 @@ This section follows a **test-driven progressive approach** where each computati
    - Never skip tests or fake data to pass
 
 6. **Document Progress**
-   - Update computation in `docs/computation-implemention-plan.json`:
-     - Set `"completed": true`
-     - Remove `lastError` field if it exists
+   - **🔴 CRITICAL: Update `docs/computation-implementation-plan.json` based on test results:**
+     - **If ALL tests pass** (`npm run test tests/basic.test.ts` shows ALL tests passing):
+       - Set `"completed": true`
+       - Remove `lastError` field if it exists
+     - **If ANY test fails** (including regression tests):
+       - Keep `"completed": false` - the computation is NOT done
+       - Add/update `lastError` field with path to error document in `docs/errors/`
+       - The computation remains incomplete and needs fixing
 
 7. **Complete and Exit**
    - **🛑 MANDATORY STOP: Exit immediately after completing ONE computation**
