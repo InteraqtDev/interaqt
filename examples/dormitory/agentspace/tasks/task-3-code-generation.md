@@ -272,7 +272,7 @@ This section follows a **test-driven progressive approach** where each computati
 ## NORMAL IMPLEMENTATION FLOW (when no lastError):
 
 1. **Implement the Computation** (following API Reference)
-   - **📖 CRITICAL: Implementation MUST follow patterns from `./agentspace/knowledge/generator/api-reference.md`**. Read FIRST.
+   - **📖 MANDATORY FIRST STEP: Completely read `./agentspace/knowledge/generator/api-reference.md` to understand all API usage before writing any code**
    - **🔴 SPECIAL CASE 1: `_parent:[parent]` notation**
      - If the computation name contains `_parent:[parent]` (e.g., `_parent:[User]`), this means:
        - You should modify the PARENT entity's computation, not the current entity
