@@ -114,7 +114,7 @@
           ],
           "reasoning": "created-with-entity type with canBeDeleted: false, created by parent entity's computation",
           "calculationMethod": "Created together with Bed entities by Dormitory's computation when Dormitory is created",
-          "completed": false
+          "completed": true
         },
         {
           "id": "UserBedRelation",
@@ -131,7 +131,7 @@
           ],
           "reasoning": "interaction-created with canBeDeleted: true (hard-delete), must use StateMachine for both create and delete",
           "calculationMethod": "Independently created by AssignUserToBed interaction",
-          "completed": false
+          "completed": true
         },
         {
           "id": "UserPointDeductionsRelation",

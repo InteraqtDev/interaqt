@@ -718,3 +718,49 @@ RemovalRequest.computation = Transform.create({
   }
 })
 
+// Relation: UserBedRelation - StateMachine computation for creation and deletion
+const userBedNotExistsState = StateNode.create({
+  name: 'relationNotExists',
+  computeValue: () => null
+})
+
+const userBedExistsState = StateNode.create({
+  name: 'relationExists',
+  computeValue: () => ({
+    assignedAt: Math.floor(Date.now() / 1000)
+  })
+})
+
+UserBedRelation.computation = StateMachine.create({
+  states: [userBedNotExistsState, userBedExistsState],
+  transfers: [
+    StateTransfer.create({
+      trigger: AssignUserToBed,
+      current: userBedNotExistsState,
+      next: userBedExistsState,
+      computeTarget: (event) => ({
+        source: { id: event.payload.userId },
+        target: { id: event.payload.bedId }
+      })
+    }),
+    StateTransfer.create({
+      trigger: RemoveUserFromBed,
+      current: userBedExistsState,
+      next: userBedNotExistsState,
+      computeTarget: async function(this: Controller, event) {
+        const relation = await this.system.storage.findOne(
+          UserBedRelation.name,
+          MatchExp.atom({
+            key: 'source.id',
+            value: ['=', event.payload.userId]
+          }),
+          undefined,
+          ['id']
+        )
+        return relation
+      }
+    })
+  ],
+  defaultState: userBedNotExistsState
+})
+

@@ -661,4 +661,137 @@ describe('Basic Functionality', () => {
     expect(relationAfterRemove).toBeUndefined()
   })
 
+  test('UserBedRelation computation (StateMachine)', async () => {
+    /**
+     * Test Plan for: UserBedRelation
+     * Dependencies: User entity, Bed entity (created through Dormitory)
+     * Steps: 1) Create admin and regular user 2) Create dormitory (which creates beds) 3) Assign user to bed via AssignUserToBed 4) Verify relation created 5) Remove user from bed via RemoveUserFromBed 6) Verify relation removed
+     * Business Logic: UserBedRelation is created/deleted through StateMachine triggered by AssignUserToBed and RemoveUserFromBed interactions
+     */
+    
+    // Create admin user
+    const adminResult = await controller.callInteraction('CreateUser', {
+      user: null,
+      payload: {
+        username: 'admin_bed_test',
+        password: 'admin123',
+        email: 'admin_bed@example.com',
+        name: 'Admin User',
+        role: 'admin'
+      }
+    })
+    
+    expect(adminResult.error).toBeUndefined()
+    
+    const adminUser = await system.storage.findOne(
+      'User',
+      MatchExp.atom({ key: 'username', value: ['=', 'admin_bed_test'] }),
+      undefined,
+      ['id', 'username', 'role']
+    )
+    
+    // Create regular user to assign to bed
+    const userResult = await controller.callInteraction('CreateUser', {
+      user: null,
+      payload: {
+        username: 'bed_resident',
+        password: 'password123',
+        email: 'bed_resident@example.com',
+        name: 'Bed Resident',
+        role: 'resident'
+      }
+    })
+    
+    expect(userResult.error).toBeUndefined()
+    
+    const regularUser = await system.storage.findOne(
+      'User',
+      MatchExp.atom({ key: 'username', value: ['=', 'bed_resident'] }),
+      undefined,
+      ['id', 'username']
+    )
+    
+    // Create dormitory (which creates beds)
+    const dormResult = await controller.callInteraction('CreateDormitory', {
+      user: adminUser,
+      payload: {
+        name: 'Dorm for Bed Test',
+        capacity: 4,
+        floor: 2,
+        building: 'Building B'
+      }
+    })
+    
+    expect(dormResult.error).toBeUndefined()
+    
+    // Get the first bed from the created dormitory
+    const dormitory = await system.storage.findOne(
+      'Dormitory',
+      MatchExp.atom({ key: 'name', value: ['=', 'Dorm for Bed Test'] }),
+      undefined,
+      ['id']
+    )
+    
+    const beds = await system.storage.find(
+      'Bed',
+      undefined,
+      undefined,
+      ['id', 'bedNumber']
+    )
+    
+    const targetBed = beds.find(b => b.bedNumber === '1')
+    expect(targetBed).toBeDefined()
+    
+    // Assign user to bed
+    const assignResult = await controller.callInteraction('AssignUserToBed', {
+      user: adminUser,
+      payload: {
+        userId: regularUser.id,
+        bedId: targetBed.id
+      }
+    })
+    
+    expect(assignResult.error).toBeUndefined()
+    
+    // Verify UserBedRelation was created with correct properties
+    const relationAfterAssign = await system.storage.findOne(
+      'UserBedRelation',
+      MatchExp.atom({ key: 'source.id', value: ['=', regularUser.id] }),
+      undefined,
+      [
+        'id',
+        'assignedAt',
+        ['source', { attributeQuery: ['id', 'username'] }],
+        ['target', { attributeQuery: ['id', 'bedNumber'] }]
+      ]
+    )
+    
+    expect(relationAfterAssign).toBeDefined()
+    expect(relationAfterAssign.source.id).toBe(regularUser.id)
+    expect(relationAfterAssign.source.username).toBe('bed_resident')
+    expect(relationAfterAssign.target.id).toBe(targetBed.id)
+    expect(relationAfterAssign.target.bedNumber).toBe('1')
+    expect(relationAfterAssign.assignedAt).toBeGreaterThan(0)
+    
+    // Remove user from bed
+    const removeResult = await controller.callInteraction('RemoveUserFromBed', {
+      user: adminUser,
+      payload: {
+        userId: regularUser.id
+      }
+    })
+    
+    expect(removeResult.error).toBeUndefined()
+    
+    // Verify UserBedRelation was deleted
+    const relationAfterRemove = await system.storage.findOne(
+      'UserBedRelation',
+      MatchExp.atom({ key: 'source.id', value: ['=', regularUser.id] }),
+      undefined,
+      ['id']
+    )
+    
+    expect(relationAfterRemove).toBeUndefined()
+  })
+
 })
