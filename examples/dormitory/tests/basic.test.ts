@@ -431,4 +431,119 @@ describe('Basic Functionality', () => {
     expect(deduction.createdBy).toBe(leaderUser.id)
   })
 
+  test('RemovalRequest entity creation via SubmitRemovalRequest interaction', async () => {
+    /**
+     * Test Plan for: RemovalRequest entity Transform computation
+     * Dependencies: User entities
+     * Steps: 1) Create target user (resident) 2) Create dormitory leader 3) Trigger SubmitRemovalRequest interaction 4) Verify RemovalRequest entity is created with correct properties 5) Verify UserRemovalRequestsRelation and DormitoryLeaderRemovalRequestsRelation are created
+     * Business Logic: RemovalRequest entities are created via SubmitRemovalRequest interaction with initial status 'pending'
+     */
+    
+    // Create a resident user who will be the target of the removal request
+    const residentResult = await controller.callInteraction('CreateUser', {
+      user: null,
+      payload: {
+        username: 'problemresident',
+        password: 'password123',
+        email: 'problem@example.com',
+        name: 'Problem Resident',
+        role: 'resident'
+      }
+    })
+    
+    expect(residentResult.error).toBeUndefined()
+    
+    const problemResident = await system.storage.findOne(
+      'User',
+      MatchExp.atom({ key: 'username', value: ['=', 'problemresident'] }),
+      undefined,
+      ['id', 'username']
+    )
+    
+    // Create dormitory leader who will submit the request
+    const leaderResult = await controller.callInteraction('CreateUser', {
+      user: null,
+      payload: {
+        username: 'dormleader',
+        password: 'leader123',
+        email: 'dormleader@example.com',
+        name: 'Dormitory Leader',
+        role: 'dormitory_leader'
+      }
+    })
+    
+    expect(leaderResult.error).toBeUndefined()
+    
+    const dormLeader = await system.storage.findOne(
+      'User',
+      MatchExp.atom({ key: 'username', value: ['=', 'dormleader'] }),
+      undefined,
+      ['id', 'username', 'role']
+    )
+    
+    // Submit removal request
+    const requestResult = await controller.callInteraction('SubmitRemovalRequest', {
+      user: dormLeader,
+      payload: {
+        userId: problemResident.id,
+        reason: 'Multiple violations of dormitory rules'
+      }
+    })
+    
+    expect(requestResult.error).toBeUndefined()
+    
+    // Query the created RemovalRequest entity
+    const removalRequests = await system.storage.find(
+      'RemovalRequest',
+      undefined,
+      undefined,
+      ['id', 'reason', 'status', 'createdAt', 'processedAt', 'adminComment']
+    )
+    
+    expect(removalRequests.length).toBe(1)
+    const request = removalRequests[0]
+    
+    expect(request.reason).toBe('Multiple violations of dormitory rules')
+    expect(request.status).toBe('pending')
+    expect(request.createdAt).toBeGreaterThan(0)
+    expect(request.processedAt).toBeUndefined()
+    expect(request.adminComment).toBeUndefined()
+    
+    // Verify UserRemovalRequestsRelation was created (target user)
+    const userRelations = await system.storage.find(
+      'UserRemovalRequestsRelation',
+      MatchExp.atom({ key: 'source.id', value: ['=', problemResident.id] }),
+      undefined,
+      [
+        'id',
+        ['source', { attributeQuery: ['id', 'username'] }],
+        ['target', { attributeQuery: ['id', 'reason', 'status'] }]
+      ]
+    )
+    
+    expect(userRelations.length).toBe(1)
+    expect(userRelations[0].source.id).toBe(problemResident.id)
+    expect(userRelations[0].target.id).toBe(request.id)
+    expect(userRelations[0].target.reason).toBe('Multiple violations of dormitory rules')
+    expect(userRelations[0].target.status).toBe('pending')
+    
+    // Verify DormitoryLeaderRemovalRequestsRelation was created (requesting leader)
+    const leaderRelations = await system.storage.find(
+      'DormitoryLeaderRemovalRequestsRelation',
+      MatchExp.atom({ key: 'source.id', value: ['=', dormLeader.id] }),
+      undefined,
+      [
+        'id',
+        ['source', { attributeQuery: ['id', 'username'] }],
+        ['target', { attributeQuery: ['id', 'reason', 'status'] }]
+      ]
+    )
+    
+    expect(leaderRelations.length).toBe(1)
+    expect(leaderRelations[0].source.id).toBe(dormLeader.id)
+    expect(leaderRelations[0].target.id).toBe(request.id)
+    expect(leaderRelations[0].target.reason).toBe('Multiple violations of dormitory rules')
+    expect(leaderRelations[0].target.status).toBe('pending')
+  })
+
 })

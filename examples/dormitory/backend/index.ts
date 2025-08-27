@@ -651,3 +651,21 @@ PointDeduction.computation = Transform.create({
   }
 })
 
+// Entity: RemovalRequest - Transform computation for creation
+// Also creates UserRemovalRequestsRelation and DormitoryLeaderRemovalRequestsRelation
+RemovalRequest.computation = Transform.create({
+  record: InteractionEventEntity,
+  callback: function(event) {
+    if (event.interactionName === 'SubmitRemovalRequest') {
+      return {
+        reason: event.payload.reason,
+        status: 'pending',
+        createdAt: Math.floor(Date.now() / 1000),
+        targetUser: { id: event.payload.userId },  // This will create UserRemovalRequestsRelation
+        requestedBy: { id: event.user.id }  // This will create DormitoryLeaderRemovalRequestsRelation
+      }
+    }
+    return null
+  }
+})
+

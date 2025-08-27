@@ -74,7 +74,7 @@
           ],
           "reasoning": "interaction-created with canBeDeleted: false, uses Transform with InteractionEventEntity",
           "calculationMethod": "Independently created by SubmitRemovalRequest interaction",
-          "completed": false
+          "completed": true
         }
       ],
       "description": "Phase 1: 5 entity computation(s)"
