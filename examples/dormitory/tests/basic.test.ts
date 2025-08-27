@@ -251,4 +251,184 @@ describe('Basic Functionality', () => {
     expect(createdDormitory.occupiedBeds).toBe(0)  // Initial occupiedBeds
   })
 
+  test('PointDeduction entity creation via DeductPoints interaction', async () => {
+    /**
+     * Test Plan for: PointDeduction entity Transform computation
+     * Dependencies: User entity
+     * Steps: 1) Create test user 2) Create admin user 3) Trigger DeductPoints interaction 4) Verify PointDeduction entity is created with correct properties 5) Verify UserPointDeductionsRelation is created
+     * Business Logic: PointDeduction entities are created via DeductPoints or DeductResidentPoints interactions
+     */
+    
+    // First create a test user to deduct points from
+    const userResult = await controller.callInteraction('CreateUser', {
+      user: null,
+      payload: {
+        username: 'testuser',
+        password: 'password123',
+        email: 'test@example.com',
+        name: 'Test User',
+        role: 'resident'
+      }
+    })
+    
+    expect(userResult.error).toBeUndefined()
+    
+    const testUser = await system.storage.findOne(
+      'User',
+      MatchExp.atom({ key: 'username', value: ['=', 'testuser'] }),
+      undefined,
+      ['id', 'username', 'points']
+    )
+    
+    // Create admin user who will perform the deduction
+    const adminResult = await controller.callInteraction('CreateUser', {
+      user: null,
+      payload: {
+        username: 'admin',
+        password: 'admin123',
+        email: 'admin@example.com',
+        name: 'Admin User',
+        role: 'admin'
+      }
+    })
+    
+    expect(adminResult.error).toBeUndefined()
+    
+    const adminUser = await system.storage.findOne(
+      'User',
+      MatchExp.atom({ key: 'username', value: ['=', 'admin'] }),
+      undefined,
+      ['id', 'username', 'role']
+    )
+    
+    // Perform point deduction
+    const deductResult = await controller.callInteraction('DeductPoints', {
+      user: adminUser,
+      payload: {
+        userId: testUser.id,
+        points: 10,
+        reason: 'Late return',
+        description: 'Returned to dormitory after curfew'
+      }
+    })
+    
+    expect(deductResult.error).toBeUndefined()
+    
+    // Query the created PointDeduction entity
+    const pointDeductions = await system.storage.find(
+      'PointDeduction',
+      undefined,
+      undefined,
+      ['id', 'reason', 'points', 'description', 'createdAt', 'createdBy']
+    )
+    
+    expect(pointDeductions.length).toBe(1)
+    const deduction = pointDeductions[0]
+    
+    expect(deduction.reason).toBe('Late return')
+    expect(deduction.points).toBe(10)
+    expect(deduction.description).toBe('Returned to dormitory after curfew')
+    expect(deduction.createdAt).toBeGreaterThan(0)
+    expect(deduction.createdBy).toBe(adminUser.id)
+    
+    // Verify UserPointDeductionsRelation was created
+    const relations = await system.storage.find(
+      'UserPointDeductionsRelation',
+      MatchExp.atom({ key: 'source.id', value: ['=', testUser.id] }),
+      undefined,
+      [
+        'id',
+        ['source', { attributeQuery: ['id', 'username'] }],
+        ['target', { attributeQuery: ['id', 'reason', 'points'] }]
+      ]
+    )
+    
+    expect(relations.length).toBe(1)
+    expect(relations[0].source.id).toBe(testUser.id)
+    expect(relations[0].target.id).toBe(deduction.id)
+    expect(relations[0].target.reason).toBe('Late return')
+    expect(relations[0].target.points).toBe(10)
+  })
+
+  test('PointDeduction entity creation via DeductResidentPoints interaction', async () => {
+    /**
+     * Test Plan for: PointDeduction entity Transform computation via DeductResidentPoints
+     * Dependencies: User entity
+     * Steps: 1) Create test user 2) Create dormitory leader 3) Trigger DeductResidentPoints interaction 4) Verify PointDeduction entity is created
+     * Business Logic: DeductResidentPoints also creates PointDeduction entities
+     */
+    
+    // Create a test user to deduct points from
+    const userResult = await controller.callInteraction('CreateUser', {
+      user: null,
+      payload: {
+        username: 'resident2',
+        password: 'password123',
+        email: 'resident2@example.com',
+        name: 'Resident User',
+        role: 'resident'
+      }
+    })
+    
+    expect(userResult.error).toBeUndefined()
+    
+    const testUser = await system.storage.findOne(
+      'User',
+      MatchExp.atom({ key: 'username', value: ['=', 'resident2'] }),
+      undefined,
+      ['id', 'username']
+    )
+    
+    // Create dormitory leader
+    const leaderResult = await controller.callInteraction('CreateUser', {
+      user: null,
+      payload: {
+        username: 'leader',
+        password: 'leader123', 
+        email: 'leader@example.com',
+        name: 'Dorm Leader',
+        role: 'dormitory_leader'
+      }
+    })
+    
+    expect(leaderResult.error).toBeUndefined()
+    
+    const leaderUser = await system.storage.findOne(
+      'User',
+      MatchExp.atom({ key: 'username', value: ['=', 'leader'] }),
+      undefined,
+      ['id', 'username', 'role']
+    )
+    
+    // Perform point deduction via DeductResidentPoints
+    const deductResult = await controller.callInteraction('DeductResidentPoints', {
+      user: leaderUser,
+      payload: {
+        userId: testUser.id,
+        points: 5,
+        reason: 'Noise violation',
+        description: 'Making loud noise after 10 PM'
+      }
+    })
+    
+    expect(deductResult.error).toBeUndefined()
+    
+    // Query the created PointDeduction entity
+    const pointDeductions = await system.storage.find(
+      'PointDeduction',
+      MatchExp.atom({ key: 'reason', value: ['=', 'Noise violation'] }),
+      undefined,
+      ['id', 'reason', 'points', 'description', 'createdAt', 'createdBy']
+    )
+    
+    expect(pointDeductions.length).toBe(1)
+    const deduction = pointDeductions[0]
+    
+    expect(deduction.reason).toBe('Noise violation')
+    expect(deduction.points).toBe(5)
+    expect(deduction.description).toBe('Making loud noise after 10 PM')
+    expect(deduction.createdAt).toBeGreaterThan(0)
+    expect(deduction.createdBy).toBe(leaderUser.id)
+  })
+
 })

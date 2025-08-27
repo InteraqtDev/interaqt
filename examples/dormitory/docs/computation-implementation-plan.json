@@ -60,7 +60,7 @@
           ],
           "reasoning": "interaction-created with canBeDeleted: false, uses Transform with InteractionEventEntity",
           "calculationMethod": "Independently created by DeductPoints or DeductResidentPoints interactions",
-          "completed": false
+          "completed": true
         },
         {
           "id": "RemovalRequest",

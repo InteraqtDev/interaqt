@@ -632,3 +632,22 @@ Dormitory.computation = Transform.create({
   }
 })
 
+// Entity: PointDeduction - Transform computation for creation
+// Also creates UserPointDeductionsRelation
+PointDeduction.computation = Transform.create({
+  record: InteractionEventEntity,
+  callback: function(event) {
+    if (event.interactionName === 'DeductPoints' || event.interactionName === 'DeductResidentPoints') {
+      return {
+        reason: event.payload.reason,
+        points: event.payload.points,
+        description: event.payload.description,
+        createdAt: Math.floor(Date.now() / 1000),
+        createdBy: event.user.id,
+        user: { id: event.payload.userId }  // This will create UserPointDeductionsRelation
+      }
+    }
+    return null
+  }
+})
+
