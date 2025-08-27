@@ -618,7 +618,8 @@ Dormitory.computation = Transform.create({
   attributeQuery: ['interactionName', 'payload'],
   callback: async function(this: Controller, event: any) {
     if (event.interactionName === 'CreateDormitory') {
-      return {
+      // Store the dormitory data for later reference
+      const dormitoryData = {
         name: event.payload.name,
         capacity: event.payload.capacity,
         floor: event.payload.floor,
@@ -627,6 +628,81 @@ Dormitory.computation = Transform.create({
         createdAt: Math.floor(Date.now() / 1000),
         isDeleted: false
       }
+      
+      // After dormitory is created, we also need to create beds for it
+      // This will be handled by a separate Bed computation
+      return dormitoryData
+    }
+    return null
+  }
+})
+
+// Bed entity Transform computation - creates Beds when Dormitory is created
+Bed.computation = Transform.create({
+  record: InteractionEventEntity,
+  attributeQuery: ['interactionName', 'payload'],
+  callback: async function(this: Controller, event: any) {
+    if (event.interactionName === 'CreateDormitory') {
+      const capacity = event.payload.capacity
+      const beds = []
+      
+      // Create beds based on dormitory capacity
+      for (let i = 1; i <= capacity; i++) {
+        beds.push({
+          bedNumber: `${i}`,
+          isOccupied: false,
+          createdAt: Math.floor(Date.now() / 1000)
+        })
+      }
+      
+      return beds // Returns array to create multiple beds
+    }
+    return null
+  }
+})
+
+// DormitoryBedsRelation Transform computation - creates relations when Dormitory and Beds are created
+DormitoryBedsRelation.computation = Transform.create({
+  record: InteractionEventEntity,
+  attributeQuery: ['interactionName', 'payload'],
+  callback: async function(this: Controller, event: any) {
+    if (event.interactionName === 'CreateDormitory') {
+      // After dormitory and beds are created, the system will have their IDs
+      // We need to find the created dormitory and beds to establish relations
+      
+      // Find the dormitory that was just created
+      const dormitory = await this.system.storage.findOne(
+        'Dormitory',
+        MatchExp.atom({ key: 'name', value: ['=', event.payload.name] })
+          .and({ key: 'capacity', value: ['=', event.payload.capacity] })
+          .and({ key: 'floor', value: ['=', event.payload.floor] })
+          .and({ key: 'building', value: ['=', event.payload.building] }),
+        undefined,
+        ['id']
+      )
+      
+      if (!dormitory) return null
+      
+      // Find all beds that were just created (they should have the same createdAt time)
+      const currentTime = Math.floor(Date.now() / 1000)
+      const beds = await this.system.storage.find(
+        'Bed',
+        MatchExp.atom({ key: 'createdAt', value: ['>=', currentTime - 2] }), // Within 2 seconds
+        undefined,
+        ['id'],
+        { limit: event.payload.capacity }
+      )
+      
+      if (!beds || beds.length === 0) return null
+      
+      // Create relations between dormitory and beds
+      const relations = beds.map(bed => ({
+        source: dormitory,
+        target: bed,
+        assignedAt: Math.floor(Date.now() / 1000)
+      }))
+      
+      return relations
     }
     return null
   }

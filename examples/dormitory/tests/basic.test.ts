@@ -191,5 +191,85 @@ describe('Basic Functionality', () => {
     expect(dormitory.isDeleted).toBe(false)
     expect(dormitory.createdAt).toBeGreaterThan(0)
   })
+
+  test('Bed creation through Dormitory Transform (_parent:[Dormitory])', async () => {
+    /**
+     * Test Plan for: _parent:[Dormitory]
+     * This tests that Bed entities are created when a Dormitory is created
+     * Dependencies: Dormitory entity
+     * Steps: 1) Create a Dormitory via CreateDormitory 2) Verify Bed entities are created 3) Verify DormitoryBedsRelation is created
+     * Business Logic: When a dormitory is created, beds equal to its capacity are automatically created
+     */
+    
+    // Create a dormitory with capacity 4
+    const result = await controller.callInteraction('CreateDormitory', {
+      user: { id: 'admin-user', role: 'admin' },
+      payload: {
+        name: 'Test Dorm',
+        capacity: 4,
+        floor: 2,
+        building: 'B'
+      }
+    })
+    
+    // Verify dormitory was created
+    const dormitories = await system.storage.find(
+      'Dormitory',
+      MatchExp.atom({ key: 'name', value: ['=', 'Test Dorm'] }),
+      undefined,
+      ['id', 'name', 'capacity']
+    )
+    
+    expect(dormitories.length).toBe(1)
+    const dormitory = dormitories[0]
+    expect(dormitory.capacity).toBe(4)
+    
+    // Verify beds were created
+    // Wait a bit for beds to be created
+    await new Promise(resolve => setTimeout(resolve, 100))
+    
+    const beds = await system.storage.find(
+      'Bed',
+      MatchExp.atom({ key: 'createdAt', value: ['>', 0] }), // Get all beds
+      undefined,
+      ['id', 'bedNumber', 'isOccupied', 'createdAt']
+    )
+    
+    expect(beds.length).toBe(4) // Should have 4 beds for capacity 4
+    
+    // Verify bed numbers are correct
+    const bedNumbers = beds.map(b => b.bedNumber).sort()
+    expect(bedNumbers).toEqual(['1', '2', '3', '4'])
+    
+    // Verify all beds are initially unoccupied
+    beds.forEach(bed => {
+      expect(bed.isOccupied).toBe(false)
+      expect(bed.createdAt).toBeGreaterThan(0)
+    })
+    
+    // Verify DormitoryBedsRelation was created
+    // Find the DormitoryBedsRelation from the relations array
+    const DormitoryBedsRelation = relations.find(r => r.name === 'DormitoryBedsRelation')
+    
+    const dormitoryBedRelations = await system.storage.find(
+      DormitoryBedsRelation!.name,
+      MatchExp.atom({ key: 'source.id', value: ['=', dormitory.id] }),
+      undefined,
+      [
+        'id',
+        ['source', { attributeQuery: ['id', 'name'] }],
+        ['target', { attributeQuery: ['id', 'bedNumber'] }]
+      ]
+    )
+    
+    expect(dormitoryBedRelations.length).toBe(4) // Should have 4 relations
+    
+    // Verify each relation connects the dormitory to a bed
+    dormitoryBedRelations.forEach(relation => {
+      expect(relation.source.id).toBe(dormitory.id)
+      expect(relation.target).toBeDefined()
+      expect(relation.target.bedNumber).toBeDefined()
+    })
+  })
   
 })
