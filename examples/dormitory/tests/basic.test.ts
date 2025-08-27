@@ -114,4 +114,45 @@ describe('Basic Functionality', () => {
     expect(createdUser.isDeleted).toBe(false)
   })
 
+  test('Dormitory entity creation via CreateDormitory interaction', async () => {
+    /**
+     * Test Plan for: Dormitory entity Transform computation
+     * Dependencies: None (entity creation is independent)
+     * Steps: 1) Trigger CreateDormitory interaction 2) Verify Dormitory entity is created with correct properties
+     * Business Logic: Dormitories are created via CreateDormitory interaction with initial occupiedBeds = 0
+     */
+    
+    // Create dormitory via CreateDormitory interaction
+    const result = await controller.callInteraction('CreateDormitory', {
+      user: { id: 'admin-user', role: 'admin' },  // Admin user context
+      payload: {
+        name: 'Dorm A',
+        capacity: 4,
+        floor: 3,
+        building: 'Building 1'
+      }
+    })
+    
+    // Verify the interaction executed successfully (no error)
+    expect(result).toBeDefined()
+    expect(result.error).toBeUndefined()
+    
+    // Query the created dormitory to verify properties
+    const createdDormitory = await system.storage.findOne(
+      'Dormitory',
+      MatchExp.atom({ key: 'name', value: ['=', 'Dorm A'] }),
+      undefined,
+      ['id', 'name', 'capacity', 'floor', 'building', 'createdAt', 'isDeleted', 'occupiedBeds']
+    )
+    
+    expect(createdDormitory).toBeDefined()
+    expect(createdDormitory.name).toBe('Dorm A')
+    expect(createdDormitory.capacity).toBe(4)
+    expect(createdDormitory.floor).toBe(3)
+    expect(createdDormitory.building).toBe('Building 1')
+    expect(createdDormitory.createdAt).toBeGreaterThan(0)
+    expect(createdDormitory.isDeleted).toBe(false)
+    expect(createdDormitory.occupiedBeds).toBe(0)  // Initial occupiedBeds
+  })
+
 })

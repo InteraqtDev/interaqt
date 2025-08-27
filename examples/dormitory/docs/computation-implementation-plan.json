@@ -31,7 +31,7 @@
           ],
           "reasoning": "interaction-created with soft-delete capability, uses Transform for creation with status property for soft deletion",
           "calculationMethod": "Independently created by CreateDormitory interaction",
-          "completed": false
+          "completed": true
         },
         {
           "id": "Bed",
