@@ -564,6 +564,55 @@ export const dicts = dictionaries
 
 // ========================= COMPUTATIONS =========================
 
+// Relation: UserDormitoryLeaderRelation - StateMachine computation
+const relationNotExistsState = StateNode.create({ 
+  name: 'notExists',
+  computeValue: () => null  // Return null means no relation
+})
+
+const relationExistsState = StateNode.create({ 
+  name: 'exists',
+  computeValue: () => ({
+    assignedAt: Math.floor(Date.now() / 1000)
+  })
+})
+
+UserDormitoryLeaderRelation.computation = StateMachine.create({
+  states: [relationNotExistsState, relationExistsState],
+  transfers: [
+    StateTransfer.create({
+      trigger: AssignDormitoryLeader,
+      current: relationNotExistsState,
+      next: relationExistsState,
+      computeTarget: function(event) {
+        return {
+          source: { id: event.payload.userId },
+          target: { id: event.payload.dormitoryId }
+        }
+      }
+    }),
+    StateTransfer.create({
+      trigger: RemoveDormitoryLeader,
+      current: relationExistsState,
+      next: relationNotExistsState,
+      computeTarget: async function(this: Controller, event) {
+        // Find existing relation to remove by userId
+        const relation = await this.system.storage.findOne(
+          UserDormitoryLeaderRelation.name,
+          MatchExp.atom({
+            key: 'source.id',
+            value: ['=', event.payload.userId]
+          }),
+          undefined,
+          ['id']
+        )
+        return relation
+      }
+    })
+  ],
+  defaultState: relationNotExistsState
+})
+
 // Entity: User - Transform computation for creation
 User.computation = Transform.create({
   record: InteractionEventEntity,

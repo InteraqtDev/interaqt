@@ -546,4 +546,119 @@ describe('Basic Functionality', () => {
     expect(leaderRelations[0].target.status).toBe('pending')
   })
 
+  test('UserDormitoryLeaderRelation computation (StateMachine)', async () => {
+    /**
+     * Test Plan for: UserDormitoryLeaderRelation
+     * Dependencies: User entity, Dormitory entity
+     * Steps: 1) Create admin user 2) Create dormitory 3) Create user to be leader 4) Assign leader via AssignDormitoryLeader 5) Verify relation created 6) Remove leader via RemoveDormitoryLeader 7) Verify relation removed
+     * Business Logic: UserDormitoryLeaderRelation is created/deleted through StateMachine triggered by AssignDormitoryLeader and RemoveDormitoryLeader interactions
+     */
+    
+    // Create admin user
+    const adminResult = await controller.callInteraction('CreateUser', {
+      user: null,
+      payload: {
+        username: 'admin',
+        password: 'admin123',
+        email: 'admin@example.com',
+        name: 'Admin User',
+        role: 'admin'
+      }
+    })
+    expect(adminResult.error).toBeUndefined()
+    
+    const adminUser = await system.storage.findOne(
+      'User',
+      MatchExp.atom({ key: 'username', value: ['=', 'admin'] }),
+      undefined,
+      ['id', 'username', 'role']
+    )
+    
+    // Create dormitory
+    const dormResult = await controller.callInteraction('CreateDormitory', {
+      user: adminUser,
+      payload: {
+        name: 'Leader Test Dorm',
+        capacity: 4,
+        floor: 2,
+        building: 'Building A'
+      }
+    })
+    expect(dormResult.error).toBeUndefined()
+    
+    const dormitory = await system.storage.findOne(
+      'Dormitory',
+      MatchExp.atom({ key: 'name', value: ['=', 'Leader Test Dorm'] }),
+      undefined,
+      ['id', 'name']
+    )
+    
+    // Create a user to be the leader
+    const leaderResult = await controller.callInteraction('CreateUser', {
+      user: null,
+      payload: {
+        username: 'futureleader',
+        password: 'leader123',
+        email: 'futureleader@example.com',
+        name: 'Future Leader',
+        role: 'resident'  // Will be promoted when assigned
+      }
+    })
+    expect(leaderResult.error).toBeUndefined()
+    
+    const futureLeader = await system.storage.findOne(
+      'User',
+      MatchExp.atom({ key: 'username', value: ['=', 'futureleader'] }),
+      undefined,
+      ['id', 'username', 'role']
+    )
+    
+    // Assign dormitory leader
+    const assignResult = await controller.callInteraction('AssignDormitoryLeader', {
+      user: adminUser,
+      payload: {
+        userId: futureLeader.id,
+        dormitoryId: dormitory.id
+      }
+    })
+    expect(assignResult.error).toBeUndefined()
+    
+    // Verify UserDormitoryLeaderRelation was created
+    const relationAfterAssign = await system.storage.findOne(
+      'UserDormitoryLeaderRelation',
+      MatchExp.atom({ key: 'source.id', value: ['=', futureLeader.id] }),
+      undefined,
+      [
+        'id',
+        ['source', { attributeQuery: ['id', 'username'] }],
+        ['target', { attributeQuery: ['id', 'name'] }],
+        'assignedAt'
+      ]
+    )
+    
+    expect(relationAfterAssign).toBeDefined()
+    expect(relationAfterAssign.source.id).toBe(futureLeader.id)
+    expect(relationAfterAssign.target.id).toBe(dormitory.id)
+    expect(relationAfterAssign.assignedAt).toBeGreaterThan(0)
+    
+    // Remove dormitory leader
+    const removeResult = await controller.callInteraction('RemoveDormitoryLeader', {
+      user: adminUser,
+      payload: {
+        userId: futureLeader.id
+      }
+    })
+    expect(removeResult.error).toBeUndefined()
+    
+    // Verify UserDormitoryLeaderRelation was removed
+    const relationAfterRemove = await system.storage.findOne(
+      'UserDormitoryLeaderRelation',
+      MatchExp.atom({ key: 'source.id', value: ['=', futureLeader.id] }),
+      undefined,
+      ['id']
+    )
+    
+    expect(relationAfterRemove).toBeUndefined()
+  })
+
 })
