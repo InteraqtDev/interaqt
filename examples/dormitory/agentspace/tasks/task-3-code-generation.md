@@ -273,6 +273,7 @@ This section follows a **test-driven progressive approach** where each computati
 
 1. **Implement the Computation** (following API Reference)
    - **📖 MANDATORY FIRST STEP: Completely read `./agentspace/knowledge/generator/api-reference.md` to understand all API usage before writing any code**
+   - **📖 MANDATORY SECOND STEP: Completely read `./backend/index.ts` to understand all existing implementations from previous tasks**
    - **🔴 SPECIAL CASE 1: `_parent:[parent]` notation**
      - If the computation name contains `_parent:[parent]` (e.g., `_parent:[User]`), this means:
        - You should modify the PARENT entity's computation, not the current entity
@@ -449,6 +450,7 @@ This section follows a **test-driven progressive approach** where each computati
    ```
 
 5. **Run Test**
+   - **First run type check**: `npm run check` to ensure test code has no type errors
    - Run full test suite: `npm run test tests/basic.test.ts`
    - Must fix any failures (new tests or regressions) before proceeding
    
@@ -795,6 +797,7 @@ import {
    - [ ] Test both success and failure cases
    
 4. **Run Test**
+   - [ ] **First run type check**: `npm run check` to ensure test code has no type errors
    - [ ] **🔴 CRITICAL: Run BOTH test suites every time** to ensure no regression:
      - Run permission tests: `npm run test tests/permission.test.ts`
      - Ensures new rules don't break existing functionality
