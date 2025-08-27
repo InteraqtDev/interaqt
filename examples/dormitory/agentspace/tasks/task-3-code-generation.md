@@ -228,20 +228,16 @@ This section follows a **test-driven progressive approach** where each computati
 }
 ```
 
-**📖 Reference `tests/crud.example.test.ts`** for computation implementation code patterns and best practices
-
-**For EACH computation in your plan, follow this progressive implementation cycle:**
-
-## START: Select Next Computation
+## START: Select Next Uncompleted Item
 
 **🔴 CRITICAL: Implement ONLY ONE computation per session, then STOP and wait for user confirmation.**
 
-1. **Read `docs/computation-implementation-plan.json`** to find the FIRST uncompleted computation
-   - ALWAYS select the FIRST uncompleted computation
+1. **Read `docs/computation-implementation-plan.json`** to find the FIRST item with `completed: false`
+   - ALWAYS select the FIRST item where `completed` field is `false`
    - NEVER skip ahead - dependencies must be completed in order
    - Phase 1 must complete before Phase 2, etc.
 
-2. **Check if computation has `lastError` field:**
+2. **Check if item has `lastError` field:**
    - If YES → Execute DEEP DEBUG MODE below
    - If NO → Execute NORMAL IMPLEMENTATION FLOW below
 
@@ -326,7 +322,7 @@ This section follows a **test-driven progressive approach** where each computati
    - Fix all type errors before proceeding to tests
 
 3. **Create Test Case Plan**
-   - Read computation details from `docs/computation-implementation-plan.json`
+   - Read item details from `docs/computation-implementation-plan.json`
    - Check `expandedDependencies` to understand all required dependencies
    - Write test plan comment with: dependencies, test steps, business logic notes
    - Cross-reference with `requirements/interaction-matrix.md` and `docs/data-design.json`
@@ -452,7 +448,7 @@ This section follows a **test-driven progressive approach** where each computati
 5. **Run Test**
    - **First run type check**: `npm run check` to ensure test code has no type errors
    - Run full test suite: `npm run test tests/basic.test.ts`
-   - Must fix any failures (new tests or regressions) before proceeding
+   
    
    **If test fails after type check passes:**
    - Review test plan - are dependencies properly set up?
@@ -461,12 +457,14 @@ This section follows a **test-driven progressive approach** where each computati
    - Common issues: missing dependencies, wrong operation order, incorrect expectations
    
    **Error handling:**
-   - After 10 fix attempts, STOP and wait for user guidance
+   - After 10 fix attempts, STOP IMMEDIATELY and wait for user guidance
    - Create error document in `docs/errors/` with test plan, code, error, and attempts
    - Update `lastError` field in computation-implementation-plan.json with error doc path
    - Never skip tests or fake data to pass
 
 6. **Document Progress**
+   Must fix any failures (new tests or regressions) before proceeding
+
    - **🔴 CRITICAL: Update `docs/computation-implementation-plan.json` based on test results:**
      - **If ALL tests pass** (`npm run test tests/basic.test.ts` shows ALL tests passing):
        - Set `"completed": true`
