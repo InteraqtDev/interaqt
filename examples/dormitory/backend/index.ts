@@ -686,6 +686,56 @@ RemovalRequest.computation = Transform.create({
 
 // Phase 2: Relation Computations
 
+// UserBedRelation StateMachine computation - handles creation and deletion
+const bedNotAssignedState = StateNode.create({ 
+  name: 'notAssigned',
+  computeValue: () => null
+})
+
+const bedAssignedState = StateNode.create({ 
+  name: 'assigned',
+  computeValue: () => ({})
+})
+
+UserBedRelation.computation = StateMachine.create({
+  states: [bedNotAssignedState, bedAssignedState],
+  defaultState: bedNotAssignedState,
+  transfers: [
+    // Create bed assignment when AssignUserToBed is called
+    StateTransfer.create({
+      trigger: AssignUserToBed,
+      current: bedNotAssignedState,
+      next: bedAssignedState,
+      computeTarget: function(event) {
+        return {
+          source: { id: event.payload.userId },
+          target: { id: event.payload.bedId }
+        }
+      }
+    }),
+    // Delete bed assignment when RemoveUserFromBed is called
+    StateTransfer.create({
+      trigger: RemoveUserFromBed,
+      current: bedAssignedState,
+      next: bedNotAssignedState,
+      computeTarget: async function(this: Controller, event) {
+        // Find the existing relation to delete
+        const MatchExp = this.globals.MatchExp
+        const existingRelation = await this.system.storage.findOne(
+          'UserBedRelation',
+          MatchExp.atom({
+            key: 'source.id',
+            value: ['=', event.payload.userId]
+          }),
+          undefined,
+          ['id']
+        )
+        return existingRelation
+      }
+    })
+  ]
+})
+
 // UserDormitoryLeaderRelation StateMachine computation - handles creation and deletion
 const leaderNotExistsState = StateNode.create({ 
   name: 'notExists',

@@ -286,4 +286,123 @@ describe('Basic Functionality', () => {
     expect(request.processedAt).toBeUndefined() // Not set during creation
     expect(request.adminComment).toBeUndefined() // Not set during creation
   })
-}) 
+  
+  test('UserBedRelation StateMachine - assign and remove user from bed', async () => {
+    /**
+     * Test Plan for: UserBedRelation
+     * Dependencies: User entity, Bed entity (created with Dormitory)
+     * Steps: 
+     *   1) Create a user
+     *   2) Create a dormitory (which creates beds)
+     *   3) Assign user to bed via AssignUserToBed interaction
+     *   4) Verify relation exists
+     *   5) Remove user from bed via RemoveUserFromBed interaction
+     *   6) Verify relation is deleted
+     * Business Logic: 1:1 relation managed by StateMachine for assignment/removal
+     */
+    
+    // Step 1: Create a user
+    await controller.callInteraction('CreateUser', {
+      user: { id: 'admin-1', role: 'admin' },
+      payload: {
+        username: 'john_doe',
+        password: 'pass123',
+        email: 'john@example.com',
+        name: 'John Doe'
+      }
+    })
+    
+    const user = await system.storage.findOne(
+      'User',
+      MatchExp.atom({ key: 'username', value: ['=', 'john_doe'] }),
+      undefined,
+      ['id', 'username']
+    )
+    
+    // Step 2: Create a dormitory (creates beds automatically)
+    await controller.callInteraction('CreateDormitory', {
+      user: { id: 'admin-1', role: 'admin' },
+      payload: {
+        name: 'Dorm A',
+        capacity: 2,
+        floor: 1,
+        building: 'Building A'
+      }
+    })
+    
+    const dormitory = await system.storage.findOne(
+      'Dormitory',
+      MatchExp.atom({ key: 'name', value: ['=', 'Dorm A'] }),
+      undefined,
+      ['id']
+    )
+    
+    // Get the first bed (beds are created when dormitory is created)
+    const bed = await system.storage.findOne(
+      'Bed',
+      undefined,
+      undefined,
+      ['id', 'bedNumber']
+    )
+    
+    expect(bed).toBeDefined()
+    expect(bed.id).toBeDefined()
+    
+    // Step 3: Assign user to bed
+    await controller.callInteraction('AssignUserToBed', {
+      user: { id: 'admin-1', role: 'admin' },
+      payload: {
+        userId: user.id,
+        bedId: bed.id
+      }
+    })
+    
+    // Step 4: Verify user has bed assignment through User entity  
+    const userWithBed = await system.storage.findOne(
+      'User',
+      MatchExp.atom({ key: 'id', value: ['=', user.id] }),
+      undefined,
+      ['id', 'bed']
+    )
+    
+    expect(userWithBed.bed).toBeDefined()
+    
+    // Step 5: Verify bed has occupant through Bed entity
+    const bedWithOccupant = await system.storage.findOne(
+      'Bed',
+      MatchExp.atom({ key: 'id', value: ['=', bed.id] }),
+      undefined,
+      ['id', 'occupant', 'isOccupied']
+    )
+    
+    expect(bedWithOccupant.occupant).toBeDefined()
+    
+    // Step 6: Remove user from bed
+    await controller.callInteraction('RemoveUserFromBed', {
+      user: { id: 'admin-1', role: 'admin' },
+      payload: {
+        userId: user.id
+      }
+    })
+    
+    // Step 7: Verify user no longer has bed assignment
+    const userWithoutBed = await system.storage.findOne(
+      'User',
+      MatchExp.atom({ key: 'id', value: ['=', user.id] }),
+      undefined,
+      ['id', 'bed']
+    )
+    
+    expect(userWithoutBed.bed).toBeUndefined()
+    
+    // Step 8: Verify bed no longer has occupant
+    const bedWithoutOccupant = await system.storage.findOne(
+      'Bed',
+      MatchExp.atom({ key: 'id', value: ['=', bed.id] }),
+      undefined,
+      ['id', 'occupant', 'isOccupied']
+    )
+    
+    expect(bedWithoutOccupant.occupant).toBeUndefined()
+  })
+})
