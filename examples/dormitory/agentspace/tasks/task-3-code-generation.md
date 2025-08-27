@@ -228,6 +228,8 @@ This section follows a **test-driven progressive approach** where each computati
 }
 ```
 
+**📖 Reference:** `./agentspace/knowledge/generator/computation-implementation.md` - Detailed computation implementation patterns and examples
+
 ## START: Select Next Uncompleted Item
 
 **🔴 CRITICAL: Implement ONLY ONE computation per session, then STOP and wait for user confirmation.**

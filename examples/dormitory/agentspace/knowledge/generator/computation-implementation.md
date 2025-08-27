@@ -3,105 +3,6 @@
 ## Overview
 Computations are the reactive core of interaqt, connecting interactions to entities and enabling automatic data flow.
 
-## 🔴 CRITICAL: Where Computations Go
-
-### MUST Place in computation Field
-```typescript
-// ❌ WRONG: Declaring computations separately
-const UserCreationTransform = Transform.create({...})
-const controller = new Controller({
-
-  system: system,
-
-  entities: entities,
-
-  relations: relations,
-
-  activities: [],
-
-  interactions: interactions,
-
-  dict: computations
-
-});
-
-// ✅ CORRECT: Using in computation field (note: no defaultValue!)
-Property.create({
-  name: 'userCount',
-  type: 'number',
-  computation: Count.create({ record: User })
-})
-```
-
-### 🔴 CRITICAL: defaultValue vs computation - MUTUALLY EXCLUSIVE!
-
-**A property can have EITHER `defaultValue` OR `computation`, but NEVER both!**
-
-```typescript
-// ❌ WRONG: Having both defaultValue and computation
-Property.create({
-  name: 'userCount',
-  type: 'number',
-  defaultValue: () => 0,  // ERROR! Remove this!
-  computation: Count.create({ record: User })
-})
-
-// ✅ CORRECT: Only computation (computation controls the value completely)
-Property.create({
-  name: 'userCount',
-  type: 'number',
-  computation: Count.create({ record: User })
-})
-
-// ✅ CORRECT: Only defaultValue (for static properties)
-Property.create({
-  name: 'status',
-  type: 'string',
-  defaultValue: () => 'draft'
-})
-```
-
-### Transform Restrictions
-```typescript
-// ❌ WRONG: Transform in Property computation
-Property.create({
-  name: 'status',
-  computation: Transform.create({...})  // ERROR! Transform can't be used in Property
-})
-
-// ✅ CORRECT: Transform ONLY in Entity/Relation computation
-Entity.create({
-  name: 'Article',
-  computation: Transform.create({
-    record: InteractionEventEntity,
-    callback: (event) => {
-      // Transform logic here
-    }
-  })
-})
-```
-
-## Core Mindset: Declare "What Data Is"
-
-### ❌ Wrong: Imperative "How to Compute"
-```typescript
-function updateLikeCount(postId) {
-  const likes = db.query('SELECT COUNT(*) FROM likes WHERE postId = ?', postId);
-  db.update('posts', { likeCount: likes }, { id: postId });
-}
-```
-
-### ✅ Correct: Declarative "What It Is"
-```typescript
-Property.create({
-  name: 'likeCount',
-  type: 'number',
-  computation: Count.create({
-    record: LikeRelation  // Like count IS the count of relations
-  })
-})
-```
-
 ## Types of Computations
 
 ### 1. Transform - Creates Entities/Relations
@@ -193,58 +94,58 @@ When using `InteractionEventEntity` as the Transform input source, understand th
 
    ```typescript
    // ❌ WRONG: Trying to update with Transform
-   Entity.create({
-     name: 'Style',
-     computation: Transform.create({
-       record: InteractionEventEntity,
-       callback: function(event) {
-         if (event.interactionName === 'UpdateStyle') {
-           // This will CREATE a new Style, not update existing!
-           return { id: event.payload.id, ... }  // WRONG!
-         }
+   const Style = Entity.create({
+     name: 'Style'
+   });
+   Style.computation = Transform.create({
+     record: InteractionEventEntity,
+     callback: function(event) {
+       if (event.interactionName === 'UpdateStyle') {
+         // This will CREATE a new Style, not update existing!
+         return { id: event.payload.id, ... }  // WRONG!
        }
-     })
-   })
+     }
+   });
    
    // ✅ CORRECT: Use StateMachine for updates
-         Property.create({
-        name: 'updatedAt',
-        type: 'number',
-        computation: StateMachine.create({
-       states: [updatedState],
-       transfers: [
-         StateTransfer.create({
-           trigger: UpdateStyleInteraction,
-           current: updatedState,
-           next: updatedState,
-           computeTarget: (event) => ({ id: event.payload.id })
-         })
-       ]
-     })
-   })
+   const updatedAtProperty = Property.create({
+     name: 'updatedAt',
+     type: 'number'
+   });
+   updatedAtProperty.computation = StateMachine.create({
+     states: [updatedState],
+     transfers: [
+       StateTransfer.create({
+         trigger: UpdateStyleInteraction,
+         current: updatedState,
+         next: updatedState,
+         computeTarget: (event) => ({ id: event.payload.id })
+       })
+     ]
+   });
    
    // ✅ CORRECT: Use soft delete with status
-   Property.create({
+   const statusProperty = Property.create({
      name: 'status',
-     type: 'string',
-     computation: StateMachine.create({
-       states: [activeState, deletedState],
-       defaultState: activeState,  // StateMachine controls initial value
-       transfers: [
-         StateTransfer.create({
-           trigger: DeleteStyleInteraction,
-           current: activeState,
-           next: deletedState,
-           computeTarget: (event) => ({ id: event.payload.id })
-         })
-       ]
-     })
-   })
+     type: 'string'
+   });
+   statusProperty.computation = StateMachine.create({
+     states: [activeState, deletedState],
+     defaultState: activeState,  // StateMachine controls initial value
+     transfers: [
+       StateTransfer.create({
+         trigger: DeleteStyleInteraction,
+         current: activeState,
+         next: deletedState,
+         computeTarget: (event) => ({ id: event.payload.id })
+       })
+     ]
+   });
    ```
 
 **Summary**: Think of InteractionEventEntity Transform as a "factory" that produces new entities from events. For any modifications to existing entities, use StateMachine. For deletions, use soft delete patterns with status fields.
 
-#### Entity Creation via Transform
+#### Entity Creation from InteractionEventEntity via Transform
 ```typescript
 import { Transform, InteractionEventEntity, Entity, Property, Interaction, Action, Payload, PayloadItem } from 'interaqt';
 
@@ -278,32 +179,85 @@ export const Style = Entity.create({
     // 🔴 CRITICAL: Always use seconds for timestamps, not milliseconds!
     Property.create({ name: 'createdAt', type: 'number', defaultValue: () => Math.floor(Date.now()/1000) }),
     Property.create({ name: 'updatedAt', type: 'number', defaultValue: () => Math.floor(Date.now()/1000) })
-  ],
-  // Transform in Entity's computation property
-  computation: Transform.create({
-    record: InteractionEventEntity,
-    callback: function(event) {
-      if (event.interactionName === 'CreateStyle') {
-        return {
-          label: event.payload.label,
-          slug: event.payload.slug,
-          description: event.payload.description || '',
-          type: event.payload.type || 'default',
-          thumbKey: event.payload.thumbKey || '',
-          priority: event.payload.priority || 0,
-          status: 'draft',
-          createdAt: Math.floor(Date.now()/1000),  // Always use seconds!
-          updatedAt: Math.floor(Date.now()/1000),  // Always use seconds!
-          lastModifiedBy: event.user  // Creates relation automatically
-        };
-      }
-      return null;
+  ]
+});
+// Transform in Entity's computation property
+Style.computation = Transform.create({
+  record: InteractionEventEntity,
+  callback: function(event) {
+    if (event.interactionName === 'CreateStyle') {
+      return {
+        label: event.payload.label,
+        slug: event.payload.slug,
+        description: event.payload.description || '',
+        type: event.payload.type || 'default',
+        thumbKey: event.payload.thumbKey || '',
+        priority: event.payload.priority || 0,
+        status: 'draft',
+        createdAt: Math.floor(Date.now()/1000),  // Always use seconds!
+        updatedAt: Math.floor(Date.now()/1000),  // Always use seconds!
+        lastModifiedBy: event.user  // Creates relation automatically
+      };
     }
-  })
+    return null;
+  }
 });
 ```
 
-#### Transform from Other Entities (Non-InteractionEventEntity)
+#### Created With Parent - Child Entities in Parent Transform
+
+**When to Use**: When child entities' lifecycle is completely dependent on parent entity.
+
+**Example**: Order with OrderItems
+
+```typescript
+// Order creates OrderItems atomically
+export const Order = Entity.create({
+  name: 'Order',
+  properties: [
+    Property.create({ name: 'orderNumber', type: 'string' }),
+    Property.create({ name: 'customerName', type: 'string' })
+  ]
+});
+
+export const OrderItem = Entity.create({
+  name: 'OrderItem',
+  properties: [
+    Property.create({ name: 'productName', type: 'string' }),
+    Property.create({ name: 'quantity', type: 'number' }),
+    Property.create({ name: 'price', type: 'number' })
+  ]
+});
+
+// Define relation
+export const OrderItemRelation = Relation.create({
+  source: Order,
+  sourceProperty: 'items',
+  target: OrderItem,
+  targetProperty: 'order',
+  type: '1:n'
+});
+
+
+Order.computation = Transform.create({
+  record: InteractionEventEntity,
+  callback: function(event) {
+    if (event.interactionName === 'CreateOrder') {
+      const items = event.payload.items || [];
+      
+      return {
+        orderNumber: event.payload.orderNumber,
+        customerName: event.payload.customerName
+        items // OrderItem and OrderItemRelation created with parent
+      };
+    }
+    return null;
+  }
+});
+```
+
+
+#### Derived from Other Entities/Relations (Non-InteractionEventEntity)
 
 Transform can also use other entities as source, not just InteractionEventEntity. This is useful for creating derived entities based on existing data.
 
@@ -322,27 +276,27 @@ export const StyleSnapshot = Entity.create({
     Property.create({ name: 'description', type: 'string' }),
     Property.create({ name: 'snapshotTakenAt', type: 'number', defaultValue: () => Math.floor(Date.now()/1000) }),
     Property.create({ name: 'version', type: 'number' })
-  ],
-  // Transform from Style entity (not InteractionEventEntity)
-  computation: Transform.create({
-    record: Style,  // ← Source is Style entity, not InteractionEventEntity
-    attributeQuery: ['id', 'label', 'slug', 'description', 'status'],
-    callback: function(style) {
-      // Only create snapshots for active styles
-      if (style.status === 'active') {
-        return {
-          label: style.label,
-          slug: style.slug,
-          description: style.description || '',
-          snapshotTakenAt: Math.floor(Date.now()/1000),  // In seconds
-          version: Math.floor(Date.now()/1000),  // Version number in seconds
-          // 🔴 CRITICAL: Must explicitly reference source entity to create relation
-          originalStyle: style  // ← This creates the relation to source Style
-        };
-      }
-      return null;  // Don't create snapshot for non-active styles
+  ]
+});
+// Transform from Style entity (not InteractionEventEntity)
+StyleSnapshot.computation = Transform.create({
+  record: Style,  // ← Source is Style entity, not InteractionEventEntity
+  attributeQuery: ['id', 'label', 'slug', 'description', 'status'],
+  callback: function(style) {
+    // Only create snapshots for active styles
+    if (style.status === 'active') {
+      return {
+        label: style.label,
+        slug: style.slug,
+        description: style.description || '',
+        snapshotTakenAt: Math.floor(Date.now()/1000),  // In seconds
+        version: Math.floor(Date.now()/1000),  // Version number in seconds
+        // 🔴 CRITICAL: Must explicitly reference source entity to create relation
+        originalStyle: style  // ← This creates the relation to source Style
+      };
     }
-  })
+    return null;  // Don't create snapshot for non-active styles
+  }
 });
 
 // Define the relation between Style and StyleSnapshot
@@ -355,89 +309,6 @@ export const StyleSnapshotRelation = Relation.create({
 });
 ```
 
-#### Relation Creation via Transform
-
-**🔴 CRITICAL: When to Use Transform for Relations**
-
-**Most relations are created automatically when entities are created!** You only need Transform in Relation's computation for specific scenarios:
-
-1. **Automatic Relation Creation (MOST COMMON)**
-   - When creating an entity that references another entity, the relation is created automatically
-   - No Transform needed in the Relation definition
-   - This covers 90% of relation creation cases
-
-   ```typescript
-   // Entity creation with automatic relation
-   const Article = Entity.create({
-     name: 'Article',
-     computation: Transform.create({
-       record: InteractionEventEntity,
-       callback: function(event) {
-         if (event.interactionName === 'CreateArticle') {
-           return {
-             title: event.payload.title,
-             content: event.payload.content,
-             author: event.user  // ← Relation created automatically!
-           };
-         }
-       }
-     })
-   });
-   
-   // Relation definition - NO computation needed
-   const UserArticleRelation = Relation.create({
-     source: User,
-     target: Article,
-     type: 'n:1'
-     // No computation - relation is created when Article is created
-   });
-   ```
-
-2. **Transform for Relations Between Existing Entities (LESS COMMON)**
-   - Only use Transform when creating relations between already existing entities
-   - Examples: favorites, follows, likes, tags added later
-
-   ```typescript
-   // Only for connecting existing entities
-   export const AddToFavorites = Interaction.create({
-     name: 'AddToFavorites',
-     action: Action.create({ name: 'addToFavorites' }),
-     payload: Payload.create({
-       items: [
-         PayloadItem.create({ name: 'styleId', base: Style, isRef: true, required: true })
-       ]
-     })
-   });
-   
-   export const UserFavoriteRelation = Relation.create({
-     source: User,
-     sourceProperty: 'favorites',
-     target: Style,
-     targetProperty: 'favoritedBy',
-     type: 'n:n',
-     properties: [
-       Property.create({ name: 'addedAt', type: 'number', defaultValue: () => Math.floor(Date.now()/1000) })  // In seconds
-     ],
-     // Transform ONLY for connecting existing entities
-     computation: Transform.create({
-       record: InteractionEventEntity,
-       callback: function(event) {
-         if (event.interactionName === 'AddToFavorites') {
-           return {
-             source: event.user,
-             target: { id: event.payload.styleId },
-             addedAt: Math.floor(Date.now()/1000)  // In seconds
-           };
-         }
-         return null;
-       }
-     })
-   });
-   ```
-
-**Key Principle**: Ask yourself - "Am I creating a new entity with relations, or connecting two existing entities?"
-- Creating new entity → Relations created automatically through entity references
-- Connecting existing entities → Use Transform in Relation's computation
 
 ### 2. StateMachine - Updates Entities
 
@@ -494,29 +365,29 @@ const DeleteStyle = Interaction.create({
 });
 
 // Apply state machine to property
-Property.create({
+const statusProperty = Property.create({
   name: 'status',
-  type: 'string',
-  computation: StateMachine.create({
-    name: 'StyleStatus',
-    states: [draftState, activeState, offlineState],
-    defaultState: draftState,  // defaultState determines initial value
-    transfers: [
-      StateTransfer.create({
-        current: draftState,
-        next: activeState,
-        trigger: PublishStyle,
-        computeTarget: (event) => ({ id: event.payload.id })
-      }),
-      StateTransfer.create({
-        current: activeState,
-        next: offlineState,
-        trigger: DeleteStyle,
-        computeTarget: (event) => ({ id: event.payload.id })
-      })
-    ]
-  })
-})
+  type: 'string'
+});
+statusProperty.computation = StateMachine.create({
+  name: 'StyleStatus',
+  states: [draftState, activeState, offlineState],
+  defaultState: draftState,  // defaultState determines initial value
+  transfers: [
+    StateTransfer.create({
+      current: draftState,
+      next: activeState,
+      trigger: PublishStyle,
+      computeTarget: (event) => ({ id: event.payload.id })
+    }),
+    StateTransfer.create({
+      current: activeState,
+      next: offlineState,
+      trigger: DeleteStyle,
+      computeTarget: (event) => ({ id: event.payload.id })
+    })
+  ]
+});
 ```
 
 #### StateMachine with Value Updates
@@ -540,23 +411,23 @@ const updatedState = StateNode.create({
   computeValue: () => Math.floor(Date.now()/1000)  // Returns timestamp in seconds when state is entered
 });
 
-Property.create({
+const updatedAtProperty = Property.create({
   name: 'updatedAt',
-  type: 'number',
-  computation: StateMachine.create({
-    name: 'UpdatedAt',
-    states: [updatedState],
-    defaultState: updatedState,  // computeValue in updatedState provides initial value
-    transfers: [
-      StateTransfer.create({
-        current: updatedState,
-        next: updatedState,  // Self-loop to same state
-        trigger: UpdateStyle,
-        computeTarget: (event) => ({ id: event.payload.id })
-      })
-    ]
-  })
-})
+  type: 'number'
+});
+updatedAtProperty.computation = StateMachine.create({
+  name: 'UpdatedAt',
+  states: [updatedState],
+  defaultState: updatedState,  // computeValue in updatedState provides initial value
+  transfers: [
+    StateTransfer.create({
+      current: updatedState,
+      next: updatedState,  // Self-loop to same state
+      trigger: UpdateStyle,
+      computeTarget: (event) => ({ id: event.payload.id })
+    })
+  ]
+});
 ```
 
 #### StateMachine with Event Context in computeValue
@@ -603,23 +474,23 @@ const modifiedState = StateNode.create({
 });
 
 // Apply to property
-Property.create({
+const modificationInfoProperty = Property.create({
   name: 'modificationInfo',
-  type: 'object',
-  computation: StateMachine.create({
-    name: 'ModificationTracker',
-    states: [modifiedState],
-    defaultState: modifiedState,  // computeValue in modifiedState handles initial value
-    transfers: [
-      StateTransfer.create({
-        current: modifiedState,
-        next: modifiedState,
-        trigger: UpdateArticle,
-        computeTarget: (event) => ({ id: event.payload.id })
-      })
-    ]
-  })
-})
+  type: 'object'
+});
+modificationInfoProperty.computation = StateMachine.create({
+  name: 'ModificationTracker',
+  states: [modifiedState],
+  defaultState: modifiedState,  // computeValue in modifiedState handles initial value
+  transfers: [
+    StateTransfer.create({
+      current: modifiedState,
+      next: modifiedState,
+      trigger: UpdateArticle,
+      computeTarget: (event) => ({ id: event.payload.id })
+    })
+  ]
+});
 
 // Another example: Approval workflow with approver tracking
 const ApproveRequest = Interaction.create({
@@ -667,137 +538,11 @@ const approvedState = StateNode.create({
 - Useful for audit trails, tracking who made changes, and capturing interaction-specific data
 - Always use optional chaining (`?.`) when accessing event properties as it may be undefined
 
-### 3. Count - Counts Relations/Entities
+
+### 3. Custom - Complete User Control (USE WITH CAUTION!)
 
 ```typescript
-// Count styles per user
-const User = Entity.create({
-  name: 'User',
-  properties: [
-    Property.create({ name: 'name', type: 'string' }),
-    Property.create({
-      name: 'styleCount',
-      type: 'number',
-      computation: Count.create({
-        property: 'styles',  // Use property name from relation
-        direction: 'target'  // Count from user to styles
-      })
-    }),
-    // Count with conditions
-    Property.create({
-      name: 'activeStyleCount',
-      type: 'number',
-      computation: Count.create({
-        property: 'styles',  // Use property name from relation
-        direction: 'target',
-        attributeQuery: ['status'],  // Query properties on related entity
-        callback: function(style) {
-          return style.status === 'active';
-        }
-      })
-    })
-  ]
-});
-
-const UserStyleRelation = Relation.create({
-  source: User,
-  sourceProperty: 'styles',
-  target: Style,
-  targetProperty: 'author',
-  type: '1:n'
-});
-```
-
-### 4. Summation - Sums Values
-
-```typescript
-// Sum order items
-const OrderItem = Entity.create({
-  name: 'OrderItem',
-  properties: [
-    Property.create({ name: 'quantity', type: 'number' }),
-    Property.create({ name: 'price', type: 'number' })
-  ]
-});
-
-const Order = Entity.create({
-  name: 'Order',
-  properties: [
-    Property.create({ name: 'orderNumber', type: 'string' }),
-    Property.create({
-      name: 'totalAmount',
-      type: 'number',
-      computation: WeightedSummation.create({
-        property: 'items',  // Use property name from relation
-        attributeQuery: ['quantity', 'price'],  // Query properties on related entity
-        callback: (item) => ({
-          weight: 1,
-          value: item.quantity * item.price
-        })
-      })
-    })
-  ]
-});
-
-const OrderItemRelation = Relation.create({
-  source: Order,
-  sourceProperty: 'items',
-  target: OrderItem,
-  targetProperty: 'order',
-  type: '1:n'
-});
-```
-
-### 5. Every/Any - Boolean Checks
-
-```typescript
-// Check if all tasks completed
-const Task = Entity.create({
-  name: 'Task',
-  properties: [
-    Property.create({ name: 'title', type: 'string' }),
-    Property.create({ name: 'isCompleted', type: 'boolean', defaultValue: () => false })
-  ]
-});
-
-const Project = Entity.create({
-  name: 'Project',
-  properties: [
-    Property.create({ name: 'name', type: 'string' }),
-    Property.create({
-      name: 'isCompleted',
-      type: 'boolean',
-      computation: Every.create({
-        property: 'tasks',  // Use property name from relation
-        attributeQuery: ['isCompleted'],  // Query properties on related entity
-        callback: (task) => task.isCompleted === true
-      })
-    }),
-    Property.create({
-      name: 'hasCompletedTasks',
-      type: 'boolean',
-      computation: Any.create({
-        property: 'tasks',  // Use property name from relation
-        attributeQuery: ['isCompleted'],  // Query properties on related entity
-        callback: (task) => task.isCompleted === true
-      })
-    })
-  ]
-});
-
-const ProjectTaskRelation = Relation.create({
-  source: Project,
-  sourceProperty: 'tasks',
-  target: Task,
-  targetProperty: 'project',
-  type: '1:n'
-});
-```
-
-### 6. Custom - Complete User Control (USE WITH CAUTION!)
-
-```typescript
-import { Custom, Controller, GlobalBoundState } from 'interaqt';
+import { Custom, Dictionary, GlobalBoundState, Entity, Property, Relation } from 'interaqt';
 ```
 
 **🔴 WARNING: Custom should be your LAST RESORT!**
@@ -811,234 +556,168 @@ Before using Custom computation, ask yourself:
 
 **Only use Custom when:**
 - You need complex business logic that doesn't fit ANY existing computation type
-- You need external API integration (but consider if this belongs in the interaction layer)
-- You need complex async operations that can't be handled by other computations
 - You need stateful calculations with custom persistence logic
 - You need advanced data transformations that require full control
 
-**Examples of MISUSE (DON'T do this):**
+**Example of PROPER use:**
 ```typescript
-// ❌ WRONG: Using Custom for simple count
-Property.create({
-  name: 'postCount',
+// ✅ CORRECT: Complex calculation using Custom computation
+const totalProductValue = Dictionary.create({
+  name: 'totalProductValue',
   type: 'number',
-  computation: Custom.create({
-    name: 'SimplePostCount',
-    dataDeps: {
-      posts: { type: 'relations', source: UserPostRelation }
-    },
-    compute: async function(dataDeps) {
-      return dataDeps.posts.length;  // Just use Count!
+  collection: false
+});
+totalProductValue.computation = Custom.create({
+  name: 'TotalValueCalculator',
+  dataDeps: {
+    products: {
+      type: 'records',
+      source: Product,
+      attributeQuery: ['price', 'quantity']
     }
-  })
-})
-
-// ❌ WRONG: Using Custom for entity creation
-Entity.create({
-  name: 'Post',
-  computation: Custom.create({
-    name: 'PostCreator',
-    dataDeps: {
-      events: { type: 'records', source: InteractionEventEntity }
-    },
-    compute: async function(dataDeps) {
-      // This won't even work! Just use Transform!
-      if (dataDeps.events.some(e => e.interactionName === 'CreatePost')) {
-        // Custom can't create entities like this
-      }
-    }
-  })
-})
-
-// ❌ WRONG: Using Custom for status updates  
-Property.create({
-  name: 'status',
-  type: 'string',
-  computation: Custom.create({
-    name: 'StatusUpdater',
-    dataDeps: {
-      deleteEvents: { type: 'records', source: InteractionEventEntity }
-    },
-    compute: async function(dataDeps, record) {
-      // This approach doesn't work! Just use StateMachine!
-      const hasDelete = dataDeps.deleteEvents.some(e => 
-        e.interactionName === 'DeleteItem' && e.payload.id === record?.id
-      );
-      return hasDelete ? 'deleted' : 'active';
-    }
-  })
-})
-```
-
-**Examples of PROPER use:**
-```typescript
-// ✅ CORRECT: Complex scoring algorithm with state
-const complexScoring = Dictionary.create({
-  name: 'userEngagementScore',
-  type: 'object',
-  computation: Custom.create({
-    name: 'EngagementScorer',
-    dataDeps: {
-      users: { type: 'records', source: User, attributeQuery: ['id', 'name'] },
-      userPosts: { type: 'relations', source: UserPostRelation, attributeQuery: [
-        ['source', { attributeQuery: ['id'] }],
-        ['target', { attributeQuery: ['id', 'createdAt', 'content'] }]
-      ]},
-      postComments: { type: 'relations', source: PostCommentRelation, attributeQuery: [
-        ['source', { attributeQuery: ['id'] }],
-        ['target', { attributeQuery: ['id', 'content', 'author'] }]
-      ]},
-      userLikes: { type: 'relations', source: UserPostLikeRelation, attributeQuery: [
-        ['source', { attributeQuery: ['id'] }],
-        ['target', { attributeQuery: ['id'] }]
-      ]}
-    },
-    createState: function() {
-      return { scoreCache: new GlobalBoundState({}) };
-    },
-    compute: async function(dataDeps) {
-      // Complex multi-factor scoring that doesn't fit other computations
-      const scores = {};
-      
-      for (const user of dataDeps.users) {
-        // Get user's posts through relations
-        const userPostRelations = dataDeps.userPosts.filter(rel => rel.source.id === user.id);
-        
-        // Calculate post score with time decay
-        const postScore = userPostRelations.reduce((acc, rel) => {
-          const post = rel.target;
-          const age = Math.floor(Date.now()/1000) - post.createdAt;
-          const decay = Math.exp(-age / (30 * 24 * 60 * 60)); // 30-day half-life in seconds
-          
-          // Count comments on this post
-          const commentCount = dataDeps.postComments.filter(c => c.source.id === post.id).length;
-          
-          // Use content length as a proxy for quality
-          const qualityFactor = post.content ? Math.min(post.content.length / 500, 2) : 1;
-          
-          return acc + (1 + commentCount * 0.5) * qualityFactor * decay;
-        }, 0);
-        
-        // Count user's likes given
-        const likeCount = dataDeps.userLikes.filter(rel => rel.source.id === user.id).length;
-        
-        // Calculate engagement score with logarithmic scaling
-        const engagementScore = Math.log(1 + postScore * 2 + likeCount * 0.3);
-        
-        scores[user.id] = {
-          userId: user.id,
-          userName: user.name,
-          score: engagementScore,
-          breakdown: { 
-            postCount: userPostRelations.length, 
-            postScore: Math.round(postScore * 100) / 100, 
-            likeCount 
-          }
-        };
-      }
-      
-      // Cache results for future use
-      if (this.state && this.state.scoreCache) {
-        await this.state.scoreCache.set(scores);
-      }
-      
-      return scores;
-    },
-    getDefaultValue: function() {
-      return {};
-    }
-  })
+  },
+  compute: async function(dataDeps) {
+    const products = dataDeps.products || [];
+    const total = products.reduce((sum, p) => {
+      return sum + (p.price || 0) * (p.quantity || 0);
+    }, 0);
+    return total;
+  },
+  getDefaultValue: function() {
+    return 0;
+  }
 });
 
-// ✅ CORRECT: Complex calculation requiring multiple data sources and custom logic
-const riskScoreCalculation = Dictionary.create({
-  name: 'entityRiskScores',
-  type: 'object',
-  computation: Custom.create({
-    name: 'RiskScoreCalculator',
-    dataDeps: {
-      entities: { type: 'records', source: BusinessEntity, attributeQuery: ['id', 'name', 'type', 'createdAt'] },
-      transactions: { type: 'relations', source: EntityTransactionRelation, attributeQuery: [
-        ['source', { attributeQuery: ['id'] }],
-        ['target', { attributeQuery: ['id', 'amount', 'status', 'createdAt'] }]
-      ]},
-      compliance: { type: 'records', source: ComplianceCheck, attributeQuery: ['entityId', 'checkType', 'result', 'severity'] }
-    },
-    createState: function() {
-      return {
-        riskThresholds: new GlobalBoundState({
-          low: 0,
-          medium: 30,
-          high: 70,
-          critical: 90
-        })
-      };
-    },
-    compute: async function(dataDeps) {
-      // Complex risk calculation that combines multiple factors
-      const riskScores = {};
-      const thresholds = this.state ? await this.state.riskThresholds.get() : {
-        low: 0,
-        medium: 30,
-        high: 70,
-        critical: 90
-      };
-      
-      for (const entity of dataDeps.entities) {
-        // Factor 1: Transaction patterns
-        const entityTransactions = dataDeps.transactions.filter(rel => rel.source.id === entity.id);
-        const failedTransactions = entityTransactions.filter(rel => rel.target.status === 'failed');
-        const transactionRisk = (failedTransactions.length / Math.max(entityTransactions.length, 1)) * 40;
-        
-        // Factor 2: Compliance issues
-        const entityCompliance = dataDeps.compliance.filter(c => c.entityId === entity.id);
-        const criticalIssues = entityCompliance.filter(c => c.severity === 'critical').length;
-        const majorIssues = entityCompliance.filter(c => c.severity === 'major').length;
-        const complianceRisk = (criticalIssues * 10 + majorIssues * 5);
-        
-        // Factor 3: Entity age (newer entities are riskier)
-        const ageInDays = (Math.floor(Date.now()/1000) - entity.createdAt) / (24 * 60 * 60);
-        const ageRisk = ageInDays < 30 ? 20 : (ageInDays < 90 ? 10 : 0);
-        
-        // Calculate final risk score with weighted factors
-        const totalRisk = Math.min(100, transactionRisk + complianceRisk + ageRisk);
-        
-        // Determine risk level
-        let riskLevel = 'low';
-        if (totalRisk >= thresholds.critical) riskLevel = 'critical';
-        else if (totalRisk >= thresholds.high) riskLevel = 'high';
-        else if (totalRisk >= thresholds.medium) riskLevel = 'medium';
-        
-        riskScores[entity.id] = {
-          entityId: entity.id,
-          entityName: entity.name,
-          score: totalRisk,
-          level: riskLevel,
-          factors: {
-            transactionRisk,
-            complianceRisk,
-            ageRisk
-          },
-          calculatedAt: Math.floor(Date.now()/1000)  // In seconds
-        };
-      }
-      
-      return riskScores;
-    },
-    getDefaultValue: function() {
-      return {};
+// ✅ CORRECT: Property-level Custom for computed field
+const Product = Entity.create({
+  name: 'Product',
+  properties: [
+    Property.create({ name: 'name', type: 'string' }),
+    Property.create({ name: 'basePrice', type: 'number' }),
+    Property.create({ name: 'taxRate', type: 'number', defaultValue: () => 0.1 }),
+    Property.create({ name: 'discount', type: 'number', defaultValue: () => 0 })
+  ]
+});
+
+// Computed property based on other properties of same record
+const finalPriceProperty = Property.create({
+  name: 'finalPrice',
+  type: 'number'
+});
+finalPriceProperty.computation = Custom.create({
+  name: 'FinalPriceCalculator',
+  dataDeps: {
+    _current: {  // Special key for current record's properties
+      type: 'property',
+      attributeQuery: ['basePrice', 'taxRate', 'discount']
     }
-  })
+  },
+  compute: async function(dataDeps, record) {
+    const basePrice = dataDeps._current?.basePrice || 0;
+    const taxRate = dataDeps._current?.taxRate || 0;
+    const discount = dataDeps._current?.discount || 0;
+    
+    // Calculate: basePrice * (1 + taxRate) * (1 - discount)
+    const priceWithTax = basePrice * (1 + taxRate);
+    const finalPrice = priceWithTax * (1 - discount);
+    
+    return Math.round(finalPrice * 100) / 100; // Round to 2 decimals
+  },
+  getDefaultValue: function() {
+    return 0;
+  }
+});
+Product.properties.push(finalPriceProperty);
+
+// ✅ CORRECT: Accessing related entity properties through relations
+const Department = Entity.create({
+  name: 'Department',
+  properties: [
+    Property.create({ name: 'name', type: 'string' }),
+    Property.create({ name: 'budget', type: 'number' })
+  ]
+});
+
+const Employee = Entity.create({
+  name: 'Employee',
+  properties: [
+    Property.create({ name: 'name', type: 'string' }),
+    Property.create({ name: 'salary', type: 'number' })
+  ]
+});
+
+// Define the relation between Employee and Department
+const EmployeeDepartmentRelation = Relation.create({
+  source: Employee,
+  sourceProperty: 'department',
+  target: Department,
+  targetProperty: 'employees',
+  type: 'n:1'  // Many employees to one department
+});
+
+// Property that accesses related department data
+const EmployeeDepartmentInfoProperty = Property.create({
+  name: 'departmentInfo',
+  type: 'string'
+});
+
+Employee.properties.push(EmployeeDepartmentInfoProperty);
+
+EmployeeDepartmentInfoProperty.computation = Custom.create({
+  name: 'DepartmentInfoGenerator',
+  dataDeps: {
+    _current: {
+      type: 'property',
+      // Access properties and related entities through nested attributeQuery
+      attributeQuery: [
+        'name',
+        'salary',
+        ['department', {  // Access related entity through relation
+          attributeQuery: ['name', 'budget']  // Specify which properties of related entity
+        }]
+      ]
+    }
+  },
+  compute: async function(dataDeps, record) {
+    const employeeName = dataDeps._current?.name || 'Unknown';
+    const salary = dataDeps._current?.salary || 0;
+    const department = dataDeps._current?.department;
+    
+    if (department) {
+      return `${employeeName} ($${salary}) works in ${department.name} with budget $${department.budget}`;
+    }
+    return `${employeeName} ($${salary}) - No department assigned`;
+  },
+  getDefaultValue: function() {
+    return 'No info available';
+  }
 });
 ```
+
+**Custom Computation dataDeps Types:**
+- `type: 'records'` - Access entity/relation records from storage
+- `type: 'global'` - Access global dictionary values  
+- `type: 'property'` - Access current record's properties and related entities
+
+**🔴 IMPORTANT: Property Type Custom Computation**
+
+When using `type: 'property'` with Custom computation:
+- Access same record properties: `attributeQuery: ['propertyName1', 'propertyName2']`
+- Access related entities through relations: Use nested attributeQuery
+  ```typescript
+  attributeQuery: [
+    'ownProperty',  // Current record's property
+    ['relationName', {  // Access related entity
+      attributeQuery: ['relatedProp1', 'relatedProp2']  // Properties of related entity
+    }]
+  ]
+  ```
+- The framework automatically tracks dependencies and recomputes when related data changes
 
 **Custom Computation Best Practices:**
 1. **Document WHY** you need Custom instead of other computations
 2. **Minimize dependencies** - only include data you absolutely need
 3. **Handle errors gracefully** - Custom computations can fail
-4. **Consider performance** - Custom computations can be expensive
-5. **Test thoroughly** - Custom logic is more prone to bugs
-6. **Cache strategically** - Use state management to avoid redundant calculations
 
 **Remember:** The power of interaqt comes from its declarative computations. Custom computation breaks this paradigm and should only be used when absolutely necessary. Always try to express your logic using the standard computation types first!
 
@@ -1069,21 +748,21 @@ export const Style = Entity.create({
       type: 'string',
       defaultValue: () => 'draft'
     })
-  ],
-  computation: Transform.create({
-    record: InteractionEventEntity,
-    callback: (event) => {
-      if (event.interactionName === 'CreateStyle') {
-        return {
-          label: event.payload.label,
-          slug: event.payload.slug,
-          status: 'draft',
-          createdAt: Math.floor(Date.now()/1000)
-        };
-      }
-      return null;
+  ]
+});
+Style.computation = Transform.create({
+  record: InteractionEventEntity,
+  callback: (event) => {
+    if (event.interactionName === 'CreateStyle') {
+      return {
+        label: event.payload.label,
+        slug: event.payload.slug,
+        status: 'draft',
+        createdAt: Math.floor(Date.now()/1000)
+      };
     }
-  })
+    return null;
+  }
 });
 ```
 
@@ -1108,22 +787,22 @@ const updatedState = StateNode.create({
   computeValue: () => Math.floor(Date.now()/1000)
 });
 
-Property.create({
+const updatedAtProperty = Property.create({
   name: 'updatedAt',
-  type: 'number',
-  computation: StateMachine.create({
-    states: [updatedState],
-    defaultState: updatedState,
-    transfers: [
-      StateTransfer.create({
-        current: updatedState,
-        next: updatedState,
-        trigger: UpdateStyle,
-        computeTarget: (event) => ({ id: event.payload.id })
-      })
-    ]
-  })
-})
+  type: 'number'
+});
+updatedAtProperty.computation = StateMachine.create({
+  states: [updatedState],
+  defaultState: updatedState,
+  transfers: [
+    StateTransfer.create({
+      current: updatedState,
+      next: updatedState,
+      trigger: UpdateStyle,
+      computeTarget: (event) => ({ id: event.payload.id })
+    })
+  ]
+});
 ```
 
 ### Step 3: Soft Delete Pattern
@@ -1144,22 +823,22 @@ const activeState = StateNode.create({ name: 'active' });
 const offlineState = StateNode.create({ name: 'offline' });
 
 // Status property handles soft delete
-Property.create({
+const statusProperty = Property.create({
   name: 'status',
-  type: 'string',
-  computation: StateMachine.create({
-    states: [activeState, offlineState],
-    defaultState: activeState,
-    transfers: [
-      StateTransfer.create({
-        current: activeState,
-        next: offlineState,
-        trigger: DeleteStyle,
-        computeTarget: (event) => ({ id: event.payload.id })
-      })
-    ]
-  })
-})
+  type: 'string'
+});
+statusProperty.computation = StateMachine.create({
+  states: [activeState, offlineState],
+  defaultState: activeState,
+  transfers: [
+    StateTransfer.create({
+      current: activeState,
+      next: offlineState,
+      trigger: DeleteStyle,
+      computeTarget: (event) => ({ id: event.payload.id })
+    })
+  ]
+});
 ```
 
 ## Critical Rules
@@ -1181,18 +860,6 @@ Property.create({
 - Don't manually update computed values
 - Don't create StateNode inside StateTransfer
 - **Don't use strings as trigger in StateTransfer** - always use Interaction instance references
-
-## What to Use Where
-
-| Computation | Where to Use | Purpose |
-|------------|--------------|---------|
-| Transform | Entity/Relation computation | Create new instances |
-| StateMachine | Property computation | State transitions, updates |
-| Count | Property computation | Count relations/entities |
-| Summation/WeightedSummation | Property computation | Sum values |
-| Every/Any | Property computation | Boolean checks |
-| computed/getValue | Property definition | Simple derived values |
-| Custom (⚠️ Last Resort) | Dictionary/Property computation | Complex logic that doesn't fit other types |
 
 ## Common Patterns
 
@@ -1228,22 +895,22 @@ const updatedState = StateNode.create({
   computeValue: () => Math.floor(Date.now()/1000)  // Always convert to seconds!
 });
 
-Property.create({
+const updatedAtProperty = Property.create({
   name: 'updatedAt',
-  type: 'number',
-  computation: StateMachine.create({
-    states: [updatedState],
-    defaultState: updatedState,
-    transfers: [
-      StateTransfer.create({
-        current: updatedState,
-        next: updatedState,
-        trigger: UpdateInteraction,
-        computeTarget: (event) => ({ id: event.payload.id })
-      })
-    ]
-  })
-})
+  type: 'number'
+});
+updatedAtProperty.computation = StateMachine.create({
+  states: [updatedState],
+  defaultState: updatedState,
+  transfers: [
+    StateTransfer.create({
+      current: updatedState,
+      next: updatedState,
+      trigger: UpdateInteraction,
+      computeTarget: (event) => ({ id: event.payload.id })
+    })
+  ]
+});
 ```
 
 ### Version Management
@@ -1265,42 +932,32 @@ export const Version = Entity.create({
     Property.create({ name: 'version', type: 'number' }),
     Property.create({ name: 'publishedAt', type: 'bigint' }),
     Property.create({ name: 'isActive', type: 'boolean', defaultValue: () => true })
-  ],
-  computation: Transform.create({
-    record: InteractionEventEntity,
-    attributeQuery: ['interactionName', 'payload', 'user', 'createdAt'],
-    dataDeps: {
-      styles: {
-        type: 'records',
-        source: Style,
-        attributeQuery: ['*']
-      }
-    },
-    callback: function(event, dataDeps) {
-      if (event.interactionName === 'PublishStyle') {
-        const style = dataDeps.styles.find(s => s.id === event.payload.styleId);
-        if (style) {
-          return {
-            version: Math.floor(Date.now()/1000),  // Version number in seconds
-            publishedAt: Math.floor(Date.now()/1000),  // In seconds
-            isActive: true,
-            publishedBy: event.user,
-            style: { id: style.id }
-          };
-        }
-      }
-      return null;
+  ]
+});
+Version.computation = Transform.create({
+  record: InteractionEventEntity,
+  attributeQuery: ['interactionName', 'payload', 'user', 'createdAt'],
+  dataDeps: {
+    styles: {
+      type: 'records',
+      source: Style,
+      attributeQuery: ['*']
     }
-  })
+  },
+  callback: function(event, dataDeps) {
+    if (event.interactionName === 'PublishStyle') {
+      const style = dataDeps.styles.find(s => s.id === event.payload.styleId);
+      if (style) {
+        return {
+          version: Math.floor(Date.now()/1000),  // Version number in seconds
+          publishedAt: Math.floor(Date.now()/1000),  // In seconds
+          isActive: true,
+          publishedBy: event.user,
+          style: { id: style.id }
+        };
+      }
+    }
+    return null;
+  }
 });
 ```
-
-## Validation Checklist
-- [ ] Transform only in Entity/Relation computation property
-- [ ] StateMachine for all property updates
-- [ ] StateNode variables declared before use in StateMachine/StateTransfer
-- [ ] All entities created via Transform from interactions
-- [ ] No circular dependencies
-- [ ] Computations are pure functions
-- [ ] Correct computation type for each use case
-- [ ] TypeScript compilation passes
