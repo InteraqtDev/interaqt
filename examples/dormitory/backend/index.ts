@@ -562,3 +562,37 @@ export const interactions = [
 export const activities: any[] = []
 export const dicts = dictionaries
 
+// ========================= COMPUTATIONS =========================
+
+// Entity: User - Transform computation for creation
+User.computation = Transform.create({
+  record: InteractionEventEntity,
+  callback: function(event) {
+    if (event.interactionName === 'CreateUser') {
+      return {
+        username: event.payload.username,
+        password: event.payload.password,  // Should be hashed in production
+        email: event.payload.email,
+        name: event.payload.name,
+        points: 100,  // Initial points
+        role: event.payload.role || 'resident',
+        createdAt: Math.floor(Date.now() / 1000),
+        isDeleted: false
+      }
+    }
+    if (event.interactionName === 'Registration') {
+      return {
+        username: event.payload.username,
+        password: event.payload.password,  // Should be hashed in production
+        email: event.payload.email,
+        name: event.payload.name,
+        points: 100,  // Initial points
+        role: 'resident',  // Registration always creates residents
+        createdAt: Math.floor(Date.now() / 1000),
+        isDeleted: false
+      }
+    }
+    return null
+  }
+})
+
