@@ -580,11 +580,10 @@ export const dicts = dictionaries
 
 // ========================= COMPUTATIONS =========================
 
-// Phase 1: Entity Computations
-
-// User entity Transform computation - handles creation from CreateUser and Registration interactions
+// User entity Transform computation
 User.computation = Transform.create({
   record: InteractionEventEntity,
+  attributeQuery: ['*'],
   callback: function(event: any) {
     if (event.interactionName === 'CreateUser') {
       return {
@@ -597,8 +596,7 @@ User.computation = Transform.create({
         createdAt: Math.floor(Date.now() / 1000),
         isDeleted: false
       }
-    }
-    if (event.interactionName === 'Registration') {
+    } else if (event.interactionName === 'Registration') {
       return {
         username: event.payload.username,
         password: event.payload.password,
@@ -608,60 +606,6 @@ User.computation = Transform.create({
         points: 100,
         createdAt: Math.floor(Date.now() / 1000),
         isDeleted: false
-      }
-    }
-    return null
-  }
-})
-
-// Dormitory entity Transform computation - handles creation from CreateDormitory interaction
-// Also creates Bed entities and DormitoryBedsRelation based on capacity
-Dormitory.computation = Transform.create({
-  record: InteractionEventEntity,
-  callback: function(event: any, context: any) {
-    if (event.interactionName === 'CreateDormitory') {
-      const dormitoryId = context.generateId()
-      const capacity = event.payload.capacity
-      
-      // Create the dormitory
-      const dormitory = {
-        id: dormitoryId,
-        name: event.payload.name,
-        capacity: capacity,
-        floor: event.payload.floor,
-        building: event.payload.building,
-        createdAt: Math.floor(Date.now() / 1000),
-        isDeleted: false,
-        occupiedBeds: 0
-      }
-      
-      // Create beds and relations based on capacity
-      const beds = []
-      const relations = []
-      
-      for (let i = 1; i <= capacity; i++) {
-        const bedId = context.generateId()
-        beds.push({
-          entity: 'Bed',
-          id: bedId,
-          bedNumber: String(i),
-          isOccupied: false,
-          createdAt: Math.floor(Date.now() / 1000)
-        })
-        
-        relations.push({
-          entity: 'DormitoryBedsRelation',
-          dormitory: { id: dormitoryId },
-          bed: { id: bedId }
-        })
-      }
-      
-      // Return the dormitory with created beds and relations
-      return {
-        ...dormitory,
-        _sideEffects: {
-          create: [...beds, ...relations]
-        }
       }
     }
     return null

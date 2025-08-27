@@ -29,87 +29,81 @@ describe('Basic Functionality', () => {
     await controller.setup(true)
   })
 
-  test('User entity Transform computation - CreateUser interaction', async () => {
+  test('User entity Transform computation', async () => {
     /**
-     * Test Plan for: User entity Transform computation
-     * Dependencies: None (entity creation)
-     * Steps: 1) Call CreateUser interaction 2) Verify User entity is created with correct data
-     * Business Logic: User is created through CreateUser interaction with admin role
+     * Test Plan for: User entity Transform
+     * Dependencies: None (entity created independently)
+     * Steps: 1) CreateUser interaction 2) Verify User created 3) Registration interaction 4) Verify second User created
+     * Business Logic: Users created from CreateUser or Registration interactions
      */
     
-    // Create admin user first (for permission)
-    const adminResult = await controller.callInteraction('CreateUser', {
-      user: null,
+    // Test CreateUser interaction
+    const createUserResult = await controller.callInteraction('CreateUser', {
+      user: { id: 'admin' },
       payload: {
-        username: 'admin',
-        password: 'admin123',
-        email: 'admin@example.com',
-        name: 'System Admin',
+        username: 'john_doe',
+        password: 'password123',
+        email: 'john@example.com',
+        name: 'John Doe',
         role: 'admin'
       }
     })
     
-    console.log('adminResult:', adminResult)
-    // Skip checking adminResult.data since Transform doesn't return data
-    // expect(adminResult.data).toBeDefined()
+    expect(createUserResult.error).toBeUndefined()
     
-    // Query the created user to verify it was created by the Transform computation
-    const foundAdmin = await system.storage.findOne(
-      'User',
-      MatchExp.atom({ key: 'username', value: ['=', 'admin'] }),
+    // Verify user was created with correct properties
+    const createdUser = await system.storage.findOne('User',
+      MatchExp.atom({ key: 'username', value: ['=', 'john_doe'] }),
       undefined,
       ['id', 'username', 'password', 'email', 'name', 'role', 'points', 'createdAt', 'isDeleted']
     )
     
-    expect(foundAdmin).toBeDefined()
-    expect(foundAdmin.username).toBe('admin')
-    expect(foundAdmin.password).toBe('admin123')
-    expect(foundAdmin.email).toBe('admin@example.com')
-    expect(foundAdmin.name).toBe('System Admin')
-    expect(foundAdmin.role).toBe('admin')
-    expect(foundAdmin.points).toBe(100)
-    expect(foundAdmin.createdAt).toBeGreaterThan(0)
-    expect(foundAdmin.isDeleted).toBe(false)
-  })
-
-  test('User entity Transform computation - Registration interaction', async () => {
-    /**
-     * Test Plan for: User entity Transform computation
-     * Dependencies: None (entity creation)
-     * Steps: 1) Call Registration interaction 2) Verify User entity is created with correct data
-     * Business Logic: User is created through Registration interaction with resident role
-     */
+    expect(createdUser).toBeDefined()
+    expect(createdUser.username).toBe('john_doe')
+    expect(createdUser.password).toBe('password123')
+    expect(createdUser.email).toBe('john@example.com')
+    expect(createdUser.name).toBe('John Doe')
+    expect(createdUser.role).toBe('admin')
+    expect(createdUser.points).toBe(100)
+    expect(createdUser.createdAt).toBeGreaterThan(0)
+    expect(createdUser.isDeleted).toBe(false)
     
-    const result = await controller.callInteraction('Registration', {
-      user: null,
+    // Test Registration interaction
+    const registrationResult = await controller.callInteraction('Registration', {
+      user: { id: 'anonymous' },
       payload: {
-        username: 'testuser',
-        password: 'password123',
-        email: 'test@example.com',
-        name: 'Test User'
+        username: 'jane_doe',
+        password: 'secret456',
+        email: 'jane@example.com',
+        name: 'Jane Doe'
       }
     })
     
-    // Skip checking result.data since Transform doesn't return data
-    // expect(result.data).toBeDefined()
+    expect(registrationResult.error).toBeUndefined()
     
-    // Query the created user to verify it was created by the Transform computation
-    const foundUser = await system.storage.findOne(
-      'User',
-      MatchExp.atom({ key: 'username', value: ['=', 'testuser'] }),
+    // Verify second user was created with correct properties
+    const registeredUser = await system.storage.findOne('User',
+      MatchExp.atom({ key: 'username', value: ['=', 'jane_doe'] }),
       undefined,
       ['id', 'username', 'password', 'email', 'name', 'role', 'points', 'createdAt', 'isDeleted']
     )
     
-    expect(foundUser).toBeDefined()
-    expect(foundUser.username).toBe('testuser')
-    expect(foundUser.password).toBe('password123')
-    expect(foundUser.email).toBe('test@example.com')
-    expect(foundUser.name).toBe('Test User')
-    expect(foundUser.role).toBe('resident') // Registration always creates resident role
-    expect(foundUser.points).toBe(100)
-    expect(foundUser.createdAt).toBeGreaterThan(0)
-    expect(foundUser.isDeleted).toBe(false)
+    expect(registeredUser).toBeDefined()
+    expect(registeredUser.username).toBe('jane_doe')
+    expect(registeredUser.password).toBe('secret456')
+    expect(registeredUser.email).toBe('jane@example.com')
+    expect(registeredUser.name).toBe('Jane Doe')
+    expect(registeredUser.role).toBe('resident') // Default role for Registration
+    expect(registeredUser.points).toBe(100)
+    expect(registeredUser.createdAt).toBeGreaterThan(0)
+    expect(registeredUser.isDeleted).toBe(false)
+    
+    // Verify we have exactly 2 users
+    const allUsers = await system.storage.find('User',
+      undefined,
+      undefined,
+      ['id']
+    )
+    expect(allUsers).toHaveLength(2)
   })
-  
 })
