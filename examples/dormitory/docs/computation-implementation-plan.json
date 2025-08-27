@@ -45,7 +45,7 @@
           ],
           "reasoning": "created-with-parent type, created by Dormitory's computation",
           "calculationMethod": "Created by Dormitory's computation when Dormitory is created (NOT by Bed's own computation)",
-          "completed": false
+          "completed": true
         },
         {
           "id": "PointDeduction",

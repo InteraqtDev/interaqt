@@ -29,6 +29,102 @@ describe('Basic Functionality', () => {
     await controller.setup(true)
   })
 
+  test('Bed entity creation through Dormitory Transform (_parent:[Dormitory])', async () => {
+    /**
+     * Test Plan for: _parent:[Dormitory]
+     * This tests the Dormitory's Transform computation that creates Beds
+     * Dependencies: Dormitory entity creation
+     * Steps: 1) Create admin user 2) Trigger CreateDormitory interaction 3) Verify Beds are created through DormitoryBedsRelation
+     * Business Logic: Dormitory's Transform creates related Bed entities equal to capacity
+     */
+    
+    // First create an admin user who can create dormitories
+    const adminResult = await controller.callInteraction('CreateUser', {
+      user: null,
+      payload: {
+        username: 'admin',
+        password: 'admin123',
+        email: 'admin@example.com',
+        name: 'Admin User',
+        role: 'admin'
+      }
+    })
+    
+    // Verify the interaction executed successfully
+    expect(adminResult).toBeDefined()
+    expect(adminResult.error).toBeUndefined()
+    
+    const adminUser = await system.storage.findOne(
+      'User',
+      MatchExp.atom({ key: 'username', value: ['=', 'admin'] }),
+      undefined,
+      ['id', 'username', 'role']
+    )
+    
+    // Create dormitory with capacity 4
+    const dormResult = await controller.callInteraction('CreateDormitory', {
+      user: adminUser,
+      payload: {
+        name: 'Dorm A',
+        capacity: 4,
+        floor: 1,
+        building: 'Building 1'
+      }
+    })
+    
+    // Verify the interaction executed successfully
+    expect(dormResult).toBeDefined()
+    expect(dormResult.error).toBeUndefined()
+    
+    // Get the created dormitory
+    const dormitory = await system.storage.findOne(
+      'Dormitory',
+      MatchExp.atom({ key: 'name', value: ['=', 'Dorm A'] }),
+      undefined,
+      ['id', 'name', 'capacity']
+    )
+    
+    const dormId = dormitory.id
+    
+    // Verify Beds were created through the relation
+    const beds = await system.storage.find(
+      'Bed',
+      undefined,
+      undefined,
+      ['id', 'bedNumber', 'isOccupied', 'createdAt']
+    )
+    
+    expect(beds.length).toBe(4)
+    expect(beds[0].bedNumber).toBe('1')
+    expect(beds[1].bedNumber).toBe('2')
+    expect(beds[2].bedNumber).toBe('3')
+    expect(beds[3].bedNumber).toBe('4')
+    
+    // Verify all beds are initially not occupied
+    beds.forEach(bed => {
+      expect(bed.isOccupied).toBe(false)
+      expect(bed.createdAt).toBeGreaterThan(0)
+    })
+    
+    // Verify DormitoryBedsRelation was created
+    const dormBedRelations = await system.storage.find(
+      'DormitoryBedsRelation',
+      MatchExp.atom({ key: 'source.id', value: ['=', dormId] }),
+      undefined,
+      [
+        'id',
+        ['source', { attributeQuery: ['id', 'name'] }],
+        ['target', { attributeQuery: ['id', 'bedNumber'] }]
+      ]
+    )
+    
+    expect(dormBedRelations.length).toBe(4)
+    dormBedRelations.forEach(rel => {
+      expect(rel.source.id).toBe(dormId)
+      expect(rel.source.name).toBe('Dorm A')
+    })
+  })
+
   test('User entity creation via CreateUser interaction', async () => {
     /**
      * Test Plan for: User entity Transform computation

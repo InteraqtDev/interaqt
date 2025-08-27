@@ -612,7 +612,7 @@ Dormitory.computation = Transform.create({
         occupiedBeds: 0
       }
       
-      // Create beds for the dormitory
+      // Create beds through the relation property
       const beds = []
       for (let i = 1; i <= event.payload.capacity; i++) {
         beds.push({
@@ -622,18 +622,11 @@ Dormitory.computation = Transform.create({
         })
       }
       
-      // Create DormitoryBedsRelation for each bed
-      const dormitoryBedsRelations = beds.map(bed => ({
-        source: dormitory,
-        target: bed,
-        assignedAt: Math.floor(Date.now() / 1000)
-      }))
-      
-      return [
-        dormitory,
-        ...beds,
-        ...dormitoryBedsRelations
-      ]
+      // Return dormitory with beds property to create the relation
+      return {
+        ...dormitory,
+        beds: beds  // This will create Bed entities and DormitoryBedsRelation
+      }
     }
     return null
   }
