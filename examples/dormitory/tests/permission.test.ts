@@ -2041,6 +2041,211 @@ describe('Permission and Business Rules', () => {
       expect(newBedRelation.target.id).toBe(bed2.id)
     })
 
+    test('BR015: Cannot assign user to occupied bed (TC012)', async () => {
+      // Create admin user
+      const admin = await system.storage.create('User', {
+        username: 'admin',
+        password: 'password123',
+        email: 'admin@test.com',
+        name: 'Admin User',
+        role: 'admin',
+        points: 100
+      })
+
+      // Create two resident users
+      const resident1 = await system.storage.create('User', {
+        username: 'resident1',
+        password: 'password123',
+        email: 'resident1@test.com',
+        name: 'Resident User 1',
+        role: 'resident',
+        points: 100
+      })
+
+      const resident2 = await system.storage.create('User', {
+        username: 'resident2',
+        password: 'password123',
+        email: 'resident2@test.com',
+        name: 'Resident User 2',
+        role: 'resident',
+        points: 100
+      })
+
+      // Create dormitory
+      const dormitory = await system.storage.create('Dormitory', {
+        name: 'Test Dorm',
+        capacity: 4,
+        floor: 1,
+        building: 'Building A',
+        isDeleted: false
+      })
+
+      // Create beds for the dormitory
+      const bed = await system.storage.create('Bed', {
+        bedNumber: '1',
+        isOccupied: false
+      })
+
+      // Create relation between dormitory and bed
+      await system.storage.create('DormitoryBedsRelation', {
+        source: { id: dormitory.id },
+        target: { id: bed.id }
+      })
+
+      // First, assign resident1 to the bed
+      const firstAssignResult = await controller.callInteraction('AssignUserToBed', {
+        user: admin,
+        payload: {
+          userId: resident1.id,
+          bedId: bed.id
+        }
+      })
+      expect(firstAssignResult.error).toBeUndefined()
+
+      // Verify bed is now occupied
+      const occupiedBed = await system.storage.findOne('Bed',
+        MatchExp.atom({ key: 'id', value: ['=', bed.id] }),
+        undefined,
+        ['id', 'isOccupied']
+      )
+      expect(occupiedBed.isOccupied).toBe(true)
+
+      // Now try to assign resident2 to the same bed (should fail due to BR015)
+      const secondAssignResult = await controller.callInteraction('AssignUserToBed', {
+        user: admin,
+        payload: {
+          userId: resident2.id,
+          bedId: bed.id
+        }
+      })
+
+      // Verify error - BR015 condition should fail
+      expect(secondAssignResult.error).toBeDefined()
+      expect((secondAssignResult.error as any).type).toBe('condition check failed')
+      expect((secondAssignResult.error as any).error.data.name).toBe('bedIsNotOccupied')
+
+      // Verify resident1 is still assigned to the bed
+      const bedRelations = await system.storage.find('UserBedRelation',
+        MatchExp.atom({ key: 'target.id', value: ['=', bed.id] }),
+        undefined,
+        ['id', ['source', { attributeQuery: ['id'] }]]
+      )
+      expect(bedRelations.length).toBe(1)
+      expect(bedRelations[0].source.id).toBe(resident1.id)
+
+      // Verify resident2 has no bed assignment
+      const resident2BedRelation = await system.storage.findOne('UserBedRelation',
+        MatchExp.atom({ key: 'source.id', value: ['=', resident2.id] })
+      )
+      expect(resident2BedRelation).toBeUndefined()
+    })
+
+    test('BR015: Can assign user to unoccupied bed after removal (TC002 extended)', async () => {
+      // Create admin user
+      const admin = await system.storage.create('User', {
+        username: 'admin',
+        password: 'password123',
+        email: 'admin@test.com',
+        name: 'Admin User',
+        role: 'admin',
+        points: 100
+      })
+
+      // Create two resident users
+      const resident1 = await system.storage.create('User', {
+        username: 'resident1',
+        password: 'password123',
+        email: 'resident1@test.com',
+        name: 'Resident User 1',
+        role: 'resident',
+        points: 100
+      })
+
+      const resident2 = await system.storage.create('User', {
+        username: 'resident2',
+        password: 'password123',
+        email: 'resident2@test.com',
+        name: 'Resident User 2',
+        role: 'resident',
+        points: 100
+      })
+
+      // Create dormitory
+      const dormitory = await system.storage.create('Dormitory', {
+        name: 'Test Dorm',
+        capacity: 4,
+        floor: 1,
+        building: 'Building A',
+        isDeleted: false
+      })
+
+      // Create a bed for the dormitory
+      const bed = await system.storage.create('Bed', {
+        bedNumber: '1',
+        isOccupied: false
+      })
+
+      // Create relation between dormitory and bed
+      await system.storage.create('DormitoryBedsRelation', {
+        source: { id: dormitory.id },
+        target: { id: bed.id }
+      })
+
+      // First, assign resident1 to the bed
+      const firstAssignResult = await controller.callInteraction('AssignUserToBed', {
+        user: admin,
+        payload: {
+          userId: resident1.id,
+          bedId: bed.id
+        }
+      })
+      expect(firstAssignResult.error).toBeUndefined()
+
+      // Remove resident1 from the bed
+      const removeResult = await controller.callInteraction('RemoveUserFromBed', {
+        user: admin,
+        payload: {
+          userId: resident1.id
+        }
+      })
+      expect(removeResult.error).toBeUndefined()
+
+      // Verify bed is now unoccupied
+      const unoccupiedBed = await system.storage.findOne('Bed',
+        MatchExp.atom({ key: 'id', value: ['=', bed.id] }),
+        undefined,
+        ['id', 'isOccupied']
+      )
+      expect(unoccupiedBed.isOccupied).toBe(false)
+
+      // Now assign resident2 to the bed (should succeed since bed is unoccupied)
+      const secondAssignResult = await controller.callInteraction('AssignUserToBed', {
+        user: admin,
+        payload: {
+          userId: resident2.id,
+          bedId: bed.id
+        }
+      })
+      expect(secondAssignResult.error).toBeUndefined()
+
+      // Verify resident2 is now assigned to the bed
+      const bedRelation = await system.storage.findOne('UserBedRelation',
+        MatchExp.atom({ key: 'source.id', value: ['=', resident2.id] }),
+        undefined,
+        ['id', ['target', { attributeQuery: ['id'] }]]
+      )
+      expect(bedRelation).toBeDefined()
+      expect(bedRelation.target.id).toBe(bed.id)
+
+      // Verify bed is occupied again
+      const reoccupiedBed = await system.storage.findOne('Bed',
+        MatchExp.atom({ key: 'id', value: ['=', bed.id] }),
+        undefined,
+        ['id', 'isOccupied']
+      )
+      expect(reoccupiedBed.isOccupied).toBe(true)
+    })
+
     test('P007: Admin can remove user from bed', async () => {
       // Create admin user
       const admin = await system.storage.create('User', {

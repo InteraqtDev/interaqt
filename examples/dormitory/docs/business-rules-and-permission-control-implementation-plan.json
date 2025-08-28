@@ -419,7 +419,7 @@
             "Can assign to unoccupied bed (TC002)",
             "Cannot assign to occupied bed (TC012)"
           ],
-          "completed": false
+          "completed": true
         },
         {
           "id": "BR016",

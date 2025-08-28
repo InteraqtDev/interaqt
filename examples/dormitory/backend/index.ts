@@ -1551,9 +1551,37 @@ const userHasNoExistingBed = Condition.create({
   }
 })
 
-// P006: Only admin can assign users to beds + BR014: User cannot already be assigned to another bed
+// BR015: Bed must not be occupied
+const bedIsNotOccupied = Condition.create({
+  name: 'bedIsNotOccupied',
+  content: async function(this: Controller, event: any) {
+    const bedId = event.payload?.bedId
+    
+    if (!bedId) {
+      return false // No bed ID provided
+    }
+    
+    // Check if the bed is occupied by looking at its isOccupied property
+    const bed = await this.system.storage.findOne(
+      'Bed',
+      MatchExp.atom({ key: 'id', value: ['=', bedId] }),
+      undefined,
+      ['id', 'isOccupied']
+    )
+    
+    // If bed doesn't exist, return false
+    if (!bed) {
+      return false
+    }
+    
+    // Return true if bed is not occupied (isOccupied is false or undefined)
+    return bed.isOccupied !== true
+  }
+})
+
+// P006: Only admin can assign users to beds + BR014: User cannot already be assigned to another bed + BR015: Bed must not be occupied
 AssignUserToBed.conditions = Conditions.create({
-  content: BoolExp.atom(isAdmin).and(userHasNoExistingBed)
+  content: BoolExp.atom(isAdmin).and(userHasNoExistingBed).and(bedIsNotOccupied)
 })
 
 // P007: Only admin can remove users from beds
