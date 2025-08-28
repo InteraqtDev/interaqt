@@ -5288,6 +5288,124 @@ describe('Permission and Business Rules', () => {
       expect(createdUser).toBeUndefined()
     })
 
+    // BR024: Username must be unique for Registration
+    test('BR024: Can register with unique username', async () => {
+      // First registration with unique username should succeed
+      const result = await controller.callInteraction('Registration', {
+        user: null, // Registration doesn't require authentication
+        payload: {
+          username: 'uniqueuser1',
+          password: 'password123',
+          email: 'uniqueuser1@test.com',
+          name: 'Unique User 1'
+        }
+      })
+      
+      expect(result.error).toBeUndefined()
+      
+      // Verify user was created
+      const createdUser = await system.storage.findOne('User',
+        MatchExp.atom({ key: 'username', value: ['=', 'uniqueuser1'] }),
+        undefined,
+        ['id', 'username', 'email', 'name', 'role']
+      )
+      expect(createdUser).toBeDefined()
+      expect(createdUser.username).toBe('uniqueuser1')
+      expect(createdUser.email).toBe('uniqueuser1@test.com')
+      expect(createdUser.name).toBe('Unique User 1')
+      expect(createdUser.role).toBe('resident')
+    })
+
+    test('BR024: Cannot register with duplicate username', async () => {
+      // First create a user
+      const firstResult = await controller.callInteraction('Registration', {
+        user: null,
+        payload: {
+          username: 'duplicateuser',
+          password: 'password123',
+          email: 'first@test.com',
+          name: 'First User'
+        }
+      })
+      expect(firstResult.error).toBeUndefined()
+
+      // Now try to register another user with the same username
+      const secondResult = await controller.callInteraction('Registration', {
+        user: null,
+        payload: {
+          username: 'duplicateuser', // Same username
+          password: 'password456',
+          email: 'second@test.com', // Different email
+          name: 'Second User'
+        }
+      })
+
+      // Verify error - should fail due to duplicate username
+      expect(secondResult.error).toBeDefined()
+      expect((secondResult.error as any).type).toBe('condition check failed')
+      
+      // The error should be about the conditions check (could be either password or username)
+      // Since both conditions are combined with AND, it will fail the entire check
+      
+      // Verify only one user exists with that username
+      const users = await system.storage.find('User',
+        MatchExp.atom({ key: 'username', value: ['=', 'duplicateuser'] }),
+        undefined,
+        ['id', 'email']
+      )
+      expect(users.length).toBe(1)
+      expect(users[0].email).toBe('first@test.com')
+    })
+
+    test('BR024 & BR006: Both conditions must pass for successful registration', async () => {
+      // Test with valid username and valid password - should succeed
+      const validResult = await controller.callInteraction('Registration', {
+        user: null,
+        payload: {
+          username: 'validuser123',
+          password: 'validpass123', // Valid password (>= 8 chars)
+          email: 'valid@test.com',
+          name: 'Valid User'
+        }
+      })
+      expect(validResult.error).toBeUndefined()
+
+      // Test with duplicate username but valid password - should fail
+      const duplicateUsernameResult = await controller.callInteraction('Registration', {
+        user: null,
+        payload: {
+          username: 'validuser123', // Duplicate username
+          password: 'anotherpass123', // Valid password
+          email: 'another@test.com',
+          name: 'Another User'
+        }
+      })
+      expect(duplicateUsernameResult.error).toBeDefined()
+      expect((duplicateUsernameResult.error as any).type).toBe('condition check failed')
+
+      // Test with unique username but short password - should fail
+      const shortPasswordResult = await controller.callInteraction('Registration', {
+        user: null,
+        payload: {
+          username: 'uniqueuser456', // Unique username
+          password: 'short', // Invalid password (< 8 chars)
+          email: 'short@test.com',
+          name: 'Short Pass User'
+        }
+      })
+      expect(shortPasswordResult.error).toBeDefined()
+      expect((shortPasswordResult.error as any).type).toBe('condition check failed')
+
+      // Verify only the first user was created
+      const allUsers = await system.storage.find('User',
+        undefined,
+        undefined,
+        ['id', 'username']
+      )
+      expect(allUsers.find(u => u.username === 'validuser123')).toBeDefined()
+      expect(allUsers.find(u => u.username === 'uniqueuser456')).toBeUndefined()
+    })
+
     // BR008: Cannot update capacity after creation
     test('BR008: Can update name, floor, building', async () => {
       // Create admin user

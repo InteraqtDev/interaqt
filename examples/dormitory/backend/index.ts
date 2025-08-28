@@ -1925,8 +1925,34 @@ const registrationPasswordLength = Condition.create({
   }
 })
 
-// Assign BR006 condition to Registration interaction
-Registration.conditions = registrationPasswordLength
+// BR024: Username must be unique for Registration
+const registrationUsernameUnique = Condition.create({
+  name: 'registrationUsernameUnique',
+  content: async function(this: Controller, event: any) {
+    const username = event.payload?.username
+    
+    // Check if username is provided
+    if (!username || typeof username !== 'string') {
+      return false
+    }
+    
+    // Check if any user exists with the same username
+    const existingUser = await this.system.storage.findOne(
+      'User',
+      MatchExp.atom({ key: 'username', value: ['=', username] }),
+      undefined,
+      ['id']
+    )
+    
+    // Return true if no existing user found (username is unique)
+    return !existingUser
+  }
+})
+
+// Combine BR006 (password length) and BR024 (username unique) for Registration
+Registration.conditions = Conditions.create({
+  content: BoolExp.atom(registrationPasswordLength).and(BoolExp.atom(registrationUsernameUnique))
+})
 
 // P015: Admin can see all requests, dormitory leaders can only see their dormitory's requests
 const canViewRemovalRequests = Condition.create({

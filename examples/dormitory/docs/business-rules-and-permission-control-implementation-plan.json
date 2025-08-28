@@ -537,7 +537,7 @@
             "Can register with unique username",
             "Cannot register with duplicate username"
           ],
-          "completed": false
+          "completed": true
         },
         {
           "id": "BR025",
