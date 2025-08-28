@@ -9801,5 +9801,116 @@ describe('Permission and Business Rules', () => {
       expect(userAfter.role).toBe('resident')  // Original role unchanged
       expect(userAfter.name).toBe('User One')  // Name also unchanged since the whole operation failed
     })
+
+    test('BR035: Active user can login', async () => {
+      // Create an active (non-deleted) user
+      const activeUser = await system.storage.create('User', {
+        username: 'activeuser',
+        password: 'password123',
+        email: 'active@test.com',
+        name: 'Active User',
+        role: 'resident',
+        points: 100,
+        isDeleted: false  // Explicitly set as not deleted
+      })
+
+      // Try to login
+      const loginResult = await controller.callInteraction('Login', {
+        user: { id: 'anonymous' },  // Login doesn't require authentication
+        payload: {
+          username: 'activeuser',
+          password: 'password123'
+        }
+      })
+
+      // Should succeed (no error from BR035 condition)
+      expect(loginResult.error).toBeUndefined()
+    })
+
+    test('BR035: Deleted user cannot login', async () => {
+      // Create a deleted user
+      const deletedUser = await system.storage.create('User', {
+        username: 'deleteduser',
+        password: 'password123',
+        email: 'deleted@test.com',
+        name: 'Deleted User',
+        role: 'resident',
+        points: 100,
+        isDeleted: true  // User is marked as deleted
+      })
+
+      // Try to login
+      const loginResult = await controller.callInteraction('Login', {
+        user: { id: 'anonymous' },  // Login doesn't require authentication
+        payload: {
+          username: 'deleteduser',
+          password: 'password123'
+        }
+      })
+
+      // Should fail with condition check
+      expect(loginResult.error).toBeDefined()
+      expect((loginResult.error as any).type).toBe('condition check failed')
+      // The condition error should be from userMustNotBeDeleted
+      expect((loginResult.error as any).error.data.name).toBe('userMustNotBeDeleted')
+    })
+
+    test('BR035: Non-existent user cannot login', async () => {
+      // Try to login with a non-existent username
+      const loginResult = await controller.callInteraction('Login', {
+        user: { id: 'anonymous' },  // Login doesn't require authentication
+        payload: {
+          username: 'nonexistentuser',
+          password: 'password123'
+        }
+      })
+
+      // Should fail with condition check
+      expect(loginResult.error).toBeDefined()
+      expect((loginResult.error as any).type).toBe('condition check failed')
+      // The condition error should be from userMustNotBeDeleted (returns false for non-existent users)
+      expect((loginResult.error as any).error.data.name).toBe('userMustNotBeDeleted')
+    })
+
+    test('BR035: User deleted after creation cannot login', async () => {
+      // Create an active user first
+      const user = await system.storage.create('User', {
+        username: 'usertoDelete',
+        password: 'password123',
+        email: 'tobedeleted@test.com',
+        name: 'To Be Deleted',
+        role: 'resident',
+        points: 100,
+        isDeleted: false
+      })
+
+      // First login should succeed
+      const firstLoginResult = await controller.callInteraction('Login', {
+        user: { id: 'anonymous' },
+        payload: {
+          username: 'usertoDelete',
+          password: 'password123'
+        }
+      })
+      expect(firstLoginResult.error).toBeUndefined()
+
+      // Now mark the user as deleted
+      await system.storage.update('User',
+        MatchExp.atom({ key: 'id', value: ['=', user.id] }),
+        { isDeleted: true }
+      )
+
+      // Second login should fail
+      const secondLoginResult = await controller.callInteraction('Login', {
+        user: { id: 'anonymous' },
+        payload: {
+          username: 'usertoDelete',
+          password: 'password123'
+        }
+      })
+      expect(secondLoginResult.error).toBeDefined()
+      expect((secondLoginResult.error as any).type).toBe('condition check failed')
+      expect((secondLoginResult.error as any).error.data.name).toBe('userMustNotBeDeleted')
+    })
   })
 })

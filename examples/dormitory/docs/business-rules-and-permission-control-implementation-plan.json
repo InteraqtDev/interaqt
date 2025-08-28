@@ -685,7 +685,7 @@
             "Active user can login",
             "Deleted user cannot login"
           ],
-          "completed": false
+          "completed": true
         },
         {
           "id": "BR036",

@@ -2356,3 +2356,36 @@ UpdateProfile.conditions = Conditions.create({
   content: BoolExp.atom(updateProfileEmailValid).and(updateProfileFieldRestriction)
 })
 
+// BR035: User must not be deleted
+const userMustNotBeDeleted = Condition.create({
+  name: 'userMustNotBeDeleted',
+  content: async function(this: Controller, event: any) {
+    const username = event.payload?.username
+    
+    if (!username) {
+      return false // No username provided
+    }
+    
+    // Query user by username
+    const user = await this.system.storage.findOne(
+      'User',
+      MatchExp.atom({ key: 'username', value: ['=', username] }),
+      undefined,
+      ['id', 'isDeleted']
+    )
+    
+    // If user doesn't exist, return false (will fail login anyway)
+    if (!user) {
+      return false
+    }
+    
+    // Check if user is deleted
+    // Return true if user is NOT deleted (isDeleted === false or undefined)
+    // Return false if user IS deleted (isDeleted === true)
+    return user.isDeleted !== true
+  }
+})
+
+// Assign BR035 condition to Login interaction
+Login.conditions = userMustNotBeDeleted
+
