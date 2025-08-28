@@ -367,7 +367,7 @@
             "Cannot assign non-resident as leader",
             "Cannot assign user without bed as leader"
           ],
-          "completed": false
+          "completed": true
         },
         {
           "id": "BR012",

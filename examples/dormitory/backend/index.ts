@@ -1441,8 +1441,42 @@ DeleteDormitory.conditions = Conditions.create({
   content: BoolExp.atom(isAdmin).and(noBedOccupiedInDormitory)
 })
 
-// P004: Only admin can assign dormitory leaders
-AssignDormitoryLeader.conditions = isAdmin
+// BR011: User must be a resident of the dormitory
+const userIsResidentOfDormitory = Condition.create({
+  name: 'userIsResidentOfDormitory',
+  content: async function(this: Controller, event: any) {
+    const userId = event.payload?.userId
+    const dormitoryId = event.payload?.dormitoryId
+    
+    if (!userId || !dormitoryId) {
+      return false // Missing required parameters
+    }
+    
+    // Get the user's bed assignment
+    const userBedRelation = await this.system.storage.findOne(
+      UserBedRelation.name,
+      MatchExp.atom({ key: 'source.id', value: ['=', userId] }),
+      undefined,
+      ['id', ['target', { attributeQuery: ['id', ['dormitory', { attributeQuery: ['id'] }]] }]]
+    )
+    
+    // If user doesn't have a bed assignment, they're not a resident
+    if (!userBedRelation || !userBedRelation.target) {
+      return false
+    }
+    
+    // Get the dormitory of the user's bed
+    const userDormitoryId = userBedRelation.target.dormitory?.id
+    
+    // Check if the user's dormitory matches the target dormitory
+    return userDormitoryId === dormitoryId
+  }
+})
+
+// P004: Only admin can assign dormitory leaders + BR011: User must be resident of dormitory
+AssignDormitoryLeader.conditions = Conditions.create({
+  content: BoolExp.atom(isAdmin).and(userIsResidentOfDormitory)
+})
 
 // P005: Only admin can remove dormitory leaders
 RemoveDormitoryLeader.conditions = isAdmin
