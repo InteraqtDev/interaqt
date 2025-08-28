@@ -1745,6 +1745,123 @@ describe('Permission and Business Rules', () => {
       )
       expect(unchangedUser.points).toBe(100)
     })
+
+    test('P010: Admin can create user', async () => {
+      // Create admin user
+      const admin = await system.storage.create('User', {
+        username: 'admin',
+        password: 'password123',
+        email: 'admin@test.com',
+        name: 'Admin User',
+        role: 'admin',
+        points: 100
+      })
+      
+      // Admin should be able to create a new user
+      const result = await controller.callInteraction('CreateUser', {
+        user: admin,
+        payload: {
+          username: 'newuser1',
+          password: 'newpassword123',
+          email: 'newuser1@test.com',
+          name: 'New User One',
+          role: 'resident'
+        }
+      })
+      
+      // Check the interaction succeeded
+      expect(result.error).toBeUndefined()
+      
+      // Verify the user was created with correct data
+      const createdUser = await system.storage.findOne('User',
+        MatchExp.atom({ key: 'username', value: ['=', 'newuser1'] }),
+        undefined,
+        ['id', 'username', 'email', 'name', 'role', 'points']
+      )
+      
+      expect(createdUser).toBeDefined()
+      expect(createdUser.username).toBe('newuser1')
+      expect(createdUser.email).toBe('newuser1@test.com')
+      expect(createdUser.name).toBe('New User One')
+      expect(createdUser.role).toBe('resident')
+      expect(createdUser.points).toBe(100) // Default points
+    })
+
+    test('P010: Non-admin cannot create user', async () => {
+      // Create non-admin user (resident)
+      const resident = await system.storage.create('User', {
+        username: 'resident1',
+        password: 'password123',
+        email: 'resident1@test.com',
+        name: 'Resident User',
+        role: 'resident',
+        points: 100
+      })
+      
+      // Resident should not be able to create a new user
+      const result = await controller.callInteraction('CreateUser', {
+        user: resident,
+        payload: {
+          username: 'newuser2',
+          password: 'newpassword123',
+          email: 'newuser2@test.com',
+          name: 'New User Two',
+          role: 'resident'
+        }
+      })
+      
+      // Check that the interaction failed with permission error
+      expect(result.error).toBeDefined()
+      expect((result.error as any).type).toBe('condition check failed')
+      expect((result.error as any).error.data.name).toBe('isAdmin')
+      
+      // Verify no user was created
+      const createdUser = await system.storage.findOne('User',
+        MatchExp.atom({ key: 'username', value: ['=', 'newuser2'] }),
+        undefined,
+        ['id']
+      )
+      
+      expect(createdUser).toBeUndefined()
+    })
+
+    test('P010: Dormitory leader cannot create user', async () => {
+      // Create dormitory leader user
+      const dormitoryLeader = await system.storage.create('User', {
+        username: 'leader1',
+        password: 'password123',
+        email: 'leader1@test.com',
+        name: 'Dormitory Leader',
+        role: 'dormitoryLeader',
+        points: 100
+      })
+      
+      // Dormitory leader should not be able to create a new user
+      const result = await controller.callInteraction('CreateUser', {
+        user: dormitoryLeader,
+        payload: {
+          username: 'newuser3',
+          password: 'newpassword123',
+          email: 'newuser3@test.com',
+          name: 'New User Three',
+          role: 'resident'
+        }
+      })
+      
+      // Check that the interaction failed with permission error
+      expect(result.error).toBeDefined()
+      expect((result.error as any).type).toBe('condition check failed')
+      expect((result.error as any).error.data.name).toBe('isAdmin')
+      
+      // Verify no user was created
+      const createdUser = await system.storage.findOne('User',
+        MatchExp.atom({ key: 'username', value: ['=', 'newuser3'] }),
+        undefined,
+        ['id']
+      )
+      
+      expect(createdUser).toBeUndefined()
+    })
   })
 
   describe('Phase 2: Simple Business Rules', () => {

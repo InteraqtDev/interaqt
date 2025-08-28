@@ -1365,6 +1365,9 @@ ProcessRemovalRequest.conditions = isAdmin
 // P009: Only admin can deduct points from any user
 DeductPoints.conditions = isAdmin
 
+// P010: Only admin can create users via CreateUser
+CreateUser.conditions = isAdmin
+
 // Phase 2: Simple Business Rules
 
 // BR001: Dormitory capacity must be between 4 and 6

@@ -123,7 +123,7 @@
             "Admin can create user",
             "Non-admin cannot create user"
           ],
-          "completed": false
+          "completed": true
         },
         {
           "id": "P011",
