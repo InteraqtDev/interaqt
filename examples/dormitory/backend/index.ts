@@ -2453,3 +2453,46 @@ Login.conditions = Conditions.create({
   content: BoolExp.atom(userMustNotBeDeleted).and(passwordMustMatch)
 })
 
+// ========================= PHASE 5: AUTHENTICATION PERMISSIONS =========================
+
+// P019-P024: Authentication check for protected interactions
+const isAuthenticated = Condition.create({
+  name: 'isAuthenticated',
+  content: function(this: Controller, event: any) {
+    // Check if user exists and has an id (authenticated)
+    return !!(event.user && event.user.id)
+  }
+})
+
+// P019: ChangePassword - Authenticated users only
+// Note: ChangePassword already has conditions (BR004 and BR037), so we need to combine them
+const existingChangePasswordConditions = ChangePassword.conditions
+ChangePassword.conditions = Conditions.create({
+  content: BoolExp.atom(isAuthenticated)
+    .and(BoolExp.atom(validPasswordLength))
+    .and(BoolExp.atom(oldPasswordMustMatch))
+})
+
+// P020: ViewMyDormitory - Authenticated users only + BR032: User must have bed assignment
+ViewMyDormitory.conditions = Conditions.create({
+  content: BoolExp.atom(isAuthenticated).and(BoolExp.atom(userMustHaveBedAssignment))
+})
+
+// P021: ViewMyPoints - Authenticated users only
+ViewMyPoints.conditions = isAuthenticated
+
+// P022: UpdateProfile - Authenticated users only
+// Note: UpdateProfile already has conditions (BR033 and BR034), so we need to combine them
+const existingUpdateProfileConditions = UpdateProfile.conditions
+UpdateProfile.conditions = Conditions.create({
+  content: BoolExp.atom(isAuthenticated)
+    .and(BoolExp.atom(updateProfileEmailValid))
+    .and(BoolExp.atom(updateProfileFieldRestriction))
+})
+
+// P023: GetDormitories - Authenticated users only
+GetDormitories.conditions = isAuthenticated
+
+// P024: GetDormitoryDetail - Authenticated users only
+GetDormitoryDetail.conditions = isAuthenticated
+

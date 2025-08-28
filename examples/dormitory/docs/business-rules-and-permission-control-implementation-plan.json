@@ -752,7 +752,7 @@
             "Authenticated user can change password",
             "Unauthenticated cannot change password"
           ],
-          "completed": false
+          "completed": true
         },
         {
           "id": "P020",
@@ -764,7 +764,7 @@
             "Authenticated user can view dormitory",
             "Unauthenticated cannot view"
           ],
-          "completed": false
+          "completed": true
         },
         {
           "id": "P021",
@@ -776,7 +776,7 @@
             "Authenticated user can view points",
             "Unauthenticated cannot view"
           ],
-          "completed": false
+          "completed": true
         },
         {
           "id": "P022",
@@ -788,7 +788,7 @@
             "Authenticated user can update profile",
             "Unauthenticated cannot update"
           ],
-          "completed": false
+          "completed": true
         },
         {
           "id": "P023",
@@ -800,7 +800,7 @@
             "Authenticated user can list dormitories",
             "Unauthenticated cannot list"
           ],
-          "completed": false
+          "completed": true
         },
         {
           "id": "P024",
@@ -812,7 +812,7 @@
             "Authenticated user can view dormitory detail",
             "Unauthenticated cannot view detail"
           ],
-          "completed": false
+          "completed": true
         }
       ]
     }

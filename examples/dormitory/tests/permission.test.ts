@@ -10442,5 +10442,310 @@ describe('Permission and Business Rules', () => {
       )
       expect(allUsers.length).toBe(3)
     })
+
+    test('P019: ChangePassword requires authentication', async () => {
+      // Test 1: Authenticated user can change password
+      const user = await system.storage.create('User', {
+        username: 'authuser1',
+        password: 'oldpassword123',
+        email: 'authuser1@test.com',
+        name: 'Auth User 1',
+        role: 'resident',
+        points: 100
+      })
+
+      const authResult = await controller.callInteraction('ChangePassword', {
+        user: user,
+        payload: {
+          oldPassword: 'oldpassword123',
+          newPassword: 'newpassword456'
+        }
+      })
+
+      expect(authResult.error).toBeUndefined()
+
+      // Test 2: Unauthenticated user cannot change password
+      const unauthResult = await controller.callInteraction('ChangePassword', {
+        user: null,
+        payload: {
+          oldPassword: 'oldpassword123',
+          newPassword: 'newpassword456'
+        }
+      })
+
+      expect(unauthResult.error).toBeDefined()
+      expect((unauthResult.error as any).type).toBe('condition check failed')
+      expect((unauthResult.error as any).error.data.name).toBe('isAuthenticated')
+    })
+
+    test('P020: ViewMyDormitory requires authentication', async () => {
+      // Create a dormitory and assign a user to a bed
+      const admin = await system.storage.create('User', {
+        username: 'admin',
+        password: 'password123',
+        email: 'admin@test.com',
+        name: 'Admin',
+        role: 'admin',
+        points: 100
+      })
+
+      const resident = await system.storage.create('User', {
+        username: 'resident1',
+        password: 'password123',
+        email: 'resident1@test.com',
+        name: 'Resident 1',
+        role: 'resident',
+        points: 100
+      })
+
+      // Create dormitory as admin
+      const createDormResult = await controller.callInteraction('CreateDormitory', {
+        user: admin,
+        payload: {
+          name: 'Test Dorm',
+          capacity: 4,
+          floor: 1,
+          building: 'Building A'
+        }
+      })
+      expect(createDormResult.error).toBeUndefined()
+
+      // Get the created dormitory and bed
+      const dormitories = await system.storage.find('Dormitory',
+        MatchExp.atom({ key: 'name', value: ['=', 'Test Dorm'] }),
+        undefined,
+        ['id']
+      )
+      const dormitory = dormitories[0]
+
+      const beds = await system.storage.find('Bed',
+        MatchExp.atom({ key: 'dormitory.id', value: ['=', dormitory.id] }),
+        undefined,
+        ['id']
+      )
+      const bed = beds[0]
+
+      // Assign resident to bed
+      const assignResult = await controller.callInteraction('AssignUserToBed', {
+        user: admin,
+        payload: {
+          userId: resident.id,
+          bedId: bed.id
+        }
+      })
+      expect(assignResult.error).toBeUndefined()
+
+      // Test 1: Authenticated user with bed can view dormitory
+      const authResult = await controller.callInteraction('ViewMyDormitory', {
+        user: resident,
+        payload: {}
+      })
+
+      expect(authResult.error).toBeUndefined()
+
+      // Test 2: Unauthenticated user cannot view dormitory
+      const unauthResult = await controller.callInteraction('ViewMyDormitory', {
+        user: null,
+        payload: {}
+      })
+
+      expect(unauthResult.error).toBeDefined()
+      expect((unauthResult.error as any).type).toBe('condition check failed')
+      expect((unauthResult.error as any).error.data.name).toBe('isAuthenticated')
+
+      // Test 3: Authenticated user without bed assignment cannot view (BR032)
+      const userNoBed = await system.storage.create('User', {
+        username: 'nobed',
+        password: 'password123',
+        email: 'nobed@test.com',
+        name: 'No Bed User',
+        role: 'resident',
+        points: 100
+      })
+
+      const noBedResult = await controller.callInteraction('ViewMyDormitory', {
+        user: userNoBed,
+        payload: {}
+      })
+
+      expect(noBedResult.error).toBeDefined()
+      expect((noBedResult.error as any).type).toBe('condition check failed')
+      expect((noBedResult.error as any).error.data.name).toBe('userMustHaveBedAssignment')
+    })
+
+    test('P021: ViewMyPoints requires authentication', async () => {
+      // Test 1: Authenticated user can view points
+      const user = await system.storage.create('User', {
+        username: 'pointsuser',
+        password: 'password123',
+        email: 'pointsuser@test.com',
+        name: 'Points User',
+        role: 'resident',
+        points: 75
+      })
+
+      const authResult = await controller.callInteraction('ViewMyPoints', {
+        user: user,
+        payload: {}
+      })
+
+      expect(authResult.error).toBeUndefined()
+
+      // Test 2: Unauthenticated user cannot view points
+      const unauthResult = await controller.callInteraction('ViewMyPoints', {
+        user: null,
+        payload: {}
+      })
+
+      expect(unauthResult.error).toBeDefined()
+      expect((unauthResult.error as any).type).toBe('condition check failed')
+      expect((unauthResult.error as any).error.data.name).toBe('isAuthenticated')
+    })
+
+    test('P022: UpdateProfile requires authentication', async () => {
+      // Test 1: Authenticated user can update profile
+      const user = await system.storage.create('User', {
+        username: 'profileuser',
+        password: 'password123',
+        email: 'profileuser@test.com',
+        name: 'Profile User',
+        role: 'resident',
+        points: 100
+      })
+
+      const authResult = await controller.callInteraction('UpdateProfile', {
+        user: user,
+        payload: {
+          name: 'Updated Name',
+          email: 'newemail@test.com'
+        }
+      })
+
+      expect(authResult.error).toBeUndefined()
+
+      // Test 2: Unauthenticated user cannot update profile
+      const unauthResult = await controller.callInteraction('UpdateProfile', {
+        user: null,
+        payload: {
+          name: 'Another Name',
+          email: 'another@test.com'
+        }
+      })
+
+      expect(unauthResult.error).toBeDefined()
+      expect((unauthResult.error as any).type).toBe('condition check failed')
+      expect((unauthResult.error as any).error.data.name).toBe('isAuthenticated')
+    })
+
+    test('P023: GetDormitories requires authentication', async () => {
+      // Create test dormitory first
+      const admin = await system.storage.create('User', {
+        username: 'admin',
+        password: 'password123',
+        email: 'admin@test.com',
+        name: 'Admin',
+        role: 'admin',
+        points: 100
+      })
+
+      await controller.callInteraction('CreateDormitory', {
+        user: admin,
+        payload: {
+          name: 'List Test Dorm',
+          capacity: 4,
+          floor: 1,
+          building: 'Building A'
+        }
+      })
+
+      // Test 1: Authenticated user can list dormitories
+      const user = await system.storage.create('User', {
+        username: 'listuser',
+        password: 'password123',
+        email: 'listuser@test.com',
+        name: 'List User',
+        role: 'resident',
+        points: 100
+      })
+
+      const authResult = await controller.callInteraction('GetDormitories', {
+        user: user,
+        payload: {}
+      })
+
+      expect(authResult.error).toBeUndefined()
+
+      // Test 2: Unauthenticated user cannot list dormitories
+      const unauthResult = await controller.callInteraction('GetDormitories', {
+        user: null,
+        payload: {}
+      })
+
+      expect(unauthResult.error).toBeDefined()
+      expect((unauthResult.error as any).type).toBe('condition check failed')
+      expect((unauthResult.error as any).error.data.name).toBe('isAuthenticated')
+    })
+
+    test('P024: GetDormitoryDetail requires authentication', async () => {
+      // Create test dormitory first
+      const admin = await system.storage.create('User', {
+        username: 'admin',
+        password: 'password123',
+        email: 'admin@test.com',
+        name: 'Admin',
+        role: 'admin',
+        points: 100
+      })
+
+      const createResult = await controller.callInteraction('CreateDormitory', {
+        user: admin,
+        payload: {
+          name: 'Detail Test Dorm',
+          capacity: 4,
+          floor: 1,
+          building: 'Building A'
+        }
+      })
+      expect(createResult.error).toBeUndefined()
+
+      // Get the created dormitory
+      const dormitories = await system.storage.find('Dormitory',
+        MatchExp.atom({ key: 'name', value: ['=', 'Detail Test Dorm'] }),
+        undefined,
+        ['id']
+      )
+      const dormitoryId = dormitories[0].id
+
+      // Test 1: Authenticated user can view dormitory detail
+      const user = await system.storage.create('User', {
+        username: 'detailuser',
+        password: 'password123',
+        email: 'detailuser@test.com',
+        name: 'Detail User',
+        role: 'resident',
+        points: 100
+      })
+
+      const authResult = await controller.callInteraction('GetDormitoryDetail', {
+        user: user,
+        payload: {
+          dormitoryId: dormitoryId
+        }
+      })
+
+      expect(authResult.error).toBeUndefined()
+
+      // Test 2: Unauthenticated user cannot view dormitory detail
+      const unauthResult = await controller.callInteraction('GetDormitoryDetail', {
+        user: null,
+        payload: {
+          dormitoryId: dormitoryId
+        }
+      })
+
+      expect(unauthResult.error).toBeDefined()
+      expect((unauthResult.error as any).type).toBe('condition check failed')
+      expect((unauthResult.error as any).error.data.name).toBe('isAuthenticated')
+    })
   })
 })
