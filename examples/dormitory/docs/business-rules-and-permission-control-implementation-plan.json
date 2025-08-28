@@ -711,7 +711,7 @@
             "Can change password with correct old password",
             "Cannot change password with incorrect old password"
           ],
-          "completed": false
+          "completed": true
         }
       ]
     },

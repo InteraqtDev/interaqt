@@ -2091,8 +2091,40 @@ const validPasswordLength = Condition.create({
   }
 })
 
-// Assign BR004 condition to ChangePassword interaction
-ChangePassword.conditions = validPasswordLength
+// BR037: Old password must match current password
+const oldPasswordMustMatch = Condition.create({
+  name: 'oldPasswordMustMatch',
+  content: async function(this: Controller, event: any) {
+    const oldPassword = event.payload?.oldPassword
+    const currentUserId = event.user?.id
+    
+    if (!oldPassword || !currentUserId) {
+      return false // Missing required data
+    }
+    
+    // Query current user to get stored password
+    const user = await this.system.storage.findOne(
+      'User',
+      MatchExp.atom({ key: 'id', value: ['=', currentUserId] }),
+      undefined,
+      ['id', 'password']
+    )
+    
+    // If user doesn't exist, return false
+    if (!user) {
+      return false
+    }
+    
+    // Check if provided old password matches stored password
+    // In production, this should use proper password hashing and comparison
+    return user.password === oldPassword
+  }
+})
+
+// Combine BR004 (new password length) and BR037 (old password matches) for ChangePassword interaction
+ChangePassword.conditions = Conditions.create({
+  content: BoolExp.atom(validPasswordLength).and(oldPasswordMustMatch)
+})
 
 // BR006: Password must meet security requirements (min 8 chars) for Registration
 const registrationPasswordLength = Condition.create({

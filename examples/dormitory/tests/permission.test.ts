@@ -5528,6 +5528,166 @@ describe('Permission and Business Rules', () => {
       expect(updatedUser.password).toBe('oldpassword')
     })
 
+    // BR037: Old password must match current password
+    test('BR037: Can change password with correct old password', async () => {
+      // Create a user
+      const user = await system.storage.create('User', {
+        username: 'testuser5',
+        password: 'currentpassword',
+        email: 'testuser5@test.com',
+        name: 'Test User 5',
+        role: 'resident',
+        points: 100
+      })
+      
+      // User should be able to change password with correct old password
+      const result = await controller.callInteraction('ChangePassword', {
+        user: user,
+        payload: {
+          oldPassword: 'currentpassword',  // Correct old password
+          newPassword: 'newpassword123'
+        }
+      })
+      
+      expect(result.error).toBeUndefined()
+      
+      // Verify password was changed
+      const updatedUser = await system.storage.findOne('User',
+        MatchExp.atom({ key: 'id', value: ['=', user.id] }),
+        undefined,
+        ['id', 'password']
+      )
+      expect(updatedUser.password).toBe('newpassword123')
+    })
+
+    test('BR037: Cannot change password with incorrect old password', async () => {
+      // Create a user
+      const user = await system.storage.create('User', {
+        username: 'testuser6',
+        password: 'currentpassword',
+        email: 'testuser6@test.com',
+        name: 'Test User 6',
+        role: 'resident',
+        points: 100
+      })
+      
+      // User should not be able to change password with incorrect old password
+      const result = await controller.callInteraction('ChangePassword', {
+        user: user,
+        payload: {
+          oldPassword: 'wrongpassword',  // Incorrect old password
+          newPassword: 'newpassword123'
+        }
+      })
+      
+      // Verify error
+      expect(result.error).toBeDefined()
+      expect((result.error as any).type).toBe('condition check failed')
+      expect((result.error as any).error.data.name).toBe('oldPasswordMustMatch')
+      
+      // Verify password was not changed
+      const updatedUser = await system.storage.findOne('User',
+        MatchExp.atom({ key: 'id', value: ['=', user.id] }),
+        undefined,
+        ['id', 'password']
+      )
+      expect(updatedUser.password).toBe('currentpassword')  // Still the old password
+    })
+
+    test('BR037: Cannot change password with empty old password', async () => {
+      // Create a user
+      const user = await system.storage.create('User', {
+        username: 'testuser7',
+        password: 'currentpassword',
+        email: 'testuser7@test.com',
+        name: 'Test User 7',
+        role: 'resident',
+        points: 100
+      })
+      
+      // User should not be able to change password with empty old password
+      const result = await controller.callInteraction('ChangePassword', {
+        user: user,
+        payload: {
+          oldPassword: '',  // Empty old password
+          newPassword: 'newpassword123'
+        }
+      })
+      
+      // Verify error
+      expect(result.error).toBeDefined()
+      expect((result.error as any).type).toBe('condition check failed')
+      expect((result.error as any).error.data.name).toBe('oldPasswordMustMatch')
+      
+      // Verify password was not changed
+      const updatedUser = await system.storage.findOne('User',
+        MatchExp.atom({ key: 'id', value: ['=', user.id] }),
+        undefined,
+        ['id', 'password']
+      )
+      expect(updatedUser.password).toBe('currentpassword')  // Still the old password
+    })
+
+    test('BR037 + BR004: Must satisfy both old password match and new password length', async () => {
+      // Create a user
+      const user = await system.storage.create('User', {
+        username: 'testuser8',
+        password: 'currentpassword',
+        email: 'testuser8@test.com',
+        name: 'Test User 8',
+        role: 'resident',
+        points: 100
+      })
+      
+      // Test case 1: Correct old password but new password too short
+      const result1 = await controller.callInteraction('ChangePassword', {
+        user: user,
+        payload: {
+          oldPassword: 'currentpassword',  // Correct old password
+          newPassword: 'short'  // Too short (less than 8 chars)
+        }
+      })
+      
+      // Should fail due to new password length
+      expect(result1.error).toBeDefined()
+      expect((result1.error as any).type).toBe('condition check failed')
+      expect((result1.error as any).error.data.name).toBe('validPasswordLength')
+      
+      // Test case 2: Incorrect old password but new password length is valid
+      const result2 = await controller.callInteraction('ChangePassword', {
+        user: user,
+        payload: {
+          oldPassword: 'wrongpassword',  // Incorrect old password
+          newPassword: 'validnewpassword123'  // Valid length
+        }
+      })
+      
+      // Should fail due to old password mismatch
+      expect(result2.error).toBeDefined()
+      expect((result2.error as any).type).toBe('condition check failed')
+      expect((result2.error as any).error.data.name).toBe('oldPasswordMustMatch')
+      
+      // Test case 3: Both conditions satisfied
+      const result3 = await controller.callInteraction('ChangePassword', {
+        user: user,
+        payload: {
+          oldPassword: 'currentpassword',  // Correct old password
+          newPassword: 'validnewpassword123'  // Valid length
+        }
+      })
+      
+      // Should succeed
+      expect(result3.error).toBeUndefined()
+      
+      // Verify password was changed
+      const updatedUser = await system.storage.findOne('User',
+        MatchExp.atom({ key: 'id', value: ['=', user.id] }),
+        undefined,
+        ['id', 'password']
+      )
+      expect(updatedUser.password).toBe('validnewpassword123')
+    })
+
     // BR005: Password must meet security requirements (min 8 chars) for CreateUser
     test('BR005: Can create user with 8+ character password', async () => {
       // Create admin user
