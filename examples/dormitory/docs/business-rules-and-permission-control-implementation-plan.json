@@ -432,7 +432,7 @@
             "Can assign dormitory leader to bed",
             "Cannot assign admin to bed"
           ],
-          "completed": false
+          "completed": true
         },
         {
           "id": "BR017",

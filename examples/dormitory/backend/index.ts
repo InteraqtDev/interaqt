@@ -1579,9 +1579,36 @@ const bedIsNotOccupied = Condition.create({
   }
 })
 
-// P006: Only admin can assign users to beds + BR014: User cannot already be assigned to another bed + BR015: Bed must not be occupied
+// BR016: User role must be resident or dormitoryLeader
+const userRoleIsResidentOrDormitoryLeader = Condition.create({
+  name: 'userRoleIsResidentOrDormitoryLeader',
+  content: async function(this: Controller, event: any) {
+    const userId = event.payload?.userId
+    
+    if (!userId) {
+      return false // No user ID provided
+    }
+    
+    // Get the target user to check their role
+    const targetUser = await this.system.storage.findOne(
+      'User',
+      MatchExp.atom({ key: 'id', value: ['=', userId] }),
+      undefined,
+      ['id', 'role']
+    )
+    
+    if (!targetUser) {
+      return false // User not found
+    }
+    
+    // Check if the user's role is resident or dormitoryLeader
+    return targetUser.role === 'resident' || targetUser.role === 'dormitoryLeader'
+  }
+})
+
+// P006: Only admin can assign users to beds + BR014: User cannot already be assigned to another bed + BR015: Bed must not be occupied + BR016: User role must be resident or dormitoryLeader
 AssignUserToBed.conditions = Conditions.create({
-  content: BoolExp.atom(isAdmin).and(userHasNoExistingBed).and(bedIsNotOccupied)
+  content: BoolExp.atom(isAdmin).and(userHasNoExistingBed).and(bedIsNotOccupied).and(userRoleIsResidentOrDormitoryLeader)
 })
 
 // P007: Only admin can remove users from beds
