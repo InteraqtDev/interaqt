@@ -9912,5 +9912,187 @@ describe('Permission and Business Rules', () => {
       expect((secondLoginResult.error as any).type).toBe('condition check failed')
       expect((secondLoginResult.error as any).error.data.name).toBe('userMustNotBeDeleted')
     })
+
+    test('BR036: Can login with correct password', async () => {
+      // Create a user with a specific password
+      const user = await system.storage.create('User', {
+        username: 'testuser',
+        password: 'correctPassword123',
+        email: 'testuser@test.com',
+        name: 'Test User',
+        role: 'resident',
+        points: 100,
+        isDeleted: false
+      })
+
+      // Try to login with the correct password
+      const loginResult = await controller.callInteraction('Login', {
+        user: { id: 'anonymous' },  // Login doesn't require authentication
+        payload: {
+          username: 'testuser',
+          password: 'correctPassword123'
+        }
+      })
+
+      // Should succeed with correct password
+      expect(loginResult.error).toBeUndefined()
+    })
+
+    test('BR036: Cannot login with incorrect password', async () => {
+      // Create a user with a specific password
+      const user = await system.storage.create('User', {
+        username: 'testuser2',
+        password: 'correctPassword123',
+        email: 'testuser2@test.com',
+        name: 'Test User 2',
+        role: 'resident',
+        points: 100,
+        isDeleted: false
+      })
+
+      // Try to login with an incorrect password
+      const loginResult = await controller.callInteraction('Login', {
+        user: { id: 'anonymous' },  // Login doesn't require authentication
+        payload: {
+          username: 'testuser2',
+          password: 'wrongPassword456'
+        }
+      })
+
+      // Should fail with condition check
+      expect(loginResult.error).toBeDefined()
+      expect((loginResult.error as any).type).toBe('condition check failed')
+      // The condition error should be from passwordMustMatch
+      expect((loginResult.error as any).error.data.name).toBe('passwordMustMatch')
+    })
+
+    test('BR036: Cannot login with empty password', async () => {
+      // Create a user
+      const user = await system.storage.create('User', {
+        username: 'testuser3',
+        password: 'myPassword123',
+        email: 'testuser3@test.com',
+        name: 'Test User 3',
+        role: 'resident',
+        points: 100,
+        isDeleted: false
+      })
+
+      // Try to login with empty password
+      const loginResult = await controller.callInteraction('Login', {
+        user: { id: 'anonymous' },  // Login doesn't require authentication
+        payload: {
+          username: 'testuser3',
+          password: ''
+        }
+      })
+
+      // Should fail with condition check
+      expect(loginResult.error).toBeDefined()
+      expect((loginResult.error as any).type).toBe('condition check failed')
+      // The condition error should be from passwordMustMatch
+      expect((loginResult.error as any).error.data.name).toBe('passwordMustMatch')
+    })
+
+    test('BR036: Cannot login without password field', async () => {
+      // Create a user
+      const user = await system.storage.create('User', {
+        username: 'testuser4',
+        password: 'myPassword123',
+        email: 'testuser4@test.com',
+        name: 'Test User 4',
+        role: 'resident',
+        points: 100,
+        isDeleted: false
+      })
+
+      // Try to login without password field
+      const loginResult = await controller.callInteraction('Login', {
+        user: { id: 'anonymous' },  // Login doesn't require authentication
+        payload: {
+          username: 'testuser4'
+          // password is missing
+        }
+      })
+
+      // Should fail with condition check
+      expect(loginResult.error).toBeDefined()
+      expect((loginResult.error as any).type).toBe('condition check failed')
+      // The condition error should be from passwordMustMatch (since it checks for missing credentials)
+      expect((loginResult.error as any).error.data.name).toBe('passwordMustMatch')
+    })
+
+    test('BR036: Non-existent user fails password check', async () => {
+      // Try to login with a non-existent username
+      const loginResult = await controller.callInteraction('Login', {
+        user: { id: 'anonymous' },  // Login doesn't require authentication
+        payload: {
+          username: 'nonexistentuser',
+          password: 'anyPassword123'
+        }
+      })
+
+      // Should fail with condition check
+      expect(loginResult.error).toBeDefined()
+      expect((loginResult.error as any).type).toBe('condition check failed')
+      // Should fail at userMustNotBeDeleted first (as it's checked before password)
+      expect((loginResult.error as any).error.data.name).toBe('userMustNotBeDeleted')
+    })
+
+    test('BR035 + BR036: Deleted user with correct password still cannot login', async () => {
+      // Create a deleted user
+      const user = await system.storage.create('User', {
+        username: 'deleteduser2',
+        password: 'correctPassword123',
+        email: 'deleteduser2@test.com',
+        name: 'Deleted User 2',
+        role: 'resident',
+        points: 100,
+        isDeleted: true  // User is marked as deleted
+      })
+
+      // Try to login with correct password
+      const loginResult = await controller.callInteraction('Login', {
+        user: { id: 'anonymous' },  // Login doesn't require authentication
+        payload: {
+          username: 'deleteduser2',
+          password: 'correctPassword123'  // Correct password
+        }
+      })
+
+      // Should still fail because user is deleted (BR035 check comes first)
+      expect(loginResult.error).toBeDefined()
+      expect((loginResult.error as any).type).toBe('condition check failed')
+      // Should fail at userMustNotBeDeleted (BR035) first
+      expect((loginResult.error as any).error.data.name).toBe('userMustNotBeDeleted')
+    })
+
+    test('BR035 + BR036: Active user with wrong password cannot login', async () => {
+      // Create an active user
+      const user = await system.storage.create('User', {
+        username: 'activeuser2',
+        password: 'correctPassword123',
+        email: 'activeuser2@test.com',
+        name: 'Active User 2',
+        role: 'resident',
+        points: 100,
+        isDeleted: false  // Active user
+      })
+
+      // Try to login with wrong password
+      const loginResult = await controller.callInteraction('Login', {
+        user: { id: 'anonymous' },  // Login doesn't require authentication
+        payload: {
+          username: 'activeuser2',
+          password: 'wrongPassword456'  // Wrong password
+        }
+      })
+
+      // Should fail at password check (BR036) since user is active
+      expect(loginResult.error).toBeDefined()
+      expect((loginResult.error as any).type).toBe('condition check failed')
+      // Should fail at passwordMustMatch (BR036)
+      expect((loginResult.error as any).error.data.name).toBe('passwordMustMatch')
+    })
   })
 })

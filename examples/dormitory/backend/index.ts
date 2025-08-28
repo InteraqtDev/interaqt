@@ -2386,6 +2386,38 @@ const userMustNotBeDeleted = Condition.create({
   }
 })
 
-// Assign BR035 condition to Login interaction
-Login.conditions = userMustNotBeDeleted
+// BR036: Password must match
+const passwordMustMatch = Condition.create({
+  name: 'passwordMustMatch',
+  content: async function(this: Controller, event: any) {
+    const username = event.payload?.username
+    const password = event.payload?.password
+    
+    if (!username || !password) {
+      return false // Missing credentials
+    }
+    
+    // Query user by username to get stored password
+    const user = await this.system.storage.findOne(
+      'User',
+      MatchExp.atom({ key: 'username', value: ['=', username] }),
+      undefined,
+      ['id', 'password']
+    )
+    
+    // If user doesn't exist, return false
+    if (!user) {
+      return false
+    }
+    
+    // Check if provided password matches stored password
+    // In production, this should use proper password hashing and comparison
+    return user.password === password
+  }
+})
+
+// Combine BR035 (user not deleted) and BR036 (password matches) for Login interaction
+Login.conditions = Conditions.create({
+  content: BoolExp.atom(userMustNotBeDeleted).and(passwordMustMatch)
+})
 
