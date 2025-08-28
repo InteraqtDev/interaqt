@@ -9510,5 +9510,188 @@ describe('Permission and Business Rules', () => {
       expect((viewResult.error as any).type).toBe('condition check failed')
       expect((viewResult.error as any).error.data.name).toBe('userMustHaveBedAssignment')
     })
+
+    // BR033: Email must be unique and valid format if provided in UpdateProfile
+    test('BR033: Can update to unique valid email', async () => {
+      // Create initial user
+      const user1 = await system.storage.create('User', {
+        username: 'user1',
+        password: 'password123',
+        email: 'user1@test.com',
+        name: 'User One',
+        role: 'resident',
+        points: 100
+      })
+
+      // Update with a new unique valid email
+      const updateResult = await controller.callInteraction('UpdateProfile', {
+        user: user1,
+        payload: {
+          email: 'newemail@test.com'
+        }
+      })
+
+      expect(updateResult.error).toBeUndefined()
+
+      // Verify email was updated
+      const userAfter = await system.storage.findOne('User',
+        MatchExp.atom({ key: 'id', value: ['=', user1.id] }),
+        undefined,
+        ['id', 'email']
+      )
+      expect(userAfter.email).toBe('newemail@test.com')
+    })
+
+    test('BR033: Cannot update to duplicate email', async () => {
+      // Create two users
+      const user1 = await system.storage.create('User', {
+        username: 'user1',
+        password: 'password123',
+        email: 'user1@test.com',
+        name: 'User One',
+        role: 'resident',
+        points: 100
+      })
+
+      const user2 = await system.storage.create('User', {
+        username: 'user2',
+        password: 'password123',
+        email: 'user2@test.com',
+        name: 'User Two',
+        role: 'resident',
+        points: 100
+      })
+
+      // Try to update user1's email to user2's email
+      const updateResult = await controller.callInteraction('UpdateProfile', {
+        user: user1,
+        payload: {
+          email: 'user2@test.com'  // This email is already taken by user2
+        }
+      })
+
+      // Should fail with condition check
+      expect(updateResult.error).toBeDefined()
+      expect((updateResult.error as any).type).toBe('condition check failed')
+      expect((updateResult.error as any).error.data.name).toBe('updateProfileEmailValid')
+
+      // Verify email was not updated
+      const userAfter = await system.storage.findOne('User',
+        MatchExp.atom({ key: 'id', value: ['=', user1.id] }),
+        undefined,
+        ['id', 'email']
+      )
+      expect(userAfter.email).toBe('user1@test.com')  // Original email unchanged
+    })
+
+    test('BR033: Cannot update to invalid email format', async () => {
+      // Create user
+      const user1 = await system.storage.create('User', {
+        username: 'user1',
+        password: 'password123',
+        email: 'user1@test.com',
+        name: 'User One',
+        role: 'resident',
+        points: 100
+      })
+
+      // Test various invalid email formats
+      const invalidEmails = [
+        'notanemail',           // No @ symbol
+        '@test.com',            // No local part
+        'user@',                // No domain
+        'user@test',            // No dot in domain
+        'user..name@test.com',  // Consecutive dots
+        'user@.test.com',       // Dot after @
+        'user@test..com',       // Consecutive dots in domain
+        'user.@test.com',       // Dot before @
+      ]
+
+      for (const invalidEmail of invalidEmails) {
+        const updateResult = await controller.callInteraction('UpdateProfile', {
+          user: user1,
+          payload: {
+            email: invalidEmail
+          }
+        })
+
+        // Should fail with condition check
+        expect(updateResult.error).toBeDefined()
+        expect((updateResult.error as any).type).toBe('condition check failed')
+        expect((updateResult.error as any).error.data.name).toBe('updateProfileEmailValid')
+      }
+
+      // Verify email was not updated
+      const userAfter = await system.storage.findOne('User',
+        MatchExp.atom({ key: 'id', value: ['=', user1.id] }),
+        undefined,
+        ['id', 'email']
+      )
+      expect(userAfter.email).toBe('user1@test.com')  // Original email unchanged
+    })
+
+    test('BR033: Can update profile without changing email', async () => {
+      // Create user
+      const user1 = await system.storage.create('User', {
+        username: 'user1',
+        password: 'password123',
+        email: 'user1@test.com',
+        name: 'User One',
+        role: 'resident',
+        points: 100
+      })
+
+      // Update only name, not email
+      const updateResult = await controller.callInteraction('UpdateProfile', {
+        user: user1,
+        payload: {
+          name: 'Updated Name'
+          // No email in payload - this should be allowed
+        }
+      })
+
+      expect(updateResult.error).toBeUndefined()
+
+      // Verify name was updated but email unchanged
+      const userAfter = await system.storage.findOne('User',
+        MatchExp.atom({ key: 'id', value: ['=', user1.id] }),
+        undefined,
+        ['id', 'email', 'name']
+      )
+      expect(userAfter.name).toBe('Updated Name')
+      expect(userAfter.email).toBe('user1@test.com')  // Email unchanged
+    })
+
+    test('BR033: Can update to same email as currently owned', async () => {
+      // Create user
+      const user1 = await system.storage.create('User', {
+        username: 'user1',
+        password: 'password123',
+        email: 'user1@test.com',
+        name: 'User One',
+        role: 'resident',
+        points: 100
+      })
+
+      // Update with the same email (should be allowed - no actual change)
+      const updateResult = await controller.callInteraction('UpdateProfile', {
+        user: user1,
+        payload: {
+          email: 'user1@test.com',  // Same as current email
+          name: 'Updated Name'
+        }
+      })
+
+      expect(updateResult.error).toBeUndefined()
+
+      // Verify name was updated
+      const userAfter = await system.storage.findOne('User',
+        MatchExp.atom({ key: 'id', value: ['=', user1.id] }),
+        undefined,
+        ['id', 'email', 'name']
+      )
+      expect(userAfter.name).toBe('Updated Name')
+      expect(userAfter.email).toBe('user1@test.com')
+    })
   })
 })

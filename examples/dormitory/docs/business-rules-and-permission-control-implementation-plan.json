@@ -659,7 +659,7 @@
             "Cannot update to duplicate email",
             "Cannot update to invalid email format"
           ],
-          "completed": false
+          "completed": true
         },
         {
           "id": "BR034",

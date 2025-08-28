@@ -2284,3 +2284,54 @@ const userMustHaveBedAssignment = Condition.create({
 // Assign BR032 condition to ViewMyDormitory interaction
 ViewMyDormitory.conditions = userMustHaveBedAssignment
 
+// BR033: Email must be unique and valid format if provided
+const updateProfileEmailValid = Condition.create({
+  name: 'updateProfileEmailValid',
+  content: async function(this: Controller, event: any) {
+    // If email is not in payload, no need to check
+    if (!event.payload?.email) {
+      return true
+    }
+    
+    const email = event.payload.email
+    const currentUserId = event.user?.id
+    
+    if (!currentUserId) {
+      return false // User not authenticated
+    }
+    
+    // Validate email format using a comprehensive regex pattern
+    // This regex checks for:
+    // - Non-whitespace characters before @
+    // - Single @ symbol
+    // - Domain with at least one dot (required)
+    // - No consecutive dots
+    // - Valid characters in domain
+    const emailRegex = /^[a-zA-Z0-9.!#$%&'*+\/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/
+    // Note the + at the end instead of * - this requires at least one dot in the domain
+    if (!emailRegex.test(email)) {
+      return false // Invalid email format
+    }
+    
+    // Additional check for consecutive dots which the regex might not catch perfectly
+    if (email.includes('..') || email.includes('@.') || email.includes('.@')) {
+      return false // Invalid email format - consecutive dots or dots adjacent to @
+    }
+    
+    // Check if any other user has this email (excluding current user)
+    const existingUser = await this.system.storage.findOne(
+      'User',
+      MatchExp.atom({ key: 'email', value: ['=', email] })
+        .and({ key: 'id', value: ['!=', currentUserId] }), // Exclude current user
+      undefined,
+      ['id']
+    )
+    
+    // Return true if no other user found with this email
+    return !existingUser
+  }
+})
+
+// Assign BR033 condition to UpdateProfile interaction
+UpdateProfile.conditions = updateProfileEmailValid
+
