@@ -35,6 +35,9 @@ Based on the current task in `docs/STATUS.json`, read and follow the correspondi
 - **Task 2** → Follow `agentspace/tasks/task-2-design-analysis.md`  
 - **Task 3** → Follow `agentspace/tasks/task-3-code-generation.md`
 
+**📌 SPECIAL TASK INSTRUCTIONS:**
+- **When executing Task 3.4.1.3**, use the sub-agent `computation-generation-handler` for handling computation generation workflow
+
 **🔴 CRITICAL EXECUTION RULES:**
 - **Create TODO plans STRICTLY from task guidance** - Follow task documents exactly to create TODO plans, do NOT summarize or paraphrase - this ensures strict execution
 - **STOP immediately when instructed** - When you see STOP or similar instructions, exit and wait for user
