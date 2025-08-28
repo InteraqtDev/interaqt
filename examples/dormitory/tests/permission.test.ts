@@ -10255,4 +10255,83 @@ describe('Permission and Business Rules', () => {
       expect((loginResult.error as any).error.data.name).toBe('passwordMustMatch')
     })
   })
+
+  describe('Phase 5: Authentication and Public Access', () => {
+    test('P017: Anyone can attempt login (public access)', async () => {
+      // Create a test user
+      const user = await system.storage.create('User', {
+        username: 'publicuser',
+        password: 'password123',
+        email: 'publicuser@test.com',
+        name: 'Public User',
+        role: 'resident',
+        points: 100,
+        isDeleted: false
+      })
+
+      // Test 1: Anonymous user can attempt login
+      const anonymousResult = await controller.callInteraction('Login', {
+        user: { id: 'anonymous' },  // No authentication required
+        payload: {
+          username: 'publicuser',
+          password: 'password123'
+        }
+      })
+
+      // Should succeed - no permission error, login is public
+      expect(anonymousResult.error).toBeUndefined()
+
+      // Test 2: Non-existent user ID can attempt login
+      const nonExistentUserResult = await controller.callInteraction('Login', {
+        user: { id: 'non-existent-user-id' },  // Any user ID works for public access
+        payload: {
+          username: 'publicuser',
+          password: 'password123'
+        }
+      })
+
+      // Should succeed - no permission error, login is public
+      expect(nonExistentUserResult.error).toBeUndefined()
+
+      // Test 3: Null user ID can attempt login
+      const nullUserResult = await controller.callInteraction('Login', {
+        user: { id: null as any },  // Null ID for public access
+        payload: {
+          username: 'publicuser',
+          password: 'password123'
+        }
+      })
+
+      // Should succeed - no permission error, login is public
+      expect(nullUserResult.error).toBeUndefined()
+
+      // Test 4: Verify login with wrong password still fails (but not due to permissions)
+      const wrongPasswordResult = await controller.callInteraction('Login', {
+        user: { id: 'anonymous' },
+        payload: {
+          username: 'publicuser',
+          password: 'wrongpassword'
+        }
+      })
+
+      // Should fail due to business rule (BR036), not permissions
+      expect(wrongPasswordResult.error).toBeDefined()
+      expect((wrongPasswordResult.error as any).type).toBe('condition check failed')
+      expect((wrongPasswordResult.error as any).error.data.name).toBe('passwordMustMatch')
+
+      // Test 5: Verify login with non-existent username still fails (but not due to permissions)
+      const nonExistentUsernameResult = await controller.callInteraction('Login', {
+        user: { id: 'anonymous' },
+        payload: {
+          username: 'nonexistentuser',
+          password: 'password123'
+        }
+      })
+
+      // Should fail due to business rule (BR035), not permissions
+      expect(nonExistentUsernameResult.error).toBeDefined()
+      expect((nonExistentUsernameResult.error as any).type).toBe('condition check failed')
+      expect((nonExistentUsernameResult.error as any).error.data.name).toBe('userMustNotBeDeleted')
+    })
+  })
 })

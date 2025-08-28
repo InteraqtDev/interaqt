@@ -729,7 +729,7 @@
           "testScenarios": [
             "Anyone can attempt login"
           ],
-          "completed": false
+          "completed": true
         },
         {
           "id": "P018",
