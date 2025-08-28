@@ -1356,3 +1356,6 @@ RemoveDormitoryLeader.conditions = isAdmin
 // P006: Only admin can assign users to beds
 AssignUserToBed.conditions = isAdmin
 
+// P007: Only admin can remove users from beds
+RemoveUserFromBed.conditions = isAdmin
+

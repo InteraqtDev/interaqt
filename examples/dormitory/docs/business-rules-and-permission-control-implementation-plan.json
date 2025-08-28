@@ -87,7 +87,7 @@
             "Admin can remove user from bed",
             "Non-admin cannot remove user from bed"
           ],
-          "completed": false
+          "completed": true
         },
         {
           "id": "P008",
