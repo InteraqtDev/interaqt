@@ -9693,5 +9693,113 @@ describe('Permission and Business Rules', () => {
       expect(userAfter.name).toBe('Updated Name')
       expect(userAfter.email).toBe('user1@test.com')
     })
+
+    // BR034: Cannot update username or role
+    test('BR034: Can update name and email', async () => {
+      // Create user
+      const user1 = await system.storage.create('User', {
+        username: 'user1',
+        password: 'password123',
+        email: 'user1@test.com',
+        name: 'User One',
+        role: 'resident',
+        points: 100
+      })
+
+      // Update name and email (allowed fields)
+      const updateResult = await controller.callInteraction('UpdateProfile', {
+        user: user1,
+        payload: {
+          name: 'Updated Name',
+          email: 'newemail@test.com'
+        }
+      })
+
+      // Should succeed
+      expect(updateResult.error).toBeUndefined()
+
+      // Verify changes
+      const userAfter = await system.storage.findOne('User',
+        MatchExp.atom({ key: 'id', value: ['=', user1.id] }),
+        undefined,
+        ['id', 'email', 'name', 'username', 'role']
+      )
+      expect(userAfter.name).toBe('Updated Name')
+      expect(userAfter.email).toBe('newemail@test.com')
+      expect(userAfter.username).toBe('user1')  // Unchanged
+      expect(userAfter.role).toBe('resident')  // Unchanged
+    })
+
+    test('BR034: Cannot update username', async () => {
+      // Create user
+      const user1 = await system.storage.create('User', {
+        username: 'user1',
+        password: 'password123',
+        email: 'user1@test.com',
+        name: 'User One',
+        role: 'resident',
+        points: 100
+      })
+
+      // Try to update username (not allowed)
+      const updateResult = await controller.callInteraction('UpdateProfile', {
+        user: user1,
+        payload: {
+          username: 'newusername',  // This should not be allowed
+          name: 'Updated Name'  // This is allowed
+        }
+      })
+
+      // Should fail with condition check
+      expect(updateResult.error).toBeDefined()
+      expect((updateResult.error as any).type).toBe('condition check failed')
+      // The condition error should be from updateProfileFieldRestriction
+      expect((updateResult.error as any).error.data.name).toBe('updateProfileFieldRestriction')
+
+      // Verify username was not updated
+      const userAfter = await system.storage.findOne('User',
+        MatchExp.atom({ key: 'id', value: ['=', user1.id] }),
+        undefined,
+        ['id', 'username', 'name']
+      )
+      expect(userAfter.username).toBe('user1')  // Original username unchanged
+      expect(userAfter.name).toBe('User One')  // Name also unchanged since the whole operation failed
+    })
+
+    test('BR034: Cannot update role', async () => {
+      // Create user
+      const user1 = await system.storage.create('User', {
+        username: 'user1',
+        password: 'password123',
+        email: 'user1@test.com',
+        name: 'User One',
+        role: 'resident',
+        points: 100
+      })
+
+      // Try to update role (not allowed)
+      const updateResult = await controller.callInteraction('UpdateProfile', {
+        user: user1,
+        payload: {
+          role: 'admin',  // This should not be allowed
+          name: 'Updated Name'  // This is allowed
+        }
+      })
+
+      // Should fail with condition check
+      expect(updateResult.error).toBeDefined()
+      expect((updateResult.error as any).type).toBe('condition check failed')
+      // The condition error should be from updateProfileFieldRestriction
+      expect((updateResult.error as any).error.data.name).toBe('updateProfileFieldRestriction')
+
+      // Verify role was not updated
+      const userAfter = await system.storage.findOne('User',
+        MatchExp.atom({ key: 'id', value: ['=', user1.id] }),
+        undefined,
+        ['id', 'role', 'name']
+      )
+      expect(userAfter.role).toBe('resident')  // Original role unchanged
+      expect(userAfter.name).toBe('User One')  // Name also unchanged since the whole operation failed
+    })
   })
 })

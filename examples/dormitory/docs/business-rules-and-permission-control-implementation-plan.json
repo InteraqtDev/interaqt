@@ -672,7 +672,7 @@
             "Cannot update username",
             "Cannot update role"
           ],
-          "completed": false
+          "completed": true
         },
         {
           "id": "BR035",

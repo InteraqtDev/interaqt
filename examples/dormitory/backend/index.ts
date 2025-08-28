@@ -2332,6 +2332,27 @@ const updateProfileEmailValid = Condition.create({
   }
 })
 
-// Assign BR033 condition to UpdateProfile interaction
-UpdateProfile.conditions = updateProfileEmailValid
+// BR034: Cannot update username or role - these fields must not be in payload
+const updateProfileFieldRestriction = Condition.create({
+  name: 'updateProfileFieldRestriction',
+  content: async function(this: Controller, event: any) {
+    // Check if username is in payload
+    if ('username' in event.payload) {
+      return false // Cannot update username
+    }
+    
+    // Check if role is in payload
+    if ('role' in event.payload) {
+      return false // Cannot update role
+    }
+    
+    // Allow the update if neither username nor role is in payload
+    return true
+  }
+})
+
+// Combine BR033 (email validation) and BR034 (field restriction) conditions for UpdateProfile
+UpdateProfile.conditions = Conditions.create({
+  content: BoolExp.atom(updateProfileEmailValid).and(updateProfileFieldRestriction)
+})
 
