@@ -1435,8 +1435,56 @@ const positiveResidentPointsToDeduct = Condition.create({
   }
 })
 
-// Assign BR003 condition to DeductResidentPoints interaction
-DeductResidentPoints.conditions = positiveResidentPointsToDeduct
+// P014: Dormitory leader can only deduct points from residents in their dormitory
+const canDeductFromOwnDormitoryResidents = Condition.create({
+  name: 'canDeductFromOwnDormitoryResidents',
+  content: async function(this: Controller, event: any) {
+    // Check if user is a dormitory leader
+    if (event.user?.role !== 'dormitoryLeader') {
+      return false
+    }
+    
+    // Get the dormitory leader's managed dormitory
+    const leaderDormitoryRelation = await this.system.storage.findOne(
+      UserDormitoryLeaderRelation.name,
+      MatchExp.atom({ key: 'source.id', value: ['=', event.user.id] }),
+      undefined,
+      ['id', ['target', { attributeQuery: ['id'] }]]
+    )
+    
+    // If leader doesn't manage any dormitory, deny
+    if (!leaderDormitoryRelation || !leaderDormitoryRelation.target) {
+      return false
+    }
+    
+    const leaderDormitoryId = leaderDormitoryRelation.target.id
+    
+    // Get the target user's bed assignment to find their dormitory
+    const targetUserBedRelation = await this.system.storage.findOne(
+      UserBedRelation.name,
+      MatchExp.atom({ key: 'source.id', value: ['=', event.payload.userId] }),
+      undefined,
+      ['id', ['target', { attributeQuery: ['id', ['dormitory', { attributeQuery: ['id'] }]] }]]
+    )
+    
+    // If target user doesn't have a bed assignment, deny
+    if (!targetUserBedRelation || !targetUserBedRelation.target) {
+      return false
+    }
+    
+    // Get the dormitory of the target user's bed
+    const targetUserDormitoryId = targetUserBedRelation.target.dormitory?.id
+    
+    // Check if target user is in the same dormitory as the leader manages
+    return targetUserDormitoryId === leaderDormitoryId
+  }
+})
+
+// Combine BR003 (positive points validation) with P014 (dormitory leader scope)
+// Check positive points first, then check dormitory leader scope
+DeductResidentPoints.conditions = Conditions.create({
+  content: BoolExp.atom(positiveResidentPointsToDeduct).and(canDeductFromOwnDormitoryResidents)
+})
 
 // BR004: New password must meet security requirements (min 8 chars)
 const validPasswordLength = Condition.create({

@@ -264,7 +264,7 @@
             "Dormitory leader cannot deduct points from other dormitory residents (TC008)",
             "Regular resident cannot use this interaction"
           ],
-          "completed": false
+          "completed": true
         },
         {
           "id": "P015",
