@@ -1362,6 +1362,9 @@ RemoveUserFromBed.conditions = isAdmin
 // P008: Only admin can process removal requests
 ProcessRemovalRequest.conditions = isAdmin
 
+// P009: Only admin can deduct points from any user
+DeductPoints.conditions = isAdmin
+
 // Phase 2: Simple Business Rules
 
 // BR001: Dormitory capacity must be between 4 and 6

@@ -1592,6 +1592,159 @@ describe('Permission and Business Rules', () => {
       expect(rejectedRequest.processedAt).toBeGreaterThan(0)
       expect(rejectedRequest.adminComment).toBe('Not sufficient grounds for removal')
     })
+
+    test('P009: Admin can deduct points (TC003)', async () => {
+      // Create admin user
+      const admin = await system.storage.create('User', {
+        username: 'admin',
+        password: 'password123',
+        email: 'admin@test.com',
+        name: 'Admin User',
+        role: 'admin',
+        points: 100
+      })
+      
+      // Create a target user
+      const targetUser = await system.storage.create('User', {
+        username: 'resident1',
+        password: 'password123',
+        email: 'resident1@test.com',
+        name: 'Resident User',
+        role: 'resident',
+        points: 100
+      })
+      
+      // Admin should be able to deduct points
+      const result = await controller.callInteraction('DeductPoints', {
+        user: admin,
+        payload: {
+          userId: targetUser.id,
+          points: 30,
+          reason: 'Violation',
+          description: 'Late night noise violation'
+        }
+      })
+      
+      expect(result.error).toBeUndefined()
+      
+      // Verify points were deducted
+      const updatedUser = await system.storage.findOne('User',
+        MatchExp.atom({ key: 'id', value: ['=', targetUser.id] }),
+        undefined,
+        ['id', 'points']
+      )
+      expect(updatedUser.points).toBe(70)
+      
+      // Verify point deduction record was created
+      const deductions = await system.storage.find('PointDeduction',
+        MatchExp.atom({ key: 'user.id', value: ['=', targetUser.id] }),
+        undefined,
+        ['id', 'points', 'reason', 'description', 'createdBy']
+      )
+      expect(deductions.length).toBe(1)
+      expect(deductions[0].points).toBe(30)
+      expect(deductions[0].reason).toBe('Violation')
+      expect(deductions[0].description).toBe('Late night noise violation')
+      expect(deductions[0].createdBy).toBe(admin.id)
+    })
+
+    test('P009: Non-admin cannot use DeductPoints interaction', async () => {
+      // Create non-admin user (resident)
+      const resident = await system.storage.create('User', {
+        username: 'resident1',
+        password: 'password123',
+        email: 'resident1@test.com',
+        name: 'Resident User',
+        role: 'resident',
+        points: 100
+      })
+      
+      // Create a target user
+      const targetUser = await system.storage.create('User', {
+        username: 'resident2',
+        password: 'password123',
+        email: 'resident2@test.com',
+        name: 'Target User',
+        role: 'resident',
+        points: 100
+      })
+      
+      // Resident should not be able to use DeductPoints
+      const result = await controller.callInteraction('DeductPoints', {
+        user: resident,
+        payload: {
+          userId: targetUser.id,
+          points: 20,
+          reason: 'Test',
+          description: 'Test deduction'
+        }
+      })
+      
+      // Verify error
+      expect(result.error).toBeDefined()
+      expect((result.error as any).type).toBe('condition check failed')
+      expect((result.error as any).error.data.name).toBe('isAdmin')
+      
+      // Verify points were not deducted
+      const unchangedUser = await system.storage.findOne('User',
+        MatchExp.atom({ key: 'id', value: ['=', targetUser.id] }),
+        undefined,
+        ['id', 'points']
+      )
+      expect(unchangedUser.points).toBe(100)
+      
+      // Verify no deduction record was created
+      const deductions = await system.storage.find('PointDeduction',
+        MatchExp.atom({ key: 'user.id', value: ['=', targetUser.id] })
+      )
+      expect(deductions.length).toBe(0)
+    })
+
+    test('P009: Dormitory leader cannot use DeductPoints interaction', async () => {
+      // Create dormitory leader user
+      const dormitoryLeader = await system.storage.create('User', {
+        username: 'leader1',
+        password: 'password123',
+        email: 'leader1@test.com',
+        name: 'Dormitory Leader',
+        role: 'dormitoryLeader',
+        points: 100
+      })
+      
+      // Create a target user
+      const targetUser = await system.storage.create('User', {
+        username: 'resident1',
+        password: 'password123',
+        email: 'resident1@test.com',
+        name: 'Target User',
+        role: 'resident',
+        points: 100
+      })
+      
+      // Dormitory leader should not be able to use DeductPoints (they should use DeductResidentPoints instead)
+      const result = await controller.callInteraction('DeductPoints', {
+        user: dormitoryLeader,
+        payload: {
+          userId: targetUser.id,
+          points: 15,
+          reason: 'Test',
+          description: 'Test deduction'
+        }
+      })
+      
+      // Verify error
+      expect(result.error).toBeDefined()
+      expect((result.error as any).type).toBe('condition check failed')
+      expect((result.error as any).error.data.name).toBe('isAdmin')
+      
+      // Verify points were not deducted
+      const unchangedUser = await system.storage.findOne('User',
+        MatchExp.atom({ key: 'id', value: ['=', targetUser.id] }),
+        undefined,
+        ['id', 'points']
+      )
+      expect(unchangedUser.points).toBe(100)
+    })
   })
 
   describe('Phase 2: Simple Business Rules', () => {

@@ -111,7 +111,7 @@
             "Admin can deduct points (TC003)",
             "Non-admin cannot use DeductPoints interaction"
           ],
-          "completed": false
+          "completed": true
         },
         {
           "id": "P010",
