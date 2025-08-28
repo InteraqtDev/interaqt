@@ -6524,5 +6524,258 @@ describe('Permission and Business Rules', () => {
       )
       expect(deletedDorm.isDeleted).toBe(true)
     })
+
+    test('BR018: Can process pending request (TC005, TC015)', async () => {
+      // Create admin user
+      const admin = await system.storage.create('User', {
+        username: 'admin',
+        password: 'password123',
+        email: 'admin@test.com',
+        name: 'Admin User',
+        role: 'admin',
+        points: 100
+      })
+      
+      // Create dormitory leader
+      const dormitoryLeader = await system.storage.create('User', {
+        username: 'leader1',
+        password: 'password123',
+        email: 'leader@test.com',
+        name: 'Dormitory Leader',
+        role: 'dormitoryLeader',
+        points: 100
+      })
+      
+      // Create target user
+      const targetUser = await system.storage.create('User', {
+        username: 'resident1',
+        password: 'password123',
+        email: 'resident@test.com',
+        name: 'Resident User',
+        role: 'resident',
+        points: 20 // Low points for removal
+      })
+      
+      // Submit removal request (creates it in pending status)
+      const submitResult = await controller.callInteraction('SubmitRemovalRequest', {
+        user: dormitoryLeader,
+        payload: {
+          userId: targetUser.id,
+          reason: 'Low points'
+        }
+      })
+      
+      // Find the created removal request
+      const requests = await system.storage.find('RemovalRequest',
+        MatchExp.atom({ key: 'targetUser.id', value: ['=', targetUser.id] }),
+        undefined,
+        ['id', 'status']
+      )
+      expect(requests.length).toBe(1)
+      expect(requests[0].status).toBe('pending')
+      
+      // Admin should be able to process pending request (approve)
+      const approveResult = await controller.callInteraction('ProcessRemovalRequest', {
+        user: admin,
+        payload: {
+          requestId: requests[0].id,
+          decision: 'approve',
+          adminComment: 'Approved due to low points'
+        }
+      })
+      
+      expect(approveResult.error).toBeUndefined()
+      
+      // Verify request status changed to approved
+      const approvedRequest = await system.storage.findOne('RemovalRequest',
+        MatchExp.atom({ key: 'id', value: ['=', requests[0].id] }),
+        undefined,
+        ['id', 'status', 'adminComment']
+      )
+      expect(approvedRequest.status).toBe('approved')
+      expect(approvedRequest.adminComment).toBe('Approved due to low points')
+    })
+
+    test('BR018: Cannot process already approved request', async () => {
+      // Create admin user
+      const admin = await system.storage.create('User', {
+        username: 'admin',
+        password: 'password123',
+        email: 'admin@test.com',
+        name: 'Admin User',
+        role: 'admin',
+        points: 100
+      })
+      
+      // Create dormitory leader
+      const dormitoryLeader = await system.storage.create('User', {
+        username: 'leader1',
+        password: 'password123',
+        email: 'leader@test.com',
+        name: 'Dormitory Leader',
+        role: 'dormitoryLeader',
+        points: 100
+      })
+      
+      // Create target user
+      const targetUser = await system.storage.create('User', {
+        username: 'resident1',
+        password: 'password123',
+        email: 'resident@test.com',
+        name: 'Resident User',
+        role: 'resident',
+        points: 20
+      })
+      
+      // Submit removal request
+      await controller.callInteraction('SubmitRemovalRequest', {
+        user: dormitoryLeader,
+        payload: {
+          userId: targetUser.id,
+          reason: 'Low points'
+        }
+      })
+      
+      // Find the created removal request
+      const requests = await system.storage.find('RemovalRequest',
+        MatchExp.atom({ key: 'targetUser.id', value: ['=', targetUser.id] }),
+        undefined,
+        ['id']
+      )
+      
+      // First approval should succeed
+      const firstApproval = await controller.callInteraction('ProcessRemovalRequest', {
+        user: admin,
+        payload: {
+          requestId: requests[0].id,
+          decision: 'approve',
+          adminComment: 'First approval'
+        }
+      })
+      expect(firstApproval.error).toBeUndefined()
+      
+      // Verify request is now approved
+      const approvedRequest = await system.storage.findOne('RemovalRequest',
+        MatchExp.atom({ key: 'id', value: ['=', requests[0].id] }),
+        undefined,
+        ['id', 'status']
+      )
+      expect(approvedRequest.status).toBe('approved')
+      
+      // Try to process the already approved request again
+      const secondApproval = await controller.callInteraction('ProcessRemovalRequest', {
+        user: admin,
+        payload: {
+          requestId: requests[0].id,
+          decision: 'reject', // Try to reject an already approved request
+          adminComment: 'Second attempt'
+        }
+      })
+      
+      // Should fail with condition check failed
+      expect(secondApproval.error).toBeDefined()
+      expect((secondApproval.error as any).type).toBe('condition check failed')
+      expect((secondApproval.error as any).error.data.name).toBe('requestMustBePending')
+      
+      // Verify status hasn't changed
+      const stillApproved = await system.storage.findOne('RemovalRequest',
+        MatchExp.atom({ key: 'id', value: ['=', requests[0].id] }),
+        undefined,
+        ['id', 'status', 'adminComment']
+      )
+      expect(stillApproved.status).toBe('approved')
+      expect(stillApproved.adminComment).toBe('First approval') // Original comment preserved
+    })
+
+    test('BR018: Cannot process already rejected request', async () => {
+      // Create admin user
+      const admin = await system.storage.create('User', {
+        username: 'admin',
+        password: 'password123',
+        email: 'admin@test.com',
+        name: 'Admin User',
+        role: 'admin',
+        points: 100
+      })
+      
+      // Create dormitory leader
+      const dormitoryLeader = await system.storage.create('User', {
+        username: 'leader1',
+        password: 'password123',
+        email: 'leader@test.com',
+        name: 'Dormitory Leader',
+        role: 'dormitoryLeader',
+        points: 100
+      })
+      
+      // Create target user
+      const targetUser = await system.storage.create('User', {
+        username: 'resident1',
+        password: 'password123',
+        email: 'resident@test.com',
+        name: 'Resident User',
+        role: 'resident',
+        points: 50 // Enough points
+      })
+      
+      // Submit removal request
+      await controller.callInteraction('SubmitRemovalRequest', {
+        user: dormitoryLeader,
+        payload: {
+          userId: targetUser.id,
+          reason: 'Other reason'
+        }
+      })
+      
+      // Find the created removal request
+      const requests = await system.storage.find('RemovalRequest',
+        MatchExp.atom({ key: 'targetUser.id', value: ['=', targetUser.id] }),
+        undefined,
+        ['id']
+      )
+      
+      // First rejection should succeed
+      const firstRejection = await controller.callInteraction('ProcessRemovalRequest', {
+        user: admin,
+        payload: {
+          requestId: requests[0].id,
+          decision: 'reject',
+          adminComment: 'Insufficient grounds'
+        }
+      })
+      expect(firstRejection.error).toBeUndefined()
+      
+      // Verify request is now rejected
+      const rejectedRequest = await system.storage.findOne('RemovalRequest',
+        MatchExp.atom({ key: 'id', value: ['=', requests[0].id] }),
+        undefined,
+        ['id', 'status']
+      )
+      expect(rejectedRequest.status).toBe('rejected')
+      
+      // Try to process the already rejected request again
+      const secondAttempt = await controller.callInteraction('ProcessRemovalRequest', {
+        user: admin,
+        payload: {
+          requestId: requests[0].id,
+          decision: 'approve', // Try to approve an already rejected request
+          adminComment: 'Changed mind'
+        }
+      })
+      
+      // Should fail with condition check failed
+      expect(secondAttempt.error).toBeDefined()
+      expect((secondAttempt.error as any).type).toBe('condition check failed')
+      expect((secondAttempt.error as any).error.data.name).toBe('requestMustBePending')
+      
+      // Verify status hasn't changed
+      const stillRejected = await system.storage.findOne('RemovalRequest',
+        MatchExp.atom({ key: 'id', value: ['=', requests[0].id] }),
+        undefined,
+        ['id', 'status', 'adminComment']
+      )
+      expect(stillRejected.status).toBe('rejected')
+      expect(stillRejected.adminComment).toBe('Insufficient grounds') // Original comment preserved
+    })
   })
 })

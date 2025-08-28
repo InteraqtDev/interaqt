@@ -1639,8 +1639,38 @@ RemoveUserFromBed.conditions = Conditions.create({
   content: BoolExp.atom(isAdmin).and(userHasBedAssignment)
 })
 
-// P008: Only admin can process removal requests
-ProcessRemovalRequest.conditions = isAdmin
+// BR018: Request must be in pending status
+const requestMustBePending = Condition.create({
+  name: 'requestMustBePending',
+  content: async function(this: Controller, event: any) {
+    const requestId = event.payload?.requestId
+    
+    if (!requestId) {
+      return false // No request ID provided
+    }
+    
+    // Get the removal request to check its status
+    const removalRequest = await this.system.storage.findOne(
+      'RemovalRequest',
+      MatchExp.atom({ key: 'id', value: ['=', requestId] }),
+      undefined,
+      ['id', 'status']
+    )
+    
+    // If request doesn't exist, return false
+    if (!removalRequest) {
+      return false
+    }
+    
+    // Check if the request status is 'pending'
+    return removalRequest.status === 'pending'
+  }
+})
+
+// P008: Only admin can process removal requests + BR018: Request must be in pending status
+ProcessRemovalRequest.conditions = Conditions.create({
+  content: BoolExp.atom(isAdmin).and(requestMustBePending)
+})
 
 // P009: Only admin can deduct points from any user
 // BR002: Points to deduct must be positive
