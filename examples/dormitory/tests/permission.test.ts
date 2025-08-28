@@ -2626,5 +2626,141 @@ describe('Permission and Business Rules', () => {
       )
       expect(dormitories.length).toBe(0)
     })
+
+    // BR002: Points to deduct must be positive
+    test('BR002: Can deduct positive points (TC003)', async () => {
+      // Create admin user
+      const admin = await system.storage.create('User', {
+        username: 'admin',
+        password: 'password123',
+        email: 'admin@test.com',
+        name: 'Admin User',
+        role: 'admin',
+        points: 100
+      })
+      
+      // Create a target user
+      const targetUser = await system.storage.create('User', {
+        username: 'resident1',
+        password: 'password123',
+        email: 'resident1@test.com',
+        name: 'Resident User',
+        role: 'resident',
+        points: 100
+      })
+      
+      // Admin should be able to deduct positive points
+      const result = await controller.callInteraction('DeductPoints', {
+        user: admin,
+        payload: {
+          userId: targetUser.id,
+          points: 30,
+          reason: 'Violation',
+          description: 'Late night noise violation'
+        }
+      })
+      
+      expect(result.error).toBeUndefined()
+      
+      // Verify points were deducted
+      const updatedUser = await system.storage.findOne('User',
+        MatchExp.atom({ key: 'id', value: ['=', targetUser.id] }),
+        undefined,
+        ['id', 'points']
+      )
+      expect(updatedUser.points).toBe(70)
+    })
+
+    test('BR002: Cannot deduct 0 points', async () => {
+      // Create admin user
+      const admin = await system.storage.create('User', {
+        username: 'admin',
+        password: 'password123',
+        email: 'admin@test.com',
+        name: 'Admin User',
+        role: 'admin',
+        points: 100
+      })
+      
+      // Create a target user
+      const targetUser = await system.storage.create('User', {
+        username: 'resident1',
+        password: 'password123',
+        email: 'resident1@test.com',
+        name: 'Resident User',
+        role: 'resident',
+        points: 100
+      })
+      
+      // Admin should not be able to deduct 0 points
+      const result = await controller.callInteraction('DeductPoints', {
+        user: admin,
+        payload: {
+          userId: targetUser.id,
+          points: 0,
+          reason: 'Violation',
+          description: 'Test deduction'
+        }
+      })
+      
+      // Verify error
+      expect(result.error).toBeDefined()
+      expect((result.error as any).type).toBe('condition check failed')
+      expect((result.error as any).error.data.name).toBe('positivePointsToDeduct')
+      
+      // Verify points were not deducted
+      const updatedUser = await system.storage.findOne('User',
+        MatchExp.atom({ key: 'id', value: ['=', targetUser.id] }),
+        undefined,
+        ['id', 'points']
+      )
+      expect(updatedUser.points).toBe(100)
+    })
+
+    test('BR002: Cannot deduct negative points', async () => {
+      // Create admin user
+      const admin = await system.storage.create('User', {
+        username: 'admin',
+        password: 'password123',
+        email: 'admin@test.com',
+        name: 'Admin User',
+        role: 'admin',
+        points: 100
+      })
+      
+      // Create a target user
+      const targetUser = await system.storage.create('User', {
+        username: 'resident1',
+        password: 'password123',
+        email: 'resident1@test.com',
+        name: 'Resident User',
+        role: 'resident',
+        points: 100
+      })
+      
+      // Admin should not be able to deduct negative points
+      const result = await controller.callInteraction('DeductPoints', {
+        user: admin,
+        payload: {
+          userId: targetUser.id,
+          points: -10,
+          reason: 'Violation',
+          description: 'Test deduction'
+        }
+      })
+      
+      // Verify error
+      expect(result.error).toBeDefined()
+      expect((result.error as any).type).toBe('condition check failed')
+      expect((result.error as any).error.data.name).toBe('positivePointsToDeduct')
+      
+      // Verify points were not deducted
+      const updatedUser = await system.storage.findOne('User',
+        MatchExp.atom({ key: 'id', value: ['=', targetUser.id] }),
+        undefined,
+        ['id', 'points']
+      )
+      expect(updatedUser.points).toBe(100)
+    })
   })
 })

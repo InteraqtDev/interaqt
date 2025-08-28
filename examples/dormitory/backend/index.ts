@@ -1363,7 +1363,19 @@ RemoveUserFromBed.conditions = isAdmin
 ProcessRemovalRequest.conditions = isAdmin
 
 // P009: Only admin can deduct points from any user
-DeductPoints.conditions = isAdmin
+// BR002: Points to deduct must be positive
+const positivePointsToDeduct = Condition.create({
+  name: 'positivePointsToDeduct',
+  content: function(this: Controller, event: any) {
+    const points = event.payload?.points
+    return points > 0
+  }
+})
+
+// Combine P009 (admin permission) with BR002 (positive points validation)
+DeductPoints.conditions = Conditions.create({
+  content: BoolExp.atom(isAdmin).and(positivePointsToDeduct)
+})
 
 // P010: Only admin can create users via CreateUser
 CreateUser.conditions = isAdmin
