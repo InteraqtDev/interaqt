@@ -51,7 +51,7 @@
             "Admin can assign dormitory leader (TC006)",
             "Non-admin cannot assign dormitory leader"
           ],
-          "completed": false
+          "completed": true
         },
         {
           "id": "P005",

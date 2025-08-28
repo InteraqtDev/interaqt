@@ -1347,3 +1347,6 @@ UpdateDormitory.conditions = isAdmin
 // P003: Only admin can delete dormitories
 DeleteDormitory.conditions = isAdmin
 
+// P004: Only admin can assign dormitory leaders
+AssignDormitoryLeader.conditions = isAdmin
+
