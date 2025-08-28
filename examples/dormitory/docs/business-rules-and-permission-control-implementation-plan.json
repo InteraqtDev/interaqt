@@ -485,7 +485,7 @@
             "Points reduced normally when sufficient",
             "Points clamped to 0 when deduction exceeds balance"
           ],
-          "completed": false
+          "completed": true
         },
         {
           "id": "BR021",
