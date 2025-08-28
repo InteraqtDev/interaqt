@@ -1,4 +1,5 @@
 {
   "currentTask": "Task 3.2.2",
-  "completed": false
+  "completed": false,
+  "completionCriteria": "All items in `docs/business-rules-and-permission-control-implementation-plan.json` have `completed: true`"
 }

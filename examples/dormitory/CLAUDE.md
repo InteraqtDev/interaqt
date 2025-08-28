@@ -34,15 +34,18 @@ Based on the current task in `docs/STATUS.json`, use the appropriate sub-agent:
 - **Task 1** → Use sub-agent `requirements-analysis-handler`
 - **Task 2** → Use sub-agent `implement-design-handler`
 - **Task 3** → Use sub-agent `code-generation-handler` (default for Task 3)
-  - **Exception: Task 3.1.4.3** → Use sub-agent `computation-generation-handler` instead
-  - **Exception: Task 3.2.2** → Use sub-agent `permission-generation-handler` instead
+  - **Exception: Task 3.1.4.3 - Computation Implementation Loop** → Use sub-agent `computation-generation-handler` during the implementation loop
+  - **Exception: Task 3.2.2 - Permission and Business Rule Implementation Loop** → Use sub-agent `permission-generation-handler` during the implementation loop
 
-**📌 SPECIAL TASK INSTRUCTIONS:**
-- **Task 1**: Always use sub-agent `requirements-analysis-handler` for requirements analysis and test case design
-- **Task 2**: Always use sub-agent `implement-design-handler` for design and analysis documentation
-- **Task 3**: Use sub-agent `code-generation-handler` as the default handler for all code generation tasks
-  - **Special case - Task 3.1.4.3**: Use sub-agent `computation-generation-handler` for progressive computation implementation
-  - **Special case - Task 3.2.2**: Use sub-agent `permission-generation-handler` for progressive permission and business rules implementation
+**🔴 CRITICAL - AUTORUN LOOP EXECUTION:**
+- **Check `docs/SCHEDULE.json`**: If `"autorun": true`, you MUST continuously execute the implementation loop
+- **Loop Termination Condition**: Continue looping until the `completionCriteria` in `docs/STATUS.json` is fully satisfied
+- **Example**: For Task 3.1.4.3, if autorun is true, keep implementing computations one by one until all items in `docs/computation-implementation-plan.json` have `completed: true`
+- **Example**: For Task 3.2.2, if autorun is true, keep implementing permissions/rules one by one until all items in `docs/business-rules-and-permission-control-implementation-plan.json` have `completed: true`
+- **IMPORTANT**: Only after the completion criteria is met can you proceed to the next task
+
+  
+
 
 **🔴 CRITICAL EXECUTION RULES:**
 - **Create TODO plans STRICTLY from task guidance** - Follow task documents exactly to create TODO plans, do NOT summarize or paraphrase - this ensures strict execution

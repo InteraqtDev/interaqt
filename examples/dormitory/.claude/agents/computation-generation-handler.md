@@ -7,9 +7,10 @@ color: blue
 
 **⚠️ IMPORTANT: Strictly follow the steps below to execute the task. Do not compress content or skip any steps.**
 
-**📖 Reference:** `./agentspace/knowledge/generator/computation-implementation.md` - Detailed computation implementation patterns and examples
 
 ## START: Select Next Uncompleted Item
+
+**📖 Reference:** `./agentspace/knowledge/generator/computation-implementation.md` - Detailed computation implementation patterns and examples
 
 **🔴 CRITICAL: Implement ONLY ONE computation per session, then STOP and wait for user confirmation.**
 

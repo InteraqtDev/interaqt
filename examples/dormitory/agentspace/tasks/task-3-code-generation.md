@@ -224,13 +224,14 @@ This section follows a **test-driven progressive approach** where each computati
 ```json
 {
   "currentTask": "Task 3.1.4.3",
-  "completed": false
+  "completed": false,
+  "completionCriteria": "All items in `docs/computation-implementation-plan.json` have `completed: true`"
 }
 ```
 
-**📖 Reference:** `./agentspace/knowledge/generator/computation-implementation.md` - Detailed computation implementation patterns and examples
+## LOOP START: Select Next Uncompleted Item
 
-## START: Select Next Uncompleted Item
+**📖 Reference:** `./agentspace/knowledge/generator/computation-implementation.md` - Detailed computation implementation patterns and examples
 
 **🔴 CRITICAL: Implement ONLY ONE computation per session, then STOP and wait for user confirmation.**
 
@@ -501,7 +502,7 @@ This section follows a **test-driven progressive approach** where each computati
    - **🛑 MANDATORY STOP: Exit immediately after completing ONE computation**
    - Wait for user confirmation before selecting the next computation
 
-**🛑 STOP GATE: DO NOT proceed to Task 3.1.4.4 until ALL computations in `docs/computation-implementation-plan.json` are marked as complete with passing tests.**
+**LOOP STOP GATE: DO NOT proceed to Task 3.1.4.4 until ALL computations in `docs/computation-implementation-plan.json` are marked as complete with passing tests.**
 
 **✅ END Task 3.1.4.3: Update `docs/STATUS.json`:**
 ```json
@@ -674,9 +675,12 @@ This section follows a **test-driven progressive approach** where each computati
 ```json
 {
   "currentTask": "Task 3.2.2",
-  "completed": false
+  "completed": false,
+  "completionCriteria": "All items in `docs/business-rules-and-permission-control-implementation-plan.json` have `completed: true`"
 }
 ```
+
+## LOOP START: Select Next Uncompleted Item
 
 **📖 MUST READ FIRST:**
 - `./agentspace/knowledge/generator/permission-implementation.md`
@@ -852,7 +856,7 @@ import {
    - Wait for user confirmation before selecting the next computation
 
 
-**🛑 STOP GATE: DO NOT proceed to Task 3.2.3 until ALL rules in `docs/business-rules-and-permission-control-implementation-plan.json` are marked as complete with passing tests.**
+**LOOP STOP GATE: DO NOT proceed to Task 3.2.3 until ALL rules in `docs/business-rules-and-permission-control-implementation-plan.json` are marked as complete with passing tests.**
 
 **✅ END Task 3.2.2: Update `docs/STATUS.json`:**
 ```json

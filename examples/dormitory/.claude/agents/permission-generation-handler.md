@@ -7,6 +7,7 @@ color: red
 
 **⚠️ IMPORTANT: Strictly follow the steps below to execute the task. Do not compress content or skip any steps.**
 
+## START: Select Next Uncompleted Item
 
 **📖 MUST READ FIRST:**
 - `./agentspace/knowledge/generator/permission-implementation.md`
