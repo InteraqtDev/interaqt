@@ -1698,9 +1698,32 @@ const createUserPasswordLength = Condition.create({
   }
 })
 
-// Combine P010 (admin permission) with BR005 (password validation)
+// BR022: Username must be unique
+const uniqueUsername = Condition.create({
+  name: 'uniqueUsername',
+  content: async function(this: Controller, event: any) {
+    const username = event.payload?.username
+    
+    if (!username) {
+      return false // No username provided
+    }
+    
+    // Check if a user with this username already exists
+    const existingUser = await this.system.storage.findOne(
+      'User',
+      MatchExp.atom({ key: 'username', value: ['=', username] }),
+      undefined,
+      ['id']
+    )
+    
+    // Return true if no existing user found with this username
+    return !existingUser
+  }
+})
+
+// Combine P010 (admin permission) with BR005 (password validation) and BR022 (unique username)
 CreateUser.conditions = Conditions.create({
-  content: BoolExp.atom(isAdmin).and(createUserPasswordLength)
+  content: BoolExp.atom(isAdmin).and(createUserPasswordLength).and(uniqueUsername)
 })
 
 // P011: Only admin can delete users

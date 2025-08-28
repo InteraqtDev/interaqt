@@ -510,7 +510,7 @@
             "Can create user with unique username",
             "Cannot create user with duplicate username"
           ],
-          "completed": false
+          "completed": true
         },
         {
           "id": "BR023",

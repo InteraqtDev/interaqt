@@ -4789,6 +4789,182 @@ describe('Permission and Business Rules', () => {
       expect(createdUser).toBeUndefined()
     })
 
+    // BR022: Username must be unique
+    test('BR022: Can create user with unique username', async () => {
+      // Create admin user
+      const admin = await system.storage.create('User', {
+        username: 'admin',
+        password: 'admin123456',
+        email: 'admin@test.com',
+        name: 'Admin User',
+        role: 'admin',
+        points: 100,
+        createdAt: Math.floor(Date.now() / 1000),
+        isDeleted: false
+      })
+      
+      // Create first user with unique username
+      const result1 = await controller.callInteraction('CreateUser', {
+        user: admin,
+        payload: {
+          username: 'uniqueUser1',
+          password: 'password123',
+          email: 'unique1@test.com',
+          name: 'Unique User 1'
+        }
+      })
+      
+      // Should succeed
+      expect(result1.error).toBeUndefined()
+      
+      // Verify user was created
+      const createdUser1 = await system.storage.findOne('User',
+        MatchExp.atom({ key: 'username', value: ['=', 'uniqueUser1'] }),
+        undefined,
+        ['id', 'username', 'email', 'name']
+      )
+      expect(createdUser1).toBeDefined()
+      expect(createdUser1.username).toBe('uniqueUser1')
+      
+      // Create second user with different unique username
+      const result2 = await controller.callInteraction('CreateUser', {
+        user: admin,
+        payload: {
+          username: 'uniqueUser2',
+          password: 'password123',
+          email: 'unique2@test.com',
+          name: 'Unique User 2'
+        }
+      })
+      
+      // Should succeed
+      expect(result2.error).toBeUndefined()
+      
+      // Verify second user was created
+      const createdUser2 = await system.storage.findOne('User',
+        MatchExp.atom({ key: 'username', value: ['=', 'uniqueUser2'] }),
+        undefined,
+        ['id', 'username', 'email', 'name']
+      )
+      expect(createdUser2).toBeDefined()
+      expect(createdUser2.username).toBe('uniqueUser2')
+    })
+    
+    test('BR022: Cannot create user with duplicate username', async () => {
+      // Create admin user
+      const admin = await system.storage.create('User', {
+        username: 'admin',
+        password: 'admin123456',
+        email: 'admin@test.com',
+        name: 'Admin User',
+        role: 'admin',
+        points: 100,
+        createdAt: Math.floor(Date.now() / 1000),
+        isDeleted: false
+      })
+      
+      // Create first user
+      const result1 = await controller.callInteraction('CreateUser', {
+        user: admin,
+        payload: {
+          username: 'duplicateTest',
+          password: 'password123',
+          email: 'first@test.com',
+          name: 'First User'
+        }
+      })
+      
+      // Should succeed
+      expect(result1.error).toBeUndefined()
+      
+      // Try to create second user with same username
+      const result2 = await controller.callInteraction('CreateUser', {
+        user: admin,
+        payload: {
+          username: 'duplicateTest',  // Same username as first user
+          password: 'password456',
+          email: 'second@test.com',
+          name: 'Second User'
+        }
+      })
+      
+      // Should fail with uniqueUsername condition check
+      expect(result2.error).toBeDefined()
+      expect((result2.error as any).type).toBe('condition check failed')
+      expect((result2.error as any).error.data.name).toBe('uniqueUsername')
+      
+      // Verify only first user exists
+      const users = await system.storage.find('User',
+        MatchExp.atom({ key: 'username', value: ['=', 'duplicateTest'] }),
+        undefined,
+        ['id', 'email', 'name']
+      )
+      expect(users.length).toBe(1)
+      expect(users[0].email).toBe('first@test.com')
+      expect(users[0].name).toBe('First User')
+    })
+    
+    test('BR022: Username uniqueness is case-sensitive', async () => {
+      // Create admin user
+      const admin = await system.storage.create('User', {
+        username: 'admin',
+        password: 'admin123456',
+        email: 'admin@test.com',
+        name: 'Admin User',
+        role: 'admin',
+        points: 100,
+        createdAt: Math.floor(Date.now() / 1000),
+        isDeleted: false
+      })
+      
+      // Create user with lowercase username
+      const result1 = await controller.callInteraction('CreateUser', {
+        user: admin,
+        payload: {
+          username: 'testuser',
+          password: 'password123',
+          email: 'lower@test.com',
+          name: 'Lowercase User'
+        }
+      })
+      
+      // Should succeed
+      expect(result1.error).toBeUndefined()
+      
+      // Try to create user with uppercase version of same username
+      // Note: This test assumes case-sensitive comparison
+      // If the system should be case-insensitive, the condition would need to be updated
+      const result2 = await controller.callInteraction('CreateUser', {
+        user: admin,
+        payload: {
+          username: 'TestUser',  // Different case
+          password: 'password456',
+          email: 'upper@test.com',
+          name: 'Uppercase User'
+        }
+      })
+      
+      // Should succeed if case-sensitive (current implementation)
+      expect(result2.error).toBeUndefined()
+      
+      // Verify both users exist
+      const lowerUser = await system.storage.findOne('User',
+        MatchExp.atom({ key: 'username', value: ['=', 'testuser'] }),
+        undefined,
+        ['id', 'username']
+      )
+      const upperUser = await system.storage.findOne('User',
+        MatchExp.atom({ key: 'username', value: ['=', 'TestUser'] }),
+        undefined,
+        ['id', 'username']
+      )
+      
+      expect(lowerUser).toBeDefined()
+      expect(upperUser).toBeDefined()
+      expect(lowerUser.username).toBe('testuser')
+      expect(upperUser.username).toBe('TestUser')
+    })
+
     // BR006: Password must meet security requirements (min 8 chars) for Registration
     test('BR006: Can register with 8+ character password', async () => {
       // Registration should work with 8 character password
