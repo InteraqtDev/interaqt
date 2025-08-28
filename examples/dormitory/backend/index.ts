@@ -1406,8 +1406,40 @@ UpdateDormitory.conditions = Conditions.create({
     .and(updateDormitoryNameUnique)
 })
 
-// P003: Only admin can delete dormitories
-DeleteDormitory.conditions = isAdmin
+// BR010: Cannot delete dormitory if any beds are occupied
+const noBedOccupiedInDormitory = Condition.create({
+  name: 'noBedOccupiedInDormitory',
+  content: async function(this: Controller, event: any) {
+    const dormitoryId = event.payload?.dormitoryId
+    
+    if (!dormitoryId) {
+      return false // No dormitory ID provided
+    }
+    
+    // Get all beds in the dormitory through DormitoryBedsRelation
+    const dormitoryBeds = await this.system.storage.find(
+      DormitoryBedsRelation.name,
+      MatchExp.atom({ key: 'source.id', value: ['=', dormitoryId] }),
+      undefined,
+      ['id', ['target', { attributeQuery: ['id', 'isOccupied'] }]]
+    )
+    
+    // Check if any bed is occupied
+    for (const bedRelation of dormitoryBeds) {
+      if (bedRelation.target?.isOccupied === true) {
+        return false // Found an occupied bed, cannot delete dormitory
+      }
+    }
+    
+    // All beds are unoccupied (or no beds exist), can delete
+    return true
+  }
+})
+
+// P003: Only admin can delete dormitories + BR010: Cannot delete if beds are occupied
+DeleteDormitory.conditions = Conditions.create({
+  content: BoolExp.atom(isAdmin).and(noBedOccupiedInDormitory)
+})
 
 // P004: Only admin can assign dormitory leaders
 AssignDormitoryLeader.conditions = isAdmin

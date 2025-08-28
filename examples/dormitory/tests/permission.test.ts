@@ -4867,4 +4867,305 @@ describe('Permission and Business Rules', () => {
       expect((result.error as any).error.data.name).toBe('canViewPointDeductions')
     })
   })
+
+  describe('Phase 4: Complex Business Rules with Entity Queries', () => {
+    // BR010: Cannot delete dormitory if any beds are occupied
+    test('BR010: Can delete empty dormitory', async () => {
+      // Create admin user
+      const admin = await system.storage.create('User', {
+        username: 'admin',
+        password: 'password123',
+        email: 'admin@test.com',
+        name: 'Admin User',
+        role: 'admin',
+        points: 100
+      })
+      
+      // Create dormitory
+      const createResult = await controller.callInteraction('CreateDormitory', {
+        user: admin,
+        payload: {
+          name: 'Empty Dorm',
+          capacity: 4,
+          floor: 1,
+          building: 'Building A'
+        }
+      })
+      expect(createResult.error).toBeUndefined()
+      
+      // Get the created dormitory
+      const dormitory = await system.storage.findOne(
+        'Dormitory',
+        MatchExp.atom({ key: 'name', value: ['=', 'Empty Dorm'] }),
+        undefined,
+        ['id', 'name', 'occupiedBeds']
+      )
+      expect(dormitory).toBeDefined()
+      expect(dormitory.occupiedBeds).toBe(0)
+      
+      // Admin should be able to delete empty dormitory
+      const deleteResult = await controller.callInteraction('DeleteDormitory', {
+        user: admin,
+        payload: {
+          dormitoryId: dormitory.id
+        }
+      })
+      
+      expect(deleteResult.error).toBeUndefined()
+      
+      // Verify dormitory is marked as deleted
+      const deletedDorm = await system.storage.findOne(
+        'Dormitory',
+        MatchExp.atom({ key: 'id', value: ['=', dormitory.id] }),
+        undefined,
+        ['id', 'isDeleted']
+      )
+      expect(deletedDorm.isDeleted).toBe(true)
+    })
+
+    test('BR010: Cannot delete dormitory with occupied beds', async () => {
+      // Create admin user
+      const admin = await system.storage.create('User', {
+        username: 'admin',
+        password: 'password123',
+        email: 'admin@test.com',
+        name: 'Admin User',
+        role: 'admin',
+        points: 100
+      })
+      
+      // Create dormitory
+      const createResult = await controller.callInteraction('CreateDormitory', {
+        user: admin,
+        payload: {
+          name: 'Occupied Dorm',
+          capacity: 4,
+          floor: 2,
+          building: 'Building B'
+        }
+      })
+      expect(createResult.error).toBeUndefined()
+      
+      // Get the created dormitory
+      const dormitory = await system.storage.findOne(
+        'Dormitory',
+        MatchExp.atom({ key: 'name', value: ['=', 'Occupied Dorm'] }),
+        undefined,
+        ['id', 'name']
+      )
+      expect(dormitory).toBeDefined()
+      
+      // Get the beds created for the dormitory
+      const beds = await system.storage.find('Bed',
+        undefined,
+        { limit: 10 },
+        ['id', 'bedNumber', 'isOccupied']
+      )
+      expect(beds.length).toBeGreaterThan(0)
+      
+      // Create a resident user
+      const resident = await system.storage.create('User', {
+        username: 'resident1',
+        password: 'password123',
+        email: 'resident1@test.com',
+        name: 'Resident User',
+        role: 'resident',
+        points: 100
+      })
+      
+      // Assign resident to a bed in the dormitory
+      const assignBedResult = await controller.callInteraction('AssignUserToBed', {
+        user: admin,
+        payload: {
+          userId: resident.id,
+          bedId: beds[0].id
+        }
+      })
+      expect(assignBedResult.error).toBeUndefined()
+      
+      // Verify bed is now occupied
+      const occupiedBed = await system.storage.findOne('Bed',
+        MatchExp.atom({ key: 'id', value: ['=', beds[0].id] }),
+        undefined,
+        ['id', 'isOccupied']
+      )
+      expect(occupiedBed.isOccupied).toBe(true)
+      
+      // Verify dormitory shows occupied beds
+      const dormWithOccupancy = await system.storage.findOne(
+        'Dormitory',
+        MatchExp.atom({ key: 'id', value: ['=', dormitory.id] }),
+        undefined,
+        ['id', 'occupiedBeds']
+      )
+      expect(dormWithOccupancy.occupiedBeds).toBe(1)
+      
+      // Admin should NOT be able to delete dormitory with occupied beds
+      const deleteResult = await controller.callInteraction('DeleteDormitory', {
+        user: admin,
+        payload: {
+          dormitoryId: dormitory.id
+        }
+      })
+      
+      // Verify error
+      expect(deleteResult.error).toBeDefined()
+      expect((deleteResult.error as any).type).toBe('condition check failed')
+      expect((deleteResult.error as any).error.data.name).toBe('noBedOccupiedInDormitory')
+      
+      // Verify dormitory is NOT deleted
+      const notDeletedDorm = await system.storage.findOne(
+        'Dormitory',
+        MatchExp.atom({ key: 'id', value: ['=', dormitory.id] }),
+        undefined,
+        ['id', 'isDeleted']
+      )
+      expect(notDeletedDorm.isDeleted).toBe(false)
+    })
+
+    test('BR010: Can delete dormitory after removing all occupants', async () => {
+      // Create admin user
+      const admin = await system.storage.create('User', {
+        username: 'admin',
+        password: 'password123',
+        email: 'admin@test.com',
+        name: 'Admin User',
+        role: 'admin',
+        points: 100
+      })
+      
+      // Create dormitory
+      const createResult = await controller.callInteraction('CreateDormitory', {
+        user: admin,
+        payload: {
+          name: 'Temporary Dorm',
+          capacity: 4,
+          floor: 3,
+          building: 'Building C'
+        }
+      })
+      expect(createResult.error).toBeUndefined()
+      
+      // Get the created dormitory
+      const dormitory = await system.storage.findOne(
+        'Dormitory',
+        MatchExp.atom({ key: 'name', value: ['=', 'Temporary Dorm'] }),
+        undefined,
+        ['id', 'name']
+      )
+      
+      // Get the beds
+      const beds = await system.storage.find('Bed',
+        undefined,
+        { limit: 20 },
+        ['id', 'bedNumber']
+      )
+      
+      // Create two residents
+      const resident1 = await system.storage.create('User', {
+        username: 'resident1',
+        password: 'password123',
+        email: 'resident1@test.com',
+        name: 'Resident 1',
+        role: 'resident',
+        points: 100
+      })
+      
+      const resident2 = await system.storage.create('User', {
+        username: 'resident2',
+        password: 'password123',
+        email: 'resident2@test.com',
+        name: 'Resident 2',
+        role: 'resident',
+        points: 100
+      })
+      
+      // Assign both residents to beds
+      await controller.callInteraction('AssignUserToBed', {
+        user: admin,
+        payload: {
+          userId: resident1.id,
+          bedId: beds[0].id
+        }
+      })
+      
+      await controller.callInteraction('AssignUserToBed', {
+        user: admin,
+        payload: {
+          userId: resident2.id,
+          bedId: beds[1].id
+        }
+      })
+      
+      // Verify dormitory has 2 occupied beds
+      const dormWithOccupants = await system.storage.findOne(
+        'Dormitory',
+        MatchExp.atom({ key: 'id', value: ['=', dormitory.id] }),
+        undefined,
+        ['id', 'occupiedBeds']
+      )
+      expect(dormWithOccupants.occupiedBeds).toBe(2)
+      
+      // Cannot delete while occupied
+      const deleteAttempt1 = await controller.callInteraction('DeleteDormitory', {
+        user: admin,
+        payload: {
+          dormitoryId: dormitory.id
+        }
+      })
+      expect(deleteAttempt1.error).toBeDefined()
+      
+      // Remove first resident from bed
+      await controller.callInteraction('RemoveUserFromBed', {
+        user: admin,
+        payload: {
+          userId: resident1.id
+        }
+      })
+      
+      // Still cannot delete with one occupant
+      const deleteAttempt2 = await controller.callInteraction('DeleteDormitory', {
+        user: admin,
+        payload: {
+          dormitoryId: dormitory.id
+        }
+      })
+      expect(deleteAttempt2.error).toBeDefined()
+      
+      // Remove second resident from bed
+      await controller.callInteraction('RemoveUserFromBed', {
+        user: admin,
+        payload: {
+          userId: resident2.id
+        }
+      })
+      
+      // Verify dormitory now has 0 occupied beds
+      const emptyDorm = await system.storage.findOne(
+        'Dormitory',
+        MatchExp.atom({ key: 'id', value: ['=', dormitory.id] }),
+        undefined,
+        ['id', 'occupiedBeds']
+      )
+      expect(emptyDorm.occupiedBeds).toBe(0)
+      
+      // Now can delete the empty dormitory
+      const deleteSuccess = await controller.callInteraction('DeleteDormitory', {
+        user: admin,
+        payload: {
+          dormitoryId: dormitory.id
+        }
+      })
+      expect(deleteSuccess.error).toBeUndefined()
+      
+      // Verify dormitory is deleted
+      const deletedDorm = await system.storage.findOne(
+        'Dormitory',
+        MatchExp.atom({ key: 'id', value: ['=', dormitory.id] }),
+        undefined,
+        ['id', 'isDeleted']
+      )
+      expect(deletedDorm.isDeleted).toBe(true)
+    })
+  })
 })

@@ -353,7 +353,7 @@
             "Can delete empty dormitory",
             "Cannot delete dormitory with occupied beds"
           ],
-          "completed": false
+          "completed": true
         },
         {
           "id": "BR011",
