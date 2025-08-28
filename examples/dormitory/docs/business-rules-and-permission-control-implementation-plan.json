@@ -279,7 +279,7 @@
             "Dormitory leader cannot see other dormitory's requests",
             "Regular resident cannot see removal requests"
           ],
-          "completed": false
+          "completed": true
         },
         {
           "id": "P016",

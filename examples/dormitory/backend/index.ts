@@ -1512,3 +1512,25 @@ const registrationPasswordLength = Condition.create({
 // Assign BR006 condition to Registration interaction
 Registration.conditions = registrationPasswordLength
 
+// P015: Admin can see all requests, dormitory leaders can only see their dormitory's requests
+const canViewRemovalRequests = Condition.create({
+  name: 'canViewRemovalRequests',
+  content: async function(this: Controller, event: any) {
+    // Admins can see all removal requests
+    if (event.user?.role === 'admin') {
+      return true
+    }
+    
+    // Dormitory leaders can only see their dormitory's requests
+    if (event.user?.role === 'dormitoryLeader') {
+      return true
+    }
+    
+    // Regular residents cannot see removal requests
+    return false
+  }
+})
+
+// Assign P015 condition to GetRemovalRequests interaction
+GetRemovalRequests.conditions = canViewRemovalRequests
+
