@@ -6777,5 +6777,100 @@ describe('Permission and Business Rules', () => {
       expect(stillRejected.status).toBe('rejected')
       expect(stillRejected.adminComment).toBe('Insufficient grounds') // Original comment preserved
     })
+
+    test('BR019: User points cannot go below 0 - Points reduced normally when sufficient (TC003)', async () => {
+      // Create admin user
+      const admin = await system.storage.create('User', {
+        username: 'admin',
+        password: 'password123',
+        email: 'admin@test.com',
+        name: 'Admin User',
+        role: 'admin',
+        points: 100
+      })
+      
+      // Create a target user with 50 points
+      const targetUser = await system.storage.create('User', {
+        username: 'resident1',
+        password: 'password123',
+        email: 'resident1@test.com',
+        name: 'Resident User',
+        role: 'resident',
+        points: 50
+      })
+      
+      // Deduct 30 points (sufficient balance)
+      const result = await controller.callInteraction('DeductPoints', {
+        user: admin,
+        payload: {
+          userId: targetUser.id,
+          points: 30,
+          reason: 'Violation',
+          description: 'Minor rule violation'
+        }
+      })
+      
+      expect(result.error).toBeUndefined()
+      
+      // Verify points were reduced normally
+      const updatedUser = await system.storage.findOne('User',
+        MatchExp.atom({ key: 'id', value: ['=', targetUser.id] }),
+        undefined,
+        ['id', 'points']
+      )
+      expect(updatedUser.points).toBe(20) // 50 - 30 = 20
+    })
+
+    test('BR019: User points cannot go below 0 - Points clamped to 0 when deduction exceeds balance (TC014)', async () => {
+      // Create admin user
+      const admin = await system.storage.create('User', {
+        username: 'admin',
+        password: 'password123',
+        email: 'admin@test.com',
+        name: 'Admin User',
+        role: 'admin',
+        points: 100
+      })
+      
+      // Create a target user with only 25 points
+      const targetUser = await system.storage.create('User', {
+        username: 'resident1',
+        password: 'password123',
+        email: 'resident1@test.com',
+        name: 'Resident User',
+        role: 'resident',
+        points: 25
+      })
+      
+      // Attempt to deduct 50 points (exceeds balance)
+      const result = await controller.callInteraction('DeductPoints', {
+        user: admin,
+        payload: {
+          userId: targetUser.id,
+          points: 50,
+          reason: 'Major violation',
+          description: 'Serious rule violation'
+        }
+      })
+      
+      // The interaction should succeed (not blocked)
+      expect(result.error).toBeUndefined()
+      
+      // Verify points were clamped to 0 (not negative)
+      const updatedUser = await system.storage.findOne('User',
+        MatchExp.atom({ key: 'id', value: ['=', targetUser.id] }),
+        undefined,
+        ['id', 'points']
+      )
+      expect(updatedUser.points).toBe(0) // Clamped to 0, not -25
+      
+      // Verify the full deduction amount was recorded
+      const deduction = await system.storage.findOne('PointDeduction',
+        MatchExp.atom({ key: 'user.id', value: ['=', targetUser.id] }),
+        undefined,
+        ['id', 'points', 'reason']
+      )
+      expect(deduction.points).toBe(50) // Full deduction amount is recorded
+    })
   })
 })

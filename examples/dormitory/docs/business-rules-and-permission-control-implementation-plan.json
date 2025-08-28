@@ -472,7 +472,7 @@
             "Points reduced normally when sufficient (TC003)",
             "Points clamped to 0 when deduction exceeds balance (TC014)"
           ],
-          "completed": false
+          "completed": true
         },
         {
           "id": "BR020",
