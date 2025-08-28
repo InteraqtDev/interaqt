@@ -29,14 +29,20 @@ This guide provides a comprehensive step-by-step process for generating backend 
 2. If the file doesn't exist, you should start with Task 1
 
 **📖 STEP 2: Execute Corresponding Task**
-Based on the current task in `docs/STATUS.json`, read and follow the corresponding task file:
+Based on the current task in `docs/STATUS.json`, use the appropriate sub-agent:
 
-- **Task 1** → Follow `agentspace/tasks/task-1-requirements-analysis.md`
-- **Task 2** → Follow `agentspace/tasks/task-2-design-analysis.md`  
-- **Task 3** → Follow `agentspace/tasks/task-3-code-generation.md`
+- **Task 1** → Use sub-agent `requirements-analysis-handler`
+- **Task 2** → Use sub-agent `implement-design-handler`
+- **Task 3** → Use sub-agent `code-generation-handler` (default for Task 3)
+  - **Exception: Task 3.1.4.3** → Use sub-agent `computation-generation-handler` instead
+  - **Exception: Task 3.2.2** → Use sub-agent `permission-generation-handler` instead
 
 **📌 SPECIAL TASK INSTRUCTIONS:**
-- **When executing Task 3.4.1.3**, use the sub-agent `computation-generation-handler` for handling computation generation workflow
+- **Task 1**: Always use sub-agent `requirements-analysis-handler` for requirements analysis and test case design
+- **Task 2**: Always use sub-agent `implement-design-handler` for design and analysis documentation
+- **Task 3**: Use sub-agent `code-generation-handler` as the default handler for all code generation tasks
+  - **Special case - Task 3.1.4.3**: Use sub-agent `computation-generation-handler` for progressive computation implementation
+  - **Special case - Task 3.2.2**: Use sub-agent `permission-generation-handler` for progressive permission and business rules implementation
 
 **🔴 CRITICAL EXECUTION RULES:**
 - **Create TODO plans STRICTLY from task guidance** - Follow task documents exactly to create TODO plans, do NOT summarize or paraphrase - this ensures strict execution
@@ -47,14 +53,6 @@ Based on the current task in `docs/STATUS.json`, read and follow the correspondi
 - **STRICT verification required** - Only mark tasks complete when ALL requirements are met with real verification
 - **NEVER fake success** - If errors occur, document them properly and exit normally - do NOT mark as complete without strict checking of actual results
 
-**📖 STEP 3: Update Progress and Commit Changes**
-- Each task file contains detailed instructions for updating `docs/STATUS.json`
-- Always update your progress as you complete subtasks
-- This ensures you can resume work from exactly where you left off
-- **Commit your changes using the format**: `[tag]:[task id] - [task content]`
-  - Example: `feat:Task1.2 - Complete entity analysis and validation`
-  - Example: `docs:Task2.1 - Add interaction design documentation`
-  - Example: `code:Task3.3 - Implement user entity and computations`
 
 ** IMPORTANT: Working Directory Constraints**
 - All reference documentation, examples, and resources are located within the current project directory
