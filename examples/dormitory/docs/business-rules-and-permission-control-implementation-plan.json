@@ -63,7 +63,7 @@
             "Admin can remove dormitory leader",
             "Non-admin cannot remove dormitory leader"
           ],
-          "completed": false
+          "completed": true
         },
         {
           "id": "P006",
