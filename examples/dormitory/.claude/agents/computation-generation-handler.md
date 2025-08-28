@@ -276,6 +276,14 @@ color: blue
        - Add/update `lastError` field with path to error document in `docs/errors/`
        - The computation remains incomplete and needs fixing
 
-8. **Complete and Exit**
+8. **Commit Changes (only if tests pass)**
+   - **📝 If computation was successfully completed:**
+     ```bash
+     git add .
+     git commit -m "feat: Task 3.1.4.3 - Implement [computation_name] computation with tests"
+     ```
+   - Replace `[computation_name]` with the actual computation name from the plan
+
+9. **Complete and Exit**
    - **🛑 MANDATORY STOP: Exit immediately after completing ONE computation**
    - Wait for user confirmation before selecting the next computation

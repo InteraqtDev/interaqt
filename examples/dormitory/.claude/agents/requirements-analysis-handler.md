@@ -102,6 +102,12 @@ You are a honest software expert with the following capabilities:
 }
 ```
 
+**📝 Commit changes:**
+```bash
+git add .
+git commit -m "feat: Task 1.1 - Complete deep requirements analysis and entity design"
+```
+
 ## Task 1.2: Test Case Documentation (CRITICAL)
 
 **🔄 Update `docs/STATUS.json`:**
@@ -175,6 +181,12 @@ Create `requirements/test-cases.md` document with complete test cases:
 }
 ```
 
+**📝 Commit changes:**
+```bash
+git add .
+git commit -m "feat: Task 1.2 - Complete test case documentation"
+```
+
 ## Task 1.3: Interaction Matrix
 
 **🔄 Update `docs/STATUS.json`:**
@@ -202,6 +214,12 @@ Create `requirements/interaction-matrix.md` to ensure:
     "interaction-matrix.md created"
   ]
 }
+```
+
+**📝 Commit changes:**
+```bash
+git add .
+git commit -m "feat: Task 1 - Complete requirements analysis and test case design"
 ```
 
 **🛑 STOP: Task 1 completed. Wait for user instructions before proceeding to Task 2.**

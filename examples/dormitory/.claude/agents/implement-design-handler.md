@@ -50,6 +50,12 @@ You are a honest software expert with the following capabilities:
 }
 ```
 
+**📝 Commit changes:**
+```bash
+git add .
+git commit -m "feat: Task 2.1 - Complete data analysis and entity design documentation"
+```
+
 ## Task 2.2: Interaction Analysis
 
 **🔄 Update `docs/STATUS.json`:**
@@ -119,6 +125,12 @@ You are a honest software expert with the following capabilities:
 }
 ```
 
+**📝 Commit changes:**
+```bash
+git add .
+git commit -m "feat: Task 2.2 - Complete interaction design documentation"
+```
+
 ## Task 2.3: Computation Analysis
 
 **🔄 Update `docs/STATUS.json`:**
@@ -164,6 +176,12 @@ You are a honest software expert with the following capabilities:
     "computation-analysis.json created"
   ]
 }
+```
+
+**📝 Commit changes:**
+```bash
+git add .
+git commit -m "feat: Task 2 - Complete design and analysis documentation"
 ```
 
 **🛑 STOP: Task 2 completed. Wait for user instructions before proceeding to Task 3.**

@@ -92,6 +92,12 @@ Common issues that can be avoided by reading the API reference:
 }
 ```
 
+**📝 Commit changes:**
+```bash
+git add .
+git commit -m "feat: Task 3.1.1 - Complete API reference study"
+```
+
 ### Task 3.1.2: Entity and Relation Implementation
 
 **🔄 Update `docs/STATUS.json`:**
@@ -128,6 +134,12 @@ Common issues that can be avoided by reading the API reference:
 }
 ```
 
+**📝 Commit changes:**
+```bash
+git add .
+git commit -m "feat: Task 3.1.2 - Complete entity and relation implementation"
+```
+
 ### Task 3.1.3: Interaction Implementation
 
 **🔄 Update `docs/STATUS.json`:**
@@ -153,6 +165,12 @@ Common issues that can be avoided by reading the API reference:
   "currentTask": "Task 3.1.3",
   "completed": true
 }
+```
+
+**📝 Commit changes:**
+```bash
+git add .
+git commit -m "feat: Task 3.1.3 - Complete interaction implementation"
 ```
 
 ### Task 3.1.4: Progressive Computation Implementation with Testing
@@ -194,6 +212,12 @@ This section follows a **test-driven progressive approach** where each computati
 }
 ```
 
+**📝 Commit changes:**
+```bash
+git add .
+git commit -m "feat: Task 3.1.4.1 - Create test file structure"
+```
+
 #### Task 3.1.4.2: Create Implementation Plan
 
 **🔄 Update `docs/STATUS.json`:**
@@ -232,6 +256,12 @@ This section follows a **test-driven progressive approach** where each computati
 }
 ```
 
+**📝 Commit changes:**
+```bash
+git add .
+git commit -m "feat: Task 3.1.4.2 - Generate computation implementation plan"
+```
+
 #### Task 3.1.4.3: Progressive Implementation Loop
 
 **📌 NOTE: For Task 3.1.4.3, use the specialized sub-agent `computation-generation-handler`**
@@ -246,6 +276,12 @@ This task has its own dedicated sub-agent that handles the progressive implement
   "currentTask": "Task 3.1.4.3",
   "completed": true
 }
+```
+
+**📝 Commit changes:**
+```bash
+git add .
+git commit -m "feat: Task 3.1.4.3 - Complete progressive computation implementation"
 ```
 
 #### Task 3.1.4.4: Completion Checklist
@@ -269,6 +305,12 @@ This task has its own dedicated sub-agent that handles the progressive implement
   "currentTask": "Task 3.1",
   "completed": true
 }
+```
+
+**📝 Commit changes:**
+```bash
+git add .
+git commit -m "feat: Task 3.1 - Complete code generation and implementation"
 ```
 
 ## Task 3.2: Progressive Permission and Business Rules Implementation with Testing
@@ -306,6 +348,12 @@ This task has its own dedicated sub-agent that handles the progressive implement
   "currentTask": "Task 3.2.0",
   "completed": true
 }
+```
+
+**📝 Commit changes:**
+```bash
+git add .
+git commit -m "feat: Task 3.2.0 - Create permission test file"
 ```
 
 ### Task 3.2.1: Create Implementation Plan
@@ -405,6 +453,12 @@ This task has its own dedicated sub-agent that handles the progressive implement
 }
 ```
 
+**📝 Commit changes:**
+```bash
+git add .
+git commit -m "feat: Task 3.2.1 - Create permission and business rules implementation plan"
+```
+
 ### Task 3.2.2: Progressive Implementation Loop
 
 **📌 NOTE: For Task 3.2.2, use the specialized sub-agent `permission-generation-handler`**
@@ -419,6 +473,12 @@ This task has its own dedicated sub-agent that handles the progressive implement
   "currentTask": "Task 3.2.2",
   "completed": true
 }
+```
+
+**📝 Commit changes:**
+```bash
+git add .
+git commit -m "feat: Task 3.2.2 - Complete progressive permission and business rules implementation"
 ```
 
 ### Task 3.2.3: Completion Checklist
@@ -456,6 +516,12 @@ Since permissions and business rules are unified in the `conditions` API, the fr
 }
 ```
 
+**📝 Commit changes:**
+```bash
+git add .
+git commit -m "feat: Task 3.2.3 - Complete permission and business rules checklist"
+```
+
 **✅ END Task 3.2: Update `docs/STATUS.json`:**
 ```json
 {
@@ -471,6 +537,12 @@ Since permissions and business rules are unified in the `conditions` API, the fr
 }
 ```
 
+**📝 Commit changes:**
+```bash
+git add .
+git commit -m "feat: Task 3.2 - Complete permission and business rules implementation with testing"
+```
+
 
 **✅ END Task 3: Update `docs/STATUS.json`:**
 ```json
@@ -484,6 +556,12 @@ Since permissions and business rules are unified in the `conditions` API, the fr
     "Permissions and business rules implemented and tested"
   ]
 }
+```
+
+**📝 Commit changes:**
+```bash
+git add .
+git commit -m "feat: Task 3 - Complete code generation and progressive testing"
 ```
 
 **✅ PROJECT COMPLETE: Final update to `docs/STATUS.json`:**

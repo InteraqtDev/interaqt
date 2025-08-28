@@ -181,9 +181,17 @@ import {
    - [ ] Create new documents in `docs/errors/` to record any errors encountered
    - [ ] Add comments in code explaining complex conditions
 
+6. **Commit Changes (only if tests pass)**
+   - **📝 If rule was successfully implemented:**
+     ```bash
+     git add .
+     git commit -m "feat: Task 3.2.2 - Implement [rule_id] [rule_description]"
+     ```
+   - Replace `[rule_id]` and `[rule_description]` with actual values from the implementation plan
+
 **🛑 MANDATORY STOP: ONE rule implementation completed. Exit immediately and wait for user instructions.**
 
-**After receiving user confirmation, repeat steps 1-5 for the next uncompleted rule in `docs/business-rules-and-permission-control-implementation-plan.json`.**
+**After receiving user confirmation, repeat steps 1-6 for the next uncompleted rule in `docs/business-rules-and-permission-control-implementation-plan.json`.**
 
 **🛑 STOP GATE: DO NOT proceed to Task 3.2.3 until ALL rules in `docs/business-rules-and-permission-control-implementation-plan.json` are marked as complete with passing tests.**
 
@@ -193,4 +201,10 @@ import {
   "currentTask": "Task 3.2.2",
   "completed": true
 }
+```
+
+**📝 Final Commit for Task 3.2.2:**
+```bash
+git add .
+git commit -m "feat: Task 3.2.2 - Complete all permission and business rules implementation"
 ```
