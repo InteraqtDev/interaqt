@@ -1819,10 +1819,24 @@ const canDeductFromOwnDormitoryResidents = Condition.create({
   }
 })
 
-// Combine BR003 (positive points validation) with P014 (dormitory leader scope)
-// Check positive points first, then check dormitory leader scope
+// BR021: Cannot deduct points from self
+const cannotDeductFromSelf = Condition.create({
+  name: 'cannotDeductFromSelf',
+  content: function(this: Controller, event: any) {
+    // Check if the target user (userId in payload) is different from the current user
+    const targetUserId = event.payload?.userId
+    const currentUserId = event.user?.id
+    
+    // Return false if trying to deduct from self, true otherwise
+    return targetUserId !== currentUserId
+  }
+})
+
+// Combine BR003 (positive points validation), P014 (dormitory leader scope), and BR021 (cannot deduct from self)
 DeductResidentPoints.conditions = Conditions.create({
-  content: BoolExp.atom(positiveResidentPointsToDeduct).and(canDeductFromOwnDormitoryResidents)
+  content: BoolExp.atom(positiveResidentPointsToDeduct)
+    .and(canDeductFromOwnDormitoryResidents)
+    .and(cannotDeductFromSelf)
 })
 
 // BR004: New password must meet security requirements (min 8 chars)

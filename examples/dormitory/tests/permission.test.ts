@@ -7118,5 +7118,213 @@ describe('Permission and Business Rules', () => {
       )
       expect(deduction.points).toBe(50) // Full deduction amount is recorded
     })
+
+    // BR021: Cannot deduct points from self
+    test('BR021: Can deduct from other residents', async () => {
+      /**
+       * Test Plan for: BR021 - Dormitory leader can deduct points from other residents
+       * Scenario: Dormitory leader deducting points from a different resident in their dormitory
+       * Steps: 1) Create users and dormitory 2) Assign dormitory leader and residents 3) Leader deducts points from other resident 4) Verify success
+       * Business Logic: DeductResidentPoints should allow deducting from other residents
+       */
+      
+      const system = controller.system
+      
+      // Create admin for setup operations
+      const admin = await system.storage.create('User', {
+        username: 'admin_br021',
+        password: 'password123',
+        email: 'admin_br021@test.com',
+        name: 'Admin BR021',
+        role: 'admin',
+        points: 100
+      })
+      
+      // Create test users
+      const leader = await system.storage.create('User', {
+        username: 'leader_br021_can',
+        password: 'password123',
+        name: 'Leader BR021 Can',
+        email: 'leader_br021_can@test.com',
+        role: 'dormitoryLeader',
+        points: 100
+      })
+      
+      const targetUser = await system.storage.create('User', {
+        username: 'target_br021',
+        password: 'password123',
+        name: 'Target BR021',
+        email: 'target_br021@test.com',
+        role: 'resident',
+        points: 100
+      })
+      
+      // Create dormitory as admin
+      const dorm = await controller.callInteraction('CreateDormitory', {
+        user: admin,
+        payload: {
+          name: 'Dorm BR021',
+          building: 'Building G',
+          floor: 4,
+          capacity: 4
+        }
+      })
+      expect(dorm.error).toBeUndefined()
+      
+      // Get the created dormitory and its beds
+      const dormitory = await system.storage.findOne('Dormitory',
+        MatchExp.atom({ key: 'name', value: ['=', 'Dorm BR021'] }),
+        undefined,
+        ['id', 'name', ['beds', { relationQuery: true, attributeQuery: ['id', 'bedNumber'] }]]
+      )
+      
+      // Assign both users to beds in the same dormitory as admin
+      const leaderBed = await controller.callInteraction('AssignUserToBed', {
+        user: admin,
+        payload: {
+          userId: leader.id,
+          bedId: dormitory.beds[0].id
+        }
+      })
+      expect(leaderBed.error).toBeUndefined()
+      
+      const targetBed = await controller.callInteraction('AssignUserToBed', {
+        user: admin,
+        payload: {
+          userId: targetUser.id,
+          bedId: dormitory.beds[1].id
+        }
+      })
+      expect(targetBed.error).toBeUndefined()
+      
+      // Assign leader as dormitory leader
+      const assignLeader = await controller.callInteraction('AssignDormitoryLeader', {
+        user: admin,
+        payload: {
+          userId: leader.id,
+          dormitoryId: dormitory.id
+        }
+      })
+      expect(assignLeader.error).toBeUndefined()
+      
+      // Leader should be able to deduct points from other resident
+      const result = await controller.callInteraction('DeductResidentPoints', {
+        user: leader,
+        payload: {
+          userId: targetUser.id,
+          points: 10,
+          reason: 'Test BR021 - can deduct from others',
+          description: 'Testing deduction from other resident'
+        }
+      })
+      
+      expect(result.error).toBeUndefined() // Should succeed
+      
+      // Verify points were deducted
+      const updatedTarget = await system.storage.findOne('User',
+        MatchExp.atom({ key: 'id', value: ['=', targetUser.id] }),
+        undefined,
+        ['id', 'points']
+      )
+      expect(updatedTarget.points).toBe(90) // 100 - 10 = 90
+    })
+
+    test('BR021: Cannot deduct from self', async () => {
+      /**
+       * Test Plan for: BR021 - Cannot deduct points from self
+       * Scenario: Dormitory leader attempting to deduct points from themselves
+       * Steps: 1) Create dormitory leader 2) Assign to dormitory 3) Leader tries to deduct from self 4) Verify failure
+       * Business Logic: DeductResidentPoints should prevent deducting from self
+       */
+      
+      const system = controller.system
+      
+      // Create admin for setup operations
+      const admin = await system.storage.create('User', {
+        username: 'admin_br021_self',
+        password: 'password123',
+        email: 'admin_br021_self@test.com',
+        name: 'Admin BR021 Self',
+        role: 'admin',
+        points: 100
+      })
+      
+      // Create test dormitory leader
+      const leader = await system.storage.create('User', {
+        username: 'leader_br021_self',
+        password: 'password123',
+        name: 'Leader BR021 Self',
+        email: 'leader_br021_self@test.com',
+        role: 'dormitoryLeader',
+        points: 100
+      })
+      
+      // Create dormitory as admin
+      const dorm = await controller.callInteraction('CreateDormitory', {
+        user: admin,
+        payload: {
+          name: 'Dorm BR021 Self',
+          building: 'Building H',
+          floor: 5,
+          capacity: 4
+        }
+      })
+      expect(dorm.error).toBeUndefined()
+      
+      // Get the created dormitory and its beds
+      const dormitory = await system.storage.findOne('Dormitory',
+        MatchExp.atom({ key: 'name', value: ['=', 'Dorm BR021 Self'] }),
+        undefined,
+        ['id', 'name', ['beds', { relationQuery: true, attributeQuery: ['id', 'bedNumber'] }]]
+      )
+      
+      // Assign leader to bed in dormitory as admin
+      const leaderBed = await controller.callInteraction('AssignUserToBed', {
+        user: admin,
+        payload: {
+          userId: leader.id,
+          bedId: dormitory.beds[0].id
+        }
+      })
+      expect(leaderBed.error).toBeUndefined()
+      
+      // Assign as dormitory leader
+      const assignLeader = await controller.callInteraction('AssignDormitoryLeader', {
+        user: admin,
+        payload: {
+          userId: leader.id,
+          dormitoryId: dormitory.id
+        }
+      })
+      expect(assignLeader.error).toBeUndefined()
+      
+      // Leader should NOT be able to deduct points from self
+      const result = await controller.callInteraction('DeductResidentPoints', {
+        user: leader,
+        payload: {
+          userId: leader.id, // Attempting to deduct from self
+          points: 10,
+          reason: 'Test BR021 - cannot deduct from self',
+          description: 'Testing self-deduction prevention'
+        }
+      })
+      
+      expect(result.error).toBeDefined() // Should fail
+      expect((result.error as any)?.message).toContain('Condition') // Failed due to condition check
+      
+      // Verify points were NOT deducted
+      const updatedLeader = await system.storage.findOne('User',
+        MatchExp.atom({ key: 'id', value: ['=', leader.id] }),
+        undefined,
+        ['id', 'points']
+      )
+      expect(updatedLeader.points).toBe(100) // Points should remain unchanged
+      
+      // Verify no deduction record was created
+      const deductions = await system.storage.find('PointDeduction',
+        MatchExp.atom({ key: 'user.id', value: ['=', leader.id] })
+      )
+      expect(deductions.length).toBe(0) // No deduction should be recorded
+    })
   })
 })

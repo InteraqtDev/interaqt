@@ -497,7 +497,7 @@
             "Can deduct from other residents",
             "Cannot deduct from self"
           ],
-          "completed": false
+          "completed": true
         },
         {
           "id": "BR022",
