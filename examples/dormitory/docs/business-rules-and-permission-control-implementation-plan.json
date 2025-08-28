@@ -632,7 +632,7 @@
             "Can deduct from resident in same dormitory (TC016)",
             "Cannot deduct from resident in different dormitory (TC008)"
           ],
-          "completed": false
+          "completed": true
         },
         {
           "id": "BR032",
