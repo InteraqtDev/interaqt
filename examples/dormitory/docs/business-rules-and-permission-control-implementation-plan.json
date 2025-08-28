@@ -27,7 +27,7 @@
             "Admin can update dormitory",
             "Non-admin cannot update dormitory"
           ],
-          "completed": false
+          "completed": true
         },
         {
           "id": "P003",

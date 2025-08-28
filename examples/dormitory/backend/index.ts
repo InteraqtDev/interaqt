@@ -1341,3 +1341,6 @@ const isAdmin = Condition.create({
 // Assign condition to existing interaction
 CreateDormitory.conditions = isAdmin
 
+// P002: Only admin can update dormitories
+UpdateDormitory.conditions = isAdmin
+

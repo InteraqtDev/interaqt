@@ -148,5 +148,127 @@ describe('Permission and Business Rules', () => {
       const dormitories = await system.storage.find('Dormitory', MatchExp.atom({ key: 'name', value: ['=', 'Dorm D'] }))
       expect(dormitories.length).toBe(0)
     })
+
+    test('P002: Admin can update dormitory', async () => {
+      // Create admin user
+      const admin = await system.storage.create('User', {
+        username: 'admin',
+        password: 'password123',
+        email: 'admin@test.com',
+        name: 'Admin User',
+        role: 'admin',
+        points: 100
+      })
+      
+      // First create a dormitory as admin
+      const createResult = await controller.callInteraction('CreateDormitory', {
+        user: admin,
+        payload: {
+          name: 'Original Dorm',
+          capacity: 4,
+          floor: 1,
+          building: 'Building A'
+        }
+      })
+      expect(createResult.error).toBeUndefined()
+      
+      // Get the created dormitory
+      const dormitories = await system.storage.find('Dormitory', 
+        MatchExp.atom({ key: 'name', value: ['=', 'Original Dorm'] }),
+        undefined,
+        ['id', 'name', 'floor', 'building']
+      )
+      expect(dormitories.length).toBe(1)
+      const dormitoryId = dormitories[0].id
+      
+      // Admin should be able to update dormitory
+      const updateResult = await controller.callInteraction('UpdateDormitory', {
+        user: admin,
+        payload: {
+          dormitoryId: dormitoryId,
+          name: 'Updated Dorm',
+          floor: 2,
+          building: 'Building B'
+        }
+      })
+      
+      expect(updateResult.error).toBeUndefined()
+      
+      // Verify dormitory was updated
+      const updatedDorms = await system.storage.find('Dormitory',
+        MatchExp.atom({ key: 'id', value: ['=', dormitoryId] }),
+        undefined,
+        ['id', 'name', 'floor', 'building', 'capacity']
+      )
+      expect(updatedDorms.length).toBe(1)
+      expect(updatedDorms[0].name).toBe('Updated Dorm')
+      expect(updatedDorms[0].floor).toBe(2)
+      expect(updatedDorms[0].building).toBe('Building B')
+      expect(updatedDorms[0].capacity).toBe(4) // Capacity should not change
+    })
+
+    test('P002: Non-admin cannot update dormitory', async () => {
+      // Create admin to create dormitory
+      const admin = await system.storage.create('User', {
+        username: 'admin',
+        password: 'password123',
+        email: 'admin@test.com',
+        name: 'Admin User',
+        role: 'admin',
+        points: 100
+      })
+      
+      // Create resident user
+      const resident = await system.storage.create('User', {
+        username: 'resident1',
+        password: 'password123',
+        email: 'resident@test.com',
+        name: 'Resident User',
+        role: 'resident',
+        points: 100
+      })
+      
+      // Create dormitory as admin
+      const createResult = await controller.callInteraction('CreateDormitory', {
+        user: admin,
+        payload: {
+          name: 'Test Dorm',
+          capacity: 4,
+          floor: 1,
+          building: 'Building 1'
+        }
+      })
+      expect(createResult.error).toBeUndefined()
+      
+      // Get the created dormitory
+      const dormitories = await system.storage.find('Dormitory',
+        MatchExp.atom({ key: 'name', value: ['=', 'Test Dorm'] }),
+        undefined,
+        ['id']
+      )
+      const dormitoryId = dormitories[0].id
+      
+      // Resident should not be able to update dormitory
+      const updateResult = await controller.callInteraction('UpdateDormitory', {
+        user: resident,
+        payload: {
+          dormitoryId: dormitoryId,
+          name: 'Hacked Dorm'
+        }
+      })
+      
+      // Verify error
+      expect(updateResult.error).toBeDefined()
+      expect((updateResult.error as any).type).toBe('condition check failed')
+      expect((updateResult.error as any).error.data.name).toBe('isAdmin')
+      
+      // Verify dormitory was not updated
+      const unchangedDorms = await system.storage.find('Dormitory',
+        MatchExp.atom({ key: 'id', value: ['=', dormitoryId] }),
+        undefined,
+        ['name']
+      )
+      expect(unchangedDorms[0].name).toBe('Test Dorm') // Name should not change
+    })
   })
 })
