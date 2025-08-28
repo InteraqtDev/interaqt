@@ -207,7 +207,7 @@
             "Cannot deduct 0 points",
             "Cannot deduct negative points"
           ],
-          "completed": false
+          "completed": true
         },
         {
           "id": "BR004",

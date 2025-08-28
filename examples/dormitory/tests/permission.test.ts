@@ -2762,5 +2762,141 @@ describe('Permission and Business Rules', () => {
       )
       expect(updatedUser.points).toBe(100)
     })
+
+    // BR003: Points to deduct must be positive for DeductResidentPoints
+    test('BR003: Can deduct positive points (TC016)', async () => {
+      // Create dormitory leader user
+      const dormitoryLeader = await system.storage.create('User', {
+        username: 'leader1',
+        password: 'password123',
+        email: 'leader1@test.com',
+        name: 'Dormitory Leader',
+        role: 'dormitoryLeader',
+        points: 100
+      })
+      
+      // Create a target resident user
+      const targetUser = await system.storage.create('User', {
+        username: 'resident1',
+        password: 'password123',
+        email: 'resident1@test.com',
+        name: 'Resident User',
+        role: 'resident',
+        points: 100
+      })
+      
+      // Dormitory leader should be able to deduct positive points
+      const result = await controller.callInteraction('DeductResidentPoints', {
+        user: dormitoryLeader,
+        payload: {
+          userId: targetUser.id,
+          points: 20,
+          reason: 'Discipline',
+          description: 'Cleanliness violation'
+        }
+      })
+      
+      expect(result.error).toBeUndefined()
+      
+      // Verify points were deducted
+      const updatedUser = await system.storage.findOne('User',
+        MatchExp.atom({ key: 'id', value: ['=', targetUser.id] }),
+        undefined,
+        ['id', 'points']
+      )
+      expect(updatedUser.points).toBe(80)
+    })
+
+    test('BR003: Cannot deduct 0 points with DeductResidentPoints', async () => {
+      // Create dormitory leader user
+      const dormitoryLeader = await system.storage.create('User', {
+        username: 'leader1',
+        password: 'password123',
+        email: 'leader1@test.com',
+        name: 'Dormitory Leader',
+        role: 'dormitoryLeader',
+        points: 100
+      })
+      
+      // Create a target resident user
+      const targetUser = await system.storage.create('User', {
+        username: 'resident1',
+        password: 'password123',
+        email: 'resident1@test.com',
+        name: 'Resident User',
+        role: 'resident',
+        points: 100
+      })
+      
+      // Dormitory leader should not be able to deduct 0 points
+      const result = await controller.callInteraction('DeductResidentPoints', {
+        user: dormitoryLeader,
+        payload: {
+          userId: targetUser.id,
+          points: 0,
+          reason: 'Discipline',
+          description: 'Test deduction'
+        }
+      })
+      
+      // Verify error
+      expect(result.error).toBeDefined()
+      expect((result.error as any).type).toBe('condition check failed')
+      expect((result.error as any).error.data.name).toBe('positiveResidentPointsToDeduct')
+      
+      // Verify points were not deducted
+      const updatedUser = await system.storage.findOne('User',
+        MatchExp.atom({ key: 'id', value: ['=', targetUser.id] }),
+        undefined,
+        ['id', 'points']
+      )
+      expect(updatedUser.points).toBe(100)
+    })
+
+    test('BR003: Cannot deduct negative points with DeductResidentPoints', async () => {
+      // Create dormitory leader user
+      const dormitoryLeader = await system.storage.create('User', {
+        username: 'leader1',
+        password: 'password123',
+        email: 'leader1@test.com',
+        name: 'Dormitory Leader',
+        role: 'dormitoryLeader',
+        points: 100
+      })
+      
+      // Create a target resident user
+      const targetUser = await system.storage.create('User', {
+        username: 'resident1',
+        password: 'password123',
+        email: 'resident1@test.com',
+        name: 'Resident User',
+        role: 'resident',
+        points: 100
+      })
+      
+      // Dormitory leader should not be able to deduct negative points
+      const result = await controller.callInteraction('DeductResidentPoints', {
+        user: dormitoryLeader,
+        payload: {
+          userId: targetUser.id,
+          points: -15,
+          reason: 'Discipline',
+          description: 'Test deduction'
+        }
+      })
+      
+      // Verify error
+      expect(result.error).toBeDefined()
+      expect((result.error as any).type).toBe('condition check failed')
+      expect((result.error as any).error.data.name).toBe('positiveResidentPointsToDeduct')
+      
+      // Verify points were not deducted
+      const updatedUser = await system.storage.findOne('User',
+        MatchExp.atom({ key: 'id', value: ['=', targetUser.id] }),
+        undefined,
+        ['id', 'points']
+      )
+      expect(updatedUser.points).toBe(100)
+    })
   })
 })

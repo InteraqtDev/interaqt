@@ -1413,3 +1413,15 @@ const isDormitoryLeader = Condition.create({
 // Assign condition to existing interaction
 SubmitRemovalRequest.conditions = isDormitoryLeader
 
+// BR003: Points to deduct must be positive for DeductResidentPoints
+const positiveResidentPointsToDeduct = Condition.create({
+  name: 'positiveResidentPointsToDeduct',
+  content: function(this: Controller, event: any) {
+    const points = event.payload?.points
+    return points > 0
+  }
+})
+
+// Assign BR003 condition to DeductResidentPoints interaction
+DeductResidentPoints.conditions = positiveResidentPointsToDeduct
+
