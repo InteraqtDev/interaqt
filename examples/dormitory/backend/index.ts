@@ -1326,3 +1326,18 @@ RemovalRequest.properties.find(p => p.name === 'adminComment').computation = Sta
   defaultState: removalRequestAdminCommentState
 })
 
+// ========= PERMISSION AND BUSINESS RULE CONDITIONS =========
+// All conditions are added via assignment pattern below
+// Phase 1: Basic Role-Based Permissions
+
+// P001: Only admin can create dormitories
+const isAdmin = Condition.create({
+  name: 'isAdmin',
+  content: function(this: Controller, event: any) {
+    return event.user?.role === 'admin'
+  }
+})
+
+// Assign condition to existing interaction
+CreateDormitory.conditions = isAdmin
+

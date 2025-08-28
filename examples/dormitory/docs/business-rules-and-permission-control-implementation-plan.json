@@ -15,7 +15,7 @@
             "Admin can create dormitory (TC001)",
             "Non-admin cannot create dormitory (TC007)"
           ],
-          "completed": false
+          "completed": true
         },
         {
           "id": "P002",
