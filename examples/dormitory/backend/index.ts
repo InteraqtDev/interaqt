@@ -444,6 +444,16 @@ const ChangePassword = Interaction.create({
   })
 })
 
+const UpdateUsername = Interaction.create({
+  action: Action.create({ name: 'updateUsername' }),
+  name: 'UpdateUsername',
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({ name: 'newUsername' })
+    ]
+  })
+})
+
 // Query Interactions
 const GetDormitories = Interaction.create({
   action: Action.create({ name: 'getDormitories' }),
@@ -500,6 +510,17 @@ const GetPointDeductions = Interaction.create({
   })
 })
 
+// Admin interaction for promoting users to admin role
+const PromoteToAdmin = Interaction.create({
+  action: Action.create({ name: 'promoteToAdmin' }),
+  name: 'PromoteToAdmin',
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({ name: 'userId' })
+    ]
+  })
+})
+
 // ========================= EXPORTS =========================
 
 export const entities = [
@@ -540,6 +561,7 @@ export const interactions = [
   DeductPoints,
   CreateUser,
   DeleteUser,
+  PromoteToAdmin,
   // Dormitory Leader
   SubmitRemovalRequest,
   DeductResidentPoints,
@@ -551,6 +573,7 @@ export const interactions = [
   Login,
   Registration,
   ChangePassword,
+  UpdateUsername,
   // Query
   GetDormitories,
   GetDormitoryDetail,
@@ -619,7 +642,7 @@ User.computation = Transform.create({
   callback: function(event) {
     if (event.interactionName === 'CreateUser') {
       return {
-        username: event.payload.username,
+        username: event.payload.username,  // Set initial username
         password: event.payload.password,  // Should be hashed in production
         email: event.payload.email,
         name: event.payload.name,
@@ -631,7 +654,7 @@ User.computation = Transform.create({
     }
     if (event.interactionName === 'Registration') {
       return {
-        username: event.payload.username,
+        username: event.payload.username,  // Set initial username
         password: event.payload.password,  // Should be hashed in production
         email: event.payload.email,
         name: event.payload.name,
@@ -762,5 +785,190 @@ UserBedRelation.computation = StateMachine.create({
     })
   ],
   defaultState: userBedNotExistsState
+})
+
+// Property: User.username - StateMachine computation for updates only
+const usernameState = StateNode.create({
+  name: 'username',
+  computeValue: (lastValue, event) => {
+    // For UpdateUsername, set new username
+    if (event?.interactionName === 'UpdateUsername') {
+      return event.payload.newUsername
+    }
+    // Preserve existing value
+    return lastValue
+  }
+})
+
+User.properties.find(p => p.name === 'username').computation = StateMachine.create({
+  states: [usernameState],
+  transfers: [
+    StateTransfer.create({
+      trigger: UpdateUsername,
+      current: usernameState,
+      next: usernameState,
+      computeTarget: (event) => ({ id: event.user.id })
+    })
+  ],
+  defaultState: usernameState
+})
+
+// Property: User.password - StateMachine computation for updates
+const passwordState = StateNode.create({
+  name: 'password',
+  computeValue: (lastValue, event) => {
+    // For ChangePassword, set new password (should be hashed in production)
+    if (event?.interactionName === 'ChangePassword') {
+      return event.payload.newPassword
+    }
+    // Preserve existing value
+    return lastValue
+  }
+})
+
+User.properties.find(p => p.name === 'password').computation = StateMachine.create({
+  states: [passwordState],
+  transfers: [
+    StateTransfer.create({
+      trigger: ChangePassword,
+      current: passwordState,
+      next: passwordState,
+      computeTarget: (event) => ({ id: event.user.id })
+    })
+  ],
+  defaultState: passwordState
+})
+
+// Property: User.email - StateMachine computation for updates
+const emailState = StateNode.create({
+  name: 'email',
+  computeValue: (lastValue, event) => {
+    // For UpdateProfile, set new email
+    if (event?.interactionName === 'UpdateProfile' && event.payload.email) {
+      return event.payload.email
+    }
+    // Preserve existing value (set by CreateUser/Registration in entity computation)
+    return lastValue
+  }
+})
+
+User.properties.find(p => p.name === 'email').computation = StateMachine.create({
+  states: [emailState],
+  transfers: [
+    StateTransfer.create({
+      trigger: UpdateProfile,
+      current: emailState,
+      next: emailState,
+      computeTarget: (event) => ({ id: event.user.id })
+    })
+  ],
+  defaultState: emailState
+})
+
+// Property: User.name - StateMachine computation for updates
+const nameState = StateNode.create({
+  name: 'name',
+  computeValue: (lastValue, event) => {
+    // For UpdateProfile, set new name
+    if (event?.interactionName === 'UpdateProfile' && event.payload.name) {
+      return event.payload.name
+    }
+    // Preserve existing value (set by CreateUser/Registration in entity computation)
+    return lastValue
+  }
+})
+
+User.properties.find(p => p.name === 'name').computation = StateMachine.create({
+  states: [nameState],
+  transfers: [
+    StateTransfer.create({
+      trigger: UpdateProfile,
+      current: nameState,
+      next: nameState,
+      computeTarget: (event) => ({ id: event.user.id })
+    })
+  ],
+  defaultState: nameState
+})
+
+// Property: User.role - StateMachine computation for role transitions
+const roleState = StateNode.create({
+  name: 'role',
+  computeValue: (lastValue, event) => {
+    // AssignDormitoryLeader: changes role to 'dormitoryLeader'
+    if (event?.interactionName === 'AssignDormitoryLeader') {
+      return 'dormitoryLeader'
+    }
+    // RemoveDormitoryLeader: changes role back to 'resident'
+    if (event?.interactionName === 'RemoveDormitoryLeader') {
+      return 'resident'
+    }
+    // PromoteToAdmin: changes role to 'admin'
+    if (event?.interactionName === 'PromoteToAdmin') {
+      return 'admin'
+    }
+    // Preserve existing value (set by CreateUser/Registration in entity computation)
+    return lastValue
+  }
+})
+
+User.properties.find(p => p.name === 'role').computation = StateMachine.create({
+  states: [roleState],
+  transfers: [
+    StateTransfer.create({
+      trigger: AssignDormitoryLeader,
+      current: roleState,
+      next: roleState,
+      computeTarget: (event) => ({ id: event.payload.userId })
+    }),
+    StateTransfer.create({
+      trigger: RemoveDormitoryLeader,
+      current: roleState,
+      next: roleState,
+      computeTarget: (event) => ({ id: event.payload.userId })
+    }),
+    StateTransfer.create({
+      trigger: PromoteToAdmin,
+      current: roleState,
+      next: roleState,
+      computeTarget: (event) => ({ id: event.payload.userId })
+    })
+  ],
+  defaultState: roleState
+})
+
+// Property: User.points - StateMachine computation for penalty points
+const pointsState = StateNode.create({
+  name: 'points',
+  computeValue: (lastValue, event) => {
+    // For DeductPoints or DeductResidentPoints, reduce points
+    if (event?.interactionName === 'DeductPoints' || event?.interactionName === 'DeductResidentPoints') {
+      const currentPoints = typeof lastValue === 'number' ? lastValue : 100
+      const deduction = event.payload.points || 0
+      // Ensure points never go below 0
+      return Math.max(0, currentPoints - deduction)
+    }
+    // Preserve existing value (set by CreateUser/Registration in entity computation)
+    return typeof lastValue === 'number' ? lastValue : 100
+  }
+})
+
+User.properties.find(p => p.name === 'points').computation = StateMachine.create({
+  states: [pointsState],
+  transfers: [
+    StateTransfer.create({
+      trigger: DeductPoints,
+      current: pointsState,
+      next: pointsState,
+      computeTarget: (event) => ({ id: event.payload.userId })
+    }),
+    StateTransfer.create({
+      trigger: DeductResidentPoints,
+      current: pointsState,
+      next: pointsState,
+      computeTarget: (event) => ({ id: event.payload.userId })
+    })
+  ],
+  defaultState: pointsState
 })
 
