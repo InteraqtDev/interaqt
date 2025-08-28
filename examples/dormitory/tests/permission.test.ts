@@ -829,6 +829,409 @@ describe('Permission and Business Rules', () => {
       expect(unchangedUser.role).toBe('resident') // Should still be resident
     })
 
+    test('BR012: Can assign leader to dormitory without leader', async () => {
+      // Create admin user
+      const admin = await system.storage.create('User', {
+        username: 'admin',
+        password: 'password123',
+        email: 'admin@test.com',
+        name: 'Admin User',
+        role: 'admin',
+        points: 100
+      })
+      
+      // Create a dormitory
+      const createResult = await controller.callInteraction('CreateDormitory', {
+        user: admin,
+        payload: {
+          name: 'Test Dorm',
+          capacity: 4,
+          floor: 1,
+          building: 'Building A'
+        }
+      })
+      expect(createResult.error).toBeUndefined()
+      
+      // Get the created dormitory
+      const dormitory = await system.storage.findOne(
+        'Dormitory',
+        MatchExp.atom({ key: 'name', value: ['=', 'Test Dorm'] }),
+        undefined,
+        ['id']
+      )
+      const dormitoryId = dormitory.id
+      
+      // Verify dormitory has no leader initially
+      const initialLeaderRelation = await system.storage.findOne(
+        'UserDormitoryLeaderRelation',
+        MatchExp.atom({ key: 'target.id', value: ['=', dormitoryId] }),
+        undefined,
+        ['id']
+      )
+      expect(initialLeaderRelation).toBeUndefined()
+      
+      // Get beds created with the dormitory
+      const beds = await system.storage.find('Bed',
+        undefined,
+        undefined,
+        ['id', 'bedNumber']
+      )
+      expect(beds.length).toBeGreaterThan(0)
+      
+      // Create a user to be assigned as dormitory leader
+      const residentUser = await system.storage.create('User', {
+        username: 'resident1',
+        password: 'password123',
+        email: 'resident1@test.com',
+        name: 'Resident User',
+        role: 'resident',
+        points: 100
+      })
+      
+      // First assign user to a bed to make them a resident
+      const assignBedResult = await controller.callInteraction('AssignUserToBed', {
+        user: admin,
+        payload: {
+          userId: residentUser.id,
+          bedId: beds[0].id
+        }
+      })
+      expect(assignBedResult.error).toBeUndefined()
+      
+      // Admin should be able to assign first dormitory leader
+      const assignResult = await controller.callInteraction('AssignDormitoryLeader', {
+        user: admin,
+        payload: {
+          userId: residentUser.id,
+          dormitoryId: dormitoryId
+        }
+      })
+      
+      expect(assignResult.error).toBeUndefined()
+      
+      // Verify the leader relation was created
+      const leaderRelation = await system.storage.findOne(
+        'UserDormitoryLeaderRelation',
+        MatchExp.atom({ key: 'source.id', value: ['=', residentUser.id] })
+          .and({ key: 'target.id', value: ['=', dormitoryId] }),
+        undefined,
+        ['id', ['source', { attributeQuery: ['id', 'role'] }], ['target', { attributeQuery: ['id'] }]]
+      )
+      expect(leaderRelation).not.toBeNull()
+      expect(leaderRelation.source.id).toBe(residentUser.id)
+      expect(leaderRelation.target.id).toBe(dormitoryId)
+      
+      // Verify the user's role was updated to dormitoryLeader
+      const updatedUser = await system.storage.findOne('User',
+        MatchExp.atom({ key: 'id', value: ['=', residentUser.id] }),
+        undefined,
+        ['role']
+      )
+      expect(updatedUser.role).toBe('dormitoryLeader')
+    })
+
+    test('BR012: Assigning new leader replaces previous leader', async () => {
+      // Create admin user
+      const admin = await system.storage.create('User', {
+        username: 'admin',
+        password: 'password123',
+        email: 'admin@test.com',
+        name: 'Admin User',
+        role: 'admin',
+        points: 100
+      })
+      
+      // Create a dormitory
+      const createResult = await controller.callInteraction('CreateDormitory', {
+        user: admin,
+        payload: {
+          name: 'Test Dorm',
+          capacity: 4,
+          floor: 1,
+          building: 'Building A'
+        }
+      })
+      expect(createResult.error).toBeUndefined()
+      
+      // Get the created dormitory
+      const dormitory = await system.storage.findOne(
+        'Dormitory',
+        MatchExp.atom({ key: 'name', value: ['=', 'Test Dorm'] }),
+        undefined,
+        ['id']
+      )
+      const dormitoryId = dormitory.id
+      
+      // Get beds created with the dormitory
+      const beds = await system.storage.find('Bed',
+        undefined,
+        undefined,
+        ['id', 'bedNumber']
+      )
+      expect(beds.length).toBeGreaterThan(1) // Need at least 2 beds for 2 residents
+      
+      // Create first user to be assigned as dormitory leader
+      const firstLeader = await system.storage.create('User', {
+        username: 'leader1',
+        password: 'password123',
+        email: 'leader1@test.com',
+        name: 'First Leader',
+        role: 'resident',
+        points: 100
+      })
+      
+      // Create second user to replace as dormitory leader
+      const secondLeader = await system.storage.create('User', {
+        username: 'leader2',
+        password: 'password123',
+        email: 'leader2@test.com',
+        name: 'Second Leader',
+        role: 'resident',
+        points: 100
+      })
+      
+      // Assign both users to beds first
+      const assignBed1Result = await controller.callInteraction('AssignUserToBed', {
+        user: admin,
+        payload: {
+          userId: firstLeader.id,
+          bedId: beds[0].id
+        }
+      })
+      expect(assignBed1Result.error).toBeUndefined()
+      
+      const assignBed2Result = await controller.callInteraction('AssignUserToBed', {
+        user: admin,
+        payload: {
+          userId: secondLeader.id,
+          bedId: beds[1].id
+        }
+      })
+      expect(assignBed2Result.error).toBeUndefined()
+      
+      // Assign first leader
+      const assignFirst = await controller.callInteraction('AssignDormitoryLeader', {
+        user: admin,
+        payload: {
+          userId: firstLeader.id,
+          dormitoryId: dormitoryId
+        }
+      })
+      expect(assignFirst.error).toBeUndefined()
+      
+      // Verify first leader is assigned
+      const firstLeaderRelation = await system.storage.findOne(
+        'UserDormitoryLeaderRelation',
+        MatchExp.atom({ key: 'target.id', value: ['=', dormitoryId] }),
+        undefined,
+        ['id', ['source', { attributeQuery: ['id', 'role'] }]]
+      )
+      expect(firstLeaderRelation).not.toBeNull()
+      expect(firstLeaderRelation.source.id).toBe(firstLeader.id)
+      
+      // Verify first user has dormitoryLeader role
+      const firstUserCheck = await system.storage.findOne('User',
+        MatchExp.atom({ key: 'id', value: ['=', firstLeader.id] }),
+        undefined,
+        ['role']
+      )
+      expect(firstUserCheck.role).toBe('dormitoryLeader')
+      
+      // Now assign second leader - this should replace the first one
+      const assignSecond = await controller.callInteraction('AssignDormitoryLeader', {
+        user: admin,
+        payload: {
+          userId: secondLeader.id,
+          dormitoryId: dormitoryId
+        }
+      })
+      expect(assignSecond.error).toBeUndefined()
+      
+      // Verify there's still only one leader relation for this dormitory
+      const allLeaderRelations = await system.storage.find(
+        'UserDormitoryLeaderRelation',
+        MatchExp.atom({ key: 'target.id', value: ['=', dormitoryId] }),
+        undefined,
+        ['id', ['source', { attributeQuery: ['id'] }]]
+      )
+      expect(allLeaderRelations.length).toBe(1)
+      expect(allLeaderRelations[0].source.id).toBe(secondLeader.id)
+      
+      // Verify first user is no longer a dormitory leader
+      const firstUserAfter = await system.storage.findOne('User',
+        MatchExp.atom({ key: 'id', value: ['=', firstLeader.id] }),
+        undefined,
+        ['role']
+      )
+      expect(firstUserAfter.role).toBe('resident') // Should be reverted to resident
+      
+      // Verify second user is now the dormitory leader
+      const secondUserAfter = await system.storage.findOne('User',
+        MatchExp.atom({ key: 'id', value: ['=', secondLeader.id] }),
+        undefined,
+        ['role']
+      )
+      expect(secondUserAfter.role).toBe('dormitoryLeader')
+      
+      // Verify the dormitory has the new leader
+      const finalLeaderRelation = await system.storage.findOne(
+        'UserDormitoryLeaderRelation',
+        MatchExp.atom({ key: 'target.id', value: ['=', dormitoryId] }),
+        undefined,
+        ['id', ['source', { attributeQuery: ['id'] }], ['target', { attributeQuery: ['id'] }]]
+      )
+      expect(finalLeaderRelation.source.id).toBe(secondLeader.id)
+      expect(finalLeaderRelation.target.id).toBe(dormitoryId)
+    })
+
+    test('BR013: Can remove current dormitory leader', async () => {
+      // Create admin user
+      const admin = await system.storage.create('User', {
+        username: 'admin',
+        password: 'password123',
+        email: 'admin@test.com',
+        name: 'Admin User',
+        role: 'admin',
+        points: 100
+      })
+      
+      // Create a dormitory
+      const createResult = await controller.callInteraction('CreateDormitory', {
+        user: admin,
+        payload: {
+          name: 'Test Dorm',
+          capacity: 4,
+          floor: 1,
+          building: 'Building A'
+        }
+      })
+      expect(createResult.error).toBeUndefined()
+      
+      // Get the created dormitory
+      const dormitory = await system.storage.findOne(
+        'Dormitory',
+        MatchExp.atom({ key: 'name', value: ['=', 'Test Dorm'] }),
+        undefined,
+        ['id']
+      )
+      const dormitoryId = dormitory.id
+      
+      // Get beds created with the dormitory
+      const beds = await system.storage.find(
+        'Bed',
+        undefined,
+        undefined,
+        ['id']
+      )
+      
+      // Create a user to be dormitory leader
+      const leaderUser = await system.storage.create('User', {
+        username: 'leader',
+        password: 'password123',
+        email: 'leader@test.com',
+        name: 'Leader User',
+        role: 'resident',
+        points: 100
+      })
+      
+      // Assign user to a bed first (required for assigning as leader)
+      const assignBedResult = await controller.callInteraction('AssignUserToBed', {
+        user: admin,
+        payload: {
+          userId: leaderUser.id,
+          bedId: beds[0].id
+        }
+      })
+      expect(assignBedResult.error).toBeUndefined()
+      
+      // Assign user as dormitory leader
+      const assignResult = await controller.callInteraction('AssignDormitoryLeader', {
+        user: admin,
+        payload: {
+          userId: leaderUser.id,
+          dormitoryId: dormitoryId
+        }
+      })
+      expect(assignResult.error).toBeUndefined()
+      
+      // Verify the user is now a dormitory leader
+      const leaderRelation = await system.storage.findOne(
+        'UserDormitoryLeaderRelation',
+        MatchExp.atom({ key: 'source.id', value: ['=', leaderUser.id] }),
+        undefined,
+        ['id']
+      )
+      expect(leaderRelation).toBeTruthy()
+      
+      // Remove the dormitory leader
+      const removeResult = await controller.callInteraction('RemoveDormitoryLeader', {
+        user: admin,
+        payload: {
+          userId: leaderUser.id
+        }
+      })
+      expect(removeResult.error).toBeUndefined()
+      
+      // Verify the leader relation was removed
+      const removedRelation = await system.storage.findOne(
+        'UserDormitoryLeaderRelation',
+        MatchExp.atom({ key: 'source.id', value: ['=', leaderUser.id] }),
+        undefined,
+        ['id']
+      )
+      expect(removedRelation).toBeUndefined()
+      
+      // Verify the user role was changed back to resident
+      const user = await system.storage.findOne('User',
+        MatchExp.atom({ key: 'id', value: ['=', leaderUser.id] }),
+        undefined,
+        ['role']
+      )
+      expect(user.role).toBe('resident')
+    })
+
+    test('BR013: Cannot remove non-leader', async () => {
+      // Create admin user
+      const admin = await system.storage.create('User', {
+        username: 'admin',
+        password: 'password123',
+        email: 'admin@test.com',
+        name: 'Admin User',
+        role: 'admin',
+        points: 100
+      })
+      
+      // Create a regular user who is NOT a dormitory leader
+      const regularUser = await system.storage.create('User', {
+        username: 'regular',
+        password: 'password123',
+        email: 'regular@test.com',
+        name: 'Regular User',
+        role: 'resident',
+        points: 100
+      })
+      
+      // Try to remove the non-leader user as dormitory leader
+      const removeResult = await controller.callInteraction('RemoveDormitoryLeader', {
+        user: admin,
+        payload: {
+          userId: regularUser.id
+        }
+      })
+      
+      // Should fail because the user is not a dormitory leader
+      expect(removeResult.error).toBeDefined()
+      expect((removeResult.error as any).type).toBe('condition check failed')
+      
+      // Verify the user role hasn't changed
+      const user = await system.storage.findOne('User',
+        MatchExp.atom({ key: 'id', value: ['=', regularUser.id] }),
+        undefined,
+        ['role']
+      )
+      expect(user.role).toBe('resident') // Should still be resident
+    })
+
     test('P005: Admin can remove dormitory leader', async () => {
       // Create admin user
       const admin = await system.storage.create('User', {

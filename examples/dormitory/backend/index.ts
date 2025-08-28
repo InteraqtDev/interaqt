@@ -652,7 +652,29 @@ UserDormitoryLeaderRelation.computation = StateMachine.create({
       trigger: AssignDormitoryLeader,
       current: relationNotExistsState,
       next: relationExistsState,
-      computeTarget: function(event) {
+      computeTarget: async function(this: Controller, event) {
+        // BR012: First check if there's an existing leader for this dormitory
+        const existingRelation = await this.system.storage.findOne(
+          UserDormitoryLeaderRelation.name,
+          MatchExp.atom({ key: 'target.id', value: ['=', event.payload.dormitoryId] }),
+          undefined,
+          ['id', ['source', { attributeQuery: ['id'] }]]
+        )
+        
+        // If there's an existing leader different from the new one, remove them first
+        if (existingRelation && existingRelation.source?.id !== event.payload.userId) {
+          await this.system.storage.delete(
+            UserDormitoryLeaderRelation.name, 
+            MatchExp.atom({ key: 'id', value: ['=', existingRelation.id] })
+          )
+          // Update the old leader's role back to resident
+          await this.system.storage.update(
+            'User', 
+            MatchExp.atom({ key: 'id', value: ['=', existingRelation.source.id] }),
+            { role: 'resident' }
+          )
+        }
+        
         return {
           source: { id: event.payload.userId },
           target: { id: event.payload.dormitoryId }
@@ -1478,8 +1500,33 @@ AssignDormitoryLeader.conditions = Conditions.create({
   content: BoolExp.atom(isAdmin).and(userIsResidentOfDormitory)
 })
 
-// P005: Only admin can remove dormitory leaders
-RemoveDormitoryLeader.conditions = isAdmin
+// BR013: User must currently be a dormitory leader
+const userIsCurrentlyDormitoryLeader = Condition.create({
+  name: 'userIsCurrentlyDormitoryLeader',
+  content: async function(this: Controller, event: any) {
+    const userId = event.payload?.userId
+    
+    if (!userId) {
+      return false // No user ID provided
+    }
+    
+    // Check if the user has a dormitory leader relation
+    const leaderRelation = await this.system.storage.findOne(
+      UserDormitoryLeaderRelation.name,
+      MatchExp.atom({ key: 'source.id', value: ['=', userId] }),
+      undefined,
+      ['id']
+    )
+    
+    // Return true if the relation exists (user is a dormitory leader)
+    return !!leaderRelation
+  }
+})
+
+// P005: Only admin can remove dormitory leaders + BR013: User must currently be a dormitory leader
+RemoveDormitoryLeader.conditions = Conditions.create({
+  content: BoolExp.atom(isAdmin).and(userIsCurrentlyDormitoryLeader)
+})
 
 // P006: Only admin can assign users to beds
 AssignUserToBed.conditions = isAdmin

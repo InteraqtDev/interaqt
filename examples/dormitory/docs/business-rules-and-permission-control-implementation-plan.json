@@ -380,7 +380,7 @@
             "Can assign leader to dormitory without leader",
             "Assigning new leader replaces previous leader"
           ],
-          "completed": false
+          "completed": true
         },
         {
           "id": "BR013",
@@ -393,7 +393,7 @@
             "Can remove current dormitory leader",
             "Cannot remove non-leader"
           ],
-          "completed": false
+          "completed": true
         },
         {
           "id": "BR014",
