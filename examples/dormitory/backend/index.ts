@@ -1451,3 +1451,16 @@ const validPasswordLength = Condition.create({
 // Assign BR004 condition to ChangePassword interaction
 ChangePassword.conditions = validPasswordLength
 
+// BR006: Password must meet security requirements (min 8 chars) for Registration
+const registrationPasswordLength = Condition.create({
+  name: 'registrationPasswordLength',
+  content: function(this: Controller, event: any) {
+    const password = event.payload?.password
+    // Check if password exists and has at least 8 characters
+    return typeof password === 'string' && password.length >= 8
+  }
+})
+
+// Assign BR006 condition to Registration interaction
+Registration.conditions = registrationPasswordLength
+

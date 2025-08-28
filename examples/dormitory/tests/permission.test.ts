@@ -3213,5 +3213,137 @@ describe('Permission and Business Rules', () => {
       )
       expect(createdUser).toBeUndefined()
     })
+
+    // BR006: Password must meet security requirements (min 8 chars) for Registration
+    test('BR006: Can register with 8+ character password', async () => {
+      // Registration should work with 8 character password
+      const result = await controller.callInteraction('Registration', {
+        user: null, // Registration doesn't require authentication
+        payload: {
+          username: 'newuser6',
+          password: 'password8',
+          email: 'newuser6@test.com',
+          name: 'New User 6'
+        }
+      })
+      
+      expect(result.error).toBeUndefined()
+      
+      // Verify user was created
+      const createdUser = await system.storage.findOne('User',
+        MatchExp.atom({ key: 'username', value: ['=', 'newuser6'] }),
+        undefined,
+        ['id', 'username', 'password', 'email', 'name', 'role']
+      )
+      expect(createdUser).toBeDefined()
+      expect(createdUser.username).toBe('newuser6')
+      expect(createdUser.password).toBe('password8')
+      expect(createdUser.email).toBe('newuser6@test.com')
+      expect(createdUser.name).toBe('New User 6')
+      expect(createdUser.role).toBe('resident') // Registration always creates residents
+    })
+
+    test('BR006: Can register with longer password', async () => {
+      // Registration should work with longer password
+      const result = await controller.callInteraction('Registration', {
+        user: null, // Registration doesn't require authentication
+        payload: {
+          username: 'newuser7',
+          password: 'verylongpassword123456',
+          email: 'newuser7@test.com',
+          name: 'New User 7'
+        }
+      })
+      
+      expect(result.error).toBeUndefined()
+      
+      // Verify user was created
+      const createdUser = await system.storage.findOne('User',
+        MatchExp.atom({ key: 'username', value: ['=', 'newuser7'] }),
+        undefined,
+        ['id', 'username', 'password']
+      )
+      expect(createdUser).toBeDefined()
+      expect(createdUser.username).toBe('newuser7')
+      expect(createdUser.password).toBe('verylongpassword123456')
+    })
+
+    test('BR006: Cannot register with short password', async () => {
+      // Registration should fail with 7 character password
+      const result = await controller.callInteraction('Registration', {
+        user: null, // Registration doesn't require authentication
+        payload: {
+          username: 'newuser8',
+          password: 'pass123', // Only 7 characters
+          email: 'newuser8@test.com',
+          name: 'New User 8'
+        }
+      })
+      
+      // Verify error
+      expect(result.error).toBeDefined()
+      expect((result.error as any).type).toBe('condition check failed')
+      expect((result.error as any).error.data.name).toBe('registrationPasswordLength')
+      
+      // Verify user was not created
+      const createdUser = await system.storage.findOne('User',
+        MatchExp.atom({ key: 'username', value: ['=', 'newuser8'] }),
+        undefined,
+        ['id']
+      )
+      expect(createdUser).toBeUndefined()
+    })
+
+    test('BR006: Cannot register with empty password', async () => {
+      // Registration should fail with empty password
+      const result = await controller.callInteraction('Registration', {
+        user: null, // Registration doesn't require authentication
+        payload: {
+          username: 'newuser9',
+          password: '', // Empty password
+          email: 'newuser9@test.com',
+          name: 'New User 9'
+        }
+      })
+      
+      // Verify error
+      expect(result.error).toBeDefined()
+      expect((result.error as any).type).toBe('condition check failed')
+      expect((result.error as any).error.data.name).toBe('registrationPasswordLength')
+      
+      // Verify user was not created
+      const createdUser = await system.storage.findOne('User',
+        MatchExp.atom({ key: 'username', value: ['=', 'newuser9'] }),
+        undefined,
+        ['id']
+      )
+      expect(createdUser).toBeUndefined()
+    })
+
+    test('BR006: Cannot register with very short password', async () => {
+      // Registration should fail with 3 character password
+      const result = await controller.callInteraction('Registration', {
+        user: null, // Registration doesn't require authentication
+        payload: {
+          username: 'newuser10',
+          password: 'abc', // Only 3 characters
+          email: 'newuser10@test.com',
+          name: 'New User 10'
+        }
+      })
+      
+      // Verify error
+      expect(result.error).toBeDefined()
+      expect((result.error as any).type).toBe('condition check failed')
+      expect((result.error as any).error.data.name).toBe('registrationPasswordLength')
+      
+      // Verify user was not created
+      const createdUser = await system.storage.findOne('User',
+        MatchExp.atom({ key: 'username', value: ['=', 'newuser10'] }),
+        undefined,
+        ['id']
+      )
+      expect(createdUser).toBeUndefined()
+    })
   })
 })
