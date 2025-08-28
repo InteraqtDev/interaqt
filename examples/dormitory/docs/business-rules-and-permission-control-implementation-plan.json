@@ -445,7 +445,7 @@
             "Can remove user with bed assignment",
             "Cannot remove user without bed assignment"
           ],
-          "completed": false
+          "completed": true
         },
         {
           "id": "BR018",

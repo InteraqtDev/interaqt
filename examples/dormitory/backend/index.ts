@@ -1611,8 +1611,33 @@ AssignUserToBed.conditions = Conditions.create({
   content: BoolExp.atom(isAdmin).and(userHasNoExistingBed).and(bedIsNotOccupied).and(userRoleIsResidentOrDormitoryLeader)
 })
 
-// P007: Only admin can remove users from beds
-RemoveUserFromBed.conditions = isAdmin
+// BR017: User must be assigned to a bed
+const userHasBedAssignment = Condition.create({
+  name: 'userHasBedAssignment',
+  content: async function(this: Controller, event: any) {
+    const userId = event.payload?.userId
+    
+    if (!userId) {
+      return false // No user ID provided
+    }
+    
+    // Check if the user has a bed assignment
+    const userBedRelation = await this.system.storage.findOne(
+      UserBedRelation.name,
+      MatchExp.atom({ key: 'source.id', value: ['=', userId] }),
+      undefined,
+      ['id']
+    )
+    
+    // Return true if user has a bed assignment
+    return !!userBedRelation
+  }
+})
+
+// P007: Only admin can remove users from beds + BR017: User must be assigned to a bed
+RemoveUserFromBed.conditions = Conditions.create({
+  content: BoolExp.atom(isAdmin).and(userHasBedAssignment)
+})
 
 // P008: Only admin can process removal requests
 ProcessRemovalRequest.conditions = isAdmin

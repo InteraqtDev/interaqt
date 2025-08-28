@@ -2585,6 +2585,115 @@ describe('Permission and Business Rules', () => {
       expect(stillAssignedRelation).toBeDefined()
     })
 
+    test('BR017: Can remove user with bed assignment', async () => {
+      // Create admin user
+      const admin = await system.storage.create('User', {
+        username: 'admin',
+        password: 'password123',
+        email: 'admin@test.com',
+        name: 'Admin User',
+        role: 'admin',
+        points: 100
+      })
+
+      const resident = await system.storage.create('User', {
+        username: 'resident',
+        password: 'password123',
+        email: 'resident@test.com',
+        name: 'Resident User',
+        role: 'resident',
+        points: 100
+      })
+
+      // Create a dormitory first (with beds)
+      const createDormResult = await controller.callInteraction('CreateDormitory', {
+        user: admin,
+        payload: {
+          name: 'Test Dorm',
+          capacity: 4,
+          floor: 3,
+          building: 'Building X'
+        }
+      })
+
+      // Get the dormitory and its beds
+      const dormitory = await system.storage.findOne('Dormitory',
+        MatchExp.atom({ key: 'name', value: ['=', 'Test Dorm'] }),
+        undefined,
+        ['id', 'name', ['beds', { attributeQuery: ['id', 'bedNumber'] }]]
+      )
+      const bedId = dormitory.beds[0].id
+
+      // Admin assigns resident to bed
+      const assignResult = await controller.callInteraction('AssignUserToBed', {
+        user: admin,
+        payload: {
+          userId: resident.id,
+          bedId: bedId
+        }
+      })
+      expect(assignResult.error).toBeUndefined()
+
+      // Verify user is assigned to bed
+      const assignedRelation = await system.storage.findOne('UserBedRelation',
+        MatchExp.atom({ key: 'source.id', value: ['=', resident.id] }),
+        undefined,
+        ['id', ['source', { attributeQuery: ['id'] }]]
+      )
+      expect(assignedRelation).toBeDefined()
+
+      // Admin removes user from bed - should succeed because user has bed assignment
+      const removeResult = await controller.callInteraction('RemoveUserFromBed', {
+        user: admin,
+        payload: {
+          userId: resident.id
+        }
+      })
+      expect(removeResult.error).toBeUndefined()
+
+      // Verify user is no longer assigned to bed
+      const removedRelation = await system.storage.findOne('UserBedRelation',
+        MatchExp.atom({ key: 'source.id', value: ['=', resident.id] }),
+        undefined,
+        ['id']
+      )
+      expect(removedRelation).toBeUndefined()
+    })
+
+    test('BR017: Cannot remove user without bed assignment', async () => {
+      // Create admin user
+      const admin = await system.storage.create('User', {
+        username: 'admin',
+        password: 'password123',
+        email: 'admin@test.com',
+        name: 'Admin User',
+        role: 'admin',
+        points: 100
+      })
+
+      const resident = await system.storage.create('User', {
+        username: 'resident',
+        password: 'password123',
+        email: 'resident@test.com',
+        name: 'Resident User',
+        role: 'resident',
+        points: 100
+      })
+
+      // Attempt to remove user from bed when they don't have a bed assignment
+      const removeResult = await controller.callInteraction('RemoveUserFromBed', {
+        user: admin,
+        payload: {
+          userId: resident.id
+        }
+      })
+      
+      // Should fail because user doesn't have a bed assignment
+      expect(removeResult.error).toBeDefined()
+      expect((removeResult.error as any).type).toBe('condition check failed')
+      // The error should indicate that the userHasBedAssignment condition failed
+    })
+
     test('P008: Admin can process removal request (TC005)', async () => {
       // Create admin user
       const admin = await system.storage.create('User', {
