@@ -1932,9 +1932,36 @@ const targetUserInLeaderDormitory = Condition.create({
   }
 })
 
-// Combine P013 (dormitory leader permission) and BR027 (target user in leader's dormitory)
+// BR028: Target user must have less than 30 points
+const targetUserLessThan30Points = Condition.create({
+  name: 'targetUserLessThan30Points',
+  content: async function(this: Controller, event: any) {
+    const targetUserId = event.payload?.userId
+    
+    if (!targetUserId) {
+      return false // No user ID provided
+    }
+    
+    // Get the target user's points
+    const targetUser = await this.system.storage.findOne(
+      'User',
+      MatchExp.atom({ key: 'id', value: ['=', targetUserId] }),
+      undefined,
+      ['id', 'points']
+    )
+    
+    if (!targetUser) {
+      return false // User not found
+    }
+    
+    // Check if user has less than 30 points
+    return targetUser.points < 30
+  }
+})
+
+// Combine P013 (dormitory leader permission), BR027 (target user in leader's dormitory), and BR028 (target user < 30 points)
 SubmitRemovalRequest.conditions = Conditions.create({
-  content: BoolExp.atom(isDormitoryLeader).and(targetUserInLeaderDormitory)
+  content: BoolExp.atom(isDormitoryLeader).and(targetUserInLeaderDormitory).and(targetUserLessThan30Points)
 })
 
 // BR003: Points to deduct must be positive for DeductResidentPoints

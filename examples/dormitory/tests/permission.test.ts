@@ -5,7 +5,10 @@ import {
   InteractionEventEntity, Controller, MonoSystem, PGLiteDB,
   Condition, Conditions, BoolExp
 } from 'interaqt'
-import { entities, relations, interactions, activities, dicts } from '../backend'
+import { 
+  entities, relations, interactions, activities, dicts,
+  DormitoryBedsRelation 
+} from '../backend'
 
 describe('Permission and Business Rules', () => {
   let system: MonoSystem
@@ -4166,6 +4169,426 @@ describe('Permission and Business Rules', () => {
       expect(result.error).toBeDefined()
       expect((result.error as any).type).toBe('condition check failed')
       expect((result.error as any).error.data.name).toBe('targetUserInLeaderDormitory')
+
+      // Verify RemovalRequest was not created
+      const removalRequests = await system.storage.find('RemovalRequest',
+        MatchExp.atom({ key: 'targetUser.id', value: ['=', targetUser.id] })
+      )
+      expect(removalRequests.length).toBe(0)
+    })
+
+    test('BR028: Can submit removal request for user with 29 points', async () => {
+      // Create admin first to set up dormitory
+      const admin = await system.storage.create('User', {
+        username: 'admin',
+        password: 'password123',
+        email: 'admin@test.com',
+        name: 'Admin User',
+        role: 'admin',
+        points: 100
+      })
+
+      // Create dormitory
+      const dormitoryResult = await controller.callInteraction('CreateDormitory', {
+        user: admin,
+        payload: {
+          name: 'Dorm A',
+          capacity: 4,
+          floor: 1,
+          building: 'Building 1'
+        }
+      })
+      expect(dormitoryResult.error).toBeUndefined()
+      const dormitory = await system.storage.findOne('Dormitory',
+        MatchExp.atom({ key: 'name', value: ['=', 'Dorm A'] })
+      )
+
+      // Create dormitory leader user 
+      const leader = await system.storage.create('User', {
+        username: 'leader1',
+        password: 'password123',
+        email: 'leader1@test.com',
+        name: 'Leader User',
+        role: 'dormitoryLeader',
+        points: 100
+      })
+
+      // Create target user with 29 points
+      const targetUser = await system.storage.create('User', {
+        username: 'resident1',
+        password: 'password123',
+        email: 'resident1@test.com',
+        name: 'Resident User',
+        role: 'resident',
+        points: 29  // Just below the threshold
+      })
+
+      // Get beds from the dormitory
+      const bedRelations = await system.storage.find(DormitoryBedsRelation.name,
+        MatchExp.atom({ key: 'source.id', value: ['=', dormitory.id] }),
+        undefined,
+        ['id', ['target', { attributeQuery: ['id'] }]]
+      )
+      const bed1 = bedRelations[0].target
+      const bed2 = bedRelations[1].target
+
+      // Assign leader to bed in the dormitory
+      const leaderBedResult = await controller.callInteraction('AssignUserToBed', {
+        user: admin,
+        payload: {
+          userId: leader.id,
+          bedId: bed1.id
+        }
+      })
+      expect(leaderBedResult.error).toBeUndefined()
+
+      // Assign target user to another bed in the same dormitory
+      const targetBedResult = await controller.callInteraction('AssignUserToBed', {
+        user: admin,
+        payload: {
+          userId: targetUser.id,
+          bedId: bed2.id
+        }
+      })
+      expect(targetBedResult.error).toBeUndefined()
+
+      // Assign leader as dormitory leader
+      const assignLeaderResult = await controller.callInteraction('AssignDormitoryLeader', {
+        user: admin,
+        payload: {
+          userId: leader.id,
+          dormitoryId: dormitory.id
+        }
+      })
+      expect(assignLeaderResult.error).toBeUndefined()
+
+      // Leader should be able to submit removal request for user with 29 points
+      const result = await controller.callInteraction('SubmitRemovalRequest', {
+        user: leader,
+        payload: {
+          userId: targetUser.id,
+          reason: 'User has 29 points'
+        }
+      })
+
+      // Verify no error
+      expect(result.error).toBeUndefined()
+
+      // Verify RemovalRequest was created
+      const removalRequests = await system.storage.find('RemovalRequest',
+        MatchExp.atom({ key: 'targetUser.id', value: ['=', targetUser.id] })
+      )
+      expect(removalRequests.length).toBe(1)
+    })
+
+    test('BR028: Can submit removal request for user with 0 points (TC004)', async () => {
+      // Create admin first to set up dormitory
+      const admin = await system.storage.create('User', {
+        username: 'admin',
+        password: 'password123',
+        email: 'admin@test.com',
+        name: 'Admin User',
+        role: 'admin',
+        points: 100
+      })
+
+      // Create dormitory
+      const dormitoryResult = await controller.callInteraction('CreateDormitory', {
+        user: admin,
+        payload: {
+          name: 'Dorm B',
+          capacity: 4,
+          floor: 2,
+          building: 'Building 2'
+        }
+      })
+      expect(dormitoryResult.error).toBeUndefined()
+      const dormitory = await system.storage.findOne('Dormitory',
+        MatchExp.atom({ key: 'name', value: ['=', 'Dorm B'] })
+      )
+
+      // Create dormitory leader user
+      const leader = await system.storage.create('User', {
+        username: 'leader2',
+        password: 'password123',
+        email: 'leader2@test.com',
+        name: 'Leader User 2',
+        role: 'dormitoryLeader',
+        points: 100
+      })
+
+      // Create target user with 0 points (TC004)
+      const targetUser = await system.storage.create('User', {
+        username: 'resident2',
+        password: 'password123',
+        email: 'resident2@test.com',
+        name: 'Resident User 2',
+        role: 'resident',
+        points: 0  // Zero points
+      })
+
+      // Get beds from the dormitory
+      const bedRelations = await system.storage.find(DormitoryBedsRelation.name,
+        MatchExp.atom({ key: 'source.id', value: ['=', dormitory.id] }),
+        undefined,
+        ['id', ['target', { attributeQuery: ['id'] }]]
+      )
+      const bed1 = bedRelations[0].target
+      const bed2 = bedRelations[1].target
+
+      // Assign leader to bed in the dormitory
+      const leaderBedResult = await controller.callInteraction('AssignUserToBed', {
+        user: admin,
+        payload: {
+          userId: leader.id,
+          bedId: bed1.id
+        }
+      })
+      expect(leaderBedResult.error).toBeUndefined()
+
+      // Assign target user to another bed in the same dormitory
+      const targetBedResult = await controller.callInteraction('AssignUserToBed', {
+        user: admin,
+        payload: {
+          userId: targetUser.id,
+          bedId: bed2.id
+        }
+      })
+      expect(targetBedResult.error).toBeUndefined()
+
+      // Assign leader as dormitory leader
+      const assignLeaderResult = await controller.callInteraction('AssignDormitoryLeader', {
+        user: admin,
+        payload: {
+          userId: leader.id,
+          dormitoryId: dormitory.id
+        }
+      })
+      expect(assignLeaderResult.error).toBeUndefined()
+
+      // Leader should be able to submit removal request for user with 0 points
+      const result = await controller.callInteraction('SubmitRemovalRequest', {
+        user: leader,
+        payload: {
+          userId: targetUser.id,
+          reason: 'User has 0 points'
+        }
+      })
+
+      // Verify no error
+      expect(result.error).toBeUndefined()
+
+      // Verify RemovalRequest was created
+      const removalRequests = await system.storage.find('RemovalRequest',
+        MatchExp.atom({ key: 'targetUser.id', value: ['=', targetUser.id] })
+      )
+      expect(removalRequests.length).toBe(1)
+    })
+
+    test('BR028: Cannot submit removal request for user with 30 points (TC011)', async () => {
+      // Create admin first to set up dormitory
+      const admin = await system.storage.create('User', {
+        username: 'admin',
+        password: 'password123',
+        email: 'admin@test.com',
+        name: 'Admin User',
+        role: 'admin',
+        points: 100
+      })
+
+      // Create dormitory
+      const dormitoryResult = await controller.callInteraction('CreateDormitory', {
+        user: admin,
+        payload: {
+          name: 'Dorm C',
+          capacity: 4,
+          floor: 3,
+          building: 'Building 3'
+        }
+      })
+      expect(dormitoryResult.error).toBeUndefined()
+      const dormitory = await system.storage.findOne('Dormitory',
+        MatchExp.atom({ key: 'name', value: ['=', 'Dorm C'] })
+      )
+
+      // Create dormitory leader user
+      const leader = await system.storage.create('User', {
+        username: 'leader3',
+        password: 'password123',
+        email: 'leader3@test.com',
+        name: 'Leader User 3',
+        role: 'dormitoryLeader',
+        points: 100
+      })
+
+      // Create target user with 30 points (at threshold)
+      const targetUser = await system.storage.create('User', {
+        username: 'resident3',
+        password: 'password123',
+        email: 'resident3@test.com',
+        name: 'Resident User 3',
+        role: 'resident',
+        points: 30  // At the threshold
+      })
+
+      // Get beds from the dormitory
+      const bedRelations = await system.storage.find(DormitoryBedsRelation.name,
+        MatchExp.atom({ key: 'source.id', value: ['=', dormitory.id] }),
+        undefined,
+        ['id', ['target', { attributeQuery: ['id'] }]]
+      )
+      const bed1 = bedRelations[0].target
+      const bed2 = bedRelations[1].target
+
+      // Assign leader to bed in the dormitory
+      const leaderBedResult = await controller.callInteraction('AssignUserToBed', {
+        user: admin,
+        payload: {
+          userId: leader.id,
+          bedId: bed1.id
+        }
+      })
+      expect(leaderBedResult.error).toBeUndefined()
+
+      // Assign target user to another bed in the same dormitory
+      const targetBedResult = await controller.callInteraction('AssignUserToBed', {
+        user: admin,
+        payload: {
+          userId: targetUser.id,
+          bedId: bed2.id
+        }
+      })
+      expect(targetBedResult.error).toBeUndefined()
+
+      // Assign leader as dormitory leader
+      const assignLeaderResult = await controller.callInteraction('AssignDormitoryLeader', {
+        user: admin,
+        payload: {
+          userId: leader.id,
+          dormitoryId: dormitory.id
+        }
+      })
+      expect(assignLeaderResult.error).toBeUndefined()
+
+      // Leader should NOT be able to submit removal request for user with 30 points
+      const result = await controller.callInteraction('SubmitRemovalRequest', {
+        user: leader,
+        payload: {
+          userId: targetUser.id,
+          reason: 'User has 30 points'
+        }
+      })
+
+      // Verify error
+      expect(result.error).toBeDefined()
+      expect((result.error as any).type).toBe('condition check failed')
+      expect((result.error as any).error.data.name).toBe('targetUserLessThan30Points')
+
+      // Verify RemovalRequest was not created
+      const removalRequests = await system.storage.find('RemovalRequest',
+        MatchExp.atom({ key: 'targetUser.id', value: ['=', targetUser.id] })
+      )
+      expect(removalRequests.length).toBe(0)
+    })
+
+    test('BR028: Cannot submit removal request for user with 50 points (TC011)', async () => {
+      // Create admin first to set up dormitory
+      const admin = await system.storage.create('User', {
+        username: 'admin',
+        password: 'password123',
+        email: 'admin@test.com',
+        name: 'Admin User',
+        role: 'admin',
+        points: 100
+      })
+
+      // Create dormitory
+      const dormitoryResult = await controller.callInteraction('CreateDormitory', {
+        user: admin,
+        payload: {
+          name: 'Dorm D',
+          capacity: 4,
+          floor: 4,
+          building: 'Building 4'
+        }
+      })
+      expect(dormitoryResult.error).toBeUndefined()
+      const dormitory = await system.storage.findOne('Dormitory',
+        MatchExp.atom({ key: 'name', value: ['=', 'Dorm D'] })
+      )
+
+      // Create dormitory leader user
+      const leader = await system.storage.create('User', {
+        username: 'leader4',
+        password: 'password123',
+        email: 'leader4@test.com',
+        name: 'Leader User 4',
+        role: 'dormitoryLeader',
+        points: 100
+      })
+
+      // Create target user with 50 points (well above threshold)
+      const targetUser = await system.storage.create('User', {
+        username: 'resident4',
+        password: 'password123',
+        email: 'resident4@test.com',
+        name: 'Resident User 4',
+        role: 'resident',
+        points: 50  // Well above the threshold
+      })
+
+      // Get beds from the dormitory
+      const bedRelations = await system.storage.find(DormitoryBedsRelation.name,
+        MatchExp.atom({ key: 'source.id', value: ['=', dormitory.id] }),
+        undefined,
+        ['id', ['target', { attributeQuery: ['id'] }]]
+      )
+      const bed1 = bedRelations[0].target
+      const bed2 = bedRelations[1].target
+
+      // Assign leader to bed in the dormitory
+      const leaderBedResult = await controller.callInteraction('AssignUserToBed', {
+        user: admin,
+        payload: {
+          userId: leader.id,
+          bedId: bed1.id
+        }
+      })
+      expect(leaderBedResult.error).toBeUndefined()
+
+      // Assign target user to another bed in the same dormitory
+      const targetBedResult = await controller.callInteraction('AssignUserToBed', {
+        user: admin,
+        payload: {
+          userId: targetUser.id,
+          bedId: bed2.id
+        }
+      })
+      expect(targetBedResult.error).toBeUndefined()
+
+      // Assign leader as dormitory leader
+      const assignLeaderResult = await controller.callInteraction('AssignDormitoryLeader', {
+        user: admin,
+        payload: {
+          userId: leader.id,
+          dormitoryId: dormitory.id
+        }
+      })
+      expect(assignLeaderResult.error).toBeUndefined()
+
+      // Leader should NOT be able to submit removal request for user with 50 points
+      const result = await controller.callInteraction('SubmitRemovalRequest', {
+        user: leader,
+        payload: {
+          userId: targetUser.id,
+          reason: 'User has 50 points'
+        }
+      })
+
+      // Verify error
+      expect(result.error).toBeDefined()
+      expect((result.error as any).type).toBe('condition check failed')
+      expect((result.error as any).error.data.name).toBe('targetUserLessThan30Points')
 
       // Verify RemovalRequest was not created
       const removalRequests = await system.storage.find('RemovalRequest',

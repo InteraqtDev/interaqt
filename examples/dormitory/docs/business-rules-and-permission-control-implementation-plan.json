@@ -593,7 +593,7 @@
             "Cannot submit for user with 30 points (TC011)",
             "Cannot submit for user with 50 points (TC011)"
           ],
-          "completed": false
+          "completed": true
         },
         {
           "id": "BR029",
