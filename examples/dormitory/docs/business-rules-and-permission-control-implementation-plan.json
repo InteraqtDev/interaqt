@@ -135,7 +135,7 @@
             "Admin can delete user",
             "Non-admin cannot delete user"
           ],
-          "completed": false
+          "completed": true
         },
         {
           "id": "P012",

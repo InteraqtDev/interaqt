@@ -1862,6 +1862,142 @@ describe('Permission and Business Rules', () => {
       
       expect(createdUser).toBeUndefined()
     })
+
+    test('P011: Admin can delete user', async () => {
+      // Create admin user
+      const admin = await system.storage.create('User', {
+        username: 'admin',
+        password: 'password123',
+        email: 'admin@test.com',
+        name: 'Admin User',
+        role: 'admin',
+        points: 100
+      })
+      
+      // Create a user to delete
+      const userToDelete = await system.storage.create('User', {
+        username: 'deleteMe',
+        password: 'password123',
+        email: 'deleteme@test.com',
+        name: 'User To Delete',
+        role: 'resident',
+        points: 100,
+        isDeleted: false
+      })
+      
+      // Admin should be able to delete the user
+      const result = await controller.callInteraction('DeleteUser', {
+        user: admin,
+        payload: {
+          userId: userToDelete.id
+        }
+      })
+      
+      // Check the interaction succeeded
+      expect(result.error).toBeUndefined()
+      
+      // Verify the user was marked as deleted (soft delete)
+      const deletedUser = await system.storage.findOne('User',
+        MatchExp.atom({ key: 'id', value: ['=', userToDelete.id] }),
+        undefined,
+        ['id', 'username', 'isDeleted']
+      )
+      
+      expect(deletedUser).toBeDefined()
+      expect(deletedUser.isDeleted).toBe(true)
+    })
+
+    test('P011: Non-admin cannot delete user', async () => {
+      // Create non-admin user (resident)
+      const resident = await system.storage.create('User', {
+        username: 'resident1',
+        password: 'password123',
+        email: 'resident1@test.com',
+        name: 'Resident User',
+        role: 'resident',
+        points: 100
+      })
+      
+      // Create a user to attempt to delete
+      const userToDelete = await system.storage.create('User', {
+        username: 'targetUser',
+        password: 'password123',
+        email: 'target@test.com',
+        name: 'Target User',
+        role: 'resident',
+        points: 100,
+        isDeleted: false
+      })
+      
+      // Resident should not be able to delete the user
+      const result = await controller.callInteraction('DeleteUser', {
+        user: resident,
+        payload: {
+          userId: userToDelete.id
+        }
+      })
+      
+      // Check that the interaction failed with permission error
+      expect(result.error).toBeDefined()
+      expect((result.error as any).type).toBe('condition check failed')
+      expect((result.error as any).error.data.name).toBe('isAdmin')
+      
+      // Verify the user was not deleted
+      const notDeletedUser = await system.storage.findOne('User',
+        MatchExp.atom({ key: 'id', value: ['=', userToDelete.id] }),
+        undefined,
+        ['id', 'username', 'isDeleted']
+      )
+      
+      expect(notDeletedUser).toBeDefined()
+      expect(notDeletedUser.isDeleted).toBe(false)
+    })
+
+    test('P011: Dormitory leader cannot delete user', async () => {
+      // Create dormitory leader user
+      const dormitoryLeader = await system.storage.create('User', {
+        username: 'leader1',
+        password: 'password123',
+        email: 'leader1@test.com',
+        name: 'Dormitory Leader',
+        role: 'dormitoryLeader',
+        points: 100
+      })
+      
+      // Create a user to attempt to delete
+      const userToDelete = await system.storage.create('User', {
+        username: 'targetUser2',
+        password: 'password123',
+        email: 'target2@test.com',
+        name: 'Target User 2',
+        role: 'resident',
+        points: 100,
+        isDeleted: false
+      })
+      
+      // Dormitory leader should not be able to delete the user
+      const result = await controller.callInteraction('DeleteUser', {
+        user: dormitoryLeader,
+        payload: {
+          userId: userToDelete.id
+        }
+      })
+      
+      // Check that the interaction failed with permission error
+      expect(result.error).toBeDefined()
+      expect((result.error as any).type).toBe('condition check failed')
+      expect((result.error as any).error.data.name).toBe('isAdmin')
+      
+      // Verify the user was not deleted
+      const notDeletedUser = await system.storage.findOne('User',
+        MatchExp.atom({ key: 'id', value: ['=', userToDelete.id] }),
+        undefined,
+        ['id', 'username', 'isDeleted']
+      )
+      
+      expect(notDeletedUser).toBeDefined()
+      expect(notDeletedUser.isDeleted).toBe(false)
+    })
   })
 
   describe('Phase 2: Simple Business Rules', () => {
