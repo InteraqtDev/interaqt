@@ -3564,6 +3564,125 @@ describe('Permission and Business Rules', () => {
       expect(createdUser).toBeUndefined()
     })
 
+    // BR008: Cannot update capacity after creation
+    test('BR008: Can update name, floor, building', async () => {
+      // Create admin user
+      const admin = await system.storage.create('User', {
+        username: 'admin',
+        password: 'password123',
+        email: 'admin@test.com',
+        name: 'Admin User',
+        role: 'admin',
+        points: 100
+      })
+      
+      // Create a dormitory first
+      const createResult = await controller.callInteraction('CreateDormitory', {
+        user: admin,
+        payload: {
+          name: 'Original Dorm',
+          capacity: 5,
+          floor: 1,
+          building: 'Building A'
+        }
+      })
+      
+      expect(createResult.error).toBeUndefined()
+      
+      // Get the dormitory ID
+      const dormitory = await system.storage.findOne('Dormitory',
+        MatchExp.atom({ key: 'name', value: ['=', 'Original Dorm'] }),
+        undefined,
+        ['id', 'name', 'capacity', 'floor', 'building']
+      )
+      expect(dormitory).toBeDefined()
+      const dormitoryId = dormitory.id
+      
+      // Admin should be able to update name, floor, and building
+      const updateResult = await controller.callInteraction('UpdateDormitory', {
+        user: admin,
+        payload: {
+          dormitoryId: dormitoryId,
+          name: 'Updated Dorm',
+          floor: 2,
+          building: 'Building B'
+        }
+      })
+      
+      expect(updateResult.error).toBeUndefined()
+      
+      // Verify dormitory was updated
+      const updatedDormitory = await system.storage.findOne('Dormitory',
+        MatchExp.atom({ key: 'id', value: ['=', dormitoryId] }),
+        undefined,
+        ['id', 'name', 'capacity', 'floor', 'building']
+      )
+      expect(updatedDormitory).toBeDefined()
+      expect(updatedDormitory.name).toBe('Updated Dorm')
+      expect(updatedDormitory.floor).toBe(2)
+      expect(updatedDormitory.building).toBe('Building B')
+      expect(updatedDormitory.capacity).toBe(5) // Capacity should remain unchanged
+    })
+
+    test('BR008: Cannot update capacity', async () => {
+      // Create admin user
+      const admin = await system.storage.create('User', {
+        username: 'admin',
+        password: 'password123',
+        email: 'admin@test.com',
+        name: 'Admin User',
+        role: 'admin',
+        points: 100
+      })
+      
+      // Create a dormitory first
+      const createResult = await controller.callInteraction('CreateDormitory', {
+        user: admin,
+        payload: {
+          name: 'Test Dorm',
+          capacity: 4,
+          floor: 1,
+          building: 'Building A'
+        }
+      })
+      
+      expect(createResult.error).toBeUndefined()
+      
+      // Get the dormitory ID
+      const dormitory = await system.storage.findOne('Dormitory',
+        MatchExp.atom({ key: 'name', value: ['=', 'Test Dorm'] }),
+        undefined,
+        ['id', 'capacity']
+      )
+      expect(dormitory).toBeDefined()
+      const dormitoryId = dormitory.id
+      
+      // Admin should not be able to update capacity through UpdateDormitory
+      const updateResult = await controller.callInteraction('UpdateDormitory', {
+        user: admin,
+        payload: {
+          dormitoryId: dormitoryId,
+          name: 'Test Dorm Updated',
+          capacity: 6 // Trying to update capacity
+        }
+      })
+      
+      // Verify error - capacity in payload should fail BR008
+      expect(updateResult.error).toBeDefined()
+      expect((updateResult.error as any).type).toBe('condition check failed')
+      expect((updateResult.error as any).error.data.name).toBe('noCapacityInUpdatePayload')
+      
+      // Verify dormitory capacity was not changed
+      const unchangedDormitory = await system.storage.findOne('Dormitory',
+        MatchExp.atom({ key: 'id', value: ['=', dormitoryId] }),
+        undefined,
+        ['id', 'name', 'capacity']
+      )
+      expect(unchangedDormitory).toBeDefined()
+      expect(unchangedDormitory.capacity).toBe(4) // Capacity should remain original value
+      expect(unchangedDormitory.name).toBe('Test Dorm') // Name should also remain unchanged
+    })
+
     // Phase 3: Scope-Based Permissions
     // P014: Dormitory leader can only deduct points from residents in their dormitory
     test('P014: Dormitory leader can deduct points from own residents (TC016)', async () => {

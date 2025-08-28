@@ -327,7 +327,7 @@
             "Can update name, floor, building",
             "Cannot update capacity"
           ],
-          "completed": false
+          "completed": true
         },
         {
           "id": "BR009",

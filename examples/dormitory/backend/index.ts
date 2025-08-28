@@ -1341,8 +1341,19 @@ const isAdmin = Condition.create({
 // Assign condition to existing interaction
 CreateDormitory.conditions = isAdmin
 
-// P002: Only admin can update dormitories
-UpdateDormitory.conditions = isAdmin
+// BR008: Cannot update capacity after creation
+const noCapacityInUpdatePayload = Condition.create({
+  name: 'noCapacityInUpdatePayload',
+  content: function(this: Controller, event: any) {
+    // Check that capacity field is not present in the payload
+    return !('capacity' in event.payload)
+  }
+})
+
+// P002: Only admin can update dormitories + BR008: Cannot update capacity
+UpdateDormitory.conditions = Conditions.create({
+  content: BoolExp.atom(isAdmin).and(noCapacityInUpdatePayload)
+})
 
 // P003: Only admin can delete dormitories
 DeleteDormitory.conditions = isAdmin
