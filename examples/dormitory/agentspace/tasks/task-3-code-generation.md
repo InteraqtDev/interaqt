@@ -658,8 +658,7 @@ This section follows a **test-driven progressive approach** where each computati
 - [ ] **Organize rules by complexity:**
   - Phase 1: Simple role-based permissions
   - Phase 2: Simple payload validations
-  - Phase 3: Rules requiring database queries
-  - Phase 4: Complex multi-condition rules
+  - Phase 3: Complex rules
 
 **✅ END Task 3.2.1: Update `docs/STATUS.json`:**
 ```json
