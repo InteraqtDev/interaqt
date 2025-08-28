@@ -9380,4 +9380,135 @@ describe('Permission and Business Rules', () => {
       expect(deductions.length).toBe(0) // No deduction should be recorded
     })
   })
+  
+  describe('BR032: ViewMyDormitory - User must have bed assignment', () => {
+    test('Can view dormitory when assigned to bed', async () => {
+      // Create admin user to perform assignments
+      const admin = await system.storage.create('User', {
+        username: 'admin',
+        password: 'password123',
+        email: 'admin@test.com',
+        name: 'Admin User',
+        role: 'admin',
+        points: 100
+      })
+      
+      // Create resident user
+      const resident = await system.storage.create('User', {
+        username: 'resident1',
+        password: 'password123',
+        email: 'resident1@test.com',
+        name: 'Resident One',
+        role: 'resident',
+        points: 100
+      })
+      
+      // Create dormitory with beds
+      const dormResult = await controller.callInteraction('CreateDormitory', {
+        user: admin,
+        payload: {
+          name: 'Test Dorm',
+          capacity: 4,
+          floor: 1,
+          building: 'Building A'
+        }
+      })
+      expect(dormResult.error).toBeUndefined()
+      
+      // Get the created dormitory with beds
+      const dormitory = await system.storage.findOne('Dormitory',
+        MatchExp.atom({ key: 'name', value: ['=', 'Test Dorm'] }),
+        undefined,
+        ['id', 'name', ['beds', { attributeQuery: ['id', 'bedNumber'] }]]
+      )
+      expect(dormitory).toBeDefined()
+      expect(dormitory.beds.length).toBe(4)
+      
+      // Assign resident to a bed
+      const assignResult = await controller.callInteraction('AssignUserToBed', {
+        user: admin,
+        payload: {
+          userId: resident.id,
+          bedId: dormitory.beds[0].id
+        }
+      })
+      expect(assignResult.error).toBeUndefined()
+      
+      // Resident with bed assignment should be able to view dormitory
+      const viewResult = await controller.callInteraction('ViewMyDormitory', {
+        user: resident,
+        payload: {}
+      })
+      
+      expect(viewResult.error).toBeUndefined() // Should succeed
+    })
+    
+    test('Cannot view dormitory without bed assignment', async () => {
+      // Create admin user
+      const admin = await system.storage.create('User', {
+        username: 'admin',
+        password: 'password123',
+        email: 'admin@test.com',
+        name: 'Admin User',
+        role: 'admin',
+        points: 100
+      })
+      
+      // Create resident user without bed assignment
+      const resident = await system.storage.create('User', {
+        username: 'resident2',
+        password: 'password123',
+        email: 'resident2@test.com',
+        name: 'Resident Two',
+        role: 'resident',
+        points: 100
+      })
+      
+      // Create dormitory (but don't assign resident to any bed)
+      const dormResult = await controller.callInteraction('CreateDormitory', {
+        user: admin,
+        payload: {
+          name: 'Another Dorm',
+          capacity: 4,
+          floor: 2,
+          building: 'Building B'
+        }
+      })
+      expect(dormResult.error).toBeUndefined()
+      
+      // Resident without bed assignment should NOT be able to view dormitory
+      const viewResult = await controller.callInteraction('ViewMyDormitory', {
+        user: resident,
+        payload: {}
+      })
+      
+      // Should fail with condition check
+      expect(viewResult.error).toBeDefined()
+      expect((viewResult.error as any).type).toBe('condition check failed')
+      expect((viewResult.error as any).error.data.name).toBe('userMustHaveBedAssignment')
+    })
+    
+    test('Admin without bed assignment cannot view dormitory', async () => {
+      // Create admin user (admins typically don't have bed assignments)
+      const admin = await system.storage.create('User', {
+        username: 'admin',
+        password: 'password123',
+        email: 'admin@test.com',
+        name: 'Admin User',
+        role: 'admin',
+        points: 100
+      })
+      
+      // Admin without bed assignment should NOT be able to view dormitory
+      const viewResult = await controller.callInteraction('ViewMyDormitory', {
+        user: admin,
+        payload: {}
+      })
+      
+      // Should fail with condition check
+      expect(viewResult.error).toBeDefined()
+      expect((viewResult.error as any).type).toBe('condition check failed')
+      expect((viewResult.error as any).error.data.name).toBe('userMustHaveBedAssignment')
+    })
+  })
 })

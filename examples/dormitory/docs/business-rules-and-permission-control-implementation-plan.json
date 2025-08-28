@@ -645,7 +645,7 @@
             "Can view dormitory when assigned to bed",
             "Cannot view dormitory without bed assignment"
           ],
-          "completed": false
+          "completed": true
         },
         {
           "id": "BR033",

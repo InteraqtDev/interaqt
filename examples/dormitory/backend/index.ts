@@ -2264,3 +2264,23 @@ const canViewPointDeductions = Condition.create({
 // Assign P016 condition to GetPointDeductions interaction
 GetPointDeductions.conditions = canViewPointDeductions
 
+// BR032: User must have a bed assignment to view dormitory
+const userMustHaveBedAssignment = Condition.create({
+  name: 'userMustHaveBedAssignment',
+  content: async function(this: Controller, event: any) {
+    // Check if the user has a bed assignment
+    const userBedRelation = await this.system.storage.findOne(
+      UserBedRelation.name,
+      MatchExp.atom({ key: 'source.id', value: ['=', event.user.id] }),
+      undefined,
+      ['id']
+    )
+    
+    // Return true if user has a bed assignment
+    return !!userBedRelation
+  }
+})
+
+// Assign BR032 condition to ViewMyDormitory interaction
+ViewMyDormitory.conditions = userMustHaveBedAssignment
+
