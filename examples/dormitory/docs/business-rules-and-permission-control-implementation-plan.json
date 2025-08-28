@@ -147,7 +147,7 @@
             "Admin can list users",
             "Non-admin cannot list users"
           ],
-          "completed": false
+          "completed": true
         },
         {
           "id": "P013",

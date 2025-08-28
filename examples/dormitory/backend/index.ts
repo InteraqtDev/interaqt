@@ -1387,3 +1387,6 @@ CreateDormitory.conditions = Conditions.create({
   content: BoolExp.atom(isAdmin).and(validDormitoryCapacity)
 })
 
+// P012: Only admin can list all users
+GetUsers.conditions = isAdmin
+

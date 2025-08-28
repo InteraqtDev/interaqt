@@ -1998,6 +1998,166 @@ describe('Permission and Business Rules', () => {
       expect(notDeletedUser).toBeDefined()
       expect(notDeletedUser.isDeleted).toBe(false)
     })
+
+    test('P012: Admin can list users', async () => {
+      // Create admin user
+      const admin = await system.storage.create('User', {
+        username: 'admin',
+        password: 'password123',
+        email: 'admin@test.com',
+        name: 'Admin User',
+        role: 'admin',
+        points: 100
+      })
+      
+      // Create some test users
+      const user1 = await system.storage.create('User', {
+        username: 'user1',
+        password: 'password123',
+        email: 'user1@test.com',
+        name: 'User One',
+        role: 'resident',
+        points: 100
+      })
+      
+      const user2 = await system.storage.create('User', {
+        username: 'user2',
+        password: 'password123',
+        email: 'user2@test.com',
+        name: 'User Two',
+        role: 'dormitoryLeader',
+        points: 100
+      })
+      
+      // Admin should be able to list all users
+      const result = await controller.callInteraction('GetUsers', {
+        user: admin,
+        payload: {}
+      })
+      
+      // Check the interaction succeeded
+      expect(result.error).toBeUndefined()
+      
+      // Note: GetUsers interaction is a query interaction that would need special handling
+      // For now, we just verify the permission check passes
+      // In a real implementation, result.data would contain the user list
+    })
+
+    test('P012: Non-admin cannot list users', async () => {
+      // Create non-admin user (resident)
+      const resident = await system.storage.create('User', {
+        username: 'resident1',
+        password: 'password123',
+        email: 'resident1@test.com',
+        name: 'Resident User',
+        role: 'resident',
+        points: 100
+      })
+      
+      // Create some test users
+      const user1 = await system.storage.create('User', {
+        username: 'user1',
+        password: 'password123',
+        email: 'user1@test.com',
+        name: 'User One',
+        role: 'resident',
+        points: 100
+      })
+      
+      const user2 = await system.storage.create('User', {
+        username: 'user2',
+        password: 'password123',
+        email: 'user2@test.com',
+        name: 'User Two',
+        role: 'dormitoryLeader',
+        points: 100
+      })
+      
+      // Resident should not be able to list users
+      const result = await controller.callInteraction('GetUsers', {
+        user: resident,
+        payload: {}
+      })
+      
+      // Check that the interaction failed with permission error
+      expect(result.error).toBeDefined()
+      expect((result.error as any).type).toBe('condition check failed')
+      expect((result.error as any).error.data.name).toBe('isAdmin')
+    })
+
+    test('P012: Dormitory leader cannot list users', async () => {
+      // Create dormitory leader user
+      const dormitoryLeader = await system.storage.create('User', {
+        username: 'leader1',
+        password: 'password123',
+        email: 'leader1@test.com',
+        name: 'Dormitory Leader',
+        role: 'dormitoryLeader',
+        points: 100
+      })
+      
+      // Create some test users
+      const user1 = await system.storage.create('User', {
+        username: 'user1',
+        password: 'password123',
+        email: 'user1@test.com',
+        name: 'User One',
+        role: 'resident',
+        points: 100
+      })
+      
+      const user2 = await system.storage.create('User', {
+        username: 'user2',
+        password: 'password123',
+        email: 'user2@test.com',
+        name: 'User Two',
+        role: 'resident',
+        points: 90
+      })
+      
+      // Dormitory leader should not be able to list users
+      const result = await controller.callInteraction('GetUsers', {
+        user: dormitoryLeader,
+        payload: {}
+      })
+      
+      // Check that the interaction failed with permission error
+      expect(result.error).toBeDefined()
+      expect((result.error as any).type).toBe('condition check failed')
+      expect((result.error as any).error.data.name).toBe('isAdmin')
+    })
+
+    test('P012: Unauthenticated user cannot list users', async () => {
+      // Create some test users in the system
+      const user1 = await system.storage.create('User', {
+        username: 'user1',
+        password: 'password123',
+        email: 'user1@test.com',
+        name: 'User One',
+        role: 'resident',
+        points: 100
+      })
+      
+      const user2 = await system.storage.create('User', {
+        username: 'user2',
+        password: 'password123',
+        email: 'user2@test.com',
+        name: 'User Two',
+        role: 'dormitoryLeader',
+        points: 100
+      })
+      
+      // Unauthenticated user (null) should not be able to list users
+      const result = await controller.callInteraction('GetUsers', {
+        user: null,
+        payload: {}
+      })
+      
+      // Check that the interaction failed with permission error
+      expect(result.error).toBeDefined()
+      expect((result.error as any).type).toBe('condition check failed')
+      expect((result.error as any).error.data.name).toBe('isAdmin')
+    })
   })
 
   describe('Phase 2: Simple Business Rules', () => {
