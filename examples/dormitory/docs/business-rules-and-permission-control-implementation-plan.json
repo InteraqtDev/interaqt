@@ -315,7 +315,7 @@
             "Cannot create dormitory with duplicate name in same building",
             "Can create dormitory with same name in different building"
           ],
-          "completed": false
+          "completed": true
         },
         {
           "id": "BR008",

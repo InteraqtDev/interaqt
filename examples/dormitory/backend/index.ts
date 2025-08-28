@@ -1407,9 +1407,38 @@ const validDormitoryCapacity = Condition.create({
   }
 })
 
-// Combine P001 (admin permission) with BR001 (capacity validation)
+// BR007: Dormitory name must be unique within building
+const uniqueDormitoryNameInBuilding = Condition.create({
+  name: 'uniqueDormitoryNameInBuilding',
+  content: async function(this: Controller, event: any) {
+    const name = event.payload?.name
+    const building = event.payload?.building
+    
+    // Check if name and building are provided
+    if (!name || !building) {
+      return false
+    }
+    
+    // Query for existing dormitories with same name in same building
+    const existingDormitory = await this.system.storage.findOne(
+      'Dormitory',
+      MatchExp.atom({ key: 'name', value: ['=', name] })
+        .and({ key: 'building', value: ['=', building] })
+        .and({ key: 'isDeleted', value: ['=', false] }), // Only check non-deleted dormitories
+      undefined,
+      ['id']
+    )
+    
+    // If no existing dormitory found, the name is unique in that building
+    return !existingDormitory
+  }
+})
+
+// Combine P001 (admin permission) with BR001 (capacity validation) and BR007 (unique name in building)
 CreateDormitory.conditions = Conditions.create({
-  content: BoolExp.atom(isAdmin).and(validDormitoryCapacity)
+  content: BoolExp.atom(isAdmin)
+    .and(validDormitoryCapacity)
+    .and(uniqueDormitoryNameInBuilding)
 })
 
 // P012: Only admin can list all users

@@ -2491,6 +2491,150 @@ describe('Permission and Business Rules', () => {
       expect(dormitories.length).toBe(0)
     })
 
+    test('BR007: Can create dormitory with unique name', async () => {
+      // Create admin user
+      const admin = await system.storage.create('User', {
+        username: 'admin',
+        password: 'password123',
+        email: 'admin@test.com',
+        name: 'Admin User',
+        role: 'admin',
+        points: 100
+      })
+      
+      // First, create a dormitory
+      const result1 = await controller.callInteraction('CreateDormitory', {
+        user: admin,
+        payload: {
+          name: 'Unique Dorm',
+          capacity: 4,
+          floor: 1,
+          building: 'Building A'
+        }
+      })
+      
+      expect(result1.error).toBeUndefined()
+      
+      // Now, create another dormitory with different name in same building
+      const result2 = await controller.callInteraction('CreateDormitory', {
+        user: admin,
+        payload: {
+          name: 'Different Dorm',
+          capacity: 5,
+          floor: 2,
+          building: 'Building A'
+        }
+      })
+      
+      expect(result2.error).toBeUndefined()
+      
+      // Verify both dormitories were created
+      const dormitories = await system.storage.find('Dormitory', 
+        MatchExp.atom({ key: 'building', value: ['=', 'Building A'] }),
+        undefined,
+        ['id', 'name', 'building']
+      )
+      expect(dormitories.length).toBe(2)
+      expect(dormitories.map(d => d.name).sort()).toEqual(['Different Dorm', 'Unique Dorm'])
+    })
+
+    test('BR007: Cannot create dormitory with duplicate name in same building', async () => {
+      // Create admin user
+      const admin = await system.storage.create('User', {
+        username: 'admin',
+        password: 'password123',
+        email: 'admin@test.com',
+        name: 'Admin User',
+        role: 'admin',
+        points: 100
+      })
+      
+      // First, create a dormitory
+      const result1 = await controller.callInteraction('CreateDormitory', {
+        user: admin,
+        payload: {
+          name: 'Dorm 101',
+          capacity: 4,
+          floor: 1,
+          building: 'Building B'
+        }
+      })
+      
+      expect(result1.error).toBeUndefined()
+      
+      // Try to create another dormitory with same name in same building
+      const result2 = await controller.callInteraction('CreateDormitory', {
+        user: admin,
+        payload: {
+          name: 'Dorm 101',  // Same name
+          capacity: 5,
+          floor: 2,
+          building: 'Building B'  // Same building
+        }
+      })
+      
+      // Verify error - unique name validation should fail
+      expect(result2.error).toBeDefined()
+      expect((result2.error as any).type).toBe('condition check failed')
+      expect((result2.error as any).error.data.name).toBe('uniqueDormitoryNameInBuilding')
+      
+      // Verify only one dormitory exists with that name
+      const dormitories = await system.storage.find('Dormitory', 
+        MatchExp.atom({ key: 'name', value: ['=', 'Dorm 101'] })
+          .and({ key: 'building', value: ['=', 'Building B'] }),
+        undefined,
+        ['id', 'name', 'building']
+      )
+      expect(dormitories.length).toBe(1)
+    })
+
+    test('BR007: Can create dormitory with same name in different building', async () => {
+      // Create admin user
+      const admin = await system.storage.create('User', {
+        username: 'admin',
+        password: 'password123',
+        email: 'admin@test.com',
+        name: 'Admin User',
+        role: 'admin',
+        points: 100
+      })
+      
+      // First, create a dormitory in Building C
+      const result1 = await controller.callInteraction('CreateDormitory', {
+        user: admin,
+        payload: {
+          name: 'Dorm 201',
+          capacity: 4,
+          floor: 2,
+          building: 'Building C'
+        }
+      })
+      
+      expect(result1.error).toBeUndefined()
+      
+      // Now, create another dormitory with same name but in different building
+      const result2 = await controller.callInteraction('CreateDormitory', {
+        user: admin,
+        payload: {
+          name: 'Dorm 201',  // Same name
+          capacity: 5,
+          floor: 2,
+          building: 'Building D'  // Different building
+        }
+      })
+      
+      expect(result2.error).toBeUndefined()
+      
+      // Verify both dormitories were created
+      const dormitories = await system.storage.find('Dormitory', 
+        MatchExp.atom({ key: 'name', value: ['=', 'Dorm 201'] }),
+        undefined,
+        ['id', 'name', 'building']
+      )
+      expect(dormitories.length).toBe(2)
+      expect(dormitories.map(d => d.building).sort()).toEqual(['Building C', 'Building D'])
+    })
+
     test('BR001: Can create dormitory with capacity 5', async () => {
       // Create admin user
       const admin = await system.storage.create('User', {
