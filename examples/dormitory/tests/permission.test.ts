@@ -10333,5 +10333,114 @@ describe('Permission and Business Rules', () => {
       expect((nonExistentUsernameResult.error as any).type).toBe('condition check failed')
       expect((nonExistentUsernameResult.error as any).error.data.name).toBe('userMustNotBeDeleted')
     })
+
+    test('P018: Anyone can attempt registration (public access)', async () => {
+      // Test 1: Registration with null user (completely anonymous)
+      const anonymousResult = await controller.callInteraction('Registration', {
+        user: null,  // No authentication required
+        payload: {
+          username: 'publicreguser1',
+          password: 'password123',
+          email: 'publicreg1@test.com',
+          name: 'Public Registration User 1'
+        }
+      })
+
+      // Should succeed - no permission error, registration is public
+      expect(anonymousResult.error).toBeUndefined()
+      
+      // Verify user was created
+      const createdUser1 = await system.storage.findOne('User',
+        MatchExp.atom({ key: 'username', value: ['=', 'publicreguser1'] }),
+        undefined,
+        ['id', 'username', 'email', 'name', 'role', 'points']
+      )
+      expect(createdUser1).toBeDefined()
+      expect(createdUser1.email).toBe('publicreg1@test.com')
+      expect(createdUser1.name).toBe('Public Registration User 1')
+      expect(createdUser1.role).toBe('resident') // Default role
+      expect(createdUser1.points).toBe(100) // Default points
+
+      // Test 2: Registration with arbitrary user ID (still public)
+      const arbitraryUserResult = await controller.callInteraction('Registration', {
+        user: { id: 'some-random-id' },  // Any user ID works for public access
+        payload: {
+          username: 'publicreguser2',
+          password: 'password123',
+          email: 'publicreg2@test.com',
+          name: 'Public Registration User 2'
+        }
+      })
+
+      // Should succeed - no permission error, registration is public
+      expect(arbitraryUserResult.error).toBeUndefined()
+
+      // Test 3: Registration with undefined user ID (still public)
+      const undefinedUserResult = await controller.callInteraction('Registration', {
+        user: { id: undefined as any },  // Undefined ID for public access
+        payload: {
+          username: 'publicreguser3',
+          password: 'password123',
+          email: 'publicreg3@test.com',
+          name: 'Public Registration User 3'
+        }
+      })
+
+      // Should succeed - no permission error, registration is public
+      expect(undefinedUserResult.error).toBeUndefined()
+
+      // Test 4: Verify registration with invalid data still fails (but not due to permissions)
+      
+      // Test 4a: Short password fails due to BR006
+      const shortPasswordResult = await controller.callInteraction('Registration', {
+        user: null,
+        payload: {
+          username: 'shortpassuser',
+          password: 'short', // Too short
+          email: 'shortpass@test.com',
+          name: 'Short Password User'
+        }
+      })
+
+      // Should fail due to business rule (BR006), not permissions
+      expect(shortPasswordResult.error).toBeDefined()
+      expect((shortPasswordResult.error as any).type).toBe('condition check failed')
+      
+      // Test 4b: Duplicate username fails due to BR024
+      const duplicateUsernameResult = await controller.callInteraction('Registration', {
+        user: null,
+        payload: {
+          username: 'publicreguser1', // Already exists
+          password: 'password123',
+          email: 'duplicate@test.com',
+          name: 'Duplicate Username User'
+        }
+      })
+
+      // Should fail due to business rule (BR024), not permissions
+      expect(duplicateUsernameResult.error).toBeDefined()
+      expect((duplicateUsernameResult.error as any).type).toBe('condition check failed')
+
+      // Test 4c: Invalid email fails due to BR025
+      const invalidEmailResult = await controller.callInteraction('Registration', {
+        user: null,
+        payload: {
+          username: 'invalidemail',
+          password: 'password123',
+          email: 'not-an-email', // Invalid email format
+          name: 'Invalid Email User'
+        }
+      })
+
+      // Should fail due to business rule (BR025), not permissions
+      expect(invalidEmailResult.error).toBeDefined()
+      expect((invalidEmailResult.error as any).type).toBe('condition check failed')
+
+      // Verify that exactly 3 users were created (the successful registrations)
+      const allUsers = await system.storage.find('User',
+        MatchExp.atom({ key: 'username', value: ['like', 'publicreguser%'] })
+      )
+      expect(allUsers.length).toBe(3)
+    })
   })
 })

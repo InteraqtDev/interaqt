@@ -740,7 +740,7 @@
           "testScenarios": [
             "Anyone can attempt registration"
           ],
-          "completed": false
+          "completed": true
         },
         {
           "id": "P019",
