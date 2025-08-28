@@ -551,7 +551,7 @@
             "Cannot register with duplicate email",
             "Cannot register with invalid email format"
           ],
-          "completed": false
+          "completed": true
         },
         {
           "id": "BR026",

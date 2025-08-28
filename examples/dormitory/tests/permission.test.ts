@@ -5406,6 +5406,237 @@ describe('Permission and Business Rules', () => {
       expect(allUsers.find(u => u.username === 'uniqueuser456')).toBeUndefined()
     })
 
+    // BR025: Email must be unique and valid format for Registration
+    test('BR025: Can register with unique valid email', async () => {
+      // Register with valid unique email
+      const result = await controller.callInteraction('Registration', {
+        user: null,
+        payload: {
+          username: 'user1',
+          password: 'password123',
+          email: 'user1@example.com',
+          name: 'User One'
+        }
+      })
+      
+      expect(result.error).toBeUndefined()
+      
+      // Verify user was created with the email
+      const user = await system.storage.findOne('User',
+        MatchExp.atom({ key: 'email', value: ['=', 'user1@example.com'] }),
+        undefined,
+        ['id', 'username', 'email']
+      )
+      expect(user).toBeDefined()
+      expect(user.email).toBe('user1@example.com')
+    })
+
+    test('BR025: Cannot register with duplicate email', async () => {
+      // First registration with an email
+      const firstResult = await controller.callInteraction('Registration', {
+        user: null,
+        payload: {
+          username: 'user1',
+          password: 'password123',
+          email: 'duplicate@example.com',
+          name: 'First User'
+        }
+      })
+      expect(firstResult.error).toBeUndefined()
+      
+      // Try to register with same email but different username
+      const duplicateResult = await controller.callInteraction('Registration', {
+        user: null,
+        payload: {
+          username: 'user2', // Different username
+          password: 'password456',
+          email: 'duplicate@example.com', // Same email
+          name: 'Second User'
+        }
+      })
+      
+      // Should fail due to duplicate email
+      expect(duplicateResult.error).toBeDefined()
+      expect((duplicateResult.error as any).type).toBe('condition check failed')
+      expect((duplicateResult.error as any).error.data.name).toBe('registrationEmailUniqueAndValid')
+      
+      // Verify only one user exists with that email
+      const users = await system.storage.find('User',
+        MatchExp.atom({ key: 'email', value: ['=', 'duplicate@example.com'] }),
+        undefined,
+        ['id', 'username']
+      )
+      expect(users.length).toBe(1)
+      expect(users[0].username).toBe('user1')
+    })
+
+    test('BR025: Cannot register with invalid email format', async () => {
+      // Test various invalid email formats
+      const invalidEmails = [
+        'notanemail',          // No @ symbol
+        '@example.com',        // No local part
+        'user@',               // No domain
+        'user@example',        // No TLD
+        'user..name@example.com', // Consecutive dots
+        'user@.example.com',   // Dot after @
+        'user.@example.com',   // Dot before @
+        'user@exam ple.com',   // Space in domain
+        'user name@example.com', // Space in local part
+        'user@example..com',   // Consecutive dots in domain
+        'user@@example.com',   // Double @
+        'user@example@com',    // Multiple @
+        '',                    // Empty string
+        'user@',               // Incomplete
+        '@',                   // Just @
+        'user.@.com',          // Multiple issues
+      ]
+      
+      for (const invalidEmail of invalidEmails) {
+        const result = await controller.callInteraction('Registration', {
+          user: null,
+          payload: {
+            username: `user_${Math.random()}`, // Unique username each time
+            password: 'password123',
+            email: invalidEmail,
+            name: 'Test User'
+          }
+        })
+        
+        // Should fail due to invalid email format
+        if (!result.error) {
+          console.log(`ERROR: Invalid email '${invalidEmail}' was accepted when it should have been rejected`)
+        }
+        expect(result.error, `Email '${invalidEmail}' should be rejected`).toBeDefined()
+        expect((result.error as any).type).toBe('condition check failed')
+        // The condition name should indicate email validation failed
+        const errorData = (result.error as any).error.data
+        expect(errorData.name).toBe('registrationEmailUniqueAndValid')
+      }
+      
+      // Verify no users were created
+      const users = await system.storage.find('User', undefined, undefined, ['id'])
+      expect(users.length).toBe(0)
+    })
+
+    test('BR025: Can register with various valid email formats', async () => {
+      // Test various valid email formats
+      const validEmails = [
+        'simple@example.com',
+        'user.name@example.com',
+        'user+tag@example.co.uk',
+        'user_name@example-domain.com',
+        '123@example.com',
+        'a@example.com',
+        'test.email.with.multiple.dots@example.com',
+        'user@subdomain.example.com',
+        'user@example.museum',  // Longer TLD
+        'user!#$%&*+=?^_`{|}~@example.com', // Special chars allowed in local part
+      ]
+      
+      let index = 0
+      for (const validEmail of validEmails) {
+        const result = await controller.callInteraction('Registration', {
+          user: null,
+          payload: {
+            username: `user${index}`, // Unique username
+            password: 'password123',
+            email: validEmail,
+            name: `Test User ${index}`
+          }
+        })
+        
+        // Should succeed with valid email format
+        expect(result.error).toBeUndefined()
+        
+        // Verify user was created
+        const user = await system.storage.findOne('User',
+          MatchExp.atom({ key: 'email', value: ['=', validEmail] }),
+          undefined,
+          ['id', 'email']
+        )
+        expect(user).toBeDefined()
+        expect(user.email).toBe(validEmail)
+        
+        index++
+      }
+    })
+
+    test('BR025 & BR024 & BR006: All conditions must pass for successful registration', async () => {
+      // Test with all valid inputs - should succeed
+      const validResult = await controller.callInteraction('Registration', {
+        user: null,
+        payload: {
+          username: 'validuser',
+          password: 'validpass123', // Valid password (>= 8 chars)
+          email: 'valid@example.com', // Valid unique email
+          name: 'Valid User'
+        }
+      })
+      expect(validResult.error).toBeUndefined()
+
+      // Test with duplicate email but unique username and valid password - should fail
+      const duplicateEmailResult = await controller.callInteraction('Registration', {
+        user: null,
+        payload: {
+          username: 'anotheruser', // Unique username
+          password: 'validpass456', // Valid password
+          email: 'valid@example.com', // Duplicate email
+          name: 'Another User'
+        }
+      })
+      expect(duplicateEmailResult.error).toBeDefined()
+      expect((duplicateEmailResult.error as any).type).toBe('condition check failed')
+
+      // Test with invalid email but unique username and valid password - should fail
+      const invalidEmailResult = await controller.callInteraction('Registration', {
+        user: null,
+        payload: {
+          username: 'uniqueuser2', // Unique username
+          password: 'validpass789', // Valid password
+          email: 'invalid.email', // Invalid email format
+          name: 'Invalid Email User'
+        }
+      })
+      expect(invalidEmailResult.error).toBeDefined()
+      expect((invalidEmailResult.error as any).type).toBe('condition check failed')
+
+      // Test with duplicate username but unique valid email - should fail
+      const duplicateUsernameResult = await controller.callInteraction('Registration', {
+        user: null,
+        payload: {
+          username: 'validuser', // Duplicate username
+          password: 'anotherpass', // Valid password
+          email: 'another@example.com', // Unique valid email
+          name: 'Duplicate Username User'
+        }
+      })
+      expect(duplicateUsernameResult.error).toBeDefined()
+      expect((duplicateUsernameResult.error as any).type).toBe('condition check failed')
+
+      // Test with short password but unique username and valid email - should fail
+      const shortPasswordResult = await controller.callInteraction('Registration', {
+        user: null,
+        payload: {
+          username: 'shortpassuser', // Unique username
+          password: 'short', // Invalid password (< 8 chars)
+          email: 'shortpass@example.com', // Unique valid email
+          name: 'Short Password User'
+        }
+      })
+      expect(shortPasswordResult.error).toBeDefined()
+      expect((shortPasswordResult.error as any).type).toBe('condition check failed')
+
+      // Verify only the first valid user was created
+      const allUsers = await system.storage.find('User',
+        undefined,
+        undefined,
+        ['id', 'username', 'email']
+      )
+      expect(allUsers.length).toBe(1)
+      expect(allUsers[0].username).toBe('validuser')
+      expect(allUsers[0].email).toBe('valid@example.com')
+    })
+
     // BR008: Cannot update capacity after creation
     test('BR008: Can update name, floor, building', async () => {
       // Create admin user

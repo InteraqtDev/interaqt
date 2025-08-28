@@ -1735,10 +1735,11 @@ const uniqueAndValidEmail = Condition.create({
     // This regex checks for:
     // - Non-whitespace characters before @
     // - Single @ symbol
-    // - Domain with at least one dot
+    // - Domain with at least one dot (required)
     // - No consecutive dots
     // - Valid characters in domain
-    const emailRegex = /^[a-zA-Z0-9.!#$%&'*+\/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/
+    const emailRegex = /^[a-zA-Z0-9.!#$%&'*+\/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/
+    // Note the + at the end instead of * - this requires at least one dot in the domain
     if (!emailRegex.test(email)) {
       return false // Invalid email format
     }
@@ -1949,9 +1950,52 @@ const registrationUsernameUnique = Condition.create({
   }
 })
 
-// Combine BR006 (password length) and BR024 (username unique) for Registration
+// BR025: Email must be unique and valid format for Registration
+const registrationEmailUniqueAndValid = Condition.create({
+  name: 'registrationEmailUniqueAndValid',
+  content: async function(this: Controller, event: any) {
+    const email = event.payload?.email
+    
+    if (!email) {
+      return false // No email provided
+    }
+    
+    // Validate email format using a comprehensive regex pattern
+    // This regex checks for:
+    // - Non-whitespace characters before @
+    // - Single @ symbol
+    // - Domain with at least one dot (required)
+    // - No consecutive dots
+    // - Valid characters in domain
+    const emailRegex = /^[a-zA-Z0-9.!#$%&'*+\/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/
+    // Note the + at the end instead of * - this requires at least one dot in the domain
+    if (!emailRegex.test(email)) {
+      return false // Invalid email format
+    }
+    
+    // Additional check for consecutive dots which the regex might not catch perfectly
+    if (email.includes('..') || email.includes('@.') || email.includes('.@')) {
+      return false // Invalid email format - consecutive dots or dots adjacent to @
+    }
+    
+    // Check if a user with this email already exists
+    const existingUser = await this.system.storage.findOne(
+      'User',
+      MatchExp.atom({ key: 'email', value: ['=', email] }),
+      undefined,
+      ['id']
+    )
+    
+    // Return true if no existing user found with this email
+    return !existingUser
+  }
+})
+
+// Combine BR006 (password length), BR024 (username unique), and BR025 (email unique and valid) for Registration
 Registration.conditions = Conditions.create({
-  content: BoolExp.atom(registrationPasswordLength).and(BoolExp.atom(registrationUsernameUnique))
+  content: BoolExp.atom(registrationPasswordLength)
+    .and(BoolExp.atom(registrationUsernameUnique))
+    .and(BoolExp.atom(registrationEmailUniqueAndValid))
 })
 
 // P015: Admin can see all requests, dormitory leaders can only see their dormitory's requests
