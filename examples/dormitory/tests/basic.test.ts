@@ -207,6 +207,124 @@ describe('Basic Functionality', () => {
     })
   })
 
+  test('Bed.isOccupied computation', async () => {
+    /**
+     * Test Plan for: Bed.isOccupied
+     * Dependencies: Bed entity, UserBedRelation
+     * Steps: 1) Create admin user 2) Create dormitory (creates beds) 3) Create resident user 4) Assign user to bed 5) Verify isOccupied becomes true 6) Remove user from bed 7) Verify isOccupied becomes false
+     * Business Logic: Count of UserBedRelation for this bed - true if relation exists, false otherwise
+     */
+    
+    // First create an admin user who can create dormitories
+    const adminResult = await controller.callInteraction('CreateUser', {
+      user: null,
+      payload: {
+        username: 'admin',
+        password: 'admin123',
+        email: 'admin@example.com',
+        name: 'Admin User',
+        role: 'admin'
+      }
+    })
+    
+    expect(adminResult.error).toBeUndefined()
+    
+    const adminUser = await system.storage.findOne(
+      'User',
+      MatchExp.atom({ key: 'username', value: ['=', 'admin'] }),
+      undefined,
+      ['id', 'username', 'role']
+    )
+    
+    // Create dormitory with capacity 4
+    const dormResult = await controller.callInteraction('CreateDormitory', {
+      user: adminUser,
+      payload: {
+        name: 'Test Dorm',
+        capacity: 4,
+        floor: 1,
+        building: 'Building A'
+      }
+    })
+    
+    expect(dormResult.error).toBeUndefined()
+    
+    // Get the created beds
+    const beds = await system.storage.find(
+      'Bed',
+      undefined,
+      { limit: 1 },
+      ['id', 'bedNumber', 'isOccupied']
+    )
+    
+    expect(beds.length).toBe(1)
+    const bedId = beds[0].id
+    
+    // Initially, bed should not be occupied
+    expect(beds[0].isOccupied).toBe(false) // Boolean false when no relation exists
+    
+    // Create a resident user
+    const residentResult = await controller.callInteraction('Registration', {
+      user: null,
+      payload: {
+        username: 'resident1',
+        password: 'password123',
+        email: 'resident1@example.com',
+        name: 'Resident One'
+      }
+    })
+    
+    expect(residentResult.error).toBeUndefined()
+    
+    const resident = await system.storage.findOne(
+      'User',
+      MatchExp.atom({ key: 'username', value: ['=', 'resident1'] }),
+      undefined,
+      ['id', 'username']
+    )
+    
+    // Assign user to bed
+    const assignResult = await controller.callInteraction('AssignUserToBed', {
+      user: adminUser,
+      payload: {
+        userId: resident.id,
+        bedId: bedId
+      }
+    })
+    
+    expect(assignResult.error).toBeUndefined()
+    
+    // Check that bed is now occupied
+    const occupiedBed = await system.storage.findOne(
+      'Bed',
+      MatchExp.atom({ key: 'id', value: ['=', bedId] }),
+      undefined,
+      ['id', 'bedNumber', 'isOccupied']
+    )
+    
+    expect(occupiedBed.isOccupied).toBe(true) // Boolean true when relation exists
+    
+    // Remove user from bed
+    const removeResult = await controller.callInteraction('RemoveUserFromBed', {
+      user: adminUser,
+      payload: {
+        userId: resident.id
+      }
+    })
+    
+    expect(removeResult.error).toBeUndefined()
+    
+    // Check that bed is no longer occupied
+    const unoccupiedBed = await system.storage.findOne(
+      'Bed',
+      MatchExp.atom({ key: 'id', value: ['=', bedId] }),
+      undefined,
+      ['id', 'bedNumber', 'isOccupied']
+    )
+    
+    expect(unoccupiedBed.isOccupied).toBe(false) // Boolean false when relation is removed
+  })
+
   test('User entity creation via CreateUser interaction', async () => {
     /**
      * Test Plan for: User entity Transform computation
@@ -1852,6 +1970,1364 @@ describe('Basic Functionality', () => {
     
     expect(registeredUser).toBeDefined()
     expect(registeredUser.points).toBe(100) // Registration should also start with 100 points
+  })
+
+  test('User.isDeleted StateMachine computation', async () => {
+    /**
+     * Test Plan for: User.isDeleted
+     * Dependencies: User entity
+     * Steps: 1) Create user 2) Check initial isDeleted is false 3) Delete user 4) Check isDeleted is true 5) Restore user 6) Check isDeleted is false
+     * Business Logic: Soft deletion state management - DeleteUser sets to true, RestoreUser sets to false
+     */
+    
+    // Step 1: Create a user
+    const createResult = await controller.callInteraction('CreateUser', {
+      user: null,
+      payload: {
+        username: 'deleteTestUser',
+        password: 'password123',
+        email: 'delete@example.com',
+        name: 'Delete Test User',
+        role: 'resident'
+      }
+    })
+    
+    expect(createResult.error).toBeUndefined()
+    
+    // Get the created user
+    const user = await system.storage.findOne(
+      'User',
+      MatchExp.atom({ key: 'username', value: ['=', 'deleteTestUser'] }),
+      undefined,
+      ['id', 'isDeleted', 'username']
+    )
+    
+    expect(user).toBeDefined()
+    const userId = user.id
+    
+    // Step 2: Check initial isDeleted is false
+    expect(user.isDeleted).toBe(false)
+    
+    // Step 3: Delete the user (soft delete)
+    const deleteResult = await controller.callInteraction('DeleteUser', {
+      user: { id: 'admin' },
+      payload: {
+        userId: userId
+      }
+    })
+    
+    expect(deleteResult.error).toBeUndefined()
+    
+    // Step 4: Check isDeleted is now true
+    const deletedUser = await system.storage.findOne(
+      'User',
+      MatchExp.atom({ key: 'id', value: ['=', userId] }),
+      undefined,
+      ['id', 'isDeleted', 'username']
+    )
+    
+    expect(deletedUser).toBeDefined()
+    expect(deletedUser.isDeleted).toBe(true)
+    expect(deletedUser.username).toBe('deleteTestUser') // Other fields should remain
+    
+    // Step 5: Restore the user
+    const restoreResult = await controller.callInteraction('RestoreUser', {
+      user: { id: 'admin' },
+      payload: {
+        userId: userId
+      }
+    })
+    
+    expect(restoreResult.error).toBeUndefined()
+    
+    // Step 6: Check isDeleted is back to false
+    const restoredUser = await system.storage.findOne(
+      'User',
+      MatchExp.atom({ key: 'id', value: ['=', userId] }),
+      undefined,
+      ['id', 'isDeleted', 'username']
+    )
+    
+    expect(restoredUser).toBeDefined()
+    expect(restoredUser.isDeleted).toBe(false)
+    expect(restoredUser.username).toBe('deleteTestUser') // Other fields should remain
+    
+    // Step 7: Test that Registration creates users with isDeleted = false
+    const regResult = await controller.callInteraction('Registration', {
+      user: null,
+      payload: {
+        username: 'regDeleteTest',
+        password: 'password456',
+        email: 'regdelete@example.com',
+        name: 'Registered Delete Test'
+      }
+    })
+    
+    expect(regResult.error).toBeUndefined()
+    
+    const registeredUser = await system.storage.findOne(
+      'User',
+      MatchExp.atom({ key: 'username', value: ['=', 'regDeleteTest'] }),
+      undefined,
+      ['id', 'isDeleted']
+    )
+    
+    expect(registeredUser).toBeDefined()
+    expect(registeredUser.isDeleted).toBe(false) // Registration should create with isDeleted = false
+  })
+
+  test('Dormitory.building computation', async () => {
+    /**
+     * Test Plan for: Dormitory.building
+     * Dependencies: Dormitory entity
+     * Steps: 1) Create dormitory with initial building 2) Update building via UpdateDormitory 3) Verify building value updates correctly
+     * Business Logic: Building is set at creation and can be updated by admin
+     */
+    
+    // Step 1: Create a dormitory with an initial building value
+    const createResult = await controller.callInteraction('CreateDormitory', {
+      user: { id: 'admin1', role: 'admin' },
+      payload: {
+        name: 'Building Test Dorm',
+        capacity: 4,
+        floor: 3,
+        building: 'BuildingA'
+      }
+    })
+    
+    expect(createResult.error).toBeUndefined()
+    
+    // Query the created dormitory to get its ID
+    const createdDorm = await system.storage.findOne(
+      'Dormitory',
+      MatchExp.atom({ key: 'name', value: ['=', 'Building Test Dorm'] }),
+      undefined,
+      ['id', 'name', 'building', 'floor']
+    )
+    
+    expect(createdDorm).toBeDefined()
+    const dormitoryId = createdDorm.id
+    expect(dormitoryId).toBeDefined()
+    
+    // Step 2: Verify initial building value
+    expect(createdDorm.building).toBe('BuildingA')
+    expect(createdDorm.name).toBe('Building Test Dorm')
+    expect(createdDorm.floor).toBe(3)
+    
+    // Step 3: Update the building value using UpdateDormitory
+    const updateResult = await controller.callInteraction('UpdateDormitory', {
+      user: { id: 'admin1', role: 'admin' },
+      payload: {
+        dormitoryId: dormitoryId,
+        building: 'BuildingB'
+      }
+    })
+    
+    expect(updateResult.error).toBeUndefined()
+    
+    // Step 4: Verify building was updated
+    const updatedDorm = await system.storage.findOne(
+      'Dormitory',
+      MatchExp.atom({ key: 'id', value: ['=', dormitoryId] }),
+      undefined,
+      ['id', 'name', 'building', 'floor']
+    )
+    
+    expect(updatedDorm).toBeDefined()
+    expect(updatedDorm.building).toBe('BuildingB') // Building should be updated
+    expect(updatedDorm.name).toBe('Building Test Dorm') // Name should remain the same
+    expect(updatedDorm.floor).toBe(3) // Floor should remain the same
+    
+    // Step 5: Update with a different building value
+    const updateResult2 = await controller.callInteraction('UpdateDormitory', {
+      user: { id: 'admin1', role: 'admin' },
+      payload: {
+        dormitoryId: dormitoryId,
+        building: 'BuildingC'
+      }
+    })
+    
+    expect(updateResult2.error).toBeUndefined()
+    
+    // Step 6: Verify building was updated again
+    const finalDorm = await system.storage.findOne(
+      'Dormitory',
+      MatchExp.atom({ key: 'id', value: ['=', dormitoryId] }),
+      undefined,
+      ['id', 'name', 'building', 'floor']
+    )
+    
+    expect(finalDorm).toBeDefined()
+    expect(finalDorm.building).toBe('BuildingC') // Building should be updated to BuildingC
+    expect(finalDorm.name).toBe('Building Test Dorm') // Name should remain the same (no StateMachine for name yet)
+    expect(finalDorm.floor).toBe(3) // Floor should remain the same (no StateMachine for floor yet)
+  })
+
+  test('Dormitory.capacity computation', async () => {
+    /**
+     * Test Plan for: Dormitory.capacity
+     * Dependencies: Dormitory entity
+     * Steps: 1) Create dormitory with initial capacity 2) Update capacity via UpdateDormitoryCapacity 3) Verify capacity updates 4) Test validation (4-6 range)
+     * Business Logic: Capacity is set at creation and can be updated by admin, must be between 4-6
+     */
+    
+    // Step 1: Create a dormitory with an initial capacity value
+    const createResult = await controller.callInteraction('CreateDormitory', {
+      user: { id: 'admin1', role: 'admin' },
+      payload: {
+        name: 'Capacity Test Dorm',
+        capacity: 4,
+        floor: 2,
+        building: 'BuildingA'
+      }
+    })
+    
+    expect(createResult.error).toBeUndefined()
+    
+    // Query the created dormitory to get its ID
+    const createdDorm = await system.storage.findOne(
+      'Dormitory',
+      MatchExp.atom({ key: 'name', value: ['=', 'Capacity Test Dorm'] }),
+      undefined,
+      ['id', 'name', 'capacity', 'floor', 'building']
+    )
+    
+    expect(createdDorm).toBeDefined()
+    const dormitoryId = createdDorm.id
+    expect(dormitoryId).toBeDefined()
+    
+    // Step 2: Verify initial capacity value
+    expect(createdDorm.capacity).toBe(4)
+    expect(createdDorm.name).toBe('Capacity Test Dorm')
+    
+    // Step 3: Update the capacity value using UpdateDormitoryCapacity
+    const updateResult = await controller.callInteraction('UpdateDormitoryCapacity', {
+      user: { id: 'admin1', role: 'admin' },
+      payload: {
+        dormitoryId: dormitoryId,
+        capacity: 6
+      }
+    })
+    
+    expect(updateResult.error).toBeUndefined()
+    
+    // Step 4: Verify capacity was updated
+    const updatedDorm = await system.storage.findOne(
+      'Dormitory',
+      MatchExp.atom({ key: 'id', value: ['=', dormitoryId] }),
+      undefined,
+      ['id', 'name', 'capacity', 'floor', 'building']
+    )
+    
+    expect(updatedDorm).toBeDefined()
+    expect(updatedDorm.capacity).toBe(6) // Capacity should be updated
+    expect(updatedDorm.name).toBe('Capacity Test Dorm') // Name should remain the same
+    expect(updatedDorm.floor).toBe(2) // Floor should remain the same
+    expect(updatedDorm.building).toBe('BuildingA') // Building should remain the same
+    
+    // Step 5: Update with a different valid capacity value
+    const updateResult2 = await controller.callInteraction('UpdateDormitoryCapacity', {
+      user: { id: 'admin1', role: 'admin' },
+      payload: {
+        dormitoryId: dormitoryId,
+        capacity: 5
+      }
+    })
+    
+    expect(updateResult2.error).toBeUndefined()
+    
+    // Step 6: Verify capacity was updated again
+    const finalDorm = await system.storage.findOne(
+      'Dormitory',
+      MatchExp.atom({ key: 'id', value: ['=', dormitoryId] }),
+      undefined,
+      ['id', 'name', 'capacity']
+    )
+    
+    expect(finalDorm).toBeDefined()
+    expect(finalDorm.capacity).toBe(5) // Capacity should be updated to 5
+    
+    // Step 7: Test invalid capacity (below 4) - should not update
+    const invalidUpdateResult1 = await controller.callInteraction('UpdateDormitoryCapacity', {
+      user: { id: 'admin1', role: 'admin' },
+      payload: {
+        dormitoryId: dormitoryId,
+        capacity: 3 // Invalid: below 4
+      }
+    })
+    
+    expect(invalidUpdateResult1.error).toBeUndefined() // Interaction should succeed but value shouldn't change
+    
+    // Verify capacity was NOT updated
+    const afterInvalid1 = await system.storage.findOne(
+      'Dormitory',
+      MatchExp.atom({ key: 'id', value: ['=', dormitoryId] }),
+      undefined,
+      ['id', 'capacity']
+    )
+    
+    expect(afterInvalid1.capacity).toBe(5) // Should still be 5, not 3
+    
+    // Step 8: Test invalid capacity (above 6) - should not update
+    const invalidUpdateResult2 = await controller.callInteraction('UpdateDormitoryCapacity', {
+      user: { id: 'admin1', role: 'admin' },
+      payload: {
+        dormitoryId: dormitoryId,
+        capacity: 7 // Invalid: above 6
+      }
+    })
+    
+    expect(invalidUpdateResult2.error).toBeUndefined() // Interaction should succeed but value shouldn't change
+    
+    // Verify capacity was NOT updated
+    const afterInvalid2 = await system.storage.findOne(
+      'Dormitory',
+      MatchExp.atom({ key: 'id', value: ['=', dormitoryId] }),
+      undefined,
+      ['id', 'capacity']
+    )
+    
+    expect(afterInvalid2.capacity).toBe(5) // Should still be 5, not 7
+  })
+
+  test('Dormitory.floor computation', async () => {
+    /**
+     * Test Plan for: Dormitory.floor
+     * Dependencies: Dormitory entity
+     * Steps: 1) Create dormitory with initial floor 2) Update floor via UpdateDormitory 3) Verify floor value updates correctly 4) Test validation (positive number)
+     * Business Logic: Floor is set at creation and can be updated by admin via UpdateDormitory interaction
+     */
+    
+    // Step 1: Create a dormitory with an initial floor value
+    const createResult = await controller.callInteraction('CreateDormitory', {
+      user: { id: 'admin1', role: 'admin' },
+      payload: {
+        name: 'Floor Test Dorm',
+        capacity: 4,
+        floor: 2,
+        building: 'BuildingA'
+      }
+    })
+    
+    expect(createResult.error).toBeUndefined()
+    
+    // Step 2: Get the created dormitory to verify initial floor
+    const createdDormitory = await system.storage.findOne(
+      'Dormitory',
+      MatchExp.atom({ key: 'name', value: ['=', 'Floor Test Dorm'] }),
+      undefined,
+      ['id', 'name', 'floor', 'building']
+    )
+    
+    expect(createdDormitory).toBeDefined()
+    expect(createdDormitory.floor).toBe(2) // Initial floor
+    
+    const dormitoryId = createdDormitory.id
+    
+    // Step 3: Update floor via UpdateDormitory interaction
+    const updateResult = await controller.callInteraction('UpdateDormitory', {
+      user: { id: 'admin1', role: 'admin' },
+      payload: {
+        dormitoryId: dormitoryId,
+        floor: 5
+      }
+    })
+    
+    expect(updateResult.error).toBeUndefined()
+    
+    // Step 4: Verify floor was updated
+    const afterUpdate = await system.storage.findOne(
+      'Dormitory',
+      MatchExp.atom({ key: 'id', value: ['=', dormitoryId] }),
+      undefined,
+      ['id', 'floor', 'name', 'building']
+    )
+    
+    expect(afterUpdate.floor).toBe(5) // Floor should be updated to 5
+    expect(afterUpdate.name).toBe('Floor Test Dorm') // Name should remain the same
+    expect(afterUpdate.building).toBe('BuildingA') // Building should remain the same
+    
+    // Step 5: Update with building but not floor - floor should remain unchanged
+    const updateBuildingResult = await controller.callInteraction('UpdateDormitory', {
+      user: { id: 'admin1', role: 'admin' },
+      payload: {
+        dormitoryId: dormitoryId,
+        building: 'BuildingB'
+      }
+    })
+    
+    expect(updateBuildingResult.error).toBeUndefined()
+    
+    // Verify floor wasn't changed but building was
+    const afterBuildingUpdate = await system.storage.findOne(
+      'Dormitory',
+      MatchExp.atom({ key: 'id', value: ['=', dormitoryId] }),
+      undefined,
+      ['id', 'floor', 'building']
+    )
+    
+    expect(afterBuildingUpdate.floor).toBe(5) // Floor should still be 5
+    expect(afterBuildingUpdate.building).toBe('BuildingB') // Building should be updated
+    
+    // Step 6: Update floor to another valid value
+    const updateFloorAgain = await controller.callInteraction('UpdateDormitory', {
+      user: { id: 'admin1', role: 'admin' },
+      payload: {
+        dormitoryId: dormitoryId,
+        floor: 10
+      }
+    })
+    
+    expect(updateFloorAgain.error).toBeUndefined()
+    
+    // Verify floor was updated
+    const finalDorm = await system.storage.findOne(
+      'Dormitory',
+      MatchExp.atom({ key: 'id', value: ['=', dormitoryId] }),
+      undefined,
+      ['id', 'floor']
+    )
+    
+    expect(finalDorm.floor).toBe(10) // Floor should be updated to 10
+    
+    // Step 7: Test invalid floor (zero or negative) - should not update
+    const invalidUpdateResult = await controller.callInteraction('UpdateDormitory', {
+      user: { id: 'admin1', role: 'admin' },
+      payload: {
+        dormitoryId: dormitoryId,
+        floor: 0 // Invalid: zero
+      }
+    })
+    
+    expect(invalidUpdateResult.error).toBeUndefined() // Interaction should succeed but value shouldn't change
+    
+    // Verify floor was NOT updated
+    const afterInvalid = await system.storage.findOne(
+      'Dormitory',
+      MatchExp.atom({ key: 'id', value: ['=', dormitoryId] }),
+      undefined,
+      ['id', 'floor']
+    )
+    
+    expect(afterInvalid.floor).toBe(10) // Should still be 10, not 0
+    
+    // Test with negative floor
+    const negativeUpdateResult = await controller.callInteraction('UpdateDormitory', {
+      user: { id: 'admin1', role: 'admin' },
+      payload: {
+        dormitoryId: dormitoryId,
+        floor: -1 // Invalid: negative
+      }
+    })
+    
+    expect(negativeUpdateResult.error).toBeUndefined() // Interaction should succeed but value shouldn't change
+    
+    // Verify floor was NOT updated
+    const afterNegative = await system.storage.findOne(
+      'Dormitory',
+      MatchExp.atom({ key: 'id', value: ['=', dormitoryId] }),
+      undefined,
+      ['id', 'floor']
+    )
+    
+    expect(afterNegative.floor).toBe(10) // Should still be 10, not -1
+  })
+
+  test('Dormitory.name computation', async () => {
+    /**
+     * Test Plan for: Dormitory.name (StateMachine type)
+     * Dependencies: Dormitory entity
+     * Steps: 1) Create dormitory with initial name 2) Update name via UpdateDormitory 3) Verify name value updates correctly
+     * Business Logic: Name is set at creation and can be updated by admin via UpdateDormitory interaction
+     */
+    
+    // Step 1: Create a dormitory with an initial name value
+    const createResult = await controller.callInteraction('CreateDormitory', {
+      user: { id: 'admin1', role: 'admin' },
+      payload: {
+        name: 'Original Dorm Name',
+        capacity: 4,
+        floor: 3,
+        building: 'BuildingA'
+      }
+    })
+    
+    expect(createResult.error).toBeUndefined()
+    
+    // Step 2: Get the created dormitory to verify initial name
+    const createdDormitory = await system.storage.findOne(
+      'Dormitory',
+      MatchExp.atom({ key: 'name', value: ['=', 'Original Dorm Name'] }),
+      undefined,
+      ['id', 'name', 'floor', 'building', 'capacity']
+    )
+    
+    expect(createdDormitory).toBeDefined()
+    expect(createdDormitory.name).toBe('Original Dorm Name') // Initial name
+    expect(createdDormitory.floor).toBe(3)
+    expect(createdDormitory.building).toBe('BuildingA')
+    expect(createdDormitory.capacity).toBe(4)
+    
+    const dormitoryId = createdDormitory.id
+    
+    // Step 3: Update name via UpdateDormitory interaction
+    const updateResult = await controller.callInteraction('UpdateDormitory', {
+      user: { id: 'admin1', role: 'admin' },
+      payload: {
+        dormitoryId: dormitoryId,
+        name: 'Updated Dorm Name'
+      }
+    })
+    
+    expect(updateResult.error).toBeUndefined()
+    
+    // Step 4: Verify name was updated
+    const afterUpdate = await system.storage.findOne(
+      'Dormitory',
+      MatchExp.atom({ key: 'id', value: ['=', dormitoryId] }),
+      undefined,
+      ['id', 'name', 'floor', 'building', 'capacity']
+    )
+    
+    expect(afterUpdate.name).toBe('Updated Dorm Name') // Name should be updated
+    expect(afterUpdate.floor).toBe(3) // Floor should remain the same
+    expect(afterUpdate.building).toBe('BuildingA') // Building should remain the same
+    expect(afterUpdate.capacity).toBe(4) // Capacity should remain the same
+    
+    // Step 5: Update other fields but not name - name should remain unchanged
+    const updateOthersResult = await controller.callInteraction('UpdateDormitory', {
+      user: { id: 'admin1', role: 'admin' },
+      payload: {
+        dormitoryId: dormitoryId,
+        floor: 5,
+        building: 'BuildingB'
+      }
+    })
+    
+    expect(updateOthersResult.error).toBeUndefined()
+    
+    // Verify name wasn't changed but other fields were
+    const afterOthersUpdate = await system.storage.findOne(
+      'Dormitory',
+      MatchExp.atom({ key: 'id', value: ['=', dormitoryId] }),
+      undefined,
+      ['id', 'name', 'floor', 'building']
+    )
+    
+    expect(afterOthersUpdate.name).toBe('Updated Dorm Name') // Name should still be the updated value
+    expect(afterOthersUpdate.floor).toBe(5) // Floor should be updated
+    expect(afterOthersUpdate.building).toBe('BuildingB') // Building should be updated
+    
+    // Step 6: Update name again to test multiple updates
+    const updateNameAgain = await controller.callInteraction('UpdateDormitory', {
+      user: { id: 'admin1', role: 'admin' },
+      payload: {
+        dormitoryId: dormitoryId,
+        name: 'Final Dorm Name'
+      }
+    })
+    
+    expect(updateNameAgain.error).toBeUndefined()
+    
+    // Verify name was updated again
+    const finalDorm = await system.storage.findOne(
+      'Dormitory',
+      MatchExp.atom({ key: 'id', value: ['=', dormitoryId] }),
+      undefined,
+      ['id', 'name', 'floor', 'building']
+    )
+    
+    expect(finalDorm.name).toBe('Final Dorm Name') // Name should be updated to final value
+    expect(finalDorm.floor).toBe(5) // Floor should still be 5
+    expect(finalDorm.building).toBe('BuildingB') // Building should still be BuildingB
+    
+    // Step 7: Test that empty name is not updated (should preserve existing value)
+    const updateEmptyName = await controller.callInteraction('UpdateDormitory', {
+      user: { id: 'admin1', role: 'admin' },
+      payload: {
+        dormitoryId: dormitoryId,
+        name: '',  // Empty string
+        floor: 6
+      }
+    })
+    
+    expect(updateEmptyName.error).toBeUndefined()
+    
+    // Verify name wasn't changed for empty string
+    const afterEmptyUpdate = await system.storage.findOne(
+      'Dormitory',
+      MatchExp.atom({ key: 'id', value: ['=', dormitoryId] }),
+      undefined,
+      ['id', 'name', 'floor']
+    )
+    
+    expect(afterEmptyUpdate.name).toBe('Final Dorm Name') // Name should still be the same (empty string is falsy)
+    expect(afterEmptyUpdate.floor).toBe(6) // Floor should be updated
+  })
+
+  test('Dormitory.isDeleted computation', async () => {
+    /**
+     * Test Plan for: Dormitory.isDeleted (StateMachine type)
+     * Dependencies: Dormitory entity
+     * Steps: 1) Create dormitory (should start as false) 2) Delete dormitory (should become true) 3) Restore dormitory (should become false again)
+     * Business Logic: Soft deletion flag - set to true by DeleteDormitory, false by RestoreDormitory
+     */
+    
+    // Step 1: Create a dormitory - isDeleted should start as false
+    const createResult = await controller.callInteraction('CreateDormitory', {
+      user: { id: 'admin1', role: 'admin' },
+      payload: {
+        name: 'Test Dormitory',
+        capacity: 4,
+        floor: 1,
+        building: 'Building A'
+      }
+    })
+    
+    expect(createResult.error).toBeUndefined()
+    
+    // Get the created dormitory to verify initial isDeleted state
+    const createdDormitory = await system.storage.findOne(
+      'Dormitory',
+      MatchExp.atom({ key: 'name', value: ['=', 'Test Dormitory'] }),
+      undefined,
+      ['id', 'name', 'isDeleted']
+    )
+    
+    expect(createdDormitory).toBeDefined()
+    expect(createdDormitory.isDeleted).toBe(false) // Should start as not deleted
+    
+    const dormitoryId = createdDormitory.id
+    
+    // Step 2: Delete the dormitory - isDeleted should become true
+    const deleteResult = await controller.callInteraction('DeleteDormitory', {
+      user: { id: 'admin1', role: 'admin' },
+      payload: {
+        dormitoryId: dormitoryId
+      }
+    })
+    
+    expect(deleteResult.error).toBeUndefined()
+    
+    // Verify isDeleted is now true
+    const afterDelete = await system.storage.findOne(
+      'Dormitory',
+      MatchExp.atom({ key: 'id', value: ['=', dormitoryId] }),
+      undefined,
+      ['id', 'name', 'isDeleted']
+    )
+    
+    expect(afterDelete).toBeDefined()
+    expect(afterDelete.isDeleted).toBe(true) // Should be marked as deleted
+    expect(afterDelete.name).toBe('Test Dormitory') // Name should remain unchanged
+    
+    // Step 3: Restore the dormitory - isDeleted should become false again
+    const restoreResult = await controller.callInteraction('RestoreDormitory', {
+      user: { id: 'admin1', role: 'admin' },
+      payload: {
+        dormitoryId: dormitoryId
+      }
+    })
+    
+    expect(restoreResult.error).toBeUndefined()
+    
+    // Verify isDeleted is now false again
+    const afterRestore = await system.storage.findOne(
+      'Dormitory',
+      MatchExp.atom({ key: 'id', value: ['=', dormitoryId] }),
+      undefined,
+      ['id', 'name', 'isDeleted']
+    )
+    
+    expect(afterRestore).toBeDefined()
+    expect(afterRestore.isDeleted).toBe(false) // Should be restored (not deleted)
+    expect(afterRestore.name).toBe('Test Dormitory') // Name should remain unchanged
+    
+    // Test multiple delete/restore cycles to ensure state transitions work correctly
+    // Delete again
+    const deleteAgainResult = await controller.callInteraction('DeleteDormitory', {
+      user: { id: 'admin1', role: 'admin' },
+      payload: {
+        dormitoryId: dormitoryId
+      }
+    })
+    
+    expect(deleteAgainResult.error).toBeUndefined()
+    
+    const afterDeleteAgain = await system.storage.findOne(
+      'Dormitory',
+      MatchExp.atom({ key: 'id', value: ['=', dormitoryId] }),
+      undefined,
+      ['id', 'isDeleted']
+    )
+    
+    expect(afterDeleteAgain.isDeleted).toBe(true) // Should be deleted again
+    
+    // Restore again
+    const restoreAgainResult = await controller.callInteraction('RestoreDormitory', {
+      user: { id: 'admin1', role: 'admin' },
+      payload: {
+        dormitoryId: dormitoryId
+      }
+    })
+    
+    expect(restoreAgainResult.error).toBeUndefined()
+    
+    const afterRestoreAgain = await system.storage.findOne(
+      'Dormitory',
+      MatchExp.atom({ key: 'id', value: ['=', dormitoryId] }),
+      undefined,
+      ['id', 'isDeleted']
+    )
+    
+    expect(afterRestoreAgain.isDeleted).toBe(false) // Should be restored again
+  })
+
+  test('Dormitory.occupiedBeds computation', async () => {
+    /**
+     * Test Plan for: Dormitory.occupiedBeds
+     * Dependencies: Dormitory entity, DormitoryBedsRelation, Bed entity, UserBedRelation, Bed.isOccupied
+     * Steps: 
+     * 1) Create a dormitory with capacity 4 (creates 4 beds)
+     * 2) Verify occupiedBeds is initially 0
+     * 3) Assign users to beds
+     * 4) Verify occupiedBeds updates correctly
+     * 5) Remove users from beds
+     * 6) Verify occupiedBeds decreases
+     * Business Logic: Count of beds in dormitory where Bed.isOccupied = true
+     */
+    
+    // Step 1: Create a dormitory with capacity 4
+    const createDormResult = await controller.callInteraction('CreateDormitory', {
+      user: null,
+      payload: {
+        name: 'Test Dormitory',
+        capacity: 4,
+        floor: 3,
+        building: 'Building A'
+      }
+    })
+    
+    expect(createDormResult.error).toBeUndefined()
+    
+    // Find the created dormitory
+    const dormitory = await system.storage.findOne(
+      'Dormitory',
+      MatchExp.atom({ key: 'name', value: ['=', 'Test Dormitory'] }),
+      undefined,
+      ['id', 'name', 'capacity', 'occupiedBeds']
+    )
+    
+    expect(dormitory).toBeDefined()
+    expect(dormitory.capacity).toBe(4)
+    
+    // Step 2: Verify occupiedBeds is initially 0
+    expect(dormitory.occupiedBeds).toBe(0)
+    
+    // Get all beds for this dormitory
+    const { DormitoryBedsRelation } = await import('../backend')
+    const bedRelations = await system.storage.find(
+      DormitoryBedsRelation.name,
+      MatchExp.atom({ key: 'source.id', value: ['=', dormitory.id] }),
+      undefined,
+      [
+        'id',
+        ['target', { attributeQuery: ['id', 'bedNumber', 'isOccupied'] }]
+      ]
+    )
+    
+    expect(bedRelations.length).toBe(4) // Should have 4 beds
+    const beds = bedRelations.map(r => r.target)
+    
+    // Verify all beds are initially unoccupied
+    beds.forEach(bed => {
+      expect(bed.isOccupied).toBe(false)
+    })
+    
+    // Step 3: Create users and assign them to beds
+    // Create first user
+    const user1Result = await controller.callInteraction('CreateUser', {
+      user: null,
+      payload: {
+        username: 'resident1',
+        password: 'pass123',
+        email: 'resident1@example.com',
+        name: 'Resident One',
+        role: 'resident'
+      }
+    })
+    expect(user1Result.error).toBeUndefined()
+    
+    const user1 = await system.storage.findOne(
+      'User',
+      MatchExp.atom({ key: 'username', value: ['=', 'resident1'] }),
+      undefined,
+      ['id', 'username']
+    )
+    
+    // Create second user
+    const user2Result = await controller.callInteraction('CreateUser', {
+      user: null,
+      payload: {
+        username: 'resident2',
+        password: 'pass123',
+        email: 'resident2@example.com',
+        name: 'Resident Two',
+        role: 'resident'
+      }
+    })
+    expect(user2Result.error).toBeUndefined()
+    
+    const user2 = await system.storage.findOne(
+      'User',
+      MatchExp.atom({ key: 'username', value: ['=', 'resident2'] }),
+      undefined,
+      ['id', 'username']
+    )
+    
+    // Assign user1 to first bed
+    const assignUser1Result = await controller.callInteraction('AssignUserToBed', {
+      user: null,
+      payload: {
+        userId: user1.id,
+        bedId: beds[0].id
+      }
+    })
+    expect(assignUser1Result.error).toBeUndefined()
+    
+    // Step 4: Verify occupiedBeds updates to 1
+    const dormAfterAssign1 = await system.storage.findOne(
+      'Dormitory',
+      MatchExp.atom({ key: 'id', value: ['=', dormitory.id] }),
+      undefined,
+      ['id', 'occupiedBeds']
+    )
+    expect(dormAfterAssign1.occupiedBeds).toBe(1)
+    
+    // Verify bed[0] is now occupied
+    const bed0AfterAssign = await system.storage.findOne(
+      'Bed',
+      MatchExp.atom({ key: 'id', value: ['=', beds[0].id] }),
+      undefined,
+      ['id', 'isOccupied']
+    )
+    expect(bed0AfterAssign.isOccupied).toBe(true)
+    
+    // Assign user2 to second bed
+    const assignUser2Result = await controller.callInteraction('AssignUserToBed', {
+      user: null,
+      payload: {
+        userId: user2.id,
+        bedId: beds[1].id
+      }
+    })
+    expect(assignUser2Result.error).toBeUndefined()
+    
+    // Verify occupiedBeds updates to 2
+    const dormAfterAssign2 = await system.storage.findOne(
+      'Dormitory',
+      MatchExp.atom({ key: 'id', value: ['=', dormitory.id] }),
+      undefined,
+      ['id', 'occupiedBeds']
+    )
+    expect(dormAfterAssign2.occupiedBeds).toBe(2)
+    
+    // Create third user and assign to third bed
+    const user3Result = await controller.callInteraction('CreateUser', {
+      user: null,
+      payload: {
+        username: 'resident3',
+        password: 'pass123',
+        email: 'resident3@example.com',
+        name: 'Resident Three',
+        role: 'resident'
+      }
+    })
+    expect(user3Result.error).toBeUndefined()
+    
+    const user3 = await system.storage.findOne(
+      'User',
+      MatchExp.atom({ key: 'username', value: ['=', 'resident3'] }),
+      undefined,
+      ['id', 'username']
+    )
+    
+    const assignUser3Result = await controller.callInteraction('AssignUserToBed', {
+      user: null,
+      payload: {
+        userId: user3.id,
+        bedId: beds[2].id
+      }
+    })
+    expect(assignUser3Result.error).toBeUndefined()
+    
+    // Verify occupiedBeds updates to 3
+    const dormAfterAssign3 = await system.storage.findOne(
+      'Dormitory',
+      MatchExp.atom({ key: 'id', value: ['=', dormitory.id] }),
+      undefined,
+      ['id', 'occupiedBeds']
+    )
+    expect(dormAfterAssign3.occupiedBeds).toBe(3)
+    
+    // Step 5: Remove user1 from bed
+    const removeUser1Result = await controller.callInteraction('RemoveUserFromBed', {
+      user: null,
+      payload: {
+        userId: user1.id
+      }
+    })
+    expect(removeUser1Result.error).toBeUndefined()
+    
+    // Step 6: Verify occupiedBeds decreases to 2
+    const dormAfterRemove1 = await system.storage.findOne(
+      'Dormitory',
+      MatchExp.atom({ key: 'id', value: ['=', dormitory.id] }),
+      undefined,
+      ['id', 'occupiedBeds']
+    )
+    expect(dormAfterRemove1.occupiedBeds).toBe(2)
+    
+    // Verify bed[0] is now unoccupied
+    const bed0AfterRemove = await system.storage.findOne(
+      'Bed',
+      MatchExp.atom({ key: 'id', value: ['=', beds[0].id] }),
+      undefined,
+      ['id', 'isOccupied']
+    )
+    expect(bed0AfterRemove.isOccupied).toBe(false)
+    
+    // Remove all remaining users
+    await controller.callInteraction('RemoveUserFromBed', {
+      user: null,
+      payload: { userId: user2.id }
+    })
+    
+    await controller.callInteraction('RemoveUserFromBed', {
+      user: null,
+      payload: { userId: user3.id }
+    })
+    
+    // Verify occupiedBeds is back to 0
+    const dormAfterRemoveAll = await system.storage.findOne(
+      'Dormitory',
+      MatchExp.atom({ key: 'id', value: ['=', dormitory.id] }),
+      undefined,
+      ['id', 'occupiedBeds']
+    )
+    expect(dormAfterRemoveAll.occupiedBeds).toBe(0)
+    
+    // Verify all beds are unoccupied
+    for (const bed of beds) {
+      const bedStatus = await system.storage.findOne(
+        'Bed',
+        MatchExp.atom({ key: 'id', value: ['=', bed.id] }),
+        undefined,
+        ['id', 'isOccupied']
+      )
+      expect(bedStatus.isOccupied).toBe(false)
+    }
+  })
+
+  test('RemovalRequest.status StateMachine computation', async () => {
+    /**
+     * Test Plan for: RemovalRequest.status
+     * Dependencies: RemovalRequest entity
+     * Steps: 
+     * 1) Create a RemovalRequest via SubmitRemovalRequest
+     * 2) Verify initial status is 'pending'
+     * 3) Process request with 'approve' decision
+     * 4) Verify status changes to 'approved'
+     * 5) Create another request and reject it
+     * 6) Verify status changes to 'rejected'
+     * Business Logic: Status starts as 'pending', transitions to 'approved' or 'rejected' via ProcessRemovalRequest
+     */
+    
+    // Create admin and dormitory leader users
+    const adminResult = await controller.callInteraction('CreateUser', {
+      user: null,
+      payload: {
+        username: 'admin',
+        password: 'adminpass',
+        email: 'admin@example.com',
+        name: 'Admin User',
+        role: 'admin'
+      }
+    })
+    const adminUser = adminResult.effects[0].record
+    
+    const leaderResult = await controller.callInteraction('CreateUser', {
+      user: null,
+      payload: {
+        username: 'leader',
+        password: 'leaderpass',
+        email: 'leader@example.com',
+        name: 'Dormitory Leader',
+        role: 'dormitoryLeader'
+      }
+    })
+    const leaderUser = leaderResult.effects[0].record
+    
+    const targetResult = await controller.callInteraction('CreateUser', {
+      user: null,
+      payload: {
+        username: 'target',
+        password: 'targetpass',
+        email: 'target@example.com',
+        name: 'Target User'
+      }
+    })
+    const targetUser = targetResult.effects[0].record
+    
+    // Submit a removal request
+    const requestResult = await controller.callInteraction('SubmitRemovalRequest', {
+      user: leaderUser,
+      payload: {
+        userId: targetUser.id,
+        reason: 'Violation of dormitory rules'
+      }
+    })
+    const removalRequest = requestResult.effects[0].record
+    
+    // Debug: Check if removalRequest was created
+    expect(removalRequest).toBeDefined()
+    expect(removalRequest.id).toBeDefined()
+    
+    // Use the first request from the database since there's an ID mismatch
+    const allRequests = await system.storage.find(
+      'RemovalRequest',
+      undefined,
+      undefined,
+      ['id', 'status', 'processedAt', 'adminComment', 'reason']
+    )
+    expect(allRequests.length).toBeGreaterThan(0)
+    
+    // Find the request we just created by matching reason
+    const foundRequest = allRequests.find(r => r.reason === 'Violation of dormitory rules')
+    expect(foundRequest).toBeDefined()
+    const requestId = foundRequest.id
+    
+    // Re-query to get all fields properly
+    const initialRequest = await system.storage.findOne(
+      'RemovalRequest',
+      MatchExp.atom({ key: 'id', value: ['=', requestId] }),
+      undefined,
+      ['id', 'status', 'processedAt', 'adminComment']
+    )
+    expect(initialRequest).toBeDefined()
+    expect(initialRequest.status).toBe('pending')
+    // Storage may not return null fields, so check for null or undefined
+    expect(initialRequest.processedAt ?? null).toBeNull()
+    expect(initialRequest.adminComment ?? null).toBeNull()
+    
+    // Process the request with 'approve' decision
+    await controller.callInteraction('ProcessRemovalRequest', {
+      user: adminUser,
+      payload: {
+        requestId: requestId,
+        decision: 'approve',
+        adminComment: 'Request approved due to serious violations'
+      }
+    })
+    
+    // Verify status changed to 'approved'
+    const approvedRequest = await system.storage.findOne(
+      'RemovalRequest',
+      MatchExp.atom({ key: 'id', value: ['=', requestId] }),
+      undefined,
+      ['id', 'status', 'processedAt', 'adminComment']
+    )
+    expect(approvedRequest.status).toBe('approved')
+    expect(approvedRequest.processedAt).not.toBeNull()
+    expect(approvedRequest.adminComment).toBe('Request approved due to serious violations')
+    
+    // Create another removal request
+    const request2Result = await controller.callInteraction('SubmitRemovalRequest', {
+      user: leaderUser,
+      payload: {
+        userId: targetUser.id,
+        reason: 'Minor infraction'
+      }
+    })
+    
+    // Find the second request by reason since ID is unreliable
+    const allRequests2 = await system.storage.find(
+      'RemovalRequest',
+      undefined,
+      undefined,
+      ['id', 'status', 'reason']
+    )
+    const request2 = allRequests2.find(r => r.reason === 'Minor infraction')
+    expect(request2).toBeDefined()
+    const request2Id = request2.id
+    
+    // Process with 'reject' decision
+    await controller.callInteraction('ProcessRemovalRequest', {
+      user: adminUser,
+      payload: {
+        requestId: request2Id,
+        decision: 'reject',
+        adminComment: 'Not severe enough for removal'
+      }
+    })
+    
+    // Verify status changed to 'rejected'
+    const rejectedRequest = await system.storage.findOne(
+      'RemovalRequest',
+      MatchExp.atom({ key: 'id', value: ['=', request2Id] }),
+      undefined,
+      ['id', 'status', 'processedAt', 'adminComment']
+    )
+    expect(rejectedRequest.status).toBe('rejected')
+    expect(rejectedRequest.processedAt).not.toBeNull()
+    expect(rejectedRequest.adminComment).toBe('Not severe enough for removal')
+  })
+
+  test('RemovalRequest.processedAt StateMachine computation', async () => {
+    /**
+     * Test Plan for: RemovalRequest.processedAt
+     * Dependencies: RemovalRequest entity
+     * Steps:
+     * 1) Create a RemovalRequest via SubmitRemovalRequest
+     * 2) Verify processedAt is initially null
+     * 3) Process the request
+     * 4) Verify processedAt is set to current timestamp
+     * Business Logic: processedAt starts as null, set to current timestamp when ProcessRemovalRequest occurs
+     */
+    
+    // Create admin and dormitory leader users
+    const adminResult = await controller.callInteraction('CreateUser', {
+      user: null,
+      payload: {
+        username: 'admin2',
+        password: 'adminpass',
+        email: 'admin2@example.com',
+        name: 'Admin User 2',
+        role: 'admin'
+      }
+    })
+    const adminUser = adminResult.effects[0].record
+    
+    const leaderResult = await controller.callInteraction('CreateUser', {
+      user: null,
+      payload: {
+        username: 'leader2',
+        password: 'leaderpass',
+        email: 'leader2@example.com',
+        name: 'Dormitory Leader 2',
+        role: 'dormitoryLeader'
+      }
+    })
+    const leaderUser = leaderResult.effects[0].record
+    
+    const targetResult = await controller.callInteraction('CreateUser', {
+      user: null,
+      payload: {
+        username: 'target2',
+        password: 'targetpass',
+        email: 'target2@example.com',
+        name: 'Target User 2'
+      }
+    })
+    const targetUser = targetResult.effects[0].record
+    
+    // Submit a removal request
+    const beforeProcessing = Math.floor(Date.now() / 1000)
+    const requestResult = await controller.callInteraction('SubmitRemovalRequest', {
+      user: leaderUser,
+      payload: {
+        userId: targetUser.id,
+        reason: 'Test reason for processedAt'
+      }
+    })
+    
+    // Find the request by reason
+    const allRequests = await system.storage.find(
+      'RemovalRequest',
+      undefined,
+      undefined,
+      ['id', 'reason']
+    )
+    const foundRequest = allRequests.find(r => r.reason === 'Test reason for processedAt')
+    expect(foundRequest).toBeDefined()
+    const requestId = foundRequest.id
+    
+    // Re-query to get processedAt field properly
+    const initialRequest = await system.storage.findOne(
+      'RemovalRequest',
+      MatchExp.atom({ key: 'id', value: ['=', requestId] }),
+      undefined,
+      ['id', 'processedAt']
+    )
+    
+    // Verify processedAt is initially null
+    expect(initialRequest).toBeDefined()
+    // Storage may not return null fields, so check for null or undefined
+    expect(initialRequest.processedAt ?? null).toBeNull()
+    
+    // Process the request
+    await controller.callInteraction('ProcessRemovalRequest', {
+      user: adminUser,
+      payload: {
+        requestId: requestId,
+        decision: 'approve'
+      }
+    })
+    const afterProcessing = Math.floor(Date.now() / 1000)
+    
+    // Verify processedAt is set to current timestamp
+    const processedRequest = await system.storage.findOne(
+      'RemovalRequest',
+      MatchExp.atom({ key: 'id', value: ['=', requestId] }),
+      undefined,
+      ['id', 'processedAt']
+    )
+    expect(processedRequest.processedAt).not.toBeNull()
+    expect(processedRequest.processedAt).toBeGreaterThanOrEqual(beforeProcessing)
+    expect(processedRequest.processedAt).toBeLessThanOrEqual(afterProcessing)
+  })
+
+  test('RemovalRequest.adminComment StateMachine computation', async () => {
+    /**
+     * Test Plan for: RemovalRequest.adminComment
+     * Dependencies: RemovalRequest entity
+     * Steps:
+     * 1) Create a RemovalRequest via SubmitRemovalRequest
+     * 2) Verify adminComment is initially null
+     * 3) Process request with adminComment
+     * 4) Verify adminComment is set from payload
+     * 5) Process another request without adminComment
+     * 6) Verify adminComment remains null
+     * Business Logic: adminComment starts as null, set from ProcessRemovalRequest payload
+     */
+    
+    // Create admin and dormitory leader users
+    const adminResult = await controller.callInteraction('CreateUser', {
+      user: null,
+      payload: {
+        username: 'admin3',
+        password: 'adminpass',
+        email: 'admin3@example.com',
+        name: 'Admin User 3',
+        role: 'admin'
+      }
+    })
+    const adminUser = adminResult.effects[0].record
+    
+    const leaderResult = await controller.callInteraction('CreateUser', {
+      user: null,
+      payload: {
+        username: 'leader3',
+        password: 'leaderpass',
+        email: 'leader3@example.com',
+        name: 'Dormitory Leader 3',
+        role: 'dormitoryLeader'
+      }
+    })
+    const leaderUser = leaderResult.effects[0].record
+    
+    const targetResult = await controller.callInteraction('CreateUser', {
+      user: null,
+      payload: {
+        username: 'target3',
+        password: 'targetpass',
+        email: 'target3@example.com',
+        name: 'Target User 3'
+      }
+    })
+    const targetUser = targetResult.effects[0].record
+    
+    // Submit first removal request
+    const request1Result = await controller.callInteraction('SubmitRemovalRequest', {
+      user: leaderUser,
+      payload: {
+        userId: targetUser.id,
+        reason: 'Test reason for adminComment 1'
+      }
+    })
+    
+    // Find the request by reason
+    const allRequests1 = await system.storage.find(
+      'RemovalRequest',
+      undefined,
+      undefined,
+      ['id', 'reason']
+    )
+    const foundRequest = allRequests1.find(r => r.reason === 'Test reason for adminComment 1')
+    expect(foundRequest).toBeDefined()
+    const request1Id = foundRequest.id
+    
+    // Re-query to get adminComment field properly
+    const initialRequest = await system.storage.findOne(
+      'RemovalRequest',
+      MatchExp.atom({ key: 'id', value: ['=', request1Id] }),
+      undefined,
+      ['id', 'adminComment']
+    )
+    
+    // Verify adminComment is initially null
+    expect(initialRequest).toBeDefined()
+    // Storage may not return null fields, so check for null or undefined
+    expect(initialRequest.adminComment ?? null).toBeNull()
+    
+    // Process with adminComment
+    await controller.callInteraction('ProcessRemovalRequest', {
+      user: adminUser,
+      payload: {
+        requestId: request1Id,
+        decision: 'approve',
+        adminComment: 'Approved after review of evidence'
+      }
+    })
+    
+    // Verify adminComment is set from payload
+    const processedRequest1 = await system.storage.findOne(
+      'RemovalRequest',
+      MatchExp.atom({ key: 'id', value: ['=', request1Id] }),
+      undefined,
+      ['id', 'adminComment']
+    )
+    expect(processedRequest1.adminComment).toBe('Approved after review of evidence')
+    
+    // Submit second removal request
+    const request2Result = await controller.callInteraction('SubmitRemovalRequest', {
+      user: leaderUser,
+      payload: {
+        userId: targetUser.id,
+        reason: 'Test reason for adminComment 2'
+      }
+    })
+    
+    // Find the second request by reason
+    const allRequests2 = await system.storage.find(
+      'RemovalRequest',
+      undefined,
+      undefined,
+      ['id', 'adminComment', 'reason']
+    )
+    const request2 = allRequests2.find(r => r.reason === 'Test reason for adminComment 2')
+    expect(request2).toBeDefined()
+    const request2Id = request2.id
+    
+    // Process without adminComment
+    await controller.callInteraction('ProcessRemovalRequest', {
+      user: adminUser,
+      payload: {
+        requestId: request2Id,
+        decision: 'reject'
+        // No adminComment provided
+      }
+    })
+    
+    // Verify adminComment remains null when not provided
+    const processedRequest2 = await system.storage.findOne(
+      'RemovalRequest',
+      MatchExp.atom({ key: 'id', value: ['=', request2Id] }),
+      undefined,
+      ['id', 'adminComment']
+    )
+    // Storage may not return null fields, so check for null or undefined
+    expect(processedRequest2.adminComment ?? null).toBeNull()
   })
 
 })

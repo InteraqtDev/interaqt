@@ -310,7 +310,7 @@
           "interactionDependencies": [],
           "reasoning": "controlType is creation-only, controlled by entity creation",
           "calculationMethod": "Set to current timestamp at creation",
-          "completed": false
+          "completed": true
         },
         {
           "id": "User.isDeleted",
@@ -328,7 +328,7 @@
           ],
           "reasoning": "Has interactionDependencies that can modify it, represents deletion state",
           "calculationMethod": "Set to true by DeleteUser, false by RestoreUser",
-          "completed": false
+          "completed": true
         },
         {
           "id": "Dormitory.id",
@@ -361,7 +361,7 @@
           ],
           "reasoning": "Has interactionDependencies that can modify it",
           "calculationMethod": "Direct assignment from interactions, admin only",
-          "completed": false
+          "completed": true
         },
         {
           "id": "Dormitory.capacity",
@@ -379,7 +379,7 @@
           ],
           "reasoning": "Has interactionDependencies that can modify it",
           "calculationMethod": "Direct assignment from interactions with range validation (4-6)",
-          "completed": false
+          "completed": true
         },
         {
           "id": "Dormitory.floor",
@@ -397,7 +397,7 @@
           ],
           "reasoning": "Has interactionDependencies that can modify it",
           "calculationMethod": "Direct assignment from interactions, admin only",
-          "completed": false
+          "completed": true
         },
         {
           "id": "Dormitory.building",
@@ -415,7 +415,7 @@
           ],
           "reasoning": "Has interactionDependencies that can modify it",
           "calculationMethod": "Direct assignment from interactions, admin only",
-          "completed": false
+          "completed": true
         },
         {
           "id": "Dormitory.createdAt",
@@ -448,7 +448,7 @@
           ],
           "reasoning": "Has interactionDependencies that can modify it, represents deletion state",
           "calculationMethod": "Set to true by DeleteDormitory, false by RestoreDormitory",
-          "completed": false
+          "completed": true
         },
         {
           "id": "Bed.id",
@@ -631,7 +631,7 @@
           ],
           "reasoning": "Has interactionDependencies that can modify it, represents state transitions",
           "calculationMethod": "Set to 'pending' at creation, updated to 'approved' or 'rejected' by ProcessRemovalRequest",
-          "completed": false
+          "completed": true
         },
         {
           "id": "RemovalRequest.createdAt",
@@ -663,7 +663,7 @@
           ],
           "reasoning": "Has interactionDependencies that can modify it, timestamp update",
           "calculationMethod": "Set to current timestamp when ProcessRemovalRequest is executed",
-          "completed": false
+          "completed": true
         },
         {
           "id": "RemovalRequest.adminComment",
@@ -680,7 +680,7 @@
           ],
           "reasoning": "Has interactionDependencies that can modify it",
           "calculationMethod": "Set from ProcessRemovalRequest payload",
-          "completed": false
+          "completed": true
         }
       ],
       "description": "Phase 2: 30 property computation(s), 6 relation computation(s)"
@@ -719,7 +719,7 @@
           "type": "property",
           "entityName": "Bed",
           "propertyName": "isOccupied",
-          "computationType": "Count",
+          "computationType": "Custom",
           "dependencies": [
             "UserBedRelation"
           ],
@@ -730,7 +730,7 @@
           "interactionDependencies": [],
           "reasoning": "Has dataDependencies with relations, checking existence of relation",
           "calculationMethod": "True if UserBedRelation exists for this bed, false otherwise",
-          "completed": false
+          "completed": true
         }
       ],
       "description": "Phase 3: 2 property computation(s)"
@@ -757,7 +757,7 @@
           "interactionDependencies": [],
           "reasoning": "Has dataDependencies with relations, computationMethod indicates count aggregation",
           "calculationMethod": "Count of Bed through DormitoryBedsRelation where Bed.isOccupied = true",
-          "completed": false
+          "completed": true
         }
       ],
       "description": "Phase 4: 1 property computation(s)"

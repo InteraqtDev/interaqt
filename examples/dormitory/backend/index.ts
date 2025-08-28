@@ -254,9 +254,30 @@ const UpdateDormitory = Interaction.create({
   })
 })
 
+const UpdateDormitoryCapacity = Interaction.create({
+  name: 'UpdateDormitoryCapacity',
+  action: Action.create({ name: 'updateDormitoryCapacity' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({ name: 'dormitoryId' }),
+      PayloadItem.create({ name: 'capacity' })
+    ]
+  })
+})
+
 const DeleteDormitory = Interaction.create({
   action: Action.create({ name: 'deleteDormitory' }),
   name: 'DeleteDormitory',
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({ name: 'dormitoryId' })
+    ]
+  })
+})
+
+const RestoreDormitory = Interaction.create({
+  action: Action.create({ name: 'restoreDormitory' }),
+  name: 'RestoreDormitory',
   payload: Payload.create({
     items: [
       PayloadItem.create({ name: 'dormitoryId' })
@@ -454,6 +475,17 @@ const UpdateUsername = Interaction.create({
   })
 })
 
+// Soft delete/restore interactions for User
+const RestoreUser = Interaction.create({
+  action: Action.create({ name: 'restoreUser' }),
+  name: 'RestoreUser',
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({ name: 'userId' })
+    ]
+  })
+})
+
 // Query Interactions
 const GetDormitories = Interaction.create({
   action: Action.create({ name: 'getDormitories' }),
@@ -540,6 +572,16 @@ export const relations = [
   DormitoryLeaderRemovalRequestsRelation
 ]
 
+// Export individual relations for testing
+export {
+  UserDormitoryLeaderRelation,
+  DormitoryBedsRelation,
+  UserBedRelation,
+  UserPointDeductionsRelation,
+  UserRemovalRequestsRelation,
+  DormitoryLeaderRemovalRequestsRelation
+}
+
 export const dictionaries = [
   totalUsers,
   totalDormitories,
@@ -552,7 +594,9 @@ export const interactions = [
   // Admin
   CreateDormitory,
   UpdateDormitory,
+  UpdateDormitoryCapacity,
   DeleteDormitory,
+  RestoreDormitory,
   AssignDormitoryLeader,
   RemoveDormitoryLeader,
   AssignUserToBed,
@@ -561,6 +605,7 @@ export const interactions = [
   DeductPoints,
   CreateUser,
   DeleteUser,
+  RestoreUser,
   PromoteToAdmin,
   // Dormitory Leader
   SubmitRemovalRequest,
@@ -733,6 +778,8 @@ RemovalRequest.computation = Transform.create({
         reason: event.payload.reason,
         status: 'pending',
         createdAt: Math.floor(Date.now() / 1000),
+        processedAt: null,  // Initially null
+        adminComment: null,  // Initially null
         targetUser: { id: event.payload.userId },  // This will create UserRemovalRequestsRelation
         requestedBy: { id: event.user.id }  // This will create DormitoryLeaderRemovalRequestsRelation
       }
@@ -970,5 +1017,312 @@ User.properties.find(p => p.name === 'points').computation = StateMachine.create
     })
   ],
   defaultState: pointsState
+})
+
+// Property: User.isDeleted - StateMachine computation for soft deletion
+const isDeletedState = StateNode.create({
+  name: 'isDeleted',
+  computeValue: (lastValue, event) => {
+    // For DeleteUser, set to true
+    if (event?.interactionName === 'DeleteUser') {
+      return true
+    }
+    // For RestoreUser, set to false
+    if (event?.interactionName === 'RestoreUser') {
+      return false
+    }
+    // Preserve existing value (set to false by CreateUser/Registration in entity computation)
+    return typeof lastValue === 'boolean' ? lastValue : false
+  }
+})
+
+User.properties.find(p => p.name === 'isDeleted').computation = StateMachine.create({
+  states: [isDeletedState],
+  transfers: [
+    StateTransfer.create({
+      trigger: DeleteUser,
+      current: isDeletedState,
+      next: isDeletedState,
+      computeTarget: (event) => ({ id: event.payload.userId })
+    }),
+    StateTransfer.create({
+      trigger: RestoreUser,
+      current: isDeletedState,
+      next: isDeletedState,
+      computeTarget: (event) => ({ id: event.payload.userId })
+    })
+  ],
+  defaultState: isDeletedState
+})
+
+// Property: Dormitory.building - StateMachine computation for updates
+const dormitoryBuildingState = StateNode.create({
+  name: 'building',
+  computeValue: (lastValue, event) => {
+    // For UpdateDormitory, set new building if provided
+    if (event?.interactionName === 'UpdateDormitory' && event.payload.building) {
+      return event.payload.building
+    }
+    // Preserve existing value (set by CreateDormitory in entity computation)
+    return lastValue
+  }
+})
+
+Dormitory.properties.find(p => p.name === 'building').computation = StateMachine.create({
+  states: [dormitoryBuildingState],
+  transfers: [
+    StateTransfer.create({
+      trigger: UpdateDormitory,
+      current: dormitoryBuildingState,
+      next: dormitoryBuildingState,
+      computeTarget: (event) => ({ id: event.payload.dormitoryId })
+    })
+  ],
+  defaultState: dormitoryBuildingState
+})
+
+// Property: Dormitory.capacity - StateMachine computation for capacity updates
+const dormitoryCapacityState = StateNode.create({
+  name: 'capacity',
+  computeValue: (lastValue, event) => {
+    // For UpdateDormitoryCapacity, set new capacity
+    if (event?.interactionName === 'UpdateDormitoryCapacity' && event.payload.capacity) {
+      // Validate capacity is between 4 and 6
+      const capacity = event.payload.capacity
+      if (capacity >= 4 && capacity <= 6) {
+        return capacity
+      }
+      // If invalid, preserve existing value
+      return lastValue
+    }
+    // Preserve existing value (set by CreateDormitory in entity computation)
+    return lastValue
+  }
+})
+
+Dormitory.properties.find(p => p.name === 'capacity').computation = StateMachine.create({
+  states: [dormitoryCapacityState],
+  transfers: [
+    StateTransfer.create({
+      trigger: UpdateDormitoryCapacity,
+      current: dormitoryCapacityState,
+      next: dormitoryCapacityState,
+      computeTarget: (event) => ({ id: event.payload.dormitoryId })
+    })
+  ],
+  defaultState: dormitoryCapacityState
+})
+
+// Property: Dormitory.floor - StateMachine computation for updates
+const dormitoryFloorState = StateNode.create({
+  name: 'floor',
+  computeValue: (lastValue, event) => {
+    // For UpdateDormitory, set new floor if provided
+    if (event?.interactionName === 'UpdateDormitory' && event.payload.floor !== undefined) {
+      // Floor is a number, validate it's a reasonable floor number
+      const floor = event.payload.floor
+      if (typeof floor === 'number' && floor > 0) {
+        return floor
+      }
+    }
+    // Preserve existing value (set by CreateDormitory in entity computation)
+    return lastValue
+  }
+})
+
+Dormitory.properties.find(p => p.name === 'floor').computation = StateMachine.create({
+  states: [dormitoryFloorState],
+  transfers: [
+    StateTransfer.create({
+      trigger: UpdateDormitory,
+      current: dormitoryFloorState,
+      next: dormitoryFloorState,
+      computeTarget: (event) => ({ id: event.payload.dormitoryId })
+    })
+  ],
+  defaultState: dormitoryFloorState
+})
+
+// Property: Dormitory.name - StateMachine computation for updates
+const dormitoryNameState = StateNode.create({
+  name: 'name',
+  computeValue: (lastValue, event) => {
+    // For UpdateDormitory, set new name if provided
+    if (event?.interactionName === 'UpdateDormitory' && event.payload.name) {
+      return event.payload.name
+    }
+    // Preserve existing value (set by CreateDormitory in entity computation)
+    return lastValue
+  }
+})
+
+Dormitory.properties.find(p => p.name === 'name').computation = StateMachine.create({
+  states: [dormitoryNameState],
+  transfers: [
+    StateTransfer.create({
+      trigger: UpdateDormitory,
+      current: dormitoryNameState,
+      next: dormitoryNameState,
+      computeTarget: (event) => ({ id: event.payload.dormitoryId })
+    })
+  ],
+  defaultState: dormitoryNameState
+})
+
+// Property: Dormitory.isDeleted - StateMachine computation for soft deletion
+const dormitoryNotDeletedState = StateNode.create({
+  name: 'notDeleted',
+  computeValue: () => false
+})
+
+const dormitoryDeletedState = StateNode.create({
+  name: 'deleted',
+  computeValue: () => true
+})
+
+// Remove the defaultValue from the property since we're adding computation
+Dormitory.properties.find(p => p.name === 'isDeleted').defaultValue = undefined
+
+Dormitory.properties.find(p => p.name === 'isDeleted').computation = StateMachine.create({
+  states: [dormitoryNotDeletedState, dormitoryDeletedState],
+  transfers: [
+    StateTransfer.create({
+      trigger: DeleteDormitory,
+      current: dormitoryNotDeletedState,
+      next: dormitoryDeletedState,
+      computeTarget: (event) => ({ id: event.payload.dormitoryId })
+    }),
+    StateTransfer.create({
+      trigger: RestoreDormitory,
+      current: dormitoryDeletedState,
+      next: dormitoryNotDeletedState,
+      computeTarget: (event) => ({ id: event.payload.dormitoryId })
+    })
+  ],
+  defaultState: dormitoryNotDeletedState
+})
+
+// Property: Bed.isOccupied - Custom computation to check if bed has an occupant
+// Remove the defaultValue from the property since we're adding computation
+Bed.properties.find(p => p.name === 'isOccupied').defaultValue = undefined
+
+Bed.properties.find(p => p.name === 'isOccupied').computation = Custom.create({
+  name: 'BedOccupancyChecker',
+  dataDeps: {
+    currentBed: {
+      type: 'property',
+      attributeQuery: [
+        'id',
+        ['occupant', { attributeQuery: ['id'] }]  // Access related User through UserBedRelation
+      ]
+    }
+  },
+  compute: async function(dataDeps, record) {
+    // Check if the bed has an occupant (UserBedRelation exists)
+    // If occupant exists, the bed is occupied
+    return dataDeps.currentBed?.occupant !== undefined && dataDeps.currentBed?.occupant !== null
+  },
+  getDefaultValue: function() {
+    return false  // Bed is not occupied by default
+  }
+})
+
+// Property: Dormitory.occupiedBeds - Count computation to count occupied beds
+// Remove the defaultValue from the property since we're adding computation
+Dormitory.properties.find(p => p.name === 'occupiedBeds').defaultValue = undefined
+
+Dormitory.properties.find(p => p.name === 'occupiedBeds').computation = Count.create({
+  property: 'beds',  // Use property name from DormitoryBedsRelation
+  attributeQuery: ['isOccupied'],  // Query the isOccupied property on related Bed entities
+  callback: function(bed) {
+    // Count only beds where isOccupied is true
+    return bed.isOccupied === true
+  }
+})
+
+// Property: RemovalRequest.status - StateMachine computation for status transitions
+// Remove the defaultValue from the property since we're adding computation  
+RemovalRequest.properties.find(p => p.name === 'status').defaultValue = undefined
+
+const removalRequestStatusState = StateNode.create({
+  name: 'status',
+  computeValue: (lastValue, event) => {
+    // For ProcessRemovalRequest, set status based on decision
+    if (event?.interactionName === 'ProcessRemovalRequest') {
+      const decision = event.payload.decision
+      if (decision === 'approve' || decision === 'approved') {
+        return 'approved'
+      } else if (decision === 'reject' || decision === 'rejected') {
+        return 'rejected'
+      }
+    }
+    // Preserve existing value (set to 'pending' by SubmitRemovalRequest in entity computation)
+    return lastValue || 'pending'
+  }
+})
+
+RemovalRequest.properties.find(p => p.name === 'status').computation = StateMachine.create({
+  states: [removalRequestStatusState],
+  transfers: [
+    StateTransfer.create({
+      trigger: ProcessRemovalRequest,
+      current: removalRequestStatusState,
+      next: removalRequestStatusState,
+      computeTarget: (event) => ({ id: event.payload.requestId })
+    })
+  ],
+  defaultState: removalRequestStatusState
+})
+
+// Property: RemovalRequest.processedAt - StateMachine computation for timestamp when processed
+const removalRequestProcessedAtState = StateNode.create({
+  name: 'processedAt',
+  computeValue: (lastValue, event) => {
+    // For ProcessRemovalRequest, set current timestamp
+    if (event?.interactionName === 'ProcessRemovalRequest') {
+      return Math.floor(Date.now() / 1000)
+    }
+    // Preserve existing value (initially null)
+    return lastValue || null
+  }
+})
+
+RemovalRequest.properties.find(p => p.name === 'processedAt').computation = StateMachine.create({
+  states: [removalRequestProcessedAtState],
+  transfers: [
+    StateTransfer.create({
+      trigger: ProcessRemovalRequest,
+      current: removalRequestProcessedAtState,
+      next: removalRequestProcessedAtState,
+      computeTarget: (event) => ({ id: event.payload.requestId })
+    })
+  ],
+  defaultState: removalRequestProcessedAtState
+})
+
+// Property: RemovalRequest.adminComment - StateMachine computation for admin comments
+const removalRequestAdminCommentState = StateNode.create({
+  name: 'adminComment',
+  computeValue: (lastValue, event) => {
+    // For ProcessRemovalRequest, set admin comment from payload
+    if (event?.interactionName === 'ProcessRemovalRequest') {
+      return event.payload.adminComment || null
+    }
+    // Preserve existing value (initially null)
+    return lastValue || null
+  }
+})
+
+RemovalRequest.properties.find(p => p.name === 'adminComment').computation = StateMachine.create({
+  states: [removalRequestAdminCommentState],
+  transfers: [
+    StateTransfer.create({
+      trigger: ProcessRemovalRequest,
+      current: removalRequestAdminCommentState,
+      next: removalRequestAdminCommentState,
+      computeTarget: (event) => ({ id: event.payload.requestId })
+    })
+  ],
+  defaultState: removalRequestAdminCommentState
 })
 
