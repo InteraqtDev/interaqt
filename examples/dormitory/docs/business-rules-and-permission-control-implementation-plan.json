@@ -607,7 +607,7 @@
             "Cannot submit duplicate pending request",
             "Can submit new request after previous was processed"
           ],
-          "completed": false
+          "completed": true
         },
         {
           "id": "BR030",

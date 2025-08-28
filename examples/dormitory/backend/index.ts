@@ -1959,9 +1959,33 @@ const targetUserLessThan30Points = Condition.create({
   }
 })
 
-// Combine P013 (dormitory leader permission), BR027 (target user in leader's dormitory), and BR028 (target user < 30 points)
+// BR029: Cannot submit if pending request already exists for user
+const noPendingRemovalRequestForUser = Condition.create({
+  name: 'noPendingRemovalRequestForUser',
+  content: async function(this: Controller, event: any) {
+    const targetUserId = event.payload?.userId
+    if (!targetUserId) return false
+
+    // Check if there's already a pending removal request for this user
+    const existingRequests = await this.system.storage.find(
+      'RemovalRequest',
+      MatchExp.atom({ key: 'targetUser.id', value: ['=', targetUserId] })
+        .and({ key: 'status', value: ['=', 'pending'] }),
+      undefined,
+      ['id', 'status']
+    )
+
+    // If there are any pending requests for this user, return false
+    return existingRequests.length === 0
+  }
+})
+
+// Combine P013 (dormitory leader permission), BR027 (target user in leader's dormitory), BR028 (target user < 30 points), and BR029 (no pending request)
 SubmitRemovalRequest.conditions = Conditions.create({
-  content: BoolExp.atom(isDormitoryLeader).and(targetUserInLeaderDormitory).and(targetUserLessThan30Points)
+  content: BoolExp.atom(isDormitoryLeader)
+    .and(targetUserInLeaderDormitory)
+    .and(targetUserLessThan30Points)
+    .and(noPendingRemovalRequestForUser)
 })
 
 // BR003: Points to deduct must be positive for DeductResidentPoints

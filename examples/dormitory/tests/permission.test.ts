@@ -7,7 +7,9 @@ import {
 } from 'interaqt'
 import { 
   entities, relations, interactions, activities, dicts,
-  DormitoryBedsRelation 
+  DormitoryBedsRelation,
+  UserDormitoryLeaderRelation,
+  UserBedRelation
 } from '../backend'
 
 describe('Permission and Business Rules', () => {
@@ -8413,6 +8415,277 @@ describe('Permission and Business Rules', () => {
       )
       expect(stillRejected.status).toBe('rejected')
       expect(stillRejected.adminComment).toBe('Insufficient grounds') // Original comment preserved
+    })
+
+    // BR029: Cannot submit if pending request already exists for user
+    test('BR029: Can submit first request for user', async () => {
+      // Create dormitory
+      const dormitory = await system.storage.create('Dormitory', {
+        name: 'Test Dorm',
+        capacity: 4,
+        floor: 1,
+        building: 'Building A'
+      })
+      
+      // Create dormitory leader
+      const leader = await system.storage.create('User', {
+        username: 'leader',
+        password: 'password123',
+        email: 'leader@test.com',
+        name: 'Dorm Leader',
+        role: 'dormitoryLeader',
+        points: 100
+      })
+      
+      // Create target user with less than 30 points
+      const targetUser = await system.storage.create('User', {
+        username: 'lowpoints',
+        password: 'password123',
+        email: 'lowpoints@test.com',
+        name: 'Low Points User',
+        role: 'resident',
+        points: 25
+      })
+      
+      // Assign beds to establish dormitory relationships
+      await system.storage.addRelationByNameById(
+        UserDormitoryLeaderRelation.name,
+        leader.id,
+        dormitory.id
+      )
+      
+      const bed = await system.storage.create('Bed', {
+        bedNumber: '101',
+        dormitory: { id: dormitory.id }
+      })
+      
+      await system.storage.addRelationByNameById(
+        UserBedRelation.name,
+        targetUser.id,
+        bed.id
+      )
+      
+      // Submit first removal request - should succeed
+      const result = await controller.callInteraction('SubmitRemovalRequest', {
+        user: leader,
+        payload: {
+          userId: targetUser.id,
+          reason: 'Multiple violations'
+        }
+      })
+      
+      expect(result.error).toBeUndefined()
+      
+      // Verify request was created
+      const request = await system.storage.findOne('RemovalRequest',
+        MatchExp.atom({ key: 'targetUser.id', value: ['=', targetUser.id] }),
+        undefined,
+        ['id', 'status', 'reason']
+      )
+      expect(request).toBeDefined()
+      expect(request.status).toBe('pending')
+      expect(request.reason).toBe('Multiple violations')
+    })
+
+    test('BR029: Cannot submit duplicate pending request', async () => {
+      // Create dormitory
+      const dormitory = await system.storage.create('Dormitory', {
+        name: 'Test Dorm 2',
+        capacity: 4,
+        floor: 2,
+        building: 'Building B'
+      })
+      
+      // Create dormitory leader
+      const leader = await system.storage.create('User', {
+        username: 'leader2',
+        password: 'password123',
+        email: 'leader2@test.com',
+        name: 'Dorm Leader 2',
+        role: 'dormitoryLeader',
+        points: 100
+      })
+      
+      // Create target user with less than 30 points
+      const targetUser = await system.storage.create('User', {
+        username: 'lowpoints2',
+        password: 'password123',
+        email: 'lowpoints2@test.com',
+        name: 'Low Points User 2',
+        role: 'resident',
+        points: 20
+      })
+      
+      // Assign beds to establish dormitory relationships
+      await system.storage.addRelationByNameById(
+        UserDormitoryLeaderRelation.name,
+        leader.id,
+        dormitory.id
+      )
+      
+      const bed = await system.storage.create('Bed', {
+        bedNumber: '201',
+        dormitory: { id: dormitory.id }
+      })
+      
+      await system.storage.addRelationByNameById(
+        UserBedRelation.name,
+        targetUser.id,
+        bed.id
+      )
+      
+      // Submit first removal request - should succeed
+      const firstResult = await controller.callInteraction('SubmitRemovalRequest', {
+        user: leader,
+        payload: {
+          userId: targetUser.id,
+          reason: 'First violation'
+        }
+      })
+      
+      expect(firstResult.error).toBeUndefined()
+      
+      // Try to submit duplicate request while first is still pending - should fail
+      const duplicateResult = await controller.callInteraction('SubmitRemovalRequest', {
+        user: leader,
+        payload: {
+          userId: targetUser.id,
+          reason: 'Second violation'
+        }
+      })
+      
+      expect(duplicateResult.error).toBeDefined()
+      expect((duplicateResult.error as any).type).toBe('condition check failed')
+      expect((duplicateResult.error as any).error.data.name).toBe('noPendingRemovalRequestForUser')
+      
+      // Verify only one request exists
+      const requests = await system.storage.find('RemovalRequest',
+        MatchExp.atom({ key: 'targetUser.id', value: ['=', targetUser.id] }),
+        undefined,
+        ['id', 'status']
+      )
+      expect(requests.length).toBe(1)
+      expect(requests[0].status).toBe('pending')
+    })
+
+    test('BR029: Can submit new request after previous was processed', async () => {
+      // Create admin for processing requests
+      const admin = await system.storage.create('User', {
+        username: 'admin',
+        password: 'password123',
+        email: 'admin@test.com',
+        name: 'Admin User',
+        role: 'admin',
+        points: 100
+      })
+      
+      // Create dormitory
+      const dormitory = await system.storage.create('Dormitory', {
+        name: 'Test Dorm 3',
+        capacity: 4,
+        floor: 3,
+        building: 'Building C'
+      })
+      
+      // Create dormitory leader
+      const leader = await system.storage.create('User', {
+        username: 'leader3',
+        password: 'password123',
+        email: 'leader3@test.com',
+        name: 'Dorm Leader 3',
+        role: 'dormitoryLeader',
+        points: 100
+      })
+      
+      // Create target user with less than 30 points
+      const targetUser = await system.storage.create('User', {
+        username: 'lowpoints3',
+        password: 'password123',
+        email: 'lowpoints3@test.com',
+        name: 'Low Points User 3',
+        role: 'resident',
+        points: 15
+      })
+      
+      // Assign beds to establish dormitory relationships
+      await system.storage.addRelationByNameById(
+        UserDormitoryLeaderRelation.name,
+        leader.id,
+        dormitory.id
+      )
+      
+      const bed = await system.storage.create('Bed', {
+        bedNumber: '301',
+        dormitory: { id: dormitory.id }
+      })
+      
+      await system.storage.addRelationByNameById(
+        UserBedRelation.name,
+        targetUser.id,
+        bed.id
+      )
+      
+      // Submit first removal request
+      const firstResult = await controller.callInteraction('SubmitRemovalRequest', {
+        user: leader,
+        payload: {
+          userId: targetUser.id,
+          reason: 'First violation'
+        }
+      })
+      
+      expect(firstResult.error).toBeUndefined()
+      
+      // Get the created request
+      const firstRequest = await system.storage.findOne('RemovalRequest',
+        MatchExp.atom({ key: 'targetUser.id', value: ['=', targetUser.id] }),
+        undefined,
+        ['id', 'status']
+      )
+      
+      // Process (reject) the first request
+      const processResult = await controller.callInteraction('ProcessRemovalRequest', {
+        user: admin,
+        payload: {
+          requestId: firstRequest.id,
+          decision: 'reject',
+          adminComment: 'Not severe enough'
+        }
+      })
+      
+      expect(processResult.error).toBeUndefined()
+      
+      // Verify request was rejected
+      const processedRequest = await system.storage.findOne('RemovalRequest',
+        MatchExp.atom({ key: 'id', value: ['=', firstRequest.id] }),
+        undefined,
+        ['id', 'status']
+      )
+      expect(processedRequest.status).toBe('rejected')
+      
+      // Now submit a new request - should succeed since previous was processed
+      const secondResult = await controller.callInteraction('SubmitRemovalRequest', {
+        user: leader,
+        payload: {
+          userId: targetUser.id,
+          reason: 'New violation after rejection'
+        }
+      })
+      
+      expect(secondResult.error).toBeUndefined()
+      
+      // Verify new request was created
+      const requests = await system.storage.find('RemovalRequest',
+        MatchExp.atom({ key: 'targetUser.id', value: ['=', targetUser.id] }),
+        undefined,
+        ['id', 'status', 'reason']
+      )
+      expect(requests.length).toBe(2)
+      
+      // Find the new pending request
+      const newRequest = requests.find(r => r.status === 'pending')
+      expect(newRequest).toBeDefined()
+      expect(newRequest.reason).toBe('New violation after rejection')
     })
 
     test('BR019: User points cannot go below 0 - Points reduced normally when sufficient (TC003)', async () => {
