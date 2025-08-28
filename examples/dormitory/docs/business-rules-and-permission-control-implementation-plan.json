@@ -1,0 +1,842 @@
+{
+  "phases": [
+    {
+      "phase": 1,
+      "name": "Basic Role-Based Permissions",
+      "description": "Simple role checks for admin-only operations",
+      "rules": [
+        {
+          "id": "P001",
+          "interaction": "CreateDormitory",
+          "type": "permission",
+          "description": "Only admin can create dormitories",
+          "condition": "user.role === 'admin'",
+          "testScenarios": [
+            "Admin can create dormitory (TC001)",
+            "Non-admin cannot create dormitory (TC007)"
+          ],
+          "completed": false
+        },
+        {
+          "id": "P002",
+          "interaction": "UpdateDormitory",
+          "type": "permission",
+          "description": "Only admin can update dormitories",
+          "condition": "user.role === 'admin'",
+          "testScenarios": [
+            "Admin can update dormitory",
+            "Non-admin cannot update dormitory"
+          ],
+          "completed": false
+        },
+        {
+          "id": "P003",
+          "interaction": "DeleteDormitory",
+          "type": "permission",
+          "description": "Only admin can delete dormitories",
+          "condition": "user.role === 'admin'",
+          "testScenarios": [
+            "Admin can delete dormitory",
+            "Non-admin cannot delete dormitory"
+          ],
+          "completed": false
+        },
+        {
+          "id": "P004",
+          "interaction": "AssignDormitoryLeader",
+          "type": "permission",
+          "description": "Only admin can assign dormitory leaders",
+          "condition": "user.role === 'admin'",
+          "testScenarios": [
+            "Admin can assign dormitory leader (TC006)",
+            "Non-admin cannot assign dormitory leader"
+          ],
+          "completed": false
+        },
+        {
+          "id": "P005",
+          "interaction": "RemoveDormitoryLeader",
+          "type": "permission",
+          "description": "Only admin can remove dormitory leaders",
+          "condition": "user.role === 'admin'",
+          "testScenarios": [
+            "Admin can remove dormitory leader",
+            "Non-admin cannot remove dormitory leader"
+          ],
+          "completed": false
+        },
+        {
+          "id": "P006",
+          "interaction": "AssignUserToBed",
+          "type": "permission",
+          "description": "Only admin can assign users to beds",
+          "condition": "user.role === 'admin'",
+          "testScenarios": [
+            "Admin can assign user to bed (TC002)",
+            "Non-admin cannot assign user to bed"
+          ],
+          "completed": false
+        },
+        {
+          "id": "P007",
+          "interaction": "RemoveUserFromBed",
+          "type": "permission",
+          "description": "Only admin can remove users from beds",
+          "condition": "user.role === 'admin'",
+          "testScenarios": [
+            "Admin can remove user from bed",
+            "Non-admin cannot remove user from bed"
+          ],
+          "completed": false
+        },
+        {
+          "id": "P008",
+          "interaction": "ProcessRemovalRequest",
+          "type": "permission",
+          "description": "Only admin can process removal requests",
+          "condition": "user.role === 'admin'",
+          "testScenarios": [
+            "Admin can process removal request (TC005)",
+            "Non-admin cannot process removal request (TC010)"
+          ],
+          "completed": false
+        },
+        {
+          "id": "P009",
+          "interaction": "DeductPoints",
+          "type": "permission",
+          "description": "Only admin can deduct points from any user",
+          "condition": "user.role === 'admin'",
+          "testScenarios": [
+            "Admin can deduct points (TC003)",
+            "Non-admin cannot use DeductPoints interaction"
+          ],
+          "completed": false
+        },
+        {
+          "id": "P010",
+          "interaction": "CreateUser",
+          "type": "permission",
+          "description": "Only admin can create users via CreateUser",
+          "condition": "user.role === 'admin'",
+          "testScenarios": [
+            "Admin can create user",
+            "Non-admin cannot create user"
+          ],
+          "completed": false
+        },
+        {
+          "id": "P011",
+          "interaction": "DeleteUser",
+          "type": "permission",
+          "description": "Only admin can delete users",
+          "condition": "user.role === 'admin'",
+          "testScenarios": [
+            "Admin can delete user",
+            "Non-admin cannot delete user"
+          ],
+          "completed": false
+        },
+        {
+          "id": "P012",
+          "interaction": "GetUsers",
+          "type": "permission",
+          "description": "Only admin can list all users",
+          "condition": "user.role === 'admin'",
+          "testScenarios": [
+            "Admin can list users",
+            "Non-admin cannot list users"
+          ],
+          "completed": false
+        },
+        {
+          "id": "P013",
+          "interaction": "SubmitRemovalRequest",
+          "type": "permission",
+          "description": "Only dormitory leader can submit removal requests",
+          "condition": "user.role === 'dormitoryLeader'",
+          "testScenarios": [
+            "Dormitory leader can submit removal request (TC004)",
+            "Regular resident cannot submit removal request (TC009)"
+          ],
+          "completed": false
+        }
+      ]
+    },
+    {
+      "phase": 2,
+      "name": "Simple Business Rules",
+      "description": "Payload validations and simple constraints",
+      "rules": [
+        {
+          "id": "BR001",
+          "interaction": "CreateDormitory",
+          "type": "business_rule",
+          "description": "Dormitory capacity must be between 4 and 6",
+          "condition": "payload.capacity >= 4 && payload.capacity <= 6",
+          "testScenarios": [
+            "Can create with capacity 4 (TC001)",
+            "Can create with capacity 6",
+            "Cannot create with capacity 3 (TC013)",
+            "Cannot create with capacity 7 (TC013)",
+            "Cannot create with capacity 10 (TC013)"
+          ],
+          "completed": false
+        },
+        {
+          "id": "BR002",
+          "interaction": "DeductPoints",
+          "type": "business_rule",
+          "description": "Points to deduct must be positive",
+          "condition": "payload.points > 0",
+          "testScenarios": [
+            "Can deduct positive points (TC003)",
+            "Cannot deduct 0 points",
+            "Cannot deduct negative points"
+          ],
+          "completed": false
+        },
+        {
+          "id": "BR003",
+          "interaction": "DeductResidentPoints",
+          "type": "business_rule",
+          "description": "Points to deduct must be positive",
+          "condition": "payload.points > 0",
+          "testScenarios": [
+            "Can deduct positive points (TC016)",
+            "Cannot deduct 0 points",
+            "Cannot deduct negative points"
+          ],
+          "completed": false
+        },
+        {
+          "id": "BR004",
+          "interaction": "ChangePassword",
+          "type": "business_rule",
+          "description": "New password must meet security requirements (min 8 chars)",
+          "condition": "payload.newPassword.length >= 8",
+          "testScenarios": [
+            "Can change with 8+ character password",
+            "Cannot change with 7 character password"
+          ],
+          "completed": false
+        },
+        {
+          "id": "BR005",
+          "interaction": "CreateUser",
+          "type": "business_rule",
+          "description": "Password must meet security requirements (min 8 chars)",
+          "condition": "payload.password.length >= 8",
+          "testScenarios": [
+            "Can create user with 8+ character password",
+            "Cannot create user with short password"
+          ],
+          "completed": false
+        },
+        {
+          "id": "BR006",
+          "interaction": "Registration",
+          "type": "business_rule",
+          "description": "Password must meet security requirements (min 8 chars)",
+          "condition": "payload.password.length >= 8",
+          "testScenarios": [
+            "Can register with 8+ character password",
+            "Cannot register with short password"
+          ],
+          "completed": false
+        }
+      ]
+    },
+    {
+      "phase": 3,
+      "name": "Scope-Based Permissions",
+      "description": "Permissions that check relationships between users and entities",
+      "rules": [
+        {
+          "id": "P014",
+          "interaction": "DeductResidentPoints",
+          "type": "permission",
+          "description": "Dormitory leader can only deduct points from residents in their dormitory",
+          "condition": "user.role === 'dormitoryLeader' && target user is in leader's dormitory",
+          "dependencies": ["Need to query user's managed dormitory", "Need to query target user's dormitory"],
+          "testScenarios": [
+            "Dormitory leader can deduct points from own residents (TC016)",
+            "Dormitory leader cannot deduct points from other dormitory residents (TC008)",
+            "Regular resident cannot use this interaction"
+          ],
+          "completed": false
+        },
+        {
+          "id": "P015",
+          "interaction": "GetRemovalRequests",
+          "type": "permission",
+          "description": "Admin can see all requests, dormitory leaders can only see their dormitory's requests",
+          "condition": "user.role === 'admin' OR (user.role === 'dormitoryLeader' AND request is for their dormitory)",
+          "dependencies": ["Need to filter requests based on user role and dormitory"],
+          "testScenarios": [
+            "Admin can see all removal requests",
+            "Dormitory leader can see own dormitory's requests",
+            "Dormitory leader cannot see other dormitory's requests",
+            "Regular resident cannot see removal requests"
+          ],
+          "completed": false
+        },
+        {
+          "id": "P016",
+          "interaction": "GetPointDeductions",
+          "type": "permission",
+          "description": "Admin can see all, dormitory leaders their dormitory, users their own",
+          "condition": "user.role === 'admin' OR (user.role === 'dormitoryLeader' AND target in their dormitory) OR target === self",
+          "dependencies": ["Need to check user role and relationships"],
+          "testScenarios": [
+            "Admin can see all point deductions",
+            "Dormitory leader can see dormitory residents' deductions",
+            "User can see own deductions",
+            "User cannot see others' deductions"
+          ],
+          "completed": false
+        }
+      ]
+    },
+    {
+      "phase": 4,
+      "name": "Complex Business Rules with Entity Queries",
+      "description": "Business rules that require checking existing data",
+      "rules": [
+        {
+          "id": "BR007",
+          "interaction": "CreateDormitory",
+          "type": "business_rule",
+          "description": "Dormitory name must be unique within building",
+          "condition": "No existing dormitory with same name in same building",
+          "dependencies": ["Query existing dormitories by name and building"],
+          "testScenarios": [
+            "Can create dormitory with unique name",
+            "Cannot create dormitory with duplicate name in same building",
+            "Can create dormitory with same name in different building"
+          ],
+          "completed": false
+        },
+        {
+          "id": "BR008",
+          "interaction": "UpdateDormitory",
+          "type": "business_rule",
+          "description": "Cannot update capacity after creation",
+          "condition": "capacity field not in payload",
+          "testScenarios": [
+            "Can update name, floor, building",
+            "Cannot update capacity"
+          ],
+          "completed": false
+        },
+        {
+          "id": "BR009",
+          "interaction": "UpdateDormitory",
+          "type": "business_rule",
+          "description": "Updated name must remain unique within building",
+          "condition": "No other dormitory with same name in same building",
+          "dependencies": ["Query existing dormitories excluding current"],
+          "testScenarios": [
+            "Can update to unique name",
+            "Cannot update to duplicate name in same building"
+          ],
+          "completed": false
+        },
+        {
+          "id": "BR010",
+          "interaction": "DeleteDormitory",
+          "type": "business_rule",
+          "description": "Cannot delete dormitory if any beds are occupied",
+          "condition": "All beds in dormitory are unoccupied",
+          "dependencies": ["Query beds in dormitory", "Check occupancy status"],
+          "testScenarios": [
+            "Can delete empty dormitory",
+            "Cannot delete dormitory with occupied beds"
+          ],
+          "completed": false
+        },
+        {
+          "id": "BR011",
+          "interaction": "AssignDormitoryLeader",
+          "type": "business_rule",
+          "description": "User must be a resident of the dormitory",
+          "condition": "Target user has bed assignment in target dormitory",
+          "dependencies": ["Query user's bed assignment", "Verify bed is in target dormitory"],
+          "testScenarios": [
+            "Can assign resident as leader",
+            "Cannot assign non-resident as leader",
+            "Cannot assign user without bed as leader"
+          ],
+          "completed": false
+        },
+        {
+          "id": "BR012",
+          "interaction": "AssignDormitoryLeader",
+          "type": "business_rule",
+          "description": "Dormitory can only have one leader",
+          "condition": "No existing leader for dormitory OR replace existing leader",
+          "dependencies": ["Query existing leader for dormitory"],
+          "testScenarios": [
+            "Can assign leader to dormitory without leader",
+            "Assigning new leader replaces previous leader"
+          ],
+          "completed": false
+        },
+        {
+          "id": "BR013",
+          "interaction": "RemoveDormitoryLeader",
+          "type": "business_rule",
+          "description": "User must currently be a dormitory leader",
+          "condition": "User has dormitory leader relation",
+          "dependencies": ["Query user's dormitory leader status"],
+          "testScenarios": [
+            "Can remove current dormitory leader",
+            "Cannot remove non-leader"
+          ],
+          "completed": false
+        },
+        {
+          "id": "BR014",
+          "interaction": "AssignUserToBed",
+          "type": "business_rule",
+          "description": "User cannot already be assigned to another bed",
+          "condition": "User has no existing bed assignment",
+          "dependencies": ["Query user's current bed assignment"],
+          "testScenarios": [
+            "Can assign user without bed",
+            "Cannot assign user already in another bed (TC017)"
+          ],
+          "completed": false
+        },
+        {
+          "id": "BR015",
+          "interaction": "AssignUserToBed",
+          "type": "business_rule",
+          "description": "Bed must not be occupied",
+          "condition": "Target bed is unoccupied",
+          "dependencies": ["Query bed's occupancy status"],
+          "testScenarios": [
+            "Can assign to unoccupied bed (TC002)",
+            "Cannot assign to occupied bed (TC012)"
+          ],
+          "completed": false
+        },
+        {
+          "id": "BR016",
+          "interaction": "AssignUserToBed",
+          "type": "business_rule",
+          "description": "User role must be resident or dormitoryLeader",
+          "condition": "user.role in ['resident', 'dormitoryLeader']",
+          "testScenarios": [
+            "Can assign resident to bed",
+            "Can assign dormitory leader to bed",
+            "Cannot assign admin to bed"
+          ],
+          "completed": false
+        },
+        {
+          "id": "BR017",
+          "interaction": "RemoveUserFromBed",
+          "type": "business_rule",
+          "description": "User must be assigned to a bed",
+          "condition": "User has bed assignment",
+          "dependencies": ["Query user's bed assignment"],
+          "testScenarios": [
+            "Can remove user with bed assignment",
+            "Cannot remove user without bed assignment"
+          ],
+          "completed": false
+        },
+        {
+          "id": "BR018",
+          "interaction": "ProcessRemovalRequest",
+          "type": "business_rule",
+          "description": "Request must be in pending status",
+          "condition": "Request status === 'pending'",
+          "dependencies": ["Query request status"],
+          "testScenarios": [
+            "Can process pending request (TC005, TC015)",
+            "Cannot process already approved request",
+            "Cannot process already rejected request"
+          ],
+          "completed": false
+        },
+        {
+          "id": "BR019",
+          "interaction": "DeductPoints",
+          "type": "business_rule",
+          "description": "User points cannot go below 0",
+          "condition": "Resulting points >= 0 (clamp to 0 if needed)",
+          "dependencies": ["Query user's current points"],
+          "testScenarios": [
+            "Points reduced normally when sufficient (TC003)",
+            "Points clamped to 0 when deduction exceeds balance (TC014)"
+          ],
+          "completed": false
+        },
+        {
+          "id": "BR020",
+          "interaction": "DeductResidentPoints",
+          "type": "business_rule",
+          "description": "User points cannot go below 0",
+          "condition": "Resulting points >= 0 (clamp to 0 if needed)",
+          "dependencies": ["Query user's current points"],
+          "testScenarios": [
+            "Points reduced normally when sufficient",
+            "Points clamped to 0 when deduction exceeds balance"
+          ],
+          "completed": false
+        },
+        {
+          "id": "BR021",
+          "interaction": "DeductResidentPoints",
+          "type": "business_rule",
+          "description": "Cannot deduct points from self",
+          "condition": "Target user is not the current user",
+          "testScenarios": [
+            "Can deduct from other residents",
+            "Cannot deduct from self"
+          ],
+          "completed": false
+        },
+        {
+          "id": "BR022",
+          "interaction": "CreateUser",
+          "type": "business_rule",
+          "description": "Username must be unique",
+          "condition": "No existing user with same username",
+          "dependencies": ["Query users by username"],
+          "testScenarios": [
+            "Can create user with unique username",
+            "Cannot create user with duplicate username"
+          ],
+          "completed": false
+        },
+        {
+          "id": "BR023",
+          "interaction": "CreateUser",
+          "type": "business_rule",
+          "description": "Email must be unique and valid format",
+          "condition": "No existing user with same email AND email matches valid pattern",
+          "dependencies": ["Query users by email", "Validate email format"],
+          "testScenarios": [
+            "Can create user with unique valid email",
+            "Cannot create user with duplicate email",
+            "Cannot create user with invalid email format"
+          ],
+          "completed": false
+        },
+        {
+          "id": "BR024",
+          "interaction": "Registration",
+          "type": "business_rule",
+          "description": "Username must be unique",
+          "condition": "No existing user with same username",
+          "dependencies": ["Query users by username"],
+          "testScenarios": [
+            "Can register with unique username",
+            "Cannot register with duplicate username"
+          ],
+          "completed": false
+        },
+        {
+          "id": "BR025",
+          "interaction": "Registration",
+          "type": "business_rule",
+          "description": "Email must be unique and valid format",
+          "condition": "No existing user with same email AND email matches valid pattern",
+          "dependencies": ["Query users by email", "Validate email format"],
+          "testScenarios": [
+            "Can register with unique valid email",
+            "Cannot register with duplicate email",
+            "Cannot register with invalid email format"
+          ],
+          "completed": false
+        },
+        {
+          "id": "BR026",
+          "interaction": "DeleteUser",
+          "type": "business_rule",
+          "description": "Cannot delete the last admin user",
+          "condition": "More than one admin exists OR target is not admin",
+          "dependencies": ["Query count of admin users"],
+          "testScenarios": [
+            "Can delete admin when multiple admins exist",
+            "Cannot delete last remaining admin",
+            "Can delete non-admin users"
+          ],
+          "completed": false
+        },
+        {
+          "id": "BR027",
+          "interaction": "SubmitRemovalRequest",
+          "type": "business_rule",
+          "description": "Target user must be in leader's dormitory",
+          "condition": "Target user has bed in same dormitory as leader manages",
+          "dependencies": ["Query leader's dormitory", "Query target user's dormitory"],
+          "testScenarios": [
+            "Can submit for resident in same dormitory",
+            "Cannot submit for resident in different dormitory"
+          ],
+          "completed": false
+        },
+        {
+          "id": "BR028",
+          "interaction": "SubmitRemovalRequest",
+          "type": "business_rule",
+          "description": "Target user must have less than 30 points",
+          "condition": "Target user.points < 30",
+          "dependencies": ["Query target user's points"],
+          "testScenarios": [
+            "Can submit for user with 29 points",
+            "Can submit for user with 0 points (TC004)",
+            "Cannot submit for user with 30 points (TC011)",
+            "Cannot submit for user with 50 points (TC011)"
+          ],
+          "completed": false
+        },
+        {
+          "id": "BR029",
+          "interaction": "SubmitRemovalRequest",
+          "type": "business_rule",
+          "description": "Cannot submit if pending request already exists for user",
+          "condition": "No existing pending removal request for target user",
+          "dependencies": ["Query removal requests for user with pending status"],
+          "testScenarios": [
+            "Can submit first request for user",
+            "Cannot submit duplicate pending request",
+            "Can submit new request after previous was processed"
+          ],
+          "completed": false
+        },
+        {
+          "id": "BR030",
+          "interaction": "SubmitRemovalRequest",
+          "type": "business_rule",
+          "description": "Cannot submit removal request for self",
+          "condition": "Target user is not the current user",
+          "testScenarios": [
+            "Can submit for other residents",
+            "Cannot submit for self"
+          ],
+          "completed": false
+        },
+        {
+          "id": "BR031",
+          "interaction": "DeductResidentPoints",
+          "type": "business_rule",
+          "description": "Target user must be in leader's dormitory",
+          "condition": "Target user has bed in same dormitory as leader manages",
+          "dependencies": ["Query leader's dormitory", "Query target user's dormitory"],
+          "testScenarios": [
+            "Can deduct from resident in same dormitory (TC016)",
+            "Cannot deduct from resident in different dormitory (TC008)"
+          ],
+          "completed": false
+        },
+        {
+          "id": "BR032",
+          "interaction": "ViewMyDormitory",
+          "type": "business_rule",
+          "description": "User must have a bed assignment",
+          "condition": "User has bed assignment",
+          "dependencies": ["Query user's bed assignment"],
+          "testScenarios": [
+            "Can view dormitory when assigned to bed",
+            "Cannot view dormitory without bed assignment"
+          ],
+          "completed": false
+        },
+        {
+          "id": "BR033",
+          "interaction": "UpdateProfile",
+          "type": "business_rule",
+          "description": "Email must be unique and valid format if provided",
+          "condition": "If email in payload, no other user has same email AND email is valid",
+          "dependencies": ["Query users by email excluding current", "Validate email format"],
+          "testScenarios": [
+            "Can update to unique valid email",
+            "Cannot update to duplicate email",
+            "Cannot update to invalid email format"
+          ],
+          "completed": false
+        },
+        {
+          "id": "BR034",
+          "interaction": "UpdateProfile",
+          "type": "business_rule",
+          "description": "Cannot update username or role",
+          "condition": "username and role not in payload",
+          "testScenarios": [
+            "Can update name and email",
+            "Cannot update username",
+            "Cannot update role"
+          ],
+          "completed": false
+        },
+        {
+          "id": "BR035",
+          "interaction": "Login",
+          "type": "business_rule",
+          "description": "User must not be deleted",
+          "condition": "User.isDeleted === false",
+          "dependencies": ["Query user by username"],
+          "testScenarios": [
+            "Active user can login",
+            "Deleted user cannot login"
+          ],
+          "completed": false
+        },
+        {
+          "id": "BR036",
+          "interaction": "Login",
+          "type": "business_rule",
+          "description": "Password must match",
+          "condition": "Provided password matches stored password",
+          "dependencies": ["Query user by username", "Compare passwords"],
+          "testScenarios": [
+            "Can login with correct password",
+            "Cannot login with incorrect password"
+          ],
+          "completed": false
+        },
+        {
+          "id": "BR037",
+          "interaction": "ChangePassword",
+          "type": "business_rule",
+          "description": "Old password must match current password",
+          "condition": "Provided old password matches stored password",
+          "dependencies": ["Compare passwords"],
+          "testScenarios": [
+            "Can change password with correct old password",
+            "Cannot change password with incorrect old password"
+          ],
+          "completed": false
+        }
+      ]
+    },
+    {
+      "phase": 5,
+      "name": "Authentication and Public Access",
+      "description": "Rules for public and authenticated-only interactions",
+      "rules": [
+        {
+          "id": "P017",
+          "interaction": "Login",
+          "type": "permission",
+          "description": "Public access - no authentication required",
+          "condition": "true (public)",
+          "testScenarios": [
+            "Anyone can attempt login"
+          ],
+          "completed": false
+        },
+        {
+          "id": "P018",
+          "interaction": "Registration",
+          "type": "permission",
+          "description": "Public access - no authentication required",
+          "condition": "true (public)",
+          "testScenarios": [
+            "Anyone can attempt registration"
+          ],
+          "completed": false
+        },
+        {
+          "id": "P019",
+          "interaction": "ChangePassword",
+          "type": "permission",
+          "description": "Authenticated users only",
+          "condition": "user is authenticated",
+          "testScenarios": [
+            "Authenticated user can change password",
+            "Unauthenticated cannot change password"
+          ],
+          "completed": false
+        },
+        {
+          "id": "P020",
+          "interaction": "ViewMyDormitory",
+          "type": "permission",
+          "description": "Authenticated users only",
+          "condition": "user is authenticated",
+          "testScenarios": [
+            "Authenticated user can view dormitory",
+            "Unauthenticated cannot view"
+          ],
+          "completed": false
+        },
+        {
+          "id": "P021",
+          "interaction": "ViewMyPoints",
+          "type": "permission",
+          "description": "Authenticated users only",
+          "condition": "user is authenticated",
+          "testScenarios": [
+            "Authenticated user can view points",
+            "Unauthenticated cannot view"
+          ],
+          "completed": false
+        },
+        {
+          "id": "P022",
+          "interaction": "UpdateProfile",
+          "type": "permission",
+          "description": "Authenticated users only",
+          "condition": "user is authenticated",
+          "testScenarios": [
+            "Authenticated user can update profile",
+            "Unauthenticated cannot update"
+          ],
+          "completed": false
+        },
+        {
+          "id": "P023",
+          "interaction": "GetDormitories",
+          "type": "permission",
+          "description": "Authenticated users only",
+          "condition": "user is authenticated",
+          "testScenarios": [
+            "Authenticated user can list dormitories",
+            "Unauthenticated cannot list"
+          ],
+          "completed": false
+        },
+        {
+          "id": "P024",
+          "interaction": "GetDormitoryDetail",
+          "type": "permission",
+          "description": "Authenticated users only",
+          "condition": "user is authenticated",
+          "testScenarios": [
+            "Authenticated user can view dormitory detail",
+            "Unauthenticated cannot view detail"
+          ],
+          "completed": false
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "totalRules": 61,
+    "permissions": 24,
+    "businessRules": 37,
+    "byPhase": {
+      "phase1": 13,
+      "phase2": 6,
+      "phase3": 3,
+      "phase4": 31,
+      "phase5": 8
+    }
+  },
+  "implementation_notes": [
+    "Start with Phase 1 (Basic Permissions) as they are simplest to implement",
+    "Phase 2 (Simple Business Rules) can be done in parallel as they only check payload",
+    "Phase 3 (Scope-Based Permissions) requires relationship queries",
+    "Phase 4 (Complex Business Rules) requires the most database queries and logic",
+    "Phase 5 (Authentication) may be handled by framework but included for completeness",
+    "Each rule should be implemented with its test scenarios to ensure correctness",
+    "Use the Condition API from interaqt framework for all rules",
+    "Permissions and business rules both use the same 'conditions' parameter in Interaction.create()"
+  ]
+}

@@ -1,24 +1,4 @@
 {
-  "currentTask": "Task 3.2.0",
-  "completed": true,
-  "lastCompletedComputation": "RemovalRequest.adminComment",
-  "completedComputations": [
-    "User.username",
-    "User.password",
-    "User.email",
-    "User.name",
-    "User.role",
-    "User.points",
-    "User.isDeleted",
-    "Dormitory.building",
-    "Dormitory.capacity",
-    "Dormitory.floor",
-    "Dormitory.name",
-    "Dormitory.isDeleted",
-    "Bed.isOccupied",
-    "Dormitory.occupiedBeds",
-    "RemovalRequest.status",
-    "RemovalRequest.processedAt",
-    "RemovalRequest.adminComment"
-  ]
+  "currentTask": "Task 3.2.1",
+  "completed": true
 }
