@@ -1593,4 +1593,312 @@ describe('Permission and Business Rules', () => {
       expect(rejectedRequest.adminComment).toBe('Not sufficient grounds for removal')
     })
   })
+
+  describe('Phase 2: Simple Business Rules', () => {
+    test('BR001: Can create dormitory with capacity 4 (TC001)', async () => {
+      // Create admin user
+      const admin = await system.storage.create('User', {
+        username: 'admin',
+        password: 'password123',
+        email: 'admin@test.com',
+        name: 'Admin User',
+        role: 'admin',
+        points: 100
+      })
+      
+      // Admin should be able to create dormitory with capacity 4
+      const result = await controller.callInteraction('CreateDormitory', {
+        user: admin,
+        payload: {
+          name: 'Dorm Capacity 4',
+          capacity: 4,
+          floor: 1,
+          building: 'Building 1'
+        }
+      })
+      
+      expect(result.error).toBeUndefined()
+      
+      // Verify dormitory was created with correct capacity
+      const dormitories = await system.storage.find('Dormitory', 
+        MatchExp.atom({ key: 'name', value: ['=', 'Dorm Capacity 4'] }),
+        undefined,
+        ['id', 'name', 'capacity']
+      )
+      expect(dormitories.length).toBe(1)
+      expect(dormitories[0].capacity).toBe(4)
+    })
+
+    test('BR001: Can create dormitory with capacity 6', async () => {
+      // Create admin user
+      const admin = await system.storage.create('User', {
+        username: 'admin',
+        password: 'password123',
+        email: 'admin@test.com',
+        name: 'Admin User',
+        role: 'admin',
+        points: 100
+      })
+      
+      // Admin should be able to create dormitory with capacity 6
+      const result = await controller.callInteraction('CreateDormitory', {
+        user: admin,
+        payload: {
+          name: 'Dorm Capacity 6',
+          capacity: 6,
+          floor: 2,
+          building: 'Building 2'
+        }
+      })
+      
+      expect(result.error).toBeUndefined()
+      
+      // Verify dormitory was created with correct capacity
+      const dormitories = await system.storage.find('Dormitory', 
+        MatchExp.atom({ key: 'name', value: ['=', 'Dorm Capacity 6'] }),
+        undefined,
+        ['id', 'name', 'capacity']
+      )
+      expect(dormitories.length).toBe(1)
+      expect(dormitories[0].capacity).toBe(6)
+    })
+
+    test('BR001: Cannot create dormitory with capacity 3 (TC013)', async () => {
+      // Create admin user
+      const admin = await system.storage.create('User', {
+        username: 'admin',
+        password: 'password123',
+        email: 'admin@test.com',
+        name: 'Admin User',
+        role: 'admin',
+        points: 100
+      })
+      
+      // Admin should not be able to create dormitory with capacity 3
+      const result = await controller.callInteraction('CreateDormitory', {
+        user: admin,
+        payload: {
+          name: 'Dorm Capacity 3',
+          capacity: 3,
+          floor: 3,
+          building: 'Building 3'
+        }
+      })
+      
+      // Verify error - capacity validation should fail
+      expect(result.error).toBeDefined()
+      expect((result.error as any).type).toBe('condition check failed')
+      expect((result.error as any).error.data.name).toBe('validDormitoryCapacity')
+      
+      // Verify dormitory was not created
+      const dormitories = await system.storage.find('Dormitory', 
+        MatchExp.atom({ key: 'name', value: ['=', 'Dorm Capacity 3'] })
+      )
+      expect(dormitories.length).toBe(0)
+    })
+
+    test('BR001: Cannot create dormitory with capacity 7 (TC013)', async () => {
+      // Create admin user
+      const admin = await system.storage.create('User', {
+        username: 'admin',
+        password: 'password123',
+        email: 'admin@test.com',
+        name: 'Admin User',
+        role: 'admin',
+        points: 100
+      })
+      
+      // Admin should not be able to create dormitory with capacity 7
+      const result = await controller.callInteraction('CreateDormitory', {
+        user: admin,
+        payload: {
+          name: 'Dorm Capacity 7',
+          capacity: 7,
+          floor: 1,
+          building: 'Building 1'
+        }
+      })
+      
+      // Verify error - capacity validation should fail
+      expect(result.error).toBeDefined()
+      expect((result.error as any).type).toBe('condition check failed')
+      expect((result.error as any).error.data.name).toBe('validDormitoryCapacity')
+      
+      // Verify dormitory was not created
+      const dormitories = await system.storage.find('Dormitory', 
+        MatchExp.atom({ key: 'name', value: ['=', 'Dorm Capacity 7'] })
+      )
+      expect(dormitories.length).toBe(0)
+    })
+
+    test('BR001: Cannot create dormitory with capacity 10 (TC013)', async () => {
+      // Create admin user
+      const admin = await system.storage.create('User', {
+        username: 'admin',
+        password: 'password123',
+        email: 'admin@test.com',
+        name: 'Admin User',
+        role: 'admin',
+        points: 100
+      })
+      
+      // Admin should not be able to create dormitory with capacity 10
+      const result = await controller.callInteraction('CreateDormitory', {
+        user: admin,
+        payload: {
+          name: 'Dorm Capacity 10',
+          capacity: 10,
+          floor: 1,
+          building: 'Building 1'
+        }
+      })
+      
+      // Verify error - capacity validation should fail
+      expect(result.error).toBeDefined()
+      expect((result.error as any).type).toBe('condition check failed')
+      expect((result.error as any).error.data.name).toBe('validDormitoryCapacity')
+      
+      // Verify dormitory was not created
+      const dormitories = await system.storage.find('Dormitory', 
+        MatchExp.atom({ key: 'name', value: ['=', 'Dorm Capacity 10'] })
+      )
+      expect(dormitories.length).toBe(0)
+    })
+
+    test('BR001: Can create dormitory with capacity 5', async () => {
+      // Create admin user
+      const admin = await system.storage.create('User', {
+        username: 'admin',
+        password: 'password123',
+        email: 'admin@test.com',
+        name: 'Admin User',
+        role: 'admin',
+        points: 100
+      })
+      
+      // Admin should be able to create dormitory with capacity 5 (within range)
+      const result = await controller.callInteraction('CreateDormitory', {
+        user: admin,
+        payload: {
+          name: 'Dorm Capacity 5',
+          capacity: 5,
+          floor: 1,
+          building: 'Building 1'
+        }
+      })
+      
+      expect(result.error).toBeUndefined()
+      
+      // Verify dormitory was created with correct capacity
+      const dormitories = await system.storage.find('Dormitory', 
+        MatchExp.atom({ key: 'name', value: ['=', 'Dorm Capacity 5'] }),
+        undefined,
+        ['id', 'name', 'capacity']
+      )
+      expect(dormitories.length).toBe(1)
+      expect(dormitories[0].capacity).toBe(5)
+    })
+
+    test('BR001: Non-admin with valid capacity still cannot create dormitory', async () => {
+      // Create non-admin user
+      const resident = await system.storage.create('User', {
+        username: 'resident1',
+        password: 'password123',
+        email: 'resident@test.com',
+        name: 'Resident User',
+        role: 'resident',
+        points: 100
+      })
+      
+      // Even with valid capacity, non-admin should not be able to create dormitory
+      const result = await controller.callInteraction('CreateDormitory', {
+        user: resident,
+        payload: {
+          name: 'Resident Dorm',
+          capacity: 5, // Valid capacity
+          floor: 1,
+          building: 'Building 1'
+        }
+      })
+      
+      // Verify error - should fail on admin check first
+      expect(result.error).toBeDefined()
+      expect((result.error as any).type).toBe('condition check failed')
+      expect((result.error as any).error.data.name).toBe('isAdmin')
+      
+      // Verify dormitory was not created
+      const dormitories = await system.storage.find('Dormitory', 
+        MatchExp.atom({ key: 'name', value: ['=', 'Resident Dorm'] })
+      )
+      expect(dormitories.length).toBe(0)
+    })
+
+    test('BR001: Cannot create dormitory with capacity 0', async () => {
+      // Create admin user
+      const admin = await system.storage.create('User', {
+        username: 'admin',
+        password: 'password123',
+        email: 'admin@test.com',
+        name: 'Admin User',
+        role: 'admin',
+        points: 100
+      })
+      
+      // Admin should not be able to create dormitory with capacity 0
+      const result = await controller.callInteraction('CreateDormitory', {
+        user: admin,
+        payload: {
+          name: 'Dorm Capacity 0',
+          capacity: 0,
+          floor: 1,
+          building: 'Building 1'
+        }
+      })
+      
+      // Verify error - capacity validation should fail
+      expect(result.error).toBeDefined()
+      expect((result.error as any).type).toBe('condition check failed')
+      expect((result.error as any).error.data.name).toBe('validDormitoryCapacity')
+      
+      // Verify dormitory was not created
+      const dormitories = await system.storage.find('Dormitory', 
+        MatchExp.atom({ key: 'name', value: ['=', 'Dorm Capacity 0'] })
+      )
+      expect(dormitories.length).toBe(0)
+    })
+
+    test('BR001: Cannot create dormitory with negative capacity', async () => {
+      // Create admin user
+      const admin = await system.storage.create('User', {
+        username: 'admin',
+        password: 'password123',
+        email: 'admin@test.com',
+        name: 'Admin User',
+        role: 'admin',
+        points: 100
+      })
+      
+      // Admin should not be able to create dormitory with negative capacity
+      const result = await controller.callInteraction('CreateDormitory', {
+        user: admin,
+        payload: {
+          name: 'Dorm Capacity -1',
+          capacity: -1,
+          floor: 1,
+          building: 'Building 1'
+        }
+      })
+      
+      // Verify error - capacity validation should fail
+      expect(result.error).toBeDefined()
+      expect((result.error as any).type).toBe('condition check failed')
+      expect((result.error as any).error.data.name).toBe('validDormitoryCapacity')
+      
+      // Verify dormitory was not created
+      const dormitories = await system.storage.find('Dormitory', 
+        MatchExp.atom({ key: 'name', value: ['=', 'Dorm Capacity -1'] })
+      )
+      expect(dormitories.length).toBe(0)
+    })
+  })
 })

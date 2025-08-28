@@ -1362,3 +1362,19 @@ RemoveUserFromBed.conditions = isAdmin
 // P008: Only admin can process removal requests
 ProcessRemovalRequest.conditions = isAdmin
 
+// Phase 2: Simple Business Rules
+
+// BR001: Dormitory capacity must be between 4 and 6
+const validDormitoryCapacity = Condition.create({
+  name: 'validDormitoryCapacity',
+  content: function(this: Controller, event: any) {
+    const capacity = event.payload?.capacity
+    return capacity >= 4 && capacity <= 6
+  }
+})
+
+// Combine P001 (admin permission) with BR001 (capacity validation)
+CreateDormitory.conditions = Conditions.create({
+  content: BoolExp.atom(isAdmin).and(validDormitoryCapacity)
+})
+

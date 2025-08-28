@@ -181,7 +181,7 @@
             "Cannot create with capacity 7 (TC013)",
             "Cannot create with capacity 10 (TC013)"
           ],
-          "completed": false
+          "completed": true
         },
         {
           "id": "BR002",
