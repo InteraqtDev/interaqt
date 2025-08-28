@@ -3356,6 +3356,193 @@ describe('Permission and Business Rules', () => {
       expect(notDeletedUser.isDeleted).toBe(false)
     })
 
+    test('BR026: Can delete admin when multiple admins exist', async () => {
+      // Create first admin user
+      const admin1 = await system.storage.create('User', {
+        username: 'admin1',
+        password: 'password123',
+        email: 'admin1@test.com',
+        name: 'Admin User 1',
+        role: 'admin',
+        points: 100
+      })
+      
+      // Create second admin user
+      const admin2 = await system.storage.create('User', {
+        username: 'admin2',
+        password: 'password123',
+        email: 'admin2@test.com',
+        name: 'Admin User 2',
+        role: 'admin',
+        points: 100
+      })
+      
+      // Create third admin user to delete
+      const admin3 = await system.storage.create('User', {
+        username: 'admin3',
+        password: 'password123',
+        email: 'admin3@test.com',
+        name: 'Admin User 3',
+        role: 'admin',
+        points: 100
+      })
+      
+      // Admin1 should be able to delete admin3 since there are multiple admins
+      const result = await controller.callInteraction('DeleteUser', {
+        user: admin1,
+        payload: {
+          userId: admin3.id
+        }
+      })
+      
+      // Check the interaction succeeded
+      expect(result.error).toBeUndefined()
+      
+      // Verify the user was deleted (soft delete)
+      const deletedUser = await system.storage.findOne(
+        'User',
+        MatchExp.atom({ key: 'id', value: ['=', admin3.id] }),
+        undefined,
+        ['id', 'username', 'isDeleted']
+      )
+      
+      expect(deletedUser).toBeDefined()
+      expect(deletedUser.isDeleted).toBe(true)
+      
+      // Verify there are still admins remaining
+      const remainingAdmins = await system.storage.find(
+        'User',
+        MatchExp.atom({ key: 'role', value: ['=', 'admin'] })
+          .and({ key: 'isDeleted', value: ['=', false] }),
+        undefined,
+        ['id']
+      )
+      
+      expect(remainingAdmins.length).toBeGreaterThanOrEqual(2)
+    })
+
+    test('BR026: Cannot delete last remaining admin', async () => {
+      // Create the only admin user
+      const admin = await system.storage.create('User', {
+        username: 'onlyadmin',
+        password: 'password123',
+        email: 'onlyadmin@test.com',
+        name: 'Only Admin',
+        role: 'admin',
+        points: 100
+      })
+      
+      // Create some non-admin users to show others exist
+      const resident = await system.storage.create('User', {
+        username: 'resident',
+        password: 'password123',
+        email: 'resident@test.com',
+        name: 'Resident User',
+        role: 'resident',
+        points: 100
+      })
+      
+      // Admin should NOT be able to delete themselves when they're the last admin
+      const result = await controller.callInteraction('DeleteUser', {
+        user: admin,
+        payload: {
+          userId: admin.id
+        }
+      })
+      
+      // Check the interaction failed
+      expect(result.error).toBeDefined()
+      expect((result.error as any).type).toBe('condition check failed')
+      expect((result.error as any).error.data.name).toBe('cannotDeleteLastAdmin')
+      
+      // Verify the admin was not deleted
+      const notDeletedAdmin = await system.storage.findOne(
+        'User',
+        MatchExp.atom({ key: 'id', value: ['=', admin.id] }),
+        undefined,
+        ['id', 'username', 'isDeleted']
+      )
+      
+      expect(notDeletedAdmin).toBeDefined()
+      expect(notDeletedAdmin.isDeleted).toBe(false)
+    })
+
+    test('BR026: Can delete non-admin users', async () => {
+      // Create admin user
+      const admin = await system.storage.create('User', {
+        username: 'admin',
+        password: 'password123',
+        email: 'admin@test.com',
+        name: 'Admin User',
+        role: 'admin',
+        points: 100
+      })
+      
+      // Create resident user to delete
+      const resident = await system.storage.create('User', {
+        username: 'resident',
+        password: 'password123',
+        email: 'resident@test.com',
+        name: 'Resident User',
+        role: 'resident',
+        points: 100
+      })
+      
+      // Create dormitory leader user to delete
+      const dormitoryLeader = await system.storage.create('User', {
+        username: 'leader',
+        password: 'password123',
+        email: 'leader@test.com',
+        name: 'Leader User',
+        role: 'dormitoryLeader',
+        points: 100
+      })
+      
+      // Admin should be able to delete resident
+      const result1 = await controller.callInteraction('DeleteUser', {
+        user: admin,
+        payload: {
+          userId: resident.id
+        }
+      })
+      
+      // Check the interaction succeeded
+      expect(result1.error).toBeUndefined()
+      
+      // Verify the resident was deleted
+      const deletedResident = await system.storage.findOne(
+        'User',
+        MatchExp.atom({ key: 'id', value: ['=', resident.id] }),
+        undefined,
+        ['id', 'username', 'isDeleted']
+      )
+      
+      expect(deletedResident).toBeDefined()
+      expect(deletedResident.isDeleted).toBe(true)
+      
+      // Admin should be able to delete dormitory leader
+      const result2 = await controller.callInteraction('DeleteUser', {
+        user: admin,
+        payload: {
+          userId: dormitoryLeader.id
+        }
+      })
+      
+      // Check the interaction succeeded
+      expect(result2.error).toBeUndefined()
+      
+      // Verify the dormitory leader was deleted
+      const deletedLeader = await system.storage.findOne(
+        'User',
+        MatchExp.atom({ key: 'id', value: ['=', dormitoryLeader.id] }),
+        undefined,
+        ['id', 'username', 'isDeleted']
+      )
+      
+      expect(deletedLeader).toBeDefined()
+      expect(deletedLeader.isDeleted).toBe(true)
+    })
+
     test('P012: Admin can list users', async () => {
       // Create admin user
       const admin = await system.storage.create('User', {

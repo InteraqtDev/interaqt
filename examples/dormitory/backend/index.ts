@@ -1767,8 +1767,52 @@ CreateUser.conditions = Conditions.create({
   content: BoolExp.atom(isAdmin).and(createUserPasswordLength).and(uniqueUsername).and(uniqueAndValidEmail)
 })
 
-// P011: Only admin can delete users
-DeleteUser.conditions = isAdmin
+// BR026: Cannot delete the last admin user
+const cannotDeleteLastAdmin = Condition.create({
+  name: 'cannotDeleteLastAdmin',
+  content: async function(this: Controller, event: any) {
+    const userId = event.payload?.userId
+    
+    if (!userId) {
+      return false // No user ID provided
+    }
+    
+    // Get the target user to check their role
+    const targetUser = await this.system.storage.findOne(
+      'User',
+      MatchExp.atom({ key: 'id', value: ['=', userId] }),
+      undefined,
+      ['id', 'role']
+    )
+    
+    if (!targetUser) {
+      return false // User not found
+    }
+    
+    // If the target user is not an admin, they can be deleted
+    if (targetUser.role !== 'admin') {
+      return true
+    }
+    
+    // Target is an admin, check if there are other admins
+    const adminUsers = await this.system.storage.find(
+      'User',
+      MatchExp.atom({ key: 'role', value: ['=', 'admin'] })
+        .and({ key: 'isDeleted', value: ['=', false] }), // Only count non-deleted admins
+      undefined,
+      ['id']
+    )
+    
+    // Can only delete this admin if there's more than one admin
+    // (The admin count includes the one we're trying to delete)
+    return adminUsers.length > 1
+  }
+})
+
+// P011: Only admin can delete users + BR026: Cannot delete the last admin
+DeleteUser.conditions = Conditions.create({
+  content: BoolExp.atom(isAdmin).and(cannotDeleteLastAdmin)
+})
 
 // Phase 2: Simple Business Rules
 

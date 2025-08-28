@@ -565,7 +565,7 @@
             "Cannot delete last remaining admin",
             "Can delete non-admin users"
           ],
-          "completed": false
+          "completed": true
         },
         {
           "id": "BR027",
