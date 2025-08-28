@@ -1980,12 +1980,31 @@ const noPendingRemovalRequestForUser = Condition.create({
   }
 })
 
-// Combine P013 (dormitory leader permission), BR027 (target user in leader's dormitory), BR028 (target user < 30 points), and BR029 (no pending request)
+// BR030: Cannot submit removal request for self
+const cannotSubmitRemovalRequestForSelf = Condition.create({
+  name: 'cannotSubmitRemovalRequestForSelf',
+  content: function(this: Controller, event: any) {
+    const targetUserId = event.payload?.userId
+    const currentUserId = event.user?.id
+    
+    // If either ID is missing, return false
+    if (!targetUserId || !currentUserId) {
+      return false
+    }
+    
+    // Return true if target user is NOT the current user (can submit for others)
+    // Return false if target user IS the current user (cannot submit for self)
+    return targetUserId !== currentUserId
+  }
+})
+
+// Combine P013 (dormitory leader permission), BR027 (target user in leader's dormitory), BR028 (target user < 30 points), BR029 (no pending request), and BR030 (cannot submit for self)
 SubmitRemovalRequest.conditions = Conditions.create({
   content: BoolExp.atom(isDormitoryLeader)
     .and(targetUserInLeaderDormitory)
     .and(targetUserLessThan30Points)
     .and(noPendingRemovalRequestForUser)
+    .and(cannotSubmitRemovalRequestForSelf)
 })
 
 // BR003: Points to deduct must be positive for DeductResidentPoints

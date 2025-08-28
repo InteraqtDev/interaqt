@@ -8688,6 +8688,149 @@ describe('Permission and Business Rules', () => {
       expect(newRequest.reason).toBe('New violation after rejection')
     })
 
+    test('BR030: Cannot submit removal request for self', async () => {
+      // Create dormitory
+      const dormitory = await system.storage.create('Dormitory', {
+        name: 'Test Dorm BR030',
+        capacity: 4,
+        floor: 1,
+        building: 'Building BR030'
+      })
+      
+      // Create dormitory leader with low points
+      const leader = await system.storage.create('User', {
+        username: 'leaderBR030',
+        password: 'password123',
+        email: 'leaderBR030@test.com',
+        name: 'Dorm Leader BR030',
+        role: 'dormitoryLeader',
+        points: 10 // Less than 30 points
+      })
+      
+      // Assign leader to dormitory
+      await system.storage.addRelationByNameById(
+        UserDormitoryLeaderRelation.name,
+        leader.id,
+        dormitory.id
+      )
+      
+      // Create bed for leader
+      const leaderBed = await system.storage.create('Bed', {
+        bedNumber: 'BR030-1',
+        dormitory: { id: dormitory.id }
+      })
+      
+      // Assign leader to bed (leader is also a resident)
+      await system.storage.addRelationByNameById(
+        UserBedRelation.name,
+        leader.id,
+        leaderBed.id
+      )
+      
+      // Try to submit removal request for self - should fail
+      const selfResult = await controller.callInteraction('SubmitRemovalRequest', {
+        user: leader,
+        payload: {
+          userId: leader.id, // Trying to submit for self
+          reason: 'Trying to remove myself'
+        }
+      })
+      
+      expect(selfResult.error).toBeDefined()
+      expect((selfResult.error as any).type).toBe('condition check failed')
+      expect((selfResult.error as any).error.data.name).toBe('cannotSubmitRemovalRequestForSelf')
+      
+      // Verify no request was created
+      const requests = await system.storage.find('RemovalRequest',
+        MatchExp.atom({ key: 'targetUser.id', value: ['=', leader.id] }),
+        undefined,
+        ['id']
+      )
+      expect(requests.length).toBe(0)
+    })
+
+    test('BR030: Can submit removal request for other residents', async () => {
+      // Create dormitory
+      const dormitory = await system.storage.create('Dormitory', {
+        name: 'Test Dorm BR030-2',
+        capacity: 4,
+        floor: 2,
+        building: 'Building BR030-2'
+      })
+      
+      // Create dormitory leader
+      const leader = await system.storage.create('User', {
+        username: 'leaderBR030-2',
+        password: 'password123',
+        email: 'leaderBR030-2@test.com',
+        name: 'Dorm Leader BR030-2',
+        role: 'dormitoryLeader',
+        points: 100
+      })
+      
+      // Create another resident with low points
+      const otherResident = await system.storage.create('User', {
+        username: 'residentBR030',
+        password: 'password123',
+        email: 'residentBR030@test.com',
+        name: 'Resident BR030',
+        role: 'resident',
+        points: 20 // Less than 30 points
+      })
+      
+      // Assign leader to dormitory
+      await system.storage.addRelationByNameById(
+        UserDormitoryLeaderRelation.name,
+        leader.id,
+        dormitory.id
+      )
+      
+      // Create beds
+      const leaderBed = await system.storage.create('Bed', {
+        bedNumber: 'BR030-2-1',
+        dormitory: { id: dormitory.id }
+      })
+      
+      const residentBed = await system.storage.create('Bed', {
+        bedNumber: 'BR030-2-2',
+        dormitory: { id: dormitory.id }
+      })
+      
+      // Assign beds
+      await system.storage.addRelationByNameById(
+        UserBedRelation.name,
+        leader.id,
+        leaderBed.id
+      )
+      
+      await system.storage.addRelationByNameById(
+        UserBedRelation.name,
+        otherResident.id,
+        residentBed.id
+      )
+      
+      // Submit removal request for other resident - should succeed
+      const result = await controller.callInteraction('SubmitRemovalRequest', {
+        user: leader,
+        payload: {
+          userId: otherResident.id, // Submitting for another resident
+          reason: 'Multiple violations'
+        }
+      })
+      
+      expect(result.error).toBeUndefined()
+      
+      // Verify request was created
+      const request = await system.storage.findOne('RemovalRequest',
+        MatchExp.atom({ key: 'targetUser.id', value: ['=', otherResident.id] }),
+        undefined,
+        ['id', 'status', 'reason']
+      )
+      expect(request).toBeDefined()
+      expect(request.status).toBe('pending')
+      expect(request.reason).toBe('Multiple violations')
+    })
+
     test('BR019: User points cannot go below 0 - Points reduced normally when sufficient (TC003)', async () => {
       // Create admin user
       const admin = await system.storage.create('User', {
