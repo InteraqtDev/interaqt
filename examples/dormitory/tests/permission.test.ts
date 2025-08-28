@@ -270,5 +270,123 @@ describe('Permission and Business Rules', () => {
       )
       expect(unchangedDorms[0].name).toBe('Test Dorm') // Name should not change
     })
+
+    test('P003: Admin can delete dormitory', async () => {
+      // Create admin user
+      const admin = await system.storage.create('User', {
+        username: 'admin',
+        password: 'password123',
+        email: 'admin@test.com',
+        name: 'Admin User',
+        role: 'admin',
+        points: 100
+      })
+      
+      // First create a dormitory as admin
+      const createResult = await controller.callInteraction('CreateDormitory', {
+        user: admin,
+        payload: {
+          name: 'Dorm to Delete', 
+          capacity: 4,
+          floor: 1,
+          building: 'Building A'
+        }
+      })
+      expect(createResult.error).toBeUndefined()
+      
+      // Get the created dormitory
+      const dormitories = await system.storage.find('Dormitory', 
+        MatchExp.atom({ key: 'name', value: ['=', 'Dorm to Delete'] }),
+        undefined,
+        ['id', 'name', 'isDeleted']
+      )
+      expect(dormitories.length).toBe(1)
+      const dormitoryId = dormitories[0].id
+      expect(dormitories[0].isDeleted).toBe(false)
+      
+      // Admin should be able to delete dormitory
+      const deleteResult = await controller.callInteraction('DeleteDormitory', {
+        user: admin,
+        payload: {
+          dormitoryId: dormitoryId
+        }
+      })
+      
+      // Verify no error
+      expect(deleteResult.error).toBeUndefined()
+      
+      // Verify dormitory is marked as deleted
+      const deletedDorms = await system.storage.find('Dormitory',
+        MatchExp.atom({ key: 'id', value: ['=', dormitoryId] }),
+        undefined,
+        ['id', 'name', 'isDeleted']
+      )
+      expect(deletedDorms.length).toBe(1)
+      expect(deletedDorms[0].isDeleted).toBe(true)
+    })
+
+    test('P003: Non-admin cannot delete dormitory', async () => {
+      // Create admin to create dormitory
+      const admin = await system.storage.create('User', {
+        username: 'admin',
+        password: 'password123',
+        email: 'admin@test.com',
+        name: 'Admin User',
+        role: 'admin',
+        points: 100
+      })
+      
+      // Create resident user
+      const resident = await system.storage.create('User', {
+        username: 'resident1',
+        password: 'password123',
+        email: 'resident@test.com',
+        name: 'Resident User',
+        role: 'resident',
+        points: 100
+      })
+      
+      // Create dormitory as admin
+      const createResult = await controller.callInteraction('CreateDormitory', {
+        user: admin,
+        payload: {
+          name: 'Test Dorm to Keep',
+          capacity: 4,
+          floor: 1,
+          building: 'Building 1'
+        }
+      })
+      expect(createResult.error).toBeUndefined()
+      
+      // Get the created dormitory
+      const dormitories = await system.storage.find('Dormitory',
+        MatchExp.atom({ key: 'name', value: ['=', 'Test Dorm to Keep'] }),
+        undefined,
+        ['id', 'isDeleted']
+      )
+      const dormitoryId = dormitories[0].id
+      expect(dormitories[0].isDeleted).toBe(false)
+      
+      // Resident should NOT be able to delete dormitory
+      const deleteResult = await controller.callInteraction('DeleteDormitory', {
+        user: resident,
+        payload: {
+          dormitoryId: dormitoryId
+        }
+      })
+      
+      // Verify error
+      expect(deleteResult.error).toBeDefined()
+      expect((deleteResult.error as any).type).toBe('condition check failed')
+      expect((deleteResult.error as any).error.data.name).toBe('isAdmin')
+      
+      // Verify dormitory was not deleted
+      const unchangedDorms = await system.storage.find('Dormitory',
+        MatchExp.atom({ key: 'id', value: ['=', dormitoryId] }),
+        undefined,
+        ['isDeleted']
+      )
+      expect(unchangedDorms[0].isDeleted).toBe(false) // Should still not be deleted
+    })
   })
 })

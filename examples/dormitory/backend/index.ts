@@ -1344,3 +1344,6 @@ CreateDormitory.conditions = isAdmin
 // P002: Only admin can update dormitories
 UpdateDormitory.conditions = isAdmin
 
+// P003: Only admin can delete dormitories
+DeleteDormitory.conditions = isAdmin
+

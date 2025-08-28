@@ -39,7 +39,7 @@
             "Admin can delete dormitory",
             "Non-admin cannot delete dormitory"
           ],
-          "completed": false
+          "completed": true
         },
         {
           "id": "P004",
