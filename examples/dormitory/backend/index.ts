@@ -1359,3 +1359,6 @@ AssignUserToBed.conditions = isAdmin
 // P007: Only admin can remove users from beds
 RemoveUserFromBed.conditions = isAdmin
 
+// P008: Only admin can process removal requests
+ProcessRemovalRequest.conditions = isAdmin
+

@@ -1336,5 +1336,261 @@ describe('Permission and Business Rules', () => {
       )
       expect(stillAssignedRelation).toBeDefined()
     })
+
+    test('P008: Admin can process removal request (TC005)', async () => {
+      // Create admin user
+      const admin = await system.storage.create('User', {
+        username: 'admin',
+        password: 'password123',
+        email: 'admin@test.com',
+        name: 'Admin User',
+        role: 'admin',
+        points: 100
+      })
+      
+      // Create dormitory leader user
+      const dormitoryLeader = await system.storage.create('User', {
+        username: 'leader1',
+        password: 'password123',
+        email: 'leader@test.com',
+        name: 'Dormitory Leader',
+        role: 'dormitoryLeader',
+        points: 100
+      })
+      
+      // Create target user
+      const targetUser = await system.storage.create('User', {
+        username: 'target1',
+        password: 'password123',
+        email: 'target@test.com',
+        name: 'Target User',
+        role: 'resident',
+        points: 20  // Low points (less than 30)
+      })
+      
+      // Create removal request - this will automatically create the relations
+      const removalRequest = await system.storage.create('RemovalRequest', {
+        reason: 'Violation of dormitory rules',
+        status: 'pending',
+        createdAt: Math.floor(Date.now() / 1000),
+        targetUser: { id: targetUser.id },
+        requestedBy: { id: dormitoryLeader.id }
+      })
+      
+      // Admin should be able to process removal request - approve
+      const approveResult = await controller.callInteraction('ProcessRemovalRequest', {
+        user: admin,
+        payload: {
+          requestId: removalRequest.id,
+          decision: 'approved',
+          adminComment: 'Request approved due to repeated violations'
+        }
+      })
+      
+      expect(approveResult.error).toBeUndefined()
+      
+      // Verify removal request was processed
+      const processedRequest = await system.storage.findOne('RemovalRequest',
+        MatchExp.atom({ key: 'id', value: ['=', removalRequest.id] }),
+        undefined,
+        ['id', 'status', 'processedAt', 'adminComment']
+      )
+      expect(processedRequest.status).toBe('approved')
+      expect(processedRequest.processedAt).toBeDefined()
+      expect(processedRequest.processedAt).toBeGreaterThan(0)
+      expect(processedRequest.adminComment).toBe('Request approved due to repeated violations')
+    })
+
+    test('P008: Non-admin cannot process removal request (TC010)', async () => {
+      // Create non-admin user (dormitory leader)
+      const dormitoryLeader = await system.storage.create('User', {
+        username: 'leader1',
+        password: 'password123',
+        email: 'leader@test.com',
+        name: 'Dormitory Leader',
+        role: 'dormitoryLeader',
+        points: 100
+      })
+      
+      // Create target user
+      const targetUser = await system.storage.create('User', {
+        username: 'target1',
+        password: 'password123',
+        email: 'target@test.com',
+        name: 'Target User',
+        role: 'resident',
+        points: 20  // Low points (less than 30)
+      })
+      
+      // Create removal request - this will automatically create the relations
+      const removalRequest = await system.storage.create('RemovalRequest', {
+        reason: 'Violation of dormitory rules',
+        status: 'pending',
+        createdAt: Math.floor(Date.now() / 1000),
+        targetUser: { id: targetUser.id },
+        requestedBy: { id: dormitoryLeader.id }
+      })
+      
+      // Dormitory leader should not be able to process removal request
+      const result = await controller.callInteraction('ProcessRemovalRequest', {
+        user: dormitoryLeader,
+        payload: {
+          requestId: removalRequest.id,
+          decision: 'approved',
+          adminComment: 'Trying to approve my own request'
+        }
+      })
+      
+      // Verify error
+      expect(result.error).toBeDefined()
+      expect((result.error as any).type).toBe('condition check failed')
+      expect((result.error as any).error.data.name).toBe('isAdmin')
+      
+      // Verify removal request was not processed
+      const unprocessedRequest = await system.storage.findOne('RemovalRequest',
+        MatchExp.atom({ key: 'id', value: ['=', removalRequest.id] }),
+        undefined,
+        ['id', 'status', 'processedAt', 'adminComment']
+      )
+      expect(unprocessedRequest.status).toBe('pending')
+      // These fields should be null since the request wasn't processed
+      // Note: processedAt and adminComment are handled by StateMachine computation 
+      // and default to null when not set
+      expect(unprocessedRequest.processedAt).toBeFalsy()  // null or undefined
+      expect(unprocessedRequest.adminComment).toBeFalsy()  // null or undefined
+    })
+
+    test('P008: Resident cannot process removal request', async () => {
+      // Create resident user
+      const resident = await system.storage.create('User', {
+        username: 'resident1',
+        password: 'password123',
+        email: 'resident@test.com',
+        name: 'Resident User',
+        role: 'resident',
+        points: 100
+      })
+      
+      // Create dormitory leader user
+      const dormitoryLeader = await system.storage.create('User', {
+        username: 'leader1',
+        password: 'password123',
+        email: 'leader@test.com',
+        name: 'Dormitory Leader',
+        role: 'dormitoryLeader',
+        points: 100
+      })
+      
+      // Create target user
+      const targetUser = await system.storage.create('User', {
+        username: 'target1',
+        password: 'password123',
+        email: 'target@test.com',
+        name: 'Target User',
+        role: 'resident',
+        points: 20  // Low points (less than 30)
+      })
+      
+      // Create removal request - this will automatically create the relations
+      const removalRequest = await system.storage.create('RemovalRequest', {
+        reason: 'Violation of dormitory rules',
+        status: 'pending',
+        createdAt: Math.floor(Date.now() / 1000),
+        targetUser: { id: targetUser.id },
+        requestedBy: { id: dormitoryLeader.id }
+      })
+      
+      // Resident should not be able to process removal request
+      const result = await controller.callInteraction('ProcessRemovalRequest', {
+        user: resident,
+        payload: {
+          requestId: removalRequest.id,
+          decision: 'approved',
+          adminComment: 'Resident trying to approve'
+        }
+      })
+      
+      // Verify error
+      expect(result.error).toBeDefined()
+      expect((result.error as any).type).toBe('condition check failed')
+      expect((result.error as any).error.data.name).toBe('isAdmin')
+      
+      // Verify removal request was not processed
+      const unprocessedRequest = await system.storage.findOne('RemovalRequest',
+        MatchExp.atom({ key: 'id', value: ['=', removalRequest.id] }),
+        undefined,
+        ['id', 'status', 'processedAt', 'adminComment']
+      )
+      expect(unprocessedRequest.status).toBe('pending')
+      // These fields should be null since the request wasn't processed
+      // Note: processedAt and adminComment are handled by StateMachine computation 
+      // and default to null when not set
+      expect(unprocessedRequest.processedAt).toBeFalsy()  // null or undefined
+      expect(unprocessedRequest.adminComment).toBeFalsy()  // null or undefined
+    })
+
+    test('P008: Admin can reject removal request', async () => {
+      // Create admin user
+      const admin = await system.storage.create('User', {
+        username: 'admin',
+        password: 'password123',
+        email: 'admin@test.com',
+        name: 'Admin User',
+        role: 'admin',
+        points: 100
+      })
+      
+      // Create dormitory leader user
+      const dormitoryLeader = await system.storage.create('User', {
+        username: 'leader1',
+        password: 'password123',
+        email: 'leader@test.com',
+        name: 'Dormitory Leader',
+        role: 'dormitoryLeader',
+        points: 100
+      })
+      
+      // Create target user
+      const targetUser = await system.storage.create('User', {
+        username: 'target1',
+        password: 'password123',
+        email: 'target@test.com',
+        name: 'Target User',
+        role: 'resident',
+        points: 20  // Low points (less than 30)
+      })
+      
+      // Create removal request - this will automatically create the relations
+      const removalRequest = await system.storage.create('RemovalRequest', {
+        reason: 'Minor issue',
+        status: 'pending',
+        createdAt: Math.floor(Date.now() / 1000),
+        targetUser: { id: targetUser.id },
+        requestedBy: { id: dormitoryLeader.id }
+      })
+      
+      // Admin should be able to reject removal request
+      const rejectResult = await controller.callInteraction('ProcessRemovalRequest', {
+        user: admin,
+        payload: {
+          requestId: removalRequest.id,
+          decision: 'rejected',
+          adminComment: 'Not sufficient grounds for removal'
+        }
+      })
+      
+      expect(rejectResult.error).toBeUndefined()
+      
+      // Verify removal request was rejected
+      const rejectedRequest = await system.storage.findOne('RemovalRequest',
+        MatchExp.atom({ key: 'id', value: ['=', removalRequest.id] }),
+        undefined,
+        ['id', 'status', 'processedAt', 'adminComment']
+      )
+      expect(rejectedRequest.status).toBe('rejected')
+      expect(rejectedRequest.processedAt).toBeDefined()
+      expect(rejectedRequest.processedAt).toBeGreaterThan(0)
+      expect(rejectedRequest.adminComment).toBe('Not sufficient grounds for removal')
+    })
   })
 })

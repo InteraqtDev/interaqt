@@ -99,7 +99,7 @@
             "Admin can process removal request (TC005)",
             "Non-admin cannot process removal request (TC010)"
           ],
-          "completed": false
+          "completed": true
         },
         {
           "id": "P009",
