@@ -4965,6 +4965,197 @@ describe('Permission and Business Rules', () => {
       expect(upperUser.username).toBe('TestUser')
     })
 
+    // BR023: Email must be unique and valid format
+    test('BR023: Can create user with unique valid email', async () => {
+      // Create admin user
+      const admin = await system.storage.create('User', {
+        username: 'admin',
+        password: 'admin123456',
+        email: 'admin@test.com',
+        name: 'Admin User',
+        role: 'admin',
+        points: 100,
+        createdAt: Math.floor(Date.now() / 1000),
+        isDeleted: false
+      })
+      
+      // Create first user with unique valid email
+      const result1 = await controller.callInteraction('CreateUser', {
+        user: admin,
+        payload: {
+          username: 'emailtest1',
+          password: 'password123',
+          email: 'unique1@example.com',
+          name: 'Email Test User 1'
+        }
+      })
+      
+      expect(result1.error).toBeUndefined()
+      
+      // Verify user was created
+      const createdUser1 = await system.storage.findOne('User',
+        MatchExp.atom({ key: 'username', value: ['=', 'emailtest1'] }),
+        undefined,
+        ['id', 'username', 'email']
+      )
+      expect(createdUser1).toBeDefined()
+      expect(createdUser1.email).toBe('unique1@example.com')
+      
+      // Create second user with different unique valid email
+      const result2 = await controller.callInteraction('CreateUser', {
+        user: admin,
+        payload: {
+          username: 'emailtest2',
+          password: 'password123',
+          email: 'unique2@example.com',
+          name: 'Email Test User 2'
+        }
+      })
+      
+      expect(result2.error).toBeUndefined()
+      
+      // Verify second user was created
+      const createdUser2 = await system.storage.findOne('User',
+        MatchExp.atom({ key: 'username', value: ['=', 'emailtest2'] }),
+        undefined,
+        ['id', 'username', 'email']
+      )
+      expect(createdUser2).toBeDefined()
+      expect(createdUser2.email).toBe('unique2@example.com')
+    })
+    
+    test('BR023: Cannot create user with duplicate email', async () => {
+      // Create admin user
+      const admin = await system.storage.create('User', {
+        username: 'admin',
+        password: 'admin123456',
+        email: 'admin@test.com',
+        name: 'Admin User',
+        role: 'admin',
+        points: 100,
+        createdAt: Math.floor(Date.now() / 1000),
+        isDeleted: false
+      })
+      
+      // Create an existing user with an email
+      await system.storage.create('User', {
+        username: 'existingUser',
+        password: 'password123',
+        email: 'existing@example.com',
+        name: 'Existing User',
+        role: 'resident',
+        points: 100,
+        createdAt: Math.floor(Date.now() / 1000),
+        isDeleted: false
+      })
+      
+      // Try to create another user with the same email
+      const result = await controller.callInteraction('CreateUser', {
+        user: admin,
+        payload: {
+          username: 'newUser',  // Different username
+          password: 'password123',
+          email: 'existing@example.com',  // Same email as existing user
+          name: 'New User'
+        }
+      })
+      
+      // Verify error
+      expect(result.error).toBeDefined()
+      expect((result.error as any).type).toBe('condition check failed')
+      expect((result.error as any).error.data.name).toBe('uniqueAndValidEmail')
+      
+      // Verify user was not created
+      const createdUser = await system.storage.findOne('User',
+        MatchExp.atom({ key: 'username', value: ['=', 'newUser'] }),
+        undefined,
+        ['id']
+      )
+      expect(createdUser).toBeUndefined()
+    })
+    
+    test('BR023: Cannot create user with invalid email format', async () => {
+      // Create admin user
+      const admin = await system.storage.create('User', {
+        username: 'admin',
+        password: 'admin123456',
+        email: 'admin@test.com',
+        name: 'Admin User',
+        role: 'admin',
+        points: 100,
+        createdAt: Math.floor(Date.now() / 1000),
+        isDeleted: false
+      })
+      
+      // Test various invalid email formats
+      const invalidEmails = [
+        'notanemail',           // Missing @ and domain
+        '@example.com',         // Missing local part
+        'user@',                // Missing domain
+        'user @example.com',    // Space in email
+        'user@example .com',    // Space in domain
+        'user@@example.com',    // Double @
+        'user@example..com',    // Double dots
+        'user@.com',            // Missing domain name
+        'user.@example.com',    // Dot before @
+      ]
+      
+      for (const invalidEmail of invalidEmails) {
+        const result = await controller.callInteraction('CreateUser', {
+          user: admin,
+          payload: {
+            username: `user_${Math.random().toString(36).substring(7)}`,  // Random unique username
+            password: 'password123',
+            email: invalidEmail,
+            name: 'Test User'
+          }
+        })
+        
+        // Verify error for invalid email
+        expect(result.error, `Should fail for invalid email: "${invalidEmail}"`).toBeDefined()
+        expect((result.error as any).type).toBe('condition check failed')
+        expect((result.error as any).error.data.name).toBe('uniqueAndValidEmail')
+      }
+      
+      // Test empty email separately
+      const emptyEmailResult = await controller.callInteraction('CreateUser', {
+        user: admin,
+        payload: {
+          username: 'emptyemailuser',
+          password: 'password123',
+          email: '',  // Empty email
+          name: 'Empty Email User'
+        }
+      })
+      
+      // Verify error for empty email
+      expect(emptyEmailResult.error).toBeDefined()
+      expect((emptyEmailResult.error as any).type).toBe('condition check failed')
+      expect((emptyEmailResult.error as any).error.data.name).toBe('uniqueAndValidEmail')
+      
+      // Test that a valid email format works
+      const validResult = await controller.callInteraction('CreateUser', {
+        user: admin,
+        payload: {
+          username: 'validemailuser',
+          password: 'password123',
+          email: 'valid.email+tag@sub.example.com',  // Complex but valid email
+          name: 'Valid Email User'
+        }
+      })
+      
+      expect(validResult.error).toBeUndefined()
+      
+      // Verify user was created with valid email
+      const createdUser = await system.storage.findOne('User',
+        MatchExp.atom({ key: 'username', value: ['=', 'validemailuser'] }),
+        undefined,
+        ['id', 'email']
+      )
+      expect(createdUser).toBeDefined()
+      expect(createdUser.email).toBe('valid.email+tag@sub.example.com')
+    })
+
     // BR006: Password must meet security requirements (min 8 chars) for Registration
     test('BR006: Can register with 8+ character password', async () => {
       // Registration should work with 8 character password

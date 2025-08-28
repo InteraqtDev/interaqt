@@ -524,7 +524,7 @@
             "Cannot create user with duplicate email",
             "Cannot create user with invalid email format"
           ],
-          "completed": false
+          "completed": true
         },
         {
           "id": "BR024",

@@ -1721,9 +1721,49 @@ const uniqueUsername = Condition.create({
   }
 })
 
-// Combine P010 (admin permission) with BR005 (password validation) and BR022 (unique username)
+// BR023: Email must be unique and valid format
+const uniqueAndValidEmail = Condition.create({
+  name: 'uniqueAndValidEmail',  
+  content: async function(this: Controller, event: any) {
+    const email = event.payload?.email
+    
+    if (!email) {
+      return false // No email provided
+    }
+    
+    // Validate email format using a more comprehensive regex pattern
+    // This regex checks for:
+    // - Non-whitespace characters before @
+    // - Single @ symbol
+    // - Domain with at least one dot
+    // - No consecutive dots
+    // - Valid characters in domain
+    const emailRegex = /^[a-zA-Z0-9.!#$%&'*+\/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/
+    if (!emailRegex.test(email)) {
+      return false // Invalid email format
+    }
+    
+    // Additional check for consecutive dots which the regex might not catch perfectly
+    if (email.includes('..') || email.includes('@.') || email.includes('.@')) {
+      return false // Invalid email format - consecutive dots or dots adjacent to @
+    }
+    
+    // Check if a user with this email already exists
+    const existingUser = await this.system.storage.findOne(
+      'User',
+      MatchExp.atom({ key: 'email', value: ['=', email] }),
+      undefined,
+      ['id']
+    )
+    
+    // Return true if no existing user found with this email
+    return !existingUser
+  }
+})
+
+// Combine P010 (admin permission) with BR005 (password validation), BR022 (unique username), and BR023 (unique and valid email)
 CreateUser.conditions = Conditions.create({
-  content: BoolExp.atom(isAdmin).and(createUserPasswordLength).and(uniqueUsername)
+  content: BoolExp.atom(isAdmin).and(createUserPasswordLength).and(uniqueUsername).and(uniqueAndValidEmail)
 })
 
 // P011: Only admin can delete users
