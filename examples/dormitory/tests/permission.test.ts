@@ -2158,6 +2158,166 @@ describe('Permission and Business Rules', () => {
       expect((result.error as any).type).toBe('condition check failed')
       expect((result.error as any).error.data.name).toBe('isAdmin')
     })
+
+    test('P013: Dormitory leader can submit removal request (TC004)', async () => {
+      // Create dormitory leader user
+      const dormitoryLeader = await system.storage.create('User', {
+        username: 'leader1',
+        password: 'password123',
+        email: 'leader1@test.com',
+        name: 'Dormitory Leader',
+        role: 'dormitoryLeader',
+        points: 100
+      })
+      
+      // Create target user (resident with low points)
+      const targetUser = await system.storage.create('User', {
+        username: 'resident1',
+        password: 'password123',
+        email: 'resident1@test.com',
+        name: 'Resident User',
+        role: 'resident',
+        points: 20  // Low points
+      })
+      
+      // Dormitory leader should be able to submit removal request
+      const result = await controller.callInteraction('SubmitRemovalRequest', {
+        user: dormitoryLeader,
+        payload: {
+          userId: targetUser.id,
+          reason: 'Low points and poor behavior'
+        }
+      })
+      
+      // Verify no error
+      expect(result.error).toBeUndefined()
+      
+      // Verify RemovalRequest was created
+      const removalRequests = await system.storage.find('RemovalRequest', 
+        MatchExp.atom({ key: 'targetUser.id', value: ['=', targetUser.id] }),
+        undefined,
+        ['id', 'reason', 'status', 'targetUser', 'requestedBy']
+      )
+      expect(removalRequests.length).toBe(1)
+      expect(removalRequests[0].reason).toBe('Low points and poor behavior')
+      expect(removalRequests[0].status).toBe('pending')
+    })
+
+    test('P013: Regular resident cannot submit removal request (TC009)', async () => {
+      // Create regular resident user
+      const resident = await system.storage.create('User', {
+        username: 'resident1',
+        password: 'password123',
+        email: 'resident1@test.com',
+        name: 'Resident User',
+        role: 'resident',
+        points: 100
+      })
+      
+      // Create target user
+      const targetUser = await system.storage.create('User', {
+        username: 'resident2',
+        password: 'password123',
+        email: 'resident2@test.com',
+        name: 'Target User',
+        role: 'resident',
+        points: 20
+      })
+      
+      // Regular resident should not be able to submit removal request
+      const result = await controller.callInteraction('SubmitRemovalRequest', {
+        user: resident,
+        payload: {
+          userId: targetUser.id,
+          reason: 'Low points'
+        }
+      })
+      
+      // Verify error
+      expect(result.error).toBeDefined()
+      expect((result.error as any).type).toBe('condition check failed')
+      expect((result.error as any).error.data.name).toBe('isDormitoryLeader')
+      
+      // Verify RemovalRequest was not created
+      const removalRequests = await system.storage.find('RemovalRequest', 
+        MatchExp.atom({ key: 'targetUser.id', value: ['=', targetUser.id] })
+      )
+      expect(removalRequests.length).toBe(0)
+    })
+
+    test('P013: Admin cannot submit removal request (not a dormitory leader)', async () => {
+      // Create admin user
+      const admin = await system.storage.create('User', {
+        username: 'admin',
+        password: 'password123',
+        email: 'admin@test.com',
+        name: 'Admin User',
+        role: 'admin',
+        points: 100
+      })
+      
+      // Create target user
+      const targetUser = await system.storage.create('User', {
+        username: 'resident1',
+        password: 'password123',
+        email: 'resident1@test.com',
+        name: 'Target User',
+        role: 'resident',
+        points: 20
+      })
+      
+      // Admin should not be able to submit removal request (only dormitory leaders can)
+      const result = await controller.callInteraction('SubmitRemovalRequest', {
+        user: admin,
+        payload: {
+          userId: targetUser.id,
+          reason: 'Admin trying to submit'
+        }
+      })
+      
+      // Verify error
+      expect(result.error).toBeDefined()
+      expect((result.error as any).type).toBe('condition check failed')
+      expect((result.error as any).error.data.name).toBe('isDormitoryLeader')
+      
+      // Verify RemovalRequest was not created
+      const removalRequests = await system.storage.find('RemovalRequest', 
+        MatchExp.atom({ key: 'targetUser.id', value: ['=', targetUser.id] })
+      )
+      expect(removalRequests.length).toBe(0)
+    })
+
+    test('P013: Unauthenticated user cannot submit removal request', async () => {
+      // Create target user
+      const targetUser = await system.storage.create('User', {
+        username: 'resident1',
+        password: 'password123',
+        email: 'resident1@test.com',
+        name: 'Target User',
+        role: 'resident',
+        points: 20
+      })
+      
+      // Unauthenticated user (null) should not be able to submit removal request
+      const result = await controller.callInteraction('SubmitRemovalRequest', {
+        user: null,
+        payload: {
+          userId: targetUser.id,
+          reason: 'Unauthenticated attempt'
+        }
+      })
+      
+      // Verify error
+      expect(result.error).toBeDefined()
+      expect((result.error as any).type).toBe('condition check failed')
+      expect((result.error as any).error.data.name).toBe('isDormitoryLeader')
+      
+      // Verify RemovalRequest was not created
+      const removalRequests = await system.storage.find('RemovalRequest', 
+        MatchExp.atom({ key: 'targetUser.id', value: ['=', targetUser.id] })
+      )
+      expect(removalRequests.length).toBe(0)
+    })
   })
 
   describe('Phase 2: Simple Business Rules', () => {

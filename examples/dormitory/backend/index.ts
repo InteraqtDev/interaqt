@@ -1390,3 +1390,14 @@ CreateDormitory.conditions = Conditions.create({
 // P012: Only admin can list all users
 GetUsers.conditions = isAdmin
 
+// P013: Only dormitory leader can submit removal requests
+const isDormitoryLeader = Condition.create({
+  name: 'isDormitoryLeader',
+  content: function(this: Controller, event: any) {
+    return event.user?.role === 'dormitoryLeader'
+  }
+})
+
+// Assign condition to existing interaction
+SubmitRemovalRequest.conditions = isDormitoryLeader
+
