@@ -406,7 +406,7 @@
             "Can assign user without bed",
             "Cannot assign user already in another bed (TC017)"
           ],
-          "completed": false
+          "completed": true
         },
         {
           "id": "BR015",

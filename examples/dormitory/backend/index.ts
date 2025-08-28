@@ -1528,8 +1528,33 @@ RemoveDormitoryLeader.conditions = Conditions.create({
   content: BoolExp.atom(isAdmin).and(userIsCurrentlyDormitoryLeader)
 })
 
-// P006: Only admin can assign users to beds
-AssignUserToBed.conditions = isAdmin
+// BR014: User cannot already be assigned to another bed
+const userHasNoExistingBed = Condition.create({
+  name: 'userHasNoExistingBed',
+  content: async function(this: Controller, event: any) {
+    const userId = event.payload?.userId
+    
+    if (!userId) {
+      return false // No user ID provided
+    }
+    
+    // Check if the user already has a bed assignment
+    const existingBedRelation = await this.system.storage.findOne(
+      UserBedRelation.name,
+      MatchExp.atom({ key: 'source.id', value: ['=', userId] }),
+      undefined,
+      ['id']
+    )
+    
+    // Return true if no existing bed assignment found
+    return !existingBedRelation
+  }
+})
+
+// P006: Only admin can assign users to beds + BR014: User cannot already be assigned to another bed
+AssignUserToBed.conditions = Conditions.create({
+  content: BoolExp.atom(isAdmin).and(userHasNoExistingBed)
+})
 
 // P007: Only admin can remove users from beds
 RemoveUserFromBed.conditions = isAdmin
