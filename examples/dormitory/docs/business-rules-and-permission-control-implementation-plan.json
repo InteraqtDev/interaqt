@@ -294,7 +294,7 @@
             "User can see own deductions",
             "User cannot see others' deductions"
           ],
-          "completed": false
+          "completed": true
         }
       ]
     },

@@ -1534,3 +1534,69 @@ const canViewRemovalRequests = Condition.create({
 // Assign P015 condition to GetRemovalRequests interaction
 GetRemovalRequests.conditions = canViewRemovalRequests
 
+// P016: Admin can see all, dormitory leaders their dormitory, users their own
+const canViewPointDeductions = Condition.create({
+  name: 'canViewPointDeductions',
+  content: async function(this: Controller, event: any) {
+    // Admins can see all point deductions
+    if (event.user?.role === 'admin') {
+      return true
+    }
+    
+    // For dormitory leaders, check if requested userId is in their dormitory
+    if (event.user?.role === 'dormitoryLeader') {
+      // If no specific userId provided, leader can see all in their dormitory
+      if (!event.payload?.userId) {
+        return true
+      }
+      
+      // Get the dormitory leader's managed dormitory
+      const leaderDormitoryRelation = await this.system.storage.findOne(
+        UserDormitoryLeaderRelation.name,
+        MatchExp.atom({ key: 'source.id', value: ['=', event.user.id] }),
+        undefined,
+        ['id', ['target', { attributeQuery: ['id'] }]]
+      )
+      
+      // If leader doesn't manage any dormitory, deny
+      if (!leaderDormitoryRelation || !leaderDormitoryRelation.target) {
+        return false
+      }
+      
+      const leaderDormitoryId = leaderDormitoryRelation.target.id
+      
+      // Get the target user's bed assignment to find their dormitory
+      const targetUserBedRelation = await this.system.storage.findOne(
+        UserBedRelation.name,
+        MatchExp.atom({ key: 'source.id', value: ['=', event.payload.userId] }),
+        undefined,
+        ['id', ['target', { attributeQuery: ['id', ['dormitory', { attributeQuery: ['id'] }]] }]]
+      )
+      
+      // If target user doesn't have a bed assignment, they're not in a dormitory
+      if (!targetUserBedRelation || !targetUserBedRelation.target) {
+        return false
+      }
+      
+      // Get the dormitory of the target user's bed
+      const targetUserDormitoryId = targetUserBedRelation.target.dormitory?.id
+      
+      // Check if target user is in the same dormitory as the leader manages
+      return targetUserDormitoryId === leaderDormitoryId
+    }
+    
+    // Regular users can only see their own deductions
+    // If no userId specified, they see their own
+    // If userId specified, it must be their own id
+    if (!event.payload?.userId || event.payload.userId === event.user.id) {
+      return true
+    }
+    
+    // Otherwise, deny access
+    return false
+  }
+})
+
+// Assign P016 condition to GetPointDeductions interaction
+GetPointDeductions.conditions = canViewPointDeductions
+

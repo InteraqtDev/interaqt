@@ -4127,5 +4127,226 @@ describe('Permission and Business Rules', () => {
       expect((result.error as any).type).toBe('condition check failed')
       expect((result.error as any).error.data.name).toBe('canViewRemovalRequests')
     })
+
+    // P016: Admin can see all, dormitory leaders their dormitory, users their own
+    test('P016: Admin can see all point deductions', async () => {
+      // Create admin user
+      const admin = await system.storage.create('User', {
+        username: 'admin',
+        password: 'password123',
+        email: 'admin@test.com',
+        name: 'Admin User',
+        role: 'admin',
+        points: 100
+      })
+      
+      // Admin should be able to see all point deductions (no userId specified)
+      const result1 = await controller.callInteraction('GetPointDeductions', {
+        user: admin,
+        payload: {}
+      })
+      
+      expect(result1.error).toBeUndefined()
+      
+      // Admin should be able to see specific user's deductions
+      const result2 = await controller.callInteraction('GetPointDeductions', {
+        user: admin,
+        payload: { userId: 'some-user-id' }
+      })
+      
+      expect(result2.error).toBeUndefined()
+    })
+
+    test('P016: Dormitory leader can see dormitory residents deductions', async () => {
+      // Create admin user
+      const admin = await system.storage.create('User', {
+        username: 'admin',
+        password: 'password123',
+        email: 'admin@test.com',
+        name: 'Admin User',
+        role: 'admin',
+        points: 100
+      })
+      
+      // Create dormitory
+      const createDormResult = await controller.callInteraction('CreateDormitory', {
+        user: admin,
+        payload: {
+          name: 'Test Dorm',
+          capacity: 4,
+          floor: 1,
+          building: 'Building A'
+        }
+      })
+      expect(createDormResult.error).toBeUndefined()
+      
+      // Get the created dormitory
+      const dormitory = await system.storage.findOne(
+        'Dormitory',
+        MatchExp.atom({ key: 'name', value: ['=', 'Test Dorm'] }),
+        undefined,
+        ['id']
+      )
+      
+      // Get the beds created for the dormitory
+      const beds = await system.storage.find('Bed',
+        undefined,
+        undefined,
+        ['id', 'bedNumber']
+      )
+      
+      // Create dormitory leader user
+      const dormitoryLeader = await system.storage.create('User', {
+        username: 'leader1',
+        password: 'password123',
+        email: 'leader1@test.com',
+        name: 'Dormitory Leader',
+        role: 'resident', // Will be promoted to dormitory leader
+        points: 100
+      })
+      
+      // Create target user (resident in the same dormitory)
+      const residentInDorm = await system.storage.create('User', {
+        username: 'resident1',
+        password: 'password123',
+        email: 'resident1@test.com',
+        name: 'Resident 1',
+        role: 'resident',
+        points: 100
+      })
+      
+      // Create another user (resident NOT in the dormitory)
+      const residentNotInDorm = await system.storage.create('User', {
+        username: 'resident2',
+        password: 'password123',
+        email: 'resident2@test.com',
+        name: 'Resident 2',
+        role: 'resident',
+        points: 100
+      })
+      
+      // Assign dormitory leader
+      const assignLeaderResult = await controller.callInteraction('AssignDormitoryLeader', {
+        user: admin,
+        payload: {
+          userId: dormitoryLeader.id,
+          dormitoryId: dormitory.id
+        }
+      })
+      expect(assignLeaderResult.error).toBeUndefined()
+      
+      // Assign residents to beds
+      const assignBedResult1 = await controller.callInteraction('AssignUserToBed', {
+        user: admin,
+        payload: {
+          userId: residentInDorm.id,
+          bedId: beds[0].id
+        }
+      })
+      expect(assignBedResult1.error).toBeUndefined()
+      
+      // Assign leader to bed in same dormitory
+      const assignBedResult2 = await controller.callInteraction('AssignUserToBed', {
+        user: admin,
+        payload: {
+          userId: dormitoryLeader.id,
+          bedId: beds[1].id
+        }
+      })
+      expect(assignBedResult2.error).toBeUndefined()
+      
+      // Re-fetch the dormitory leader to get updated role
+      const updatedLeader = await system.storage.findOne(
+        'User',
+        MatchExp.atom({ key: 'id', value: ['=', dormitoryLeader.id] }),
+        undefined,
+        ['id', 'role']
+      )
+      
+      // Leader can see all point deductions in their dormitory (no userId specified)
+      const result1 = await controller.callInteraction('GetPointDeductions', {
+        user: updatedLeader,
+        payload: {}
+      })
+      
+      expect(result1.error).toBeUndefined()
+      
+      // Leader can see deductions for resident in their dormitory
+      const result2 = await controller.callInteraction('GetPointDeductions', {
+        user: updatedLeader,
+        payload: { userId: residentInDorm.id }
+      })
+      
+      expect(result2.error).toBeUndefined()
+      
+      // Leader CANNOT see deductions for resident NOT in their dormitory
+      const result3 = await controller.callInteraction('GetPointDeductions', {
+        user: updatedLeader,
+        payload: { userId: residentNotInDorm.id }
+      })
+      
+      expect(result3.error).toBeDefined()
+      expect((result3.error as any).type).toBe('condition check failed')
+      expect((result3.error as any).error.data.name).toBe('canViewPointDeductions')
+    })
+
+    test('P016: User can see own deductions', async () => {
+      // Create regular user
+      const user = await system.storage.create('User', {
+        username: 'user1',
+        password: 'password123',
+        email: 'user1@test.com',
+        name: 'User 1',
+        role: 'resident',
+        points: 100
+      })
+      
+      // User can see their own deductions (no userId specified - defaults to self)
+      const result1 = await controller.callInteraction('GetPointDeductions', {
+        user: user,
+        payload: {}
+      })
+      
+      expect(result1.error).toBeUndefined()
+      
+      // User can see their own deductions (explicitly specifying their own userId)
+      const result2 = await controller.callInteraction('GetPointDeductions', {
+        user: user,
+        payload: { userId: user.id }
+      })
+      
+      expect(result2.error).toBeUndefined()
+    })
+
+    test('P016: User cannot see others deductions', async () => {
+      // Create two regular users
+      const user1 = await system.storage.create('User', {
+        username: 'user1',
+        password: 'password123',
+        email: 'user1@test.com',
+        name: 'User 1',
+        role: 'resident',
+        points: 100
+      })
+      
+      const user2 = await system.storage.create('User', {
+        username: 'user2',
+        password: 'password123',
+        email: 'user2@test.com',
+        name: 'User 2',
+        role: 'resident',
+        points: 100
+      })
+      
+      // User1 CANNOT see User2's deductions
+      const result = await controller.callInteraction('GetPointDeductions', {
+        user: user1,
+        payload: { userId: user2.id }
+      })
+      
+      expect(result.error).toBeDefined()
+      expect((result.error as any).type).toBe('condition check failed')
+      expect((result.error as any).error.data.name).toBe('canViewPointDeductions')
+    })
   })
 })
