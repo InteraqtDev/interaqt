@@ -1870,8 +1870,72 @@ const isDormitoryLeader = Condition.create({
   }
 })
 
-// Assign condition to existing interaction
-SubmitRemovalRequest.conditions = isDormitoryLeader
+// BR027: Target user must be in leader's dormitory
+const targetUserInLeaderDormitory = Condition.create({
+  name: 'targetUserInLeaderDormitory',
+  content: async function(this: Controller, event: any) {
+    try {
+      // Check if user and payload are valid
+      if (!event.user || !event.user.id || !event.payload || !event.payload.userId) {
+        return false
+      }
+      
+      // Get the dormitory leader's managed dormitory
+      const leaderDormitoryRelation = await this.system.storage.findOne(
+        UserDormitoryLeaderRelation.name,
+        MatchExp.atom({ key: 'source.id', value: ['=', event.user.id] }),
+        undefined,
+        ['id', ['target', { attributeQuery: ['id'] }]]
+      )
+      
+      // If leader doesn't manage any dormitory, deny
+      if (!leaderDormitoryRelation || !leaderDormitoryRelation.target) {
+        return false
+      }
+      
+      const leaderDormitoryId = leaderDormitoryRelation.target.id
+      
+      // Get the target user's bed assignment
+      const targetUserBedRelation = await this.system.storage.findOne(
+        UserBedRelation.name,
+        MatchExp.atom({ key: 'source.id', value: ['=', event.payload.userId] }),
+        undefined,
+        ['id', ['target', { attributeQuery: ['id'] }]]
+      )
+      
+      // If target user doesn't have a bed assignment, deny
+      if (!targetUserBedRelation || !targetUserBedRelation.target) {
+        return false
+      }
+      
+      // Get the dormitory that contains this bed
+      const bedDormitoryRelation = await this.system.storage.findOne(
+        DormitoryBedsRelation.name,
+        MatchExp.atom({ key: 'target.id', value: ['=', targetUserBedRelation.target.id] }),
+        undefined,
+        ['id', ['source', { attributeQuery: ['id'] }]]
+      )
+      
+      // If bed is not in any dormitory, deny
+      if (!bedDormitoryRelation || !bedDormitoryRelation.source) {
+        return false
+      }
+      
+      const targetUserDormitoryId = bedDormitoryRelation.source.id
+      
+      // Check if target user is in the same dormitory as the leader manages
+      return targetUserDormitoryId === leaderDormitoryId
+    } catch (error) {
+      console.error('Error in targetUserInLeaderDormitory condition:', error)
+      return false
+    }
+  }
+})
+
+// Combine P013 (dormitory leader permission) and BR027 (target user in leader's dormitory)
+SubmitRemovalRequest.conditions = Conditions.create({
+  content: BoolExp.atom(isDormitoryLeader).and(targetUserInLeaderDormitory)
+})
 
 // BR003: Points to deduct must be positive for DeductResidentPoints
 const positiveResidentPointsToDeduct = Condition.create({
