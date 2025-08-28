@@ -340,7 +340,7 @@
             "Can update to unique name",
             "Cannot update to duplicate name in same building"
           ],
-          "completed": false
+          "completed": true
         },
         {
           "id": "BR010",

@@ -3683,6 +3683,261 @@ describe('Permission and Business Rules', () => {
       expect(unchangedDormitory.name).toBe('Test Dorm') // Name should also remain unchanged
     })
 
+    // BR009: Updated name must remain unique within building
+    test('BR009: Can update to unique name', async () => {
+      // Create admin user
+      const admin = await system.storage.create('User', {
+        username: 'admin',
+        password: 'password123',
+        email: 'admin@test.com',
+        name: 'Admin User',
+        role: 'admin',
+        points: 100
+      })
+      
+      // Create two dormitories in the same building
+      const createResult1 = await controller.callInteraction('CreateDormitory', {
+        user: admin,
+        payload: {
+          name: 'Dorm A',
+          capacity: 4,
+          floor: 1,
+          building: 'Building 1'
+        }
+      })
+      expect(createResult1.error).toBeUndefined()
+      
+      const createResult2 = await controller.callInteraction('CreateDormitory', {
+        user: admin,
+        payload: {
+          name: 'Dorm B',
+          capacity: 5,
+          floor: 2,
+          building: 'Building 1'
+        }
+      })
+      expect(createResult2.error).toBeUndefined()
+      
+      // Get the second dormitory's ID
+      const dormitory = await system.storage.findOne('Dormitory',
+        MatchExp.atom({ key: 'name', value: ['=', 'Dorm B'] }),
+        undefined,
+        ['id']
+      )
+      expect(dormitory).toBeDefined()
+      
+      // Update Dorm B to a unique name
+      const updateResult = await controller.callInteraction('UpdateDormitory', {
+        user: admin,
+        payload: {
+          dormitoryId: dormitory.id,
+          name: 'Dorm C' // Unique name
+        }
+      })
+      
+      expect(updateResult.error).toBeUndefined()
+      
+      // Verify the name was updated
+      const updatedDormitory = await system.storage.findOne('Dormitory',
+        MatchExp.atom({ key: 'id', value: ['=', dormitory.id] }),
+        undefined,
+        ['id', 'name']
+      )
+      expect(updatedDormitory.name).toBe('Dorm C')
+    })
+
+    test('BR009: Cannot update to duplicate name in same building', async () => {
+      // Create admin user
+      const admin = await system.storage.create('User', {
+        username: 'admin',
+        password: 'password123',
+        email: 'admin@test.com',
+        name: 'Admin User',
+        role: 'admin',
+        points: 100
+      })
+      
+      // Create two dormitories in the same building
+      const createResult1 = await controller.callInteraction('CreateDormitory', {
+        user: admin,
+        payload: {
+          name: 'Dorm X',
+          capacity: 4,
+          floor: 1,
+          building: 'Building 2'
+        }
+      })
+      expect(createResult1.error).toBeUndefined()
+      
+      const createResult2 = await controller.callInteraction('CreateDormitory', {
+        user: admin,
+        payload: {
+          name: 'Dorm Y',
+          capacity: 5,
+          floor: 2,
+          building: 'Building 2'
+        }
+      })
+      expect(createResult2.error).toBeUndefined()
+      
+      // Get the second dormitory's ID
+      const dormitory = await system.storage.findOne('Dormitory',
+        MatchExp.atom({ key: 'name', value: ['=', 'Dorm Y'] }),
+        undefined,
+        ['id']
+      )
+      expect(dormitory).toBeDefined()
+      
+      // Try to update Dorm Y to have the same name as Dorm X in the same building
+      const updateResult = await controller.callInteraction('UpdateDormitory', {
+        user: admin,
+        payload: {
+          dormitoryId: dormitory.id,
+          name: 'Dorm X' // Duplicate name in same building
+        }
+      })
+      
+      // Verify error
+      expect(updateResult.error).toBeDefined()
+      expect((updateResult.error as any).type).toBe('condition check failed')
+      expect((updateResult.error as any).error.data.name).toBe('updateDormitoryNameUnique')
+      
+      // Verify the name was not updated
+      const unchangedDormitory = await system.storage.findOne('Dormitory',
+        MatchExp.atom({ key: 'id', value: ['=', dormitory.id] }),
+        undefined,
+        ['id', 'name']
+      )
+      expect(unchangedDormitory.name).toBe('Dorm Y')
+    })
+
+    test('BR009: Can update to same name in different building', async () => {
+      // Create admin user
+      const admin = await system.storage.create('User', {
+        username: 'admin',
+        password: 'password123',
+        email: 'admin@test.com',
+        name: 'Admin User',
+        role: 'admin',
+        points: 100
+      })
+      
+      // Create two dormitories in different buildings
+      const createResult1 = await controller.callInteraction('CreateDormitory', {
+        user: admin,
+        payload: {
+          name: 'Dorm Alpha',
+          capacity: 4,
+          floor: 1,
+          building: 'Building A'
+        }
+      })
+      expect(createResult1.error).toBeUndefined()
+      
+      const createResult2 = await controller.callInteraction('CreateDormitory', {
+        user: admin,
+        payload: {
+          name: 'Dorm Beta',
+          capacity: 5,
+          floor: 2,
+          building: 'Building B'
+        }
+      })
+      expect(createResult2.error).toBeUndefined()
+      
+      // Get the second dormitory's ID
+      const dormitory = await system.storage.findOne('Dormitory',
+        MatchExp.atom({ key: 'name', value: ['=', 'Dorm Beta'] }),
+        undefined,
+        ['id']
+      )
+      expect(dormitory).toBeDefined()
+      
+      // Update Dorm Beta to have the same name as Dorm Alpha (but in different building)
+      const updateResult = await controller.callInteraction('UpdateDormitory', {
+        user: admin,
+        payload: {
+          dormitoryId: dormitory.id,
+          name: 'Dorm Alpha' // Same name but in different building
+        }
+      })
+      
+      expect(updateResult.error).toBeUndefined()
+      
+      // Verify the name was updated
+      const updatedDormitory = await system.storage.findOne('Dormitory',
+        MatchExp.atom({ key: 'id', value: ['=', dormitory.id] }),
+        undefined,
+        ['id', 'name', 'building']
+      )
+      expect(updatedDormitory.name).toBe('Dorm Alpha')
+      expect(updatedDormitory.building).toBe('Building B')
+    })
+
+    test('BR009: Can update to same name when changing building', async () => {
+      // Create admin user
+      const admin = await system.storage.create('User', {
+        username: 'admin',
+        password: 'password123',
+        email: 'admin@test.com',
+        name: 'Admin User',
+        role: 'admin',
+        points: 100
+      })
+      
+      // Create two dormitories with same name in different buildings
+      const createResult1 = await controller.callInteraction('CreateDormitory', {
+        user: admin,
+        payload: {
+          name: 'Dorm Common',
+          capacity: 4,
+          floor: 1,
+          building: 'Building East'
+        }
+      })
+      expect(createResult1.error).toBeUndefined()
+      
+      const createResult2 = await controller.callInteraction('CreateDormitory', {
+        user: admin,
+        payload: {
+          name: 'Dorm Different',
+          capacity: 5,
+          floor: 2,
+          building: 'Building West'
+        }
+      })
+      expect(createResult2.error).toBeUndefined()
+      
+      // Get the second dormitory's ID
+      const dormitory = await system.storage.findOne('Dormitory',
+        MatchExp.atom({ key: 'name', value: ['=', 'Dorm Different'] }),
+        undefined,
+        ['id']
+      )
+      expect(dormitory).toBeDefined()
+      
+      // Update Dorm Different to have same name as Dorm Common but change building too
+      const updateResult = await controller.callInteraction('UpdateDormitory', {
+        user: admin,
+        payload: {
+          dormitoryId: dormitory.id,
+          name: 'Dorm Common',
+          building: 'Building South' // Different building from the existing Dorm Common
+        }
+      })
+      
+      expect(updateResult.error).toBeUndefined()
+      
+      // Verify the update succeeded
+      const updatedDormitory = await system.storage.findOne('Dormitory',
+        MatchExp.atom({ key: 'id', value: ['=', dormitory.id] }),
+        undefined,
+        ['id', 'name', 'building']
+      )
+      expect(updatedDormitory.name).toBe('Dorm Common')
+      expect(updatedDormitory.building).toBe('Building South')
+    })
+
     // Phase 3: Scope-Based Permissions
     // P014: Dormitory leader can only deduct points from residents in their dormitory
     test('P014: Dormitory leader can deduct points from own residents (TC016)', async () => {

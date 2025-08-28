@@ -1350,9 +1350,60 @@ const noCapacityInUpdatePayload = Condition.create({
   }
 })
 
-// P002: Only admin can update dormitories + BR008: Cannot update capacity
+// BR009: Updated name must remain unique within building
+const updateDormitoryNameUnique = Condition.create({
+  name: 'updateDormitoryNameUnique',
+  content: async function(this: Controller, event: any) {
+    // If name is not being updated, no need to check
+    if (!event.payload?.name) {
+      return true
+    }
+    
+    const dormitoryId = event.payload?.dormitoryId
+    const newName = event.payload.name
+    
+    // Get the current dormitory to know its building
+    const currentDormitory = await this.system.storage.findOne(
+      'Dormitory',
+      MatchExp.atom({ key: 'id', value: ['=', dormitoryId] }),
+      undefined,
+      ['id', 'building', 'name']
+    )
+    
+    if (!currentDormitory) {
+      return false // Dormitory not found
+    }
+    
+    // If building is also being updated, use the new building
+    const building = event.payload.building || currentDormitory.building
+    
+    // If the name isn't changing (same as current), it's valid
+    if (newName === currentDormitory.name) {
+      return true
+    }
+    
+    // Query for other dormitories with the same name in the same building
+    // Exclude the current dormitory being updated
+    const existingDormitory = await this.system.storage.findOne(
+      'Dormitory',
+      MatchExp.atom({ key: 'name', value: ['=', newName] })
+        .and({ key: 'building', value: ['=', building] })
+        .and({ key: 'id', value: ['!=', dormitoryId] }) // Exclude current dormitory
+        .and({ key: 'isDeleted', value: ['=', false] }), // Only check non-deleted dormitories
+      undefined,
+      ['id']
+    )
+    
+    // If no other dormitory found with same name in same building, the update is valid
+    return !existingDormitory
+  }
+})
+
+// P002: Only admin can update dormitories + BR008: Cannot update capacity + BR009: Name uniqueness
 UpdateDormitory.conditions = Conditions.create({
-  content: BoolExp.atom(isAdmin).and(noCapacityInUpdatePayload)
+  content: BoolExp.atom(isAdmin)
+    .and(noCapacityInUpdatePayload)
+    .and(updateDormitoryNameUnique)
 })
 
 // P003: Only admin can delete dormitories
