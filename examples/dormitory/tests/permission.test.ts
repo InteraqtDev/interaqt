@@ -3029,5 +3029,189 @@ describe('Permission and Business Rules', () => {
       )
       expect(updatedUser.password).toBe('oldpassword')
     })
+
+    // BR005: Password must meet security requirements (min 8 chars) for CreateUser
+    test('BR005: Can create user with 8+ character password', async () => {
+      // Create admin user
+      const admin = await system.storage.create('User', {
+        username: 'admin',
+        password: 'password123',
+        email: 'admin@test.com',
+        name: 'Admin User',
+        role: 'admin',
+        points: 100
+      })
+      
+      // Admin should be able to create user with 8+ character password
+      const result = await controller.callInteraction('CreateUser', {
+        user: admin,
+        payload: {
+          username: 'newuser',
+          password: 'password8',  // Exactly 8 characters
+          email: 'newuser@test.com',
+          name: 'New User',
+          role: 'resident'
+        }
+      })
+      
+      expect(result.error).toBeUndefined()
+      
+      // Verify user was created
+      const createdUser = await system.storage.findOne('User',
+        MatchExp.atom({ key: 'username', value: ['=', 'newuser'] }),
+        undefined,
+        ['id', 'username', 'password', 'email']
+      )
+      expect(createdUser).toBeDefined()
+      expect(createdUser.username).toBe('newuser')
+      expect(createdUser.password).toBe('password8')
+    })
+
+    test('BR005: Can create user with longer password', async () => {
+      // Create admin user
+      const admin = await system.storage.create('User', {
+        username: 'admin',
+        password: 'password123',
+        email: 'admin@test.com',
+        name: 'Admin User',
+        role: 'admin',
+        points: 100
+      })
+      
+      // Admin should be able to create user with longer password
+      const result = await controller.callInteraction('CreateUser', {
+        user: admin,
+        payload: {
+          username: 'newuser2',
+          password: 'verylongpassword123456',  // Much longer than 8 characters
+          email: 'newuser2@test.com',
+          name: 'New User 2',
+          role: 'resident'
+        }
+      })
+      
+      expect(result.error).toBeUndefined()
+      
+      // Verify user was created
+      const createdUser = await system.storage.findOne('User',
+        MatchExp.atom({ key: 'username', value: ['=', 'newuser2'] }),
+        undefined,
+        ['id', 'username', 'password']
+      )
+      expect(createdUser).toBeDefined()
+      expect(createdUser.username).toBe('newuser2')
+      expect(createdUser.password).toBe('verylongpassword123456')
+    })
+
+    test('BR005: Cannot create user with short password', async () => {
+      // Create admin user
+      const admin = await system.storage.create('User', {
+        username: 'admin',
+        password: 'password123',
+        email: 'admin@test.com',
+        name: 'Admin User',
+        role: 'admin',
+        points: 100
+      })
+      
+      // Admin should not be able to create user with short password
+      const result = await controller.callInteraction('CreateUser', {
+        user: admin,
+        payload: {
+          username: 'newuser3',
+          password: 'short7',  // Only 7 characters
+          email: 'newuser3@test.com',
+          name: 'New User 3',
+          role: 'resident'
+        }
+      })
+      
+      // Verify error
+      expect(result.error).toBeDefined()
+      expect((result.error as any).type).toBe('condition check failed')
+      expect((result.error as any).error.data.name).toBe('createUserPasswordLength')
+      
+      // Verify user was not created
+      const createdUser = await system.storage.findOne('User',
+        MatchExp.atom({ key: 'username', value: ['=', 'newuser3'] }),
+        undefined,
+        ['id']
+      )
+      expect(createdUser).toBeUndefined()
+    })
+
+    test('BR005: Cannot create user with empty password', async () => {
+      // Create admin user
+      const admin = await system.storage.create('User', {
+        username: 'admin',
+        password: 'password123',
+        email: 'admin@test.com',
+        name: 'Admin User',
+        role: 'admin',
+        points: 100
+      })
+      
+      // Admin should not be able to create user with empty password
+      const result = await controller.callInteraction('CreateUser', {
+        user: admin,
+        payload: {
+          username: 'newuser4',
+          password: '',  // Empty password
+          email: 'newuser4@test.com',
+          name: 'New User 4',
+          role: 'resident'
+        }
+      })
+      
+      // Verify error
+      expect(result.error).toBeDefined()
+      expect((result.error as any).type).toBe('condition check failed')
+      expect((result.error as any).error.data.name).toBe('createUserPasswordLength')
+      
+      // Verify user was not created
+      const createdUser = await system.storage.findOne('User',
+        MatchExp.atom({ key: 'username', value: ['=', 'newuser4'] }),
+        undefined,
+        ['id']
+      )
+      expect(createdUser).toBeUndefined()
+    })
+
+    test('BR005: Non-admin with valid password still cannot create user', async () => {
+      // Create non-admin user
+      const resident = await system.storage.create('User', {
+        username: 'resident',
+        password: 'password123',
+        email: 'resident@test.com',
+        name: 'Resident User',
+        role: 'resident',
+        points: 100
+      })
+      
+      // Non-admin should not be able to create user even with valid password
+      const result = await controller.callInteraction('CreateUser', {
+        user: resident,
+        payload: {
+          username: 'newuser5',
+          password: 'validpassword123',  // Valid password
+          email: 'newuser5@test.com',
+          name: 'New User 5',
+          role: 'resident'
+        }
+      })
+      
+      // Verify error - should fail on admin check first
+      expect(result.error).toBeDefined()
+      expect((result.error as any).type).toBe('condition check failed')
+      expect((result.error as any).error.data.name).toBe('isAdmin')
+      
+      // Verify user was not created
+      const createdUser = await system.storage.findOne('User',
+        MatchExp.atom({ key: 'username', value: ['=', 'newuser5'] }),
+        undefined,
+        ['id']
+      )
+      expect(createdUser).toBeUndefined()
+    })
   })
 })

@@ -231,7 +231,7 @@
             "Can create user with 8+ character password",
             "Cannot create user with short password"
           ],
-          "completed": false
+          "completed": true
         },
         {
           "id": "BR006",

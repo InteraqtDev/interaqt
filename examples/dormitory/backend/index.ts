@@ -1378,7 +1378,20 @@ DeductPoints.conditions = Conditions.create({
 })
 
 // P010: Only admin can create users via CreateUser
-CreateUser.conditions = isAdmin
+// BR005: Password must meet security requirements (min 8 chars) for CreateUser
+const createUserPasswordLength = Condition.create({
+  name: 'createUserPasswordLength',
+  content: function(this: Controller, event: any) {
+    const password = event.payload?.password
+    // Check if password exists and has at least 8 characters
+    return typeof password === 'string' && password.length >= 8
+  }
+})
+
+// Combine P010 (admin permission) with BR005 (password validation)
+CreateUser.conditions = Conditions.create({
+  content: BoolExp.atom(isAdmin).and(createUserPasswordLength)
+})
 
 // P011: Only admin can delete users
 DeleteUser.conditions = isAdmin
