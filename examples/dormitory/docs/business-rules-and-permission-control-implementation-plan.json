@@ -219,7 +219,7 @@
             "Can change with 8+ character password",
             "Cannot change with 7 character password"
           ],
-          "completed": false
+          "completed": true
         },
         {
           "id": "BR005",

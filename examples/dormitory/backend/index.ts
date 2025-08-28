@@ -1425,3 +1425,16 @@ const positiveResidentPointsToDeduct = Condition.create({
 // Assign BR003 condition to DeductResidentPoints interaction
 DeductResidentPoints.conditions = positiveResidentPointsToDeduct
 
+// BR004: New password must meet security requirements (min 8 chars)
+const validPasswordLength = Condition.create({
+  name: 'validPasswordLength',
+  content: function(this: Controller, event: any) {
+    const newPassword = event.payload?.newPassword
+    // Check if newPassword exists and has at least 8 characters
+    return typeof newPassword === 'string' && newPassword.length >= 8
+  }
+})
+
+// Assign BR004 condition to ChangePassword interaction
+ChangePassword.conditions = validPasswordLength
+

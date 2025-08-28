@@ -2898,5 +2898,136 @@ describe('Permission and Business Rules', () => {
       )
       expect(updatedUser.points).toBe(100)
     })
+
+    // BR004: New password must meet security requirements (min 8 chars)
+    test('BR004: Can change password with 8+ character password', async () => {
+      // Create a user
+      const user = await system.storage.create('User', {
+        username: 'testuser',
+        password: 'oldpassword',
+        email: 'testuser@test.com',
+        name: 'Test User',
+        role: 'resident',
+        points: 100
+      })
+      
+      // User should be able to change password with 8+ characters
+      const result = await controller.callInteraction('ChangePassword', {
+        user: user,
+        payload: {
+          oldPassword: 'oldpassword',
+          newPassword: 'newpass8'  // Exactly 8 characters
+        }
+      })
+      
+      expect(result.error).toBeUndefined()
+      
+      // Verify password was changed
+      const updatedUser = await system.storage.findOne('User',
+        MatchExp.atom({ key: 'id', value: ['=', user.id] }),
+        undefined,
+        ['id', 'password']
+      )
+      expect(updatedUser.password).toBe('newpass8')
+    })
+
+    test('BR004: Can change password with longer than 8 character password', async () => {
+      // Create a user
+      const user = await system.storage.create('User', {
+        username: 'testuser2',
+        password: 'oldpassword',
+        email: 'testuser2@test.com',
+        name: 'Test User 2',
+        role: 'resident',
+        points: 100
+      })
+      
+      // User should be able to change password with more than 8 characters
+      const result = await controller.callInteraction('ChangePassword', {
+        user: user,
+        payload: {
+          oldPassword: 'oldpassword',
+          newPassword: 'verylongnewpassword123'  // Much longer than 8 characters
+        }
+      })
+      
+      expect(result.error).toBeUndefined()
+      
+      // Verify password was changed
+      const updatedUser = await system.storage.findOne('User',
+        MatchExp.atom({ key: 'id', value: ['=', user.id] }),
+        undefined,
+        ['id', 'password']
+      )
+      expect(updatedUser.password).toBe('verylongnewpassword123')
+    })
+
+    test('BR004: Cannot change password with 7 character password', async () => {
+      // Create a user
+      const user = await system.storage.create('User', {
+        username: 'testuser3',
+        password: 'oldpassword',
+        email: 'testuser3@test.com',
+        name: 'Test User 3',
+        role: 'resident',
+        points: 100
+      })
+      
+      // User should not be able to change password with less than 8 characters
+      const result = await controller.callInteraction('ChangePassword', {
+        user: user,
+        payload: {
+          oldPassword: 'oldpassword',
+          newPassword: 'short7p'  // Only 7 characters
+        }
+      })
+      
+      // Verify error
+      expect(result.error).toBeDefined()
+      expect((result.error as any).type).toBe('condition check failed')
+      expect((result.error as any).error.data.name).toBe('validPasswordLength')
+      
+      // Verify password was not changed
+      const updatedUser = await system.storage.findOne('User',
+        MatchExp.atom({ key: 'id', value: ['=', user.id] }),
+        undefined,
+        ['id', 'password']
+      )
+      expect(updatedUser.password).toBe('oldpassword')
+    })
+
+    test('BR004: Cannot change password with empty password', async () => {
+      // Create a user
+      const user = await system.storage.create('User', {
+        username: 'testuser4',
+        password: 'oldpassword',
+        email: 'testuser4@test.com',
+        name: 'Test User 4',
+        role: 'resident',
+        points: 100
+      })
+      
+      // User should not be able to change password with empty string
+      const result = await controller.callInteraction('ChangePassword', {
+        user: user,
+        payload: {
+          oldPassword: 'oldpassword',
+          newPassword: ''  // Empty password
+        }
+      })
+      
+      // Verify error
+      expect(result.error).toBeDefined()
+      expect((result.error as any).type).toBe('condition check failed')
+      expect((result.error as any).error.data.name).toBe('validPasswordLength')
+      
+      // Verify password was not changed
+      const updatedUser = await system.storage.findOne('User',
+        MatchExp.atom({ key: 'id', value: ['=', user.id] }),
+        undefined,
+        ['id', 'password']
+      )
+      expect(updatedUser.password).toBe('oldpassword')
+    })
   })
 })
