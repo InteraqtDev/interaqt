@@ -3076,4 +3076,103 @@ describe('Basic Functionality', () => {
     expect(updatedBed.number).toBe('BN002')
     expect(updatedBed.id).toBe(bedId) // ID should remain the same
   })
+
+  test('Bed.createdAt property is set by owner computation (_owner)', async () => {
+    /**
+     * Test Plan for: Bed.createdAt (_owner)
+     * This tests that createdAt is properly set when Bed is created
+     * Dependencies: Bed entity, Dormitory entity, CreateBed interaction
+     * Steps: 1) Create dormitory 2) Create bed 3) Verify createdAt is set to current timestamp
+     * Business Logic: Bed's creation computation sets createdAt timestamp when CreateBed interaction occurs
+     */
+    
+    // Create a dormitory first
+    const dormitoryResult = await controller.callInteraction('createDormitory', {
+      user: { id: 'admin' },
+      payload: {
+        name: 'Test Dormitory for Bed CreatedAt',
+        location: 'Building C',
+        capacity: 5
+      }
+    })
+    
+    expect(dormitoryResult.error).toBeUndefined()
+    await new Promise(resolve => setTimeout(resolve, 100))
+    
+    // Get the dormitory ID
+    let dormitoryId
+    const dormitoryCreateEffect = dormitoryResult.effects.find(effect => effect.recordName === 'Dormitory' && effect.type === 'create')
+    
+    if (dormitoryCreateEffect && dormitoryCreateEffect.record.id) {
+      dormitoryId = dormitoryCreateEffect.record.id
+    } else {
+      const allDormitories = await system.storage.find(
+        'Dormitory',
+        MatchExp.atom({ key: 'name', value: ['=', 'Test Dormitory for Bed CreatedAt'] }),
+        undefined,
+        ['id', 'name']
+      )
+      expect(allDormitories.length).toBe(1)
+      dormitoryId = allDormitories[0].id
+    }
+    
+    expect(dormitoryId).toBeDefined()
+    
+    // Record timestamp before creating bed
+    const beforeTimestamp = Math.floor(Date.now() / 1000)
+    
+    // Create a bed via interaction
+    const bedResult = await controller.callInteraction('createBed', {
+      user: { id: 'admin' },
+      payload: {
+        dormitoryId: dormitoryId,
+        number: 'BC001'
+      }
+    })
+    
+    // Record timestamp after creating bed
+    const afterTimestamp = Math.floor(Date.now() / 1000)
+    
+    expect(bedResult.error).toBeUndefined()
+    expect(bedResult.effects).toBeDefined()
+    await new Promise(resolve => setTimeout(resolve, 100))
+    
+    // Get the created bed ID from effects OR from database query
+    let bedCreateEffect = bedResult.effects.find(effect => effect.recordName === 'Bed' && effect.type === 'create')
+    let createdBed
+    
+    if (bedCreateEffect) {
+      expect(bedCreateEffect.record.id).toBeDefined()
+      createdBed = await system.storage.findOne(
+        'Bed',
+        MatchExp.atom({ key: 'id', value: ['=', bedCreateEffect.record.id] }),
+        undefined,
+        ['id', 'number', 'createdAt', 'updatedAt']
+      )
+    } else {
+      // If no effect, query the database to find the created bed
+      const beds = await system.storage.find(
+        'Bed',
+        MatchExp.atom({ key: 'number', value: ['=', 'BC001'] }),
+        undefined,
+        ['id', 'number', 'createdAt', 'updatedAt']
+      )
+      expect(beds.length).toBe(1)
+      createdBed = beds[0]
+    }
+    
+    expect(createdBed).toBeDefined()
+    
+    // Verify that createdAt is properly set (_owner computation)
+    expect(createdBed.createdAt).toBeDefined()
+    expect(typeof createdBed.createdAt).toBe('number')
+    
+    // Verify timestamp is reasonable (within the before/after range)
+    expect(createdBed.createdAt).toBeGreaterThanOrEqual(beforeTimestamp)
+    expect(createdBed.createdAt).toBeLessThanOrEqual(afterTimestamp)
+    
+    // Verify other properties
+    expect(createdBed.number).toBe('BC001')
+    expect(createdBed.updatedAt).toBeDefined()
+  })
 }) 
