@@ -2112,4 +2112,76 @@ describe('Basic Functionality', () => {
     expect(leaderRelation[0].target.id).toBe(dormitory.id)
     expect(leaderRelation[0].assignedAt).toBeGreaterThan(0)
   })
+
+  test('User.createdAt property is set by owner computation (_owner)', async () => {
+    /**
+     * Test Plan for: User.createdAt _owner computation
+     * Dependencies: User entity, CreateUser interaction
+     * Steps: 1) Record timestamp before creation 2) Create user 3) Verify createdAt is set correctly
+     * Business Logic: createdAt is set once at entity creation and controlled by owner (User Transform)
+     */
+
+    const beforeCreation = Math.floor(Date.now() / 1000)
+    
+    // Create user via CreateUser interaction
+    const result = await controller.callInteraction('createUser', {
+      user: { id: 'admin' },
+      payload: {
+        name: 'Timestamp Test User',
+        email: 'timestamp@example.com',
+        studentId: 'STU999',
+        phone: '999-999-9999',
+        role: 'user'
+      }
+    })
+
+    // Verify interaction succeeded
+    expect(result.error).toBeUndefined()
+    expect(result.effects).toBeDefined()
+    expect(result.effects.length).toBeGreaterThan(0)
+
+    await new Promise(resolve => setTimeout(resolve, 100))
+
+    // Find the created user
+    const createdUser = await system.storage.findOne(
+      'User',
+      MatchExp.atom({ key: 'email', value: ['=', 'timestamp@example.com'] }),
+      undefined,
+      ['id', 'name', 'email', 'createdAt', 'updatedAt']
+    )
+
+    expect(createdUser).toBeDefined()
+    
+    // Verify createdAt was set by the owner computation
+    expect(createdUser.createdAt).toBeDefined()
+    expect(typeof createdUser.createdAt).toBe('number')
+    expect(createdUser.createdAt).toBeGreaterThanOrEqual(beforeCreation)
+    expect(createdUser.createdAt).toBeLessThanOrEqual(Math.floor(Date.now() / 1000) + 1)
+
+    // Verify this is creation-only - createdAt should not be modifiable by updates
+    const afterCreation = Math.floor(Date.now() / 1000) + 5
+    
+    const updateResult = await controller.callInteraction('updateUser', {
+      user: { id: 'admin' },
+      payload: {
+        userId: createdUser.id,
+        name: 'Updated Name'
+      }
+    })
+
+    expect(updateResult.error).toBeUndefined()
+    await new Promise(resolve => setTimeout(resolve, 100))
+
+    // Check that createdAt remains unchanged after update
+    const updatedUser = await system.storage.findOne(
+      'User',
+      MatchExp.atom({ key: 'id', value: ['=', createdUser.id] }),
+      undefined,
+      ['id', 'name', 'createdAt', 'updatedAt']
+    )
+
+    expect(updatedUser).toBeDefined()
+    expect(updatedUser.createdAt).toBe(createdUser.createdAt) // Should remain unchanged
+    expect(updatedUser.name).toBe('Updated Name') // Name should be updated
+  })
 }) 
