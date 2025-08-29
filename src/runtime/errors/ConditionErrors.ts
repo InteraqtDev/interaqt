@@ -74,7 +74,7 @@ export class ConditionError extends FrameworkError {
     }
 
     static conditionCheckFailed(error: EvaluateError<ConditionInstance>, context?: Record<string, any>): ConditionError {
-        return new ConditionError('Condition check failed', {
+        return new ConditionError(`Condition check failed: ${error.data.name}`, {
             checkType: 'condition',
             evaluationError: error,
             severity: ErrorSeverity.HIGH,

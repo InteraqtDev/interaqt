@@ -1883,7 +1883,7 @@ const targetUserInLeaderDormitory = Condition.create({
       // Get the dormitory leader's managed dormitory
       const leaderDormitoryRelation = await this.system.storage.findOne(
         UserDormitoryLeaderRelation.name,
-        MatchExp.atom({ key: 'source.id', value: ['=', event.user.id] }),
+        MatchExp.atom({ key: 'source.id', value: ['=', event.payload.userId] }),
         undefined,
         ['id', ['target', { attributeQuery: ['id'] }]]
       )

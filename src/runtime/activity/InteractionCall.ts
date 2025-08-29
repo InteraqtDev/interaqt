@@ -412,7 +412,6 @@ export class InteractionCall {
             }
 
             const result =  await conditions.evaluateAsync(handleAttribute)
-            assert(result !== undefined&&result!==null, `To avoid ambiguous information, condition callback should explicitly return true if the condition passes, or return an error object if it fails. You returned ${result}.`)
             if (result !== true ) {
                 throw ConditionError.conditionCheckFailed(result)
             }
