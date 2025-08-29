@@ -1284,3 +1284,32 @@ User.properties.find(p => p.name === 'isDeleted').computation = StateMachine.cre
   ],
   defaultState: isDeletedActiveState
 })
+
+// Dormitory.name StateMachine computation
+const dormitoryNameDefaultState = StateNode.create({
+  name: 'default',
+  computeValue: (lastValue, event) => {
+    if (event && event.interactionName === 'createDormitory') {
+      return event.payload.name;
+    }
+    if (event && event.interactionName === 'updateDormitory' && event.payload.name !== undefined) {
+      return event.payload.name;
+    }
+    return lastValue;
+  }
+});
+
+Dormitory.properties.find(p => p.name === 'name').computation = StateMachine.create({
+  states: [dormitoryNameDefaultState],
+  transfers: [
+    StateTransfer.create({
+      trigger: UpdateDormitoryInteraction,
+      current: dormitoryNameDefaultState,
+      next: dormitoryNameDefaultState,
+      computeTarget: (event) => ({
+        id: event.payload.dormitoryId
+      })
+    })
+  ],
+  defaultState: dormitoryNameDefaultState
+})

@@ -200,6 +200,71 @@ describe('Basic Functionality', () => {
     expect(createdDormitory.updatedAt).toBeDefined()
   })
 
+  test('Dormitory.name StateMachine computation', async () => {
+    /**
+     * Test Plan for: Dormitory.name StateMachine computation
+     * Dependencies: Dormitory entity, CreateDormitory interaction, UpdateDormitory interaction
+     * Steps: 1) Create dormitory 2) Verify name is set correctly 3) Update dormitory name 4) Verify name is updated
+     * Business Logic: StateMachine computation handles dormitory name creation and updates through interactions
+     */
+    
+    // Create dormitory via interaction
+    const createResult = await controller.callInteraction('createDormitory', {
+      user: { id: 'admin' },
+      payload: {
+        name: 'Building A Room 101',
+        location: 'North Campus Building A',
+        capacity: 4
+      }
+    })
+
+    expect(createResult.error).toBeUndefined()
+    
+    // Wait for computations to process
+    await new Promise(resolve => setTimeout(resolve, 100))
+
+    // Find the created dormitory
+    const dormitories = await system.storage.find(
+      'Dormitory',
+      MatchExp.atom({ key: 'name', value: ['=', 'Building A Room 101'] }),
+      undefined,
+      ['id', 'name', 'location', 'capacity']
+    )
+    
+    expect(dormitories.length).toBe(1)
+    const dormitory = dormitories[0]
+    
+    // Verify initial name is set correctly by StateMachine computation
+    expect(dormitory.name).toBe('Building A Room 101')
+    
+    // Update the dormitory name
+    const updateResult = await controller.callInteraction('updateDormitory', {
+      user: { id: 'admin' },
+      payload: {
+        dormitoryId: dormitory.id,
+        name: 'Building B Room 202'
+      }
+    })
+
+    expect(updateResult.error).toBeUndefined()
+    
+    // Wait for computations to process
+    await new Promise(resolve => setTimeout(resolve, 100))
+
+    // Verify the name has been updated by StateMachine computation
+    const updatedDormitory = await system.storage.findOne(
+      'Dormitory',
+      MatchExp.atom({ key: 'id', value: ['=', dormitory.id] }),
+      undefined,
+      ['id', 'name', 'location', 'capacity']
+    )
+    
+    expect(updatedDormitory.name).toBe('Building B Room 202')
+    // Other properties should remain unchanged
+    expect(updatedDormitory.location).toBe('North Campus Building A')
+    expect(updatedDormitory.capacity).toBe(4)
+  })
+
   test('Bed entity Transform computation creates bed via CreateBed interaction', async () => {
     /**
      * Test Plan for: Bed entity Transform computation
