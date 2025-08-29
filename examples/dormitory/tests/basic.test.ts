@@ -1989,4 +1989,127 @@ describe('Basic Functionality', () => {
     expect(userWithClearedPhone.studentId).toBe('STU789') // Should remain unchanged
     expect(userWithClearedPhone.phone).toBe('') // Should be cleared to empty string
   })
+
+  test('User.role computation', async () => {
+    /**
+     * Test Plan for: User.role
+     * Dependencies: User entity, CreateUser interaction, AssignDormitoryLeader interaction
+     * Steps: 1) Create user with default role 2) Create user with custom role 3) Assign user as dormitory leader 4) Verify role changes
+     * Business Logic: Set to 'dormitoryLeader' by AssignDormitoryLeader, otherwise directly assigned from CreateUser (defaults to 'user')
+     */
+
+    // Step 1: Create a user with default role
+    const createDefaultUserResult = await controller.callInteraction('createUser', {
+      user: { id: 'admin' },
+      payload: {
+        name: 'Default Role User',
+        email: 'defaultrole@example.com',
+        studentId: 'STU001'
+        // No role specified, should default to 'user'
+      }
+    })
+
+    expect(createDefaultUserResult.error).toBeUndefined()
+    await new Promise(resolve => setTimeout(resolve, 100))
+
+    const defaultUser = await system.storage.findOne(
+      'User',
+      MatchExp.atom({ key: 'email', value: ['=', 'defaultrole@example.com'] }),
+      undefined,
+      ['id', 'name', 'email', 'studentId', 'role']
+    )
+
+    expect(defaultUser).toBeDefined()
+    expect(defaultUser.role).toBe('user') // Should default to 'user'
+
+    // Step 2: Create a user with custom role
+    const createCustomUserResult = await controller.callInteraction('createUser', {
+      user: { id: 'admin' },
+      payload: {
+        name: 'Custom Role User',
+        email: 'customrole@example.com',
+        studentId: 'STU002',
+        role: 'admin'
+      }
+    })
+
+    expect(createCustomUserResult.error).toBeUndefined()
+    await new Promise(resolve => setTimeout(resolve, 100))
+
+    const customUser = await system.storage.findOne(
+      'User',
+      MatchExp.atom({ key: 'email', value: ['=', 'customrole@example.com'] }),
+      undefined,
+      ['id', 'name', 'email', 'studentId', 'role']
+    )
+
+    expect(customUser).toBeDefined()
+    expect(customUser.role).toBe('admin') // Should use specified role
+
+    // Step 3: Create a dormitory and assign user as leader
+    const createDormitoryResult = await controller.callInteraction('createDormitory', {
+      user: { id: 'admin' },
+      payload: {
+        name: 'Test Dormitory',
+        location: 'Test Location',
+        capacity: 4
+      }
+    })
+
+    expect(createDormitoryResult.error).toBeUndefined()
+    await new Promise(resolve => setTimeout(resolve, 100))
+
+    const dormitory = await system.storage.findOne(
+      'Dormitory',
+      MatchExp.atom({ key: 'name', value: ['=', 'Test Dormitory'] }),
+      undefined,
+      ['id', 'name']
+    )
+
+    expect(dormitory).toBeDefined()
+
+    // Step 4: Assign default user as dormitory leader
+    const assignLeaderResult = await controller.callInteraction('assignDormitoryLeader', {
+      user: { id: 'admin' },
+      payload: {
+        userId: defaultUser.id,
+        dormitoryId: dormitory.id
+      }
+    })
+
+    expect(assignLeaderResult.error).toBeUndefined()
+    await new Promise(resolve => setTimeout(resolve, 100))
+
+    // Verify the role was changed to 'dormitoryLeader'
+    const leaderUser = await system.storage.findOne(
+      'User',
+      MatchExp.atom({ key: 'id', value: ['=', defaultUser.id] }),
+      undefined,
+      ['id', 'name', 'email', 'studentId', 'role']
+    )
+
+    expect(leaderUser).toBeDefined()
+    expect(leaderUser.role).toBe('dormitoryLeader') // Should be set to 'dormitoryLeader' by AssignDormitoryLeader
+    expect(leaderUser.name).toBe('Default Role User') // Other fields should remain unchanged
+    expect(leaderUser.email).toBe('defaultrole@example.com')
+    expect(leaderUser.studentId).toBe('STU001')
+
+    // Step 5: Verify the dormitory leader relation was created
+    const leaderRelation = await system.storage.findRelationByName(
+      UserDormitoryLeaderRelation.name,
+      MatchExp.atom({ key: 'source.id', value: ['=', defaultUser.id] }),
+      undefined,
+      [
+        'id',
+        'assignedAt',
+        ['source', { attributeQuery: ['id', 'name'] }],
+        ['target', { attributeQuery: ['id', 'name'] }]
+      ]
+    )
+
+    expect(leaderRelation.length).toBe(1)
+    expect(leaderRelation[0].source.id).toBe(defaultUser.id)
+    expect(leaderRelation[0].target.id).toBe(dormitory.id)
+    expect(leaderRelation[0].assignedAt).toBeGreaterThan(0)
+  })
 }) 

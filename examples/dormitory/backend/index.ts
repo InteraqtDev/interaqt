@@ -61,8 +61,7 @@ export const User = Entity.create({
     }),
     Property.create({
       name: 'role',
-      type: 'string',
-      defaultValue: () => 'user'
+      type: 'string'
     }),
     Property.create({
       name: 'createdAt',
@@ -1198,4 +1197,33 @@ User.properties.find(p => p.name === 'phone').computation = StateMachine.create(
     })
   ],
   defaultState: phoneDefaultState
+})
+
+// User.role StateMachine computation
+const roleDefaultState = StateNode.create({
+  name: 'default',
+  computeValue: (lastValue, event) => {
+    if (event && event.interactionName === 'createUser') {
+      return event.payload.role || 'user';
+    }
+    if (event && event.interactionName === 'assignDormitoryLeader') {
+      return 'dormitoryLeader';
+    }
+    return lastValue;
+  }
+});
+
+User.properties.find(p => p.name === 'role').computation = StateMachine.create({
+  states: [roleDefaultState],
+  transfers: [
+    StateTransfer.create({
+      trigger: AssignDormitoryLeaderInteraction,
+      current: roleDefaultState,
+      next: roleDefaultState,
+      computeTarget: (event) => ({
+        id: event.payload.userId
+      })
+    })
+  ],
+  defaultState: roleDefaultState
 })

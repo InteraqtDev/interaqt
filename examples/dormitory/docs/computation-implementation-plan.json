@@ -344,7 +344,7 @@
           ],
           "reasoning": "controlType is independent and has interactionDependencies that can modify the property",
           "calculationMethod": "Set to 'dormitoryLeader' by AssignDormitoryLeader, otherwise directly assigned",
-          "completed": false
+          "completed": true
         },
         {
           "id": "User.createdAt",
