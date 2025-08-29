@@ -5,7 +5,7 @@ import {
   InteractionEventEntity, Controller, MonoSystem, PGLiteDB,
   Condition, Conditions, BoolExp
 } from 'interaqt'
-import { entities, relations, interactions, activities, dicts, UserDormitoryLeaderRelation, UserBedAssignmentRelation, UserPointDeductionRelation, UserRemovalRequestTargetRelation, UserRemovalRequestRequesterRelation } from '../backend'
+import { entities, relations, interactions, activities, dicts, UserDormitoryLeaderRelation, UserBedAssignmentRelation, UserPointDeductionRelation, UserRemovalRequestTargetRelation, UserRemovalRequestRequesterRelation, UserRemovalRequestProcessorRelation } from '../backend'
 
 describe('Basic Functionality', () => {
   let system: MonoSystem
@@ -1244,5 +1244,124 @@ describe('Basic Functionality', () => {
     expect(actualRequest.requestedBy.role).toBe('dormitoryLeader')
     expect(actualRequest.targetUser.id).toBe(targetUserId)
     expect(actualRequest.targetUser.name).toBe('Target User')
+  })
+
+  test('UserRemovalRequestProcessorRelation StateMachine computation creates relation via ProcessRemovalRequest interaction', async () => {
+    /**
+     * Test Plan for: UserRemovalRequestProcessorRelation StateMachine computation
+     * Dependencies: UserRemovalRequestProcessorRelation, ProcessRemovalRequest interaction, User entity, RemovalRequest entity
+     * Steps: 1) Create admin user 2) Create target user 3) Submit removal request 4) Process removal request 5) Verify processor relation is created
+     * Business Logic: StateMachine computation creates UserRemovalRequestProcessorRelation when ProcessRemovalRequest interaction occurs
+     */
+    
+    // Step 1: Create admin user (who will process the request)
+    const adminResult = await controller.callInteraction('createUser', {
+      user: { id: 'super-admin' },
+      payload: {
+        name: 'Admin User',
+        email: 'admin@example.com',
+        studentId: 'ADM001',
+        role: 'admin'
+      }
+    })
+    
+    expect(adminResult.error).toBeUndefined()
+    await new Promise(resolve => setTimeout(resolve, 100))
+    
+    let adminId
+    const adminCreateEffect = adminResult.effects.find(effect => effect.recordName === 'User' && effect.type === 'create')
+    if (adminCreateEffect && adminCreateEffect.record.id) {
+      adminId = adminCreateEffect.record.id
+    } else {
+      const users = await system.storage.find('User', undefined, undefined, ['id', 'email'])
+      const adminUser = users.find(user => user.email === 'admin@example.com')
+      expect(adminUser).toBeDefined()
+      adminId = adminUser.id
+    }
+
+    // Step 2: Create target user
+    const targetResult = await controller.callInteraction('createUser', {
+      user: { id: adminId },
+      payload: {
+        name: 'Target User',
+        email: 'target@example.com',
+        studentId: 'STU002',
+        role: 'user'
+      }
+    })
+    
+    expect(targetResult.error).toBeUndefined()
+    await new Promise(resolve => setTimeout(resolve, 100))
+    
+    let targetUserId
+    const targetCreateEffect = targetResult.effects.find(effect => effect.recordName === 'User' && effect.type === 'create')
+    if (targetCreateEffect && targetCreateEffect.record.id) {
+      targetUserId = targetCreateEffect.record.id
+    } else {
+      const users = await system.storage.find('User', undefined, undefined, ['id', 'email'])
+      const targetUser = users.find(user => user.email === 'target@example.com')
+      expect(targetUser).toBeDefined()
+      targetUserId = targetUser.id
+    }
+
+    // Step 3: Submit removal request (required for processing)
+    const requestResult = await controller.callInteraction('submitRemovalRequest', {
+      user: { id: adminId },
+      payload: {
+        targetUserId: targetUserId,
+        reason: 'Violation requiring admin review'
+      }
+    })
+
+    expect(requestResult.error).toBeUndefined()
+    await new Promise(resolve => setTimeout(resolve, 100))
+
+    // Find the created removal request
+    const removalRequests = await system.storage.find('RemovalRequest', 
+      MatchExp.atom({ key: 'reason', value: ['=', 'Violation requiring admin review'] }),
+      undefined, 
+      ['id', 'reason', 'status']
+    )
+    expect(removalRequests.length).toBe(1)
+    const requestId = removalRequests[0].id
+
+    // Step 4: Process the removal request
+    const processResult = await controller.callInteraction('processRemovalRequest', {
+      user: { id: adminId, name: 'Admin User', role: 'admin' },
+      payload: {
+        requestId: requestId,
+        decision: 'approved',
+        adminComment: 'Request approved after review'
+      }
+    })
+
+    expect(processResult.error).toBeUndefined()
+    await new Promise(resolve => setTimeout(resolve, 100))
+
+    // Step 5: Verify UserRemovalRequestProcessorRelation was created
+    const processorRelations = await system.storage.find(
+      UserRemovalRequestProcessorRelation.name,
+      MatchExp.atom({ key: 'source.id', value: ['=', adminId] })
+        .and({ key: 'target.id', value: ['=', requestId] }),
+      undefined,
+      [
+        'id',
+        'processedAt',
+        ['source', { attributeQuery: ['id', 'name', 'role'] }],
+        ['target', { attributeQuery: ['id', 'reason', 'status'] }]
+      ]
+    )
+
+    expect(processorRelations.length).toBe(1)
+    
+    const processorRelation = processorRelations[0]
+    expect(processorRelation.source.id).toBe(adminId)
+    expect(processorRelation.source.name).toBe('Admin User')
+    expect(processorRelation.source.role).toBe('admin')
+    expect(processorRelation.target.id).toBe(requestId)
+    expect(processorRelation.target.reason).toBe('Violation requiring admin review')
+    expect(processorRelation.processedAt).toBeDefined()
+    expect(typeof processorRelation.processedAt).toBe('number')
+    expect(processorRelation.processedAt).toBeGreaterThan(0)
   })
 }) 

@@ -211,7 +211,7 @@
           ],
           "reasoning": "interaction-created relation with auto-delete capability requires StateMachine for creation",
           "calculationMethod": "Created by ProcessRemovalRequest interaction when admin processes a request",
-          "completed": false
+          "completed": true
         },
         {
           "id": "DeductionRuleApplicationRelation",

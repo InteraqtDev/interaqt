@@ -342,7 +342,13 @@ export const UserRemovalRequestProcessorRelation = Relation.create({
   sourceProperty: 'processedRequests',
   target: RemovalRequest,
   targetProperty: 'processedBy',
-  type: '1:n'
+  type: '1:n',
+  properties: [
+    Property.create({
+      name: 'processedAt',
+      type: 'number'
+    })
+  ]
 })
 
 // DeductionRuleApplicationRelation: 1:n - DeductionRule to PointDeduction
@@ -1063,4 +1069,45 @@ UserBedAssignmentRelation.computation = StateMachine.create({
     })
   ],
   defaultState: notAssignedToBedState
+})
+
+// UserRemovalRequestProcessorRelation StateMachine computation
+const notProcessedState = StateNode.create({ 
+  name: 'notProcessed',
+  computeValue: () => null  // Return null means no relation
+});
+
+const processedState = StateNode.create({ 
+  name: 'processed',
+  computeValue: () => ({
+    processedAt: Math.floor(Date.now() / 1000)
+  })
+});
+
+UserRemovalRequestProcessorRelation.computation = StateMachine.create({
+  states: [notProcessedState, processedState],
+  transfers: [
+    StateTransfer.create({
+      trigger: ProcessRemovalRequestInteraction,
+      current: notProcessedState,
+      next: processedState,
+      computeTarget: async function(this: any, event) {
+        // Find the removal request that is being processed
+        const request = await this.system.storage.findOne('RemovalRequest', 
+          this.globals.MatchExp.atom({
+            key: 'id',
+            value: ['=', event.payload.requestId]
+          }),
+          undefined,
+          ['id']
+        );
+        
+        return {
+          source: event.user, // The admin who is processing the request
+          target: request     // The request being processed
+        };
+      }
+    })
+  ],
+  defaultState: notProcessedState
 })
