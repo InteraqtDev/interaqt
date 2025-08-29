@@ -948,7 +948,8 @@ PointDeduction.computation = Transform.create({
         points: 0, // Will be set by property computation from deduction rule
         deductedAt: Math.floor(Date.now() / 1000),
         isDeleted: false,
-        user: { id: event.payload.targetUserId } // Creates UserPointDeductionRelation via 'user' targetProperty
+        user: { id: event.payload.targetUserId }, // Creates UserPointDeductionRelation via 'user' targetProperty
+        rule: { id: event.payload.ruleId } // Creates DeductionRuleApplicationRelation via 'rule' targetProperty
       }
     }
     return null

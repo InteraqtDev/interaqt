@@ -228,7 +228,7 @@
           ],
           "reasoning": "creation type is created-with-entity, so relation is created by parent PointDeduction entity's computation",
           "calculationMethod": "Created together with PointDeduction entity by ApplyPointDeduction interaction",
-          "completed": false
+          "completed": true
         },
         {
           "id": "User.id",

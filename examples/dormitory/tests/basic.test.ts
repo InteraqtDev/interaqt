@@ -5,7 +5,7 @@ import {
   InteractionEventEntity, Controller, MonoSystem, PGLiteDB,
   Condition, Conditions, BoolExp
 } from 'interaqt'
-import { entities, relations, interactions, activities, dicts, UserDormitoryLeaderRelation, UserBedAssignmentRelation, UserPointDeductionRelation, UserRemovalRequestTargetRelation, UserRemovalRequestRequesterRelation, UserRemovalRequestProcessorRelation } from '../backend'
+import { entities, relations, interactions, activities, dicts, UserDormitoryLeaderRelation, UserBedAssignmentRelation, UserPointDeductionRelation, UserRemovalRequestTargetRelation, UserRemovalRequestRequesterRelation, UserRemovalRequestProcessorRelation, DeductionRuleApplicationRelation } from '../backend'
 
 describe('Basic Functionality', () => {
   let system: MonoSystem
@@ -1363,5 +1363,196 @@ describe('Basic Functionality', () => {
     expect(processorRelation.processedAt).toBeDefined()
     expect(typeof processorRelation.processedAt).toBe('number')
     expect(processorRelation.processedAt).toBeGreaterThan(0)
+  })
+
+  test('DeductionRule entity Transform computation creates deduction rule via CreateDeductionRule interaction', async () => {
+    /**
+     * Test Plan for: DeductionRule entity Transform computation
+     * Dependencies: DeductionRule entity, CreateDeductionRule interaction
+     * Steps: 1) Trigger CreateDeductionRule interaction 2) Verify DeductionRule entity is created 3) Verify properties are correct
+     * Business Logic: Transform computation creates DeductionRule entity when CreateDeductionRule interaction occurs
+     */
+    
+    // Create deduction rule via interaction
+    const result = await controller.callInteraction('createDeductionRule', {
+      user: { id: 'admin' }, // Admin user triggering the creation
+      payload: {
+        name: 'Test Violation Rule',
+        description: 'A test rule for dormitory violations',
+        points: 10,
+        isActive: true
+      }
+    })
+
+    // Check that interaction was successful
+    expect(result.error).toBeUndefined()
+    expect(result.effects).toBeDefined()
+    console.log('DeductionRule creation effects:', result.effects)
+
+    // Wait a bit for computations to process
+    await new Promise(resolve => setTimeout(resolve, 100))
+
+    // Check if any DeductionRule records were created by querying the database
+    const allRules = await system.storage.find(
+      'DeductionRule',
+      undefined,
+      undefined,
+      ['id', 'name', 'description', 'points', 'isActive', 'createdAt', 'updatedAt', 'isDeleted']
+    )
+
+    console.log('All DeductionRules:', allRules)
+
+    // Get the created rule ID from effects OR from database query
+    let ruleCreateEffect = result.effects.find(effect => effect.recordName === 'DeductionRule' && effect.type === 'create')
+    let createdRule
+    
+    if (ruleCreateEffect) {
+      expect(ruleCreateEffect.record.id).toBeDefined()
+      createdRule = await system.storage.findOne(
+        'DeductionRule',
+        MatchExp.atom({ key: 'id', value: ['=', ruleCreateEffect.record.id] }),
+        undefined,
+        ['id', 'name', 'description', 'points', 'isActive', 'createdAt', 'updatedAt', 'isDeleted']
+      )
+    } else {
+      // If no effect, try to find the created rule by name (should be unique)
+      createdRule = allRules.find(rule => rule.name === 'Test Violation Rule')
+      expect(createdRule).toBeDefined()
+    }
+
+    expect(createdRule).toBeDefined()
+    expect(createdRule.name).toBe('Test Violation Rule')
+    expect(createdRule.description).toBe('A test rule for dormitory violations')
+    expect(createdRule.points).toBe(10)
+    expect(createdRule.isActive).toBe(true)
+    expect(createdRule.isDeleted).toBe(false)
+    expect(createdRule.createdAt).toBeDefined()
+    expect(createdRule.updatedAt).toBeDefined()
+  })
+
+  test('DeductionRuleApplicationRelation created by PointDeduction Transform (_parent:PointDeduction)', async () => {
+    /**
+     * Test Plan for: DeductionRuleApplicationRelation (_parent:PointDeduction)
+     * Dependencies: DeductionRule entity, PointDeduction entity, User entity, DeductionRuleApplicationRelation, ApplyPointDeduction interaction
+     * Steps: 1) Create deduction rule 2) Create user 3) Apply point deduction with ruleId 4) Verify DeductionRuleApplicationRelation is created
+     * Business Logic: PointDeduction's Transform creates DeductionRuleApplicationRelation using rule targetProperty when ApplyPointDeduction interaction occurs
+     */
+
+    // Create deduction rule first (let's use the existing successful pattern)
+    await new Promise(resolve => setTimeout(resolve, 100)) // Wait a bit to ensure clean state
+    
+    const ruleResult = await controller.callInteraction('createDeductionRule', {
+      user: { id: 'admin' },
+      payload: {
+        name: 'Test Rule',
+        description: 'Test deduction rule for relation testing',
+        points: 5,
+        isActive: true
+      }
+    })
+
+    expect(ruleResult.error).toBeUndefined()
+    console.log('Rule creation effects:', ruleResult.effects)
+    
+    // Wait a bit for computations to process
+    await new Promise(resolve => setTimeout(resolve, 100))
+    
+    // Find the created rule by name since effects may not contain it
+    const allRules = await system.storage.find(
+      'DeductionRule',
+      undefined,
+      undefined,
+      ['id', 'name', 'description', 'points', 'isActive']
+    )
+    
+    console.log('All rules after creation:', allRules)
+    const createdRule = allRules.find(rule => rule.name === 'Test Rule')
+    expect(createdRule).toBeDefined()
+    const ruleId = createdRule.id
+
+    // Create user who will receive point deduction
+    const userResult = await controller.callInteraction('createUser', {
+      user: { id: 'admin' },
+      payload: {
+        name: 'Test User',
+        email: 'testuser@example.com',
+        studentId: 'STU123',
+        phone: '123-456-7890'
+      }
+    })
+
+    expect(userResult.error).toBeUndefined()
+    await new Promise(resolve => setTimeout(resolve, 100))
+    
+    // Find the created user by email since effects may not contain it
+    const allUsers = await system.storage.find(
+      'User',
+      undefined,
+      undefined,
+      ['id', 'email']
+    )
+    
+    const createdUser = allUsers.find(user => user.email === 'testuser@example.com')
+    expect(createdUser).toBeDefined()
+    const userId = createdUser.id
+
+    // Apply point deduction with ruleId
+    const deductionResult = await controller.callInteraction('applyPointDeduction', {
+      user: { id: 'admin' },
+      payload: {
+        targetUserId: userId,
+        ruleId: ruleId,
+        reason: 'Test violation for relation testing'
+      }
+    })
+
+    expect(deductionResult.error).toBeUndefined()
+    await new Promise(resolve => setTimeout(resolve, 100))
+
+    // Find the point deduction that was created
+    const allDeductions = await system.storage.find(
+      'PointDeduction',
+      undefined,
+      undefined,
+      [
+        'id', 
+        'reason', 
+        'points',
+        'deductedAt',
+        ['rule', { attributeQuery: ['id', 'name'] }]
+      ]
+    )
+    
+    console.log('All PointDeductions:', allDeductions)
+    
+    const actualDeduction = allDeductions.find(deduction => deduction.reason === 'Test violation for relation testing')
+    expect(actualDeduction).toBeDefined()
+    const deductionId = actualDeduction.id
+
+    // Verify DeductionRuleApplicationRelation was created between the rule and point deduction
+    const relations = await system.storage.find(
+      DeductionRuleApplicationRelation.name,
+      MatchExp.atom({ key: 'source.id', value: ['=', ruleId] })
+        .and({ key: 'target.id', value: ['=', deductionId] }),
+      undefined,
+      [
+        'id',
+        ['source', { attributeQuery: ['id', 'name', 'points'] }],
+        ['target', { attributeQuery: ['id', 'reason'] }]
+      ]
+    )
+
+    expect(relations.length).toBe(1)
+    
+    const relation = relations[0]
+    expect(relation.source.id).toBe(ruleId)
+    expect(relation.source.name).toBe('Test Rule')
+    expect(relation.source.points).toBe(5)
+    expect(relation.target.id).toBe(deductionId)
+    expect(relation.target.reason).toBe('Test violation for relation testing')
+    
+    // Verify the point deduction has the rule reference
+    expect(actualDeduction.rule.id).toBe(ruleId)
+    expect(actualDeduction.rule.name).toBe('Test Rule')
   })
 }) 
