@@ -662,7 +662,7 @@
           ],
           "reasoning": "controlType is creation-only, so property is controlled by entity creation",
           "calculationMethod": "Set once at creation for audit trail integrity",
-          "completed": false
+          "completed": true
         },
         {
           "id": "PointDeduction.points",
